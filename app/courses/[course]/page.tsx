@@ -1,0 +1,236 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { evaluate } from "@mdx-js/mdx";
+import * as runtime from "react/jsx-runtime";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import { getCourse, getCourses, isReadable, previewMode } from "@/lib/content/site";
+
+interface Params {
+  course: string;
+}
+
+export const dynamicParams = false;
+
+export function generateStaticParams(): Params[] {
+  return getCourses().map((c) => ({ course: c.course.slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<Params>;
+}): Promise<Metadata> {
+  const loaded = getCourse((await params).course);
+  return { title: loaded?.course.title, description: loaded?.course.tagline };
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-3 font-mono text-[11px] uppercase tracking-wider text-faint">
+      {children}
+    </p>
+  );
+}
+
+export default async function CoursePage({
+  params,
+}: {
+  params: Promise<Params>;
+}) {
+  const loaded = getCourse((await params).course);
+  if (loaded === undefined) notFound();
+  const { course } = loaded;
+  const bySlug = new Map(loaded.lessons.map((l) => [l.lesson.slug, l]));
+
+  let Intro: React.ComponentType | null = null;
+  if (course.intro !== undefined) {
+    const compiled = await evaluate(course.intro, {
+      ...runtime,
+      remarkPlugins: [remarkGfm, remarkMath],
+      rehypePlugins: [rehypeKatex],
+    } as Parameters<typeof evaluate>[1]);
+    Intro = compiled.default;
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-4xl px-6">
+      <header className="border-b border-line py-10">
+        <h1 className="text-3xl font-semibold tracking-tight">{course.title}</h1>
+        <p className="mt-2 max-w-2xl text-soft">{course.tagline}</p>
+      </header>
+
+      {Intro !== null && (
+        <section className="border-b border-line py-8">
+          <SectionLabel>Introduction</SectionLabel>
+          <div className="course-intro max-w-2xl leading-relaxed">
+            <Intro />
+          </div>
+        </section>
+      )}
+
+      {course.prerequisites.length > 0 && (
+        <section className="border-b border-line py-8">
+          <SectionLabel>Prerequisites</SectionLabel>
+          <ul className="flex flex-col gap-1.5">
+            {course.prerequisites.map((p, i) => (
+              <li key={i} className="flex gap-2 text-[0.95rem] text-soft">
+                <span aria-hidden className="text-faint">
+                  –
+                </span>
+                <span>
+                  {p.text}
+                  {p.course !== undefined && (
+                    <>
+                      {" "}
+                      <Link
+                        href={`/courses/${p.course}`}
+                        className="text-accent underline decoration-line underline-offset-2 hover:decoration-accent"
+                      >
+                        → course
+                      </Link>
+                    </>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="border-b border-line py-8">
+        <SectionLabel>Outcomes</SectionLabel>
+        <ul className="flex flex-col gap-1.5">
+          {course.outcomes.map((o) => (
+            <li key={o.id} className="flex gap-2 text-[0.95rem] text-soft">
+              <span aria-hidden className="text-faint">
+                –
+              </span>
+              {o.text}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {course.key_results.length > 0 && (
+        <section className="border-b border-line py-8">
+          <SectionLabel>Key results</SectionLabel>
+          <ol className="flex list-none flex-col gap-2">
+            {course.key_results.map((kr, i) => {
+              const target = bySlug.get(kr.lesson);
+              const readable = target !== undefined && isReadable(target);
+              return (
+                <li key={i} className="flex gap-3 text-[0.95rem]">
+                  <span className="shrink-0 font-mono text-[0.8rem] text-faint">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="text-soft">
+                    {kr.text}{" "}
+                    {readable ? (
+                      <Link
+                        href={`/courses/${course.slug}/lessons/${kr.lesson}`}
+                        className="whitespace-nowrap font-mono text-[11px] text-accent hover:underline"
+                      >
+                        → {target.lesson.title}
+                      </Link>
+                    ) : (
+                      target !== undefined && (
+                        <span className="whitespace-nowrap font-mono text-[11px] text-faint">
+                          → {target.lesson.title} (planned)
+                        </span>
+                      )
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      <section className="border-b border-line py-8">
+        <SectionLabel>Contents</SectionLabel>
+        {course.modules.map((mod, mi) => (
+          <div key={mod.slug} className={mi > 0 ? "mt-7" : ""}>
+            <h2 className="flex items-baseline gap-3">
+              <span className="font-mono text-[11px] text-faint">
+                {String(mi + 1).padStart(2, "0")}
+              </span>
+              <span className="text-lg font-semibold">{mod.title}</span>
+            </h2>
+            <ol className="mt-3">
+              {mod.lessons.map((lesson) => {
+                const entry = bySlug.get(lesson.slug)!;
+                const readable = isReadable(entry);
+                const number = String(entry.index + 1).padStart(2, "0");
+
+                const row = (
+                  <div className="flex items-baseline gap-4 py-2.5">
+                    <span className="font-mono text-[0.8rem] text-faint">{number}</span>
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`block text-[1rem] font-medium leading-snug ${
+                          readable ? "group-hover:text-accent" : "text-faint"
+                        }`}
+                      >
+                        {lesson.title}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[0.88rem] text-faint">
+                        {lesson.goal}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-3 font-mono text-[11px] text-faint">
+                      {readable ? (
+                        <>
+                          {previewMode() && lesson.status !== "published" && (
+                            <span className="rounded border border-line px-1.5 py-0.5">
+                              {lesson.status}
+                            </span>
+                          )}
+                          <span>{lesson.est_minutes} min</span>
+                        </>
+                      ) : (
+                        <span>planned</span>
+                      )}
+                    </span>
+                  </div>
+                );
+
+                return (
+                  <li
+                    key={lesson.slug}
+                    className="list-none border-b border-line/60 last:border-b-0"
+                  >
+                    {readable ? (
+                      <Link
+                        href={`/courses/${course.slug}/lessons/${lesson.slug}`}
+                        className="group block"
+                      >
+                        {row}
+                      </Link>
+                    ) : (
+                      row
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ))}
+      </section>
+
+      {course.sources.length > 0 && (
+        <section className="py-8">
+          <SectionLabel>Main sources</SectionLabel>
+          <ol className="flex flex-col gap-1.5 pl-5 text-[0.92rem] leading-relaxed text-soft">
+            {course.sources.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </section>
+      )}
+    </div>
+  );
+}
