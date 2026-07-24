@@ -87,3 +87,30 @@ density-upgrade revision should add.
 6. **NEW, single `<Figure>` (component)** — the `log2 n` ceiling as a staircase:
    coin (1), 4-outcome (2), byte (8), each uniform bar touching its ceiling, a
    non-uniform bar sitting below. Inspiration: the "range of entropy" heading.
+
+## Revision round 2 — QA findings (2026-07-24, post-restructure)
+
+Independent course-qa (opus): **ready=false — light revision, not a
+rewrite**. 12 rubric PASS; the only WEAK is L6 visual density: FIGURE PLAN
+items #4 and #5 remain unbuilt. Required, in priority order:
+
+1. Build FIGURE PLAN #4 — `<FigureSequence>` "concentrating mass lowers
+   entropy": uniform-over-4 morphing to a point mass over 3-4 frames, H
+   readout dropping each frame (2.00 -> ... -> 0). Place it in "The
+   extremes: certainty and even spread" (also breaks that section's
+   3-paragraph prose run). Raw-SVG tier like the existing entropy-steps-N.
+2. Build FIGURE PLAN #5 — single `<Figure>`: zoom of the binary-entropy
+   curve near p=1, tangent going vertical, annotated H(0.99) ~ 0.081 bits.
+   Anchors "Steep at the ends, flat in the middle" (currently prose-only).
+3. Verify from the demo source that EntropyExplorer starts on a
+   non-degenerate distribution (D3) and the Task path (H=0 then rebuild
+   2.00 bits) is achievable; note the check in the report.
+
+Nice-to-have (apply if cheap):
+- Operational `<Remark>`: replace generic "the coding lessons that follow"
+  with `<Ref lesson="prefix-codes">` and `<Ref lesson="source-coding-theorem-lite">`.
+- One clause noting the operational claim is formalized via the typical set
+  in source-coding-theorem-lite (precise forward hook).
+
+All round-1 pitfalls verified handled (Jensen equality condition, 0 log 0
+convention, monogram-vs-rate distinction) — do not touch those passages.

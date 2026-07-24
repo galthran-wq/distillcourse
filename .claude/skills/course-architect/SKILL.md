@@ -35,7 +35,10 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
    /lesson-factory runs — happens inside this worktree.
 
 3. **Launch the factory.** Invoke the Workflow tool:
-   `{name: "course-factory", args: {phase: "structure", slug: "<slug>", topic: "<topic>"}}`.
+   `{name: "course-factory", args: {phase: "structure", slug: "<slug>", topic: "<topic>", root: "<absolute worktree path>"}}`.
+   `root` is mandatory: workflow subagents inherit the session's launch
+   directory, not your worktree — without it they write into the wrong
+   checkout (usually master).
    The workflow runs: canon discovery (perplexity deep research) → a
    sonnet reading swarm (one source-reader agent per source) → synthesis on
    the session model, producing `course.yaml`, `concepts.yaml`, and the
@@ -55,5 +58,6 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
 
 - Never write lesson.mdx files; never change `status` of existing lessons.
 - Never run the factory on master — worktree first.
-- 10–15 lessons max in any structure you accept from the workflow; if it
-  returns more, have it cut scope before reporting.
+- No lesson-count cap (C2): accept whatever count the material justifies,
+  but reject padding and micro-slicing — every lesson needs one substantive
+  goal. Never have the workflow cut material just to hit a number.

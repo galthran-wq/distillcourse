@@ -42,7 +42,9 @@ composition rules. Gold example:
 3. **Author** the component/SVG.
 4. **THE LOOP — mandatory:** render and look, fix, repeat:
    - component: `npm run figure -- <Name> [frame]`, then Read the PNG in
-     `.preview/`; also check `--dark` once near the end.
+     `.preview/`; also check `--dark` once near the end. Not yet registered
+     (e.g. parallel builds where index.ts is off-limits)? Render by path:
+     `npm run figure -- components/figures/<course>/<Name>.tsx [frame]`.
    - raw SVG: `rsvg-convert -w 1200 -b white <file> -o /tmp/…png`, Read it.
    List the defects you SEE (clipped labels, collisions, broken TeX shown
    as red source, spacing, misaligned arrows) and fix them. Repeat until a

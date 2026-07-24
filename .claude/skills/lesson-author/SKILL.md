@@ -61,6 +61,14 @@ For figures beyond simple SVGs, delegate to or follow /figure-artist
      follow @docs/figures.md — the house style is non-negotiable. The
      research brief's figure plan lists what to draw; recreate ideas from
      sources, never copy their drawings.
+   - For every PascalCase component-figure reference you do NOT build
+     yourself, put an MDX comment directly above it — your handoff to the
+     figure builder:
+     `{/* fig <Name>: what it shows; layout; exact labels and notation
+     (KaTeX where math); color roles; for sequences: frame count and what
+     changes per frame */}`. Be as specific as you are in your head — the
+     builder sees only this comment, the research-brief figure plan, and
+     the surrounding prose.
    - `## Exercises` before the references: numbered `<Exercise>` blocks, each
      with a complete `<Solution>` (E1, E4); most require producing a
      computation or argument (E2); from the course's 3rd lesson on, ≥1

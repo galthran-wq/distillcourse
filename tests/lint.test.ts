@@ -47,6 +47,17 @@ describe("lintCourse", () => {
     expect(errors(lintDir(dir)).map((d) => d.rule)).toContain("prereq-cycle");
   });
 
+  it("flags a non-extra lesson requiring an extra lesson (extra-prereq)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "course.yaml"),
+        "slug: intro-surprise\n        title: \"Measuring surprise\"\n        type: core",
+        "slug: intro-surprise\n        title: \"Measuring surprise\"\n        type: extra",
+      ),
+    );
+    expect(errors(lintDir(dir)).map((d) => d.rule)).toContain("extra-prereq");
+  });
+
   it("flags a concept missing from the registry (concept-unknown)", () => {
     const dir = brokenCopy((d) =>
       rewrite(join(d, "course.yaml"), "reinforces: [surprisal]", "reinforces: [entropy]"),

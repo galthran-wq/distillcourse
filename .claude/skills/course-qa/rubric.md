@@ -54,5 +54,6 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 13. Lessons 1–2 are the most polished and gentlest entry (C3).
 14. Spiral: second-half lessons reinforce first-half concepts in course.yaml
     AND in actual exercises (C5, E3).
-15. 10–15 lessons; every outcome claimed and actually served (C1, C2); all
+15. No count cap, but no padding or micro-slicing either (C2 — each lesson
+    has one substantive goal); every outcome claimed and actually served (C1); all
     titles are precise technical noun phrases (C6).

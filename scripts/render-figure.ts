@@ -9,26 +9,43 @@
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { createElement } from "react";
+import { basename, join, resolve } from "node:path";
+import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { figures } from "../components/figures";
 
 const args = process.argv.slice(2).filter((a) => a !== "--dark");
 const dark = process.argv.includes("--dark");
-const [name, frameArg] = args;
+const [target, frameArg] = args;
 
-if (!name || !(name in figures)) {
+let name: string;
+let component: ComponentType<{ frame?: number }>;
+if (target !== undefined && target in figures) {
+  name = target;
+  component = figures[target].component;
+} else if (target !== undefined && /\.tsx?$/.test(target)) {
+  // Path mode: render a not-yet-registered figure straight from its module.
+  // Used when figures are built in parallel and registration is a single
+  // later step (index.ts must not be edited concurrently).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require(resolve(target)) as {
+    default?: ComponentType<{ frame?: number }>;
+  };
+  if (!mod.default) {
+    console.error(`${target} has no default export`);
+    process.exit(1);
+  }
+  component = mod.default;
+  name = basename(target).replace(/\.tsx?$/, "");
+} else {
   console.error(
-    `Usage: npm run figure -- <Name> [frame] [--dark]\nRegistered: ${Object.keys(figures).join(", ") || "(none)"}`,
+    `Usage: npm run figure -- <Name|path/to/Figure.tsx> [frame] [--dark]\nRegistered: ${Object.keys(figures).join(", ") || "(none)"}`,
   );
   process.exit(1);
 }
 
 const frame = frameArg !== undefined ? Number(frameArg) : undefined;
-const markup = renderToStaticMarkup(
-  createElement(figures[name].component, { frame }),
-);
+const markup = renderToStaticMarkup(createElement(component, { frame }));
 
 const repoRoot = resolve(__dirname, "..");
 const katexCss = join(repoRoot, "node_modules/katex/dist/katex.min.css");

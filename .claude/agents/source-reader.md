@@ -19,10 +19,18 @@ findings:
   what the source assumes as prerequisites.
 - **Notable figures/visualizations** — what the source draws and where;
   note anything canonical (the diagram "everyone" uses).
+- **Gems** — the worked examples, striking numbers, analogies, and case
+  studies the source is known for (with pointers): the concrete set pieces
+  a lesson could recreate. A great source's gems are half its value —
+  hunt for them, don't wait to stumble on them.
 - **Chapter map** — for each major topic: "topic → chapter/section to consult".
 
-Methods: WebFetch the URL; for PDFs use the pdf-reader MCP tools via
-ToolSearch. If the full text is paywalled, work from the table of contents,
+Methods: WebFetch the URL. For PDFs, download and extract locally:
+`curl -L <url> -o /tmp/<name>.pdf && pdftotext -layout /tmp/<name>.pdf -`
+(use `-f`/`-l` for page ranges; `pdftotext` is installed). Do NOT use the
+pdf-reader MCP tools — the server is a single process shared by the whole
+swarm and hangs under parallel load, and a hung MCP call blocks you
+forever. If the full text is paywalled, work from the table of contents,
 publisher page, and reputable summaries — and SAY SO in a `access` note.
 Never fabricate chapter numbers or content; if you couldn't verify
 something, omit it.

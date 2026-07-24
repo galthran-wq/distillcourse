@@ -32,7 +32,10 @@ directly. Any other model: **STOP** and output only:
    the human's curation edits may have broken references.
 
 3. **Launch:** Workflow
-   `{name: "course-factory", args: {phase: "lessons", slug: "<slug>", count: <n if given>}}`.
+   `{name: "course-factory", args: {phase: "lessons", slug: "<slug>", count: <n if given>, root: "<absolute worktree path>"}}`.
+   `root` is mandatory: workflow subagents inherit the session's launch
+   directory, not your worktree — without it they write into the wrong
+   checkout (usually master).
    Per planned lesson, sequentially (prerequisite order): lesson-writer agent
    (session model, grounded in the research brief) → demo-builder execution
    where a demo is specced → course-qa on opus with a structured verdict →

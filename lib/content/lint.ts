@@ -405,6 +405,16 @@ export function lintCourse(
           file: coursePath,
           message: `lesson "${entry.lesson.slug}" requires "${prereq}", which does not come earlier in the course`,
         });
+      } else if (
+        target.lesson.type === "extra" &&
+        entry.lesson.type !== "extra"
+      ) {
+        diags.push({
+          level: "error",
+          rule: "extra-prereq",
+          file: coursePath,
+          message: `lesson "${entry.lesson.slug}" requires extra lesson "${prereq}" — extra chapters must be skippable, no non-extra lesson may depend on one`,
+        });
       }
     }
   }

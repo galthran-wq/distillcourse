@@ -93,3 +93,23 @@ correct in the draft.
    a two-box split: `log2 52 = log2 4 (suit) + log2 13 (rank)`, each box a
    labeled bar summing to 5.70 bits. Inspiration: formula-dissection rule
    (labels-above-symbols) from the playbook.
+
+## Revision round 2 — QA findings (2026-07-24, post-restructure)
+
+Independent course-qa (opus): **ready=true, zero required fixes** — all round-1
+density items and the full FIGURE PLAN are implemented. Apply the
+nice-to-haves only; do not restructure a passing lesson:
+
+1. Ex 1 restates the opening sunrise/Cairo example nearly verbatim — replace
+   with a production (computation) exercise per E2.
+2. Forward references to the entropy lesson are bare prose ("the next
+   lesson") — convert to `<Ref lesson="entropy-as-average-surprise">` links.
+3. NLL `<Remark>`: add a forward `<Ref>` to `cross-entropy-loss` and cite
+   Deletang et al., "Language Modeling Is Compression" (arXiv:2309.10668,
+   in sources.yaml) as the modern anchor.
+4. Demo/prose misalignment: SurprisalSlider has a built-in "exactly 3 bits
+   -> p=1/8" hint the prose never mentions, while the prose Task (decade ->
+   +3.32 bits) has no matching cue in the demo. Align: mention the 3-bit
+   observation in the Task text (prose-side fix; do not rewrite the demo).
+5. Units `<Aside>` still carries the inline conversion display equation now
+   duplicated by units.svg — trim the equation, keep figure + prose.

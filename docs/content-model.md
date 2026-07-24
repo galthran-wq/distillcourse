@@ -42,7 +42,7 @@ Per lesson:
 | Field | Meaning |
 |---|---|
 | `slug` | kebab-case, = directory name, immutable once drafted |
-| `type` | `core \| worked-practice \| synthesis \| review` |
+| `type` | `core \| worked-practice \| synthesis \| review \| extra`. `extra` = advanced off-path chapter (a "starred section"): shown with an `extra` badge, and no non-extra lesson may list it as a prerequisite (lint: `extra-prereq`) — the core path must survive skipping every extra. |
 | `status` | `planned → drafted → reviewed → published`. Skills may only set `drafted`; `reviewed`/`published` are manual human sign-offs. Production renders `published` only; dev and `CONTENT_PREVIEW=1` builds also render `drafted` and `reviewed`. |
 | `goal` | exactly one objective, starts with a Bloom verb |
 | `opening` | declarative first sentence stating the problem the lesson solves; lesson.mdx must open with it verbatim (no teasers, no rhetorical questions) |

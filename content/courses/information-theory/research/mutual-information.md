@@ -36,6 +36,9 @@ goal: Compute the mutual information between two variables as the drop in uncert
    or a rotated joint) where `corr = 0` but `I > 0`.
 6. Worked on a 2x2 joint morphing from independent to lockstep (the
    MutualInfoDial demo), splitting `H(X)` into `H(X|Y) + I(X;Y)` live.
+7. Close with one forward-looking sentence: MI is the working currency of the
+   applications module (`information-bottleneck` optimizes it,
+   `infonce` bounds it from samples). No content from those lessons here.
 
 ## Pitfalls / subtleties to flag
 

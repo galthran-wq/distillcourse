@@ -182,6 +182,11 @@ export default async function CoursePage({
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-3 font-mono text-[11px] text-faint">
+                      {lesson.type === "extra" && (
+                        <span className="rounded border border-dashed border-line px-1.5 py-0.5">
+                          extra
+                        </span>
+                      )}
                       {readable ? (
                         <>
                           {previewMode() && lesson.status !== "published" && (

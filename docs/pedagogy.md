@@ -17,8 +17,14 @@ being finished.
 - **C1 — Backward design.** Outcomes (with Bloom levels) are written before any
   module or lesson exists. Every module claims ≥1 course outcome; every lesson
   `goal` serves its module's outcomes.
-- **C2 — Short course.** 10–15 lessons total. If the syllabus wants more, cut
-  scope or split the course. Completion beats coverage.
+- **C2 — Scope follows the material.** No lesson-count cap: 12 lessons or 30,
+  whatever the material justifies. The guards are per-lesson, not per-course —
+  every lesson carries one substantive goal (no padding, no micro-slicing),
+  and nothing is kept that serves no outcome. Never cut material just to hit
+  a number; never add a lesson just to look thorough. Advanced material that
+  would bloat the core path goes in `type: extra` lessons — off-path
+  "starred sections" that are skippable by construction: no non-extra
+  lesson may require them (lint-enforced).
 - **C3 — Easy openers.** The first two lessons are the easiest and most
   polished in the course, each ending in a felt "I can do this" win. Dropout
   concentrates in the first sessions; polish is front-loaded there.

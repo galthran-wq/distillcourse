@@ -5,6 +5,12 @@ module: coding
 type: core
 goal: Explain why no lossless code can average fewer bits per symbol than the entropy.
 
+Restructure note: prerequisites are now `huffman-by-hand` and
+`entropy-as-average-surprise` (the Kraft achievability engine moved to its own
+`kraft-inequality` lesson, upstream of Huffman). This lesson also formally
+introduces the `typical-set` concept (the AEP/typical-set argument in point 4),
+which the noisy-channel-coding lesson later reuses for joint typicality.
+
 ## Sources to consult
 
 - Cover & Thomas, **§5.3 "Optimal Codes"** and **§5.4 "Bounds on the Optimal

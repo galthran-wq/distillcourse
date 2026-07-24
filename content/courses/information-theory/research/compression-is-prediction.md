@@ -21,8 +21,8 @@ goal: Explain why a better predictive model is exactly a better compressor, and 
 - Cover & Thomas, **§5.10 "Arithmetic Coding"** and **§5.4** (wrong-code /
   `H(p)+D(p||q)`) — the coding-cost accounting.
 - Reuse: `source-coding-theorem-lite` (entropy floor), `cross-entropy-loss`
-  (log-loss = coding cost), `entropy-of-english` (entropy rate), `kraft-inequality`
-  (budget), `kl-divergence` (mismatch cost).
+  (log-loss = coding cost), `entropy-of-english` (entropy rate), `prefix-codes`
+  (Kraft budget), `kl-divergence` (mismatch cost).
 
 ## Key points the lesson must cover
 
@@ -52,7 +52,8 @@ goal: Explain why a better predictive model is exactly a better compressor, and 
   cost given the model*. A fair accounting either fixes the model on both ends or
   includes the model's description length (two-part / MDL code). For a fixed
   pretrained model this is amortized; say so to avoid the "but you cheated by
-  shipping a 70B model" objection.
+  shipping a 70B model" objection. Forward-ref `minimum-description-length`,
+  which makes exactly this accounting the object of study.
 - **Arithmetic coding overhead is O(1) total**, not per symbol — this is why
   stream codes reach the entropy rate where Huffman's per-symbol 1-bit gap does
   not (callback to huffman-by-hand's motivating flaw).

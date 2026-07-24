@@ -4,7 +4,11 @@ Answer each with yes/no before reporting. Any "no" means fix first.
 
 1. Were outcomes written (with Bloom levels) BEFORE any lesson was designed?
 2. Does every module claim ≥1 course outcome, and is every outcome claimed?
-3. Is the total 10–15 lessons? (More = cut scope, don't squeeze.)
+3. Does every lesson earn its slot — one substantive goal, no padding, no
+   micro-slicing? (No count cap; scope follows the material, C2.)
+3a. Is advanced off-path material marked `type: extra`, and does the core
+    path survive skipping every extra lesson (no non-extra lesson requires
+    one)?
 4. Are the first two lessons the easiest in the course, each with a felt win
    reachable inside 10 minutes?
 5. Does every lesson goal contain exactly ONE objective, starting with a

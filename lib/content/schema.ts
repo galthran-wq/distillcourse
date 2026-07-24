@@ -24,6 +24,9 @@ export const LESSON_TYPES = [
   "worked-practice",
   "synthesis",
   "review",
+  // Advanced off-path chapter (a "starred section"): skippable by
+  // construction — lint forbids non-extra lessons from requiring it.
+  "extra",
 ] as const;
 
 export const LESSON_STATUSES = [
