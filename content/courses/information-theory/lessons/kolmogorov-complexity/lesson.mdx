@@ -1,0 +1,774 @@
+The Kolmogorov complexity of a string is the length of the shortest program
+that prints it: the single number under which no compressor, however clever,
+can push the string. This lesson defines $K(x)$ and establishes its
+load-bearing properties: switching the programming language moves it by at
+most an additive constant (invariance); almost every string sits within a
+few bits of its own length (a counting argument); no algorithm computes it
+(Berry's paradox); and for a computable source its per-symbol expectation
+converges to the entropy. The result closes the module's thread at its
+ceiling: the best compressor, and with it the best predictor, exists and
+cannot be run.
+
+## Three strings: regularity is a short program
+
+Take three strings of $n = 10^6$ bits each:
+
+- $x_1 = $ `000000…0`: one million zeros.
+- $x_2 = $ `010101…01`: the pair `01` repeated $500{,}000$ times.
+- $x_3 = $ `110100…1`: one million flips of a fair coin, recorded faithfully.
+
+All three occupy the same megabit of storage. They differ in how short a
+**description** suffices to regenerate them.
+
+### The programs
+
+<Example title="three program lengths">
+A program printing $x_1$ is a loop: emit `0`, $10^6$ times. Its text is a
+fixed few dozen bytes of loop code — a constant $c$, independent of the
+count — plus the number $10^6$ itself, which takes
+$\lceil \log_2 (10^6 + 1) \rceil = 20$ bits to state. Description length:
+$20 + c$ bits.
+
+A program for $x_2$ is the same loop with the two-character body `01` and
+the count $500{,}000$, a $\lceil \log_2 (5 \times 10^5 + 1) \rceil = 19$-bit
+numeral: $19 + c'$ bits, with $c'$ exceeding $c$ only by the cost of the
+one extra body character.
+
+For $x_3$ no pattern is available to exploit; the only general recipe is
+`print "1101000110…"` with the million bits included verbatim, a program of
+$10^6 + c''$ bits.
+
+Per output bit: $x_1$ and $x_2$ cost on the order of $10^{-5}$ bits of
+program per bit of output; $x_3$ costs $1$. Three strings of identical
+length, and the shortest known descriptions differ by five orders of
+magnitude.
+</Example>
+
+{/* fig ThreeProgramsBars: three rows, one per string, each row: (left) a
+   mono sample of the string, truncated with an ellipsis — "000000…0",
+   "010101…01", "110100…1" — with a small muted label "10^6 bits" under
+   each; (middle) the program in mono, one line each: `repeat 1000000:
+   print "0"`, `repeat 500000: print "01"`, `print "1101000110…"` (the
+   third with the ellipsis inside the quotes, and a muted note "data
+   carried inline"); (right) a horizontal description-length bar on a
+   shared axis labeled "shortest known description (bits)": rows 1 and 2
+   get thin amber slivers labeled "≈ 30" and "≈ 30", row 3 gets a
+   full-width blue bar labeled "≈ 1,000,000". Payoff line beneath, KaTeX:
+   "structure $\Rightarrow$ short program; no structure $\Rightarrow$ the
+   data is its own shortest description". Colors: amber = the short
+   programs (the subject), blue = the incompressible bar, currentColor
+   text. One idea: regularity is exactly what a short program exploits. */}
+<Figure
+  name="ThreeProgramsBars"
+  alt="Three million-bit strings beside their shortest programs: the all-zeros and periodic strings compress to roughly thirty-bit loop programs, while the fair-coin string needs a million-bit program carrying the data verbatim"
+  caption="Three strings, three programs: the loops cost ≈ 30 bits, the coin flips cost the full million. Structure is what a short program exploits."
+/>
+
+<Task>
+Write the two loop programs in a language of your choice and count their
+bytes: both fit in under 40 characters, about 300 bits, against $10^6$ bits
+of output. Attempt the same for a string of coin flips; every honest attempt
+ends with the data pasted into the source.
+</Task>
+
+The gap is not about loops specifically. Any regularity (repetition,
+symmetry, a formula, a grammar) is a handle some program can grip; a string
+with no computable regularity leaves nothing to grip. Measuring the shortest
+program therefore measures the total structure in the string.
+
+<KeyFact>
+Description length is the universal currency of structure: a string is
+compressible exactly when some program shorter than the string can
+regenerate it.
+</KeyFact>
+
+## The definition: the shortest program that prints x
+
+Fix a programming language $U$ that is *universal*: it can express an
+interpreter for any other language. Python, C, and the universal Turing
+machine all qualify. Programs are finite binary strings (source text at 8
+bits per character); $\ell(p)$ denotes the length of program $p$ in bits.
+
+<Definition title="Kolmogorov complexity">
+The **Kolmogorov complexity** of a binary string $x$ with respect to a
+universal language $U$ is
+$$
+K_U(x) = \min \{\, \ell(p) : U(p) = x \,\},
+$$
+the length in bits of the shortest program that outputs $x$ and halts,
+run on empty input.
+</Definition>
+
+The minimum is over a non-empty set: the literal program `print "x"` always
+qualifies, so $K_U(x) \le n + c$ for every $n$-bit string, where $c$ is the
+fixed cost of the quoting code. The loop programs above give the
+complementary bound for structured strings: $K_U(0^n) \le \log_2 n + c$,
+since the program need only contain the count $n$ and a constant amount of
+loop code.
+
+<Remark title="a property of one string">
+$K_U(x)$ is defined for an **individual string**. Every measure so far in
+this course (entropy, mutual information, cross-entropy) required a
+probability distribution before it could assign a number. $K_U$ assigns a
+number to `0101…01` itself, with no source, no ensemble, and no
+probabilities in sight. This is the point of the algorithmic definition,
+and the reason it can serve as the limit concept under all compression.
+</Remark>
+
+<Remark title="looking random is not being random">
+The first $10^6$ bits of the binary expansion of $\pi$ pass every standard
+statistical test for randomness, yet a fixed spigot program plus the count
+$n$ prints them: $K_U \le \log_2 n + c$, about as small as for the
+all-zeros string. High apparent disorder does not certify high $K$; only
+the absence of **any** computable regularity does.
+</Remark>
+
+### Every compressed file is a program
+
+<Ref lesson="compression-is-prediction"/> treated a compressed file $z$ and
+its decoder as a pair. Bundle them: the program "run the following decoder
+on the following bits", with the decoder's code and $z$ inlined, prints $x$.
+Its length is $\ell_C(x)$ plus the fixed size of the decoder: a
+self-extracting archive, and by construction an upper bound on $K_U(x)$.
+
+{/* fig SelfExtractingArchive: one row, the bundled program p_x as an outer
+   rounded container labeled "one program $p_x$ — a self-extracting
+   archive": inside it, left, a blue rounded box "decoder $D$ — code,
+   $c_C$ bits, fixed" immediately followed by an amber rounded box
+   "$z = C(x)$ — compressed data, $\ell_C(x)$ bits"; a thin arrow from the
+   container's right edge to a mono "x" annotated "run $p_x$ → prints
+   $x$, halts". Under the container a bracket spanning both boxes with
+   KaTeX "$\ell(p_x) = \ell_C(x) + c_C \;\Rightarrow\; K_U(x) \le
+   \ell_C(x) + c_C$". Payoff line: "every compressed file, bundled with
+   its decoder, is a program that prints $x$". Colors: blue = the fixed
+   decoder block (same role as the interpreter in InterpreterOverhead),
+   amber = the per-file compressed payload (the subject), currentColor
+   text and arrows. One idea: compressed file + decoder = one program,
+   hence an upper bound on K. */}
+<Figure
+  name="SelfExtractingArchive"
+  alt="A single program built from a fixed blue decoder block and an amber compressed-data block, printing x, with the bracket showing its length ell C of x plus c C upper-bounds the Kolmogorov complexity of x"
+  caption="The self-extracting archive: decoder code plus compressed bits form one program printing x, so K(x) is at most ℓ_C(x) + c_C for every compressor C."
+/>
+
+<Theorem title="K undercuts every compressor">
+For every computable lossless compressor $C$ there is a constant $c_C$,
+independent of $x$, such that
+$$
+K_U(x) \;\le\; \ell_C(x) + c_C \quad \text{for all strings } x,
+$$
+where $\ell_C(x)$ is the length of $C$'s output on $x$.
+
+<Proof>
+Let $D$ be $C$'s decoder, a fixed program. For any $x$, the program
+$p_x$ = "run $D$ on $z$", with $z = C(x)$ included literally, outputs $x$
+and halts. Its length is $\ell_C(x) + c_C$, where $c_C$ covers $D$'s code
+and the glue that delimits $z$. The shortest program for $x$ is no longer
+than this particular one.
+</Proof>
+</Theorem>
+
+The theorem is the lesson's title claim: gzip, a block Huffman code, and a
+language model driving an arithmetic coder are each one program family,
+and $K_U(x)$ sits at or below the output length of every one of them, up to
+that family's fixed constant.
+
+<KeyFact>
+$K_U(x) \le \ell_C(x) + c_C$ for every computable lossless compressor $C$:
+the shortest program is the floor under all compression, reachable by none
+of it by more than an additive constant.
+</KeyFact>
+
+## The invariance theorem: switching languages costs a constant
+
+The subscript $U$ looks like a defect: a "Python complexity" and a "C
+complexity" could disagree, and a quantity that depends on a taste in
+languages would not be a property of the string. The rescue is concrete. A
+Python interpreter can be written in C, once, as a fixed file; call its
+length $c$ bits. Prepending that interpreter to any Python program $p$
+yields a C program of length $\ell(p) + c$ with identical output. Whatever
+Python saves, C recovers at a one-time cost of $c$.
+
+<Theorem title="invariance (Solomonoff–Kolmogorov)">
+Let $A$ and $B$ be universal languages. There is a constant $c_{AB}$,
+depending on the pair of languages but not on $x$, with
+$$
+K_A(x) \;\le\; K_B(x) + c_{AB} \quad \text{for all } x .
+$$
+Applying the statement in both directions,
+$\lvert K_A(x) - K_B(x) \rvert \le \max(c_{AB}, c_{BA})$ for all $x$.
+
+<Proof>
+$A$ is universal, so some $A$-program $I_B$ of fixed length $c_{AB}$
+interprets $B$: given a $B$-program $p$ appended to its own code (with a
+fixed self-delimiting framing, absorbed into $c_{AB}$), it simulates $B$
+running $p$. For the shortest $B$-program $p^*$ printing $x$, the
+$A$-program $I_B\,p^*$ prints $x$ and has length $K_B(x) + c_{AB}$; the
+$A$-minimum is at most that.
+</Proof>
+</Theorem>
+
+{/* fig InterpreterOverhead: two rows sharing one horizontal length axis
+   (bits). Row 1, label "language B": a single amber rounded box of width w
+   labeled "$p^*$ — shortest B-program for $x$" with a small KaTeX length
+   annotation "$\ell = K_B(x)$" under it, and a thin arrow from the box to
+   a mono "x" at the right margin. Row 2, label "language A": a blue
+   rounded box of fixed width labeled "interpreter for B ($c_{AB}$ bits,
+   written once)" immediately followed by the identical amber box "$p^*$"
+   (same width as row 1), arrow to the same mono "x". Under row 2 a
+   bracket spanning both boxes with KaTeX "$K_A(x) \le K_B(x) + c_{AB}$".
+   Payoff line: "the language costs at most one interpreter — a constant
+   independent of $x$". Colors: amber = the program being reused
+   unchanged, blue = the fixed interpreter block, currentColor text and
+   arrows. One idea: switching languages = prepending one fixed
+   interpreter. */}
+<Figure
+  name="InterpreterOverhead"
+  alt="The shortest B-program for x reused inside language A by prepending a fixed interpreter block, showing the A-length is at most the B-length plus a constant independent of x"
+  caption="Invariance: language A runs B's shortest program behind one fixed interpreter, so the two complexities differ by at most a constant that does not depend on x."
+/>
+
+The constant is real, and can be large: the interpreter for a rich language
+is megabytes of code, and for one specific short string the choice of
+language can dominate the value. Invariance is an **asymptotic** guarantee:
+as strings grow, a fixed $\pm c$ becomes negligible against $K(x)$, and
+every statement in this lesson holds up to such a constant. No exact,
+language-free value of $K(x)$ exists; the honest notation for the rest of
+the lesson is $K(x)$ with a fixed universal $U$ understood, and claims
+carry $+O(1)$.
+
+<KeyFact>
+Changing the universal language changes $K$ by at most one interpreter's
+length: $K(x)$ is a property of the string, well-defined up to $+O(1)$.
+</KeyFact>
+
+## Counting: almost every string is incompressible
+
+The three-strings opener suggests compressibility is common; arithmetic
+says the opposite. Count the descriptions available for 1000-bit strings.
+Programs of length strictly below $980$ bits number at most
+$$
+1 + 2 + 4 + \cdots + 2^{979} = 2^{980} - 1 < 2^{980},
+$$
+and each program prints at most one string. So fewer than $2^{980}$ of the
+$2^{1000}$ strings can be compressed by 20 or more bits: a fraction below
+$2^{-20}$, under one in a million.
+
+<Theorem title="incompressibility is the rule">
+For every $n$ and every $c \ge 1$, the fraction of $n$-bit strings with
+$K(x) < n - c$ is less than $2^{-c}$. In particular, at least one $n$-bit
+string satisfies $K(x) \ge n$ for every $n$.
+
+<Proof>
+There are fewer than $2^{n-c}$ binary programs of length below $n - c$,
+and each outputs at most one string, so fewer than $2^{n-c}$ of the $2^n$
+strings have such a program: a fraction below $2^{-c}$. For the second
+claim take $c = 0$: programs of length below $n$ number $2^n - 1$, one
+short of the $2^n$ strings, so some string has no program shorter than
+itself.
+</Proof>
+</Theorem>
+
+{/* fig IncompressibleCount: one large rounded rectangle representing all
+   1000-bit strings, corner label KaTeX "$2^{1000}$ strings". Inside, near
+   a corner, a very small amber rounded sub-region labeled "compressible by
+   $\ge 20$ bits" with a leader annotation "$< 2^{980}$ strings — at most a
+   $2^{-20} \approx 10^{-6}$ fraction"; the amber region should be
+   visibly tiny relative to the rectangle. The remaining area muted,
+   labeled "incompressible to within 20 bits: $K(x) \ge 980$ — the
+   typical case". Below the rectangle one annotation with a counting
+   gloss, KaTeX: "programs shorter than $980$ bits: $1 + 2 + \cdots +
+   2^{979} < 2^{980}$, one output each". Colors: amber = the rare
+   compressible minority (the subject), currentColor frame and text,
+   muted fill for the majority. One idea: there are not enough short
+   programs to go around. */}
+<Figure
+  name="IncompressibleCount"
+  alt="A large rectangle of all 2 to the 1000 strings containing a tiny amber region of fewer than 2 to the 980 strings compressible by twenty bits; the vast muted remainder is incompressible"
+  caption="The census for n = 1000, c = 20: fewer than 2⁹⁸⁰ short programs exist for 2¹⁰⁰⁰ strings, so under one string in a million compresses by 20 bits."
+/>
+
+<Task>
+Run the same census for $c = 10$: count the programs shorter than $990$
+bits and the resulting fraction. It should land below $2^{-10} \approx
+10^{-3}$: compressing by even 10 bits is already a one-in-a-thousand
+property.
+</Task>
+
+<Definition title="incompressible string">
+An $n$-bit string $x$ is **$c$-incompressible** if $K(x) \ge n - c$, and
+**incompressible** (algorithmically random) if $K(x) \ge n$.
+</Definition>
+
+The counting theorem gives the algorithmic reading of randomness developed
+in Cover & Thomas §14.5: a fair-coin outcome is overwhelmingly likely to be
+near-incompressible, and any compressible outcome (a run of a million
+zeros, say) is an event of probability below $2^{-c}$, not a typical draw.
+Structure in data is always the exception that a counting argument prices.
+
+<KeyFact>
+Fewer than $2^{n-c}$ programs are shorter than $n - c$ bits, so at most a
+$2^{-c}$ fraction of $n$-bit strings compresses by $c$ bits:
+incompressibility is the rule, and every compressible file is a rarity to
+the exact extent it compresses.
+</KeyFact>
+
+## Uncomputability: the ideal compressor cannot be run
+
+The natural next step is a program that computes $K(x)$, turning the floor
+into a tool. No such program exists, and the obstruction is a sentence.
+[Berry's paradox](https://en.wikipedia.org/wiki/Berry_paradox) (reported by
+Russell in 1908) asks for "the least integer not nameable in fewer than
+nineteen syllables" — a phrase of eighteen syllables that names it.
+Kolmogorov complexity makes the paradox precise, and precision turns it
+from a curiosity into an impossibility proof.
+
+Suppose a program $Q$, say $10^6$ bits long, computed $K(x)$ for every
+$x$. Build the searcher $R$: "for each string $x$ in order of length,
+compute $K(x)$ using $Q$; print the first $x$ with $K(x) > 10^9$ and
+halt." $R$ contains $Q$, the threshold $10^9$ (30 bits), and fixed loop
+code: about $10^6$ bits in total. The search terminates, because strings
+with $K(x) > 10^9$ exist by the counting theorem. But then $R$ is a
+$10^6$-bit program printing a string whose complexity exceeds $10^9$:
+a contradiction three orders of magnitude wide.
+
+<Theorem title="K is not computable">
+No algorithm outputs $K(x)$ on input $x$ for all strings $x$.
+
+<Proof>
+Suppose $Q$ computes $K$, with $\ell(Q) = q$. For a threshold $L$, let
+$R_L$ enumerate strings in length-lexicographic order, compute each
+$K(x)$ by running $Q$, and print the first $x^*$ with $K(x^*) > L$. Such
+a string exists (counting theorem), so $R_L$ halts and prints $x^*$;
+hence $K(x^*) \le \ell(R_L) \le q + \log_2 L + c$, the length of $Q$
+plus the binary threshold plus fixed glue. But $K(x^*) > L$ by the test
+$R_L$ applied. For $L$ large enough that $L > q + \log_2 L + c$ (true
+for all sufficiently large $L$), the two conclusions contradict.
+No $Q$ exists.
+</Proof>
+</Theorem>
+
+{/* fig BerryLoop: a single program listing box (rounded rect, mono text)
+   labeled "$R$ — total length $\approx 10^6$ bits", containing three
+   numbered lines: "1  for each string x (in order):", "2    k = K(x)
+   // calls Q, 10^6 bits", "3    if k > 10^9: print x; halt". An arrow
+   from the box to a mono token "$x^*$" labeled "first string with
+   $K(x^*) > 10^9$". Below, two short deduction lines joined by a bold
+   amber "contradiction" bar: left line "$R$ prints $x^*$ $\Rightarrow$
+   $K(x^*) \le 10^6 + c$", right line "line 3 test $\Rightarrow$
+   $K(x^*) > 10^9$"; the two inequalities boxed and the amber bar between
+   them labeled "both cannot hold — no program computes $K$". Colors:
+   blue = the program listing, amber = the contradiction marking (the
+   "don't" role), currentColor text. One idea: a small program would name
+   a string whose complexity it certifies to be huge. */}
+<Figure
+  name="BerryLoop"
+  alt="A million-bit searcher program that prints the first string of complexity above a billion, yielding the contradiction that a million-bit program prints a string it certifies as having no description under a billion bits"
+  caption="Berry's paradox as a program: if K were computable, a ≈10⁶-bit searcher would print a string it proves needs 10⁹ bits. The contradiction rules out the searcher's only assumption: the subroutine Q."
+/>
+
+<Remark title="uncomputable is not undefined">
+$K(x)$ is a perfectly definite integer for every $x$: the minimum of a
+non-empty set of program lengths, bounded above by $n + c$. What fails is
+the existence of an algorithm that returns it. $K$ can even be approached
+from above: run all programs up to the literal bound in parallel
+(dovetailed), and record the shortest that has halted with output $x$ so
+far. The record converges to $K(x)$, but certifying convergence would
+mean certifying that no shorter program ever halts, which is the
+[halting problem](https://en.wikipedia.org/wiki/Halting_problem). $K$ is
+upper-semicomputable, never computable.
+</Remark>
+
+The practical consequence organizes the whole compression stack: every
+runnable compressor is a computable upper bound on an uncomputable floor.
+gzip is one bound; a language model with an arithmetic coder is a tighter
+one; nothing runnable is the floor itself. The same limitation, inherited
+by <Ref lesson="minimum-description-length"/>, is why practical MDL
+replaces shortest programs with restricted, computable model classes.
+
+<KeyFact>
+$K$ is well-defined and uncomputable: an exact shortest-description finder
+would contain Berry's paradox as a subroutine. The ideal compressor exists
+as a mathematical object and cannot be run.
+</KeyFact>
+
+## Complexity meets entropy: E[K]/n converges to H
+
+$K$ was built with no distribution; entropy needs one. Put a distribution
+back and the two meet.
+
+<Example title="a two-part description at the entropy">
+Let the source be the course's 90/10 coin ($H \approx 0.469$ bits per
+flip) and draw $n = 10^4$ flips. A typical draw $x$ has about $k = 1000$
+tails, and admits a **two-part description**:
+
+1. State $k$: at most $\lceil \log_2 (n+1) \rceil = 14$ bits.
+2. State which arrangement: an index into the
+   $\binom{10^4}{1000}$ strings with exactly that many tails,
+   $\log_2 \binom{10^4}{1000} \approx 4680$ bits.
+
+A fixed decoder turns the pair into the string, so
+$K(x) \le 14 + 4680 + c \approx 4700$ bits: about $0.47$ per flip, at the
+entropy, for **every** string of typical composition, not on average but
+individually. The general inequality behind step 2 is
+$\log_2 \binom{n}{k} \le n\,H(k/n)$; here
+$n\,H(1000/10^4) = 10^4 \times H(0.1) \approx 4690$ bits, so the index
+term sits within 10 bits of that ceiling.
+</Example>
+
+<Theorem title="complexity meets entropy">
+Let $X_1, X_2, \ldots$ be i.i.d. draws from a computable distribution $p$
+on a finite alphabet $\mathcal{X}$. Then
+$$
+\frac{1}{n}\, \mathbb{E}\left[ K(X_1 \ldots X_n) \right]
+\;\longrightarrow\; H(X) \qquad (n \to \infty).
+$$
+
+<Proof>
+Sketch; the full statement is Theorem 14.3.1 of Cover & Thomas, and
+chapter 7 of Shen–Uspensky–Vereshchagin. *Upper bound:* the two-part
+description generalizes: state the count of each symbol
+($(|\mathcal{X}|-1)\lceil \log_2 (n+1) \rceil$ bits), then the index
+within that type class ($\le n H(\hat{p})$ bits for empirical
+distribution $\hat{p}$). Taking expectations,
+$\mathbb{E}[H(\hat{p})] \le H(p)$ by concavity of entropy, so
+$\mathbb{E}[K] \le nH + O(\log n)$. *Lower bound:* self-delimiting
+programs form a prefix-free set, so their lengths obey the Kraft budget
+of <Ref lesson="kraft-inequality"/>; shortest-program lengths are then
+the lengths of a lossless description system, and the source coding
+theorem of <Ref lesson="source-coding-theorem-lite"/> floors their
+expectation at $nH$ minus a constant (plain, non-self-delimiting
+programs shift the bound by $O(\log n)$, which the division by $n$
+kills).
+</Proof>
+</Theorem>
+
+{/* fig ComplexityMeetsEntropy: a plot, x-axis "n (flips of the 90/10
+   coin)" on a log scale with ticks 10, 100, 1000, 10^4; y-axis "bits per
+   flip" from 0 to 1.1 with ticks 0, 0.469 (labeled specially), 1. A blue
+   dashed horizontal line at 0.469 labeled in KaTeX "$H = 0.469$". An
+   amber descending curve = the two-part upper envelope
+   $H + (\log_2(n+1) + 50)/n$, passing roughly through (10, ~1.0 —
+   clamp/start the curve where it enters the axis range), (100, 1.03) —
+   spec: clamp at 1.1 — (1000, 0.53), (10^4, 0.475), labeled "two-part
+   bound on $\mathbb{E}[K]/n$"; the region between curve and dashed line
+   lightly amber-shaded with the annotation "$O(\log n / n)$ gap". A
+   muted note under the axis: "curve = the computable upper envelope;
+   $\mathbb{E}[K]/n$ itself lies between it and $H$". Colors: amber = the
+   complexity envelope (subject), blue = the entropy line, currentColor
+   axes. One idea: algorithmic and probabilistic information agree in the
+   limit. */}
+<Figure
+  name="ComplexityMeetsEntropy"
+  alt="A curve of the two-part upper bound on expected Kolmogorov complexity per flip descending toward the dashed entropy line at 0.469 bits as the number of 90/10 coin flips grows to ten thousand"
+  caption="E[K]/n for the 90/10 coin, squeezed between H and the two-part bound H + O(log n / n): the algorithmic and Shannon measures agree in the limit."
+/>
+
+Both hypotheses earn their keep. *Computable source:* the decoder in the
+upper bound must be able to work with $p$'s structure; for sources with no
+computable description the theorem's route fails. *Expectation:* the
+agreement is on average over draws; an individual string can sit far below
+($x_1$, the all-zeros draw) or slightly above the entropy rate. Where no
+distribution exists at all (one fixed file, one genome, one photograph),
+entropy is silent and $K$ is the measure that remains.
+
+<KeyFact>
+For a computable i.i.d. source, $\mathbb{E}[K(X^n)]/n \to H(X)$: Shannon
+entropy is the expected value of algorithmic information, and the two
+theories certify the same per-symbol price wherever both apply.
+</KeyFact>
+
+## The ceiling: Solomonoff's predictor and the limit of learning
+
+<Ref lesson="compression-is-prediction"/> established the dictionary:
+predictors and compressors are one object in two interfaces. $K$ is the
+compression side's absolute floor; its prediction-side mirror is a mixture
+over all programs. Work on a universal language whose valid programs are
+*self-delimiting* (no program is a prefix of another; the machine knows
+where the code ends). Program lengths then obey the Kraft budget of
+<Ref lesson="kraft-inequality"/>, $\sum_p 2^{-\ell(p)} \le 1$, so weights
+$2^{-\ell(p)}$ can be read as a prior over programs.
+
+<Definition title="universal (Solomonoff) mixture">
+For a binary string $x$, the **universal mixture** assigns
+$$
+M(x) \;=\; \sum_{p\,:\; U(p) \text{ outputs a string starting with } x} 2^{-\ell(p)},
+$$
+the total prior weight of all programs whose output begins with $x$.
+Prediction is by conditioning:
+$M(\text{next bit} = 1 \mid x) = M(x1)/M(x)$.
+</Definition>
+
+Every program is a hypothesis about the data's law, weighted by
+$2^{-\ell}$: short programs, the simple hypotheses, carry exponentially
+more weight. The mixture's power is a one-line domination argument.
+
+<Theorem title="the mixture's total regret is a constant">
+Let $\mu$ be any computable distribution over binary streams, computed by
+a program of length $K(\mu)$. For every string $x$,
+$$
+-\log_2 M(x) \;\le\; -\log_2 \mu(x) + K(\mu) + O(1) .
+$$
+Read through <Ref lesson="compression-is-prediction"/>: coding with the
+mixture costs at most $K(\mu)$ more bits **in total**, not per symbol,
+over coding with the true model, whatever the stream length.
+
+<Proof>
+The sum defining $M(x)$ includes the programs that compute $\mu$ and then
+arithmetic-decode $x$'s $\mu$-code; through that family
+$M(x) \ge 2^{-K(\mu) - O(1)}\, \mu(x)$, the true model's weight times its
+probability. Taking $-\log_2$ of the domination gives the claim.
+</Proof>
+</Theorem>
+
+A predictor whose lifetime excess loss against every computable competitor
+is a constant learns, in the limit, every regularity that any program can
+express: this is [Solomonoff's induction](https://en.wikipedia.org/wiki/Solomonoff%27s_theory_of_inductive_inference)
+(1964), the theoretical optimum of sequence prediction. It inherits $K$'s
+defect in full: $M$ sums over all programs, including non-halting ones,
+and is uncomputable. It is a ceiling to approximate, never an algorithm to
+deploy; [Delétang et al. (2023)](https://arxiv.org/abs/2309.10668) (§2)
+frame modern language-model training exactly so, as pushing a computable
+predictor toward the Solomonoff limit, with the compression numbers of
+<Ref lesson="compression-is-prediction"/> as the progress meter.
+
+{/* fig CompressionCeilingLadder: a horizontal bar chart of description
+   lengths for one fixed 10^6-character English text, four rungs top to
+   bottom on a shared "bits" axis 0 to 8×10^6 (ticks 0, 2M, 4M, 6M, 8M):
+   "raw ASCII" = 8.0 Mbit, "gzip" ≈ 2.6 Mbit, "language model +
+   arithmetic coder" ≈ 1.0 Mbit, all three currentColor/muted bars with
+   values printed at their right ends; then, below them, a dashed amber
+   floor line (vertical tick position ≈ 0.9 Mbit but drawn as a bar
+   outline, visibly below the LLM bar) labeled in KaTeX "$K(x) + c$ —
+   uncomputable floor under every rung". Right of the ladder a vertical
+   double-headed arrow annotation: "each rung = one computable program
+   family; descending = better modeling". Footer line: "prediction-side
+   mirror of the floor: Solomonoff's mixture $M$". Colors: amber = the
+   K floor (subject), muted/currentColor = the computable rungs, blue
+   optional for the LLM rung as the best computable entry. One idea:
+   every real compressor is an upper bound sliding down toward one
+   uncomputable limit. */}
+<Figure
+  name="CompressionCeilingLadder"
+  alt="Description lengths of one megabyte of English under raw ASCII, gzip, and a language model with arithmetic coder, descending bars above a dashed uncomputable floor labeled K of x"
+  caption="One text, one ladder: 8 Mbit raw, ≈2.6 Mbit gzip, ≈1 Mbit for a strong model. Every computable rung sits above the uncomputable floor K(x); better modeling descends toward it."
+/>
+
+### Fine print: what the ceiling does and does not govern
+
+The whole construction is **lossless**: $K$ prices exact regeneration of
+$x$, and says nothing about coding within a distortion tolerance, which is
+<Ref lesson="rate-distortion"/>'s trade-off. And the mixture's two-part
+skeleton (pay $K(\mu)$ for a model, then $-\log_2 \mu(x)$ for the data
+under it) is the *ideal MDL* of Shen–Uspensky–Vereshchagin §14.3:
+$K(x) \le K(\mu) - \log_2 \mu(x) + O(1)$ for every computable model
+$\mu$. Replacing "all programs" with a computable model class turns this
+bound into a usable selection rule, the subject of
+<Ref lesson="minimum-description-length"/>.
+
+<KeyFact>
+The Solomonoff mixture pays at most $K(\mu) + O(1)$ total extra bits
+against any computable source: compression, prediction, and learning share
+one uncomputable ceiling, and a good learner is measured by how closely it
+approximates it.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Rank the following $10^6$-bit strings by Kolmogorov complexity and justify
+each rank with a program sketch and a length estimate: (a) one million
+copies of the bit `1`; (b) the first $10^6$ bits of the binary expansion
+of $\sqrt{2}$; (c) $10^6$ bits produced by a fair coin.
+
+<Solution>
+(a) and (b) are both $O(\log n)$; (c) is $\approx n$.
+
+(a) "repeat $10^6$ times: print 1": fixed loop code plus
+$\log_2 10^6 \approx 20$ bits for the count: $K \le 20 + c$.
+
+(b) $\sqrt{2}$ is computable: a fixed digit-extraction routine (constant
+size) plus the count $n$ prints its first $n$ bits: $K \le 20 + c'$, the
+same order as (a), despite the digits passing statistical randomness
+tests.
+
+(c) With probability at least $1 - 2^{-c}$, a fair-coin string is not
+compressible by $c$ bits (counting theorem), so $K \ge 10^6 - c$ except
+with probability $2^{-c}$; the literal program gives $K \le 10^6 + c''$.
+Ranking: (a) $\approx$ (b) $\ll$ (c), with (a) and (b) not separable
+beyond the $\pm O(1)$ that invariance leaves undefined.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove the two general upper bounds from the definition: (a)
+$K(x) \le n + c$ for every $n$-bit string $x$; (b)
+$K(0^n) \le \log_2 n + c'$. Then explain why, for small $n$, the bound
+(a) can be the better of the two even for $0^n$.
+
+<Solution>
+(a) The program `print "x"` with $x$ inlined outputs $x$ and halts; its
+length is $n$ bits of data plus a constant $c$ of quoting code,
+independent of $x$. The minimum over programs is at most this.
+
+(b) The program "repeat $n$ times: print 0" contains the loop code
+(constant $c'$) plus the binary numeral for $n$
+($\lceil \log_2 (n+1) \rceil$ bits).
+
+For small $n$ the constants dominate: the loop machinery in $c'$ (parsing
+a numeral, maintaining a counter) can cost more than simply quoting a
+handful of zeros under the smaller constant $c$. The crossover point is
+language-dependent: exactly the $\pm O(1)$ slack that the invariance
+theorem says no statement about $K$ may lean on.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) At most how many 1000-bit strings satisfy $K(x) < 980$, and what
+fraction is that of all 1000-bit strings? (b) Show that for every $n$
+some $n$-bit string has $K(x) \ge n$. (c) For $X^n$ a uniform random
+$n$-bit string, show $\mathbb{E}[K(X^n)] > n - 2$.
+
+<Solution>
+(a) Programs of length $< 980$ number $2^{980} - 1$; one output each, so
+at most $2^{980} - 1 < 2^{980}$ strings qualify: a fraction below
+$2^{980}/2^{1000} = 2^{-20} \approx 10^{-6}$.
+
+(b) Programs of length $< n$ number $2^n - 1$, but there are $2^n$
+strings of length $n$; by pigeonhole at least one string is the output of
+no program shorter than itself, i.e. $K(x) \ge n$.
+
+(c) For $c \ge 1$, $\Pr[n - K \ge c] = \Pr[K \le n - c] < 2^{-(c-1)}$
+by the counting theorem (strings with $K < n - c + 1$ are fewer than
+$2^{n-c+1}$). Summing the tail,
+$$
+\mathbb{E}[\max(n - K, 0)] = \sum_{c \ge 1} \Pr[n - K \ge c]
+< \sum_{c \ge 1} 2^{-(c-1)} = 2 ,
+$$
+and $\mathbb{E}[n - K] \le \mathbb{E}[\max(n - K, 0)] < 2$, so
+$\mathbb{E}[K] > n - 2$: a uniform string is expected to be within two
+bits of incompressible.
+</Solution>
+</Exercise>
+
+<Exercise>
+Languages $A$ and $B$ have interpreters for each other: an interpreter for
+$B$ written in $A$ of $120{,}000$ bits, and one for $A$ written in $B$ of
+$300{,}000$ bits. (a) Bound $\lvert K_A(x) - K_B(x) \rvert$. (b) A
+colleague reports "$K$ of this 500-bit string is exactly 137 bits."
+State precisely what is wrong with the claim.
+
+<Solution>
+(a) Prepending interpreters: $K_A(x) \le K_B(x) + 120{,}000$ and
+$K_B(x) \le K_A(x) + 300{,}000$ for all $x$, hence
+$-120{,}000 \le K_B(x) - K_A(x) \le 300{,}000$, and
+$\lvert K_A - K_B \rvert \le 300{,}000$ bits.
+
+(b) The number 137 is only meaningful relative to a named universal
+language, and for a 500-bit string the interpreter constants between
+reasonable languages (here up to $3 \times 10^5$ bits) dwarf both the
+string and the claimed value: another language can assign the same
+string any value from $O(1)$ up to $\approx 500 + c$. Exact
+language-free values of $K$ do not exist; only statements stable under
+$\pm O(1)$ (asymptotics, comparisons on long strings) are about the
+string rather than the language.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose a program $Q$ of $2 \times 10^6$ bits computes $K(x)$ for all
+$x$. Construct from it a program that yields a contradiction at the
+threshold $L = 10^{10}$, verifying each step: the searcher's length, why
+its search terminates, and the two incompatible conclusions.
+
+<Solution>
+Build $R$: "for each string $x$ in length-lexicographic order, compute
+$K(x)$ by running $Q$; if $K(x) > 10^{10}$, print $x$ and halt."
+Length: $Q$'s $2 \times 10^6$ bits, the threshold
+($\log_2 10^{10} \approx 34$ bits), and constant loop code:
+$\ell(R) \approx 2 \times 10^6 + c$.
+
+Termination: by the counting theorem, strings with
+$K(x) \ge n$ exist at every length $n$, in particular strings with
+$K(x) > 10^{10}$; the ordered search reaches the first one, $x^*$.
+
+Conclusion 1: $R$ prints $x^*$, so $K(x^*) \le \ell(R) \approx
+2 \times 10^6 + c$. Conclusion 2: $x^*$ passed the test, so
+$K(x^*) > 10^{10}$. Since $2 \times 10^6 + c < 10^{10}$, both cannot
+hold. Every step used only $Q$'s assumed existence, so no such $Q$
+exists.
+</Solution>
+</Exercise>
+
+<Exercise>
+The bigram model of <Ref lesson="compression-is-prediction"/> achieves
+$3.3$ bits per character on a $10^6$-character English text $x$, its
+count table costs $2^4$ bits for each of $27 \times 27$ context-symbol
+pairs, and the arithmetic coder adds 2 bits. (a) Assemble the full
+self-extracting program for $x$ and compute the resulting upper bound on
+$K(x)$. (b) State which term the bound of the theorem "K undercuts every
+compressor" absorbs into $c_C$ and which it charges per file, and why a
+70-billion-parameter model would change the accounting.
+
+<Solution>
+(a) The program must be self-contained: decoder and model code (a
+constant $c$, thousands of bits), the count table
+($27 \times 27 \times 16 = 11{,}664$ bits), and the arithmetic-coded
+data ($3.3 \times 10^6 + 2$ bits). Total:
+$K(x) \le 3.3 \times 10^6 + 11{,}664 + 2 + c \approx 3.31 \times 10^6$
+bits; the table is a $0.35\%$ surcharge.
+
+(b) The decoder code is fixed across files and lands in $c_C$; the coded
+data is per-file. The count table sits in between: fixed if the same
+table is declared part of the compressor, per-file if fitted to $x$ (as
+in the worked example's model 3, which must then ship its counts). A
+$70$B-parameter model at 16 bits per parameter puts
+$\approx 1.1 \times 10^{12}$ bits into the "constant": the bound on
+$K(x)$ still holds, but it is vacuous until the compressed data
+outweighs the model: the adjusted-rate accounting of
+<Ref lesson="compression-is-prediction"/>, and the trade-off
+<Ref lesson="minimum-description-length"/> optimizes.
+</Solution>
+</Exercise>
+
+<Exercise>
+A run of $n = 10^4$ flips of the 90/10 coin comes back with $k = 500$
+tails, half the expected count. (a) Compute the two-part description
+length of this string (count, then index; use
+$\log_2 \binom{10^4}{500} \approx 2860$). (b) Compute the length of its
+codeword under the Shannon-optimal code for the true 90/10 model, i.e.
+its surprisal (use $-\log_2 0.9 \approx 0.152$,
+$-\log_2 0.1 \approx 3.322$). (c) Explain the direction of the gap using
+the entropy concepts of <Ref lesson="entropy-as-average-surprise"/> and
+<Ref lesson="source-coding-theorem-lite"/>.
+
+<Solution>
+(a) Count: $\lceil \log_2 (10^4 + 1) \rceil = 14$ bits. Index:
+$\approx 2860$ bits (consistent with the bound
+$\log_2 \binom{n}{k} \le n H(0.05) = 2864$). Two-part total:
+$14 + 2860 + c \approx 2874 + c$ bits, so
+$K(x) \lesssim 2900$ bits $\approx 0.29$ per flip.
+
+(b) Surprisal under the true model:
+$9500 \times 0.152 + 500 \times 3.322 = 1444 + 1661 = 3105$ bits: what
+a code matched to the 90/10 distribution spends on this string.
+
+(c) The string is atypical for the source: its empirical tail rate
+$0.05$ differs from the source's $0.1$, and the fixed code pays the
+per-symbol mismatch (the cross-entropy reading: coding a
+$0.05$-composition stream with the $0.1$-model's code). The two-part
+description instead adapts to the individual string, paying
+$nH(\hat{p}) + O(\log n)$ at the string's own empirical entropy
+$H(0.05) \approx 0.286 < H(0.1) \approx 0.469$. $K$ tracks the
+structure the string actually has; distribution-based coding tracks the
+structure the source was expected to have; expectation is where the two
+reconcile ($\mathbb{E}[K]/n \to H$).
+</Solution>
+</Exercise>
+
+<References>
+1. A. Shen, V. A. Uspensky, N. Vereshchagin, *Kolmogorov Complexity and Algorithmic Randomness*, AMS, 2017 — the opening survey "What is this book about?" and ch. 1: the definition, the Solomonoff–Kolmogorov invariance theorem, the counting argument, and non-computability via Berry's paradox; ch. 7: complexity and Shannon entropy; §14.3: the two-part code and the MDL reading. Free PDF: https://www.lirmm.fr/~ashen/kolmbook-eng-scan.pdf
+2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 14: §14.2 definitions and the universality of $K$, §14.3 the $\mathbb{E}[K]/n \to H$ theorem (Theorem 14.3.1), §14.5 incompressible and algorithmically random sequences, §14.6 universal probability.
+3. G. Delétang, A. Ruoss, et al., "Language Modeling Is Compression," ICLR 2024 — §2 "Universal Coding": Solomonoff's mixture as the optimal predictor–compressor and the ceiling that trained models approximate. https://arxiv.org/abs/2309.10668
+4. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 28 §28.3: minimum description length and Occam's razor, the practical shadow of the ideal two-part code. Free online: https://www.inference.org.uk/mackay/itila/
+</References>

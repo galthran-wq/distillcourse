@@ -12,4 +12,20 @@ export const demos: Record<
 > = {
   SurprisalSlider: () => import("./information-theory/SurprisalSlider"),
   EntropyExplorer: () => import("./information-theory/EntropyExplorer"),
+  CodewordBudget: () => import("./information-theory/CodewordBudget"),
+  BlockCodingGap: () => import("./information-theory/BlockCodingGap"),
+  JointEntropyGrid: () => import("./information-theory/JointEntropyGrid"),
+  MutualInfoDial: () => import("./information-theory/MutualInfoDial"),
+  ChannelCapacityDial: () => import("./information-theory/ChannelCapacityDial"),
+  KLMismatch: () => import("./information-theory/KLMismatch"),
+  ChannelCodingThreshold: () =>
+    import("./information-theory/ChannelCodingThreshold"),
+  PredictiveCompressor: () =>
+    import("./information-theory/PredictiveCompressor"),
+  MaxEntDice: () => import("./information-theory/MaxEntDice"),
+  RateDistortionCurve: () =>
+    import("./information-theory/RateDistortionCurve"),
+  TwoPartCode: () => import("./information-theory/TwoPartCode"),
+  InformationPlane: () => import("./information-theory/InformationPlane"),
+  InfoNCESaturation: () => import("./information-theory/InfoNCESaturation"),
 };

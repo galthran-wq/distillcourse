@@ -1,0 +1,789 @@
+No lossless code achieves fewer expected bits per symbol than the source
+entropy. This lesson gives the argument. The route: every prefix code
+implicitly bets on a distribution $q(x) = 2^{-\ell(x)}$; the expected length
+decomposes as $L = H(p) + D(p\,\|\,q) + \text{slack}$ with every term
+non-negative, which proves the floor; the Shannon code
+$\ell(x) = \lceil -\log_2 p(x) \rceil$ lands within one bit of the floor;
+block coding shrinks the remaining per-symbol overhead to at most $1/n$; and
+the typical set explains why $nH$ bits is the right total for $n$ symbols.
+
+## A code is a bet: lengths are probabilities
+
+<Ref lesson="kraft-inequality"/> priced a codeword of length $\ell$ at
+$2^{-\ell}$ of a budget of one, and its closing remark observed that for a
+complete code the claims $2^{-\ell_i}$ are positive and sum to exactly 1:
+formally a probability distribution. That observation now carries weight.
+
+### The claims of the matched code, read as a distribution
+
+The matched code for the running source, $A \mapsto \texttt{1}$,
+$B \mapsto \texttt{01}$, $C \mapsto \texttt{001}$, $D \mapsto \texttt{000}$,
+has lengths $(1, 2, 3, 3)$ and claims
+
+$$
+q = \bigl(\tfrac12,\ \tfrac14,\ \tfrac18,\ \tfrac18\bigr).
+$$
+
+On the dyadic source with exactly these probabilities, every codeword length
+equals its symbol's surprisal and $L = H = 1.75$ bits (exercise 6 of
+<Ref lesson="kraft-inequality"/>): the code is **exact** for $q$. Used on the
+actual running source $p = (.5, .25, .15, .1)$, the same code acts as if $C$
+occurred with probability $\tfrac18$ when it occurs with $.15$, and as if $D$
+occurred with probability $\tfrac18$ when it occurs with $.1$. The code bets
+on $q$; the source draws from $p$.
+
+{/* fig CodeAsBet: three aligned columns over the four symbols A, B, C, D
+   (one row per symbol, rows aligned across all columns). Left column: the
+   code table with headers symbol | codeword | $\ell$, rows (A, 1, 1),
+   (B, 01, 2), (C, 001, 3), (D, 000, 3), codewords mono. Middle column
+   titled "the bet $q(x) = 2^{-\ell(x)}$": horizontal amber bars of widths
+   .5, .25, .125, .125 with KaTeX value labels $2^{-1} = .5$, $2^{-2} = .25$,
+   $2^{-3} = .125$, $2^{-3} = .125$. Right column titled "the source $p(x)$":
+   horizontal blue bars .5, .25, .15, .1 with plain value labels. Rows A and
+   B annotated with a small check ("bet matches"); rows C and D flagged: C
+   "bet .125 < true .15" and D "bet .125 > true .1", the mismatched bar pairs
+   emphasized (slightly stronger stroke). Payoff line beneath, KaTeX:
+   "choosing lengths is choosing a distribution: $\ell(x) = -\log_2 q(x)$".
+   Colors: amber = the implied bet q, blue = the true source p, currentColor
+   table and text. One idea: a codeword-length table IS a probability
+   model. */}
+<Figure
+  name="CodeAsBet"
+  alt="The matched code's length table beside two bar columns: the implied distribution q with values one half, one quarter, one eighth, one eighth, and the true source p with values .5, .25, .15, .1; the C and D rows are flagged as mismatched"
+  caption="Lengths (1, 2, 3, 3) are the bet q = (½, ¼, ⅛, ⅛); the true source is p = (.5, .25, .15, .1). The mismatch sits at C and D."
+/>
+
+### The implied distribution of an arbitrary prefix code
+
+For a code that is not complete, the claims sum to less than 1 and
+normalizing them yields a distribution.
+
+<Definition title="implied distribution of a code">
+Let a prefix code have lengths $\ell(x)$ and Kraft sum
+$c = \sum_x 2^{-\ell(x)} \le 1$. Its **implied distribution** is
+$$
+q(x) = \frac{2^{-\ell(x)}}{c},
+$$
+and every codeword length is a surprisal under $q$ plus a constant:
+$\ell(x) = -\log_2 q(x) + \log_2 \tfrac{1}{c}$, with
+$\log_2 \tfrac{1}{c} \ge 0$ by the Kraft inequality.
+</Definition>
+
+Short codewords are exactly high implied probabilities: assigning $C$ a
+3-bit codeword and assigning $C$ implied probability $\tfrac18$ are the same
+act. The Kraft budget of <Ref lesson="kraft-inequality"/> is the statement
+that the bets of a prefix code cannot sum past 1.
+
+<KeyFact>
+Choosing codeword lengths is choosing a probability distribution:
+length $\ell(x)$ is the bet $q(x) \propto 2^{-\ell(x)}$, and shortness
+spent on one symbol is probability withdrawn from the others.
+</KeyFact>
+
+## The floor: expected length is entropy plus mismatch
+
+The bet reading turns the gap $L - H$ into a computable quantity. The
+concrete cases first.
+
+### Two codes priced against the entropy
+
+The running source has $H(p) \approx 1.743$ bits
+(<Ref lesson="prefix-codes"/>). The balanced code (all lengths 2) costs
+$L = 2.00$ bits, a gap of $0.257$; the matched code costs $1.75$, a gap of
+$0.007$. Both gaps are exactly the mismatch between $p$ and each code's bet.
+
+<Example title="the gap is a sum of betting errors">
+For each code, compute $\sum_x p(x) \log_2 \tfrac{p(x)}{q(x)}$, the
+probability-weighted log-ratio of truth to bet.
+
+**Balanced code:** lengths $(2,2,2,2)$, complete, so
+$q = (\tfrac14, \tfrac14, \tfrac14, \tfrac14)$. The terms:
+
+$$
+.5 \log_2 \tfrac{.5}{.25} = .5, \quad
+.25 \log_2 1 = 0, \quad
+.15 \log_2 \tfrac{.15}{.25} \approx -.111, \quad
+.1 \log_2 \tfrac{.1}{.25} \approx -.132 .
+$$
+
+Sum: $.5 - .111 - .132 + 0 \approx 0.257$ bits: the gap $2.00 - 1.743$.
+
+**Matched code:** $q = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$. The $A$
+and $B$ terms vanish ($p = q$ there); the rest:
+
+$$
+.15 \log_2 \tfrac{.15}{.125} \approx .0395, \qquad
+.1 \log_2 \tfrac{.1}{.125} \approx -.0322 .
+$$
+
+Sum: $\approx 0.007$ bits: the gap $1.75 - 1.743$.
+
+**Bounds check:** individual terms go negative (the code over-bets on $D$),
+but each total is positive and equals its code's gap exactly.
+</Example>
+
+### The decomposition: L = H + D + slack
+
+The agreement is an identity. Take any prefix code with lengths $\ell(x)$,
+Kraft sum $c$, and implied distribution $q(x) = 2^{-\ell(x)}/c$. Substituting
+$\ell(x) = -\log_2 q(x) + \log_2 \tfrac1c$ into the expected length:
+
+$$
+L = \sum_x p(x)\,\ell(x)
+= \underbrace{\sum_x p(x) \log_2 \tfrac{1}{p(x)}}_{H(p)}
+\;+\; \underbrace{\sum_x p(x) \log_2 \tfrac{p(x)}{q(x)}}_{D(p \,\|\, q)}
+\;+\; \underbrace{\log_2 \tfrac{1}{c}}_{\text{slack} \,\ge\, 0} .
+$$
+
+The middle term is the *Kullback–Leibler divergence* $D(p\,\|\,q)$, the
+expected extra bits from betting $q$ when the truth is $p$; it gets a lesson
+of its own (<Ref lesson="kl-divergence"/>). The slack term prices an
+incomplete tree: unclaimed budget is length wasted on no symbol
+(<Ref lesson="kraft-inequality"/> showed any slack buys a shorter code).
+What remains to prove is that the mismatch term is never negative.
+
+<Theorem title="Gibbs' inequality">
+For probability distributions $p$ and $q$ on a finite set,
+$$
+D(p \,\|\, q) = \sum_x p(x) \log_2 \frac{p(x)}{q(x)} \;\ge\; 0,
+$$
+with equality if and only if $p = q$.
+
+<Proof>
+If $q(x) = 0$ for some $x$ with $p(x) > 0$, the sum is $+\infty$ and the
+inequality holds. Otherwise use $\ln t \le t - 1$, an inequality valid for
+all $t > 0$ with equality only at $t = 1$ (the graph of $\ln$ lies below its
+tangent at 1). Applied to $t = q(x)/p(x)$ inside the sum:
+
+$$
+-D(p\,\|\,q) \cdot \ln 2
+= \sum_{x:\,p(x)>0} p(x) \ln \frac{q(x)}{p(x)}
+\;\le\; \sum_{x:\,p(x)>0} p(x)\!\left(\frac{q(x)}{p(x)} - 1\right)
+= \sum_{x:\,p(x)>0} q(x) \;-\; 1 \;\le\; 0 .
+$$
+
+Hence $D(p\,\|\,q) \ge 0$. Equality forces $q(x)/p(x) = 1$ wherever
+$p(x) > 0$ and $\sum_{x:\,p(x)>0} q(x) = 1$, i.e. $q = p$.
+</Proof>
+</Theorem>
+
+### The theorem: no code beats the entropy
+
+<Theorem title="entropy floor">
+Every uniquely decodable code for a source $X$ with distribution $p$
+satisfies
+$$
+L \;\ge\; H(X),
+$$
+with equality if and only if $\ell(x) = -\log_2 p(x)$ for every outcome:
+a complete code on a dyadic distribution.
+
+<Proof>
+By McMillan's theorem (<Ref lesson="kraft-inequality"/>), the lengths of any
+uniquely decodable code satisfy $c = \sum_x 2^{-\ell(x)} \le 1$, so the
+implied distribution $q$ and the decomposition above apply:
+
+$$
+L = H(p) + D(p \,\|\, q) + \log_2 \tfrac{1}{c} .
+$$
+
+Gibbs' inequality gives $D(p\,\|\,q) \ge 0$, and $c \le 1$ gives
+$\log_2 \tfrac1c \ge 0$; hence $L \ge H(p)$. Equality requires both
+$q = p$ and $c = 1$, which together say $2^{-\ell(x)} = p(x)$, i.e.
+$\ell(x) = -\log_2 p(x)$: every probability a power of $\tfrac12$, every
+length its symbol's surprisal.
+</Proof>
+</Theorem>
+
+This settles the bound that <Ref lesson="prefix-codes"/> stated without
+proof and <Ref lesson="huffman-by-hand"/> used as the lower half of its
+guarantee. The proof also says exactly where a code's cost goes: the
+entropy is the part no code avoids, the mismatch $D$ is the price of
+betting on the wrong distribution, and the slack is the price of wasting
+tree.
+
+{/* fig CostDecomposition: two horizontal stacked bars over one shared
+   bits-axis from 0 to 2.1 (ticks at 0, 0.5, 1, 1.5, 2), one bar per code on
+   the running source. Top bar "balanced code (2,2,2,2)": blue segment from 0
+   to 1.743 labeled $H(p) = 1.743$, amber segment from 1.743 to 2.00 labeled
+   $D(p\,\|\,q) = 0.257$, right end annotated "L = 2.00". Bottom bar
+   "matched code (1,2,3,3)": blue segment to 1.743, thin amber sliver to
+   1.75, sliver called out with a leader line "$D = 0.007$", right end
+   "L = 1.75". Above both bars the identity in KaTeX with color-bound terms:
+   $L = \textcolor{blue}{H(p)} + \textcolor{amber}{D(p\,\|\,q)} +
+   \log_2(1/c)$, and a note "both codes complete: slack $= 0$". Annotation
+   under the amber segments: "extra bits from betting wrong". Colors: blue =
+   the entropy floor (same in both bars), amber = the mismatch, currentColor
+   axis/labels. One idea: cost = floor + mismatch. */}
+<Figure
+  name="CostDecomposition"
+  alt="Two stacked cost bars for the balanced and matched codes on the running source: each is the same blue entropy segment of 1.743 bits plus an amber mismatch segment of 0.257 and 0.007 bits respectively"
+  caption="Both codes pay the same H(p) = 1.743-bit floor; the difference is the amber mismatch D(p‖q): 0.257 bits for the balanced bet, 0.007 for the matched one."
+/>
+
+<KeyFact>
+$L = H(p) + D(p\,\|\,q) + \text{slack}$: entropy is the unavoidable part,
+mismatch and slack are non-negative, so no lossless code averages below
+$H(p)$, and every excess bit is attributable to a wrong bet or a wasted
+node.
+</KeyFact>
+
+## Achievability: rounding surprisals up costs less than a bit
+
+The floor is approachable from above. The equality condition says lengths
+should be $\ell(x) = -\log_2 p(x)$; when the surprisals are not integers,
+round them up:
+
+$$
+\ell(x) = \lceil -\log_2 p(x) \rceil .
+$$
+
+This is the *Shannon code*: the ceiling-length witness that
+<Ref lesson="huffman-by-hand"/> built to prove its one-bit guarantee, now
+under its proper name. Since $2^{-\lceil -\log_2 p(x) \rceil} \le p(x)$, the
+Kraft sum is at most $\sum_x p(x) = 1$ and the lengths are achievable; since
+each length overshoots its surprisal by less than one bit, $L < H(p) + 1$.
+On the running source the Shannon lengths are $(1, 2, 3, 4)$, costing
+$L = 1.85$ bits: the rounding gaps $(0, 0, 0.263, 0.678)$, weighted by $p$,
+add the $0.107$ bits above $H \approx 1.743$.
+
+{/* fig ShannonCodeRounding: four vertical column pairs over symbols A, B,
+   C, D, sharing a bits-axis 0 to 4 (ticks 0..4). For each symbol: a blue
+   bar of height equal to the surprisal $-\log_2 p(x)$ (values 1, 2, 2.737,
+   3.322, printed at the bar tops) and, behind or beside it, an amber
+   outline bar of height $\lceil -\log_2 p \rceil$ (1, 2, 3, 4); the strip
+   between blue top and amber top lightly amber-shaded, labeled for C and D
+   with the gap values 0.263 and 0.678; A and B annotated "no gap —
+   surprisal already integer". Beneath, one KaTeX tally line:
+   $L = H + \underbrace{0.107}_{\text{expected rounding}} = 1.85$ bits, and
+   the payoff "each gap $< 1$ bit, so $L < H + 1$". Colors: blue =
+   surprisals, amber = ceiling lengths and rounding gaps, currentColor
+   axis. One idea: rounding up costs less than one bit per symbol. */}
+<Figure
+  name="ShannonCodeRounding"
+  alt="Bars comparing each symbol's surprisal 1, 2, 2.737, 3.322 with its ceiling length 1, 2, 3, 4; the shaded rounding gaps of 0.263 and 0.678 bits at C and D are each below one bit"
+  caption="The Shannon code rounds each surprisal up to an integer length. Every gap is below 1 bit, so L = 1.85 < H + 1."
+/>
+
+Huffman coding can only improve on this witness, which yields the two-sided
+guarantee proved in <Ref lesson="huffman-by-hand"/>: the optimal symbol code
+satisfies $H(X) \le L^* < H(X) + 1$.
+
+<KeyFact>
+The floor is approachable: betting $q$ as close to $p$ as integer lengths
+allow costs less than one extra bit per symbol, so the optimal symbol code
+is trapped in $[H, H+1)$.
+</KeyFact>
+
+## Blocks: the overhead is per block, not per symbol
+
+The remaining defect is the one <Ref lesson="huffman-by-hand"/> ended on:
+the $+1$ is paid **per symbol**. The 90/10 coin has $H \approx 0.469$ bits,
+yet any symbol code spends $L = 1$ bit per flip, an overhead of 113%. The
+fix is to enlarge the symbol.
+
+### A block of n symbols is one symbol with entropy nH
+
+Treat $n$ consecutive independent draws $X_1, \dots, X_n$ as a single
+super-symbol $X^n$ over the $2^n$ (in general $|\mathcal{X}|^n$) possible
+blocks. Its entropy needs no new machinery: probabilities of independent
+draws multiply, so surprisals add
+(<Ref lesson="what-is-surprise"/>),
+
+$$
+-\log_2 p(x_1, \dots, x_n) = \sum_{i=1}^{n} -\log_2 p(x_i),
+$$
+
+and taking expectations term by term gives $H(X^n) = n\,H(X)$.
+
+<Theorem title="block coding bound">
+For an i.i.d. source $X$ and any block length $n$, the optimal prefix code
+for blocks of $n$ symbols has expected length $L_n$ satisfying
+$$
+H(X) \;\le\; \frac{L_n}{n} \;<\; H(X) + \frac{1}{n} .
+$$
+
+<Proof>
+Apply the entropy floor and the Shannon-code bound to the super-symbol
+source $X^n$: $H(X^n) \le L_n < H(X^n) + 1$. Substitute
+$H(X^n) = nH(X)$ and divide by $n$.
+</Proof>
+</Theorem>
+
+The up-to-one-bit rounding cost is now paid once per **block**: at most
+$1/n$ bits per symbol, squeezed toward zero by growing $n$.
+
+### The 90/10 coin, coded in blocks
+
+Running the Huffman algorithm of <Ref lesson="huffman-by-hand"/> on the
+$2^n$ block probabilities gives the exact optimal cost per symbol:
+
+| $n$ | block alphabet | $L_n$ (bits/block) | $L_n / n$ (bits/symbol) | gap to $H \approx 0.469$ |
+| --- | --- | --- | --- | --- |
+| 1 | 2 | $1.000$ | $1.000$ | $0.531$ |
+| 2 | 4 | $1.290$ | $0.645$ | $0.176$ |
+| 4 | 16 | $1.970$ | $0.493$ | $0.024$ |
+| 6 | 64 | $2.821$ | $0.470$ | $0.001$ |
+| 8 | 256 | $3.806$ | $0.476$ | $0.007$ |
+
+The $n = 2$ row is the pair code built by hand in
+<Ref lesson="huffman-by-hand"/>. By $n = 6$ the gap is a thousandth of a
+bit. The price is the alphabet: $2^n$ codewords must be built, stored, and
+transmitted.
+
+<FigureSequence
+  name="block-gap"
+  alt="Five frames adding one point each: optimal bits per symbol for block Huffman codes on the 90/10 coin at block sizes 1, 2, 4, 6, 8, dropping from 1.000 toward the dashed entropy line at 0.469, always below the H plus 1 over n guarantee curve"
+  caption="One block size per frame. Watch the amber points fall onto the blue entropy line while staying below the dashed H + 1/n guarantee."
+/>
+
+<Task>
+Step through the five frames and check each gap against the guarantee: at
+every $n$ the point sits below $H + 1/n$. Then reproduce the plot in the
+demo below: load the 90/10 preset and drag $n$ from 1 to 8; the per-symbol
+cost should fall from $1.000$ to within $0.01$ of the entropy line. Switch
+to the fair-coin preset and note the gap is $0$ at every $n$: surprisals
+are already integers.
+</Task>
+
+<Demo
+  name="BlockCodingGap"
+  caption="Optimal block-code cost per symbol against the entropy line, for an adjustable coin bias and block size n = 1–8."
+/>
+
+<Aside>
+The exact per-symbol cost is not monotone in $n$: the table shows $n = 6$
+beating both $n = 7$ ($0.474$) and $n = 8$ ($0.476$) on this coin, because
+how well $2^n$ block probabilities happen to fit integer lengths varies
+with $n$. The theorem never promised monotonicity; it promises the
+squeezing band $[H,\, H + \tfrac1n)$, and every value in the table obeys
+it.
+</Aside>
+
+<KeyFact>
+Block coding pays the rounding bit once per block: $H \le L_n/n < H + 1/n$,
+so the achievable cost per symbol converges to the entropy as the block
+length grows.
+</KeyFact>
+
+## The typical set: where the probability concentrates
+
+The block bound proves that $nH$ bits per block suffice; the typical set
+shows what those bits index. It is the structural reason block coding
+works, and it returns for channel coding in
+<Ref lesson="noisy-channel-coding"/>.
+
+### One hundred flips of the 90/10 coin
+
+A block of $n = 100$ flips has $2^{100}$ possible outcomes. They are far
+from equally likely:
+
+- The single most probable sequence, all heads, has surprisal
+  $100 \cdot 0.152 = 15.2$ bits: probability $2^{-15.2}$, about
+  $3 \cdot 10^{-5}$.
+- A sequence with the *expected* composition, 90 heads and 10 tails, has
+  surprisal $90 \cdot 0.152 + 10 \cdot 3.322 = 46.9$ bits, exactly
+  $nH$. There are $\binom{100}{10} \approx 2^{44}$ such sequences.
+- The all-tails sequence has surprisal $100 \cdot 3.322 = 332$ bits:
+  probability $\approx 10^{-100}$, an event that never occurs in practice.
+
+The draws that actually occur crowd around the expected composition:
+sequences with 5 to 15 tails number about $2^{58}$ (a $2^{-42}$ fraction
+of the $2^{100}$), yet carry $93.6\%$ of the probability. Almost every draw
+is one of relatively few, roughly equiprobable sequences.
+
+### Near-average surprisal defines the set
+
+The engine is the
+[law of large numbers](https://en.wikipedia.org/wiki/Law_of_large_numbers)
+applied to surprisals: the per-symbol surprisal of a block,
+$-\tfrac1n \log_2 p(X^n) = \tfrac1n \sum_i \bigl(-\log_2 p(X_i)\bigr)$, is
+an average of $n$ independent draws of a quantity whose mean is $H(X)$, so
+it concentrates near $H(X)$ as $n$ grows.
+
+<Definition title="typical set">
+For an i.i.d. source $X$ and tolerance $\varepsilon > 0$, the **typical
+set** $T_\varepsilon^{(n)}$ is the set of length-$n$ sequences whose
+per-symbol surprisal is within $\varepsilon$ of the entropy:
+$$
+T_\varepsilon^{(n)} = \Bigl\{ x^n :
+\Bigl| -\tfrac{1}{n} \log_2 p(x^n) - H(X) \Bigr| \le \varepsilon \Bigr\}.
+$$
+Each member has probability between $2^{-n(H+\varepsilon)}$ and
+$2^{-n(H-\varepsilon)}$.
+</Definition>
+
+<Theorem title="asymptotic equipartition, stated">
+For every $\varepsilon > 0$, as $n \to \infty$:
+
+1. $\Pr\bigl(X^n \in T_\varepsilon^{(n)}\bigr) \to 1$: almost all draws are
+   typical.
+2. $\bigl|T_\varepsilon^{(n)}\bigr| \le 2^{\,n(H+\varepsilon)}$: there are
+   only about $2^{nH}$ typical sequences.
+3. $\bigl|T_\varepsilon^{(n)}\bigr| \ge (1-\varepsilon)\,
+   2^{\,n(H-\varepsilon)}$ for $n$ large: and not substantially fewer.
+
+<Proof>
+Sketch only; the full statement and proof are Chapter 3 of
+Cover & Thomas. (1) is the law of large numbers applied to the i.i.d.
+surprisals $-\log_2 p(X_i)$, which have mean $H(X)$ and finite variance on
+a finite alphabet. (2) is counting: each typical sequence has probability
+at least $2^{-n(H+\varepsilon)}$, and the total probability is at most 1,
+so at most $2^{n(H+\varepsilon)}$ of them fit. (3) follows the same way
+from (1): the set eventually holds mass at least $1 - \varepsilon$, and
+each member's probability is at most $2^{-n(H-\varepsilon)}$.
+</Proof>
+</Theorem>
+
+{/* fig TypicalSetMap: one large rounded rectangle representing the space
+   of all length-n sequences, corner label in KaTeX "$2^{n}$ sequences
+   (here $2^{100}$)". Inside, a much smaller amber rounded region (roughly
+   1/8 of the area, clearly a small minority) labeled "typical set
+   $T_\varepsilon^{(n)}$: $\approx 2^{nH} \approx 2^{47}$ sequences" with a
+   second line "carries $\approx$ all the probability". The surrounding
+   area muted, labeled "atypical: almost never drawn". Two marked dots
+   outside the amber region with short leader labels: near one corner "all
+   heads — the single most probable sequence, still atypical", far corner
+   "all tails: surprisal 332 bits". One annotation arrow into the amber
+   region: "indexing these needs only $\log_2 2^{nH} = nH$ bits". Colors:
+   amber = the typical set, currentColor frame and text, muted for the
+   atypical region. One idea: almost all probability sits in ~2^{nH}
+   near-equiprobable sequences. */}
+<Figure
+  name="TypicalSetMap"
+  alt="A large rectangle of all 2 to the n sequences containing a small amber typical-set region of about 2 to the nH sequences that carries almost all probability; the all-heads and all-tails sequences sit outside it"
+  caption="The typical set: a vanishing fraction of sequence space (≈2⁴⁷ of 2¹⁰⁰ for 100 flips of the 90/10 coin) that carries almost all the probability."
+/>
+
+### Why nH bits is the right count, in both directions
+
+The typical set explains the block bound's number. **Sufficiency:** a block
+coder can spend $\lceil n(H+\varepsilon) \rceil + 1$ bits to index the
+typical sequences and fall back on $n + O(1)$ raw bits for the rare
+atypical remainder; the expected cost per symbol approaches $H$.
+**Necessity:** the $\approx 2^{nH}$ typical sequences are nearly
+equiprobable, and no lossless scheme can give short names to more than a
+vanishing share of $2^{nH}$ nearly equal claimants: fewer than
+$n(H - \varepsilon)$ bits provide $2^{n(H-\varepsilon)}$ names, a
+$2^{-n\varepsilon}$ fraction of what is needed.
+
+This section asserts the typical set's properties with a sketch rather than
+a full proof: the "lite" of this lesson. The floor proved
+earlier needed none of it: the decomposition argument is complete on its
+own. [MacKay's chapter 4](https://www.inference.org.uk/mackay/itila/)
+builds the source coding theorem entirely on the typical set instead.
+
+<KeyFact>
+A long block concentrates on $\approx 2^{nH}$ roughly equiprobable typical
+sequences: naming one of them takes $nH$ bits, and almost every draw is one
+of them: compression is possible exactly because so few sequences
+actually occur.
+</KeyFact>
+
+<Aside>
+MacKay's accounting makes the same point with two numbers. The *raw bit
+content* of $n$ flips is $\log_2 2^n = n$ bits: the cost of naming any
+outcome whatsoever. The *essential bit content* $H_\delta$ is the cost of
+naming any outcome outside a set of probability at most $\delta$ that the
+coder agrees to ignore. His Theorem 4.1: for any fixed tolerance
+$\delta > 0$, the essential bit content per symbol tends to $H$ as
+$n \to \infty$: the plateau of nearly all the probability sits at
+$\approx 2^{nH}$ outcomes regardless of how strict $\delta$ is. Allowing
+any fixed failure probability, however small, buys the full compression to
+$H$; allowing none still costs $n$ bits for the last atypical stragglers,
+which is why practical schemes attach a cheap escape code instead of
+ignoring them.
+</Aside>
+
+## The source coding theorem
+
+The pieces assemble into the module's headline result, first stated as
+[Theorem 9 of Shannon's 1948 paper](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf)
+(the "fundamental theorem for a noiseless channel").
+
+<Theorem title="source coding theorem">
+Let $X$ be an i.i.d. source with entropy $H(X)$. Then:
+
+1. **Converse.** Every uniquely decodable code for blocks of $n$ symbols
+   has expected length per symbol at least $H(X)$.
+2. **Achievability.** For every $n$ there is a prefix code for blocks of
+   $n$ symbols with expected length per symbol below $H(X) + \tfrac1n$.
+
+The infimum of achievable expected bits per symbol over all lossless codes
+and all block lengths is exactly $H(X)$.
+
+<Proof>
+Both halves were proved above. The converse is the entropy floor applied to
+the super-symbol source $X^n$: $L_n \ge H(X^n) = nH(X)$, using McMillan to
+cover every uniquely decodable code. Achievability is the Shannon code on
+blocks: $L_n < H(X^n) + 1 = nH(X) + 1$. Dividing both by $n$ gives the two
+statements, and letting $n \to \infty$ closes the infimum onto $H(X)$.
+</Proof>
+</Theorem>
+
+Entropy thereby acquires its **operational meaning**: $H(X)$ is not merely
+a formula from <Ref lesson="entropy-as-average-surprise"/> but the measured
+price, in bits per symbol, of transmitting the source losslessly: the
+number that the best possible engineering converges to and cannot cross.
+
+### What the theorem does and does not say
+
+Three boundaries, each load-bearing:
+
+- **The bound is on the expectation.** Individual messages compress below
+  $H$ routinely: the all-heads block of 100 flips gets a short codeword in
+  any good block code. The average over the source cannot.
+- **Lossless is essential.** Codes that tolerate reconstruction error can
+  go below $H$; how far, as a function of the tolerated distortion, is the
+  subject of <Ref lesson="rate-distortion"/>.
+- **Independence is assumed.** For sources with memory (English text is
+  the standing example), the floor is the *entropy rate*, the per-symbol
+  entropy given unbounded context, which is lower than the single-symbol
+  $H$. <Ref lesson="entropy-of-english"/> measures it.
+
+{/* fig EntropyWall: a horizontal bits-per-symbol number line for the 90/10
+   coin, axis from 0.4 to 1.1 with ticks. At $H \approx 0.469$ a bold blue
+   vertical wall (thick line segment) labeled "$H(X)$ — the floor". The
+   region left of the wall lightly hatched/muted, labeled "unreachable for
+   lossless codes". Right of the wall, a shaded band $[H, H+1)$ (extending
+   off-axis to the right, annotated "symbol codes land here") with an amber
+   marker at 1.0 labeled "Huffman/Shannon, $n=1$". Amber markers converging
+   onto the wall from the right at 0.645, 0.493, 0.470 labeled "$n=2$",
+   "$n=4$", "$n=6$", with a curved arrow over them toward the wall labeled
+   "block codes $\to H$". Colors: blue = the entropy wall, amber = the
+   codes' costs, currentColor axis, muted hatching for the forbidden
+   region. One idea: H is a hard wall — approached from the right,
+   never crossed. */}
+<Figure
+  name="EntropyWall"
+  alt="A number line with a blue wall at the entropy 0.469 bits per symbol; the region below is marked unreachable, symbol codes sit at 1.0, and block codes at 0.645, 0.493, 0.470 converge onto the wall from the right"
+  caption="The source coding theorem on the 90/10 coin: lossless codes approach the entropy wall from the right and never cross it."
+/>
+
+<KeyFact>
+The module in one line: the Kraft inequality decides which length sets
+exist, Gibbs' inequality proves none of them averages below $H(X)$, the
+Shannon code comes within one bit, and block coding closes the gap:
+entropy is exactly the cost of lossless description.
+</KeyFact>
+
+<Aside>
+The bet reading of this theorem is the bridge to the machine-learning
+module. A code's cost decomposes as $H(p) + D(p\,\|\,q)$; a probabilistic
+model assigned the role of $q$ pays the same two terms, and
+$\sum_x p(x) \log_2 \tfrac{1}{q(x)} = H(p) + D(p\,\|\,q)$ is exactly the
+cross-entropy loss minimized when training a classifier or a language
+model (<Ref lesson="cross-entropy-loss"/>). Training a model to predict
+and designing a code to compress are the same optimization; the exact
+correspondence is <Ref lesson="compression-is-prediction"/>.
+</Aside>
+
+## Exercises
+
+<Exercise>
+For the running source $p = (.5, .25, .15, .1)$ and the balanced code with
+lengths $(2, 2, 2, 2)$: compute the Kraft sum $c$, the implied distribution
+$q$, and $D(p\,\|\,q)$ term by term, and verify the decomposition
+$L = H(p) + D(p\,\|\,q) + \log_2 \tfrac1c$ numerically
+(use $H(p) \approx 1.743$).
+
+<Solution>
+Kraft sum: $c = 4 \cdot 2^{-2} = 1$: complete, slack $\log_2 \tfrac11 = 0$.
+Implied distribution: $q = (\tfrac14, \tfrac14, \tfrac14, \tfrac14)$.
+
+Terms of $D(p\,\|\,q)$:
+$.5 \log_2 \tfrac{.5}{.25} = .5 \cdot 1 = .5$;
+$.25 \log_2 \tfrac{.25}{.25} = 0$;
+$.15 \log_2 \tfrac{.15}{.25} = .15 \cdot (-0.737) \approx -.111$;
+$.1 \log_2 \tfrac{.1}{.25} = .1 \cdot (-1.322) \approx -.132$.
+
+$D(p\,\|\,q) \approx .5 + 0 - .111 - .132 = 0.257$ bits.
+
+Decomposition: $H + D + \text{slack} \approx 1.743 + 0.257 + 0 = 2.000$
+bits, matching $L = \sum_x p(x) \cdot 2 = 2$ exactly.
+</Solution>
+</Exercise>
+
+<Exercise>
+The matched code's lengths $(1, 2, 3, 3)$ are assigned to a source with the
+probabilities reversed: $p = (.1, .15, .25, .5)$ against lengths
+$(1, 2, 3, 3)$ in that order — the shortest codeword on the rarest symbol.
+Compute $L$, then compute $D(p\,\|\,q)$ against the code's implied
+distribution $q = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$, and verify
+$L = H(p) + D(p\,\|\,q)$. ($H(p) \approx 1.743$: entropy is invariant
+under relabeling, per <Ref lesson="entropy-as-average-surprise"/>.)
+
+<Solution>
+Expected length:
+$L = .1 \cdot 1 + .15 \cdot 2 + .25 \cdot 3 + .5 \cdot 3 = 2.65$ bits.
+
+Mismatch, term by term:
+$.1 \log_2 \tfrac{.1}{.5} = .1 \cdot (-2.322) \approx -.232$;
+$.15 \log_2 \tfrac{.15}{.25} = .15 \cdot (-0.737) \approx -.111$;
+$.25 \log_2 \tfrac{.25}{.125} = .25 \cdot 1 = .25$;
+$.5 \log_2 \tfrac{.5}{.125} = .5 \cdot 2 = 1$.
+
+$D(p\,\|\,q) \approx -.232 - .111 + .25 + 1 = 0.907$ bits.
+
+Verification: the code is complete ($c = 1$, no slack), and
+$H + D \approx 1.743 + 0.907 = 2.650 = L$. Betting exactly backwards costs
+$0.907$ extra bits per symbol, more than half the entropy itself.
+</Solution>
+</Exercise>
+
+<Exercise>
+Build the Shannon code for the source $p = (.4, .3, .2, .1)$: compute the
+four surprisals, the ceiling lengths, and the Kraft sum; verify the lengths
+are achievable; compute $L$ and check $H \le L < H + 1$ with
+$H \approx 1.846$ (computed in <Ref lesson="entropy-as-average-surprise"/>).
+Compare with the Huffman cost $1.9$ bits found in exercise 1 of
+<Ref lesson="huffman-by-hand"/>.
+
+<Solution>
+Surprisals: $-\log_2 .4 \approx 1.322$, $-\log_2 .3 \approx 1.737$,
+$-\log_2 .2 \approx 2.322$, $-\log_2 .1 \approx 3.322$.
+
+Ceiling lengths: $(2, 2, 3, 4)$. Kraft sum:
+$\tfrac14 + \tfrac14 + \tfrac18 + \tfrac1{16} = \tfrac{11}{16} \le 1$:
+achievable by the shortest-first construction of
+<Ref lesson="kraft-inequality"/>.
+
+Expected length:
+$L = .4 \cdot 2 + .3 \cdot 2 + .2 \cdot 3 + .1 \cdot 4 = 2.4$ bits.
+
+Bounds: $1.846 \le 2.4 < 2.846$: the guarantee holds. Huffman achieves
+$1.9$ bits on the same source: the Shannon code proves the $H + 1$ bound
+but is not optimal — its large slack ($\log_2 \tfrac{16}{11} \approx 0.54$
+bits) is exactly the sort of waste Huffman eliminates.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the uniform three-symbol source $p = (\tfrac13, \tfrac13, \tfrac13)$,
+$H = \log_2 3 \approx 1.585$ bits: (a) give the Shannon-code lengths and
+cost; (b) run the Huffman algorithm and give its cost; (c) explain via the
+equality condition of the entropy floor why no code reaches $1.585$;
+(d) code pairs of symbols (9 equiprobable outcomes) with Huffman lengths
+and give the new per-symbol cost.
+
+<Solution>
+(a) Every surprisal is $\log_2 3 \approx 1.585$, so every Shannon length is
+$\lceil 1.585 \rceil = 2$: $L = 2$ bits.
+
+(b) Merges: $\tfrac13 + \tfrac13 = \tfrac23$, then the root. Lengths
+$(1, 2, 2)$: $L = \tfrac13 (1 + 2 + 2) = \tfrac53 \approx 1.667$ bits.
+
+(c) Equality requires $\ell(x) = -\log_2 p(x)$ for every symbol; $1.585$ is
+not an integer, so no integer length set attains the floor. The Huffman
+gap $1.667 - 1.585 = 0.082$ bits is irreducible at block length 1.
+
+(d) Pairs: 9 outcomes of probability $\tfrac19$ each. Huffman on 9
+equiprobable symbols gives 7 codewords of length 3 and 2 of length 4
+(Kraft sum $7 \cdot \tfrac18 + 2 \cdot \tfrac1{16} = 1$):
+$L_2 = \tfrac{7 \cdot 3 + 2 \cdot 4}{9} = \tfrac{29}{9} \approx 3.222$ bits
+per pair, i.e. $1.611$ per symbol. The gap falls from $0.082$ to $0.026$
+bits, consistent with the block bound $\tfrac{L_2}{2} < H + \tfrac12$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Using the block coding bound, find a block length $n$ that guarantees an
+overhead below $0.01$ bits per symbol for every i.i.d. source. Then explain
+what the 90/10 table's $n = 6$ row (gap $0.001$) shows about the difference
+between the guarantee and actual performance.
+
+<Solution>
+The bound gives overhead $\tfrac{L_n}{n} - H < \tfrac1n$, so
+$\tfrac1n \le 0.01$, i.e. $n \ge 100$, guarantees the target for any
+source.
+
+The guarantee is a worst case over sources. For the 90/10 coin the exact
+optimal block code already has a gap of $0.001 < \tfrac16$ at $n = 6$: the
+$2^6 = 64$ block probabilities happen to fit integer lengths well. The
+bound certifies $1/n$ without inspecting the source; particular sources
+reach the floor much faster (and non-monotonically: the $n = 8$ gap is
+larger than the $n = 6$ gap).
+</Solution>
+</Exercise>
+
+<Exercise>
+For $n = 100$ flips of the 90/10 coin, using the surprisal arithmetic of
+<Ref lesson="what-is-surprise"/>: (a) compute the surprisal of a sequence
+with 90 heads and 10 tails and compare it to $nH$; (b) compute the
+surprisal and per-symbol surprisal of the all-heads sequence, and state
+whether the single most probable sequence is typical; (c) estimate the
+fraction of the $2^{100}$ sequences that the $\approx 2^{nH}$ typical
+sequences occupy.
+
+<Solution>
+(a) Surprisals add over independent flips:
+$90 \cdot 0.152 + 10 \cdot 3.322 = 13.68 + 33.22 = 46.9$ bits, exactly
+$nH = 100 \cdot 0.469$. Any sequence with the 90/10 composition lands
+exactly on $nH$; that is what makes it typical.
+
+(b) All heads: $100 \cdot 0.152 = 15.2$ bits, per-symbol surprisal
+$0.152$. This is the most probable single sequence, but $0.152$ is far
+from $H \approx 0.469$, so it lies outside every small-$\varepsilon$
+typical set: typicality means average-looking composition, not high
+probability of the individual sequence.
+
+(c) $2^{nH} / 2^n = 2^{46.9 - 100} = 2^{-53.1} \approx 10^{-16}$: the
+typical set is a vanishing sliver of sequence space, which is why indexing
+it with $\approx 47$ bits instead of $100$ is possible.
+</Solution>
+</Exercise>
+
+<Exercise>
+The theorem claims no *lossless* code beats $H$, not merely no prefix code.
+Reconstruct the chain of results that closes this gap, naming the theorem
+from <Ref lesson="kraft-inequality"/> that does the work and stating where
+the entropy-floor proof uses it.
+
+<Solution>
+A lossless code here is a uniquely decodable code: every concatenated
+message has exactly one parse. McMillan's theorem states that the codeword
+lengths of any uniquely decodable code satisfy the same Kraft budget
+$\sum_i 2^{-\ell_i} \le 1$ that prefix codes obey.
+
+The entropy-floor proof uses only that budget: it needs $c \le 1$ to make
+$q(x) = 2^{-\ell(x)}/c$ a distribution and to make the slack
+$\log_2 \tfrac1c$ non-negative. Nothing in the decomposition
+$L = H + D + \text{slack}$ refers to the prefix property itself. So the
+floor binds every uniquely decodable code; and conversely, by Kraft
+sufficiency, any lengths such a code achieves are achievable by a prefix
+code — the optimum over both classes coincides, and restricting attention
+to prefix codes loses nothing.
+</Solution>
+</Exercise>
+
+<Exercise>
+The best symbol code for the 90/10 coin has lengths $(1, 1)$ and $L = 1$
+bit, an overhead of $0.531$ bits (<Ref lesson="huffman-by-hand"/>).
+Compute the implied distribution of that code and show that the overhead
+is exactly $D(p\,\|\,q)$: identify the wrong bet the code is forced to
+make.
+
+<Solution>
+Lengths $(1, 1)$ give claims $(\tfrac12, \tfrac12)$ with Kraft sum 1:
+$q$ is the fair coin. The code is forced to bet that heads and tails are
+equally likely, because integer lengths on a binary alphabet leave no
+other complete choice.
+
+$$
+D(p\,\|\,q) = .9 \log_2 \tfrac{.9}{.5} + .1 \log_2 \tfrac{.1}{.5}
+= .9 \cdot 0.848 - .1 \cdot 2.322
+\approx 0.763 - 0.232 = 0.531 \text{ bits,}
+$$
+
+which equals $L - H = 1 - 0.469$ exactly (slack is 0). The entire symbol-
+code overhead is the KL cost of modeling a 90/10 coin as fair — and block
+coding removes it by letting the code bet on compositions of many flips
+instead.
+</Solution>
+</Exercise>
+
+<References>
+1. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — Part I, Theorem 9: the fundamental theorem for a noiseless channel, stating $H$ as the achievable limit of bits per symbol.
+2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §5.3–5.4: the bounds $H \le L^* < H + 1$ (Theorem 5.4.1), the $D(p\|q)$ wrong-code decomposition, and block coding (Theorem 5.4.2); ch. 3: the asymptotic equipartition property and the typical set in full.
+3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 4 "The Source Coding Theorem": raw and essential bit content, the typical set, and the block-coding proof (Theorem 4.1); §4.4–4.6 for the typical-set figures this lesson's schematic follows. Free online: https://www.inference.org.uk/mackay/itila/
+</References>

@@ -1,0 +1,616 @@
+English text carries roughly one bit of information per letter while ASCII
+spends eight; the gap is redundancy, and Shannon's guessing game measures
+it. This lesson establishes that number in four steps: the ladder of
+conditional entropies $F_N$, which drops as context grows; the *entropy
+rate*, defined as its limit; the guessing game of
+[Shannon's 1951 paper](https://www.princeton.edu/~wbialek/rome/refs/shannon_51.pdf),
+which turns a reader's next-letter guesses into upper and lower bounds on
+the rate; and the resulting redundancy of roughly 75%. Throughout, the
+alphabet is the 27 symbols a–z plus space, with case and punctuation
+dropped; every number below is tied to that choice.
+
+## Context buys bits: the ladder of conditional entropies
+
+The single-letter frequencies of English give an entropy of about $4.1$
+bits per character, computed in
+<Ref lesson="entropy-as-average-surprise"/>. That number treats each letter
+as an independent draw. English letters are not independent: after the
+letter *q*, the next letter is almost always *u*, and the conditional
+distribution of the next letter collapses nearly to a point. Its entropy,
+$H(X_{n+1} \mid X_n = q)$, is close to zero bits, against $4.1$ without
+the context.
+
+Averaging over all contexts is exactly the conditional entropy of
+<Ref lesson="joint-and-conditional-entropy"/>. Shannon organized these
+averages into a sequence: the *N-gram entropy* $F_N$ is the conditional
+entropy of the next letter given $N-1$ preceding letters,
+
+$$
+F_N = H(X_N \mid X_1, X_2, \ldots, X_{N-1}),
+$$
+
+with $F_1 = H(X_1)$, the monogram entropy, and $F_0 = \log_2 27 \approx
+4.76$ bits by convention: the cost of a letter with no statistics at all.
+
+### Measured rungs: Shannon's 1951 table
+
+From letter, digram, and trigram frequency tables, and from word
+frequencies via [Zipf's law](https://en.wikipedia.org/wiki/Zipf%27s_law),
+Shannon computed the first rungs for the 27-letter alphabet:
+
+| $F_N$ | conditions on | bits per letter |
+| --- | --- | --- |
+| $F_0$ | nothing: 27 equiprobable symbols | $4.76$ |
+| $F_1$ | letter frequencies | $4.03$ |
+| $F_2$ | one preceding letter (digrams) | $3.32$ |
+| $F_3$ | two preceding letters (trigrams) | $3.1$ |
+| $F_{\text{word}}$ | word frequencies (Zipf fit) | $2.14$ |
+
+Each added letter of context buys bits: $0.73$ from $F_1$ to $F_2$,
+another $0.2$ to $F_3$. The word-level figure comes from an entropy of
+$11.82$ bits per word divided by $5.5$ symbols per word (average word
+length $4.5$ letters plus one space). The ladder stops at $N = 3$ for a
+mechanical reason: an $N$-gram table has $27^N$ entries, and no corpus of
+1951 (or a printed table) supported reliable frequencies past trigrams.
+
+{/* fig ApproximationsLadder: horizontal bar chart, one idea: each rung of
+   conditioning buys bits. Six rows top to bottom on a shared bits axis
+   0–5 (ticks 0..5): F0 = 4.76 "nothing — 27 equiprobable symbols",
+   F1 = 4.03 "letter frequencies", F2 = 3.32 "1 preceding letter",
+   F3 = 3.1 "2 preceding letters", F_word = 2.14 "word frequencies (Zipf)",
+   then a shaded band from 0.6 to 1.3 labeled "F_100 — guessing game
+   (Shannon 1951)". Bars amber fill; band blue, hatched or translucent.
+   Left labels: the KaTeX symbol (F_0, F_1, F_2, F_3, F_word, F_100) plus
+   the conditioning description in small muted text; value at each bar's
+   right end ("4.76 bits" etc.). Colors: amber = the descending bars (the
+   subject), blue = the F_100 band only. Numbers from Shannon 1951 §2 and
+   §6, 27-letter alphabet. */}
+<Figure
+  name="ApproximationsLadder"
+  alt="Horizontal bars descending from 4.76 bits (27 equiprobable symbols) through 4.03 (letter frequencies), 3.32 (digrams), 3.1 (trigrams), and 2.14 (word statistics), down to a shaded 0.6–1.3 band from the guessing game at 100 letters of context"
+  caption="Shannon's ladder for the 27-symbol alphabet: every added rung of statistical structure lowers the per-letter entropy."
+/>
+
+The monogram values differ across sources: Shannon's counts give
+$F_1 = 4.03$ bits, while the table in
+[MacKay](https://www.inference.org.uk/mackay/itila/) §2.1, used in
+<Ref lesson="entropy-as-average-surprise"/>, gives $4.11$. Letter
+frequencies are corpus estimates, and every rung inherits their
+uncertainty; the shape of the ladder, not the second decimal, is the
+result.
+
+<KeyFact>
+The $4.1$-bit monogram figure is not the entropy of English: it prices
+letters as independent draws and ignores all structure between them. Each
+letter of conditioning context strictly lowers the per-letter cost.
+</KeyFact>
+
+<Aside>
+Shannon's 1948 paper, [§3](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf),
+runs the same ladder in the generative direction: sample text *from* each
+approximation and watch it approach English. A trigram-level sample reads
+"IN NO IST LAT WHEY CRATICT FROURE BIRS GROCID…", and a second-order word
+approximation produces "THE HEAD AND IN FRONTAL ATTACK ON AN ENGLISH
+WRITER THAT THE CHARACTER OF THIS POINT IS THEREFORE ANOTHER METHOD…":
+locally plausible, globally empty. The better a model's sample text looks,
+the fewer bits per letter the model needs; the ladder read in either
+direction is the same fact.
+</Aside>
+
+## The entropy rate: the limit of the ladder
+
+The measured rungs decrease: $4.76, 4.03, 3.32, 3.1, \ldots$ The sequence
+cannot decrease forever, since every conditional entropy is at least $0$.
+A decreasing sequence bounded below converges; the limit is the number the
+opening paragraph promised.
+
+<Definition title="entropy rate">
+For a stationary source $X_1, X_2, \ldots$ over a finite alphabet, the
+**entropy rate** is
+$$
+H_{\text{rate}} = \lim_{N \to \infty} H(X_N \mid X_1, \ldots, X_{N-1})
+= \lim_{N \to \infty} F_N,
+$$
+in bits per symbol: the per-letter uncertainty given unlimited preceding
+context. For stationary sources this limit exists and equals
+$\lim_{N \to \infty} \tfrac{1}{N} H(X_1, \ldots, X_N)$
+([Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X),
+Theorem 4.2.1); Exercise 3 connects the two forms.
+</Definition>
+
+*Stationary* means the statistics do not depend on position: the
+distribution of $(X_{k+1}, \ldots, X_{k+n})$ is the same for every shift
+$k$. English prose is treated as approximately stationary: letter
+statistics in chapter 12 match those in chapter 1.
+
+<Theorem title="the ladder never rises">
+For a stationary source, $F_{N+1} \le F_N$ for every $N \ge 1$, and the
+limit $H_{\text{rate}}$ exists.
+
+<Proof>
+Fix the shorter context $(X_2, \ldots, X_N)$. For each of its values,
+adding the observation $X_1$ cannot raise the average uncertainty about
+$X_{N+1}$: this is conditioning-reduces-entropy from
+<Ref lesson="joint-and-conditional-entropy"/>, applied under each context
+value and then averaged over contexts. Hence
+$$
+F_{N+1} = H(X_{N+1} \mid X_1, \ldots, X_N)
+\le H(X_{N+1} \mid X_2, \ldots, X_N).
+$$
+By stationarity, shifting all indices down by one leaves the right side
+unchanged: $H(X_{N+1} \mid X_2, \ldots, X_N) = H(X_N \mid X_1, \ldots,
+X_{N-1}) = F_N$. The sequence $(F_N)$ is non-increasing and bounded below
+by $0$, so it converges.
+</Proof>
+</Theorem>
+
+{/* fig BitsPerContext: line plot, one idea: the limit of the dropping
+   curve is the entropy rate. Axes: x = letters of known context N (marks
+   at 0, 1, 2, 3, then an axis break, then 100), y = bits per letter, 0–5.
+   Amber points at (0, 4.76), (1, 4.03), (2, 3.32), (3, 3.1), connected by
+   a dashed amber curve continuing downward past the axis break; at
+   N = 100 a blue vertical error bar from 0.6 to 1.3 (the experimental
+   bounds). A dashed horizontal guide line through ~1 bit labeled
+   "H_rate — the entropy rate" (KaTeX H_{rate}); label each early point
+   with its value. Colors: amber = the F_N curve, blue = the measured
+   bounds bar. */}
+<Figure
+  name="BitsPerContext"
+  alt="Bits per letter against letters of known context: points at 4.76, 4.03, 3.32, 3.1 for 0–2 letters of context, falling toward a 0.6–1.3 error bar at 100 letters, with a dashed asymptote near one bit labeled entropy rate"
+  caption="F_N against context length: the curve falls toward its limit, the entropy rate — on the order of one bit per letter."
+/>
+
+<KeyFact>
+The entropy of English means the entropy rate: per-letter uncertainty with
+unlimited context. For English it is on the order of $1$ bit per letter,
+a quarter of the monogram figure.
+</KeyFact>
+
+## Shannon's guessing game: the speaker is the model
+
+Extending the table method to $F_{100}$ requires the joint statistics of
+$27^{100}$ contexts. No corpus fills that table. What is needed is the
+conditional distribution of the next letter given a long context; where it
+lives is in the head of every fluent reader, who has absorbed the words,
+grammar, and idioms of the language. Shannon's method queries that
+implicit model directly.
+
+The protocol: show a subject $N-1$ letters of an unfamiliar text. The
+subject guesses the next letter; if wrong, guesses again, until correct.
+Record the number of guesses, reveal the letter, advance one position, and
+repeat. The output is one *guess rank* per position: a $1$ means the
+first guess was right, a $17$ means sixteen wrong guesses came first.
+
+<FigureSequence
+  name="guessing-game"
+  alt="Five frames of the guessing game on the text IT IS: each frame reveals one position, lists the subject's guesses until the correct letter, and appends the guess count to a tally row that ends 4, 2, 1, 2, 1"
+  caption="The guessing game on a five-symbol text. Each position yields one number: how many guesses the correct letter took."
+/>
+
+<Task>
+Step through the five frames. Check that context is doing the work: the
+first position, guessed blind, costs 4 tries, while every position with a
+word underway costs 1 or 2. The output of the whole game is only the tally
+row: ranks $4, 2, 1, 2, 1$.
+</Task>
+
+Shannon's demonstration runs show how strong human prediction is. On a
+129-letter passage, his subject guessed 89 of the letters (69%) right on
+the first try. In the guess-until-correct variant on a 102-symbol text, 79
+positions took one guess, 8 took two, 3 took three, 2 each took four and
+five, and only 8 needed more. For the systematic experiment he drew 100
+passages from a novel and had the subject play at every context length
+$N-1 = 0, 1, \ldots, 14$, and $99$.
+
+### The reduced text: ranks carry the same information
+
+The rank sequence looks like a loss of information; it is not. Suppose a
+second subject exists with **exactly the same prediction model**:
+Shannon's "identical twin", in practice the same person following a fixed
+guessing rule. Given the ranks alone, the twin replays the game: at each
+position the twin generates guesses in the same order, and the rank says
+which guess is the true letter. The text reconstructs perfectly; Exercise
+6 runs this decoding on a toy predictor.
+
+The predictor is therefore an invertible transducer: original text in,
+*reduced text* (the rank sequence) out, and back again with the same
+predictor. Both directions look only at the current symbol and the $N-1$
+preceding text letters, so the transformation preserves $N$-gram
+statistics, and the reduced text has the same entropy per symbol as
+English itself. What the translation changes is the *shape* of the
+frequencies: complicated constraints among letters become a single wildly
+skewed distribution over ranks, mass piled on rank 1.
+
+<KeyFact>
+Text and rank sequence are two encodings of the same information: given
+the predictor, each reconstructs the other. Measuring the ranks measures
+English.
+</KeyFact>
+
+## Bounds from the guess-rank frequencies
+
+Let $q_i$ denote the fraction of positions resolved on guess $i$ when the
+subject knows $N-1$ preceding letters, with $q_1 \ge q_2 \ge \cdots \ge
+q_{27}$ and $q_{28} = 0$. For an ideal predictor — one that always guesses
+in order of decreasing conditional probability — the rank frequencies pin
+$F_N$ between two computable numbers.
+
+<Theorem title="Shannon's guessing bounds">
+For the ideal predictor with $N-1$ known letters,
+$$
+\sum_{i=1}^{27} i\,(q_i - q_{i+1}) \log_2 i
+\;\le\; F_N \;\le\;
+-\sum_{i=1}^{27} q_i \log_2 q_i .
+$$
+The upper bound holds for any predictor whose guessing order is a fixed
+function of the known context, a human included; the lower bound is proved
+only for the ideal predictor.
+
+<Proof>
+Sketch of the upper bound. The rank sequence has the same $N$-gram entropy
+as the text (previous section). By the ladder theorem, its per-symbol
+conditional entropy $F_N$ is at most its $F_1$, and $F_1$ of the rank
+sequence is exactly the entropy of the rank distribution,
+$-\sum_i q_i \log_2 q_i$: ignoring inter-rank structure can only
+overestimate. Any deterministic guesser yields a valid rank encoding, so
+the bound needs no ideal predictor.
+
+The lower bound is Shannon's rectangular-decomposition argument
+([1951](https://www.princeton.edu/~wbialek/rome/refs/shannon_51.pdf), §5):
+among all sources whose ideal-prediction rank frequencies equal $q$, the
+least uncertain one splits into blocks of equally probable guesses, and
+its entropy is the left-hand sum. Equality requires every context to offer
+a set of equally probable next letters; real English does not, which is
+one reason the two bounds stay apart.
+</Proof>
+</Theorem>
+
+The coding reading of the upper bound: build a prefix code for the rank
+alphabet matched to $q$, per <Ref lesson="prefix-codes"/>. The rank stream
+then costs about $-\sum_i q_i \log_2 q_i$ bits per symbol
+(<Ref lesson="source-coding-theorem-lite"/>), and the rank stream
+reconstructs the text. A concentrated guess distribution is a cheap code
+for English; the peaked histogram *is* the low entropy.
+
+{/* fig GuessRankHistogram: vertical bar chart, one idea: a peaked rank
+   distribution means low entropy. x axis = guess rank 1..6 (then "7+"
+   empty), y axis = fraction of positions 0–0.7. Amber bars at heights
+   0.65, 0.15, 0.10, 0.05, 0.025, 0.025 with the value printed above each
+   bar; the rank-1 bar carries a short callout "two thirds of letters:
+   first guess" (blue text with thin pointer line). Caption territory:
+   this is the worked 40-position tally of the Example below. Colors:
+   amber = bars, blue = the callout only. */}
+<Figure
+  name="GuessRankHistogram"
+  alt="Histogram of guess ranks from a 40-position game: 65% of letters guessed on the first try, 15% on the second, 10% on the third, and a thin tail out to rank six"
+  caption="Guess-rank frequencies from the worked 40-position game below. The mass piled on rank 1 is what drives both bounds down."
+/>
+
+### Shannon's measured bounds
+
+Applying the bounds to the guess tallies at each context length (100
+samples per column, smoothed) gave:
+
+| known letters | 0 | 1 | 2 | 4 | 9 | 14 | 99 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| upper bound | $4.03$ | $3.42$ | $3.0$ | $2.7$ | $2.1$ | $2.1$ | $1.3$ |
+| lower bound | $3.19$ | $2.50$ | $2.1$ | $1.7$ | $1.0$ | $1.2$ | $0.6$ |
+
+The zero-context column reproduces the monogram $F_1 = 4.03$ exactly: with
+no context the ideal guesser works from letter frequencies alone. At 99
+letters of context the estimate lands between $0.6$ and $1.3$ bits per
+letter. The bumps along the way (the lower bound rising from $1.0$ to
+$1.2$) are sampling error from 100-sample columns, flagged by Shannon
+himself.
+
+<Remark title="what the estimate measures">
+Three qualifications. The bounds coincide only in idealized limits; a
+finite game gives a range, not a value. The upper bound measures the
+*predictor's model* of English, which can only overestimate the true rate:
+a better predictor produces a more concentrated rank distribution and a
+lower bound on the same text.
+[Cover and King (1978)](https://ieeexplore.ieee.org/document/1055912/)
+sharpened the protocol by having subjects bet on their guesses, estimating
+approximately $1.3$ bits per symbol. And every figure is relative to the
+declared 27-symbol alphabet: restoring case and punctuation changes each
+number. <Ref lesson="compression-is-prediction"/> replaces the human with
+a trained language model and reads its loss as exactly this game's score.
+</Remark>
+
+## A worked estimate from one short game
+
+<Example title="from tally to bounds">
+Suppose a 40-position game on an unfamiliar passage produces the tally
+
+| guess rank $i$ | 1 | 2 | 3 | 4 | 5 | 6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| positions | 26 | 6 | 4 | 2 | 1 | 1 |
+| $q_i$ | $.65$ | $.15$ | $.10$ | $.05$ | $.025$ | $.025$ |
+
+**Upper bound: the entropy of the rank distribution.** Surprisals:
+$-\log_2 .65 = 0.621$, $-\log_2 .15 = 2.737$, $-\log_2 .10 = 3.322$,
+$-\log_2 .05 = 4.322$, $-\log_2 .025 = 5.322$. Weighted:
+
+$$
+.65 \times 0.621 + .15 \times 2.737 + .10 \times 3.322
++ .05 \times 4.322 + 2 \times .025 \times 5.322
+$$
+$$
+= 0.404 + 0.411 + 0.332 + 0.216 + 0.266 = 1.63 \text{ bits.}
+$$
+
+**Lower bound: $\sum_i i\,(q_i - q_{i+1}) \log_2 i$**, with $q_7 = 0$.
+The $i = 1$ term vanishes ($\log_2 1 = 0$), and $i = 5$ vanishes
+($q_5 = q_6$):
+
+$$
+2(.15 - .10)(1) + 3(.10 - .05)(1.585) + 4(.05 - .025)(2)
++ 6(.025)(2.585)
+$$
+$$
+= 0.100 + 0.238 + 0.200 + 0.388 = 0.93 \text{ bits.}
+$$
+
+**Estimate.** The game places the per-letter entropy between $0.93$ and
+$1.63$ bits, consistent with Shannon's $0.6$–$1.3$ from a hundred times
+the data. Forty positions is a small sample; the bounds carry error bars
+of the same order as the interval itself.
+
+**A non-estimate, for contrast.** The average number of guesses is
+$(26 \cdot 1 + 6 \cdot 2 + 4 \cdot 3 + 2 \cdot 4 + 1 \cdot 5 + 1 \cdot 6)/40
+= 69/40 \approx 1.7$ guesses per letter. That number is not an entropy;
+only the distribution of ranks, pushed through the bounds, is.
+</Example>
+
+<Task>
+Run the game yourself, with a partner and a paragraph the guesser has not
+read. Use the 27-symbol alphabet: lowercase everything, drop punctuation,
+keep spaces. Play 40 positions, tally the ranks into counts, convert to
+frequencies $q_i$, and compute both bounds as in the example. Expect an
+upper bound between roughly $1$ and $2.5$ bits depending on the text and
+the guesser.
+</Task>
+
+## Redundancy: what the gap is worth
+
+A raw fixed-width encoding of the 27-symbol alphabet spends $\log_2 27
+\approx 4.76$ bits per letter; ASCII spends 8. If the entropy rate is
+about $1.2$ bits per letter, the fraction of the raw encoding that carries
+no information is
+
+$$
+\text{redundancy} = 1 - \frac{H_{\text{rate}}}{\log_2 27}
+\approx 1 - \frac{1.2}{4.76} \approx 0.75.
+$$
+
+Shannon's statement: long-range statistics reduce the entropy of ordinary
+literary English to about one bit per letter, "with a corresponding
+redundancy of roughly 75%". His 1948 estimate, using only statistics out
+to about eight letters, was $2.3$ bits per letter and roughly 50%
+redundancy; the extra 25 points came from the long-range structure only
+the guessing game could reach.
+
+{/* fig RedundancyBar: one idea: most of written English is predictable
+   structure. Two horizontal bars sharing a bits axis 0–8. Top bar: length
+   4.76, labeled "fixed-width, 27 symbols: log2 27 = 4.76 bits"; its left
+   segment 0–1.2 filled amber and labeled "information ≈ 1.2 bits", the
+   remainder muted/hatched labeled "redundancy ≈ 75% — removable by
+   lossless compression". Bottom bar: length 8, labeled "ASCII: 8 bits",
+   same amber 1.2-bit segment at left, rest muted. Colors: amber = the
+   information content (the subject); currentColor/muted = the redundant
+   remainder; no third color. */}
+<Figure
+  name="RedundancyBar"
+  alt="Two bars on a shared bits axis: a 4.76-bit fixed-width slot and an 8-bit ASCII slot, each with the same 1.2-bit information segment shaded and the remainder marked as redundancy"
+  caption="Per letter stored: 4.76 bits (fixed-width) or 8 (ASCII). Per letter carried: about 1.2. The rest is redundancy."
+/>
+
+By the source coding theorem of
+<Ref lesson="source-coding-theorem-lite"/>, the entropy rate is the floor
+for lossless compression of English, and the redundancy is exactly the
+compressible fraction: a perfect compressor would shrink ASCII text by a
+factor near $8/1.2 \approx 7$. Reaching the floor requires a coder driven
+by a model as good as the human predictor: the subject of
+<Ref lesson="compression-is-prediction"/>, and the reason
+[MacKay](https://www.inference.org.uk/mackay/itila/) (ch. 6) builds stream
+codes around a predictive model.
+
+<KeyFact>
+Redundancy $= 1 - H_{\text{rate}} / \log_2 27 \approx 75\%$: roughly
+three quarters of printed English is determined by structure rather than
+free choice, and that fraction is what lossless compression can remove.
+</KeyFact>
+
+<Aside>
+Redundancy is why damaged English survives. Shannon's 1948 discussion
+notes that a language of zero redundancy would make any letter string
+valid text: errors would be undetectable, and (his example) any
+two-dimensional letter array would be a valid crossword. English's
+redundancy is what lets a reader repair "th_ r__m w_s n_t v_ry l_ght",
+and what crossword constructors fight against: too much redundancy and
+few grids fill; none, and every grid does. The same margin is what
+error-correcting codes will spend deliberately in the channel-coding
+module.
+</Aside>
+
+## Exercises
+
+<Exercise>
+A toy language over the alphabet $\{t, h, e\}$ has adjacent-pair joint
+distribution
+
+| $p(x_1, x_2)$ | $x_2 = t$ | $x_2 = h$ | $x_2 = e$ |
+| --- | --- | --- | --- |
+| $x_1 = t$ | $0$ | $3/8$ | $1/8$ |
+| $x_1 = h$ | $0$ | $0$ | $1/4$ |
+| $x_1 = e$ | $1/8$ | $1/8$ | $0$ |
+
+Compute the marginal entropy $H(X_2)$ and the conditional entropy
+$H(X_2 \mid X_1)$ by the weighted-average form, and state the toy
+language's first ladder step $F_1 \to F_2$. Use
+$\log_2 3 \approx 1.585$.
+
+<Solution>
+**Marginals.** Rows: $p(t) = \tfrac12$, $p(h) = \tfrac14$,
+$p(e) = \tfrac14$. Columns: $p(t) = \tfrac18$,
+$p(h) = \tfrac38 + \tfrac18 = \tfrac12$,
+$p(e) = \tfrac18 + \tfrac14 = \tfrac38$.
+
+**Marginal entropy.**
+$H(X_2) = \tfrac18 \cdot 3 + \tfrac12 \cdot 1 + \tfrac38 \log_2
+\tfrac83 = 0.375 + 0.5 + 0.375 \times 1.415 \approx 1.41$ bits.
+
+**Row entropies.** Given $t$: $(0, \tfrac34, \tfrac14)$, entropy
+$H(\tfrac14) \approx 0.811$ bits. Given $h$: $(0, 0, 1)$, entropy $0$.
+Given $e$: $(\tfrac12, \tfrac12, 0)$, entropy $1$ bit.
+
+**Weighted average.**
+$H(X_2 \mid X_1) = \tfrac12 \times 0.811 + \tfrac14 \times 0 +
+\tfrac14 \times 1 \approx 0.656$ bits.
+
+**Ladder step.** $F_1 \approx 1.41$ bits, $F_2 \approx 0.66$ bits: one
+letter of context removes $0.75$ bits, more than half the per-letter
+uncertainty: the toy version of English's $4.03 \to 3.32$.
+</Solution>
+</Exercise>
+
+<Exercise>
+A 20-position guessing game yields the tally: rank 1 fourteen times,
+rank 2 three times, rank 3 twice, rank 4 once. Compute Shannon's upper
+and lower bounds on the per-letter entropy. Use $\log_2 .7 \approx
+-0.515$, $\log_2 .15 \approx -2.737$, $\log_2 .10 \approx -3.322$,
+$\log_2 .05 \approx -4.322$, $\log_2 3 \approx 1.585$.
+
+<Solution>
+Frequencies: $q_1 = .7$, $q_2 = .15$, $q_3 = .10$, $q_4 = .05$,
+$q_5 = 0$.
+
+**Upper bound.**
+$-\sum q_i \log_2 q_i = .7 \times 0.515 + .15 \times 2.737 + .10 \times
+3.322 + .05 \times 4.322 = 0.360 + 0.411 + 0.332 + 0.216 \approx 1.32$
+bits.
+
+**Lower bound.** $\sum i (q_i - q_{i+1}) \log_2 i$: the $i = 1$ term is
+$0$; $i = 2$: $2(.15 - .10)(1) = 0.100$; $i = 3$:
+$3(.10 - .05)(1.585) = 0.238$; $i = 4$: $4(.05 - 0)(2) = 0.400$. Sum
+$\approx 0.74$ bits.
+
+The 20-position game brackets the entropy between $0.74$ and $1.32$
+bits per letter, with error bars the size of the interval: the tally is
+ten times smaller than one column of Shannon's experiment.
+</Solution>
+</Exercise>
+
+<Exercise>
+Using the two-variable chain rule of
+<Ref lesson="joint-and-conditional-entropy"/> repeatedly, show that
+$$
+H(X_1, X_2, \ldots, X_N) = \sum_{k=1}^{N} F_k ,
+$$
+and conclude that $\tfrac{1}{N} H(X_1, \ldots, X_N)$ — the per-letter
+cost of describing a block of $N$ letters — is the running average of
+the ladder, and therefore also converges to $H_{\text{rate}}$ for a
+stationary source.
+
+<Solution>
+**Chain.** The two-variable rule $H(A, B) = H(A) + H(B \mid A)$ with
+$A = (X_1, \ldots, X_{N-1})$ and $B = X_N$ gives
+$$
+H(X_1, \ldots, X_N) = H(X_1, \ldots, X_{N-1})
++ H(X_N \mid X_1, \ldots, X_{N-1}).
+$$
+The last term is $F_N$. Applying the same step to
+$H(X_1, \ldots, X_{N-1})$, and so on down to $H(X_1) = F_1$, unrolls the
+joint entropy into $\sum_{k=1}^N F_k$.
+
+**Average.** Dividing by $N$,
+$\tfrac1N H(X_1, \ldots, X_N) = \tfrac1N \sum_{k=1}^N F_k$: the mean of
+the first $N$ rungs. If $F_k \to H_{\text{rate}}$, then for any
+$\varepsilon$ all but finitely many terms lie within $\varepsilon$ of
+the limit; the finitely many exceptional terms contribute at most a
+constant divided by $N$, which vanishes. Hence the running mean
+converges to the same limit (the Cesàro-mean argument), which is
+Theorem 4.2.1 of Cover & Thomas: block description cost per letter and
+conditional-entropy limit agree.
+</Solution>
+</Exercise>
+
+<Exercise>
+A novel contains $500{,}000$ characters. Compute its size in ASCII
+(8 bits per character), its information content at an entropy rate of
+$1.2$ bits per character, the ideal compression factor, and the
+redundancy relative to a fixed-width 27-symbol encoding
+($\log_2 27 \approx 4.755$).
+
+<Solution>
+ASCII: $500{,}000 \times 8 = 4{,}000{,}000$ bits $= 500{,}000$ bytes,
+about $0.5$ MB. Information content: $500{,}000 \times 1.2 = 600{,}000$
+bits $= 75{,}000$ bytes. Ideal compression factor:
+$8 / 1.2 \approx 6.7$. Redundancy:
+$1 - 1.2/4.755 \approx 1 - 0.252 = 0.748 \approx 75\%$.
+
+The entropy rate is a floor, not an achieved figure: reaching $75$ kB
+requires a coder whose predictive model matches a fluent reader's;
+dictionary compressors with short memories stop well short of it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose a "language" produces 27 symbols independently and uniformly at
+random. Determine the ideal predictor's guess-rank frequencies $q_i$,
+and evaluate both of Shannon's bounds. State what the result says about
+flat versus peaked rank histograms.
+
+<Solution>
+Every conditional distribution is uniform, so every guessing order is
+ideal, and each guess is correct with probability $\tfrac{1}{27}$
+regardless of rank: $q_i = \tfrac{1}{27}$ for $i = 1, \ldots, 27$.
+
+**Upper bound.** $-\sum_{i=1}^{27} \tfrac{1}{27} \log_2 \tfrac{1}{27}
+= \log_2 27 \approx 4.75$ bits.
+
+**Lower bound.** For $i < 27$, $q_i - q_{i+1} = 0$; only $i = 27$
+survives: $27 \times \tfrac{1}{27} \times \log_2 27 = \log_2 27$.
+
+The bounds coincide at $\log_2 27$: for a memoryless uniform source the
+game measures the entropy exactly, and prediction buys nothing. A
+perfectly flat rank histogram certifies incompressibility; the entire
+entropy saving of English is visible as the peak of its histogram at
+rank 1.
+</Solution>
+</Exercise>
+
+<Exercise>
+A toy predictor over $\{A, B, C\}$ guesses in a fixed order determined
+by the previous letter: after $A$ it guesses $B, A, C$; after $B$:
+$A, C, B$; after $C$: $A, B, C$; at the start of the text: $A, B, C$.
+Decode the rank sequence $2, 1, 1, 3, 1$ into text, then re-encode your
+text into ranks to verify the round trip. State what this shows about
+the information content of the reduced text.
+
+<Solution>
+**Decode.** Position 1: start order $(A, B, C)$, rank 2 $\to B$.
+Position 2: after $B$, order $(A, C, B)$, rank 1 $\to A$. Position 3:
+after $A$, order $(B, A, C)$, rank 1 $\to B$. Position 4: after $B$,
+order $(A, C, B)$, rank 3 $\to B$. Position 5: after $B$, order
+$(A, C, B)$, rank 1 $\to A$. Text: $B\,A\,B\,B\,A$.
+
+**Re-encode.** $B$ at the start is guess 2; $A$ after $B$ is guess 1;
+$B$ after $A$ is guess 1; $B$ after $B$ is guess 3; $A$ after $B$ is
+guess 1. Ranks: $2, 1, 1, 3, 1$. The round trip closes.
+
+Given the predictor, text and ranks determine each other, position by
+position; the maps are mutually inverse. Two sequences related by an
+invertible, context-respecting recoding carry the same information and
+have the same entropy rate. This is why measuring the rank distribution
+in the guessing game measures English itself.
+</Solution>
+</Exercise>
+
+<References>
+1. C. E. Shannon, "Prediction and Entropy of Printed English," *Bell System Technical Journal*, 30, 1951, pp. 50–64 — the lesson's primary source: §2 the $F_N$ ladder from letter, digram, trigram, and word statistics; §3 the prediction experiments and the reduced text; §5 the entropy bounds from prediction frequencies; §6 the experimental bounds, $0.6$–$1.3$ bits per letter at 100 letters of context.
+2. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — §3 the series of approximations to English with generated samples; §7 the ≈50% redundancy estimate from statistics out to about eight letters.
+3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §4.2 entropy rate and Theorem 4.2.1 (the two limits agree); §6.4 the entropy of English; §6.6 the gambling estimate of the entropy of English.
+4. T. M. Cover, R. C. King, "A Convergent Gambling Estimate of the Entropy of English," *IEEE Transactions on Information Theory*, 24(4), 1978, pp. 413–421 — sequential betting at 27-for-1 odds; estimates approximately $1.3$ bits per symbol.
+5. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §2.1 the English monogram distribution behind the $4.11$-bit figure; ch. 6 "Stream Codes": compression driven by a predictive model. Free online: https://www.inference.org.uk/mackay/itila/
+</References>

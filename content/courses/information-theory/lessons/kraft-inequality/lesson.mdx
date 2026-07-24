@@ -1,0 +1,600 @@
+A codeword of length L claims the fraction 2^-L of a fixed budget of one,
+and a prefix code exists with a given set of lengths exactly when those
+fractions sum to at most one — the Kraft inequality. This lesson proves both
+directions: the disjoint subtrees of a prefix code force the bound
+$\sum_i 2^{-\ell_i} \le 1$, and a shortest-first placement realizes any
+lengths that obey it. The closing sections read equality as a complete code
+tree with no wasted nodes, and state McMillan's theorem: every uniquely
+decodable code obeys the same bound, so prefix codes give up nothing.
+
+## A codeword owns its subtree: the cost of length ℓ
+
+The code tree of <Ref lesson="prefix-codes"/> assigns each codeword the node
+its bit path reaches, and the prefix condition puts every codeword at a
+leaf: no codeword lies on the path to another. This section prices a node.
+
+### The fraction is the same at every depth
+
+Fix the codeword `10`. A binary string begins with `10` exactly when its
+node lies in the subtree below `10`. At depth 3 that is 2 strings of 8
+(`100` and `101`); at depth 4, 4 of 16; at depth $D \ge 2$, exactly
+$2^{D-2}$ of the $2^D$ strings of that length. The fraction is constant:
+
+$$
+\frac{2^{D-2}}{2^{D}} = 2^{-2} = \tfrac{1}{4}
+\qquad \text{at every depth } D.
+$$
+
+{/* fig SubtreeClaim: a binary tree drawn to depth 4, currentColor skeleton
+   with 0/1 bit labels on the edges. The node reached by the path 10 (depth 2)
+   is an amber pill labeled `10`; its entire subtree — the nodes 100, 101,
+   1000…1011 and the dangling edges below depth 4 — sits inside one amber
+   shaded region (fill ~10% opacity, dashed amber outline) labeled "all
+   strings starting 10". To the right of the tree a small column tallies the
+   count per depth in KaTeX: "depth 3: $2$ of $8$", "depth 4: $4$ of $16$",
+   vertical dots, "depth $D$: $2^{D-2}$ of $2^D$", each line reducing to the
+   same fraction, with the payoff line "the codeword 10 claims
+   $2^{-2} = \tfrac14$ of the tree at every depth" ($2^{-2}$ and $\tfrac14$
+   in amber). Colors: amber = the codeword and its claim, currentColor
+   everything else. One idea: a codeword owns the constant fraction
+   $2^{-\ell}$ of the tree. */}
+<Figure
+  name="SubtreeClaim"
+  alt="A binary tree with the codeword 10 highlighted and its whole subtree shaded; counts at depths 3 and 4 show the subtree holds 2 of 8, then 4 of 16 strings: one quarter at every depth"
+  caption="The codeword 10 owns its subtree: one quarter of the tree's strings at every depth."
+/>
+
+The same count holds for any length: below a codeword of length $\ell$ sit
+$2^{D-\ell}$ of the $2^D$ strings at each depth $D \ge \ell$, the fraction
+$2^{-\ell}$. And in a prefix code no codeword is an ancestor or descendant
+of another, so distinct codewords claim **disjoint** subtrees.
+
+### One budget shared by all codewords
+
+Disjoint fractions of one tree sum to at most 1.
+[MacKay's chapter 5](https://www.inference.org.uk/mackay/itila/) (§5.2)
+prices this as a budget: all codewords spend from a total budget of 1, and
+a codeword of length $\ell$ costs $2^{-\ell}$. Short codewords are
+expensive (length 1 costs $\tfrac12$, length 2 costs $\tfrac14$); long
+ones are nearly free (length 20 costs less than one millionth).
+
+<Remark title="the budget bounds cost, not count">
+$\sum_i 2^{-\ell_i} \le 1$ does not bound the number of codewords. Three
+codewords of length 1 are already impossible (cost $\tfrac32$), while a
+million codewords of length 30 together cost
+$10^6 \cdot 2^{-30} < 0.001$. What the budget rations is shortness, not
+quantity.
+</Remark>
+
+<KeyFact>
+A codeword of length $\ell$ claims the fraction $2^{-\ell}$ of the code
+tree; in a prefix code the claims are disjoint and spend from a single
+budget of 1.
+</KeyFact>
+
+<Aside>
+The tree picture has an arithmetic twin. Read a codeword
+$c = b_1 b_2 \dots b_\ell$ as the binary fraction $0.b_1 b_2 \dots b_\ell$;
+the strings beginning with $c$ correspond to the half-open interval
+$[0.c,\; 0.c + 2^{-\ell}) \subseteq [0, 1)$ of length $2^{-\ell}$. The
+prefix condition says the intervals of distinct codewords are disjoint, and
+the Kraft inequality says disjoint subintervals of $[0,1)$ have total
+length at most 1. This interval reading returns in
+<Ref lesson="compression-is-prediction"/>, where arithmetic coding assigns
+intervals from model probabilities.
+</Aside>
+
+## Spending the budget: (1, 2, 3, 3) fits, (1, 2, 2, 2) collides
+
+The matched code of <Ref lesson="prefix-codes"/>, with $A \mapsto 1$,
+$B \mapsto 01$, $C \mapsto 001$, $D \mapsto 000$, has lengths
+$(1, 2, 3, 3)$. Its claims:
+
+$$
+2^{-1} + 2^{-2} + 2^{-3} + 2^{-3}
+= \tfrac12 + \tfrac14 + \tfrac18 + \tfrac18 = 1.
+$$
+
+The budget is spent exactly. The four subtrees tile the tree with nothing
+left over, and no fifth codeword of any length fits: any positive cost
+overflows.
+
+<FigureSequence
+  name="budget-fill"
+  alt="A budget bar of total 1 filling as the codewords 1, 01, 001, 000 are added: 1/2, then 1/4, then 1/8, then 1/8, reaching exactly 1; an attempted fifth codeword of length 2 overflows to 1.25"
+  caption="One codeword per frame; each fills 2^-ℓ of the bar. Step through and check every running sum: after D the bar reads exactly 1, and the attempted fifth codeword of length 2 finds nothing left."
+/>
+
+### The impossible set (1, 2, 2, 2)
+
+Lengths $(1, 2, 2, 2)$ overspend: $2^{-1} + 3 \cdot 2^{-2} = 1.25$. The
+failure is visible without the arithmetic. A length-1 codeword occupies a
+depth-1 node, say `0`, and its claim swallows both depth-2 nodes below it.
+Only `10` and `11` survive for the three length-2 codewords: three
+codewords, two free nodes. Placing the length-1 codeword at `1` instead
+mirrors the same collision, so no assignment works.
+
+{/* fig ImpossibleVsTight: two small tree panels side by side, playbook
+   comparison layout. Left panel titled "lengths 1, 2, 2, 2 — sum 1.25":
+   a depth-2 binary tree; the length-1 codeword sits at node 0 (blue pill)
+   with its subtree shaded blue; two length-2 codewords occupy amber pills at
+   10 and 11; a third amber pill floats beside the tree with a
+   struck-through placement arrow toward the already-shaded node 01, labeled
+   "no free node". Right panel titled "lengths 1, 2, 3, 3 — sum 1": a depth-3
+   tree with pills 0 (length 1), 10 (length 2), 110 and 111 (length 3), each
+   subtree shaded, the shadings tiling the whole tree, annotated "claims tile
+   the tree exactly". Below both panels one line pairs the sums in KaTeX:
+   $1.25 > 1$ (left, warning-styled) versus $1.00$ (right). Colors: amber =
+   the codewords at issue, blue = the length-1 codeword and its claim,
+   currentColor elsewhere. One idea: overspending the budget forces two
+   codewords into one subtree. */}
+<Figure
+  name="ImpossibleVsTight"
+  alt="Two code trees side by side: lengths 1, 2, 2, 2 leave only two free depth-2 nodes for three codewords and collide; lengths 1, 2, 3, 3 tile the tree exactly with sum 1"
+  caption="Sum 1.25 forces a collision; sum 1.00 tiles the tree exactly."
+/>
+
+<Demo
+  name="CodewordBudget"
+  caption="Add and remove codewords of chosen lengths on the tree; the budget bar fills by 2^-ℓ per codeword and turns red past 1."
+/>
+
+<Task>
+Load the impossible preset (1, 2, 2, 2): the bar reads 1.25 and turns red.
+Repair it by hand: lengthen two of the length-2 codewords to length 3. The
+bar drops to exactly 1.00 and every codeword finds a node — the tight
+preset (1, 2, 3, 3). Then load the question-tree preset for the source
+(.5, .25, .15, .1) and read off its lengths from the tree.
+</Task>
+
+<KeyFact>
+One number separates the two cases: lengths (1, 2, 3, 3) cost exactly 1,
+while (1, 2, 2, 2) would cost 1.25, and the overspend appears in the tree
+as two codewords forced into one subtree.
+</KeyFact>
+
+## The Kraft inequality: the budget test is exact
+
+The budget test generalizes to a theorem, named for
+[Kraft's 1949 MIT thesis](https://en.wikipedia.org/wiki/Kraft%E2%80%93McMillan_inequality):
+the sum $\sum_i 2^{-\ell_i}$ against 1 decides achievability in both
+directions. The two directions are genuinely different arguments — a
+counting bound for necessity, a construction for sufficiency.
+
+### Necessity: count descendants at the deepest level
+
+<Example title="the descendant count">
+Take any prefix code with lengths $(1, 2, 3, 3)$ and extend its tree to
+the maximal depth $\ell_{\max} = 3$. The length-1 codeword has
+$2^{3-1} = 4$ descendants at depth 3, the length-2 codeword has $2$, and
+each length-3 codeword is its own single node there:
+
+$$
+4 + 2 + 1 + 1 = 8 = 2^{3}.
+$$
+
+The prefix condition makes the four descendant sets disjoint, and here
+they exhaust depth 3 exactly. For lengths $(1, 2, 2, 2)$ the same count
+demands $2 + 1 + 1 + 1 = 5$ disjoint nodes at depth $\ell_{\max} = 2$,
+where only $2^2 = 4$ exist: no such prefix code.
+</Example>
+
+The general statement follows the same count. Each codeword of length
+$\ell_i$ owns $2^{\ell_{\max} - \ell_i}$ nodes at depth $\ell_{\max}$, the
+sets are disjoint, and depth $\ell_{\max}$ holds only $2^{\ell_{\max}}$
+nodes:
+
+$$
+\sum_i 2^{\ell_{\max} - \ell_i} \le 2^{\ell_{\max}}
+\quad\Longleftrightarrow\quad
+\sum_i 2^{-\ell_i} \le 1.
+$$
+
+This is the budget argument with the infinite tree cut off at a finite
+depth.
+
+### Sufficiency: place codewords shortest-first
+
+The converse asks for a construction: given lengths with
+$\sum_i 2^{-\ell_i} \le 1$, produce a prefix code. Sort the lengths
+$\ell_1 \le \ell_2 \le \cdots \le \ell_m$. Place codeword $i$ at the
+**leftmost** depth-$\ell_i$ node that lies in no claimed subtree, then
+claim its subtree.
+
+<FigureSequence
+  name="construction"
+  alt="Four frames placing the sorted lengths 1, 2, 3, 3 on a depth-3 tree: codeword 0 claims the left half, 10 claims a quarter, 110 and 111 take the last two leaves, ending with the complete prefix code {0, 10, 110, 111}"
+  caption="One placement per frame, always at the leftmost free node of the required depth."
+/>
+
+<Task>
+Step through the four placements. At each frame verify that the chosen
+node is the leftmost node of its depth outside every shaded claim. The
+result {0, 10, 110, 111} is the matched code of the previous lesson with
+its 0/1 labels mirrored: same lengths, same tree shape.
+</Task>
+
+<Example title="the free-node count during construction">
+The construction cannot get stuck while the budget holds. For the lengths
+$(1, 2, 3, 3)$:
+
+1. Length 1: no claims exist; take `0`.
+2. Length 2: the claim of `0` blocks the depth-2 nodes `00` and `01`,
+   $2^{2-1} = 2$ of the $4$; leftmost free is `10`.
+3. Length 3: blocked at depth 3 are $2^{3-1} = 4$ nodes below `0` and
+   $2^{3-2} = 2$ below `10`, together $6$ of $8$; take `110`.
+4. Length 3: now $7$ of $8$ are blocked; take `111`.
+
+At every step the blocked count is
+$\sum_{j<i} 2^{\ell_i - \ell_j} = 2^{\ell_i} \sum_{j<i} 2^{-\ell_j}$,
+strictly less than $2^{\ell_i}$ because the budget leaves at least
+$2^{-\ell_i}$ unspent before codeword $i$ is placed.
+</Example>
+
+Sorting is what makes "free" safe. Every earlier codeword sits at depth
+$\le \ell_i$, so none can lie strictly below the new node: the new
+codeword is neither a prefix nor an extension of any earlier one. Unsorted
+placement can strand a short codeword even when the budget holds: place
+the two length-3 codewords of $(1, 2, 3, 3)$ first at `011` and `100` and
+the length-2 codeword at `00`, and both depth-1 nodes are contaminated —
+the length-1 codeword has nowhere to go although the sum is exactly 1
+(exercise 8).
+
+### The theorem
+
+<Theorem title="Kraft inequality">
+A binary prefix code with codeword lengths $\ell_1, \dots, \ell_m$ exists
+if and only if
+$$
+\sum_{i=1}^{m} 2^{-\ell_i} \le 1.
+$$
+
+<Proof>
+**Necessity.** Let a prefix code with lengths $\ell_1, \dots, \ell_m$ be
+given and set $\ell_{\max} = \max_i \ell_i$. In the full binary tree of
+depth $\ell_{\max}$, the codeword of length $\ell_i$ has exactly
+$2^{\ell_{\max} - \ell_i}$ descendants at depth $\ell_{\max}$. If two
+codewords shared such a descendant, one codeword would be a prefix of the
+other, contradicting the prefix condition; so the descendant sets are
+pairwise disjoint subsets of the $2^{\ell_{\max}}$ depth-$\ell_{\max}$
+nodes. Hence $\sum_i 2^{\ell_{\max} - \ell_i} \le 2^{\ell_{\max}}$;
+dividing by $2^{\ell_{\max}}$ gives the inequality.
+
+**Sufficiency.** Assume $\sum_i 2^{-\ell_i} \le 1$ and sort
+$\ell_1 \le \cdots \le \ell_m$. Assign codewords in this order, each to
+the leftmost depth-$\ell_i$ node that is neither a claimed codeword nor a
+descendant of one. When codeword $i$ is to be placed, each earlier
+codeword $j < i$ (of depth $\ell_j \le \ell_i$) blocks exactly
+$2^{\ell_i - \ell_j}$ of the $2^{\ell_i}$ nodes at depth $\ell_i$: the
+depth-$\ell_i$ nodes in its subtree. The blocked total is
+
+$$
+\sum_{j<i} 2^{\ell_i - \ell_j}
+= 2^{\ell_i} \sum_{j<i} 2^{-\ell_j}
+\le 2^{\ell_i} \bigl(1 - 2^{-\ell_i}\bigr)
+= 2^{\ell_i} - 1 < 2^{\ell_i},
+$$
+
+using $\sum_{j \le i} 2^{-\ell_j} \le 1$. A free node exists. Because all
+earlier codewords sit at depth $\le \ell_i$, none lies strictly below the
+chosen node, and by choice the node is not below any of them: no prefix
+relation arises in either direction. Induction over $i$ completes the
+prefix code with the prescribed lengths.
+</Proof>
+</Theorem>
+
+<Remark title="existence of lengths, not quality of a code">
+The theorem decides whether a length set is achievable; it says nothing
+about which lengths a source deserves. On the source
+$(.5, .25, .15, .1)$, both the balanced lengths $(2, 2, 2, 2)$ and the
+matched lengths $(1, 2, 3, 3)$ pass the test, with expected lengths
+$2.00$ and $1.75$ bits (<Ref lesson="prefix-codes"/>). Kraft rules length
+sets in or out; choosing the best admissible set for a distribution is
+the Huffman algorithm of <Ref lesson="huffman-by-hand"/>.
+</Remark>
+
+<KeyFact>
+The budget test is exact: every prefix code satisfies
+$\sum_i 2^{-\ell_i} \le 1$, and every length set satisfying it is realized
+by the shortest-first construction.
+</KeyFact>
+
+## Equality: complete codes and the length trade-off
+
+<Definition title="complete code">
+A prefix code is **complete** if its lengths satisfy
+$\sum_i 2^{-\ell_i} = 1$.
+</Definition>
+
+In the tree, completeness means no waste: the claims tile the entire tree,
+and no codeword can be added at any length. The codes
+$\{0, 10, 110, 111\}$ and $\{00, 01, 10, 11\}$ are complete; the code
+$\{0, 10, 110\}$ is not, with sum $\tfrac78$. Its unclaimed subtree below
+`111` admits a free extra codeword, or the shortening of `110` to `11`.
+
+### Slack always buys a shorter code
+
+Nonzero slack is never negligible: every term $2^{-\ell_i}$ is a multiple
+of $2^{-\ell_{\max}}$, so the sum is too, and a sum below 1 is below 1 by
+at least $2^{-\ell_{\max}}$. Reducing one longest length from
+$\ell_{\max}$ to $\ell_{\max} - 1$ raises the sum by exactly
+$2^{-\ell_{\max}}$, so the shortened length set still passes the test and
+the construction rebuilds a prefix code for it. An incomplete code always
+wastes describable length; the rebuild may relocate every codeword, but
+the lengths strictly improve.
+
+### At equality, lengths become zero-sum
+
+For a complete code the trade is exact: shortening one codeword by a bit
+doubles its cost, and other codewords must jointly surrender the
+difference by growing longer.
+
+<FigureSequence
+  name="tradeoff"
+  alt="Three frames: four length-2 codewords cost 4 quarters and fill the budget; shortening one to length 1 overflows the budget to 1.25; lengthening two others to length 3 restores the sum to exactly 1"
+  caption="Shortening one codeword overflows the budget; other codewords pay with extra bits."
+/>
+
+<Task>
+Step through the three frames and track the bar: frame 2's overspend is
+$\tfrac12 + 3 \cdot \tfrac14 = 1.25$, and frame 3 restores
+$\tfrac12 + \tfrac14 + \tfrac18 + \tfrac18 = 1$. Compute the total length
+cells before and after: 8 bits of codeword become 9 — one bit saved on A
+costs two bits elsewhere.
+</Task>
+
+<Remark title="the claims will read as probabilities">
+At equality the claims $q_i = 2^{-\ell_i}$ are positive and sum to 1:
+formally a probability distribution over the outcomes. Nothing
+probabilistic has happened — $q_i$ is a share of a tree, not a chance.
+<Ref lesson="source-coding-theorem-lite"/> reads $q$ as the distribution
+the code is implicitly designed for and prices the mismatch between $q$
+and the true source distribution; that step turns the Kraft budget into
+the entropy floor $H(X) \le L$ stated in <Ref lesson="prefix-codes"/>.
+</Remark>
+
+<KeyFact>
+Equality $\sum_i 2^{-\ell_i} = 1$ marks a complete tree with no wasted
+nodes; any slack is at least $2^{-\ell_{\max}}$ and permits a strictly
+shorter length set.
+</KeyFact>
+
+## McMillan's theorem: the same budget for every uniquely decodable code
+
+Prefix codes are a strict subclass of the uniquely decodable codes: the
+code $\{0, 01, 011, 0111\}$ from <Ref lesson="prefix-codes"/> violates the
+prefix condition yet decodes uniquely, with lookahead. Its lengths
+$(1, 2, 3, 4)$ cost $\tfrac{15}{16} \le 1$, although no
+subtree-disjointness argument applies: `01` sits inside the subtree of
+`0`. McMillan's theorem shows the budget bound survives anyway.
+
+<Theorem title="McMillan">
+Every uniquely decodable binary code with codeword lengths
+$\ell_1, \dots, \ell_m$ satisfies $\sum_{i=1}^{m} 2^{-\ell_i} \le 1$.
+
+<Proof>
+Sketch. Let $C = \sum_i 2^{-\ell_i}$ and fix an integer $k \ge 1$. Raising
+the sum to the $k$-th power expands over $k$-tuples of codewords:
+
+$$
+C^k = \sum_{i_1, \dots, i_k} 2^{-(\ell_{i_1} + \cdots + \ell_{i_k})}
+    = \sum_{n} N(n)\, 2^{-n},
+$$
+
+where $N(n)$ counts the $k$-tuples whose concatenation is $n$ bits long.
+Unique decodability is used exactly once: distinct tuples concatenate to
+distinct $n$-bit strings, so $N(n) \le 2^n$ and every term
+$N(n) 2^{-n} \le 1$. Only lengths $n \le k \ell_{\max}$ occur, so
+$C^k \le k \ell_{\max}$ for every $k$. A value $C > 1$ would make the
+left side grow exponentially in $k$ against a linear right side; hence
+$C \le 1$.
+</Proof>
+</Theorem>
+
+Combined with the sufficiency direction of Kraft, the consequence is
+structural: whatever lengths any uniquely decodable code achieves, those
+lengths pass the budget, and the shortest-first construction realizes them
+as a prefix code. For $\{0, 01, 011, 0111\}$ the construction returns
+$\{0, 10, 110, 1110\}$: the same lengths, decodable one bit at a time with
+no lookahead. Minimizing expected length over all uniquely decodable codes
+and over prefix codes therefore produce the same optimum, which is why
+<Ref lesson="source-coding-theorem-lite"/> can restrict attention to
+prefix codes without loss.
+
+{/* fig McMillanReach: two nested rounded rectangles, a two-set Venn by
+   containment. Outer set labeled "uniquely decodable codes" (currentColor
+   outline), inner set labeled "prefix codes" (amber outline, light amber
+   fill). One example code typeset mono inside each region: inner
+   {0, 10, 110, 1110}; outer ring (uniquely decodable but not prefix)
+   {0, 01, 011, 0111}. Across both sets one KaTeX banner:
+   $\sum_i 2^{-\ell_i} \le 1$, annotated "the same length budget (Kraft +
+   McMillan)". Below, one payoff line: "same achievable lengths — prefix
+   codes give up nothing". Colors: amber = the prefix inner set,
+   currentColor elsewhere. One idea: the budget bound is not special to
+   prefix codes. */}
+<Figure
+  name="McMillanReach"
+  alt="Nested sets: prefix codes inside uniquely decodable codes, with the inequality sum of 2 to the minus lengths at most 1 written across both and example codes in each region"
+  caption="The budget bound holds across the larger class: prefix codes achieve every length set any uniquely decodable code achieves."
+/>
+
+<KeyFact>
+Uniquely decodable codes obey the same bound $\sum_i 2^{-\ell_i} \le 1$,
+so any achievable set of lengths is achievable by a prefix code: nothing
+is lost by decoding one bit at a time.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+For each length set, decide by the Kraft sum whether a binary prefix code
+exists; for the achievable sets state the slack $1 - \sum_i 2^{-\ell_i}$:
+(a) $(2, 2, 2, 2)$; (b) $(1, 2, 3, 4)$; (c) $(1, 1, 2)$;
+(d) $(2, 3, 3, 3, 3, 3)$.
+
+<Solution>
+(a) $4 \cdot \tfrac14 = 1 \le 1$: achievable, slack $0$ (a complete code,
+e.g. $\{00, 01, 10, 11\}$).
+
+(b) $\tfrac12 + \tfrac14 + \tfrac18 + \tfrac1{16} = \tfrac{15}{16} \le 1$:
+achievable, slack $\tfrac{1}{16}$.
+
+(c) $\tfrac12 + \tfrac12 + \tfrac14 = 1.25 > 1$: no prefix code.
+
+(d) $\tfrac14 + 5 \cdot \tfrac18 = \tfrac14 + \tfrac58 = \tfrac78 \le 1$:
+achievable, slack $\tfrac18$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Verify that the lengths $(2, 2, 2, 3, 4, 4)$ satisfy the Kraft inequality
+with equality, then build a prefix code for them with the shortest-first
+construction. List the codewords in placement order.
+
+<Solution>
+Sum: $3 \cdot \tfrac14 + \tfrac18 + 2 \cdot \tfrac1{16}
+= \tfrac34 + \tfrac18 + \tfrac18 = 1$: achievable and complete.
+
+Shortest-first, always at the leftmost free node: the three length-2
+codewords take `00`, `01`, `10`. At depth 3, the claims block the eight
+nodes below `00`, `01`, `10`, i.e. $6$ of $8$; the leftmost free node is
+`110`. At depth 4, blocked are $12$ nodes below the length-2 codewords and
+$2$ below `110`, $14$ of $16$; the free nodes are `1110` and `1111`.
+
+Code: $\{00, 01, 10, 110, 1110, 1111\}$. No codeword is a prefix of
+another, and the sum of claims is exactly 1.
+</Solution>
+</Exercise>
+
+<Exercise>
+Use the descendant count at the deepest level to prove that no prefix code
+has lengths $(1, 1, 2)$, and check that the same count does not rule out
+$(2, 3, 3, 3, 3, 3)$.
+
+<Solution>
+For $(1, 1, 2)$: $\ell_{\max} = 2$. Each length-1 codeword owns
+$2^{2-1} = 2$ descendants at depth 2 and the length-2 codeword owns $1$:
+together $2 + 2 + 1 = 5$ disjoint nodes among the $2^2 = 4$ that exist.
+Impossible.
+
+For $(2, 3, 3, 3, 3, 3)$: $\ell_{\max} = 3$. The count is
+$2^{3-2} + 5 \cdot 2^0 = 2 + 5 = 7 \le 8 = 2^3$: consistent, and by the
+sufficiency construction a code exists, e.g.
+$\{00, 010, 011, 100, 101, 110\}$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The prefix code $\{0, 10\}$ is in use. Compute how many codewords of
+length 8 can be added while keeping the code prefix-free, and describe the
+extension.
+
+<Solution>
+The two codewords spend $\tfrac12 + \tfrac14 = \tfrac34$; the remaining
+budget is $\tfrac14$. Each length-8 codeword costs $2^{-8}$, so at most
+$\tfrac14 / 2^{-8} = 2^6 = 64$ fit — and 64 are actually achievable: the
+free subtree is everything below `11`, and the 64 strings
+$\texttt{11}x_1 \dots x_6$ with $x_j \in \{0, 1\}$ are exactly the
+depth-8 nodes outside both claims. Adding all 64 spends the budget to 1: a
+complete code with lengths $(1, 2, 8, \dots, 8)$.
+</Solution>
+</Exercise>
+
+<Exercise>
+State the Kraft inequality for codes over an alphabet of $D$ symbols.
+Test the ternary length set $(1, 1, 2, 2, 2)$ and, if it passes, construct
+a code over $\{0, 1, 2\}$.
+
+<Solution>
+Over a $D$-ary alphabet the code tree is $D$-ary, a codeword of length
+$\ell$ claims the fraction $D^{-\ell}$, and the condition reads
+$\sum_i D^{-\ell_i} \le 1$; both proofs go through with $2$ replaced by
+$D$.
+
+Ternary test: $\tfrac13 + \tfrac13 + 3 \cdot \tfrac19 = \tfrac23 +
+\tfrac13 = 1 \le 1$: achievable with equality.
+
+Shortest-first over $\{0, 1, 2\}$: the length-1 codewords take `0` and
+`1`; the three length-2 codewords take the free depth-2 nodes below `2`:
+$\{0, 1, 20, 21, 22\}$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The complete code $\{0, 10, 110, 111\}$ has claims
+$q = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$. Using the three-step
+method of <Ref lesson="entropy-as-average-surprise"/>, compute the entropy
+$H(q)$, then compute the expected length of this code under the source
+distribution $q$, and state what the agreement of the two numbers
+instantiates.
+
+<Solution>
+Surprisals: $-\log_2 \tfrac12 = 1$, $-\log_2 \tfrac14 = 2$,
+$-\log_2 \tfrac18 = 3$ (twice). Weighted average:
+$$
+H(q) = \tfrac12 \cdot 1 + \tfrac14 \cdot 2 + \tfrac18 \cdot 3 +
+\tfrac18 \cdot 3 = .5 + .5 + .375 + .375 = 1.75 \text{ bits.}
+$$
+
+Expected length under $q$: the lengths are $(1, 2, 3, 3)$, so
+$L = \tfrac12 \cdot 1 + \tfrac14 \cdot 2 + \tfrac18 \cdot 3 + \tfrac18
+\cdot 3 = 1.75$ bits $= H(q)$.
+
+Every codeword length equals the surprisal of its claim,
+$\ell_i = -\log_2 q_i$, so the two weighted sums are identical term by
+term: this is the equality case of the entropy floor $H(X) \le L$ stated
+in <Ref lesson="prefix-codes"/>, attained exactly when the source
+distribution matches the code's claims.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the uniquely decodable, non-prefix code $\{0, 01, 011, 0111\}$:
+(a) compute its Kraft sum; (b) construct a prefix code with the same
+lengths; (c) state the general fact these two computations illustrate.
+
+<Solution>
+(a) $2^{-1} + 2^{-2} + 2^{-3} + 2^{-4} = \tfrac{15}{16} \le 1$, as
+McMillan's theorem requires of any uniquely decodable code.
+
+(b) Shortest-first on $(1, 2, 3, 4)$: $\{0, 10, 110, 1110\}$.
+
+(c) Every uniquely decodable code obeys $\sum_i 2^{-\ell_i} \le 1$
+(McMillan), and any length set obeying it is realized by a prefix code
+(Kraft sufficiency): restricting to prefix codes never sacrifices a single
+codeword length.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lengths $(1, 2, 3, 3)$ satisfy the Kraft inequality with equality, yet
+the following placement gets stuck: length-3 codewords at `011` and `100`,
+then the length-2 codeword at `00`. Show that no depth-1 node remains for
+the length-1 codeword, identify the hypothesis of the shortest-first
+argument that this placement violates, and explain why the failure does
+not contradict the theorem.
+
+<Solution>
+The node `0` has the codewords `00` and `011` in its subtree, and `1` has
+`100`: placing the length-1 codeword at either depth-1 node would make it
+a prefix of an existing codeword. The placement is stuck.
+
+The violated hypothesis is the nondecreasing order. The free-node count
+assumed every earlier codeword has depth $\le \ell_i$, so that codeword
+$j$ blocks $2^{\ell_i - \ell_j} \ge 1$ whole depth-$\ell_i$ subtrees and
+never sits below a candidate node. Here the earlier codewords are deeper
+than the new one, and each blocks its depth-1 ancestor: three codewords
+contaminate both depth-1 nodes.
+
+No contradiction: the theorem guarantees that some assignment achieves the
+lengths, produced by the sorted construction ($\{0, 10, 110, 111\}$), not
+that every partial assignment extends to one.
+</Solution>
+</Exercise>
+
+<References>
+1. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §5.2 states and proves the Kraft inequality via the code tree; §5.5 proves the extension to uniquely decodable codes with McMillan's power-sum argument.
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 5 "Symbol Codes", §5.2: the total-budget-of-1 reading of the Kraft inequality and complete codes. Free online: https://www.inference.org.uk/mackay/itila/
+3. L. G. Kraft, "A device for quantizing, grouping, and coding amplitude-modulated pulses," M.S. thesis, MIT, 1949 — the original inequality for instantaneous (prefix) codes.
+4. B. McMillan, "Two inequalities implied by unique decipherability," *IRE Transactions on Information Theory*, 2(4), 1956 — the same bound for all uniquely decodable codes.
+</References>

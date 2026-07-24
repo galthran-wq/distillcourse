@@ -1,0 +1,738 @@
+The Huffman algorithm builds a minimum-expected-length prefix code by
+repeatedly merging the two least probable symbols. This lesson states the
+merge rule and runs it in full on the running source $(.5, .25, .15, .1)$,
+shows that tie-breaking changes the tree but never the cost, proves
+optimality by an exchange argument, and derives the guarantee
+$H(X) \le L < H(X) + 1$. The closing section measures the flaw the
+guarantee hides: an overhead of up to one bit per symbol.
+
+## Balanced splitting is not optimal
+
+<Ref lesson="prefix-codes"/> ended with a heuristic: choose each question so
+that the remaining probability mass splits as close to half as possible. On
+the running source the heuristic produces the matched code with $L = 1.75$
+bits, and <Ref lesson="kraft-inequality"/> certified its lengths
+$(1, 2, 3, 3)$ as achievable. Nothing so far shows that no admissible
+length set does better.
+
+The heuristic also has a deeper defect: executed perfectly, it can still
+lose. [MacKay's §5.5](https://www.inference.org.uk/mackay/itila/) gives a
+seven-symbol source on which top-down splitting is exactly balanced at the
+first two levels and still overpays:
+
+$$
+p(a), \dots, p(g) \;=\; .01,\; .24,\; .05,\; .20,\; .47,\; .01,\; .02 .
+$$
+
+The split $\{a, b, c, d\}$ against $\{e, f, g\}$ carries mass $.50$ against
+$.50$, and the next split of the left half is $.25$ against $.25$. The
+resulting code spends 2 bits on $e$ and 3 bits on every other symbol:
+$L = 2 \cdot .47 + 3 \cdot .53 = 2.53$ bits. The optimal symbol code for
+the same source, built by the merge rule in exercise 8, has lengths
+$(6, 2, 4, 3, 1, 6, 5)$ and $L = 1.97$ bits. Perfect balance overpaid by
+$0.56$ bits per symbol, 28%, on a source of entropy $H \approx 1.93$.
+
+The failure is structural. A top-down splitter commits the **short**
+codewords first, while it sees only coarse halves of the mass: here it
+locks $e$, nearly half of all draws, into 2 bits before ever examining the
+rare symbols. The fix reverses the direction of construction.
+
+<KeyFact>
+A perfectly balanced top-down split can overpay by half a bit per symbol.
+Optimality requires deciding the tree bottom-up: the deepest level first,
+rarest symbols first.
+</KeyFact>
+
+## The algorithm: merge the two least probable, repeat
+
+Required: for a known distribution $p$, a prefix code minimizing the
+expected length $L = \sum_x p(x)\,\ell(x)$ of
+<Ref lesson="prefix-codes"/>. Method, from
+[Huffman's 1952 paper](https://doi.org/10.1109/JRPROC.1952.273898): build
+the code tree from its leaves, maintaining a pool of weighted subtrees.
+
+1. **Initialize.** One node per symbol, weighted by its probability.
+2. **Merge.** Remove the two nodes of smallest weight; make them the two
+   children of a new node whose weight is their sum; return the new node
+   to the pool.
+3. **Repeat** until a single node of weight $1$ remains: the root. An
+   $m$-symbol source takes exactly $m - 1$ merges.
+4. **Read off.** Each symbol's codeword is the branch string from the root
+   to its leaf, one bit per branch, under any fixed 0/1 labeling.
+
+The merge step encodes one commitment: the two least probable symbols in
+the pool will end as **siblings**, sharing a parent and differing only in
+their last bit. Seen from the parent, the pair is a single symbol of the
+summed probability, so each merge shrinks the alphabet by one and the same
+rule applies again. The optimality section proves this commitment safe;
+first, the run.
+
+<FigureSequence
+  name="huffman-merge"
+  alt="Five frames running Huffman on the source A:.5, B:.25, C:.15, D:.1: C and D merge into a node of weight .25, B and that node merge into .50, A and the .50 node merge into the root, and the final frame labels branches with bits and reads off the codewords 1, 01, 001, 000 with expected length 1.75 bits"
+  caption="One merge per frame, always the two smallest weights in the pool. Final frame: 0/1 per branch, codewords at the leaves."
+/>
+
+<Task>
+Step through the merges. Before advancing each frame, name the two
+smallest weights in the pool and predict the new node's weight:
+$.15 + .1 = .25$, then $.25 + .25 = .50$, then $.5 + .5 = 1.0$. In the
+final frame verify the tally $L = 1.75$ bits.
+</Task>
+
+### The run as a table
+
+<Example title="Huffman code for (.5, .25, .15, .1)">
+Each row lists the pool before the merge, sorted for inspection:
+
+| step | pool | merged pair | new weight |
+| --- | --- | --- | --- |
+| 1 | $.5,\ .25,\ .15,\ .1$ | $C + D$ | $.25$ |
+| 2 | $.5,\ .25,\ .25$ | $B + (CD)$ | $.50$ |
+| 3 | $.5,\ .50$ | $A + (BCD)$ | $1.00$ |
+
+Reading the tree with the figure's labeling gives $A \mapsto \texttt{1}$,
+$B \mapsto \texttt{01}$, $C \mapsto \texttt{001}$,
+$D \mapsto \texttt{000}$: lengths $(1, 2, 3, 3)$ and
+
+$$
+L = .5 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 + .1 \cdot 3 = 1.75
+\text{ bits.}
+$$
+
+**Bounds check:** the merge weights sum to the same number,
+$.25 + .50 + 1.00 = 1.75$. This is an identity, not a coincidence: a
+draw's codeword length counts the internal nodes above its leaf, and an
+internal node's weight is exactly the probability that a draw passes
+through it, so summing the internal weights computes
+$\sum_x p(x) \cdot \mathrm{depth}(x) = L$. The identity is a fast check on
+any hand-built Huffman tree.
+</Example>
+
+The output is the matched code of <Ref lesson="prefix-codes"/>, produced
+this time by an algorithm rather than by inspection. Its cost sits $0.007$
+bits above the source entropy $H \approx 1.743$, and the optimality proof
+below shows that no prefix code sits lower.
+
+{/* fig HuffmanResult: left, the finished Huffman tree for the running
+   source: root 1.0 with children leaf A and node .50; node .50 with
+   children leaf B and node .25; node .25 with children leaves C and D.
+   Branch bits in amber placed as in the huffman-merge sequence (A-side 1,
+   merged-side 0), codewords mono at the leaves: 1, 01, 001, 000. Right, a
+   table with columns symbol | $p$ | codeword | $\ell$ | $p\,\ell$ and rows
+   (A, .5, 1, 1, .50), (B, .25, 01, 2, .50), (C, .15, 001, 3, .45),
+   (D, .1, 000, 3, .30), tally row $L = 1.75$ bits in bold amber. Below,
+   one KaTeX line pairing cost against floor:
+   $H(X) \approx 1.743 \;\le\; L = 1.75$, with a small brace annotated
+   "gap 0.007 bits: the integer-rounding cost". Colors: amber = the code
+   and its cost L, blue = the entropy floor H, currentColor structure. One
+   idea: the finished code and what it costs against entropy. */}
+<Figure
+  name="HuffmanResult"
+  alt="The finished Huffman tree for the source .5, .25, .15, .1 beside its code table; the expected length 1.75 bits sits 0.007 bits above the entropy 1.743"
+  caption="The finished code: lengths (1, 2, 3, 3), expected length 1.75 bits, 0.007 bits above the entropy floor."
+/>
+
+<KeyFact>
+Huffman coding is a single move applied to exhaustion: merge the two
+lightest nodes into one of their summed weight. An $m$-symbol source needs
+$m - 1$ merges, and the internal weights sum to the expected length $L$.
+</KeyFact>
+
+## Ties: different trees, identical cost
+
+When several pool weights tie for smallest, the merge rule does not say
+which pair to take. The choice is genuinely free:
+[MacKay (§5.5)](https://www.inference.org.uk/mackay/itila/) states that
+when there is more than one way of selecting the two least probable
+symbols, the choice may be made in any manner and the expected length of
+the code does not depend on it. The trees, however, can differ, down to
+their length multisets.
+
+<Example title="two Huffman trees for (1/3, 1/3, 1/4, 1/12)">
+Symbols $a, b, c, d$ with $p = (\tfrac13, \tfrac13, \tfrac14,
+\tfrac1{12})$. The first merge is forced:
+$\tfrac14 + \tfrac1{12} = \tfrac13$. The pool is now three nodes of weight
+$\tfrac13$ each — the tie — and any two of them may be merged.
+
+**Choice 1: merge the two original symbols.** $a + b \to \tfrac23$; the
+root joins $\tfrac23$ with the $(cd)$ node. Depths: $a, b$ at 2, and $c,
+d$ at 2 below the $(cd)$ node. Lengths $(2, 2, 2, 2)$:
+$L = 2 \cdot (\tfrac13 + \tfrac13 + \tfrac14 + \tfrac1{12}) = 2$ bits.
+
+**Choice 2: merge an original with the made node.** $b + (cd) \to
+\tfrac23$; the root joins it with $a$. Depths: $a$ at 1, $b$ at 2, $c, d$
+at 3. Lengths $(1, 2, 3, 3)$:
+$L = \tfrac13 \cdot 1 + \tfrac13 \cdot 2 + \tfrac14 \cdot 3 + \tfrac1{12}
+\cdot 3 = \tfrac13 + \tfrac23 + \tfrac34 + \tfrac14 = 2$ bits.
+
+Different shapes, different length multisets, the same $L = 2$ bits
+exactly. Both length sets spend the Kraft budget of
+<Ref lesson="kraft-inequality"/> completely: $4 \cdot \tfrac14 = 1$ and
+$\tfrac12 + \tfrac14 + \tfrac18 + \tfrac18 = 1$.
+</Example>
+
+{/* fig TwoHuffmanTrees: two tree panels side by side over the same
+   distribution (1/3, 1/3, 1/4, 1/12), playbook comparison layout. Left
+   panel titled "merge the two original thirds": balanced depth-2 tree with
+   leaves a, b, c, d all at depth 2, probabilities under each leaf in KaTeX
+   fractions, lengths (2, 2, 2, 2); tally beneath: $L = 2.00$ bits. Right
+   panel titled "merge b with the made third": skewed tree with a at depth
+   1, b at depth 2, c and d at depth 3, lengths (1, 2, 3, 3); tally:
+   $L = \frac13 + \frac23 + \frac34 + \frac14 = 2.00$ bits. The two tied
+   $\frac13$ weights that cause the fork marked blue in both panels; both
+   2.00 tallies bold amber; between the panels a bold double-headed arrow
+   labeled "same cost". One payoff line beneath both: "different shapes,
+   identical expected length". Colors: amber = the equal costs, blue = the
+   tied weights, currentColor trees. One idea: tie-breaking changes the
+   tree, never the cost. */}
+<Figure
+  name="TwoHuffmanTrees"
+  alt="Two valid Huffman trees for the distribution 1/3, 1/3, 1/4, 1/12: a balanced tree with lengths 2, 2, 2, 2 and a skewed tree with lengths 1, 2, 3, 3, both with expected length exactly 2 bits"
+  caption="One tie, two trees: lengths (2, 2, 2, 2) and (1, 2, 3, 3) both cost exactly 2.00 bits on this source."
+/>
+
+Two further freedoms change nothing: the 0/1 labels on branches
+(<Ref lesson="prefix-codes"/> established that cost lives in the lengths
+alone) and which merged node becomes the left child. A drawing that
+differs from someone else's is not evidence of an error; the number to
+compare is $L$.
+
+<KeyFact>
+Huffman trees are not unique: tie-breaking and bit labeling are free, and
+even the length multiset can vary. Every Huffman tree for a source has
+the same expected length.
+</KeyFact>
+
+## Optimality: the exchange argument
+
+### One swap repairs a bad assignment
+
+The engine of the proof is a swap computation. Take the tree shape with
+lengths $(1, 2, 3, 3)$ and assign the running source's symbols against
+their probabilities: $D \mapsto \texttt{1}$, $B \mapsto \texttt{01}$,
+$C \mapsto \texttt{001}$, $A \mapsto \texttt{000}$, putting the rarest
+symbol on the shortest codeword. The cost is
+
+$$
+L = .1 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 + .5 \cdot 3 = 2.55
+\text{ bits.}
+$$
+
+Swapping the codewords of $A$ and $D$ leaves all four lengths in place and
+moves $.4$ of probability mass from depth 3 to depth 1:
+
+$$
+\Delta L = -(p_A - p_D)(3 - 1) = -(.4)(2) = -0.8 \text{ bits,}
+$$
+
+and $L$ drops to $1.75$. In general, swapping the leaves of symbols $i$
+and $j$ changes $L$ by $(p_i - p_j)(\ell_j - \ell_i)$: whenever the more
+probable symbol sits deeper, the swap helps or is neutral.
+
+<FigureSequence
+  name="exchange"
+  alt="Three frames: a tree with lengths 1, 2, 3, 3 whose shortest codeword holds the rarest symbol costs 2.55 bits; swapping the deep frequent symbol with the shallow rare one drops the cost to 1.75 bits with delta minus 0.8; the general rule places the two least probable symbols as siblings at the greatest depth"
+  caption="The exchange argument: swapping a deep frequent leaf with a shallow rare one never raises L."
+/>
+
+<Task>
+Step through the three frames. In frame 2, recompute the tally
+$.5 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 + .1 \cdot 3 = 1.75$ and check it
+against $2.55 - 0.8$ from the swap formula.
+</Task>
+
+### The lemma: the two rarest can sit as bottom siblings
+
+<Theorem title="exchange lemma">
+For every source there is an optimal prefix code in which the two least
+probable symbols have codewords of maximal length that differ only in
+their last bit — deepest siblings in the code tree.
+
+<Proof>
+Fix an optimal prefix code and sort the symbols so that
+$p_1 \ge p_2 \ge \dots \ge p_m$. Three repairs, none increasing $L$:
+
+**Order lengths against probabilities.** If $p_i > p_j$ but
+$\ell_i > \ell_j$, swapping the two codewords changes $L$ by
+$(p_i - p_j)(\ell_j - \ell_i) < 0$, contradicting optimality. Swaps
+between symbols of equal probability change nothing, so after neutral
+swaps $\ell_1 \le \ell_2 \le \dots \le \ell_m$.
+
+**Deepest codewords come in sibling pairs.** Let $w$ be a codeword of
+maximal length and consider its sibling node. No codeword lies strictly
+below the sibling — it would be longer than the maximum — so the sibling
+either carries a codeword or is unclaimed. If unclaimed, replace $w$ by
+its parent: the parent's only codeword descendant was $w$, so the code
+stays prefix-free while $L$ drops by $p_w > 0$, contradicting optimality.
+Hence the sibling carries a codeword, itself of maximal length.
+
+**Move the two least probable to one such pair.** With lengths sorted,
+$\ell_m$ is maximal, and by the previous step the sibling of symbol $m$'s
+codeword carries some symbol $k \le m - 1$ with $p_k \ge p_{m-1}$ and
+$\ell_k$ maximal. Swapping symbols $k$ and $m - 1$ changes $L$ by
+$(p_k - p_{m-1})(\ell_{m-1} - \ell_k) \le 0$; optimality forces the change
+to be exactly $0$, so the swap is free. After it, symbols $m$ and $m - 1$
+are siblings at maximal depth.
+</Proof>
+</Theorem>
+
+### The theorem: greedy merging is optimal
+
+The lemma converts one merge into an exact accounting identity. Commit $C$
+and $D$ of the running source to being deepest siblings and view their
+parent as a single symbol $(CD)$ of weight $.25$. A code for the reduced
+source $(.5, .25, .25)$ — say $A \mapsto \texttt{1}$,
+$B \mapsto \texttt{01}$, $(CD) \mapsto \texttt{00}$ with
+$L' = .5 + .5 + .5 = 1.5$ — expands to a code for the original source by
+appending one bit to the pair's codeword, and that extra bit is paid
+exactly when the draw is $C$ or $D$:
+
+$$
+L = L' + p_C + p_D = 1.5 + .25 = 1.75 .
+$$
+
+The added constant $p_C + p_D$ does not depend on which codes are chosen,
+so minimizing $L$ over the original source and minimizing $L'$ over the
+reduced source are the same problem.
+
+<Theorem title="optimality of Huffman coding">
+For every finite source distribution the Huffman procedure produces a
+prefix code of minimum expected length. By McMillan's theorem
+(<Ref lesson="kraft-inequality"/>), no uniquely decodable code of any kind
+does better.
+
+<Proof>
+Induction on the alphabet size $m$. For $m = 2$, Huffman assigns
+$\texttt{0}$ and $\texttt{1}$; no nonempty codewords are shorter.
+
+Assume the claim for $m - 1$ symbols and sort
+$p_1 \ge \dots \ge p_m$. Any prefix code $C'$ for the reduced source
+$p' = (p_1, \dots, p_{m-2},\, p_{m-1} + p_m)$ expands, by appending
+$\texttt{0}$ and $\texttt{1}$ to the merged symbol's codeword, into a
+prefix code $C$ for $p$ with
+
+$$
+L(C) = L(C') + p_{m-1} + p_m .
+$$
+
+Conversely, the exchange lemma provides an optimal code $C^{*}$ for $p$
+with symbols $m - 1$ and $m$ as deepest siblings; collapsing the pair
+into its parent gives a prefix code for $p'$ with expected length
+$L(C^{*}) - (p_{m-1} + p_m)$. The two directions together give
+
+$$
+L^{*}(p) = L^{*}(p') + p_{m-1} + p_m ,
+$$
+
+where $L^{*}$ denotes the optimal expected length. Huffman's first merge
+realizes exactly this reduction, and by induction its recursive output is
+optimal for $p'$; adding the constant, its output is optimal for $p$.
+Finally, McMillan's theorem bounds every uniquely decodable code by the
+same Kraft budget that prefix codes obey, so the prefix optimum is the
+global optimum among uniquely decodable codes.
+</Proof>
+</Theorem>
+
+<KeyFact>
+Each merge is provably safe: some optimal tree has the two least probable
+symbols as bottom siblings, and collapsing them shrinks the problem by one
+symbol at the fixed cost $p_{m-1} + p_m$. Induction over merges makes the
+greedy tree optimal.
+</KeyFact>
+
+## The one-bit guarantee: H(X) ≤ L < H(X) + 1
+
+### A certificate code from ceiling lengths
+
+The entropy floor of <Ref lesson="prefix-codes"/> bounds the Huffman code
+from below: $H(X) \le L$. An upper bound needs a witness: any explicit
+prefix code will do, since Huffman can only improve on it. The witness assigns
+each symbol the ceiling of its surprisal, $\ell(x) = \lceil -\log_2
+p(x) \rceil$: the integer-rounded version of the target lengths
+$\ell(x) \approx -\log_2 p(x)$ identified in
+<Ref lesson="prefix-codes"/>.
+
+On the running source the surprisals are $(1,\ 2,\ 2.737,\ 3.322)$, so the
+ceiling lengths are $(1, 2, 3, 4)$. Their Kraft sum is
+$2^{-1} + 2^{-2} + 2^{-3} + 2^{-4} = \tfrac{15}{16} \le 1$, so the
+shortest-first construction of <Ref lesson="kraft-inequality"/> realizes
+them, at cost
+
+$$
+L_{\lceil \cdot \rceil} = .5 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 +
+.1 \cdot 4 = 1.85 \text{ bits.}
+$$
+
+The ceiling code is not optimal — Huffman's $1.75$ beats it — but each of
+its lengths overshoots the surprisal by less than one bit, which is all
+the bound requires.
+
+<Theorem title="Huffman lies within one bit of entropy">
+For every source $X$, the expected length $L$ of a Huffman code satisfies
+$$
+H(X) \le L < H(X) + 1 .
+$$
+
+<Proof>
+**Lower bound.** $H(X) \le L$ holds for every prefix code; the statement
+is in <Ref lesson="prefix-codes"/> and the proof, via the Kraft
+inequality, in <Ref lesson="source-coding-theorem-lite"/>.
+
+**Upper bound.** Set $\ell(x) = \lceil -\log_2 p(x) \rceil$. Then
+$2^{-\ell(x)} \le 2^{\log_2 p(x)} = p(x)$, so
+$\sum_x 2^{-\ell(x)} \le \sum_x p(x) = 1$: the lengths satisfy the Kraft
+inequality, and a prefix code with them exists by the sufficiency
+construction. Since $\ell(x) < -\log_2 p(x) + 1$,
+
+$$
+L_{\lceil \cdot \rceil} = \sum_x p(x)\,\ell(x)
+< \sum_x p(x)\bigl(-\log_2 p(x)\bigr) + \sum_x p(x)
+= H(X) + 1 .
+$$
+
+Huffman's code is optimal, so $L \le L_{\lceil \cdot \rceil} < H(X) + 1$.
+</Proof>
+</Theorem>
+
+### Equality is the dyadic case
+
+<Remark title="when Huffman meets entropy">
+$L = H(X)$ forces every codeword length to equal its symbol's surprisal
+(the equality condition of the entropy floor), so it requires every
+probability to be a power of $\tfrac12$ — a *dyadic* distribution. On
+$(\tfrac12, \tfrac14, \tfrac18, \tfrac18)$ the surprisals $(1, 2, 3, 3)$
+are integers and Huffman achieves $L = H = 1.75$ bits exactly
+(exercise 3). On the running source the surprisals $2.737$ and $3.322$
+are not integers, and the $0.007$-bit gap is the rounding cost. Huffman
+does not "achieve entropy"; it achieves the best that integer lengths
+allow.
+</Remark>
+
+{/* fig OneBitGap: two stacked number-line panels sharing one bits-axis
+   style, ticks 0 to 3. Top panel titled "the running source
+   (.5, .25, .15, .1)": blue marker at $H \approx 1.743$ labeled $H$; amber
+   marker at $L = 1.75$ labeled $L_{\text{Huffman}}$; dashed currentColor
+   marker at $H + 1 \approx 2.743$; a light band shading the interval
+   $[H, H+1)$ annotated "Huffman always lands here"; a magnifier callout on
+   the nearly-coincident H and L marks reading "gap 0.007". Bottom panel
+   titled "a 90/10 coin": same axis; blue marker at $H \approx 0.469$;
+   amber marker at $L = 1$ (the best two-symbol code); band over
+   $[0.469, 1.469)$; annotation "overhead 0.531 bits — 113% of the
+   information". Colors: blue = entropy, amber = Huffman cost, currentColor
+   axis and band. One idea: the +1 is per symbol, and on low-entropy
+   sources it dominates. */}
+<Figure
+  name="OneBitGap"
+  alt="Two number lines: for the running source the Huffman length 1.75 sits just above the entropy 1.743 inside the band from H to H plus 1; for a 90/10 coin the length 1 sits far above the entropy 0.469, an overhead larger than the entropy itself"
+  caption="Huffman lands in [H, H+1): a 0.007-bit gap for the running source, a 0.531-bit gap for the 90/10 coin."
+/>
+
+<KeyFact>
+The optimal symbol code is trapped in $[H, H+1)$: integer codeword lengths
+must round surprisals up, the rounding is the entire gap, and the gap
+vanishes exactly when every probability is a power of $\tfrac12$.
+</KeyFact>
+
+## The flaw that remains: up to one bit per symbol
+
+### A half-bit source forced to pay a full bit
+
+The guarantee's weak spot is the additive 1: it is one bit **per symbol**.
+Take the biased coin $p = (.9, .1)$. Its entropy is
+$H = .9 \cdot 0.152 + .1 \cdot 3.322 \approx 0.469$ bits, yet any symbol
+code must give both outcomes nonempty codewords; the best lengths are
+$(1, 1)$ and $L = 1$ bit. The overhead $0.531$ bits is 113% of the
+information actually delivered, and no cleverness within symbol coding
+removes it.
+
+[MacKay's §5.6](https://www.inference.org.uk/mackay/itila/) sharpens the
+point with English text: in the context `strings_of_ch`, the next nine
+characters are nearly determined, carrying about $0.13$ bits in total, yet
+a Huffman coder must spend at least one full bit on each — nine bits for
+an eighth of a bit of information. The same section names a second
+practical defect: Huffman needs the distribution before coding starts, and
+a source whose statistics drift forces rebuilding and retransmitting the
+table. Adaptive variants exist and are out of scope here.
+
+### Blocks shrink the overhead
+
+<Example title="Huffman on pairs of coin flips">
+Code the $(.9, .1)$ coin two flips at a time. The pair distribution is
+$p(\text{HH}) = .81$, $p(\text{HT}) = p(\text{TH}) = .09$,
+$p(\text{TT}) = .01$. Merges: $.01 + .09 = .10$, then $.09 + .10 = .19$,
+then $.81 + .19 = 1.00$. Lengths: $\text{HH} \mapsto 1$,
+$\text{HT} \mapsto 2$, $\text{TH} \mapsto 3$, $\text{TT} \mapsto 3$.
+
+$$
+L = .81 \cdot 1 + .09 \cdot 2 + .09 \cdot 3 + .01 \cdot 3 = 1.29
+\text{ bits per pair} = 0.645 \text{ bits per flip.}
+$$
+
+Bounds check: the merge weights give $.10 + .19 + 1.00 = 1.29$. The
+per-flip overhead falls from $0.531$ to $0.645 - 0.469 = 0.176$ bits, and
+the pair entropy obeys the guarantee: $0.938 \le 1.29 < 1.938$.
+</Example>
+
+The mechanism generalizes: coding blocks of $n$ symbols pays the up-to-one
+bit overhead once per **block**, so at most $1/n$ bits per symbol. The
+price is an alphabet of size $2^n$ and a code table to match.
+<Ref lesson="source-coding-theorem-lite"/> turns this limit into the
+source coding theorem; <Ref lesson="compression-is-prediction"/> removes
+the symbol boundary altogether with stream codes, which need no table at
+all.
+
+<Aside>
+History. Huffman devised the algorithm in 1951 as a term paper in Robert
+Fano's MIT information-theory course; the assignment was the optimal-code
+problem that Shannon's and Fano's own top-down constructions had left
+open. The paper appeared in 1952. The top-down method of the first
+section, splitting mass as evenly as possible, is the Shannon–Fano
+construction his algorithm displaced.
+</Aside>
+
+<Aside>
+Practice. DEFLATE (gzip, zlib, PNG) and baseline JPEG store data with
+Huffman tables, in canonical form: only the length of each codeword is
+transmitted, and the codewords are reconstructed by the shortest-first
+convention of <Ref lesson="kraft-inequality"/>. Formats for which the
+sub-bit gap matters — arithmetic coders in video standards,
+asymmetric-numeral-system coders in zstd — implement the stream-code fix
+of <Ref lesson="compression-is-prediction"/>.
+</Aside>
+
+<KeyFact>
+Huffman is optimal among symbol codes, and symbol codes are the wrong tool
+for low-entropy sources: the up-to-one-bit overhead is paid per symbol.
+Spreading it over blocks or streams is the subject of the next lessons.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Run the Huffman algorithm on the source $p(E) = .4$, $p(F) = .3$,
+$p(G) = .2$, $p(H) = .1$. List every merge with the pool before it, give
+the codeword lengths, compute $L$ two ways (probability-weighted lengths
+and summed merge weights), and compare with the chain-question tree built
+for this source in exercise 1 of <Ref lesson="prefix-codes"/>. Check the
+one-bit guarantee against $H \approx 1.846$ bits.
+
+<Solution>
+Merges: pool $.4, .3, .2, .1$, merge $G + H \to .3$; pool $.4, .3, .3$,
+merge $F + (GH) \to .6$; pool $.4, .6$, merge to the root $1.0$.
+
+Depths: $E$ at 1, $F$ at 2, $G$ and $H$ at 3 — lengths $(1, 2, 3, 3)$.
+
+$$
+L = .4 \cdot 1 + .3 \cdot 2 + .2 \cdot 3 + .1 \cdot 3 = 1.9
+\text{ bits,}
+$$
+
+and the merge weights agree: $.3 + .6 + 1.0 = 1.9$.
+
+The chain tree of the earlier exercise ($E$ at depth 1, $F$ at 2, $G$ and
+$H$ at 3) has the same lengths and the same $L = 1.9$: that hand-built
+code is now certified optimal. Guarantee:
+$1.846 \le 1.9 < 2.846$ holds, with a gap of $0.054$ bits.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the Huffman algorithm on the five-symbol source
+$p = (.3, .25, .2, .15, .1)$. A tie appears after the first merge; resolve
+it both ways and show the resulting codes have the same lengths per
+symbol. Give $L$, verify it against the summed merge weights, and check
+the guarantee against $H \approx 2.228$ bits.
+
+<Solution>
+First merge: $.15 + .1 = .25$ (symbols $d + e$). Pool:
+$.3, .25, .2, .25$ — the two smallest are $.2$ and one of the two $.25$s,
+a tie between symbol $b$ and the made node $(de)$.
+
+Resolution 1: merge $c + (de) \to .45$; pool $.3, .25, .45$; merge
+$a + b \to .55$; root. Depths: $a, b$ at 2; $c$ at 2, $d, e$ at 3.
+
+Resolution 2: merge $c + b \to .45$; pool $.3, .25, .45$; merge
+$a + (de) \to .55$; root. Depths: $b, c$ at 2; $a$ at 2; $d, e$ at 3.
+
+Both give the same lengths per symbol: $(2, 2, 2, 3, 3)$ for
+$(a, b, c, d, e)$.
+
+$$
+L = 2(.3 + .25 + .2) + 3(.15 + .1) = 1.5 + .75 = 2.25 \text{ bits;}
+$$
+
+merge weights (resolution 1): $.25 + .45 + .55 + 1.00 = 2.25$. Guarantee:
+$2.228 \le 2.25 < 3.228$, gap $0.022$ bits.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the Huffman algorithm on the dyadic source
+$(\tfrac12, \tfrac14, \tfrac18, \tfrac18)$. Compute $L$, then compute
+$H$ by the surprisal-weighted method of
+<Ref lesson="entropy-as-average-surprise"/>, and explain why the two are
+equal here. State the exact class of distributions on which Huffman meets
+the entropy.
+
+<Solution>
+Merges: $\tfrac18 + \tfrac18 = \tfrac14$; $\tfrac14 + \tfrac14 =
+\tfrac12$; $\tfrac12 + \tfrac12 = 1$. Lengths $(1, 2, 3, 3)$ and
+
+$$
+L = \tfrac12 \cdot 1 + \tfrac14 \cdot 2 + \tfrac18 \cdot 3 + \tfrac18
+\cdot 3 = 1.75 \text{ bits.}
+$$
+
+Surprisals: $-\log_2 \tfrac12 = 1$, $-\log_2 \tfrac14 = 2$,
+$-\log_2 \tfrac18 = 3$ (twice). Weighted:
+$H = \tfrac12 \cdot 1 + \tfrac14 \cdot 2 + \tfrac18 \cdot 3 + \tfrac18
+\cdot 3 = 1.75$ bits $= L$.
+
+The sums agree term by term because every codeword length equals its
+symbol's surprisal, which is possible only when every surprisal is an
+integer. That holds exactly when every probability is a power of
+$\tfrac12$: the dyadic distributions, and only they, give $L = H$.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the source $(\tfrac13, \tfrac13, \tfrac14, \tfrac1{12})$, run Huffman
+twice, resolving the three-way tie of the second merge in both ways shown
+in the lesson. Give both length sets, verify that both are complete
+(Kraft sum exactly 1), show both have $L = 2$ bits, and check the
+guarantee against $H \approx 1.855$ bits.
+
+<Solution>
+Forced first merge: $\tfrac14 + \tfrac1{12} = \tfrac13$.
+
+Resolution (a), merge the two original thirds: lengths $(2, 2, 2, 2)$.
+Kraft sum $4 \cdot 2^{-2} = 1$. $L = 2 \cdot 1 = 2$ bits.
+
+Resolution (b), merge one original third with the made node: lengths
+$(1, 2, 3, 3)$. Kraft sum $\tfrac12 + \tfrac14 + \tfrac18 + \tfrac18 =
+1$. $L = \tfrac13 + \tfrac23 + \tfrac34 + \tfrac14 = 2$ bits.
+
+Both codes cost exactly $2$ bits, and $1.855 \le 2 < 2.855$: the
+guarantee holds with a gap of $0.145$ bits.
+</Solution>
+</Exercise>
+
+<Exercise>
+The code $A \mapsto \texttt{000}$, $B \mapsto \texttt{01}$,
+$C \mapsto \texttt{001}$, $D \mapsto \texttt{1}$ is proposed for the
+running source $(.5, .25, .15, .1)$. Compute its expected length, list
+every pair of symbols violating the ordering
+$p_i > p_j \Rightarrow \ell_i \le \ell_j$, apply the single most valuable
+codeword swap, compute $\Delta L$ from the swap formula, and identify the
+resulting code.
+
+<Solution>
+Lengths: $A$: 3, $B$: 2, $C$: 3, $D$: 1.
+$L = .5 \cdot 3 + .25 \cdot 2 + .15 \cdot 3 + .1 \cdot 1 = 2.55$ bits.
+
+Ordering violations (more probable but strictly longer): $(A, B)$,
+$(A, D)$, $(B, D)$, $(C, D)$.
+
+Most valuable swap: $A \leftrightarrow D$, the largest probability gap
+across the largest length gap.
+$\Delta L = (p_A - p_D)(\ell_D - \ell_A) = (.4)(1 - 3) = -0.8$ bits, so
+$L$ falls to $1.75$.
+
+The result is $A \mapsto \texttt{1}$, $B \mapsto \texttt{01}$,
+$C \mapsto \texttt{001}$, $D \mapsto \texttt{000}$: the matched code, the
+Huffman output for this source, and (by the optimality theorem) the
+minimum. No violating pairs remain.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that the lengths of every Huffman code satisfy the Kraft inequality
+of <Ref lesson="kraft-inequality"/> with equality — every Huffman code is
+complete. Verify the equality on the length sets of exercises 1 and 2,
+and state what completeness rules out, using the slack result of that
+lesson.
+
+<Solution>
+Run the merges backwards: the finished tree is produced from the single
+root by repeatedly expanding a leaf at some depth $\ell$ into an internal
+node with exactly two children at depth $\ell + 1$ (every internal node
+has two children, because every merge joins exactly two nodes). The root
+alone has leaf sum $2^{-0} = 1$, and each expansion changes the sum by
+$-2^{-\ell} + 2 \cdot 2^{-(\ell+1)} = 0$. So the final leaves — the
+codewords — always satisfy $\sum_i 2^{-\ell_i} = 1$.
+
+Checks: $(1, 2, 3, 3)$: $\tfrac12 + \tfrac14 + \tfrac18 + \tfrac18 = 1$.
+$(2, 2, 2, 3, 3)$: $3 \cdot \tfrac14 + 2 \cdot \tfrac18 = 1$.
+
+Completeness rules out free improvements: by the slack result, any code
+with $\sum_i 2^{-\ell_i} < 1$ admits a strictly shorter length set at no
+cost. A Huffman code leaves no such slack — consistent with its
+optimality, since an incomplete optimal code would be a contradiction.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the coin $p(\mathrm{H}) = .9$, $p(\mathrm{T}) = .1$: (a) compute
+$H(X)$ by the surprisal-weighted method of
+<Ref lesson="entropy-as-average-surprise"/>; (b) explain why every symbol
+code for a two-outcome source has $L = 1$ bit and give the per-flip
+overhead; (c) rebuild the pair-block code of the worked example from
+scratch and give the new per-flip cost and overhead.
+
+<Solution>
+(a) Surprisals: $-\log_2 .9 \approx 0.152$ and $-\log_2 .1 \approx
+3.322$. $H = .9 \cdot 0.152 + .1 \cdot 3.322 \approx 0.137 + 0.332 =
+0.469$ bits.
+
+(b) Codewords are nonempty, so both lengths are at least 1; lengths
+$(1, 1)$ are achievable ($\texttt{0}$ and $\texttt{1}$) and give $L = 1$
+bit exactly. Overhead: $1 - 0.469 = 0.531$ bits per flip, 113% of the
+information.
+
+(c) Pairs: $(.81, .09, .09, .01)$. Merges: $.01 + .09 = .10$;
+$.09 + .10 = .19$; $.81 + .19 = 1.00$. Lengths $(1, 2, 3, 3)$ for
+$(\text{HH}, \text{HT}, \text{TH}, \text{TT})$.
+$L = .81 + .18 + .27 + .03 = 1.29$ bits per pair, $0.645$ per flip.
+Overhead: $0.645 - 0.469 = 0.176$ bits per flip — the same source, the
+same theorem, one third of the waste.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the Huffman algorithm on the seven-symbol source of the first
+section, $p(a), \dots, p(g) = .01, .24, .05, .20, .47, .01, .02$. List
+the merges, give each symbol's codeword length, compute $L$ both ways,
+and compare with the balanced top-down code's $2.53$ bits.
+
+<Solution>
+Merges, smallest pair each time:
+
+1. $a + f \to .02$; pool $.47, .24, .20, .05, .02, .02$.
+2. $(af) + g \to .04$ (a tie between the two $.02$s — either order gives
+   the same weights); pool $.47, .24, .20, .05, .04$.
+3. $(afg) + c \to .09$; pool $.47, .24, .20, .09$.
+4. $(afgc) + d \to .29$; pool $.47, .24, .29$.
+5. $(afgcd) + b \to .53$; pool $.47, .53$.
+6. root $\to 1.00$.
+
+Depths: $e$ at 1; $b$ at 2; $d$ at 3; $c$ at 4; $g$ at 5; $a, f$ at 6 —
+lengths $(6, 2, 4, 3, 1, 6, 5)$ for $(a, b, c, d, e, f, g)$.
+
+$$
+L = .01 \cdot 6 + .24 \cdot 2 + .05 \cdot 4 + .20 \cdot 3 + .47 \cdot 1
++ .01 \cdot 6 + .02 \cdot 5 = 1.97 \text{ bits;}
+$$
+
+merge weights: $.02 + .04 + .09 + .29 + .53 + 1.00 = 1.97$. Against the
+perfectly balanced top-down code's $2.53$ bits, the greedy bottom-up tree
+saves $0.56$ bits per symbol, and with $H \approx 1.93$ it sits only
+$0.04$ bits above the entropy floor.
+</Solution>
+</Exercise>
+
+<References>
+1. D. A. Huffman, "A Method for the Construction of Minimum-Redundancy Codes," *Proceedings of the IRE*, 40(9), 1952 — the original algorithm and optimality argument. https://doi.org/10.1109/JRPROC.1952.273898
+2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §5.4 proves $H \le L^* < H + 1$ via ceiling lengths; §5.6–5.7 the Huffman procedure, worked examples, and non-uniqueness; §5.8 the exchange lemma and the induction proof of optimality (Lemma 5.8.1, Theorem 5.8.1).
+3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 5 "Symbol Codes": §5.5 the Huffman algorithm, the suboptimality of balanced top-down splitting, and the tie invariance; §5.6 "Disadvantages of the Huffman code": the extra bit and the changing-ensemble problem, motivating the stream codes of ch. 6. Free online: https://www.inference.org.uk/mackay/itila/
+</References>

@@ -1,0 +1,845 @@
+Model selection is a compression problem: the best hypothesis for a dataset
+minimizes the total description length L(H) + L(D|H) — the bits to state the
+model plus the bits to state the data given the model. This lesson makes the
+principle computable and runs it. The route: the retreat from shortest
+programs to a fixed model class; fit measured as a code length; the two-part
+principle and why the model term blocks overfitting; a complete selection
+computed by hand on a 41-bit record; the $(k/2)\log_2 n$ cost of parameters;
+the asymmetric pricing of the two selection errors; and the same accounting
+applied to trained neural networks.
+
+## From the uncomputable floor to a computable rule
+
+<Ref lesson="kolmogorov-complexity"/> established the ideal: the shortest
+description of the data over all programs, well-defined and uncomputable,
+with the two-part form $K(\mu) - \log_2 \mu(D)$ as its model-selection
+reading. The *minimum description length* (MDL) principle of
+[Rissanen (1978)](https://doi.org/10.1016/0005-1098(78)90005-5) is the
+computable retreat: replace "all programs" by a **fixed, searchable class**
+of candidate descriptions, and minimize length within the class.
+
+### Three 24-bit strings under one description scheme
+
+The retreat is concrete. Fix one scheme for describing 24-bit strings:
+first state the number of ones $k$, using
+$\lceil \log_2 25 \rceil = 5$ bits; then state which arrangement, an index
+into the $\binom{24}{k}$ strings with that count, costing
+$\log_2 \binom{24}{k}$ bits. Apply it to three strings:
+
+- $x_1 = $ `000000000000000000000000`: $k = 0$, and only one such string
+  exists. Cost: $5 + 0 = 5$ bits.
+- $x_2 = $ `101101001110100001011010`: $k = 12$, and
+  $\log_2 \binom{24}{12} = \log_2 2{,}704{,}156 \approx 21.4$ bits.
+  Cost: $26.4$ bits, worse than the $24$ literal bits. The scheme has
+  nothing to grip.
+- $x_3 = $ `010000100001000010010001`: $k = 6$, and
+  $\log_2 \binom{24}{6} = \log_2 134{,}596 \approx 17.0$ bits.
+  Cost: $5 + 17.0 = 22.0$ bits, beating the literal string.
+
+{/* fig ThreeStringsThreeCodes: three rows, one per string, sharing one
+   horizontal bits axis 0–27 (ticks 0, 5, 10, 15, 20, 24, with 24 marked by
+   a dashed currentColor guide line labeled "literal: 24 bits"). Each row:
+   (left) the 24-bit string in mono — `000000000000000000000000`,
+   `101101001110100001011010`, `010000100001000010010001`; (right) its
+   description-length bar. Row 1: amber segment of 5 units labeled
+   "count $k=0$ (5)" and no blue segment; total printed "5.0". Row 2: a
+   muted outline bar to 26.4 split amber 5 + blue 21.4 with note "scheme
+   loses — send the literal 24 bits instead", and the solid bar drawn at 24
+   in currentColor; total "24". Row 3: amber segment 5 units "count $k=6$
+   (5)" + blue segment 17 units "index among $\binom{24}{6}$ (17.0)"; total
+   "22.0". Colors: amber = the model part (the count), blue = the data part
+   (the index), currentColor = axis, text, and the literal fallback. One
+   idea: statistical regularity shortens a two-part description; its absence
+   makes the literal string the best description. */}
+<Figure
+  name="ThreeStringsThreeCodes"
+  alt="Three 24-bit strings with their description lengths under a count-then-index scheme: the all-zeros string costs 5 bits, the fair-coin-like string is cheaper sent literally at 24 bits, and the biased string costs 22 bits as 5 count bits plus a 17-bit index"
+  caption="One scheme, three verdicts: 5 bits, 24 bits (literal wins), 22 bits. The count is the model part; the index is the data part."
+/>
+
+The scheme is a miniature model class. The count $k$ is a **hypothesis**
+about the string's statistics; the index is the data described *given* that
+hypothesis. $x_1$ has extreme structure and compresses to almost nothing;
+$x_2$ has none, and the honest answer is the literal string; $x_3$ has
+statistical structure only, no period and no formula, and still saves two
+bits. That third case, structure visible only as a probability bias, is the
+kind of regularity model selection deals in.
+
+<KeyFact>
+Within a fixed model class, description length is computable, and a string
+is exactly as compressible as the statistical structure the class can
+express: MDL is the two-part Kolmogorov idea with "all programs" cut down
+to a menu that can be searched.
+</KeyFact>
+
+## Fit is a code length: L(D|H) = −log₂ P(D|H)
+
+A hypothesis in this lesson is a probability model: $H$ assigns the
+observed data a probability $P(D \mid H)$. The coding module priced exactly
+this object. By the code–probability correspondence of
+<Ref lesson="source-coding-theorem-lite"/>, a code matched to $H$ spends
+$-\log_2 P(D \mid H)$ bits on $D$, no code matched to anything else does
+better on average, and an arithmetic coder realizes the number within two
+bits (<Ref lesson="compression-is-prediction"/>). Define therefore
+
+$$
+L(D \mid H) \;=\; -\log_2 P(D \mid H),
+$$
+
+the **fit term**: the bits needed to state the data, given that both ends
+hold the model $H$.
+
+<Example title="three hypotheses price one string">
+Take $x_3$ above ($24$ bits, $6$ ones) and three Bernoulli hypotheses,
+each claiming the bits are i.i.d. with $P(1) = \theta$:
+
+$\theta = \tfrac12$: every bit costs $1$ bit of code, so
+$L(x_3 \mid H) = 24.0$ bits.
+
+$\theta = \tfrac14$: each one costs $-\log_2 \tfrac14 = 2$ bits, each zero
+$-\log_2 \tfrac34 = 0.415$ bits, so
+$L = 6 \times 2 + 18 \times 0.415 = 12 + 7.47 = 19.5$ bits.
+
+$\theta = 0.9$: each one costs $0.152$ bits, but each zero costs
+$-\log_2 0.1 = 3.322$ bits, so
+$L = 6 \times 0.152 + 18 \times 3.322 = 0.91 + 59.79 = 60.7$ bits.
+
+The hypothesis that rates the data most probable encodes it most cheaply;
+a confident hypothesis pointed the wrong way is a catastrophe in bits.
+Minimizing $L(D \mid H)$ over $\theta$ is precisely maximum likelihood,
+and the minimizer here is the empirical rate $\hat\theta = 6/24 = 1/4$.
+</Example>
+
+The fit term is also a familiar quantity from the machine-learning module:
+$-\log_2 P(D \mid H)$ is $H$'s log-loss on $D$, the summed surprisal that
+<Ref lesson="cross-entropy-loss"/> identified as the cross-entropy training
+objective. Fit measured in bits, fit measured by likelihood, and fit
+measured by the loss curve are one number.
+
+<KeyFact>
+$L(D \mid H) = -\log_2 P(D \mid H)$: assigning the data high probability
+and encoding the data cheaply are the same property, so maximum likelihood
+is minimum fit-bits.
+</KeyFact>
+
+## The two-part principle: charge the model its bits
+
+Fit alone cannot select a model. Enlarging the hypothesis class can only
+raise the maximal $P(D \mid H)$, and the limit is degenerate: the
+*memorizer* $H_D$, the hypothesis "the source emits exactly $D$", achieves
+$P(D \mid H_D) = 1$ and $L(D \mid H_D) = 0$ for any $D$ whatsoever.
+Selection by fit is maximum likelihood run over an unbounded menu, and it
+always ends at a memorizer. This is overfitting stated in coding terms.
+
+The repair is to price the hypothesis too. Stating $H_D$ means stating
+$D$: hypotheses live in a prefix-free code of their own, and the counting
+argument of <Ref lesson="kolmogorov-complexity"/> applies to it verbatim,
+so fewer than $2^{n-c}$ of the $2^n$ strings' memorizers can be described
+in under $n - c$ bits. For all but a vanishing fraction of datasets,
+$L(H_D) + 0$ is no better than the literal data. The bits pushed out of
+the fit term reappear in the model term.
+
+<Definition title="two-part description length; crude MDL">
+Let $\mathcal{H}$ be a countable class of hypotheses, each assigning the
+data a probability $P(D \mid H)$, and fix a prefix-free code over
+$\mathcal{H}$ with lengths $L(H)$, chosen **before seeing the data**. The
+**two-part description length** of $D$ under $H$ is
+$$
+L(H) \;+\; L(D \mid H) \;=\; L(H) - \log_2 P(D \mid H),
+$$
+and the **(crude) MDL principle** selects
+$$
+H^\ast \;=\; \operatorname*{arg\,min}_{H \in \mathcal{H}} \;\bigl[\, L(H) + L(D \mid H) \,\bigr].
+$$
+For parametric hypotheses $H = (k, \theta)$, the model term itself splits:
+$L(H) = L(k) + L(\theta \mid k)$, the structure plus its parameters.
+</Definition>
+
+{/* fig TwoPartMessage: the literal two-part bitstream, two rows on one
+   shared bits axis 0–25 (ticks 0, 5, 10, 15, 20, 24). Row 1, label
+   "candidate 1 — literal code": one currentColor bar of 24 units labeled
+   inside "data: the 24 bits verbatim"; total at right "24.0 bits". Row 2,
+   label "candidate 2 — Bernoulli count code": an amber segment of 5 units
+   labeled "model: $k = 6$ (5 bits)" immediately followed by a blue segment
+   of 17 units labeled "data given model: index among $\binom{24}{6}$
+   (17.0 bits)"; total at right "22.0 bits", marked with a small amber
+   "shorter" tag. Under both rows one gloss line: "same string $x_3$, two
+   messages; MDL sends the shorter one". Colors: amber = model bits, blue =
+   data-given-model bits, currentColor = the literal bar, axis, text. One
+   idea: model selection is choosing the shorter total message. */}
+<Figure
+  name="TwoPartMessage"
+  alt="Two candidate messages encoding the same 24-bit string: a 24-bit literal message, and a two-part message of 5 model bits plus a 17-bit index totalling 22 bits, the shorter of the two"
+  caption="The two-part message is literal: model bits, then data-given-model bits. Selection compares total lengths."
+/>
+
+The definition is honest coding, not bookkeeping: the two parts
+concatenate into one decodable message.
+
+<Theorem title="the two-part code is a code">
+If the lengths $L(H)$ belong to a prefix-free code over $\mathcal{H}$ and,
+for each $H$, the data lengths are $L(D \mid H) = -\log_2 P(D \mid H)$,
+then the concatenated descriptions are uniquely decodable and their total
+lengths satisfy the Kraft budget:
+$$
+\sum_{H} \sum_{D} 2^{-[L(H) + L(D \mid H)]} \;\le\; 1 .
+$$
+
+<Proof>
+Decoding is sequential: the hypothesis code is prefix-free, so the
+receiver reads it to completion unambiguously, learns $H$, and then knows
+which data code governs the remaining bits. For the budget,
+$\sum_H 2^{-L(H)} \le 1$ by the Kraft inequality of
+<Ref lesson="kraft-inequality"/>, and for each $H$,
+$\sum_D 2^{-L(D \mid H)} = \sum_D P(D \mid H) \le 1$; the double sum
+factors as $\sum_H 2^{-L(H)} \sum_D P(D \mid H) \le 1$. By the
+achievability direction of the Kraft inequality, an actual prefix code
+with these total lengths exists.
+</Proof>
+</Theorem>
+
+<Remark title="the hypothesis code is fixed in advance">
+The clause "chosen before seeing the data" is load-bearing. A hypothesis
+code tuned after looking at $D$ can assign the best-fitting $H$ a
+one-bit codeword, driving $L(H)$ to zero and collapsing the criterion
+back to maximum likelihood; the smuggled bits are real but hidden in the
+choice of code. Grünwald's tutorial (§2.4) makes the same point for
+$n$-dependent parameter codes. A fixed code is what makes the total an
+honest message length that a receiver could actually have decoded.
+</Remark>
+
+<Aside>
+The Kraft budget gives the theorem a Bayesian reading, worked out in
+[MacKay's chapter 28](https://www.inference.org.uk/mackay/itila/): the
+weights $2^{-L(H)}$ form a (sub-)prior over hypotheses, $P(D \mid H)$ is
+the likelihood, and
+$2^{-[L(H) + L(D\mid H)]} = 2^{-L(H)} P(D \mid H)$, so minimizing the
+two-part length is maximizing prior times likelihood: MAP estimation in
+coding units. MacKay's *Occam factor*, the probability mass of parameter
+settings that remain consistent with the data, is the Bayesian face of
+the parameter-precision argument two sections below: a model with more
+adjustable parameters spreads its prior thinner, exactly as a longer
+$L(H)$ spends more bits. The two formalisms diverge in their fine print
+(MDL's refined form optimizes worst-case regret, not posterior belief),
+but at the level of this lesson they compute the same trade.
+</Aside>
+
+<KeyFact>
+Fit bits alone always elect a memorizer; adding $L(H)$ makes the election
+honest, because bits removed from $L(D \mid H)$ by enriching the
+hypothesis reappear in $L(H)$ unless the structure is genuinely in the
+data.
+</KeyFact>
+
+## Curve fitting: the U-shape on one scatter
+
+The canonical picture, from §1.2 of
+[Grünwald's tutorial](https://arxiv.org/abs/math/0406077), is polynomial
+regression. Take $n = 10$ points $(x_i, y_i)$ measured to fixed precision.
+A candidate hypothesis is a polynomial $f$ of degree $k$ plus Gaussian
+noise; its two parts are $L(H)$, the $k + 1$ coefficients stated to the
+precision they need, and $L(D \mid H) = \sum_i -\log_2 P(y_i \mid f(x_i))$,
+which up to a constant set by the recording precision behaves as
+$\tfrac{n}{2}\log_2 \hat\sigma^2$: every halving of the mean squared
+residual saves $n/2$ bits.
+
+The two ends of the degree axis fail in opposite directions. Degree $0$
+states one coefficient and pays for every residual, in full, forever.
+Degree $n - 1$ threads all ten points, drives every residual below the
+recording precision, and owes essentially nothing in fit; its ten
+finely-tuned coefficients dominate the total instead.
+
+{/* fig PolyFitTally, FigureSequence, 4 frames — polynomial candidates on
+   one fixed scatter with a two-bar bits tally. Shared layout: left, an
+   x–y plot (currentColor axes, no gridlines) with the SAME 10 data points
+   in all frames, drawn as 4px currentColor dots scattered around a gentle
+   parabola (e.g. y = 0.08x^2 − 0.6x + 3 plus noise, x from 0.5 to 9.5);
+   an amber candidate curve overlaid; thin blue vertical residual sticks
+   from each point to the curve. Right: a horizontal two-bar tally on one
+   shared bits axis (0–90): top bar amber "$L(H)$", bottom bar blue
+   "$L(D \mid H)$", with "total ≈ …" printed beneath. Frame headers name
+   the candidate; only the curve, residuals, and tally change per frame.
+   Frames: (1) "degree 0 — a constant": flat line at the data mean, long
+   residual sticks; tally L(H) ≈ 8, L(D|H) ≈ 70, total ≈ 78. (2) "degree
+   2 — matches the trend": parabola tracking the points, short residuals;
+   tally L(H) ≈ 24, L(D|H) ≈ 26, total ≈ 50 printed bold. (3) "degree 9 —
+   interpolation": a wiggly curve passing exactly through every point,
+   residual sticks gone; tally L(H) ≈ 80 dwarfing the panel, L(D|H) ≈ 0,
+   total ≈ 80. (4) "the totals compared": plot panel dimmed to muted, the
+   right panel replaced by three labeled total bars 78 / 50 / 80 with the
+   degree-2 bar amber and tagged "MDL choice". The tally numbers are
+   illustrative and should be printed as given. Colors: amber = the
+   candidate/model role, blue = the fit/data role, currentColor = data and
+   axes. One idea: as the candidate grows richer, fit bits fall while
+   model bits climb, and the smallest total sits in the middle. */}
+<FigureSequence
+  name="PolyFitTally"
+  alt="Four frames fitting one scatter with polynomials of degree 0, 2, and 9, each with a two-bar tally of model bits and fit bits: the constant pays 70 fit bits, the quadratic totals 50, the interpolating degree-9 curve pays nothing in fit but 80 model bits, and the final frame compares the three totals"
+  caption="One scatter, three candidates: the constant underpays in model bits and overpays in fit; the interpolator does the reverse; the quadratic minimizes the sum."
+/>
+
+Step through the four frames watching only the two bars: the blue fit bar
+shrinks monotonically with degree, the amber model bar grows
+monotonically, and the printed total falls from 78 to 50 before rising
+back to 80. The minimum sits at degree 2, the trend actually present in
+the points.
+
+<Demo
+  name="TwoPartCode"
+  caption="A fixed noisy dataset; drag the polynomial degree k and watch L(H), L(D|H), and their sum. Presets: underfit (k = 0), the sweet spot, an interpolating degree."
+/>
+
+<Task>
+Drag $k$ upward from $0$ and find the degree where the total bottoms out;
+it should match the sweet-spot preset. Then push $k$ to the interpolating
+preset and confirm the signature of overfitting in coding terms:
+$L(D \mid H)$ pinned near zero while the total climbs past the $k = 0$
+underfit.
+</Task>
+
+<KeyFact>
+As the candidate grows richer, $L(D \mid H)$ falls and $L(H)$ climbs: the
+total is U-shaped in model complexity, and its minimum, at neither end, is
+the MDL choice.
+</KeyFact>
+
+## A selection by hand: Markov orders on a 41-bit record
+
+The polynomial picture is qualitative; this section is exact. The data is a
+41-bit record from a sensor that alternates but occasionally repeats a
+bit, printed in groups of ten:
+
+```
+0101011010 0101010101 0101010010 1010110101 0
+```
+
+Sufficient statistics, checkable by tallying the string: $20$ ones and
+$21$ zeros; among the $40$ adjacent pairs, a $0$ is followed by $1$
+eighteen times and by $0$ twice, and a $1$ is followed by $0$ eighteen
+times and by $1$ twice.
+
+The candidate class is the Markov chains of order $k$, written $B(k)$: the
+next bit's distribution depends on the previous $k$ bits, giving $2^k$
+parameters $\theta_{1 \mid \text{context}}$. The hypothesis code, fixed in
+advance: the order $k$ in unary ($k + 1$ bits), then each parameter as one
+of $64$ evenly spaced values ($6$ bits per parameter). Initial symbols
+without a full context are charged $1$ bit each.
+
+<Example title="two-part totals for orders 0, 1, 2">
+**Order 0** (a Bernoulli coin, one parameter). Best fit at
+$\hat\theta = 20/41$:
+$$
+L(D \mid H) = -\bigl[\, 20\log_2\tfrac{20}{41} + 21\log_2\tfrac{21}{41} \,\bigr]
+= 20.7 + 20.3 = 41.0 \text{ bits.}
+$$
+Model: $1 + 6 = 7$ bits. **Total: $48.0$.**
+
+**Order 1** (two parameters). From state $0$ ($20$ transitions), the MLE
+is $\hat\theta_{1\mid 0} = 18/20 = 0.9$, costing $20\,H(0.1) = 9.38$
+bits; from state $1$, symmetrically, $9.38$ bits; the first symbol costs
+$1$ bit:
+$$
+L(D \mid H) = 1 + 9.38 + 9.38 = 19.8 \text{ bits.}
+$$
+Model: $2 + 2 \times 6 = 14$ bits. **Total: $33.8$.**
+
+**Order 2** (four parameters). The four contexts among the $39$
+transitions with two-bit history: context $01$ occurs $18$ times and is
+followed by $1$ twice ($18\,H(1/9) = 9.06$ bits); context $10$ occurs
+$17$ times, followed by $0$ twice ($17\,H(2/17) = 8.88$ bits); contexts
+$00$ and $11$ occur twice each and are followed deterministically ($0$
+bits). Two initial symbols cost $2$ bits:
+$$
+L(D \mid H) = 2 + 9.06 + 8.88 + 0 + 0 = 19.9 \text{ bits.}
+$$
+Model: $3 + 4 \times 6 = 27$ bits. **Total: $46.9$.**
+
+The doubling of parameters bought nothing: the new contexts $00$ and
+$11$ are perfectly predictive but occur twice each, so the fit term is
+flat while the model term doubles.
+
+**Order 3 and beyond, without computing the fit.** Even if an
+order-3 chain fit all its in-context transitions perfectly, its fit term
+could not drop below the $3$ bits for the initial symbols, so its total
+is at least $4 + 8 \times 6 + 3 = 55$ bits. The parameter bill alone
+eliminates it, and every higher order more so.
+
+| order $k$ | $L(k)$ | $L(\theta \mid k)$ | $L(D \mid H)$ | total |
+| --- | --- | --- | --- | --- |
+| $0$ | $1$ | $6$ | $41.0$ | $48.0$ |
+| $1$ | $2$ | $12$ | $19.8$ | $\mathbf{33.8}$ |
+| $2$ | $3$ | $24$ | $19.9$ | $46.9$ |
+| $3$ | $4$ | $48$ | $\ge 3$ | $\ge 55$ |
+
+MDL selects $B(1)$: the record is best described as an alternator that
+sticks with probability $0.1$.
+</Example>
+
+{/* fig MarkovUCurve: a small line plot of the worked example's tally.
+   x-axis "Markov order k" with ticks 0, 1, 2, 3; y-axis "bits" 0–80
+   (ticks 0, 20, 40, 60, 80). Three series, each with point markers and
+   printed values: thin amber line "$L(H)$" through (0, 7), (1, 14),
+   (2, 27), (3, 52); thin blue line "$L(D \mid H)$" through (0, 41.0),
+   (1, 19.8), (2, 19.9), and at k = 3 a blue open marker at 20 with label
+   "≈ 20 (barely moves)"; bold currentColor line "total" through
+   (0, 48.0), (1, 33.8), (2, 46.9), (3, ≈ 72). An amber ring around the
+   total's minimum point at (1, 33.8) with callout "MDL choice: k = 1".
+   Legend as three short color-matched labels directly under the plot.
+   Colors: amber = model term, blue = fit term, currentColor = the total.
+   One idea: the fit line flattens, the model line keeps climbing, so
+   their sum turns over. */}
+<Figure
+  name="MarkovUCurve"
+  alt="Model bits rising with Markov order, fit bits dropping from 41 to about 20 and then flattening, and their U-shaped total with its minimum of 33.8 bits at order one"
+  caption="The worked example as a plot: after order 1 the fit term has nothing left to gain, the model term keeps growing, and the total turns over."
+/>
+
+<Task>
+Verify the order-2 row from the printed record: tally the four context
+counts (context $01$: 18 with 2 exceptions; $10$: 17 with 2; $00$ and
+$11$: 2 each, deterministic) and evaluate
+$2 + 18\,H(1/9) + 17\,H(2/17)$; it should land on $19.9$ bits.
+</Task>
+
+<Remark title="grid rounding is absorbed">
+The table charges fit at the exact maximum-likelihood parameters, while
+the code transmits them rounded to the 64-value grid. The rounding error
+is at most $1/128$ per parameter, and because the likelihood is
+stationary at the MLE, it changes each fit entry by under $0.05$ bits:
+invisible at the table's precision. The next section turns this
+observation into the general parameter price.
+</Remark>
+
+<KeyFact>
+On the 41-bit record the totals read $48.0$, $33.8$, $46.9$, $\ge 55$
+bits for orders $0$ through $3$: the two-part sum rejects both the blind
+coin and the over-parameterized orders by arithmetic alone.
+</KeyFact>
+
+## The parameter cost: (k/2) log₂ n
+
+The crude code above spent $6$ bits per parameter by fiat. The right
+spend is a trade the data itself sets, and it is where the celebrated
+$(k/2)\log_2 n$ penalty comes from.
+
+### Concrete first: how coarsely can θ = 0.9 be stated
+
+Round a parameter by $\varepsilon$ away from its MLE and the fit term
+rises by the second-order Taylor amount
+$$
+\Delta L \;\approx\; \frac{n\, I(\hat\theta)}{2\ln 2}\, \varepsilon^2
+\text{ bits,}
+\qquad
+I(\theta) = \frac{1}{\theta(1 - \theta)}
+$$
+for $n$ Bernoulli observations with Fisher information $I$; the
+first-order term vanishes because the MLE is a maximum. For
+$\hat\theta_{1 \mid 0} = 0.9$ estimated from its $n = 20$ transitions,
+$I = 11.1$: a grid of spacing $1/8$ (3 bits) misstates it by
+$\varepsilon = 0.025$ and costs $0.10$ bits of fit; the 6-bit grid costs
+under $0.01$ bits. Both grids overpay in description what they save in
+fit — the trade has an interior optimum.
+
+### The trade in general
+
+A grid of spacing $d$ costs $\log_2(1/d)$ bits per parameter and, at
+worst-case rounding $d/2$, adds $n I d^2 / (8 \ln 2)$ bits of fit.
+Minimizing the sum over $d$ gives
+$$
+d^\ast = \frac{2}{\sqrt{n I}} \;\propto\; \frac{1}{\sqrt{n}},
+\qquad
+\log_2 \frac{1}{d^\ast} = \frac{1}{2}\log_2 n + O(1) :
+$$
+parameters are worth stating to precision $1/\sqrt{n}$ and no finer,
+because two parameter values closer than that produce codes for the data
+whose lengths differ by a fraction of a bit. A $k$-parameter hypothesis
+therefore costs
+$$
+L(\theta \mid k) \;\approx\; \frac{k}{2}\log_2 n \;+\; O(k)
+$$
+bits: the penalty **grows with the data**, but logarithmically, while fit
+terms grow linearly. For the worked example's $B(1)$ at $n = 41$, the
+refined price is $\log_2 41 \approx 5.4$ bits instead of the crude $12$;
+the ranking of the table is unchanged (exercise 5).
+
+{/* fig ParameterPrecision: the precision trade on one parameter axis.
+   Top: a horizontal θ-axis from 0 to 1 drawn twice, as two rows sharing
+   x-coordinates. Row 1 label "spacing 1/8 — 3 bits": blue ticks at
+   multiples of 0.125, an amber dot at θ̂ = 0.9 with a short arrow to the
+   nearest tick 0.875, annotation "ε = 0.025 → fit +0.10 bits". Row 2
+   label "spacing 1/64 — 6 bits": denser blue ticks, amber dot at 0.9
+   essentially on-grid, annotation "fit +0.01 bits — precision the data
+   cannot see". Below the rows, a small cost plot: x-axis "bits per
+   parameter, $\log_2(1/d)$" (ticks 1–8), y-axis "bits"; a blue falling
+   curve "fit penalty $n I d^2 / 8\ln 2$", an amber rising 45° line
+   "description cost", and a bold currentColor U-curve their sum with the
+   minimum marked and labeled in KaTeX "$d^\ast \propto 1/\sqrt{n}
+   \Rightarrow \tfrac{1}{2}\log_2 n$ bits per parameter". Footer line:
+   "$k$ parameters $\Rightarrow L(\theta) \approx (k/2)\log_2 n$". Colors:
+   amber = description/model role, blue = fit role, currentColor = the
+   total and axes. One idea: encode parameters exactly as finely as the
+   data can distinguish, which is 1/√n. */}
+<Figure
+  name="ParameterPrecision"
+  alt="A parameter axis with coarse and fine grids showing the rounding of theta equals 0.9, above a cost plot where the falling fit penalty and rising description cost sum to a U-curve minimized at spacing proportional to one over root n, giving half log n bits per parameter"
+  caption="The precision trade: coarser grids cost fit, finer grids cost description, and the optimum spacing 1/√n prices a parameter at (1/2) log₂ n bits."
+/>
+
+### Refined MDL: from a chosen code to a canonical one
+
+The crude $L(H)$ is arbitrary: unary versus binary for $k$, 64 versus 42
+grid points, each choice shifts the totals. *Refined MDL* removes the
+arbitrariness by replacing the two-part code for a parametric class
+$\mathcal{M}$ with a single one-part universal code, the **normalized
+maximum likelihood** (NML) code, whose length is
+$$
+-\log_2 P(D \mid \hat\theta(D)) \;+\; \mathrm{COMP}_n(\mathcal{M}),
+\qquad
+\mathrm{COMP}_n(\mathcal{M}) \approx \frac{k}{2}\log_2\frac{n}{2\pi}
++ \log_2 \int \sqrt{\det I(\theta)}\, d\theta ,
+$$
+the *stochastic complexity* of
+[Rissanen (1996)](https://doi.org/10.1109/18.481776). The leading term
+recovers $(k/2)\log_2 n$; the integral term makes the price
+parametrization-invariant. This lesson states the expansion without
+deriving it; Grünwald's tutorial §2.6 gives the construction.
+
+<Aside>
+What NML normalizes. The maximum-likelihood "distribution"
+$P(D \mid \hat\theta(D))$ sums over datasets to more than one, since every
+$D$ gets its own best parameters; dividing by the sum
+$\sum_{D'} P(D' \mid \hat\theta(D'))$ restores a genuine distribution,
+and $\mathrm{COMP}_n = \log_2 \sum_{D'} P(D' \mid \hat\theta(D'))$ is the
+log of the excess: a direct measure of how many distinguishable datasets
+the class can fit well. A class is complex exactly when it can fit many
+things, which is why the same number is both a normalizer and a penalty.
+The NML code is also minimax optimal: it minimizes the worst-case regret
+against the best hindsight member of the class.
+</Aside>
+
+<Remark title="MDL is not BIC">
+Dropping the $O(1)$ terms of $\mathrm{COMP}_n$ leaves
+$-\log_2 P(D \mid \hat\theta) + \tfrac{k}{2}\log_2 n$, which is the
+[Bayesian information criterion](https://en.wikipedia.org/wiki/Bayesian_information_criterion)
+in base 2. The agreement holds only for fixed $k$ as
+$n \to \infty$: the Fisher-information term is $O(1)$ in $n$ but can be
+large and can differ substantially between the classes being compared,
+and for small samples or growing model families the two criteria part
+ways (Grünwald §2.9.2). BIC is a truncation of refined MDL, not a synonym
+for it.
+</Remark>
+
+<KeyFact>
+Data of size $n$ distinguishes a parameter only to precision
+$\sim 1/\sqrt{n}$, so an honest code spends $\tfrac12 \log_2 n$ bits per
+parameter: $L(H) \approx (k/2)\log_2 n$, a penalty that grows with the
+data but only logarithmically.
+</KeyFact>
+
+## The two errors are priced asymmetrically
+
+The U-curve's two arms rise at different rates, and the difference is the
+practical content of the principle.
+
+**Underfitting is billed per symbol, forever.** Insist on $B(0)$ for the
+sticky alternator and the fit overpayment is
+$41.0/41 - 18.76/40 \approx 0.53$ bits per symbol: the divergence rate of
+<Ref lesson="kl-divergence"/> between the true chain and the best i.i.d.
+model. At $n$ symbols the bill is $\approx 0.53\,n$ bits, linear and
+unbounded.
+
+**Overfitting is billed per parameter, logarithmically.** Choosing $B(2)$
+over $B(1)$ costs the two superfluous parameters' description,
+$2 \times \tfrac12 \log_2 n$ bits: at $n = 4{,}100$ symbols, about $12$
+bits against roughly $2{,}200$ for the underfit: a factor of about
+$180$, two orders of magnitude, and the gap keeps widening because the
+ratio $0.53\,n / \log_2 n$ is unbounded in $n$.
+
+<Figure
+  src="./figures/asymmetric-price.svg"
+  alt="Excess bits versus record length on a logarithmic bits axis: the blue underfitting arm at 0.53 n bits grows linearly while the amber overfitting arm at log base 2 of n bits stays nearly flat, and at n equals 4,100 the two sit at about 2,200 and 12 bits, roughly a factor of 180 apart"
+  caption="The two arms of the U-curve, priced over time: underfitting compounds at 0.53 bits per symbol, overfitting is a one-off log₂ n, and by n = 4,100 they are two orders of magnitude apart."
+/>
+
+The asymmetry explains MDL's small-sample behavior, which Grünwald's
+tutorial (§1.5–1.6) is careful to state as strategy rather than
+metaphysics. At small $n$ the criterion picks simple models even when the
+true source is complex, and this is correct play: with too little data to
+pin down a rich model's parameters to useful precision, the rich
+hypothesis genuinely does not shorten the message, and the description
+arithmetic prices that automatically. As $n$ grows, a real regularity
+eventually pays for its parameters and the selection upgrades. Preferring
+the simple model is not the claim that the world is simple; it is the
+worst-case-safe way to bet bits.
+
+Two honesty clauses close the principle. MDL selects among the
+**candidates offered**: if no hypothesis in $\mathcal{H}$ is anywhere near
+the source, the winner is merely the least bad description, and its
+selection behavior can degrade (Grünwald §2.10 catalogs the failure modes
+under misspecification). And the whole construction is **lossless** coding
+of $D$ given $H$: bits-for-fidelity trades belong to
+<Ref lesson="rate-distortion"/> and are a different theory.
+
+<KeyFact>
+Underfitting costs $\Theta(n)$ bits and overfitting costs
+$\Theta(\log n)$: preferring the simpler model at small sample size is a
+bounded-loss strategy, not a claim about nature, and it self-corrects as
+the data grows.
+</KeyFact>
+
+## Charging the network: the adjusted compression rate
+
+<Ref lesson="compression-is-prediction"/> ended on a caveat: a language
+model's compression numbers charge nothing for the model, which must ride
+on both ends of the channel. The two-part principle is exactly the missing
+accounting, and
+[Delétang et al. (2023)](https://arxiv.org/abs/2309.10668) (§3.3) run it
+on real networks. Their **adjusted compression rate** for a model $H$
+trained on and compressing a dataset $D$ is
+$$
+\frac{L(H) + L(D \mid H)}{\text{raw bits of } D},
+$$
+with $L(H)$ the encoded parameter bits and $L(D \mid H)$ the arithmetic-
+coding cost under the model: a two-part total, normalized.
+
+The raw (unadjusted) rate improves monotonically with model scale: bigger
+Transformers predict better, so $L(D \mid H)$ only falls. The adjusted
+rate does not. On a small corpus the parameter bits dominate and small
+models win; on a larger corpus the same parameter bits amortize over more
+data and the optimum moves to larger models. Each dataset size traces a
+U-curve in model size, and the minimum migrates rightward as the dataset
+grows — the same turnover as the Markov table, at nine orders of magnitude
+the scale.
+
+{/* fig AdjustedRateUCurves: schematic recreation of the Delétang §3.3
+   finding, no real data points. x-axis "model size (parameters, log
+   scale)" with ticks 10^5, 10^6, 10^7, 10^8, 10^9; y-axis "compression
+   rate (compressed / raw)" from 0 to 1.2. Three curves: (1) muted dashed
+   monotone-decreasing curve labeled "raw rate — model bits uncharged",
+   flattening at the right; (2) blue U-curve labeled "adjusted, small
+   dataset", minimum around 10^6, rising steeply to >1 at the right edge;
+   (3) amber U-curve labeled "adjusted, large dataset", sitting lower,
+   minimum around 10^8, rising gently at the right. Small filled circles
+   at the two minima, connected by a light arrow annotated "optimal model
+   size grows with the dataset". A dashed horizontal guide at rate 1.0
+   labeled "no compression". Colors: amber = large-dataset curve (the
+   subject), blue = small-dataset curve, muted currentColor = raw-rate
+   curve, currentColor axes. One idea: charging the model its own bits
+   turns a monotone curve into a U whose minimum moves with the dataset
+   size. */}
+<Figure
+  name="AdjustedRateUCurves"
+  alt="Schematic adjusted compression rate versus model size: a monotonically falling raw-rate curve, and two U-shaped adjusted curves whose minima sit at small model size for a small dataset and larger model size for a large dataset"
+  caption="Charging the network its parameter bits: the raw rate falls forever, the adjusted rate is U-shaped, and the optimal model size grows with the dataset."
+/>
+
+This is an MDL reading of scaling: "bigger is better" is a statement
+about the fit term alone, and it survives the full accounting only when
+the dataset is large enough to amortize the model. The break-even
+arithmetic is elementary (exercise 6), and it reproduces in two lines the
+paper's finding that a 70-billion-parameter model, unbeatable on raw
+rate, loses the adjusted comparison on datasets far smaller than its own
+description.
+
+<KeyFact>
+Charged its own parameter bits, a network's compression rate becomes
+U-shaped in model size, and the optimal size grows with the dataset: the
+two-part principle evaluated at modern scale.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+A 25-bit record reads `0000100100000010000010000` (four ones, at
+positions 5, 8, 15, and 21; among the 24 adjacent pairs, $0$ is followed
+by $1$ four times and by $0$ sixteen times, and every $1$ is followed by
+$0$). Using the worked example's codes with
+$\lceil \log_2 26 \rceil = 5$ bits per parameter (order in unary, $2^k$
+parameters for order $k$, 1 bit per initial symbol), compute the two-part
+totals for $B(0)$ and $B(1)$ and state the MDL selection. Use
+$H(0.16) \approx 0.634$, $H(0.2) \approx 0.722$.
+
+<Solution>
+$B(0)$: $\hat\theta = 4/25 = 0.16$, so
+$L(D \mid H) = 25\,H(0.16) \approx 15.9$ bits; model
+$1 + 5 = 6$ bits; total $\approx 21.9$ bits.
+
+$B(1)$: first bit $1$ bit. From state $0$ ($20$ transitions,
+$\hat\theta_{1\mid 0} = 4/20 = 0.2$): $20\,H(0.2) = 14.4$ bits. From
+state $1$ ($4$ transitions, all to $0$, $\hat\theta_{1\mid 1} = 0$): $0$
+bits. Fit $= 1 + 14.4 + 0 = 15.4$ bits; model $2 + 10 = 12$ bits; total
+$\approx 27.4$ bits.
+
+MDL selects $B(0)$: $21.9 < 27.4$. Serial context improves the fit by
+only half a bit (the ones are scattered, so knowing the previous bit
+barely helps), while the second-order structure costs six extra model
+bits. Same procedure as the worked example, opposite verdict — the
+selection follows the data, not the richer candidate.
+</Solution>
+</Exercise>
+
+<Exercise>
+The 16-bit string `0010000101000010` has four ones. Compute the fit term
+$L(D \mid H) = -\log_2 P(D \mid H)$ under Bernoulli hypotheses
+$\theta = 0.5$, $\theta = 0.25$, and $\theta = 0.9$, identify which is the
+maximum-likelihood choice, and state the relation between the fit term and
+the string's per-symbol cross-entropy under each hypothesis. Use
+$\log_2 3 \approx 1.585$, $\log_2 0.1 \approx -3.322$,
+$\log_2 0.9 \approx -0.152$.
+
+<Solution>
+$\theta = 0.5$: every bit costs $1$ bit; $L = 16.0$ bits.
+
+$\theta = 0.25$: ones cost $2$ bits, zeros cost
+$\log_2 \tfrac43 = 2 - 1.585 = 0.415$ bits;
+$L = 4 \times 2 + 12 \times 0.415 = 8 + 4.98 \approx 13.0$ bits.
+
+$\theta = 0.9$: ones cost $0.152$ bits, zeros cost $3.322$ bits;
+$L = 4 \times 0.152 + 12 \times 3.322 = 0.61 + 39.86 \approx 40.5$ bits.
+
+The empirical rate is $4/16 = 0.25$, so $\theta = 0.25$ is the maximum-
+likelihood hypothesis and, consistently, the smallest fit: $13.0 < 16.0
+\ll 40.5$. Each fit divided by $16$ is the per-symbol cross-entropy of
+the hypothesis on this string ($0.81$, $1.0$, and $2.5$ bits per symbol):
+the fit term is the log-loss, i.e. the compressed size the hypothesis
+achieves.
+</Solution>
+</Exercise>
+
+<Exercise>
+A model has $k = 3$ parameters and is fit to $n = 10^4$ observations.
+(a) Compute the MDL parameter cost $(k/2)\log_2 n$ and compare it with
+shipping the parameters as three 32-bit floats. (b) State the parameter
+precision the data supports. (c) By how many bits does the cost rise if
+the dataset quadruples?
+
+<Solution>
+(a) $(3/2)\log_2 10^4 = 1.5 \times 13.29 \approx 19.9$ bits. Three
+32-bit floats cost $96$ bits: almost five times the information the data
+can actually use; the extra $76$ bits state digits of the parameters that
+the sample cannot distinguish.
+
+(b) Precision $\sim 1/\sqrt{n} = 0.01$ per parameter: about $\log_2 100
+\approx 6.6$ bits each, which is $(1/2)\log_2 n$.
+
+(c) At $n = 4 \times 10^4$:
+$(3/2)\log_2(4 \times 10^4) = (3/2)(13.29 + 2) \approx 22.9$ bits, a
+rise of $(k/2)\log_2 4 = 3$ bits. Quadrupling the data adds one bit of
+usable precision per parameter.
+</Solution>
+</Exercise>
+
+<Exercise>
+Consider the "memorizer class": for every $n$-bit string $s$, a
+hypothesis $H_s$ with $P(D \mid H_s) = 1$ if $D = s$ and $0$ otherwise,
+so $L(D \mid H_{D}) = 0$. Using the Kraft inequality of
+<Ref lesson="kraft-inequality"/>, prove that in any prefix-free code for
+this class, fewer than $2^{n-c}$ of the $2^n$ hypotheses can have
+$L(H_s) < n - c$, and conclude that for all but a $2^{-c}$ fraction of
+datasets the memorizer's two-part total is at least $n - c$ bits.
+
+<Solution>
+The hypothesis code is prefix-free, so its lengths satisfy
+$\sum_s 2^{-L(H_s)} \le 1$. If $m$ hypotheses had lengths below $n - c$,
+each would contribute more than $2^{-(n-c)}$ to the sum, forcing
+$m \cdot 2^{-(n-c)} < 1$, i.e. $m < 2^{n-c}$. The class has $2^n$
+hypotheses, one per string, so at most a $2^{n-c}/2^n = 2^{-c}$ fraction
+of strings $D$ have $L(H_D) < n - c$. For every other $D$, the two-part
+total is $L(H_D) + 0 \ge n - c$: within a couple of bits of sending $D$
+literally. Memorization moves the bits from the data term to the model
+term without shrinking the message — the same counting that made most
+strings incompressible in <Ref lesson="kolmogorov-complexity"/>, applied
+to a hypothesis code.
+</Solution>
+</Exercise>
+
+<Exercise>
+Recompute the worked example's table with the refined parameter price of
+$(1/2)\log_2 41 \approx 2.68$ bits per parameter in place of the crude
+$6$, keeping the unary order code and the fit entries. Does the selection
+change? What structural feature of the two-part totals does the
+recomputation illustrate?
+
+<Solution>
+$B(0)$: $1 + 1 \times 2.68 + 41.0 = 44.7$ bits.
+$B(1)$: $2 + 2 \times 2.68 + 19.8 = 27.2$ bits.
+$B(2)$: $3 + 4 \times 2.68 + 19.9 = 33.6$ bits.
+$B(3)$: $4 + 8 \times 2.68 + (\ge 3) \ge 28.4$ bits — now within reach
+of $B(1)$ numerically, but only by granting it an impossible perfect
+fit; with any realistic fit near $20$ bits it lands near $45$.
+
+The selection is unchanged: $B(1)$ wins. The recomputation shows that
+crude MDL's arbitrary constants (6 bits per parameter versus 2.68) shift
+every total but tend to preserve comparisons whose gaps exceed a few
+bits; the $14$-bit and $6$-bit margins here are robust. Refined MDL
+exists precisely to remove the remaining arbitrariness when margins are
+thin.
+</Solution>
+</Exercise>
+
+<Exercise>
+A small model ($4 \times 10^6$ parameters) achieves $1.9$ bits/char; a
+large model ($4 \times 10^8$ parameters) achieves $1.5$ bits/char. Both
+ship parameters at $16$ bits each. Compute the adjusted compression
+totals of both models on corpora of $N = 10^9$ and $N = 10^{11}$
+characters, find the break-even $N$, and state the conclusion in the
+terms of <Ref lesson="compression-is-prediction"/>.
+
+<Solution>
+Model bits: small $4 \times 10^6 \times 16 = 6.4 \times 10^7$; large
+$4 \times 10^8 \times 16 = 6.4 \times 10^9$.
+
+$N = 10^9$: small total $6.4 \times 10^7 + 1.9 \times 10^9 =
+1.96 \times 10^9$ bits ($1.96$ bits/char); large total
+$6.4 \times 10^9 + 1.5 \times 10^9 = 7.9 \times 10^9$ bits
+($7.9$ bits/char, worse than raw ASCII). The small model wins by
+a factor of four.
+
+$N = 10^{11}$: small total $\approx 1.9 \times 10^{11}$ bits
+($1.90$ bits/char); large total $6.4 \times 10^9 + 1.5 \times 10^{11} =
+1.56 \times 10^{11}$ bits ($1.56$ bits/char). The large model wins.
+
+Break-even: $0.4\,N = 6.4 \times 10^9 - 6.4 \times 10^7$, so
+$N \approx 1.6 \times 10^{10}$ characters. In the earlier lesson's
+terms: the model rides on both ends, so its description is part of the
+message; a better per-symbol predictor is a better compressor only once
+the stream is long enough to amortize the model that achieves it.
+</Solution>
+</Exercise>
+
+<Exercise>
+The sticky alternator of the worked example has entropy rate
+$H(0.1) \approx 0.469$ bits/symbol, while its best i.i.d. description
+$B(0)$ spends $\approx 1.0$ bits/symbol. (a) Identify the per-symbol
+overpayment of $B(0)$ as a quantity from <Ref lesson="kl-divergence"/>.
+(b) Find the stream length $n$ at which underfitting has cost $1{,}000$
+excess bits. (c) Compute the overfitting premium of $B(2)$ over $B(1)$
+at that $n$ under the refined $(1/2)\log_2 n$ price, and compare the two
+errors.
+
+<Solution>
+(a) $1.0 - 0.469 = 0.53$ bits/symbol is the divergence (KL) rate
+between the true first-order chain and the best i.i.d. model: the
+per-symbol price of coding with the wrong distribution, paid at every
+symbol.
+
+(b) $n = 1{,}000 / 0.53 \approx 1{,}900$ symbols.
+
+(c) $B(2)$ carries two superfluous parameters:
+$2 \times \tfrac12 \log_2 1900 = \log_2 1900 \approx 10.9$ bits, paid
+once. At $n \approx 1{,}900$ the underfit has cost $1{,}000$ bits and
+keeps growing linearly; the overfit has cost $11$ bits and grows only
+as $\log_2 n$. The errors are asymmetric by roughly a factor of a
+hundred here and unboundedly for larger $n$, which is why a
+description-length criterion can afford its bias toward simplicity.
+</Solution>
+</Exercise>
+
+<References>
+1. P. Grünwald, "A Tutorial Introduction to the Minimum Description Length Principle," in *Advances in Minimum Description Length*, MIT Press, 2004 — the lesson's primary source: §1.2 regularity as compressibility and the polynomial example; §1.3 the crude two-part principle; §1.5–1.6 what MDL does and does not claim; §2.2 the codelength–probability correspondence; §2.4 crude MDL on Markov chains and the parameter-precision argument; §2.6 refined MDL, NML, and the complexity expansion; §2.9.2 and §2.10 the BIC comparison and misspecification. https://arxiv.org/abs/math/0406077
+2. J. Rissanen, "Modeling by Shortest Data Description," *Automatica*, 14(5), 1978 — the original two-part MDL paper.
+3. J. Rissanen, "Fisher Information and Stochastic Complexity," *IEEE Transactions on Information Theory*, 42(1), 1996 — the NML stochastic complexity and its $(k/2)\log(n/2\pi) + \log \int \sqrt{\det I}$ expansion.
+4. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 28 "Model Comparison and Occam's Razor": the Bayesian dual of description-length selection and the Occam factor. Free online: https://www.inference.org.uk/mackay/itila/
+5. G. Delétang, A. Ruoss, et al., "Language Modeling Is Compression," ICLR 2024 — §3.3: the adjusted compression rate and the optimal model–dataset size trade-off. https://arxiv.org/abs/2309.10668
+6. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §14.13: the minimum description length principle as the computable shadow of the Kolmogorov two-part code.
+</References>

@@ -1,0 +1,580 @@
+A yes/no question strategy over a finite outcome set and a binary prefix
+code are the same object: each outcome sits at a leaf of a decision tree,
+and its depth is the length of its codeword. This lesson builds a question
+strategy for a concrete four-outcome source, converts it into a code,
+isolates the prefix condition that makes concatenated codewords decodable
+without separators, defines the expected codeword length $L$ that a good
+code minimizes, and states the entropy floor $H(X) \le L$ whose proof
+arrives in <Ref lesson="source-coding-theorem-lite"/>.
+
+## A question strategy is a binary tree
+
+The running source, used from here through
+<Ref lesson="huffman-by-hand"/>: one draw from four outcomes with
+
+$$
+p(A) = 0.5, \qquad p(B) = 0.25, \qquad p(C) = 0.15, \qquad p(D) = 0.1.
+$$
+
+The task is to identify the draw by asking yes/no questions, using as few
+questions as possible **on average** over many draws. A strategy is
+committed before the draw: which question comes first, and which question
+follows each possible answer. Later questions may depend on earlier
+answers; a **binary tree** records exactly that dependence. Each
+internal node is a question, its two children are the two answers, and
+each outcome sits at the leaf its answer path leads to.
+
+### Three questions for four outcomes
+
+One strategy: ask "Is it $A$?" first, since $A$ alone carries half the
+probability. On "yes" the draw is identified after one question. On "no",
+ask "Is it $B$?"; on a second "no", a final "Is it $C$?" separates $C$
+from $D$.
+
+<FigureSequence
+  name="tree-build"
+  alt="Four frames building a question tree on the distribution A:.5, B:.25, C:.15, D:.1, one question node per frame; the final frame labels each leaf with its codeword and depth and tallies 1.75 expected questions"
+  caption="One question node per frame. Final frame: each leaf's answer transcript is its codeword, and its depth is the number of questions."
+/>
+
+<Task>
+Step through the four frames. In frame 3, read off each outcome's depth:
+$A$ at 1, $B$ at 2, $C$ and $D$ at 3. Verify in frame 4 that the tally
+$.5 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 + .1 \cdot 3$ equals $1.75$.
+</Task>
+
+### The average number of questions
+
+The number of questions spent on a draw is the depth of its leaf. The
+average cost of the strategy weights each depth by its outcome's
+probability, the same weighting that defined entropy in
+<Ref lesson="entropy-as-average-surprise"/>:
+
+$$
+.5 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 + .1 \cdot 3 = 1.75
+\text{ questions per draw.}
+$$
+
+Half of all draws end after a single question, which is what pulls the
+average below 2 despite two outcomes sitting at depth 3.
+
+<KeyFact>
+A fixed yes/no strategy is a binary tree with outcomes at leaves; its
+average cost is $\sum_x p(x) \cdot \mathrm{depth}(x)$: here $1.75$
+questions per draw.
+</KeyFact>
+
+## Answers are bits: the strategy is a code
+
+Record each answer as one bit, **yes = 1** and **no = 0**. A draw of $C$
+produces the transcript no, no, yes: the string `001`. Every outcome gets
+the binary string of answers along its root-to-leaf path:
+
+| outcome | $p$ | transcript | codeword | length |
+| --- | --- | --- | --- | --- |
+| $A$ | $.5$ | yes | `1` | 1 |
+| $B$ | $.25$ | no, yes | `01` | 2 |
+| $C$ | $.15$ | no, no, yes | `001` | 3 |
+| $D$ | $.1$ | no, no, no | `000` | 3 |
+
+The tree read this way is a *code tree*: each branch carries a bit, each
+leaf carries a codeword, and **depth equals codeword length**. Asking one
+question and reading one bit are the same act.
+
+{/* fig CodeTreeCorrespondence: two panels showing the SAME binary tree twice,
+   joined by a bold horizontal double-headed arrow labeled "same object".
+   Left panel titled "question strategy": root node "Is it A?", branches
+   labeled "yes"/"no" (blue words), then "Is it B?", then "Is it C?"; leaves
+   A, B, C, D with probabilities .5, .25, .15, .1 under each letter. Right
+   panel titled "prefix code": identical tree geometry, branches labeled with
+   bits 1 (yes side) and 0 in amber, leaves labeled with mono amber codewords
+   1, 01, 001, 000. Under the right panel a horizontal bracket from the root
+   level down to leaf D annotated "3 questions = 3 bits: depth = codeword
+   length" (KaTeX not required; plain text fine). Colors: amber = bits and
+   codewords, blue = yes/no answer words, currentColor tree structure. One
+   idea: strategy and code are one object. */}
+<Figure
+  name="CodeTreeCorrespondence"
+  alt="The same binary tree drawn twice: left with yes/no questions at internal nodes, right with 0/1 bits on branches and codewords 1, 01, 001, 000 at the leaves; a bracket marks depth = codeword length"
+  caption="One tree, two readings: a question strategy and a binary code. Depth = questions asked = codeword length."
+/>
+
+<Definition title="binary symbol code">
+A **binary symbol code** for a finite outcome set $\mathcal{X}$ is a map
+$C$ assigning each outcome $x \in \mathcal{X}$ a finite binary string
+$C(x)$, its **codeword**, of length $\ell(x)$. A sequence of outcomes is
+encoded by concatenating the codewords, with no separators.
+</Definition>
+
+Concatenation is where variable lengths pay off. The five-symbol message
+$A\,B\,A\,A\,C$ encodes as
+
+$$
+\underbrace{1}_{A}\,\underbrace{01}_{B}\,\underbrace{1}_{A}\,
+\underbrace{1}_{A}\,\underbrace{001}_{C} \;=\; \texttt{10111001},
+$$
+
+8 bits. A fixed-length code for four outcomes spends 2 bits per symbol
+($\log_2 4 = 2$, the entropy ceiling of
+<Ref lesson="entropy-as-average-surprise"/>), hence 10 bits on the same
+message. The saving comes from giving the frequent outcome $A$ a 1-bit
+codeword and paying 3 bits only for the rare $C$ and $D$.
+
+<KeyFact>
+A question strategy and a binary code are one object: the answer
+transcript is the codeword, and asking a question is reading a bit.
+</KeyFact>
+
+## The prefix condition: outcomes at leaves only
+
+The tree above has a structural property that is easy to miss: outcomes
+sit only at **leaves**. Breaking that property breaks decoding.
+
+### A broken tree and an ambiguous stream
+
+Move $B$ from its leaf onto the internal node with path `01`, and hang
+$C$ and $D$ below it at `011` and `010`, keeping $A$ at `1`. The
+codewords become $\{A \mapsto \texttt{1},\; B \mapsto \texttt{01},\;
+C \mapsto \texttt{011},\; D \mapsto \texttt{010}\}$. Now $B$'s codeword
+`01` is a *prefix* of $C$'s codeword `011`, and the stream `011` has two
+valid parses:
+
+$$
+\texttt{011} = \underbrace{\texttt{011}}_{C}
+\quad\text{or}\quad
+\texttt{011} = \underbrace{\texttt{01}}_{B}\,\underbrace{\texttt{1}}_{A}.
+$$
+
+A receiver holding `011` cannot decide between "one draw, $C$" and "two
+draws, $B$ then $A$", and no amount of further reading settles it. In
+tree terms: after the answers no, yes the receiver stands on $B$'s node
+but cannot tell whether the walk has ended (emit $B$) or continues into
+$B$'s subtree.
+
+{/* fig NonPrefixAmbiguity: left, a small code tree with A at leaf "1", B
+   parked on the INTERNAL node "01" (B's node visually flagged in amber, with
+   a short label "outcome on an internal node"), and B's children C at leaf
+   "011", D at leaf "010"; branch bits 0/1 on every edge, codewords in mono
+   under each outcome. Right, the received stream 0 1 1 as three mono digit
+   cells, with TWO parse brackets: above the cells one bracket spanning all
+   three digits labeled "C"; below the cells two brackets, one spanning 01
+   labeled "B" and one spanning the final 1 labeled "A"; beside the brackets
+   the line "two valid parses — the stream is ambiguous" in amber. Colors:
+   amber = the offending outcome B, its codeword 01, and the ambiguity label;
+   currentColor everything else. One idea: an outcome on an internal node
+   makes a concatenated stream ambiguous. */}
+<Figure
+  name="NonPrefixAmbiguity"
+  alt="A code tree with outcome B parked on the internal node 01, its codeword a prefix of leaf codeword 011, and the received stream 011 shown with its two parses: C alone, or B followed by A"
+  caption="B parked on an internal node: its codeword 01 is a prefix of 011, and the stream 011 has two valid parses."
+/>
+
+<Definition title="prefix code">
+A binary symbol code is a **prefix code** (also *prefix-free code* or
+*instantaneous code*) if no codeword is a prefix of another codeword.
+Equivalently: in the code tree, every codeword sits at a leaf, and no
+codeword lies on the path to another.
+</Definition>
+
+### Decoding a prefix stream: walk, emit, reset
+
+Prefix codes decode a concatenated stream with no separators and no
+lookahead: start at the root, follow one branch per bit, and the moment a
+leaf is reached, emit its outcome and jump back to the root. Because no
+codeword continues past a leaf, the walk never faces the ambiguity above:
+each codeword is recognized the instant its last bit arrives, which is
+what *instantaneous* means.
+
+<Example title="decoding a concatenated stream">
+Decode the stream `000011001` under the code
+$\{A \mapsto \texttt{1}, B \mapsto \texttt{01}, C \mapsto \texttt{001},
+D \mapsto \texttt{000}\}$.
+
+Walk from the root, one bit per step:
+
+1. `0`, `0`, `0`: three "no" branches reach the leaf $D$. Emit $D$,
+   return to the root.
+2. `0`, `1`: reaches the leaf $B$. Emit $B$, reset.
+3. `1`: reaches the leaf $A$ in one step. Emit $A$, reset.
+4. `0`, `0`, `1`: reaches the leaf $C$. Emit $C$.
+
+The stream parses uniquely as `000`&#8203;`01`&#8203;`1`&#8203;`001`
+$= D\,B\,A\,C$, nine bits, four symbols, no separators consumed.
+</Example>
+
+<KeyFact>
+No codeword a prefix of another $\Leftrightarrow$ outcomes at leaves only
+$\Leftrightarrow$ a concatenated stream decodes uniquely, one bit at a
+time, with no separators.
+</KeyFact>
+
+<Aside>
+Prefix-free is sufficient for unique decodability, not necessary. The code
+$\{\texttt{0}, \texttt{01}, \texttt{011}, \texttt{0111}\}$ violates the
+prefix condition four times over, yet decodes uniquely: every codeword
+starts with `0` and contains no other `0`, so each `0` in the stream marks
+the start of a new codeword. The price is delay: after reading `01` the
+receiver must wait for the next `0` to learn whether the codeword has
+ended, whereas a prefix code emits at the final bit of every codeword.
+Reversing each codeword of a prefix code gives another uniquely decodable
+family (suffix codes) with the same lengths. The
+[Kraft–McMillan theorem](https://en.wikipedia.org/wiki/Kraft%E2%80%93McMillan_inequality)
+of <Ref lesson="kraft-inequality"/> shows the restriction to prefix codes
+costs nothing: any lengths achievable by a uniquely decodable code are
+achievable by a prefix code.
+</Aside>
+
+## Expected length: the cost of a code
+
+Two prefix codes for the running source, both decodable without
+separators. The *balanced code* assigns
+$\{A \mapsto \texttt{11}, B \mapsto \texttt{10}, C \mapsto \texttt{01},
+D \mapsto \texttt{00}\}$: a complete depth-2 tree, every codeword of
+length 2. The *matched code* is the question tree built above, lengths
+$(1, 2, 3, 3)$ tracking the probabilities $(.5, .25, .15, .1)$ in
+decreasing order.
+
+### Two codes for one source
+
+<Example title="expected length of two codes">
+Balanced code: every outcome costs 2 bits, so the average is
+
+$$
+.5 \cdot 2 + .25 \cdot 2 + .15 \cdot 2 + .1 \cdot 2 = 2.00 \text{ bits.}
+$$
+
+Matched code: the tally from the question tree,
+
+$$
+.5 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 + .1 \cdot 3
+= .5 + .5 + .45 + .3 = 1.75 \text{ bits.}
+$$
+
+The matched code saves $0.25$ bits per symbol: $A$'s saved bit, weighted
+by $p(A) = .5$, outweighs the extra bit each spent on $C$ and $D$,
+weighted by only $.15 + .1 = .25$.
+</Example>
+
+<Definition title="expected codeword length">
+The **expected length** of a code $C$ for a source $X$ with distribution
+$p$ is
+$$
+L(C) = \sum_x p(x)\, \ell(x),
+$$
+the probability-weighted average of the codeword lengths, in bits per
+symbol. Source coding seeks the prefix code minimizing $L(C)$.
+</Definition>
+
+{/* fig TwoCodesOneSource: two near-identical panels side by side over the
+   same source, per the playbook comparison rule. Each panel is a small table
+   with rows A, B, C, D: columns "p" (.5, .25, .15, .1), "codeword" (mono),
+   "len". Left panel titled "balanced code": codewords 11, 10, 01, 00, all
+   len 2; tally line under the table "L = .5·2 + .25·2 + .15·2 + .1·2 = 2.00
+   bits" (KaTeX). Right panel titled "matched code": codewords 1, 01, 001,
+   000, lens 1, 2, 3, 3 with the len column highlighted amber; tally "L =
+   .5·1 + .25·2 + .15·3 + .1·3 = 1.75 bits" with 1.75 bold amber. Between or
+   below the panels the payoff line "matching lengths to probabilities saves
+   0.25 bits per symbol". Colors: amber = the varying lengths and the winning
+   L; currentColor tables. One idea: same distribution, different lengths,
+   lower L. */}
+<Figure
+  name="TwoCodesOneSource"
+  alt="Two code tables for the distribution .5, .25, .15, .1 side by side: a balanced code with all lengths 2 totaling L = 2.00 bits, and a matched code with lengths 1, 2, 3, 3 totaling L = 1.75 bits"
+  caption="Same source, two prefix codes: matching lengths to probabilities lowers the expected length from 2.00 to 1.75 bits."
+/>
+
+### Lengths and the distribution are all that matter
+
+$L(C)$ depends on the code only through its lengths $\ell(x)$, and on the
+source only through $p$. Two consequences:
+
+- **Bit labels are free.** Swapping the two children of any node
+  (relabeling yes and no) permutes the codewords but changes no length,
+  so $L$ is unchanged. The matched code with root labels swapped,
+  $\{A \mapsto \texttt{0}, B \mapsto \texttt{11}, C \mapsto \texttt{101},
+  D \mapsto \texttt{100}\}$, is equally good. What a code commits to is
+  its set of lengths; <Ref lesson="kraft-inequality"/> makes that precise.
+- **$L$ is an average over the distribution, not over leaves.** The
+  matched code wins on this source, but on the uniform distribution
+  $(.25, .25, .25, .25)$ its expected length is
+  $.25(1 + 2 + 3 + 3) = 2.25$ bits, and the balanced code's $2.00$ wins.
+  Neither tree is better in itself; a code is only good *for* a
+  distribution.
+
+<KeyFact>
+Expected length pairs a set of codeword lengths with a distribution:
+the balanced tree is optimal only for the uniform source, and skewed
+sources reward skewed trees.
+</KeyFact>
+
+## Split the mass, not the outcome count
+
+The choice of first question sets the cost of the whole strategy. Two
+candidates split the running source very differently:
+
+- "Is it $D$?" isolates the **rarest** outcome: mass split $.1$ versus
+  $.9$. The frequent draws all take the "no" branch, and everything
+  popular still needs separating afterwards. Completing this tree as well
+  as possible (ask "Is it $A$?" next, then "Is it $B$?") gives lengths
+  $1, 2, 3, 3$ against the probabilities $.1, .5, .25, .15$: an expected
+  $.1 \cdot 1 + .5 \cdot 2 + .25 \cdot 3 + .15 \cdot 3 = 2.30$ bits.
+- "Is it $A$?" splits the mass $.5$ versus $.5$ and yields the matched
+  code's $1.75$.
+
+<FigureSequence
+  name="split-half"
+  alt="Three frames comparing first questions: 'Is it D?' splits the probability mass .1 versus .9, 'Is it A?' splits it .5 versus .5, and the best completions cost L = 2.30 versus L = 1.75 questions"
+  caption="Two first questions on the same source. Balancing the probability mass, not the outcome count, is what shortens the tree."
+/>
+
+<Task>
+Step through the three frames and compare the mass bars: the bad question
+leaves $.9$ of the probability on one side, the good one cuts it exactly
+in half. Frame 3 tallies the cost after each tree is completed optimally:
+$2.30$ against $1.75$ questions per draw.
+</Task>
+
+### One bit per question at most
+
+The binary entropy function of
+<Ref lesson="entropy-as-average-surprise"/> says why balance wins. The
+answer to a question is a two-outcome random variable; if "yes" has
+probability $q$, the answer carries entropy $H(q) \le 1$ bit, with
+equality exactly at $q = \tfrac12$. The answer to "Is it $D$?" is a
+90/10 coin, $H(0.1) \approx 0.469$ bits: the question spends a full
+question-slot to learn less than half a bit. "Is it $A$?" is a fair coin
+and delivers the full bit.
+
+Splitting the outcome *count* in half is not the target. "Is it $A$ or
+$B$?" balances the count two against two, but the mass $.75$ against
+$.25$: its answer carries $H(0.75) \approx 0.811$ bits, and the strategy
+it starts (two questions always) is the balanced code's $L = 2.00$.
+
+Near-halving the mass at every node is a heuristic, not yet an algorithm;
+<Ref lesson="huffman-by-hand"/> gives the greedy construction that is
+provably optimal.
+
+<KeyFact>
+Each answer delivers at most one bit, and exactly one bit only when the
+question splits the remaining probability mass 50/50 — good trees halve
+the mass, not the outcome count.
+</KeyFact>
+
+## Entropy is the floor: no code beats H
+
+The entropy of the running source, by the three-step computation of
+<Ref lesson="entropy-as-average-surprise"/>: surprisals
+$-\log_2 .5 = 1$, $-\log_2 .25 = 2$, $-\log_2 .15 \approx 2.737$,
+$-\log_2 .1 \approx 3.322$; weighted,
+
+$$
+H(X) = .5 \cdot 1 + .25 \cdot 2 + .15 \cdot 2.737 + .1 \cdot 3.322
+\approx 1.743 \text{ bits.}
+$$
+
+The matched code's $L = 1.75$ sits $0.007$ bits above this number, about
+$0.01$ bits, and not below it. That is not an accident of this source.
+
+<Theorem title="entropy bounds expected length">
+For every prefix code $C$ for a source $X$,
+$$
+H(X) \le L(C).
+$$
+</Theorem>
+
+The theorem is stated here for orientation and proved in
+<Ref lesson="source-coding-theorem-lite"/>, after
+<Ref lesson="kraft-inequality"/> supplies the tool. The strategy picture
+makes it plausible (identifying the draw requires $H(X)$ bits on average
+and each answer delivers at most one), but that is a reading, not a
+proof.
+
+{/* fig EntropyFloor: horizontal bar chart with two bars and a floor line.
+   Bars, top to bottom: "balanced code" length 2.00 (currentColor outline)
+   and "matched code" length 1.75 (amber fill), both labeled at their right
+   ends "L = 2.00 bits" / "L = 1.75 bits". A dashed vertical line at 1.743
+   spanning both bars, labeled "H(X) ≈ 1.74 bits — the floor" (blue, KaTeX
+   for H(X)). A small brace or arrow between the matched bar's end and the
+   dashed line calling out "gap ≈ 0.01 bits". A shared bits axis 0 to 2.25
+   with ticks at 0, 0.5, 1, 1.5, 2. Colors: amber = the matched code (the
+   subject), blue = the entropy floor line and its label, currentColor
+   elsewhere. One idea: L is the cost, H is the floor no code crosses. */}
+<Figure
+  name="EntropyFloor"
+  alt="Bar chart of expected lengths: balanced code at 2.00 bits and matched code at 1.75 bits, against a dashed entropy floor at H ≈ 1.74 bits, with the 0.01-bit gap called out"
+  caption="Both codes sit above the entropy floor H ≈ 1.74 bits; the matched code clears it by about 0.01 bits."
+/>
+
+### When the floor is hit exactly
+
+The four-symbol source of <Ref lesson="entropy-as-average-surprise"/>
+with probabilities $(\tfrac12, \tfrac14, \tfrac18, \tfrac18)$ has
+$H = 1.75$ bits, and its surprisals $1, 2, 3, 3$ are integers. Assigning
+each outcome a codeword of length equal to its surprisal (the matched
+tree fits exactly) gives $L = 1.75 = H$: the floor is attained. On the
+running distribution the surprisals $2.737$ and $3.322$ are not integers,
+no codeword can be $2.737$ bits long, and the $0.007$-bit gap is the
+rounding cost. How small that gap can always be made, and why $\ell(x)
+\approx -\log_2 p(x)$ is the right target, is the subject of the next
+three lessons.
+
+<KeyFact>
+No prefix code's expected length beats the entropy: $H(X) \le L(C)$,
+with equality exactly when every codeword length equals its outcome's
+surprisal.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+For the source $p(E) = .4$, $p(F) = .3$, $p(G) = .2$, $p(H) = .1$, build
+the question tree that asks "Is it $E$?", then "Is it $F$?", then "Is it
+$G$?". Write the codeword of each outcome (yes = 1, no = 0), and compute
+the expected length. Compare it with the balanced code's $2.00$ bits.
+
+<Solution>
+The chain of questions puts $E$ at depth 1, $F$ at depth 2, $G$ and $H$
+at depth 3. Codewords: $E \mapsto \texttt{1}$, $F \mapsto \texttt{01}$,
+$G \mapsto \texttt{001}$, $H \mapsto \texttt{000}$.
+
+Expected length:
+$$
+L = .4 \cdot 1 + .3 \cdot 2 + .2 \cdot 3 + .1 \cdot 3
+= .4 + .6 + .6 + .3 = 1.9 \text{ bits.}
+$$
+
+This beats the balanced code's $2.00$ bits by $0.1$ bits per symbol: the
+mass is skewed enough ($.4$ on $E$) that $E$'s saved bit outweighs the
+third bit spent on $G$ and $H$ (combined mass $.3$).
+</Solution>
+</Exercise>
+
+<Exercise>
+Decode the stream `0010001101` under the matched code
+$\{A \mapsto \texttt{1}, B \mapsto \texttt{01}, C \mapsto \texttt{001},
+D \mapsto \texttt{000}\}$, using the walk-emit-reset procedure. State
+after which bits an outcome is emitted.
+
+<Solution>
+Walk from the root: `0`, `0`, `1` reaches the leaf $C$ (emit after bit 3);
+`0`, `0`, `0` reaches $D$ (emit after bit 6); `1` reaches $A$ (emit after
+bit 7); `1` reaches $A$ again (emit after bit 8); `0`, `1` reaches $B$
+(emit after bit 10). The stream parses uniquely as
+`001`&#8203;`000`&#8203;`1`&#8203;`1`&#8203;`01` $= C\,D\,A\,A\,B$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The code $\{A \mapsto \texttt{0}, B \mapsto \texttt{10},
+C \mapsto \texttt{010}, D \mapsto \texttt{101}\}$ is proposed for the
+running source. Show that it is not a prefix code, and exhibit a bit
+string with two valid parses.
+
+<Solution>
+$A$'s codeword `0` is a prefix of $C$'s codeword `010`, and $B$'s
+codeword `10` is a prefix of $D$'s `101`: the prefix condition fails
+twice.
+
+The string `010` has two valid parses: as the single codeword $C$, or as
+`0` followed by `10`, i.e. $A$ then $B$. A receiver holding `010`
+cannot decide between one draw and two, so the code is not uniquely
+decodable.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compute the expected length of the matched code (lengths $1, 2, 3, 3$)
+and of the balanced code (all lengths $2$) under the uniform distribution
+$(.25, .25, .25, .25)$. State which code wins and what this says about
+"good codes" in general.
+
+<Solution>
+Matched code: $L = .25 \cdot 1 + .25 \cdot 2 + .25 \cdot 3 + .25 \cdot 3
+= .25 \cdot 9 = 2.25$ bits. Balanced code: $L = 2.00$ bits.
+
+The balanced code wins by $0.25$ bits per symbol. Expected length is an
+average over the distribution, not a property of the tree alone: the
+matched tree's short codeword is wasted when its outcome is no more
+likely than the others, while its two depth-3 leaves still cost a full
+extra bit each a quarter of the time. A code is good only relative to a
+distribution; for the uniform source the uniform-depth tree is optimal.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the source $(\tfrac12, \tfrac14, \tfrac18, \tfrac18)$, compute the
+entropy $H(X)$ (three-step method of the entropy lesson) and the expected
+length of the matched code with lengths $(1, 2, 3, 3)$. Verify that
+$L = H$ and explain, via surprisal, why the floor is attained here but
+not for $(.5, .25, .15, .1)$.
+
+<Solution>
+Surprisals: $-\log_2 \tfrac12 = 1$, $-\log_2 \tfrac14 = 2$,
+$-\log_2 \tfrac18 = 3$ (twice). Weighted:
+$H = \tfrac12 \cdot 1 + \tfrac14 \cdot 2 + \tfrac18 \cdot 3 + \tfrac18
+\cdot 3 = .5 + .5 + .375 + .375 = 1.75$ bits.
+
+Expected length: $L = \tfrac12 \cdot 1 + \tfrac14 \cdot 2 + \tfrac18
+\cdot 3 + \tfrac18 \cdot 3 = 1.75$ bits $= H$.
+
+Every codeword length equals its outcome's surprisal,
+$\ell(x) = -\log_2 p(x)$, so the two weighted sums are term-by-term
+identical. This is possible because all surprisals are integers (the
+probabilities are powers of $\tfrac12$). For $(.5, .25, .15, .1)$ the
+surprisals $2.737$ and $3.322$ are not integers; codeword lengths must
+round them, and the rounded lengths $(1, 2, 3, 3)$ leave the
+$1.75 - 1.743 = 0.007$-bit gap.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that the code $\{\texttt{0}, \texttt{01}, \texttt{011},
+\texttt{0111}\}$ is not a prefix code but is uniquely decodable, and
+explain why its decoder is not instantaneous, using the stream `0011101`
+as the worked case.
+
+<Solution>
+Not prefix: `0` is a prefix of `01`, `011`, and `0111` (and `01` of
+`011`, `011` of `0111`).
+
+Uniquely decodable: every codeword consists of a single `0` followed by
+zero to three `1`s, so every `0` in a stream is the first bit of a
+codeword. Splitting the stream immediately before each `0` recovers the
+codeword boundaries uniquely. For `0011101`: the `0`s sit at positions 1,
+2, and 6, so the splits are `0` | `0111` | `01`: three codewords, one
+parse.
+
+Not instantaneous: after reading `01` the decoder cannot emit, because
+the codeword might be `01`, `011`, or `0111`; it must wait for the next
+`0` (or the end of the stream) to learn where the codeword ends. A prefix
+code never waits: each codeword is recognized at its final bit.
+</Solution>
+</Exercise>
+
+<Exercise>
+In the matched code's tree, swap the yes/no labels at the root only.
+Write the four new codewords, verify each codeword length is unchanged,
+and conclude what the swap shows about which properties of a code carry
+its cost.
+
+<Solution>
+Swapping the root labels flips the first bit of every codeword: $A$'s
+path becomes "no" $= \texttt{0}$, and the other three start with "yes"
+$= \texttt{1}$. New codewords: $A \mapsto \texttt{0}$,
+$B \mapsto \texttt{11}$, $C \mapsto \texttt{101}$,
+$D \mapsto \texttt{100}$.
+
+Lengths: $1, 2, 3, 3$, identical to before, since relabeling branches
+moves no outcome to a different depth. Hence
+$L = .5 \cdot 1 + .25 \cdot 2 + .15 \cdot 3 + .1 \cdot 3 = 1.75$ bits,
+unchanged, and the code is still prefix-free (outcomes still sit at
+leaves). The cost of a code lives entirely in its multiset of lengths
+paired with the distribution; the particular 0/1 labels are arbitrary.
+</Solution>
+</Exercise>
+
+<References>
+1. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §5.1: codeword lengths, expected length, and the hierarchy of nonsingular, uniquely decodable, and instantaneous (prefix) codes.
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §4.1 (identifying an outcome by yes/no questions: the weighing problem and guessing games) and ch. 5 "Symbol Codes", §5.1 (prefix codes as binary trees, expected length). Free online: https://www.inference.org.uk/mackay/itila/
+3. C. Olah, "Visual Information Theory," 2015 — variable-length codes and the cost of short codewords, visually. https://colah.github.io/posts/2015-09-Visual-Information/
+</References>

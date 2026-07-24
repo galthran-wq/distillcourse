@@ -94,20 +94,23 @@ const QA_SCHEMA = {
   },
 }
 
-const phaseArg = args?.phase ?? 'structure'
-const slug = args?.slug
+// Some launch paths deliver args as a JSON string instead of an object —
+// tolerate both so a run never dies on the very first line.
+const argv = typeof args === 'string' ? JSON.parse(args) : (args ?? {})
+const phaseArg = argv.phase ?? 'structure'
+const slug = argv.slug
 if (!slug) throw new Error('args.slug is required')
 
 // Subagents inherit the SESSION's launch directory, not the orchestrator's
 // current worktree — so the orchestrating skill passes args.root (absolute
 // path of the course worktree) and every agent prompt is prefixed with it.
-const root = args?.root
+const root = argv.root
 const at = root
   ? `Repo root for ALL file reads and writes: ${root} (a git worktree). Use absolute paths under it; never touch any other checkout of this repo.\n\n`
   : ''
 
 if (phaseArg === 'structure') {
-  const topic = args?.topic ?? slug
+  const topic = argv.topic ?? slug
 
   phase('Canon')
   const canon = await agent(
@@ -154,7 +157,7 @@ if (phaseArg === 'lessons') {
     `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "planned", in course order (modules in file order, lessons in file order within each module). hasDemo = the lesson's demo field is not null.`,
     { label: 'plan', model: 'sonnet', schema: PLAN_SCHEMA },
   )
-  const todo = plan.lessons.slice(0, args?.count ?? plan.lessons.length)
+  const todo = plan.lessons.slice(0, argv.count ?? plan.lessons.length)
   log(`writing ${todo.length} lesson(s): ${todo.map((l) => l.slug).join(', ')}`)
 
   const written = []
@@ -182,7 +185,7 @@ if (phaseArg === 'lessons') {
                 `Read .claude/skills/figure-artist/SKILL.md and follow it exactly (component tier). The render-and-look loop is mandatory — the figure is not yet registered, so render by file path: \`npm run figure -- components/figures/${slug}/${f.name}.tsx [frame]\` — and LOOK at the PNG every iteration, listing visible defects before declaring it done.`,
                 `PARALLEL-SAFETY HARD LIMIT: other figure builders run concurrently — do NOT edit components/figures/index.ts or any file outside components/figures/${slug}/${f.name}.tsx. Final message: the figure's one-line description and, for sequences, the frame count N.`,
               ].join('\n\n'),
-              { label: `figure: ${f.name}`, phase: 'Lessons' },
+              { label: `figure: ${f.name}`, phase: 'Lessons', model: 'opus' },
             ),
           ),
         )

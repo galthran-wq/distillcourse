@@ -1,0 +1,699 @@
+For any variable T computed from X, no processing can increase information
+about a third variable Y: if Y, X, T form a Markov chain, then
+I(T;Y) \<= I(X;Y). This lesson watches the loss happen on a four-symbol
+table, states the Markov condition that makes "computed from X" precise,
+proves the inequality by expanding one quantity two ways with the chain
+rule, characterizes the equality case as sufficiency, and reads the result
+as a ceiling over every learned representation: no feature of X knows more
+about a target than X does.
+
+## A merge that loses bits: I drops from 0.811 to 0.467
+
+### The setup: a four-symbol source with a binary label
+
+Take the four-symbol source used since
+<Ref lesson="entropy-as-average-surprise"/>: $X \in \{a,b,c,d\}$ with
+probabilities $\tfrac{1}{2}, \tfrac{1}{4}, \tfrac{1}{8}, \tfrac{1}{8}$, so
+$H(X) = 1.75$ bits. Attach a binary label $Y$: $Y = 1$ if
+$X \in \{c, d\}$, else $Y = 0$. The joint table has one nonzero cell per
+column:
+
+| $p(x,y)$ | $x = a$ | $x = b$ | $x = c$ | $x = d$ | $p(y)$ |
+| --- | --- | --- | --- | --- | --- |
+| $y = 0$ | $\tfrac{1}{2}$ | $\tfrac{1}{4}$ | $0$ | $0$ | $\tfrac{3}{4}$ |
+| $y = 1$ | $0$ | $0$ | $\tfrac{1}{8}$ | $\tfrac{1}{8}$ | $\tfrac{1}{4}$ |
+| $p(x)$ | $\tfrac{1}{2}$ | $\tfrac{1}{4}$ | $\tfrac{1}{8}$ | $\tfrac{1}{8}$ | $1$ |
+
+$Y$ is a function of $X$: every column is certain, so
+$H(Y \mid X) = 0$, the determinism endpoint of
+<Ref lesson="joint-and-conditional-entropy"/>. The marginal is
+$p(Y{=}1) = \tfrac{1}{8} + \tfrac{1}{8} = \tfrac{1}{4}$, so
+$H(Y) = H_2(\tfrac{1}{4}) \approx 0.811$ bits, and by the definition of
+<Ref lesson="mutual-information">mutual information</Ref>,
+$$
+I(X;Y) = H(Y) - H(Y \mid X) \approx 0.811 - 0 = 0.811 \text{ bits}.
+$$
+$X$ resolves the label completely; $0.811$ bits is the entire budget in
+play.
+
+### The processing step: collapse b and c into one symbol
+
+Process the data: define $T = f(X)$ with $f(a) = a$,
+$f(b) = f(c) = m$, $f(d) = d$, a quantizer that merges the two middle
+symbols. $T$ is computed from $X$ alone; it never sees $Y$.
+
+<Example title="mutual information after the merge">
+Compute $I(T;Y)$ for the merged variable.
+
+**Step 1: distribution of $T$.** Merging adds probabilities:
+$p(a) = \tfrac{1}{2}$, $p(m) = \tfrac{1}{4} + \tfrac{1}{8} =
+\tfrac{3}{8}$, $p(d) = \tfrac{1}{8}$.
+
+**Step 2: label given $T$.** Given $a$: $Y = 0$, certain. Given $d$:
+$Y = 1$, certain. Given $m$: the merged column holds $b$'s mass
+$\tfrac{1}{4}$ with $Y = 0$ and $c$'s mass $\tfrac{1}{8}$ with $Y = 1$,
+so $p(Y{=}1 \mid m) = \tfrac{1/8}{3/8} = \tfrac{1}{3}$.
+
+**Step 3: conditional entropy.** Only the $m$ slice is uncertain, with
+$H_2(\tfrac{1}{3}) = \log_2 3 - \tfrac{2}{3} \approx 0.918$ bits:
+$$
+H(Y \mid T) = \tfrac{1}{2} \cdot 0 + \tfrac{3}{8} \cdot 0.918
++ \tfrac{1}{8} \cdot 0 \approx 0.344 \text{ bits}.
+$$
+
+**Step 4: subtract.**
+$$
+I(T;Y) = H(Y) - H(Y \mid T) \approx 0.811 - 0.344 = 0.467
+\text{ bits} \;<\; 0.811 = I(X;Y).
+$$
+</Example>
+
+{/* fig DpiMergeDrop: the worked drop in one picture. Layout, left to
+    right: (1) the 2×4 joint table p(x,y) from the prose (rows y=0, y=1;
+    columns a,b,c,d; cells 1/2, 1/4, 0, 0 / 0, 0, 1/8, 1/8), with the b
+    and c columns tinted blue and a brace beneath them labeled "merge:
+    $f(b)=f(c)=m$"; (2) below or beside it the resulting 2×3 table for
+    (T,Y) (columns a, m, d; cells 1/2, 1/4, 0 / 0, 1/8, 1/8) with the m
+    column tinted blue and annotated $p(Y{=}1\mid m)=\tfrac13$; (3) a
+    tally of two horizontal bars on a shared bits scale 0–0.811:
+    top bar $I(X;Y) = 0.811$ fully amber; bottom bar $I(T;Y) = 0.467$
+    amber with the remaining span to 0.811 hatched/muted and labeled
+    "lost: 0.344 bits". KaTeX for all math labels. Color roles: amber =
+    information about Y (the subject), blue = the merged symbol
+    (processing), currentColor = table structure; the loss segment muted,
+    not a new hue. One idea: merging a Y=0 column with a Y=1 column is
+    exactly where the bits about Y are destroyed. */}
+<Figure
+  name="DpiMergeDrop"
+  alt="The 2 by 4 joint table for X and Y with columns b and c braced into one symbol m, the resulting 2 by 3 table for T and Y, and two bars showing I(X;Y) = 0.811 bits against I(T;Y) = 0.467 bits with the 0.344-bit loss marked"
+  caption="Merging b (pure Y = 0) with c (pure Y = 1) hides the one distinction that carried 0.344 of the 0.811 bits about Y."
+/>
+
+The merge cost $0.344$ bits because it fused a pure-$Y{=}0$ column with a
+pure-$Y{=}1$ column: inside $m$ the label is uncertain. The theorem of
+this lesson states that the direction of this comparison is universal:
+for every $T$ computed from $X$, whatever the map,
+$I(T;Y) \le I(X;Y)$.
+
+<KeyFact>
+Processing dropped the information about $Y$ from $0.811$ to $0.467$
+bits: the merged symbol $m$ hides the $b$/$c$ distinction, and that
+distinction is where $0.344$ of the bits about $Y$ lived.
+</KeyFact>
+
+## The Markov condition: what "computed from X" means
+
+The merge is one instance of a general shape: $T$ is produced from $X$
+by a fixed rule, possibly with added randomness, and without access to
+$Y$. The probabilistic statement of "without access to $Y$" is
+conditional independence.
+
+<Definition title="Markov chain">
+Random variables $Y$, $X$, $T$ form a **Markov chain**, written
+$Y \to X \to T$, if
+$$
+p(t \mid x, y) = p(t \mid x) \quad \text{whenever } p(x,y) > 0;
+$$
+equivalently, if $Y$ and $T$ are conditionally independent given $X$:
+$p(y, t \mid x) = p(y \mid x)\, p(t \mid x)$.
+</Definition>
+
+{/* fig DpiMarkovChain: the chain as three nodes. Layout: three rounded
+    boxes left to right labeled $Y$ (target), $X$ (data, amber), $T$
+    (representation, blue); a straight data-flow arrow from Y to X
+    labeled $p(x\mid y)$ and one from X to T labeled $p(t \mid x)$ with
+    the gloss "the processing"; a faint dashed arc directly from Y to T
+    crossed out and labeled "no direct path". Below the nodes, two
+    horizontal span brackets: one under Y–X labeled $I(X;Y) = 0.811$
+    bits (amber), one under Y–T labeled $I(T;Y) = 0.467$ bits (blue),
+    and between them the KaTeX inequality $I(T;Y) \le I(X;Y)$. Color
+    roles: amber = X and its information about Y (subject), blue = T and
+    its information, currentColor = Y and structure. One idea: the
+    processing stage sits between the target and the representation, and
+    the span it gates can only shrink. Inspiration: Cover & Thomas §2.8
+    (recreate, do not copy). */}
+<Figure
+  name="DpiMarkovChain"
+  alt="Three nodes Y, X, T in a chain with arrows Y to X and X to T labeled p(t given x), a crossed-out direct path from Y to T, and span brackets beneath comparing I(X;Y) = 0.811 bits with I(T;Y) = 0.467 bits"
+  caption="The Markov chain Y → X → T: all of T's dependence on Y routes through X, so the T span cannot exceed the X span."
+/>
+
+Three consequences fix the scope of the hypothesis:
+
+- **Deterministic maps qualify.** $T = f(X)$ gives
+  $p(t \mid x, y) = \mathbf{1}\{t = f(x)\}$, which does not involve
+  $y$: every function of the data, including the merge above, forms a
+  Markov chain.
+- **Randomized processing qualifies.** If $T$ is computed from $X$ and
+  fresh noise independent of $(X,Y)$, e.g. $T = X \oplus N$, the
+  condition still holds. The proof below uses the Markov property only,
+  never determinism.
+- **The chain reverses.** Factoring
+  $p(y,x,t) = p(x)\, p(y \mid x)\, p(t \mid x)$ is symmetric in $y$ and
+  $t$, so $Y \to X \to T$ holds exactly when $T \to X \to Y$ does. One
+  hypothesis serves both reading directions.
+
+<Remark title="the arrow direction is the hypothesis">
+If $T$ is built with access to $Y$ itself, the condition
+$p(t \mid x,y) = p(t \mid x)$ fails and the conclusion can fail with it:
+Exercise 3 constructs a $T$ with $I(T;Y) = 1$ bit while $I(X;Y) = 0$.
+Checking the Markov property is not a formality; it is the entire
+content of "$T$ was computed from $X$".
+</Remark>
+
+<KeyFact>
+$Y \to X \to T$ states exactly that all of $T$'s dependence on $Y$
+routes through $X$: determinism is not required, fresh randomness is
+allowed, access to $Y$ is not.
+</KeyFact>
+
+## The proof: expand I(Y; X,T) two ways
+
+The proof needs one new quantity and one identity, both assembled from
+entropies the course already owns.
+
+### Conditional mutual information: the missing primitive
+
+<Definition title="conditional mutual information">
+The **conditional mutual information** of $Y$ and $T$ given $X$ is
+$$
+I(Y;T \mid X) = H(Y \mid X) - H(Y \mid X, T)
+= \sum_{x} p(x)\, I(Y;T \mid X{=}x),
+$$
+where $I(Y;T \mid X{=}x)$ is the mutual information of the conditional
+joint distribution $p(y,t \mid x)$.
+</Definition>
+
+Each slice $I(Y;T \mid X{=}x)$ is an ordinary mutual information, hence
+nonnegative by the nonnegativity theorem of
+<Ref lesson="mutual-information"/>; the weighted average inherits the
+bound: $I(Y;T \mid X) \ge 0$, with equality exactly when $Y$ and $T$
+are independent inside every slice. That equality condition is the
+Markov property, restated.
+
+On the running table both conditional informations are computable
+directly. Given $X = b$, the value $T = m$ is certain, and a constant
+is independent of everything: every slice of $I(Y;T \mid X)$ is zero,
+so $I(Y;T \mid X) = 0$. The mirror quantity $I(Y;X \mid T)$: the
+slices $T = a$ and $T = d$ determine $Y$, contributing zero; the slice
+$T = m$ holds $X \in \{b, c\}$ with probabilities
+$(\tfrac{2}{3}, \tfrac{1}{3})$ and $Y$ follows $X$ inside it, so its
+mutual information is $H_2(\tfrac{1}{3}) \approx 0.918$ bits. Averaging:
+$$
+I(Y;X \mid T) = \tfrac{3}{8} \cdot 0.918 \approx 0.344 \text{ bits},
+$$
+which is numerically the loss $I(X;Y) - I(T;Y)$ observed in the first
+section. The chain rule turns this coincidence into an identity.
+
+### The chain rule for mutual information
+
+<Theorem title="chain rule for mutual information">
+For any discrete random variables $Y$, $X$, $T$,
+$$
+I(Y;\, X, T) = I(Y;X) + I(Y;T \mid X) = I(Y;T) + I(Y;X \mid T).
+$$
+
+<Proof>
+The pair $(X,T)$ is one discrete variable, so
+$I(Y;\, X,T) = H(Y) - H(Y \mid X, T)$. Insert $H(Y \mid X)$:
+$$
+I(Y;\, X,T)
+= \bigl[H(Y) - H(Y \mid X)\bigr]
++ \bigl[H(Y \mid X) - H(Y \mid X,T)\bigr]
+= I(Y;X) + I(Y;T \mid X).
+$$
+The first bracket is the definition of $I(Y;X)$; the second is the
+definition of $I(Y;T \mid X)$. The pair enters only as a pair, so the
+same insertion with $H(Y \mid T)$ in place of $H(Y \mid X)$ gives the
+second equality. This is the chain rule for information,
+[Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+Theorem 2.5.2, in the two-variable case.
+</Proof>
+</Theorem>
+
+The identity reads: the information the pair $(X,T)$ carries about $Y$
+can be tallied $X$-first or $T$-first, and both tallies equal the same
+total.
+
+### The theorem
+
+<Theorem title="data-processing inequality">
+If $Y \to X \to T$, then
+$$
+I(T;Y) \le I(X;Y),
+$$
+with equality if and only if $I(Y;X \mid T) = 0$.
+
+<Proof>
+Expand $I(Y;\, X,T)$ both ways with the chain rule:
+$$
+I(Y;X) + I(Y;T \mid X) = I(Y;\, X,T) = I(Y;T) + I(Y;X \mid T).
+$$
+The Markov property makes $Y$ and $T$ conditionally independent given
+$X$, so $I(Y;T \mid X) = 0$ and the left side collapses to $I(Y;X)$:
+$$
+I(Y;X) = I(Y;T) + I(Y;X \mid T).
+$$
+Since $I(Y;X \mid T) \ge 0$, the right side is at least $I(Y;T)$, which
+is the inequality; equality holds exactly when the residual term
+$I(Y;X \mid T)$ vanishes. This is
+[Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+Theorem 2.8.1, with the chain relabeled $Y \to X \to T$.
+</Proof>
+</Theorem>
+
+{/* fig DpiProofTwoWays: FigureSequence, 3 frames, component tier
+    (register with frames: 3). Shared layout: the quantity
+    $I(Y;\,X,T)$ centered at top; two expansion slots below it,
+    connected by thin "expands to" arrows; a conclusion line at the
+    bottom. KaTeX throughout. Frame 1: only the X-first expansion
+    filled: $I(Y;X) + I(Y;T\mid X)$, with under-labels "what X tells"
+    (amber on I(Y;X)) and "what T adds given X" (blue on the
+    conditional term); T-first slot empty/muted. Frame 2: the T-first
+    expansion appears in the second slot: $I(Y;T) + I(Y;X\mid T)$ with
+    under-labels "what T tells" (blue) and "what X adds given T"
+    (amber); both expansions now visible, joined by an equals sign
+    through the top quantity. Frame 3: the term $I(Y;T\mid X)$ struck
+    through with "= 0 (Markov)" beside it; conclusion line appears:
+    $I(Y;X) = I(Y;T) + \underbrace{I(Y;X\mid T)}_{\ge 0} \;\Rightarrow\;
+    I(T;Y) \le I(X;Y)$, plus the numeric instance from the lesson's
+    table: $0.811 = 0.467 + 0.344$. Exactly one element changes per
+    frame. Color roles: amber = information X carries about Y, blue =
+    information T carries. Inspiration: Cover & Thomas §2.8 proof
+    (recreate the algebra as a picture, do not copy any drawing). */}
+<FigureSequence
+  name="DpiProofTwoWays"
+  alt="Three frames expanding I(Y; X,T) first via X as I(Y;X) plus I(Y;T given X), then via T as I(Y;T) plus I(Y;X given T), then striking the Markov term to zero and reading off I(T;Y) less than or equal to I(X;Y) with the instance 0.811 = 0.467 + 0.344"
+  caption="One quantity, two expansions: the Markov property zeroes one conditional term, nonnegativity of the other yields the inequality."
+/>
+
+<Task>
+Step through the three frames, then check the conclusion on the table
+of the first section: $I(Y;X) = 0.811$, $I(Y;T) = 0.467$, and the
+destroyed information $I(Y;X \mid T) = 0.344$ satisfy
+$0.811 = 0.467 + 0.344$ exactly.
+</Task>
+
+<Remark title="an average, not a pointwise bound">
+The theorem compares averages over the joint tables. It does not order
+individual events: for a particular outcome, observing $T = t$ may
+shift the conditional distribution of $Y$ more than observing some
+uninformative value $X = x$ would. As with the pointwise mutual
+information of <Ref lesson="mutual-information"/>, only the
+expectation obeys the inequality.
+</Remark>
+
+<KeyFact>
+For a Markov chain, $I(X;Y) = I(T;Y) + I(Y;X \mid T)$: the information
+about $Y$ splits exactly into the part that survives in $T$ plus the
+part the processing destroyed, and the destroyed part cannot be
+negative.
+</KeyFact>
+
+## No function of the data beats the data
+
+<Theorem title="corollary: functions and pipelines">
+For any function $f$ and any $Y$,
+$$
+I(f(X);\,Y) \le I(X;Y).
+$$
+More generally, if each stage of a pipeline
+$X \to T_1 \to T_2 \to \cdots$ is computed from the previous stage
+(deterministically or with independent randomness), then
+$I(T_k;Y)$ is non-increasing in $k$.
+
+<Proof>
+$T = f(X)$ satisfies $p(t \mid x,y) = \mathbf{1}\{t = f(x)\}
+= p(t \mid x)$, so $Y \to X \to T$ and the theorem applies. For the
+pipeline, each stage $T_{k+1}$ depends on $Y$ only through $T_k$, so
+$Y \to T_k \to T_{k+1}$ is a Markov chain and
+$I(T_{k+1};Y) \le I(T_k;Y)$; chaining the inequalities gives the
+monotone sequence.
+</Proof>
+</Theorem>
+
+The corollary covers every post-processing step in an engineer's
+toolbox: a hash, a quantizer, a cropped or downsampled image, a summary
+statistic, a neural network layer. Each is a $T$ computed from its
+input, so each can only shed information about any fixed target.
+
+{/* fig DpiCeilingStack: the ML reading as a bottom-up architecture
+    stack (playbook rule 5: data at the bottom, prediction at the top,
+    arrows point up). Left column, four rounded boxes stacked bottom to
+    top: "data $X$" (amber), "feature $T_1$" (blue), "feature $T_2$"
+    (blue), "prediction $\hat{Y}$" (blue), joined by upward data-flow
+    arrows each labeled "processing". Right of the stack, a horizontal
+    bar per stage on a shared bits axis: $I(X;Y) = 0.811$ for the data
+    row (amber, touching the ceiling), then successively shorter or
+    equal bars for $I(T_1;Y)$, $I(T_2;Y)$, $I(\hat{Y};Y)$ (blue). A
+    vertical dashed line at 0.811 spans all rows, labeled "ceiling:
+    $I(\,\cdot\,;Y) \le I(X;Y)$". Color roles: amber = the raw data and
+    its information (subject), blue = processed stages, dashed
+    currentColor = the ceiling. One idea: no layer of a pipeline rises
+    above the information the raw data had about the label. */}
+<Figure
+  name="DpiCeilingStack"
+  alt="A bottom-up stack from data X through two feature layers to a prediction, with a horizontal information bar per stage under a dashed ceiling at I(X;Y): every processed stage's bar is at most the data's bar"
+  caption="A pipeline under the DPI ceiling: each stage is processed from the one below, so I(stage; Y) can only shrink going up."
+/>
+
+### What representation learning does under the ceiling
+
+$I(X;Y)$ counts bits, not the ease of extracting them. Reading the
+label from raw pixels may require exactly the computation a trained
+network performs; reading it from the last-layer feature needs one
+linear map. Training a representation rearranges a fixed information
+budget into usable form; it never grows the budget.
+
+The contrapositive is a working debugging rule: a learned feature that
+appears to know more about $Y$ than the raw input did is evidence of
+leakage: somewhere, the pipeline touched $Y$ or a proxy for it
+directly, and the Markov chain assumed in evaluation does not hold.
+
+<Aside>
+The same machinery prices what a learning algorithm memorizes. For a
+training set $S$ and learned weights $W$,
+[Xu & Raginsky (2017)](https://arxiv.org/abs/1705.07809) bound the
+expected generalization gap of any algorithm with a $\sigma$-sub-Gaussian
+loss by
+$$
+\left|\, \mathbb{E}[\text{gen}(S,W)] \,\right|
+\le \sqrt{\frac{2\sigma^2\, I(S;W)}{n}},
+$$
+where $n$ is the number of training examples: an algorithm whose output
+shares few bits with its training set cannot overfit it. The mutual
+information between data and hypothesis plays the same gating role that
+$I(X;Y)$ plays across a Markov chain.
+</Aside>
+
+<KeyFact>
+Every stage of a pipeline lives under one ceiling:
+$I(\text{stage};\, Y) \le I(X;Y)$. A representation can concentrate the
+bits about $Y$ into accessible form; only measuring new data raises the
+ceiling.
+</KeyFact>
+
+## Equality: sufficient statistics
+
+The proof localizes the entire loss into one term:
+$I(T;Y) = I(X;Y)$ exactly when $I(Y;X \mid T) = 0$, that is, when,
+given $T$, the original $X$ carries no further information about $Y$.
+In that case $Y \to T \to X$ is also a Markov chain: $T$ stands fully
+between the data and the target.
+
+<Definition title="sufficient statistic">
+A variable $T$ with $Y \to X \to T$ is a **sufficient statistic** for
+$Y$ if
+$$
+I(T;Y) = I(X;Y),
+$$
+equivalently, if $X$ and $Y$ are conditionally independent given $T$.
+</Definition>
+
+<Example title="a merge with equality">
+On the same table, merge the other pair: $T' = g(X)$ with $g(a) = a$,
+$g(b) = b$, $g(c) = g(d) = e$.
+
+**Step 1: distribution of $T'$.** $p(a) = \tfrac{1}{2}$,
+$p(b) = \tfrac{1}{4}$, $p(e) = \tfrac{1}{8} + \tfrac{1}{8} =
+\tfrac{1}{4}$.
+
+**Step 2: label given $T'$.** Given $a$ or $b$: $Y = 0$, certain.
+Given $e$: both merged columns carry $Y = 1$, so $Y = 1$, certain.
+Hence $H(Y \mid T') = 0$.
+
+**Step 3: subtract.**
+$I(T';Y) = H(Y) - 0 \approx 0.811$ bits $= I(X;Y)$: equality. $T'$ is
+a sufficient statistic for $Y$.
+
+**Compression check.** $T'$ is strictly coarser than $X$:
+$H(T') = \tfrac{1}{2} \cdot 1 + \tfrac{1}{4} \cdot 2 + \tfrac{1}{4}
+\cdot 2 = 1.5$ bits, against $H(X) = 1.75$. The merge discarded a
+quarter bit of $X$, all of it irrelevant to $Y$.
+</Example>
+
+{/* fig DpiSufficiencyBars: the equality case as two bar comparisons on
+    one shared bits axis from 0 to 0.811 (playbook rule 8: twin panels).
+    Top row, labeled "$T$: merge $b,c$ (lossy)": an amber bar of length
+    0.467 labeled $I(T;Y) = 0.467$, with the remaining span to the
+    dashed ceiling hatched/muted and labeled "$0.344$ lost". Bottom row,
+    labeled "$T'$: merge $c,d$ (sufficient statistic)": an amber bar
+    reaching exactly the dashed ceiling, labeled $I(T';Y) = 0.811 =
+    I(X;Y)$, with a green check accent on the equality. A vertical
+    dashed currentColor line at 0.811 spans both rows, labeled
+    "$I(X;Y)$". Color roles: amber = information about Y, green =
+    the equality/accept state, currentColor = ceiling and structure.
+    One idea: equality in the DPI means nothing about Y was lost, and
+    which merge achieves it depends on where the Y-relevant distinction
+    sits. */}
+<Figure
+  name="DpiSufficiencyBars"
+  alt="Two bars against the same dashed ceiling at I(X;Y) = 0.811 bits: the b,c merge reaches only 0.467 bits with 0.344 marked lost, while the c,d merge reaches the ceiling exactly and is labeled sufficient statistic"
+  caption="Two merges of the same X: one destroys 0.344 bits about Y, the other loses nothing — equality in the DPI is sufficiency."
+/>
+
+<Remark title="sufficiency is relative to the target">
+$T'$ is sufficient for this $Y$. For the target $X$ itself the same
+merge is lossy: $I(T';X) = H(T') = 1.5$ bits, below
+$I(X;X) = H(X) = 1.75$ bits (self-information,
+<Ref lesson="mutual-information"/>). A statistic sufficient for one
+target can destroy information about another; sufficiency is a property
+of the pair (statistic, target). Exercise 5 works the comparison.
+</Remark>
+
+Classical statistics states the same notion with the target a model
+parameter: $T(X)$ is sufficient for a family $p(x;\theta)$ when
+$\theta \to T(X) \to X$, i.e. the conditional law of $X$ given $T$ does
+not involve $\theta$, and
+[Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+§2.9 shows this coincides with the information-preservation condition
+$I(\theta; T) = I(\theta; X)$: a sufficient statistic is one at the
+DPI's equality case for every prior on $\theta$.
+
+<KeyFact>
+Equality in the data-processing inequality is exactly sufficiency: $T$
+may be far smaller than $X$, provided the discarded bits are ones $Y$
+never touched.
+</KeyFact>
+
+## Where the inequality operates next
+
+Three later results are applications of this theorem, each in one
+sentence:
+
+- The converse of the
+  <Ref lesson="noisy-channel-coding">noisy-channel coding theorem</Ref>
+  runs the same machinery through Fano's inequality (Cover & Thomas
+  §2.10), turning "information was lost across the chain
+  message $\to$ channel $\to$ decoder" into an explicit lower bound on
+  decoding error.
+- In <Ref lesson="rate-distortion"/>, the reconstruction $\hat{X}$ is
+  processed from the compressed description of $X$, so the DPI pins the
+  information any reconstruction can retain to what the bit budget let
+  through.
+- The <Ref lesson="information-bottleneck"/> objective trades $I(X;T)$
+  against $I(T;Y)$ over encoders $X \to T$; its entire feasible region
+  sits under the ceiling $I(T;Y) \le I(X;Y)$ established here.
+
+## Exercises
+
+<Exercise>
+Let $X$ be uniform on $\{1, 2, 3, 4\}$ and $Y = 1$ if $X \ge 3$, else
+$Y = 0$. Consider two merges: $T_1$ maps $\{1,2\} \to s$ and
+$\{3,4\} \to t$; $T_2$ maps $\{1,3\} \to u$ and $\{2,4\} \to v$.
+Compute $I(X;Y)$, $I(T_1;Y)$, and $I(T_2;Y)$, verify the
+data-processing inequality for both merges, and identify which merge is
+a sufficient statistic for $Y$.
+
+<Solution>
+**$I(X;Y)$.** $Y$ is a function of $X$, so $H(Y \mid X) = 0$;
+$p(Y{=}1) = \tfrac{1}{2}$, so $H(Y) = 1$ bit and $I(X;Y) = 1$ bit.
+
+**$T_1$.** Given $s$, $X \in \{1,2\}$, so $Y = 0$ certain; given $t$,
+$Y = 1$ certain. $H(Y \mid T_1) = 0$ and
+$I(T_1;Y) = H(Y) = 1$ bit $= I(X;Y)$: equality, so $T_1$ is a
+sufficient statistic. The merge respects the $Y$-boundary.
+
+**$T_2$.** Given $u$, $X$ is $1$ or $3$ with probability $\tfrac{1}{2}$
+each, so $p(Y{=}1 \mid u) = \tfrac{1}{2}$; likewise given $v$. Every
+slice of $Y$ is a fair coin: $H(Y \mid T_2) = 1$ bit, so
+$I(T_2;Y) = 1 - 1 = 0$ bits.
+
+**DPI check.** $1 \le 1$ and $0 \le 1$: both merges obey the bound.
+$T_2$ crosses the $Y$-boundary in both merged pairs and destroys all
+information about the label while keeping a full bit of $X$
+($H(T_2) = 1$): how many bits survive and which bits survive are
+different questions.
+</Solution>
+</Exercise>
+
+<Exercise>
+On the lesson's table with the lossy merge $T$ ($b, c \to m$), compute
+$I(Y;\, X, T)$ directly, then verify both chain-rule expansions
+numerically: $I(Y;X) + I(Y;T \mid X)$ and $I(Y;T) + I(Y;X \mid T)$.
+
+<Solution>
+**Direct.** $T = f(X)$, so the pair $(X,T)$ takes the same values as
+$X$ with the same probabilities: $H(Y \mid X, T) = H(Y \mid X) = 0$,
+and $I(Y;\, X,T) = H(Y) - 0 = H_2(\tfrac{1}{4}) \approx 0.811$ bits.
+
+**$X$-first.** $I(Y;X) \approx 0.811$ bits (lesson, first section).
+Given any $X = x$, the value $T = f(x)$ is certain, so every slice of
+$I(Y;T \mid X)$ is zero: $I(Y;T \mid X) = 0$. Sum:
+$0.811 + 0 = 0.811$ bits.
+
+**$T$-first.** $I(Y;T) \approx 0.467$ bits (worked example). For
+$I(Y;X \mid T)$: slices $T = a$ and $T = d$ determine $Y$, contributing
+$0$; the slice $T = m$ (probability $\tfrac{3}{8}$) holds
+$X \in \{b,c\}$ with conditional probabilities
+$(\tfrac{2}{3}, \tfrac{1}{3})$, and within the slice $Y$ is determined
+by $X$, so the slice's mutual information is
+$H_2(\tfrac{1}{3}) \approx 0.918$ bits. Average:
+$\tfrac{3}{8} \cdot 0.918 \approx 0.344$ bits. Sum:
+$0.467 + 0.344 = 0.811$ bits.
+
+Both expansions match the direct value, and the $T$-first expansion
+exhibits the loss as the residual term $I(Y;X \mid T) = 0.344$ bits.
+</Solution>
+</Exercise>
+
+<Exercise>
+Construct random variables $Y$, $X$, $T$ for which
+$I(T;Y) > I(X;Y)$, and state which hypothesis of the data-processing
+inequality your construction violates.
+
+<Solution>
+Let $X$ and $Y$ be independent fair bits and set $T = Y$.
+
+Then $I(X;Y) = 0$ (independence, the nonnegativity equality case of
+<Ref lesson="mutual-information"/>), while
+$I(T;Y) = I(Y;Y) = H(Y) = 1$ bit: the "processed" variable carries one
+full bit more than $X$.
+
+The violated hypothesis is the Markov condition: here
+$p(t \mid x, y) = \mathbf{1}\{t = y\}$ depends on $y$, so
+$p(t \mid x, y) \ne p(t \mid x)$ and $Y \to X \to T$ fails. $T$ was
+not computed from $X$; it was computed from $Y$ directly. The
+inequality bounds processing of the data, not arbitrary side
+information.
+</Solution>
+</Exercise>
+
+<Exercise>
+Let $Y$ be a fair bit, $X = Y \oplus N_1$, and $T = X \oplus N_2$,
+where $N_1, N_2$ are independent $\mathrm{Bernoulli}(0.1)$ flips, also
+independent of $Y$. Verify that $Y \to X \to T$ is a Markov chain, then
+compute $I(X;Y)$ and $I(T;Y)$ and check the data-processing inequality.
+Use $H_2(0.1) \approx 0.469$ and $H_2(0.18) \approx 0.680$.
+
+<Solution>
+**Markov.** $T$ is computed from $X$ and the noise $N_2$, which is
+independent of $(Y, X)$: $p(t \mid x, y) = p(t \mid x)$, so
+$Y \to X \to T$ holds. Randomized processing qualifies.
+
+**$I(X;Y)$.** Given $Y$, $X$ differs from it with probability $0.1$:
+$H(X \mid Y) = H_2(0.1) \approx 0.469$ bits. By symmetry $X$ is a fair
+bit, $H(X) = 1$. So
+$I(X;Y) = 1 - 0.469 = 0.531$ bits (the $q = 0.9$ dial value of
+<Ref lesson="mutual-information"/>, Exercise 3).
+
+**$I(T;Y)$.** $T = Y \oplus N_1 \oplus N_2$ differs from $Y$ when
+exactly one flip fires:
+$0.1 \cdot 0.9 + 0.9 \cdot 0.1 = 0.18$. So
+$H(T \mid Y) = H_2(0.18) \approx 0.680$, $H(T) = 1$, and
+$I(T;Y) = 1 - 0.680 = 0.320$ bits.
+
+**Check.** $0.320 \le 0.531$: the second noisy stage destroyed a
+further $0.211$ bits. Cascading channels degrades information at every
+stage, exactly as the pipeline corollary requires.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson showed that $T'$ (the merge $c, d \to e$) is a sufficient
+statistic for $Y$. Show that the same $T'$ is **not** sufficient when
+the target is $X$ itself: compute $I(T';X)$ and $I(X;X)$ and compare.
+
+<Solution>
+$T'$ is a function of $X$, so $H(T' \mid X) = 0$ and
+$I(T';X) = H(T') - H(T' \mid X) = H(T')$. From the worked example,
+$H(T') = \tfrac{1}{2} \cdot 1 + \tfrac{1}{4} \cdot 2 + \tfrac{1}{4}
+\cdot 2 = 1.5$ bits.
+
+The benchmark is $I(X;X) = H(X) = 1.75$ bits: a variable shares its
+whole entropy with itself (self-information,
+<Ref lesson="mutual-information"/>).
+
+Comparison: $I(T';X) = 1.5 < 1.75 = I(X;X)$. Taking the target to be
+$X$, the chain $X \to X \to T'$ gives $I(T';X) \le I(X;X)$ with a
+strict $0.25$-bit gap: the merge cannot distinguish $c$ from $d$, and
+that distinction is worth
+$\tfrac{1}{4} \cdot 1 = 0.25$ bits of $X$. Sufficient for $Y$, lossy
+for $X$: sufficiency is relative to the target.
+</Solution>
+</Exercise>
+
+<Exercise>
+Encode the lesson's source with the prefix code
+$a \to 0$, $b \to 10$, $c \to 110$, $d \to 111$ (the optimal code for
+$\{\tfrac{1}{2}, \tfrac{1}{4}, \tfrac{1}{8}, \tfrac{1}{8}\}$ from
+<Ref lesson="huffman-by-hand"/>), and let $T$ be the codeword. Compute
+the expected codeword length, and prove that $I(T;Y) = I(X;Y)$ for
+**every** random variable $Y$, using the data-processing inequality
+twice.
+
+<Solution>
+**Expected length.**
+$\tfrac{1}{2} \cdot 1 + \tfrac{1}{4} \cdot 2 + \tfrac{1}{8} \cdot 3 +
+\tfrac{1}{8} \cdot 3 = 1.75$ bits per symbol, equal to $H(X)$: the
+code is complete and the source probabilities are powers of two, so the
+code meets the entropy floor of
+<Ref lesson="source-coding-theorem-lite"/> exactly.
+
+**Equality of information.** $T$ is a function of $X$, so
+$Y \to X \to T$ holds for any $Y$ and the DPI gives
+$I(T;Y) \le I(X;Y)$. The code is prefix-free, hence uniquely decodable
+(<Ref lesson="prefix-codes"/>): there is a decoding function $g$ with
+$X = g(T)$. Then $X$ is a function of $T$, so $Y \to T \to X$ also
+holds and the DPI gives the reverse bound $I(X;Y) = I(g(T);Y) \le
+I(T;Y)$. Both directions together force $I(T;Y) = I(X;Y)$.
+
+An invertible map is a sufficient statistic for every target: lossless
+compression changes the representation of the data, never its
+information content about anything.
+</Solution>
+</Exercise>
+
+<Exercise>
+For a Markov chain $Y \to X \to T$, show that conditioning on the
+processed output can only reduce the dependence between the endpoints:
+$$
+I(Y;X \mid T) \le I(Y;X).
+$$
+Then evaluate both sides on the lesson's table with the lossy merge
+$T$.
+
+<Solution>
+Expand $I(Y;\, X,T)$ both ways, using the Markov property
+$I(Y;T \mid X) = 0$ as in the theorem's proof:
+$$
+I(Y;X) = I(Y;T) + I(Y;X \mid T)
+\quad\Longrightarrow\quad
+I(Y;X \mid T) = I(Y;X) - I(Y;T).
+$$
+Since $I(Y;T) \ge 0$ (nonnegativity of mutual information), the right
+side is at most $I(Y;X)$, which is the claim.
+
+On the table: $I(Y;X \mid T) \approx 0.344$ bits and
+$I(Y;X) \approx 0.811$ bits, and indeed
+$0.344 = 0.811 - 0.467 \le 0.811$. Observing $T$ "explains away"
+$0.467$ of the $0.811$ bits of dependence between $X$ and $Y$; only
+the part $T$ failed to capture remains.
+</Solution>
+</Exercise>
+
+<References>
+1. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §2.5 defines conditional mutual information and proves the chain rule for information (Theorem 2.5.2); §2.8 states and proves the data-processing inequality (Theorem 2.8.1) with its corollaries; §2.9 connects the equality case to sufficient statistics; §2.10 develops Fano's inequality, the error-bound form used in the channel-coding converse.
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 8 "Dependent Random Variables": the joint-ensemble entropy and mutual-information identities this lesson's proof reuses, with the data-processing theorem among the chapter's exercises. Free online: https://www.inference.org.uk/mackay/itila/
+3. A. Xu, M. Raginsky, "Information-theoretic analysis of generalization capability of learning algorithms," *Advances in Neural Information Processing Systems* 30, 2017 — the generalization bound $\sqrt{2\sigma^2 I(S;W)/n}$ quoted in the aside. https://arxiv.org/abs/1705.07809
+</References>

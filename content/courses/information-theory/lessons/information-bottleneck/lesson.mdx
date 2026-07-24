@@ -1,0 +1,875 @@
+The information bottleneck makes relevant compression precise: choose a
+stochastic encoder mapping X to T that minimizes I(X;T) - beta I(T;Y),
+keeping the bits of X that inform the target Y and discarding the rest.
+This lesson replaces rate-distortion's hand-picked distortion measure with
+a second mutual information, computes the trade-off in full on a
+four-symbol source with a binary label, maps every candidate encoder into
+the information plane under two data-processing ceilings, states the
+Gibbs-form optimal encoder whose distortion measure emerges as a KL
+divergence, and derives the exchange rate $\beta$ that prices a relevant
+bit in bits of rate.
+
+## Relevance replaces distortion: the flaw the bottleneck fixes
+
+<Ref lesson="rate-distortion"/> priced lossy compression as
+$R(D) = \min I(X;\hat X)$ subject to $\mathbb{E}[d(x, \hat x)] \le D$, and
+its closing observation was that one ingredient is not derived: someone
+must pick the distortion measure $d$, and that choice silently decides
+which differences matter. A codec judged by squared error spends bits on
+deviations no user of the data cares about.
+
+[Tishby, Pereira & Bialek (1999)](https://arxiv.org/abs/physics/0004057)
+remove the hand-picked ingredient by changing what the constraint asks
+for. Instead of "reconstruct $X$ within tolerance $d$", the requirement
+becomes "keep information about a **target variable** $Y$": predict a
+label from an input, a disease from a scan, the next word from a context.
+Which bits of $X$ are *relevant* is then defined by the joint distribution
+$p(x, y)$ itself, not by a designer. The reconstruction term
+$\mathbb{E}[d(x, \hat x)]$ is replaced by a second mutual information,
+$I(T;Y)$, measured in the same currency as the rate.
+
+{/* fig IbVsRd: two near-identical objective panels side by side
+    (playbook rule 8), joined by a bold arrow labeled "replace the
+    hand-picked term". Left panel, header "rate-distortion": formula
+    $\min_{p(\hat x \mid x)} I(X;\hat X)$ s.t.
+    $\mathbb{E}[d(x,\hat x)] \le D$, with the term $d(x,\hat x)$
+    highlighted blue and a tag under it "hand-picked by a designer".
+    Right panel, header "information bottleneck": formula
+    $\min_{p(t \mid x)} I(X;T) - \beta\, I(T;Y)$, with the term
+    $I(T;Y)$ highlighted amber and a tag under it "derived from
+    $p(x,y)$: bits about the target". Only the changed term and its tag
+    differ between panels. Payoff line centered underneath: "relevance
+    without a designed distortion". Color roles: amber = the new
+    data-derived term (subject), blue = the old hand-picked term,
+    currentColor = shared structure. One idea: the bottleneck is
+    rate-distortion with the distortion measure replaced by relevant
+    information. Inspiration: Tishby §1–§3.1 (recreate, no figure
+    exists in the source). */}
+<Figure
+  name="IbVsRd"
+  alt="Two objective panels side by side: rate-distortion minimizing I(X;X̂) under a hand-picked distortion budget, and the information bottleneck minimizing I(X;T) minus beta times I(T;Y), with the replaced term highlighted"
+  caption="One substitution: the hand-picked distortion budget becomes a second mutual information, and relevance is defined by the data."
+/>
+
+<KeyFact>
+The information bottleneck is rate-distortion with the distortion measure
+removed from the designer's hands: the constraint "reconstruct $X$ well"
+becomes "inform about $Y$", and $p(x,y)$ decides which bits are relevant.
+</KeyFact>
+
+## The objective: compress X, keep Y
+
+### The pieces: a fixed joint, a chosen encoder
+
+Two distributions play different roles. The joint $p(x, y)$ is **given**:
+it is the statistics of the data. The encoder is **chosen**: a
+*stochastic encoder* is a conditional distribution $p(t \mid x)$ mapping
+each input $x$ to a distribution over representation values $t$, with
+deterministic maps $T = f(X)$ as the special case of one-point
+conditionals.
+
+The encoder reads $x$ only. $T$ never sees $Y$, so the three variables
+form the Markov chain $Y \to X \to T$ of
+<Ref lesson="data-processing-inequality"/>: all of $T$'s dependence on
+$Y$ routes through $X$. The arrow direction is a hypothesis, not a
+decoration. $T$ is a compressed code of $X$, not a hidden cause
+generating $Y$; Tishby, Pereira & Bialek flag exactly this reading in a
+footnote, and every figure in this lesson keeps the encoder arrow
+pointing out of $X$.
+
+<Definition title="information bottleneck objective">
+Given a joint distribution $p(x,y)$ and a trade-off parameter
+$\beta \ge 0$, the **information bottleneck** problem is
+$$
+\min_{p(t \mid x)} \; \mathcal{L}\bigl[p(t \mid x)\bigr]
+= I(X;T) \;-\; \beta\, I(T;Y),
+$$
+the minimum over stochastic encoders $p(t \mid x)$ with a fixed number
+$|\mathcal{T}|$ of representation values, where $T$ obeys the Markov
+chain $Y \to X \to T$.
+</Definition>
+
+{/* fig IbObjective: the objective dissected in place (playbook rule 7:
+    short labels above the formula, thin arrows onto exact symbols).
+    Center: the KaTeX formula
+    $\mathcal{L} = I(X;T) - \beta\, I(T;Y)$. Three labels with thin
+    arrows: "rate: bits $T$ keeps about $X$ — minimize" onto $I(X;T)$
+    (blue); "price of a relevant bit" onto $\beta$ (currentColor);
+    "relevance: bits $T$ keeps about the target $Y$ — maximize" onto
+    $I(T;Y)$ (amber). Below, a small chain diagram: node $Y$ →
+    node $X$ → rounded box "encoder $p(t\mid x)$" → node $T$, straight
+    data-flow arrows; the $X\to T$ stage tagged "the only object
+    chosen"; a faint crossed-out dashed arc from $Y$ to the encoder
+    labeled "the encoder never sees $Y$". Color roles: amber =
+    relevance term and target, blue = rate term, currentColor =
+    structure. One idea: compress X (pay rate), keep Y (earn
+    relevance), β sets the exchange rate. */}
+<Figure
+  name="IbObjective"
+  alt="The bottleneck objective L = I(X;T) minus beta I(T;Y) annotated term by term as rate, price, and relevance, above a chain diagram Y to X to encoder to T in which the encoder never sees Y"
+  caption="The objective dissected: pay rate I(X;T), earn relevance I(T;Y), with β the price of a relevant bit. The encoder touches X only."
+/>
+
+### The two extremes of β
+
+The parameter $\beta$ prices relevant bits in units of rate, and its
+extremes bracket the behavior:
+
+- **$\beta \to 0$**: relevance is worthless, and the objective reduces to
+  minimizing $I(X;T)$ alone. The minimum is $0$, attained by collapsing
+  every $x$ to one constant value of $T$: maximal compression, zero
+  information about anything.
+- **$\beta \to \infty$**: rate is free, and the objective reduces to
+  maximizing $I(T;Y)$. Copying, $T = X$, attains the maximum the next
+  section shows is $I(X;Y)$: all the relevance $X$ ever had, at full
+  rate $H(X)$.
+
+Every finite $\beta$ buys a point between these extremes. The rest of
+the lesson computes what the intermediate points look like, first by
+brute force on a toy source, then in general.
+
+<KeyFact>
+$\mathcal{L} = I(X;T) - \beta\, I(T;Y)$ trades bits kept about $X$
+against bits kept about $Y$: $\beta \to 0$ collapses $T$ to a constant,
+$\beta \to \infty$ makes $T$ a copy of $X$, and finite $\beta$ prices
+every position in between.
+</KeyFact>
+
+## The trade-off computed: four symbols, one binary label
+
+### The source: same rate, different relevance
+
+Let $X$ be uniform on $\{a, b, c, d\}$, $p(x) = \tfrac14$ each, with a
+binary label $Y$ attached through the conditionals
+$$
+p(1 \mid a) = 0, \quad
+p(1 \mid b) = \tfrac14, \quad
+p(1 \mid c) = \tfrac34, \quad
+p(1 \mid d) = 1,
+$$
+writing $p(1 \mid x)$ for $p(Y{=}1 \mid X{=}x)$. The joint table:
+
+| $p(x,y)$ | $x = a$ | $x = b$ | $x = c$ | $x = d$ | $p(y)$ |
+| --- | --- | --- | --- | --- | --- |
+| $y = 0$ | $\tfrac14$ | $\tfrac{3}{16}$ | $\tfrac{1}{16}$ | $0$ | $\tfrac12$ |
+| $y = 1$ | $0$ | $\tfrac{1}{16}$ | $\tfrac{3}{16}$ | $\tfrac14$ | $\tfrac12$ |
+| $p(x)$ | $\tfrac14$ | $\tfrac14$ | $\tfrac14$ | $\tfrac14$ | $1$ |
+
+<Example title="the budget in play: I(X;Y)">
+The label's marginal is fair, $H(Y) = 1$ bit. Given $X$, the label is
+certain for $a$ and $d$ and a $\tfrac14$-coin for $b$ and $c$
+($H_2(\tfrac14) = H_2(\tfrac34) \approx 0.811$):
+$$
+H(Y \mid X) = \tfrac14\bigl(0 + 0.811 + 0.811 + 0\bigr) \approx 0.406
+\text{ bits},
+$$
+so by <Ref lesson="mutual-information"/>,
+$$
+I(X;Y) = H(Y) - H(Y \mid X) \approx 1 - 0.406 = 0.594 \text{ bits}.
+$$
+$X$ carries $0.594$ bits about the label, out of $H(X) = 2$ bits of
+description: less than a third of the input is relevant.
+</Example>
+
+### Three hard 2-cluster encoders, priced
+
+Take the simplest nontrivial encoders: deterministic merges of the four
+symbols into two clusters of two, $T = f(X)$ with
+$|\mathcal{T}| = 2$. There are three such pairings. For each,
+$I(X;T) = H(T) - H(T \mid X) = H(T) = 1$ bit, since the clusters are
+equiprobable and $T$ is a function of $X$: **all three cost the same
+rate**, so the comparison isolates relevance.
+
+<Example title="the aligned merge: ab | cd">
+Cluster $t_1 = \{a, b\}$, $t_2 = \{c, d\}$, each with $p(t) = \tfrac12$.
+
+**Step 1: label given cluster.** The mass with $Y = 1$ inside $t_1$ is
+$p(a)\, p(1 \mid a) + p(b)\, p(1 \mid b) = 0 + \tfrac14 \cdot \tfrac14 =
+\tfrac{1}{16}$, so
+$p(1 \mid t_1) = \tfrac{1/16}{1/2} = \tfrac18$. Symmetrically
+$p(1 \mid t_2) = \tfrac78$.
+
+**Step 2: conditional entropy.** Both clusters are $\tfrac18$-coins:
+$H(Y \mid T) = H_2(\tfrac18) \approx 0.544$ bits.
+
+**Step 3: subtract.**
+$$
+I(T;Y) = H(Y) - H(Y \mid T) \approx 1 - 0.544 = 0.456 \text{ bits}.
+$$
+The merge keeps $0.456$ of the $0.594$ available bits; the loss is
+$0.138$ bits.
+</Example>
+
+The other two pairings, computed the same way (Exercise 1 works the
+first in full):
+
+- **$\{a,c\} \mid \{b,d\}$**: cluster conditionals
+  $p(1 \mid t) = \tfrac38$ and $\tfrac58$, so
+  $H(Y \mid T) = H_2(\tfrac38) \approx 0.954$ and
+  $I(T;Y) \approx 0.046$ bits.
+- **$\{a,d\} \mid \{b,c\}$**: both cluster conditionals equal
+  $\tfrac12$, so $H(Y \mid T) = 1$ and $I(T;Y) = 0$ bits: one bit of
+  rate spent, nothing about the label kept.
+
+{/* fig IbToyMerges: FigureSequence, 4 frames, component tier (register
+    with frames: 4). Shared layout: left, the 2×4 joint table from the
+    prose (rows y=0, y=1; columns a,b,c,d; cells 1/4, 3/16, 1/16, 0 /
+    0, 1/16, 3/16, 1/4) with a strip beneath it plotting the four
+    conditionals p(1|x) as dots on a 0–1 axis: a at 0, b at 1/4, c at
+    3/4, d at 1 (amber dots, KaTeX labels). Right, a two-bar tally slot
+    on shared scales: "rate I(X;T)" (blue bar, scale 0–2) and
+    "relevance I(T;Y)" (amber bar, scale 0–0.594 with a dashed ceiling
+    line at 0.594 labeled "I(X;Y)"). Frame 1: no merge; tally shows the
+    identity encoder T = X: rate 2, relevance 0.594; caption-line
+    "before merging: all rate, all relevance". Frame 2: brace under
+    columns a,b and under c,d labeled "$t_1 = \{a,b\}$, $t_2 =
+    \{c,d\}$"; the dot strip groups the two nearest-conditional pairs;
+    tally: rate 1, relevance 0.456. Frame 3: brace under a,c and b,d
+    ("$t_1 = \{a,c\}$"); the strip shows each cluster spanning distant
+    dots; tally: rate 1, relevance 0.046. Frame 4: brace under a,d and
+    b,c; both cluster conditionals land on 1/2 (dots merge at the
+    strip's center); tally: rate 1, relevance 0.000. Exactly one
+    pairing + tally changes per frame. Color roles: amber = relevance
+    and the conditional dots (subject), blue = rate, currentColor =
+    table. One idea: same rate, three relevances — merging similar
+    conditionals keeps the label information. */}
+<FigureSequence
+  name="IbToyMerges"
+  alt="Four frames on one joint table: the identity encoder at rate 2 and relevance 0.594, then three two-cluster merges all costing one bit of rate but keeping 0.456, 0.046, and 0 bits about the label, depending on how similar the merged conditionals p(y given x) are"
+  caption="Three merges, one price: each 2-cluster encoder costs I(X;T) = 1 bit, but relevance ranges from 0.456 bits to zero depending on which conditionals p(y|x) are fused."
+/>
+
+<Task>
+Step through the four frames and track the dot strip: the merge that
+pairs neighbors on the $p(1 \mid x)$ axis ($0$ with $\tfrac14$,
+$\tfrac34$ with $1$) keeps $0.456$ bits, and relevance falls to $0.046$
+and then $0$ as the pairings fuse increasingly distant conditionals.
+</Task>
+
+The ranking is decided entirely by **which conditionals get fused**.
+Merging $a$ with $b$ works because $p(y \mid a)$ and $p(y \mid b)$ are
+similar: inside the cluster, the label distribution barely blurs.
+Merging $a$ with $d$ fuses opposite conditionals into a fair coin and
+destroys everything. The Gibbs-form optimum below turns this observation
+into the exact assignment rule.
+
+One caveat scopes the enumeration: hard clusterings are a strict subset
+of stochastic encoders. The definition optimizes over all
+$p(t \mid x)$, and the true optimum at a given rate can strictly beat
+every hard partition; the hard points computed here are candidates, not
+the frontier itself.
+
+<KeyFact>
+At equal rate $I(X;T) = 1$ bit, the three 2-cluster encoders keep
+$0.456$, $0.046$, and $0$ bits about $Y$: relevance is decided by how
+similar the fused conditionals $p(y \mid x)$ are, not by how much of
+$X$ survives.
+</KeyFact>
+
+## The information plane: two ceilings cap every encoder
+
+### Both bounds are the data-processing inequality
+
+Plot every encoder as a point with coordinates
+$\bigl(I(X;T),\, I(T;Y)\bigr)$: rate spent against relevance kept. This
+coordinate system is the *information plane*, and two lines cap it, both
+inherited from <Ref lesson="data-processing-inequality"/>.
+
+The Markov chain $Y \to X \to T$ reverses to $T \to X \to Y$ (the
+factorization is symmetric, as established there), and the DPI applied
+to each reading direction gives one ceiling:
+
+- **The relevance ceiling.** From $Y \to X \to T$:
+  $\;I(T;Y) \le I(X;Y)$. No encoder can know more about the target than
+  the input did; for the toy source, no point rises above $0.594$ bits.
+- **The rate diagonal.** From $T \to X \to Y$:
+  $\;I(T;Y) \le I(X;T)$. A representation cannot say more about $Y$
+  than it contains about anything: relevance never exceeds rate, so
+  every point lies on or below the $45°$ line.
+
+{/* fig IbPlane: the information plane, static twin of the
+    InformationPlane demo. Axes: horizontal $I(X;T)$ in bits, 0 to 2.2
+    (ticks at 0, 0.5, 1, 1.5, 2); vertical $I(T;Y)$ in bits, 0 to 0.7.
+    Two boundary lines in currentColor dashed: horizontal ceiling at
+    0.594 labeled "$I(X;Y) = 0.594$: DPI ceiling", and the diagonal
+    $I(T;Y) = I(X;T)$ from the origin labeled "$I(T;Y) \le I(X;T)$"
+    (clipped at the ceiling). Plotted points from the toy: amber dots
+    at (0, 0) "collapse", (1, 0.456) "$ab \mid cd$", (2, 0.594)
+    "$T = X$"; blue (dominated) dots at (1, 0.046) "$ac \mid bd$",
+    (1, 0) "$ad \mid bc$", (0.811, 0.311) "$a \mid bcd$". A smooth
+    concave amber frontier curve from (0,0) rising steeply, passing at
+    or slightly above (1, 0.456), flattening into the ceiling near
+    (2, 0.594), labeled "β-swept frontier (stochastic encoders)"; small
+    annotation near the curve at low rate: "slope $1/\beta$". Color
+    roles: amber = frontier and the encoders on/near it (subject),
+    blue = dominated hard encoders, dashed currentColor = the two DPI
+    bounds. One idea: every encoder is a point under two DPI lines;
+    sweeping β traces the upper-left boundary. Inspiration: Tishby
+    §3.4 — described in prose there, never drawn; built from the
+    math. */}
+<Figure
+  name="IbPlane"
+  alt="The information plane with rate I(X;T) horizontal and relevance I(T;Y) vertical: a dashed ceiling at I(X;Y) = 0.594, the diagonal I(T;Y) at most I(X;T), the toy encoders plotted as points, and a concave frontier curve from the origin flattening into the ceiling"
+  caption="Every encoder is a point under two DPI lines. The toy's hard encoders scatter below the β-swept frontier; the identity encoder ends the curve where it meets the ceiling."
+/>
+
+### The frontier: what β sweeps out
+
+For each rate the interesting quantity is the **largest** relevance any
+encoder achieves; the resulting upper boundary is the *frontier*, traced
+by solving the bottleneck problem as $\beta$ sweeps from $0$ to
+$\infty$. Three facts locate it:
+
+- It starts at $(0, 0)$: zero rate forces $T$ independent of $X$, hence
+  of $Y$ (the $\beta \to 0$ collapse).
+- It ends on the ceiling: at rate $H(X) = 2$ bits the identity encoder
+  reaches $I(T;Y) = I(X;Y) = 0.594$, and more rate buys nothing.
+- It is concave, and there is one such curve per cardinality
+  $|\mathcal{T}|$: allowing more clusters relaxes the optimization, so
+  the curves nest, each approaching the $|\mathcal{T}| = |\mathcal{X}|$
+  master curve from below.
+
+The toy's hard encoders sit **under** the frontier at their rates,
+except where they happen to touch it; the stochastic optimum at rate
+$1$ bit is at least the $0.456$ bits of the aligned merge.
+
+<KeyFact>
+The feasible region of the bottleneck is bounded by two applications of
+one theorem: $I(T;Y) \le I(X;Y)$ and $I(T;Y) \le I(X;T)$, the DPI read
+along the chain in its two directions.
+</KeyFact>
+
+## The optimal encoder: the distortion measure emerges as a KL
+
+### Exactly what a merge loses: an identity
+
+The toy ranking suggested that the cost of assigning $x$ to a cluster
+$t$ is the mismatch between $p(y \mid x)$ and the cluster's aggregate
+conditional $p(y \mid t)$. That is an exact accounting, not a
+heuristic.
+
+<Theorem title="relevance loss is an expected KL divergence">
+For any encoder $p(t \mid x)$ with $Y \to X \to T$,
+$$
+I(X;Y) - I(T;Y)
+= \mathbb{E}_{p(x,t)}\Bigl[\, D\bigl(p(y \mid x) \,\|\, p(y \mid t)\bigr) \Bigr]
+\;\ge\; 0,
+$$
+the average, over inputs and their cluster assignments, of the KL
+divergence of <Ref lesson="kl-divergence"/> between the input's label
+conditional and its cluster's label conditional.
+
+<Proof>
+Expand the expectation:
+$$
+\mathbb{E}\bigl[D\bigr]
+= \sum_{x,t} p(x,t) \sum_y p(y \mid x)
+\log_2 \frac{p(y \mid x)}{p(y \mid t)}.
+$$
+The Markov chain gives $p(y \mid x, t) = p(y \mid x)$, so
+$p(x,t)\,p(y \mid x) = p(x,t,y)$, and the sum splits into two full
+expectations over the joint. The numerator term is
+$\sum_{x,y} p(x,y) \log_2 p(y \mid x) = -H(Y \mid X)$. The denominator
+term is
+$-\sum_{x,t,y} p(x,t,y) \log_2 p(y \mid t)
+= -\sum_{t,y} p(t,y) \log_2 p(y \mid t) = H(Y \mid T)$. Hence
+$$
+\mathbb{E}\bigl[D\bigr] = H(Y \mid T) - H(Y \mid X)
+= \bigl[H(Y) - H(Y \mid X)\bigr] - \bigl[H(Y) - H(Y \mid T)\bigr]
+= I(X;Y) - I(T;Y),
+$$
+and nonnegativity of each KL term makes the loss nonnegative, which is
+the relevance ceiling again.
+</Proof>
+</Theorem>
+
+**Numeric check** on the aligned merge: the four assignment costs are
+$D\bigl((1,0) \,\|\, (\tfrac78, \tfrac18)\bigr) = \log_2 \tfrac87
+\approx 0.193$ bits for $a$, $\approx 0.083$ bits for $b$, and by
+symmetry $0.083$ and $0.193$ for $c$ and $d$. Their average,
+$\tfrac14(0.193 + 0.083 + 0.083 + 0.193) \approx 0.138$ bits, is
+exactly the loss $0.594 - 0.456$ computed by brute force (Exercise 3
+verifies the four divergences).
+
+### Theorem 4: the Gibbs form
+
+The identity says the objective is rate plus $\beta$ times an expected
+KL "distortion". Minimizing it yields the central result of Tishby,
+Pereira & Bialek, their Theorem 4, stated here without its Lagrange
+derivation.
+
+<Theorem title="optimal bottleneck encoder (Tishby–Pereira–Bialek)">
+The stationary encoders of
+$\mathcal{L} = I(X;T) - \beta\, I(T;Y)$ satisfy
+$$
+p(t \mid x) = \frac{p(t)}{Z(x, \beta)}
+\exp\!\Bigl(-\beta\, D\bigl(p(y \mid x) \,\|\, p(y \mid t)\bigr)\Bigr),
+$$
+where $Z(x, \beta)$ normalizes over $t$, and the cluster statistics are
+determined self-consistently by the encoder:
+$$
+p(t) = \sum_x p(x)\, p(t \mid x),
+\qquad
+p(y \mid t) = \frac{1}{p(t)} \sum_x p(x, y)\, p(t \mid x).
+$$
+</Theorem>
+
+The exponent is the theorem's point: the quantity playing the role that
+$d(x, \hat x)$ played in rate-distortion is
+$D\bigl(p(y \mid x) \,\|\, p(y \mid t)\bigr)$, **derived** from the
+objective rather than assumed. Relevance defines its own distortion
+measure: the cost of putting $x$ into cluster $t$ is how differently
+$x$ and $t$ predict the target.
+
+{/* fig IbGibbsEncoder: Theorem 4 dissected in place (playbook rule 7:
+    labels above the formula, thin arrows onto exact symbols). Center:
+    the KaTeX formula $p(t \mid x) = \dfrac{p(t)}{Z(x,\beta)}
+    \exp\bigl(-\beta\, D(p(y \mid x)\,\|\,p(y \mid t))\bigr)$. Four
+    labels with thin arrows: "cluster prior" onto $p(t)$
+    (currentColor); "normalizer over $t$" onto $Z(x,\beta)$
+    (currentColor, muted); "price of a relevant bit" onto $\beta$;
+    "the emergent distortion: how differently $x$ and cluster $t$
+    predict $Y$" onto the KL term (amber). Below, a concrete two-row
+    instance for symbol $a$ of the toy (dot strip or two mini bars):
+    "assign $a$ to $t_{ab}$ ($p(y{\mid}t) = (\tfrac78,\tfrac18)$):
+    $D = 0.193$ bits" (amber, preferred, check mark) versus "assign
+    $a$ to $t_{ad}$ ($p(y{\mid}t) = (\tfrac12,\tfrac12)$): $D = 1$
+    bit" (blue, penalized); gloss "the exponential weights favor the
+    cluster that predicts $Y$ the way $a$ does". Color roles: amber =
+    the emergent KL distortion and the preferred assignment (subject),
+    blue = the costly assignment, currentColor = structure. One idea:
+    the distortion is a KL, derived not chosen. */}
+<Figure
+  name="IbGibbsEncoder"
+  alt="The Gibbs-form optimal encoder annotated term by term: cluster prior, normalizer, beta, and the emergent KL distortion, with a concrete comparison showing symbol a pays 0.193 bits to join the ab cluster but a full bit to join a cluster predicting Y as a fair coin"
+  caption="Theorem 4 dissected: the optimal encoder is Gibbs in an emergent distortion — the KL divergence between how x and its cluster predict Y."
+/>
+
+Three readings of the form:
+
+- **It explains the toy ranking.** The aligned merge won because its
+  assignment costs ($0.193$ and $0.083$ bits) are the smallest any
+  2-cluster partition can offer; the $\{a,d\}$ merge charges
+  $D\bigl((1,0) \,\|\, (\tfrac12,\tfrac12)\bigr) = 1$ bit per certain
+  symbol.
+- **It is a soft assignment.** At finite $\beta$ the encoder is
+  genuinely stochastic, splitting borderline inputs between clusters
+  in proportion to $e^{-\beta D}$; hard partitions reappear only as
+  $\beta \to \infty$. This is how the frontier dominates the hard
+  points.
+- **It is rate-distortion's own solution form.** The Gibbs encoder is
+  the standard rate-distortion optimality condition with $d(x, t)$
+  replaced by the emergent KL, and the self-consistent equations are
+  solved by alternating updates exactly as
+  [Blahut–Arimoto](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+  (Cover & Thomas §10.8) solves $R(D)$: Tishby, Pereira & Bialek's
+  Theorem 5 proves the iteration converges, though not to a unique
+  optimum; the algorithm itself is out of scope here.
+
+<KeyFact>
+The optimal encoder is
+$p(t \mid x) \propto p(t)\, e^{-\beta D(p(y \mid x) \| p(y \mid t))}$:
+the distortion measure rate-distortion required as an input is here an
+output of the objective, and it is a KL divergence between label
+conditionals.
+</KeyFact>
+
+## Along the frontier: one relevant bit costs β bits of rate
+
+### The slope, derived from the Lagrangian
+
+Write the frontier as a function: $I_Y^\ast(R)$ is the largest
+relevance any encoder achieves at rate $I(X;T) = R$. A $\beta$-optimal
+encoder minimizes $\mathcal{L} = R - \beta I_Y$, so at its frontier
+point a small move **along the frontier** cannot change the objective
+to first order:
+$$
+\delta \mathcal{L} = \delta R - \beta\, \delta I_Y = 0
+\quad\Longrightarrow\quad
+\frac{\delta R}{\delta I_Y} = \beta,
+\qquad
+\frac{d I_Y^\ast}{d R} = \frac{1}{\beta}.
+$$
+Each additional bit of relevance costs exactly $\beta$ bits of rate at
+the operating point $\beta$ selects; equivalently the frontier's slope
+in the plane is $1/\beta$. Conventions differ across write-ups (some
+papers put $\beta$ on the rate term, flipping the slope to $\beta$),
+which is why the relation is derived here from the stated
+$\mathcal{L}$ rather than quoted.
+
+Because the frontier is concave, its slope falls monotonically:
+**cheap relevant bits are bought first**. Near the origin, one bit of
+rate buys nearly one bit of relevance (small $\beta$ suffices); near
+the ceiling, each remaining sliver of relevance costs many bits of rate
+(large $\beta$).
+
+<Example title="where each encoder wins">
+Compare three toy encoders by
+$\mathcal{L} = I(X;T) - \beta\, I(T;Y)$ as $\beta$ varies:
+$$
+\mathcal{L}_{\text{collapse}} = 0, \qquad
+\mathcal{L}_{ab|cd} = 1 - 0.456\,\beta, \qquad
+\mathcal{L}_{T=X} = 2 - 0.594\,\beta.
+$$
+
+**Collapse vs. merge.** $1 - 0.456\,\beta < 0$ exactly when
+$\beta > 1/0.456 \approx 2.19$: below this price, relevance is too
+cheap to bother paying a bit of rate for, and total collapse wins.
+
+**Merge vs. copy.** $2 - 0.594\,\beta < 1 - 0.456\,\beta$ exactly when
+$0.138\,\beta > 1$, i.e. $\beta > 1/0.138 \approx 7.25$: the extra bit
+of rate from merge to copy buys only $0.138$ bits of relevance, so it
+pays only when a relevant bit is worth more than $7.25$ rate bits.
+
+Among these three candidates: collapse for $\beta < 2.19$, the aligned
+merge for $2.19 < \beta < 7.25$, the copy for $\beta > 7.25$. The
+crossover values are exactly the inverse slopes
+$\Delta R / \Delta I_Y$ between consecutive points, the exchange-rate
+relation read off discretely (Exercise 7 proves this in general).
+</Example>
+
+{/* fig IbBetaExtremes: three small encoder diagrams left to right,
+    one per β regime (playbook rule 4: one running example across
+    figures). Each diagram: four input dots a,b,c,d on the left,
+    cluster node(s) on the right, straight assignment arrows; beneath
+    each, its plane coordinates as a KaTeX pair. Left, header
+    "$\beta < 2.19$": all four arrows converge on one node $t$;
+    coordinates $(0,\, 0)$; tag "collapse". Middle, header
+    "$2.19 < \beta < 7.25$": arrows a,b → $t_1$ and c,d → $t_2$
+    (amber arrows); coordinates $(1,\, 0.456)$; tag "the aligned
+    merge". Right, header "$\beta > 7.25$": four parallel arrows to
+    four nodes; coordinates $(2,\, 0.594)$; tag "copy: $T = X$".
+    Under all three, one shared horizontal axis line sketching the
+    frontier from (0,0) to (2, 0.594) with the three points marked
+    and an arrow "β grows →" along it. Color roles: amber = the
+    active/optimal structure per regime (subject), currentColor =
+    inputs and frame. One idea: β dials where on the frontier the
+    solution sits. */}
+<Figure
+  name="IbBetaExtremes"
+  alt="Three encoder diagrams for the toy source: below beta 2.19 all symbols collapse to one cluster at the origin of the plane, between 2.19 and 7.25 the aligned two-cluster merge at point (1, 0.456) wins, and above 7.25 the identity encoder at (2, 0.594) wins"
+  caption="β dials the operating point: collapse, the aligned merge, then the full copy, each optimal on its β range; the crossovers are the inverse slopes between the points."
+/>
+
+<Demo
+  name="InformationPlane"
+  caption="The frontier live: a β slider on the toy joint traces the information-plane curve with I(X;T) and I(T;Y) readouts against the 0.594-bit ceiling. Presets: collapse, the knee, copy."
+/>
+
+<Task>
+Drag $\beta$ from $0$ upward and watch the point leave $(0,0)$: it
+should pass near the aligned merge's $(1, 0.456)$ in the knee region
+and flatten into the $I(X;Y) = 0.594$ ceiling as $\beta$ grows. Check
+the two crossover prices: below $\beta \approx 2.19$ the point stays
+at the origin, and pushing past $\beta \approx 7.25$ buys the last
+$0.138$ bits of relevance for a full bit of rate.
+</Task>
+
+### The β → ∞ limit: minimal sufficient statistics
+
+At $\beta \to \infty$ the objective keeps **all** the relevance,
+$I(T;Y) = I(X;Y)$, at the least possible rate. That is the equality
+case of the DPI: $T$ is a sufficient statistic for $Y$
+(<Ref lesson="data-processing-inequality"/>), and among sufficient
+statistics the bottleneck selects a minimal one, the smallest $I(X;T)$
+that still loses nothing
+([Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+§2.9). The bottleneck at large $\beta$ is therefore a variational
+construction of minimal sufficiency; at finite $\beta$ it relaxes
+sufficiency into a continuum of lossy summaries. On the toy source the
+four conditionals $p(y \mid x)$ are pairwise distinct, so no merge is
+sufficient and the minimal sufficient statistic is $X$ itself: the
+frontier reaches the ceiling only at full rate. Exercise 6 modifies
+the source so a genuine 1-bit sufficient statistic exists.
+
+### What the objective does not give you
+
+Everything above assumed the joint $p(x, y)$ is known and small enough
+to enumerate. Estimating the two mutual informations from samples of
+high-dimensional data is its own hard problem, and it gates every
+practical use of the objective: the trainable route, a variational
+bound optimized with neural encoders, is
+[deep variational IB](https://arxiv.org/abs/1612.00410) (Alemi et al.,
+2017), and the general tool for bounding mutual information from
+samples is the InfoNCE bound of the next lesson,
+<Ref lesson="infonce"/>.
+
+<Aside>
+Two adjacent literatures border the objective without being part of
+it. First, the famous "information plane trajectories of deep
+networks": [Shwartz-Ziv & Tishby (2017)](https://arxiv.org/abs/1703.00810)
+plotted $\bigl(I(X;T), I(T;Y)\bigr)$ for hidden layers $T$ during SGD
+training and reported a fitting phase followed by a compression phase;
+[Saxe et al. (2018)](https://openreview.net/forum?id=ry_WPG-A-) found
+the compression phase absent for non-saturating activations and
+sensitive to the mutual-information estimator. The 1999 paper contains
+none of these claims (and zero figures); this lesson teaches the
+objective, on which the dynamics debate has no bearing. Second, the
+"keep few bits of the data" idea reappears in generalization theory:
+[Xu & Raginsky (2017)](https://arxiv.org/abs/1705.07809) bound the
+expected generalization gap of a learning algorithm by
+$\sqrt{2\sigma^2 I(S;W)/n}$, where $I(S;W)$ is the mutual information
+between training set and learned weights, the quantity the aside of
+<Ref lesson="data-processing-inequality"/> introduced: an algorithm
+that keeps few bits about its sample cannot overfit it, a sibling of
+the bottleneck's compression term.
+</Aside>
+
+<KeyFact>
+Moving along the frontier, one additional bit of $I(T;Y)$ costs
+$\beta$ bits of $I(X;T)$; $\beta \to \infty$ recovers minimal
+sufficient statistics, and finite $\beta$ prices the lossy summaries
+in between.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Work the $\{a,c\} \mid \{b,d\}$ merge of the toy source in full:
+compute the cluster conditionals $p(1 \mid t)$, the conditional entropy
+$H(Y \mid T)$, and $I(T;Y)$, and state why this pairing loses almost
+all relevance at the same rate as the aligned merge. Use
+$H_2(\tfrac38) \approx 0.954$.
+
+<Solution>
+Clusters $t_1 = \{a, c\}$ and $t_2 = \{b, d\}$, each with
+$p(t) = \tfrac12$.
+
+**Cluster conditionals.** Mass with $Y = 1$ in $t_1$:
+$p(a)\,p(1 \mid a) + p(c)\,p(1 \mid c) = 0 + \tfrac14 \cdot \tfrac34
+= \tfrac{3}{16}$, so $p(1 \mid t_1) = \tfrac{3/16}{1/2} = \tfrac38$.
+In $t_2$: $\tfrac14 \cdot \tfrac14 + \tfrac14 \cdot 1 = \tfrac{5}{16}$,
+so $p(1 \mid t_2) = \tfrac58$.
+
+**Conditional entropy.** Both clusters have entropy
+$H_2(\tfrac38) = H_2(\tfrac58) \approx 0.954$ bits, so
+$H(Y \mid T) \approx 0.954$ bits.
+
+**Relevance.** $I(T;Y) = 1 - 0.954 = 0.046$ bits, against $0.456$ for
+the aligned merge at the identical rate $I(X;T) = 1$ bit.
+
+The pairing fuses distant conditionals: $0$ with $\tfrac34$, and
+$\tfrac14$ with $1$. Each cluster's aggregate conditional lands near
+$\tfrac12$, blurring the label almost to a fair coin; relevance is
+decided by the similarity of the fused $p(y \mid x)$, not by the
+cluster sizes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Price the unequal split $T$ with clusters $\{a\}$ and $\{b, c, d\}$:
+compute $I(X;T)$ and $I(T;Y)$, then verify both information-plane
+ceilings from the data-processing inequality. Use
+$H_2(\tfrac14) \approx 0.811$ and $H_2(\tfrac13) \approx 0.918$.
+
+<Solution>
+**Rate.** $T$ is a function of $X$ with
+$p(t_1) = \tfrac14$, $p(t_2) = \tfrac34$:
+$I(X;T) = H(T) = H_2(\tfrac14) \approx 0.811$ bits.
+
+**Relevance.** Given $t_1 = \{a\}$: $Y = 0$ certain, entropy $0$.
+Given $t_2$: mass with $Y = 1$ is
+$\tfrac{1}{16} + \tfrac{3}{16} + \tfrac14 = \tfrac12$, so
+$p(1 \mid t_2) = \tfrac{1/2}{3/4} = \tfrac23$, entropy
+$H_2(\tfrac23) = H_2(\tfrac13) \approx 0.918$ bits. Average:
+$$
+H(Y \mid T) = \tfrac14 \cdot 0 + \tfrac34 \cdot 0.918 \approx 0.689
+\text{ bits},
+\qquad
+I(T;Y) = 1 - 0.689 = 0.311 \text{ bits}.
+$$
+
+**Ceilings.** Relevance ceiling: $0.311 \le 0.594 = I(X;Y)$, the DPI
+along $Y \to X \to T$. Rate diagonal: $0.311 \le 0.811 = I(X;T)$, the
+DPI along the reversed chain $T \to X \to Y$. Both hold; the point
+$(0.811, 0.311)$ sits inside the feasible region, below the frontier.
+</Solution>
+</Exercise>
+
+<Exercise>
+Verify the relevance-loss identity on the aligned merge
+$\{a,b\} \mid \{c,d\}$: compute the four assignment costs
+$D\bigl(p(y \mid x) \,\|\, p(y \mid t(x))\bigr)$ from the definition of
+KL divergence, average them under $p(x)$, and check the result against
+$I(X;Y) - I(T;Y) = 0.594 - 0.456$. Use $\log_2 \tfrac87 \approx 0.193$
+and $\log_2 \tfrac67 \approx -0.222$.
+
+<Solution>
+The cluster conditionals are
+$p(y \mid t_{ab}) = (\tfrac78, \tfrac18)$ and
+$p(y \mid t_{cd}) = (\tfrac18, \tfrac78)$, ordered $(y{=}0, y{=}1)$.
+
+**Symbol $a$**, $p(y \mid a) = (1, 0)$:
+$$
+D = 1 \cdot \log_2 \frac{1}{7/8} + 0 = \log_2 \tfrac87 \approx 0.193
+\text{ bits}.
+$$
+(The $y{=}1$ term contributes $0$ by the convention
+$0 \log \tfrac{0}{q} = 0$.)
+
+**Symbol $b$**, $p(y \mid b) = (\tfrac34, \tfrac14)$:
+$$
+D = \tfrac34 \log_2 \frac{3/4}{7/8} + \tfrac14 \log_2 \frac{1/4}{1/8}
+= \tfrac34 \log_2 \tfrac67 + \tfrac14 \cdot 1
+\approx -0.167 + 0.25 = 0.083 \text{ bits}.
+$$
+
+**Symbols $c$ and $d$** mirror $b$ and $a$ against $t_{cd}$:
+$0.083$ and $0.193$ bits.
+
+**Average.** Under the uniform $p(x)$:
+$$
+\tfrac14 (0.193 + 0.083 + 0.083 + 0.193) \approx 0.138 \text{ bits},
+$$
+which matches $I(X;Y) - I(T;Y) = 0.594 - 0.456 = 0.138$ bits: the
+relevance the merge destroys is exactly the average KL divergence
+between each symbol's label conditional and its cluster's.
+</Solution>
+</Exercise>
+
+<Exercise>
+At $\beta = 3$, rank the following toy encoders by the objective
+$\mathcal{L} = I(X;T) - \beta\, I(T;Y)$, using the coordinates computed
+in this lesson: collapse $(0, 0)$; the three 2-cluster merges
+$(1, 0.456)$, $(1, 0.046)$, $(1, 0)$; the split $\{a\} \mid \{b,c,d\}$
+at $(0.811, 0.311)$; the identity $(2, 0.594)$. State the winner and
+check it against the crossover prices of the worked example.
+
+<Solution>
+Evaluate $\mathcal{L} = I(X;T) - 3\, I(T;Y)$:
+
+- collapse: $0 - 0 = 0$
+- $\{a,b\} \mid \{c,d\}$: $1 - 3 \cdot 0.456 = -0.369$
+- $\{a,c\} \mid \{b,d\}$: $1 - 3 \cdot 0.046 = 0.863$
+- $\{a,d\} \mid \{b,c\}$: $1 - 0 = 1$
+- $\{a\} \mid \{b,c,d\}$: $0.811 - 3 \cdot 0.311 = -0.122$
+- identity: $2 - 3 \cdot 0.594 = 0.217$
+
+Ranking (best first): the aligned merge $(-0.369)$, then
+$\{a\} \mid \{b,c,d\}$ $(-0.122)$, collapse $(0)$, identity $(0.217)$,
+$\{a,c\} \mid \{b,d\}$ $(0.863)$, $\{a,d\} \mid \{b,c\}$ $(1)$.
+
+The winner is the aligned merge, consistent with the worked example's
+regimes: $\beta = 3$ lies in the window $2.19 < \beta < 7.25$ where the
+merge beats both collapse and copy. The misaligned merges rank below
+even the collapse: at any $\beta$, a bit of rate spent on clusters
+that blur the label is a pure loss.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove from the data-processing inequality of
+<Ref lesson="data-processing-inequality"/> that every encoder
+$p(t \mid x)$ with $Y \to X \to T$ satisfies both plane bounds,
+$$
+I(T;Y) \le I(X;Y)
+\qquad \text{and} \qquad
+I(T;Y) \le I(X;T),
+$$
+stating explicitly which Markov chain each application uses.
+
+<Solution>
+**Relevance ceiling.** The hypothesis is the chain $Y \to X \to T$
+directly: $T$ depends on $Y$ only through $X$. The DPI (Cover & Thomas
+Theorem 2.8.1, as proved in the prerequisite lesson) applied to this
+chain gives $I(T;Y) \le I(X;Y)$.
+
+**Rate diagonal.** The Markov factorization
+$p(y, x, t) = p(x)\, p(y \mid x)\, p(t \mid x)$ is symmetric in $y$
+and $t$, so $Y \to X \to T$ holds exactly when $T \to X \to Y$ does
+(the chain-reversal fact of the prerequisite lesson). Apply the DPI to
+$T \to X \to Y$, reading $T$ as the source variable and $Y$ as the
+processed one: the information the endpoint carries about $T$ is at
+most what the middle carries, $I(Y;T) \le I(X;T)$.
+
+Both bounds are one theorem applied to one hypothesis read in its two
+directions; no property of the bottleneck objective enters. Every
+encoder, optimal or not, lives in the region under both lines.
+</Solution>
+</Exercise>
+
+<Exercise>
+Modify the toy source: keep $X$ uniform on $\{a,b,c,d\}$ but set
+$p(1 \mid a) = p(1 \mid b) = 0$ and $p(1 \mid c) = p(1 \mid d) = 1$.
+Compute $I(X;Y)$, then show that the merge
+$T$ with clusters $\{a,b\}$ and $\{c,d\}$ is a sufficient statistic
+for $Y$, and give the information-plane point at which the
+$\beta \to \infty$ solutions accumulate.
+
+<Solution>
+**Budget.** $Y$ is now a deterministic function of $X$
+($Y = 1$ exactly on $\{c,d\}$), so $H(Y \mid X) = 0$; the marginal is
+fair, $H(Y) = 1$, hence $I(X;Y) = 1$ bit.
+
+**Sufficiency of the merge.** The clusters have
+$p(1 \mid t_1) = 0$ and $p(1 \mid t_2) = 1$: given $T$, the label is
+certain, $H(Y \mid T) = 0$, so
+$$
+I(T;Y) = H(Y) - 0 = 1 = I(X;Y),
+$$
+the equality case of the DPI, which is precisely the definition of a
+sufficient statistic from the prerequisite lesson. Equivalently, every
+assignment cost vanishes:
+$D\bigl(p(y \mid x) \,\|\, p(y \mid t(x))\bigr) = 0$ for all four
+symbols, so the relevance-loss identity gives loss zero.
+
+**The large-β point.** The merge costs $I(X;T) = H(T) = 1$ bit, and no
+cheaper encoder is sufficient: $I(T;Y) = 1$ requires
+$I(X;T) \ge I(T;Y) = 1$ by the rate diagonal. So the minimal
+sufficient statistic costs exactly $1$ bit, and as
+$\beta \to \infty$ the optima accumulate at $(1, 1)$, not at the
+identity's $(2, 1)$: the second bit of $X$ (which symbol within the
+cluster) is pure irrelevance, and the bottleneck discards it at any
+price.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two encoders occupy plane points $(R_1, I_1)$ and $(R_2, I_2)$ with
+$I_2 > I_1$. Show that their objectives tie,
+$\mathcal{L}_1 = \mathcal{L}_2$, at exactly
+$$
+\beta^\ast = \frac{R_2 - R_1}{I_2 - I_1},
+$$
+the inverse slope of the segment joining the points, and evaluate
+$\beta^\ast$ for the aligned merge $(1, 0.456)$ against the identity
+$(2, 0.594)$. State how this connects to the frontier's slope
+relation.
+
+<Solution>
+Set the objectives equal:
+$$
+R_1 - \beta I_1 = R_2 - \beta I_2
+\;\Longleftrightarrow\;
+\beta (I_2 - I_1) = R_2 - R_1
+\;\Longleftrightarrow\;
+\beta^\ast = \frac{R_2 - R_1}{I_2 - I_1}.
+$$
+For $\beta < \beta^\ast$ the cheaper encoder wins ($R$ dominates); for
+$\beta > \beta^\ast$ the more informative one wins ($I$ dominates).
+
+For the given pair:
+$$
+\beta^\ast = \frac{2 - 1}{0.594 - 0.456} = \frac{1}{0.138} \approx
+7.25,
+$$
+the merge-vs-copy crossover of the worked example.
+
+Connection: on the smooth frontier, the optimum at price $\beta$ sits
+where $dI_Y^\ast/dR = 1/\beta$, i.e. $\delta R / \delta I_Y = \beta$.
+The tie price $\beta^\ast$ is the discrete version of the same
+statement: it is the inverse slope $\Delta R / \Delta I_Y$ between two
+candidate points, the average price per relevant bit of upgrading from
+one encoder to the other. As the candidates crowd the frontier, the
+discrete exchange rate converges to the derivative relation.
+</Solution>
+</Exercise>
+
+<References>
+1. N. Tishby, F. C. Pereira, W. Bialek, "The Information Bottleneck Method," *Proc. 37th Allerton Conference on Communication, Control, and Computing*, 1999 — §1 the relevance critique of rate-distortion; §3.1 the objective over stochastic encoders and the data-processing bound; §3.2 Theorem 4, the Gibbs-form encoder with the emergent KL distortion, and Theorem 5, convergence of the alternating iteration; §3.4 the information plane and the frontier. https://arxiv.org/abs/physics/0004057
+2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §2.8 the data-processing inequality behind both plane ceilings; §2.9 sufficient statistics, the β → ∞ limit; §10.8 the Blahut–Arimoto algorithm the IB iteration generalizes.
+3. A. A. Alemi, I. Fischer, J. V. Dillon, K. Murphy, "Deep Variational Information Bottleneck," ICLR 2017 — the variational bound making the objective trainable with neural encoders on high-dimensional data. https://arxiv.org/abs/1612.00410
+4. R. Shwartz-Ziv, N. Tishby, "Opening the Black Box of Deep Neural Networks via Information," 2017 — the (contested) information-plane analysis of SGD training dynamics. https://arxiv.org/abs/1703.00810
+5. A. M. Saxe, Y. Bansal, J. Dapello, M. Advani, A. Kolchinsky, B. D. Tracey, D. D. Cox, "On the Information Bottleneck Theory of Deep Learning," ICLR 2018 — the counter-evidence: the compression phase depends on activation choice and estimator. https://openreview.net/forum?id=ry_WPG-A-
+6. A. Xu, M. Raginsky, "Information-theoretic analysis of generalization capability of learning algorithms," *NeurIPS* 30, 2017 — the generalization bound via I(S;W), the compression-controls-overfitting sibling of the bottleneck. https://arxiv.org/abs/1705.07809
+</References>

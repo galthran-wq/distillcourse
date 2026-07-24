@@ -1,0 +1,608 @@
+A neuron is a noisy channel from stimulus to spike train, and the mutual
+information I(S;R) = H(R) - H(R|S) measures, in bits, how much its
+response reveals about what it saw. This lesson builds a small
+stimulus-response table, computes $I(S;R)$ by the direct method as a total
+response entropy minus a noise entropy, divides the result by the mean spike
+count to read off bits per spike, measures the code against the channel's
+capacity as coding efficiency, and states honestly what a finite sample of
+spikes can and cannot certify.
+
+## A neuron is a noisy channel
+
+Present a stimulus to a sensory neuron and record its spikes; present the
+same stimulus again and the spike pattern differs. The variability is the
+channel's noise. Fix a short time bin and record whether the neuron fired at
+least once (a **spike**, $R = 1$) or stayed silent ($R = 0$). Two stimuli, a
+weak drive $s_0$ and a strong drive $s_1$, presented with equal frequency,
+produce a two-row transition table:
+
+$$
+p(r \mid s):\qquad
+\begin{array}{c|cc}
+ & r = 0 & r = 1 \\ \hline
+s = s_0 & 7/8 & 1/8 \\
+s = s_1 & 1/8 & 7/8
+\end{array}
+$$
+
+Each row is the response distribution for one stimulus: given $s_0$ the
+neuron is usually silent, given $s_1$ it usually fires. Nothing about the
+biophysics enters beyond this table: membrane currents, synapses, and ion
+channels matter only through the numbers $p(r \mid s)$. This is exactly the
+<Ref lesson="channel-capacity">discrete memoryless channel</Ref> of the
+channel lessons, relabelled: the stimulus is the input, the binned spike
+count is the output.
+
+{/* fig NeuronAsChannel: single component Figure, the neuron drawn as a
+    transition channel, styled like BscTransition from channel-capacity.
+    Left region: two stimulus input nodes stacked vertically, labeled
+    $s_0$ "weak" and $s_1$ "strong" (currentColor). Middle: a small
+    rounded box labeled "neuron $p(r\mid s)$" (currentColor). Right
+    region: two output nodes stacked, $r=0$ "silent" and $r=1$ "spike".
+    Four arrows from inputs to outputs carrying the table entries:
+    straight-ish arrows $s_0\!\to\!0$ labeled $7/8$ and $s_1\!\to\!1$
+    labeled $7/8$ in currentColor (the reliable transitions); crossing
+    diagonal arrows $s_0\!\to\!1$ and $s_1\!\to\!0$ each labeled $1/8$ in
+    amber (the noise/error transitions, the subject). Far right, past
+    $r=1$, a tiny raster of three trials (rows of dots/ticks) suggesting
+    the binned spike train the output stands for. Below the diagram, one
+    KaTeX line binding it to the matrix: the same 2x2 table
+    $p(r\mid s)$ with the two $1/8$ entries amber. Color roles: amber =
+    the noise (flip) transitions, currentColor = everything else. One
+    idea: a neuron IS its stimulus-response transition table. Inspiration:
+    Borst & Theunissen fig. 2, recreate schematically, do not copy. */}
+<Figure
+  name="NeuronAsChannel"
+  alt="A neuron drawn as a channel: two stimulus inputs, weak and strong, connect through a neuron box to two outputs, silent and spike; reliable arrows carry 7/8 and crossing noise arrows carry 1/8, beside the 2 by 2 transition matrix"
+  caption="The neuron as a transition table: stimulus in, binned spike response out, with the 1/8 crossings as noise."
+/>
+
+The table is symmetric (the neural reading of $\mathrm{BSC}(1/8)$), but
+nothing in what follows needs the symmetry; an asymmetric neuron gives
+asymmetric rows and the same computation.
+
+<KeyFact>
+A neuron is specified, for information purposes, by its transition table
+$p(r \mid s)$: one response distribution per stimulus. The trial-to-trial
+variability within a row is the channel's noise.
+</KeyFact>
+
+## The direct method: I(S;R) = H(R) − H(R|S)
+
+The tuning curve of classical neurophysiology records only the mean response
+per stimulus: here $\mathbb{E}[R \mid s_0] = 1/8$ and
+$\mathbb{E}[R \mid s_1] = 7/8$. Two means do not say how reliably a downstream
+neuron, seeing one spike count, can tell the stimuli apart. Mutual
+information does, and it is computed from the same table by the **direct
+method**: estimate the total response entropy $H(R)$ and the average
+per-stimulus noise entropy $H(R \mid S)$, then subtract.
+
+**Total response entropy $H(R)$.** Marginalize the table over the two equally
+likely stimuli:
+$$
+p(R = 1) = \tfrac{1}{2}\cdot\tfrac{1}{8} + \tfrac{1}{2}\cdot\tfrac{7}{8}
+         = \tfrac{1}{2},
+$$
+so the pooled response is a fair coin and $H(R) = 1$ bit. This is the full
+variety the output could carry.
+
+**Noise entropy $H(R \mid S)$.** Each row is a $(7/8, 1/8)$ split, whose
+binary entropy is
+$$
+H(\tfrac{1}{8}) = -\tfrac{1}{8}\log_2\tfrac{1}{8}
+- \tfrac{7}{8}\log_2\tfrac{7}{8} = 0.375 + 0.169 = 0.544 \text{ bits}.
+$$
+Both rows give the same value, so the weighted average is
+$H(R \mid S) = 0.544$ bits: the response entropy that survives even when the
+stimulus is known, which is noise by definition.
+
+**Subtract.**
+$$
+I(S;R) = H(R) - H(R \mid S) = 1 - 0.544 = 0.456 \text{ bits per bin}.
+$$
+
+<FigureSequence
+  name="DirectMethodSteps"
+  alt="Three frames over the fixed neuron table: frame one pools the two rows into the response distribution (1/2, 1/2) and reads H(R) = 1 bit; frame two shows each stimulus row with its binary entropy H(1/8) = 0.544 and averages them into the noise entropy H(R|S) = 0.544; frame three subtracts to I(S;R) = 0.456 bits"
+  caption="The direct method in three moves: pool for H(R), average the rows for H(R|S), subtract for I(S;R)."
+/>
+
+{/* fig DirectMethodSteps: FigureSequence, component tier, 3 frames.
+    Shared layout: the 2x2 table p(r|s) at top left (rows s0, s1;
+    columns r=0, r=1; entries 7/8,1/8 / 1/8,7/8, the 1/8 entries amber),
+    and a stack of up to three equation slots on the right that fill one
+    per frame; inactive slots absent (not grayed).
+    Frame 1: a downward brace under the table's two columns collapsing to
+    a pooled bar (1/2, 1/2) drawn in blue beside it; slot 1 shows
+    $H(R) = H(\tfrac12) = 1$ bit, gloss "pool both rows: the total
+    response variety". 
+    Frame 2: highlight each row; to the right of each row its entropy
+    $H(\tfrac18) = 0.544$ (amber, since it is the noise term being
+    settled); slot 2 shows $H(R\mid S) = 0.544$ bits, gloss "average the
+    per-stimulus rows: the leftover noise".
+    Frame 3: slot 3 shows $I(S;R) = H(R) - H(R\mid S) = 1 - 0.544 =
+    0.456$ bits, boxed in amber, gloss "subtract: what the spike reveals".
+    Color roles: amber = the quantity each frame settles and the noise
+    entries, blue = the pooled H(R) bar, currentColor = carried lines and
+    table. Delta = exactly one new line per frame. Inspiration:
+    Borst & Theunissen Box 2. */}
+
+<Task>
+Step through the three frames and check the arithmetic at each stop: the
+pooled response is $(\tfrac{1}{2}, \tfrac{1}{2})$ so $H(R) = 1$; each row
+carries $H(\tfrac{1}{8}) = 0.544$ so $H(R \mid S) = 0.544$; the difference
+$1 - 0.544 = 0.456$ bits is what one binned response reveals about the
+stimulus.
+</Task>
+
+The recipe is the entropy and <Ref lesson="mutual-information">mutual-information</Ref>
+machinery applied verbatim, with $S$ and $R$ in place of the weather
+variables. Its neural name, the *direct method*, is due to
+[Strong et al. (1998)](https://link.aps.org/doi/10.1103/PhysRevLett.80.197),
+who estimated both entropies straight from binned spike trains of the fly
+motion-sensitive neuron H1 rather than from any model of the neuron.
+
+<Example title="the same number from the stimulus side">
+Mutual information is symmetric, so the same $0.456$ bits must come out of
+$I(S;R) = H(S) - H(S \mid R)$. The stimulus prior is uniform, $H(S) = 1$ bit.
+Condition on the response instead. Since $p(R = 0) = p(R = 1) = \tfrac{1}{2}$,
+Bayes' rule gives, for $R = 0$,
+$$
+p(s_0 \mid R = 0) = \frac{\tfrac{1}{2}\cdot\tfrac{7}{8}}{\tfrac{1}{2}}
+= \tfrac{7}{8},
+$$
+so the posterior over stimuli is $(7/8, 1/8)$ with entropy $0.544$ bits;
+$R = 1$ is the mirror image, also $0.544$ bits. Averaging,
+$H(S \mid R) = 0.544$, and
+$$
+I(S;R) = 1 - 0.544 = 0.456 \text{ bits},
+$$
+matching the response-side computation. A downstream neuron that sees one
+spike bin resolves $0.456$ of the $1$ bit of stimulus uncertainty.
+</Example>
+
+<KeyFact>
+The direct method computes $I(S;R) = H(R) - H(R \mid S)$ straight from the
+response table: total response entropy minus the average within-stimulus
+(noise) entropy — no model of the neuron required.
+</KeyFact>
+
+## Mutual information beats the tuning curve
+
+The tuning curve reports a mean and, at best, an error bar per stimulus. Two
+neurons with identical tuning curves can carry very different information: if
+the trial-to-trial response distributions overlap heavily, a single response
+barely distinguishes the stimuli even when the means are far apart; if they
+are tight and separated, one response nearly settles the question. The mean
+cannot see this; the full distributions $p(r \mid s)$ can, and $I(S;R)$ reads
+it off directly.
+
+{/* fig MiBeatsTuningCurve: single component Figure, two-panel comparison
+    (playbook rule 8) of the same neuron summarized two ways. Left panel,
+    headed "tuning curve": a stimulus axis with two points s0, s1 and a
+    mean-response value at each with +/- sd error bars that visibly
+    overlap; gloss "means only: overlap hidden". Right panel, headed
+    "full response distributions": for the same two stimuli, two response
+    histograms over r drawn on a shared axis, s0's mass near r=0 and s1's
+    near a higher r, colored blue (s0) and amber (s1), with their overlap
+    region shaded; below it the readout $I(S;R) = 0.456$ bits. A bold
+    arrow from left panel to right panel with the changed phrase
+    "distributions, not means" highlighted. Color roles: amber = the
+    preferred-stimulus distribution and the MI payoff, blue = the other
+    distribution, currentColor = axes and the tuning curve. One idea:
+    variance summaries lose exactly what mutual information keeps.
+    Inspiration: Borst & Theunissen fig. 1, recreate with the synthetic
+    two-stimulus example, do not copy. */}
+<Figure
+  name="MiBeatsTuningCurve"
+  alt="Left, a tuning curve showing two stimulus means with overlapping error bars; right, the full per-stimulus response distributions with their overlap shaded and the readout I(S;R) = 0.456 bits, joined by an arrow labeled distributions not means"
+  caption="Same neuron, two summaries: the tuning curve hides the response overlap that mutual information prices exactly."
+/>
+
+Mutual information also needs no assumption that the code is a firing rate. A
+neuron that signals with precise spike *timing* rather than average rate has
+a response distribution over timing patterns, and the direct method applies
+unchanged once those patterns are binned — which is why
+[Strong et al.](https://link.aps.org/doi/10.1103/PhysRevLett.80.197) could
+measure the information in H1's spike timing at millisecond resolution
+without committing to any rate code.
+
+<KeyFact>
+The tuning curve keeps means; mutual information keeps whole response
+distributions, and so measures discriminability the mean cannot — including
+information carried by spike timing rather than rate.
+</KeyFact>
+
+## Bits per spike
+
+An absolute figure of $0.456$ bits per bin is hard to compare across neurons
+and experiments, because bins and firing rates differ. Dividing by the mean
+number of spikes normalizes it. In the running example the mean count per bin
+is
+$$
+\mathbb{E}[R] = p(R = 1) = 0.5 \text{ spikes},
+$$
+so the code delivers
+$$
+\frac{I(S;R)}{\mathbb{E}[R]} = \frac{0.456}{0.5} \approx 0.91 \text{ bits per spike}.
+$$
+Each spike, in this idealized neuron, is worth close to one bit: an
+information-bearing symbol, not merely a tick contributing to an average
+rate.
+
+{/* fig BitsPerSpikeTally: single component Figure, a spike train with a
+    running information tally. Layout: a horizontal time axis with a
+    binned spike raster — a row of ~8 bins, some containing a spike tick
+    (amber vertical mark), some empty. Above the raster, a step function
+    (the running information total in bits) that jumps up by ~0.9 bit at
+    each bin that contains a spike and stays flat at empty bins; the
+    y-axis labeled "information (bits)". A dashed guide line of slope
+    "~1 bit per spike" annotated. To the right, the readout
+    $I/\mathbb{E}[R] \approx 0.91$ bits/spike. Color roles: amber = spikes
+    and the increments they cause, currentColor = axis, empty bins, and
+    the running total. One idea: information accumulates one spike at a
+    time, roughly a bit each. Inspiration: Borst & Theunissen Table 2
+    bits/spike column. */}
+<Figure
+  name="BitsPerSpikeTally"
+  alt="A binned spike raster with a running information total above it that steps up by about 0.9 bit at each bin containing a spike and stays flat at empty bins, annotated roughly one bit per spike"
+  caption="Information accumulates spike by spike: each spike adds close to one bit, empty bins add nothing."
+/>
+
+The value $0.91$ is a property of this constructed table. What makes it worth
+computing is that real recordings land in the same neighbourhood.
+[Borst & Theunissen (1999)](https://www.nature.com/articles/nn0999_947)
+collect measurements across species in their Table 2: bits per spike
+clustered near **1**, with a reported range of roughly $0.6$ to $3.2$ across
+preparations. The number is an empirical regularity of recorded neurons, not
+a theorem: it depends on the stimulus ensemble, the bin width, and the
+species. Its order of magnitude is nonetheless robust, and it is the reason
+spike trains are read as information-bearing codes rather than as smoothed
+rates.
+
+<Example title="a neuron that wastes its spikes">
+Not every neuron approaches a bit per spike. Take a neuron whose two
+stimulus rows are $p(r \mid s_0) = (\tfrac{1}{2}, \tfrac{1}{4}, \tfrac{1}{4})$
+and $p(r \mid s_1) = (\tfrac{1}{4}, \tfrac{1}{4}, \tfrac{1}{2})$ over spike
+counts $r \in \{0, 1, 2\}$, with uniform stimuli. Pooling gives
+$p(R) = (\tfrac{3}{8}, \tfrac{1}{4}, \tfrac{3}{8})$, so
+$$
+H(R) = 2\cdot\tfrac{3}{8}\log_2\tfrac{8}{3} + \tfrac{1}{4}\cdot 2
+\approx 1.56 \text{ bits}.
+$$
+Each row is a permutation of $(\tfrac{1}{2}, \tfrac{1}{4}, \tfrac{1}{4})$
+with entropy $1.5$ bits, so $H(R \mid S) = 1.5$ and
+$I(S;R) \approx 0.06$ bits. The mean count is
+$\tfrac{1}{2}(0.75 + 1.25) = 1$ spike, so this neuron spends a full spike per
+bin to transmit $0.06$ bits: about $0.06$ bits per spike. High firing, almost
+no information: the metric exposes a code that a tuning curve, showing a
+clean difference in means, would flatter.
+</Example>
+
+<KeyFact>
+Dividing $I(S;R)$ by the mean spike count gives bits per spike; recorded
+single neurons cluster near one bit per spike (Borst & Theunissen, Table 2),
+an empirical range across preparations, not a universal constant.
+</KeyFact>
+
+## Coding efficiency: I(S;R) / C
+
+The neuron's channel has a ceiling. Its
+<Ref lesson="channel-capacity">capacity</Ref> is the largest mutual
+information any stimulus ensemble could push through the fixed table,
+$C = \max_{p(s)} I(S;R)$, and **coding efficiency** is the fraction of that
+ceiling a given code actually uses.
+
+<Definition title="coding efficiency">
+For a neuron with capacity $C$ driven by a stimulus ensemble that transmits
+$I(S;R)$ bits, the **coding efficiency** is
+$$
+\eta = \frac{I(S;R)}{C},
+$$
+the fraction of the channel's capacity the code realizes, $0 \le \eta \le 1$.
+</Definition>
+
+For the symmetric running table, $\mathrm{BSC}(1/8)$, the capacity is
+$C = 1 - H(\tfrac{1}{8}) = 1 - 0.544 = 0.456$ bits per bin, attained by the
+uniform stimulus prior (<Ref lesson="channel-capacity"/>). The running
+example uses exactly that prior, so it sits at the ceiling by construction:
+$\eta = 0.456 / 0.456 = 1$. This is an artifact of a symmetric toy driven by
+its capacity-achieving input, not a claim that neurons choose optimal codes.
+
+Change the ensemble and efficiency drops. Suppose the strong stimulus $s_1$
+is presented nine times as often, $p(s_1) = 0.9$. The noise term is
+unchanged, $H(R \mid S) = 0.544$, but the pooled response is now
+$p(R = 1) = 0.9\cdot\tfrac{7}{8} + 0.1\cdot\tfrac{1}{8} = 0.8$, so
+$H(R) = H(0.8) = 0.722$ and
+$$
+I(S;R) = 0.722 - 0.544 = 0.178 \text{ bits}, \qquad
+\eta = \frac{0.178}{0.456} \approx 0.39.
+$$
+The same neuron now uses under $40\%$ of its channel: a stimulus set that
+rarely exercises the silent response wastes the capacity.
+
+{/* fig CodingEfficiencyBars: single component Figure, two capacity bars
+    on a shared bits axis (playbook rule 8). Each bar is the full capacity
+    C drawn as an outlined bar of length C (dashed "capacity C" ceiling),
+    with the transmitted I(S;R) shaded amber inside it and the unused
+    remainder left blank. Top pair, labeled "matched / naturalistic
+    ensemble": long amber fill nearly to the ceiling, annotated
+    "$\eta \approx 90\%$". Bottom pair, labeled "mismatched / noise
+    ensemble": short amber fill, annotated "$\eta \approx 20\%$". Between
+    them a small note "same neuron, different stimulus ensemble". Use the
+    cited frog-auditory figures as the two regimes, not the toy numbers.
+    Color roles: amber = information transmitted (the used fraction),
+    currentColor = the capacity outline and axis. One idea: efficiency is
+    a property of the stimulus ensemble, not of the neuron alone.
+    Inspiration: Borst & Theunissen efficiency discussion / Table 2,
+    recreate schematically. */}
+<Figure
+  name="CodingEfficiencyBars"
+  alt="Two capacity bars of equal length C; the top, a naturalistic ensemble, is filled nearly to the ceiling at about 90 percent efficiency, the bottom, a noise ensemble, is filled to about 20 percent, illustrating that efficiency depends on the stimulus ensemble"
+  caption="Efficiency is stimulus-dependent: a naturalistic ensemble fills the channel; a noise ensemble leaves most of it empty."
+/>
+
+Real measurements show the same stimulus dependence far more sharply.
+[Borst & Theunissen](https://www.nature.com/articles/nn0999_947) review cases
+in which a neuron encodes a naturalistic stimulus with efficiency approaching
+$90\%$ while encoding a white-noise stimulus of matched power at a fraction of
+that — on the order of $20\%$ in bullfrog auditory afferents. Sensory neurons
+appear tuned to the statistics of their natural inputs, and efficiency, unlike
+an absolute bit count, is comparable across those conditions.
+
+<Aside>
+Capacity for a continuous response. Real spike trains are not binary, and
+their capacity is usually estimated through the Gaussian-channel bound rather
+than a discrete maximization. Treating the response as a signal plus
+independent Gaussian noise across frequency bands gives
+$$
+C = \int \log_2\!\bigl(1 + \mathrm{SNR}(f)\bigr)\, df,
+$$
+the continuous-channel formula whose single-band form
+$C = \tfrac{1}{2}\log_2(1 + P/N)$ was cited in
+<Ref lesson="channel-capacity"/>. Borst & Theunissen's Box 3 develops the
+coherence-based upper and lower bounds built on it. The continuous derivation
+is out of scope here; this course stays with the discrete table, where the
+capacity is the same maximization the channel lessons already ran.
+</Aside>
+
+<KeyFact>
+Coding efficiency $\eta = I(S;R) / C$ is the fraction of channel capacity a
+code uses. It is a property of the stimulus ensemble, not of the neuron
+alone: naturalistic stimuli raise it, and mutual information is only
+meaningful relative to a stated ensemble.
+</KeyFact>
+
+## What the estimate can and cannot claim
+
+Every number above assumed the true probabilities $p(r \mid s)$. In an
+experiment they are estimated from finitely many trials, and that introduces
+a bias with a definite sign.
+
+**Finite samples overestimate.** Entropy estimated by plugging empirical
+frequencies into $-\sum \hat{p}\log_2\hat{p}$ is biased, and for mutual
+information the biases combine so that the plug-in estimate sits *above* the
+true value. The clean diagnostic is a **shuffled control**: randomly repair
+each response with a stimulus drawn independently, destroying any real
+dependence, and re-estimate. The true mutual information of shuffled data is
+zero, so whatever the estimator returns, often a visibly nonzero number, is
+pure bias at that sample size. Corrections that extrapolate the bias away
+(for instance a jackknife over subsets of the data) exist; the point here is
+that a raw positive estimate is not, by itself, evidence of a code.
+
+{/* fig EstimationBias: single component Figure, a plot of estimated
+    mutual information against sample size. Axes: horizontal "trials per
+    stimulus" (log-ish, increasing); vertical "estimated I (bits)". Three
+    elements: (1) a flat dashed currentColor line at the true value
+    $I_{\text{true}} = 0.456$ labeled "truth"; (2) an amber curve that
+    starts well ABOVE the truth line at small sample size and decays down
+    toward it as trials increase, labeled "plug-in estimate"; the vertical
+    gap between the amber curve and the truth line at small N shaded in a
+    warning color (rose) and labeled "bias"; (3) a rose curve for the
+    shuffled control that starts clearly above 0 at small N and decays
+    toward 0, labeled "shuffled control (true I = 0)". Color roles: amber
+    = the estimate, warning rose = the bias gap and the shuffle line,
+    currentColor = axes and truth. One idea: small samples manufacture
+    information; the shuffle reveals how much. Inspiration: the review's
+    finite-sample-bias caveat. */}
+<Figure
+  name="EstimationBias"
+  alt="Estimated mutual information versus sample size: a plug-in estimate starting above the true value of 0.456 bits and decaying toward it, with the gap marked as bias, and a shuffled-control curve starting above zero and decaying toward zero"
+  caption="Finite samples fake information: the plug-in estimate decays onto the truth from above, and the shuffled control shows the bias sitting above zero."
+/>
+
+**A decoder only lower-bounds the information.** A common alternative to the
+direct method fits a model that reconstructs the stimulus from the response
+and reports the information in the reconstruction. Because the reconstruction
+$\hat{S}$ is computed from $R$ alone, the chain $S \to R \to \hat{S}$ is
+Markov, and the <Ref lesson="data-processing-inequality">data-processing
+inequality</Ref> gives
+$$
+I(S; \hat{S}) \le I(S; R).
+$$
+Any decoding-based estimate is therefore a *lower* bound on the true mutual
+information: a better decoder can only raise it toward $I(S;R)$, never past
+it. Borst & Theunissen (p. 949) make exactly this point in separating the
+direct method from reconstruction methods.
+
+**The number is relative to the ensemble.** Because $I(S;R)$ averages over
+$p(s)$, it is defined only once the stimulus ensemble is fixed. Absolute bit
+counts do not transfer between experiments with different stimuli; efficiency
+and bits per spike, which normalize against capacity and spike count, are the
+quantities that compare. The finite-sample MI-estimation problem is the same
+obstacle that <Ref lesson="infonce">InfoNCE</Ref> sidesteps for
+high-dimensional data by replacing a plug-in entropy estimate with a
+sample-based bound that stays valid without ever filling in a joint table.
+
+<KeyFact>
+Finite-sample mutual information is biased upward (a nonzero shuffled control
+is bias, not signal); decoding-based estimates only lower-bound the truth by
+the data-processing inequality; and every value is relative to the stimulus
+ensemble it was averaged over.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+A neuron has the binned response table $p(r \mid s_0) = (\tfrac{3}{4},
+\tfrac{1}{4})$ and $p(r \mid s_1) = (\tfrac{1}{4}, \tfrac{3}{4})$ over
+$r \in \{0, 1\}$, with equally likely stimuli. Compute $I(S;R)$ by the direct
+method and the bits per spike. Use $H(\tfrac{1}{4}) \approx 0.811$ bits.
+
+<Solution>
+**Pool.** $p(R = 1) = \tfrac{1}{2}\cdot\tfrac{1}{4} + \tfrac{1}{2}
+\cdot\tfrac{3}{4} = \tfrac{1}{2}$, so $H(R) = 1$ bit.
+
+**Noise.** Each row is a $(\tfrac{3}{4}, \tfrac{1}{4})$ split, entropy
+$H(\tfrac{1}{4}) \approx 0.811$; averaging, $H(R \mid S) = 0.811$.
+
+**Subtract.** $I(S;R) = 1 - 0.811 = 0.189$ bits per bin.
+
+**Bits per spike.** $\mathbb{E}[R] = p(R = 1) = 0.5$ spikes, so
+$0.189 / 0.5 = 0.377$ bits per spike. This noisier neuron (crossover
+$\tfrac{1}{4}$ against the lesson's $\tfrac{1}{8}$) carries less than half the
+information per spike of the running example.
+</Solution>
+</Exercise>
+
+<Exercise>
+A different neuron behaves as $\mathrm{BSC}(1/5)$ (crossover $\tfrac{1}{5}$)
+with equally likely stimuli. Compute $I(S;R)$ from the stimulus side, as
+$H(S) - H(S \mid R)$ using the posterior over stimuli, and confirm it equals
+the response-side value $H(R) - H(R \mid S)$. Use $H(\tfrac{1}{5}) \approx
+0.722$ bits. This is the symmetry of mutual information from
+<Ref lesson="mutual-information"/>.
+
+<Solution>
+**Stimulus side.** $H(S) = 1$ bit (uniform prior). The pooled response is
+uniform, $p(R = 0) = p(R = 1) = \tfrac{1}{2}\cdot\tfrac{4}{5} +
+\tfrac{1}{2}\cdot\tfrac{1}{5} = \tfrac{1}{2}$. By Bayes, for $R = 0$,
+$p(s_0 \mid R = 0) = (\tfrac{1}{2}\cdot\tfrac{4}{5}) / \tfrac{1}{2} =
+\tfrac{4}{5}$, so the posterior is $(\tfrac{4}{5}, \tfrac{1}{5})$ with entropy
+$H(\tfrac{1}{5}) = 0.722$ bits; $R = 1$ is the mirror image, also $0.722$.
+Averaging, $H(S \mid R) = 0.722$, hence $I(S;R) = 1 - 0.722 = 0.278$ bits.
+
+**Response side.** $H(R) = 1$ bit (pooled response uniform); each row is a
+$(\tfrac{4}{5}, \tfrac{1}{5})$ split, so $H(R \mid S) = H(\tfrac{1}{5}) =
+0.722$, and $H(R) - H(R \mid S) = 1 - 0.722 = 0.278$ bits. The two routes
+agree, as the symmetry of mutual information guarantees.
+</Solution>
+</Exercise>
+
+<Exercise>
+Treat a neuron as $\mathrm{BSC}(1/4)$ (crossover $\tfrac{1}{4}$). (a) Compute
+its capacity $C$. (b) Under the biased ensemble $p(s_1) = 0.8$, compute
+$I(S;R)$ and the coding efficiency $\eta = I(S;R)/C$. Use
+$H(\tfrac{1}{4}) \approx 0.811$ and $H(0.35) \approx 0.934$ bits. This uses
+the capacity recipe of <Ref lesson="channel-capacity"/>.
+
+<Solution>
+**(a)** For a symmetric channel the noise term is $H(\tfrac{1}{4}) = 0.811$
+regardless of input, and the uniform stimulus maximizes $H(R)$ at $1$ bit, so
+$C = 1 - 0.811 = 0.189$ bits per bin.
+
+**(b)** Noise term unchanged: $H(R \mid S) = 0.811$. Pooled response:
+$p(R = 1) = 0.8\cdot\tfrac{3}{4} + 0.2\cdot\tfrac{1}{4} = 0.6 + 0.05 = 0.65$,
+so $H(R) = H(0.35) \approx 0.934$. Then $I(S;R) = 0.934 - 0.811 = 0.123$
+bits, and $\eta = 0.123 / 0.189 \approx 0.65$. The biased ensemble uses about
+$65\%$ of the channel; the uniform ensemble would reach $\eta = 1$ because it
+is the capacity-achieving input for this symmetric neuron.
+</Solution>
+</Exercise>
+
+<Exercise>
+A decoder observes the binned response $R$ of the running example and outputs
+a stimulus guess $\hat{S}$. (a) For the identity decoder $\hat{S} = s_1$ if
+$R = 1$ else $s_0$, compute $I(S; \hat{S})$. (b) For the constant decoder
+$\hat{S} = s_1$ always, compute $I(S; \hat{S})$. (c) State which theorem
+guarantees neither exceeds $I(S;R) = 0.456$ bits.
+
+<Solution>
+**(a)** With $\hat{S}$ a relabelling of the binary $R$, the joint table of
+$(S, \hat{S})$ is the table of $(S, R)$ with $r = 1 \mapsto s_1$,
+$r = 0 \mapsto s_0$. So $I(S; \hat{S}) = I(S;R) = 0.456$ bits: for a binary
+response, the identity decoder loses nothing, because $R$ is already a
+sufficient statistic.
+
+**(b)** A constant $\hat{S}$ is independent of $S$, so
+$I(S; \hat{S}) = 0$ bits.
+
+**(c)** The chain $S \to R \to \hat{S}$ is Markov ($\hat{S}$ depends on $S$
+only through $R$), so the data-processing inequality gives
+$I(S; \hat{S}) \le I(S;R) = 0.456$. Both decoders respect it: $0.456 \le
+0.456$ and $0 \le 0.456$. A decoding-based estimate is a lower bound on the
+true information.
+</Solution>
+</Exercise>
+
+<Exercise>
+An experimenter estimates $\hat{I}(S;R) = 0.30$ bits from a small number of
+trials, then repeats the estimate after randomly shuffling which response
+goes with which stimulus and obtains $\hat{I}_{\text{shuffled}} = 0.08$ bits.
+Interpret the shuffled value, and give a corrected estimate of the true
+mutual information.
+
+<Solution>
+Shuffling destroys any real stimulus-response dependence, so the true mutual
+information of the shuffled data is exactly $0$. The estimate
+$\hat{I}_{\text{shuffled}} = 0.08$ bits is therefore entirely the positive
+bias of the plug-in estimator at that sample size. A first-order correction
+subtracts it: $\hat{I}_{\text{corrected}} \approx 0.30 - 0.08 = 0.22$ bits.
+The raw $0.30$ overstated the code by roughly a third; only the excess of the
+estimate over its shuffled control is defensible as signal, and even that is
+best confirmed with more data or a jackknife extrapolation.
+</Solution>
+</Exercise>
+
+<Exercise>
+A neuron fires up to two spikes per bin, with
+$p(r \mid s_0) = (\tfrac{3}{4}, \tfrac{1}{8}, \tfrac{1}{8})$ and
+$p(r \mid s_1) = (\tfrac{1}{8}, \tfrac{1}{8}, \tfrac{3}{4})$ over
+$r \in \{0, 1, 2\}$, with uniform stimuli. Compute $H(R)$, $H(R \mid S)$,
+$I(S;R)$, and the bits per spike. Use $\log_2 3 \approx 1.585$ and
+$\log_2 7 \approx 2.807$.
+
+<Solution>
+**Pool.** $p(R) = (\tfrac{7}{16}, \tfrac{1}{8}, \tfrac{7}{16})$. With
+$\log_2\tfrac{16}{7} = 4 - 2.807 = 1.193$:
+$H(R) = 2\cdot\tfrac{7}{16}\log_2\tfrac{16}{7} + \tfrac{1}{8}\log_2 8
+= 2\cdot 0.4375\cdot 1.193 + 0.125\cdot 3 = 1.044 + 0.375 = 1.419$ bits.
+
+**Noise.** Each row is a permutation of $(\tfrac{3}{4}, \tfrac{1}{8},
+\tfrac{1}{8})$ with entropy
+$\tfrac{3}{4}\log_2\tfrac{4}{3} + 2\cdot\tfrac{1}{8}\log_2 8
+= 0.75\,(2 - 1.585) + 2\cdot 0.125\cdot 3 = 0.311 + 0.75 = 1.061$ bits, so
+$H(R \mid S) = 1.061$.
+
+**Subtract.** $I(S;R) = 1.419 - 1.061 = 0.358$ bits per bin.
+
+**Bits per spike.** $\mathbb{E}[R \mid s_0] = \tfrac{1}{8} + 2\cdot\tfrac{1}{8}
+= 0.375$, $\mathbb{E}[R \mid s_1] = \tfrac{1}{8} + 2\cdot\tfrac{3}{4} = 1.625$,
+mean $1.0$ spike. So $0.358 / 1.0 = 0.358$ bits per spike: by placing its
+spikes to distinguish the two stimuli, this neuron gets about a third of a bit
+from each spike, far above the wasteful neuron of the earlier example.
+</Solution>
+</Exercise>
+
+<Exercise>
+Explain, in two or three sentences, why "this neuron carries $2.4$ bits" is an
+incomplete claim, and what two normalized quantities make information measures
+comparable across experiments.
+
+<Solution>
+Mutual information averages over the stimulus prior $p(s)$, so a raw bit count
+is defined only relative to the stimulus ensemble used; the same neuron
+reports different $I(S;R)$ under different ensembles, and the number does not
+transfer to another experiment's stimuli. The comparable quantities are bits
+per spike ($I / \mathbb{E}[R]$), which normalizes against firing, and coding
+efficiency ($I / C$), which normalizes against the neuron's own channel
+capacity.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Borst, F. E. Theunissen, "Information Theory and Neural Coding," *Nature Neuroscience*, 2, 1999, pp. 947–957 — the primary source: general framework and Boxes 1–2 (the three decompositions of $I(R,S)$ and the direct method), the direct-versus-reconstruction distinction and data-processing argument (p. 949), Box 3 (Gaussian/coherence capacity bounds), and Table 2 (bits/second, bits/spike, and efficiency across species).
+2. S. P. Strong, R. Koberle, R. R. de Ruyter van Steveninck, W. Bialek, "Entropy and Information in Neural Spike Trains," *Physical Review Letters*, 80, 1998, pp. 197–200 — introduces the direct method of estimating $H(R)$ and $H(R \mid S)$ from binned spike trains, applied to the fly motion-sensitive neuron H1.
+3. F. Rieke, D. Warland, R. de Ruyter van Steveninck, W. Bialek, *Spikes: Exploring the Neural Code*, MIT Press, 1997 — book-length treatment of spike-train information, bits per spike, and the efficiency of naturalistic versus artificial stimuli.
+4. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §§2.2–2.4 for the entropy, conditional-entropy, and mutual-information identities used by the direct method; §7 for channel capacity, reused here as the denominator of coding efficiency.
+</References>

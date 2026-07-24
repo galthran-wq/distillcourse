@@ -1,0 +1,815 @@
+Reliable communication is possible at every rate below the channel capacity
+and impossible above it: capacity is a sharp threshold, not a soft
+trade-off. This lesson defines block codes and their rates, states the
+noisy-channel coding theorem, sketches both halves of the argument
+(achievability by random codebooks with joint-typicality decoding, the
+converse by Fano's inequality combined with the data-processing
+inequality), and works one finite code, the Hamming (7,4), by hand.
+
+## Brute redundancy: reliability at a vanishing rate
+
+Fix the channel of <Ref lesson="channel-capacity"/>: $\mathrm{BSC}(0.1)$,
+each transmitted bit flipped independently with probability $f = 0.1$,
+capacity $C = 1 - H(0.1) \approx 0.531$ bits per use. Sending data bits raw
+corrupts one in ten. The oldest countermeasure is repetition: transmit
+every data bit three times and decode by majority vote.
+
+<Example title="the repetition code R3 on BSC(0.1)">
+Each data bit becomes three channel bits; the decoder outputs the majority
+of the three received copies. The vote errs exactly when at least two of
+the three copies flip:
+$$
+p_b = 3f^2(1 - f) + f^3 = 3 \cdot 0.01 \cdot 0.9 + 0.001 = 0.028.
+$$
+Per-bit error falls from $0.1$ to $0.028$. The price is paid in rate: three
+channel uses now carry one data bit, $R = \tfrac{1}{3}$ against the raw
+code's $R = 1$.
+</Example>
+
+Repeating $N$ times continues the pattern: the majority vote fails only
+when half the copies flip, an event whose probability falls exponentially
+in $N$, while the rate falls as $1/N$.
+[MacKay](https://www.inference.org.uk/mackay/itila/) (ch. 1) runs the
+numbers for a target of $p_b \le 10^{-15}$, the reliability a disk drive
+needs: $N = 61$ copies, rate $\tfrac{1}{61} \approx 0.016$. The pattern
+suggests a general law: error tends to zero only if rate does. The theorem
+of this lesson says the suggestion is false, and that the true boundary
+sits at $R = 0.531$, not at $R = 0$.
+
+<KeyFact>
+Repetition buys reliability only by spending the entire rate: driving its
+error to zero drives $R \to 0$. That trade is a defect of the code, not a
+law of the channel.
+</KeyFact>
+
+## Codes and rates: the objects the theorem quantifies
+
+R3 is one instance of a general shape. It assigns $M = 2$ messages the
+codewords $000$ and $111$ of length $n = 3$, and maps each received triple
+back to a message. The general object replaces $2$ and $3$ by parameters.
+
+<Definition title="block code and rate">
+An **$(M, n)$ block code** for a channel $p(y \mid x)$ consists of an
+encoder assigning each message $w \in \{1, \ldots, M\}$ a codeword
+$x^n(w) \in \mathcal{X}^n$, and a decoder
+$g : \mathcal{Y}^n \to \{1, \ldots, M\}$. Its **rate** is
+$$
+R = \frac{\log_2 M}{n} \text{ bits per channel use},
+$$
+so a rate-$R$ code carries $M = 2^{nR}$ distinct messages on $n$ uses.
+</Definition>
+
+<Definition title="achievable rate">
+The **maximal block error probability** of a code is
+$\lambda^{(n)} = \max_w \Pr\{g(Y^n) \ne w \mid W = w\}$: the worst case
+over messages of decoding to anything but the sent message. A rate $R$ is
+**achievable** if a sequence of $(2^{nR}, n)$ codes exists with
+$\lambda^{(n)} \to 0$ as $n \to \infty$.
+</Definition>
+
+{/* fig CodingPipeline: the coding pipeline in one row. Six rounded boxes
+    left to right joined by straight data-flow arrows: "message
+    $W \in \{1,\dots,2^{nR}\}$" → "encoder" → codeword $X^n(W)$ drawn as a
+    horizontal strip of n small cells (blue fill, a few cells showing bits
+    0/1) → "channel $p(y\mid x)$, used $n$ times" → received $Y^n$ as the
+    same strip with 2–3 cells recolored amber (the flipped positions) →
+    "decoder" → "$\hat W$". Under the codeword strip a brace labeled "$n$
+    channel uses"; under the whole pipeline one KaTeX line:
+    $R = \tfrac{\log_2 M}{n}$ bits per use. Color roles: blue = the
+    message-bearing codeword cells, amber = the noise corruptions,
+    currentColor = boxes/arrows/labels. One idea: a code spreads one
+    message over many channel uses so noise can be averaged out.
+    Inspiration: MacKay ch. 9.1 big-picture diagram (recreate, do not
+    copy). */}
+<Figure
+  name="CodingPipeline"
+  alt="Pipeline from a message W through an encoder to an n-symbol codeword, through n uses of a noisy channel that flips some symbols, to a decoder producing the estimate W-hat, with the rate R equal to log2 M over n labeled"
+  caption="One message, n channel uses: the rate R counts message bits per use, and the decoder must undo the flips."
+/>
+
+The question the theorem answers: for a given discrete memoryless channel,
+which rates are achievable. The limit $n \to \infty$ is part of the
+question. At any fixed $n$ some error probability remains; achievability
+asks whether a *sequence* of codes drives it to zero at fixed rate.
+
+## The theorem: the achievable rates are exactly the rates below C
+
+<Theorem title="noisy-channel coding theorem">
+Let a discrete memoryless channel have capacity
+$C = \max_{p(x)} I(X;Y)$.
+
+**Achievability.** Every rate $R < C$ is achievable: there exist
+$(2^{nR}, n)$ codes with $\lambda^{(n)} \to 0$.
+
+**Converse.** No rate above $C$ is achievable: every $(2^{nR}, n)$ code
+with $R > C$ has average block error
+$$
+P_e \;\ge\; 1 - \frac{C}{R} - \frac{1}{nR},
+$$
+which is bounded away from $0$ as $n \to \infty$.
+</Theorem>
+
+This is Theorem 11 of
+[Shannon's 1948 paper](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf)
+(Part II, §13). The two directions are separate arguments with separate
+tools, sketched in the next two sections: a probabilistic existence proof
+for achievability, an information-counting bound for the converse. Neither
+direction implies the other.
+
+{/* fig CapacityThreshold: the threshold as a picture, error vs rate in
+    the n→∞ limit. Axes: horizontal "rate R (bits per use)" from 0 to 1
+    with a tick at C = 0.531; vertical "best achievable block error" from
+    0 to 1. For R < C the curve lies flat on the axis at 0 (blue, thick),
+    labeled "error → 0: achievable". At R = C a vertical dashed amber
+    wall, labeled $C = 0.531$. For R > C an amber curve rising from 0 at
+    R = C along $1 - C/R$ (values: 0.115 at R = 0.6, 0.29 at 0.75, 0.47
+    at 1.0), with the region below it lightly hatched and labeled "no
+    code lands here (Fano floor $1 - C/R$)". Color roles: blue =
+    achievable side, amber = the wall and the forbidden floor,
+    currentColor = axes. One idea: capacity is a cliff — zero on one
+    side, a hard floor on the other. Inspiration: Cover & Thomas ch. 7
+    coding-theorem region (recreate, do not copy). */}
+<Figure
+  name="CapacityThreshold"
+  alt="Best achievable block error against rate: zero for all rates below capacity 0.531, then a floor rising along 1 minus C over R for rates above it, with the region below the floor marked unreachable"
+  caption="The n → ∞ picture: error vanishes at every rate left of C and is floored at 1 − C/R right of it."
+/>
+
+<KeyFact>
+Capacity is a sharp threshold, not a trade-off: below $C$ the error can be
+made arbitrarily small at full fixed rate, above $C$ it cannot be made
+small at all. Nothing about the boundary is gradual.
+</KeyFact>
+
+<Demo
+  name="ChannelCodingThreshold"
+  caption="Block error against rate on a binary symmetric channel, with blocklength n adjustable: the cliff at C = 0.531 sharpens as n grows."
+/>
+
+<Task>
+Load the *below capacity* preset and raise $n$: the block error falls
+toward $0$. Load *above capacity* and raise $n$ again: the error climbs
+instead. Then fix the largest $n$ and sweep $R$ across $0.531$ to trace
+the cliff in one pass.
+</Task>
+
+## Finite blocklength: the cliff is the n → ∞ limit
+
+At any finite $n$ there is no discontinuity. The error-versus-rate curve
+of the best length-$n$ codes is an S-shaped slope through the
+neighborhood of $C$; the theorem describes the limit of these slopes, and
+the wall at $C$ is what they steepen into.
+
+{/* fig ThresholdSharpens: FigureSequence, component tier, 3 frames
+    (register with frames: 3). Shared layout: the same axes as
+    CapacityThreshold (error 0–1 vertical, rate 0–1 horizontal, dashed
+    vertical guide at C = 0.531 in currentColor). Frame 1: one amber
+    S-curve labeled "n = 10", a gentle slope crossing ~0.5 near C, wide
+    transition. Frame 2: the n = 10 curve fades to muted (opacity 0.35);
+    a steeper amber S-curve labeled "n = 100" appears, narrower
+    transition centered on C. Frame 3: n = 10 and n = 100 both muted; a
+    near-step amber curve labeled "n = 1000" hugs 0 left of C and 1
+    right of it. Exactly one new curve per frame; axes and guide
+    pixel-identical. Color roles: amber = the current n's curve, muted
+    currentColor = earlier curves, dashed currentColor = the C guide.
+    One idea: the sharp threshold is the limit of steepening finite-n
+    slopes. Inspiration: finite-blocklength dispersion plots, Polyanskiy
+    & Wu ch. 20 (recreate, do not copy). */}
+<FigureSequence
+  name="ThresholdSharpens"
+  alt="Three frames of block error against rate on the same axes: an S-curve for n equals 10, a steeper one for n equals 100, and a near-step for n equals 1000, all crossing at capacity 0.531"
+  caption="n = 10, 100, 1000: each frame steepens the transition around C toward the limiting step."
+/>
+
+<Task>
+Step through the three frames and read the transition width at each $n$:
+it shrinks roughly like $1/\sqrt{n}$, so sharpening the cliff by another
+factor of ten costs a hundredfold longer blocks.
+</Task>
+
+<Aside>
+The $1/\sqrt{n}$ width has an exact form. For error tolerance
+$\varepsilon$, the largest number of messages $M^*(n, \varepsilon)$
+carried by length-$n$ codes satisfies
+$$
+\log_2 M^*(n, \varepsilon) \;\approx\; nC - \sqrt{nV}\, Q^{-1}(\varepsilon),
+$$
+where $V$ is the *channel dispersion*, a variance-like constant of the
+channel, and $Q^{-1}$ is the inverse Gaussian tail function. The
+best usable rate at finite $n$ sits below $C$ by a deficit shrinking as
+$\sqrt{V/n}$: the normal approximation of
+[Polyanskiy & Wu](https://people.lids.mit.edu/yp/homepage/data/itlectures_v5.pdf)
+(ch. 20, §20.3), sharpening a line of analysis going back to Strassen
+(1962). For $\mathrm{BSC}(0.1)$ at $n = 1000$ and
+$\varepsilon = 10^{-3}$, the deficit is on the order of $0.03$ bits per
+use: the theorem's promise is honest, but blocklength is the currency
+that pays for it.
+</Aside>
+
+## Achievability: random codebooks, typicality decoding
+
+The task: show that for every $R < C$ codes with vanishing error exist.
+The obstacle is scale. At $n = 1000$ and $R = 0.4$ a codebook assigns
+$2^{400} \approx 10^{120}$ messages their thousand-bit codewords; no
+explicit construction of that size was known in 1948, and analyzing any
+particular one is hopeless. Shannon's argument sidesteps both problems
+with two moves: a decoder whose analysis needs only typicality counts,
+and an average over *all* codebooks in place of any particular one.
+
+### The decoder: joint typicality
+
+<Ref lesson="source-coding-theorem-lite"/> established the typical set:
+for large $n$, the sequences a source actually produces concentrate on
+$\approx 2^{nH}$ roughly equiprobable *typical* sequences. Apply this to
+the pair $(X^n, Y^n)$ under the capacity-achieving input distribution
+(uniform, for the BSC): a pair is *jointly typical* when the input is
+typical, the output is typical, and the pair looks like $n$ draws from
+the joint distribution $p(x)\,p(y \mid x)$.
+
+The counts for $\mathrm{BSC}(0.1)$ with uniform input: $H(X) = 1$,
+$H(Y) = 1$, $H(X,Y) = 1 + H(0.1) = 1.469$, so
+$H(X \mid Y) = 0.469$. Given a received $y^n$, the inputs jointly typical
+with it number $\approx 2^{0.469\,n}$, out of $\approx 2^{n}$ typical
+inputs: a fraction
+$$
+\frac{2^{nH(X \mid Y)}}{2^{nH(X)}} = 2^{-n I(X;Y)} = 2^{-0.531\,n}.
+$$
+
+The decoder: output $\hat w$ if $x^n(\hat w)$ is the *unique* codeword
+jointly typical with the received $y^n$; declare an error otherwise.
+
+### Two failure modes, one union bound
+
+The decoder fails in exactly two ways. First, the true pair
+$(x^n(w), y^n)$ falls outside the jointly typical set; the law of large
+numbers sends this probability to $0$. Second, some *wrong* codeword is
+jointly typical with $y^n$. A wrong codeword, drawn independently of the
+transmission, hits the jointly typical shell of $y^n$ with probability
+$\approx 2^{-nI(X;Y)}$; there are $2^{nR} - 1$ wrong codewords, and the
+union bound charges them all:
+$$
+2^{nR} \cdot 2^{-n I(X;Y)} = 2^{-n\,(I(X;Y) - R)} \;\longrightarrow\; 0
+\qquad \text{whenever } R < I(X;Y).
+$$
+Choosing the input distribution that attains the maximum makes
+$I(X;Y) = C$, so every $R < C$ is covered. At $n = 1000$, $R = 0.4$:
+$2^{400}$ competitors against an exponent of $2^{-531}$ leaves total wrong-codeword
+probability $\approx 2^{-131} \approx 10^{-39}$.
+
+{/* fig JointTypicalityDecode: FigureSequence, component tier, 4 frames
+    (register with frames: 4). Shared layout: a large rounded rectangle
+    labeled "typical inputs: $\approx 2^{nH(X)}$" (currentColor frame),
+    containing a dashed amber blob region labeled "jointly typical with
+    received $y^n$: $\approx 2^{nH(X\mid Y)}$", occupying a small
+    fraction of the rectangle; a small caption slot under the rectangle
+    for the frame's formula. Frame 1: only the true codeword, an amber
+    dot labeled $x^n(w)$, sitting inside the amber blob; caption slot:
+    "the sent codeword is jointly typical with the output w.h.p.".
+    Frame 2: one blue dot labeled "wrong codeword" far outside the blob;
+    caption: "an independent codeword hits the blob with probability
+    $\approx 2^{-nI(X;Y)}$". Frame 3: many small blue dots scattered
+    over the rectangle (the $2^{nR}$ codebook), all outside the blob,
+    one grazing its boundary; caption: union bound
+    $2^{nR} \cdot 2^{-nI} = 2^{-n(I-R)}$. Frame 4: same picture with the
+    blob drawn smaller (larger n shrinks the fraction), all blue dots
+    clear of it, and the conclusion boxed in amber: "$R < C$: error
+    $\to 0$". One element changes per frame. Color roles: amber = the
+    received output's typicality region and the true codeword, blue =
+    wrong codewords, currentColor = the sequence space. Inspiration:
+    MacKay ch. 10 typicality picture (recreate, do not copy). */}
+<FigureSequence
+  name="JointTypicalityDecode"
+  alt="Four frames over the space of typical inputs with a small region of inputs jointly typical with the received output: the true codeword sits inside, a wrong codeword sits outside, the full random codebook scatters outside with union bound 2 to the minus n times I minus R, and at larger n the region shrinks and decoding succeeds"
+  caption="Joint-typicality decoding: the true codeword lands in the shell of the received output; each of the 2^nR wrong codewords hits it with probability ≈ 2^−nI."
+/>
+
+<Task>
+Step through the four frames and recompute the exponents at $R = 0.5$ on
+the same channel: wrong-codeword mass $2^{-n(0.531 - 0.5)} = 2^{-0.031\,n}$,
+which at $n = 1000$ is $2^{-31} \approx 5 \times 10^{-10}$. Closing in on
+capacity thins the safety exponent; only larger $n$ restores it.
+</Task>
+
+### The random-codebook trick
+
+The union bound computed an *average*: codewords were treated as drawn
+independently and uniformly at random, so the quantity bounded is the
+error probability averaged over all codebooks. The final step is the
+oldest argument in the probabilistic method: if the average over
+codebooks of the error tends to $0$, then for each $n$ at least one
+specific codebook does at least as well as the average. Existence
+follows; no codebook is named. (The average controls the *average-over-messages*
+error; discarding the worse half of each codebook's messages converts
+the guarantee to the maximal error $\lambda^{(n)}$ at a rate cost of
+$\tfrac{1}{n}$, which vanishes —
+[Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+§7.7.)
+
+<Remark title="existence without construction">
+The proof is non-constructive twice over. It exhibits no codebook, only
+the goodness of an average; and the objects it averages over are
+unusable, since a random codebook has no structure to exploit: storing
+it takes $n \cdot 2^{nR}$ bits and typicality decoding means searching
+all $2^{nR}$ codewords per received block. The gap between this
+existence proof and codes that run on hardware stayed open for
+decades; the closing section returns to it.
+</Remark>
+
+<KeyFact>
+Random codes beat the noise for every $R < C$: a wrong codeword is
+jointly typical with the output with probability $\approx 2^{-nC}$, and
+even $2^{nR}$ competitors lose that race whenever $R < C$. If the
+average codebook succeeds, some codebook does.
+</KeyFact>
+
+## The converse: Fano's inequality and the data-processing bound
+
+The converse must rule out every conceivable code at rates above $C$,
+including codes no one has imagined. The argument therefore cannot
+examine decoders; it counts information along the pipeline
+$W \to X^n \to Y^n \to \hat W$ and shows the count fails when $R > C$.
+Two bounds do all the work.
+
+### Fano: low error forces low conditional entropy
+
+If the decoder is usually right, then given its output $\hat W$ little
+uncertainty about $W$ can remain. Fano's inequality makes the
+quantifier exact.
+
+<Theorem title="Fano's inequality">
+Let $W$ take values in a set of size $M$ and let $\hat W$ be any estimate
+of $W$ (any function of any data), with error probability
+$P_e = \Pr\{\hat W \ne W\}$. Then
+$$
+H(W \mid \hat W) \;\le\; H_2(P_e) + P_e \log_2 (M - 1)
+\;\le\; 1 + P_e \log_2 M .
+$$
+
+<Proof>
+Let $E = \mathbf{1}\{\hat W \ne W\}$, the error indicator. Expand
+$H(E, W \mid \hat W)$ both ways with the chain rule of
+<Ref lesson="joint-and-conditional-entropy"/>:
+$$
+H(W \mid \hat W) + H(E \mid W, \hat W)
+= H(E \mid \hat W) + H(W \mid E, \hat W).
+$$
+The second term on the left is $0$: $E$ is a function of $(W, \hat W)$.
+On the right, $H(E \mid \hat W) \le H(E) = H_2(P_e)$, since conditioning
+does not increase entropy. For the last term, split on $E$: given
+$E = 0$, $W = \hat W$ exactly, contributing $0$; given $E = 1$, $W$ is
+one of the $M - 1$ values other than $\hat W$, so its conditional
+entropy is at most $\log_2(M-1)$ (the range bound of
+<Ref lesson="entropy-as-average-surprise"/>). Hence
+$$
+H(W \mid \hat W) \le H_2(P_e) + P_e \log_2 (M - 1),
+$$
+and the weaker form follows from $H_2(P_e) \le 1$ and
+$\log_2(M-1) \le \log_2 M$. This is
+[Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+Theorem 2.10.1.
+</Proof>
+</Theorem>
+
+The reading direction matters: Fano converts an assumed error rate into
+an upper bound on leftover uncertainty, so, contraposed, a *large*
+leftover uncertainty forces a *large* error. The converse manufactures
+exactly that large leftover.
+
+### The code is a Markov chain, and n uses carry at most nC
+
+Encoder, channel, and decoder form the chain
+$W \to X^n \to Y^n \to \hat W$: each stage is computed from the one
+before it. The <Ref lesson="data-processing-inequality"/> applies twice
+and gives $I(W; \hat W) \le I(X^n; Y^n)$. Memorylessness then caps the
+middle link:
+$$
+I(X^n;Y^n) = H(Y^n) - \sum_{i=1}^n H(Y_i \mid X_i)
+\;\le\; \sum_{i=1}^n \bigl[ H(Y_i) - H(Y_i \mid X_i) \bigr]
+= \sum_{i=1}^n I(X_i;Y_i) \;\le\; nC .
+$$
+The equality uses independence of the noise across uses
+($H(Y^n \mid X^n) = \sum_i H(Y_i \mid X_i)$); the first inequality is
+subadditivity of entropy, from the chain rule plus conditioning
+(<Ref lesson="joint-and-conditional-entropy"/>); the last holds because
+each $I(X_i;Y_i)$ enters the maximization defining $C$. Whatever
+dependence the encoder builds across the block, $n$ uses of the channel
+pass at most $n$ capacities of information.
+
+{/* fig ConverseChain: the converse as one schematic. Center: four
+    rounded boxes in a row, $W$ → $X^n$ → $Y^n$ → $\hat W$, arrows
+    labeled "encoder", "channel", "decoder" (currentColor). Above the
+    row: a wide bracket spanning from W to W-hat with the KaTeX bound
+    $I(W;\hat W) \le n C$ and the sub-label "data-processing +
+    memorylessness" (amber). Below the row: a second bracket with
+    Fano's bound $H(W \mid \hat W) \le 1 + P_e\, nR$ (blue). At the
+    bottom, the two bounds meet in one boxed amber conclusion line:
+    $nR = H(W) \le nC + 1 + P_e nR \;\Rightarrow\; P_e \ge 1 - C/R -
+    \tfrac{1}{nR}$. Color roles: amber = the capacity ceiling and the
+    conclusion, blue = the Fano term, currentColor = the chain. One
+    idea: nR message bits must flow through a pipe of width nC, and
+    Fano prices the shortfall in error probability. Inspiration:
+    Cover & Thomas §7.9 (recreate, do not copy). */}
+<Figure
+  name="ConverseChain"
+  alt="The chain W to X n to Y n to W-hat with the data-processing bound I of W and W-hat at most n C above it and Fano's bound H of W given W-hat at most 1 plus P e n R below it, combining into the floor P e at least 1 minus C over R minus 1 over n R"
+  caption="The converse in one picture: nR bits must cross a link that passes at most nC, and Fano converts the deficit into an error floor."
+/>
+
+### The arithmetic of impossibility
+
+Take $W$ uniform over the $M = 2^{nR}$ messages, so $H(W) = nR$; the
+average error $P_e$ under uniform messages lower-bounds the maximal
+error, so a floor here floors both. Split $H(W)$ with the
+three-forms identity of <Ref lesson="mutual-information"/> and apply the
+two bounds:
+$$
+nR = H(W) = I(W;\hat W) + H(W \mid \hat W)
+\;\le\; nC + 1 + P_e\, nR .
+$$
+Solving for $P_e$:
+$$
+P_e \;\ge\; 1 - \frac{C}{R} - \frac{1}{nR}.
+$$
+For $R \le C$ the bound is vacuous. For any $R > C$ it converges to
+$1 - C/R > 0$: at $R = 0.6$ on $\mathrm{BSC}(0.1)$, at least $11.5\%$ of
+blocks decode wrongly whatever the code; at $R = 1$ (uncoded
+transmission of a full bit per use), at least $46.9\%$. No decoder
+design enters the computation. The floor binds every code because it is
+an accounting identity about entropy, not an analysis of a mechanism.
+
+<Aside>
+Two refinements, both out of scope. **Strong converse:** above capacity
+the situation is worse than the Fano floor: for a DMC, the block error
+of any code sequence at fixed $R > C$ tends to $1$, not merely to
+$1 - C/R$ (Wolfowitz, 1957). The cliff is two-sided: error $\to 0$
+below, error $\to 1$ above. **Feedback:** the bound
+$I(X^n;Y^n) \le nC$ as derived assumes the encoder does not see the
+channel outputs. Shannon proved in 1956 that even a perfect feedback
+link changes nothing for a DMC: $C_{\text{feedback}} = C$. Feedback
+shortens delays and simplifies codes; it adds no capacity.
+</Aside>
+
+<KeyFact>
+The converse is bookkeeping, not engineering: $nR$ message bits must
+pass a link that carries at most $nC$, and Fano's inequality converts
+the shortfall into a hard error floor $P_e \ge 1 - C/R - \tfrac{1}{nR}$.
+Above capacity, no code, present or future, escapes it.
+</KeyFact>
+
+## Hamming (7,4): three parity checks localize one error
+
+The theorem names no code; this section builds the classic small one.
+The [Hamming (7,4) code](https://en.wikipedia.org/wiki/Hamming%287%2C4%29)
+(Hamming 1950, already exhibited in §17 of Shannon's 1948 paper)
+protects $4$ data bits $s_1 s_2 s_3 s_4$ with $3$ parity bits computed
+as
+$$
+t_5 = s_1 \oplus s_2 \oplus s_3, \qquad
+t_6 = s_2 \oplus s_3 \oplus s_4, \qquad
+t_7 = s_1 \oplus s_3 \oplus s_4,
+$$
+and transmits the $7$-bit block $s_1 s_2 s_3 s_4 t_5 t_6 t_7$: rate
+$R = \tfrac{4}{7} \approx 0.571$. Each parity bit makes the total number
+of ones in its group even, and the three groups overlap in the pattern
+of a three-circle Venn diagram.
+
+{/* fig HammingVenn: the (7,4) code as three overlapping parity circles.
+    Three large circles labeled "check 1", "check 2", "check 3"
+    (currentColor outlines), overlapping in the classic Venn layout.
+    Region contents as bit labels with concrete values from the codeword
+    1000101: center (all three circles) $s_3 = 0$; circle1∩circle3
+    $s_1 = 1$; circle1∩circle2 $s_2 = 0$; circle2∩circle3 $s_4 = 0$;
+    circle-1-only $t_5 = 1$; circle-2-only $t_6 = 0$; circle-3-only
+    $t_7 = 1$. The bit $s_2$ drawn amber with a small flip mark "0→1"
+    (the error). Circles 1 and 2 get amber outlines + small "parity
+    odd: fails" tags; circle 3 stays currentColor with a "parity even:
+    holds" tag in blue. Payoff label under the diagram: "fails ∩ fails ∖
+    holds = $s_2$ — two failing checks and one holding check intersect
+    in exactly one bit". Color roles: amber = the flipped bit and the
+    failing checks, blue = the passing check, currentColor = structure.
+    One idea: three overlapping checks triangulate any single error.
+    Inspiration: MacKay ch. 1 / Cover & Thomas §7.11 Venn (recreate, do
+    not copy). */}
+<Figure
+  name="HammingVenn"
+  alt="Three overlapping parity circles holding the four data bits and three parity bits of the codeword 1000101, with the flipped bit s2 sitting in the two failing circles and outside the holding one"
+  caption="Three parity circles over 7 bits: the pattern of failing checks intersects in exactly one bit, the error."
+/>
+
+<Example title="encode, corrupt, correct">
+**Encode** $s = 1000$. The parities:
+$t_5 = 1 \oplus 0 \oplus 0 = 1$, $t_6 = 0 \oplus 0 \oplus 0 = 0$,
+$t_7 = 1 \oplus 0 \oplus 0 = 1$. Transmitted block: $1000101$.
+
+**Corrupt.** The channel flips $s_2$: received $1100101$.
+
+**Recompute the three checks** on the received block (each sums its
+circle, and should be even):
+- check 1 ($s_1, s_2, s_3, t_5$): $1 + 1 + 0 + 1 = 3$, odd — **fails**;
+- check 2 ($s_2, s_3, s_4, t_6$): $1 + 0 + 0 + 0 = 1$, odd — **fails**;
+- check 3 ($s_1, s_3, s_4, t_7$): $1 + 0 + 0 + 1 = 2$, even — holds.
+
+**Localize.** The error lies in every failing circle and in no holding
+circle: inside checks 1 and 2, outside check 3. One bit occupies that
+region of the Venn diagram: $s_2$. Flip it back; the data $1000$ is
+recovered exactly.
+</Example>
+
+The pattern of check results is the *syndrome*, and the count works out
+exactly: $3$ binary checks give $2^3 = 8$ syndromes, which is one for
+"no error" plus one for each of the $7$ possible single-bit flips. Every
+single error in a block, in data or parity bits alike, is corrected;
+blocks with two or more flips decode to the wrong codeword.
+
+### The payoff against repetition: structure beats brute redundancy
+
+At $f = 0.01$, a block fails when at least two of its $7$ bits flip:
+$$
+1 - (1-f)^7 - 7f(1-f)^6 \approx 0.0020,
+$$
+against $0.039$ for $4$ unprotected bits. Repetition R3 protecting the
+same $4$ data bits spends $12$ channel uses (rate $\tfrac{1}{3}$) for a
+block failure probability of $\approx 0.0012$. The Hamming code reaches
+a comparable failure rate, within a factor of two, while carrying
+$71\%$ more data per channel use. Both codes correct any single error
+per block; Hamming simply pays $3$ parity bits for $4$ data bits where
+repetition pays $8$ for $4$.
+
+{/* fig HammingVsRepetition: two-panel tally, playbook rule 8. Both
+    panels protect the same 4 data bits on BSC(0.01). Left panel
+    "repetition ×3": a strip of 12 cells, 4 blue (data) + 8 amber
+    (redundancy), labels "rate 1/3", "block error ≈ 1.2 × 10⁻³". Right
+    panel "Hamming (7,4)": a strip of 7 cells, 4 blue + 3 amber, labels
+    "rate 4/7", "block error ≈ 2.0 × 10⁻³". Between/below the panels a
+    bold payoff line (currentColor): "same single-error correction,
+    comparable failure rate, 71% more data per use". Color roles: blue =
+    data bits, amber = redundant bits, currentColor = labels. One idea:
+    how redundancy is arranged matters more than how much is spent.
+    Inspiration: MacKay ch. 1 error-vs-rate comparison (recreate, do
+    not copy). */}
+<Figure
+  name="HammingVsRepetition"
+  alt="Two bit strips protecting the same four data bits: repetition times three spends eight redundant bits at rate one third and block error 1.2 times ten to the minus three, Hamming 7 4 spends three redundant bits at rate four sevenths and block error 2.0 times ten to the minus three"
+  caption="Matched protection, unmatched rate: Hamming's three structured parity bits do nearly the work of repetition's eight copies."
+/>
+
+<Remark title="one point, not the theorem">
+Hamming (7,4) is a single $(16, 7)$ code at one fixed rate: its block
+error on $\mathrm{BSC}(f)$ is a fixed number, not a sequence tending to
+$0$, and at $f = 0.01$ its rate $0.571$ sits far below the capacity
+$C = 1 - H(0.01) \approx 0.919$ that the theorem makes achievable with
+vanishing error. Shannon's §17 shows the code attains the capacity of a
+different, specially constrained channel, one guaranteed to corrupt at
+most one symbol per block of seven; on the BSC no capacity claim
+attaches to it. The code demonstrates that structured redundancy works;
+the theorem says how far such structure can be pushed.
+</Remark>
+
+<KeyFact>
+Three parity checks pinpoint any single error in seven bits because the
+counting is exact: $2^3 = 8$ syndromes cover $7$ error positions plus
+"no error". Redundancy arranged to intersect beats redundancy merely
+piled up.
+</KeyFact>
+
+## From existence to constructions: LDPC, turbo, polar
+
+What the theorem delivers is the exact frontier, in both directions, for
+every discrete memoryless channel. What it withholds is a code:
+the achievability proof averages over codebooks that cannot be stored or
+searched, and for decades no explicit family provably approached $C$
+with practical decoding.
+
+The gap closed in stages.
+[Gallager's low-density parity-check codes](https://en.wikipedia.org/wiki/Low-density_parity-check_code)
+(1963) generalize Hamming's idea to large sparse random check
+matrices; they were computationally ahead of their time, forgotten, and
+rediscovered in the 1990s (MacKay & Neal, 1996), whereupon iterative
+decoding carried them to within fractions of a decibel of capacity.
+Turbo codes (Berrou, Glavieux & Thitimajshima, 1993) reached similar
+performance empirically and made near-capacity coding an engineering
+commodity. The proof came last:
+[Arıkan's polar codes](https://arxiv.org/abs/0807.3917) (2009) are the
+first explicit family with a theorem: they achieve the capacity of every
+symmetric binary-input DMC with encoding and decoding complexity
+$O(n \log n)$. Later standardization work built on that result: the 5G
+cellular standard (3GPP, 2016–2018) adopted polar codes for its control
+channels, with LDPC codes carrying the data channels.
+
+One boundary of scope: capacity is a statement per channel use, and
+matching a *source* of entropy rate $H$ to a channel of capacity $C$ is
+a further theorem, source-channel separation, which states that
+compressing first (<Ref lesson="source-coding-theorem-lite"/>) and
+channel-coding second loses nothing for a DMC. Shannon's §14 already
+notes the mechanism behind it: natural sources arrive with redundancy of
+their own, and coding redistributes it.
+
+<KeyFact>
+The pair of coding theorems gives each course quantity its operational
+meaning: entropy is the fewest bits per symbol a source can be
+compressed to, and capacity, the maximum of mutual information, is the
+most message bits per use a channel can carry reliably. Mutual
+information is not a descriptive statistic; it is a rate.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Compute the per-bit error probability of the five-fold repetition code
+R5 on $\mathrm{BSC}(0.1)$ under majority decoding, and its rate. Compare
+both numbers with R3's ($p_b = 0.028$ at $R = \tfrac{1}{3}$), and state
+what the comparison illustrates about repetition.
+
+<Solution>
+Majority-of-five errs when at least $3$ of the $5$ copies flip:
+$$
+p_b = \binom{5}{3} f^3 (1-f)^2 + \binom{5}{4} f^4 (1-f) + f^5
+= 10 \cdot 0.001 \cdot 0.81 + 5 \cdot 0.0001 \cdot 0.9 + 10^{-5},
+$$
+so $p_b = 0.0081 + 0.00045 + 0.00001 \approx 0.0086$, at rate
+$R = \tfrac{1}{5} = 0.2$.
+
+Against R3: error improves by a factor of $\approx 3.3$
+($0.028 \to 0.0086$) while the rate drops from $0.333$ to $0.2$. Each
+step of improvement costs a constant fraction of the remaining rate:
+error $\to 0$ along the repetition family forces $R \to 0$. The coding
+theorem asserts this trade is avoidable at every rate below
+$C = 0.531$.
+</Solution>
+</Exercise>
+
+<Exercise>
+A system must deliver $300$ message bits over $n = 1000$ uses of
+$\mathrm{BSC}(0.1)$; a second design calls for $600$ message bits over
+the same $1000$ uses. For each design, give the rate, state what the
+coding theorem says about it, and where applicable compute the error
+floor from the converse.
+
+<Solution>
+First design: $R = 300/1000 = 0.3 < C = 0.531$. Achievable: by the
+theorem there exist $(2^{300}, 1000)$-style code sequences whose block
+error tends to $0$ (and at this margin below capacity, good codes of
+blocklength $1000$ already exist in practice).
+
+Second design: $R = 600/1000 = 0.6 > C$. Not achievable. The converse
+floor:
+$$
+P_e \ge 1 - \frac{C}{R} - \frac{1}{nR}
+= 1 - \frac{0.531}{0.6} - \frac{1}{600}
+= 1 - 0.885 - 0.0017 \approx 0.113.
+$$
+At least $11\%$ of blocks decode wrongly under every conceivable code;
+the specification cannot be met on this channel. The remedy is more
+channel uses per message bit, not a cleverer code.
+</Solution>
+</Exercise>
+
+<Exercise>
+The achievability sketch bounds the wrong-codeword error by
+$2^{-n(I(X;Y) - R)}$. On $\mathrm{BSC}(0.1)$ (so $I = C = 0.531$ at the
+uniform input), evaluate the bound at $n = 1000$ for $R = 0.4$ and for
+$R = 0.53$. Then find the blocklength $n$ at which the $R = 0.53$ bound
+matches the $R = 0.4$, $n = 1000$ bound. What does the comparison say
+about operating near capacity?
+
+<Solution>
+At $R = 0.4$: exponent $n(C - R) = 1000 \cdot 0.131 = 131$, bound
+$2^{-131} \approx 10^{-39}$.
+
+At $R = 0.53$: exponent $1000 \cdot 0.001 = 1$, bound
+$2^{-1} = 0.5$ — useless at this blocklength.
+
+Matching: the bound is $2^{-n(C-R)}$, so $n \cdot 0.001 = 131$ requires
+$n = 131{,}000$.
+
+The safety margin is the exponent $n(C - R)$: the product of blocklength
+and distance from capacity. Halving the distance to capacity doubles the
+blocklength needed for the same guarantee; operating within $0.001$ bits
+of $C$ costs two orders of magnitude more blocklength than operating
+$0.131$ bits below it. The threshold is sharp only in the limit; near
+it, $n$ is the price.
+</Solution>
+</Exercise>
+
+<Exercise>
+A decoder for $M = 2^{500}$ messages ($n = 1000$, $R = 0.5$) achieves
+$P_e = 10^{-3}$. Use Fano's inequality to bound $H(W \mid \hat W)$, and
+interpret the two terms of the bound. Use
+$\log_2 10^{-3} \approx -9.97$.
+
+<Solution>
+The exact form:
+$$
+H(W \mid \hat W) \le H_2(P_e) + P_e \log_2 (M - 1).
+$$
+First term: $H_2(10^{-3}) = -10^{-3} \log_2 10^{-3} - 0.999 \log_2
+0.999 \approx 0.00997 + 0.00144 \approx 0.011$ bits. Second term:
+$10^{-3} \cdot \log_2(2^{500} - 1) \approx 10^{-3} \cdot 500 = 0.5$
+bits. Total: $H(W \mid \hat W) \le 0.511$ bits.
+
+Interpretation: out of $H(W) = 500$ bits of message uncertainty, the
+decoder's output leaves at most half a bit unresolved. The first term
+prices the uncertainty about *whether* an error occurred (the indicator
+$E$); the second prices *which* of the $M - 1$ wrong messages was sent
+when one did, weighted by how rarely that case arises. Small error
+probability forces small residual entropy: exactly the lever the
+converse pulls in reverse.
+</Solution>
+</Exercise>
+
+<Exercise>
+Encode $s = 0110$ with the Hamming (7,4) code. The channel then flips
+the parity bit $t_6$. Compute the received block, run the three checks,
+localize the error from the syndrome, and state what the receiver
+outputs.
+
+<Solution>
+**Encode.** $s_1 s_2 s_3 s_4 = 0110$:
+$t_5 = 0 \oplus 1 \oplus 1 = 0$, $t_6 = 1 \oplus 1 \oplus 0 = 0$,
+$t_7 = 0 \oplus 1 \oplus 0 = 1$. Transmitted: $0110001$.
+
+**Corrupt.** Flipping $t_6$ gives received block $0110011$.
+
+**Checks** (each sums its circle; even = holds):
+- check 1 ($s_1, s_2, s_3, t_5$): $0 + 1 + 1 + 0 = 2$, even — holds;
+- check 2 ($s_2, s_3, s_4, t_6$): $1 + 1 + 0 + 1 = 3$, odd — **fails**;
+- check 3 ($s_1, s_3, s_4, t_7$): $0 + 1 + 0 + 1 = 2$, even — holds.
+
+**Localize.** The error lies inside check 2 and outside checks 1 and 3.
+The only bit in circle 2 alone is $t_6$ itself. Flip it back to get
+$0110001$; the receiver outputs the data bits $0110$, which were in fact
+never corrupted. Errors in parity bits are detected and corrected by
+the same mechanism as errors in data bits: the syndrome does not care
+which kind of bit failed.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that Hamming (7,4) is a *perfect* code: the radius-$1$ Hamming
+balls around its $16$ codewords exactly partition the space of $2^7$
+binary words. Conclude that every pattern of two or more bit errors is
+decoded to a wrong codeword.
+
+<Solution>
+**Ball size.** The radius-$1$ ball around a $7$-bit word contains the
+word itself plus its $7$ single-bit neighbors: $1 + 7 = 8$ words.
+
+**Disjointness.** Single-error correction means every word at distance
+$\le 1$ from a codeword is decoded to that codeword; a word inside two
+different codewords' balls would have to decode to both, which is
+impossible. So the $16$ balls are pairwise disjoint.
+
+**Counting.** Disjoint balls cover $16 \cdot 8 = 128 = 2^7$ words: the
+whole space, with nothing left over. The balls partition
+$\{0,1\}^7$ exactly, which is the definition of a perfect code.
+
+**Consequence.** A received word carrying $\ge 2$ errors lies at
+distance $\ge 2$ from the true codeword, hence outside its ball. Being
+in the partition, it lies inside exactly one other codeword's ball and
+is decoded there: a wrong codeword, with certainty. Perfection means
+zero slack — every syndrome is spent on single errors, so nothing is
+left to even detect double ones.
+</Solution>
+</Exercise>
+
+<Exercise>
+The binary erasure channel $\mathrm{BEC}(e)$ of
+<Ref lesson="channel-capacity"/> has capacity $C = 1 - e$. (a) For
+$\mathrm{BEC}(0.4)$ and rate $R = 0.75$, compute the asymptotic converse
+floor. (b) Give a direct counting argument, without Fano, for why no
+code at rate $R > 1 - e$ can have vanishing error: compare the number of
+messages with the number a genie-aided receiver could distinguish if
+the erasure locations were announced in advance.
+
+<Solution>
+**(a)** $C = 1 - 0.4 = 0.6$, and
+$$
+P_e \ge 1 - \frac{C}{R} = 1 - \frac{0.6}{0.75} = 0.2
+$$
+asymptotically: at least one block in five fails, under every code.
+
+**(b)** Over $n$ uses, the law of large numbers puts the number of
+unerased positions near $(1 - e)n$. Hand the receiver a genie that
+announces the erasure pattern in advance: the transmission is then
+determined entirely by the $\approx (1-e)n$ surviving bits, so the
+receiver can distinguish at most $2^{(1-e)n}$ transmission outcomes.
+The code carries $2^{nR}$ messages, and for $R > 1 - e$,
+$$
+\frac{2^{nR}}{2^{(1-e)n}} = 2^{n(R - (1-e))} \longrightarrow \infty:
+$$
+exponentially many messages per distinguishable outcome, so most
+messages share their receivable evidence with exponentially many others
+and cannot be decoded reliably. The genie only strengthens the
+receiver, so the true channel does no better. This is the converse made
+concrete: the channel simply does not deliver enough distinguishable
+outputs to separate $2^{nR}$ messages.
+</Solution>
+</Exercise>
+
+<References>
+1. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — Part II: §13 states and proves the fundamental theorem for a discrete channel with noise (Theorem 11) by the random-coding argument, with the converse; §14 discusses redundancy already present in the source; §17 exhibits the (7,4) single-error-correcting code and the constrained channel whose capacity it attains.
+2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §7.5 definitions of codes, rates, and achievability; §7.6 jointly typical sequences; §7.7 the channel coding theorem (Theorem 7.7.1) via random coding and joint typicality; §2.10 and §7.9 Fano's inequality and the converse; §7.11 Hamming codes; §7.12 feedback capacity.
+3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 1 repetition codes and the (7,4) Hamming code with the parity-circle picture; §§9.6–9.7 statement of the theorem with the typical-set preview; ch. 10 the full random-coding and joint-typicality proof and the converse. Free online: https://www.inference.org.uk/mackay/itila/
+4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441 / UIUC ECE 563), 2016 — chs. 14–16 achievability bounds and the Fano-based converse; ch. 20, §20.3 channel dispersion and the finite-blocklength normal approximation behind the sharpening cliff.
+5. E. Arıkan, "Channel Polarization: A Method for Constructing Capacity-Achieving Codes for Symmetric Binary-Input Memoryless Channels," *IEEE Transactions on Information Theory*, 55(7), 2009 — polar codes, the first explicit capacity-achieving family with $O(n \log n)$ coding complexity. https://arxiv.org/abs/0807.3917
+</References>

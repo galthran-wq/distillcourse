@@ -1,5 +1,105 @@
 import type { ComponentType } from "react";
 import W2vOneStep from "./examples/W2vOneStep";
+import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
+import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
+import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
+import EntropyFloor from "./information-theory/EntropyFloor";
+import SubtreeClaim from "./information-theory/SubtreeClaim";
+import ImpossibleVsTight from "./information-theory/ImpossibleVsTight";
+import McMillanReach from "./information-theory/McMillanReach";
+import HuffmanResult from "./information-theory/HuffmanResult";
+import TwoHuffmanTrees from "./information-theory/TwoHuffmanTrees";
+import OneBitGap from "./information-theory/OneBitGap";
+import CodeAsBet from "./information-theory/CodeAsBet";
+import CostDecomposition from "./information-theory/CostDecomposition";
+import ShannonCodeRounding from "./information-theory/ShannonCodeRounding";
+import TypicalSetMap from "./information-theory/TypicalSetMap";
+import EntropyWall from "./information-theory/EntropyWall";
+import EntropySplitBar from "./information-theory/EntropySplitBar";
+import MutualInfoArea from "./information-theory/MutualInfoArea";
+import JointVsProduct from "./information-theory/JointVsProduct";
+import CorrelationBlindSpot from "./information-theory/CorrelationBlindSpot";
+import DpiMergeDrop from "./information-theory/DpiMergeDrop";
+import DpiMarkovChain from "./information-theory/DpiMarkovChain";
+import DpiProofTwoWays from "./information-theory/DpiProofTwoWays";
+import DpiCeilingStack from "./information-theory/DpiCeilingStack";
+import DpiSufficiencyBars from "./information-theory/DpiSufficiencyBars";
+import ApproximationsLadder from "./information-theory/ApproximationsLadder";
+import BitsPerContext from "./information-theory/BitsPerContext";
+import GuessRankHistogram from "./information-theory/GuessRankHistogram";
+import RedundancyBar from "./information-theory/RedundancyBar";
+import BscTransition from "./information-theory/BscTransition";
+import CapacityOverInputs from "./information-theory/CapacityOverInputs";
+import BscCapacityDerivation from "./information-theory/BscCapacityDerivation";
+import BscCapacityCurve from "./information-theory/BscCapacityCurve";
+import BecTransition from "./information-theory/BecTransition";
+import BscVsBecBars from "./information-theory/BscVsBecBars";
+import TwoLimitsMap from "./information-theory/TwoLimitsMap";
+import CodingPipeline from "./information-theory/CodingPipeline";
+import CapacityThreshold from "./information-theory/CapacityThreshold";
+import ThresholdSharpens from "./information-theory/ThresholdSharpens";
+import JointTypicalityDecode from "./information-theory/JointTypicalityDecode";
+import ConverseChain from "./information-theory/ConverseChain";
+import HammingVenn from "./information-theory/HammingVenn";
+import HammingVsRepetition from "./information-theory/HammingVsRepetition";
+import KlGapBars from "./information-theory/KlGapBars";
+import JensenChord from "./information-theory/JensenChord";
+import KlAsymmetryPanels from "./information-theory/KlAsymmetryPanels";
+import MissingOutcomeBlowup from "./information-theory/MissingOutcomeBlowup";
+import LogLossSurprisal from "./information-theory/LogLossSurprisal";
+import CrossEntropyStack from "./information-theory/CrossEntropyStack";
+import TrainingShrinksKl from "./information-theory/TrainingShrinksKl";
+import OneHotCollapse from "./information-theory/OneHotCollapse";
+import ConfidentWrongBlowup from "./information-theory/ConfidentWrongBlowup";
+import PredictThenCode from "./information-theory/PredictThenCode";
+import PredictorCompressorLoop from "./information-theory/PredictorCompressorLoop";
+import StreamCostStack from "./information-theory/StreamCostStack";
+import BitsPerCharLadder from "./information-theory/BitsPerCharLadder";
+import CourseSpine from "./information-theory/CourseSpine";
+import ThreeProgramsBars from "./information-theory/ThreeProgramsBars";
+import InterpreterOverhead from "./information-theory/InterpreterOverhead";
+import SelfExtractingArchive from "./information-theory/SelfExtractingArchive";
+import IncompressibleCount from "./information-theory/IncompressibleCount";
+import BerryLoop from "./information-theory/BerryLoop";
+import ComplexityMeetsEntropy from "./information-theory/ComplexityMeetsEntropy";
+import CompressionCeilingLadder from "./information-theory/CompressionCeilingLadder";
+import FeasibleSetSimplex from "./information-theory/FeasibleSetSimplex";
+import LambdaTiltDial from "./information-theory/LambdaTiltDial";
+import MaxEntFormula from "./information-theory/MaxEntFormula";
+import BoltzmannSoftmax from "./information-theory/BoltzmannSoftmax";
+import RdPlane from "./information-theory/RdPlane";
+import RdObjective from "./information-theory/RdObjective";
+import CapacityVsRateDistortion from "./information-theory/CapacityVsRateDistortion";
+import GaussianRdCurve from "./information-theory/GaussianRdCurve";
+import NeuralCodecLoop from "./information-theory/NeuralCodecLoop";
+import ThreeStringsThreeCodes from "./information-theory/ThreeStringsThreeCodes";
+import TwoPartMessage from "./information-theory/TwoPartMessage";
+import PolyFitTally from "./information-theory/PolyFitTally";
+import MarkovUCurve from "./information-theory/MarkovUCurve";
+import ParameterPrecision from "./information-theory/ParameterPrecision";
+import AdjustedRateUCurves from "./information-theory/AdjustedRateUCurves";
+import IbVsRd from "./information-theory/IbVsRd";
+import IbObjective from "./information-theory/IbObjective";
+import IbToyMerges from "./information-theory/IbToyMerges";
+import IbPlane from "./information-theory/IbPlane";
+import IbGibbsEncoder from "./information-theory/IbGibbsEncoder";
+import IbBetaExtremes from "./information-theory/IbBetaExtremes";
+import ContrastiveLineup from "./information-theory/ContrastiveLineup";
+import InfonceDerivation from "./information-theory/InfonceDerivation";
+import CertifiedBitsBudget from "./information-theory/CertifiedBitsBudget";
+import InfonceToyTally from "./information-theory/InfonceToyTally";
+import InfonceSaturationCurves from "./information-theory/InfonceSaturationCurves";
+import CpcPipeline from "./information-theory/CpcPipeline";
+import NeuronAsChannel from "./information-theory/NeuronAsChannel";
+import DirectMethodSteps from "./information-theory/DirectMethodSteps";
+import MiBeatsTuningCurve from "./information-theory/MiBeatsTuningCurve";
+import BitsPerSpikeTally from "./information-theory/BitsPerSpikeTally";
+import CodingEfficiencyBars from "./information-theory/CodingEfficiencyBars";
+import EstimationBias from "./information-theory/EstimationBias";
+import UnitsBridge from "./information-theory/UnitsBridge";
+import LandauerErasure from "./information-theory/LandauerErasure";
+import FeedbackSecondLaw from "./information-theory/FeedbackSecondLaw";
+import TwoPhysicsFaces from "./information-theory/TwoPhysicsFaces";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -23,4 +123,104 @@ export interface RegisteredFigure {
  */
 export const figures: Record<string, RegisteredFigure> = {
   W2vOneStep: { component: W2vOneStep },
+  CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
+  NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
+  TwoCodesOneSource: { component: TwoCodesOneSource },
+  EntropyFloor: { component: EntropyFloor },
+  SubtreeClaim: { component: SubtreeClaim },
+  ImpossibleVsTight: { component: ImpossibleVsTight },
+  McMillanReach: { component: McMillanReach },
+  HuffmanResult: { component: HuffmanResult },
+  TwoHuffmanTrees: { component: TwoHuffmanTrees },
+  OneBitGap: { component: OneBitGap },
+  CodeAsBet: { component: CodeAsBet },
+  CostDecomposition: { component: CostDecomposition },
+  ShannonCodeRounding: { component: ShannonCodeRounding },
+  TypicalSetMap: { component: TypicalSetMap },
+  EntropyWall: { component: EntropyWall },
+  EntropySplitBar: { component: EntropySplitBar },
+  MutualInfoArea: { component: MutualInfoArea },
+  JointVsProduct: { component: JointVsProduct },
+  CorrelationBlindSpot: { component: CorrelationBlindSpot },
+  DpiMergeDrop: { component: DpiMergeDrop },
+  DpiMarkovChain: { component: DpiMarkovChain },
+  DpiProofTwoWays: { component: DpiProofTwoWays, frames: 3 },
+  DpiCeilingStack: { component: DpiCeilingStack },
+  DpiSufficiencyBars: { component: DpiSufficiencyBars },
+  ApproximationsLadder: { component: ApproximationsLadder },
+  BitsPerContext: { component: BitsPerContext },
+  GuessRankHistogram: { component: GuessRankHistogram },
+  RedundancyBar: { component: RedundancyBar },
+  BscTransition: { component: BscTransition },
+  CapacityOverInputs: { component: CapacityOverInputs },
+  BscCapacityDerivation: { component: BscCapacityDerivation, frames: 3 },
+  BscCapacityCurve: { component: BscCapacityCurve },
+  BecTransition: { component: BecTransition },
+  BscVsBecBars: { component: BscVsBecBars },
+  TwoLimitsMap: { component: TwoLimitsMap },
+  CodingPipeline: { component: CodingPipeline },
+  CapacityThreshold: { component: CapacityThreshold },
+  ThresholdSharpens: { component: ThresholdSharpens, frames: 3 },
+  JointTypicalityDecode: { component: JointTypicalityDecode, frames: 4 },
+  ConverseChain: { component: ConverseChain },
+  HammingVenn: { component: HammingVenn },
+  HammingVsRepetition: { component: HammingVsRepetition },
+  KlGapBars: { component: KlGapBars },
+  JensenChord: { component: JensenChord },
+  KlAsymmetryPanels: { component: KlAsymmetryPanels },
+  MissingOutcomeBlowup: { component: MissingOutcomeBlowup },
+  LogLossSurprisal: { component: LogLossSurprisal },
+  CrossEntropyStack: { component: CrossEntropyStack },
+  TrainingShrinksKl: { component: TrainingShrinksKl, frames: 4 },
+  OneHotCollapse: { component: OneHotCollapse },
+  ConfidentWrongBlowup: { component: ConfidentWrongBlowup },
+  PredictThenCode: { component: PredictThenCode, frames: 5 },
+  PredictorCompressorLoop: { component: PredictorCompressorLoop },
+  StreamCostStack: { component: StreamCostStack },
+  BitsPerCharLadder: { component: BitsPerCharLadder },
+  CourseSpine: { component: CourseSpine },
+  ThreeProgramsBars: { component: ThreeProgramsBars },
+  InterpreterOverhead: { component: InterpreterOverhead },
+  SelfExtractingArchive: { component: SelfExtractingArchive },
+  IncompressibleCount: { component: IncompressibleCount },
+  BerryLoop: { component: BerryLoop },
+  ComplexityMeetsEntropy: { component: ComplexityMeetsEntropy },
+  CompressionCeilingLadder: { component: CompressionCeilingLadder },
+  FeasibleSetSimplex: { component: FeasibleSetSimplex },
+  LambdaTiltDial: { component: LambdaTiltDial },
+  MaxEntFormula: { component: MaxEntFormula },
+  BoltzmannSoftmax: { component: BoltzmannSoftmax },
+  RdPlane: { component: RdPlane },
+  RdObjective: { component: RdObjective },
+  CapacityVsRateDistortion: { component: CapacityVsRateDistortion },
+  GaussianRdCurve: { component: GaussianRdCurve },
+  NeuralCodecLoop: { component: NeuralCodecLoop },
+  ThreeStringsThreeCodes: { component: ThreeStringsThreeCodes },
+  TwoPartMessage: { component: TwoPartMessage },
+  PolyFitTally: { component: PolyFitTally, frames: 4 },
+  MarkovUCurve: { component: MarkovUCurve },
+  ParameterPrecision: { component: ParameterPrecision },
+  AdjustedRateUCurves: { component: AdjustedRateUCurves },
+  IbVsRd: { component: IbVsRd },
+  IbObjective: { component: IbObjective },
+  IbToyMerges: { component: IbToyMerges, frames: 4 },
+  IbPlane: { component: IbPlane },
+  IbGibbsEncoder: { component: IbGibbsEncoder },
+  IbBetaExtremes: { component: IbBetaExtremes },
+  ContrastiveLineup: { component: ContrastiveLineup },
+  InfonceDerivation: { component: InfonceDerivation, frames: 4 },
+  CertifiedBitsBudget: { component: CertifiedBitsBudget },
+  InfonceToyTally: { component: InfonceToyTally },
+  InfonceSaturationCurves: { component: InfonceSaturationCurves },
+  CpcPipeline: { component: CpcPipeline },
+  NeuronAsChannel: { component: NeuronAsChannel },
+  DirectMethodSteps: { component: DirectMethodSteps, frames: 3 },
+  MiBeatsTuningCurve: { component: MiBeatsTuningCurve },
+  BitsPerSpikeTally: { component: BitsPerSpikeTally },
+  CodingEfficiencyBars: { component: CodingEfficiencyBars },
+  EstimationBias: { component: EstimationBias },
+  UnitsBridge: { component: UnitsBridge },
+  LandauerErasure: { component: LandauerErasure },
+  FeedbackSecondLaw: { component: FeedbackSecondLaw },
+  TwoPhysicsFaces: { component: TwoPhysicsFaces },
 };
