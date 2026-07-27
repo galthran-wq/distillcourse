@@ -129,6 +129,21 @@ describe("lintCourse", () => {
     expect(warns).toContain("exercise-solution");
   });
 
+  it("flags MDX that compiles but throws at render (mdx-render)", () => {
+    // `{p}` outside math is a JS expression over an undefined identifier —
+    // compiles fine, dies with a ReferenceError only when rendered.
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "lessons/intro-surprise/lesson.mdx"),
+        "<Example>",
+        "A stray expression {p} in prose.\n\n<Example>",
+      ),
+    );
+    const render = errors(lintDir(dir)).filter((d) => d.rule === "mdx-render");
+    expect(render.length).toBeGreaterThan(0);
+    expect(render[0].message).toContain("p is not defined");
+  });
+
   it("flags MDX that parses but fails full compilation (mdx-compile)", () => {
     // Two default exports parse fine (each ESM block is valid on its own)
     // but compileSync rejects the duplicate layout at compile time.

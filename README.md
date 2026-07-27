@@ -1,4 +1,4 @@
-# Grasp (working title)
+# distillcourse
 
 Textbook-quality interactive courses on fundamental topics, built for busy
 engineers who keep starting textbooks and never finishing them.

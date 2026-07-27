@@ -19,8 +19,8 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Grasp — short interactive courses on fundamentals",
-    template: "%s · Grasp",
+    default: "distillcourse — short interactive courses on fundamentals",
+    template: "%s · distillcourse",
   },
   description:
     "Short interactive courses on engineering fundamentals. Lessons of 5–15 minutes with computations to perform and checks to pass.",
@@ -41,13 +41,13 @@ export default function RootLayout({
           // Applies the stored theme before first paint to avoid a flash.
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('grasp.theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
+              "try{var t=localStorage.getItem('distillcourse.theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
           }}
         />
         <header className="border-b border-line">
           <div className="mx-auto flex h-13 w-full max-w-7xl items-center justify-between px-6">
             <Link href="/" className="text-[15px] font-semibold tracking-tight hover:text-accent">
-              Grasp
+              distillcourse
             </Link>
             <ThemeToggle />
           </div>
@@ -55,7 +55,7 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
         <footer className="border-t border-line">
           <div className="mx-auto w-full max-w-7xl px-6 py-4 font-mono text-[11px] text-faint">
-            Grasp
+            distillcourse
           </div>
         </footer>
       </body>

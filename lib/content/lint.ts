@@ -1,7 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { unified } from "unified";
-import { compileSync } from "@mdx-js/mdx";
+import { compileSync, evaluateSync } from "@mdx-js/mdx";
+import * as jsxRuntime from "react/jsx-runtime";
+import { createElement, Fragment, type ComponentType } from "react";
+import { renderToString } from "react-dom/server";
+import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import remarkMdx from "remark-mdx";
 import remarkMath from "remark-math";
@@ -139,6 +143,36 @@ function lintLessonMdx(
       rule: "mdx-compile",
       file,
       message: `MDX compile error: ${(err as Error).message}`,
+    });
+    return;
+  }
+
+  // mdx-render: a document can compile yet still throw when rendered — a
+  // stray `{p}` in prose compiles to the JS expression `p` and only dies as
+  // a ReferenceError at prerender time (multi-line inline math that fails to
+  // parse as math is the classic source). Render with stub components so
+  // validation, not the production build, is the gate that catches it.
+  try {
+    const mod = evaluateSync(entry.mdx, {
+      ...jsxRuntime,
+      remarkPlugins: [remarkGfm, remarkMath],
+    } as never);
+    const Stub = (props: { children?: unknown }) =>
+      createElement(Fragment, null, props.children as never);
+    const components = Object.fromEntries(
+      [...ALLOWED_COMPONENTS].map((name) => [name, Stub]),
+    ) as Record<string, ComponentType>;
+    renderToString(
+      createElement(mod.default as ComponentType<{ components: unknown }>, {
+        components,
+      }),
+    );
+  } catch (err) {
+    diags.push({
+      level: "error",
+      rule: "mdx-render",
+      file,
+      message: `MDX renders with an error: ${(err as Error).message}`,
     });
   }
 

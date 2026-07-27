@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Project: course platform (working title "Grasp")
+# Project: course platform "distillcourse"
 
 AI-authored, human-curated interactive courses. Read `README.md` for the
 authoring loop and `docs/pedagogy.md` before writing ANY lesson content —

@@ -15,7 +15,7 @@ function subscribe(listener: () => void): () => void {
 }
 
 function getSnapshot(): Theme {
-  const stored = window.localStorage.getItem("grasp.theme");
+  const stored = window.localStorage.getItem("distillcourse.theme");
   if (stored === "light" || stored === "dark") return stored;
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
@@ -32,7 +32,7 @@ export default function ThemeToggle() {
   function toggle() {
     const next: Theme = theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
-    window.localStorage.setItem("grasp.theme", next);
+    window.localStorage.setItem("distillcourse.theme", next);
     listeners.forEach((listener) => listener());
   }
 
