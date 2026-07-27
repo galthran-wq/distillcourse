@@ -17,9 +17,8 @@ function subscribe(listener: () => void): () => void {
 function getSnapshot(): Theme {
   const stored = window.localStorage.getItem("distillcourse.theme");
   if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  // Light by default; dark only by explicit choice (matches globals.css).
+  return "light";
 }
 
 function getServerSnapshot(): Theme | null {
