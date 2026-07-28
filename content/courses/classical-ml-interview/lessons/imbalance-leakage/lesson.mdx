@@ -1,0 +1,350 @@
+The two most common ways a good-looking model fails in production are class imbalance handled with the wrong metric and information leaking from the future into training. This closing chapter turns each failure into a checkable procedure. The route: the five imbalance moves ordered by cost, the calibration debt that resampling creates and the prior-correction formula that repays it, a four-type leakage taxonomy with one concrete case per type, the detection heuristics with the test that confirms each, and the deployment checklist that closes the course.
+
+## The imbalance playbook: order the moves by cost
+
+The running example, continuing the fraud data of <Ref lesson="classification-metrics" /> at production scale: $10^6$ card transactions, 1,000 fraudulent, prevalence $\pi = 0.001$. The all-negative classifier scores 99.9% accuracy; [Huyen's interview book](https://huyenchip.com/ml-interviews-book/) uses the medical version, a skin-lesion classifier at roughly 1% malignant that minimizes error by under-flagging exactly the cases whose misses are catastrophic. Both facts are the base-rate failure established in <Ref lesson="classification-metrics" />, and they define the problem: not that positives are rare, but that default metrics and default thresholds silently assume they are not.
+
+The interview question "how do you handle class imbalance" is a question about **ordering**. The standard moves range from free to invasive, and the expected answer applies them in cost order: two that change only the evaluation and the decision rule, two that change the fitted model, one that changes the problem.
+
+<Figure
+  src="./figures/playbook.svg"
+  alt="Five-step imbalance playbook flowchart from fixing the metric through threshold, class weights, resampling, to reframing, each with a one-line rationale, with a struck-out reflex path jumping directly to resampling"
+  caption="The playbook, ordered by cost. The struck-out path is the reflex answer: resampling first skips the two free moves."
+/>
+
+### Move 1: fix the metric
+
+Accuracy is vacuous at $\pi = 0.001$, and ROC-AUC is built from truth-conditioned rates, so it is invariant to prevalence while precision collapses with it: the imbalance stress test of <Ref lesson="classification-metrics" />, formalized in [Murphy's PML §5.1.3.3 and §5.1.4.4](https://probml.github.io/pml-book/book1.html). The working metrics under imbalance are the PR curve, recall at the precision the review team tolerates (or precision at a fixed alert budget), and expected cost when the cost matrix is known. Evaluation is fixed before any training decision is made, because every later move is judged by this number.
+
+### Move 2: fix the threshold
+
+The default threshold 0.5 asserts equal error costs. The cost-derived threshold on calibrated probabilities, from <Ref lesson="classification-metrics" />, is
+
+$$
+p^* = \frac{c_{FP}}{c_{FP} + c_{FN}} = \frac{1}{1 + c}, \qquad c = \frac{c_{FN}}{c_{FP}},
+$$
+
+so a missed fraud costing $9\times$ a review gives $p^* = 0.1$. Threshold moving requires no retraining and no data surgery; on a well-calibrated model it is the Bayes-optimal response to asymmetric costs, and a large fraction of practical "imbalance problems" end here. Its one requirement, calibration, is exactly what move 4 will break.
+
+### Move 3: reweight the loss
+
+When the model itself underperforms on the minority, the first modeling move is to reweight the training objective. For the fraud data, weighting each class inversely to its frequency gives $w_+ = 10^6 / (2 \cdot 10^3) = 500$ and $w_- = 10^6 / (2 \cdot 999{,}000) \approx 0.5$; in general the *balanced* heuristic sets $w_y = n / (K\, n_y)$ for $K$ classes, and the training objective becomes $\sum_i w_{y_i}\, \ell(f(x_i), y_i)$. Every standard library exposes this as one hyperparameter (`class_weight` in scikit-learn, `scale_pos_weight` in XGBoost); no rows are created or destroyed, and the weight can itself be tuned by cross-validated PR metrics.
+
+<Remark title="class weights are oversampling, until they are not">
+For a loss minimized in batch, duplicating every minority example $k$ times produces the objective $\sum_{y_i = 0} \ell_i + k \sum_{y_i = 1} \ell_i$: exactly the class-weighted objective with $w_+ = k$. For convex losses the two are the same problem with the same optimum. The equivalence breaks where the algorithm sees rows rather than objectives: SGD visits a duplicated point more often instead of scaling its gradient (different noise, same expectation), and tree ensembles count duplicates as distinct data, so bootstrap draws, `min_samples_leaf`-type constraints, and split counts all shift. Exercise 8 works the algebra and the exceptions.
+</Remark>
+
+<KeyFact>
+Metric and threshold repair the evaluation and the decision without touching the model; class weights repair the model without touching the data. These three moves cost nearly nothing and resolve most imbalance problems, which is why the playbook's order is the answer interviewers grade.
+</KeyFact>
+
+## Resampling: changing the training distribution
+
+The remaining moves alter the training set itself. They are legitimate, standard, and last for a reason: each one destroys information, duplicates it, or fabricates it, and every one of them changes the class prior the model learns.
+
+### Undersample, oversample, SMOTE
+
+**Undersampling** drops majority rows until the desired ratio is reached: cheap, and defensible when the majority is enormous and redundant (throwing away 90% of $999{,}000$ legitimate transactions may cost little signal while cutting training cost tenfold). **Oversampling** duplicates minority rows: no information is lost, but a tree ensemble can carve leaves around repeated copies of the same 1,000 frauds, which is memorization by another name.
+
+**SMOTE** fabricates instead of duplicating: it manufactures new minority points by interpolating between existing ones.
+
+<Example title="one synthetic positive">
+A minority point sits at $x_i = (2, 1)$ and one of its minority-class nearest neighbors at $x_{zi} = (4, 2)$. The difference vector is $x_{zi} - x_i = (2, 1)$. Drawing $u = 0.4$ places the synthetic positive at
+
+$$
+x_{\text{new}} = x_i + u\,(x_{zi} - x_i) = (2, 1) + 0.4 \cdot (2, 1) = (2.8, 1.4),
+$$
+
+40% of the way along the segment from $x_i$ to its neighbor. Every draw $u \in (0, 1)$ lands on that segment, so every synthetic positive is a convex combination of two real ones — the fact Exercise 3 turns against SMOTE for linear models.
+</Example>
+
+<Definition title="SMOTE">
+For each minority example $x_i$, choose one of its $k$ nearest **minority-class** neighbors $x_{zi}$ (default $k = 5$), draw $u \sim \mathrm{Uniform}(0, 1)$, and add the synthetic minority example
+$$
+x_{\text{new}} = x_i + u \,(x_{zi} - x_i),
+$$
+repeating until the desired class ratio is reached ([Chawla et al., 2002](https://doi.org/10.1613/jair.953)).
+</Definition>
+
+<Figure
+  src="./figures/resampling-gallery.svg"
+  alt="Three panels showing the same two-class 2D dataset under undersampling with thinned majority points, oversampling with stacked duplicated minority markers, and SMOTE with synthetic points interpolated on segments between minority neighbors, one synthetic point landing inside the majority region"
+  caption="One dataset, three resamplers. The flagged SMOTE point interpolates toward a minority outlier and lands inside the majority region: a fabricated positive in negative territory."
+/>
+
+Two caveats travel with SMOTE in any complete answer. Near the class boundary, interpolation **amplifies noise**: a mislabeled or outlying minority point spawns a whole segment of synthetic positives inside the majority region, as in the figure. And in high-dimensional or sparse feature spaces the construction stops meaning anything: nearest neighbors are barely nearer than average points (the distance concentration of <Ref lesson="knn-curse" />), and interpolating two one-hot encoded rows produces fractional vectors that resemble no real input.
+
+<Remark title="two protocol rules that outrank the method choice">
+First: **never resample the test or validation set.** Evaluation must reflect the deployment distribution; a test set rebalanced to 1:1 answers a question production will never ask, and this is the most common homework-grade error in imbalance work. Second: resampling is a fitted, data-dependent step, so it runs **inside the cross-validation folds**, on training folds only: the pipeline rule of <Ref lesson="cross-validation-bootstrap" id="the-wrong-way-data-dependent-steps-outside-the-loop">the wrong-way-CV set piece</Ref>, stated here for the third time in this course because this is the third distinct way to violate it. SMOTE applied before the split interpolates between future training and test rows, planting near-copies of test points in the training set.
+</Remark>
+
+### Move 5: change the data or the problem
+
+When 1,000 positives become 20 (novel attack types, rare hardware failures, ratios near $1{:}10^6$), no reweighting scheme manufactures the missing information. The honest answers change the inputs or the framing: pay for more minority labels, since targeted labeling of suspected positives is usually cheaper than any modeling effort of equal value; or reframe as **anomaly detection**, fitting the majority distribution alone (isolation forests, one-class SVMs, density models) and flagging low-density points, with the few positives reserved for evaluating the detector rather than training it.
+
+### When imbalance is not a problem
+
+Imbalance is stated as a ratio; learning difficulty tracks the **absolute minority count**. A 1% prevalence over $10^7$ rows leaves 100,000 positives, plenty to estimate a minority class; the same 1% over 20,000 rows leaves 200, and the count, not the ratio, is what limits the fit. With enough positives and a proper metric, the correct amount of intervention is frequently zero. The reflex sequence, resample first and look at metrics later, inverts the playbook: it applies the most invasive move before the free ones, and creates the calibration problem of the next section without establishing that any problem existed.
+
+<Remark title="stratification is not a mitigation">
+Stratified $k$-fold (<Ref lesson="cross-validation-bootstrap" />) preserves the class ratio *within each fold* so that per-fold metrics are computable and stable. It does not change the ratio, reweight anything, or alter the model: it is a measurement fix, not an imbalance treatment, and conflating the two is a named trap in interview rubrics.
+</Remark>
+
+<KeyFact>
+Resampling is the fourth move, not the first: undersampling discards information, oversampling duplicates it, SMOTE fabricates it, and all three retrain the model on a class prior that deployment will contradict. Enough absolute positives plus the right metric often means doing nothing at all.
+</KeyFact>
+
+## The calibration bill: resampled models report the wrong probabilities
+
+A model trained on data rebalanced to 1:1 learns, correctly for its training world, that half of all cases are positive. Deployed where positives are rare, every probability it outputs is inflated. The numbers first.
+
+<Example title="correcting a 90% score">
+This example and the reliability diagram below use a deployment prevalence of $\pi_d = 0.01$ for legible arithmetic; the running fraud deployment stays at $\pi = 0.001$, which returns in the compound failure below and in Exercise 2. The model, trained at prior $\pi_t = 0.5$, reports $\hat{p} = 0.9$ for a transaction. The deployment-correct probability weights each class's evidence by the ratio of new to old priors:
+
+$$
+p_{\text{corr}}
+= \frac{0.9 \cdot \frac{0.01}{0.5}}
+       {0.9 \cdot \frac{0.01}{0.5} + 0.1 \cdot \frac{0.99}{0.5}}
+= \frac{0.018}{0.018 + 0.198}
+= 0.083.
+$$
+
+The same number by a shorter route, in odds: training odds $0.9/0.1 = 9$; prior-odds ratio $\frac{0.01/0.99}{0.5/0.5} \approx 0.0101$; corrected odds $9 \times 0.0101 = 0.091$; corrected probability $0.091/1.091 = 0.083$. A "90% fraud" score is an 8.3% fraud probability.
+</Example>
+
+The general statement is [Bishop's PRML §1.5.4](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) recipe: divide out the training-set class fractions, multiply by the deployment priors, renormalize.
+
+<Theorem title="prior correction">
+Let a probabilistic classifier be trained on data with class priors $\pi_t(y)$ and output posteriors $p_t(y \mid x)$, and let deployment data have priors $\pi_d(y)$ with the **same class-conditional densities** $p(x \mid y)$. Then the deployment posterior is
+
+$$
+p_d(y \mid x)
+= \frac{p_t(y \mid x)\, \dfrac{\pi_d(y)}{\pi_t(y)}}
+       {\sum_{y'} p_t(y' \mid x)\, \dfrac{\pi_d(y')}{\pi_t(y')}} .
+$$
+
+<Proof>
+By Bayes' rule on the training distribution, $p_t(y \mid x) = p(x \mid y)\, \pi_t(y) / p_t(x)$, so $p(x \mid y) = p_t(y \mid x)\, p_t(x) / \pi_t(y)$. On the deployment distribution, $p_d(y \mid x) \propto p(x \mid y)\, \pi_d(y) \propto p_t(y \mid x)\, \pi_d(y) / \pi_t(y)$, the factor $p_t(x)$ being constant in $y$. Normalizing over $y'$ gives the formula.
+</Proof>
+</Theorem>
+
+In the binary case the formula is one line in odds: $\text{odds}_d = \text{odds}_t \times \frac{\pi_d / (1 - \pi_d)}{\pi_t / (1 - \pi_t)}$ — the shorter route the example above took, with the prior-odds ratio now named in general.
+
+<FigureSequence
+  name="calibration"
+  alt="Three frames on one reliability diagram: predictions from a model trained at balanced prior sit on the diagonal in the training world; at 1% deployment prevalence the observed frequencies fall far below the diagonal, predicted 0.9 against observed 0.083; applying the prior correction moves each point back onto the diagonal at its corrected value"
+  caption="The calibration story in three frames: calibrated at 1:1, broken at 1:100, repaired by the prior correction. The same four predictions are tracked throughout."
+/>
+
+<Task>
+Step through the three frames tracking the $\hat{p} = 0.7$ prediction, then verify its frame-3 value by hand: $\text{odds}_t = 7/3 \approx 2.33$, corrected odds $2.33 \times 0.0101 \approx 0.0236$, corrected probability $0.0236 / 1.0236 \approx 0.023$.
+</Task>
+
+<Remark title="for logistic regression, the correction is an intercept shift">
+Logistic regression outputs $\log \frac{p}{1-p} = w^\top x + b$, and the odds form of the correction multiplies odds by a constant, so correcting priors adds $\log \frac{\pi_d/(1-\pi_d)}{\pi_t/(1-\pi_t)}$ to the intercept and touches nothing else. Training at 1:1 for a $\pi_d = 0.001$ deployment means shifting $b$ by $\ln(0.001/0.999) \approx -6.9$. The ranking, the ROC curve, and the AUC are unchanged by construction: prior correction is a monotone map, a calibration repair in the exact sense of <Ref lesson="classification-metrics" />.
+</Remark>
+
+The theorem's hypothesis does real work. Undersampling and duplication-oversampling change $\pi$ and leave $p(x \mid y)$ alone, so the analytic correction is exact. SMOTE alters the minority class-conditional itself (synthetic points have their own distribution), so the correction is approximate, and the robust alternative is empirical recalibration, Platt or isotonic from <Ref lesson="classification-metrics" />, fit on **unresampled** validation data.
+
+The compound failure interviewers probe is the conjunction of three individually defensible steps: oversample to 1:1 for training, keep the raw output probabilities, apply the business threshold $p^* = 0.1$ derived from a 9:1 cost ratio. The threshold rule presumes deployment-calibrated probabilities. Back at the running fraud prevalence $\pi_d = 0.001$: a raw score of $0.1$ has training odds $1/9 \approx 0.111$, prior-odds ratio $\frac{0.001/0.999}{1} \approx 0.001$, corrected odds $\approx 0.000111$ — a corrected probability of about $0.00011$, so the system flags cases roughly nine hundred times below the intended cutoff and floods the review queue. Exercise 2 works the production version of this failure.
+
+<KeyFact>
+Resampling buys a training-time convenience with a deployment-time debt: every output probability is calibrated to the synthetic prior. Repay it analytically (divide by training priors, multiply by deployment priors, renormalize) or empirically (recalibrate on unresampled validation data) before any threshold or cost rule touches the scores.
+</KeyFact>
+
+## The leakage taxonomy: four carriers of tomorrow's information
+
+The second failure family needs a definition before a taxonomy.
+
+<Definition title="data leakage">
+**Data leakage** is the use, in training or evaluation, of information that will not be available at prediction time, causing offline performance estimates to exceed anything deployment can deliver. The standard formulation and taxonomy are due to [Kaufman, Rosset, Perlich, and Stitelman (2012)](https://doi.org/10.1145/2382577.2382579), who split leaks into *illegitimate features* (label information inside a predictor) and *train–test contamination* (test information inside the training procedure).
+</Definition>
+
+The practical taxonomy refines this into four types, classified by what leaks and by the channel that carries it: a feature, a fitted transform, the clock, or an identity.
+
+<Figure
+  src="./figures/taxonomy-map.svg"
+  alt="Two-by-two map of leakage types: target leakage where label information enters through a feature, temporal leakage where future information enters through the split, train-test contamination where test-row information enters through fitted transforms, and group leakage where a shared entity sits on both sides of the split"
+  caption="The taxonomy: what leaks (rows) against the channel that carries it (columns), with the canonical case pinned in each cell."
+/>
+
+### Target leakage: a feature caused by the label
+
+An infection-prediction model with `antibiotics_given` among its features looks superb offline: the feature is nearly a perfect predictor, because antibiotics are prescribed *after*, and *because*, the infection was diagnosed. The feature is downstream of the label. At prediction time, before diagnosis, the field is empty or false for everyone, and the model's best feature is a constant. The transaction-features version, the `chargebacks_7d_after` column, was audited in <Ref lesson="feature-engineering" />: consequences of the outcome (status fields updated after the fact, follow-up counts, post-outcome timestamps) are the label written into $x$. The one-line test: for each feature, whether its value can be *set or changed by* the event being predicted.
+
+### Train–test contamination: a transform fitted on all rows
+
+No individual feature leaks; the protocol does. The archetype is <Ref lesson="cross-validation-bootstrap" id="the-wrong-way-data-dependent-steps-outside-the-loop">ESL's wrong-way-CV set piece</Ref>: screen 5,000 null features against all 50 labels, then cross-validate on the winners, and the reported error is 3% where the truth is 50% ([ESL §7.10.2](https://hastie.su.domains/ElemStatLearn/)). Classified in this taxonomy, the leak's carrier is a **fitted transform**: the screen's parameters (its chosen feature set) were computed from rows and labels the evaluation then treats as unseen. Full-table scalers and imputers, naive target encoding, and pre-split SMOTE are the same error with different transforms, and one fix covers all of them: every data-dependent step runs inside the fold, on training rows only.
+
+### Temporal leakage: the future trains the past
+
+When rows carry timestamps, a shuffled split trains on the future of the rows it tests on: the forward-chaining argument of <Ref lesson="cross-validation-bootstrap" />. The subtler instance hides inside features: an aggregate such as `mean_amount_30d` computed over a customer's *entire* history includes transactions that happen after the row being scored, so each training row contains a summary of its own future. The correct construction lags the window to end strictly before the prediction time, current row excluded.
+
+<Figure
+  src="./figures/temporal-leakage.svg"
+  alt="Timeline with a prediction time t and a label window after it; a struck-out feature window computed over the whole history overlaps the label window, while the correct thirty-day window ends strictly at t before the label window begins"
+  caption="The same aggregate feature drawn both ways: the whole-history window overlaps the label window and leaks; the as-of window ends at t."
+/>
+
+### Group leakage: one entity on both sides of the split
+
+When several rows share a source (transactions per customer, images per patient), a random split puts the same entity in train and test, and the model is graded partly on recognizing entities it memorized: the group $k$-fold argument of <Ref lesson="cross-validation-bootstrap" />, now classified as a leak whose carrier is an **identity**. The historical cautionary tale is patient overlap in medical-imaging benchmarks, where per-patient splits erase a large fraction of the reported gains from per-image splits. Duplicated and near-duplicated rows are the degenerate case. Exercise 5 quantifies how thoroughly a random split shreds users across folds.
+
+<KeyFact>
+All four leakage types are one failure, offline access to information deployment will not have, distinguished by the carrier: a feature (target leakage), a fitted transform (contamination), the clock (temporal), or an identity (group). Naming the carrier is what makes the fix obvious: audit the feature, move the transform inside the fold, lag the window, split by group.
+</KeyFact>
+
+## Detection: tells are hypotheses, tests are verdicts
+
+Leakage is found by symptom, and every symptom has a confirming test. The four standard tells:
+
+- **The score is too good.** An AUC of 0.99 on churn, a problem where good models live near 0.75, is a leakage hypothesis before it is an achievement. It is only a hypothesis: some problems are genuinely easy, and a high score on one of those is just a high score.
+- **One feature dominates the importances.** When a single feature carries several times the importance of the next (<Ref lesson="bagging-random-forests" /> supplies the importance machinery and its biases), audit that feature's provenance first; a proxy for the label is the usual explanation. Dropping it and refitting shows how much of the score it carried.
+- **Performance collapses on a time split.** Rerun the evaluation with a forward-chained split; the gap between shuffled-CV and time-split scores is a direct measurement of the temporal leak's size.
+- **The availability audit fails.** The per-feature question of <Ref lesson="feature-engineering" />: computable at prediction time, from data that exists then. Rebuilding features with a strict as-of cutoff and re-scoring converts the audit into a number; a feature whose importance collapses under the cutoff was leaking.
+
+In production, one more monitor closes the loop: **train/serve skew**, a live input or score distribution that diverges from its offline counterpart, is the deployment-side symptom of a feature that was computed differently, or not computable at all, at serving time.
+
+<Figure
+  src="./figures/detection-dashboard.svg"
+  alt="Four warning cards, each pairing a leakage tell with its confirming test: too-good score with a time-split rerun, dominant feature importance with a provenance audit and refit, time-split collapse with the shuffled-versus-chained gap, and availability failure with an as-of feature rebuild"
+  caption="The detection dashboard: each tell generates a hypothesis, and each card names the test that confirms or clears it."
+/>
+
+<KeyFact>
+Detection heuristics generate hypotheses, not verdicts: a suspicious score is confirmed or cleared by the time-split rerun and the as-of rebuild, not by inspection. The complementary error, declaring leakage because a problem turned out easy, is also a wrong answer.
+</KeyFact>
+
+## The deployment checklist
+
+The course's practical material compresses to five checks, each anchored in one earlier chapter, applied before any classifier ships.
+
+<Figure
+  src="./figures/deployment-checklist.svg"
+  alt="Deployment checklist card with five checks: metric matches the cost structure, threshold derived from costs, calibration verified on deployment priors, split respects time and groups, and every feature passes the as-of audit, each tagged with the chapter that established it"
+  caption="The closing synthesis: five checks, five chapters. A model that passes all five has an offline score that means something."
+/>
+
+The checks, with their sources: the **metric matches the cost structure** and is stated with its baseline (<Ref lesson="classification-metrics" />); the **threshold is derived from costs**, not inherited from 0.5 (<Ref lesson="classification-metrics" />); **calibration is verified on the true priors**, with the prior correction applied if training was resampled (this chapter); the **split respects time and groups**, forward-chained and group-aware where the data demands it (<Ref lesson="cross-validation-bootstrap" />); and **every feature passes the as-of audit** (<Ref lesson="feature-engineering" />). A model that fails a check has an offline score that measures the wrong thing; a model that passes all five can still fail in production, but not for a reason this course covered and the checklist missed.
+
+## Exercises
+
+<Exercise>
+Interview question ([Ace the Data Science Interview](https://www.acethedatascienceinterview.com/), ch. 7 territory): "Fraud is 0.1% of transactions at our payments company. Walk me through your modeling and evaluation plan end to end." Give the structured answer.
+
+<Solution>
+**Frame the data.** $10^6$ transactions per evaluation window gives 1,000 positives: enough absolute positives for supervised learning, so no anomaly-detection reframe is needed. State the two costs (missed fraud $c_{FN}$, needless review $c_{FP}$) or commit to obtaining them.
+
+**Split before anything else.** Transactions are timestamped and grouped by customer: forward-chained time split, with all of a customer's rows on one side (group-aware), stratification within folds so every fold holds positives. Test and validation sets stay at the natural 0.1% prevalence, untouched by any resampling.
+
+**Metric.** PR curve, reported as recall at the precision the review team can absorb (equivalently precision at the fixed alert budget); expected cost if $c_{FN}/c_{FP}$ is known. Not accuracy (99.9% baseline), not ROC-AUC alone (imbalance-invariant, hides the alert queue's false-alarm ratio).
+
+**Model, in playbook order.** Baseline model with class weights ($w_+ \approx 500$ at this ratio), tuned by the PR metric inside the CV loop. Threshold from the cost rule $p^* = c_{FP}/(c_{FP}+c_{FN})$, applied to calibrated probabilities. Resampling only if weighted training measurably underperforms, executed inside training folds only; if used, recalibrate on unresampled validation data or apply the prior correction before thresholding.
+
+**Leakage audit.** Every feature timestamp-audited (as-of computability; no post-outcome fields such as chargeback counts); aggregates lagged with the current row excluded; final scores confirmed on the time split. In production, monitor precision/recall on labeled outcomes and train/serve skew on the feature distributions.
+</Solution>
+</Exercise>
+
+<Exercise>
+"You oversampled fraud to 1:1 in training. In production the model's average predicted fraud probability is 45%, but only 0.1% of transactions are fraudulent. Explain the 45%, and fix it." Compute the corrected probability for a transaction scored $\hat{p} = 0.45$, and state two alternative fixes.
+
+<Solution>
+**Explanation.** The model is calibrated to its training world, where the prior is $\pi_t = 0.5$: for a calibrated model, the mean predicted probability matches the prevalence it was trained on, so an average near 0.5 (here 0.45) on production inputs is exactly what a 1:1-trained model reports. Nothing is broken inside the model; its probabilities answer a question about a distribution that does not exist in production.
+
+**Correction** with $\pi_t = 0.5$, $\pi_d = 0.001$. Odds form: $\text{odds}_t = 0.45/0.55 = 0.818$; correction factor $\frac{0.001/0.999}{0.5/0.5} = 0.001001$; corrected odds $= 0.818 \times 0.001001 = 0.000819$; corrected probability $= 0.000819 / 1.000819 \approx 0.00082$. A "45% fraud" score is a 0.08% fraud probability. Applied to every score, the corrected mean lands near the true 0.001, as it must.
+
+**Alternative fixes.** (1) For logistic-family models, shift the intercept once by $\ln\frac{0.001/0.999}{1} \approx -6.9$: identical to the correction, applied inside the model. (2) Recalibrate empirically (Platt or isotonic) on unresampled validation data at true prevalence: the robust choice if the resampling was SMOTE, whose synthetic points also perturb $p(x \mid y)$ and make the analytic correction approximate. In every variant, thresholds and cost rules apply only after the repair.
+</Solution>
+</Exercise>
+
+<Exercise>
+"Does SMOTE help logistic regression trained on 200 positives and 1,000,000 negatives? What would you try first?"
+
+<Solution>
+**Try first**, in playbook order: a PR-based metric with the 0.02% baseline stated; class weights, $w_+ = n/(2 n_+) = 1{,}000{,}200/400 \approx 2{,}500$, one hyperparameter tuned by cross-validated PR; the cost-derived threshold on calibrated outputs. Undersampling the negatives (say 10:1) is also defensible here purely for compute, with the prior correction applied after.
+
+**On SMOTE.** For a convex loss, oversampling by duplication is exactly class weighting (Exercise 8), so SMOTE's only additional contribution is the interpolation. Synthetic points are convex combinations of the 200 real positives: they lie inside the minority's convex hull and add no information beyond those 200 points, so for a linear model the fitted boundary moves little relative to plain reweighting, at the cost of the calibration debt and the inside-the-folds machinery. If the features are high-dimensional or sparse (one-hot heavy), interpolation is additionally meaningless: fractional one-hots resemble no real transaction, and nearest neighbors are barely nearer than random points. Expected answer: SMOTE is not where the leverage is; the binding constraint is 200 positives, and the highest-value move after weights and threshold is acquiring more labeled fraud.
+</Solution>
+</Exercise>
+
+<Exercise>
+"Your churn model reaches AUC 0.99 offline. List your leakage hypotheses and how you would test each."
+
+<Solution>
+Sweep the taxonomy, one hypothesis and one test per type, ordered by cost:
+
+**Target leakage.** A feature downstream of the churn event: `account_status`, `days_since_cancellation_call`, refund or win-back fields populated after the decision. Test: rank feature importances; audit the provenance and update-timestamp of the top features; rebuild them as-of prediction time and refit. A score collapse convicts the feature.
+
+**Temporal leakage.** Shuffled split over time-ordered snapshots, or whole-history aggregates (usage averaged over months including post-churn silence). Test: re-split forward-chained with an as-of feature rebuild; the shuffled-versus-chained gap measures the leak.
+
+**Train–test contamination.** Any transform fitted on all rows: full-table scaler or imputer, target encoding computed globally, feature selection on the full label set, resampling before the split. Test: rebuild the run as a strict pipeline with every fitted step inside the folds and compare scores.
+
+**Group leakage.** Customers contributing multiple rows on both sides of the split; duplicated snapshots are the degenerate case. Test: rerun with group $k$-fold on customer id after deduplication.
+
+**Null hypothesis.** The problem is genuinely easy: if churn is operationally defined by an observable precursor (subscription lapse after a failed payment), 0.99 may be real. If every test above leaves the score standing and the top features are all legitimately pre-outcome, report the score and the audit trail together. The heuristics generate hypotheses; only the reruns settle them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="cross-validation-bootstrap" />: "The same user appears in both train and test. Quantify the danger and fix the split." Include this computation: each user contributes 5 rows, assigned independently and uniformly to 5 folds; find the probability that a user's rows all land in one fold.
+
+<Solution>
+**Mechanism and direction.** Rows of one user share stable user-level signal (baseline spend, device, plan). With users straddling the split, the model is partly graded on recognizing users it trained on, so the offline score is biased **optimistic** relative to the deployment question, performance on new users. The bias grows with rows per user and with how predictive user identity is; exact duplicates are the extreme case, where a memorizing model scores perfectly on every duplicated test row.
+
+**Computation.** A user's 5 rows land in one specific fold with probability $(1/5)^5$; over 5 folds, $\Pr(\text{all in one fold}) = 5 \times (1/5)^5 = (1/5)^4 = 1/625 = 0.0016$. With random assignment, 99.8% of users straddle folds: the leak is not an edge case but the default outcome of shuffled splitting on grouped data.
+
+**Fix.** Group $k$-fold on user id, all of a user's rows on one side of every split, after deduplication; stratify the group assignment if the label is rare. One scope check: if the product genuinely predicts future behavior of *known* users, the deployment question changes, and the right split is by time within user (train on each user's past, test on their future), not by user. The split must mirror the deployment query either way.
+</Solution>
+</Exercise>
+
+<Exercise>
+"The feature `days_since_last_support_call` is the top importance in your churn model. Legit or leaky?" Give the reasoning that decides it.
+
+<Solution>
+The importance alone cannot decide; the answer depends on the timing and cause of the calls it counts, so the reasoning is an audit, not a verdict.
+
+**Leaky if** the recorded call is downstream of the churn event: the cancellation call itself, a retention-team call triggered by a cancellation request, or a value recomputed from a data snapshot taken after the outcome. Then the feature is `antibiotics_given` in churn clothing: near-perfect offline, unavailable or constant at prediction time.
+
+**Legit if** support contact genuinely precedes and predicts churn (frustrated customers call, then leave) and the feature is computed as-of prediction time from calls strictly before it.
+
+**The audit.** (1) Trace provenance: which call types populate the field, and whether cancellation-flow calls are included. (2) Rebuild as-of: recompute with a strict timestamp cutoff before the prediction time, current interaction excluded, and refit; importance collapse convicts it. (3) Time-split rerun: temporal leaks shrink under forward chaining. (4) Distribution check in production: if the live feature is systematically more stale than offline (train/serve skew), the offline version was computed with information serving does not have. Plausibility in both directions is exactly why the tests, not the story, decide.
+</Solution>
+</Exercise>
+
+<Exercise>
+Huyen's selection-bias case: "Articles our site translated get twice the views of untranslated articles. Should we translate everything?"
+
+<Solution>
+No conclusion follows from the comparison as stated. Translation was not assigned at random: editors translate articles that are already popular or expected to perform, so the translated set is selected on the outcome variable. The $2\times$ gap measures editorial selection plus any translation effect, in unknown proportions; conditioning on a choice that itself used outcome-related information is the same structural error as leakage, an offline correlation produced by information (editor judgment) that a "translate everything" policy would not act on. Translating everything extrapolates the observed association far off the selection policy that generated it.
+
+**The test.** Randomize: translate a random sample of new articles and compare views against untranslated controls (an A/B test), stratified by topic and traffic tier if volume is limited. Absent an experiment, a weaker observational check: compare articles matched on *pre-translation* popularity, or exploit a discontinuity in the editors' selection rule. The interview-grade answer names the selection mechanism, refuses the causal conclusion, and proposes the randomized test.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove that for any loss $\ell$ minimized in batch, training on the dataset with every minority example duplicated $k$ times is equivalent to minimizing a class-weighted objective, and give two settings where duplication and weighting genuinely differ.
+
+<Solution>
+**Equivalence.** Let $P$ index minority and $N$ majority examples. On the duplicated dataset each minority example appears $k$ times, so the training objective is
+
+$$
+\sum_{i \in N} \ell(f(x_i), y_i) + \sum_{i \in P} k\, \ell(f(x_i), y_i)
+= \sum_{i} w_{y_i} \ell(f(x_i), y_i),
+\quad w_- = 1,\; w_+ = k .
+$$
+
+The two objectives are identical as functions of $f$, so they have the same minimizers: for any batch-minimized loss (convex or not), duplication *is* class weighting with $w_+ = k$. Non-integer weights extend the same idea beyond what duplication can express.
+
+**Where they differ.** (1) **Stochastic optimization**: SGD on the duplicated set samples minority points $k$ times as often, while weighted SGD samples uniformly and scales their gradients by $k$. The expected update matches, but the gradient-noise distributions differ, so the paths and the practical results can. (2) **Trees and ensembles**: duplicates are counted as distinct rows, so bootstrap resamples (<Ref lesson="bagging-random-forests" />) draw the same minority point multiple times with altered probabilities, and split-acceptance constraints of the `min_samples_leaf` kind treat $k$ copies as $k$ pieces of evidence, letting trees grow leaves around single duplicated points. Weighted impurities modify the split criterion without inflating the apparent sample size. Default preference: weights, which are exact at the objective level, cost no memory, and inflate no counts.
+</Solution>
+</Exercise>
+
+<References>
+1. C. Huyen, *Introduction to Machine Learning Interviews*, self-published web book — §7.2: training-data questions: sampling design, class imbalance (the skin-lesion case), and the selection-bias scenarios adapted in Exercises 1 and 7. https://huyenchip.com/ml-interviews-book/
+2. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §5.1.2.2: the cost-derived threshold; §5.1.3.3: ROC's invariance to class imbalance; §5.1.4.4: precision–recall's sensitivity to it. https://probml.github.io/pml-book/book1.html
+3. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.5.4: compensating for class priors: train on balanced data, divide out the training fractions, multiply by the target priors, renormalize. https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf
+4. N. V. Chawla, K. W. Bowyer, L. O. Hall, W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *Journal of Artificial Intelligence Research*, 16, 2002 — the interpolation construction and its intended regime. https://doi.org/10.1613/jair.953
+5. S. Kaufman, S. Rosset, C. Perlich, O. Stitelman, "Leakage in Data Mining: Formulation, Detection, and Avoidance," *ACM Transactions on Knowledge Discovery from Data*, 6(4), 2012 — the formal treatment of illegitimate features and train–test contamination; expands the KDD 2011 paper. https://doi.org/10.1145/2382577.2382579
+6. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.10.2: the wrong way to do cross-validation, this chapter's contamination archetype. https://hastie.su.domains/ElemStatLearn/
+7. N. Singh, K. Huo, *Ace the Data Science Interview*, 2021 — ch. 7: the fraud-detection and churn phrasings behind Exercises 1, 4, and 6.
+</References>

@@ -1,0 +1,384 @@
+The direction that maximizes projected variance is the top eigenvector of the covariance matrix; everything else in PCA — SVD, scree plots, reconstruction — follows from that one Lagrange computation. This chapter executes the computation in full, since "derive PCA in matrix form" sits on the explicit whiteboard list at several companies, and then builds the working knowledge around it. The route: centering and the covariance matrix on a six-point example, the Lagrange derivation, the reconstruction-error and SVD readings of the same answer, the operating decisions (how many components, when to standardize), and the limitations that the follow-up questions probe.
+
+## Setup: center the data, then form the covariance matrix
+
+Two features can carry one fact. [CS229 ch. 12](https://cs229.stanford.edu/main_notes.pdf) opens with a car dataset holding top speed in mph and top speed in kph: two columns, perfectly correlated up to rounding, so the data lie along a line in $\mathbb{R}^2$ and one coordinate along that line says everything. Its second example is subtler: helicopter pilots scored on skill and on enjoyment, two correlated measurements of one latent "aptitude" direction. PCA is the general tool for both cases: find the few orthogonal directions that carry the variance, and represent each point by its coordinates along them. The payoffs are compression, 2D visualization of high-dimensional data, denoising, and preprocessing for distance-based methods, where <Ref lesson="knn-curse" /> showed that extra dimensions actively destroy the metric.
+
+### A six-point example, centered by hand
+
+Six raw observations of two features: $(5,4)$, $(4,3)$, $(2,1)$, $(1,0)$, $(4,1)$, $(2,3)$. The mean is $\bar{x} = \tfrac16(18, 12) = (3, 2)$. Subtracting it from every row gives the *centered* data
+
+$$
+(2,2),\quad (1,1),\quad (-1,-1),\quad (-2,-2),\quad (1,-1),\quad (-1,1),
+$$
+
+a cloud around the origin, stretched along the diagonal. All of PCA operates on this centered cloud: the method finds directions of variation *about the mean*, so the mean must be removed first.
+
+<Definition title="sample covariance matrix">
+For centered data $x_1, \dots, x_n \in \mathbb{R}^d$ stacked as the rows of $X \in \mathbb{R}^{n \times d}$, the **sample covariance matrix** is
+
+$$
+\hat\Sigma \;=\; \frac{1}{n} \sum_{i=1}^{n} x_i x_i^\top \;=\; \frac{1}{n} X^\top X ,
+$$
+
+a symmetric positive semi-definite $d \times d$ matrix. Entry $\hat\Sigma_{jk}$ is the sample covariance of features $j$ and $k$; the diagonal holds the feature variances.
+</Definition>
+
+For the six points: $\sum x_{i1}^2 = 4{+}1{+}1{+}4{+}1{+}1 = 12$, likewise $\sum x_{i2}^2 = 12$, and $\sum x_{i1}x_{i2} = 4{+}1{+}1{+}4{-}1{-}1 = 8$, so
+
+$$
+\hat\Sigma = \frac{1}{6}\begin{pmatrix} 12 & 8 \\ 8 & 12 \end{pmatrix}
+= \begin{pmatrix} 2 & \tfrac43 \\ \tfrac43 & 2 \end{pmatrix}.
+$$
+
+Each feature has variance $2$; the covariance $\tfrac43$ records the diagonal stretch. (Statistics texts divide by $n-1$ instead of $n$; the choice rescales every eigenvalue by the same factor and changes no direction, but it must be made consistently; scikit-learn uses $n-1$.)
+
+<Figure
+  src="./figures/cloud.svg"
+  alt="Left: the six centered points with the two principal axes drawn from the origin, the long amber axis along the diagonal and the short blue axis across it. Right: the same points projected onto PC1 with variance 3.33 and onto the x1-axis with variance 2.00"
+  caption="The centered cloud and its principal axes (lengths ∝ √λ). Projecting onto PC1 keeps variance 3.33; projecting onto the x₁-axis keeps only 2.00."
+/>
+
+Skipping the centering step is the classic silent failure. Without it, the matrix $\tfrac1n \sum x_i x_i^\top$ built from raw data mixes the spread of the cloud with the location of its mean, and the top "direction" it reports points from the origin toward $\bar{x}$ rather than along the cloud's variation; Exercise 3 runs the numbers on exactly this dataset and watches the answer bend toward the mean.
+
+<KeyFact>
+PCA describes variation about the mean, so the data must be centered before $\hat\Sigma$ (or any SVD) is formed. On uncentered data the leading direction chases the mean offset, not the shape of the cloud.
+</KeyFact>
+
+## The derivation: the max-variance direction is the top eigenvector
+
+The set piece, asked in exactly this form ("show the direction of maximum variance is the top eigenvector of the covariance matrix"). The staging below follows [CS229 ch. 12](https://cs229.stanford.edu/main_notes.pdf) and [Bishop §12.1.1](https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/).
+
+### The objective: projected variance is a quadratic form
+
+A direction is a unit vector $u \in \mathbb{R}^d$; projecting point $x_i$ onto it gives the scalar $u^\top x_i$. Concretely, projecting the six points onto the $x_1$-axis, $u = (1,0)$, gives $2, 1, -1, -2, 1, -1$: variance $\tfrac{12}{6} = 2$. Projecting onto the diagonal, $u = \tfrac{1}{\sqrt2}(1,1)$, gives $2\sqrt2, \sqrt2, -\sqrt2, -2\sqrt2, 0, 0$: variance $\tfrac{8+2+2+8}{6} = \tfrac{10}{3} \approx 3.33$. The diagonal direction keeps more of the cloud's spread.
+
+The general formula behind both numbers: since the data are centered, the projections have mean zero, and their variance is
+
+$$
+\frac{1}{n}\sum_{i=1}^{n} \bigl(u^\top x_i\bigr)^2
+= \frac{1}{n}\sum_{i=1}^{n} u^\top x_i x_i^\top u
+= u^\top \hat\Sigma\, u .
+$$
+
+The problem is therefore: maximize the quadratic form $u^\top \hat\Sigma u$ over unit vectors $u$. The constraint $u^\top u = 1$ is essential, because scaling $u$ by $c$ scales the objective by $c^2$; without it the maximum is unbounded and the problem meaningless.
+
+### The Lagrange computation, every step
+
+**Lagrangian.** One constraint, one multiplier:
+
+$$
+\mathcal{L}(u, \lambda) \;=\; u^\top \hat\Sigma\, u \;-\; \lambda\,\bigl(u^\top u - 1\bigr).
+$$
+
+**Stationarity.** Using $\nabla_u\, (u^\top A u) = 2Au$ for symmetric $A$:
+
+$$
+\nabla_u \mathcal{L} = 2\hat\Sigma u - 2\lambda u = 0
+\quad\Longrightarrow\quad
+\boxed{\;\hat\Sigma u = \lambda u\;}.
+$$
+
+Every candidate maximizer is an **eigenvector** of $\hat\Sigma$, with its multiplier equal to the corresponding eigenvalue.
+
+**Which eigenvector.** Left-multiply the eigenvector equation by $u^\top$ and use $u^\top u = 1$:
+
+$$
+u^\top \hat\Sigma u = \lambda\, u^\top u = \lambda .
+$$
+
+The objective's value *at* an eigenvector *is* its eigenvalue. Maximizing over the finitely many candidate directions therefore means picking the eigenvector with the largest eigenvalue $\lambda_1$, and the maximum projected variance achieved is $\lambda_1$ itself.
+
+<FigureSequence
+  name="derivation"
+  alt="Four frames deriving PCA: the projected-variance objective with values 2.00 and 3.33 for two candidate directions on the unit circle, the Lagrangian with the unit-length constraint term in blue, the gradient set to zero yielding the boxed eigenvector equation, and the substitution showing the objective equals the eigenvalue with the arrow snapping to the top eigenvector"
+  caption="The derivation in four moves on the six-point cloud. The ledger grows one line per frame; in the last frame the direction snaps to the top eigenvector and the achieved variance reads λ₁ = 3.33."
+/>
+
+<Task>
+Step through the four frames, then close them and reproduce the ledger on paper: objective, constraint, Lagrangian, gradient, eigenvector equation, value $= \lambda$. Exercise 1 asks for exactly this with nothing on screen.
+</Task>
+
+On the running example: the eigenvalues of $\hat\Sigma = \bigl(\begin{smallmatrix} 2 & 4/3 \\ 4/3 & 2 \end{smallmatrix}\bigr)$ are $2 \pm \tfrac43$, i.e. $\lambda_1 = \tfrac{10}{3}$ with eigenvector $u_1 = \tfrac{1}{\sqrt2}(1,1)$ and $\lambda_2 = \tfrac{2}{3}$ with $u_2 = \tfrac{1}{\sqrt2}(1,-1)$. The diagonal direction tested above was not just better than the axis; it is the best possible, and its variance $\tfrac{10}{3}$ is the top eigenvalue.
+
+<Theorem title="variance-maximizing directions">
+Let $\hat\Sigma$ have eigenvalues $\lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_d \ge 0$ with orthonormal eigenvectors $u_1, \dots, u_d$. Then $\max_{\lVert u \rVert = 1} u^\top \hat\Sigma u = \lambda_1$, attained at $u_1$; and for each $k$, the maximum of $u^\top \hat\Sigma u$ over unit vectors orthogonal to $u_1, \dots, u_{k-1}$ is $\lambda_k$, attained at $u_k$. The $k$-dimensional subspace maximizing total projected variance is $\operatorname{span}(u_1, \dots, u_k)$, capturing variance $\lambda_1 + \dots + \lambda_k$.
+</Theorem>
+
+The second component needs one extra line beyond the computation above. Maximize $u^\top \hat\Sigma u$ subject to $u^\top u = 1$ and the new orthogonality constraint $u^\top u_1 = 0$: the Lagrangian gains a term $-\mu\, u^\top u_1$, and stationarity reads $\hat\Sigma u = \lambda u + \tfrac{\mu}{2} u_1$. Left-multiplying by $u_1^\top$ gives $u_1^\top \hat\Sigma u = \lambda_1 u_1^\top u = 0$ on the left and $\tfrac{\mu}{2}$ on the right, so $\mu = 0$ and the same eigenvector equation returns; the best remaining eigenvalue is $\lambda_2$. Induction extends this to all $k$ ([Bishop §12.1.1](https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/)).
+
+<Definition title="principal components, scores, loadings">
+The **principal components** (or *principal directions*) of centered data are the orthonormal eigenvectors $u_1, \dots, u_d$ of $\hat\Sigma$, ordered by eigenvalue. The **scores** of point $x_i$ are its coordinates $z_{ij} = u_j^\top x_i$ in that basis; the entries of $u_j$, read as weights on the original features, are its **loadings**.
+</Definition>
+
+<Remark title="signs and ties are arbitrary">
+If $u$ is a unit eigenvector, so is $-u$: every principal direction is defined only up to sign, so two correct implementations can report PC1 pointing opposite ways, and flipped score plots are not a bug. When eigenvalues tie ($\lambda_j = \lambda_{j+1}$), any orthonormal basis of the shared eigenspace is equally valid, and the reported directions within it are an artifact of the solver. An isotropic cloud ($\lambda_1 = \lambda_2$) has no preferred axes at all.
+</Remark>
+
+<KeyFact>
+$\hat\Sigma u = \lambda u$ is the entire answer: principal directions are eigenvectors of the covariance matrix, the variance captured along $u_j$ is exactly $\lambda_j$, and the total variance $\sum_j \lambda_j = \operatorname{tr} \hat\Sigma$ is conserved by the change of basis.
+</KeyFact>
+
+## Equivalent views: reconstruction error and the SVD
+
+Maximum variance is one of two classical routes to the same directions. The other, historically first ([Pearson, 1901](https://doi.org/10.1080/14786440109462720)), asks for the line (or subspace) with the smallest total squared distance to the data; Hotelling's 1933 variance formulation came second. The equivalence is one Pythagoras identity.
+
+### Pythagoras: kept variance plus reconstruction error is total
+
+Take the point $x = (2,1)$ and the direction $u = \tfrac{1}{\sqrt2}(1,1)$. Its projection is $\hat x = (u^\top x)\,u = (1.5, 1.5)$, and the residual $x - \hat x = (0.5, -0.5)$ is orthogonal to $u$. Squared lengths: $\lVert x \rVert^2 = 5$, kept $(u^\top x)^2 = 4.5$, lost $\lVert x - \hat x \rVert^2 = 0.5$, and $5 = 4.5 + 0.5$.
+
+<Figure
+  src="./figures/pythagoras.svg"
+  alt="A point x, its orthogonal projection x-hat on the amber PC1 line through the origin, and the dashed residual, with squared lengths 5, 4.5, and 0.5 labeled; below, a bar splitting the total variance 4.00 into kept 3.33 and lost 0.67"
+  caption="Per point and on average: total = kept + lost. Maximizing kept variance and minimizing reconstruction error are the same optimization."
+/>
+
+<Theorem title="max variance ⇔ min reconstruction error">
+For centered data and any unit vector $u$,
+
+$$
+\underbrace{\frac1n \sum_{i=1}^n \lVert x_i \rVert^2}_{\text{total, fixed}}
+= \underbrace{\frac1n \sum_{i=1}^n (u^\top x_i)^2}_{\text{kept variance } u^\top \hat\Sigma u}
++ \underbrace{\frac1n \sum_{i=1}^n \bigl\lVert x_i - (u^\top x_i)u \bigr\rVert^2}_{\text{mean reconstruction error}} ,
+$$
+
+so the unit direction maximizing projected variance is the direction minimizing mean squared reconstruction error, and likewise for $k$-dimensional subspaces.
+
+<Proof>
+For each $i$, decompose $x_i = (u^\top x_i)u + r_i$ with $r_i = x_i - (u^\top x_i)u$. Then $u^\top r_i = u^\top x_i - (u^\top x_i)(u^\top u) = 0$: the residual is orthogonal to the projection. Pythagoras gives $\lVert x_i \rVert^2 = (u^\top x_i)^2 + \lVert r_i \rVert^2$; averaging over $i$ yields the displayed identity. The left side does not depend on $u$, so over unit vectors the two right-hand terms are maximized and minimized by the same $u$. For a $k$-dimensional subspace with orthonormal basis $u_1, \dots, u_k$ the kept term becomes $\sum_{j \le k} u_j^\top \hat\Sigma u_j$ and the same argument applies; [Bishop §12.1.2](https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/) and [ESL §14.5.1](https://hastie.su.domains/ElemStatLearn/) (Eqs. 14.49–14.55, including the affine case with the mean as offset) carry it out in full.
+</Proof>
+</Theorem>
+
+On the example: total variance $\operatorname{tr}\hat\Sigma = 4$, kept along $u_1$ is $\lambda_1 = \tfrac{10}{3}$, and the mean squared reconstruction error of the best line is the discarded eigenvalue $\lambda_2 = \tfrac23$. Dropping component $j$ always costs exactly $\lambda_j$ in mean squared error.
+
+### The SVD route: what software actually computes
+
+<Definition title="singular value decomposition">
+Any $X \in \mathbb{R}^{n \times d}$ factors as $X = U D V^\top$ with $U \in \mathbb{R}^{n \times d}$ and $V \in \mathbb{R}^{d \times d}$ having orthonormal columns and $D = \operatorname{diag}(d_1 \ge \dots \ge d_d \ge 0)$ the **singular values**.
+</Definition>
+
+Substituting the SVD of the centered $X$ into the covariance matrix:
+
+$$
+\hat\Sigma = \frac{1}{n} X^\top X = \frac{1}{n} V D U^\top U D V^\top = V\, \frac{D^2}{n}\, V^\top ,
+$$
+
+an eigendecomposition read off by inspection: the right singular vectors $v_j$ **are** the principal directions, with eigenvalues
+
+$$
+\lambda_j = \frac{d_j^2}{n} .
+$$
+
+The score matrix is $Z = XV = UD$: column $j$ holds all $n$ points' coordinates along $v_j$. (Interviewers probe the $\tfrac1n$: singular values of $X$ relate to eigenvalues of $\hat\Sigma$ through $d_j^2/n$, and forgetting the divisor, or mixing the $n$ and $n{-}1$ conventions, is the standard slip. Exercise 8 drills it.)
+
+Practice computes PCA by SVD of $X$, not by eigendecomposition of $\hat\Sigma$, for two reasons. Numerically, forming $X^\top X$ squares the condition number, amplifying rounding error in exactly the small trailing directions; the SVD works on $X$ directly. Computationally, when $d$ is large the $d \times d$ covariance matrix need never be materialized, and truncated or randomized SVD delivers only the top $k$ components at a fraction of the cost. The same decomposition already appeared in <Ref lesson="ridge-lasso" />: ridge regression damps the fit along these very directions $v_j$ by $d_j^2/(d_j^2 + \lambda)$, shrinking hardest where PCA's variance is smallest — the two methods read one geometry.
+
+<KeyFact>
+PCA and the SVD are the same computation: $v_j$ are the principal directions, $\lambda_j = d_j^2/n$, scores are $UD$. Software runs the SVD because it avoids forming $X^\top X$ (conditioning) and supports truncated top-$k$ computation.
+</KeyFact>
+
+## Using it: explained variance, scree plots, and scaling
+
+Three operating decisions follow every PCA run: how many components to keep, whether to standardize first, and what the components feed into.
+
+### Choosing k: ratios, the elbow, and the 90% convention
+
+<Definition title="explained variance ratio">
+The **explained variance ratio** of component $j$ is $\lambda_j / \sum_{k=1}^{d} \lambda_k$, the share of total variance carried along $u_j$.
+</Definition>
+
+The six-point example splits $\tfrac{10/3}{4} = 83.3\%$ against $16.7\%$: one coordinate per point retains five sixths of the variance. The standard diagnostic at scale is the *scree plot*, eigenvalues (or ratios) against component index, read together with the cumulative curve.
+
+<Figure
+  src="./figures/scree.svg"
+  alt="Scree plot for an eight-feature example: amber bars showing per-component explained variance 52.5, 26.3, 11.3, 5, 2.5, 1.3, 0.8, 0.5 percent, a blue cumulative curve crossing the dashed 90 percent line at k equals 3, and the elbow marked at the third component"
+  caption="An 8-feature scree plot: the elbow and the 90% cumulative line happen to agree at k = 3 here; on real data they frequently do not, and neither is a theorem."
+/>
+
+Two conventions circulate: keep components up to the *elbow* where the eigenvalue decay flattens, or keep enough for 90–95% cumulative variance. Both are heuristics, not theorems; nothing guarantees the discarded 10% is noise. [ESL §14.5.1](https://hastie.su.domains/ElemStatLearn/) makes the scale point with 130 handwritten '3's as $16 \times 16$ images: $d = 256$, the first two components already encode recognizable strokes (lower-tail lengthening and line thickness), yet roughly 50 components are needed for 90% of the variance. When the components feed a downstream supervised task, the defensible choice is to treat $k$ as a hyperparameter and select it by cross-validation on that task's error, with the protocol discipline of <Ref lesson="cross-validation-bootstrap" />; Exercise 5 works through this, including where PCA may legitimately be fit before splitting.
+
+### Scaling: variance is unit-bound
+
+The objective $u^\top \hat\Sigma u$ is measured in the features' units, so changing a unit changes the answer. Re-express one feature of a two-feature dataset in grams instead of kilograms and its variance multiplies by $10^6$; the top eigenvector of the new $\hat\Sigma$ swings to within $0.03°$ of the gram axis, and PC1 reports "the feature I measured in small units" (Exercise 4 computes this). Standardizing each feature to unit variance before PCA removes the arbitrariness; running PCA on standardized data is identical to eigendecomposing the *correlation matrix*, which is the vocabulary many texts and interviewers use interchangeably.
+
+<Figure
+  src="./figures/scaling.svg"
+  alt="Two panels of the same two-feature data joined by an arrow labeled divide by each feature's standard deviation: on raw units the cloud is a thin horizontal strip and PC1 lies along the gram axis with 99.99 percent of variance; standardized, the cloud is round-diagonal and PC1 lies along the correlated direction at 45 degrees"
+  caption="Same data, two unit systems. Standardization is not cosmetic: it changes the components, because variance is unit-bound."
+/>
+
+The decision rule: **standardize when units differ or are arbitrary** (dollars next to years next to counts); **do not standardize when features share one meaningful scale** and their differing variances are signal, as with pixel intensities or spectral channels, where inflating quiet features to unit variance amplifies noise. This is the USArrests lesson of [ISLP §12.1](https://www.statlearning.com), where unscaled PCA is captured by the one variable with the largest raw variance.
+
+Two one-liners complete the toolkit. *Whitening* divides each score by $\sqrt{\lambda_j}$, producing coordinates with identity covariance for algorithms that assume isotropy. *Principal component regression* ([ISLP §6.3](https://www.statlearning.com)) runs OLS on the first $k$ scores instead of the raw features, taming the collinearity failure of <Ref lesson="ols" />; and PCA before <Ref lesson="knn-curse">k-NN</Ref> or <Ref lesson="kmeans">k-means</Ref> shrinks the dimension those distance-based methods suffer in.
+
+### Case study: seventeen dimensions of British food
+
+<Example title="Eating in the UK">
+The dataset behind [Setosa's PCA explainer](https://setosa.io/ev/principal-component-analysis/) (from UK government statistics) records average weekly consumption of 17 food categories for the four UK countries: a $4 \times 17$ table no scatter plot can show. PCA on the 17-dimensional country profiles compresses each country to its top scores. Already on PC1 alone, England, Wales, and Scotland bunch together while Northern Ireland sits far out; the PC1–PC2 plane shows the same isolation with the other three now slightly spread. The loadings say why without any label ever being supplied: PC1 weights fresh potatoes strongly against fresh fruit, cheese, and alcoholic drinks, and Northern Ireland's profile is high on the former and low on the latter. One eigenvector turned a 17-column table into a one-line finding.
+</Example>
+
+<Figure
+  src="./figures/uk-food.svg"
+  alt="Schematic pipeline: a 17-row by 4-column table of food categories, an arrow labeled PCA, then a PC1 strip with England, Wales, and Scotland bunched and Northern Ireland far right in amber, and a PC1-PC2 scatter showing the same outlier"
+  caption="The 17-dimensional table projected to its top components: Northern Ireland separates on PC1, and the loadings name the foods responsible."
+/>
+
+<Demo
+  name="PcaExplorer"
+  caption="A draggable 2D cloud with live principal axes (lengths ∝ explained variance) and a per-component variance bar chart; the projection toggle collapses points onto PC1. Presets: correlated cloud, isotropic cloud, two elongated blobs."
+/>
+
+<Task>
+On the correlated preset, drag one point far from the cloud and watch PC1 rotate toward it: variance is a squared statistic, and a single outlier can own the top direction. Then switch to the isotropic preset and drag gently: with $\lambda_1 \approx \lambda_2$ the axes swing wildly, the tie-instability of the Remark above made visible.
+</Task>
+
+<KeyFact>
+Explained variance ratios $\lambda_j / \sum_k \lambda_k$ drive the keep-or-drop decision, but the 90% convention and the elbow are heuristics: when a downstream task exists, choose $k$ by cross-validation on it. Standardization changes the components and is decided by whether the units are comparable, not by habit.
+</KeyFact>
+
+## Limitations: variance is not relevance
+
+Every limitation interviewers probe traces to one fact: PCA sees $\hat\Sigma$ and nothing else. No labels, no nonlinearity, no notion of importance beyond variance.
+
+### Max variance can be uninformative for classification
+
+PCA is unsupervised; labels never enter $\hat\Sigma$. When two class clouds are both elongated along a shared, uninformative direction, PC1 aligns with the elongation, and projecting onto it stacks the classes on top of each other; the direction that separates them is a *low*-variance one that PCA ranks last. Fisher's criterion from <Ref lesson="lda-gda" /> optimizes separation instead, $w \propto S_W^{-1}(\mu_1 - \mu_0)$, and in this geometry points orthogonally to PC1. Exercise 6 quantifies the gap: on a concrete pair of clouds, the PCA projection is class-blind (50% error) while the Fisher projection classifies at about 2%.
+
+<Figure
+  src="./figures/pca-vs-lda.svg"
+  alt="Two elongated class clouds, blue and green, stacked with a horizontal amber PC1 arrow along the shared elongation and a vertical Fisher direction arrow; below, the 1D projection onto PC1 shows the two class histograms fully overlapping while the projection onto the Fisher direction shows them cleanly separated"
+  caption="Unsupervised variance against supervised separation: PC1 follows the elongation both classes share; Fisher's direction, orthogonal to it, is the one that classifies."
+/>
+
+### Linearity, mixing, and outliers
+
+**Linear only.** PCA fits a linear subspace; a curved manifold (a spiral, a ring) has no faithful one-dimensional linear summary. *Kernel PCA* ([Schölkopf, Smola & Müller, 1998](https://doi.org/10.1162/089976698300017467)) runs the same eigenproblem on kernel-implied features, at the price of the kernel machinery of <Ref lesson="svm-dual-kernels" />; <Ref lesson="tsne" /> takes the fully nonlinear route for visualization, and the next chapter draws the decision rule between them.
+
+**Components mix all features.** Each $u_j$ is a dense linear combination of every original feature, so PCA is *not* feature selection: no original column is ever dropped, and a scree-approved "component 1" can be unexplainable to a domain expert. When interpretability or true selection is required, sparse PCA constrains loadings to few nonzeros, or the embedded selection of <Ref lesson="ridge-lasso">the lasso</Ref> applies.
+
+**Outliers own squared statistics.** The demo task above showed one dragged point capturing PC1: variance weights squared deviations, so far points dominate. Standard responses, in order: inspect and fix or trim the offending rows, use a robust scale estimate, or use robust PCA, which decomposes $X$ into a low-rank part plus a sparse outlier part ([Candès et al., 2011](https://doi.org/10.1145/1970392.1970395)).
+
+<KeyFact>
+PCA optimizes retained variance, and variance is not relevance: the top components can be useless for a downstream label (PCA vs LDA), unexplainable (dense loadings), hijacked by units (scaling) or by single points (outliers). Every one of these is a one-line interview follow-up.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+The set piece, from a standing start: show that the unit vector maximizing the projected sample variance of centered data is the top eigenvector of the sample covariance matrix, and that the maximum value is its eigenvalue. State precisely how components $2, \dots, k$ are characterized.
+
+<Solution>
+Centered data $x_1, \dots, x_n$; candidate unit direction $u$. The projections $u^\top x_i$ have mean zero, so their variance is $\tfrac1n \sum_i (u^\top x_i)^2 = u^\top \bigl(\tfrac1n \sum_i x_i x_i^\top\bigr) u = u^\top \hat\Sigma u$. The problem is $\max_u u^\top \hat\Sigma u$ subject to $u^\top u = 1$ (unconstrained, the objective scales as $\lVert u \rVert^2$ and is unbounded).
+
+Lagrangian: $\mathcal{L}(u, \lambda) = u^\top \hat\Sigma u - \lambda(u^\top u - 1)$. Stationarity: $\nabla_u \mathcal{L} = 2\hat\Sigma u - 2\lambda u = 0$, so $\hat\Sigma u = \lambda u$: every candidate is an eigenvector of $\hat\Sigma$ with the multiplier as its eigenvalue. Value at a candidate: left-multiplying by $u^\top$ and using $u^\top u = 1$ gives $u^\top \hat\Sigma u = \lambda$. The objective at each eigenvector equals its eigenvalue, so the maximizer is the eigenvector $u_1$ of the largest eigenvalue $\lambda_1$, and the maximum variance is $\lambda_1$.
+
+Components $2, \dots, k$: component $j$ maximizes $u^\top \hat\Sigma u$ over unit vectors orthogonal to $u_1, \dots, u_{j-1}$. Adding the constraint $u^\top u_1 = 0$ with multiplier $\mu$ gives $\hat\Sigma u = \lambda u + \tfrac{\mu}{2} u_1$; left-multiplying by $u_1^\top$ makes the left side $u_1^\top \hat\Sigma u = \lambda_1 u_1^\top u = 0$, forcing $\mu = 0$, so the eigenvector equation returns restricted to the orthogonal complement, and the best available eigenvalue is $\lambda_2$; induction gives $u_j$ with value $\lambda_j$. Equivalently: the best $k$-dimensional subspace is spanned by the top $k$ eigenvectors and captures variance $\lambda_1 + \dots + \lambda_k$.
+</Solution>
+</Exercise>
+
+<Exercise>
+By hand: compute the principal components and explained variance ratios of
+$\hat\Sigma = \begin{pmatrix} 5 & 2 \\ 2 & 2 \end{pmatrix}$,
+and compare the variance kept by projecting onto PC1 against projecting onto the first coordinate axis.
+
+<Solution>
+Characteristic polynomial: $\det(\hat\Sigma - \lambda I) = (5-\lambda)(2-\lambda) - 4 = \lambda^2 - 7\lambda + 6 = (\lambda - 6)(\lambda - 1)$, so $\lambda_1 = 6$, $\lambda_2 = 1$.
+
+Eigenvector for $\lambda_1 = 6$: $(\hat\Sigma - 6I)u = 0$ gives $-u_1 + 2u_2 = 0$, so $u \propto (2, 1)$, normalized $u_1 = \tfrac{1}{\sqrt5}(2,1)$. For $\lambda_2 = 1$: $4u_1 + 2u_2 = 0$, so $u_2 = \tfrac{1}{\sqrt5}(1,-2)$ (orthogonal to $u_1$, as symmetry guarantees; signs are free).
+
+Explained variance ratios: $6/7 \approx 85.7\%$ and $1/7 \approx 14.3\%$.
+
+Projections: onto the first axis $e_1$, kept variance is $e_1^\top \hat\Sigma e_1 = \hat\Sigma_{11} = 5$; onto PC1 it is $\lambda_1 = 6$, the maximum. The natural-looking axis leaves $1$ unit of recoverable variance on the table.
+</Solution>
+</Exercise>
+
+<Exercise>
+Centering, quantified. Take the chapter's raw data $(5,4), (4,3), (2,1), (1,0), (4,1), (2,3)$ and form the **uncentered** second-moment matrix $M = \tfrac{1}{n}\sum_i x_i x_i^\top$ from the raw rows. Compute $M$, its top eigenvector's direction (in degrees), and compare with the direction of the mean $\bar x = (3,2)$ and with the true PC1 at $45°$. Verify $\operatorname{tr} M = \operatorname{tr} \hat\Sigma + \lVert \bar x \rVert^2$ and state the general lesson.
+
+<Solution>
+Raw sums: $\sum x_{i1}^2 = 25{+}16{+}4{+}1{+}16{+}4 = 66$; $\sum x_{i2}^2 = 16{+}9{+}1{+}0{+}1{+}9 = 36$; $\sum x_{i1} x_{i2} = 20{+}12{+}2{+}0{+}4{+}6 = 44$. So
+$M = \tfrac16 \begin{pmatrix} 66 & 44 \\ 44 & 36 \end{pmatrix} = \begin{pmatrix} 11 & 22/3 \\ 22/3 & 6 \end{pmatrix}$.
+
+Eigenvalues: trace $17$, determinant $66 - (22/3)^2 = \tfrac{110}{9} \approx 12.22$, so $\lambda = \tfrac{17 \pm \sqrt{289 - 4 \cdot 110/9}}{2} = \tfrac{17 \pm 15.50}{2}$: $\lambda_1 \approx 16.25$, $\lambda_2 \approx 0.75$. Top eigenvector: $(11 - 16.25)u_1 + \tfrac{22}{3} u_2 = 0$ gives $u_2/u_1 = 5.25/7.33 \approx 0.716$, direction $\arctan(0.716) \approx 35.6°$.
+
+Comparison: the mean $(3,2)$ points at $\arctan(2/3) \approx 33.7°$; the true PC1 (of centered data) points at $45°$. The uncentered "top component" sits nearly on top of the mean direction, far from the actual axis of variation, because $M = \hat\Sigma + \bar x \bar x^\top$: the rank-one mean term, with weight $\lVert \bar x \rVert^2 = 13$ against $\lambda_1 = 10/3$, dominates the decomposition. Trace check: $\operatorname{tr} M = 17 = 4 + 13 = \operatorname{tr}\hat\Sigma + \lVert \bar x \rVert^2$.
+
+General lesson: skipping centering makes PC1 point from the origin toward the data's mean whenever the mean offset is large relative to the spread, which is the typical case; the reported "structure" is then the location of the cloud, not its shape.
+</Solution>
+</Exercise>
+
+<Exercise>
+Standardization, quantified. Two features have correlation $0.5$; measured in kilograms and in the second feature's natural unit, both have variance $1$, so $\hat\Sigma_{\text{kg}} = \begin{pmatrix} 1 & 0.5 \\ 0.5 & 1 \end{pmatrix}$. (a) Compute PC1 and its explained variance ratio. (b) The first feature is re-recorded in grams (multiply by $1000$). Write the new covariance matrix, compute its eigenvalues and top eigenvector approximately, and the new explained variance ratio. (c) State when standardizing before PCA is wrong.
+
+<Solution>
+**(a)** For $\begin{pmatrix} 1 & 0.5 \\ 0.5 & 1 \end{pmatrix}$, the symmetric structure gives eigenvalues $1 \pm 0.5$: $\lambda_1 = 1.5$ at $u_1 = \tfrac{1}{\sqrt2}(1,1)$, $\lambda_2 = 0.5$ at $\tfrac{1}{\sqrt2}(1,-1)$. Ratio: $1.5/2 = 75\%$.
+
+**(b)** Scaling feature 1 by $1000$ multiplies its variance by $10^6$ and the covariance by $10^3$:
+$\hat\Sigma_{\text{g}} = \begin{pmatrix} 10^6 & 500 \\ 500 & 1 \end{pmatrix}$.
+Eigenvalues satisfy $\lambda_1 + \lambda_2 = 10^6 + 1$ and $\lambda_1\lambda_2 = 10^6 - 25\times10^4 = 75\times10^4$, so $\lambda_2 \approx 75\times10^4 / 10^6 = 0.75$ and $\lambda_1 \approx 10^6 + 0.25$. Top eigenvector: $u_2/u_1 = (\lambda_1 - 10^6)/500 \approx 0.25/500 = 0.0005$, i.e. $u_1 \approx (1,\ 0.0005)$, within $0.03°$ of the gram axis. Explained variance ratio: $\lambda_1/(10^6+1) \approx 99.99993\%$. PC1 now reports the unit choice, not the data: the correlated structure of (a) is invisible. Standardizing (equivalently, eigendecomposing the correlation matrix) restores exactly the answer of (a).
+
+**(c)** Standardizing is wrong when the features already share one meaningful scale and their variance differences are signal — pixel intensities, spectral channels, standardized test batteries: dividing by per-feature standard deviations then inflates the quietest (often noisiest) features to equal say. The choice changes the components and must be argued from the units, not defaulted.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review (cross-validation). A 40-feature dataset yields the scree-plot eigenvalue shares $52.5, 26.25, 11.25, 5, 2.5, 1.25, 0.75, 0.5$ (percent, first 8 components; the rest are negligible). (a) Find the smallest $k$ reaching 90% and 95% cumulative variance. (b) The scores will feed a classifier. Describe the honest protocol for choosing $k$, and state — with the reason — whether fitting the PCA on the full dataset before cross-validating the classifier is the same leakage error as supervised feature screening before CV.
+
+<Solution>
+**(a)** Cumulative: $52.5, 78.75, 90.0, 95.0, 97.5, \dots$, so $k = 3$ reaches 90% and $k = 4$ reaches 95%.
+
+**(b)** Treat $k$ as a hyperparameter of the pipeline (standardize → PCA($k$) → classifier) and select it by cross-validation on classification error: for each fold, fit the scaler and PCA on the training portion only, transform the held-out fold with those fitted parameters, and score; pick $k$ minimizing CV error (optionally the smallest $k$ within one standard error of the minimum). If a final performance estimate is also needed, wrap the selection in nested CV.
+
+The leakage comparison: supervised screening (choosing features by correlation with the labels on all data) before CV is the classic invalidating error, because label information from the test folds enters the model. PCA fit on all data uses **no labels**, so it is unsupervised preprocessing; ESL (§7.10.2) explicitly permits unsupervised steps before splitting, since they cannot import label information. The safe default in code remains fit-inside-folds (it also matches deployment, where future data cannot influence the projection), but the two mistakes are not of the same kind, and saying so precisely is worth points.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review (LDA). Two balanced classes in $\mathbb{R}^2$ have means $\mu_0 = (0,-1)$, $\mu_1 = (0,1)$ and shared within-class covariance $S_W = \operatorname{diag}(9,\ 0.25)$. (a) Compute the pooled data's total covariance and its PC1. (b) Compute Fisher's direction. (c) For each projection, give the 1D class distributions and the resulting Bayes error, and state the conclusion.
+
+<Solution>
+**(a)** For a balanced mixture, total covariance = within + between: the means are $\pm(0,1)$, so the between-class part is $\mathbb{E}[\mu\mu^\top] = (0,1)(0,1)^\top = \operatorname{diag}(0,1)$, giving $\Sigma_T = \operatorname{diag}(9,\ 1.25)$. PC1 is the eigenvector of the larger eigenvalue: $e_1 = (1,0)$ with $\lambda_1 = 9$ (ratio $9/10.25 \approx 88\%$).
+
+**(b)** Fisher: $w \propto S_W^{-1}(\mu_1 - \mu_0) = \operatorname{diag}(\tfrac19,\ 4)\,(0,2)^\top = (0, 8)^\top \propto e_2$: orthogonal to PC1.
+
+**(c)** Onto PC1 ($e_1$): both classes project to $\mathcal{N}(0, 9)$, identical distributions, so no threshold beats chance: error $50\%$. Onto Fisher's $e_2$: the classes project to $\mathcal{N}(-1, 0.25)$ and $\mathcal{N}(+1, 0.25)$ (s.d. $0.5$); the midpoint threshold $0$ errs with probability $\Phi(-1/0.5) = \Phi(-2) \approx 0.023$.
+
+Conclusion: the direction carrying $88\%$ of the variance carries $0\%$ of the class information, and the discriminative direction is the *lowest*-variance one, which a "keep 90%" PCA rule would happily discard. Unsupervised variance maximization and supervised separation are different objectives; when labels exist and the goal is classification, reduce with LDA/Fisher or validate PCA's $k$ on the downstream task.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview scenario. A teammate one-hot encodes a 50-category feature set, runs PCA on the binary matrix, plots the first two scores, and reports "elegant customer clusters." List the concerns you would raise and what you would check or use instead. Possible answers, not a unique solution.
+
+<Solution>
+Possible answers:
+
+1. **Dummy variance is frequency.** A one-hot column with category probability $p$ has variance $p(1-p)$, so PCA on raw dummies orders directions by category *frequency* structure, not by any notion of similarity; rare-but-informative categories are ranked last (and standardizing dummies instead inflates the rarest categories; neither choice is neutral).
+2. **Geometry of the simplex.** One-hot vectors sit at hypercube corners; within one categorical variable the columns sum to 1, so the encoded block is linearly dependent (rank $\le$ categories $-1$), directions mix indicator columns, and "clusters" in a 2D score plot can be encoding artifacts: groups of frequent co-occurring categories, not behavioral segments.
+3. **Checks.** Inspect the loadings of PC1–PC2 (if a handful of indicator columns dominate, the plot shows category membership, not structure); check the explained variance (two components of a 50-dummy matrix often carry little); recolor the scatter by the dominant raw categories to test the artifact hypothesis.
+4. **Alternatives.** Multiple correspondence analysis (the categorical analogue of PCA), embeddings learned from the downstream task, or clustering on a dissimilarity designed for categorical data — with any claimed clusters validated against held-out behavior, per <Ref lesson="cross-validation-bootstrap" />.
+</Solution>
+</Exercise>
+
+<Exercise>
+SVD arithmetic and the ridge connection. A centered design $X$ with $n = 100$ rows has singular values $d = (30, 20, 10, 5)$. (a) Compute the PCA eigenvalues and explained variance ratios; find the smallest $k$ reaching 90%. (b) Ridge regression with $\lambda = 100$ is run on $X$: compute the shrink factor $d_j^2/(d_j^2 + \lambda)$ per principal direction, and state in two sentences how ridge and PCA-then-OLS (principal component regression) relate.
+
+<Solution>
+**(a)** $\lambda_j = d_j^2/n$: $900/100 = 9$, $400/100 = 4$, $100/100 = 1$, $25/100 = 0.25$. Total $14.25$. Ratios: $63.2\%, 28.1\%, 7.0\%, 1.8\%$; cumulative $63.2, 91.2, 98.2, 100$ — so $k = 2$ clears 90%. (The classic slip: quoting $d_j^2$ or $d_j$ as "variance explained" without the $1/n$; only ratios survive that error, absolute variances do not.)
+
+**(b)** Shrink factors $d_j^2/(d_j^2 + 100)$: $900/1000 = 0.90$, $400/500 = 0.80$, $100/200 = 0.50$, $25/125 = 0.20$. Ridge keeps 90% of the fit along the top principal direction and only 20% along the last. Relation: both methods act on the same SVD directions — PCR is the hard version (factor $1$ for $j \le k$, factor $0$ beyond), ridge the soft version (smoothly decaying factors) — so PCR is approximately ridge with a step-shaped shrinkage profile, and both trade variance in the poorly-determined trailing directions for bias, per <Ref lesson="ridge-lasso" />.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — ch. 12: motivation (redundant features, pilot skill/enjoyment), normalization steps, and the Lagrange derivation of the top eigenvector. https://cs229.stanford.edu/main_notes.pdf
+2. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §12.1: the maximum-variance (§12.1.1) and minimum-error (§12.1.2) formulations proved equivalent, with the sequential extraction of further components. https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §14.5.1: PCA via the SVD, best rank-$q$ approximation (Eqs. 14.49–14.55), and the handwritten-threes example; §3.4.1 for the ridge–SVD shrinkage used here; §7.10.2 for the unsupervised-preprocessing point in Exercise 5. https://hastie.su.domains/ElemStatLearn/
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §12.1: PCA, scaling and the USArrests example, biplots; §6.3: principal component regression. https://www.statlearning.com
+5. V. Powell, L. Lehe, "Principal Component Analysis Explained Visually," Setosa.io — the interactive 2D/3D projections and the 17-dimensional UK food-consumption example recreated in this chapter. https://setosa.io/ev/principal-component-analysis/
+6. J. Starmer, "StatQuest: Principal Component Analysis (PCA), Step-by-Step," YouTube — scree plots and per-component variance in practice. https://www.youtube.com/watch?v=FgakZw6K1QQ
+7. K. Pearson, "On Lines and Planes of Closest Fit to Systems of Points in Space," *Philosophical Magazine* 2(11), 1901 — the original minimum-reconstruction-error formulation. https://doi.org/10.1080/14786440109462720
+8. H. Hotelling, "Analysis of a Complex of Statistical Variables into Principal Components," *Journal of Educational Psychology* 24, 1933 — the maximum-variance formulation and the name "principal components."
+9. B. Schölkopf, A. Smola, K.-R. Müller, "Nonlinear Component Analysis as a Kernel Eigenvalue Problem," *Neural Computation* 10(5), 1998 — kernel PCA. https://doi.org/10.1162/089976698300017467
+10. E. J. Candès, X. Li, Y. Ma, J. Wright, "Robust Principal Component Analysis?," *Journal of the ACM* 58(3), 2011 — the low-rank-plus-sparse decomposition cited for outlier-robust PCA. https://doi.org/10.1145/1970392.1970395
+</References>

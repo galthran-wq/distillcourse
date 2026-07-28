@@ -1,0 +1,423 @@
+Fitting one Gaussian per class and applying Bayes' rule produces exactly the logistic-regression functional form — but the two fits give different parameters, and that difference is the generative–discriminative trade-off. This chapter works that statement in full on Gaussian discriminant analysis (GDA), the canonical generative classifier for continuous features. The route: the three-approach taxonomy, the GDA model and its closed-form maximum-likelihood fit, the derivation that shared-covariance Gaussians give a sigmoid posterior, the LDA–QDA covariance trade-off, the efficiency-versus-robustness comparison with logistic regression, and the ledger of what generative modeling buys.
+
+## Three routes from features to a label
+
+<Ref lesson="naive-bayes" /> was introduced as *generative* and <Ref lesson="logistic-regression" /> as *discriminative*. [Bishop's PRML](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) (§1.5.4) fixes the taxonomy those labels come from. Three progressively cheaper ways to get from a feature vector $x$ to a label:
+
+- **Generative**: model the class-conditional $p(x \mid y)$ and the prior $p(y)$, and invert with Bayes' rule to get $p(y \mid x)$. The model can *generate* feature vectors. Members so far: naive Bayes; GDA is this chapter's.
+- **Discriminative**: model $p(y \mid x)$ directly and assume nothing about how $x$ is distributed. Members: logistic regression; $k$-NN, which estimates $p(y \mid x)$ by a local vote.
+- **Discriminant function**: learn a map $f: x \to \text{label}$ with no probabilities anywhere. Members: the perceptron, least squares on class indicators, and the SVM of <Ref lesson="svm-max-margin" />.
+
+Each step down the list solves a smaller problem: the generative route models the full joint $p(x, y)$ to answer a question that only needs $p(y \mid x)$, and the discriminant-function route discards even the probabilities. Vapnik's principle says never to solve a harder problem than necessary; the rest of this chapter prices what the harder problem buys. One classical warning about the cheapest route: least squares on class indicators can **mask** a middle class entirely when $K \ge 3$ (its fitted score is dominated everywhere and never wins the argmax), a failure LDA on the same data does not share ([ESL](https://hastie.su.domains/ElemStatLearn/) §4.2).
+
+{/* fig GenDiscTaxonomy: three horizontal pipelines stacked (component figure, HTML boxes + right-pointing arrows, KaTeX for every modeled object). Lane 1 "generative" (amber accent — the chapter's subject): box "data (x, y)" → boxes "fit p(x|y)" and "fit p(y)" → "Bayes' rule" → "p(y|x)" → "decision"; badges under the lane: naive Bayes, GDA (this chapter). Lane 2 "discriminative": "data (x, y)" → "fit p(y|x) directly" → "decision"; badges: logistic regression, k-NN; right-edge note "never models x". Lane 3 "discriminant function": "data (x, y)" → "fit f: x → label" → "decision"; badges: perceptron, SVM, least squares on indicators; right-edge note "no probabilities anywhere". Same box heights across lanes so the shrinking pipeline length is the visual message. */}
+<Figure
+  name="GenDiscTaxonomy"
+  alt="Three stacked pipelines: generative models fit p(x given y) and p(y) then apply Bayes' rule; discriminative models fit p(y given x) directly; discriminant functions map x straight to a label, with the classifiers met so far placed as badges"
+  caption="The taxonomy (Bishop §1.5.4): each route models less. GDA sits in the top lane, logistic regression in the middle one."
+/>
+
+<Remark title="three things called LDA">
+Interviews use one acronym for three objects. (1) **Linear discriminant analysis**: shared-covariance GDA, this chapter's classifier. (2) **Fisher's linear discriminant**: a projection direction for supervised dimensionality reduction, derived without Gaussians; the Aside below shows it points the same way as (1). (3) **Latent Dirichlet allocation**: a topic model from NLP, unrelated. State which one you mean before answering.
+</Remark>
+
+<KeyFact>
+The taxonomy is about what gets modeled: $p(x \mid y)\,p(y)$ inverted by Bayes' rule, $p(y \mid x)$ alone, or a bare label map. Everything generative modeling buys, and everything it risks, follows from modeling $x$.
+</KeyFact>
+
+## Gaussian discriminant analysis: two Gaussians, a prior, Bayes' rule
+
+For continuous features the generative recipe needs a class-conditional density; GDA takes it multivariate Gaussian,
+
+$$
+\mathcal N(x; \mu, \Sigma) = \frac{1}{(2\pi)^{d/2}\,\lvert\Sigma\rvert^{1/2}}
+\exp\!\Bigl(-\tfrac12 (x - \mu)^\top \Sigma^{-1} (x - \mu)\Bigr),
+$$
+
+with the mean $\mu$ placing the cloud and the covariance $\Sigma$ shaping it. The classifier is Bayes' rule executed on two fitted Gaussians; the numbers come first.
+
+<Example title="Bayes' rule with two fitted Gaussians">
+Two classes with equal priors $\varphi = p(y{=}1) = \tfrac12$ and a **shared** covariance, in $d = 2$:
+
+$$
+\mu_0 = \begin{pmatrix}1\\1\end{pmatrix}, \quad
+\mu_1 = \begin{pmatrix}3\\2\end{pmatrix}, \quad
+\Sigma = \begin{pmatrix}1 & \tfrac12\\ \tfrac12 & 1\end{pmatrix}, \quad
+\Sigma^{-1} = \frac{4}{3}\begin{pmatrix}1 & -\tfrac12\\ -\tfrac12 & 1\end{pmatrix}.
+$$
+
+Classify $x = (2.5,\, 0.5)^\top$. The quadratic form is $v^\top \Sigma^{-1} v = \tfrac43\,(v_1^2 - v_1 v_2 + v_2^2)$. For class 0, $v = x - \mu_0 = (1.5, -0.5)^\top$: $\tfrac43(2.25 + 0.75 + 0.25) = \tfrac{13}{3}$. For class 1, $v = x - \mu_1 = (-0.5, -1.5)^\top$: $\tfrac43(0.25 - 0.75 + 2.25) = \tfrac{7}{3}$.
+
+With $\lvert\Sigma\rvert = \tfrac34$, the shared normalizer is $2\pi\sqrt{3}/2 = 5.441$, so
+
+$$
+p(x \mid y{=}0) = \frac{e^{-13/6}}{5.441} = 0.0211,
+\qquad
+p(x \mid y{=}1) = \frac{e^{-7/6}}{5.441} = 0.0572 .
+$$
+
+Equal priors multiply both by $\tfrac12$ and cancel in the posterior:
+
+$$
+p(y{=}1 \mid x) = \frac{0.0572}{0.0572 + 0.0211} = 0.731 .
+$$
+
+The exponent difference is $\tfrac12\bigl(\tfrac{13}{3} - \tfrac{7}{3}\bigr) = 1$, and $\sigma(1) = 0.731$: the posterior is a sigmoid of that difference, which the next section turns into a theorem.
+</Example>
+
+<Definition title="Gaussian discriminant analysis">
+**GDA** models a binary label and continuous features as $y \sim \text{Bernoulli}(\varphi)$ and $x \mid y{=}k \sim \mathcal N(\mu_k, \Sigma_k)$, classifying by the posterior $p(y \mid x)$ from Bayes' rule. With a shared covariance $\Sigma_0 = \Sigma_1 = \Sigma$ the method is **linear discriminant analysis (LDA)**; with per-class covariances it is **quadratic discriminant analysis (QDA)**. The names record the boundary shapes proved below.
+</Definition>
+
+### The maximum-likelihood fit is class statistics
+
+The joint log-likelihood of a labeled sample splits into a label part and a feature part, $\sum_i \ln p(y_i; \varphi) + \sum_i \ln \mathcal N(x_i; \mu_{y_i}, \Sigma)$, and each part maximizes separately by the two-step recipe of <Ref lesson="mle-map" />. The label part is a Bernoulli likelihood, so $\hat\varphi$ is a frequency; each $\mu_k$ appears only in class $k$'s terms, and setting $\nabla_{\mu_k} = \Sigma^{-1}\sum_{i: y_i = k}(x_i - \mu_k) = 0$ gives the class mean; the shared $\Sigma$ collects every centered point:
+
+$$
+\hat\varphi = \frac{n_1}{n},
+\qquad
+\hat\mu_k = \frac{1}{n_k}\sum_{i:\, y_i = k} x_i,
+\qquad
+\hat\Sigma = \frac{1}{n}\sum_{i=1}^{n} (x_i - \hat\mu_{y_i})(x_i - \hat\mu_{y_i})^\top .
+$$
+
+The last estimate is the **pooled covariance**: writing $\hat\Sigma_k$ for class $k$'s own scatter matrix, $\hat\Sigma = \tfrac{n_0}{n}\hat\Sigma_0 + \tfrac{n_1}{n}\hat\Sigma_1$, the sample-size-weighted average ([Bishop](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) §4.2.2). Training is one pass of counting and averaging: the same closed-form character as naive Bayes, against the iterative fit that logistic regression requires.
+
+<KeyFact>
+Training GDA is computing a class frequency, two class means, and a pooled covariance: closed form, one pass over the data, no optimizer and no learning rate.
+</KeyFact>
+
+## The set piece: shared covariance collapses the posterior to a sigmoid
+
+Interviewers ask for this derivation cold: start from Bayes' rule with two shared-covariance Gaussians, show the posterior is $\sigma(w^\top x + b)$, and produce $w$ explicitly.
+
+<Theorem title="shared-covariance posterior is a sigmoid">
+Under the GDA model with $\Sigma_0 = \Sigma_1 = \Sigma$,
+
+$$
+p(y{=}1 \mid x) = \sigma\bigl(w^\top x + b\bigr),
+\qquad
+w = \Sigma^{-1}(\mu_1 - \mu_0),
+\qquad
+b = -\tfrac12 (\mu_1 + \mu_0)^\top \Sigma^{-1} (\mu_1 - \mu_0) + \ln\frac{\varphi}{1 - \varphi}.
+$$
+
+The log-odds are affine in $x$; the decision boundary is the hyperplane $w^\top x + b = 0$.
+
+<Proof>
+Write the posterior log-odds via Bayes' rule; the evidence $p(x)$ cancels:
+
+$$
+a(x) = \ln\frac{p(y{=}1 \mid x)}{p(y{=}0 \mid x)}
+= \ln\frac{\varphi}{1-\varphi} + \ln\frac{\mathcal N(x; \mu_1, \Sigma)}{\mathcal N(x; \mu_0, \Sigma)} .
+$$
+
+The Gaussian normalizers $(2\pi)^{d/2}\lvert\Sigma\rvert^{1/2}$ are identical because $\Sigma$ is shared, so the density ratio keeps only the exponents:
+
+$$
+a(x) = \ln\frac{\varphi}{1-\varphi}
+- \tfrac12 (x - \mu_1)^\top \Sigma^{-1} (x - \mu_1)
++ \tfrac12 (x - \mu_0)^\top \Sigma^{-1} (x - \mu_0) .
+$$
+
+Expand each quadratic form, merging the two cross terms by symmetry of $\Sigma^{-1}$:
+
+$$
+(x - \mu_k)^\top \Sigma^{-1} (x - \mu_k)
+= x^\top \Sigma^{-1} x - 2\mu_k^\top \Sigma^{-1} x + \mu_k^\top \Sigma^{-1} \mu_k .
+$$
+
+In the difference, the two $\pm\tfrac12\, x^\top \Sigma^{-1} x$ terms **cancel**. This is the step that needs the shared covariance; with distinct $\Sigma_k$ it fails. What survives is affine:
+
+$$
+a(x) = (\mu_1 - \mu_0)^\top \Sigma^{-1} x
+- \tfrac12\bigl(\mu_1^\top \Sigma^{-1} \mu_1 - \mu_0^\top \Sigma^{-1} \mu_0\bigr)
++ \ln\frac{\varphi}{1-\varphi} .
+$$
+
+The middle term factors as $\mu_1^\top \Sigma^{-1} \mu_1 - \mu_0^\top \Sigma^{-1} \mu_0 = (\mu_1 + \mu_0)^\top \Sigma^{-1} (\mu_1 - \mu_0)$, giving $a(x) = w^\top x + b$ as claimed. Finally $p(y{=}1 \mid x) = 1/(1 + e^{-a(x)}) = \sigma(a(x))$, since the sigmoid is exactly the inverse of the log-odds map established in <Ref lesson="logistic-regression" />.
+</Proof>
+</Theorem>
+
+{/* fig GdaSigmoidSteps (3 frames, component sequence): formula dissection of the sigmoid derivation on one shared layout, KaTeX throughout. Frame 1: the log-odds a(x) = ln[φ/(1−φ)] + ln N(x;μ₁,Σ)/N(x;μ₀,Σ) with short labels above the two parts ("prior odds", "density ratio"), expanded below into −½(x−μ₁)ᵀΣ⁻¹(x−μ₁) + ½(x−μ₀)ᵀΣ⁻¹(x−μ₀) plus the prior term; muted note "normalizers already cancelled: same Σ". Frame 2: both quadratic forms expanded into their three terms (xᵀΣ⁻¹x, −2μₖᵀΣ⁻¹x, μₖᵀΣ⁻¹μₖ); the two opposite-sign ½xᵀΣ⁻¹x terms struck through, with the condition "shared Σ" highlighted amber next to the strike-outs as the reason; layout otherwise pixel-identical to frame 1's expansion. Frame 3: surviving terms collected into the boxed affine form a(x) = (μ₁−μ₀)ᵀΣ⁻¹x − ½(μ₁+μ₀)ᵀΣ⁻¹(μ₁−μ₀) + ln[φ/(1−φ)]; thin naming arrows bind w = Σ⁻¹(μ₁−μ₀) (amber) and b (blue) to their pieces; the running example's values w = (2, 0)ᵀ, b = −4 plugged in at the bottom. */}
+<FigureSequence
+  name="GdaSigmoidSteps"
+  alt="Three frames: the log-odds written as prior odds plus a ratio of Gaussians, the quadratic terms struck out under the shared-covariance condition, and the surviving affine form boxed with w equal to Sigma inverse times the mean difference"
+  caption="The derivation in three moves: write the log-odds, cancel the quadratics (shared Σ is what allows it), read off w and b."
+/>
+
+<Task>
+Step through the three frames, then verify the theorem on the worked example: $w = \Sigma^{-1}(\mu_1 - \mu_0) = \tfrac43\bigl(2 - \tfrac12,\ -1 + 1\bigr)^\top = (2, 0)^\top$ and $b = -\tfrac12(4,3)\,\Sigma^{-1}(2,1)^\top = -4$, so the boundary is $x_1 = 2$ and the test point scores $a = 2(2.5) - 4 = 1$, reproducing $\sigma(1) = 0.731$ from the density computation exactly.
+</Task>
+
+### Same functional form, different fit
+
+The theorem says GDA's posterior **is** the logistic-regression hypothesis $\sigma(w^\top x + b)$. The converse fails: a sigmoid posterior does not imply Gaussian classes; the [CS229 notes](https://cs229.stanford.edu/main_notes.pdf) (§4.1.3) note that Poisson class-conditionals, among many others, produce the same form. GDA's assumption is therefore strictly stronger.
+
+Sharing the form is not sharing the classifier. GDA computes $(w, b)$ from class statistics ($\hat\mu_k$, $\hat\Sigma$, $\hat\varphi$); logistic regression maximizes the conditional likelihood of the labels with no model of $x$. On any finite sample the two estimates differ, the boundaries differ, and which is better is exactly the generative–discriminative question the rest of the chapter answers.
+
+<KeyFact>
+Shared-covariance GDA and logistic regression fit the same hypothesis class, $\sigma(w^\top x + b)$, by different criteria: class statistics through Bayes' rule against conditional maximum likelihood. Same form, different parameters, different boundaries on finite data.
+</KeyFact>
+
+<Aside>
+More than two classes. With $K$ classes sharing $\Sigma$, each class gets the affine *discriminant score* $\delta_k(x) = x^\top \Sigma^{-1}\mu_k - \tfrac12 \mu_k^\top \Sigma^{-1} \mu_k + \ln \pi_k$ ([ESL](https://hastie.su.domains/ElemStatLearn/) §4.3, eq. 4.10), the prediction is $\arg\max_k \delta_k(x)$, and the posterior is the softmax of the $\delta_k$: the same collapse to the multiclass logistic form that the two-class theorem shows for the sigmoid. Every pairwise boundary $\delta_j = \delta_k$ is a hyperplane, so LDA partitions the space into convex polyhedral class regions.
+</Aside>
+
+## LDA versus QDA: the covariance choice decides the boundary
+
+Give each class its own $\Sigma_k$ and rerun the proof: the normalizers no longer cancel and neither do the quadratic terms. The log-odds keep a quadratic piece,
+
+$$
+a(x) = \tfrac12\, x^\top \bigl(\Sigma_0^{-1} - \Sigma_1^{-1}\bigr)\, x
++ \bigl(\Sigma_1^{-1}\mu_1 - \Sigma_0^{-1}\mu_0\bigr)^\top x
++ \text{const}
+- \tfrac12 \ln\frac{\lvert\Sigma_1\rvert}{\lvert\Sigma_0\rvert},
+$$
+
+so QDA's decision boundary $a(x) = 0$ is a conic: ellipse, parabola, or hyperbola, depending on the sign pattern of $\Sigma_0^{-1} - \Sigma_1^{-1}$ ([Murphy, PML](https://probml.github.io/pml-book/book1.html) §9.2). LDA is the special case where the quadratic matrix is zero because the two inverses coincide.
+
+<Figure
+  src="./figures/boundaries.svg"
+  alt="Left panel: two identically shaped Gaussian contour sets separated by a straight vertical boundary through the midpoint of the means. Right panel: a tight round class next to a broad tilted class with the QDA boundary curving around the tighter one"
+  caption="Left: shared Σ, the worked example's vertical boundary x₁ = 2. Right: distinct Σₖ keep the quadratic term and the boundary bends."
+/>
+
+### Parameter counts: the bias–variance reading
+
+A symmetric $d \times d$ covariance carries $d(d+1)/2$ free numbers, and QDA pays for it per class:
+
+| model | parameters | at $d = 50$ |
+| --- | --- | --- |
+| logistic regression | $d + 1$ | 51 |
+| LDA (shared $\Sigma$) | $2d + d(d+1)/2 + 1$ | 1,376 |
+| QDA (per-class $\Sigma_k$) | $2d + d(d+1) + 1$ | 2,651 |
+
+In the language of <Ref lesson="bias-variance" />: QDA has lower bias (its boundary family includes every curved conic; LDA can only draw hyperplanes) and higher variance (twice the covariance parameters to estimate from the same data). QDA is not "more powerful", it is a different point on the trade-off: with small $n$ its estimated boundary wobbles more than its extra flexibility earns, and LDA's wrong-but-stable hyperplane wins. QDA earns its quadratic term when classes have visibly different covariances and $n$ is large enough to estimate each one.
+
+### When the covariance itself cannot be estimated
+
+The estimates need $\hat\Sigma$ invertible, and the pooled scatter has rank at most $n - 2$: with $d \ge n - 1$ it is singular and LDA is undefined as written. The repair mirrors <Ref lesson="ols" />'s door to ridge: **shrink** the estimate, $\hat\Sigma(\lambda) = (1 - \lambda)\hat\Sigma + \lambda\, \operatorname{diag}(\hat\Sigma)$ or $+\,\lambda I$. Friedman's regularized discriminant analysis (1989) interpolates continuously from QDA through LDA toward a near-spherical covariance, with $\lambda$ chosen by cross-validation.
+
+<KeyFact>
+The shared-covariance assumption is exactly what deletes the quadratic term: LDA draws hyperplanes with $O(d^2)$ parameters paid once, QDA draws conics and pays $O(d^2)$ per class: a bias–variance dial, not a strict upgrade.
+</KeyFact>
+
+### Fisher's direction: the same $w$ without Gaussians
+
+The projection view of LDA needs no distributional assumption, and it explains the operator $\Sigma^{-1}$ in $w$.
+
+<Aside>
+Fisher (1936) asked for the 1D projection $z = w^\top x$ that best separates two labeled clouds: maximize between-class separation relative to within-class spread,
+
+$$
+J(w) = \frac{\bigl(w^\top(\mu_1 - \mu_0)\bigr)^2}{w^\top S_W\, w},
+$$
+
+where $S_W$ is the pooled within-class scatter (proportional to the shared $\hat\Sigma$). Setting $\nabla J = 0$ gives $\bigl(w^\top(\mu_1{-}\mu_0)\bigr)\, S_W w \propto \bigl(w^\top S_W w\bigr)(\mu_1 - \mu_0)$, and since scalar factors do not change a direction,
+
+$$
+w \;\propto\; S_W^{-1}(\mu_1 - \mu_0):
+$$
+
+the same direction as the GDA-LDA weight vector, reached with no Gaussian anywhere ([Bishop](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) §4.1.4). The $S_W^{-1}$ factor is the content: the naive direction $\mu_1 - \mu_0$ ignores within-class covariance, while Fisher's direction discounts separation that lies along directions of large within-class spread. In the worked example $\mu_1 - \mu_0 = (2,1)^\top$ but $\Sigma^{-1}(\mu_1 - \mu_0) \propto (2,0)^\top$: the second coordinate's apparent evidence is entirely explained by its correlation with the first, and the corrected direction drops it.
+
+Used as **supervised dimensionality reduction**, Fisher's construction generalizes to $K$ classes and yields at most $K - 1$ discriminant directions. It optimizes class separation where <Ref lesson="pca" /> optimizes retained variance while ignoring labels; the comparison is drilled in Exercise 8 and revisited in the PCA chapter.
+</Aside>
+
+<Figure
+  src="./figures/fisher.svg"
+  alt="Two correlated elongated class clouds with two arrows from the first mean: the raw mean-difference direction and the Sigma-inverse corrected direction; below, 1D projections showing overlapping class histograms on the first direction and separated ones on the second"
+  caption="The worked example's clouds. Projecting on μ₁ − μ₀ = (2,1) mixes in the shared high-variance direction; projecting on Σ⁻¹(μ₁ − μ₀) ∝ (2,0) separates the classes."
+/>
+
+## GDA versus logistic regression: efficiency against robustness
+
+The comparison the module has been building to, in two directions.
+
+### When the Gaussian model is right, GDA uses the data better
+
+If the classes really are shared-covariance Gaussians, GDA's parameter estimates are maximum likelihood in the full joint model, and the resulting classifier is **asymptotically efficient**: no consistent procedure, logistic regression included, has lower asymptotic error ([CS229](https://cs229.stanford.edu/main_notes.pdf) §4.1.3). The gap is not hypothetical: Efron (1975) computed it, finding logistic regression typically one half to two thirds as efficient as LDA under normality: the price of ignoring what is known about $x$. The practical reading: with small $n$ and roughly Gaussian features, GDA extracts more classifier per sample.
+
+### When it is wrong, GDA pays and logistic regression does not
+
+Logistic regression assumes only that the log-odds are linear, a strictly weaker premise, so it stays consistent for the best linear-log-odds fit across every $p(x \mid y)$ that satisfies it. GDA's boundary, computed through $\hat\mu_k$ and $\hat\Sigma$, is biased whenever the Gaussian model is misspecified: heavy tails, skew, multimodality, or outliers all pull the class statistics and the boundary with them. [ESL](https://hastie.su.domains/ElemStatLearn/) (§4.4.5) locates the mechanism precisely: LDA gives every observation full weight in the class statistics, including points far from the boundary, while logistic regression's gradient $(y_i - p_i)\,x_i$ from <Ref lesson="logistic-regression" /> gives correctly classified distant points $y_i - p_i \approx 0$, no influence at all.
+
+<Figure
+  src="./figures/outlier.svg"
+  alt="Two class clusters with the shared boundary of both fits shown dashed; adding one outlier far on the correct side tilts the LDA boundary while the logistic boundary stays on the dashed line"
+  caption="One outlier on the correct side: it shifts μ̂₁ and Σ̂, so the LDA boundary moves; its logistic gradient contribution is (y − p)x ≈ 0, so the logistic boundary does not."
+/>
+
+### Separable data reverses the failure
+
+The comparison runs both ways. On linearly separable data the logistic MLE does not exist, by the divergence theorem of <Ref lesson="logistic-regression" />: $\lVert \hat w \rVert \to \infty$, convergence warnings, probabilities pinned to 0 and 1. LDA is untouched: class means and a pooled covariance exist regardless of separation, the fit stays closed-form and finite, and well-separated classes are in fact the regime where the Gaussian machinery is most stable. "Your logistic regression fails to converge on well-separated data — would LDA?" is a standard probe, and the answer is that LDA cannot fail to converge because nothing in it iterates.
+
+<KeyFact>
+GDA is asymptotically efficient when its Gaussian assumption holds and biased when it fails; logistic regression is the reverse: never the most efficient, never misled by $p(x \mid y)$. Prefer LDA for small $n$ with roughly Gaussian features or separated classes; prefer logistic regression when the feature distribution is untrusted and $n$ is large.
+</KeyFact>
+
+## The generative ledger: what modeling x buys
+
+The trade-off list interviewers expect, each entry one mechanism ([Murphy, PML](https://probml.github.io/pml-book/book1.html) §9.4; [Bishop](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) §1.5.4):
+
+- **Missing features at test time.** A generative model marginalizes them out: Gaussian marginals are Gaussian (drop the missing coordinates from $\mu$ and $\Sigma$), and naive Bayes drops the missing factors. A discriminative model has no $p(x)$ to integrate and must impute.
+- **Class-prior shift.** Deployment base rates differing from training frequencies change only the $\ln\frac{\varphi}{1-\varphi}$ term in $b$: swap it, keep everything else. Logistic regression must be refit or reweighted.
+- **Unlabeled data.** A generative model assigns unlabeled points a likelihood through the mixture $p(x) = \sum_k p(x \mid y{=}k)\,p(y{=}k)$, so they carry fitting information: semi-supervised learning falls out. Unlabeled $x$ says nothing to a model of $p(y \mid x)$ alone.
+- **Adding classes.** Class $k$'s parameters are estimated from class $k$'s points alone, so a new class means one new Gaussian, not a global refit.
+- **Feature freedom**, the discriminative side's entry. Logistic regression accepts arbitrary transformed, correlated, engineered features without modeling their joint density; a generative model must account for every feature it is fed, and correlated features are exactly where naive Bayes' assumption broke.
+- **Calibration in practice.** A correctly specified generative model yields calibrated posteriors, but misspecification shows up directly in the probabilities: naive Bayes' double-counted evidence pushed posteriors toward 0 and 1 in <Ref lesson="naive-bayes" />. Murphy's ledger scores practical calibration for the discriminative column.
+
+{/* fig GenDiscScorecard: two-column verdict table (component figure, HTML table, green checks, muted crosses). Column headers: "generative" (amber) | "discriminative" (blue). Rows, each with ✓/✗ plus a 3–6 word note per cell: closed-form one-pass fit (✓ class statistics / ✗ iterative optimization); missing features at test time (✓ marginalize them out / ✗ impute first); class-prior shift (✓ swap the ln-odds term / ✗ refit or reweight); unlabeled data (✓ x alone has likelihood / ✗ unusable without y); arbitrary correlated features (✗ must model their density / ✓ free); wrong p(x|y) (✗ biased boundary / ✓ unaffected); asymptotic error (✗ at best equal / ✓ at least as low); calibration in practice (✗ overconfident when misspecified / ✓ direct fit of p(y|x)). Footer strip spanning both columns: "sample efficiency: the generative fit reaches its (worse) asymptote first — Ng & Jordan 2002". */}
+<Figure
+  name="GenDiscScorecard"
+  alt="A two-column scorecard: generative models win on closed-form fitting, missing features, prior shift, unlabeled data, and added classes; discriminative models win on feature freedom, robustness to a wrong class-conditional, asymptotic error, and practical calibration"
+  caption="The ledger. Neither column dominates: generative buys structure that pays only while the model of x is roughly right."
+/>
+
+The pattern repeats one level down: naive Bayes against logistic regression is the same pairing with a factorized $p(x \mid y)$ in place of a Gaussian one, and [Ng and Jordan's comparison](https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf) quantified the sample-efficiency entry there: the generative model approaches its (generally worse) asymptotic error after $O(\log d)$ examples against $O(d)$ for the discriminative fit, as covered in <Ref lesson="naive-bayes" />.
+
+<KeyFact>
+Generative models trade robustness for structure: closed-form fitting, missing features, prior shift, unlabeled data, and new classes all come from having a model of $x$, and all of it is only as good as that model.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+The set piece, cold: for the model $y \sim \text{Bernoulli}(\varphi)$, $x \mid y{=}k \sim \mathcal N(\mu_k, \Sigma)$ with shared covariance, derive $p(y{=}1 \mid x)$ from Bayes' rule and show it equals $\sigma(w^\top x + b)$, giving $w$ and $b$ explicitly. Point out the exact step that requires the shared covariance.
+
+<Solution>
+Bayes' rule, with $p(x)$ cancelling in the odds:
+
+$$
+a(x) = \ln\frac{p(y{=}1 \mid x)}{p(y{=}0 \mid x)}
+= \ln\frac{\varphi}{1-\varphi} + \ln\frac{\mathcal N(x;\mu_1,\Sigma)}{\mathcal N(x;\mu_0,\Sigma)} .
+$$
+
+The normalizers $(2\pi)^{d/2}\lvert\Sigma\rvert^{1/2}$ are equal (same $\Sigma$) and cancel, leaving
+
+$$
+a(x) = \ln\frac{\varphi}{1-\varphi} - \tfrac12(x-\mu_1)^\top\Sigma^{-1}(x-\mu_1) + \tfrac12(x-\mu_0)^\top\Sigma^{-1}(x-\mu_0).
+$$
+
+Expand $(x-\mu_k)^\top\Sigma^{-1}(x-\mu_k) = x^\top\Sigma^{-1}x - 2\mu_k^\top\Sigma^{-1}x + \mu_k^\top\Sigma^{-1}\mu_k$. In the difference the $\pm\tfrac12 x^\top\Sigma^{-1}x$ terms cancel: **this is the shared-covariance step**; with $\Sigma_0 \ne \Sigma_1$ the quadratic survives (and so does a $\ln\lvert\Sigma_k\rvert$ ratio). Collecting the rest:
+
+$$
+a(x) = \underbrace{(\mu_1-\mu_0)^\top\Sigma^{-1}}_{w^\top}\,x
+\;\underbrace{-\,\tfrac12(\mu_1+\mu_0)^\top\Sigma^{-1}(\mu_1-\mu_0) + \ln\tfrac{\varphi}{1-\varphi}}_{b},
+$$
+
+using $\mu_1^\top\Sigma^{-1}\mu_1 - \mu_0^\top\Sigma^{-1}\mu_0 = (\mu_1+\mu_0)^\top\Sigma^{-1}(\mu_1-\mu_0)$. Inverting the log-odds gives $p(y{=}1\mid x) = 1/(1+e^{-a(x)}) = \sigma(w^\top x + b)$ with $w = \Sigma^{-1}(\mu_1-\mu_0)$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Parallel to the worked example, with an unequal prior: $\mu_0 = (0,0)^\top$, $\mu_1 = (2,2)^\top$, shared $\Sigma = \operatorname{diag}(2, 1)$, and $\varphi = p(y{=}1) = \tfrac14$. Compute $w$, $b$, and the decision boundary; classify $x = (1,1)^\top$; and explain the posterior value you get there.
+
+<Solution>
+$\Sigma^{-1} = \operatorname{diag}(\tfrac12, 1)$, so $w = \Sigma^{-1}(2,2)^\top = (1, 2)^\top$.
+
+$$
+b = -\tfrac12 (2,2)\,\Sigma^{-1}(2,2)^\top + \ln\tfrac{1/4}{3/4}
+= -\tfrac12(2 + 4) - \ln 3 = -3 - 1.099 = -4.099 .
+$$
+
+Boundary: $x_1 + 2x_2 = 4.099$. At $x = (1,1)^\top$: $a = 1 + 2 - 4.099 = -1.099$, so $p(y{=}1 \mid x) = \sigma(-\ln 3) = \frac{1}{1 + 3} = 0.25$.
+
+Explanation: $(1,1)^\top$ is the midpoint of the means, where the two Gaussian densities are equal (same $\Sigma$, symmetric Mahalanobis distances), so the likelihood ratio is 1 and the posterior falls back to the prior, $\varphi = 0.25$. With equal priors the boundary would pass through this midpoint ($x_1 + 2x_2 = 3$); the $-\ln 3$ prior term pushes it a distance $\ln 3 / \lVert w \rVert$ toward the rarer class, demanding stronger evidence before predicting it.
+</Solution>
+</Exercise>
+
+<Exercise>
+QDA in one dimension: $x \mid y{=}0 \sim \mathcal N(0, 1)$, $x \mid y{=}1 \sim \mathcal N(2, 4)$, equal priors. Find every decision threshold, describe each class's decision region, and explain the region shape in one sentence.
+
+<Solution>
+Log-odds of class 1:
+
+$$
+a(x) = \ln\frac{\sigma_0}{\sigma_1} - \frac{(x-2)^2}{2\cdot 4} + \frac{x^2}{2}
+= -\ln 2 - \frac{(x-2)^2}{8} + \frac{x^2}{2}.
+$$
+
+Set $a(x) = 0$ and multiply by 8: $-8\ln 2 - (x-2)^2 + 4x^2 = 0$, i.e.
+
+$$
+3x^2 + 4x - 4 - 8\ln 2 = 0
+\quad\Longrightarrow\quad
+3x^2 + 4x - 9.545 = 0 .
+$$
+
+Roots: $x = \frac{-4 \pm \sqrt{16 + 114.54}}{6} = \frac{-4 \pm 11.43}{6}$, so $x \approx 1.24$ and $x \approx -2.57$: **two** thresholds, because the boundary condition is a genuine quadratic (the $x^2$ coefficient $\tfrac12 - \tfrac18 = \tfrac38$ is the 1D version of $\tfrac12(\Sigma_0^{-1} - \Sigma_1^{-1})$).
+
+Regions: class 0 on the middle interval $(-2.57,\ 1.24)$, class 1 outside it on **both** sides. The wide Gaussian owns both tails: far enough from either mean, the $\sigma = 2$ density dominates the $\sigma = 1$ density regardless of direction. (Check at $x = -4$: class-1 density $\tfrac12\varphi(\tfrac{-6}{2}) \approx 0.0022$ against class-0 density $\varphi(-4) \approx 0.0001$.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "LDA versus QDA: state the trade-off." Give the boundary shapes, the parameter counts at $d = 50$, the bias–variance reading (the concept from <Ref lesson="bias-variance" />), and the standard middle ground.
+
+<Solution>
+Boundaries: LDA's shared covariance cancels the quadratic term, so boundaries are hyperplanes; QDA's per-class covariances keep $\tfrac12 x^\top(\Sigma_0^{-1} - \Sigma_1^{-1})x$, so boundaries are conics.
+
+Counts at $d = 50$: LDA $2d + d(d+1)/2 + 1 = 100 + 1275 + 1 = 1{,}376$; QDA $2d + d(d+1) + 1 = 100 + 2550 + 1 = 2{,}651$. The covariance block doubles, and it is the dominant $O(d^2)$ term.
+
+Bias–variance: QDA is the lower-bias, higher-variance model. Its hypothesis class strictly contains LDA's, but it estimates a full covariance per class. With small $n$, QDA's extra variance costs more than its flexibility earns and LDA generalizes better even when the true boundary is curved; with large $n$ and genuinely different class covariances, LDA's bias dominates and QDA wins. "More flexible" is not "better": it is the same U-curve as everywhere else in the course.
+
+Middle ground: regularized discriminant analysis, which shrinks each $\hat\Sigma_k$ toward the pooled $\hat\Sigma$ (and optionally toward a diagonal or spherical matrix), with the shrinkage weight tuned by cross-validation; it also repairs singular covariance estimates when $d$ approaches $n$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The classic: "Define generative and discriminative classifiers, give two examples of each, and name two practical advantages of each side."
+
+<Solution>
+Definitions: a generative classifier models the joint distribution (the class-conditional $p(x \mid y)$ and the prior $p(y)$) and classifies through Bayes' rule; a discriminative classifier models the conditional $p(y \mid x)$ directly (or, in the discriminant-function variant, just a label map) and never models $x$.
+
+Examples. Generative: naive Bayes, Gaussian discriminant analysis (also: Gaussian mixtures used for classification). Discriminative: logistic regression, $k$-nearest neighbors; the SVM is strictly a discriminant function (no probabilities), worth saying explicitly.
+
+Generative advantages (any two): closed-form one-pass fitting from class statistics; handles missing features by marginalization; adapts to class-prior shift by swapping one term; uses unlabeled data through $p(x)$ (semi-supervised); reaches its asymptotic error with fewer samples (Ng–Jordan).
+
+Discriminative advantages (any two): robust to misspecification of $p(x \mid y)$, which it never models; asymptotic error at least as low when both fit the same functional form; accepts arbitrary engineered, correlated features without modeling their density; better-calibrated probabilities in practice when generative assumptions are violated.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "My logistic regression fails to converge on this dataset; a colleague says the classes are almost perfectly separable. Would LDA have the same problem? What does its fitted posterior look like on such data?" Use the divergence theorem of <Ref lesson="logistic-regression" />.
+
+<Solution>
+Logistic: by the separability theorem, the MLE does not exist. Scaling any separating $w$ up strictly increases the likelihood, so the optimizer diverges, $\lVert \hat w\rVert \to \infty$, with fitted probabilities pinned at 0 and 1. (Practical fixes: L2 regularization, i.e. a Gaussian prior, restores a finite unique optimum.)
+
+LDA: no such failure is possible, because nothing iterates. The estimates $\hat\varphi$, $\hat\mu_0$, $\hat\mu_1$, $\hat\Sigma$ are one-pass class statistics that exist for any labeled sample, separable or not; the only existence condition is an invertible pooled covariance (enough points in general position, or shrinkage otherwise). The fitted posterior is $\sigma(\hat w^\top x + \hat b)$ with finite $\hat w = \hat\Sigma^{-1}(\hat\mu_1 - \hat\mu_0)$: probabilities strictly inside $(0,1)$, steep but not degenerate across the gap between the classes. Separated, roughly Gaussian classes are in fact a favorable regime for LDA: the case where the efficiency argument for the generative fit applies and the discriminative MLE is at infinity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="naive-bayes" />: Gaussian naive Bayes as a special case of GDA. (a) Show that GDA with a shared **diagonal** covariance $\Sigma = \operatorname{diag}(\sigma_1^2, \dots, \sigma_d^2)$ gives $w_j = (\mu_{1j} - \mu_{0j})/\sigma_j^2$, the shared-variance Gaussian naive Bayes classifier. (b) In the chapter's worked example ($\mu_1 - \mu_0 = (2,1)^\top$, unit marginal variances, correlation $\tfrac12$), compare the naive-Bayes direction with the full-covariance $w$ and interpret the difference.
+
+<Solution>
+(a) A diagonal shared covariance means the features are conditionally independent given the class: exactly the naive Bayes factorization with Gaussian factors. The theorem's weight vector is $w = \Sigma^{-1}(\mu_1 - \mu_0)$, and inverting a diagonal matrix inverts its entries: $w_j = (\mu_{1j} - \mu_{0j})/\sigma_j^2$, matching the coordinate-wise derivation done for Gaussian naive Bayes in the earlier chapter.
+
+(b) Ignoring the correlation (using only the unit marginal variances) gives the naive direction $w_{\text{NB}} = (2, 1)^\top$: both coordinates count as evidence. The full-covariance fit gives $w = \Sigma^{-1}(2,1)^\top = (2, 0)^\top$: the second coordinate is dropped entirely. The correlation $\rho = \tfrac12$ means $x_2$'s mean shift of 1 is exactly what its co-movement with $x_1$ (mean shift 2, $\rho\,\delta\mu_1 = 1$) already predicts, so $x_2$ carries no *independent* evidence; naive Bayes re-counts it anyway. This is the double-counting that made naive Bayes overconfident, now visible as a wrong direction in $w$: the off-diagonal of $\Sigma$ is precisely the information naive Bayes discards.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "PCA or LDA for dimensionality reduction before a classifier: what is the difference and when does each fail?" Answer using Fisher's criterion; the PCA details are developed in <Ref lesson="pca" />.
+
+<Solution>
+PCA is unsupervised: it projects onto the directions of maximal data variance, computed from $X$ alone, labels never consulted. Fisher's LDA is supervised: it projects onto directions maximizing between-class separation relative to within-class scatter, $w \propto S_W^{-1}(\mu_1 - \mu_0)$, and for $K$ classes yields at most $K - 1$ directions.
+
+Failure modes: PCA fails when variance and class-relevance disagree. Two elongated parallel class clouds have their top principal component along the (shared, uninformative) elongation, and the discriminating low-variance direction is discarded; this is the chapter's Fisher figure. LDA fails when its ingredients do: at most $K-1$ output dimensions regardless of the structure, class statistics estimated from few labeled points (needs $S_W$ invertible or shrunk), and separation measured only through means and covariances, so classes distinguished by higher-order structure (same means, different shapes) can show zero Fisher separation. Standard practice when labels exist and the task is classification: LDA or a supervised method; PCA when labels are absent, scarce, or the goal is compression/denoising rather than separation.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §4.1: the multivariate normal, the GDA model and its closed-form MLE, and §4.1.3: GDA versus logistic regression (efficiency against robustness, the one-directional implication). https://cs229.stanford.edu/main_notes.pdf
+2. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.5.4: the generative / discriminative / discriminant-function taxonomy; §4.1.4: Fisher's linear discriminant; §4.2.1–4.2.2: the sigmoid posterior with w = Σ⁻¹(μ₁−μ₀) and the pooled-covariance ML solution. https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §9.2: Gaussian discriminant analysis, LDA/QDA boundary geometry, and the LDA–logistic connection; §9.4: the generative-versus-discriminative trade-off list behind the ledger. https://probml.github.io/pml-book/book1.html
+4. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §4.2: indicator regression and masking; §4.3: LDA, QDA, discriminant functions, and regularized discriminant analysis; §4.3.3: reduced-rank (Fisher) LDA; §4.4.5: LDA versus logistic regression. https://hastie.su.domains/ElemStatLearn/
+5. B. Efron, "The Efficiency of Logistic Regression Compared to Normal Discriminant Analysis," *Journal of the American Statistical Association*, 70(352), 1975 — logistic regression typically one half to two thirds as efficient as LDA when the normality assumption holds.
+6. A. Y. Ng, M. I. Jordan, "On Discriminative vs. Generative Classifiers: A Comparison of Logistic Regression and Naive Bayes," *Advances in Neural Information Processing Systems* 14, 2002 — the two-regimes sample-complexity result cited in the ledger. https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf
+7. J. H. Friedman, "Regularized Discriminant Analysis," *Journal of the American Statistical Association*, 84(405), 1989 — shrinkage interpolation between QDA, LDA, and near-spherical covariance estimates.
+8. R. A. Fisher, "The Use of Multiple Measurements in Taxonomic Problems," *Annals of Eugenics*, 7(2), 1936 — the original linear discriminant, derived from the separation criterion with no Gaussian assumption.
+</References>

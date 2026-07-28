@@ -1,0 +1,349 @@
+Averaging B identically distributed trees leaves bias unchanged and cuts variance only down to a floor set by the between-tree correlation — random forests exist to attack that floor. This chapter derives that floor, the correlated-average formula $\rho\sigma^2 + (1-\rho)\sigma^2/B$, and builds both ensemble algorithms on it. The route: why averaging independent estimators divides variance by $B$ and why bootstrapped trees are not independent, the formula derived from the covariance expansion, bagging and the learners it helps, per-split feature subsampling and the strength–correlation trade, out-of-bag error, the two variable-importance measures and their biases, and Breiman's theorem that more trees never overfit.
+
+## Averaging independent estimators: variance ÷ B, bias unchanged
+
+<Ref lesson="decision-trees" /> closed on instability: deleting one row of a ten-row table flipped the root split and rebuilt the entire tree. A deep tree is a **low-bias, high-variance** estimator, and in the decomposition of <Ref lesson="bias-variance" /> its test error is dominated by the variance term: the fitted model is a jumpy function of the training draw.
+
+The classical treatment for variance is averaging. If $\hat f_1, \dots, \hat f_B$ are estimators of the same quantity, each with variance $\sigma^2$ at a query point, and they are **independent**, then
+
+$$
+\mathrm{Var}\!\left(\frac{1}{B}\sum_{b=1}^B \hat f_b\right) = \frac{1}{B^2}\sum_{b=1}^B \mathrm{Var}(\hat f_b) = \frac{\sigma^2}{B},
+$$
+
+while the expectation, hence the bias, is untouched: $\mathbb{E}[\bar f\,] = \mathbb{E}[\hat f_1]$. In the ideal experiment of [Weinberger's CS4780 bagging lecture](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote18.html), $B$ independent training sets each produce a tree; by the weak law of large numbers the average converges, as $B \to \infty$, to the *expected* tree $\mathbb{E}_D[\hat f_D]$, and the variance term of the error vanishes entirely. Only bias and irreducible noise survive.
+
+<Figure
+  src="./figures/vote-average.svg"
+  alt="Left panel: eight jagged axis-aligned tree boundaries scattered around a diagonal true boundary; right panel: their vote, a single near-smooth boundary through the same two-class data"
+  caption="Eight trees on resampled data: each boundary is a staircase in a different place; their vote is nearly smooth. Averaging removes the scatter, not the systematic part."
+/>
+
+For classification the aggregate is a **majority vote**, and the independence ideal has a sharp benchmark computation, from [Dietterich (2000)](https://doi.org/10.1007/3-540-45014-9_1):
+
+<Example title="21 independent voters">
+Let 21 classifiers each have error rate $0.3$, with independent errors. The majority vote is wrong only when at least 11 of them are wrong simultaneously: a binomial tail,
+
+$$
+\Pr(\text{vote wrong}) = \sum_{k=11}^{21} \binom{21}{k} (0.3)^k (0.7)^{21-k} \approx 0.026 .
+$$
+
+The largest term, $k = 11$: $\binom{21}{11}(0.3)^{11}(0.7)^{10} = 352{,}716 \times 1.771\times 10^{-6} \times 0.02825 \approx 0.018$; the remaining terms decay fast. Twenty-one mediocre but independent voters compress a 30% error rate to 2.6%.
+</Example>
+
+The obstacle is one sentence long: there is one training set, all $B$ trees must be grown from it, and models grown from the same data are not independent. How far correlation degrades the $\sigma^2/B$ ideal is exactly what the next section computes.
+
+<Aside>
+Dietterich's paper organizes *why* ensembles help into three reasons, and the trio is a useful frame for this whole module. **Statistical**: with limited data many different trees fit about equally well; averaging them hedges the arbitrary choice of one. **Computational**: greedy growing lands in different local optima on different resamples; averaging smooths over the greedy search's accidents. **Representational**: no single axis-aligned staircase equals a diagonal boundary, but a vote over many staircases can approximate it arbitrarily well (Dietterich's Fig. 4 argument, visible in the figure above). Bagging exploits mainly the first two; the third is why the ensemble can beat every one of its members.
+</Aside>
+
+<KeyFact>
+Averaging $B$ independent copies of an estimator divides variance by $B$ and leaves bias unchanged. Every design decision in bagging and random forests is an attempt to manufacture copies that are as close to independent as one training set allows.
+</KeyFact>
+
+## The interview set piece: variance of a correlated average
+
+Two trees first, with numbers. Suppose two trees' predictions at a fixed query point each have standard deviation 10 ($\sigma^2 = 100$) across training draws. If they were independent, their average would have variance $100/2 = 50$. If their correlation is $\rho = 0.9$:
+
+$$
+\mathrm{Var}\!\left(\tfrac{Z_1 + Z_2}{2}\right) = \tfrac{1}{4}\left[\mathrm{Var}(Z_1) + \mathrm{Var}(Z_2) + 2\,\mathrm{Cov}(Z_1, Z_2)\right] = \tfrac{1}{4}\left[100 + 100 + 2(0.9)(100)\right] = 95 .
+$$
+
+Averaging two nearly redundant trees bought a 5% variance reduction, not 50%. The general statement is the module's central formula, [ESL Eq. 15.1](https://hastie.su.domains/ElemStatLearn/):
+
+<Theorem title="variance of a correlated average">
+Let $Z_1, \dots, Z_B$ be identically distributed with $\mathrm{Var}(Z_b) = \sigma^2$ and pairwise correlation $\mathrm{Corr}(Z_i, Z_j) = \rho \ge 0$ for all $i \ne j$. Then
+
+$$
+\mathrm{Var}\!\left(\frac{1}{B}\sum_{b=1}^B Z_b\right) = \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2 .
+$$
+
+<Proof>
+Expand by bilinearity of covariance:
+
+$$
+\mathrm{Var}\!\left(\frac{1}{B}\sum_b Z_b\right) = \frac{1}{B^2} \sum_{i=1}^B \sum_{j=1}^B \mathrm{Cov}(Z_i, Z_j).
+$$
+
+The double sum has $B^2$ terms of two kinds. The $B$ diagonal terms are variances: $\mathrm{Cov}(Z_i, Z_i) = \sigma^2$. The $B(B-1)$ off-diagonal terms are covariances of distinct pairs: $\mathrm{Cov}(Z_i, Z_j) = \rho\sigma^2$, by the definition of correlation and equal variances. Therefore
+
+$$
+\mathrm{Var}\!\left(\frac{1}{B}\sum_b Z_b\right) = \frac{1}{B^2}\Big[B\sigma^2 + B(B-1)\rho\sigma^2\Big] = \frac{\sigma^2}{B} + \frac{B-1}{B}\rho\sigma^2 = \rho\sigma^2 + \frac{1-\rho}{B}\sigma^2 ,
+$$
+
+the last step by splitting $\frac{B-1}{B} = 1 - \frac{1}{B}$ and collecting the $1/B$ terms.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="formula"
+  alt="Three frames: the variance of the average expanded into a 4-by-4 covariance grid; the grid's diagonal cells evaluated to sigma squared and off-diagonal cells to rho sigma squared with tallies B and B(B minus 1); the sum simplified to rho sigma squared plus (1 minus rho) sigma squared over B with both limits annotated"
+  caption="The derivation as a covariance grid: expand, evaluate the two kinds of cell, simplify. B controls only the second term."
+/>
+
+<Task>
+Step through the three frames, then plug the two-tree numbers into the frame-3 formula: $\rho\sigma^2 + (1-\rho)\sigma^2/B = 0.9 \times 100 + 0.1 \times 100 / 2 = 95$, matching the direct computation above.
+</Task>
+
+### Reading the formula: B kills one term, ρ owns the other
+
+The second term, $(1-\rho)\sigma^2/B$, dies at rate $1/B$: trees are cheap and parallel, so this term is never the binding constraint. The first term, $\rho\sigma^2$, does not contain $B$. It is a **floor**: no number of trees passes it. The sanity checks: $\rho = 0$ recovers the i.i.d. value $\sigma^2/B$; $\rho = 1$ gives $\sigma^2$, since averaging $B$ identical copies changes nothing.
+
+<Figure
+  src="./figures/floor.svg"
+  alt="Ensemble variance versus number of trees for correlations 0, 0.3, and 0.7; each curve flattens at its own floor rho sigma squared, with a green arrow labeled feature subsampling pushing the 0.7 floor down"
+  caption="Variance vs B for three values of ρ. Each curve flattens at ρσ²; only lowering ρ moves the flat part."
+/>
+
+<Example title="B versus ρ, numerically">
+Take $\sigma^2 = 100$ and $\rho = 0.7$. The ensemble variance is $70 + 30/B$: at $B = 10$ it is $73$, at $B = 25$ it is $71.2$, at $B = 100$ it is $70.3$, and the limit is $70$. Growing the forest from 10 trees to infinity moves the variance from 73 to 70. Cutting the correlation to $\rho = 0.2$ at a fixed $B = 25$ gives $20 + 80/25 = 23.2$: a threefold reduction. Past a few dozen trees, decorrelation is the only lever that matters.
+</Example>
+
+<Remark title="what ρ is, precisely">
+$\rho$ is the correlation between the *predictions* of two trees at a fixed point, viewed as random variables over the draw of the training data and any algorithmic randomness, not the correlation between features. Two trees are correlated because they were grown from the same sample and therefore make similar calls, and this holds even on a dataset whose features are mutually independent. Stating $\rho$ as "feature correlation" is the standard misstatement, and interviewers listen for it. ESL §15.4.1 gives the formal definition as a sampling correlation.
+</Remark>
+
+Bias needs one line: the average has the same expectation as a single (bootstrap-trained) tree, so averaging never reduces bias. That fixes the design of the base learner: grow trees **deep and unpruned**, driving bias low and accepting the large $\sigma^2$, because the ensemble machinery repairs variance and cannot repair bias. A single tree must balance both hazards through pruning; a forest member only needs to be unbiased.
+
+<KeyFact>
+$\mathrm{Var}(\bar Z) = \rho\sigma^2 + (1-\rho)\sigma^2/B$: more trees remove only the second term, and the correlation term $\rho\sigma^2$ is a floor that no $B$ can pass. Bias is untouched by averaging.
+</KeyFact>
+
+<Aside>
+The formula quietly assumes $\rho \ge 0$, and for large ensembles that assumption is forced: a common pairwise correlation among $B$ variables must satisfy $\rho \ge -1/(B-1)$ for the covariance matrix to remain positive semidefinite, so as $B$ grows the feasible $\rho$ is essentially non-negative. Systematically anti-correlated trees, which would make averaging better than the i.i.d. case, are not an option at scale.
+</Aside>
+
+## Bagging: bootstrap resamples as substitute training sets
+
+Independent training sets do not exist; the bootstrap of <Ref lesson="cross-validation-bootstrap" /> manufactures substitutes. Recap in one sentence: a bootstrap resample draws $n$ points from the training set with replacement, repeating some rows and omitting $\approx 36.8\%$ of them.
+
+<Definition title="bagging">
+*Bagging* (bootstrap aggregation, [Breiman 1996](https://doi.org/10.1007/BF00058655)): draw $B$ bootstrap resamples of the training set, grow one deep unpruned tree on each, and aggregate: average the $B$ predictions for regression, take the majority vote (or average the class probabilities) for classification.
+</Definition>
+
+Each resampled point is marginally distributed like a draw from the training data, so each bagged tree is close in distribution to a tree grown on a fresh sample of the empirical distribution. The $B$ resamples, however, all come from the *same* $n$ rows, sharing on average $\approx 63.2\%$ of their distinct points pairwise. The trees are identically distributed, not independent: the previous section's formula applies with a strictly positive $\rho$, and the 21-voter benchmark of 0.026 is the unattainable ideal, not the achieved value.
+
+Two structural consequences follow directly from the formula.
+
+**Bagging needs unstable learners.** A *stable* procedure (linear regression on a well-conditioned problem, k-NN with large $k$) returns nearly the same fit on every resample, since resamples differ in about a third of their rows and stable fits shrug that off. Then $\rho \approx 1$, the floor is $\approx \sigma^2$, and bagging buys nothing (a small $\sigma^2$, but it was already small). Deep trees are the ideal client precisely because of the argmin-flipping instability documented in <Ref lesson="decision-trees" />: high $\sigma^2$, and resamples different enough to push $\rho$ well below 1. Breiman's original paper makes the same list: bagging helps trees and neural networks, and does little for stable methods.
+
+**Bagging never repairs bias.** An averaged underfit model is still underfit: bagged stumps predict the expected stump, not the truth. When the base learner's problem is bias, the tool is boosting, which is <Ref lesson="adaboost" />'s subject.
+
+One practical bonus: the spread of the $B$ individual predictions around the ensemble mean is a free uncertainty readout. A house-price prediction of \$300k with a cross-tree standard deviation of \$10k is a different decision input than the same \$300k with a spread of \$50k, and no extra computation produces the distinction.
+
+<KeyFact>
+Bagging is bootstrap plus aggregation: a pure variance tool that requires an unstable, low-bias base learner. For stable learners $\rho \approx 1$ and nothing is gained; for biased learners nothing can be gained, because averaging preserves expectation.
+</KeyFact>
+
+## Random forests: per-split feature subsampling attacks ρ
+
+Bagging's residual flaw has a name: the **dominant predictor**. Suppose one feature is clearly the strongest. Every bootstrap resample still contains that feature and most of its rows, so every tree's root scan picks it, the second levels look alike, and the $B$ trees are structural near-copies producing highly correlated predictions ([ISLP §8.2.2](https://www.statlearning.com)). Bagging randomized the *rows*, but rows are not what correlates the trees; the shared argmax over features is.
+
+<Figure
+  src="./figures/dominant.svg"
+  alt="Left: three bagged trees all rooted at the strong feature x1; right: three random-forest trees rooted at x1, x7, and x3 because each split's candidate set of m features may omit x1"
+  caption="What m randomizes: under bagging the strong feature wins every root; under per-split subsampling it is absent from a split's candidate set with probability (p−m)/p, and tree structures diverge."
+/>
+
+<Definition title="random forest">
+A *random forest* ([Breiman 2001](https://doi.org/10.1023/A:1010933404324)) is bagging with one modification: at **every split**, draw $m$ of the $p$ features uniformly at random and restrict the split search to those $m$. Standard defaults (ESL §15.3): $m = \lfloor\sqrt{p}\rfloor$ for classification with minimum leaf size 1, $m = \lfloor p/3 \rfloor$ for regression with minimum leaf size 5. Setting $m = p$ recovers plain bagging.
+</Definition>
+
+The subsampling is drawn **per split, not per tree**. The per-tree variant exists (the random subspace method, which fixes one feature subset for a whole tree), but a random forest redraws the candidate set at every node, so even two trees that agree at the root can diverge one level down. Confusing the two is a standard interview trap.
+
+The mechanism, quantified: with $p = 100$ and $m = 10$, any given split fails to even consider the dominant feature with probability $(p - m)/p = 0.9$. Other features get to lead, tree structures diverge, and $\rho$ falls. The cost is that each tree individually weakens slightly: the best available split at a node is now the best of $m$ candidates, not of $p$.
+
+### The trade: correlation falls faster than strength
+
+Breiman's experiments (Figs. 1–3 of the 2001 paper) plot the two effects against $m$: the individual trees' accuracy (his *strength* $s$, the expected margin of a single tree) rises quickly with $m$ and then plateaus, while the between-tree correlation $\bar\rho$ keeps climbing all the way to $m = p$. Small $m$ therefore decorrelates the forest much faster than it weakens its members, and the error-minimizing $m$ sits low, near $\sqrt{p}$ rather than near $p$.
+
+<Figure
+  src="./figures/strength-correlation.svg"
+  alt="Two curves against m: tree strength rising quickly and plateauing, correlation rising steadily throughout; a green band at small m marks the error-minimizing region"
+  caption="Schematic of Breiman's Figs. 1–3: strength saturates early, correlation keeps climbing, so the optimum m is small."
+/>
+
+The formal version of the trade is Breiman's bound:
+
+<Theorem title="strength–correlation bound (Breiman 2001, Thm 2.3)">
+For a random forest classifier with strength $s > 0$ (the expected margin of the randomized tree) and mean prediction correlation $\bar\rho$, the generalization error satisfies
+
+$$
+PE^{*} \;\le\; \frac{\bar\rho\,(1 - s^2)}{s^2} .
+$$
+</Theorem>
+
+The proof is one application of Chebyshev's inequality to the margin: error is the probability the margin goes negative, bounded by the margin's variance over $s^2$, and that variance is at most $\bar\rho(1 - s^2)$. The bound is loose in absolute terms; its value is the direction it points: generalization error improves by **shrinking $\bar\rho$ without collapsing $s$**, which is precisely what a small $m$ does and what the variance formula predicts for the regression case.
+
+The effect is largest when $p$ is large and predictors are correlated. On ISLP's 500-gene expression data (15 cancer classes, Fig. 8.10), the forest with $m = \sqrt{p}$ clearly beats $m = p$ bagging at every ensemble size. $m$ is the forest's main tuning knob, and the next section's OOB error is the standard way to set it.
+
+<KeyFact>
+Feature subsampling is the only ingredient random forests add to bagging, and its entire purpose is to lower $\rho$ in the variance formula. Small $m$ decorrelates trees faster than it weakens them; the subsampling happens at every split, not once per tree.
+</KeyFact>
+
+## Out-of-bag error: the free test set inside the ensemble
+
+The 0.632 set piece of <Ref lesson="cross-validation-bootstrap" /> established that a bootstrap resample omits each point with probability $(1 - 1/n)^n \to 1/e \approx 0.368$. In an ensemble of bootstrapped trees that fact becomes an evaluation protocol: for every training point, about a third of the forest never saw it.
+
+<Definition title="out-of-bag error">
+A point $x_i$ is *out of bag* (OOB) for tree $b$ if the $b$-th bootstrap resample omitted it. The **OOB prediction** for $x_i$ aggregates only the trees for which $x_i$ is out of bag; the **OOB error** is the average loss of these predictions over all $n$ training points.
+</Definition>
+
+<Figure
+  src="./figures/oob.svg"
+  alt="One training point and nine trees: six grayed trees whose bootstrap samples contained the point, three amber trees that never saw it, with arrows from the amber trees to a vote box producing the OOB prediction"
+  caption="OOB mechanics for one point: only the trees that never saw it vote. Averaged over all points, the votes form a test-error estimate with no held-out data."
+/>
+
+<Example title="how many honest voters each point gets">
+$n = 1{,}000$ points, $B = 500$ trees. Each tree omits each point with probability $(1 - 1/1000)^{1000} \approx 0.368$, so a given point is OOB for about $0.368 \times 500 \approx 184$ trees. Its OOB prediction is the vote of a 184-tree forest that treats it as unseen data: not a noisy single-model score but an ensemble prediction in its own right.
+</Example>
+
+Because every point is scored by a genuinely held-out sub-forest, the OOB error behaves like a cross-validation estimate; [ISLP §8.2.1](https://www.statlearning.com) notes that for large $B$ it is virtually equivalent to the LOOCV error. The economics are the point: $k$-fold CV on a forest costs $k$ retrainings of the whole ensemble, while OOB error falls out of the single training run, which matters exactly in the large-$n$, large-$B$ regime where forests are used. Standard uses: monitor OOB error as trees are added ($B$ is sufficient when the curve flattens), and tune $m$ by comparing OOB errors across a small grid.
+
+One honesty caveat carries over from the validation chapter: OOB error is an unbiased-style estimate for a *fixed* configuration, but the minimum of OOB errors over many tried configurations inherits the optimism of any minimized noisy estimate (<Ref lesson="cross-validation-bootstrap" /> computed the effect). A tuned forest's final quoted number should come from data that never voted on the tuning.
+
+<KeyFact>
+Each tree's resample misses $\approx 36.8\%$ of the points, so scoring every point with only the trees that never saw it yields the OOB error: a test-quality estimate, approximately LOOCV for large $B$, at zero additional training cost.
+</KeyFact>
+
+## Variable importance: impurity accumulation versus permutation
+
+A forest gives up the single tree's readable flowchart; importance scores are the partial refund, and the two standard scores fail in different ways.
+
+**Mean decrease in impurity** (Gini importance): for each feature, sum the impurity reductions of every split made on it, across all trees, and normalize. The score is free (bookkeeping over splits already made) and it has two known biases. First, it inherits the high-cardinality bias flagged in <Ref lesson="decision-trees" />: a feature with many distinct values offers many candidate thresholds, hence many chances at a spuriously large impurity drop, so a pure-noise ID-like column can outrank real signal. Second, it is computed entirely on training-time splits, so it reports what the trees *used*, not what generalizes.
+
+**Permutation importance** (Breiman 2001, §10): for each tree, record its accuracy on its OOB points; then randomly permute the values of feature $j$ among those OOB points and record the accuracy again. The importance of $j$ is the average degradation across trees. Shuffling destroys the feature's association with the label while preserving its marginal distribution; a feature the forest does not rely on degrades nothing. Because the measurement runs on OOB data, a junk high-cardinality column scores near zero, whatever it did during training.
+
+<Figure
+  src="./figures/importance.svg"
+  alt="Two bar charts for the same forest: impurity importance ranks a 200-level pure-noise ID feature first, while OOB permutation importance ranks it near zero and the true signal feature first"
+  caption="The disagreement pattern that matters: impurity importance inflates the high-cardinality junk feature; permutation importance, measured on OOB data, does not."
+/>
+
+Breiman's own demonstration used the congressional-votes benchmark: permutation importance concentrated almost entirely on one variable, and a forest grown on that single variable came close to the full model's error: the importance ranking identified, from inside the model, that most of the dataset was redundant.
+
+Both measures share one caveat: **correlated features split the credit**. Duplicate a strong feature and each copy's permutation score drops, because when one copy is shuffled the trees fall back on the other; impurity credit likewise divides across the copies. Importance ranks features *within this fitted forest*; it is not a causal statement, and low importance for one member of a correlated group does not mean the group is dispensable.
+
+<KeyFact>
+When the two importance measures disagree on a high-cardinality feature, trust permutation: impurity importance is a training-time tally with a known bias toward many-valued features, while permutation importance is measured on out-of-bag data. Both dilute across correlated features.
+</KeyFact>
+
+## More trees never overfit; deeper trees still can
+
+The remaining interview question is whether a 10,000-tree forest overfits where a 100-tree forest did not. Breiman answered it as a theorem:
+
+<Theorem title="forests converge (Breiman 2001, Thm 1.2)">
+As $B \to \infty$, the generalization error of a random forest converges almost surely (over the sequence of trees' random parameters) to a limiting value $PE^{*}$ determined by the data distribution and the randomized tree-growing procedure.
+</Theorem>
+
+The intuition is that $B$ is not a complexity parameter. Each tree is an i.i.d. draw of a *fixed-capacity* randomized predictor, and the forest's vote is a Monte Carlo estimate of that predictor's expectation: adding trees reduces the estimation noise and adds no representational power. The practical reading: grow trees until the OOB curve flattens (typically a few hundred), and never expect error to turn back up. Boosting is the contrast case: each round fits a *new* function to the current mistakes, so complexity grows with the iteration count and the round number is a genuine overfitting knob (<Ref lesson="gradient-boosting" />).
+
+<KeyFact>
+"More trees never overfit" is a theorem; "random forests cannot overfit" is false. The limit the forest converges to is set by the individual trees, and trees grown to depth-unlimited, single-point leaves on noisy data yield an overfit limit; tree depth, minimum leaf size, and $m$ still regularize the forest even though $B$ does not.
+</KeyFact>
+
+The same averaging logic explains the forest's tolerance of label noise. In Breiman's experiments (2001, §8, Table 4), adding 5% class-label noise raised AdaBoost's error by roughly 40% on average across datasets while the random forest's rose by about 2%: a vote over independent-ish trees shrugs off a few corrupted labels, whereas a method that concentrates weight on its mistakes chases them. The mechanism, and boosting's side of the comparison, is developed in <Ref lesson="adaboost" />; the placement summary until then is one line: **bagging and forests reduce variance, boosting reduces bias**, and the two families fail in opposite directions.
+
+## Exercises
+
+<Exercise>
+The set piece, exactly as interviewers ask it: "Why does bagging reduce variance? Derive it." Give the full derivation for $B$ identically distributed trees with common variance $\sigma^2$ and pairwise prediction correlation $\rho$, read off both limits, and state what bagging does to bias.
+
+<Solution>
+Let $Z_1, \dots, Z_B$ be the trees' predictions at a fixed point, $\mathrm{Var}(Z_b) = \sigma^2$, $\mathrm{Corr}(Z_i, Z_j) = \rho$ for $i \ne j$. Expand:
+
+$$
+\mathrm{Var}\!\left(\frac{1}{B}\sum_b Z_b\right) = \frac{1}{B^2}\sum_{i,j} \mathrm{Cov}(Z_i, Z_j) = \frac{1}{B^2}\Big[\underbrace{B\sigma^2}_{i=j} + \underbrace{B(B-1)\rho\sigma^2}_{i \ne j}\Big] = \frac{\sigma^2}{B} + \frac{B-1}{B}\rho\sigma^2 = \rho\sigma^2 + \frac{1-\rho}{B}\sigma^2 .
+$$
+
+Limits: $\rho = 0$ gives the i.i.d. $\sigma^2/B$; $B \to \infty$ gives $\rho\sigma^2$, the floor set by correlation; $\rho = 1$ gives $\sigma^2$ (identical copies, no gain). Bagging reduces variance because bootstrapped trees are unstable enough that $\rho$ is well below 1, so both terms shrink relative to a single tree's $\sigma^2$. Bias is unchanged: the average has the same expectation as a single bootstrap-trained tree, so bagging is purely a variance tool. Mention, for full credit, that $\rho$ is the correlation of predictions across training draws, not feature correlation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: bagging already randomizes the training rows; why do random forests additionally subsample *features*? Answer in terms of the variance formula, and quantify the mechanism for $p = 100$, $m = 10$.
+
+<Solution>
+Row resampling alone leaves a specific correlation channel open: a dominant predictor. Every bootstrap resample still contains the strongest feature, so every tree's greedy root scan selects it, the trees become structural near-copies, and $\rho$ stays high. In the formula $\rho\sigma^2 + (1-\rho)\sigma^2/B$, more trees only remove the second term; the high $\rho$ from shared structure is a floor that row randomization cannot touch.
+
+Per-split feature subsampling attacks $\rho$ directly: with $m$ of $p$ features eligible at each split, a given split omits the dominant feature from its candidate set with probability $(p-m)/p$; with $p = 100$, $m = 10$ that is $0.9$, so nine of ten splits cannot pick it. Different features lead in different trees, structures diverge, $\rho$ falls. The cost is a small loss of per-tree strength (best-of-$m$ splits instead of best-of-$p$), and Breiman's experiments show correlation falls much faster than strength as $m$ shrinks, so the error-optimal $m$ is small ($\approx \sqrt{p}$ for classification).
+</Solution>
+</Exercise>
+
+<Exercise>
+The OOB set piece, drawing on <Ref lesson="cross-validation-bootstrap" />: (a) derive the probability that a given training point is out of bag for one tree, and its limit; (b) for $n = 1{,}000$ and $B = 300$, compute the expected number of trees for which a point is OOB; (c) explain why OOB error is "free" compared to cross-validating the forest, and state its one honesty caveat.
+
+<Solution>
+(a) One bootstrap draw misses the point with probability $1 - 1/n$; the $n$ draws are independent, so the resample misses it with probability $(1 - 1/n)^n \to e^{-1} \approx 0.368$ (the complement of the 0.632 rule derived in the cross-validation chapter).
+
+(b) Each of the 300 trees omits the point with probability $\approx 0.368$, so it is OOB for $\approx 0.368 \times 300 \approx 110$ trees; its OOB prediction is the vote of that 110-tree sub-forest.
+
+(c) OOB error reuses the single training run: the trees that must exist anyway partition into "saw the point" and "did not" for every point, so a held-out-quality score requires no retraining, while $k$-fold CV would retrain the entire forest $k$ times. For large $B$ the OOB error approximates LOOCV. Caveat: it is honest for a fixed configuration, but the minimum of OOB errors over many tuned configurations (values of $m$, depths) is optimistically biased, like any minimized noisy estimate; a tuned forest's reported error should come from untouched data.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "Does adding more trees overfit a random forest?" Give the complete answer, including the theorem being invoked, the intuition, the contrast with boosting iterations, and the sense in which a random forest can still overfit.
+
+<Solution>
+No: Breiman's convergence theorem (2001, Thm 1.2) states that as $B \to \infty$ the forest's generalization error converges almost surely to a limit $PE^{*}$; the error curve flattens and never turns back up. Intuition: each tree is an i.i.d. draw of a fixed-capacity randomized predictor, and the forest's average is a Monte Carlo estimate of that predictor's expectation. Adding trees reduces the estimate's noise and adds zero representational capacity, so $B$ is not a complexity parameter. In the variance formula, growing $B$ only drives the ensemble toward its $\rho\sigma^2$ floor.
+
+Boosting is the opposite: each round fits a new function to the current residuals or reweighted mistakes, so the model's complexity grows with the number of rounds, and the iteration count is a real overfitting knob requiring early stopping or shrinkage.
+
+The forest can still overfit through its *trees*: the limit $PE^{*}$ is a property of the randomized tree-growing procedure, and depth-unlimited trees with single-point leaves grown on noisy data converge to an overfit limit. "More trees don't overfit" is true; "forests can't overfit" is not; depth, minimum leaf size, and $m$ remain the regularizers.
+</Solution>
+</Exercise>
+
+<Exercise>
+On a dataset containing a 200-level categorical identifier that is pure noise, Gini importance ranks the identifier first while permutation importance ranks it last. Explain both mechanisms and state which ranking to trust, with the one caveat that applies to the trusted measure too.
+
+<Solution>
+Gini importance sums training-time impurity reductions per feature. A 200-level categorical offers an enormous number of candidate partitions at every node, so by pure chance some partition of its levels produces a large impurity drop on the training sample; the trees take those splits, and the tally credits the identifier: the same high-cardinality bias that inflates information gain in single trees. The score also never consults held-out data, so a chance fit is never audited.
+
+Permutation importance shuffles the identifier's values among each tree's OOB points and measures the accuracy drop. The identifier's training-time splits do not generalize to OOB points, so predictions for them are unaffected by the shuffle and the score lands near zero. Trust permutation: it is measured on data the trees never fit.
+
+Caveat: permutation importance divides credit across correlated features: shuffle one of two near-duplicates and the trees fall back on the other, so both score low even if the pair jointly carries real signal. Low permutation importance for one member of a correlated group is not evidence the group is useless.
+</Solution>
+</Exercise>
+
+<Exercise>
+Scenario question: 200 rows, 10,000 features (a genomics screen). Compare a single pruned decision tree, a random forest with default $m = \sqrt{p} = 100$, and an L2- or L1-regularized linear model. Which concerns dominate for each, and what would you actually run?
+
+<Solution>
+Single tree: worst positioned. With 200 rows, a greedy scan over 10,000 features almost surely finds spurious splits (the same chance-correlation arithmetic as ESL's wrong-way-CV set piece: thousands of candidates, tiny sample), and one tree's high variance means a different tree on every resample; pruning limits the damage but the model remains a coin flip of the draw.
+
+Random forest: averaging tames the variance and OOB error gives a cheap honest estimate, but the default $m = 100$ means each split sees only 1% of the features; if only a handful of the 10,000 carry signal, a split's candidate set contains a relevant feature with small probability, so individual trees are weak (low strength $s$ in Breiman's bound) and the forest needs a larger $m$, worth tuning by OOB error. Forests remain usable here, but with many pure-noise features their advantage shrinks.
+
+Regularized linear model: usually the right first answer in $p \gg n$ when effects are plausibly additive: ridge handles the singular design (the $p > n$ failure of OLS), lasso additionally selects a sparse gene set, and the whole pipeline (including any feature screening) must sit inside cross-validation to avoid the leakage trap. Practical answer: a regularized linear baseline first, a random forest with tuned $m$ as the nonlinear comparison, both evaluated by properly nested resampling; expect the linear model to win unless interactions are real.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review, from <Ref lesson="bias-variance" /> and <Ref lesson="decision-trees" />: a single deployed tree is normally cost-complexity pruned, yet the trees inside a random forest are grown deep and left unpruned. Reconcile the two practices using the bias–variance decomposition.
+
+<Solution>
+A single tree must manage both error terms itself. Deep growth drives bias down but variance up (the argmin-flipping instability: near-tie splits reverse under small data changes and the flip cascades); pruning trades some bias back for a large variance reduction, and cross-validated $\alpha$ finds the balance. That is the only variance control a lone tree has.
+
+Inside a forest the division of labor changes: averaging attacks variance (down to $\rho\sigma^2 + (1-\rho)\sigma^2/B$) but provably cannot touch bias, since the ensemble's expectation equals a single tree's. The base learner should therefore spend nothing on variance control and everything on bias: grow deep, don't prune, accept a huge $\sigma^2$, and let the ensemble average it away. Pruning forest members would add bias the ensemble can never remove while reducing a variance the ensemble was about to remove anyway. (Depth limits and minimum leaf sizes are still used in noisy problems, because the forest's limiting error inherits whatever noise-fitting the individual trees converge to.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Numeric drill, parallel to the worked examples. (a) With $\sigma^2 = 100$: compute the ensemble variance for $\rho = 0.8$ at $B = 10$, $B = 100$, and $B \to \infty$, then for $\rho = 0.2$ at the same three sizes, and state the conclusion. (b) Eleven independent classifiers each have error rate $0.25$; compute the majority-vote error rate.
+
+<Solution>
+(a) Variance $= \rho\sigma^2 + (1-\rho)\sigma^2/B$. For $\rho = 0.8$: $80 + 20/10 = 82$; $80 + 20/100 = 80.2$; limit $80$. For $\rho = 0.2$: $20 + 80/10 = 28$; $20 + 80/100 = 20.8$; limit $20$. Conclusion: at $\rho = 0.8$, going from 10 trees to infinitely many recovers only 2 points of variance, while cutting $\rho$ to 0.2 at $B = 10$ removes 54: past a few dozen trees, decorrelation is worth far more than ensemble size.
+
+(b) The vote errs when at least 6 of 11 err: $\sum_{k=6}^{11}\binom{11}{k}(0.25)^k(0.75)^{11-k}$. Terms: $k=6$: $462 \times (0.25)^6 (0.75)^5 \approx 0.0268$; $k=7$: $330 \times (0.25)^7 (0.75)^4 \approx 0.0064$; $k=8$: $165 \times (0.25)^8 (0.75)^3 \approx 0.0011$; $k=9$: $\approx 0.00012$; $k=10, 11$: negligible. Total $\approx 0.034$. Eleven independent 25%-error voters vote at about 3.4% error: the independence ideal that correlation between real bagged trees prevents.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §8.7: bagging; ch. 15: random forests, the correlated-average formula (Eq. 15.1), the $m$ defaults, OOB samples (§15.3.1), variable importance (§15.3.2), variance and decorrelation analysis (§15.4). https://hastie.su.domains/ElemStatLearn/
+2. L. Breiman, "Random Forests," *Machine Learning* 45, 2001 — the definition, the convergence theorem (Thm 1.2), the strength–correlation bound (Thm 2.3), Forest-RI and the strength/correlation experiments (Figs. 1–3), noise robustness (Table 4), OOB estimates (§3.1), permutation importance (§10). https://doi.org/10.1023/A:1010933404324
+3. L. Breiman, "Bagging Predictors," *Machine Learning* 24, 1996 — the original bagging paper, including the stability argument for which learners benefit. https://doi.org/10.1007/BF00058655
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §8.2.1–8.2.2: bagging, OOB error and its LOOCV equivalence, the dominant-predictor argument for $m = \sqrt{p}$, variable importance, the gene-expression comparison (Fig. 8.10). https://www.statlearning.com
+5. T. G. Dietterich, "Ensemble Methods in Machine Learning," *Multiple Classifier Systems (MCS)*, LNCS 1857, 2000 — the statistical/computational/representational frame, the 21-voter binomial computation, the diagonal-boundary representational argument (Fig. 4). https://doi.org/10.1007/3-540-45014-9_1
+6. K. Q. Weinberger, "Lecture 18: Bagging," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — the weak-law-of-large-numbers framing and the bootstrap-as-substitute-sample argument. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote18.html
+7. N. Singh, K. Huo, *Ace the Data Science Interview*, 2021 — ch. 7: the interview phrasings of the bagging-variance, feature-subsampling, and OOB questions.
+</References>

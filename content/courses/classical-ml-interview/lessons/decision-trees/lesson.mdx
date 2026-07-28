@@ -1,0 +1,406 @@
+A decision tree fits by asking one greedy question at a time — which split most reduces impurity — and controls overfitting by pruning the result. This chapter constructs the full CART procedure: the partition-plus-constants model, a root split chosen entirely by hand with Gini impurity, the three impurity measures and why classification error cannot grow a tree, regression trees on residual sums of squares, cost-complexity pruning with $\alpha$ selected by cross-validation, and the trade-off ledger that the three ensemble chapters build on.
+
+## The model: a tree is an axis-aligned partition with constant leaves
+
+A binary decision tree is a flowchart of threshold questions. Each internal node tests one feature against one cutoff: $x_j \le t$ for a numeric feature, $x_j \in S$ for a categorical one. Each answer descends one level; each leaf outputs a constant. Tracing every path at once shows what the flowchart is: a recursive carving of feature space into **axis-aligned rectangles**, one rectangle per leaf.
+
+<Definition title="decision tree (CART)">
+A *decision tree* partitions the feature space into disjoint regions $R_1, \dots, R_M$ by recursive binary splits on single features, and predicts a constant per region:
+
+$$
+f(x) = \sum_{m=1}^{M} c_m \,\mathbf{1}\{x \in R_m\},
+$$
+
+where $c_m$ is the **majority class** of the training points in $R_m$ (classification) or their **mean response** (regression).
+</Definition>
+
+<Figure
+  src="./figures/duality.svg"
+  alt="The same two-split model drawn as a tree on the left and as three nested axis-aligned rectangles in feature space on the right, with colors matching each leaf to its region"
+  caption="One model, two drawings: every leaf of the tree is a rectangle of the partition, and prediction is a lookup: find the rectangle, output its constant."
+/>
+
+The model class is *non-parametric*: there is no fixed coefficient vector, and the number of regions grows with the data. A leaf's prediction uses only the training points inside its own rectangle, which makes the tree a piecewise-constant estimator with data-chosen pieces.
+
+Fitting the best partition is not an option. Even for binary features, constructing the smallest tree consistent with a training set is NP-complete ([Hyafil & Rivest, 1976](https://doi.org/10.1016/0020-0190(76)90095-8)), and the space of axis-aligned partitions is astronomically large. CART answers with a **greedy heuristic**: choose the single best split now, commit to it, recurse on each child. The rest of the chapter is that heuristic plus its damage control.
+
+<KeyFact>
+A tree and its rectangular partition are the same object. Everything CART does (splitting, pruning, predicting) is an operation on axis-aligned rectangles carrying constants.
+</KeyFact>
+
+## One split by hand: score every candidate, keep the argmin
+
+The greedy step is the interview set piece, so it is worth executing once with no steps skipped. Ten machines, two features, a binary label:
+
+| machine | vibration | temp (°C) | fails |
+| --- | --- | --- | --- |
+| 1 | high | 28 | yes |
+| 2 | high | 31 | yes |
+| 3 | high | 24 | yes |
+| 4 | high | 21 | no |
+| 5 | high | 33 | yes |
+| 6 | low | 26 | no |
+| 7 | low | 19 | no |
+| 8 | low | 30 | yes |
+| 9 | low | 23 | no |
+| 10 | low | 25 | no |
+
+The root node holds 5 failures and 5 survivals. Draw two rows at random with replacement; they carry different labels with probability $2 \times 0.5 \times 0.5 = 0.5$. That number, the chance a random pair disagrees, is the node's impurity.
+
+<Definition title="Gini impurity">
+For a node whose class proportions are $p_1, \dots, p_K$, the *Gini impurity* is
+
+$$
+G = \sum_{k=1}^{K} p_k (1 - p_k) = 1 - \sum_{k=1}^{K} p_k^2 ,
+$$
+
+the probability that two independent draws from the node disagree. $G = 0$ iff the node is pure; for two classes the maximum is $G = 0.5$ at a 50/50 mix.
+</Definition>
+
+A split is scored by the **weighted average** of its children's impurities, weights proportional to child sizes; the best split is the one with the smallest weighted child impurity, equivalently the largest impurity drop.
+
+<Example title="the root split, every candidate scored">
+**Candidates.** The binary feature contributes one split, vibration $\in \{$high, low$\}$. For temperature, sort the ten values; only thresholds between adjacent distinct values can produce distinct partitions, giving 9 midpoints: $20, 22, 23.5, 24.5, 25.5, 27, 29, 30.5, 32$.
+
+**Vibration.** High: machines 1–5, with 4 fail / 1 OK, so $G = 1 - (4/5)^2 - (1/5)^2 = 0.320$. Low: machines 6–10, with 1 fail / 4 OK, $G = 0.320$ by symmetry. Weighted: $0.5 \times 0.320 + 0.5 \times 0.320 = 0.320$.
+
+**Temperature, $t = 27$.** Left ($\le 27$): machines 3, 4, 6, 7, 9, 10, with 1 fail / 5 OK, $G = 1 - (1/6)^2 - (5/6)^2 = 10/36 = 0.278$. Right ($> 27$): machines 1, 2, 5, 8, with 4 fail / 0 OK, $G = 0$. Weighted: $\tfrac{6}{10} \times 0.278 + \tfrac{4}{10} \times 0 = 0.167$.
+
+**All nine thresholds**, same arithmetic:
+
+| $t$ | left fail/OK | right fail/OK | weighted Gini |
+| --- | --- | --- | --- |
+| 20 | 0/1 | 5/4 | 0.444 |
+| 22 | 0/2 | 5/3 | 0.375 |
+| 23.5 | 0/3 | 5/2 | 0.286 |
+| 24.5 | 1/3 | 4/2 | 0.417 |
+| 25.5 | 1/4 | 4/1 | 0.320 |
+| **27** | **1/5** | **4/0** | **0.167** |
+| 29 | 2/5 | 3/0 | 0.286 |
+| 30.5 | 3/5 | 2/0 | 0.375 |
+| 32 | 4/5 | 1/0 | 0.444 |
+
+**Verdict.** Temperature $\le 27$ scores $0.167$ against vibration's $0.320$; the impurity drop is $0.500 - 0.167 = 0.333$ against $0.180$. The root splits on temp $\le 27$.
+</Example>
+
+<FigureSequence
+  name="split"
+  alt="Four frames: the ten machines plotted on a temperature axis in two vibration rows with candidate splits; the vibration split scored; the temperature split scored and compared; the winning split applied with a recursion arrow into the impure child"
+  caption="The greedy step: enumerate candidates, score each by weighted child Gini, apply the argmin, recurse on the impure child."
+/>
+
+<Task>
+Step through the four frames, then recompute the $t = 24.5$ row of the table by hand: left child 1 fail / 3 OK gives $G = 0.375$, right child 4 fail / 2 OK gives $G = 0.444$, and the weighted score is $0.4 \times 0.375 + 0.6 \times 0.444 = 0.417$.
+</Task>
+
+### Recursion and stopping
+
+The right child (temp $> 27$) is pure: it becomes a leaf predicting *fails*. The left child (1 fail / 5 OK, $G = 0.278$) is re-split by the same scan restricted to its six rows: vibration now scores $\tfrac{2}{6} \times 0.5 + \tfrac{4}{6} \times 0 = 0.167$, beating the best temperature threshold in the child ($t = 23.5$, weighted $0.222$), so the second level splits on vibration. Its low branch (machines 6, 7, 9, 10) is a pure OK leaf; the high branch holds machines 3 and 4, separated by one final cut at temp $\le 22.5$. The fully grown tree has 4 leaves and zero training errors, a fact the pruning section returns to.
+
+Growth stops at a node when it is pure, when it holds fewer than a minimum number of points, or when no split reduces impurity by more than a threshold. Per feature, the scan costs one sort plus a linear sweep, $O(n \log n)$, because the class counts on each side update by one point per candidate threshold.
+
+<KeyFact>
+CART's entire training loop is: for every feature and every viable threshold, compute the weighted child impurity; keep the argmin; recurse. Executed by hand it is bookkeeping, and interviewers ask for exactly this bookkeeping.
+</KeyFact>
+
+## Impurity measures: Gini, entropy, and why error cannot grow a tree
+
+Three impurity functions appear in practice, all functions of the node's class proportions. At the root above, $p = (0.5, 0.5)$: Gini gives $0.5$, entropy gives $1$ bit, misclassification error gives $0.5$.
+
+<Definition title="entropy and information gain">
+The *entropy* of a node with class proportions $p_1, \dots, p_K$ is $H = -\sum_k p_k \log_2 p_k$, and the *information gain* of a split is the parent's entropy minus the weighted child entropy. The *misclassification error* is $E = 1 - \max_k p_k$, the fraction a majority-vote leaf gets wrong.
+</Definition>
+
+<Figure
+  src="./figures/impurity-curves.svg"
+  alt="Gini, halved entropy, and misclassification error plotted against the class-1 proportion p; Gini and entropy are strictly concave and nearly coincide, while error is two straight segments; a chord on the Gini curve marks the parent-versus-children gap of the worked example"
+  caption="Binary impurities vs p. Gini and (scaled) entropy are strictly concave: the chord through any two child distributions lies below the parent's value. Error is piecewise linear, so the chord can lie on the curve."
+/>
+
+Running the root scan with entropy instead of Gini picks the same split: temp $\le 27$ has weighted entropy $0.390$ against vibration's $0.722$. That agreement is typical. **Gini and entropy are nearly interchangeable**: both strictly concave, both differentiable, disagreeing only on a small fraction of candidate splits. The honest answer to "which one and why": Gini by default because it skips the logarithm, entropy if you want the information-theoretic reading; the resulting trees rarely differ.
+
+### Error stalls where Gini moves
+
+Misclassification error is the metric that ultimately matters, and it is still the wrong growing criterion. The failure is concrete:
+
+<Example title="purer children, unchanged error">
+A node holds 6 positives and 2 negatives; error as a leaf: $2/8$. Split it into children $(3+, 0-)$ and $(3+, 2-)$. Both children still vote positive, so the errors are $0$ and $2$: total $2/8$, unchanged. The Gini score sees the progress: parent $G = 1 - (6/8)^2 - (2/8)^2 = 0.375$; weighted children $\tfrac{3}{8} \times 0 + \tfrac{5}{8} \times 0.48 = 0.300$. Entropy agrees: $0.811 \to 0.607$.
+</Example>
+
+<Figure
+  src="./figures/purity-error.svg"
+  alt="A parent node of six positives and two negatives split into a pure child and a five-point child; the tally shows classification error unchanged at two eighths while Gini drops from 0.375 to 0.300"
+  caption="A split that manufactures a pure leaf while classification error sits still. Error-driven growing would refuse it; Gini-driven growing takes it and cashes in on the next level."
+/>
+
+The pure child is genuine progress (one branch of the tree is finished), yet an error-greedy grower would score the split at zero and could stop. The general fact behind the example:
+
+<Theorem title="strictly concave impurities reward every purification">
+Let $i(p)$ be concave on the probability simplex, and let a split send fractions $w_L, w_R$ of a node's points to children with class distributions $p_L, p_R$, so the parent distribution is $p = w_L p_L + w_R p_R$. Then the weighted child impurity never exceeds the parent's:
+
+$$
+w_L\, i(p_L) + w_R\, i(p_R) \;\le\; i(p),
+$$
+
+with strict inequality whenever $i$ is strictly concave and $p_L \ne p_R$.
+
+<Proof>
+The parent's class distribution is the mixture of the children's with weights $w_L + w_R = 1$, so the claim is Jensen's inequality applied to the concave $i$ at the point $p = w_L p_L + w_R p_R$. Strict concavity makes Jensen strict unless the two child distributions coincide. Misclassification error $E(p) = 1 - \max_k p_k$ is concave but only *piecewise linear*: on a linear segment (in the binary case, whenever both children keep the same majority class) the inequality holds with equality, which is exactly the stalled split of the example.
+</Proof>
+</Theorem>
+
+For **pruning**, the calculus flips: the question is no longer "which split makes progress" but "which subtree is worth its leaves," and there [ESL §9.2](https://hastie.su.domains/ElemStatLearn/) recommends plain misclassification error (or the actual deployment loss), since accuracy is what the pruned tree is judged on.
+
+<Remark title="high-cardinality features cheat the gain">
+A categorical feature with many levels (an ID column in the extreme) can shatter a node into near-singleton children, driving impurity to zero with zero generalization value. Information gain therefore systematically favors high-cardinality features; C4.5's *gain ratio* ([Quinlan, 1986](https://doi.org/10.1007/BF00116251)) divides the gain by the split's own entropy to tax the fan-out. The same bias resurfaces as inflated variable importance in <Ref lesson="bagging-random-forests" />.
+</Remark>
+
+<Aside>
+Entropy's impurity reading is a KL divergence in disguise. For $K$ classes, $\mathrm{KL}(p \,\|\, \text{uniform}) = \sum_k p_k \log_2 \frac{p_k}{1/K} = \log_2 K - H(p)$, so minimizing weighted child entropy is the same as pushing the children's class distributions as far from uniform as possible in KL. A pure leaf is the distribution farthest from "no information": the greedy grower is doing information maximization one split at a time, which is the framing in [Weinberger's CS4780 lecture](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote17.html).
+</Aside>
+
+<KeyFact>
+Grow with Gini or entropy: strict concavity means any purification scores as progress. Misclassification error is piecewise linear, can sit still through a genuinely useful split, and is the right metric only for pruning, where accuracy is the question.
+</KeyFact>
+
+## Regression trees: RSS as impurity, leaf means as predictions
+
+For a numeric response the recipe survives with two substitutions: the leaf constant becomes the **mean**, and impurity becomes the **residual sum of squares** around that mean. A concrete scan first:
+
+<Example title="a regression split by hand">
+Six employees, $x$ = years of experience, $y$ = salary in \$1000s: $(1, 96), (2, 104), (3, 100), (4, 300), (5, 320), (6, 310)$. The root prediction is the grand mean $\bar y = 205$, with $\mathrm{RSS} = 66{,}382$.
+
+Candidate thresholds sit between adjacent $x$ values. For $t = 3.5$: left mean $= (96 + 104 + 100)/3 = 100$, $\mathrm{RSS}_L = 16 + 16 + 0 = 32$; right mean $= 310$, $\mathrm{RSS}_R = 100 + 100 + 0 = 200$; total $232$. The competitors are not close: $t = 2.5$ gives $32 + 33{,}275 = 33{,}307$, $t = 4.5$ gives $30{,}032 + 50 = 30{,}082$, and the edge splits exceed $52{,}000$. The split at $t = 3.5$ collapses the RSS from $66{,}382$ to $232$ because it separates the two salary regimes; further splits inside each child now shave residuals of tens, not tens of thousands.
+</Example>
+
+The general objective, in the notation of [ISLP §8.1](https://www.statlearning.com): at each node choose the feature $j$ and cutpoint $s$ minimizing
+
+$$
+\sum_{i:\, x_i \in R_1(j,s)} (y_i - \bar y_{R_1})^2 \;+\; \sum_{i:\, x_i \in R_2(j,s)} (y_i - \bar y_{R_2})^2 ,
+$$
+
+where $R_1(j, s) = \{x \mid x_j \le s\}$ and $R_2(j, s) = \{x \mid x_j > s\}$ and each $\bar y$ is the mean response in its region. As in classification, the scan over $s$ is exact and fast: sorted once, the two means and RSS values update in constant time per candidate.
+
+The field's canonical first tree is ISLP's Hitters example: predicting a baseball player's log salary, the root asks Years $< 4.5$; experienced players are then split by Hits $< 117.5$. Back-transformed, the three leaves predict about \$165k for junior players, \$403k for seniors with few hits, and \$845k for seniors with many: a three-rectangle partition of the (Years, Hits) plane that reads as three sentences.
+
+## Grow deep, then prune: cost-complexity and the tree's lasso
+
+The fully grown tree from the hand-built example ended with two singleton leaves whose only job is to classify machines 3 and 4, one training row each. That is memorization: depth is a flexibility dial, and an unrestricted tree drives training error to zero while test error climbs, the variance-dominated regime of <Ref lesson="bias-variance" />. Both failure directions exist: a stump can underfit badly, so trees are not "always overfitting," they are **unstable at high depth and biased at low depth**.
+
+<Figure
+  src="./figures/depth-overfit.svg"
+  alt="Training error falling monotonically to zero and test error tracing a U shape as tree depth grows from 1 to 10, with the cross-validated depth marked at the test minimum"
+  caption="Depth is the flexibility dial: training error falls monotonically; test error turns back up where the extra leaves start fitting noise. Cross-validation picks the turn."
+/>
+
+<Demo
+  name="TreeDepthExplorer"
+  caption="A CART partition on 2D data: the max-depth slider redraws the rectangles and traces train/test error vs depth. Presets: stump, depth 3, depth 10."
+/>
+
+<Task>
+Slide the depth from 1 to 10 and find the depth where test error turns back up. Then compare the partition there with the depth-10 partition: each extra rectangle at depth 10 captures a handful of individual noise points, the two-dimensional version of the singleton leaves above.
+</Task>
+
+### Why prune instead of stopping early
+
+The cheap control is *early stopping*: cap the depth, require a minimum leaf size, or refuse splits below a minimum impurity drop. The first two are standard and harmless as coarse limits. The third is myopic in a specific way: a split with a small immediate drop can unlock an excellent split one level down, so a grower that stops on low gain never finds the pair (the extreme case is XOR-structured data, taken up in the ledger). CART's answer is to **grow deep first and prune afterwards**, judging each subtree by what it achieved, not by what its first split promised.
+
+<Definition title="cost-complexity pruning">
+For a subtree $T$ of the full tree $T_0$, with $|T|$ leaves, the *cost-complexity* criterion is
+
+$$
+C_\alpha(T) = \sum_{m=1}^{|T|} \sum_{x_i \in R_m} L\big(y_i, c_m\big) \;+\; \alpha\, |T| ,
+$$
+
+training loss plus a per-leaf charge. For each $\alpha \ge 0$, the subtree minimizing $C_\alpha$ is found by *weakest-link pruning*: repeatedly collapse the internal node whose subtree buys the least loss reduction per leaf spent.
+</Definition>
+
+The criterion is the tree's version of the penalized objectives of <Ref lesson="ridge-lasso" />: loss plus $\alpha \times$ complexity, with $|T|$ playing the role of $\|\beta\|_1$ and $\alpha$ walking the model from memorization ($\alpha = 0$ keeps $T_0$) to a bare root ($\alpha$ large). And as with the lasso path, the whole family comes cheap:
+
+<Example title="weakest-link pruning of the machines tree">
+The grown tree has 4 leaves and training error $0$; internal nodes are the root, the vibration node (6 rows, 1 fail / 5 OK), and the temp $\le 22.5$ node (2 rows). Collapsing a node to a leaf costs errors and saves leaves; the *link strength* is $g = \frac{\Delta\text{error rate}}{\Delta\text{leaves}}$:
+
+- temp $\le 22.5$ node: collapse costs $1/10$, saves $1$ leaf $\Rightarrow g = 0.10$;
+- vibration node (3-leaf subtree): collapse costs $1/10$, saves $2$ leaves $\Rightarrow g = 0.05$;
+- root (whole tree): collapse costs $5/10$, saves $3$ leaves $\Rightarrow g = 0.167$.
+
+The weakest link is the vibration node: at $\alpha = 0.05$ its whole subtree collapses to an OK leaf, giving a 2-leaf tree (temp $\le 27 \to$ OK, else fail) with error $1/10$. Recomputing on the survivor, the root's link is $g = (0.5 - 0.1)/1 = 0.4$. The full solution path is therefore: 4 leaves for $\alpha < 0.05$, 2 leaves for $0.05 \le \alpha < 0.4$, the root for $\alpha \ge 0.4$. The 2-leaf tree is the one worth keeping: the two singleton leaves existed to memorize machines 3 and 4.
+</Example>
+
+<Remark title="the sequence is nested, not exhaustive">
+Weakest-link pruning does not consider every subtree of $T_0$; it produces one **nested sequence** $T_0 \supset T_1 \supset \cdots \supset \{\text{root}\}$, and a theorem of [Breiman et al. (1984)](https://doi.org/10.1201/9781315139470) guarantees the $C_\alpha$-optimal subtree for every $\alpha$ lies on that path. Candidates think every subtree is in play; only the path is, which is what makes the search tractable.
+</Remark>
+
+Selecting $\alpha$ is a one-dimensional tuning problem, handled exactly like $\lambda$ in penalized regression, by the machinery of <Ref lesson="cross-validation-bootstrap" />. ISLP's Algorithm 8.1, in full:
+
+1. Grow $T_0$ on the training data, stopping only at a minimum leaf size.
+2. Weakest-link prune to obtain the nested sequence of subtrees indexed by $\alpha$.
+3. For each of $K$ folds: grow and prune on the other $K - 1$ folds, and record each $\alpha$'s held-out error.
+4. Pick the $\alpha$ minimizing the CV error (or the simplest tree within one standard error of the minimum); return that member of the sequence from step 2.
+
+On the Hitters data this procedure cuts a 12-leaf grown tree down to the 3-leaf tree shown above: the CV curve bottoms out almost immediately, and the one-SE rule lands on the smallest tree near the bottom.
+
+<KeyFact>
+Cost-complexity pruning is the tree's lasso: training loss plus $\alpha|T|$, one nested solution path traced by weakest-link collapses, one scalar $\alpha$ chosen by cross-validation.
+</KeyFact>
+
+## The ledger: what one tree buys and what it costs
+
+The next three chapters each exist to fix one line of this table, so it is the map of the whole module.
+
+| trees buy | trees cost |
+| --- | --- |
+| Readable models: a small tree is an executable flowchart | High variance: small data changes rebuild the tree |
+| Mixed numeric/categorical features, no dummy coding required | Axis-aligned bias: diagonal boundaries become staircases |
+| Invariance to monotone feature transforms; no scaling ever | Greedy myopia: gain-blind at split time (XOR) |
+| Native missing-value handling (surrogates, default directions) | Piecewise-constant fits: no smooth trends, no extrapolation |
+| Automatic interaction discovery and feature selection | Accuracy: a single pruned tree rarely wins benchmarks |
+
+### Instability: the argmin flips
+
+Every split is a discrete argmin over candidates, and near-ties are everywhere. Delete one row, machine 8, from the hand-built table and the root scan reverses: vibration now scores $0.178$ against temperature's $0.185$, so the root feature itself changes, and everything below it is rebuilt. Two trees, one row apart, similar accuracy, disjoint structure: that is **variance in model space**, and it is the raw material <Ref lesson="bagging-random-forests" /> averages away.
+
+<Figure
+  src="./figures/instability.svg"
+  alt="Two trees grown on the machines table: with all ten rows the root splits on temperature at 27; with row 8 deleted the root splits on vibration instead, and the structures below differ"
+  caption="One deleted row flips the root's argmin, and the flip cascades: hierarchical fitting amplifies small data perturbations into different trees."
+/>
+
+### Axis-aligned bias: diagonals become staircases
+
+Rectangles are the model class, so any boundary that is not axis-parallel is approximated by stairs. A true boundary $x_2 = x_1$ costs a tower of splits to imitate, and the staircase's corners are regions of guaranteed error; a linear model draws the same boundary with one coefficient pair. The mismatch runs both ways: when the truth is a checkerboard of interactions, the tree wins and the linear model needs hand-built cross terms.
+
+<Figure
+  src="./figures/staircase.svg"
+  alt="A diagonal true class boundary approximated by an axis-aligned staircase of tree splits, with each step corresponding to one split"
+  caption="Axis-aligned bias: a diagonal boundary is representable only as a staircase, one split per stair. Ensembles of trees average many staircases into a nearly smooth boundary."
+/>
+
+Greedy myopia has the same flavor. On XOR-structured data (positives in two opposite quadrants), every single split leaves both children at 50/50, so every candidate's gain is zero and the greedy score is blind, even though a depth-2 tree separates the classes perfectly. Implementations that split anyway on an arbitrary tie-break recover; the point is that the greedy criterion, not the model class, is what fails.
+
+Two practicalities complete the ledger. A categorical feature with $q$ levels admits $2^{q-1} - 1$ subset splits: exponential, though for binary classification and regression, ordering the levels by their mean response finds the optimum among only $q - 1$ ordered splits (ESL §9.2.4). Missing values never stop a tree: CART routes them by *surrogate splits* (backup features that mimic the primary split), and gradient-boosted variants learn a per-node *default direction*, the mechanism <Ref lesson="xgboost" /> makes central.
+
+<KeyFact>
+Everything the ensemble chapters fix is a line in this ledger: bagging attacks the variance, random forests the correlation among bagged trees, boosting the bias. A single pruned tree is an interview staple and a strong baseline, and it is almost never the final model.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+The mechanics set piece. Ten pumps, features load $\in \{$high, low$\}$ and age (years), label fails:
+
+| pump | load | age | fails |
+| --- | --- | --- | --- |
+| 1 | high | 4 | yes |
+| 2 | high | 6 | yes |
+| 3 | high | 7 | yes |
+| 4 | high | 8 | yes |
+| 5 | high | 9 | yes |
+| 6 | high | 5 | no |
+| 7 | low | 1 | no |
+| 8 | low | 2 | no |
+| 9 | low | 3 | no |
+| 10 | low | 10 | no |
+
+Build the first two levels of a Gini-grown tree: score every candidate split at the root (load, plus every viable age threshold), apply the winner, and split any impure child.
+
+<Solution>
+**Root.** 5 fail / 5 OK, $G = 0.5$.
+
+**Load.** High: 5 fail / 1 OK, $G = 1 - (5/6)^2 - (1/6)^2 = 10/36 = 0.278$; low: 0/4, $G = 0$. Weighted: $0.6 \times 0.278 = 0.167$.
+
+**Age.** Sorted with labels: $1^-, 2^-, 3^-, 4^+, 5^-, 6^+, 7^+, 8^+, 9^+, 10^-$. Weighted Ginis at the nine midpoints: $t{=}1.5$: $0.444$; $t{=}2.5$: $0.375$; $t{=}3.5$: left $0/3$ pure, right $5$ fail$/2$ OK gives $G = 20/49$, weighted $0.7 \times 0.408 = 0.286$; $t{=}4.5$: $0.417$; $t{=}5.5$: $0.320$; $t{=}6.5$: $0.417$; $t{=}7.5$: $0.476$; $t{=}8.5$: $0.500$; $t{=}9.5$: $0.444$. Best age split: $0.286$.
+
+**Root verdict.** Load wins, $0.167 < 0.286$. Children: low $\to$ pure OK leaf (pumps 7–10); high $\to$ 5 fail / 1 OK, $G = 0.278$.
+
+**Second level (high branch).** Only age varies; its labels change at $t = 4.5$ and $t = 5.5$ (ages $4^+, 5^-, 6^+, 7^+, 8^+, 9^+$). $t = 4.5$: children $\{4\}$ pure and $\{5,\dots,9\}$ with 4/1, weighted $\tfrac{5}{6} \times 0.32 = 0.267$. $t = 5.5$: children $\{4, 5\}$ with 1/1 ($G = 0.5$) and $\{6, 7, 8, 9\}$ pure, weighted $\tfrac{2}{6} \times 0.5 = 0.167$. Split at age $\le 5.5$: right child is a pure fail leaf; the two-row left child would need one final cut at $4.5$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Gini versus entropy: state both formulas and their ranges for $K = 2$, compute both (plus misclassification error) at $p = (0.5, 0.5)$ and $p = (0.9, 0.1)$, and give the interview answer to "which do you use and when do they differ."
+
+<Solution>
+$G = 1 - \sum_k p_k^2 \in [0, 0.5]$ for two classes; $H = -\sum_k p_k \log_2 p_k \in [0, 1]$ bit; $E = 1 - \max_k p_k \in [0, 0.5]$. At $(0.5, 0.5)$: $G = 0.5$, $H = 1$, $E = 0.5$: all maximal. At $(0.9, 0.1)$: $G = 1 - 0.81 - 0.01 = 0.18$; $H = -0.9 \log_2 0.9 - 0.1 \log_2 0.1 = 0.9 \times 0.152 + 0.1 \times 3.322 = 0.469$; $E = 0.1$.
+
+Answer: both are strictly concave and reward every purification (the Theorem in the chapter), so they choose the same split on the vast majority of nodes; entropy weights very rare classes a little more strongly (the $\log$ diverges as $p \to 0$) and costs a logarithm per evaluation, so Gini is the common default. The pair worth contrasting is not Gini vs entropy but either of them vs misclassification error, which is piecewise linear and can score a useful split at zero.
+</Solution>
+</Exercise>
+
+<Exercise>
+A node holds 9 positives and 3 negatives. A candidate split produces children $(5+, 0-)$ and $(4+, 3-)$. Show that misclassification error refuses this split while Gini accepts it, computing all quantities.
+
+<Solution>
+Parent as a leaf predicts positive: error $3/12 = 0.25$. After the split both children still vote positive, with errors $0$ and $3$: total $3/12$, unchanged: an error-greedy grower scores the split at exactly zero.
+
+Gini: parent $G = 1 - (9/12)^2 - (3/12)^2 = 1 - 0.5625 - 0.0625 = 0.375$. Left child pure, $G = 0$. Right child: $G = 1 - (4/7)^2 - (3/7)^2 = 24/49 = 0.490$. Weighted: $\tfrac{5}{12} \times 0 + \tfrac{7}{12} \times 0.490 = 0.286$, a drop of $0.089$: Gini takes the split. The split is genuinely useful: five points are finished in a pure leaf, and the remaining impurity is concentrated where later splits can attack it. Error misses this because both children kept the parent's majority, which is precisely the piecewise-linear blind spot.
+</Solution>
+</Exercise>
+
+<Exercise>
+Regression split by hand: $x = 1, \dots, 6$, $y = 40, 44, 42, 10, 8, 12$. Compute the RSS of every candidate split, name the winner, and give the two leaf predictions and the total RSS before and after.
+
+<Solution>
+Root: mean $\bar y = 156/6 = 26$, $\mathrm{RSS} = 196 + 324 + 256 + 256 + 324 + 196 = 1552$.
+
+Candidates: $t{=}1.5$: left $\{40\}$, RSS $0$; right mean $23.2$, RSS $1316.8$; total $1316.8$. $t{=}2.5$: left mean $42$, RSS $8$; right mean $18$, RSS $576 + 64 + 100 + 36 = 776$; total $784$. $t{=}3.5$: left $\{40, 44, 42\}$, mean $42$, RSS $4 + 4 + 0 = 8$; right $\{10, 8, 12\}$, mean $10$, RSS $0 + 4 + 4 = 8$; total $16$. $t{=}4.5$: left mean $34$, RSS $36 + 100 + 64 + 576 = 776$; right mean $10$, RSS $8$; total $784$. $t{=}5.5$: left mean $28.8$, RSS $1316.8$; right $0$; total $1316.8$.
+
+Winner: $t = 3.5$, leaf predictions $42$ (left) and $10$ (right), RSS $1552 \to 16$. The split sits exactly at the regime change in the response, as in the chapter's salary example.
+</Solution>
+</Exercise>
+
+<Exercise>
+Categorical and missing data: (a) count the distinct binary splits of a categorical feature with $q = 4$ levels and with $q = 20$ levels; (b) state the trick that avoids the exponential search for binary classification; (c) describe two mechanisms by which trees handle missing feature values at test time.
+
+<Solution>
+(a) A binary split assigns each level to one of two sides, up to swapping sides and excluding the empty split: $2^{q-1} - 1$. For $q = 4$: $2^3 - 1 = 7$. For $q = 20$: $2^{19} - 1 = 524{,}287$: infeasible to enumerate inside every node.
+
+(b) For binary classification (and for regression), sort the levels by their proportion of positives (mean response) and consider only the $q - 1$ splits of that ordering; the optimal subset split under Gini/entropy (RSS) is among them (ESL §9.2.4). The categorical search becomes the same sorted scan as a numeric feature.
+
+(c) CART's *surrogate splits*: at each node, backup splits on other features are ranked by how well they mimic the primary split's left/right assignment on the training data; a point missing the primary feature is routed by the best surrogate it does have. Gradient-boosted trees instead learn a *default direction* per node: during training, points with missing values are tried down each branch and the direction that reduces the loss more is stored; this is the sparsity-aware rule at the core of <Ref lesson="xgboost" />. Either way, no imputation step is required, unlike for linear models or k-NN.
+</Solution>
+</Exercise>
+
+<Exercise>
+Instability, verified. Delete machine 8 (low vibration, 30 °C, fails) from the chapter's table and rescore the two leading root candidates, vibration and temp $\le 27$. Show the winning root split changes, then explain in the terms of <Ref lesson="bias-variance" /> why deep trees are high-variance and what averaging over bootstrap resamples would do to that term.
+
+<Solution>
+Nine rows remain: 4 fail / 5 OK, root $G = 1 - (4/9)^2 - (5/9)^2 = 40/81 = 0.494$.
+
+Vibration: high unchanged, 4 fail / 1 OK, $G = 0.32$; low is now 0 fail / 4 OK, $G = 0$. Weighted: $\tfrac{5}{9} \times 0.32 = 0.178$. Temp $\le 27$: left unchanged, 1 fail / 5 OK, $G = 0.278$; right $\{28, 31, 33\}$, pure. Weighted: $\tfrac{6}{9} \times 0.278 = 0.185$ (and no other threshold beats it: $t = 25.5$ gives $0.344$, $t = 23.5$ gives $0.296$, $t = 29$ gives $0.318$). Verdict flips: $0.178 < 0.185$, the root now splits on vibration, and the entire subtree below is rebuilt.
+
+Bias–variance reading: a deep tree can realize almost any labeling of the training set, so its bias is near zero and its error is dominated by variance: the fitted model is a jumpy function of the training draw, exactly like the degree-9 sheaf of the bias–variance chapter. The mechanism is discrete: each split is an argmin over candidates, near-ties flip under one-point perturbations, and the hierarchy propagates a flipped root into a completely different partition. Averaging $B$ trees fitted on bootstrap resamples leaves the (low) bias essentially unchanged and divides the independent part of the variance, which is why bagging targets trees specifically; the correlated remainder is the next chapter's subject.
+</Solution>
+</Exercise>
+
+<Exercise>
+Does standardizing features change a CART tree? Prove your answer for any strictly increasing transform of a single feature, and name a model from an earlier chapter where the answer is the opposite.
+
+<Solution>
+No. Let $g$ be strictly increasing and replace feature $j$ by $g(x_j)$. Splits use only threshold comparisons: for any threshold $t$ on the original scale, the split $x_j \le t$ induces the same left/right partition of the training points as $g(x_j) \le g(t)$ on the transformed scale, and conversely every transformed-scale partition arises this way, because $g$ preserves order and the candidate set (one partition per gap between adjacent sorted values) depends only on the ordering. Identical candidate partitions have identical class counts, hence identical impurities: the grown tree is the same tree with relabeled thresholds, and predictions are unchanged. Standardization is affine with positive slope, a special case; the same argument covers $\log$, rank, and any monotone rescaling.
+
+The opposite: k-NN (<Ref lesson="knn-curse" />) computes distances, so rescaling one feature reweights its contribution to every distance and can change every neighborhood; feature scaling is mandatory there and irrelevant here. (SVMs and penalized regressions are also scale-sensitive, through the inner products and the penalty respectively.)
+</Solution>
+</Exercise>
+
+<Exercise>
+When would a decision tree beat logistic regression, and when the reverse? Give at least three concrete conditions each way.
+
+<Solution>
+Tree wins: (1) strong feature interactions: a tree's nested splits model "risk is high only if A and B" natively, while logistic regression needs hand-built cross terms; (2) nonlinear, threshold-like effects (dose above a cutoff, age bands): piecewise-constant fits match them with one split; (3) mixed numeric/categorical features with missing values: no dummy coding, no scaling, surrogate/default routing; (4) the audience requires a readable decision rule.
+
+Logistic regression wins: (1) the true boundary is close to linear in the features: the tree must build a staircase (axis-aligned bias) while one coefficient vector nails it; (2) small samples with many weak additive effects: a deep tree's variance overwhelms the signal a stable linear fit captures; (3) calibrated probabilities and inference are required: coefficients, odds ratios, and confidence statements (<Ref lesson="logistic-regression" />), where a small tree outputs coarse leaf frequencies; (4) extrapolation beyond the training range, where any tree predicts the constant of its edge leaf.
+</Solution>
+</Exercise>
+
+<References>
+1. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §8.1: the Hitters tree, recursive binary splitting (Eqs. 8.1–8.3), cost-complexity pruning and Algorithm 8.1, classification trees (Eqs. 8.5–8.7), trees vs linear models. https://www.statlearning.com
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §9.2: CART formalism, impurity choice for growing vs pruning, categorical subset splits, surrogate splits. https://hastie.su.domains/ElemStatLearn/
+3. K. Q. Weinberger, "Lecture 17: Decision Trees," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — Gini and entropy impurities, ID3, the entropy-as-KL view. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote17.html
+4. L. Breiman, J. H. Friedman, R. A. Olshen, C. J. Stone, *Classification and Regression Trees*, Wadsworth, 1984 — the CART monograph: splitting rules, weakest-link pruning and the nested-sequence theorem (ch. 3), regression trees (ch. 8), surrogate splits.
+5. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §18.1: a compact modern statement of CART. https://probml.github.io/pml-book/book1.html
+6. J. R. Quinlan, "Induction of Decision Trees," *Machine Learning* 1, 1986 — ID3, information gain, and the gain-ratio correction for high-cardinality features.
+7. L. Hyafil, R. L. Rivest, "Constructing Optimal Binary Decision Trees is NP-complete," *Information Processing Letters* 5(1), 1976 — why growing is greedy.
+8. J. Starmer, "Decision and Classification Trees, Clearly Explained!!!," StatQuest (YouTube), 2021 — the hand-computed Gini split walkthrough this chapter's worked example parallels.
+</References>

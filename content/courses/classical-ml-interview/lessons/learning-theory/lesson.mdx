@@ -1,0 +1,383 @@
+Learning from a finite sample is feasible because empirical error concentrates around true error — Hoeffding's inequality plus the growth function turn that claim into a quantitative bound. This chapter builds the bound in the order the argument actually runs: Hoeffding for one fixed hypothesis, the 1000-coins computation showing why selecting among hypotheses breaks it, the growth function and break points that replace the hypothesis count, VC dimension with the perceptron worked in both directions, and finally the VC bound with its $N \ge 10\,d_{\text{vc}}$ rule of thumb and an honest account of what the bound is and is not good for. The chapter is off the core path: interviews that touch it are research- and quant-flavored, and nothing later depends on it.
+
+Notation follows [Learning From Data](https://work.caltech.edu/telecourse): a hypothesis class $\mathcal{H}$, a candidate $h \in \mathcal{H}$, the final learned hypothesis $g$, in-sample error $E_{\text{in}}$ and out-of-sample error $E_{\text{out}}$.
+
+## Verification is easy: Hoeffding for one fixed hypothesis
+
+For a fixed classifier $h$ and data $(x, y) \sim P$, define the two errors under 0–1 loss:
+
+$$
+E_{\text{out}}(h) = \Pr_{(x,y)\sim P}\bigl[h(x) \ne y\bigr],
+\qquad
+E_{\text{in}}(h) = \frac{1}{N}\sum_{i=1}^{N} \mathbf{1}\bigl[h(x_i) \ne y_i\bigr].
+$$
+
+$E_{\text{out}}$ is the generalization error of <Ref lesson="bias-variance" /> specialized to classification; $E_{\text{in}}$ is its estimate from $N$ i.i.d. draws. The relation between them is a pure sampling question. Color each point of the input space by whether $h$ gets it wrong: the population is a bin of marbles with an unknown error fraction $\mu = E_{\text{out}}(h)$, and the training set is $N$ marbles drawn from the bin, with observed error fraction $\nu = E_{\text{in}}(h)$.
+
+{/* fig HoeffdingBin: single Figure, component tier. Left: a bin (rounded-rect jar) of many small marbles, amber marbles = points where h(x) ≠ y (errors), muted currentColor marbles = correct points; label under the bin, KaTeX: "population: $\mu = E_{\text{out}}(h)$" with "unknown" muted. A straight data-flow arrow labeled "draw $N$ i.i.d." to a small blue-outlined tray of 12 sampled marbles, 3 of them amber; label under the tray: "sample: $\nu = E_{\text{in}}(h)$" with "observed" muted. Right: the inequality $\Pr\left[\,\lvert E_{\text{in}}(h)-E_{\text{out}}(h)\rvert>\epsilon\,\right]\le 2e^{-2\epsilon^{2}N}$ in large KaTeX; thin naming lines bind $E_{\text{in}}$ to the tray and $E_{\text{out}}$ to the bin (color-matched: amber = the error fraction being tracked, blue = the sample); beneath it the plugged instance "$\epsilon=0.05$, $N=1000$: bound $=2e^{-5}\approx 0.014$" with 0.014 bold. One idea: for one FIXED h, the sample fraction tracks the bin fraction. */}
+<Figure
+  name="HoeffdingBin"
+  alt="A bin of marbles with unknown error fraction mu, a sampled tray with observed fraction nu, and Hoeffding's inequality typeset with each symbol tied to the picture"
+  caption="One fixed hypothesis is a bin: E_in is a sample estimate of E_out, and Hoeffding bounds the deviation."
+/>
+
+Sample fractions of i.i.d. draws concentrate around the population fraction, and the concentration is exponential in $N$:
+
+<Theorem title="Hoeffding's inequality">
+Let $z_1, \dots, z_N$ be i.i.d. random variables taking values in $[0, 1]$, with sample mean $\nu$ and expectation $\mu$. For any $\epsilon > 0$,
+
+$$
+\Pr\bigl[\,\lvert \nu - \mu \rvert > \epsilon\,\bigr] \;\le\; 2\,e^{-2\epsilon^2 N}.
+$$
+</Theorem>
+
+The inequality ([Hoeffding, 1963](https://www.jstor.org/stable/2282952)) holds for every $N$ and every distribution on $[0,1]$; no Gaussian approximation is involved. Applied to the indicator variables $\mathbf{1}[h(x_i) \ne y_i]$, it bounds the train–test gap of one hypothesis.
+
+<Example title="verifying a fixed classifier">
+A spam filter is built from rules written down **before** any evaluation data is collected, then scored on $N = 1000$ fresh labeled messages. The probability that its measured error is off from its true error by more than $\epsilon = 0.05$ is at most
+
+$$
+2\,e^{-2 \cdot 0.05^2 \cdot 1000} = 2\,e^{-5} \approx 0.0135.
+$$
+
+With probability above 98.6%, the observed error rate is within five points of the truth. Verification of one fixed hypothesis is statistically cheap: the guarantee needs no assumption about $P$ beyond i.i.d. sampling.
+</Example>
+
+The fine print carries the entire subject. Hoeffding's premise is that $h$ is **fixed before the sample is drawn**: the bin is chosen first, then the marbles. A learning algorithm does the opposite: it looks at the marbles from many bins and picks the bin that looks best. That inversion voids the guarantee, as the next computation shows.
+
+<KeyFact>
+Hoeffding's inequality applies to a hypothesis fixed before the data is seen. Learning selects the hypothesis after seeing the data, which breaks the premise; the rest of this chapter repairs the guarantee under selection.
+</KeyFact>
+
+## Selection inflates success: the best of 1000 coins
+
+The failure mode is reproduced exactly by coins. A fair coin flipped 10 times lands all heads with probability
+
+$$
+\Pr[\text{10 of 10 heads}] = 2^{-10} = \tfrac{1}{1024} \approx 0.001.
+$$
+
+Now flip **1000 fair coins** 10 times each and track the best performer. The probability that at least one coin lands 10 of 10 is
+
+$$
+1 - \bigl(1 - 2^{-10}\bigr)^{1000} \approx 1 - 0.376 = 0.624.
+$$
+
+An event with probability 0.1% for any fixed coin has probability 62% for the selected coin. Nothing about any individual coin changed; the selection did the work.
+
+<Figure
+  src="./figures/coins.svg"
+  alt="Histogram of heads counts for 1000 fair coins flipped 10 times each, binomially shaped, with the 10-heads bar highlighted and a tally comparing 0.1 percent for one fixed coin against 62 percent for the best of 1000"
+  caption="1000 fair coins, 10 flips each. Some coin looks perfect with probability 0.62; each fixed coin with probability 0.001."
+/>
+
+The dictionary between coins and learning is one-to-one: each coin is a hypothesis, its heads fraction is $E_{\text{in}}$, its true heads probability $0.5$ is $E_{\text{out}}$, and "10 of 10 heads" is the event $E_{\text{in}} = 0$ while $E_{\text{out}} = 0.5$. A learning algorithm that returns the hypothesis with the best training score is exactly the observer who reports the perfect coin: with enough hypotheses, **some** hypothesis looks excellent by luck, and it is precisely the one that gets selected. This is also the statistics of multiple hypothesis testing, met as selection optimism in <Ref lesson="cross-validation-bootstrap" />.
+
+### The union bound: a factor of M, fatal at M = ∞
+
+For a finite class $\mathcal{H} = \{h_1, \dots, h_M\}$ the repair is mechanical. The learned $g$ is one of the $M$ candidates, so the event "$g$'s gap exceeds $\epsilon$" is contained in the union of the $M$ individual events, and probabilities of unions are at most sums:
+
+$$
+\Pr\bigl[\,\lvert E_{\text{in}}(g) - E_{\text{out}}(g)\rvert > \epsilon\,\bigr]
+\;\le\; \sum_{m=1}^{M} \Pr\bigl[\,\lvert E_{\text{in}}(h_m) - E_{\text{out}}(h_m)\rvert > \epsilon\,\bigr]
+\;\le\; 2M\,e^{-2\epsilon^2 N}.
+$$
+
+Equivalently, setting the right side to $\delta$ and solving: with probability at least $1 - \delta$, **every** $h \in \mathcal{H}$ simultaneously satisfies
+
+$$
+\lvert E_{\text{in}}(h) - E_{\text{out}}(h)\rvert \;\le\; \sqrt{\frac{1}{2N}\ln\frac{2M}{\delta}},
+$$
+
+the finite-class uniform convergence statement of [CS229 §8.3](https://cs229.stanford.edu/main_notes.pdf). The price of selection is the factor $M$ inside a logarithm: doubling the number of candidates costs the same as a fixed additive increment to $N$.
+
+<Example title="the factor M in numbers">
+At $\epsilon = 0.05$ and $N = 1000$, one fixed hypothesis had failure probability $0.0135$. With $M = 1000$ candidates the union bound gives $2000\,e^{-5} \approx 13.5$: a probability bound above 1, which guarantees nothing. Solving $2M e^{-2\epsilon^2 N} \le 0.05$ for $N$ gives
+
+$$
+N \;\ge\; \frac{\ln(2M/\delta)}{2\epsilon^2} = \frac{\ln 40{,}000}{2 \cdot 0.0025} \approx 2{,}120.
+$$
+
+Doubling the data restores the guarantee for a thousandfold larger class: the logarithm does the heavy lifting.
+</Example>
+
+The repair fails completely for the classes that matter. A perceptron's weight vector ranges over $\mathbb{R}^{d+1}$: $M$ is uncountably infinite, the union bound reads $\infty$, and the theory appears to end before reaching even linear models. The resolution is that $M$ was the wrong count.
+
+<KeyFact>
+Picking the best-looking of $M$ hypotheses multiplies the Hoeffding failure probability by $M$. The union bound survives inside a logarithm for finite classes and dies at $M = \infty$; every continuous-parameter model needs a better count.
+</KeyFact>
+
+## The growth function: count labelings, not hypotheses
+
+Two hypotheses that label every training point identically are, for the purposes of $E_{\text{in}}$, the same hypothesis. The union bound overcounts by treating them as different. The right count is the number of **distinct behaviors on $N$ points**.
+
+<Definition title="dichotomy and growth function">
+For points $x_1, \dots, x_N$, a *dichotomy* generated by $\mathcal{H}$ is a vector $(h(x_1), \dots, h(x_N)) \in \{-1, +1\}^N$ for some $h \in \mathcal{H}$. The *growth function* is the largest number of dichotomies achievable on any $N$ points:
+
+$$
+m_{\mathcal{H}}(N) \;=\; \max_{x_1, \dots, x_N} \;\bigl\lvert \{ (h(x_1), \dots, h(x_N)) : h \in \mathcal{H} \} \bigr\rvert \;\le\; 2^N.
+$$
+</Definition>
+
+Infinitely many hypotheses can produce few dichotomies. Three one-dimensional and one degenerate class make the range of behaviors concrete.
+
+<Example title="three growth functions computed">
+**Positive rays**, $h_a(x) = \operatorname{sign}(x - a)$ on $\mathbb{R}$: for $N$ distinct points there are $N + 1$ gaps to place the threshold $a$ in, and each gap gives a different dichotomy, so $m_{\mathcal{H}}(N) = N + 1$. Infinitely many hypotheses, linearly many behaviors.
+
+**Positive intervals**, $h(x) = +1$ exactly on $[\ell, r]$: a dichotomy is fixed by which two of the $N+1$ gaps hold the endpoints, plus one all-negative dichotomy when the interval covers no point:
+
+$$
+m_{\mathcal{H}}(N) = \binom{N+1}{2} + 1 = \tfrac{1}{2}N^2 + \tfrac{1}{2}N + 1.
+$$
+
+**Convex sets in the plane**, $h = +1$ inside a convex region: place the $N$ points on a circle; for any subset, the polygon through the positive points contains them and no others. All $2^N$ labelings are achievable, so $m_{\mathcal{H}}(N) = 2^N$: the growth function saturates.
+</Example>
+
+<Figure
+  src="./figures/growth.svg"
+  alt="Log-scale plot of three growth functions versus N: convex sets grow as 2 to the N along a straight line, positive intervals along a quadratic curve, positive rays along N plus 1, with the first break points of rays and intervals marked"
+  caption="log₂ m_H(N) for three classes. A class either saturates 2^N forever or bends onto a polynomial; there is no middle path."
+/>
+
+<Task>
+Verify the smallest cases against the figure: positive rays give $m(2) = 3$ of the $4$ possible labelings of two points (the labeling $+,-$ with the larger point negative is impossible), and positive intervals give $m(3) = 7$ of $8$ (the labeling $+,-,+$ needs two intervals). Each first failure is that class's marked break point.
+</Task>
+
+<Definition title="break point">
+$k$ is a *break point* for $\mathcal{H}$ if no set of $k$ points is shattered, i.e. $m_{\mathcal{H}}(k) < 2^k$. Rays have break point $2$, intervals $3$; convex sets have none.
+</Definition>
+
+A single break point already forces the growth function down from exponential to polynomial, the pivotal combinatorial fact of the theory:
+
+<Theorem title="Sauer–Shelah bound">
+If $\mathcal{H}$ has break point $k$, then for all $N$
+
+$$
+m_{\mathcal{H}}(N) \;\le\; \sum_{i=0}^{k-1} \binom{N}{i},
+$$
+
+a polynomial in $N$ of degree $k - 1$.
+</Theorem>
+
+The proof idea fits in two sentences. Let $B(N, k)$ be the largest possible number of dichotomies on $N$ points with no $k$ of them shattered; splitting the list of dichotomies by whether their restriction to the first $N-1$ points occurs once or twice yields the recursion $B(N,k) \le B(N-1,k) + B(N-1,k-1)$, and induction with Pascal's rule turns the recursion into the binomial sum. The full argument is [LFD](https://work.caltech.edu/telecourse) §2.1.2 (also [Sauer, 1972](https://doi.org/10.1016/0097-3165(72)90019-2)); the check against the worked classes: intervals have $k = 3$ and indeed $\tfrac12 N^2 + \tfrac12 N + 1 = \binom{N}{0} + \binom{N}{1} + \binom{N}{2}$, met with equality.
+
+<KeyFact>
+One break point anywhere forces polynomial growth everywhere: $m_{\mathcal{H}}(N)$ is either $2^N$ for all $N$ or bounded by a polynomial of degree $k-1$. "Effective hypothesis count" is polynomial for every class anyone regularizes.
+</KeyFact>
+
+## VC dimension: the largest sample the class can shatter
+
+The degree of that polynomial deserves its own name.
+
+<Definition title="VC dimension">
+The *Vapnik–Chervonenkis dimension* $d_{\text{vc}}(\mathcal{H})$ is the largest $N$ for which some set of $N$ points is shattered by $\mathcal{H}$: $m_{\mathcal{H}}(N) = 2^N$. Equivalently, $d_{\text{vc}} = k^* - 1$ where $k^*$ is the smallest break point. If $\mathcal{H}$ shatters arbitrarily large sets, $d_{\text{vc}} = \infty$.
+</Definition>
+
+By the Sauer–Shelah bound, $m_{\mathcal{H}}(N) \le N^{d_{\text{vc}}} + 1$: the VC dimension is the exponent of the effective hypothesis count. From the worked examples: rays $d_{\text{vc}} = 1$, intervals $d_{\text{vc}} = 2$, convex sets $d_{\text{vc}} = \infty$.
+
+<Remark title="the quantifiers, which interviews test">
+Shattering requires **some** placement of $N$ points whose every labeling is realized, not every placement. Three collinear points are not shattered by 2D linear separators (the middle-point-different labeling fails), yet $d_{\text{vc}} = 3$ because a triangle works. Conversely, showing $d_{\text{vc}} < N$ requires that **no** $N$-point set is shattered; one failing configuration proves nothing.
+</Remark>
+
+### Worked case: the 2D perceptron has VC dimension 3
+
+Lower bound: exhibit three shattered points. A triangle works, and all $8 = 2^3$ labelings are realized by lines:
+
+<FigureSequence
+  name="shatter"
+  alt="Eight mini-panels of three points in a triangle, filled in over three frames until all eight labelings have a separating line; a fourth frame shows four points with the XOR labeling and a struck-out line marking that no line realizes it"
+  caption="Three points: all 8 dichotomies realized by lines. Four points: the XOR labeling is realized by no line."
+/>
+
+<Task>
+Step through the frames. For each realized panel, check the line's orientation against the labeling; in the last frame, verify the failure argument directly: the segment joining the two $+$ points crosses the segment joining the two $-$ points, and a half-plane containing both $+$ points contains their whole segment.
+</Task>
+
+Upper bound: no four points are shattered, whatever their placement. Two cases cover all configurations. If one point lies inside the triangle of the other three, label the inside point $-$ and the rest $+$: a half-plane containing the three vertices contains their convex hull, hence the inside point, so the labeling fails. If the four points are in convex position, use the *XOR labeling*: opposite corners of the quadrilateral get the same sign. The two diagonals intersect, so the convex hulls of the $+$ pair and the $-$ pair share a point; a separating line would put those disjoint-signed hulls on opposite sides, which is impossible. Hence $d_{\text{vc}} = 3$, and the growth function confirms it: lines on $N$ points in general position realize $m_{\mathcal{H}}(4) = 14$ of $16$ labelings.
+
+The pattern generalizes exactly:
+
+<Theorem title="VC dimension of the perceptron">
+For linear separators $h(x) = \operatorname{sign}(w^\top x + b)$ on $\mathbb{R}^d$, $\;d_{\text{vc}} = d + 1$.
+
+<Proof>
+Sketch, both directions, following LFD Lecture 7. Write hypotheses as $\operatorname{sign}(\tilde{w}^\top \tilde{x})$ with augmented vectors $\tilde{x} = (1, x) \in \mathbb{R}^{d+1}$.
+
+**$d_{\text{vc}} \ge d + 1$.** Take the $d+1$ points $x_0 = 0$ and $x_i = e_i$. Their augmented vectors form a $(d+1) \times (d+1)$ matrix that is invertible (row-reduce: subtract the first row from the others to get a triangular matrix). For any target signs $y \in \{-1,+1\}^{d+1}$, solve the linear system $\tilde{X} \tilde{w} = y$ exactly; then $\operatorname{sign}(\tilde{w}^\top \tilde{x}_i) = y_i$ for all $i$. Every labeling is realized, so these $d+1$ points are shattered.
+
+**$d_{\text{vc}} < d + 2$.** Take any $d + 2$ points. Their augmented vectors are $d+2$ vectors in $\mathbb{R}^{d+1}$, hence linearly dependent: some $\tilde{x}_j = \sum_{i \ne j} a_i \tilde{x}_i$ with not all $a_i$ zero. Consider the labeling $y_i = \operatorname{sign}(a_i)$ for the nonzero coefficients and $y_j = -1$ (other points labeled arbitrarily). Any $\tilde{w}$ realizing the $y_i$ has $a_i\, \tilde{w}^\top \tilde{x}_i > 0$ for every nonzero $a_i$, so $\tilde{w}^\top \tilde{x}_j = \sum_i a_i\, \tilde{w}^\top \tilde{x}_i > 0$, forcing $h(x_j) = +1 \ne y_j$. The labeling is unrealizable, so no $d+2$ points are shattered.
+</Proof>
+</Theorem>
+
+<Remark title="VC dimension is not a parameter count">
+For perceptrons $d_{\text{vc}} = d + 1$ equals the number of free parameters, and the same holds for many linear-in-parameters classes: a useful heuristic, not a law. The one-parameter class $h_\omega(x) = \operatorname{sign}(\sin(\omega x))$ has $d_{\text{vc}} = \infty$: for any $N$, the points $x_i = 10^{-i}$ are shattered by choosing the frequency $\omega$ appropriately (the standard cautionary example, due to Vapnik). In the other direction, 1-nearest-neighbor has no finite parameterization at all and $d_{\text{vc}} = \infty$, since it labels any distinct training points perfectly. VC dimension measures expressive capacity on samples, not parameter arithmetic.
+</Remark>
+
+<KeyFact>
+$d_{\text{vc}}$ is the largest $N$ such that some $N$-point set is shattered. For linear separators in $\mathbb{R}^d$ it is exactly $d+1$; agreement with the parameter count is a pattern with real exceptions in both directions.
+</KeyFact>
+
+## The VC bound: the gap costs √(d_vc · ln N / N)
+
+Substituting the polynomial $m_{\mathcal{H}}$ for the fatal $M$ in the union-bound argument requires genuine work: the sample must be compared against a second "ghost" sample so that the hypothesis class only ever acts on $2N$ points, which is where a growth function evaluated at $2N$ and extra constants enter. The result ([Vapnik and Chervonenkis, 1971](https://doi.org/10.1137/1116025); LFD Theorem 2.5):
+
+<Theorem title="VC generalization bound">
+For any target distribution and any learning algorithm returning $g \in \mathcal{H}$, with probability at least $1 - \delta$ over the draw of $N$ training points,
+
+$$
+E_{\text{out}}(g) \;\le\; E_{\text{in}}(g) + \underbrace{\sqrt{\frac{8}{N}\,\ln\frac{4\, m_{\mathcal{H}}(2N)}{\delta}}}_{\Omega(N,\, \mathcal{H},\, \delta)} .
+$$
+</Theorem>
+
+<Aside>
+Why $m_{\mathcal{H}}(2N)$ and not $m_{\mathcal{H}}(N)$: the proof cannot condition on $E_{\text{out}}$ directly, since it is an average over the whole input space where the class has infinitely many behaviors. The symmetrization trick replaces $E_{\text{out}}$ by the error on an independent ghost sample of size $N$; deviations between two finite samples are controlled by the class's behaviors on their union of $2N$ points, of which there are at most $m_{\mathcal{H}}(2N)$. The union bound then runs over dichotomies instead of hypotheses. The full proof occupies Appendix A of LFD and is standardly skipped; the statement and its reading are what get asked.
+</Aside>
+
+{/* fig VcBoundAnatomy: single Figure, component tier. Top: the inequality $E_{\text{out}}(g) \le E_{\text{in}}(g) + \sqrt{\frac{8}{N}\ln\frac{4 m_{\mathcal H}(2N)}{\delta}}$ in large KaTeX with an underbrace labeling the square root $\Omega(N, \mathcal{H}, \delta)$; short labels with thin leader lines: "fit term — driven down by training" onto $E_{\text{in}}$ (blue), "complexity term — grows with $d_{\text{vc}}$, shrinks like $\sqrt{d_{\text{vc}} \ln N / N}$" onto the root (amber), "confidence" onto $\delta$ (muted). Two small annotation arrows beneath: "more flexible $\mathcal H$: $E_{\text{in}} \downarrow$, $\Omega \uparrow$" and "more data: $\Omega \downarrow$". Bottom: a compact U-curve inset, x axis $d_{\text{vc}}$ (model complexity): blue falling curve $E_{\text{in}}$, amber rising curve $\Omega$, currentColor U-shaped sum labeled "bound on $E_{\text{out}}$", dashed vertical at the minimum labeled $d_{\text{vc}}^*$; one-line strip under the inset: "the U-curve of bias–variance, re-derived from a tail bound". */}
+<Figure
+  name="VcBoundAnatomy"
+  alt="The VC bound annotated term by term: E_out bounded by a fit term E_in plus a complexity term Omega, with arrows showing that flexibility lowers the first and raises the second, and a U-curve of their sum beneath"
+  caption="The bound's anatomy: a fit term and a complexity term, pulling in opposite directions as flexibility grows."
+/>
+
+With $m_{\mathcal{H}}(2N) \le (2N)^{d_{\text{vc}}} + 1$, the complexity term behaves like $\Omega \sim \sqrt{d_{\text{vc}} \ln N / N}$. The qualitative content is the course's oldest picture in new clothes: increasing flexibility drives $E_{\text{in}}$ down and $\Omega$ up, their sum traces the U-curve of <Ref lesson="bias-variance" />, and overfitting is winning the first term while losing the second. The two standard responses attack $\Omega$ from opposite sides: **regularization** (<Ref lesson="ridge-lasso" />) constrains the effective class to shrink $\Omega$ analytically, while **validation** (<Ref lesson="cross-validation-bootstrap" />) sidesteps the bound entirely by measuring $E_{\text{out}}$ on data the fit never touched.
+
+<Figure
+  src="./figures/gap-vs-n.svg"
+  alt="Training error rising and test error falling toward a common asymptote as N grows, with the VC bound as a dashed curve above the test error and a marker at N equal to ten times the VC dimension"
+  caption="More data closes the gap at rate roughly √(d_vc ln N / N); the dashed VC bound tracks E_out from above, loosely."
+/>
+
+### How much data: the 10·d_vc rule
+
+Solving the bound for $N$ at fixed $\epsilon$ and $\delta$ gives sample complexity proportional to $d_{\text{vc}}$ up to logarithms, and with absurd constants. Requiring $\Omega \le 0.1$ at $\delta = 0.1$ for $d_{\text{vc}} = 3$ demands $N \approx 30{,}000$: ten thousand examples per unit of VC dimension. Empirically, across models and data distributions, generalization behaves reasonably once
+
+$$
+N \;\ge\; 10 \times d_{\text{vc}},
+$$
+
+the working rule of LFD Lecture 7. The thousandfold gap between the provable constant and the practical one is the honest summary of the bound's numerical value.
+
+<KeyFact>
+With probability $1-\delta$, $E_{\text{out}} \le E_{\text{in}} + \Omega$ where $\Omega \sim \sqrt{d_{\text{vc}}\ln N / N}$: the train–test gap is controlled by capacity over sample size. Practical calibration: about $10$ examples per unit of VC dimension.
+</KeyFact>
+
+## What the bound buys: structure, not numbers
+
+The VC bound is **distribution-free**: it holds for the worst-case data distribution, so on any particular problem it is loose, typically by orders of magnitude. Quoting it as a prediction of test error is a standard interview mistake. Its value is structural, and three of its lessons survive the looseness intact: the gap scales as $\sqrt{1/N}$, so data requirements grow quadratically in the demanded precision; capacity enters through $d_{\text{vc}}$, not through parameter count or hypothesis count, so constraining a model's behaviors is what earns generalization; and the guarantee is uniform over algorithms, so no clever optimizer escapes it.
+
+The margin story of the SVM chapters is the classic application of the second lesson. [Cortes and Vapnik (1995)](https://doi.org/10.1007/BF00994018), §5.3, bound the capacity of *margin-restricted* separators: hyperplanes separating data in a ball of radius $R$ with margin at least $\Delta$ have
+
+$$
+d_{\text{vc}} \;\le\; \min\!\left(\left\lceil \tfrac{R^2}{\Delta^2} \right\rceil,\, d\right) + 1,
+$$
+
+a bound that does not grow with the ambient dimension $d$. A kernel machine working in a $10^{16}$-dimensional feature space (<Ref lesson="svm-dual-kernels" />) is therefore not committing the union-bound sin: maximizing the margin shrinks $R^2/\Delta^2$, and the effective capacity is set by the margin achieved, not the space entered. The same paper's leave-one-out argument gives the companion bound: expected test error at most $\mathbb{E}[\#\text{support vectors}]/N$.
+
+Infinite VC dimension, conversely, is not a death sentence: the bound is sufficient, not necessary. 1-NN has $d_{\text{vc}} = \infty$ and a vacuous VC guarantee, yet its distribution-dependent analysis (the Cover–Hart bound of <Ref lesson="knn-curse" />) pins its asymptotic error below twice the Bayes error. Exercises 6 and 7 work both sides of this line.
+
+## Exercises
+
+<Exercise>
+Interview question: state Hoeffding's inequality, and explain precisely what breaks when you evaluate $M$ hypotheses and keep the best. Support the explanation with the 1000-coins computation, and state the repaired (union) bound for finite $M$.
+
+<Solution>
+**Hoeffding.** For i.i.d. draws with sample mean $\nu$ and true mean $\mu$ in $[0,1]$: $\Pr[\lvert\nu - \mu\rvert > \epsilon] \le 2e^{-2\epsilon^2 N}$. Applied to a classifier: $\Pr[\lvert E_{\text{in}}(h) - E_{\text{out}}(h)\rvert > \epsilon] \le 2e^{-2\epsilon^2 N}$, valid when $h$ is fixed before the data is drawn.
+
+**What breaks.** Selection reverses the order of quantifiers: the learned $g$ is chosen because its $E_{\text{in}}$ looks good on this sample, so the bound must hold simultaneously for every candidate that might have been chosen. Coins make it concrete: one fair coin lands 10 of 10 heads with probability $2^{-10} \approx 0.001$, but among 1000 fair coins the best lands 10 of 10 with probability $1 - (1 - 2^{-10})^{1000} \approx 0.62$. The "perfect" coin is guaranteed to be found about 62% of the time despite every coin being fair: selecting on observed performance inflates observed performance.
+
+**Repair.** For $\mathcal{H} = \{h_1, \dots, h_M\}$, the union bound gives $\Pr[\lvert E_{\text{in}}(g) - E_{\text{out}}(g)\rvert > \epsilon] \le 2M e^{-2\epsilon^2 N}$; equivalently, with probability $1-\delta$, every hypothesis's gap is at most $\sqrt{\ln(2M/\delta)/(2N)}$. The factor $M$ sits inside a logarithm, so finite classes are cheap; $M = \infty$ (any continuous-parameter model) makes the bound vacuous and requires the growth function instead.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compute the growth function of the class of **two-sided rays** on $\mathbb{R}$: $\mathcal{H} = \{x \mapsto \operatorname{sign}(x - a)\} \cup \{x \mapsto \operatorname{sign}(a - x)\}$, i.e. thresholds that may point in either direction. Then find the break point and the VC dimension.
+
+<Solution>
+Fix $N$ distinct points. Rightward rays $\operatorname{sign}(x-a)$ contribute one dichotomy per gap: $N+1$ of them, of the form $(-,\dots,-,+,\dots,+)$. Leftward rays contribute $N+1$ dichotomies of the form $(+,\dots,+,-,\dots,-)$. The two families overlap in exactly the two constant dichotomies (all $+$ and all $-$), each achieved by both orientations with the threshold beyond the data. So
+
+$$
+m_{\mathcal{H}}(N) = (N+1) + (N+1) - 2 = 2N .
+$$
+
+Checks: $m(1) = 2 = 2^1$, so one point is shattered. $m(2) = 4 = 2^2$: two points are shattered (rightward rays give $--, -+, ++$; a leftward ray adds $+-$). $m(3) = 6 < 8$: the labelings $+,-,+$ and $-,+,-$ are monotone in neither direction and unrealizable. The smallest break point is $k^* = 3$, hence $d_{\text{vc}} = 2$: one more than positive rays, paid for by the orientation bit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview classic: compute the VC dimension of axis-aligned rectangles in the plane ($h = +1$ inside the rectangle, $-1$ outside). Give both directions of the argument in full.
+
+<Solution>
+**Lower bound, $d_{\text{vc}} \ge 4$.** Take four points in a diamond: $N = (0,1)$, $S = (0,-1)$, $E = (1,0)$, $W = (-1,0)$. For any labeling, take the bounding box of the $+$ points (a degenerate rectangle if fewer than two): it contains every $+$ point by construction. It excludes every $-$ point: each of the four points is the strict extreme in its own direction (topmost, bottommost, rightmost, leftmost), so a $-$ point sticks out beyond all $+$ points in its direction and lies outside their bounding box. If all four are $-$, place the rectangle away from the data. All 16 labelings are realized.
+
+**Upper bound, $d_{\text{vc}} < 5$.** Take any five points. Choose a topmost, a bottommost, a leftmost, and a rightmost point (ties broken arbitrarily); at most four distinct points hold these roles, so some fifth point $p$ holds none. Label the four extreme points $+$ and $p$ $-$. Any rectangle containing the four extremes spans at least $[x_{\min}, x_{\max}] \times [y_{\min}, y_{\max}]$ of the whole five-point set, and $p$'s coordinates lie inside those ranges by construction, so the rectangle contains $p$. The labeling is unrealizable, no five points are shattered, and $d_{\text{vc}} = 4$.
+
+The heuristic cross-check: a rectangle has four free parameters (two ranges), matching $d_{\text{vc}} = 4$, with the usual caveat that this correspondence is a pattern, not a theorem.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: your model class has $d_{\text{vc}} = 50$. Roughly how much training data do you need, and what stands behind the number? State both the practical answer and what the theory itself would demand, with the caveats an interviewer expects.
+
+<Solution>
+Practical answer: $N \approx 10 \times d_{\text{vc}} = 500$ examples, the empirical rule of thumb from Learning From Data. It is a calibration observed across problems, not a theorem.
+
+What the raw bound demands: sample complexity from the VC bound scales as $N \sim (d_{\text{vc}}/\epsilon^2)$ up to logarithmic factors, with constants so pessimistic that requiring $\Omega \le 0.1$ at 90% confidence costs on the order of $10{,}000$ examples per unit of VC dimension (about $30{,}000$ for $d_{\text{vc}} = 3$), roughly a thousandfold above the practical rule, because the bound is distribution-free and worst-case.
+
+Caveats worth saying aloud: the requirement grows as $1/\epsilon^2$ in the demanded precision; the target $\delta$ enters only logarithmically; and the rule presumes the model class is fixed in advance: tuning flexibility on the data (hyperparameter search) enlarges the effective class beyond the nominal $d_{\text{vc}}$, which is why honest selection needs the protocols of <Ref lesson="cross-validation-bootstrap" />.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review from <Ref lesson="cross-validation-bootstrap" />: you compare $M = 50$ hyperparameter configurations on one held-out validation set of $N = 500$ examples. Using the finite-class uniform bound, compute the deviation $\epsilon$ guaranteed simultaneously for all 50 estimates at confidence $\delta = 0.05$, and reconcile the result with that chapter's warning that the winning validation score is optimistic. How large must $N$ be to certify all 50 scores within $\pm 0.03$?
+
+<Solution>
+Uniform deviation: with probability $\ge 0.95$, every configuration's validation error is within
+
+$$
+\epsilon = \sqrt{\frac{\ln(2M/\delta)}{2N}} = \sqrt{\frac{\ln(100/0.05)}{1000}} = \sqrt{\frac{\ln 2000}{1000}} = \sqrt{\frac{7.60}{1000}} \approx 0.087
+$$
+
+of its true error. Selection is then safe in the sense that the chosen configuration's *true* error exceeds the best candidate's true error by at most $2\epsilon \approx 0.17$ (its score beat the best's score, and both scores sit within $\epsilon$ of their truths).
+
+Reconciliation: this is the same mathematics as the previous chapter's min-of-noisy-estimates argument, seen from the guarantee side. The winner's *reported score* is still biased low (it won partly by luck, exactly like the selected coin), but the uniform bound caps how far any score, including the winner's, can sit from its truth. Selection optimism lives inside the $\pm\epsilon$ band; the band itself is honest, which is why a validation set used for selection still needs a final untouched test set to *grade* the winner.
+
+Required $N$ for $\epsilon = 0.03$: $N = \ln(2M/\delta)/(2\epsilon^2) = 7.60/(2 \cdot 0.0009) \approx 4{,}200$ validation examples: the $1/\epsilon^2$ scaling makes tight certification expensive, while pushing $M$ from 50 to 500 would only move $\ln(2M/\delta)$ from 7.6 to 9.9.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: an RBF-kernel SVM operates in an effectively infinite-dimensional feature space, where linear separators have unbounded VC dimension. Explain why the classifier can still generalize, citing the two quantitative facts that carry the argument.
+
+<Solution>
+The class the SVM actually searches is not "all hyperplanes in feature space": margin maximization restricts it to separators with large margin on data of bounded norm, and capacity follows the restriction, not the ambient dimension.
+
+Fact one (Cortes and Vapnik, 1995, §5.3): hyperplanes separating data inside a ball of radius $R$ with margin at least $\Delta$ have $d_{\text{vc}} \le \min(\lceil R^2/\Delta^2 \rceil, d) + 1$. The first argument of the min is dimension-free: if the kernel places the data in a ball and the optimizer finds a wide margin, the effective VC dimension is $R^2/\Delta^2$ regardless of whether the feature space has dimension $10^{16}$ or $\infty$. Maximizing the margin is capacity control performed by the optimizer.
+
+Fact two, the leave-one-out bound: the expected test error of an SVM trained on $N$ examples is at most $\mathbb{E}[\#\text{support vectors}]/N$. Removing a non-support vector leaves the solution unchanged, so only support vectors can be mispredicted in leave-one-out; a solution carried by few support vectors certifies its own generalization (<Ref lesson="svm-dual-kernels" />).
+
+One-line summary for the interviewer: generalization is paid for by the margin achieved and the sparsity of the solution, not by the dimension entered.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review from <Ref lesson="knn-curse" />: 1-nearest-neighbor has $d_{\text{vc}} = \infty$. Prove that claim in two sentences, state what the VC bound then says, and explain why learning with 1-NN is nonetheless not hopeless.
+
+<Solution>
+Proof of $d_{\text{vc}} = \infty$: for any $N$, take any $N$ distinct points as the training set; whatever labels are assigned, 1-NN classifies each training point by its own label (each point is its own nearest neighbor), so every labeling of every distinct-point set is realized and arbitrarily large sets are shattered. Equivalently, $E_{\text{in}} = 0$ always: the class memorizes.
+
+The VC bound then reads $E_{\text{out}} \le 0 + \Omega$ with $m_{\mathcal{H}}(2N) = 2^{2N}$, making $\Omega$ a constant that never shrinks with $N$: the guarantee is vacuous.
+
+Why learning is not hopeless: the VC bound is a sufficient condition for generalization, uniform over all data distributions; its failure retracts a guarantee, not the possibility of learning. Distribution-dependent analysis fills the gap: the Cover–Hart theorem gives 1-NN asymptotic error at most twice the Bayes error, and $k$-NN with $k \to \infty$, $k/n \to 0$ converges to the Bayes error itself. And regardless of any theory, $E_{\text{out}}$ of the trained classifier can be *measured* by the validation protocols of <Ref lesson="cross-validation-bootstrap" />: bounds are one route to trusting a model, and holding out data is another.
+</Solution>
+</Exercise>
+
+<References>
+1. Y. S. Abu-Mostafa, M. Magdon-Ismail, H.-T. Lin, *Learning From Data*, AMLBook, 2012 — ch. 1.3 (feasibility, bins and coins) and ch. 2 (growth function, break points, Sauer–Shelah, VC dimension, the VC bound); Appendix A carries the full proof. Companion lectures 2, 5–7 of the Caltech CS156 telecourse. https://work.caltech.edu/telecourse
+2. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §8.3: union bound plus Hoeffding for finite classes, sample complexity, VC dimension for infinite classes. https://cs229.stanford.edu/main_notes.pdf
+3. W. Hoeffding, "Probability Inequalities for Sums of Bounded Random Variables," *Journal of the American Statistical Association* 58(301), 1963 — the concentration inequality itself.
+4. V. N. Vapnik, A. Ya. Chervonenkis, "On the Uniform Convergence of Relative Frequencies of Events to Their Probabilities," *Theory of Probability and Its Applications* 16(2), 1971 — the growth-function bound and the birth of the subject.
+5. N. Sauer, "On the Density of Families of Sets," *Journal of Combinatorial Theory, Series A* 13, 1972 — the polynomial bound on the growth function (independently Shelah, 1972).
+6. C. Cortes, V. Vapnik, "Support-Vector Networks," *Machine Learning* 20, 1995 — §5.3: margin-based capacity control and the expected-support-vector bound.
+7. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.9: VC dimension in the context of model assessment. https://hastie.su.domains/ElemStatLearn/
+</References>

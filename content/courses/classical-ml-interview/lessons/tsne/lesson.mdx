@@ -1,0 +1,303 @@
+t-SNE matches neighbor distributions between the original space and a 2D map; a heavy-tailed kernel in the map is what keeps moderate-distance points from crushing into the center. This chapter builds the method at the cost-function level — the level interviews probe — and closes with the two questions every t-SNE plot invites: how to read it, and when to use PCA instead. The route: why variance is the wrong objective for a picture, the neighbor-probability construction with perplexity as its one knob, the crowding problem and the Student-t fix, the reading checklist, and the PCA-vs-t-SNE decision.
+
+## Variance is the wrong objective for a picture
+
+<Ref lesson="pca" /> established what PCA optimizes: the linear projection keeping maximum variance, equivalently minimum reconstruction error. A visualization has a different job. A useful 2D map of high-dimensional data should keep **neighborhoods**: points close in $\mathbb{R}^p$ should land close in the map, so that visible islands correspond to actual groups.
+
+The two objectives disagree whenever the data curve. Take two nested rings of points. Any linear projection to one dimension lays the inner ring's range inside the outer ring's range: the classes overlap, and points from opposite rings become apparent neighbors. Variance was preserved as well as linearly possible; the neighborhoods were destroyed. A neighbor-preserving embedding instead pulls each ring's points together and lets the rings drift apart into two islands.
+
+<Figure
+  src="./figures/rings.svg"
+  alt="Three panels: nested amber and blue rings as data, their 1D PCA projection with the two classes overlapping on one axis, and a t-SNE map showing two cleanly separated islands"
+  caption="Nested rings: the best linear projection overlaps the classes; a neighbor-preserving map separates them. Variance kept is not neighborhoods kept."
+/>
+
+<KeyFact>
+PCA preserves global variance; visualization needs local neighborhoods preserved. On curved or clustered data these objectives conflict, and t-SNE optimizes the second one directly.
+</KeyFact>
+
+## The construction: match two neighbor distributions
+
+[Stochastic neighbor embedding](https://papers.nips.cc/paper_files/paper/2002/hash/6150ccc6069bea6b5716254057a194ef-Abstract.html) (Hinton & Roweis, 2002) converts distances into probabilities: around each point, a Gaussian assigns every other point a probability of being picked as a neighbor. The map is then chosen to make the map-side probabilities match.
+
+### Gaussian neighbor probabilities, computed on four points
+
+Four points on a line at positions $0, 1, 2, 6$, named $A, B, C, D$. Center a Gaussian with $\sigma_A = 1$ on $A$ and score each other point by $\exp(-d^2 / 2\sigma_A^2)$: $B$ scores $e^{-1/2} = 0.607$, $C$ scores $e^{-2} = 0.135$, $D$ scores $e^{-18} \approx 1.5 \times 10^{-8}$. Normalizing the three scores to sum to 1 gives $A$'s neighbor distribution: $p_{B|A} = 0.82$, $p_{C|A} = 0.18$, $p_{D|A} \approx 2 \times 10^{-8}$. Distant points are not merely down-weighted; the Gaussian makes them exponentially irrelevant.
+
+<Definition title="conditional neighbor probabilities">
+For data points $x_1, \dots, x_n$, the probability that point $i$ picks point $j$ as its neighbor is
+
+$$
+p_{j|i} \;=\; \frac{\exp\!\bigl(-\lVert x_i - x_j \rVert^2 / 2\sigma_i^2\bigr)}{\sum_{k \neq i} \exp\!\bigl(-\lVert x_i - x_k \rVert^2 / 2\sigma_i^2\bigr)},
+\qquad p_{i|i} = 0,
+$$
+
+where $\sigma_i$ is a per-point bandwidth. Each point owns one distribution $P_i$ over all others.
+</Definition>
+
+### Perplexity: the bandwidth knob, counted in neighbors
+
+The bandwidth $\sigma_i$ decides how many points get non-negligible probability. The number it implicitly sets has a name and a formula worth memorizing: the *perplexity* of $P_i$ is $2^{H(P_i)}$, where $H(P_i) = -\sum_j p_{j|i} \log_2 p_{j|i}$ is the Shannon entropy, and it reads as the **effective number of neighbors**.
+
+<Example title="perplexity at two bandwidths">
+Continue with $A$'s distribution on the four-point line.
+
+**$\sigma_A = 1$:** $p_{j|A} = (0.82, 0.18, 2 \times 10^{-8})$ for $B, C, D$. Entropy:
+$H = -0.82 \log_2 0.82 - 0.18 \log_2 0.18 - (\text{negligible}) = 0.238 + 0.448 = 0.685$ bits, so $\mathrm{Perp} = 2^{0.685} \approx 1.6$: one dominant neighbor plus a partial second.
+
+**$\sigma_A = 3$:** scores become $e^{-1/18} = 0.946$, $e^{-4/18} = 0.801$, $e^{-2} = 0.135$, summing to $1.882$; normalizing, $p_{j|A} = (0.503, 0.425, 0.072)$. Entropy:
+$H = 0.499 + 0.524 + 0.273 = 1.296$ bits, so $\mathrm{Perp} = 2^{1.296} \approx 2.5$: widening the Gaussian recruited most of a third neighbor.
+</Example>
+
+<Figure
+  src="./figures/perplexity-dial.svg"
+  alt="Two panels of the four-point line with a Gaussian bump on point A: narrow sigma gives neighbor probabilities 0.82, 0.18, 0 and perplexity 1.6; wide sigma gives 0.50, 0.43, 0.07 and perplexity 2.5"
+  caption="One point, two bandwidths. The bars are p(j|A); perplexity 2^H counts how many of them matter."
+/>
+
+<Definition title="perplexity">
+The **perplexity** of point $i$'s neighbor distribution is $\mathrm{Perp}(P_i) = 2^{H(P_i)}$ with $H(P_i) = -\sum_j p_{j|i} \log_2 p_{j|i}$. t-SNE takes one target perplexity as its main hyperparameter and finds each $\sigma_i$ by **binary search** so that every $P_i$ hits the target.
+</Definition>
+
+The per-point search is the point: in a dense region a small $\sigma_i$ already reaches the target, in a sparse region $\sigma_i$ grows until it does. Every point ends up with the same effective neighbor count regardless of local density. [Van der Maaten & Hinton (2008)](https://jmlr.org/papers/v9/vandermaaten08a.html) report typical values between 5 and 50.
+
+<KeyFact>
+$\mathrm{Perp} = 2^{H(P_i)}$ is the effective number of neighbors each point's Gaussian is calibrated to, set per point by binary search on $\sigma_i$; it is t-SNE's one first-order knob, typically 5–50.
+</KeyFact>
+
+### The cost: KL divergence, and which mistakes it punishes
+
+Now give every data point a map position $y_i \in \mathbb{R}^2$ and define map-side neighbor probabilities $q_{j|i}$ by the same formula (original SNE uses a Gaussian with fixed bandwidth in the map). A perfect map would reproduce $p_{j|i} = q_{j|i}$ for all pairs; SNE minimizes the total Kullback–Leibler divergence
+
+$$
+C \;=\; \sum_i \mathrm{KL}(P_i \,\Vert\, Q_i) \;=\; \sum_i \sum_j p_{j|i} \log \frac{p_{j|i}}{q_{j|i}}
+$$
+
+by gradient descent on the positions $y_i$.
+
+The KL direction is a design decision, stated once: each term is weighted by $p_{j|i}$. Using a small $q_{j|i}$ to model a large $p_{j|i}$ (true neighbors placed far apart) costs a large penalty; using a large $q_{j|i}$ to model a small $p_{j|i}$ (distant points placed nearby) costs almost nothing, because the small $p$ multiplies the term away. The cost function is therefore biased toward **retaining local structure**: it fights hardest to keep neighbors together and only weakly to keep non-neighbors apart. Reversing the divergence would reverse the bias.
+
+In practice t-SNE uses a symmetrized joint distribution $p_{ij} = (p_{j|i} + p_{i|j})/2n$, which guarantees $\sum_j p_{ij} > 1/2n$ for every $i$, so even outliers exert force on the map.
+
+## The crowding problem: 2D has no room for the middle distances
+
+Plain SNE, run as described, produces maps whose points pile up in the center. The cause is geometric, not algorithmic, and reproducing it is a standard interview ask.
+
+### The volume argument
+
+Volume scales as $r^D$ in $D$ dimensions. Fix a point and compare two shells around it: the ball of radius $r$ and the shell from $r$ to $2r$. In $D = 10$, the outer shell holds $2^{10} - 1 = 1023$ times the volume of the inner ball; for uniformly spread data, points at moderate distance outnumber near neighbors a thousandfold. In the 2D map the same shell holds only $2^2 - 1 = 3$ times the inner volume. A faithful map would need to place a thousand volumes of points into three; there is no room.
+
+<Remark title="eleven equidistant points">
+The extreme case: in 10 dimensions, 11 points can be mutually equidistant (the vertices of a regular 10-simplex). In the plane at most 3 points can be. No 2D arrangement renders 11 mutual ties faithfully; some pairwise distances must be misrepresented, and the only question is which.
+</Remark>
+
+Under a Gaussian map kernel, the answer is the bad one: to keep its many moderate-distance points at moderate $q$, each point pulls them inward, and the whole map collapses toward its center. Van der Maaten & Hinton call this the *crowding problem*.
+
+<FigureSequence
+  name="crowding"
+  alt="Three frames: a high-dimensional point with a small near shell and a mid shell holding 1023 times its volume; the same points forced into a 2D disk where the mid shell crushes onto the near shell; a heavy-tailed map kernel pushing the mid shell outward to restore room"
+  caption="The crowding problem in three moves: high-D volumes, the 2D squeeze under a Gaussian kernel, and the heavy-tail repair."
+/>
+
+<Task>
+Step through the three frames tracking the amber mid-shell points. Frame 2: count how close they sit to the blue near shell under the Gaussian kernel. Frame 3: verify the blue shell is unchanged and only the amber shell moved outward.
+</Task>
+
+### The fix: Student-t tails in the map
+
+The repair changes one ingredient. Keep the Gaussian in the original space, but compute map similarities with a Student-t distribution with one degree of freedom (a Cauchy), whose density decays as $1/(1+d^2)$ instead of $e^{-d^2}$.
+
+<Definition title="t-SNE">
+Given symmetrized $p_{ij}$, define map similarities
+
+$$
+q_{ij} \;=\; \frac{\bigl(1 + \lVert y_i - y_j \rVert^2\bigr)^{-1}}{\sum_{k \neq l} \bigl(1 + \lVert y_k - y_l \rVert^2\bigr)^{-1}}
+$$
+
+and choose the positions $y_1, \dots, y_n \in \mathbb{R}^2$ minimizing $\mathrm{KL}(P \,\Vert\, Q) = \sum_{i \neq j} p_{ij} \log (p_{ij}/q_{ij})$ by gradient descent.
+</Definition>
+
+The heavy tail does the geometric work. A moderate similarity that the Gaussian reaches at distance $1.3$ is reached by the Cauchy only at distance $2.0$: matching the same $q$ value now requires a **larger map distance**. Moderately-distant points get pushed outward instead of crammed inward, clusters gain empty space between them, and the center decompresses.
+
+<Figure
+  src="./figures/tails.svg"
+  alt="Gaussian and Student-t similarity curves versus distance, with a dashed line at similarity 0.2 meeting the Gaussian at distance 1.27 and the Student-t at distance 2.0, and the heavy tail visible at large distance"
+  caption="Same similarity, larger map distance: the Student-t kernel reaches 0.2 at d = 2.0 where the Gaussian reaches it at d = 1.27. The tail gap grows with distance."
+/>
+
+The gradient reads as mechanics in one sentence: each pair connects by a spring whose force is proportional to the mismatch $p_{ij} - q_{ij}$, attracting when the map understates a similarity and repelling when it overstates one.
+
+<Aside>
+Optimization details, for completeness. The gradient is
+$\partial C / \partial y_i = 4 \sum_j (p_{ij} - q_{ij})\,(1 + \lVert y_i - y_j \rVert^2)^{-1} (y_i - y_j)$,
+descended with momentum from a small random initialization. *Early exaggeration* multiplies all $p_{ij}$ by a constant (4 in the original paper) for the first iterations, forcing tight, well-separated clusters early so they can move past each other before settling. The cost is non-convex: different seeds reach different local minima, and the KL value is invariant under rotation and reflection of the whole map, so even equally good runs look different. Plain t-SNE is $O(n^2)$ in time and memory; [Barnes–Hut t-SNE](https://jmlr.org/papers/v15/vandermaaten14a.html) (van der Maaten, 2014) approximates the repulsive forces with a quadtree for $O(n \log n)$, and FIt-SNE pushes further with FFT-based interpolation.
+</Aside>
+
+<KeyFact>
+The crowding problem is a volume mismatch: a moderate-distance shell holds $\sim 2^D$ relative volume in $D$ dimensions but only $4\times$ in 2D. The Student-t map kernel fixes it because heavy tails let the same similarity be modeled at a larger map distance.
+</KeyFact>
+
+## Reading a t-SNE map: what the picture licenses
+
+The construction dictates the reading rules, and most published misreadings violate the same one: t-SNE preserves neighborhoods, not distances and not densities. The systematic study of these artifacts is [Wattenberg, Viégas & Johnson (2016)](https://distill.pub/2016/misread-tsne/).
+
+### The checklist
+
+- **Cluster sizes mean nothing.** The binary search gives every point the same effective neighbor count, so dense clusters get expanded and sparse ones contracted: apparent area is an artifact of the density equalization, not a property of the data.
+- **Inter-cluster distances mean little.** Once $q_{ij}$ between two clusters is near zero, the cost barely changes as the gap widens; where islands land relative to each other depends on initialization and perplexity.
+- **Axes mean nothing.** The map coordinates are free parameters of a non-convex optimization; the cost is invariant to rotating or reflecting them, and no axis corresponds to any feature.
+- **One run means little.** Different seeds give different layouts, and at unlucky perplexities random noise can produce convincing-looking clumps. Structure is credible when it survives a sweep of perplexities and seeds.
+
+<Figure
+  src="./figures/misreading.svg"
+  alt="A t-SNE map with three islands annotated with three struck-out claims about density, inter-cluster gap, and axis meaning, and one valid green-checked claim that points within an island are mutual neighbors"
+  caption="The misreading gallery: three claims the map does not support, one it does."
+/>
+
+### Perplexity changes the topology
+
+Perplexity is not a cosmetic setting; it selects the scale of structure the map reports. At perplexity 2 each point commits to a couple of neighbors and real clusters shatter into micro-fragments. At perplexity 100 on a few hundred points, each Gaussian spans a large fraction of the dataset and distinct clusters merge. Implementations require perplexity below $n$, and as it approaches a third of the dataset every point is forced to treat a third of all points as neighbors, washing cluster structure out entirely.
+
+<Figure
+  src="./figures/sweep.svg"
+  alt="The same three-class dataset embedded at perplexity 2, 5, 30, and 100: shattered micro-clusters, partial fragments, three clean clusters, and one merged blob"
+  caption="One dataset, four perplexities. Only the sweep, not any single panel, is evidence."
+/>
+
+<Demo
+  name="PerplexityExplorer"
+  caption="Precomputed embeddings of one labeled dataset at perplexity 2, 5, 30, 100, plus the PCA projection; the readout names the artifact at each extreme."
+/>
+
+<Task>
+Find the perplexity at which the class structure is clearest, then visit both extremes: at 2, verify that same-colored points split into disconnected fragments (shattering); at 100, verify that distinct classes share one blob (merging). Compare the winner against the PCA panel: same data, different objective.
+</Task>
+
+<KeyFact>
+A t-SNE map licenses exactly one kind of claim: points sharing an island are mutual neighbors at the chosen perplexity. Sizes, gaps, axes, and any single run are not evidence; sweep perplexity and seeds before claiming structure.
+</KeyFact>
+
+## PCA or t-SNE: the decision
+
+The two methods answer different questions, and the interview form of the comparison is a table.
+
+| | PCA | t-SNE |
+| --- | --- | --- |
+| objective | max projected variance (global) | match neighbor distributions (local) |
+| map | linear: $z = V_k^\top x$ | nonlinear, no explicit formula |
+| new points | project with stored $V_k$ | no out-of-sample map; re-run |
+| deterministic | yes (up to sign) | no: non-convex, seed-dependent |
+| output dims | any $k \le d$ | 2–3 in practice |
+| cost | one (truncated) SVD | $O(n^2)$; Barnes–Hut $O(n\log n)$ |
+| use | preprocessing, features, compression | final-mile visualization, eyes only |
+
+The rows above the last carry the practical rule. PCA is a fitted linear map: store $V_k$, project new points in microseconds, feed the scores to any downstream model. t-SNE fits positions, not a map: there is nothing to apply to a new point, coordinates change with every seed, and its distances are deliberately distorted. **Embeddings are for eyes**; t-SNE coordinates do not belong in a feature pipeline.
+
+The methods also compose. The original paper's own recipe reduces the data with PCA to 30 dimensions first, then runs t-SNE: the PCA stage strips noise directions and cuts the pairwise-distance cost, and the t-SNE stage handles the nonlinear final mile. This pipeline, with 30–50 PCA dimensions, remains the standard default.
+
+<Figure
+  src="./figures/pipeline.svg"
+  alt="Pipeline diagram: an n-by-p data matrix reduced by PCA to 30 to 50 dimensions, then embedded by t-SNE into a 2D map labeled for visualization only"
+  caption="The standard pipeline from the original paper: PCA to 30–50 dimensions, then t-SNE to 2D."
+/>
+
+Van der Maaten & Hinton close their paper with three named weaknesses, all still current: it is unclear how t-SNE performs on general dimensionality reduction to $d > 3$; the method relies on local Euclidean distances and can fail when the data's intrinsic dimensionality is high (the curse of dimensionality of <Ref lesson="knn-curse" /> applies to the $p_{j|i}$ themselves); and the cost is non-convex. [UMAP](https://arxiv.org/abs/1802.03426) (McInnes, Healy & Melville, 2018) occupies the same neighbor-embedding niche with a graph-based construction, runs faster, and arguably keeps more global structure; the reading checklist above applies to it unchanged.
+
+<KeyFact>
+PCA for preprocessing, features, speed, determinism, and new-point projection; t-SNE for final-mile visualization of cluster structure; in practice both, as PCA to 30–50 dimensions followed by t-SNE.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+A point has three neighbors at squared distances $2, 2, 8$, and $\sigma_i = 1$. (a) Compute the conditional probabilities $p_{j|i}$ and the perplexity $2^{H(P_i)}$. (b) Interpret the value as an effective neighbor count. (c) On a dataset of $n = 500$ points, predict what a t-SNE map looks like at perplexity 2 and at perplexity 100, and name the artifact in each case.
+
+<Solution>
+**(a)** Unnormalized similarities $\exp(-d^2/2)$: $e^{-1} = 0.368$, $e^{-1} = 0.368$, $e^{-4} = 0.018$; sum $0.754$. Normalizing: $p = (0.488, 0.488, 0.024)$. Entropy:
+$H = -2 \times 0.488 \log_2 0.488 - 0.024 \log_2 0.024 = 1.010 + 0.130 = 1.141$ bits.
+Perplexity: $2^{1.141} \approx 2.20$.
+
+**(b)** About $2.2$ effective neighbors: the two close points count fully, the far point contributes a fraction. This matches the geometry (two neighbors at distance $\sqrt{2}$, one at $2\sqrt{2}$).
+
+**(c)** Perplexity 2: each point's Gaussian is calibrated to two effective neighbors, so points commit to tiny cliques; real clusters shatter into many micro-fragments (shattering artifact), and even noise can look clumped. Perplexity 100 on $n = 500$: each Gaussian treats a fifth of the dataset as neighbors, cross-cluster pairs receive substantial $p_{ij}$, and distinct clusters merge into few undifferentiated blobs (merging artifact). Neither extreme is evidence about the data; the honest procedure is a sweep.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "When would you use PCA and when t-SNE? Could you use t-SNE instead of PCA as preprocessing for a classifier?" Answer both parts with the specific technical reasons.
+
+<Solution>
+**When each.** PCA when the output feeds anything downstream: it is a stored linear map (project new points at inference), deterministic, fast via truncated SVD, works to any output dimension, and its coordinates have a meaning (variance directions). t-SNE when the goal is a human looking at cluster structure: it preserves local neighborhoods that linear projections destroy, at the cost of everything PCA guarantees.
+
+**t-SNE as preprocessing: no**, for three independent reasons. (1) Non-parametric: t-SNE fits positions for the training points only; there is no function to apply to a test point, so the "feature extractor" cannot run at inference (re-running t-SNE with the test data changes all coordinates). (2) Distorted geometry: the method deliberately equalizes densities and misrepresents non-local distances, so distance-based classifiers inherit artifacts rather than structure. (3) Non-determinism: different seeds give different embeddings of the same data, so the features are not reproducible. PCA has none of these problems, which is why the standard pipeline is PCA for reduction and t-SNE strictly for visualization.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "Why does t-SNE use a Student-t distribution in the map but a Gaussian in the original space?" Reproduce the crowding argument, including the volume numbers for $D = 10$ versus the 2D map and the equidistant-points fact.
+
+<Solution>
+The Gaussian in the original space is doing a different job: with per-point $\sigma_i$ set by perplexity, it defines which points count as neighbors, and its fast decay makes far points irrelevant, which is wanted.
+
+The map kernel faces the crowding problem. Volume scales as $r^D$: around any point in $D = 10$ dimensions, the shell between $r$ and $2r$ holds $2^{10} - 1 = 1023$ times the volume of the inner ball, so moderate-distance points vastly outnumber close neighbors; in the 2D map that shell holds only $2^2 - 1 = 3$ times the inner volume. The extreme statement: 10 dimensions admit 11 mutually equidistant points, the plane admits 3, so the mid-range distance structure cannot be reproduced. With a Gaussian map kernel, the optimizer models the many moderate similarities by pulling those points inward, and the map collapses toward the center.
+
+A Student-t with one degree of freedom decays as $1/(1+d^2)$: to achieve the same moderate similarity, the map must place the pair at a larger distance than a Gaussian would (e.g., similarity $0.2$ at $d = 2.0$ instead of $d \approx 1.27$). The mid-range points are pushed outward rather than crushed inward, which is exactly the room 2D was missing. Asymmetry of the kernels is the point: neighbor definition wants thin tails, map layout wants heavy ones.
+</Solution>
+</Exercise>
+
+<Exercise>
+The cost is $\mathrm{KL}(P \Vert Q)$, not $\mathrm{KL}(Q \Vert P)$. For a single pair, compare the cost contribution $p \log_2 (p/q)$ in two mismatch cases: (a) true neighbors mapped far apart, $p = 0.8$, $q = 0.1$; (b) distant points mapped close together, $p = 0.1$, $q = 0.8$. Conclude which structure the objective protects, and what the reversed divergence would protect.
+
+<Solution>
+**(a)** $0.8 \log_2(0.8/0.1) = 0.8 \times 3 = 2.4$ bits: a large penalty.
+
+**(b)** $0.1 \log_2(0.1/0.8) = 0.1 \times (-3) = -0.3$ bits: a term of small magnitude (individual terms may be negative; the full KL over all pairs is non-negative, and this pair moves it very little).
+
+Every term is weighted by $p$, so mismatches on high-$p$ pairs (true neighbors) dominate the cost while mismatches on low-$p$ pairs (non-neighbors) barely register. The objective therefore protects **local structure**: it keeps neighbors together and tolerates distant points drifting close. $\mathrm{KL}(Q \Vert P)$ would weight by $q$: it would heavily punish placing non-neighbors close (large $q$, small $p$) while tolerating separated neighbors, a global-structure preference. The choice of divergence direction is the choice of which errors the map makes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review (k-means). A colleague runs t-SNE at perplexity 30, sees three islands, runs <Ref lesson="kmeans">k-means</Ref> with $k = 3$ on the 2D t-SNE coordinates, gets matching clusters, and reports "the data has three clusters, confirmed by two methods." Identify every flaw in this pipeline and state the correct one.
+
+<Solution>
+Flaws, in order of severity:
+
+1. **Clustering on distorted coordinates.** k-means minimizes the distortion $J = \sum_n \lVert x_n - \mu_{c(n)} \rVert^2$, a squared-Euclidean objective, on coordinates whose distances t-SNE deliberately distorted: densities are equalized, inter-island gaps are arbitrary, and mid-range distances are misrepresented. $J$ computed in map space measures nothing about the data.
+2. **Circularity, not confirmation.** The three islands were produced by t-SNE at one perplexity; k-means run on those coordinates can only rediscover the picture it is given. Two methods agreeing on one derived representation is one piece of evidence, not two.
+3. **Single run, single perplexity.** At other perplexities the same data may show one blob or a dozen fragments; without a sweep over perplexity and seeds the island count is an artifact candidate.
+
+Correct pipeline: cluster in the original space or in a PCA-reduced space (where distances are meaningful), choose $k$ with diagnostics computed there (elbow on $J$, silhouette per <Ref lesson="hierarchical-dbscan" />), and use t-SNE afterwards only to visualize the result, coloring points by the cluster labels found in the original space. If the coloring aligns with t-SNE islands found at several perplexities, that is legitimate supporting evidence.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two t-SNE runs on the same data, same perplexity, different seeds, give visibly different maps. Interview question: "Does this mean the data has no stable structure?" Answer, and give the procedure for deciding what is stable.
+
+<Solution>
+No. Two mechanisms produce run-to-run variation with no change in the data. First, the cost is non-convex and the optimization starts from a random initialization, so different seeds reach different local minima. Second, the cost is invariant under rotations and reflections of the entire map, so even runs of identical quality display differently oriented layouts; island positions can permute freely because inter-island distances barely affect the cost.
+
+Procedure: run several seeds (and several perplexities) and look for the properties that are preserved across runs, which are the properties t-SNE actually optimizes: which points co-occupy an island, whether a given pair of points lands in the same or different islands, the number of islands at a given perplexity. If the same groups re-form under every seed, the grouping is credible; if islands dissolve and re-form with different memberships, the structure was an artifact. Layout, orientation, and inter-island geometry are expected to vary and carry no information.
+</Solution>
+</Exercise>
+
+<Exercise>
+A stakeholder looks at your t-SNE map and concludes: "Cluster A covers twice the area of cluster B, so segment A is more diverse; and A sits far from B, so those segments are very dissimilar." Correct both readings and state what the map does support.
+
+<Solution>
+**Area.** The perplexity calibration gives every point the same effective neighbor count, so t-SNE expands dense clusters and contracts sparse ones. Cluster area reflects this density equalization plus point count, not the original spread: a tight, homogeneous segment with many members can easily paint the largest island. Diversity claims need a statistic computed in the original feature space (e.g., within-cluster variance there).
+
+**Distance.** Once two clusters are separated, their map similarity $q_{ij}$ is near zero and the KL cost is almost flat in the gap width; how far apart islands land depends on initialization and perplexity, not on dissimilarity. Runs with different seeds will reorder the islands. Dissimilarity claims need original-space distances between the segments' distributions (e.g., between centroids, computed on the features).
+
+**What the map supports:** points within one island are mutual neighbors in the original space at the chosen perplexity, and the island structure is credible to the extent it recurs across a perplexity and seed sweep. Everything metric (sizes, gaps, axes) is unsupported.
+</Solution>
+</Exercise>
+
+<References>
+1. L. van der Maaten, G. Hinton, "Visualizing Data using t-SNE," *Journal of Machine Learning Research* 9, 2008 — the primary source: §2 SNE and perplexity, §3.1 symmetrization, §3.2 the crowding problem, §3.3 the Student-t kernel and gradient, §3.4 early exaggeration, §6 the three weaknesses. https://jmlr.org/papers/v9/vandermaaten08a.html
+2. G. Hinton, S. Roweis, "Stochastic Neighbor Embedding," *Advances in Neural Information Processing Systems* 15, 2002 — the original Gaussian neighbor-probability construction and KL objective. https://papers.nips.cc/paper_files/paper/2002/hash/6150ccc6069bea6b5716254057a194ef-Abstract.html
+3. M. Wattenberg, F. Viégas, I. Johnson, "How to Use t-SNE Effectively," *Distill*, 2016 — the reading pitfalls: cluster sizes, inter-cluster distances, perplexity sweeps, noise that looks structured. https://distill.pub/2016/misread-tsne/
+4. L. van der Maaten, "Accelerating t-SNE using Tree-Based Algorithms," *Journal of Machine Learning Research* 15, 2014 — Barnes–Hut t-SNE, $O(n \log n)$. https://jmlr.org/papers/v15/vandermaaten14a.html
+5. L. McInnes, J. Healy, J. Melville, "UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction," arXiv:1802.03426, 2018 — the main modern alternative in the same niche. https://arxiv.org/abs/1802.03426
+6. J. Starmer, "StatQuest: t-SNE, Clearly Explained," YouTube — the move-points-to-match-neighbors mechanics at whiteboard pace. https://www.youtube.com/watch?v=NEaUSP4YerM
+</References>
