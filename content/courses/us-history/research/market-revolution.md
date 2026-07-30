@@ -131,3 +131,20 @@ fought after the peace was signed (Howe's Prologue) as the before-picture.
 6. `draw:` single `<Figure>` — **household production before and after**: two
    panels of the same farm household, with home-produced goods in the first
    replaced by purchased goods in the second, and a cash arrow appearing.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Quantitative spine (FREE portals)** — this lesson's freight-cost and
+  wage claims should each carry a checkable series:
+  - *Historical Statistics of the US* (hsus.cambridge.org; subscription, but
+    series reproduced in the free 1975 Census Bicentennial Edition scans) —
+    internal transport costs, canal/rail mileage, wholesale prices.
+  - *MeasuringWorth* (free) — real-wage and purchasing-power calculators for
+    the Lowell wage material.
+  - *Maddison Project* (free download) — US vs UK GDP per capita 1820-1860,
+    the international baseline for the era's growth claim.
+- **North, *The Economic Growth of the United States, 1790-1860*** (Tier 2;
+  archive.org) — the classic model tying the era's growth to the cotton
+  export engine and interregional trade; use as the named interpretation
+  behind the freight-data key idea, and note later scholarship qualifies the
+  cotton-trade multiplier (attribute, don't assert).

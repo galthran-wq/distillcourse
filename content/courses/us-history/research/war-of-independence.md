@@ -168,3 +168,31 @@ Native nations' choices, and the enslaved people who fled to British lines.
     de Grasse's arrival, the Battle of the Capes, the siege, and the
     surrender, with the window of French naval superiority shaded — the
     closing contingency in one strip.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Fischer, *Washington's Crossing*** (TOC + one verified excerpt only;
+  cached `texts/wcrossing-*.txt`; do not quote prose beyond the cached
+  pp.206-208 excerpt without library verification) — the scholarly apparatus
+  under this brief's Trenton centerpiece:
+  - The "Ten Crucial Days" (Dec 25, 1776 - Jan 3, 1777) as ONE contingent
+    sequence — crossing, two Trenton battles, Assunpink, Princeton — the
+    strongest structural frame for this lesson's contingency argument, and a
+    natural timeline figure.
+  - Ch. 10's Leutze-painting autopsy (pp.206-220, esp. 216-217): real Durham
+    boats were 40-60 ft flat-bottomed cargo vessels; standing was practical
+    (icy bilgewater), the boat and flag are wrong. Pairs with the
+    mccullough76-leutze-crossing-delaware capture already planned — Fischer
+    supplies the evidence-vs-image method (a duplicate capture,
+    wcrossing-leutze-crossing-delaware, is indexed in images.yaml).
+  - The drunk-Hessians myth-bust via eyewitness John Greenwood ("not a drop
+    of liquor was drunk during the whole night") — surprise and Rall's
+    refusal to fortify, not liquor, explain Trenton.
+  - Ch. 1-3's three-armies social profile (Rebels/Regulars/Hessians) — a
+    clean comparison-table figure before any battle narrative.
+  - Quotable strategic-reversal thesis: before the crossing the British were
+    attacking; after it, "the British focused on being attacked."
+- **CMH, *American Military History*, Vol. I** (FREE PDF, US Army Center of
+  Military History, history.army.mil) — the free, citable operational
+  reference for orders of battle, strengths, and campaign maps; use it to
+  verify every number this lesson states.

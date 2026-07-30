@@ -125,3 +125,29 @@ editorializing in either direction.
    as one bar chart. One idea: the yeoman was not the main recipient.
 8. `draw:` single `<Figure>` — **Turner's thesis in one box**: the claim, its
    1893 date beside Wounded Knee's 1890, and three counter-claims listed beneath.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Gates, *History of Public Land Law Development*** (FREE, full text;
+  cached `texts/gateslandlaw*.txt` + `gateslandlaw.pdf`; verify all table
+  numbers against page images) — the land-law machinery of incorporation:
+  - Ch. XV: the Homestead Act measured against outcomes — including the
+    built-in myth-bust that Daniel Freeman's "first homestead" was "one of a
+    dozen or more firsts" before being named official (his certificate is
+    captured: gateslandlaw-s2-freeman-homestead-certificate, indexed).
+  - Ch. XVI-XVIII: the "incongruous land system" — unit-size escalation
+    160→640→320→640 acres as the government re-learning aridity
+    (ready-made figure); the "12 by 14" dollhouse fraud and the Kansas sod
+    home photograph (both captured, indexed) as evidence-vs-statute set
+    pieces; Powell's classification report as the road not taken.
+  - Ch. XIV: railroad checkerboard grants and Gates's own historiographical
+    strike — "not a scintilla of evidence" the double-minimum price
+    recouped the grants: a named, citable myth correction.
+- **Anderson & Hill, *The Not So Wild, Wild West*** (print; NOT read by the
+  swarm — no cached text; verify every claim against a library copy before
+  quoting) — frontier self-government as this course's institutions thesis
+  past the 100th meridian: wagon-train constitutions drafted on the trail,
+  mining-district codes, claim clubs, cattlemen's associations — private
+  order preceding formal government, and a documented corrective to the
+  lawless-frontier myth. Use for named set pieces; pair with Gates's claims
+  associations (Ch. VIII/X) which ARE verifiable from the cached text.

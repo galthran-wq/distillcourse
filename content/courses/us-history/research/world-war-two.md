@@ -122,3 +122,13 @@ carried by the comparative-cost table, not by assertion.
 8. `draw:` single `<Figure>` — **the deficit that ended the Depression**: federal
    spending and deficit as a share of GNP, 1929-1945, with New Deal peaks dwarfed
    by wartime levels and unemployment overlaid.
+
+## Canon additions (curated expansion, July 2026)
+
+- **CMH, *American Military History*, Vol. II + the US Army in World War II
+  series ("Green Books") (FREE PDFs, history.army.mil)** — the official,
+  public-domain operational and logistical record: production and shipping
+  statistics for the war-of-machines key idea, theater campaign narratives,
+  and orders of battle. US government works — maps and tables freely
+  reusable; the Green Books' logistics volumes are the primary check on
+  every "production as strategy" number this lesson states.

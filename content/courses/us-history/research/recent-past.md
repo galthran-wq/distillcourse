@@ -138,3 +138,14 @@ mostly under copyright. Keep it drawn.
    columns, each cell holding one measurement and linking the lesson that
    established it. The closing synthesis figure — every cell must link to a
    lesson.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Quantitative spine for the closing audit (FREE portals)** — the course
+  ends by putting its own thesis on the bench; the long-run series are how
+  it gets scored: *Maddison Project* (free download) for two centuries of
+  US-vs-world GDP per capita — the "most powerful state in history" claim
+  as a testable curve; *MeasuringWorth* for long-run real wages and growth;
+  *Historical Statistics of the US* (subscription; series reproduced in the
+  free 1975 Bicentennial Edition) for the pre-1970 links in any series the
+  lesson runs to the present. State series IDs so every chart is checkable.

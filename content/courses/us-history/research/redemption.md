@@ -120,3 +120,25 @@ however delayed, ran through its own instruments.
 7. `draw:` single `<Figure>` — **three amendments, unenforced**: the text
    guarantees on the left, the enforcement reality by 1890 on the right, and the
    gap labeled as the twentieth century's agenda.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Guelzo, *Reconstruction: A Concise History*** (PARTIAL access: only the
+  Introduction was read — cached `texts/guelzorecon.pdf`/`.txt`; the
+  overthrow chapters, Ch.4 "Resistance" through Ch.7 "Dissension" and the
+  Epilogue, are corroborated TOC only) — use for framing, carefully:
+  - Periodization: Guelzo dates the Overthrow from 1870 (first Redeemer
+    regimes), not 1873 or 1877 — a datable disagreement with Foner's arc
+    worth one sentence in this lesson's framing.
+  - The comparative-settlement device from the read Introduction (Rome after
+    Sulla, France under Henri IV, Cromwell's corpse, the Taiping slaughter)
+    sharpens this lesson's stakes: the US overthrow happened WITHIN an
+    unusually mild postwar settlement — both facts on the record.
+  - His "Aftermath" coda runs 1877-1896 and ends at Plessy — matches this
+    module's hand-off to jim-crow; cite the periodization, not unread
+    chapter content.
+  - Historiographical guardrail: Guelzo's Introduction maps Dunning → Du
+    Bois → revisionists → Foner in two pages (read and cached) — the honest
+    way for this lesson to acknowledge that "Reconstruction was overthrown"
+    is itself a school's claim, now the consensus, with the older school
+    named and dated.

@@ -141,3 +141,30 @@ from the documents and the numbers.
 9. `draw:` single `<Figure>` — **Black officeholding, 1868-1877**: officeholders
    by state and level over time, drawn so the later collapse (next lesson) has a
    baseline to fall from.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Guelzo, *Reconstruction: A Concise History*** (PARTIAL: Introduction
+  pp.1-13 read in full, cached `texts/guelzorecon.pdf`/`.txt`; Ch.1-7 and
+  Epilogue are TOC-only — cite nothing from them beyond titles without
+  library verification) — the deliberate counterweight to Foner this lesson
+  should pair, not replace:
+  - The four-part periodization (Early 1862-65 / Presidential 1865-67 /
+    Congressional 1867-70 / Overthrow 1870-77, plus Aftermath to Plessy) as
+    an alternative scaffold to test against Foner's.
+  - The two structural problems built in from the start: freedpeople's
+    undefined legal status, and the end of the three-fifths clause —
+    Stevens's arithmetic that the defeated South could gain up to 13 House
+    seats explains Republican strategy without imputing motives.
+  - Lincoln's constitutional theory (states never left) vs Sumner's
+    state-suicide theory — the executive-vs-Congress fight as a legal
+    argument, in the course's statute-and-holding register.
+  - Guelzo's "four successes" (Union restored; generosity over vengeance;
+    economic beachheads; permanent constitutional equality of citizenship)
+    against the overthrow narrative — state both, sourced, and let the
+    reader weigh them; his explicit rejection of the bourgeois-revolution
+    frame belongs in the historiographical footnote alongside Foner and Du
+    Bois (cross-reference historiographical-lenses).
+  - Quotable Introduction gems (all page-cited in the read text): Lincoln's
+    April 11, 1865 limited-black-suffrage speech three days before the
+    assassination; Whitman on leniency "paralleled nowhere in the world."

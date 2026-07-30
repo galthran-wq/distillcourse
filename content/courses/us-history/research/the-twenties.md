@@ -112,3 +112,14 @@ in copyright and is reserved, if used at all, for the Depression lesson.)
    weaknesses (farm depression, unit banking without deposit insurance, income
    concentration, installment debt, margin lending) each with a one-line
    statement of how it would transmit a shock. Sets up great-depression.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Gordon, *The Rise and Fall of American Growth*** (Tier 2; print, not
+  read by the swarm) — the measured frame for this lesson's consumer-economy
+  key idea: the 1920s as the steep slope of the "special century" —
+  electrification, the internal-combustion diffusion curve, and the
+  networked house (electricity, plumbing, appliances) reaching ordinary
+  homes. Use its named series for the mass-production-meets-mass-credit
+  claim; verify figures against the book's data appendix or HSUS series
+  before quoting.

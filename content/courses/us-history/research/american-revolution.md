@@ -132,3 +132,29 @@ sectional-crisis).
 7. `draw:` single `<Figure>` — **the paradox tally**: what the Revolution
    universalized against whom it excluded, closing with the 30,000-100,000
    figure — facts side by side, no commentary.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Bailyn, *The Ideological Origins of the American Revolution*** (FULL TEXT
+  read; cached `texts/bailyn-clean.txt`; 1967 pagination) — the intellectual
+  substructure under this brief's escalation ladder:
+  - Ch. III's power-vs-liberty grammar — the catalogue of power-as-predator
+    metaphors ("encroaching", "grasping", "jaws... always opened to devour",
+    p.56) explains WHY each British measure read as part of a design.
+  - Ch. IV + "A Note on Conspiracy" — the colonists strung 1763-76 into one
+    deliberate pattern, and Bailyn argues this was period-rational inference,
+    not paranoia: the analytic bridge between this brief's "imperial finance"
+    opening and the Declaration's "long train of abuses" language.
+  - Ch. V.1 — virtual vs actual representation as the constitutional
+    argument's worked example (Manchester/Birmingham parallel), directly
+    serving the consent-and-representation key idea.
+  - Ch. VI — the "contagion of liberty": the same argument-shape turned on
+    slavery (Otis 1764: "all men" means "white or black", p.237),
+    establishment, and deference — scholarly ground for this brief's paradox
+    key idea.
+  - Set-piece quotes: Adams 1818, "The Revolution was in the minds and hearts
+    of the people... before the war commenced" (Ch. V epigraph, p.160); the
+    Adams library bequest naming Sidney, Locke, and Cato's Letters (p.21).
+- **Documentary corpora (FREE)** — Founders Online (founders.archives.gov)
+  for Adams/Jefferson/Franklin correspondence quoted above; Avalon Project
+  (already a course source) for the statutes and state papers of 1763-76.

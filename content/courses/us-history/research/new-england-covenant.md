@@ -150,3 +150,39 @@ that held some 54 years, with its artifact.
    1638, Bay Psalm Book 1640, first newspaper attempts 1690/1704 — a dated
    column showing the print infrastructure's head start over every other
    colonial region.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Lutz (ed.), *Colonial Origins of the American Constitution*** (FREE
+  Liberty Fund PDF; full text cached `texts/lutz-colonial-origins.pdf`/`.txt`)
+  — upgrades this brief's primary-source base from two documents to the whole
+  documentary ladder: Mayflower Compact from the 1669 Morton reprint, the
+  earliest surviving text (doc 3, with the gem that contemporaries called it
+  "The Plymouth Combination" — "Mayflower Compact" dates from 1793); Plymouth
+  Oath of Allegiance 1625, a colony founded by oath alone (doc 4); Salem
+  Covenant 1629, "probably the briefest covenant in American history" (doc 5);
+  Oath of a Freeman (docs 9/15) for citizenship-by-oath; Pilgrim Code of Law
+  1636 explicitly citing "the combination made at Cape Cod" as its own legal
+  basis (doc 20) — one foundation document citing an earlier one, the
+  compounding claim in a single quotation; Massachusetts Body of Liberties
+  1641 with the headnote's 7-of-26 Bill of Rights lineage claim (doc 22).
+  Use for the Compact worked reading's parallel exercise and set-piece quotes.
+- **Lutz, *The Origins of American Constitutionalism*** (full OCR cached
+  `texts/lutz-origins.txt`; verify quotes vs print) — the analytic frame for
+  key point 3: church covenant (Charlestown-Boston 1630) as the template;
+  the foundation-elements ladder (covenant → +institutions = constitution);
+  federalism-from-covenant (Fundamental Orders uniting three towns, 1639).
+  Quotable: "it makes more sense to call Locke an American than to call
+  America Lockean" (Locke was 9 when the Piscataqua Combination was written).
+- **Fischer, *Albion's Seed*, Ch. 1** (summary-based; cached
+  `texts/albionseed-*`; contested synthesis — attribute, don't assert) — the
+  East Anglia→Massachusetts migration as a selected population in Fischer's
+  telling: ~21,000 of ~80,000 emigrating Puritans, gentry/artisan/professional
+  skew, "ordered liberty" as the regional folkway. Color gems (1648
+  stubborn-son law never applied to a child; 94%/98% marriage rates;
+  literacy roughly double the English average) support key points 4-5 but
+  each needs a page-verified citation before use.
+- **Tocqueville forward-link** — Vol. 1 Ch. V: "In New England townships were
+  completely and definitively constituted as early as 1650." The
+  tocqueville-democracy lesson (module 3) picks up this exact sentence; the
+  ladder figure drawn here is the one his 1831 observations re-certify.

@@ -185,3 +185,42 @@ the top-down classical design meet in 1787.
    the design's exports (written constitutions worldwide, separation of
    powers, judicial review, federal structures) with dates of first
    adoptions — the "most imitated" claim as a figure, sourced.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Richard, *The Founders and the Classics*** (summary-based; cached
+  `texts/richardclassics-secondary.txt`; chapter pointers are inferred —
+  verify pages and every quotation before use) — the dedicated study behind
+  this brief's "working design vocabulary, not decoration" claim:
+  - Ch. 1, classical conditioning: Latin required for college entry;
+    Cicero/Sallust/Virgil curricula — the mechanism that made the vocabulary
+    common property. Gem: "merit" effectively meant "learning."
+  - Ch. 3, antimodels: Sulla, Catiline, Nero, Caligula, Caesar as the named
+    negative exemplars — the fear side of the design brief, with an afterlife
+    ("an American Caesar" thrown at Jackson) worth a forward pointer.
+  - Ch. 4, mixed government and regime cycles: NOTE the overlap risk — Richard
+    frames the cycle via Plato, Wood/this brief via Polybius. Draw ONE cycle
+    figure and name both framings in the caption; do not duplicate.
+  - Built-in debate pairing: Paine ("Clear away the mists of antiquity!") and
+    Rush as the classics-skeptics against Jefferson/Adams — lets the lesson
+    show the vocabulary was chosen, not inherited unthinkingly.
+  - Federalist 55 (verifiable at Avalon): "Had every Athenian citizen been a
+    Socrates, every Athenian assembly would still have been a mob."
+- **Lutz, *The Origins of American Constitutionalism*, Ch. 11** (full OCR
+  cached `texts/lutz-origins.txt`; table numbers need print verification) —
+  the citation-frequency corrective that keeps this lesson honest about
+  sources: in ~1,000 founding-era political publications, the Bible is ~1/3
+  of all citations; Montesquieu 8.3%, Blackstone 7.9%, Locke only 2.9% —
+  "Deuteronomy is cited almost twice as often as all of Locke's writings put
+  together." A ready-made bar-chart figure, and a caution against
+  single-source genealogies (including this lesson's own Roman emphasis —
+  say what the classics were and were not doing).
+- **Bailyn** (already cited above; full text now cached
+  `texts/bailyn-clean.txt`) — the Cato's Letters transmission argument is now
+  quotable from the read text; the pool has
+  bailyn-catos-letters-title-page (1723 Vol. II title page, John Adams
+  Library copy — indexed in images.yaml) as a `source:` figure candidate.
+- **McDonald, *Novus Ordo Seclorum*** (Tier 2, print; not read by the swarm)
+  — the intellectual-history counterpart Lutz explicitly positions against;
+  cite for the delegates' eclectic sources if needed, verify against a
+  library copy.

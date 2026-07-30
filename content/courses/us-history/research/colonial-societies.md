@@ -130,3 +130,30 @@ and the References.
 10. `draw:` indenture-vs-slavery.svg — kept.
 11. `draw:` bacon-divergence.svg — kept.
 12. `draw:` atlantic-economy.svg — kept.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Fischer, *Albion's Seed*** (summary-based; cached `texts/albionseed-*`;
+  an influential but contested synthesis — Sosin/McKinney/Zelinsky critiques
+  on sourcing and cultural determinism; flag it as interpretation) — the
+  strongest available frame for this lesson's two-societies comparison,
+  extended to four: East Anglia→Massachusetts (ordered liberty),
+  south-of-England Cavaliers and servants→Virginia (hegemonic liberty,
+  Berkeley's royalist government, 40,000-50,000 indentured servants), North
+  Midlands Quakers→Delaware Valley, borderers→backcountry. The ~24-'ways'
+  comparative grid (speech, family, child-rearing, rank, liberty) is a
+  ready-made comparison-table figure; the closing four-liberties-in-tension
+  claim (pp.897-98) is a strong capstone quotation if page-verified. Material
+  color for the Chesapeake side: red high heels and plumed hats vs Puritan
+  pea porridge — verify before quoting.
+- **Lutz (ed.), *Colonial Origins of the American Constitution*** (FREE;
+  cached `texts/lutz-colonial-origins.pdf`/`.txt`) — the two polities in
+  documents: the Massachusetts run (docs 5-31) against Virginia's Articles,
+  Laws, and Orders, Divine, Politic, and Martial (doc 69, martial law as
+  founding order — the anti-covenant) and the assembly acts (docs 70-73).
+  Maryland Toleration Act (doc 68) supplies the gem of a "toleration" act
+  opening with capital blasphemy provisions (never enforced, per headnote).
+- **Captured portraits in the pool** (indexed in `research/images.yaml`):
+  albionseed-john-winthrop-portrait (c.1650, American Antiquarian Society)
+  and albionseed-william-berkeley-portrait ("after Lely" — caption carefully)
+  put faces on the two folkways if the lesson wants them.

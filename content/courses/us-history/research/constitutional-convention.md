@@ -132,3 +132,30 @@ the convention narrative on it rather than re-teaching it.
    National Archives transcript's own bracketed annotations.
 7. `draw:` single `<Figure>` — **three state constitutions compared**: a compact
    three-column table (suffrage, establishment, executive) from MIT Week 5.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Lutz, *The Origins of American Constitutionalism*** (full OCR cached
+  `texts/lutz-origins.txt`; verify quotes vs print) — three arguments that
+  serve this brief directly:
+  - Ch. 12: the 1787 text's institutions traced clause-by-clause to state
+    constitutions and colonial compacts — scholarly ground for the existing
+    "state constitutions were the rehearsal" key idea.
+  - Ch. 11: Madison's own convention notes show 40 of his 71 proposals lost
+    and the Virginia Plan beaten — the compromise machinery, not a single
+    architect; a clean corrective set piece.
+  - Conclusion: the Constitution as textually incomplete without the state
+    constitutions and the Declaration — a framing note, use sparingly.
+- **Lutz (ed.), *Colonial Origins*, docs 76-80** (FREE; cached
+  `texts/lutz-colonial-origins.pdf`/`.txt`) — the confederation prehistory in
+  primary text: New England Confederation 1643, Albany Plan 1754, Articles of
+  Confederation (doc 78), plus Penn's 1697 and Galloway's 1774 plans in the
+  appendix. The doc 77 headnote's structural comparison (Albany Plan/Articles
+  descend from the 1643 confederation, NOT from the Iroquois model —
+  delegate selection, unanimity, representation all differ) settles a common
+  classroom claim with evidence.
+- **Tier 2 references** — Rakove, *Original Meanings* (Pulitzer) and Amar,
+  *America's Constitution: A Biography* for clause-level drafting and
+  ratification-era meaning; print, not read by the swarm — verify before
+  quoting. Farrand's *Records* via Founders Online / LoC "Century of
+  Lawmaking" (FREE) for convention-debate primary text.

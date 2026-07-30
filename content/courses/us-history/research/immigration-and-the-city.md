@@ -112,3 +112,27 @@ course tracks alongside every expansion.
    Chinese Exclusion → 1892/1902 extensions → 1907 Gentlemen's Agreement → 1917
    literacy test → 1921/1924 quotas, as a single timeline with each measure's
    target group named. Ends with a forward pointer to the-twenties.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Abramitzky & Boustan, *Streets of Gold* + NBER WP 26408** (paper FREE
+  and read in full; cached `texts/streetsgold-nber26408.pdf`/`.txt`; the
+  book itself is TOC-only) — the measured answer to this lesson's mobility
+  question, from 1.2M + 2.7M linked Census father-son pairs:
+  - Children of immigrants at the 25th parental percentile out-perform
+    children of the US-born by 3-6 percentile ranks in EVERY era studied
+    (1880-1910, 1910-1940, today) — and for nearly every sending country,
+    including the "unassimilable" ones (Figure 2/Table 1).
+  - The mechanism is geography, not schooling: the advantage vanishes
+    entirely once children raised in the same county are compared —
+    immigrants chose high-mobility places (Figure 11). The paired
+    settlement/mobility maps are captured (streetsgold-mobility-maps,
+    indexed in images.yaml) as a `source:` figure.
+  - Then-vs-now roster (Figure 1): 1st-generation Finns/Italians/Russians
+    then, Dominicans/Mexicans/Vietnamese now, at similar relative deficits —
+    closed or reversed by the 2nd generation in both eras. Directly serves
+    this lesson's wave-quota-wave demo with a mobility overlay.
+  - Method caveat to state: historical "income" is an occupation-based
+    score (no Census income question before 1940); linked samples skew
+    toward uncommon names. The paper's own robustness apparatus covers
+    this — cite it.

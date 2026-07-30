@@ -165,3 +165,21 @@ working before the government even existed.
     dropped. Idea from Maier's Epilogue.
 11. `draw:` single `<Figure>` — **twelve proposed, ten ratified** — kept
     (composes with the parchment scan).
+
+## Canon additions (curated expansion, July 2026)
+
+- **Tier 2 references** — Rakove, *Original Meanings* (the ratification
+  debates as the source of constitutional meaning) and Amar, *America's
+  Constitution: A Biography* (clause-by-clause, incl. the Bill of Rights as
+  structure rather than mere parchment); both print, not read by the swarm —
+  use for framing and verify any quotation against library copies.
+- **Lutz, *The Origins of American Constitutionalism*, Ch. 9 and 11** (full
+  OCR cached `texts/lutz-origins.txt`) — two usable set pieces: the
+  "unanimous" controversy (New York abstained July 4; "unanimous" added for
+  the Jan 1777 printing) as a document-reading aside, and the citation-
+  frequency data for what ratification-era writers actually cited (see
+  roman-blueprint addendum; don't duplicate the chart — cross-reference it).
+- **Documentary corpora (FREE)** — Founders Online for the
+  Madison-Jefferson bill-of-rights correspondence; LoC "A Century of
+  Lawmaking" (Elliot's Debates) for state-convention speeches; both are the
+  checkable primary layer under Maier's narrative already in this brief.

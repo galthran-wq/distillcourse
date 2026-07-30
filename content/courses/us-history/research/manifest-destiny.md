@@ -119,3 +119,23 @@ war-to-Wilmot chain.
    a spectrum from abolition through free soil, popular sovereignty, and the
    federal-protection (Calhoun) position, each with its one-line claim and its
    partisan home. This spectrum is reused in sectional-crisis.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Gates, *History of Public Land Law Development*** (FREE, full text —
+  1968 GPO publication, no copyright; cached `texts/gateslandlaw*.txt` +
+  page-image PDF `gateslandlaw.pdf`, PDF page = printed page + 20; numeric
+  tables are OCR-garbled, verify against page images) — the statutes and
+  prices behind "cheap land," which this lesson's expansion story runs on:
+  - Ch. V: every acquisition priced — Louisiana at roughly 3 cents/acre
+    (523,446,400 acres), with Benton's Gadsden put-down ("neither men nor
+    wolves could live on it") for color; the book's own acquisition map is
+    captured (gateslandlaw-s1-acquisition-map, indexed) and better redrawn
+    in house style.
+  - Ch. VII-IX: the credit-sale bubble, cash sales at $1.25, and the
+    Graduation Act's price decay to 12.5 cents — a one-figure price ladder
+    showing what "free land" actually cost by decade.
+  - Ch. X: preemption as legalized squatting — settler petitions quoted
+    verbatim in period spelling fit the course's primary-source method.
+  - Cross-reference: conquering-the-west's addendum takes the Homestead Act
+    and after; this lesson stops at 1854's graduation arc. Don't duplicate.

@@ -124,3 +124,26 @@ regimes), completing the module's social picture.
    coverture / Dutch community property / Quaker meetings as three columns
    over rows (own property? make wills? speak in governance?), each cell a
    documented instance, with the post-1664 erosion arrow on the Dutch column.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Lutz (ed.), *Colonial Origins of the American Constitution*** (FREE;
+  cached `texts/lutz-colonial-origins.pdf`/`.txt`) — the middle colonies'
+  founding documents in full text with headnotes: Fundamentals of West New
+  Jersey (doc 57), Penn's Concessions and Charter of Liberties / Frame of
+  Government (docs 58-59), the Act for Freedom of Conscience (doc 60), the
+  Pennsylvania Charter of Liberties (doc 61) — the 1701 Charter of Privileges
+  material this brief already centers, now quotable from a verified primary
+  text — and New York's Charter of Liberties and Privileges (docs 55-56) for
+  the Dutch-to-English continuity point.
+- **Fischer, *Albion's Seed*, Ch. 3** (summary-based; cached
+  `texts/albionseed-*`; flag as contested synthesis) — the Friends' migration
+  1675-1725 as the third folkway: 20,000+ Quakers from the North Midlands and
+  Wales, "reciprocal liberty" (golden-rule-grounded, extended to all) as the
+  regional liberty concept — a one-line frame for why Pennsylvania's
+  pluralism was principled rather than accidental. Pairs with the existing
+  women's-legal-standing key idea (Quaker meetings in Fischer's gender
+  'ways'). Attribute to Fischer by name.
+- **Captured portrait in the pool**: albionseed-william-penn-portrait
+  (18th-c. engraving, indexed in `research/images.yaml`) if the lesson wants
+  Penn as a period likeness rather than a drawn figure.

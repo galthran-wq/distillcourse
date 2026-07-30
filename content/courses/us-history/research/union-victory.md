@@ -131,3 +131,27 @@ tests peer republics failed.
 8. `draw:` single `<Figure>` — **272 words against two hours**: a proportional
    comparison of the Everett oration and the Gettysburg Address with the
    Address's three-part structure labeled.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Oakes, *Freedom National*, Ch. 10-12 + Epilogue opening** (FULL TEXT
+  read; cached `texts/oakesfn.pdf` + `oakesfn-s4.txt`; cite the Norton
+  edition) — the emancipation-to-amendment arc that runs under this lesson's
+  1864-65 politics:
+  - Black troops as war-winning arithmetic: ~180,000 total, ~146,000 from
+    slave states; enlistment as patriarchal emancipation of families.
+  - The scale problem stated in one number: only ~525,000 of ~4 million
+    (roughly 13%) actually freed by war's end — why military emancipation
+    could not finish the job and the 13th Amendment had to.
+  - The 1864 election as the amendment's referendum (this brief's "last
+    Confederate strategy" key idea, seen from the antislavery side);
+    Maryland abolition carried by 263 votes, soldiers' ballots 10-to-1.
+  - Jan 31, 1865: House passage 119-56, decided by a three-vote shift, the
+    chamber erupting — and Lincoln's "King's cure" remark. Kentucky and
+    Delaware as the last holdouts closes the arc with an irony worth
+    stating.
+  - The Lincoln-Douglass August 1864 White House meeting (recruiting
+    enticement agents if the war looked lost) — the two voices the course's
+    register is named for, in one documented room.
+- Role note: Oakes grounds the emancipation-policy thread; McPherson (already
+  in this brief) remains the operational-military spine. Keep the division.

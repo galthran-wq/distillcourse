@@ -117,3 +117,12 @@ decoded document whose materiality carries the story.
 6. `draw:` single `<Figure>` — **Fourteen Points vs. Versailles**: a two-column
    audit of Wilson's points against the treaty's terms, each row marked kept,
    diluted, or dropped — with the tally as the payoff.
+
+## Canon additions (curated expansion, July 2026)
+
+- **CMH, *American Military History*, Vol. II (US Army Center of Military
+  History; FREE PDF at history.army.mil)** — the citable operational
+  reference for the AEF: mobilization numbers, divisions shipped by month,
+  Meuse-Argonne strengths and casualties. US government work, public
+  domain — its maps and tables are freely reusable; use it to verify every
+  military number this lesson states.

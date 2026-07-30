@@ -117,3 +117,21 @@ an institutional technology as consequential as the constitutional ones.
    listed with a marker on each showing whether it was enacted later (income tax,
    direct election of senators, regulation) — Populism as a legislative
    forerunner.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Quantitative spine (FREE portals)** — the "largest economic expansion in
+  history, measured" key idea needs series, not adjectives: *Historical
+  Statistics of the US* (production, wages, strikes — series citable via the
+  free 1975 Bicentennial Edition), *MeasuringWorth* (real wages, GDP), and
+  the *Maddison Project* (US overtaking the UK in GDP per capita ~1900 —
+  the single number that dates the lesson's claim).
+- **Gordon, *The Rise and Fall of American Growth*** (Tier 2; print) — the
+  "special century" frame (1870-1970) and the networked-house revolution:
+  use its named thesis to periodize the Gilded Age expansion; verify all
+  figures against the book or its published data appendix.
+- **Chandler, *The Visible Hand*** (Tier 2; print) — the managerial
+  revolution as the mechanism behind Trachtenberg's incorporation frame
+  already in this brief: railroads as the first modern managerial
+  enterprises, administrative coordination replacing market coordination.
+  Cite the thesis by name; not read by the swarm — verify before quoting.

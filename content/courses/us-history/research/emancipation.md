@@ -141,3 +141,38 @@ sentiment. The course key result (war for Union becomes war for emancipation,
 9. `draw:` single `<Figure>` — **what the edits changed**: the preliminary and
    final texts as two columns with the removed clauses (compensation,
    colonization) struck and the added clause (enlistment) highlighted.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Oakes, *Freedom National*** (FULL TEXT read; cached `texts/oakesfn.pdf` +
+  shard extractions `oakesfn-s1..s4.txt`; cite the 2013 Norton edition) —
+  the scholarly spine for this whole lesson, in the exact register the course
+  intro promises (the founding as promise, the war as enforcement):
+  - Ch. 3: the Fortress Monroe episode in full — Baker, Townsend, and
+    Mallory's escape; the Butler-Cary exchange (Virginia as "a foreign
+    country"); cabinet endorsement within a week; the May 30, 1861
+    instructions as the first federal fugitive policy. Gem: slavery began in
+    1619 at Hampton Roads and began to end at the same waters in 1861.
+  - Ch. 4 + 7: the two Confiscation Acts as the statutory emancipation the
+    Proclamation myth erases — "By the Act of Congress they are clearly
+    free" (Butler, Oct 1862). The purpose-vs-effect rhetorical discipline is
+    the analytic key to Lincoln's public caution (pairs with the Greeley
+    letter already in this brief's key ideas).
+  - Ch. 6: "self-emancipation" — its genealogy (Creole, Amistad) and the
+    Sea Islands as the first full-scale test; Sam Mitchell's mother at Port
+    Royal ("dat ain't no t'under, dat Yankee come to gib you Freedom").
+  - Ch. 9: the Mythmaking section — Reluctant Emancipator (Greeley) vs Great
+    Emancipator (Emerson), both wrong about chronology; use as the lesson's
+    historiographical close.
+  - Ch. 10: the ~700-word Proclamation's two buried operative changes
+    (enticement lifted; black enlistment opened) — exactly the "what the
+    document did and did not do" key idea, now with page-level support.
+  - Vote tallies as evidence (93-55, 33-6, 117-2) fit the course's
+    numbers-carry-the-argument tone.
+- **Captures in the pool** (indexed in `research/images.yaml`):
+  oakesfn-s1-contraband-of-war-nast (June 1861 illustrated-press reaction),
+  oakesfn-s1-fort-monroe-doctrine-cartoon (the period pun itself),
+  oakesfn-s2-port-royal-contrabands-1862 (period photograph),
+  oakesfn-s3-national-republican-prelim-proclamation (the Preliminary
+  Proclamation as readers saw it, Sept 23, 1862), Butler/Frémont/Hunter/
+  Susie King Taylor portraits — see index entries for caption caveats.
