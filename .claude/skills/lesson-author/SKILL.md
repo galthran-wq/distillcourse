@@ -74,6 +74,11 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      already there:
      `{/* img <file-stem>: what the reader must see; candidate <images.yaml
      id> — <source>, <location>, <url>; placement centered|float-right */}`
+     You may also ADD such handoffs beyond the plan — where a real artefact
+     would serve the prose better than any drawing — with or without a pool
+     candidate (no candidate = the figure agent hunts one; name the likely
+     source if you know it). The bar is the same: the artefact must carry
+     material, not decorate it.
    - For every PascalCase component-figure reference you do NOT build
      yourself, put an MDX comment directly above it — your handoff to the
      figure builder:

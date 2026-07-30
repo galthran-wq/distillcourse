@@ -82,9 +82,17 @@ capture.
    else — the reading swarm's PDF captures often extract the stored bitmap
    whole — there is nothing to cut: go straight to `fit` and the loop.
    Missing, or the wrong page? Re-capture from the pointer in images.yaml:
-   `npm run image -- capture <url|pdf> <dest> [page] --dpi 220`. Only if the
-   source itself is gone do you go hunting — catalogs and API recipes:
-   [references/image-sources.md](references/image-sources.md).
+   `npm run image -- capture <url|pdf> <dest> [page] --dpi 220`.
+   **Hunting for new images is allowed** — when the brief names no candidate,
+   when the pool's copy is inadequate, or when you judge that a real artefact
+   the pool lacks would genuinely serve the material better than a drawing.
+   Catalogs and API recipes: [references/image-sources.md](references/image-sources.md).
+   A hunted image obeys every rule a pooled one does: read the source page
+   for author/caption/licence before downloading, capture into
+   `research/images/` with a new id, and record it in `research/images.yaml`
+   (or, in a parallel build, report the entry for the closing agent to land)
+   so the dossier stays the full record. Hunting is for serving the prose,
+   not decorating it — the "source it or draw it" test still decides.
 3. **Cut and clean** (a page render, or a capture with page furniture on it).
    - `npm run image -- crop <capture> <out> <WxH+X+Y>` — coordinates come
      from LOOKING at the capture, then adjusting; two or three iterations is
