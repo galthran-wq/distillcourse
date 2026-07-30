@@ -18,7 +18,11 @@ Structural mechanics (skeleton, density norms, task/reference mechanics —
 distilled from the best reference course): @docs/voita-playbook.md. Adopt
 its STRUCTURE; the register stays dry per L9.
 For figures beyond simple SVGs, delegate to or follow /figure-artist
-(component figures with real KaTeX, verified by render-and-look).
+(component figures with real KaTeX, verified by render-and-look). For a
+figure that must be the real artefact — a historical photograph, a scan, a
+published plot of measured data — that is /figure-artist's sourced-image
+tier: the reading swarm captured it into `research/images/` and the figure
+agent cuts, verifies and credits it (docs/figures.md §Sourced images).
 
 ## Workflow
 
@@ -61,6 +65,15 @@ For figures beyond simple SVGs, delegate to or follow /figure-artist
      follow @docs/figures.md — the house style is non-negotiable. The
      research brief's figure plan lists what to draw; recreate ideas from
      sources, never copy their drawings.
+   - The brief's FIGURE PLAN tags each visual `draw:` or `source:`. A
+     `source:` entry is a real artefact (photograph, scan, published data
+     plot) that a figure-artist agent lands after you: do NOT write the
+     `<Figure src>` tag for it (the file does not exist yet and validation
+     would fail) and do NOT invent a substitute drawing. Leave the handoff
+     comment where the figure goes, and write the prose as if the image were
+     already there:
+     `{/* img <file-stem>: what the reader must see; candidate <images.yaml
+     id> — <source>, <location>, <url>; placement centered|float-right */}`
    - For every PascalCase component-figure reference you do NOT build
      yourself, put an MDX comment directly above it — your handoff to the
      figure builder:

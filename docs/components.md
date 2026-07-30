@@ -54,18 +54,23 @@ No interactive grading. Validator warns on an `<Exercise>` without a
 Last block of every lesson: a markdown ordered list of real, verified
 sources with chapter-level pointers.
 
-## `<Figure src?="./figures/x.svg" name?="ComponentName" alt="..." caption?="..." />`
+## `<Figure src?="./figures/x.svg" name?="ComponentName" alt="..." caption?="..." float?="left|right" width?="s|m" />`
 
-Static visual, two tiers (docs/figures.md): `src` = raw SVG relative to the
-lesson directory (inlined, `currentColor` themes); `name` = a component
+Static visual, three tiers (docs/figures.md): `src` = a file relative to the
+lesson directory — a raw SVG (inlined, `currentColor` themes) or a sourced
+raster image (`.png/.jpg/.jpeg/.webp/.gif`, credited in
+`figures/credits.yaml`, cut and credited via /figure-artist); `name` = a component
 figure registered in `components/figures/index.ts` (HTML + KaTeX + SVG, for
 math/text-rich figures — authored via /figure-artist). Exactly one of
-`src`/`name`. Labels belong inside the figure (L6).
+`src`/`name`. `float` sets the figure beside the prose (`width="s"` ≈ 260px,
+`"m"` ≈ 380px). Labels belong inside the figure (L6); a sourced image's
+provenance prints itself in `<References>` — never in the caption.
 
 ## `<FigureSequence name="x" alt="..." caption?="..." />`
 
 Step-through carousel (the house signature for processes): renders
-`figures/<name>-1.svg`, `<name>-2.svg`, … with prev/next controls and a
+`figures/<name>-1.svg`, `<name>-2.svg`, … (or `-1.png`, `-2.png`, … for
+sourced images) with prev/next controls and a
 frame counter. Frames share one layout and change one thing per step —
 3–7 frames recommended; ≥2 is the enforced floor (validator warns below it). Style per
 `docs/figures.md`.

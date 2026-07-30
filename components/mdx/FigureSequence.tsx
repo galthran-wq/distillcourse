@@ -1,8 +1,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { figures } from "@/components/figures";
+import { creditFor, loadCredits } from "@/lib/content/credits";
+import { RASTER_EXTENSIONS } from "@/lib/content/images";
 import FrameStepper from "./FrameStepper";
 import FrameStepperNodes from "./FrameStepperNodes";
+import SourcedImage, { resolveImage } from "./SourcedImage";
 
 interface Props {
   /**
@@ -43,25 +46,56 @@ export default function FigureSequence({ name, alt, caption, lessonDir }: Props)
     );
   }
 
-  // SVG-file tier: figures/<name>-1.svg, <name>-2.svg, … in the lesson dir.
-  let frames: string[] = [];
+  // File tiers: figures/<name>-1.<ext>, <name>-2.<ext>, … in the lesson dir.
+  let files: string[] = [];
   if (/^[a-z0-9-]+$/.test(name)) {
     try {
-      const dir = join(lessonDir, "figures");
-      const re = new RegExp(`^${name}-\\d+\\.svg$`);
-      frames = readdirSync(dir)
+      const re = new RegExp(
+        `^${name}-\\d+\\.(svg|${RASTER_EXTENSIONS.map((e) => e.slice(1)).join("|")})$`,
+      );
+      files = readdirSync(join(lessonDir, "figures"))
         .filter((f) => re.test(f))
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-        .map((f) => readFileSync(join(dir, f), "utf8"));
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     } catch {
-      frames = [];
+      files = [];
     }
   }
+
+  // Sourced-image tier: raster frames step through the same carousel, each
+  // frame carrying its own credit line (frames may come from one plate or
+  // from several sources).
+  if (files.length > 0 && !files[0].endsWith(".svg")) {
+    const credits = loadCredits(lessonDir);
+    const resolved = files.flatMap((f) => {
+      const image = resolveImage(lessonDir, `figures/${f}`);
+      return image === undefined ? [] : [{ file: f, image }];
+    });
+    if (resolved.length > 0) {
+      return (
+        <FrameStepperNodes
+          frames={resolved.map(({ file, image }) => (
+            <SourcedImage
+              key={file}
+              image={image}
+              alt={alt}
+              background={creditFor(credits, file)?.background}
+            />
+          ))}
+          alt={alt}
+          caption={caption}
+        />
+      );
+    }
+  }
+
+  const frames: string[] = files
+    .filter((f) => f.endsWith(".svg"))
+    .map((f) => readFileSync(join(lessonDir, "figures", f), "utf8"));
 
   if (frames.length === 0) {
     return (
       <div className="my-10 rounded-md border border-dashed border-line px-5 py-8 text-center font-mono text-sm text-faint">
-        sequence “{name}” has no frames (figures/{name}-1.svg, …)
+        sequence “{name}” has no frames (figures/{name}-1.svg|.png, …)
       </div>
     );
   }

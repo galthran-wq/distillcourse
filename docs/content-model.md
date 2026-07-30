@@ -11,9 +11,13 @@ code wins and this file needs fixing. Cross-file rules are enforced by
 content/courses/<course-slug>/
   course.yaml          # curation surface — the human owns this file
   concepts.yaml        # concept registry (append-mostly)
+  research/            # the factory's dossier (see README)
+    images.yaml        # index of real-image candidates found while reading
+    images/            # their captures: whole pages / downloaded files
   lessons/<lesson-slug>/
     lesson.mdx         # the chapter; NO frontmatter (directory name = slug)
-    figures/           # optional SVGs referenced by <Figure>
+    figures/           # SVGs and sourced raster images used by <Figure>
+      credits.yaml     # provenance of every raster file in this directory
 ```
 
 Modules exist only inside `course.yaml`; lesson directories are flat under
@@ -66,6 +70,35 @@ concepts:
 Every `concepts.*` entry in course.yaml must resolve here; `introduced_in`
 must match the lesson that declares `introduces`.
 
+## figures/credits.yaml
+
+Provenance for sourced raster figures (docs/figures.md, third tier). Every
+`.png/.jpg/.jpeg/.webp/.gif` file in a lesson's `figures/` needs an entry —
+an uncredited image is a validation error, not a warning. SVGs are ours and
+need nothing.
+
+```yaml
+schema_version: 1
+images:
+  - file: shannon-maze-mouse.jpg     # file name inside figures/; a `*` pattern
+                                     # (frames-*.png) covers a whole sequence
+    title: "Shannon with Theseus, his maze-solving mouse"
+    credit: "Bell Labs / AT&T Archives"    # attribution line under the figure
+    source_url: "https://commons.wikimedia.org/wiki/File:…"   # the page
+    license: "public domain"               # exactly what the source states
+    license_url: "https://…"               # optional
+    retrieved: "2026-07-30"                # ISO date of download
+    located: "arXiv:2103.00020 p.5 fig.3"  # optional: where inside the source
+    modifications: "cropped to panel b, resized to 1200px"    # optional
+    background: light                      # none (default) | light card
+```
+
+Rendered as an "Image credits" list at the end of the lesson's
+`<References>` — one entry per line, linked to the source page. The image
+bytes stay in the content tree; `scripts/sync-assets.ts` copies them into
+`public/course-assets/<course>/<lesson>/` at `predev`/`prebuild`/`prevalidate`
+(the copy is git-ignored).
+
 ## lesson.mdx
 
 No frontmatter. Layout auto-renders title/goal/est_minutes from course.yaml —
@@ -78,9 +111,11 @@ section of `<Exercise>` blocks with collapsible `<Solution>`s; a final
 `<References>` section.
 
 The validator checks the shell, not the prose: unknown components,
-unparseable MDX, and demo-name mismatches are errors; a lesson not starting
-with its `opening`, missing exercises, missing references, or an exercise
-without a solution are warnings.
+unparseable MDX, demo-name mismatches, a `<Figure src>` with no file behind
+it, a broken/truncated image, and an uncredited sourced image are errors; a
+lesson not starting with its `opening`, missing exercises, missing
+references, an exercise without a solution, a low-resolution or oversized
+image, and an unused credits entry are warnings.
 
 ## Validation
 

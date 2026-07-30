@@ -13,6 +13,8 @@ import DemoHost from "@/components/mdx/DemoHost";
 import LessonToc from "@/components/LessonToc";
 import Figure, { type FigureProps } from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
+import { ImageCredits } from "@/components/mdx/SourcedImage";
+import { loadCredits } from "@/lib/content/credits";
 import {
   Aside,
   Definition,
@@ -67,6 +69,8 @@ export default async function LessonPage({
   const lesson = entry.lesson;
   const number = String(entry.index + 1).padStart(2, "0");
 
+  const imageCredits = loadCredits(entry.dir).entries;
+
   const components: MDXComponents = {
     // Cross-reference to another lesson of the same course: renders the
     // target's title (or custom children) as a link; plain text if the
@@ -109,7 +113,14 @@ export default async function LessonPage({
     Task,
     Exercise,
     Solution,
-    References,
+    // Sourced images cite themselves at the end of References, not under the
+    // figure (docs/figures.md §Sourced images).
+    References: (props: { children: React.ReactNode }) => (
+      <References
+        {...props}
+        credits={<ImageCredits credits={imageCredits} />}
+      />
+    ),
     Aside,
   };
 

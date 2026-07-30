@@ -112,6 +112,41 @@ export const CourseSchema = z.object({
   modules: z.array(ModuleSchema).min(1),
 });
 
+/**
+ * Provenance for ONE sourced raster figure (docs/figures.md, third tier).
+ * Every .png/.jpg/.webp/.gif in a lesson's `figures/` needs an entry — an
+ * image whose origin we cannot state is an image we do not ship.
+ */
+export const ImageCreditSchema = z.object({
+  /** File name inside the lesson's figures/ directory. */
+  file: z.string().min(1),
+  /** What the image is, in the source's terms. */
+  title: z.string().min(1),
+  /** Attribution line shown under the figure ("NASA/JPL", "Bell Labs"). */
+  credit: z.string().min(1),
+  /** Page the image was taken from — the human-readable one, not the raw file. */
+  source_url: z.string().url(),
+  /** "public domain", "CC BY-SA 4.0", "© Springer — teaching use", … */
+  license: z.string().min(1),
+  license_url: z.string().url().optional(),
+  /** ISO date the file was downloaded. */
+  retrieved: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD"),
+  /** Where inside the source: "arXiv:2103.00020 p.5 fig.3", "plate VII". */
+  located: z.string().optional(),
+  /** Everything we did to the file: "cropped to panel b, resized to 1200px". */
+  modifications: z.string().optional(),
+  /**
+   * Render the image on a light card. Line art with a transparent or white
+   * background is unreadable on the dark theme without it.
+   */
+  background: z.enum(["none", "light"]).default("none"),
+});
+
+export const CreditsFileSchema = z.object({
+  schema_version: z.literal(1),
+  images: z.array(ImageCreditSchema),
+});
+
 export const ConceptSchema = z.object({
   id: slug,
   name: z.string().min(1),
@@ -129,6 +164,8 @@ export type Lesson = z.infer<typeof LessonSchema>;
 export type Module = z.infer<typeof ModuleSchema>;
 export type Course = z.infer<typeof CourseSchema>;
 export type Concept = z.infer<typeof ConceptSchema>;
+export type ImageCredit = z.infer<typeof ImageCreditSchema>;
+export type CreditsFile = z.infer<typeof CreditsFileSchema>;
 export type ConceptsFile = z.infer<typeof ConceptsFileSchema>;
 export type CoursePrereq = z.infer<typeof CoursePrereqSchema>;
 export type KeyResult = z.infer<typeof KeyResultSchema>;

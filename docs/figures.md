@@ -1,8 +1,10 @@
 # Figure style guide
 
-Figures are authored as code and visually verified — the scalable equivalent
-of Voita-style hand-drawn slides. No generated raster images, no
-screenshots, no mermaid. Two tiers:
+Explanatory figures are authored as code and visually verified — the scalable
+equivalent of Voita-style hand-drawn slides. No AI-generated imagery, no
+mermaid. Where the content is a real artefact rather than an explanation
+(a photograph, a scan, a measured plot), the real thing is sourced instead
+and always ships with its provenance. Three tiers:
 
 - **Component figures** (default for anything with formulas, running
   sentences, labeled pipelines, comparisons): pure React components in
@@ -14,6 +16,12 @@ screenshots, no mermaid. Two tiers:
   `docs/voita-playbook.md`.
 - **Raw SVG figures** (simple plots and diagrams with few short labels):
   the rules below. /figure-artist is the skill for both.
+- **Sourced images** (photographs, portraits, apparatus, page scans,
+  published plots of real data, canonical diagrams): raster files in the
+  lesson's `figures/`, credited in `figures/credits.yaml`, embedded with the
+  same `<Figure src>`/`<FigureSequence>` API. The reading swarm captures
+  them during research; /figure-artist cuts, verifies and credits them.
+  See §Sourced images.
 
 ## Principles
 
@@ -26,9 +34,11 @@ screenshots, no mermaid. Two tiers:
    algorithm, a renormalization, a proof idea) is a `<FigureSequence>`:
    frames share one layout and change ONE thing per frame, so the eye tracks
    the delta. 3–7 frames. This is the house signature — use it often.
-4. **Recreate, never copy.** Source figures found during research are
-   inspiration for what to SHOW; the drawing itself is always ours, in this
-   style. Never trace or reproduce a copyrighted figure.
+4. **Explanations are ours; artefacts are theirs.** A source figure that
+   explains an idea is inspiration for what to SHOW — the drawing itself is
+   always ours, in this style, never traced. A figure whose value is that it
+   is the real thing (a photograph, a scan, a measurement) is sourced as-is
+   and credited; redrawing it would be a fabrication, not a style choice.
 
 ## Anatomy
 
@@ -61,6 +71,43 @@ screenshots, no mermaid. Two tiers:
   under 2 frames). Frames must keep identical viewBox and layout — only the
   step's delta changes.
 - Alt text: describe what the figure shows, factually, one sentence.
+
+## Sourced images
+
+The third tier: a real image we did not make. Use it when authenticity is the
+content — historical photographs and portraits, apparatus, page scans of the
+original paper, published plots of real data, canonical diagrams. Do NOT use
+it for schematics, pipelines, or anything math-bound: a foreign-style diagram
+with 8px labels is worse than a house-style drawing of the same idea.
+
+- **Files.** `figures/<name>.{png,jpg,jpeg,webp,gif}` in the lesson dir, same
+  place as the SVGs. Embedded with `<Figure src="./figures/<name>.jpg" …/>`;
+  a raster `<FigureSequence>` uses `<name>-1.png`, `<name>-2.png`, … and gets
+  the same carousel. `float`/`width` work exactly as for the other tiers.
+- **Provenance is mandatory.** Every raster file needs an entry in
+  `figures/credits.yaml` (schema: `docs/content-model.md`) with the source
+  page, the licence as the source states it, and the retrieval date. It
+  prints itself once, as an "Image credits" list at the end of the lesson's
+  `<References>` — never under the figure, where licence text buries the
+  caption. One entry may cover a whole sequence via a `*` pattern
+  (`shannon-1948-approximations-*.png`). No entry ⇒ `npm run validate` fails.
+- **Quality floor.** ≥480px wide (the validator warns below it), ≤2.5 MB,
+  never upscaled. `npm run image -- check <file>` proves the file is a
+  complete, non-blank image of the format it claims; looking at it is what
+  proves it is the right image, and that step is not optional.
+  `npm run preview -- <course> <lesson>` renders the whole chapter to
+  `.preview/` in both themes — the loop for judging a figure in place
+  (text wrap, credit line, carousel) without a dev server.
+- **Both themes.** Line art with a white or transparent background needs
+  `background: light` in credits.yaml, which renders it on a light card.
+- **Edits.** Cropping, trimming margins, resizing and flattening
+  transparency only (`npm run image -- crop|fit`). Removing a curve, an axis
+  or a label from a published plot is falsification.
+- **Serving.** `scripts/sync-assets.ts` copies the files into
+  `public/course-assets/<course>/<lesson>/` at `predev`/`prebuild`/
+  `prevalidate`; run `npm run sync-assets` by hand when a dev server is
+  already up. The copy is git-ignored — the content tree stays the source of
+  truth.
 
 ## Worked references
 

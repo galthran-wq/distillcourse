@@ -69,13 +69,26 @@ export function Solution({ children }: { children: ReactNode }) {
   );
 }
 
-export function References({ children }: { children: ReactNode }) {
+export function References({
+  children,
+  credits,
+}: {
+  children: ReactNode;
+  /**
+   * Provenance of the lesson's sourced images, injected by the page from
+   * figures/credits.yaml. It belongs here rather than under each figure:
+   * a three-line licence note beside a plot is noise, but a citation is
+   * exactly what this section is for.
+   */
+  credits?: ReactNode;
+}) {
   return (
     <section className="references mt-12 border-t border-line pt-5">
       <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-faint">
         References
       </p>
       <div className="references-body">{children}</div>
+      {credits}
     </section>
   );
 }

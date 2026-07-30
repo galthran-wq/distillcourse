@@ -37,9 +37,11 @@ directly. Any other model: **STOP** and output only:
    directory, not your worktree — without it they write into the wrong
    checkout (usually master).
    Per planned lesson, sequentially (prerequisite order): lesson-writer agent
-   (session model, grounded in the research brief) → demo-builder execution
-   where a demo is specced → course-qa on opus with a structured verdict →
-   one revision cycle if QA requires fixes.
+   (session model, grounded in the research brief) → figure-artist agents in
+   parallel: drawn figures, and the brief's `source:` visuals cut from the
+   captures the reading swarm already took, verified and credited →
+   demo-builder execution where a demo is specced → course-qa on opus with a
+   structured verdict → one revision cycle if QA requires fixes.
 
 4. **On completion:** run `npm run validate <slug>`; report per-lesson
    outcomes (written / QA verdict / revised), remaining planned lessons, and
