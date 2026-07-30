@@ -4,7 +4,7 @@ export const meta = {
   whenToUse: 'Invoked by the /course-architect (phase: structure) and /lesson-factory (phase: lessons) skills. Args: {phase, slug, topic?, count?}.',
   phases: [
     { title: 'Canon', detail: 'perplexity deep research: the mainstream sources', model: 'sonnet' },
-    { title: 'Read', detail: 'one sonnet reader per source; each captures its image candidates', model: 'sonnet' },
+    { title: 'Read', detail: 'scope → readers (big books shard by ToC) → merge; readers capture image candidates', model: 'sonnet' },
     { title: 'Synthesize', detail: 'course.yaml + research dossier (session model)' },
     { title: 'Lessons', detail: 'write → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson' },
   ],
@@ -83,6 +83,27 @@ const PLAN_SCHEMA = {
   },
 }
 
+const SCOPE_SCHEMA = {
+  type: 'object',
+  required: ['access', 'where', 'shards'],
+  properties: {
+    access: { type: 'string', description: 'full | toc-only | summary-based' },
+    where: { type: 'string', description: 'best reading location found: URL(s), archive.org id, mirror — enough that a reader needs no re-hunting' },
+    shards: {
+      type: 'array',
+      description: '1 entry = no split; 2-4 entries only for big fully-accessible sources, split on chapter boundaries',
+      items: {
+        type: 'object',
+        required: ['range'],
+        properties: {
+          range: { type: 'string', description: 'explicit chapter/page range, e.g. "chs. 1-9 (pp. 1-310)"' },
+          note: { type: 'string', description: 'what this stretch of the book covers, one line' },
+        },
+      },
+    },
+  },
+}
+
 const FIGLIST_SCHEMA = {
   type: 'object',
   required: ['missing'],
@@ -140,14 +161,41 @@ if (phaseArg === 'structure') {
   log(`canon: ${sources.length} sources — ${sources.map((s) => s.title).join('; ')}`)
 
   phase('Read')
+  // Big fully-accessible books are sharded across readers by a deterministic
+  // ToC split: one context window per ~10-15 chapters instead of one per
+  // book, so the long tail of a 900-page source stops evaporating. A scoper
+  // finds the source and proposes the split; shard readers see ONLY their
+  // range; a merger folds shard summaries back into one per-source summary
+  // (same shape, so synthesis downstream is unchanged). pipeline(): each
+  // source flows scope -> read -> merge without waiting for the others.
+  const capNote = `Capture directory for image candidates: content/courses/${slug}/research/images/ — create it if missing, and prefix every id with a short source tag so the swarm's ids never collide.`
   const summaries = (
-    await parallel(
-      sources.map((s) => () =>
+    await pipeline(
+      sources,
+      (s) =>
         agent(
-          `${at}Source to summarize: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Reason it is canon: ${s.why}. Follow your source-reader briefing.\n\nCapture directory for image candidates: content/courses/${slug}/research/images/ — create it if missing, and prefix every id with a short source tag (e.g. \`shannon48-\`) so the swarm's ids never collide.`,
-          { label: `read: ${s.title.slice(0, 30)}`, agentType: 'source-reader', schema: SUMMARY_SCHEMA },
+          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Find where it can actually be read, fetch its table of contents, and decide the split. Shard ONLY when the full text is accessible AND the source is big (roughly 350+ pages or 25+ chapters): 2-4 shards along chapter boundaries, balanced by page count. Otherwise return a single shard covering everything. Report access honestly (full | toc-only | summary-based) and pass on the best reading location you found so readers do not re-hunt.`,
+          { label: `scope: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SCOPE_SCHEMA },
         ),
-      ),
+      (scope, s) =>
+        scope &&
+        parallel(
+          scope.shards.map((shard, i) => () =>
+            agent(
+              `${at}Source to summarize: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind}). Reason it is canon: ${s.why}. Access per the scoper: ${scope.access}; read it at: ${scope.where}. ${scope.shards.length > 1 ? `YOUR SHARD (${i + 1}/${scope.shards.length}): ${shard.range} — read ONLY this range, report ONLY from it, and stay silent about the rest of the book; the swarm covers it.` : 'You cover the whole source.'} Follow your source-reader briefing.\n\n${capNote} For this source use the tag \`${(s.title.match(/[A-Za-z0-9]+/g) || ['src']).slice(0, 2).join('').toLowerCase().slice(0, 12)}${scope.shards.length > 1 ? `-s${i + 1}` : ''}-\`.`,
+              { label: `read: ${s.title.slice(0, 22)}${scope.shards.length > 1 ? ` [${i + 1}/${scope.shards.length}]` : ''}`, phase: 'Read', agentType: 'source-reader', schema: SUMMARY_SCHEMA },
+            ),
+          ),
+        ),
+      (parts, s) => {
+        const kept = (parts || []).filter(Boolean)
+        if (kept.length === 0) return null
+        if (kept.length === 1) return kept[0]
+        return agent(
+          `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape. Concatenate topics and chapter_map in book order; keep EVERY key_result, gem, and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
+          { label: `merge: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SUMMARY_SCHEMA },
+        )
+      },
     )
   ).filter(Boolean)
   log(`read: ${summaries.length}/${sources.length} sources summarized`)
