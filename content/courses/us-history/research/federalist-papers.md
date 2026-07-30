@@ -9,6 +9,19 @@ This is an `extra` (starred) chapter: a close-reading deep dive. No core lesson
 may depend on it — everything the core path needs from The Federalist is already
 carried by ratification-and-bill-of-rights.
 
+THESIS ROLE. The primary text of thesis element (2) read in its own words:
+Publius arguing, essay by essay, that the classical materials (mixed
+government, the Roman consulship in No. 70, the "improved science of politics"
+in No. 9) could be re-engineered for an extended commercial republic. Frame
+the series per Maier's *Ratification*: one entry — outsized in retrospect,
+modest in reach at the time — in a much larger newspaper war fought under
+deadline for New York's 30-27 convention. Wood's *Creation* Ch.XV supplies the
+closing register: No. 10 is where the classical assumption of a single public
+good gives way to the management of interest — quote his "end of the classical
+conception of politics" verdict as the historiographical cap, attributed.
+Reinforces mixed-government from roman-blueprint alongside the four concepts
+already listed.
+
 ## Sources to consult
 
 - **The Federalist Papers, Avalon Project** — the primary and near-only source.

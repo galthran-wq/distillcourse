@@ -5,6 +5,15 @@ module: depression-and-war
 type: core
 goal: Explain the US path from neutrality through Pearl Harbor to victory, and why the war left the US uniquely advantaged among the powers.
 
+THESIS ROLE. The second world-order reset and a course key result: entered
+last, fought farthest from home, lost the fewest people among the major
+powers, emerged richer than it entered — with the production tally (the war
+of machines) as the thesis's industrial argument at maximum and the 1945
+institutional settlement (Bretton Woods, the UN) as the American-designed
+order the postwar module inherits. The Eastern Front proportion stays stated
+plainly; the uniquely-privileged-belligerent claim is Kennedy's and is
+carried by the comparative-cost table, not by assertion.
+
 ## Sources to consult
 
 - **Kennedy, *Freedom from Fear*** — **Ch.13** "The Gathering Storm", **Ch.14**

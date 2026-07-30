@@ -5,6 +5,16 @@ module: civil-war-and-reconstruction
 type: core
 goal: Explain why the Union won — total war on Confederate resources, the 1864 election, and the meanings Lincoln gave the war.
 
+THESIS ROLE. Two thesis threads close here. Contingency (the standing concept
+from war-of-independence, reinforced in course.yaml): McPherson's
+Atlanta-saved-the-election claim is the course's premier later instance — the
+Blind Memorandum in August, the election in November, and the difference one
+city's fall made. Institutions: a national election held in the middle of a
+civil war, and the war's meanings fixed by Lincoln in the Gettysburg Address
+and Second Inaugural — the constitutional order explaining its own price. The
+holding of the 1864 election belongs beside 1800 in the course's list of
+tests peer republics failed.
+
 ## Sources to consult
 
 - **McPherson, *Battle Cry of Freedom*, Ch.21-28** — Gettysburg and Vicksburg

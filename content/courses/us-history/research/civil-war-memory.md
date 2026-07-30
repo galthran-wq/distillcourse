@@ -8,6 +8,15 @@ goal: Evaluate how reconciliationist memory eclipsed emancipationist memory of t
 `extra` (starred) chapter. No core lesson may require it; it deepens
 redemption and civil-war-memory themes for readers who want the historiography.
 
+THESIS ROLE. The course's memory-methods chapter: how the record established
+in the previous five lessons was later renarrated, and how to date a memory
+artifact against the events it depicts. For the thesis it guards the
+register — the Lost Cause is the cautionary case of a national story built by
+selection against the documents, and the lesson's method (check the memory
+claims against the secession declarations, monument dates against
+disenfranchisement dates) is the same evidence-first discipline the course
+applies to its own thesis in historiographical-lenses.
+
 ## Sources to consult
 
 - **Blight, HIST 119 Lectures 26-27** — "Race and Reunion: the Civil War in

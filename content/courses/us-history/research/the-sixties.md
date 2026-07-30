@@ -5,6 +5,14 @@ module: postwar-america
 type: core
 goal: Analyze how the Great Society's legal triumphs and the Vietnam escalation fractured 1960s liberalism.
 
+THESIS ROLE. The high-water mark and first overreach of the postwar state:
+the largest legislative wave since 1935 with measured outcomes (the poverty
+series, elderly poverty after Medicare) alongside an escalation authorized by
+a resolution whose breadth the course reads closely — the delegation-of-war-
+power problem the recent-past lesson revisits via the 2001 AUMF. The 1960
+margin (112,827 votes) extends the contingency thread; 1968 shows the
+coalition's break as datable events.
+
 ## Sources to consult
 
 - **American Yawp Ch.27 "The Sixties"** — the chapter's own throughline:

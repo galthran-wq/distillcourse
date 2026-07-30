@@ -5,6 +5,15 @@ module: early-republic
 type: core
 goal: Explain how a founding generation that dreaded faction produced the first party system and the first peaceful transfer of power.
 
+THESIS ROLE. The design of 1787 meets its first live-fire tests: a fiscal
+program that splits the government, a foreign-war panic that criminalizes
+opposition, and a tied election thrown into the House — and the machinery
+holds. The 1800 transfer is a course key result: the first peaceful transfer
+of national power between hostile parties, an event contemporary theory
+expected republics to fail, and a rung in the contingency chain the course
+tracks (reinforce the contingency concept from war-of-independence — militias
+were readying while the House balloted).
+
 ## Sources to consult
 
 - **Wood, *Empire of Liberty*** — the depth source. **Ch.1** (experiment in

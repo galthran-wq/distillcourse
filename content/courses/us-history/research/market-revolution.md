@@ -3,9 +3,29 @@
 status: planned
 module: early-republic
 type: core
-goal: Explain how transportation, factory labor, and finance transformed the antebellum Northern economy.
+goal: Explain how transportation, communication, factory labor, and finance transformed the antebellum Northern economy.
+
+THESIS ROLE. Thesis element (4), technology, gets its first full lesson: the
+transport-and-communications revolution is the mechanism by which a literate,
+commercial population (element 1) converted a continent of cheap land
+(element 4a) into one market. Howe's organizing image — overcoming the
+"tyranny of distance" — is adopted as the lesson's second thread: the Erie
+Canal's freight prices AND the information network (post office, penny press,
+the 1844 telegraph) as one revolution, opening with the Battle of New Orleans
+fought after the peace was signed (Howe's Prologue) as the before-picture.
 
 ## Sources to consult
+
+- **Howe, *What Hath God Wrought*** — Prologue (New Orleans as the parable of
+  a country not yet connected), **Ch.6 "Overcoming the Tyranny of Distance"**
+  (Erie Canal, steamboats, the postal system and print culture as the era's
+  true engine), **Ch.14** (the new economy, Panic of 1837), **Ch.17** (the
+  telegraph: "What hath God wrought," May 24, 1844, the phrase chosen by
+  Annie Ellsworth, sent from the Supreme Court chamber). Howe's thesis that
+  the communications revolution, not manufacturing per se, drove the era —
+  and his rejection of Sellers's pessimistic market-revolution reading — is
+  the interpretive frame to present alongside Sellers's coinage.
+  Summary-based access; verify prose quotes.
 
 - **American Yawp Ch.8 "The Market Revolution"** — the spine: transportation and
   industrial transformation, the Erie Canal, wage labor, and the reorganization
@@ -30,6 +50,13 @@ goal: Explain how transportation, factory labor, and finance transformed the ant
    and cut transit time from weeks to days. Steamboats did the same on western
    rivers; railroads followed from the 1830s. Every other change follows from
    this price change.
+1b. **Information sped up faster than freight (Howe).** The post office as
+   the federal government's largest civilian presence; cheap newspapers
+   riding postal subsidies; and the 1844 Washington–Baltimore telegraph
+   separating information from transportation entirely. Open with New
+   Orleans (a battle fought two weeks after the peace treaty because news
+   could not cross the Atlantic) and close the thread with Morse's message —
+   the era bracketed by its own communications revolution.
 2. **What a market economy did to households.** Production moved out of the
    household and into shops and mills; households became buyers of what they had
    made; the cash nexus and store credit reorganized rural life; clock time

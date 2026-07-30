@@ -5,6 +5,14 @@ module: postwar-america
 type: core
 goal: Explain containment abroad and anticommunism at home in the first Cold War decade.
 
+THESIS ROLE. The postwar order the 1945 settlement built, run from
+Washington: containment, the Marshall Plan, and NATO as the institutional
+export of American power — the world-order reset of world-war-two made
+permanent. The domestic loyalty state stays in the same frame as the
+documented cost, with McCarthy's political (not judicial) fall as the
+boundary-enforcement case the course's institutions thread records honestly:
+the check that worked was the Senate, late.
+
 ## Sources to consult
 
 - **American Yawp Ch.25 "The Cold War"** — containment, Korea, McCarthyism,

@@ -8,6 +8,14 @@ goal: Explain how freedpeople, Congress, and the Reconstruction Amendments refou
 Foner's organizing method is the one to borrow: build the lesson from what
 freedpeople *did*, then layer elite politics on top.
 
+THESIS ROLE. The self-correction written into the Constitution: more
+constitutional content added in five years than in the previous seventy —
+abolition, birthright citizenship, equal protection, suffrage — the
+amendment machinery from Article V used to complete what the war paid for.
+The register holds: the amendments as the system's second founding, the land
+question's defeat and sharecropping as its documented limits, both stated
+from the documents and the numbers.
+
 ## Sources to consult
 
 - **Foner, *Reconstruction: America's Unfinished Revolution*** — **Ch.3** "The

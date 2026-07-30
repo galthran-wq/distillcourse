@@ -5,6 +5,18 @@ module: postwar-america
 type: core
 goal: Analyze the movement from Brown through Montgomery, Birmingham, and Selma to the Civil Rights and Voting Rights Acts.
 
+THESIS ROLE. The enforcement of the second founding, and a course key
+result: eleven years of disciplined mass protest producing two federal
+statutes that made the Reconstruction amendments operative — 250,000 new
+Black voters registered by the end of 1965, the registration-collapse
+numbers from jim-crow finally reversed. In the course's register this is the
+system passing a test at cost: the movement's strategic engineering
+(Birmingham's calculation), the state's reluctance on the record (FBI
+surveillance, intervention only after televised violence), and the measured
+outcome, all documented. The Douglass-to-King continuity — the founding
+documents claimed, not rejected, as the movement's instrument — closes the
+promise arc the course opened in sectional-crisis.
+
 ## Sources to consult
 
 - **American Yawp Ch.27 "The Sixties"**, civil rights sections — including the

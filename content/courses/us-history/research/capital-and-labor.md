@@ -5,6 +5,16 @@ module: industry-and-empire
 type: core
 goal: Explain the incorporation of the American economy and the labor and Populist revolts it provoked.
 
+THESIS ROLE. The thesis's headline economic fact lands here and must be
+measured, not asserted: between 1870 and 1900 the United States became the
+world's largest economy — steel output passing Britain's, rail mileage,
+manufacturing value added — the largest economic expansion in history to that
+date. The lesson holds the two documented facts together in one frame: real
+wages rose across the period AND inequality and insecurity rose faster, which
+is what produced the labor wars and Populism. The corporation belongs in the
+course's institutions thread: a legal person with continuous existence —
+an institutional technology as consequential as the constitutional ones.
+
 ## Sources to consult
 
 - **MIT 21H.102 Lecture 6 "Capital, Labor, and the Standardization of Work"**

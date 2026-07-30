@@ -5,6 +5,14 @@ module: reform-war-normalcy
 type: core
 goal: Analyze the consumer economy, cultural modernism, and reactionary politics of the 1920s.
 
+THESIS ROLE. Mass production arrives (thesis element 4's technology thread at
+full scale — the assembly line, electrification, the price of a Model T
+falling through the decade) and with it the first mass consumer economy in
+history, measured in durables per household. The lesson keeps the course's
+double ledger: the measured prosperity, its uneven distribution (farm incomes,
+the quota laws closing the immigration channel the thesis counted), and the
+structural fragilities Kennedy's Ch.1 catalogs as the setup for 1929.
+
 ## Sources to consult
 
 - **American Yawp Ch.22 "The New Era" (2nd ed. "The Twenties")** — consumer

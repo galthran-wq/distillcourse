@@ -5,6 +5,15 @@ module: reform-war-normalcy
 type: core
 goal: Examine US entry into World War I, the home-front repression it licensed, and the failed Wilsonian peace.
 
+THESIS ROLE. The first of the two war mobilizations that reset the world
+order (thesis element 4): a state-directed war economy assembled in eighteen
+months, US finance and materiel deciding the Atlantic balance, and the
+American president writing the peace agenda — alongside the documented costs
+at home (Espionage and Sedition Act prosecutions) that the course's
+promise-and-enforcement outcome tracks. The rejected League ending matters to
+the thesis too: the institutional order declined its first world-hegemony
+draft; 1945's acceptance is the contrast world-war-two sets up.
+
 ## Sources to consult
 
 - **American Yawp Ch.21 "World War I & Its Aftermath"** — the spine: entry, the

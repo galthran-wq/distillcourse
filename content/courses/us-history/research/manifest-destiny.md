@@ -5,7 +5,22 @@ module: slavery-and-crisis
 type: core
 goal: Explain how continental expansion reopened the slavery question the Missouri Compromise had closed.
 
+THESIS ROLE. The land condition at continental completion — and its price:
+the acquisitions that made the United States a two-ocean power (Texas,
+Oregon, the Mexican Cession) immediately destabilized the political system
+that made them, because every acre reopened the slavery question. The lesson
+keeps both halves of the thesis's ledger visible: the measured scale of
+expansion, and the war and broken guarantees it ran on. Howe's Ch.18-19
+supply the manifest-destiny ideology (O'Sullivan's coinage) and the
+war-to-Wilmot chain.
+
 ## Sources to consult
+
+- **Howe, *What Hath God Wrought*, Ch.18 "Westward the Star of Empire" and
+  Ch.19 "The War Against Mexico"** — the trails, manifest destiny as
+  ideology, and the war's role in sharpening the sectional conflict; Howe's
+  counterfactual that a Clay victory in 1844 might have changed the road to
+  war, flagged as his aside. Summary-based access.
 
 - **American Yawp Ch.12 "Manifest Destiny"** — the spine: westward expansion,
   Oregon migration, the Mexican-American War, and the ideology itself.

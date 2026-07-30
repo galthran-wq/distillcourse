@@ -5,6 +5,16 @@ module: industry-and-empire
 type: core
 goal: Analyze the incorporation of the West — Indian wars, the destruction of the bison, allotment and assimilation, and the frontier myth.
 
+THESIS ROLE. The enabling-conditions ledger's western page, both columns: the
+railroad-and-homestead machinery that converted the continent into farms and
+exports (the power the thesis measures), and the documented means — treaty
+breach, subsistence destruction, allotment, boarding schools — by which the
+land was cleared of its owners. Turner's frontier thesis appears here twice:
+as the era's own self-explanation, and as the first lens the
+historiographical-lenses chapter will test. The register holds: policy texts,
+acreage numbers, and the Army's own photographs carry the account; no
+editorializing in either direction.
+
 ## Sources to consult
 
 - **MIT 21H.102 Lecture 5 "Conflict and Conquest in the Frontier West"** (full

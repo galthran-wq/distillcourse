@@ -9,6 +9,14 @@ Carries outcome co-data. Demo (ImmigrationWaves) specced in course.yaml — the
 prose must set a concrete task ("find the decade the quota law bites") before
 open exploration.
 
+THESIS ROLE. Thesis element (4), immigration at continental scale, measured:
+tens of millions of arrivals building the industrial cities and labor force
+the previous lesson's expansion ran on — the data-first treatment (waves,
+origins, return migration) IS the thesis's evidence here. The exclusion
+politics stay in the same frame as documented institutional choices (the
+Chinese Exclusion Act through the 1924 quotas), the boundary-drawing the
+course tracks alongside every expansion.
+
 ## Sources to consult
 
 - **American Yawp Ch.18 "Industrial America"** — urbanization, immigration,

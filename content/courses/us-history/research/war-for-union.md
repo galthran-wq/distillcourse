@@ -5,6 +5,14 @@ module: civil-war-and-reconstruction
 type: core
 goal: Explain how both sides mobilized for war and why the short-war illusion died at Bull Run, Shiloh, and Antietam.
 
+THESIS ROLE. The system's supreme test opens: the war is told in the
+Lincoln–Douglass register the course states in its intro — the Union cause as
+the constitutional order defending itself against a counterrevolution made on
+behalf of slavery (the seceders' own declarations, from sectional-crisis),
+and the cost counted without flinching. The material-imbalance section is
+also the thesis's industrial argument mid-stride: the mobilization capacity
+measured here is what the enabling-conditions chapters built.
+
 ## Sources to consult
 
 - **American Yawp Ch.14 "The Civil War"**, section "A War for Union 1861-1863" —

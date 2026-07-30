@@ -9,6 +9,14 @@ goal: Analyze the HOLC security maps as primary sources and trace their conseque
 the course's best single demonstration that a primary source can be read as
 policy and its effects measured decades later.
 
+THESIS ROLE. The course's premier documents-to-data case study, and the
+promise-and-enforcement outcome's economic chapter: the same federal capacity
+the thesis credits with building the middle class (mortgage insurance, the GI
+Bill's channel) documented writing race into its credit geography — policy
+text, maps, and measured present-day gradients, no editorializing needed in
+either direction. The method (read the form, then measure the consequence) is
+the course's register at its purest.
+
 ## Sources to consult
 
 - **Mapping Inequality: Redlining in New Deal America** (DSL Richmond) — the

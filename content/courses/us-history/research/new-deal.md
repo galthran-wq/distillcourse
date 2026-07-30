@@ -5,6 +5,15 @@ module: depression-and-war
 type: core
 goal: Analyze what the New Deal built, whom it excluded, and why it did not end the Depression.
 
+THESIS ROLE. Institutional adaptation under stress: the federal floor built
+in five years (Social Security, deposit insurance, labor law) as the
+constitutional order rewriting the state's job description without rewriting
+the state — the court-packing failure and the Court's shift showing the
+checks straining and holding. The exclusions (agricultural and domestic
+workers, the price of Southern votes) stay stated in the same breath, per the
+register; the unemployment series stays honest about what ended the
+Depression (war mobilization, next lesson).
+
 ## Sources to consult
 
 - **Kennedy, *Freedom from Fear*** — **Ch.5** "The Hundred Days", **Ch.7**

@@ -1,7 +1,7 @@
 # Research brief: historiographical-lenses (Framing US History: The Historiographical Lenses)
 
 status: planned
-module: cold-war-and-after
+module: postwar-america
 type: extra
 goal: Evaluate the major historiographical frameworks for US history as testable models — what each explains, what each obscures, and what evidence would decide between them.
 
@@ -12,6 +12,25 @@ register matters doubly here — each framework is presented as a MODEL (claim,
 evidence it rests on, what it explains, what it systematically misses), never
 as a side in a culture war. Both the 1619 Project's claims and the historians'
 objections are quoted from the record, not paraphrased into caricature.
+
+THESIS ROLE — the course tests itself. This course argues a thesis: an
+unusually selected population, compounding institutions of self-government, a
+revolution that succeeded against measurable odds, and enabling conditions
+(cheap land, technology, immigration, war mobilization) made thirteen colonies
+the most powerful state in history. That thesis is itself a lens, and this
+chapter puts it in the LensMatrix beside the others: what it explains (the
+institutional continuity from compact to Constitution; the measured
+distinctiveness of the settler population; why contingent events mattered),
+what it systematically underweights (the lenses that center slavery's
+economics, class conflict, or the dispossessed would each reorder the same
+evidence), and what evidence would count against it (e.g., settler societies
+with similar selection and institutions that did not compound — comparative
+cases the course does not run). The reader should leave able to name the
+course's own blind spots, argue with its thesis using its own documents, and
+recognize that the Lincoln–Douglass register the course uses for slavery and
+self-correction is also a choice among defensible registers. Foner's freedom
+lens remains in the matrix as one instrument among the seven-plus, no longer
+the course's frame.
 
 ## Sources to consult
 
@@ -68,11 +87,22 @@ objections are quoted from the record, not paraphrased into caricature.
    claims; the economists' pushback on Baptist's cotton-productivity
    arithmetic (Olmstead & Rhode) — a second live case of numbers disciplining
    a narrative.
-6. **Foner's freedom lens, self-applied.** What this course's own frame
-   explains (continuity, source-reading discipline) and what it trades away
-   (economic causation gets less airtime than in a capitalism-first course;
-   diplomatic/military history compressed). The reader should leave able to
-   name the course's own blind spots — that is the point of the chapter.
+6. **Foner's freedom lens as one instrument.** What it explains (continuity
+   of the freedom argument, source-reading discipline) and what it trades
+   away (economic causation, diplomatic/military history) — presented now as
+   one row of the matrix, not the course's frame.
+7. **This course's thesis, self-applied.** The selection-institutions-
+   improbability-conditions model stated as a testable claim; its supporting
+   measurements recalled from the lessons that made them
+   (new-england-covenant's literacy series, roman-blueprint's clause
+   genealogy, war-of-independence's odds, ratification's vote table); its
+   systematic blind spots named (what a capitalism-first or
+   dispossession-first ordering of the same evidence would foreground); and
+   the evidence that would count against it stated. Also note its
+   intellectual kin on the record — Johnson's *A History of the American
+   People* runs a national-achievement narrative with three organizing
+   questions of its own — and what distinguishes an argued, measured thesis
+   from a celebratory one: falsifiability and the register of measurement.
 
 ## Pitfalls
 
@@ -86,9 +116,11 @@ objections are quoted from the record, not paraphrased into caricature.
 
 ## FIGURE PLAN
 
-1. `draw:` single `<Figure>` (component) — **LensMatrix**: rows = seven
+1. `draw:` single `<Figure>` (component) — **LensMatrix**: rows = eight
    frameworks (Turner, Beard, consensus, New Left, race-centered, capitalism,
-   freedom), columns = central claim / key evidence / systematically misses.
+   freedom, and THIS COURSE's selection-institutions-improbability-conditions
+   thesis), columns = central claim / key evidence / systematically misses.
+   The course's own row must be filled with the same severity as the others.
    Dense text figure; component tier.
 2. `draw:` single `<Figure>` — **timeline of the schools**, 1893–present,
    each school a labeled band with its founding text; shows schools as
@@ -118,3 +150,7 @@ objections are quoted from the record, not paraphrased into caricature.
   would settle it.
 - E3 review: restate Turner's thesis and the two pieces of evidence from
   conquering-the-west that cut against it.
+- Self-test: state this course's thesis in one sentence, then write the
+  strongest counter-ordering of the same evidence (which lessons' facts
+  would a capitalism-first survey lead with?) and name one observation that
+  would count against the thesis outright.

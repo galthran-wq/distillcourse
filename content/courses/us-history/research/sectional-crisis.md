@@ -8,6 +8,17 @@ goal: Analyze the escalation from the Compromise of 1850 through Dred Scott and 
 Longest lesson in the module (30 min) and the causal hinge of the course. The
 demo (SenateBalanceTimeline) is specced in course.yaml.
 
+THESIS ROLE. The compromise machine reaches its load limit: the lesson shows
+the institutions that had absorbed every previous conflict (Missouri, 1850)
+failing one component at a time — party system, Court, Senate floor, ballot —
+under the contradiction the cotton-kingdom lesson measured. The
+founding-as-promise register gets its primary text here: Frederick Douglass's
+July 5, 1852 Rochester address and his 1860 Glasgow speech reading the
+Constitution as "a GLORIOUS LIBERTY DOCUMENT" — the abolitionist claim ON the
+founding, set directly against Taney's Dred Scott reading of the same
+document. Two constitutional readings, both quoted; the war decides between
+them. Reinforces the contingency concept (the 1860 four-way split).
+
 ## Sources to consult
 
 - **Blight, HIST 119 Lectures 6-11** — the decisive depth source. L6 (Compromise
@@ -68,6 +79,11 @@ demo (SenateBalanceTimeline) is specced in course.yaml.
 
 ## Set pieces and worked examples to recreate
 
+- **Douglass on the Constitution**: the 1852 Rochester address ("What to the
+  Slave is the Fourth of July?") and the 1860 Glasgow "GLORIOUS LIBERTY
+  DOCUMENT" argument, quoted and set against Dred Scott's holdings — two
+  professional readings of one text, worked as the lesson's
+  constitutional-interpretation set piece.
 - **The six-document secession stack** (MIT Week 13) read in chronological order
   as rhetoric hardening in real time — the lesson's culminating worked reading.
   Worked example: the lesson analyzes the first three; parallel exercise: the

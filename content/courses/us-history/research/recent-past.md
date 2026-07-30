@@ -5,9 +5,21 @@ module: postwar-america
 type: core
 goal: Examine the post-Cold War arc from globalization through 9/11 and the 2008 crisis to partisan polarization.
 
-Final lesson: it must close the course by returning to the freedom lens the
-introduction set up, and by pointing back at named earlier lessons rather than
-adding new machinery.
+Final core lesson: it must close the course by returning to the thesis the
+introduction argued — selection, compounding institutions, improbability,
+enabling conditions — and by pointing back at named earlier lessons rather
+than adding new machinery.
+
+THESIS ROLE. The closing audit. The era supplies the thesis's terminal
+measurements (the unipolar moment; the world's largest economy globalized
+under institutions it designed) and its live counter-evidence (polarization
+indices, two impeachments, January 6, the 2008 crisis testing which New Deal
+guardrails held). The lesson's final section restates the causal chain the
+course argued, cites the lesson that established each link, states the
+evidence cutoff, and refuses prediction — then hands the reader to
+historiographical-lenses, where the thesis itself goes on the bench. Foner's
+three-part freedom question stays available as a source-reading instrument in
+this closing audit, not as the frame.
 
 ## Sources to consult
 
@@ -59,10 +71,13 @@ adding new machinery.
    and the electorate, geographic sorting, media fragmentation, and the decline
    of split-ticket voting; two impeachments, contested election results, and
    January 6, 2021. Present measurable indicators rather than adjectives.
-7. **Close the course.** Return to the three-part freedom question — meanings,
-   material conditions, boundaries — and show the reader that each era's answer
-   was contested at the time. State the course's evidence cutoff and refuse
-   prediction.
+7. **Close the course.** Restate the argued causal chain — selected
+   population, compounding institutions, improbable revolution, enabling
+   conditions — with one linked lesson and one measurement per link, and
+   set beside it the era's open counter-evidence (polarization, 2008,
+   January 6) without adjudicating what is still moving. State the course's
+   evidence cutoff and refuse prediction; point the reader at
+   historiographical-lenses for the thesis's own trial.
 
 ## Set pieces and worked examples to recreate
 
@@ -117,7 +132,9 @@ mostly under copyright. Keep it drawn.
 6. `draw:` single `<Figure>` — **rights extended and contracted, 2000-2020**: a
    two-sided timeline with expansions (*Lawrence*, ADA amendments, *Obergefell*)
    above and contractions (*Shelby County*, voting-law changes) below.
-7. `draw:` single `<Figure>` — **the course in one frame**: the three-part
-   freedom question as three rows against six era columns, each cell holding one
-   phrase from the lesson that established it. The closing synthesis figure —
-   every cell must link to a lesson.
+7. `draw:` single `<Figure>` — **the course in one frame**: the thesis's four
+   links (selected population / compounding institutions / improbability
+   survived / enabling conditions) as four rows against the course's era
+   columns, each cell holding one measurement and linking the lesson that
+   established it. The closing synthesis figure — every cell must link to a
+   lesson.

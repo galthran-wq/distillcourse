@@ -5,6 +5,15 @@ module: civil-war-and-reconstruction
 type: core
 goal: Analyze how terror, Northern retreat, and the bargain of 1877 ended Reconstruction.
 
+THESIS ROLE. The self-correction suspended: the second founding overthrown by
+violence and bargaining, with the mechanism named (who, how, at what price).
+For the course's argument the survival matters as much as the defeat — the
+amendments stayed in the text, unenforced, which is precisely what made the
+twentieth-century civil rights movement a matter of enforcement rather than
+refounding (the arc that civil-rights-movement completes). State that
+continuity explicitly; it is the thesis's claim that the system's corrections,
+however delayed, ran through its own instruments.
+
 ## Sources to consult
 
 - **Foner, *Reconstruction*** — **Ch.9** "The Challenge of Enforcement" (the New

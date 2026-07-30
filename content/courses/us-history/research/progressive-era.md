@@ -5,6 +5,14 @@ module: reform-war-normalcy
 type: core
 goal: Explain Progressivism's two reform impulses — moral purity and scientific efficiency — and their constitutional harvest.
 
+THESIS ROLE. The amendment machinery at industrial scale: four constitutional
+amendments in seven years — the system rewriting itself through Article V
+under organized public pressure, two of the four enacting Populist demands
+from 1892. For the thesis this is institutions compounding again (reform
+movements → amendments → new state capacity), with the boundaries (who the
+19th Amendment reached in practice) stated in the same sections per the
+course register.
+
 ## Sources to consult
 
 - **MIT 21H.102 Lecture 9 "Progressive Reform"** (published notes) — the dual

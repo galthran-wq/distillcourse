@@ -5,6 +5,16 @@ module: postwar-america
 type: core
 goal: Analyze postwar prosperity and suburbanization, and the exclusions that defined both.
 
+THESIS ROLE. The thesis's prosperity peak measured (GDP doubling,
+homeownership 40% to 60%, the manufactured middle class) with its policy
+inputs named — and the exclusions documented in the same sections, because
+the same instruments (FHA terms, GI Bill administration) distributed the
+boom along the color line the redlining chapter mapped. Brown v. Board opens
+the enforcement arc: the Court reversing its own 1896 ratification is the
+self-correction machinery restarting, with the Cold War's documented pressure
+(the Justice Department's amicus brief) as a causal input the thesis's
+world-power thread supplies.
+
 ## Sources to consult
 
 - **American Yawp Ch.26 "The Affluent Society"** — postwar prosperity,

@@ -5,6 +5,14 @@ module: postwar-america
 type: core
 goal: Analyze the conservative movement's road to power — markets, law and order, and the culture wars.
 
+THESIS ROLE. The party system doing what the thesis says the institutions do:
+absorbing a generational revolt and returning it as a governing majority
+through elections — institution-building (think tanks, PACs, legal networks)
+before power, then measured policy outputs (tax rates, the Volcker
+disinflation's price, incarceration series, union density) stated as series
+the reader can judge. The Cold War's end is presented with the
+historiographical dispute intact, per the register.
+
 ## Sources to consult
 
 - **American Yawp Ch.29 "The Triumph of the Right" (2nd ed. "The Rise of the

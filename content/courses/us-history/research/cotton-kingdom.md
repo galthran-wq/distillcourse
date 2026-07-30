@@ -8,6 +8,17 @@ goal: Analyze the political economy that made cotton and slavery expand together
 Carries course outcome co-data. The demo (CottonSlaveryScrubber) is specced in
 course.yaml; the prose must give the reader a concrete task before free play.
 
+THESIS ROLE. The enabling-conditions argument's hardest chapter, told at full
+documented weight: the cotton gin (technology), land seized from Native
+nations (cheap land), and a bound labor system expanded together into the
+export engine of the antebellum economy — the causal chain stated from
+prices, export shares, and migration counts. The register is the course's
+standing one: statutes, prices, and the planter's own sentence carry the
+analysis; the Douglass–Lincoln framing (the founding as promise, this system
+as its contradiction) is set up here and paid off in sectional-crisis and
+emancipation. Howe's Ch.4 ("The World that Cotton Made") corroborates the
+spine numbers.
+
 ## Sources to consult
 
 - **American Yawp Ch.11 "The Cotton Revolution" (2nd ed.: "The Old South")** —

@@ -5,6 +5,16 @@ module: industry-and-empire
 type: core
 goal: Explain how the South legally dismantled Black citizenship between 1890 and 1910 and how the Supreme Court ratified it.
 
+THESIS ROLE. The self-correction's longest suspension, documented as legal
+engineering: race-neutral statute text producing racial results, ratified by
+the Court the constitutional machine relies on. For the course's arc this
+lesson is the "before" that makes civil-rights-movement's enforcement story
+measurable — the registration-collapse numbers established here are the
+baseline the VRA's numbers reverse. The register does the work: statutes,
+registration counts, spending ratios, and Wells's own tabulation method
+(count the cases, test the claimed causes) — her method is the course's
+method, and the lesson should say so.
+
 ## Sources to consult
 
 - **Milestone Documents** #48 Plessy v. Ferguson (1896) — the ruling, Brown's

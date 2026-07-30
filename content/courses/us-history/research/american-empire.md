@@ -5,6 +5,14 @@ module: industry-and-empire
 type: core
 goal: Analyze why the United States took an overseas empire in 1898 and the arguments made against it.
 
+THESIS ROLE. The power the course has been measuring goes overseas: a
+ten-week war against a European empire, won at sea in an afternoon at Manila
+Bay — the industrial and naval capacity from capital-and-labor converted into
+geopolitical reach. The lesson keeps the course's double ledger: the measured
+arrival of the United States as a world power, and the documented arguments
+and costs on the record against it (the Kūʻē petitions, the Philippine war's
+casualty asymmetry, the Insular Cases' constitutional residue).
+
 ## Sources to consult
 
 - **MIT 21H.102 Lecture 8 "Becoming a World Power"** (published notes) — the

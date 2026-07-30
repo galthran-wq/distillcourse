@@ -7,6 +7,14 @@ goal: Analyze how enslaved people's flight and Lincoln's policy together turned 
 
 Document-heavy lesson; the manuscript sequence is the argument.
 
+THESIS ROLE. The self-correction thesis's central chapter: the promise of the
+founding documents enforced at the price the war set — driven jointly from
+below (flight to Union lines) and from the top (Lincoln's staged legal
+instruments), completed by constitutional amendment. The register is already
+this lesson's method: manuscripts, dates, and exact legal reach, no
+sentiment. The course key result (war for Union becomes war for emancipation,
+~750,000 dead) lives here.
+
 ## Sources to consult
 
 - **Library of Congress, "Abraham Lincoln and Emancipation"** essay (linked from

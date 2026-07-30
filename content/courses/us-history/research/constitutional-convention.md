@@ -5,7 +5,25 @@ module: revolution-and-founding
 type: core
 goal: Explain how the Constitutional Convention's compromises produced the federal structure of 1787.
 
+THESIS ROLE. The keystone of thesis element (2): the compounding institutions
+of module 1, plus the classical/English design vocabulary from roman-blueprint
+(now this lesson's prerequisite), assembled under deadline into the machine
+this lesson dissects. The design's durability is the measured claim — the
+oldest surviving written national constitution, amendable by design (the
+superseded-clause map is the proof the lesson closes on). Wood's *Creation of
+the American Republic* now grounds the state-constitutions-as-rehearsal
+section: recap roman-blueprint's sovereignty story in two sentences and build
+the convention narrative on it rather than re-teaching it.
+
 ## Sources to consult
+
+- **Wood, *The Creation of the American Republic*, Part Two and Ch.VIII-XI**
+  — the state constitutions 1776-80 as the running experiment (Pennsylvania's
+  radical unicameralism vs Massachusetts's 1780 balance), the "vices of the
+  system" catalog of the 1780s (paper money, debtor relief, factional
+  lawmaking) as what the delegates thought they were fixing, and the
+  convention-of-the-people device that made "We the People" a working legal
+  mechanism rather than rhetoric. Summary-based access; verify prose quotes.
 
 - **National Archives, "A More Perfect Union"** essay — the convention narrative:
   May-September 1787, Washington presiding, Madison's notes, Virginia Plan vs.
@@ -36,6 +54,11 @@ goal: Explain how the Constitutional Convention's compromises produced the feder
 2. **The state constitutions were the rehearsal.** Virginia, Pennsylvania, and
    Massachusetts (1776-80) solved suffrage, establishment, and executive power
    differently; the federal framers had a decade of comparative evidence.
+   Wood's addition: the 1780s "vices" — state legislatures behaving as the
+   factional bodies 1776's virtue-assumption said they would not — are what
+   the delegates named as the problem, and Massachusetts's 1780 procedure
+   (drafted by convention, ratified by the towns) supplied the constituent
+   device Philadelphia and Article VII would reuse.
 3. **Two plans and one bargain.** Virginia Plan (proportional representation,
    national veto over state laws) vs. New Jersey Plan (one state one vote);
    the Connecticut Compromise gives proportional House and equal Senate. Say

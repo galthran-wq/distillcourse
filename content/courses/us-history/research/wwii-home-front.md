@@ -5,6 +5,14 @@ module: depression-and-war
 type: core
 goal: Analyze how the war remade American society — women and Black workers in war industry, the GI Bill — while incarcerating Japanese Americans.
 
+THESIS ROLE. The mobilization's domestic ledger, both columns at documented
+weight: the war economy doubling the female industrial workforce, EO 8802 as
+the first federal fair-employment instrument (won by threatened mass
+mobilization — enforcement politics previewing the civil-rights module), and
+the GI Bill manufacturing the postwar middle class; beside them EO 9066 and
+the incarceration of 120,000 people without charge, upheld in Korematsu, with
+the 1988 redress as the system's own delayed correction on the record.
+
 ## Sources to consult
 
 - **Kennedy, *Freedom from Fear*, Ch.21 "The Cauldron of the Home Front"** —

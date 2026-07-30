@@ -5,7 +5,27 @@ module: early-republic
 type: core
 goal: Explain how evangelical revival fueled abolitionism, temperance, and women's rights.
 
+THESIS ROLE. The selected population's religious culture as a
+reform-generating engine: disestablishment (an institutional choice) created
+a competitive religious market; the revival it produced converted private
+conviction into organized civic association — the temperance, abolition, and
+women's-rights machinery that later supplies the civil-war and suffrage
+modules their movements. Distinguish this SECOND Great Awakening from the
+First (awakening-and-empire) in one sentence. Howe adds the postmillennial
+mechanism (perfection expected in history, hence reform now) and frames
+Seneca Falls as the era's culmination; the Declaration-of-Sentiments-vs-
+Declaration parallel is also the founding-as-promise register working: the
+reformers' instrument was the founding document itself.
+
 ## Sources to consult
+
+- **Howe, *What Hath God Wrought*** — **Ch.5 "Awakenings of Religion"**
+  (revivalism, Finney, Mormonism's origins), **Ch.7 "The Improvers"**,
+  **Ch.8 "Pursuing the Millennium"** (postmillennial theology as reform's
+  driver), **Ch.20 "The Revolutions of 1848"** (Seneca Falls, which Howe
+  singles out among the era's "hopeful aspects"). The Millerite Great
+  Disappointment (Oct 22, 1844) as the vivid emblem of millennial fervor.
+  Summary-based access.
 
 - **American Yawp Ch.10 "Religion and Reform"** — the spine: Second Great
   Awakening, abolitionism, women's rights, utopian communities.
@@ -105,6 +125,10 @@ goal: Explain how evangelical revival fueled abolitionism, temperance, and women
 5. `draw:` single `<Figure>` — **two declarations in parallel**: the 1776 and
    1848 opening passages side by side with every altered phrase highlighted and
    the tally of substitutions stated.
+5b. `source:` **howe-declaration-of-sentiments-1848** — save as
+   `seneca-falls-roll-of-honor-1848`. Reader must be able to see: the printed
+   signature roll with Mott, Stanton, and Foote legible. Placement: beside
+   the two-declarations figure — the real names under the rewritten text.
 6. `draw:` single `<Figure>` — **one itinerant's year**: Lorenzo Dow's 1805
    circuit as a route sketch with mileage and meeting count annotated — reach
    made concrete.

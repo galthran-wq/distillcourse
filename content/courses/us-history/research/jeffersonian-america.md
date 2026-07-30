@@ -5,6 +5,16 @@ module: early-republic
 type: core
 goal: Explain how the Louisiana Purchase, judicial review, and the War of 1812 consolidated the republic.
 
+THESIS ROLE. Three consolidations of the thesis's institutional and land
+arguments: judicial review completes the constitutional machine's third check
+(Marbury operationalizing the fiduciary logic planted in roman-blueprint's
+Trevett v. Weeden and Federalist 78); the Louisiana Purchase doubles the
+cheap-land base the enabling-conditions argument runs on (with whose land it
+was stated plainly); and the War of 1812 — ending in a draw the republic
+survived intact — closes the founding era with the institutions stress-tested
+by war. The New Orleans news-lag irony previews Howe's tyranny-of-distance
+theme that the next lesson develops.
+
 ## Sources to consult
 
 - **Wood, *Empire of Liberty*** — **Ch.10** "The Jeffersonian West" (Louisiana

@@ -5,7 +5,27 @@ module: early-republic
 type: core
 goal: Analyze how mass white male democracy and Indian removal advanced together in the Age of Jackson.
 
+THESIS ROLE. The institutions argument under mass conditions: the franchise
+expands to near-universal white male suffrage and the party becomes a mass
+technology — democratization the thesis counts as institutional deepening —
+while the same electorate's government defies the Supreme Court to remove the
+Cherokee. Worcester unenforced is the course's cleanest case of the machine's
+dependence on executive compliance (back-reference Marbury). Howe's
+Whig-vs-Democrat revision replaces the old "Age of Jackson" frame: two
+programs for the republic — improvement, schools, and markets against
+expansion, removal, and cheap land — argued as such, with Bingham's "The
+County Election" as the period's own picture of the system working.
+
 ## Sources to consult
+
+- **Howe, *What Hath God Wrought*** — **Ch.9 "Andrew Jackson and His Age"**,
+  **Ch.10 "Battles Over Sovereignty"** (nullification), **Ch.11 "Jacksonian
+  Democracy and the Law"** (Indian Removal, Worcester v. Georgia, the Trail
+  of Tears as the central indictment), **Ch.13** (Van Buren), **Ch.15 "The
+  Whigs and Their Age"** — the revisionist claim that the Whigs (Adams,
+  Clay) were the era's modernizers on education, economic development, and
+  Indian rights, and that Jacksonian egalitarianism was bounded by race and
+  sex. Present as Howe's argued revision, attributed. Summary-based access.
 
 - **American Yawp Ch.9 "Democracy in America"** — the spine: expanded white male
   suffrage, the second party system, the Bank War, nativism.
@@ -83,9 +103,20 @@ goal: Analyze how mass white male democracy and Indian removal advanced together
 
 ## FIGURE PLAN
 
-No `source:` figures for this lesson: the pool holds no Jacksonian-era artifacts.
-If the writer wants one, the Milestone Documents page for Jackson's 1830 removal
-message can be captured later; otherwise the drawn figures carry it.
+0a. `source:` **howe-bingham-county-election** — save as
+   `bingham-county-election-1852`. Reader must be able to see: the courthouse
+   porch, the mixed crowd, the drinking and campaigning. Placement: centered
+   in the mass-politics section; caption states the 1852 date and that Howe
+   uses the painting as period evidence of democratic culture's messy
+   vitality. A named artwork; redrawing would strip its evidentiary status.
+0b. `source:` **howe-jqa-daguerreotype** and **howe-jackson-tennessee-gentleman**
+   — save as `jqa-daguerreotype` / `jackson-tennessee-gentleman`. Paired
+   floats where the Whig-vs-Democrat contrast is drawn: Adams the aged
+   ex-president photographed by the era's newest technology, Jackson painted
+   full-length by his own court painter — the two programs personified in
+   their chosen media. Optional pair; drop if the lesson is image-heavy.
+If a document capture is wanted later, the Milestone Documents page for
+Jackson's 1830 removal message remains the candidate.
 
 1. `draw:` `<FigureSequence>` (4 frames) — **who could vote, 1800-1840**: the
    same US map colored by suffrage rules, frame by frame, showing property

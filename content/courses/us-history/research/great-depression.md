@@ -5,6 +5,15 @@ module: depression-and-war
 type: core
 goal: Explain the causes of the crash and depression, Hoover's response, and the uneven suffering that followed.
 
+THESIS ROLE. The system's worst peacetime crisis, stated in the numbers
+(output down a third, 25% unemployment, ~9,000 bank failures) — the stress
+test that broke peer republics in the same decade. The course's comparative
+point is made without editorializing: the constitutional machinery ran on
+schedule through the trough (the 1932 election, the interregnum's designed
+gap and the 20th Amendment that fixed it), which is what the thesis means by
+institutions surviving crises that destroyed contemporaries. The mechanisms
+chain and the uneven suffering stay documented at full weight.
+
 ## Sources to consult
 
 - **Kennedy, *Freedom from Fear*** — **Ch.1** (the eve: 1920s fragilities),

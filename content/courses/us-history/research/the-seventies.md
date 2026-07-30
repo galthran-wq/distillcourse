@@ -5,6 +5,15 @@ module: postwar-america
 type: core
 goal: Explain the 1970s crisis of confidence — Vietnam's end, Watergate, stagflation, and the new identity politics.
 
+THESIS ROLE. The constitutional machine's modern stress test, run in public:
+Watergate worked through courts, press, and congressional oversight to remove
+a president without a shot — the accountability chain worked as a case study
+in the institutions the course has tracked since 1787, with the honest
+caveats (contingent disclosure, Church Committee revelations) stated. The
+economic break (stagflation, the end of Bretton Woods) closes the postwar
+boom the thesis measured and sets up the next lesson's turn; the trust-in-
+government series is the decade's thesis-relevant measurement.
+
 ## Sources to consult
 
 - **American Yawp Ch.28 "The Unraveling"** — Vietnam's end, Watergate, 1970s
