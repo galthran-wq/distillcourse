@@ -168,7 +168,7 @@ if (phaseArg === 'structure') {
   // range; a merger folds shard summaries back into one per-source summary
   // (same shape, so synthesis downstream is unchanged). pipeline(): each
   // source flows scope -> read -> merge without waiting for the others.
-  const capNote = `Capture directory for image candidates: content/courses/${slug}/research/images/ — create it if missing, and prefix every id with a short source tag so the swarm's ids never collide.`
+  const capNote = `Capture directory for image candidates: content/courses/${slug}/research/images/ — create it if missing, and prefix every id with a short source tag so the swarm's ids never collide. Texts cache for the raw material you fetch (PDFs, extracted text, flattened chapters — each with its .meta.yaml sidecar, per your briefing): content/courses/${slug}/research/texts/ — create it if missing; lesson writers will read from it instead of re-fetching.`
   const summaries = (
     await pipeline(
       sources,

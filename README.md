@@ -18,6 +18,9 @@ content/courses/<course>/
     sources.yaml     #   canon list with roles and URLs
     images.yaml      #   real-image candidates the readers found worth using
     images/          #   their captures — the source is never re-read
+    texts/           #   raw fetched material (PDFs, extracted text) with
+                     #   .meta.yaml sidecars — git-ignored; writers read from
+                     #   here instead of re-fetching the sources
     <lesson>.md      #   per-lesson brief: which chapters to consult, key
                      #   points, figure plan (each visual draw: or source:)
   lessons/<slug>/

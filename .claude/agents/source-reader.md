@@ -65,8 +65,22 @@ findings:
   hunt for them, don't wait to stumble on them.
 - **Chapter map** — for each major topic: "topic → chapter/section to consult".
 
+**Store the raw material you fetch.** Whatever you actually read — a
+downloaded PDF, pdftotext output, fetched chapters flattened to text — lands
+in the texts cache named in your prompt (conventionally
+`content/courses/<slug>/research/texts/`, git-ignored: local working copies,
+never committed), so the lesson writers later read from disk instead of
+re-hunting the source. Name files by your source tag (`<tag>.pdf`,
+`<tag>-ch05.txt`, shard readers `<tag>-s2.txt`), and next to EVERY file write
+a sidecar `<same-name>.meta.yaml` with: `source:` (title, author), `covers:`
+(what part of the work this file holds), `url:` (where it came from),
+`fetched_via:` (curl | WebFetch | wayback | mirror), `notes:` (quirks — a
+403-dodging user agent, OCR quality, missing pages). Sidecars, never a shared
+index file: other readers run in parallel and shared writes collide. Store
+extracted text even when you also keep the PDF — text is what a writer greps.
+
 Methods: WebFetch the URL. For PDFs, download and extract locally:
-`curl -L <url> -o /tmp/<name>.pdf && pdftotext -layout /tmp/<name>.pdf -`
+`curl -L <url> -o <texts-dir>/<tag>.pdf && pdftotext -layout <texts-dir>/<tag>.pdf <texts-dir>/<tag>.txt`
 (use `-f`/`-l` for page ranges; `pdftotext` is installed). Do NOT use the
 pdf-reader MCP tools — the server is a single process shared by the whole
 swarm and hangs under parallel load, and a hung MCP call blocks you

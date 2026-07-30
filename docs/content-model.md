@@ -14,6 +14,9 @@ content/courses/<course-slug>/
   research/            # the factory's dossier (see README)
     images.yaml        # index of real-image candidates found while reading
     images/            # their captures: whole pages / downloaded files
+    texts/             # git-ignored cache of raw fetched sources; every file
+                       # carries a .meta.yaml sidecar (what it holds, url,
+                       # fetch method) — writers read here before the web
   lessons/<lesson-slug>/
     lesson.mdx         # the chapter; NO frontmatter (directory name = slug)
     figures/           # SVGs and sourced raster images used by <Figure>
