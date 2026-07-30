@@ -1,0 +1,104 @@
+# Research brief: federalist-papers (The Federalist Papers: Publius's Argument)
+
+status: planned
+module: revolution-and-founding
+type: extra
+goal: Analyze the core arguments of Federalist Nos. 10, 51, 70, 78, and 84 in Publius's own text.
+
+This is an `extra` (starred) chapter: a close-reading deep dive. No core lesson
+may depend on it — everything the core path needs from The Federalist is already
+carried by ratification-and-bill-of-rights.
+
+## Sources to consult
+
+- **The Federalist Papers, Avalon Project** — the primary and near-only source.
+  Read in full: **Nos. 1, 9, 10, 37, 39, 47, 51, 68, 70, 78, 84, 85**. Avalon
+  presents bare text with no apparatus, headnotes, or authorship attribution;
+  all framing must be supplied by the lesson.
+- **National Archives, "A More Perfect Union"** — for the publication context
+  (serialized Oct 1787-Aug 1788 in the Independent Journal, New York Packet,
+  Daily Advertiser) and the New York ratifying convention's timing.
+- **MIT 21H.101 Week 7** — the ratifying-convention speeches, as the opposing
+  voices Publius was answering in real time.
+
+## Key points the lesson must cover
+
+1. **The series as a deadline-driven persuasion campaign.** 85 newspaper essays
+   in ten months under one pseudonym, aimed at New York's convention — not a
+   treatise composed at leisure. No. 1 lays out the six-part plan and frames the
+   stakes: whether people can establish government "from reflection and choice"
+   rather than "accident and force".
+2. **No. 10 — faction.** The definition (a group adverse to others' rights or to
+   the aggregate interest), the two cures and why liberty-destroying and
+   opinion-uniforming cures are rejected, and the extended-republic conclusion.
+   Note Madison starts from self-interest, not civic virtue.
+3. **No. 51 — mechanism.** Each department needs "the constitutional means and
+   personal motives to resist encroachment"; the compound republic gives a double
+   security; the large republic protects minority rights.
+4. **No. 70 — energy in the executive.** The case for a unitary rather than
+   plural executive on grounds of decision, activity, secrecy, dispatch, and
+   accountability, argued through the Roman consuls analogy. Reconstruct the
+   argument step by step; it is unusually clean.
+5. **No. 78 — the judiciary.** Neither sword nor purse, hence "least dangerous";
+   life tenure during good behavior; and the judicial-review argument — a limited
+   constitution is meaningless unless courts prefer it over inconsistent statutes.
+   This is the textual root of Marbury (forward link to jeffersonian-america).
+6. **No. 84 — against a bill of rights.** Enumerating exceptions to powers never
+   granted implies the powers exist; the Constitution "is itself, in every
+   rational sense... A BILL OF RIGHTS". Then No. 85's procedural close: Article
+   V's 9-of-13 amendment threshold makes ratify-then-amend the better strategy.
+7. **No. 37 as counterweight.** Madison conceding that "a faultless plan was not
+   to be expected" and dwelling on the imprecision of language — evidence the
+   framers knew they were compromising.
+
+## Set pieces and worked examples to recreate
+
+- **Argument reconstruction as the lesson's method**: for each essay, extract
+  premises → inference → conclusion in the reader's own words, worked once by
+  the lesson (No. 10) and then handed to the reader as exercises (Nos. 70, 78).
+- **The authorship puzzle**: all essays published as Publius; the disputed
+  dozen; a discussion prompt about pseudonymous political writing.
+- **No. 84 vs. the Ninth Amendment**: Hamilton's danger argument and the textual
+  answer the drafters wrote to defuse it.
+- **The 1788 McLean first edition title page** with Elizabeth Hamilton's
+  inscription and Jefferson's ownership mark — the essays becoming a book, and
+  passing between the two households that would soon split American politics.
+
+## Pitfalls / subtleties to flag
+
+- Do not read The Federalist as authoritative constitutional interpretation: it
+  is advocacy by three men, two of whom later disagreed with each other about
+  what the document meant.
+- The essays' modern canonical status is retrospective; contemporaries in other
+  states barely read them.
+- Publius sometimes argues positions the authors did not hold privately
+  (Hamilton on limited federal power is the standard example).
+- Quote Avalon's text exactly, including 18th-century spelling and capitalization
+  — the register is part of the evidence.
+- Keep the lesson to argument analysis; it must not become a second telling of
+  the ratification narrative.
+
+## FIGURE PLAN
+
+1. `source:` **fedpapers-1788-title-page** — save as `federalist-1788-title-page`.
+   Reader must be able to see: the 1788 McLean imprint and the manuscript
+   inscriptions ("For Mrs. Church from her sister Elizabeth Hamilton"; the
+   "Mr. Jefferson's copy" note). Placement: float right at the publication-history
+   section. The provenance is the whole value; a retyped title page has none.
+2. `draw:` single `<Figure>` — **publication timeline vs. ratification calendar**:
+   essay numbers plotted Oct 1787-Aug 1788 against the dates states ratified,
+   with the New York convention marked — the essays as real-time persuasion.
+3. `draw:` `<FigureSequence>` (4 frames) — **reconstructing No. 10**: frame 1 the
+   definition of faction; frame 2 the two cures with both rejections; frame 3 the
+   control-the-effects branch; frame 4 the extended-republic conclusion. One step
+   added per frame.
+4. `draw:` single `<Figure>` — **No. 70's unitary-executive ledger**: the four
+   claimed virtues (decision, activity, secrecy, dispatch) plus accountability,
+   each with the plural-executive failure it is meant to avoid.
+5. `draw:` single `<Figure>` — **No. 78's syllogism**: constitution is the
+   people's superior will → statute is the legislature's subordinate will →
+   conflict must resolve in favor of the superior → courts must void the statute.
+   Drawn as a four-step chain with the conclusion boxed.
+6. `draw:` single `<Figure>` — **No. 84 vs. the Ninth Amendment**: Hamilton's
+   "enumeration implies power" objection on the left, the Ninth Amendment's text
+   on the right, with the arrow labeled as the drafters' answer.
