@@ -110,6 +110,20 @@ being finished.
   shows what the section contributes to the argument, the section is an
   inventory and gets re-argued. Material that bears on nothing gets cut,
   however good the source it came from.
+- **L11 — First exposure is the contract.** The audience field defines a
+  reader with no prior coursework; every first mention is written for that
+  reader. (a) Places: anchored at first mention — a locator figure nearby,
+  or a relative clause ("Madeira, 600 km off the Moroccan coast"). (b)
+  Events: date plus a half-sentence of what-happened at first mention;
+  never a bare name-drop ("the strikes at Potosí (1545)" needs "a mountain
+  of silver ore in the high Andes"). (c) New named terms: defined at first
+  use (L9), and no more than about three introduced per section — a
+  paragraph that introduces three foreign institutions at once is three
+  paragraphs. (d) Cross-lesson recall: anything established in an earlier
+  lesson is re-anchored with a <Ref> plus a clause of reminder, never
+  assumed remembered. The test: every proper noun either carries its anchor
+  in the sentence, was anchored earlier in the lesson, or is Ref'd to the
+  lesson that anchored it.
 
 ## Exercise rules (E)
 

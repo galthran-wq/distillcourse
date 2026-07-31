@@ -87,3 +87,15 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   References. Inline naming passes only where provenance is content: primary
   artifacts read or quoted, measurements whose method carries the argument,
   named theses under discussion.
+
+## Anchoring (L11)
+
+- **N1 (required)**: sample three paragraphs dense with proper nouns; every
+  place name is anchored (locator figure or relative clause), every event
+  carries its date and a what-happened clause at first mention.
+- **N2 (required)**: no paragraph introduces more than ~3 new named terms;
+  foreign institutions are glossed at first use and given their own
+  paragraph beat.
+- **N3 (required)**: material established in earlier lessons is recalled
+  with an explicit <Ref> and a reminder clause, not assumed ("the conquests
+  of Mexico and Peru" without date or Ref fails).

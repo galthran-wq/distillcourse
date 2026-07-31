@@ -69,6 +69,11 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      rhetorical questions, no teasers, no chattiness, no narrative framing;
      second person only in instructions).
    - A concrete instance or computation precedes every general formula (L4).
+   - First exposure is the contract (L11): anchor every first-mention place
+     (locator figure or relative clause), date every first-mention event
+     with a half-sentence of what happened, introduce at most ~3 new named
+     terms per section, and re-anchor earlier lessons' material with <Ref>
+     plus a reminder clause — never assume the reader remembers or knows.
    - Environments numbered automatically — never hand-number them.
    - Visuals dense per L6 — roughly one every 3–4 paragraphs: `<Demo>` where
      specced; `<Figure>` SVGs you author in `figures/`; `<FigureSequence>`
