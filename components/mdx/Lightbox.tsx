@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 interface Props {
   src: string;
   alt: string;
-  width: number;
-  height: number;
+  /** Intrinsic size when known (prevents layout shift in prose). */
+  width?: number;
+  height?: number;
   className?: string;
 }
 
@@ -53,7 +54,13 @@ export default function Lightbox({ src, alt, width, height, className }: Props) 
         loading="lazy"
         className={className}
         style={{ cursor: "zoom-in" }}
-        onClick={() => setState("open")}
+        onClick={(e) => {
+          // The trigger may sit inside a <Link> (course contents thumbnails):
+          // expanding must not navigate.
+          e.preventDefault();
+          e.stopPropagation();
+          setState("open");
+        }}
       />
       {state !== "closed" && (
         <div
@@ -61,7 +68,11 @@ export default function Lightbox({ src, alt, width, height, className }: Props) 
           aria-modal="true"
           aria-label={alt}
           className={`lightbox-overlay${state === "closing" ? " is-closing" : ""}`}
-          onClick={() => setState("closing")}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setState("closing");
+          }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={src} alt={alt} className="lightbox-full" />

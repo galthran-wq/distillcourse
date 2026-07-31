@@ -12,6 +12,7 @@ import Figure from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl } from "@/lib/content/images";
+import Lightbox from "@/components/mdx/Lightbox";
 
 interface Params {
   course: string;
@@ -198,12 +199,9 @@ export default async function CoursePage({
                   <div className="flex items-center gap-4 py-2.5">
                     <span className="font-mono text-[0.8rem] text-faint">{number}</span>
                     {thumb !== undefined && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Lightbox
                         src={thumb}
-                        alt=""
-                        aria-hidden
-                        loading="lazy"
+                        alt={`${lesson.title} — key image`}
                         className={`h-14 w-20 shrink-0 rounded border border-line object-cover ${readable ? "" : "opacity-50"} ${(lesson.key_image ?? "").endsWith(".svg") ? "bg-white object-contain p-1" : ""}`}
                       />
                     )}
