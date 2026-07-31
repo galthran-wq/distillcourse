@@ -33,6 +33,15 @@ export default function Lightbox({ src, alt, width, height, className }: Props) 
     };
   }, [state]);
 
+  // Unmount on a timer, never on animationend: the event does not fire when
+  // the exit animation is suppressed (prefers-reduced-motion) or fails to
+  // restart, and a missed event would leave the overlay eating every click.
+  useEffect(() => {
+    if (state !== "closing") return;
+    const t = setTimeout(() => setState("closed"), 160);
+    return () => clearTimeout(t);
+  }, [state]);
+
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized static asset, no optimizer in this build */}
@@ -53,7 +62,6 @@ export default function Lightbox({ src, alt, width, height, className }: Props) 
           aria-label={alt}
           className={`lightbox-overlay${state === "closing" ? " is-closing" : ""}`}
           onClick={() => setState("closing")}
-          onAnimationEnd={() => state === "closing" && setState("closed")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={src} alt={alt} className="lightbox-full" />
