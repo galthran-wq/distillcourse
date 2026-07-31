@@ -188,9 +188,13 @@ export function fileBytes(path: string): number {
   }
 }
 
-/** Quality floors for a sourced image used as a lesson figure. */
+/**
+ * Quality bounds for a sourced image used as a lesson figure. The ceiling is
+ * generous on purpose: images open in a full-viewport lightbox, so the file
+ * IS the zoom — never shrink to display size (docs/figures.md).
+ */
 export const MIN_FIGURE_WIDTH = 480;
-export const MAX_FIGURE_BYTES = 2_500_000;
+export const MAX_FIGURE_BYTES = 6_000_000;
 
 /**
  * Public URL of a lesson asset. Raster figures are copied out of the content

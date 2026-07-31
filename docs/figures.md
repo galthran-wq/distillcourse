@@ -96,8 +96,11 @@ with 8px labels is worse than a house-style drawing of the same idea.
   `<References>` — never under the figure, where licence text buries the
   caption. One entry may cover a whole sequence via a `*` pattern
   (`shannon-1948-approximations-*.png`). No entry ⇒ `npm run validate` fails.
-- **Quality floor.** ≥480px wide (the validator warns below it), ≤2.5 MB,
-  never upscaled. `npm run image -- check <file>` proves the file is a
+- **Quality floor and ceiling.** ≥480px wide (the validator warns below it),
+  ≤6 MB, never upscaled — and never DOWNSCALED to display size either:
+  images open in a full-viewport lightbox on click, so the stored file is
+  the zoom. Keep the best resolution the source offers (fit's default cap
+  is 2400px). `npm run image -- check <file>` proves the file is a
   complete, non-blank image of the format it claims; looking at it is what
   proves it is the right image, and that step is not optional.
   `npm run preview -- <course> <lesson>` renders the whole chapter to

@@ -139,7 +139,7 @@ export default async function LessonPage({
   } as Parameters<typeof evaluate>[1]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_230px] lg:gap-14">
+    <div className="lesson-grid mx-auto w-full max-w-7xl px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_230px] lg:gap-14">
       <article className="min-w-0">
         <header className="border-b border-line py-10">
           <p className="font-mono text-[11px] uppercase tracking-wider text-faint">

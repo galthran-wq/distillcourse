@@ -7,6 +7,7 @@ import {
   slugsFromLessonDir,
 } from "@/lib/content/images";
 import type { ImageCredit } from "@/lib/content/schema";
+import Lightbox from "./Lightbox";
 
 /**
  * The sourced-image tier (docs/figures.md): a real photograph, scan, or
@@ -56,15 +57,12 @@ export default function SourcedImage({
   background?: ImageCredit["background"];
 }) {
   return (
-    // Plain <img>: these are pre-sized static files and next/image's optimizer
-    // would pull in a native dependency the build does not have.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    // Clickable: expands to the full-resolution file in a modal (Lightbox).
+    <Lightbox
       src={image.url}
       alt={alt}
       width={image.width}
       height={image.height}
-      loading="lazy"
       className={`mx-auto block h-auto w-full rounded-sm${
         background === "light" ? " bg-white p-3" : ""
       }`}
