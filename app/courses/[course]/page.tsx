@@ -96,6 +96,49 @@ export default async function CoursePage({
         </section>
       )}
 
+      {course.spine.length > 0 && (
+        <section className="border-b border-line py-8">
+          <SectionLabel>The argument, mapped</SectionLabel>
+          <ol className="flex flex-col gap-4">
+            {course.spine.map((step, i) => (
+              <li key={i} className="flex gap-4">
+                <span className="mt-0.5 shrink-0 font-mono text-[0.8rem] text-faint">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[0.95rem] leading-relaxed text-soft">{step.step}</p>
+                  <p className="mt-1.5 flex flex-wrap gap-1.5">
+                    {step.lessons.map((slug) => {
+                      const entry = bySlug.get(slug);
+                      if (entry === undefined) return null;
+                      const readable = isReadable(entry);
+                      const pill = (
+                        <span
+                          className={`inline-block rounded border px-2 py-0.5 font-mono text-[11px] ${
+                            readable
+                              ? "border-line text-soft hover:border-accent hover:text-accent"
+                              : "border-line/60 text-faint"
+                          }`}
+                        >
+                          {entry.lesson.title}
+                        </span>
+                      );
+                      return readable ? (
+                        <Link key={slug} href={`/courses/${course.slug}/lessons/${slug}`}>
+                          {pill}
+                        </Link>
+                      ) : (
+                        <span key={slug}>{pill}</span>
+                      );
+                    })}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       {course.prerequisites.length > 0 && (
         <section className="border-b border-line py-8">
           <SectionLabel>Prerequisites</SectionLabel>
