@@ -50,8 +50,16 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    `<References>`.
 
 4. **Write `lesson.mdx`:**
-   - First paragraph opens with the `opening` **verbatim**, then states in
-     one or two factual sentences what the lesson establishes (L3).
+   - First paragraph opens with the `opening` **verbatim**, then the
+     throughline paragraph (L10): two to four declarative sentences placing
+     this lesson in the course's argument — what the spine (course.yaml) has
+     established so far, what stands open, what this lesson contributes. To
+     write it you MUST read the course `spine` and the CLOSING section of the
+     immediately preceding lesson's lesson.mdx. Every `##` section opens with
+     a sentence tying it to the lesson's running question or the previous
+     section — never a cold definition. The final section (before Exercises)
+     ends by naming what is now established and what the next lesson takes
+     up, as fact (no suspense).
    - Free-form `##` sections; substantial is good — depth over brevity, but
      every sentence carries a fact (L9: dry engineering register — no
      rhetorical questions, no teasers, no chattiness, no narrative framing;

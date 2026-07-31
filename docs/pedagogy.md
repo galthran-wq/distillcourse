@@ -77,11 +77,23 @@ being finished.
   pointers. Real references, verified — never invented.
 - **L9 — Dry engineering register.** Declarative sentences; facts carry the
   text. No rhetorical questions, no exclamations, no chattiness ("almost
-  embarrassingly simple"), no narrative framing ("a friend says…"), no filler.
-  Second person only for instructions ("compute", "drag", "verify"). Define
-  jargon at the point of first use or don't use it. Every sentence either
-  states a fact that advances the one objective or gets cut. Italics only for
-  standard emphasis of a single term, sparingly.
+  embarrassingly simple"), no invented scenes or personas ("a friend says…"),
+  no filler. Second person only for instructions ("compute", "drag",
+  "verify"). Define jargon at the point of first use or don't use it. Every
+  sentence either advances the argument — a fact, or the connection between
+  facts — or gets cut: connective declaratives ("the previous section
+  established X; what it leaves unexplained is Y") are load-bearing prose,
+  not filler. Italics only for standard emphasis of a single term, sparingly.
+- **L10 — Throughline.** A lesson is one move in the course's argument, and
+  says so. (a) Directly after the opening: two to four declarative sentences
+  placing the move — what the argument has established so far, what stands
+  open, what this lesson contributes; the course `spine` in course.yaml is
+  the reference for the sequence of moves. (b) Sections chain: every `##`
+  opens with a sentence tying it to the lesson's running question or to what
+  the previous section established — never with a cold definition. (c) The
+  lesson closes by naming what is now established and what the next lesson
+  takes up, stated as fact. (d) Clarifying L3: stating what comes next is
+  required; manufacturing suspense ("you'll soon see…") stays banned.
 
 ## Exercise rules (E)
 

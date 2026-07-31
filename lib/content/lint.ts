@@ -499,6 +499,34 @@ export function lintCourse(
   // Course-page fields: key results resolve; cross-course prereqs resolve;
   // intro/sources presence is guidance.
   const bySlug = new Map(loaded.lessons.map((l) => [l.lesson.slug, l]));
+  // Spine (L10): steps reference real lessons; core lessons belong to a step.
+  const spineLessons = new Set<string>();
+  for (const [i, step] of course.spine.entries()) {
+    for (const lessonSlug of step.lessons) {
+      if (!bySlug.has(lessonSlug)) {
+        diags.push({
+          level: "error",
+          rule: "spine-lesson",
+          file: coursePath,
+          message: `spine step ${i + 1} ("${step.step.slice(0, 40)}…") names unknown lesson "${lessonSlug}"`,
+        });
+      }
+      spineLessons.add(lessonSlug);
+    }
+  }
+  if (course.spine.length > 0) {
+    for (const entry of loaded.lessons) {
+      if (entry.lesson.type !== "extra" && !spineLessons.has(entry.lesson.slug)) {
+        diags.push({
+          level: "warn",
+          rule: "spine-coverage",
+          file: coursePath,
+          message: `core lesson "${entry.lesson.slug}" belongs to no spine step — every core lesson is a move in the argument (L10)`,
+        });
+      }
+    }
+  }
+
   for (const kr of course.key_results) {
     if (!bySlug.has(kr.lesson)) {
       diags.push({
