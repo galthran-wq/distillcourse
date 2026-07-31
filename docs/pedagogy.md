@@ -124,6 +124,22 @@ being finished.
   assumed remembered. The test: every proper noun either carries its anchor
   in the sentence, was anchored earlier in the lesson, or is Ref'd to the
   lesson that anchored it.
+- **L12 — Numbers punctuate the record.** The argument is carried by the
+  record — documents, scenes, testimony, artifacts; numbers are its
+  punctuation, not its prose. (a) Every number in prose carries its frame in
+  the same sentence — a denominator, a comparison, or a consequence: "about
+  400 colonists killed" is unevaluable; "one colonist in six killed, the
+  colony annihilated" is not. (b) Each lesson has two or three KEEPER
+  numbers — what the reader should leave with — privileged in KeyFacts and
+  figures; every other quantity defaults to order-of-magnitude words ("a few
+  thousand", "most of the world's silver"). (c) Relations before values:
+  "the size of contemporary London" before — or instead of — "10–20,000".
+  (d) Events involving people are scenes or judgments, never data rows:
+  narrate ("six days before the enlistments expired") or conclude ("a
+  massacre that halved the pueblo"); no casualty bookkeeping in narrative
+  prose. (e) Date precision follows function: decade by default, the exact
+  day only where contingency is the point. (f) Dense numeric series live in
+  figures, tables, and asides — prose states what they mean.
 
 ## Exercise rules (E)
 

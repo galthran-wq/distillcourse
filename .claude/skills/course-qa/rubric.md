@@ -99,3 +99,15 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 - **N3 (required)**: material established in earlier lessons is recalled
   with an explicit <Ref> and a reminder clause, not assumed ("the conquests
   of Mexico and Peru" without date or Ref fails).
+
+## Numbers (L12)
+
+- **M1 (required)**: sample numeric sentences — every number in prose
+  carries its frame (denominator, comparison, or consequence) in the same
+  sentence. An unframed count ("about 400 were killed") is a required fix.
+- **M2 (required)**: the lesson's keeper numbers are identifiable and live
+  in KeyFacts/figures; prose is not carrying unframed precision that a
+  figure or aside should hold.
+- **M3 (required)**: no data-row narration of human events — casualties,
+  migrations, and battles are scenes or judgments with at most one framed
+  number each.

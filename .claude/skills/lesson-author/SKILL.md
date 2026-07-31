@@ -74,6 +74,11 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      with a half-sentence of what happened, introduce at most ~3 new named
      terms per section, and re-anchor earlier lessons' material with <Ref>
      plus a reminder clause — never assume the reader remembers or knows.
+   - Numbers punctuate the record (L12): pick the lesson's 2-3 keeper
+     numbers and privilege them (KeyFacts, figures); every other quantity is
+     framed (denominator / comparison / consequence) or rounded to words;
+     human events are scenes or judgments, never data rows; dense series go
+     to figures and asides.
    - Environments numbered automatically — never hand-number them.
    - Visuals dense per L6 — roughly one every 3–4 paragraphs: `<Demo>` where
      specced; `<Figure>` SVGs you author in `figures/`; `<FigureSequence>`
