@@ -15,6 +15,22 @@ is what produced the labor wars and Populism. The corporation belongs in the
 course's institutions thread: a legal person with continuous existence —
 an institutional technology as consequential as the constitutional ones.
 
+## ARC (L10)
+
+- **Inherits:** Conquering-the-west established incorporation as the era's
+  operative logic, applied there to land and to Native peoples — the bison
+  exterminated, nations confined to allotments, the continent opened to
+  farms, exports, and rail.
+
+- **Contributes:** This lesson's share of the spine's move — capital and
+  labor at war — the corporation's reorganization of American space, work,
+  and time into the largest economic expansion in history to that date, and
+  the labor and Populist revolts it provoked.
+
+- **Hands off:** Immigration-and-the-city takes up the workforce this
+  incorporated economy pulled in: mass immigration and the industrial city
+  built from it, and the exclusion politics that immigration triggered.
+
 ## Sources to consult
 
 - **MIT 21H.102 Lecture 6 "Capital, Labor, and the Standardization of Work"**

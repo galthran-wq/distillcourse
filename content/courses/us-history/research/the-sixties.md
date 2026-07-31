@@ -13,6 +13,18 @@ power problem the recent-past lesson revisits via the 2001 AUMF. The 1960
 margin (112,827 votes) extends the contingency thread; 1968 shows the
 coalition's break as datable events.
 
+## ARC (L10)
+
+- **Inherits:** civil-rights-movement has established the Civil Rights and
+  Voting Rights Acts as enacted law and the coalition that won them.
+
+- **Contributes:** This lesson is the spine's overreach: the Great Society
+  extends that coalition's legislative wave to its high-water mark while
+  Vietnam's escalation fractures the same coalition.
+
+- **Hands off:** the-seventies takes up the fracture's aftermath — Vietnam's
+  end, Watergate, and the stagflation that closes the postwar economic boom.
+
 ## Sources to consult
 
 - **American Yawp Ch.27 "The Sixties"** — the chapter's own throughline:

@@ -14,6 +14,20 @@ economic break (stagflation, the end of Bretton Woods) closes the postwar
 boom the thesis measured and sets up the next lesson's turn; the trust-in-
 government series is the decade's thesis-relevant measurement.
 
+## ARC (L10)
+
+- **Inherits:** the-sixties has established the Great Society's legislative
+  peak and the coalition's break under Vietnam's escalation and the crises
+  of 1968.
+
+- **Contributes:** This lesson is the spine's correction: the constitutional
+  machinery removing a president through courts, press, and Congress, and
+  the stagflation that ends the postwar economic consensus.
+
+- **Hands off:** rise-of-the-right takes up the political realignment that
+  answers the decade's crisis of confidence, assembling markets, law and
+  order, and the culture wars into a new governing majority.
+
 ## Sources to consult
 
 - **American Yawp Ch.28 "The Unraveling"** — Vietnam's end, Watergate, 1970s

@@ -5,6 +5,14 @@ module: early-republic
 type: core
 goal: Explain how transportation, communication, factory labor, and finance transformed the antebellum Northern economy.
 
+## ARC (L10)
+
+- **Inherits:** From jeffersonian-america, the immediately preceding lesson, the reader arrives with the republic consolidated — its institutions stress-tested by parties, courts, and a foreign war, and its land base doubled by the Louisiana Purchase.
+
+- **Contributes:** This lesson's share of the spine's eighth step — the economic engine engaging: canals, steamboats, the post office, the penny press, and the 1844 telegraph overcoming the "tyranny of distance" and pulling ordinary households out of subsistence and into markets.
+
+- **Hands off:** Jacksonian-democracy takes up the mass politics that same market society produced — near-universal white male suffrage and the party remade as a mass technology, advancing alongside Indian removal.
+
 THESIS ROLE. Thesis element (4), technology, gets its first full lesson: the
 transport-and-communications revolution is the mechanism by which a literate,
 commercial population (element 1) converted a continent of cheap land

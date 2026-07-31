@@ -5,6 +5,14 @@ module: revolution-and-founding
 type: core
 goal: Analyze how imperial finance and the constitutional argument over consent escalated into independence, reading the Declaration as a structured legal argument.
 
+## ARC (L10)
+
+- **Inherits:** The argument has established a selected, self-reproducing, literate colonial population (module 1) that compounded self-government from compact to assembly, and awakening-and-empire — the immediately preceding lesson — has just shown the Great Awakening binding the colonies into a shared public and the Seven Years' War leaving Britain indebted 13.5 times its revenue and drawing the Proclamation Line.
+
+- **Contributes:** This lesson's share of the spine's fourth step — the colonies, "rich, literate, self-governing," collided with an empire that tried to govern them directly, and the lesson reads that collision as imperial finance escalating into a constitutional argument over consent, closing with the Declaration as a structured legal argument.
+
+- **Hands off:** War-of-independence takes up the war that argument became — Trenton, Saratoga, the French alliance, Yorktown — and the constitutional question independence now forces: whether self-government can scale from town to continent.
+
 RE-SCOPED under the course re-architecture: this lesson now carries the
 CAUSES (1763-1775) and the DECLARATION; the war itself moved to the new
 war-of-independence lesson (Trenton, Saratoga, the French alliance, Yorktown,

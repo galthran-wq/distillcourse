@@ -13,6 +13,20 @@ disinflation's price, incarceration series, union density) stated as series
 the reader can judge. The Cold War's end is presented with the
 historiographical dispute intact, per the register.
 
+## ARC (L10)
+
+- **Inherits:** the-seventies has established stagflation's break with the
+  postwar economic consensus and the silent-majority backlash against 1960s
+  liberalism and disorder.
+
+- **Contributes:** This lesson is the spine's turn: the conservative movement
+  built its institutions before it won elections, then converted the
+  backlash into the Reagan coalition's governing majority.
+
+- **Hands off:** recent-past takes up the post-Cold War arc that this
+  realignment set in motion, from globalization through 9/11 to the
+  polarization of contemporary politics.
+
 ## Sources to consult
 
 - **American Yawp Ch.29 "The Triumph of the Right" (2nd ed. "The Rise of the

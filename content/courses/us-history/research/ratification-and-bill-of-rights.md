@@ -5,6 +5,14 @@ module: revolution-and-founding
 type: core
 goal: Evaluate the Federalist and Anti-Federalist arguments over ratification and explain how the Bill of Rights emerged from that fight.
 
+## ARC (L10)
+
+- **Inherits:** The argument has established the selected, self-governing colonial population, the imperial collision, and the war won at measurable odds, and — from constitutional-convention, the immediately preceding lesson — the finished 1787 document itself: seven articles as a machine, signed by 39 of 55 delegates.
+
+- **Contributes:** This lesson's share of the spine's sixth step — the design "was ratified by argument, vote by vote," and this lesson carries the Federalist and Anti-Federalist fight state by state (187–168 in Massachusetts, 89–79 in Virginia, 30–27 in New York) to the Bill of Rights it produced.
+
+- **Hands off:** Early-republic-politics, the next module's first lesson, takes up how that ratified design survived its first stress tests — organized parties, a hostile transfer of power in 1800, courts, and war.
+
 THESIS ROLE. Two thesis loads meet here. Contingency: Maier's *Ratification*
 supplies the margins — 187-168 in Massachusetts, 89-79 in Virginia, 30-27 in
 New York — that make the constitutional order a near-run event, not a

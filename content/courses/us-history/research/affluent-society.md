@@ -15,6 +15,22 @@ self-correction machinery restarting, with the Cold War's documented pressure
 (the Justice Department's amicus brief) as a causal input the thesis's
 world-power thread supplies.
 
+## ARC (L10)
+
+- **Inherits:** cold-war has established containment as the organizing frame
+  of American foreign policy and closed the domestic loyalty-state chapter
+  of anticommunism with the Senate's censure of McCarthy as the enforced
+  boundary.
+
+- **Contributes:** This lesson carries the spine's affluence half: the
+  manufactured middle class and suburbanization measured against the
+  exclusions the same policy instruments wrote in, opening the second
+  founding's enforcement arc with Brown v. Board.
+
+- **Hands off:** civil-rights-movement takes up the enforcement Brown v.
+  Board opened, tracing the movement from Montgomery through Selma to the
+  Civil Rights and Voting Rights Acts.
+
 ## Sources to consult
 
 - **American Yawp Ch.26 "The Affluent Society"** — postwar prosperity,

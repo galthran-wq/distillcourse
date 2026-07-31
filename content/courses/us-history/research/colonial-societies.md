@@ -13,6 +13,21 @@ module: contact-and-colonies
 type: core
 goal: Compare the Chesapeake and New England as two economies, two demographies, and two polities — assembly and county court against covenanted town — and trace the legal turn to hereditary racial slavery to its causal core.
 
+## ARC (L10)
+
+- **Inherits:** From natives-and-english, the immediately preceding lesson,
+  the reader arrives having seen New England's selected population, its
+  institutions, and the war that secured its land; the Chesapeake and its
+  labor system remain to be placed beside it.
+- **Contributes:** This lesson supplies the comparative synthesis — two
+  economies, two demographies, two polities (assembly and county court
+  against covenanted town) — and traces the legal turn to hereditary racial
+  slavery to its statutory core, completing the settler-selection measurement
+  common to both regions.
+- **Hands off:** The next lesson, middle-colonies, takes up a third English
+  society — New York and Pennsylvania — as the pluralist, commercial variant
+  on the same compounding institutions.
+
 THESIS ROLE. The module's comparative synthesis. New-england-covenant
 established the selected population and its institutions; this lesson sets the
 other English society beside it and shows that the differences were systematic:

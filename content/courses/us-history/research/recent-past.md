@@ -21,6 +21,21 @@ historiographical-lenses, where the thesis itself goes on the bench. Foner's
 three-part freedom question stays available as a source-reading instrument in
 this closing audit, not as the frame.
 
+## ARC (L10)
+
+- **Inherits:** rise-of-the-right has established the Reagan coalition's
+  governing majority — tax and regulatory policy, the Cold War's end, mass
+  incarceration — as the closing act of the spine's four-decade contest and
+  affluence.
+
+- **Contributes:** This lesson is the spine's closing audit: the unipolar
+  peak, its shocks — 9/11's wars, the 2008 crisis — and the polarization
+  that follows, closed by restating the course's causal chain against the
+  evidence.
+
+- **Hands off:** historiographical-lenses takes up the course's own thesis
+  as one lens among several, testing it on the bench beside the others.
+
 ## Sources to consult
 
 - **American Yawp Ch.30 "The Recent Past"** — globalization, 9/11 and its wars,

@@ -15,6 +15,20 @@ this lesson's method: manuscripts, dates, and exact legal reach, no
 sentiment. The course key result (war for Union becomes war for emancipation,
 ~750,000 dead) lives here.
 
+## ARC (L10)
+
+- **Inherits:** war-for-union has established the war as a contest of
+  mobilized societies whose short-war illusion died at Bull Run, Shiloh, and
+  Antietam, with slavery — the contradiction the previous spine step
+  named — still legally intact in the loyal border states.
+- **Contributes:** This lesson delivers the spine's turning point itself:
+  the war for Union becomes a war for emancipation, driven jointly by
+  enslaved people's flight to Union lines and Lincoln's staged legal
+  instruments.
+- **Hands off:** The next lesson, union-victory, takes up how the Union
+  turned that broadened war aim into military victory and the meanings
+  Lincoln gave the war.
+
 ## Sources to consult
 
 - **Library of Congress, "Abraham Lincoln and Emancipation"** essay (linked from

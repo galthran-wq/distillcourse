@@ -5,6 +5,20 @@ module: contact-and-colonies
 type: core
 goal: Explain how New York's Dutch inheritance and Pennsylvania's Quaker constitution made the middle colonies the pluralist, commercial template for later America.
 
+## ARC (L10)
+
+- **Inherits:** From colonial-societies, the immediately preceding lesson,
+  the reader arrives having compared New England and the Chesapeake as two
+  economies, demographies, and polities built on the same selected,
+  self-governing population; a third regional variant remains unplaced.
+- **Contributes:** This lesson supplies the engine's third case — New York's
+  Dutch inheritance and Pennsylvania's Quaker constitution — showing
+  selected, self-governing migration compounding into pluralism and
+  commerce, the configuration closest to the later United States.
+- **Hands off:** The next lesson, awakening-and-empire, takes up how these
+  now three separate, self-governing colonial societies were bound into one
+  connected public for the first time.
+
 THESIS ROLE. The thesis holds that the colonial population was selected for
 dissent and commerce and that institutions compounded. The middle colonies are
 the third data point after New England and the Chesapeake — and the one that

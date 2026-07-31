@@ -5,6 +5,14 @@ module: revolution-and-founding
 type: extra
 goal: Analyze the core arguments of Federalist Nos. 10, 51, 70, 78, and 84 in Publius's own text.
 
+## ARC (L10)
+
+- **Inherits:** This lesson stars off ratification-and-bill-of-rights, where the Federalist Papers already appear as one entry — outsized in retrospect, modest in reach at the time — in the newspaper war fought over ratification.
+
+- **Contributes:** A close reading of Publius's own text in Federalist Nos. 10, 51, 70, 78, and 84, reconstructing premise-to-conclusion the arguments for faction control, the compound republic, a unitary executive, judicial review, and against a bill of rights that the core lesson narrates only from outside.
+
+- **Hands off:** The core path resumes at early-republic-politics.
+
 This is an `extra` (starred) chapter: a close-reading deep dive. No core lesson
 may depend on it — everything the core path needs from The Federalist is already
 carried by ratification-and-bill-of-rights.

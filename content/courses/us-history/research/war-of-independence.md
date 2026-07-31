@@ -5,6 +5,14 @@ module: revolution-and-founding
 type: core
 goal: Explain how an outmatched rebellion won — Boston, Trenton, Saratoga, the French alliance, Yorktown — with the odds stated in numbers.
 
+## ARC (L10)
+
+- **Inherits:** The argument has established the selected, self-governing colonial population and the imperial collision of 1763–75, and american-revolution — the immediately preceding lesson — has just carried that collision through the Declaration as a structured legal argument to Lexington and Concord, with the liberty-vs-slavery paradox stated on the record.
+
+- **Contributes:** This lesson's share of the spine's fifth step — the argument became a war won at measurable odds (Trenton's roughly 900 Hessians taken for two dead of exposure, Saratoga, the French alliance, Yorktown), and independence now forces the constitutional question of whether self-government can scale from town to continent.
+
+- **Hands off:** Roman-blueprint takes up how the framers began answering that scaling question — by design, assembling classical Roman and English constitutional materials into a compound republic.
+
 THESIS ROLE. Thesis element (3): the Revolution was a military and political
 improbability that succeeded, and the course states the improbability in
 numbers rather than adjectives. This lesson introduces the course's standing

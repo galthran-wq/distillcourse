@@ -5,6 +5,20 @@ module: slavery-and-crisis
 type: core
 goal: Explain how continental expansion reopened the slavery question the Missouri Compromise had closed.
 
+## ARC (L10)
+
+- **Inherits:** Cotton-kingdom, the immediately preceding lesson, has
+  established cotton and slavery expanding together as one measured system —
+  export prices, population growth, and the domestic slave trade all driven
+  by the same land hunger, with Indian removal supplying the land it
+  expanded onto.
+- **Contributes:** This lesson's share of the spine step is the acquisitions
+  — Texas, Oregon, the Mexican Cession — that completed the continent and
+  reopened the slavery question the Missouri Compromise had closed.
+- **Hands off:** The next lesson, sectional-crisis, takes up the compromise
+  machinery's attempt, and eventual failure, to answer the question these
+  acquisitions reopened.
+
 THESIS ROLE. The land condition at continental completion — and its price:
 the acquisitions that made the United States a two-ocean power (Texas,
 Oregon, the Mexican Cession) immediately destabilized the political system

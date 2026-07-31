@@ -17,6 +17,17 @@ claims against the secession declarations, monument dates against
 disenfranchisement dates) is the same evidence-first discipline the course
 applies to its own thesis in historiographical-lenses.
 
+## ARC (L10)
+
+- **Inherits:** civil-war-memory stars off redemption, taking the overthrow
+  of Reconstruction — the terror, the retreat, the bargain of 1877 — as the
+  event whose memory it then traces.
+- **Contributes:** This deep dive adds the analytic method for reading
+  memory itself — the reconciliationist, emancipationist, and
+  white-supremacist traditions dated and checked against the documents
+  redemption already established.
+- **Hands off:** The core path resumes at conquering-the-west.
+
 ## Sources to consult
 
 - **Blight, HIST 119 Lectures 26-27** — "Race and Reunion: the Civil War in

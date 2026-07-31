@@ -5,6 +5,23 @@ module: reform-war-normalcy
 type: core
 goal: Analyze the consumer economy, cultural modernism, and reactionary politics of the 1920s.
 
+## ARC (L10)
+
+- **Inherits:** World-war-one established the state-directed war economy
+  since dismantled, the Great Migration set in motion by wartime labor
+  demand, and the Red Scare's repression apparatus turned from wartime
+  dissent onto domestic radicals and immigrants after the failed Wilsonian
+  peace.
+- **Contributes:** The twenties complete this step's second half — the first
+  mass consumer economy in history (the assembly line, mass credit, national
+  broadcast culture) running alongside its reaction in equal weight — Klan
+  revival, immigration quotas, Scopes, Sacco and Vanzetti — with the
+  prosperity's uneven distribution and hidden structural fragilities stated
+  in the same breath.
+- **Hands off:** great-depression takes up those same fragilities — thin
+  credit, weak unit banking, farm depression, and margin lending — as the
+  mechanism of the 1929 crash.
+
 THESIS ROLE. Mass production arrives (thesis element 4's technology thread at
 full scale — the assembly line, electrification, the price of a Model T
 falling through the decade) and with it the first mass consumer economy in

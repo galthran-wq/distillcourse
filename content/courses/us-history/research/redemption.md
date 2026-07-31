@@ -14,6 +14,18 @@ refounding (the arc that civil-rights-movement completes). State that
 continuity explicitly; it is the thesis's claim that the system's corrections,
 however delayed, ran through its own instruments.
 
+## ARC (L10)
+
+- **Inherits:** reconstruction has established the second founding as a
+  constitutional fact — the 13th, 14th, and 15th Amendments ratified and
+  Black male suffrage enacted, with the land question already decided
+  against freedpeople.
+- **Contributes:** This lesson delivers the spine's final clause: the second
+  founding overthrown for a century, by organized terror, Northern retreat,
+  and the bargain of 1877, with the amendments left in the text unenforced.
+- **Hands off:** The next lesson, civil-war-memory, takes up how the
+  conflict just narrated was renarrated in national memory.
+
 ## Sources to consult
 
 - **Foner, *Reconstruction*** — **Ch.9** "The Challenge of Enforcement" (the New

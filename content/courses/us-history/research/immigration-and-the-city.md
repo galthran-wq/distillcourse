@@ -17,6 +17,22 @@ politics stay in the same frame as documented institutional choices (the
 Chinese Exclusion Act through the 1924 quotas), the boundary-drawing the
 course tracks alongside every expansion.
 
+## ARC (L10)
+
+- **Inherits:** Capital-and-labor established the incorporated economy's
+  scale — the largest expansion in history to that date, held against the
+  labor and Populist revolts it provoked; this lesson measures the migrants
+  who supplied the labor that expansion ran on.
+
+- **Contributes:** This lesson's share of the spine's move — immigration at
+  continental scale — the flow data on the new immigration and
+  urbanization, and the exclusion politics, from the Chinese Exclusion Act
+  onward, that immigration triggered.
+
+- **Hands off:** Jim-crow takes up the correction suspended in the South:
+  the legal machinery by which Black citizenship was dismantled in the same
+  decades this lesson's exclusion politics restricted immigrant citizenship.
+
 ## Sources to consult
 
 - **American Yawp Ch.18 "Industrial America"** — urbanization, immigration,

@@ -13,6 +13,21 @@ and the cost counted without flinching. The material-imbalance section is
 also the thesis's industrial argument mid-stride: the mobilization capacity
 measured here is what the enabling-conditions chapters built.
 
+## ARC (L10)
+
+- **Inherits:** By the end of sectional-crisis the constitutional order has
+  survived a century of institutional stress tests and then failed to contain
+  slavery's expansion: the compromise machinery broke piece by piece, Dred
+  Scott and John Brown escalated the crisis, and eleven states seceded,
+  framing secession as counterrevolution against the elected government.
+- **Contributes:** This lesson delivers this step's opening act — "the war
+  that turned Union into emancipation" begins with both sides mobilizing,
+  the material imbalance measured, and the ninety-day illusion dying at Bull
+  Run, Shiloh, and Antietam.
+- **Hands off:** The next lesson, emancipation, takes up how enslaved
+  people's flight and Lincoln's policy turn this war for Union into a war
+  for freedom.
+
 ## Sources to consult
 
 - **American Yawp Ch.14 "The Civil War"**, section "A War for Union 1861-1863" —

@@ -6,6 +6,17 @@ module: contact-and-colonies
 type: core
 goal: Explain how European contact transformed the Americas demographically and ecologically.
 
+## ARC (L10)
+
+- **Inherits:** This is the course's first lesson: nothing precedes it in the
+  argument, and there is no prior lesson to arrive from.
+- **Contributes:** Contact emptied a continent and set the terms — the land
+  future colonies would grow on was cheap because it had been demographically
+  emptied, and the crossing ran east to west because only one side had ships.
+- **Hands off:** The next lesson, european-empires, takes up how three rival
+  European powers colonized the emptied land, and why none but the English
+  produced a self-reproducing settler population.
+
 Lesson 1 of the course (pedagogy C3): the most polished, ending in a felt win —
 the reader finishes able to read a 1502 map as evidence and to state the
 demographic argument with numbers.

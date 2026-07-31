@@ -5,6 +5,14 @@ module: early-republic
 type: core
 goal: Explain how the Louisiana Purchase, judicial review, and the War of 1812 consolidated the republic.
 
+## ARC (L10)
+
+- **Inherits:** From early-republic-politics, the immediately preceding lesson, the reader arrives with the first party system formed and the first peaceful transfer of national power between hostile parties accomplished in the election of 1800 — the machinery tested by faction and holding.
+
+- **Contributes:** This lesson's share of the spine's seventh step — the remaining stress tests, courts and war: Marbury's judicial review, the Louisiana Purchase doubling the republic's land base, and a War of 1812 that ended in a draw the republic survived intact, consolidating a continental republic.
+
+- **Hands off:** Market-revolution takes up the economic engine that consolidation enabled — the transportation and communications revolution that turns that continental land base into one market.
+
 THESIS ROLE. Three consolidations of the thesis's institutional and land
 arguments: judicial review completes the constitutional machine's third check
 (Marbury operationalizing the fiduciary logic planted in roman-blueprint's

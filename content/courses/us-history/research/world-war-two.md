@@ -5,6 +5,12 @@ module: depression-and-war
 type: core
 goal: Explain the US path from neutrality through Pearl Harbor to victory, and why the war left the US uniquely advantaged among the powers.
 
+## ARC (L10)
+
+- **Inherits:** The previous lesson on the spine, "The New Deal," established the permanent federal floor built under American capitalism, and left the Depression itself unresolved short of a mobilization larger than any New Dealer had contemplated.
+- **Contributes:** This lesson supplies the spine's second half: the war of machines — neutrality eroded, Pearl Harbor, production as strategy — that finally ended the Depression and left the United States holding the institutional design of the postwar order.
+- **Hands off:** The next lesson, "The Home Front," takes up what that same war did inside American society, from war industry to incarceration.
+
 THESIS ROLE. The second world-order reset and a course key result: entered
 last, fought farthest from home, lost the fewest people among the major
 powers, emerged richer than it entered — with the production tally (the war

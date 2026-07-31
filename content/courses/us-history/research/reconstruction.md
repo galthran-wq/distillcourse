@@ -16,6 +16,19 @@ The register holds: the amendments as the system's second founding, the land
 question's defeat and sharecropping as its documented limits, both stated
 from the documents and the numbers.
 
+## ARC (L10)
+
+- **Inherits:** union-victory has established the war as won and its price
+  fixed in Lincoln's own words, leaving the amendment machinery of Article
+  V — introduced in constitutional-convention — available to complete what
+  the war paid for.
+- **Contributes:** This lesson delivers the spine's constitutional clause
+  directly: the war's outcome is written into the Constitution as a second
+  founding — abolition, birthright citizenship, equal protection, and Black
+  male suffrage.
+- **Hands off:** The next lesson, redemption, takes up how that second
+  founding was overthrown.
+
 ## Sources to consult
 
 - **Foner, *Reconstruction: America's Unfinished Revolution*** — **Ch.3** "The

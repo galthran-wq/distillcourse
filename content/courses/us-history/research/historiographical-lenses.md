@@ -32,6 +32,23 @@ self-correction is also a choice among defensible registers. Foner's freedom
 lens remains in the matrix as one instrument among the seven-plus, no longer
 the course's frame.
 
+## ARC (L10)
+
+- **Inherits:** recent-past has closed the course's causal argument —
+  selection, institutions, improbability, enabling conditions — restated and
+  cited lesson by lesson through the unipolar peak and its shocks.
+
+- **Contributes:** This deep-dive puts the course's own thesis in the
+  LensMatrix beside rival historiographical frameworks — the frontier
+  thesis, the economic reading, consensus against New Left, the
+  race-centered frame, the history-of-capitalism revival — stating what
+  each explains, what each misses, and what evidence would decide between
+  them.
+
+- **Hands off:** the core path does not resume — this is the course's final
+  chapter, and recent-past's closing section is the reader's last word on
+  the thesis argued as fact; no further lesson takes up the argument.
+
 ## Sources to consult
 
 - **Turner, "The Significance of the Frontier in American History" (1893)** —

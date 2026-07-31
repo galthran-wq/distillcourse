@@ -15,6 +15,23 @@ historiographical-lenses chapter will test. The register holds: policy texts,
 acreage numbers, and the Army's own photographs carry the account; no
 editorializing in either direction.
 
+## ARC (L10)
+
+- **Inherits:** The republic has reunified and abolished slavery, but its own
+  constitutional correction has just been overthrown: Redemption ended
+  Reconstruction through Klan terror, a depression-driven Northern retreat,
+  and the Wormley Hotel bargain of 1877, restoring white political control
+  across the South.
+
+- **Contributes:** This lesson's share of the spine's move — the West
+  incorporated — through Indian wars, the deliberate destruction of the
+  bison, Dawes allotment and Carlisle assimilation, and the frontier myth
+  that narrated the process as closure rather than conquest.
+
+- **Hands off:** Capital-and-labor takes up the same incorporating logic
+  applied to the domestic economy: the corporation's reorganization of
+  capital and labor, and the revolts that reorganization provoked.
+
 ## Sources to consult
 
 - **MIT 21H.102 Lecture 5 "Conflict and Conquest in the Frontier West"** (full

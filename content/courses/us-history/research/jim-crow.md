@@ -15,6 +15,23 @@ registration counts, spending ratios, and Wells's own tabulation method
 (count the cases, test the claimed causes) — her method is the course's
 method, and the lesson should say so.
 
+## ARC (L10)
+
+- **Inherits:** Reconstruction's amendments established Black citizenship and
+  the vote on paper, and Redemption overthrew Reconstruction's enforcement
+  by terror and bargain; immigration-and-the-city established this era's
+  parallel habit of restricting citizenship by ostensibly race-neutral
+  statute rather than by naming race outright.
+
+- **Contributes:** This lesson's share of the spine's move — the correction
+  suspended in the South — the race-neutral statutes, poll taxes, literacy
+  tests, and grandfather clauses that dismantled Black citizenship between
+  1890 and 1910, ratified by the Court in Plessy.
+
+- **Hands off:** American-empire takes up the empire acquired offshore,
+  testing the same racial and constitutional exclusions this lesson
+  documents against the newly annexed territories and peoples.
+
 ## Sources to consult
 
 - **Milestone Documents** #48 Plessy v. Ferguson (1896) — the ruling, Brown's

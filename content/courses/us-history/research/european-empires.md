@@ -5,6 +5,20 @@ module: contact-and-colonies
 type: core
 goal: Compare the Spanish, French, and Dutch colonization models and explain what each left in North America.
 
+## ARC (L10)
+
+- **Inherits:** From indigenous-america, the immediately preceding lesson, the
+  reader arrives knowing the land was demographically emptied by disease
+  before serious conquest, and that contact ran east to west because only
+  Europeans had oceangoing ships — the precondition any colonization needs.
+- **Contributes:** Three rival colonization models — Spanish rule, French
+  exchange, Dutch commerce — each structurally failed to produce a
+  self-reproducing settler society, leaving the English colonies' anomaly to
+  explain.
+- **Hands off:** The next lesson, new-england-covenant, takes up the English
+  anomaly directly: the selected, literate migrants who wrote self-government
+  into their founding documents.
+
 Second lesson of the course (pedagogy C3): still an easy opener, polished, ending
 in a felt win — the reader finishes able to name the three colonization models,
 place them on a map, and read one piece of period propaganda (the Black Legend)

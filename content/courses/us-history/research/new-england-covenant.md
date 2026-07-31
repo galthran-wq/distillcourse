@@ -5,6 +5,21 @@ module: contact-and-colonies
 type: core
 goal: Explain how Plymouth and Massachusetts Bay built self-governing institutions — compact, congregation, town meeting — and the literate, family-based population that ran them.
 
+## ARC (L10)
+
+- **Inherits:** From european-empires, the immediately preceding lesson, the
+  reader arrives knowing the land was emptied, that three rival empires each
+  failed to reproduce a settler population, and that the English anomaly
+  remains to be explained.
+- **Contributes:** This lesson supplies the anomaly's engine's founding
+  case — a selected, literate, family-based migration that wrote
+  self-government into its founding documents (Mayflower Compact, covenant
+  congregation, town meeting), the first rung of the institutional ladder the
+  course later traces to the Constitution.
+- **Hands off:** The next lesson, natives-and-english, takes up the alliance
+  this lesson establishes (Massasoit, 1621) and the war that eventually broke
+  it.
+
 THESIS ROLE. This is the lesson where the course's first two causal claims are
 established with measurements: (1) the settler population was unusually
 selected — family migration, dissenting motivation, near-universal male

@@ -5,6 +5,21 @@ module: slavery-and-crisis
 type: core
 goal: Analyze the political economy that made cotton and slavery expand together, using export and migration data.
 
+## ARC (L10)
+
+- **Inherits:** By this point the argument has traced self-government from
+  covenant to constitutional order, watched the design survive its early
+  stress tests, and followed the market revolution and mass democracy that
+  engaged the economic engine; religion-and-reform, the immediately
+  preceding lesson, showed the Second Great Awakening converting revival
+  into abolitionism without yet naming the system abolitionism opposed.
+- **Contributes:** This lesson's share of the spine step is the first half —
+  "slavery expanded as a system," measured from cotton's export curve, the
+  enslaved population, and the domestic slave trade as one causal chain.
+- **Hands off:** The next lesson, manifest-destiny, takes up how this
+  system's land hunger drove the continental acquisitions that reopened the
+  slavery question the Missouri Compromise had closed.
+
 Carries course outcome co-data. The demo (CottonSlaveryScrubber) is specced in
 course.yaml; the prose must give the reader a concrete task before free play.
 

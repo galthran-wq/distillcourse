@@ -5,6 +5,14 @@ module: early-republic
 type: core
 goal: Analyze Tocqueville's account of township government, juries, and voluntary associations as period evidence for how the American system actually worked.
 
+## ARC (L10)
+
+- **Inherits:** From jacksonian-democracy, the immediately preceding lesson, the reader arrives with mass white male democracy and the party system in full operation, and Indian removal proceeding under that same electorate's authority.
+
+- **Contributes:** This lesson's share of the spine's eighth step — "self-government observed working at scale by its sharpest outside witness": Tocqueville's 1831 account of the township, the jury, and voluntary associations as the machine's working parts, and his tyranny-of-the-majority warning.
+
+- **Hands off:** Religion-and-reform takes up the voluntary associations Tocqueville just described, as the mechanism that converts the era's religious revival into organized reform movements.
+
 THESIS ROLE. The course's institutions claim has so far been built from the
 documents themselves (compact → covenant → town meeting → assembly →
 Constitution). This lesson adds a different kind of evidence: a trained

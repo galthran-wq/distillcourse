@@ -5,6 +5,12 @@ module: depression-and-war
 type: core
 goal: Analyze how the war remade American society — women and Black workers in war industry, the GI Bill — while incarcerating Japanese Americans.
 
+## ARC (L10)
+
+- **Inherits:** The previous lesson, "The Second World War," established the war's outcome abroad — the United States entering last, losing the fewest people among the major powers, and emerging in 1945 richer than it entered, holding the postwar order's design.
+- **Contributes:** This lesson supplies the argument's domestic ledger: the same mobilization that made the US the postwar order's designer doubled the female industrial workforce, forced the first federal fair-employment order, and manufactured the postwar middle class through the GI Bill — while incarcerating 120,000 Japanese Americans without charge, the boundary the Four Freedoms did not reach.
+- **Hands off:** The next lesson, "The Cold War," takes up the world order the United States now designs, already dividing into blocs within two years of victory.
+
 THESIS ROLE. The mobilization's domestic ledger, both columns at documented
 weight: the war economy doubling the female industrial workforce, EO 8802 as
 the first federal fair-employment instrument (won by threatened mass

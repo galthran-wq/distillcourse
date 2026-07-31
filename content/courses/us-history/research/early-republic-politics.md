@@ -5,6 +5,14 @@ module: early-republic
 type: core
 goal: Explain how a founding generation that dreaded faction produced the first party system and the first peaceful transfer of power.
 
+## ARC (L10)
+
+- **Inherits:** The argument has established the framers' design ratified by argument, vote by vote, and — from ratification-and-bill-of-rights, the immediately preceding lesson — a signed, ratified Constitution and the Bill of Rights that was its price, about to be run for the first time by a government that had never yet had to survive organized faction.
+
+- **Contributes:** This lesson's share of the spine's seventh step — the design's first stress test: parties and a hostile transfer of power, as Washington's quasi-monarchical presidency, Hamilton's fiscal program, and the Alien and Sedition Acts' crisis of 1798 produced the first party system, and the 36-ballot election of 1800 ended it without bloodshed.
+
+- **Hands off:** Jeffersonian-america takes up the design's next stress tests — judicial review and a foreign war — that consolidate the continental republic.
+
 THESIS ROLE. The design of 1787 meets its first live-fire tests: a fiscal
 program that splits the government, a foreign-war panic that criminalizes
 opposition, and a tied election thrown into the House — and the machinery

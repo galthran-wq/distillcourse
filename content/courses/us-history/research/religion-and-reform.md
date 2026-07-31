@@ -5,6 +5,14 @@ module: early-republic
 type: core
 goal: Explain how evangelical revival fueled abolitionism, temperance, and women's rights.
 
+## ARC (L10)
+
+- **Inherits:** From tocqueville-democracy, the immediately preceding lesson, the reader arrives with voluntary associations established as democracy's substitute for aristocracy — the intermediate powers Tocqueville credited with checking the tyranny of the majority.
+
+- **Contributes:** This lesson's share of the spine's eighth step — the associational machinery running on the era's own fuel: the Second Great Awakening's revival converting private conviction into the temperance, abolitionist, and women's-rights societies that carry mass politics into moral reform.
+
+- **Hands off:** Cotton-kingdom, the next module's first lesson, takes up the system the abolitionist thread set up here will indict — cotton and slavery expanding together as one political economy.
+
 THESIS ROLE. The selected population's religious culture as a
 reform-generating engine: disestablishment (an institutional choice) created
 a competitive religious market; the revival it produced converted private

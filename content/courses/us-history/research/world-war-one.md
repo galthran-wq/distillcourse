@@ -5,6 +5,23 @@ module: reform-war-normalcy
 type: core
 goal: Examine US entry into World War I, the home-front repression it licensed, and the failed Wilsonian peace.
 
+## ARC (L10)
+
+- **Inherits:** Progressive-era established the reform state's constitutional
+  harvest — the 16th through 19th Amendments and new regulatory capacity —
+  built by a coalition that also accepted segregation and eugenic exclusion
+  as part of its program.
+- **Contributes:** World-war-one is this step's first world-order reset — a
+  state-directed war economy assembled in eighteen months, US finance and
+  materiel deciding the Atlantic balance, and Wilson's Fourteen Points
+  written as the peace agenda — set against the Espionage and Sedition Act
+  prosecutions the promise-and-enforcement ledger tracks, and the Senate's
+  rejection of the League.
+- **Hands off:** the-twenties takes up the demobilized war economy — the
+  Great Migration wartime labor demand set in motion, and the repression
+  apparatus turned from wartime dissent onto domestic radicals and
+  immigrants in the Red Scare.
+
 THESIS ROLE. The first of the two war mobilizations that reset the world
 order (thesis element 4): a state-directed war economy assembled in eighteen
 months, US finance and materiel deciding the Atlantic balance, and the

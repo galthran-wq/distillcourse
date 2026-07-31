@@ -5,6 +5,22 @@ module: contact-and-colonies
 type: core
 goal: Analyze Native–English relations in the seventeenth century as both alliance and war, using the Pequot War and King Philip's War as the measured cases.
 
+## ARC (L10)
+
+- **Inherits:** From new-england-covenant, the immediately preceding lesson,
+  the reader arrives having met the selected, self-governing New England
+  settlers and the 1621 Wampanoag alliance that let them survive their first
+  years.
+- **Contributes:** The anomaly's engine needed room to compound, and this
+  lesson supplies the mechanism by which that room opened — the trade
+  alliance that held for decades, and the Pequot War and King Philip's War
+  that broke it, clearing southern New England for the settler model at a
+  measured, proportionally record cost.
+- **Hands off:** The next lesson, colonial-societies, takes up the other
+  English society built on the same engine but different terms — the
+  Chesapeake — and sets it beside New England as the module's comparative
+  synthesis.
+
 THESIS ROLE. The thesis requires the Native-English story told factually both
 ways: the alliance and trade that were real and mutually chosen (established in
 new-england-covenant), and the wars that broke them, counted. King Philip's War

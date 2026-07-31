@@ -13,6 +13,22 @@ arrival of the United States as a world power, and the documented arguments
 and costs on the record against it (the Kūʻē petitions, the Philippine war's
 casualty asymmetry, the Insular Cases' constitutional residue).
 
+## ARC (L10)
+
+- **Inherits:** Jim-crow established the legal machinery — poll taxes,
+  literacy tests, Plessy's sanction — by which the South's Black citizens
+  were disenfranchised and segregated, while capital-and-labor supplied the
+  industrial and naval capacity this lesson converts into overseas reach.
+
+- **Contributes:** This lesson's share of the spine's move — an empire
+  acquired offshore — the ten-week war against Spain, the territories it
+  produced, and the arguments made against holding them.
+
+- **Hands off:** Progressive-era, the first lesson of the next module, takes
+  up the domestic reckoning with this same industrial and imperial scale:
+  reform movements that wrote four constitutional amendments into the
+  Constitution in seven years.
+
 ## Sources to consult
 
 - **MIT 21H.102 Lecture 8 "Becoming a World Power"** (published notes) — the

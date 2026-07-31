@@ -5,6 +5,23 @@ module: contact-and-colonies
 type: core
 goal: Explain how the First Great Awakening and the Seven Years' War each bound thirteen separate colonies together and set the terms of the imperial crisis.
 
+## ARC (L10)
+
+- **Inherits:** From middle-colonies, the immediately preceding lesson, the
+  reader arrives with three regional colonial societies established, each
+  rich, literate, and self-governing on the strength of a selected population
+  and compounding institutions; those societies have not yet acted as one
+  public or collided with imperial authority.
+- **Contributes:** This lesson supplies the binding: the First Great
+  Awakening and the Seven Years' War as the colonies' first shared,
+  intercolonial experiences, closing with 1763's fiscal arithmetic —
+  Britain's debt at roughly 13.5 times annual revenue — the fact that forces
+  the imperial collision.
+- **Hands off:** The next lesson, american-revolution (opening the
+  Revolution and Founding module), takes up the imperial crisis and
+  constitutional argument that 1763's debt set in motion, ending at the
+  Declaration of Independence.
+
 THESIS ROLE. The module's hinge lesson: it converts thirteen separate colonial
 societies (the previous five lessons) into one connected public with shared
 experiences — a revival everyone heard about and a war everyone paid for — and

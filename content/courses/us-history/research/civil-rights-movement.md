@@ -17,6 +17,21 @@ outcome, all documented. The Douglass-to-King continuity — the founding
 documents claimed, not rejected, as the movement's instrument — closes the
 promise arc the course opened in sectional-crisis.
 
+## ARC (L10)
+
+- **Inherits:** affluent-society has established Brown v. Board's reversal of
+  Plessy and documented the exclusions — segregated suburbs, discriminatory
+  federal housing programs — that made enforcement of the second founding
+  necessary.
+
+- **Contributes:** This lesson is the spine's "enforced the second founding
+  at home": the movement from Brown through Montgomery, Birmingham, and
+  Selma winning the Civil Rights and Voting Rights Acts.
+
+- **Hands off:** the-sixties takes up the Great Society's extension of that
+  enforcement into law and policy, alongside the Vietnam escalation that
+  fractures the coalition which won it.
+
 ## Sources to consult
 
 - **American Yawp Ch.27 "The Sixties"**, civil rights sections — including the

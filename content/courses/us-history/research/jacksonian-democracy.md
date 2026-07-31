@@ -5,6 +5,14 @@ module: early-republic
 type: core
 goal: Analyze how mass white male democracy and Indian removal advanced together in the Age of Jackson.
 
+## ARC (L10)
+
+- **Inherits:** From market-revolution, the immediately preceding lesson, the reader arrives with a Northern economy transformed by transportation, communication, and wage labor — a population reorganized by markets rather than subsistence.
+
+- **Contributes:** This lesson's share of the spine's eighth step — mass politics: suffrage expanded to near-universal white male participation, the party remade as a mass technology, and the Bank War fought by veto, advancing in the same years as the federal government's forced removal of the Cherokee and other Native nations.
+
+- **Hands off:** Tocqueville-democracy takes up the outside witness who watched this same mass democracy in operation in 1831.
+
 THESIS ROLE. The institutions argument under mass conditions: the franchise
 expands to near-universal white male suffrage and the party becomes a mass
 technology — democratization the thesis counts as institutional deepening —

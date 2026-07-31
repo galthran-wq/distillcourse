@@ -5,6 +5,12 @@ module: depression-and-war
 type: extra
 goal: Analyze the HOLC security maps as primary sources and trace their consequences to present-day inequality.
 
+## ARC (L10)
+
+- **Inherits:** This deep dive stars off "The New Deal," whose federal housing programs — the HOLC survey and the FHA's underwriting rules — reached into local mortgage markets as part of the new federal floor.
+- **Contributes:** It adds the close reading the core path does not stop for: the HOLC area-description forms read as primary sources, and the traced chain from their 1930s grades to today's measured gaps in wealth, health, and heat.
+- **Hands off:** The core path resumes at world-war-two.
+
 `extra` (starred) chapter: a document-and-data deep dive off the core path. It is
 the course's best single demonstration that a primary source can be read as
 policy and its effects measured decades later.

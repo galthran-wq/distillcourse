@@ -5,6 +5,14 @@ module: revolution-and-founding
 type: core
 goal: Explain how the Constitutional Convention's compromises produced the federal structure of 1787.
 
+## ARC (L10)
+
+- **Inherits:** The argument has established the selected, self-governing colonial population, the imperial collision, and the war won at measurable odds, and — from roman-blueprint, the immediately preceding lesson — the classical Roman and English design vocabulary (mixed government, separation of powers) the framers had assembled to draw on.
+
+- **Contributes:** This lesson's share of the spine's sixth step — that design vocabulary was machined, through compromise (the Virginia and New Jersey plans resolved by the Connecticut Compromise, the three-fifths clause), into the seven-article federal structure signed at Philadelphia in 1787.
+
+- **Hands off:** Ratification-and-bill-of-rights takes up whether the states would accept that design — the Federalist and Anti-Federalist fight, state by state, and the Bill of Rights it produced.
+
 THESIS ROLE. The keystone of thesis element (2): the compounding institutions
 of module 1, plus the classical/English design vocabulary from roman-blueprint
 (now this lesson's prerequisite), assembled under deadline into the machine

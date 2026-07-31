@@ -5,6 +5,14 @@ module: revolution-and-founding
 type: core
 goal: Analyze how the constitutional design of 1787 was assembled from its named sources — Polybius's mixed government, the English constitutional inheritance, Montesquieu, and the republican ideology of 1776.
 
+## ARC (L10)
+
+- **Inherits:** The argument has established the selected, self-governing colonial population and the imperial collision, and — from war-of-independence, the immediately preceding lesson — a war won at measurable odds that achieved independence but left open the question of whether self-government could scale from town to continent.
+
+- **Contributes:** This lesson's share of the spine's sixth step — the framers answered the scaling question by design, and this lesson supplies the genealogy: Polybius's mixed government, the English constitutional inheritance, and Montesquieu, deliberately assembled into the design vocabulary the next lesson's convention machines into a document.
+
+- **Hands off:** Constitutional-convention takes up how that classical and English vocabulary was machined, under deadline and compromise, into the federal structure signed at Philadelphia in 1787.
+
 THESIS ROLE. Thesis element (2) at its keystone: the constitutional order was
 not improvised — its framers deliberately assembled it from classical Roman and
 English constitutional materials, and the assembly can be traced clause by

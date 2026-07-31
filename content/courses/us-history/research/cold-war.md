@@ -13,6 +13,22 @@ documented cost, with McCarthy's political (not judicial) fall as the
 boundary-enforcement case the course's institutions thread records honestly:
 the check that worked was the Senate, late.
 
+## ARC (L10)
+
+- **Inherits:** By the end of wwii-home-front, the United States has emerged
+  from World War II as the least-damaged and richest of the major powers,
+  holding the institutional design of the postwar order, with wartime
+  mobilization having remade the home front — war work, the GI Bill,
+  Japanese American incarceration — under the Four Freedoms banner.
+
+- **Contributes:** This lesson opens the spine's "four decades of contest
+  and affluence" with its contest half: containment organizes the postwar
+  order abroad, and anticommunism organizes its domestic politics for a
+  decade, with McCarthy's Senate censure as the boundary the system enforced.
+
+- **Hands off:** affluent-society takes up the prosperity and suburbanization
+  the postwar order enabled at home, and the exclusions built into both.
+
 ## Sources to consult
 
 - **American Yawp Ch.25 "The Cold War"** — containment, Korea, McCarthyism,

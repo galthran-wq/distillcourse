@@ -5,6 +5,12 @@ module: depression-and-war
 type: core
 goal: Analyze what the New Deal built, whom it excluded, and why it did not end the Depression.
 
+## ARC (L10)
+
+- **Inherits:** The previous lesson, "The Great Depression," established the scale of the collapse and Hoover's orthodoxy-bound response, leaving open what federal power would do about a crisis of that size.
+- **Contributes:** This lesson supplies the spine's first answer: the permanent federal floor — Social Security, deposit insurance, labor law — built in five years of improvisation, excluding whom it excluded, without ending the Depression it answered.
+- **Hands off:** The next lesson, "The Second World War," takes up the war of machines that ended the Depression the New Deal did not.
+
 THESIS ROLE. Institutional adaptation under stress: the federal floor built
 in five years (Social Security, deposit insurance, labor law) as the
 constitutional order rewriting the state's job description without rewriting

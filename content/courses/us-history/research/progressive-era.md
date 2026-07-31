@@ -5,6 +5,21 @@ module: reform-war-normalcy
 type: core
 goal: Explain Progressivism's two reform impulses — moral purity and scientific efficiency — and their constitutional harvest.
 
+## ARC (L10)
+
+- **Inherits:** By american-empire, the republic had industrialized into the
+  largest economy on earth, incorporated the West, fought capital and labor
+  to a standstill, absorbed immigration at continental scale, watched the
+  post-Reconstruction correction collapse into Jim Crow in the South, and
+  acquired an overseas empire in 1898.
+- **Contributes:** Progressivism supplies this step's amendment machinery —
+  reform pressure organized around moral purity and scientific efficiency
+  converts into four constitutional amendments in seven years and new
+  regulatory capacity, institutions compounding again, with the 19th
+  Amendment's practical exclusions stated alongside its grant.
+- **Hands off:** world-war-one takes up this same reform-era state, redirected
+  into an eighteen-month wartime economy and Wilson's bid to write the peace.
+
 THESIS ROLE. The amendment machinery at industrial scale: four constitutional
 amendments in seven years — the system rewriting itself through Article V
 under organized public pressure, two of the four enacting Populist demands

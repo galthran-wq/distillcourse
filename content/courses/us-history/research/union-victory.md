@@ -15,6 +15,18 @@ and Second Inaugural — the constitutional order explaining its own price. The
 holding of the 1864 election belongs beside 1800 in the course's list of
 tests peer republics failed.
 
+## ARC (L10)
+
+- **Inherits:** emancipation has established the war as a fight for freedom
+  as well as Union, fought against a Confederacy whose material
+  disadvantage, quantified in war-for-union, had not yet proven decisive.
+- **Contributes:** This lesson pays the spine's price in full — total war on
+  Confederate resources, a national election held and won in the middle of
+  civil war, and the war's meanings fixed by Lincoln at Gettysburg and in
+  the Second Inaugural.
+- **Hands off:** The next lesson, reconstruction, takes up how that victory
+  is written into the Constitution as a second founding.
+
 ## Sources to consult
 
 - **McPherson, *Battle Cry of Freedom*, Ch.21-28** — Gettysburg and Vicksburg

@@ -5,6 +5,12 @@ module: depression-and-war
 type: core
 goal: Explain the causes of the crash and depression, Hoover's response, and the uneven suffering that followed.
 
+## ARC (L10)
+
+- **Inherits:** The previous lesson, "The New Era: The Twenties," established the consumer economy that mass production and installment credit built through the decade, and named the fragilities — thin bank capital, speculative finance, uneven prosperity — that were already built into that boom before 1929.
+- **Contributes:** This lesson supplies the spine's stress test itself: the crash and the depression that followed it — output down a third, unemployment at 25 percent (50 for Black workers) — and Hoover's associationalist response overwhelmed by a crisis of a scale it could not match.
+- **Hands off:** The next lesson, "The New Deal," takes up the federal floor built in response to the collapse this lesson describes.
+
 THESIS ROLE. The system's worst peacetime crisis, stated in the numbers
 (output down a third, 25% unemployment, ~9,000 bank failures) — the stress
 test that broke peer republics in the same decade. The course's comparative

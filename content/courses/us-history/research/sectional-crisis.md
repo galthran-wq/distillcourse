@@ -5,6 +5,21 @@ module: slavery-and-crisis
 type: core
 goal: Analyze the escalation from the Compromise of 1850 through Dred Scott and John Brown to secession.
 
+## ARC (L10)
+
+- **Inherits:** Cotton-kingdom measured slavery's expansion as a system and
+  manifest-destiny, the immediately preceding lesson, showed continental
+  acquisition reopening the slavery question the Missouri Compromise had
+  closed, ending with the Wilmot Proviso converting every new territory into
+  a slavery vote.
+- **Contributes:** This lesson's share of the spine step is the second half
+  — "the compromise machinery that contained it failed component by
+  component," from the Compromise of 1850 through the party system, the
+  Court, the Senate floor, and the ballot, to secession.
+- **Hands off:** The next lesson, war-for-union, opening the Civil War and
+  Reconstruction module, takes up the war fought to decide the question this
+  crisis left unresolved.
+
 Longest lesson in the module (30 min) and the causal hinge of the course. The
 demo (SenateBalanceTimeline) is specced in course.yaml.
 
