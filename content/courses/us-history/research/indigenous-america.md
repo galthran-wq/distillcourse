@@ -91,3 +91,13 @@ Parry, The Age of Reconnaissance.
    be visible; the source-reading object.
 8. `draw:` source-reading.svg — the standing records/argues/omits method box,
    reused by later lessons.
+
+
+## Compression note (July 2026 curation)
+The demographic collapse is stated ONCE, compactly: one static figure, the
+mechanism in three sentences, and a forward paragraph naming what the
+emptying enabled (headrights, frontier, Homestead Act). The four-frame
+sequence, the contested-baseline dispute, and the ice-core check live behind
+an <Aside> fold. Encomienda and colonial-mortality machinery belong to
+european-empires, not here. Any future revision keeps this balance: the fact
+is load-bearing (the course's cheap-land precondition), the dwelling is not.
