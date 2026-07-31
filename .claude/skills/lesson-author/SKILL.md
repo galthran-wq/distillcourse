@@ -79,6 +79,17 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      candidate (no candidate = the figure agent hunts one; name the likely
      source if you know it). The bar is the same: the artefact must carry
      material, not decorate it.
+   - **Never hand-draw what exists as an artifact.** Geographic maps,
+     portraits, paintings, photographs, posters, and document pages are
+     ALWAYS sourced (`{/* img */}` handoff) — a hand-drawn SVG map is a
+     defect, not a figure. The drawn tiers exist for the course's OWN
+     constructs: comparisons, causal diagrams, data charts, step-throughs.
+     For artifact-rich subjects (history, art, biology) the brief's FIGURE
+     PLAN is a floor, not a ceiling: add `{/* img */}` handoffs liberally
+     wherever a real artifact carries material — for this kind of course,
+     sourced images should carry roughly half the lesson's visuals, and
+     Wikimedia Commons / LoC hold canonical public-domain copies of nearly
+     every map, portrait, and painting you will want.
    - For every PascalCase component-figure reference you do NOT build
      yourself, put an MDX comment directly above it — your handoff to the
      figure builder:
