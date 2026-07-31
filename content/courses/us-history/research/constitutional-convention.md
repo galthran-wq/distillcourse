@@ -109,29 +109,59 @@ the convention narrative on it rather than re-teaching it.
 
 1. `source:` **archives-constitution-page1** — save as `constitution-page1-we-the-people`.
    Reader must be able to see: the oversized "We the People" calligraphy and the
-   opening of Article I. Placement: centered, at the section where the finished
-   document is introduced. The scribal emphasis is the artifact's own rhetoric.
-2. `draw:` single `<Figure>` — **what the Articles lacked**: a checklist table of
+   opening of Article I. Why it must be the real artifact: the scribal emphasis
+   is the artifact's own rhetoric — a redraw would flatten Jacob Shallus's
+   deliberate oversizing back into ordinary type. Placement: centered, at the
+   section where the finished document is introduced.
+2. `source:` **maier-madison-stuart-portrait** — save as
+   `madison-stuart-1821-convention`. Reader must be able to see: Madison's
+   likeness (Gilbert Stuart, c.1821). Why it must be the real artifact: Madison
+   is a specific, identifiable historical actor — the Virginia Plan's author and
+   the convention's meticulous note-taker — and a real portrait grounds that
+   role in a face rather than a name; the same painting anchors his Virginia-fight
+   role in ratification-and-bill-of-rights. Placement: float-left at key point 3
+   (Two plans and one bargain), where the Virginia Plan is introduced.
+3. `source:` **wood-eol-lansdowne-washington** — save as
+   `washington-lansdowne-1796-presiding`. Reader must be able to see: the
+   full-length quasi-regal staging, sash, and steady gaze. Why it must be the
+   real artifact: no 1787-dated Washington portrait is in the pool; the caption
+   must flag this as Stuart's 1796 presidential portrait, used here only for the
+   authority register the era itself invested in Washington's presence — a real,
+   dated painting with its anachronism stated beats an invented likeness.
+   Placement: float-right at the convention's opening (Washington presiding, May
+   1787).
+4. `source:` no pool candidate — hunt: a period or near-period engraving of
+   Shays's Rebellion (the Springfield armory confrontation, January 1787) —
+   Wikimedia Commons / American Antiquarian Society hold 18th-19th-century prints
+   (search "Shays' Rebellion engraving" or "Springfield armory 1787 Shays");
+   the Massachusetts Historical Society also catalogs period broadsides on the
+   uprising. Reader must be able to see: armed farmers confronting militia at the
+   armory. Why it must be the real artifact: Shays's Rebellion is cited as THE
+   concrete event that convinced the elite the Articles had failed — a real
+   period image of farmers under arms grounds the abstraction in the actual
+   event, not a generic illustration. Placement: centered at key point 1 (what
+   the Articles could not do).
+5. `draw:` single `<Figure>` — **what the Articles lacked**: a checklist table of
    government powers (tax, regulate trade, enforce judgments, amend, execute)
    with the Articles column mostly empty and the 1787 column filled.
-3. `draw:` `<FigureSequence>` (5 frames) — **the convention timeline**: May 25
+6. `draw:` `<FigureSequence>` (5 frames) — **the convention timeline**: May 25
    opening → Virginia Plan → New Jersey Plan → Connecticut Compromise →
    three-fifths and slave-trade clauses → Sept 17 signing. One event added per
    frame along a single horizontal axis.
-4. `draw:` single `<Figure>` — **two plans, one bargain**: side-by-side
+7. `draw:` single `<Figure>` — **two plans, one bargain**: side-by-side
    representation schemes with the compromise drawn as the merged bicameral
    result; the changed cell (Senate) highlighted.
-5. `draw:` single `<Figure>` — **the seven articles as a machine**: three branch
+8. `draw:` single `<Figure>` — **the seven articles as a machine**: three branch
    blocks (I, II, III) with the check-arrows between them, plus IV-VII drawn as
    the framing rails (federalism, amendment, supremacy, ratification). Arrows
    point only up or right.
-6. `draw:` single `<Figure>` — **clauses later overridden**: the Constitution's
+9. `draw:` single `<Figure>` — **clauses later overridden**: the Constitution's
    article structure with six clauses tagged by the amendment that superseded
    them (3/5 → 14th; Senate election → 17th; direct taxes → 16th; succession →
    12th/25th; sovereign immunity → 11th; fugitive slave → 13th). Idea from the
    National Archives transcript's own bracketed annotations.
-7. `draw:` single `<Figure>` — **three state constitutions compared**: a compact
-   three-column table (suffrage, establishment, executive) from MIT Week 5.
+10. `draw:` single `<Figure>` — **three state constitutions compared**: a compact
+    three-column table (suffrage, establishment, executive) from MIT Week 5.
 
 ## Canon additions (curated expansion, July 2026)
 

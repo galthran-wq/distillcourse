@@ -122,6 +122,20 @@ reformers' instrument was the founding document itself.
    frame 3 Walker's *Appeal* and the *Liberator*; frame 4 the American
    Anti-Slavery Society's immediatist platform. One position added per frame on
    the same spectrum line.
+4b. `source:` no pool candidate — hunt: the masthead of William Lloyd
+   Garrison's *The Liberator*, vol. 1 no. 1 (Jan 1, 1831) — digitized by the
+   Library of Congress, Boston Public Library, and accessible-archives.com;
+   search Wikimedia Commons "The Liberator newspaper masthead". Reader must be
+   able to see: the masthead's own illustration (slave auction / Second
+   Coming imagery) and the "Boston, Mass." dateline — the real document frame
+   3 of the sequence above names. Placement: centered, keyed to frame 3.
+4c. `source:` no pool candidate — hunt: the title page of David Walker's
+   *Appeal to the Coloured Citizens of the World* (1829; 3rd ed. 1830) —
+   digitized by Documenting the American South (UNC, docsouth.unc.edu) and
+   the Library of Congress; search Wikimedia Commons or docsouth.unc.edu
+   directly. Reader must be able to see: the real pamphlet's title page,
+   Walker's name on it. Placement: float left beside item 4b, same frame-3
+   pairing.
 5. `draw:` single `<Figure>` — **two declarations in parallel**: the 1776 and
    1848 opening passages side by side with every altered phrase highlighted and
    the tally of substitutions stated.
@@ -131,4 +145,17 @@ reformers' instrument was the founding document itself.
    the two-declarations figure — the real names under the rewritten text.
 6. `draw:` single `<Figure>` — **one itinerant's year**: Lorenzo Dow's 1805
    circuit as a route sketch with mileage and meeting count annotated — reach
-   made concrete.
+   made concrete. (Our own reconstruction from mileage figures — no canonical
+   period map of Dow's specific circuit is known to exist — stays drawn.)
+7. `source:` no pool candidate — hunt: an 1840s-50s Frederick Douglass
+   daguerreotype (distinct from the pool's 1879 `blight-douglass-portrait-1879`,
+   captured for the Civil War module) — e.g. the c.1850s Onondaga Historical
+   Association / National Portrait Gallery daguerreotype reproduced widely in
+   Douglass scholarship; search Wikimedia Commons category "Frederick
+   Douglass" filtered to pre-1860 images. If none is found at adequate
+   resolution, `blight-douglass-portrait-1879` may substitute with a caption
+   noting it postdates the *Narrative* (1845) and the *Liberator* years by
+   decades. Reader must be able to see: Douglass's face at (or near) the age
+   he wrote the *Narrative* and edited his own paper — the era's most
+   photographed American, self-representing. Placement: float right beside
+   key point 4 (abolitionism's radical turn), near items 4b/4c.

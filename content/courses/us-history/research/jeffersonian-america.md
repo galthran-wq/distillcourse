@@ -100,19 +100,40 @@ theme that the next lesson develops.
    `burning-of-washington-1814`. Reader must be able to see: the marching
    columns, the burning public buildings, and the engraving's period linework.
    Placement: centered in the War of 1812 section.
-3. `draw:` `<FigureSequence>` (4 frames) — **Marshall's reasoning in Marbury**:
+3. `source:` **wood-eol-marshall-portrait-peale** — save as
+   `marshall-portrait-peale-1834`. Reader must be able to see: Marshall's face
+   and judicial robes, a from-life 1834 likeness — the man behind the reasoning
+   diagrammed in the next figure. Placement: float left opening the Marbury
+   section, beside item 4 below.
+4. `draw:` `<FigureSequence>` (4 frames) — **Marshall's reasoning in Marbury**:
    one link of the chain per frame, ending with the boxed conclusion "a law
    repugnant to the Constitution is void". Sequence because it is an argument
    that unfolds. Inspiration: Wood Ch.12.
-4. `draw:` single `<Figure>` — **the Louisiana Purchase to scale**: the purchase
-   territory against the 1803 United States, with the price per acre annotated
-   and the major Native nations resident in the territory labeled.
-5. `draw:` single `<Figure>` — **the embargo's export collapse**: US export value
+5. `source:` the Louisiana Purchase territory is a real geographic fact, not
+   our diagram to invent — no pool candidate — hunt: a canonical map of the
+   1803 Purchase, e.g. Nicholas King's 1803 manuscript "Map of Louisiana"
+   (Library of Congress Geography & Map Division, g4050 ct000523) or the
+   widely reproduced National Atlas/National Park Service "Louisiana Purchase"
+   territorial map (US government work, public domain); search Wikimedia
+   Commons category "Maps of the Louisiana Purchase". Reader must be able to
+   see: the purchase boundary against the pre-1803 United States and the
+   scale of the acquisition. Caption carries the price-per-acre figure and
+   names the major Native nations resident in the territory — the analysis
+   stays in prose and caption; the map itself is the real cartographic
+   record. Placement: centered in the Louisiana Purchase section.
+6. `draw:` single `<Figure>` — **the embargo's export collapse**: US export value
    1790-1815 as a line, the 1807 Embargo Act and 1809 repeal marked, and the
    ~80% one-year drop called out. Idea from Wood Ch.17's numbers.
-6. `draw:` single `<Figure>` — **the War of 1812 in four theaters**: Canadian
+7. `draw:` single `<Figure>` — **the War of 1812 in four theaters**: Canadian
    frontier, Great Lakes, Chesapeake, and Gulf, each with its decisive event and
    outcome in one line — the war's incoherence made legible.
-7. `draw:` single `<Figure>` — **peace before the battle**: a timeline strip
+8. `source:` no pool candidate — hunt: a period or near-period depiction of the
+   Battle of New Orleans — e.g. Jean Hyacinthe de Laclotte's 1815 eyewitness
+   watercolor, or Dennis Malone Carter's 1856 painting "The Battle of New
+   Orleans"; search Wikimedia Commons category "Battle of New Orleans (1815)
+   paintings". Reader must be able to see: the battle line and the lopsided
+   casualties it produced. Placement: centered in the four-theaters section,
+   beside item 7.
+9. `draw:` single `<Figure>` — **peace before the battle**: a timeline strip
    showing Ghent (Dec 24, 1814), New Orleans (Jan 8, 1815), and ratification
    (Feb 1815), with the news-travel delay shaded.

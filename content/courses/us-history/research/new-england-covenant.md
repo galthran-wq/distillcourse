@@ -150,6 +150,55 @@ that held some 54 years, with its artifact.
    1638, Bay Psalm Book 1640, first newspaper attempts 1690/1704 — a dated
    column showing the print infrastructure's head start over every other
    colonial region.
+7. `source:` single `<Figure>` — **John Winthrop, portrait**: pool candidate
+   `albionseed-john-winthrop-portrait` (17th-c. oil, attributed to a
+   follower of Van Dyck, c.1650, American Antiquarian Society); the reader
+   must see the Massachusetts Bay governor's own face beside the "Model of
+   Christian Charity" discussion — real because it is the closest surviving
+   likeness of the man who wrote the sermon, not a course illustration of
+   him. Placement: float-right, beside the Winthrop's-sentence set piece.
+8. `source:` single `<Figure>` — **Mourt's Relation, 1622 title page**:
+   file-stem `new-england-covenant-mourts-relation-1622`; the reader must
+   see the actual title page of the pamphlet containing Winslow's paragraph
+   — the only contemporary account of the 1621 harvest feast — so the claim
+   "one documented feast" points at a real printed object, not a
+   paraphrase. No pool candidate — hunt: Internet Archive or LOC Rare Book
+   Division scan of "Mourt's Relation: A Journal of the Plantation at
+   Plymouth" (London, 1622) (search "Mourt's Relation 1622 title page
+   Library of Congress" or "archive.org Mourt's Relation 1622"). Placement:
+   float-left, beside the harvest-feast paragraph.
+9. `source:` single `<Figure>` — **Bradford's "Of Plymouth Plantation,"
+   manuscript page**: file-stem `new-england-covenant-bradford-manuscript`;
+   the reader must see Bradford's own handwriting recording the 1621 treaty
+   — the treaty-clauses figure (#3) diagrams what the manuscript itself
+   says, and showing the actual page grounds the tabulation in a real,
+   physically surviving document (Massachusetts State Archives, with its own
+   dramatic loss-and-recovery history). No pool candidate — hunt: the
+   Massachusetts State Archives / State Library digitization of the Bradford
+   manuscript, or the Internet Archive full-text edition's frontispiece
+   facsimile page (search "Bradford Of Plymouth Plantation manuscript page
+   facsimile Massachusetts State Archives"). Placement: float-right, beside
+   the treaty-clauses figure.
+10. `source:` single `<Figure>` — **Morton's "New England's Memoriall,"
+    1669, the Compact page**: file-stem
+    `new-england-covenant-morton-memoriall-1669`; the reader must see the
+    printed page of the earliest surviving text of the Compact (per the
+    Lutz-edition headnote: contemporaries called it "the Plymouth
+    Combination," not "Mayflower Compact," a name coined in 1793) — pairing
+    the Compact-dissected figure (#2) with the real page it is dissected
+    from. No pool candidate — hunt: Internet Archive or a research-library
+    scan of Nathaniel Morton, "New-England's Memoriall" (Cambridge, 1669),
+    the compact's page (search "New England's Memoriall 1669 Morton
+    archive.org"). Placement: centered, immediately below figure #2.
+
+This lesson stays drawing-heavy by design: six of its ten figures are the
+course's own institutional-analysis constructs (a compounding ladder, two
+text dissections with labeled arrows, a tabulation, a four-frame settlement
+sequence, and two dated charts) rather than reproductions of a single real
+object, so they remain drawn per house style even where they annotate real
+text. The four sourced additions land exactly where a primary document or
+contemporary portrait survives and a real image would ground the claim more
+than a redrawing could.
 
 ## Canon additions (curated expansion, July 2026)
 

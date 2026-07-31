@@ -114,23 +114,51 @@ tests peer republics failed.
    `lincoln-gardner-1865`. Reader must be able to see: Lincoln holding spectacles
    and pencil, weeks before his death. Placement: float left at the closing
    section. (Small file — check rendered size; drop if it prints too small.)
-4. `draw:` single `<Figure>` — **the cost, to scale**: US war deaths across all
+4. `source:` **no pool candidate — hunt:** Timothy H. O'Sullivan, "A Harvest of
+   Death, Gettysburg, July 1863" (published in Gardner's *Photographic Sketch
+   Book of the War*, 1866). Search Wikimedia Commons for "Harvest of Death
+   O'Sullivan Gettysburg" or the Library of Congress Prints & Photographs
+   Division Civil War collection (Gardner/O'Sullivan Gettysburg series); public
+   domain, pre-1867. Save as `harvest-of-death-gettysburg-1863`. Reader must be
+   able to see: the rows of Union dead swollen in the field at dawn, the flat
+   Pennsylvania farmland receding to the horizon. Why it must be the real thing:
+   this is the photograph that makes "51,000 casualties, the war's bloodiest
+   battle" a physical fact rather than a number — no drawing substitutes for
+   the actual wet-plate record. Placement: centered, opening the "1863's
+   turning points" section, before the Vicksburg material.
+5. `source:` **no pool candidate — hunt:** a period photograph of the McLean
+   House at Appomattox Court House, VA, taken within days of the April 9, 1865
+   surrender (Mathew Brady studio or Timothy O'Sullivan; Library of Congress
+   Civil War Photographs collection, search "Appomattox Court House McLean
+   House 1865"). If unavailable, substitute the National Archives facsimile of
+   Grant's handwritten terms of surrender and Lee's acceptance letter (search
+   "Grant Lee Appomattox terms of surrender manuscript National Archives").
+   Save as `appomattox-mclean-house-1865`. Reader must be able to see: the
+   actual house/room where the surrender was negotiated, or Grant's own hand
+   setting the terms. Why it must be the real thing: Appomattox is a specific
+   building and a specific manuscript, not a generic "surrender" scene — a
+   drawn illustration would invent a room the camera and the archive already
+   recorded. Placement: centered, in the closing section, beside the
+   Appomattox-terms sentence.
+6. `draw:` single `<Figure>` — **the cost, to scale**: US war deaths across all
    American wars as bars with the Civil War's ~750,000 dominating and the 1860
    population share annotated. Idea from Blight L1's scale figures.
-5. `draw:` `<FigureSequence>` (5 frames) — **1864 in five moves**: Overland
+7. `draw:` `<FigureSequence>` (5 frames) — **1864 in five moves**: Overland
    Campaign attrition → Cold Harbor → the Blind Memorandum (Aug 23) → Atlanta
    falls (Sept 2) → the November result. Each frame adds one event and updates a
    small "Lincoln's re-election odds as contemporaries saw them" bar.
-6. `draw:` single `<Figure>` — **Sherman's march as a target list**: the route
+8. `draw:` single `<Figure>` — **Sherman's march as a target list**: the route
    from Atlanta to Savannah to Columbia with the categories destroyed (railroads,
-   mills, stores, plantations) tallied, and the categories excluded stated.
-7. `draw:` single `<Figure>` — **why the Union won**: five contributing factors
+   mills, stores, plantations) tallied, and the categories excluded stated. This
+   is the course's own tally overlaid on a route, not a reproduction of a period
+   campaign map — stays drawn.
+9. `draw:` single `<Figure>` — **why the Union won**: five contributing factors
    as weighted bars (logistics, emancipation and Black enlistment, blockade,
    Confederate internal collapse, Northern political will), with the note that
    the last was the one that could have failed.
-8. `draw:` single `<Figure>` — **272 words against two hours**: a proportional
-   comparison of the Everett oration and the Gettysburg Address with the
-   Address's three-part structure labeled.
+10. `draw:` single `<Figure>` — **272 words against two hours**: a proportional
+    comparison of the Everett oration and the Gettysburg Address with the
+    Address's three-part structure labeled.
 
 ## Canon additions (curated expansion, July 2026)
 

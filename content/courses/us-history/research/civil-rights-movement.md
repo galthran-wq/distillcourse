@@ -110,30 +110,58 @@ promise arc the course opened in sectional-crisis.
 
 1. `source:` **yawp-selma-montgomery-march** — save as `selma-montgomery-1965`.
    Reader must be able to see: the marchers with flags, the children, and the
-   ordinary storefront backdrop. Placement: centered at the Selma section; the
-   mundane setting is part of the evidence.
+   ordinary storefront backdrop. Must be the real photograph — the mundane
+   setting is part of the evidence. Placement: centered at the Selma section.
 2. `source:` **yawp-march-on-washington** — save as `march-on-washington-1963`.
    Reader must be able to see: the leaders arm-in-arm and the legible placards
-   demanding jobs. Placement: centered beside the reading of the program's
-   demands — the placards support the point about the day's economic content.
+   demanding jobs. Must be the real photograph — the placards are the
+   primary evidence for the day's economic content. Placement: centered
+   beside the reading of the program's demands.
 3. `source:` **milestone-civil-rights-act-1964** — save as `civil-rights-act-1964`.
    Reader must be able to see: the enrolled first page and the JUL 2 / JUL 6 1964
-   routing stamps. Placement: float right at the legislation section.
-4. `draw:` `<FigureSequence>` (6 frames) — **campaign by campaign**: Montgomery →
+   routing stamps. Must be the real enrolled act — the stamps are the
+   evidence for how fast passage became law. Placement: float right at the
+   legislation section.
+4. `source:` **no pool candidate — hunt:** the Greensboro sit-in, February 1
+   1960 — the International Civil Rights Center & Museum (the actual
+   Woolworth's counter is preserved there) and the Smithsonian NMAAHC hold
+   period wire photographs of the four A&T students seated at the counter;
+   also check the Wikimedia Commons category "Greensboro sit-ins". Save as
+   `greensboro-sit-in-1960`. Reader must be able to see: the students seated
+   at the counter and the staff/patrons around them. Must be the real
+   photograph — this is the movement's own opening tactic, not a staged
+   recreation. Placement: centered at the Greensboro frame of the
+   campaign-by-campaign sequence.
+5. `source:` **no pool candidate — hunt:** the Voting Rights Act of 1965,
+   enrolled first page — archives.gov/milestone-documents (Voting Rights
+   Act), the same National Archives collection the Civil Rights Act capture
+   above comes from. Save as `voting-rights-act-1965`. Reader must be able
+   to see: the enrolled act's opening text and the date of signature. Must
+   be the real act — the registration figure below claims a measurable legal
+   effect, and the statute itself is the cause on trial. Placement:
+   float-right at the registration-before-and-after figure.
+6. `draw:` `<FigureSequence>` (6 frames) — **campaign by campaign**: Montgomery →
    Greensboro → Freedom Rides → Albany (failure) → Birmingham → Selma. Each frame
    carries target, tactic, response, and federal action, so the escalation logic
    and the one failure are both visible.
-5. `draw:` single `<Figure>` — **Birmingham's strategy**: a decision diagram of
+7. `draw:` single `<Figure>` — **Birmingham's strategy**: a decision diagram of
    target selection criteria (predictable adversary, media access, local
    infrastructure, economic leverage) with Albany and Birmingham scored against
    each.
-6. `draw:` single `<Figure>` — **the Senate cloture arithmetic**: the 1964 vote
+8. `draw:` single `<Figure>` — **the Senate cloture arithmetic**: the 1964 vote
    assembled by party and region, showing which coalition broke the filibuster
    and how the count reached 73.
-7. `draw:` single `<Figure>` — **registration before and after the VRA**: Black
+9. `draw:` single `<Figure>` — **registration before and after the VRA**: Black
    voter registration by Southern state, 1964 vs. 1967, as paired bars with
    Mississippi's change labeled. The law with a measurable effect.
-8. `draw:` single `<Figure>` — **movement and counter-movement**: a single
-   1954-1965 timeline with movement actions above the line and resistance
-   (Southern Manifesto, school closures, Wallace, bombings) below it. Idea from
-   the Yawp's facing-page treatment.
+10. `draw:` single `<Figure>` — **movement and counter-movement**: a single
+    1954-1965 timeline with movement actions above the line and resistance
+    (Southern Manifesto, school closures, Wallace, bombings) below it. Idea from
+    the Yawp's facing-page treatment.
+
+5 of 10 entries (50%) are sourced: three already in the pool, plus the
+Greensboro sit-in photograph and the Voting Rights Act's enrolled page added
+above. The remaining five figures — the campaign sequence, Birmingham's
+target-selection logic, the cloture arithmetic, the registration bars, and
+the movement/counter-movement timeline — are the course's own analytical
+and data constructs.

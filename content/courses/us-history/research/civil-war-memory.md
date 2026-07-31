@@ -104,15 +104,42 @@ applies to its own thesis in historiographical-lenses.
    `stone-mountain-carving`. Reader must be able to see: the three mounted
    figures at monumental scale against the rock face. Placement: centered in the
    memorialization section; caption gives the 1915 start date.
-3. `draw:` single `<Figure>` — **three memory traditions**: a three-column
+3. `source:` **no pool candidate — hunt:** a photograph of the 1913 Gettysburg
+   reunion — the "Great Reunion," July 1913, 50th anniversary — Union and
+   Confederate veterans meeting at the stone wall on Cemetery Ridge, some
+   staged shaking hands across it. Search Wikimedia Commons / Library of
+   Congress "Great Reunion 1913 Gettysburg veterans" or the National Park
+   Service Gettysburg photo archive; public domain (pre-1928 US press/federal
+   photograph). Save as `gettysburg-reunion-1913`. Reader must be able to see:
+   elderly veterans from both armies together, in the open field, without a
+   single Black veteran among them. Why it must be the real thing: the
+   absence the lesson names (no Black veterans present, Wilson presiding) has
+   to be verifiable in the actual photograph, not asserted over a drawn crowd.
+   Placement: centered, in the "how the fusion happened" section, beside the
+   Blue-Gray reunions paragraph.
+4. `source:` **no pool candidate — hunt:** the theatrical release poster for
+   D. W. Griffith's *The Birth of a Nation* (1915). Search Wikimedia Commons
+   "Birth of a Nation 1915 poster"; public domain (US work published before
+   1929, copyright not renewed). Save as `birth-of-a-nation-poster-1915`.
+   Reader must be able to see: the poster's own imagery and lettering as
+   contemporary audiences saw it advertised. Why it must be the real thing:
+   the film's "political effect" is a claim about a mass-market artifact;
+   showing the actual promotional object situates the claim in the
+   commercial culture that carried the Lost Cause, rather than illustrating
+   the film's content (which the lesson does not need to depict). Placement:
+   centered, in the "memory built in artifacts" section, beside the Stone
+   Mountain / Dunning School / *Birth of a Nation* paragraph.
+5. `draw:` single `<Figure>` — **three memory traditions**: a three-column
    comparison (what the war was about / who the heroes are / what Reconstruction
    was) with the fusion of two of them marked by a bracket.
-4. `draw:` single `<Figure>` — **when the monuments were built**: Confederate
+6. `draw:` single `<Figure>` — **when the monuments were built**: Confederate
    monument dedications per year, 1865-1970, with the disenfranchisement era and
-   the civil rights era shaded. One idea: the dates are the argument.
-5. `draw:` `<FigureSequence>` (4 frames) — **an event and its retellings**:
+   the civil rights era shaded. One idea: the dates are the argument. This is
+   the course's own tally of dedication counts, not a reproduction of an
+   existing published chart — stays drawn.
+7. `draw:` `<FigureSequence>` (4 frames) — **an event and its retellings**:
    frame 1 Colfax as documented in 1873; frames 2-4 the same event renamed and
    recast in successive accounts, with the changed words highlighted each time.
-6. `draw:` single `<Figure>` — **what the painting documents vs. what it
+8. `draw:` single `<Figure>` — **what the painting documents vs. what it
    depicts**: two labeled timelines — the 1859 events and the 1880s production
    context — with the invented element marked on the second.

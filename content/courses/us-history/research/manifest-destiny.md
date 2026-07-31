@@ -96,29 +96,74 @@ war-to-Wilmot chain.
 
 ## FIGURE PLAN
 
-1. `source:` **panorama-overland-trails** — save as `panorama-overland-trails`.
+1. `source:` **territorial-growth-reference-map** — no pool candidate — hunt:
+   Wikimedia Commons historical-atlas map, e.g. William R. Shepherd, *Historical
+   Atlas* (1911), "Territorial Growth of the United States" plate (public
+   domain), or a National Archives/USGS reference map of the same title. Reader
+   must be able to see: each acquisition block (Louisiana, Texas, Oregon,
+   Mexican Cession, Gadsden) labeled with its year and method (purchase /
+   annexation / treaty / war) on one real, published map. Placement:
+   float-right at the lesson's opening — the oriented, factual map the reader
+   returns to; the drawn sequence in entry 3 re-argues it for the slavery
+   question specifically. Supersedes any plan to redraw the Gates 1968
+   acquisition map (`gateslandlaw-s1-acquisition-map`) in house style — that map
+   is a real artifact and belongs sourced, not redrawn; use it only as a
+   secondary reference if a stronger public copy of the Shepherd/USGS map can't
+   be found.
+2. `source:` **gast-american-progress-1872** — no pool candidate — hunt:
+   Wikimedia Commons, "File:American Progress (John Gast painting).jpg" (Autry
+   Museum of the American West; a Library of Congress print copy also exists).
+   Reader must be able to see: Columbia floating westward stringing telegraph
+   wire, the light-to-dark gradient from settled East to unsettled West, and
+   the retreating Native people and bison at the painting's dark edge.
+   Placement: centered, opening the manifest-destiny-as-ideology section (key
+   point 2), right after O'Sullivan's coinage is introduced. Caption must state
+   it is an 1872 commercial chromolithograph subject (made for Crofutt's
+   railroad guide), not 1845 art — a retrospective self-image of the ideology,
+   including what it erases.
+3. `draw:` `<FigureSequence>` (4 frames) — **the map of slavery's line**: frame 1
+   the Missouri Compromise line (1820); frame 2 Texas annexation (1845); frame 3
+   the Oregon settlement (1846); frame 4 the Mexican Cession (1848) with the
+   question mark over its status. One acquisition per frame on a fixed base
+   map, each frame keyed to the acquisitions entry 1 shows factually, but
+   reading the political status of slavery in each — which no found map does.
+4. `source:` **overland-trail-wagon-photograph** — no pool candidate — hunt:
+   Library of Congress Prints & Photographs Division, search "wagon train
+   Oregon Trail" or "emigrants crossing the plains" (several 1860s-70s
+   photographs and stereographs, e.g. William Henry Jackson's emigrant views);
+   confirm public-domain status before use. Reader must be able to see: a real
+   wagon train in transit — canvas-covered wagons, draft animals, the open
+   trail — giving the migration numbers in entry 5 a physical referent.
+   Placement: float-left beside the overland-migration column chart (entry 5).
+5. `draw:` single `<Figure>` — **overland migration by year, 1840-1860**: a
+   column chart with the 1849-1852 gold-rush spike and the Mormon migration
+   distinguished. Data from the Panorama Overland Trails layer.
+6. `source:` **panorama-overland-trails** — save as `panorama-overland-trails`.
    Reader must be able to see: the three trail routes, the named diarist list,
    and the year-by-year volume timeline. Placement: centered in the migration
    section, credited to DSL/Stamen with a link. NOTE: publisher-copyright
-   screenshot; if licensing is a concern, drop it and use drawn figure 3 alone,
-   linking the atlas.
-2. `draw:` `<FigureSequence>` (4 frames) — **the map of slavery's line**: frame 1
-   the Missouri Compromise line (1820); frame 2 Texas annexation (1845); frame 3
-   the Oregon settlement (1846); frame 4 the Mexican Cession (1848) with the
-   question mark over its status. One acquisition per frame on a fixed base map.
-3. `draw:` single `<Figure>` — **overland migration by year, 1840-1860**: a
-   column chart with the 1849-1852 gold-rush spike and the Mormon migration
-   distinguished. Data from the Panorama Overland Trails layer.
-4. `draw:` single `<Figure>` — **what the war transferred**: the Mexican Cession
+   screenshot; if licensing is a concern, drop it and use drawn figure 5 and
+   sourced figure 4 alone, linking the atlas.
+7. `source:` **guadalupe-hidalgo-treaty-page** — no pool candidate — hunt:
+   National Archives Milestone Documents, "Treaty of Guadalupe Hidalgo" high-res
+   download (archives.gov/milestone-documents/treaty-of-guadalupe-hidalgo; URL
+   pattern matches the milestone-* entries already in images.yaml, e.g.
+   archives.gov/files/milestone-documents/images/doc-0XX-big.jpg). Reader must
+   be able to see: the treaty's signature/seal page and enough of the actual
+   text to show the property and citizenship guarantees to Mexican residents
+   (key point 5). Placement: centered, in the war's-terms section, directly
+   beside the discussion of guarantees "widely ignored afterward."
+8. `draw:` single `<Figure>` — **what the war transferred**: the Mexican Cession
    plus Texas against the 1845 United States, with area and current-state
-   overlay, and the Guadalupe Hidalgo terms listed beside it.
-5. `draw:` single `<Figure>` — **the Wilmot Proviso vote by section**: a
+   overlay, and the Guadalupe Hidalgo terms (entry 7) listed beside it.
+9. `draw:` single `<Figure>` — **the Wilmot Proviso vote by section**: a
    grouped bar of House yeas and nays by North/South and by party, showing party
    lines crossing and sectional lines holding.
-6. `draw:` single `<Figure>` — **four positions on slavery in the territories**:
-   a spectrum from abolition through free soil, popular sovereignty, and the
-   federal-protection (Calhoun) position, each with its one-line claim and its
-   partisan home. This spectrum is reused in sectional-crisis.
+10. `draw:` single `<Figure>` — **four positions on slavery in the
+    territories**: a spectrum from abolition through free soil, popular
+    sovereignty, and the federal-protection (Calhoun) position, each with its
+    one-line claim and its partisan home. This spectrum is reused in
+    sectional-crisis.
 
 ## Canon additions (curated expansion, July 2026)
 

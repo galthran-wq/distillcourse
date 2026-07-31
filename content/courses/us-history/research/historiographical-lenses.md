@@ -133,12 +133,29 @@ the course's frame.
 4. `source:` — **Turner essay first page** (1893 AHA annual report, PD).
    No capture in the pool yet; capture from archive.org
    (`annualreportofam1893amer` or the AHA text). File stem
-   `turner-1893-frontier-essay`. Placement: float-right, width m.
+   `turner-1893-frontier-essay`. Reader must be able to see: the essay's
+   opening paragraph and its 1893 imprint. Must be the real page — it is
+   the text the whole lesson treats as a primary source to be tested, not
+   a summary of it. Placement: float-right, width m.
 5. `source:` — **Black Reconstruction "Propaganda of History" opening page**
    (1935; verify PD/renewal status before shipping — if unclear, quote the
    text in prose instead and skip the scan). No capture in the pool; candidate
    to capture from archive.org. File stem `dubois-propaganda-of-history`.
-   Placement: centered.
+   Reader must be able to see: the chapter's opening lines and its 1935
+   imprint. Must be the real page for the same reason as figure 4 — it goes
+   under the same scrutiny the lesson applies to Turner. Placement: centered.
+6. `source:` **no pool candidate — hunt:** a portrait photograph of
+   Frederick Jackson Turner — the Wisconsin Historical Society and the
+   Wikimedia Commons category "Frederick Jackson Turner" hold pre-1929
+   portraits, public domain. Save as `turner-portrait`. Reader must be able
+   to see: a recognizable likeness of Turner. Must be the real photograph —
+   it puts a face on the historian whose essay figure 4 reproduces.
+   Placement: float-left, beside the Turner essay figure.
+
+3 of 6 entries (50%) are sourced. This lesson is historiography-about-
+historiography, so the LensMatrix, the schools timeline, and the Beard test
+stay drawn by design — they compare arguments against each other, not
+artifacts against each other.
 
 ## Exercises seed
 

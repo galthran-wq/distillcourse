@@ -129,9 +129,25 @@ Jackson's 1830 removal message remains the candidate.
    (Maysville, Bank, Nullification) against three rows (what federal power is
    claimed, against whom, on what constitutional theory). Idea from the MIT
    Week 10 handout.
-4. `draw:` single `<Figure>` — **the removal map**: the five nations' homelands,
-   the removal routes, and the destination territory, with mortality figures
-   annotated per nation.
+4. `source:` the five nations' removal routes are real geography, not ours to
+   invent — no pool candidate — hunt: the canonical Indian Removal / Trail of
+   Tears routes map — e.g. the National Park Service's official "Trail of
+   Tears National Historic Trail" route map (nps.gov/trte, a US government
+   public-domain work) showing the Cherokee, Creek, Choctaw, Chickasaw, and
+   Seminole routes; search Wikimedia Commons category "Trail of Tears maps".
+   Reader must be able to see: the homelands, the routes, and the destination
+   territory as the real, government-mapped geography. Mortality figures per
+   nation stay in the caption, not drawn onto the map. Placement: centered in
+   the removal section.
+4b. `source:` no pool candidate — hunt: archives.gov Milestone Documents page
+   image for Jackson's Message to Congress "On Indian Removal" (Dec 6, 1830) —
+   parallel to the milestone-* document scans already captured in the pool
+   (e.g. milestone-marbury-show-cause-order); check archives.gov's
+   milestone-documents listing for the assigned document number, or the
+   National Archives catalog. Reader must be able to see: the actual page of
+   the message quoted in the document-vs-outcome figure below — the real
+   document behind the benevolence framing. Placement: float left beside item
+   5.
 5. `draw:` single `<Figure>` — **document vs. outcome**: a two-panel comparison
    of the 1830 message's stated purpose (quoted phrase) against the recorded
    consequences (acres transferred, people removed, deaths). Rule 8 comparison

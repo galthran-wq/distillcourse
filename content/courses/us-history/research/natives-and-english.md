@@ -126,10 +126,42 @@ archives.
    losses (deaths, enslaved, displaced, population decline band) — with the
    proportional comparison to later American wars beneath. The lesson's
    key-result figure.
-4. `draw:` single `<Figure>` — **the war mapped**: southern New England with
-   attacked towns marked, Metacom's movements, the Great Swamp Fight, and
-   Deer Island, one legend, no battle-narrative clutter.
+4. `source:` single `<Figure>` — **the war mapped, on the period's own map**:
+   file-stem `natives-and-english-foster-map-new-england-1677`; the reader
+   must see John Foster's "A Map of New England" (Boston, 1677) — the first
+   map engraved and printed in British North America, published in the
+   immediate aftermath of King Philip's War and covering exactly this
+   geography (oriented with west at top). Real because it is a specific,
+   dated, physically printed war-era map, not a locator the course could
+   redraw without fabricating a historical object; annotate attacked towns,
+   Metacom's movements, the Great Swamp Fight, and Deer Island as an overlay
+   on the scan rather than inventing a new base map. No pool candidate —
+   hunt: Library of Congress or American Antiquarian Society digitization
+   of "A Map of New England, Being the first that ever was here cut" (search
+   "John Foster map of New England 1677 Library of Congress" or
+   "Wikimedia Commons Foster map New England 1677"). Placement: centered.
 5. `draw:` single `<Figure>` — **two archives**: the records/argues/omits
    boxes applied twice side by side — once to Rowlandson, once to the Native
    record's forms (oral tradition, petitions, court testimony) — stating what
    each preserves and what each cannot.
+6. `source:` single `<Figure>` — **the Mystic fort assault, 1638 woodcut**:
+   file-stem `natives-and-english-underhill-mystic-woodcut`; the reader must
+   see the period woodcut of English and allied forces surrounding the
+   palisaded Pequot fort at Mystic — a contemporary illustration of the
+   event Bradford's quoted passage describes, not a course reconstruction of
+   a massacre. No pool candidate — hunt: the woodcut/engraving from John
+   Underhill, "Newes from America" (London, 1638), widely reproduced (search
+   "Underhill Newes from America 1638 Mystic fort woodcut Wikimedia
+   Commons" or the John Carter Brown Library digital collection). Placement:
+   float-left, beside the Pequot War / Mystic massacre paragraph.
+7. `source:` single `<Figure>` — **Rowlandson, title page, 1682**: file-stem
+   `natives-and-english-rowlandson-title-1682`; the reader must see the
+   actual title page of "The Sovereignty and Goodness of God" — the first
+   American bestseller and the lesson's records/argues/omits worked
+   example — grounding that reading exercise in the real printed object
+   rather than a summary of it. No pool candidate — hunt: Library of
+   Congress or Evans Early American Imprint Collection scan of the first
+   Cambridge, MA (1682) edition's title page (search "Rowlandson Sovereignty
+   and Goodness of God 1682 title page" or "Evans Early American Imprints
+   Rowlandson 1682"). Placement: float-right, beside the Rowlandson set
+   piece.

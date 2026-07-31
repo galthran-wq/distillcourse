@@ -90,28 +90,72 @@ government series is the decade's thesis-relevant measurement.
 
 ## FIGURE PLAN
 
-No `source:` figures in the pool for this lesson. Candidate for later capture if
-wanted: the Watergate hearings or the resignation letter, both NARA-held.
-
-1. `draw:` single `<Figure>` — **trust collapses**: the trust-in-government
+1. `source:` **no pool candidate — hunt:** Richard Nixon's resignation
+   letter, August 9 1974 — the National Archives holds the one-sentence
+   original ("I hereby resign the Office of President of the United
+   States"), addressed to Secretary of State Kissinger; check
+   archives.gov/milestone-documents. Save as
+   `nixon-resignation-letter-1974`. Reader must be able to see: the single
+   operative sentence and Nixon's signature. Must be the real letter — the
+   accountability-chain sequence below argues for one institution acting per
+   frame, and this is the last institution's actual output. Placement:
+   centered at the resignation frame of that sequence.
+2. `source:` **no pool candidate — hunt:** the Senate Watergate Committee
+   hearings, 1973 — the US Senate Historical Office photograph collection or
+   the National Archives holds public-domain hearing-room photographs (Sam
+   Ervin presiding, or John Dean testifying). Save as
+   `senate-watergate-hearings-1973`. Reader must be able to see: the hearing
+   room, the committee dais, and the witness table. Must be the real
+   photograph — the hearings' public, televised nature is the mechanism the
+   lesson credits for moving opinion. Placement: float-right at the "Senate
+   hearings and the tapes" frame.
+3. `source:` **no pool candidate — hunt:** a 1973-74 gas line photograph —
+   the EPA's Documerica project (1971-77) is entirely public domain and
+   includes gas-station queues and rationing signage; search the National
+   Archives' Documerica collection or the Wikimedia Commons category
+   "Documerica" for "gas lines 1973" or "1974 fuel shortage." Save as
+   `gas-lines-oil-embargo-1974`. Reader must be able to see: cars queued at
+   a pump and a rationing or "sorry, no gas" sign. Must be the real
+   photograph — it is the misery index's most legible everyday instance.
+   Placement: centered near the misery-index figure.
+4. `source:` **no pool candidate — hunt:** a mid-1970s idle steel mill or
+   factory photograph — the EPA's Documerica project also documented
+   industrial decline in the Rust Belt; search the National Archives'
+   Documerica collection for "steel mill" or "factory closed" 1970s frames.
+   Save as `rust-belt-mill-1970s`. Reader must be able to see: the plant's
+   scale and its idled or shuttered state. Must be the real photograph — the
+   deindustrialization map's claim is about actual places, not a modeled
+   trend. Placement: float-left beside the deindustrialization map.
+5. `draw:` single `<Figure>` — **trust collapses**: the trust-in-government
    series 1958-1980 with Vietnam escalation, the Pentagon Papers, Watergate, and
    the oil shocks annotated. The lesson's spine figure.
-2. `draw:` `<FigureSequence>` (5 frames) — **Watergate's accountability chain**:
+6. `draw:` `<FigureSequence>` (5 frames) — **Watergate's accountability chain**:
    break-in → press investigation → Senate hearings and the tapes →
    *United States v. Nixon* → impeachment articles and resignation. One
    institution acts per frame.
-3. `draw:` single `<Figure>` — **the misery index**: inflation plus unemployment,
+7. `draw:` single `<Figure>` — **the misery index**: inflation plus unemployment,
    1965-1982, with 1973 and 1979 shocks marked and the 1970s plateau highlighted.
-4. `draw:` single `<Figure>` — **real wages flatten**: median real weekly
+8. `draw:` single `<Figure>` — **real wages flatten**: median real weekly
    earnings 1947-1980, showing the postwar climb and the mid-1970s break. One
    idea: the trend line changes and does not change back.
-5. `draw:` single `<Figure>` — **deindustrialization mapped**: manufacturing
+9. `draw:` single `<Figure>` — **deindustrialization mapped**: manufacturing
    employment change by metro area, 1970-1985, with the steel and auto belt
    losses visible.
-6. `draw:` single `<Figure>` — **the ERA's ratification map**: states ratifying
-   by year, the 35-of-38 stall, and the rescission attempts, with the STOP ERA
-   campaign's argument summarized in one line.
-7. `draw:` single `<Figure>` — **movements and their instruments**: five
-   movements as rows against columns (organizing form, key legal instrument won,
-   year) — feminism/Title IX, Chicano/UFW contracts, AIM/Indian Self-
-   Determination Act, gay liberation/decriminalization, disability/Section 504.
+10. `draw:` single `<Figure>` — **the ERA's ratification map**: states ratifying
+    by year, the 35-of-38 stall, and the rescission attempts, with the STOP ERA
+    campaign's argument summarized in one line.
+11. `draw:` single `<Figure>` — **movements and their instruments**: five
+    movements as rows against columns (organizing form, key legal instrument won,
+    year) — feminism/Title IX, Chicano/UFW contracts, AIM/Indian Self-
+    Determination Act, gay liberation/decriminalization, disability/Section 504.
+
+4 of 11 entries (36%) are sourced — the resignation letter and Senate
+hearings photo (the pool's own suggested candidates, converted to concrete
+hunt pointers), plus two Documerica photographs, a public-domain federal
+collection the original note undersold when it called this era "mostly
+under copyright." Below half: the remaining seven figures are this
+lesson's own time-series and comparison devices (trust, misery index,
+wages, deindustrialization's specific metro pattern, ratification, movement
+instruments) — the deindustrialization and ERA maps stay drawn because they
+plot modern statistical series on a map, not a canonical historical map
+itself.

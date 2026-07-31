@@ -124,6 +124,41 @@ regimes), completing the module's social picture.
    coverture / Dutch community property / Quaker meetings as three columns
    over rows (own property? make wills? speak in governance?), each cell a
    documented instance, with the post-1664 erosion arrow on the Dutch column.
+6. `source:` single `<Figure>` — **William Penn, portrait**: pool candidate
+   `albionseed-william-penn-portrait` (18th-c. engraving); the reader must
+   see Penn's own likeness beside the constitution-making discussion — real
+   because it is a period likeness of the man, not a course illustration of
+   him, as the brief's own canon note already flags. Placement: float-right,
+   beside the Charter of Privileges paragraph.
+7. `source:` single `<Figure>` — **the Flushing Remonstrance, 1657**:
+   file-stem `middle-colonies-flushing-remonstrance-1657`; the reader must
+   see the actual signed petition asserting liberty of conscience against
+   Stuyvesant — the concrete pre-Penn artifact the brief names, and a real
+   document because the signatures and the petition's physical survival (New
+   York State Archives) are the evidence for "conscience asserted," not a
+   paraphrase of it. No pool candidate — hunt: New York State Archives or
+   Wikimedia Commons scan of the Flushing Remonstrance (search "Flushing
+   Remonstrance 1657 New York State Archives" or "Flushing Remonstrance
+   Wikimedia Commons"). Placement: float-left, beside the New Netherland
+   paragraph.
+8. `source:` single `<Figure>` — **the Germantown Protest, 1688**: file-stem
+   `middle-colonies-germantown-protest-1688`; the reader must see the actual
+   four-signature page — the first recorded antislavery petition in English
+   America — because the document's survival and the signatures themselves
+   are the primary evidence the key point rests on. No pool candidate —
+   hunt: Haverford College Quaker & Special Collections digitization of the
+   1688 Germantown Protest (search "Germantown Protest 1688 Haverford
+   College" or "Germantown Quaker Petition Against Slavery 1688 Wikimedia
+   Commons"). Placement: centered, beside the Germantown Protest set piece.
+9. `source:` single `<Figure>` — **Zenger trial pamphlet, title page,
+   1736**: file-stem `middle-colonies-zenger-trial-title-1736`; the reader
+   must see the actual title page of "A Brief Narrative of the Case and
+   Tryal of John Peter Zenger" — the free-press precedent named in key point
+   6, grounded in the real printed report of the trial rather than a
+   description of it. No pool candidate — hunt: Library of Congress or
+   Evans Early American Imprints scan of the 1736 Zenger trial pamphlet
+   (search "Zenger trial pamphlet 1736 title page Library of Congress").
+   Placement: float-right, beside the free-press / Zenger paragraph.
 
 ## Canon additions (curated expansion, July 2026)
 

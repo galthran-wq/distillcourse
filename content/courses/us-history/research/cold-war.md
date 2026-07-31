@@ -94,25 +94,62 @@ the check that worked was the Senate, late.
 
 ## FIGURE PLAN
 
-No `source:` figures in the pool for this lesson. If one is wanted, the NARA
-Truman Doctrine or Marshall Plan document page is a clean candidate to capture.
-
-1. `draw:` `<FigureSequence>` (5 frames) — **containment assembled**: Long
+1. `source:` **no pool candidate — hunt:** a real Cold War Europe map —
+   Wikimedia Commons categories "Occupation zones of Germany" and "Cold War
+   Europe" hold CIA- and US-Army-produced public-domain composites; if no
+   single map carries all four layers, pair the occupation-zones map with a
+   companion NATO/Cominform-membership map from the same PD family rather
+   than redrawing either. Save as `europe-divided-1945-1949`. Reader must be
+   able to see: the four occupation zones, the Iron Curtain line, and the
+   NATO/Cominform bloc boundaries. Must be the real map — a redrawn
+   political-boundary map is exactly the fabrication the house style
+   forbids; the actual government cartography is the primary evidence for
+   who drew the line where. Placement: centered, replacing the originally
+   planned drawn map.
+2. `source:` **no pool candidate — hunt:** US Army Center of Military
+   History (history.army.mil) official Korean War campaign maps — the CMH's
+   Korean War brochures carry dated front-line maps for June 1950, September
+   1950, November 1950, and July 1953, all public-domain federal works. Save
+   as `korean-war-front-lines-1950-1953` (sequence). Reader must be able to
+   see: the front line's location on the peninsula at each date, including
+   the near-return to the 38th parallel by 1953. Must be the real campaign
+   maps — this is the military's own documented record of where the line
+   actually ran, not a schematic. Placement: centered `<FigureSequence>`.
+3. `source:` **no pool candidate — hunt:** the Truman Doctrine address to
+   Congress, March 12 1947 — archives.gov/milestone-documents (Truman
+   Doctrine) or the Truman Presidential Library's online document collection
+   holds the reading-copy or enrolled page. Save as
+   `truman-doctrine-address-1947`. Reader must be able to see: the operative
+   sentence, "It must be the policy of the United States to support free
+   peoples..." Must be the real document — that sentence is the instrument's
+   actual charter language, not a paraphrase. Placement: float-right at the
+   Truman Doctrine paragraph.
+4. `source:` **no pool candidate — hunt:** the Army-McCarthy hearings, 1954 —
+   the Wikimedia Commons category "Army–McCarthy hearings" or the US Senate
+   Historical Office photograph collection holds public-domain hearing-room
+   photographs, including the Welch/McCarthy exchange. Save as
+   `army-mccarthy-hearings-1954`. Reader must be able to see: the crowded
+   hearing room, McCarthy at the microphone, and Joseph Welch. Must be the
+   real photograph — the loyalty apparatus's public collapse is the evidence
+   for "the censure set the boundary." Placement: centered at the
+   McCarthyism section.
+5. `draw:` `<FigureSequence>` (5 frames) — **containment assembled**: Long
    Telegram → Truman Doctrine → Marshall Plan → NATO → NSC-68, one instrument
    per frame, with a running "commitment scope" and "defense budget" readout
    changing each time.
-2. `draw:` single `<Figure>` — **three interpretations**: orthodox, revisionist,
+6. `draw:` single `<Figure>` — **three interpretations**: orthodox, revisionist,
    post-revisionist as three columns (who is responsible / key evidence / what it
    explains poorly). The course's model figure for contested causation.
-3. `draw:` single `<Figure>` — **Europe divided, 1945-1949**: a map with
-   occupation zones, Marshall Plan recipients, Cominform members, and NATO's
-   founding members marked in one legend.
-4. `draw:` `<FigureSequence>` (4 frames) — **the Korean front moves**: June 1950,
-   September 1950, November 1950, and July 1953 front lines on one peninsula map;
-   the last frame returns nearly to the first.
-5. `draw:` single `<Figure>` — **the defense-budget ratchet**: US defense
+7. `draw:` single `<Figure>` — **the defense-budget ratchet**: US defense
    spending as a share of GDP, 1945-1960, with demobilization, NSC-68, Korea, and
    the post-armistice plateau annotated. One idea: it never returned to 1948.
-6. `draw:` single `<Figure>` — **the loyalty apparatus**: investigations,
+8. `draw:` single `<Figure>` — **the loyalty apparatus**: investigations,
    dismissals, and resignations under the federal loyalty program, plus the
    Lavender Scare's separate count, as one tally card.
+
+4 of 8 entries (50%) are sourced: the Europe map and the Korean-front
+sequence are converted from drawn maps (geography is an artifact, per house
+rule), and the Truman Doctrine page and the McCarthy hearings photo are new.
+The remaining four figures — containment's instrument sequence, the three
+historiographical schools, the defense-budget ratio, and the loyalty tally
+— are the course's own comparative and quantitative constructs.

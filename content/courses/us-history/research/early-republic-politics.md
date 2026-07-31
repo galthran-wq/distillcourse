@@ -97,20 +97,44 @@ were readying while the House balloted).
    members watching, and the printed doggerel caption. Placement: centered in the
    crisis-of-1798 section. A period cartoon is evidence of contemporary opinion,
    not decoration.
-3. `draw:` single `<Figure>` — **Hamilton's program as a flow**: state debts →
+3. `source:` no pool candidate — hunt: a life portrait of Alexander Hamilton —
+   John Trumbull's 1805/1806 portrait (National Gallery of Art, NGA 1954.8.1) or
+   his 1792 Trumbull portrait for the New York Chamber of Commerce (the likeness
+   behind the ten-dollar-bill engraving); search Wikimedia Commons category
+   "Alexander Hamilton paintings". Reader must be able to see: Hamilton's face
+   and dress as a real, named likeness — this is the man whose fiscal program is
+   about to be diagrammed, not decoration. Placement: float-left opening the
+   Hamilton's-program section, beside item 4 below.
+4. `source:` no pool candidate — hunt: a life portrait of Thomas Jefferson —
+   Rembrandt Peale's 1800 portrait (New-York Historical Society, 1867.306) or
+   the Gilbert Stuart "Edgehill" Jefferson (1805/1821, National Gallery of Art);
+   search Wikimedia Commons category "Thomas Jefferson paintings". Reader must
+   be able to see: Jefferson's face as a real, named likeness, paired against
+   the Hamilton portrait above — the two men whose split defines the section.
+   Placement: float-right, opposite the Hamilton portrait.
+5. `source:` no pool candidate — hunt: a period printing of the Sedition Act
+   itself — the enrolled Fifth Congress act "An Act for the Punishment of
+   Certain Crimes Against the United States" (July 14, 1798; Statutes at Large
+   vol. 1, p. 596) or a contemporary newspaper printing of its text; search
+   loc.gov and Wikimedia Commons category "Alien and Sedition Acts". Reader
+   must be able to see: the actual statutory language criminalizing "false,
+   scandalous and malicious writing" against the government — the real
+   document the fact-card figure (item 10 below) summarizes. Placement:
+   centered in the crisis-of-1798 section, immediately before the fact card.
+6. `draw:` single `<Figure>` — **Hamilton's program as a flow**: state debts →
    federal assumption → funded national debt → Bank of the United States →
    credit and manufactures, with the constitutional objection (implied powers)
    annotated at the Bank node.
-4. `draw:` `<FigureSequence>` (4 frames) — **how a party formed**: frame 1 a
+7. `draw:` `<FigureSequence>` (4 frames) — **how a party formed**: frame 1 a
    single undifferentiated Congress; frame 2 split on assumption; frame 3 split
    again on the Bank; frame 4 split on the Jay Treaty and France, with the two
    blocs now stable. Same seating chart each frame, colors changing only.
-5. `draw:` single `<Figure>` — **the 1800 deadlock**: the 73-73 electoral tie, a
+8. `draw:` single `<Figure>` — **the 1800 deadlock**: the 73-73 electoral tie, a
    ballot-count strip across all 36 House ballots showing the state delegations
    moving, and the resolution date. Idea from Wood Ch.8.
-6. `draw:` single `<Figure>` — **the Sedition Act's terms**: the prohibited
+9. `draw:` single `<Figure>` — **the Sedition Act's terms**: the prohibited
    speech, the penalties, the number of prosecutions, and the expiry date set to
    the end of Adams's term, laid out as a fact card.
-7. `draw:` single `<Figure>` — **interposition's afterlife**: a forward-pointing
+10. `draw:` single `<Figure>` — **interposition's afterlife**: a forward-pointing
    timeline from the Kentucky and Virginia Resolutions (1798) to nullification
    (1832) to secession (1860-61), one line each.

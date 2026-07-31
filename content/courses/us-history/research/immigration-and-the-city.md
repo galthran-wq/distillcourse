@@ -96,22 +96,49 @@ course tracks alongside every expansion.
    the methodology/data section, credited to DSL/Stamen with a link. NOTE:
    publisher-copyright screenshot; if licensing is a concern, drop it and rely on
    drawn figures 2 and 3, linking the live atlas.
-2. `draw:` single `<Figure>` — **foreign-born share of the US population,
+2. `source:` no pool candidate — hunt: "Immigrants Just Arrived from Foreign
+   Countries — Immigration Building, Ellis Island, N.Y." (Detroit Publishing
+   Co., c. 1902-13), via Wikimedia Commons / LOC Prints & Photographs. Save as
+   `ellis-island-arrivals`. Reader must be able to see: the crowd of new
+   arrivals with baggage inside the actual immigration building. Why sourced:
+   a period photograph of the real intake process, not a staged illustration.
+   Placement: centered, opening the lesson's data section, before the "two
+   waves" composition figures below.
+3. `draw:` single `<Figure>` — **foreign-born share of the US population,
    1850-2010**: one line with the 1890-1910 peak, the post-1924 collapse, the
    1970 trough, and the recent rise annotated. The demo animates this; the figure
    fixes it.
-3. `draw:` `<FigureSequence>` (4 frames) — **origins shift**: stacked composition
+4. `draw:` `<FigureSequence>` (4 frames) — **origins shift**: stacked composition
    bars for 1860, 1880, 1900, and 1920, each frame changing only the composition,
    so the northwestern-to-southeastern European shift is a visible delta.
-4. `draw:` single `<Figure>` — **the dumbbell tenement**: floor plan with the
+5. `source:` no pool candidate — hunt: "Mulberry Street, New York" (Detroit
+   Publishing Co. photochrom, c. 1900), via Wikimedia Commons / LOC — the
+   canonical Lower East Side immigrant-neighborhood street scene. Save as
+   `mulberry-street-1900`. Reader must be able to see: the street market, the
+   density of people, and the tenement facades. Why sourced: a real
+   photographed streetscape of the neighborhood the lesson analyzes as an
+   institution (key point 2) — a drawn scene would fabricate specific,
+   nonexistent storefronts and faces. Placement: float-right beside the
+   "neighborhood as an institution" passage.
+6. `draw:` single `<Figure>` — **the dumbbell tenement**: floor plan with the
    airshaft, room count, and typical occupancy labeled, plus the density figure
    for a Lower East Side block.
-5. `draw:` single `<Figure>` — **arrivals and departures**: gross arrivals against
+7. `draw:` single `<Figure>` — **arrivals and departures**: gross arrivals against
    estimated return migration by nationality, showing the sojourner pattern.
-6. `draw:` single `<Figure>` — **the exclusion ladder**: 1875 Page Act → 1882
+8. `draw:` single `<Figure>` — **the exclusion ladder**: 1875 Page Act → 1882
    Chinese Exclusion → 1892/1902 extensions → 1907 Gentlemen's Agreement → 1917
    literacy test → 1921/1924 quotas, as a single timeline with each measure's
    target group named. Ends with a forward pointer to the-twenties.
+9. `source:` no pool candidate — hunt: a Chinese Exclusion Act "Certificate of
+   Identity" / "Certificate of Residence" (Geary Act, 1892 enforcement
+   document, photograph + physical description + government seal), from NARA's
+   Chinese Exclusion Act case files or Wikimedia Commons. Save as
+   `chinese-exclusion-certificate`. Reader must be able to see: the attached
+   photograph, the printed legal language, and the seal — a real person made
+   to carry government-issued proof of a race-based exclusion. Why sourced:
+   the actual enforcement document the exclusion ladder (item 8) only lists
+   by name; the object itself is the evidence. Placement: centered, at the
+   exclusion-ladder figure, directly illustrating its first rung.
 
 ## Canon additions (curated expansion, July 2026)
 

@@ -123,24 +123,51 @@ from the documents and the numbers.
 4. `source:` **milestone-14th-amendment-resolution** — save as
    `fourteenth-amendment-resolution`. Reader must be able to see: the opening
    text of Section 1. Placement: centered in the constitutional section.
-5. `draw:` single `<Figure>` — **three amendments, three additions**: 13th
+5. `source:` **no pool candidate — hunt:** Jourdan Anderson's 1865 letter to
+   his old master, first printed in the *Cincinnati Commercial* (Aug 22, 1865)
+   and reprinted in Lydia Maria Child's *The Freedmen's Book* (1865). Search
+   Wikimedia Commons / the Vermont Historical Society (Anderson's postwar home
+   was Dayton, Ohio, but the letter circulated nationally) for a period-printed
+   facsimile page, or the National Archives/Library of Congress digitized
+   newspaper column. If no period facsimile is locatable, the fallback is a
+   library scan of the 1865 pamphlet reprint credited accordingly — prefer the
+   period newspaper column if found. Save as `jourdan-anderson-letter-1865`.
+   Reader must be able to see: the letter's actual salutation and itemized
+   wage demand, in period type. Why it must be the real thing: this document
+   *is* the lesson's opening set piece — the brief says to "read it closely";
+   the reader should read Jourdan Anderson's own words as a printed artifact,
+   not a paraphrase. Placement: centered, opening the lesson, above the "what
+   freedom meant" section.
+6. `source:` **no pool candidate — hunt:** the Mississippi Black Code of 1865
+   ("An Act to Confer Civil Rights on Freedmen"), printed in *Laws of the
+   State of Mississippi, Called Session, 1865*. Search the University of North
+   Carolina's "Documenting the American South", the Mississippi Department of
+   Archives and History, or Wikimedia Commons for a period-printed statute
+   page ("Mississippi Black Code 1865"). Save as
+   `mississippi-black-code-1865`. Reader must be able to see: the statute's
+   actual vagrancy and labor-contract clauses in period print. Why it must be
+   the real thing: the lesson reads the Black Code "against the 13th Amendment
+   ratified the same year" — that confrontation is textual and needs the
+   actual statute page, not a summary of it. Placement: float right beside the
+   Black Codes paragraph in the Presidential Reconstruction section.
+7. `draw:` single `<Figure>` — **three amendments, three additions**: 13th
    (abolition), 14th (citizenship, due process, equal protection), 15th
    (suffrage), each with a one-line statement of what federal power it created
    and what it left out.
-6. `draw:` `<FigureSequence>` (5 frames) — **four Reconstructions**: wartime →
+8. `draw:` `<FigureSequence>` (5 frames) — **four Reconstructions**: wartime →
    presidential (Johnson) → congressional/Radical → Redemption (foreshadowed).
    Each frame changes who holds authority in the South and what freedpeople can
    legally do. Frame 4 ends with a forward pointer to the next lesson.
-7. `draw:` single `<Figure>` — **the spectrum of labor arrangements**: slavery →
+9. `draw:` single `<Figure>` — **the spectrum of labor arrangements**: slavery →
    gang wage labor → sharecropping → tenancy → landownership, with the share of
    Black Southern farmers at each position by 1880 and by 1900 (~15-20%
    landowning).
-8. `draw:` single `<Figure>` — **the sharecropping settlement, computed**: a
-   worked year-end ledger from the Rosstown-style contract, showing crop value,
-   the half share, and the deductions producing a debt balance.
-9. `draw:` single `<Figure>` — **Black officeholding, 1868-1877**: officeholders
-   by state and level over time, drawn so the later collapse (next lesson) has a
-   baseline to fall from.
+10. `draw:` single `<Figure>` — **the sharecropping settlement, computed**: a
+    worked year-end ledger from the Rosstown-style contract, showing crop value,
+    the half share, and the deductions producing a debt balance.
+11. `draw:` single `<Figure>` — **Black officeholding, 1868-1877**: officeholders
+    by state and level over time, drawn so the later collapse (next lesson) has a
+    baseline to fall from.
 
 ## Canon additions (curated expansion, July 2026)
 

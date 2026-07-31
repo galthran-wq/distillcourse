@@ -117,20 +117,52 @@ fought after the peace was signed (Howe's Prologue) as the before-picture.
 2. `draw:` single `<Figure>` — **transport cost per ton-mile, 1815 vs 1850**:
    wagon, canal boat, steamboat, railroad as four bars with the wagon bar
    dominating. One idea: distance got cheap.
-3. `draw:` single `<Figure>` — **Erie Canal freight composition, 1825-1860**: a
+3. `source:` no pool candidate — hunt: a period engraving of the Erie Canal in
+   operation — e.g. William Henry Bartlett's c.1839 aquatints "Erie Canal,
+   Lockport" or "Utica" (from *American Scenery*), widely reproduced and public
+   domain; search Wikimedia Commons category "Erie Canal historical images".
+   Reader must be able to see: a real canal boat, lock, or landing — the
+   physical infrastructure the freight chart (item 4) quantifies. Placement:
+   float right beside the freight-composition chart.
+4. `draw:` single `<Figure>` — **Erie Canal freight composition, 1825-1860**: a
    stacked area chart of commodity categories built from the American Panorama
    Canals data, with the 1849 total annotated. Inspiration: the Panorama canal
-   panel; our own drawing.
-4. `draw:` `<FigureSequence>` (4-5 frames) — **the transportation network fills
+   panel; our own drawing. (A data chart built from real tonnage data, not a
+   map artifact — stays drawn.)
+5. `draw:` `<FigureSequence>` (4-5 frames) — **the transportation network fills
    in**: the same base map at 1800, 1825, 1840, 1860, adding roads, then canals,
-   then rail; the sparse Southern network visible by the last frame.
-5. `draw:` single `<Figure>` — **the Lowell system as a diagram**: recruitment →
+   then rail; the sparse Southern network visible by the last frame. (Our own
+   analytical reconstruction from infrastructure data, not a copy of a single
+   published historical map — stays drawn.)
+6. `source:` no pool candidate — hunt: a Lowell mill-girls daguerreotype (e.g.
+   Baker Library, Harvard Business School, holds several named "Lowell mill
+   girl" portraits) or the title page/masthead of *The Lowell Offering*, the
+   1840s magazine written and edited by the mill women themselves; search
+   Wikimedia Commons categories "Lowell Mills" and "Lowell Offering". Reader
+   must be able to see: a real mill worker's face or the real periodical's
+   masthead — the primary evidence the Lowell-test set piece argues from, not
+   illustration. Placement: centered opening the Lowell section, before item 7.
+7. `draw:` single `<Figure>` — **the Lowell system as a diagram**: recruitment →
    boardinghouse → mill floor → wages → remittance home, with the three pressure
    points (speed-up, wage cut, labor substitution) marked where the turn-outs
    occurred.
-6. `draw:` single `<Figure>` — **household production before and after**: two
+8. `draw:` single `<Figure>` — **household production before and after**: two
    panels of the same farm household, with home-produced goods in the first
    replaced by purchased goods in the second, and a cash arrow appearing.
+9. `source:` no pool candidate — hunt: Library of Congress, Samuel F. B. Morse
+   Papers — the original manuscript/paper-tape record of the May 24, 1844
+   message "What hath God wrought," transmitted Washington–Baltimore (search
+   loc.gov "Morse telegraph 1844" or the Morse Papers finding aid). Reader must
+   be able to see: the actual dots-and-dashes tape or Morse's manuscript
+   record — the real artifact closing Howe's tyranny-of-distance thread opened
+   by the New Orleans anecdote. Placement: centered, closing section.
+10. `source:` no pool candidate — hunt: Edward W. Clay's 1837 lithograph "The
+   Times" — the widely reproduced Panic-of-1837 satirical print (held by the
+   Library Company of Philadelphia / American Antiquarian Society); search
+   Wikimedia Commons "The Times 1837 Edward Clay". Reader must be able to see:
+   the panic's real period caricature — shuttered bank, running crowd, "no
+   more credit" signage. Placement: centered in the finance-and-shocks
+   section.
 
 ## Canon additions (curated expansion, July 2026)
 

@@ -95,24 +95,57 @@ world-power thread supplies.
 
 1. `source:` **milestone-brown-v-board-opinion** — save as `brown-v-board-opinion`.
    Reader must be able to see: the four consolidated case captions and the
-   "Mr. Chief Justice Warren delivered the opinion of the Court" line.
+   "Mr. Chief Justice Warren delivered the opinion of the Court" line. Must
+   be the real opinion page — it is the ruling itself, not a summary of it.
    Placement: centered at the *Brown* section.
 2. `draw:` single `<Figure>` — **the boom's inputs**: pent-up savings, GI Bill,
    FHA/VA mortgages, highways, and defense spending as five arrows into a
    household-formation and homeownership outcome box.
-3. `draw:` `<FigureSequence>` (4 frames) — **building a suburb**: farmland →
+3. `source:` **panorama-holc-redlining-philadelphia-1937** — save as
+   `holc-redlining-philadelphia-1937`. Reader must be able to see: the A-D
+   color-graded neighborhoods and the legend, the federal map class Mapping
+   Inequality republishes. Must be the real map — it is the actual
+   instrument the FHA/VA mortgages in figure 2 were priced against, not an
+   illustration of the idea. Placement: float-right, immediately after the
+   boom's-inputs figure.
+4. `source:` **mapineq-area-description-clarifying-remarks** — save as
+   `holc-area-description-racial-clause`. Reader must be able to see: the
+   typed "CLARIFYING REMARKS" field reading "The particular hazard in the
+   area is racial..." in the appraiser's own typescript. Must be the real
+   form — the appraiser's own words are the evidence that exclusion was
+   policy, not custom or coincidence. Placement: centered, directly under
+   the redlining map.
+5. `draw:` `<FigureSequence>` (4 frames) — **building a suburb**: farmland →
    graded lots and utilities → mass-produced houses → occupancy, with the
    mortgage terms and the exclusion clause surfacing in the final frame.
-4. `draw:` single `<Figure>` — **two housing costs**: monthly outlay for a
+6. `source:` **no pool candidate — hunt:** a Levittown aerial or street
+   photograph — Library of Congress Prints & Photographs (search "Levittown
+   New York aerial 1948" or "Levittown Pennsylvania 1952") or the Wikimedia
+   Commons category "Levittown, New York" hold period press photographs.
+   Save as `levittown-aerial-1948`. Reader must be able to see: the
+   repeating grid of near-identical houses stretching to the horizon. Must
+   be the real photograph — the uniformity the drawn sequence gestures at
+   is a fact about an actual place, not a stylization. Placement: centered,
+   after the building-a-suburb sequence.
+7. `draw:` single `<Figure>` — **two housing costs**: monthly outlay for a
    Levittown purchase vs. a comparable city rental, 1950, with twenty-year equity
    accumulation projected beneath each. The worked example, drawn.
-5. `draw:` single `<Figure>` — **the metropolitan split**: central-city and
+8. `draw:` single `<Figure>` — **the metropolitan split**: central-city and
    suburban population by race, 1940-1970, as four lines. One idea: the
    divergence is postwar, not ancient.
-6. `draw:` single `<Figure>` — **urban renewal's displacement**: projects and
+9. `draw:` single `<Figure>` — **urban renewal's displacement**: projects and
    families displaced by city, with the share who were families of color
    (Baltimore's 74% labeled). Data from American Panorama's Renewing Inequality.
-7. `draw:` single `<Figure>` — **Brown, then nothing**: share of Southern Black
-   students in integrated schools by year, 1954-1968, with *Brown II*, the
-   Southern Manifesto, Little Rock, and the 1964 Civil Rights Act marked. The
-   inflection is at 1964-65, not 1954.
+10. `draw:` single `<Figure>` — **Brown, then nothing**: share of Southern Black
+    students in integrated schools by year, 1954-1968, with *Brown II*, the
+    Southern Manifesto, Little Rock, and the 1964 Civil Rights Act marked. The
+    inflection is at 1964-65, not 1954.
+
+4 of 10 entries (40%) are sourced: the existing Brown opinion page, plus two
+HOLC/FHA redlining documents pulled from the pool's redlining capture set
+(shared subject matter with the separate redlining lesson, used here for the
+"suburbs built white by policy" claim) and a Levittown photograph to hunt.
+The remaining six are the lesson's own economic worked example and
+time-series charts (housing costs, metro population split, displacement
+counts, integration share) plus the boom's-inputs diagram — genuinely data-
+and-comparison figures with no single artifact to stand in for a trend.

@@ -96,9 +96,11 @@ course register.
 
 1. `source:` **foner-hine-breaker-boys** — save as `hine-breaker-boys`. Reader
    must be able to see: the boys' coal-dusted faces and work clothes, and their
-   direct gaze at the camera. Placement: centered in the muckraking section; the
-   caption must record that Hine photographed for the NCLC and captioned with
-   names, ages, and hours.
+   direct gaze at the camera. Why real: this is the actual NCLC evidentiary
+   photograph the muckraking argument turns on — the lesson's own point is
+   that the photograph *is* the policy argument, which a drawing cannot make.
+   Placement: centered in the muckraking section; the caption must record that
+   Hine photographed for the NCLC and captioned with names, ages, and hours.
 2. `draw:` single `<Figure>` — **two faces of Progressivism**: purity column and
    efficiency column with a shared middle band, populated with named reforms.
    Idea from MIT Lecture 9's two-column chart.
@@ -106,16 +108,48 @@ course register.
    investigation published → public reaction measured → a bill introduced → the
    law enacted (and, in the Keating-Owen frame, struck down). One stage per frame,
    worked on child labor.
-4. `draw:` single `<Figure>` — **four amendments in seven years**: 16th, 17th,
+4. `source:` no pool candidate — hunt: first-edition title page of Upton
+   Sinclair's *The Jungle* (Doubleday, Page & Co., 1906) or Ida Tarbell's *The
+   History of the Standard Oil Company* (McClure, Phillips & Co., 1904); period
+   scans of both are on Wikimedia Commons and archive.org under those exact
+   titles. Save as `muckraking-title-page`. Reader must be able to see: the
+   period typography, publisher's imprint, and date. Why real: "muckraking as
+   an engine" is a claim about specific books moving specific legislation —
+   the actual title page is the citable object; a drawn book icon carries no
+   evidentiary weight. Placement: float-right in the muckraking section,
+   alongside item 1.
+5. `draw:` single `<Figure>` — **four amendments in seven years**: 16th, 17th,
    18th, 19th on a timeline, each tagged with the movement that demanded it
    (Populist, Populist, WCTU/temperance, suffrage).
-5. `draw:` single `<Figure>` — **the suffrage map by year**: states granting
-   full women's suffrage before 1920, shaded by date, showing the western
-   priority and the Southern absence.
-6. `draw:` single `<Figure>` — **1912 in four programs**: Roosevelt, Wilson,
+6. `source:` no pool candidate — hunt: the National American Woman Suffrage
+   Association / National Woman's Party "Woman Suffrage" map published
+   c.1917–1919 (reproduced in *The Suffragist* and distributed as a standalone
+   campaign map); LOC Prints & Photographs and Wikimedia Commons both hold
+   copies — search "woman suffrage map full presidential primary no suffrage
+   1919". Save as `suffrage-map-1919`. Reader must be able to see: the map's
+   own four-category shading (full / presidential / primary / no suffrage) by
+   state and the western-vs-southern pattern the lesson argues from. Why
+   real: this is the movement's own persuasion document, not the course's
+   reconstruction of the same data — the map suffragists actually printed and
+   distributed is stronger evidence of "the western priority and the Southern
+   absence" than a redrawn choropleth, and a geographic map of a real object
+   belongs in the sourced tier, not the drawn one. Placement: centered,
+   replacing the drawn choropleth originally planned here.
+7. `source:` no pool candidate — hunt: National Woman's Party "Silent
+   Sentinels" picketing the White House, 1917 (Harris & Ewing press
+   photographs; LOC Prints & Photographs and Wikimedia Commons hold copies
+   under "suffrage pickets White House 1917"). Save as
+   `suffrage-silent-sentinels-1917`. Reader must be able to see: the picket
+   banners' actual wording and the White House gate in frame. Why real: this
+   is the documented confrontational final phase of the suffrage campaign
+   (arrests, imprisonment, forced feeding) the brief distinguishes from
+   NAWSA's state-by-state strategy — a real press photograph of the picket
+   line, not a generic drawn protest scene. Placement: float-left in the
+   women's-reform-activism section, near the suffrage-timeline discussion.
+8. `draw:` single `<Figure>` — **1912 in four programs**: Roosevelt, Wilson,
    Taft, and Debs as four cards (diagnosis of the trust problem / remedy / vote
    share).
-7. `draw:` single `<Figure>` — **who was left out**: the 19th Amendment's legal
+9. `draw:` single `<Figure>` — **who was left out**: the 19th Amendment's legal
    grant against the practical exclusions still operating in 1920 (poll taxes,
    literacy tests, Asian exclusion from citizenship, Native citizenship not
    universal until 1924).

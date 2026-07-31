@@ -95,31 +95,83 @@ however delayed, ran through its own instruments.
 
 ## FIGURE PLAN
 
-1. `source:` **foner-recon-colfax-massacre-1873** — save as
+1. `source:` **no pool candidate — hunt:** Thomas Nast, "Worse Than Slavery,"
+   *Harper's Weekly*, October 24, 1874 — the canonical cartoon showing a Black
+   family cowering before a Klansman and a White Leaguer shaking hands over a
+   shield reading "The Union As It Was / This Is A White Man's Government."
+   Search Wikimedia Commons "Nast Worse Than Slavery 1874" or HarpWeek's Nast
+   catalog; public domain (pre-1928 US periodical). Save as
+   `nast-worse-than-slavery-1874`. Reader must be able to see: the Klan and
+   White League figures shaking hands and the family they menace. Why it must
+   be the real thing: this is contemporary Northern editorial cartooning
+   naming the Klan and the White League as "the armed wing of the Democratic
+   Party" in exactly the terms the lesson uses — a drawn recreation would
+   flatten a period argument into a modern illustration. Placement: centered,
+   opening the "Terror as politics" section.
+2. `source:` **no pool candidate — hunt:** a page from the congressional Ku
+   Klux Klan hearings, *Report of the Joint Select Committee to Inquire into
+   the Condition of Affairs in the Late Insurrectionary States* (1872) —
+   search HathiTrust, Google Books, or the Library of Congress for a
+   testimony-page scan (a victim's or a Klansman's sworn testimony, with the
+   committee's printed heading). Save as `kkk-hearings-testimony-1871`.
+   Reader must be able to see: the printed transcript format — question,
+   witness answer, committee heading. Why it must be the real thing: "the
+   congressional Klan hearings are the documentary record" per this brief;
+   the reader should see the record itself, not a paraphrase of it. Placement:
+   centered, in the "federal enforcement worked — briefly" section.
+3. `source:` **foner-recon-colfax-massacre-1873** — save as
    `colfax-harpers-1873`. Reader must be able to see: the men carrying the dead
    and wounded, the bodies in the field, and the armed riders. Placement:
    centered in the Colfax section. Crop the massacre illustration out of the full
    Harper's page; the companion cartoon on the same sheet is unrelated.
-2. `draw:` `<FigureSequence>` (5 frames) — **Redemption state by state**: the
+4. `draw:` `<FigureSequence>` (5 frames) — **Redemption state by state**: the
    same Southern map at 1870, 1872, 1874, 1876, and 1877, Republican governments
    turning Democratic one group at a time, ending with the three holdouts and
-   then none.
-3. `draw:` single `<Figure>` — **enforcement, then retreat**: federal
+   then none. This is the course's own data overlay on a blank state map, not a
+   reproduction of a period map — stays drawn.
+5. `draw:` single `<Figure>` — **enforcement, then retreat**: federal
    prosecutions under the Enforcement Acts by year with the 1871 habeas
    suspension marked and the post-1873 collapse annotated against the Panic.
-4. `draw:` single `<Figure>` — **Cruikshank's doctrine**: a two-box diagram —
+6. `draw:` single `<Figure>` — **Cruikshank's doctrine**: a two-box diagram —
    state action (reachable by the 14th Amendment) vs. private violence (not) —
    with the Colfax facts placed on the unreachable side.
-5. `draw:` single `<Figure>` — **the 1877 bargain**: a two-column ledger of what
+7. `source:` **no pool candidate — hunt:** a group photograph of the Electoral
+   Commission of 1877 (the fifteen-member panel — five Supreme Court justices,
+   five senators, five representatives — that resolved the disputed returns).
+   Search Wikimedia Commons / Library of Congress Brady-Handy or Prints &
+   Photographs collections for "Electoral Commission 1877." Save as
+   `electoral-commission-1877`. Reader must be able to see: the fifteen named
+   members seated together. Why it must be the real thing: an ad hoc
+   fifteen-member tribunal deciding a presidential election is itself the
+   fact worth showing — a drawn panel of anonymous figures loses exactly what
+   makes the image evidence. Placement: centered, opening the "1876-77"
+   section.
+8. `source:` **no pool candidate — hunt:** a period photograph of Wormley's
+   Hotel, Washington, D.C. (15th and H Streets NW), site of the informal
+   February 1877 negotiations. Search Wikimedia Commons / Library of Congress
+   for "Wormley's Hotel Washington" or the Historical Society of Washington
+   D.C. photo archive. Save as `wormleys-hotel-1877`. Reader must be able to
+   see: the actual building's facade or period streetscape. Why it must be the
+   real thing: Blight insists the 1877 deal "was a treaty, not a compromise" —
+   naming the actual room where it was struck is part of taking that claim
+   seriously. Placement: float left beside the Wormley Hotel negotiations
+   paragraph.
+9. `draw:` single `<Figure>` — **the 1877 bargain**: a two-column ledger of what
    Republicans and Southern Democrats each conceded and received, with the
    uncompensated party (Southern Black voters) shown as a third column receiving
    nothing.
-6. `draw:` single `<Figure>` — **Black officeholding collapses**: continuation of
-   the reconstruction lesson's officeholding chart through 1900, showing the
-   near-total elimination — same axes, so the two figures compose.
-7. `draw:` single `<Figure>` — **three amendments, unenforced**: the text
-   guarantees on the left, the enforcement reality by 1890 on the right, and the
-   gap labeled as the twentieth century's agenda.
+10. `source:` **blight-douglass-portrait-1879** — save as
+    `frederick-douglass-1879-redemption`. Reader must be able to see: Douglass
+    as he chose to be photographed, c.1879. Placement: float right beside the
+    "rope of sand" / Lazarus-line paragraph closing the lesson. Reuses the
+    portrait already captured for emancipation; a different crop or size is
+    fine if it reads as a distinct figure on the page.
+11. `draw:` single `<Figure>` — **Black officeholding collapses**: continuation
+    of the reconstruction lesson's officeholding chart through 1900, showing
+    the near-total elimination — same axes, so the two figures compose.
+12. `draw:` single `<Figure>` — **three amendments, unenforced**: the text
+    guarantees on the left, the enforcement reality by 1890 on the right, and
+    the gap labeled as the twentieth century's agenda.
 
 ## Canon additions (curated expansion, July 2026)
 

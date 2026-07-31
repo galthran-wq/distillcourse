@@ -199,7 +199,26 @@ course carries into the sectional crisis.
 4. `source:` — **tocqueville-s1-title-page** (in the pool, indexed in
    `research/images.yaml`): title page of the 1838 New York first American
    edition of the Reeve translation, New-York Society Library stamp visible —
-   the book as a period object; credit per the index entry.
-5. `source:` (optional, if an author image is wanted) —
-   **tocqueville-s1-portrait-chasseriau**: Chassériau's 1850 portrait;
-   caption must note it shows Tocqueville 15+ years after the journey.
+   the book as a period object; credit per the index entry. Placement:
+   centered, opening the lesson.
+5. `source:` — **tocqueville-s1-portrait-chasseriau**: Chassériau's 1850
+   portrait; caption must note it shows Tocqueville 15+ years after the
+   journey. Placement: float right beside the source-criticism section (key
+   point 5) — no longer optional; this lesson needs the author's face where
+   it interrogates his standpoint.
+6. `source:` no pool candidate — hunt: a period print or broadside of the
+   July 1812 Baltimore riot — the mob attack on the *Federal Republican*
+   newspaper office and the jail assault that followed; held by the Maryland
+   Center for History and Culture / Enoch Pratt Free Library; search
+   Wikimedia Commons "Baltimore riot 1812" or the Maryland Historical
+   Society's digitized collections. Reader must be able to see: the real mob
+   scene Tocqueville cites as his evidence for majority tyranny turning
+   violent. Placement: centered in the tyranny-of-the-majority section,
+   beside the Ch. XV chain figure (item 3).
+7. `source:` no pool candidate — hunt: the title page of *Proceedings of the
+   Free Trade Convention, Held in Philadelphia, in September and October,
+   1831* (digitized on Internet Archive / HathiTrust) — the actual convention
+   Tocqueville uses as his worked example of an association shadowing a
+   legislature. Reader must be able to see: the real pamphlet's title page and
+   date. Placement: centered in the associations section, beside the
+   associations-ladder figure (item 2).

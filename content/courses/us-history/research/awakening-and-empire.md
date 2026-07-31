@@ -110,6 +110,9 @@ population is what made an intercolonial mass event possible at all.
 1. `draw:` single `<Figure>` — **one voice, thirteen colonies**: Whitefield's
    1739-41 itinerary as a route down the seaboard with crowd estimates and
    newspaper coverage marked per colony — the first shared event mapped.
+   Kept drawn: this is the course's own data synthesis (estimated crowds,
+   newspaper coverage per colony) plotted on a route, not a reproduction of
+   any single surviving period map.
 2. `draw:` single `<Figure>` — **Franklin's computation, dissected**: the
    semicircle diagram with radius, area, and packing-density terms labeled
    and the ~30,000 result boxed — a period estimate rebuilt per the
@@ -121,8 +124,38 @@ population is what made an intercolonial mass event possible at all.
    vs annual revenue as two bars (the 13.5x ratio called out), the peacetime
    army line item, and the revenue acts listed as the consequence — the
    handoff figure to american-revolution (which re-draws the same ratio).
-5. `draw:` single `<Figure>` — **"Join, or Die" read as a source**: the
-   segmented-snake cartoon redrawn schematically with the records/argues
-   boxes beside it and the Albany Plan's rejection tally beneath — disunion
-   in 1754 as the measure of what changed by 1776. (If a period print scan is
-   preferred, the LOC copy is a clean later capture; none in the pool yet.)
+5. `source:` single `<Figure>` — **"Join, or Die," 1754, the real print**:
+   file-stem `awakening-and-empire-join-or-die-1754`; the reader must see
+   Franklin's actual segmented-snake woodcut as printed in the Pennsylvania
+   Gazette, May 9, 1754 — this is a real political cartoon/poster, and the
+   house rule is unambiguous that posters are sourced, never redrawn; the
+   brief's own note flagging "if a period print scan is preferred" is
+   resolved in favor of the scan. Overlay the records/argues/omits boxes and
+   the Albany Plan's rejection tally beside the scan rather than inside a
+   redrawn version. No pool candidate — hunt: Library of Congress or
+   Wikimedia Commons high-resolution scan of "Join, or Die," Pennsylvania
+   Gazette, May 9, 1754 (search "Join or Die 1754 Pennsylvania Gazette
+   Library of Congress" or "Join or Die Franklin 1754 Wikimedia Commons").
+   Placement: centered.
+6. `source:` single `<Figure>` — **George Whitefield, portrait**: file-stem
+   `awakening-and-empire-whitefield-portrait`; the reader must see the
+   revivalist's own face beside the itinerary figure — real because it is a
+   period likeness of the actual preacher, not a course illustration.
+   No pool candidate — hunt: John Wollaston's portrait of George Whitefield
+   (National Portrait Gallery, London, multiple period versions/copies
+   exist), widely reproduced on Wikimedia Commons (search "George
+   Whitefield portrait Wollaston Wikimedia Commons"). Placement: float-left,
+   beside the Whitefield/Franklin business-story set piece.
+7. `source:` single `<Figure>` — **Washington, Colonel of the Virginia
+   Regiment, 1772 portrait**: file-stem
+   `awakening-and-empire-washington-virginia-regiment-1772`; the reader must
+   see Charles Willson Peale's 1772 portrait of Washington in his actual
+   Virginia militia uniform — the earliest surviving portrait of Washington,
+   painted from life, showing the uniform of the young colonel whose 1754
+   ambush opens the war narrative; real because it is a documented likeness
+   in his real uniform, not a scene the course would have to invent. No pool
+   candidate — hunt: Charles Willson Peale, "George Washington as Colonel of
+   the Virginia Regiment" (1772), Washington and Lee University collection,
+   widely reproduced on Wikimedia Commons (search "Peale Washington Colonel
+   Virginia Regiment 1772 Wikimedia Commons"). Placement: float-right,
+   beside the 1754 ambush / Washington's first war paragraph.

@@ -108,20 +108,41 @@ chain and the uneven suffering stay documented at full weight.
    Reader must be able to see: Florence Owens Thompson and the two children
    turned away. Placement: centered, closing the migration section. Caption must
    name the FSA commission, the sitter, and the date.
-4. `draw:` single `<Figure>` — **the four series**: real GDP, unemployment,
+4. `source:` no pool candidate — hunt: a Hoover photographic portrait, c.
+   1928-1932 (Wikimedia Commons, category "Herbert Hoover" — the Bachrach or
+   Harris & Ewing studio official portrait; LOC Prints & Photographs holds
+   period prints). Save as `hoover-portrait-1929`. Reader must be able to see:
+   Hoover's own face and bearing — the "activist engineer" the text is arguing
+   against the do-nothing caricature, not an abstraction. This is a real
+   photograph of the man the section is about; a drawing would substitute our
+   illustration for the historical record of who he was. Placement: float-right
+   beside the "Hoover reassessed" key point.
+5. `source:` no pool candidate — hunt: Dorothea Lange, "White Angel Breadline"
+   (San Francisco, 1933) — Wikimedia Commons or the Oakland Museum of
+   California collection; search "White Angel Breadline Dorothea Lange 1933".
+   Save as `white-angel-breadline-1933`. Reader must be able to see: the mass
+   of men queued at the rail, backs to the camera, one man turned to face it.
+   Placement: centered beside the "Scale" key point, before the Dust Bowl
+   material — the breadline is the Depression's other canonical image besides
+   migration, and it is a real photograph documentary photographers actually
+   took, not a staged illustration. Caption must note it predates Lange's FSA
+   employment by about two years — she took it independently, for a local
+   relief agency, not on federal commission (the same "commissioned evidence
+   with a purpose" discipline the brief asks for the FSA photos).
+6. `draw:` single `<Figure>` — **the four series**: real GDP, unemployment,
    bank failures, and the price level, 1929-1933, as four small aligned panels
    sharing one time axis. One idea: everything fell together.
-5. `draw:` `<FigureSequence>` (5 frames) — **the transmission chain**: bank
+7. `draw:` `<FigureSequence>` (5 frames) — **the transmission chain**: bank
    failure → deposits lost → credit contracts → orders cancelled → layoffs →
    defaults feeding back to banks. One arrow added per frame, closing the loop in
    the final frame.
-6. `draw:` single `<Figure>` — **unemployment was not evenly shared**: national,
+8. `draw:` single `<Figure>` — **unemployment was not evenly shared**: national,
    Black, and by-region rates in 1932 as bars, with the ~25% / ~50% contrast
    stated.
-7. `draw:` single `<Figure>` — **Hoover's toolkit**: what he did (RFC, public
+9. `draw:` single `<Figure>` — **Hoover's toolkit**: what he did (RFC, public
    works, Federal Home Loan Banks, voluntary wage agreements) against what
    associationalist and balanced-budget doctrine ruled out (direct relief,
    deficit spending, leaving gold).
-8. `draw:` single `<Figure>` — **the interregnum**: a November 1932 to March 1933
-   timeline with bank holidays declared state by state, the count rising to
-   near-total closure by inauguration day. Idea from Kennedy Ch.4.
+10. `draw:` single `<Figure>` — **the interregnum**: a November 1932 to March
+    1933 timeline with bank holidays declared state by state, the count rising
+    to near-total closure by inauguration day. Idea from Kennedy Ch.4.

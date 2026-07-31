@@ -88,30 +88,85 @@ structural fragilities Kennedy's Ch.1 catalogs as the setup for 1929.
 
 ## FIGURE PLAN
 
-No `source:` figures assigned. (The Benton *America Today* panel in the pool is
-in copyright and is reserved, if used at all, for the Depression lesson.)
+No pool candidates for this lesson. (The Benton *America Today* panel in the
+pool is in copyright and is reserved, if used at all, for the Depression
+lesson.) Five sourced artifacts have been hunted below to run alongside the
+lesson's own diagrams — this decade is unusually rich in iconic, well-archived
+public-domain photography, and the lesson should use it.
 
-1. `draw:` single `<Figure>` — **the consumer durables curve**: households with
+1. `source:` no pool candidate — hunt: a photograph of Ford's Highland Park or
+   River Rouge moving assembly line in the 1910s-20s (Ford archives via The
+   Henry Ford, LOC, or Wikimedia Commons — search "Ford assembly line Highland
+   Park photograph" or "Model T assembly line 1920s"). Save as
+   `ford-assembly-line`. Reader must be able to see: workers stationed along
+   the moving line with partially assembled chassis in view. Why real: "mass
+   production met mass credit" is a claim about a specific, famous production
+   method — the actual factory floor, not a generic drawn diagram of an
+   assembly line. Placement: float-left in the consumer-economy section,
+   beside item 2.
+2. `draw:` single `<Figure>` — **the consumer durables curve**: households with
    cars, radios, and electric appliances, 1920-1929, with the share bought on
    installment credit shown as a shaded band.
-2. `draw:` `<FigureSequence>` (4 frames) — **the 1924 quota, constructed**: frame
+3. `draw:` `<FigureSequence>` (4 frames) — **the 1924 quota, constructed**: frame
    1 the actual 1920 foreign-born composition; frame 2 the same population as
    recorded in 1890; frame 3 the 2%-of-1890 quotas assigned; frame 4 the
    resulting arrival composition after 1925. The base-year swap is the single
    change that does all the work.
-3. `draw:` single `<Figure>` — **two economies**: farm income index against
+4. `draw:` single `<Figure>` — **two economies**: farm income index against
    urban wage index, 1920-1929, diverging from the start of the decade.
-4. `draw:` single `<Figure>` — **the second Klan mapped**: estimated membership
+5. `source:` no pool candidate — hunt: a photograph of the 1925 Ku Klux Klan
+   march down Pennsylvania Avenue, Washington, D.C. (widely reproduced;
+   Wikimedia Commons and LOC hold period press photographs — search "Ku Klux
+   Klan march Washington DC 1925 Pennsylvania Avenue"). Save as
+   `kkk-march-washington-1925`. Reader must be able to see: the scale of the
+   march (crowd depth, robes, the Capitol or another recognizable Washington
+   landmark in frame). Why real: the point of this figure is that the Klan
+   was "national in scope," staging a mass march on the national capital, not
+   a regional fringe event — a photograph of the actual march at the actual
+   seat of government carries that claim in a way a membership choropleth
+   cannot. Placement: centered, immediately before item 6.
+6. `draw:` single `<Figure>` — **the second Klan mapped**: estimated membership
    by state in the mid-1920s, with Indiana and Oregon labeled — a national, not
    regional, organization.
-5. `draw:` single `<Figure>` — **modernism and reaction, same years**: a single
+7. `source:` no pool candidate — hunt: a 1925 photograph of Clarence Darrow and
+   William Jennings Bryan at the Scopes trial in Dayton, Tennessee (the
+   outdoor courtroom sessions are extensively photographed; LOC and Wikimedia
+   Commons hold press images — search "Scopes trial 1925 Darrow Bryan
+   photograph Dayton Tennessee"). Save as `scopes-trial-darrow-bryan-1925`.
+   Reader must be able to see: both men, identifiable, in the trial setting.
+   Why real: Scopes is named as a specific, dated event with named
+   participants — the actual photograph of that confrontation, not a drawn
+   courtroom scene. Placement: float-left in the reaction section, near item
+   9.
+8. `source:` no pool candidate — hunt: a 1920s photograph of Nicola Sacco and
+   Bartolomeo Vanzetti, e.g. the widely reproduced image of the two men
+   handcuffed together (Wikimedia Commons and LOC hold period press
+   photographs — search "Sacco and Vanzetti photograph handcuffed"). Save as
+   `sacco-vanzetti-portrait`. Reader must be able to see: both men's faces,
+   identifiable. Why real: this is a named, dated case the lesson cites by
+   the men's names and the execution year — a real photograph of the two men,
+   not a generic drawn defendants' scene. Placement: float-right in the
+   reaction section, near item 9.
+9. `draw:` single `<Figure>` — **modernism and reaction, same years**: a single
    timeline 1920-1929 with cultural events above the line (Harlem Renaissance
    publications, radio networks, films) and reaction below it (quotas, Scopes,
    Sacco and Vanzetti, Klan peak). One idea: they are contemporaneous.
-6. `draw:` single `<Figure>` — **fragilities checklist**: five structural
-   weaknesses (farm depression, unit banking without deposit insurance, income
-   concentration, installment debt, margin lending) each with a one-line
-   statement of how it would transmit a shock. Sets up great-depression.
+10. `source:` no pool candidate — hunt: a 1920s photograph of a Harlem
+    Renaissance figure or scene — e.g. a portrait of Langston Hughes (c.1925)
+    or Zora Neale Hurston, or a Harlem street/theater scene; the Schomburg
+    Center for Research in Black Culture (NYPL) and LOC hold period portraits
+    — search "Langston Hughes 1925 photograph" or "Harlem Renaissance writers
+    photograph 1920s". Save as `harlem-renaissance-portrait`. Reader must be
+    able to see: the subject's face, or the street scene's signage and
+    crowd, at legible detail. Why real: the Harlem Renaissance section names
+    specific authors and artists — a real portrait or documentary photograph
+    of the actual movement, not a drawn illustration of "a writer." Placement:
+    centered, above the timeline (item 9), anchoring the "cultural events
+    above the line" material with a concrete face.
+11. `draw:` single `<Figure>` — **fragilities checklist**: five structural
+    weaknesses (farm depression, unit banking without deposit insurance, income
+    concentration, installment debt, margin lending) each with a one-line
+    statement of how it would transmit a shock. Sets up great-depression.
 
 ## Canon additions (curated expansion, July 2026)
 

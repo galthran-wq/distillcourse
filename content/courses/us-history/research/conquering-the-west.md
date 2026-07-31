@@ -110,20 +110,46 @@ editorializing in either direction.
    Reader must be able to see: the burial trench with bodies, the soldiers ranged
    above it, and the inscribed caption naming it a "Battle". Placement: centered
    at the Wounded Knee section, with a caption that flags the wording.
-4. `draw:` single `<Figure>` — **bison population collapse**: estimated herd size
+4. `source:` no pool candidate — hunt: the "East and West Shaking Hands" golden-spike
+   ceremony photograph, Promontory Summit, Utah, May 10, 1869 (Andrew J. Russell;
+   on Wikimedia Commons, and via Yale Beinecke / Library of Congress). Save as
+   `promontory-summit-golden-spike-1869`. Reader must be able to see: the two
+   locomotives nose to nose and the crowd of workers and officials filling the
+   frame — and must be told what the photograph omits: despite Chinese laborers
+   building most of the Central Pacific grade, none appear in it. Why sourced:
+   a real photographed event whose composition IS the argument (an absence a
+   redrawn version could not honestly reproduce). Placement: centered, opening
+   the infrastructure discussion (key point 1), doubling as the forward pointer
+   to key point 6 (Chinese labor and exclusion).
+5. `draw:` single `<Figure>` — **bison population collapse**: estimated herd size
    1800-1900 on a log axis with hide-market and railroad expansion annotated, and
    the surviving wild count in the 1880s labeled.
-5. `draw:` `<FigureSequence>` (4 frames) — **land, decade by decade**: the same
-   western map showing tribal land holdings in 1850, 1870, 1890, and 1930, with
-   the Dawes Act marked between the last two frames. One change per frame.
-6. `draw:` single `<Figure>` — **two tracks of federal policy**: extermination
+6. `source:` no pool candidate — hunt: American Panorama, "Land Acquisition and
+   Dispossession: Mapping the Homestead Act, 1863-1912" (dsl.richmond.edu/panorama,
+   already in Sources to consult) — screenshot the map at two or three snapshot
+   years (e.g. 1870, 1890, 1910) showing homestead patents accumulating against
+   reservation land lost over the same period; if the interactive cannot be
+   captured cleanly, fall back to Charles C. Royce, "Indian Land Cessions in the
+   United States" (18th Annual Report of the Bureau of American Ethnology, 1899;
+   LOC / Wikimedia Commons), the canonical cession-by-cession compilation map.
+   Save as `land-acquisition-and-dispossession-map`. Reader must be able to see:
+   real surveyed geography — actual state and reservation boundaries and actual
+   acreages, not a schematic. Why sourced: this is a geographic map of real
+   historical land tenure; the house rule holds maps to the sourced tier
+   regardless of who compiled the underlying dataset — a hand-drawn choropleth
+   would misrepresent the map as our invention. Placement: centered, replacing
+   the previously planned drawn four-frame sequence (CONVERTED from `draw:`
+   `<FigureSequence>`; if a genuine decade-by-decade sourced sequence is later
+   found — e.g. successive period Indian Territory maps — restore the sequence
+   form with real frames).
+7. `draw:` single `<Figure>` — **two tracks of federal policy**: extermination
    (war, subsistence destruction) and assimilation (allotment, boarding schools,
    citizenship conditions) as parallel columns with instruments listed under
    each. Idea from MIT Lecture 5's own framing.
-7. `draw:` single `<Figure>` — **who got the land**: acreage transferred by
+8. `draw:` single `<Figure>` — **who got the land**: acreage transferred by
    channel — homesteads, railroad grants, state grants, sales to speculators —
    as one bar chart. One idea: the yeoman was not the main recipient.
-8. `draw:` single `<Figure>` — **Turner's thesis in one box**: the claim, its
+9. `draw:` single `<Figure>` — **Turner's thesis in one box**: the claim, its
    1893 date beside Wounded Knee's 1890, and three counter-claims listed beneath.
 
 ## Canon additions (curated expansion, July 2026)

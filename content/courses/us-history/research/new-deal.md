@@ -103,21 +103,51 @@ Depression (war mobilization, next lesson).
    `social-security-signing-1935`. Reader must be able to see: FDR at the desk,
    the crowd of sponsors, and Frances Perkins. Placement: centered at the
    Social Security section; caption names Perkins, Wagner, and Doughton.
-2. `draw:` single `<Figure>` — **the alphabet agencies, dated and sorted**: 1933
+2. `source:` no pool candidate — hunt: the NRA "Blue Eagle" compliance poster
+   (1933) — Wikimedia Commons or NARA; search "NRA Blue Eagle poster 1933" /
+   "We Do Our Part NRA". Save as `nra-blue-eagle-poster-1933`. Reader must be
+   able to see: the eagle-and-gear emblem and the "We Do Our Part" slogan as
+   printed for shop windows. Placement: float-left beside the Hundred Days /
+   NIRA material — the poster is the real object businesses displayed to
+   signal compliance, not a modern reconstruction of the idea.
+3. `source:` no pool candidate — hunt: a photograph of the Flint sit-down
+   strike (Fisher Body plant, 1936-37) — Wikimedia Commons or the Walter P.
+   Reuther Library (Wayne State); search "Flint sit-down strike 1937 Fisher
+   Body". Save as `flint-sit-down-strike-1937`. Reader must be able to see:
+   workers occupying the plant floor, asserting control of the physical space
+   rather than picketing outside it — the tactic's novelty is visible only in
+   a real photograph of men inside the factory. Placement: centered at
+   "Labor's surge."
+4. `source:` no pool candidate — hunt: a 1937 editorial cartoon on FDR's
+   court-packing plan (the Judicial Procedures Reform Bill) — LOC Prints &
+   Photographs or Wikimedia Commons; search "1937 court packing plan cartoon
+   Roosevelt Supreme Court". Save as `court-packing-cartoon-1937`. Reader must
+   be able to see: the period's own visual argument against the plan —
+   contemporary editorial opinion is itself primary-source evidence of the
+   political cost, which a modern diagram cannot supply. Placement: float-right
+   beside the court-packing set piece.
+5. `source:` no pool candidate — hunt: a photograph of Huey Long, c. 1934-35,
+   speaking or at his Senate desk — Wikimedia Commons or LOC; search "Huey Long
+   portrait Share Our Wealth". Save as `huey-long-1935`. Reader must be able to
+   see: Long himself, the demagogic showman whose "Share Our Wealth" movement
+   the brief credits with forcing the Second New Deal. Placement: float-left
+   beside the "pressure from outside" key point, next to the Long/Coughlin/
+   Townsend diagram.
+6. `draw:` single `<Figure>` — **the alphabet agencies, dated and sorted**: 1933
    and 1935 waves as two rows, each agency tagged relief, recovery, or reform,
    and struck-down agencies marked. The canonical New Deal figure, done cleanly.
-3. `draw:` `<FigureSequence>` (5 frames) — **the Hundred Days**: bank holiday →
+7. `draw:` `<FigureSequence>` (5 frames) — **the Hundred Days**: bank holiday →
    Emergency Banking Act → leaving gold → CCC/AAA/TVA → NIRA, one measure per
    frame with a small "banks open / deposits" indicator updating.
-4. `draw:` single `<Figure>` — **unemployment, 1929-1945**: the whole series with
+8. `draw:` single `<Figure>` — **unemployment, 1929-1945**: the whole series with
    the 1933 trough, the 1937 recession dip, and the wartime collapse to near zero
    annotated. One idea: the war, not the New Deal, closed the gap.
-5. `draw:` single `<Figure>` — **who was covered**: original Social Security
+9. `draw:` single `<Figure>` — **who was covered**: original Social Security
    coverage by occupation category, with agricultural and domestic work shaded
    out and the resulting share of Black workers excluded stated.
-6. `draw:` single `<Figure>` — **pressure from outside**: Long, Coughlin, and
-   Townsend as three cards (proposal, constituency size, effect on 1935
-   legislation) with arrows into the Second New Deal box.
-7. `draw:` single `<Figure>` — **court-packing's ledger**: what the plan proposed,
-   the political cost (conservative coalition, stalled agenda), and the outcome
-   (the Court's doctrinal shift) as a three-column tally.
+10. `draw:` single `<Figure>` — **pressure from outside**: Long, Coughlin, and
+    Townsend as three cards (proposal, constituency size, effect on 1935
+    legislation) with arrows into the Second New Deal box.
+11. `draw:` single `<Figure>` — **court-packing's ledger**: what the plan
+    proposed, the political cost (conservative coalition, stalled agenda), and
+    the outcome (the Court's doctrinal shift) as a three-column tally.

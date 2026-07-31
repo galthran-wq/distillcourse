@@ -97,21 +97,59 @@ casualty asymmetry, the Insular Cases' constitutional residue).
    Reader must be able to see: Roosevelt with the regiment and the flag on the
    hill. Placement: float right beside the martial-masculinity passage; caption
    notes the photograph's role in making a political career.
-2. `draw:` single `<Figure>` — **four causes converge on 1898**: causal arrows
+2. `source:` no pool candidate — hunt: a photographic portrait of Queen
+   Liliʻuokalani (period studio portraits, 1880s-90s, public domain via
+   Wikimedia Commons / Hawaii State Archives). Save as
+   `liliuokalani-portrait`. Reader must be able to see: the Queen's face,
+   giving the overthrow and annexation a named party. Why sourced: a real
+   photographed historical figure central to key point 2 — invented likeness
+   is fabrication. Placement: float-left, opening the Hawaii passage.
+3. `source:` no pool candidate — hunt: a page of the Kūʻē Petitions (1897,
+   signed opposing annexation by a majority of Native Hawaiians) —
+   digitized pages exist via the Hawaii State Archives / "Kūʻē Petitions"
+   project and are reproduced on Wikimedia Commons and in Noenoe Silva's
+   published scholarship. Save as `kue-petitions-1897`. Reader must be able
+   to see: a real page of signatures in rows, as physical evidence of
+   organized mass opposition. Why sourced: this is explicitly a documented
+   counter-source (the brief's own set piece) — its evidentiary force is that
+   it is the actual petition, not a description of one. Placement: centered,
+   directly after the Liliʻuokalani portrait, closing the Hawaii passage.
+4. `draw:` single `<Figure>` — **four causes converge on 1898**: causal arrows
    from economic panic/market search, resource and coaling-station competition,
    missionary-exceptionalist ideology, and martial masculinity into a single 1898
    node. Idea from MIT Lecture 8.
-3. `draw:` `<FigureSequence>` (4 frames) — **the empire assembled**: a Pacific
-   and Caribbean map gaining Hawaii, Puerto Rico and Guam, the Philippines, and
-   then the Platt-Amendment protectorate over Cuba, one acquisition per frame
-   with its legal instrument named.
-4. `draw:` single `<Figure>` — **two wars, one policy**: paired bars for duration
+5. `source:` no pool candidate — hunt: a period (c. 1898-1903) map or atlas
+   plate titled along the lines of "The United States and Its Insular
+   Possessions" showing Hawaii, Puerto Rico, Guam, the Philippines, and Cuba
+   together — via LOC / David Rumsey Map Collection / Wikimedia Commons; if no
+   clean period map is found, a contemporary Puck/Judge cartoon map of the new
+   overseas holdings is an acceptable substitute (still a real, dated artifact).
+   Save as `us-insular-possessions-map`. Reader must be able to see: real
+   geography — the actual islands and their relative distances from the
+   continental US. Why sourced: this is a geographic map; the house rule holds
+   it to the sourced tier even though it depicts a US-built empire — a
+   hand-drawn version would misrepresent both the coastline and the map as our
+   own invention. Placement: centered, replacing the previously planned drawn
+   four-frame acquisition sequence (CONVERTED from `draw:` `<FigureSequence>`;
+   restore a sequence only if period maps for each successive acquisition date
+   are actually found).
+6. `draw:` single `<Figure>` — **two wars, one policy**: paired bars for duration
    and deaths — the ten-week Spanish war against the multi-year Philippine war,
    with civilian estimates shown as a range.
-5. `draw:` single `<Figure>` — **what the press said vs. what was known**: a
+7. `source:` no pool candidate — hunt: the New York Journal front page of Feb.
+   17, 1898 ("DESTRUCTION OF THE WAR SHIP MAINE WAS THE WORK OF AN ENEMY," with
+   its diagram of an alleged mine) — via Wikimedia Commons / LOC. Save as
+   `nyjournal-maine-headline-1898`. Reader must be able to see: the actual
+   Hearst headline and invented diagram, as the object the "manufactured
+   consent" set piece analyzes. Why sourced: the lesson's argument is
+   specifically about what a real newspaper printed versus what was known — a
+   redrawn mockup headline would undercut the very point being made about
+   period yellow journalism. Placement: centered, at the press-comparison
+   figure below.
+8. `draw:` single `<Figure>` — **what the press said vs. what was known**: a
    two-column comparison for February 1898 (headline claims / evidentiary basis)
    with the *Maine* board's finding and the later analyses noted.
-6. `draw:` single `<Figure>` — **does the Constitution follow the flag?**: the
+9. `draw:` single `<Figure>` — **does the Constitution follow the flag?**: the
    Insular Cases' categories — states, incorporated territories, unincorporated
    territories — with rights availability marked in each and present-day examples
    listed.

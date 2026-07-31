@@ -99,28 +99,60 @@ coalition's break as datable events.
 
 ## FIGURE PLAN
 
-No `source:` figures in the pool for this lesson. If one is wanted, the NARA
-aerial photograph of missiles in Cuba (Milestone #90) is the obvious candidate:
-a real reconnaissance image whose evidentiary status is the point.
-
-1. `draw:` single `<Figure>` — **the 1960 margin, to scale**: total votes cast
+1. `source:` **no pool candidate — hunt:** the Cuban Missile Crisis low-level
+   reconnaissance photograph, October 1962 — the National Archives (RG 373)
+   and the JFK Presidential Library hold the declassified US aerial
+   photographs showing missile-transporter equipment at San Cristóbal; also
+   indexed at archives.gov/milestone-documents. Save as
+   `cuba-missile-recon-1962`. Reader must be able to see: the annotated
+   low-oblique frame with the missile-erector equipment marked by the
+   original CIA analysts. Must be the real photograph — its entire
+   evidentiary status is that it is the actual reconnaissance frame, not an
+   illustration of what was found. Placement: centered at the Kennedy-era
+   foreign-policy paragraph.
+2. `source:` **no pool candidate — hunt:** Lyndon Johnson signing the
+   Medicare bill, Independence, Missouri, July 30 1965, with Harry Truman
+   present — an official White House/LBJ Presidential Library photograph,
+   public domain. Save as `lbj-medicare-signing-1965`. Reader must be able
+   to see: Johnson signing, Truman seated beside him, and the assembled
+   crowd. Must be the real photograph — Truman's presence is the evidence
+   the lesson cites for the bill's twenty-year political lineage. Placement:
+   centered beside the Great Society's ledger figure.
+3. `source:` **no pool candidate — hunt:** the Gulf of Tonkin Resolution,
+   August 1964 — the National Archives holds the engrossed joint
+   resolution; check archives.gov/milestone-documents. Save as
+   `tonkin-gulf-resolution-1964`. Reader must be able to see: the operative
+   clause authorizing "all necessary measures." Must be the real resolution
+   — the escalation sequence's legal hinge is this exact sentence, not a
+   paraphrase. Placement: float-right at the Tonkin Resolution frame of the
+   escalation sequence.
+4. `draw:` single `<Figure>` — **the 1960 margin, to scale**: total votes cast
    with the 112,827-vote difference shown as a sliver, and the electoral map
    beside it.
-2. `draw:` `<FigureSequence>` (5 frames) — **escalation by increment**: US troop
+5. `draw:` `<FigureSequence>` (5 frames) — **escalation by increment**: US troop
    levels in Vietnam at 1961, 1964, 1965, 1967, 1968, one frame each, with the
    authorizing decision annotated per frame and the Tonkin Resolution marked.
-3. `draw:` single `<Figure>` — **the Great Society's ledger**: major acts
+6. `draw:` single `<Figure>` — **the Great Society's ledger**: major acts
    1964-1966 listed with what each created and one outcome measure per row.
-4. `draw:` single `<Figure>` — **poverty measured**: the official poverty rate
+7. `draw:` single `<Figure>` — **poverty measured**: the official poverty rate
    1959-1973 overall and for people over 65, with Medicare and Medicaid marked at
    1965. One idea: the elderly line moves most.
-5. `draw:` single `<Figure>` — **guns and butter**: federal spending on Vietnam
+8. `draw:` single `<Figure>` — **guns and butter**: federal spending on Vietnam
    against Great Society programs, 1964-1969, with the inflation rate overlaid —
    the fiscal setup for stagflation.
-6. `draw:` single `<Figure>` — **three manifestos compared**: Black Panther,
+9. `draw:` single `<Figure>` — **three manifestos compared**: Black Panther,
    Young Lords, and gay liberation platforms as three columns against shared rows
    (who is named, what subordination is diagnosed, what is demanded). Idea from
    MIT Session 19.
-7. `draw:` single `<Figure>` — **1968 month by month**: Tet, King, Robert
-   Kennedy, Chicago, and the November result on a single twelve-month strip. One
-   idea: the coalition came apart within one calendar year.
+10. `draw:` single `<Figure>` — **1968 month by month**: Tet, King, Robert
+    Kennedy, Chicago, and the November result on a single twelve-month strip. One
+    idea: the coalition came apart within one calendar year.
+
+3 of 10 entries (30%) are sourced — the pool held nothing for this lesson,
+so all three are hunt pointers (the Cuban Missile Crisis recon photo, the
+Medicare-signing photo, and the Tonkin Gulf Resolution page). Below half:
+the rest of the lesson's visual argument (the election margin, escalation,
+the Great Society ledger, poverty, guns-and-butter, the manifestos table,
+1968) is comparative and time-series synthesis the course builds itself,
+with no single canonical photograph standing in for a trend line or a
+platform comparison.

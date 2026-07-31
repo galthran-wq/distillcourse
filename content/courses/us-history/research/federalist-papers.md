@@ -96,22 +96,46 @@ already listed.
 1. `source:` **fedpapers-1788-title-page** — save as `federalist-1788-title-page`.
    Reader must be able to see: the 1788 McLean imprint and the manuscript
    inscriptions ("For Mrs. Church from her sister Elizabeth Hamilton"; the
-   "Mr. Jefferson's copy" note). Placement: float right at the publication-history
-   section. The provenance is the whole value; a retyped title page has none.
-2. `draw:` single `<Figure>` — **publication timeline vs. ratification calendar**:
+   "Mr. Jefferson's copy" note). Why it must be the real artifact: the
+   provenance is the whole value; a retyped title page has none. Placement:
+   float right at the publication-history section.
+2. `source:` **maier-madison-stuart-portrait** — save as
+   `madison-stuart-1821-publius`. Reader must be able to see: Madison's
+   likeness (Gilbert Stuart, c.1821). Why it must be the real artifact:
+   Madison authored the essays this lesson close-reads most (Nos. 10, 51,
+   37) — the authorship-puzzle set piece names him as a real historical
+   person behind the pseudonym, not an abstraction. Placement: paired float
+   at the authorship-puzzle set piece, alongside a Hamilton portrait.
+3. `source:` no pool candidate — hunt: a portrait of Alexander Hamilton —
+   e.g. John Trumbull's 1792 or 1806 half-length (National Gallery of Art)
+   or the Ceracchi bust, via Wikimedia Commons (search "Alexander Hamilton
+   Trumbull portrait"). Reader must be able to see: the standard reference
+   likeness. Why it must be the real artifact: Hamilton is the presumed
+   author of Nos. 70, 78, and 84 — the majority of essays this lesson
+   reconstructs — and pairs with the Madison portrait at the same
+   authorship-puzzle set piece. Placement: paired float alongside the
+   Madison portrait.
+4. `draw:` single `<Figure>` — **publication timeline vs. ratification calendar**:
    essay numbers plotted Oct 1787-Aug 1788 against the dates states ratified,
    with the New York convention marked — the essays as real-time persuasion.
-3. `draw:` `<FigureSequence>` (4 frames) — **reconstructing No. 10**: frame 1 the
+5. `draw:` `<FigureSequence>` (4 frames) — **reconstructing No. 10**: frame 1 the
    definition of faction; frame 2 the two cures with both rejections; frame 3 the
    control-the-effects branch; frame 4 the extended-republic conclusion. One step
    added per frame.
-4. `draw:` single `<Figure>` — **No. 70's unitary-executive ledger**: the four
+6. `draw:` single `<Figure>` — **No. 70's unitary-executive ledger**: the four
    claimed virtues (decision, activity, secrecy, dispatch) plus accountability,
    each with the plural-executive failure it is meant to avoid.
-5. `draw:` single `<Figure>` — **No. 78's syllogism**: constitution is the
+7. `draw:` single `<Figure>` — **No. 78's syllogism**: constitution is the
    people's superior will → statute is the legislature's subordinate will →
    conflict must resolve in favor of the superior → courts must void the statute.
    Drawn as a four-step chain with the conclusion boxed.
-6. `draw:` single `<Figure>` — **No. 84 vs. the Ninth Amendment**: Hamilton's
+8. `draw:` single `<Figure>` — **No. 84 vs. the Ninth Amendment**: Hamilton's
    "enumeration implies power" objection on the left, the Ninth Amendment's text
    on the right, with the arrow labeled as the drafters' answer.
+
+**Note on balance**: this lesson stays sourced-thin relative to "half" (3
+source / 5 draw, ~38%) because it is a close-reading chapter — its content
+past the title page and the two author portraits is the essays' own
+argument structure (definitions, cures, ledgers, syllogisms), which is
+inherently the course's own diagrammatic reconstruction, not a real-world
+object to photograph.

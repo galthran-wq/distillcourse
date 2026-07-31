@@ -97,29 +97,70 @@ method, and the lesson should say so.
 
 ## FIGURE PLAN
 
-No `source:` figures: the pool holds no Plessy-era artifacts (the Brown opinion
-scan is reserved for affluent-society). If a source image is wanted later,
-capture the NARA Plessy page or a state constitution's suffrage article.
+The pool holds no Plessy-era artifacts (the Brown opinion scan is reserved for
+affluent-society), so every `source:` entry below is a hunt pointer rather
+than a pool id — Commons and LOC hold real candidates for all of them; this is
+not a genuinely diagrammatic lesson, and it should not stay drawing-heavy.
 
-1. `draw:` `<FigureSequence>` (5 frames) — **how a state disenfranchises**: the
+1. `source:` no pool candidate — hunt: the text of Article 12 (suffrage) of
+   Mississippi's Constitution of 1890 — the founding template statute (key
+   point 1); a period printed copy or the state archives' scan, via Wikimedia
+   Commons / HathiTrust / Mississippi Dept. of Archives and History. Save as
+   `mississippi-1890-suffrage-article`. Reader must be able to see: the
+   printed statute language itself — poll tax, understanding clause, residency
+   — race never named. Why sourced: the lesson's central claim ("race-neutral
+   text, racial results") is a claim about actual statutory wording; a
+   redrawn mockup of a law is a fabricated document. Placement: centered,
+   opening the disenfranchisement section, before the figures below.
+2. `draw:` `<FigureSequence>` (5 frames) — **how a state disenfranchises**: the
    same 100,000-voter cohort reduced frame by frame — poll tax, literacy clause,
    registrar discretion, felony list, grandfather clause exempting white voters —
    with the surviving count printed each frame. The delta per frame is the device.
-2. `draw:` single `<Figure>` — **registration collapse**: Black voter registration
+3. `draw:` single `<Figure>` — **registration collapse**: Black voter registration
    in Louisiana and Mississippi before and after their new constitutions, as
    before/after bars with the constitutional convention dates marked.
-3. `draw:` single `<Figure>` — **what got segregated, and when**: a timeline of
+4. `draw:` single `<Figure>` — **what got segregated, and when**: a timeline of
    statute types (rail, streetcar, school, hospital, marriage, cemetery) by
    decade, showing the system is built in the 1890s-1900s, not the 1860s.
-4. `draw:` single `<Figure>` — **"equal" audited**: per-pupil spending for white
+5. `draw:` single `<Figure>` — **"equal" audited**: per-pupil spending for white
    and Black schools in selected Southern states around 1910-1930, as paired
    bars with the ratio annotated.
-5. `draw:` single `<Figure>` — **Plessy and Harlan**: two quotation panels with
+6. `source:` no pool candidate — hunt: the original 1896 Plessy v. Ferguson
+   case file / opinion first page, NARA (the brief's own suggested capture),
+   via archives.gov milestone-documents style high-res scan or Wikimedia
+   Commons. Save as `plessy-v-ferguson-1896-case-file`. Reader must be able to
+   see: the case caption, filing stamps, and opening text as an actual federal
+   court record. Why sourced: the ruling this lesson turns on is a real
+   document, not a paraphrase — pair directly with the quotation panels below.
+   Placement: centered, at the Plessy/Harlan figure.
+7. `draw:` single `<Figure>` — **Plessy and Harlan**: two quotation panels with
    the majority's reasoning and the dissent's rebuttal, and a dated arrow
    pointing forward 58 years to Brown.
-6. `draw:` single `<Figure>` — **Wells's tabulation**: lynchings per year with
+8. `source:` no pool candidate — hunt: a photographic portrait of Ida B. Wells
+   (several period studio portraits, 1890s-1900s, are public domain via LOC /
+   Wikimedia Commons). Save as `ida-b-wells-portrait`. Reader must be able to
+   see: Wells's face, giving the tabulation method below a named author. Why
+   sourced: a real photographic likeness of the person whose analytic method
+   the lesson adopts as its own — drawing an invented likeness of a real,
+   photographed historical figure is exactly the fabrication the house rule
+   forbids. Placement: float-left beside the Wells's-tabulation figure.
+9. `draw:` single `<Figure>` — **Wells's tabulation**: lynchings per year with
    the alleged causes broken out by category, drawn so the mismatch between the
    claimed justification and the record is visible.
-7. `draw:` single `<Figure>` — **two strategies**: Washington and Du Bois as
-   paired cards (diagnosis / method / institution built), with the point of
-   disagreement highlighted.
+10. `source:` no pool candidate — hunt: a photographic portrait of Booker T.
+    Washington (Library of Congress / Wikimedia Commons; multiple public-domain
+    studio portraits exist). Save as `booker-t-washington-portrait`. Reader
+    must be able to see: Washington's face. Why sourced: same as the Wells
+    portrait — a real, widely photographed public figure. Placement: float-left
+    beside the "two strategies" figure, paired with the Du Bois portrait below.
+11. `source:` no pool candidate — hunt: a photographic portrait of W. E. B. Du
+    Bois (Library of Congress / Wikimedia Commons; public-domain studio
+    portraits exist from the 1900s Niagara Movement era). Save as
+    `web-du-bois-portrait`. Reader must be able to see: Du Bois's face. Why
+    sourced: same reasoning as the Washington portrait — pairing the two real
+    likenesses lets the reader see the disagreement as between two named,
+    photographed people, not abstractions. Placement: float-right beside the
+    "two strategies" figure, opposite the Washington portrait.
+12. `draw:` single `<Figure>` — **two strategies**: Washington and Du Bois as
+    paired cards (diagnosis / method / institution built), with the point of
+    disagreement highlighted.

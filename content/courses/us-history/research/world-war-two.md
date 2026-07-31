@@ -95,33 +95,55 @@ carried by the comparative-cost table, not by assertion.
 
 ## FIGURE PLAN
 
-1. `source:` **ffear-pearl-harbor-arizona-burning** — save as
+1. `source:` no pool candidate — hunt: a photograph of an America First
+   Committee rally, 1941 (the Madison Square Garden rallies with Charles
+   Lindbergh are the most reproduced) — Wikimedia Commons; search "America
+   First Committee rally Lindbergh 1941". Save as `america-first-rally-1941`.
+   Reader must be able to see: a packed hall and isolationist signage — the
+   scale of a "serious majority position", not a footnote, is only credible as
+   a real crowd photograph. Placement: centered at the neutrality/isolationism
+   key point.
+2. `source:` no pool candidate — hunt: the Atlantic Charter meeting, FDR and
+   Churchill aboard USS Augusta, August 1941 — Wikimedia Commons / US Navy
+   photograph; search "Atlantic Charter Roosevelt Churchill USS Augusta 1941".
+   Save as `atlantic-charter-meeting-1941`. Reader must be able to see: the two
+   leaders together on deck — the undeclared wartime partnership made visible
+   before Pearl Harbor. Placement: float-right beside the Lend-Lease/Atlantic
+   Charter material.
+3. `source:` **ffear-pearl-harbor-arizona-burning** — save as
    `pearl-harbor-arizona-1941`. Reader must be able to see: the Arizona burning
    and listing. Placement: centered at the Pearl Harbor section.
-2. `source:` **ffear-omaha-beach-jaws-of-death** — save as `omaha-beach-1944`.
+4. `source:` **ffear-omaha-beach-jaws-of-death** — save as `omaha-beach-1944`.
    Reader must be able to see: troops in the water from the landing craft's
    ramp. Placement: centered at the D-Day section; caption names the Coast Guard
    photographer aboard the craft.
-3. `source:` **ffear-nagasaki-mushroom-cloud** — save as `nagasaki-1945`.
+5. `source:` no pool candidate — hunt: the Trinity test detonation, July 16,
+   1945 — Wikimedia Commons / National Archives (Los Alamos / DOE
+   photograph); search "Trinity test July 1945 fireball". Save as
+   `trinity-test-1945`. Reader must be able to see: the fireball at the moment
+   of detonation — the Manhattan Project's product as a photographed event,
+   ahead of and distinct from its use on Japan. Placement: centered at the
+   Manhattan Project key point, before the Nagasaki figure.
+6. `source:` **ffear-nagasaki-mushroom-cloud** — save as `nagasaki-1945`.
    Reader must be able to see: the cloud column photographed from the air.
    Placement: centered at the endgame section, with a caption stating date,
    photographer, and the casualty estimate range.
-4. `draw:` single `<Figure>` — **war deaths by country**: absolute deaths and
+7. `draw:` single `<Figure>` — **war deaths by country**: absolute deaths and
    share of prewar population for the US, UK, USSR, Germany, Japan, and China as
    paired bars. The single figure carrying the "uniquely privileged belligerent"
    claim.
-5. `draw:` `<FigureSequence>` (5 frames) — **from neutrality to war**: Neutrality
+8. `draw:` `<FigureSequence>` (5 frames) — **from neutrality to war**: Neutrality
    Acts → cash-and-carry → destroyers-for-bases → Lend-Lease → Pearl Harbor. One
    step per frame with a "how far from belligerence" gauge moving each time.
-6. `draw:` single `<Figure>` — **the war of machines**: US aircraft, ships, and
+9. `draw:` single `<Figure>` — **the war of machines**: US aircraft, ships, and
    tank production by year 1940-1945 against combined Axis production, with the
    crossover year marked.
-7. `draw:` single `<Figure>` — **where the German army died**: German casualties
-   by front, showing the Eastern Front's share. One idea, stated once, with
-   sources.
-8. `draw:` single `<Figure>` — **the deficit that ended the Depression**: federal
-   spending and deficit as a share of GNP, 1929-1945, with New Deal peaks dwarfed
-   by wartime levels and unemployment overlaid.
+10. `draw:` single `<Figure>` — **where the German army died**: German
+    casualties by front, showing the Eastern Front's share. One idea, stated
+    once, with sources.
+11. `draw:` single `<Figure>` — **the deficit that ended the Depression**:
+    federal spending and deficit as a share of GNP, 1929-1945, with New Deal
+    peaks dwarfed by wartime levels and unemployment overlaid.
 
 ## Canon additions (curated expansion, July 2026)
 

@@ -108,36 +108,67 @@ this closing audit, not as the frame.
 
 ## FIGURE PLAN
 
-No `source:` figures in the pool for this lesson; the artifacts of this era are
-mostly under copyright. Keep it drawn.
+The pool's own note that "the artifacts of this era are mostly under
+copyright" holds for press photography but not for federal government
+documents and government-photographer images, which stay public domain
+regardless of date (17 U.S.C. §105). Three real, findable items follow.
 
-1. `draw:` single `<Figure>` — **globalization measured**: US trade as a share of
+1. `source:` **no pool candidate — hunt:** the 2001 Authorization for Use of
+   Military Force (Public Law 107-40) — congress.gov/govinfo.gov holds the
+   enrolled statute. Save as `aumf-2001-page1`. Reader must be able to see:
+   the operative "all necessary and appropriate force" clause. Must be the
+   real statute — the two-authorizations figure below compares its exact
+   wording against the Tonkin Gulf Resolution's, and a paraphrase would beg
+   the comparison. Placement: float-right beside the two-authorizations
+   table.
+2. `source:` **no pool candidate — hunt:** Pentagon damage, September 11 2001
+   — a Department of Defense photographer's image (public domain), widely
+   mirrored at defense.gov and the Wikimedia Commons category "September 11
+   attacks (Pentagon)". Save as `pentagon-911-damage`. Reader must be able
+   to see: the crash site and the extent of the damage. Must be the real
+   photograph — it documents the attack the AUMF was written to answer.
+   Placement: centered at the 9/11 paragraph.
+3. `source:` **no pool candidate — hunt:** a September/October 2008
+   financial-crisis congressional hearing — a Senate or House photographer's
+   official image (public domain) of Bernanke or Paulson testifying, via the
+   relevant committee's site or Wikimedia Commons. Save as
+   `financial-crisis-hearings-2008`. Reader must be able to see: the witness
+   table and the hearing-room setting. Must be the real photograph — it is
+   the visible moment the crisis became a policy emergency, not an
+   illustration of "the government responded." Placement: centered near the
+   how-2008-propagated sequence.
+4. `draw:` single `<Figure>` — **globalization measured**: US trade as a share of
    GDP and manufacturing employment, 1970-2020, on one chart with NAFTA and
    China's WTO accession marked.
-2. `draw:` single `<Figure>` — **two authorizations**: the Tonkin Gulf Resolution
+5. `draw:` single `<Figure>` — **two authorizations**: the Tonkin Gulf Resolution
    and the 2001 AUMF as two quoted operative sentences with scope, geography,
    named adversary, and sunset compared in a table beneath. Spaced review of
    the-sixties.
-3. `draw:` `<FigureSequence>` (5 frames) — **how 2008 propagated**: mortgage
+6. `draw:` `<FigureSequence>` (5 frames) — **how 2008 propagated**: mortgage
    originated → securitized and rated → held with leverage → defaults rise →
    funding markets freeze → federal intervention. One link per frame, mirroring
    the great-depression chain figure so the two compose.
-4. `draw:` single `<Figure>` — **the wealth gap across the crisis**: median
+7. `draw:` single `<Figure>` — **the wealth gap across the crisis**: median
    household wealth by race, 1983-2019, with 2007 and 2013 marked and arrows
    pointing back to the redlining and GI Bill chapters.
-5. `draw:` single `<Figure>` — **polarization, measured three ways**:
+8. `draw:` single `<Figure>` — **polarization, measured three ways**:
    congressional ideological distance, split-ticket voting share, and the share
    of voters living in landslide counties, as three small aligned panels
    1950-2020. Data from American Panorama's election layer and standard series.
-6. `draw:` single `<Figure>` — **rights extended and contracted, 2000-2020**: a
+9. `draw:` single `<Figure>` — **rights extended and contracted, 2000-2020**: a
    two-sided timeline with expansions (*Lawrence*, ADA amendments, *Obergefell*)
    above and contractions (*Shelby County*, voting-law changes) below.
-7. `draw:` single `<Figure>` — **the course in one frame**: the thesis's four
-   links (selected population / compounding institutions / improbability
-   survived / enabling conditions) as four rows against the course's era
-   columns, each cell holding one measurement and linking the lesson that
-   established it. The closing synthesis figure — every cell must link to a
-   lesson.
+10. `draw:` single `<Figure>` — **the course in one frame**: the thesis's four
+    links (selected population / compounding institutions / improbability
+    survived / enabling conditions) as four rows against the course's era
+    columns, each cell holding one measurement and linking the lesson that
+    established it. The closing synthesis figure — every cell must link to a
+    lesson.
+
+3 of 10 entries (30%) are sourced. The remaining seven are quantitative
+syntheses (trade, propagation chains, wealth gaps, polarization measures,
+the closing thesis audit) that are properly this course's own construction
+— no single photograph stands in for a forty-year statistical claim.
 
 ## Canon additions (curated expansion, July 2026)
 

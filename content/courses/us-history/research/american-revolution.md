@@ -111,25 +111,50 @@ sectional-crisis).
 
 1. `source:` **archives-declaration-stone-engraving** — save as
    `declaration-stone-engraving-1823`. Reader must be able to see: legible
-   body text, grievance paragraphs, all 56 signatures. Placement: centered.
+   body text, grievance paragraphs, all 56 signatures. Why it must be the
+   real artifact: this is the fully-legible version every textbook actually
+   reproduces — the object under discussion, not an illustration of it.
+   Placement: centered.
 2. `source:` **archives-declaration-parchment** — save as
    `declaration-parchment-faded`. Reader must be able to see: the crisp
-   banner against the effaced signatures. Placement: beside figure 1 as the
+   banner against the effaced signatures. Why it must be the real artifact:
+   the fading itself is the evidence (35 years of sunlight), not a scan
+   defect — a redraw would erase the point. Placement: beside figure 1 as the
    original-vs-reproduction comparison; the fading is the evidence.
-3. `draw:` single `<Figure>` — **imperial arithmetic**: debt vs revenue with
+3. `source:` **bailyn-catos-letters-title-page** — save as
+   `catos-letters-1723-title`. Reader must be able to see: the Vol. II title
+   page and period woodcut vignette of Trenchard and Gordon's *Cato's
+   Letters*, John Adams Library copy. Why it must be the real artifact: this
+   is the specific pamphlet Bailyn identifies as the most load-bearing
+   transmission channel for the colonists' power-vs-liberty vocabulary —
+   Adams's own library held this exact title, and the physical book is the
+   evidence for "working equipment," not decoration. Placement: float-left at
+   key point 2 (the institutional/consent argument and its Whig-pamphlet
+   grammar).
+4. `source:` no pool candidate — hunt: Paul Revere's 1770 engraving "The
+   Bloody Massacre Perpetrated in King Street" (the Boston Massacre) —
+   Wikimedia Commons / Library of Congress hold period copies (search
+   "Paul Revere Bloody Massacre King Street 1770"; LOC has a hand-colored
+   copy). Reader must be able to see: the soldiers firing in a line, a fallen
+   Crispus Attucks, the "Butcher's Hall" signage Revere added as agitprop.
+   Why it must be the real artifact: this is the actual 1770 propaganda print
+   colonists circulated to inflame opinion — the point of showing it is that
+   IT was the inflammatory object, not a modern illustration of the event.
+   Placement: centered in the escalation narrative (key point 3).
+5. `draw:` single `<Figure>` — **imperial arithmetic**: debt vs revenue with
    the 13.5x ratio and the resulting acts on the timeline (recap-and-extend
    of the awakening-and-empire ledger).
-4. `draw:` single `<Figure>` — **the tax-burden comparison**: per-capita
+6. `draw:` single `<Figure>` — **the tax-burden comparison**: per-capita
    taxation, Britain vs colonies, c.1765 — one idea: the dispute was
    constitutional, not fiscal.
-5. `draw:` `<FigureSequence>` (5 frames) — **the escalation ladder,
+7. `draw:` `<FigureSequence>` (5 frames) — **the escalation ladder,
    1765-1775**: one act and colonial response added per frame (Stamp Act →
    repeal + Declaratory → Townshend → Tea Act/Tea Party → Coercive Acts →
    Congress and Lexington).
-6. `draw:` single `<Figure>` — **anatomy of the Declaration**: premise /
+8. `draw:` single `<Figure>` — **anatomy of the Declaration**: premise /
    27 grievances / operative declaration as labeled zones with the struck
    slave-trade passage marked as a deleted block.
-7. `draw:` single `<Figure>` — **the paradox tally**: what the Revolution
+9. `draw:` single `<Figure>` — **the paradox tally**: what the Revolution
    universalized against whom it excluded, closing with the 30,000-100,000
    figure — facts side by side, no commentary.
 

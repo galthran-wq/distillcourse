@@ -101,33 +101,58 @@ spine numbers.
 
 ## FIGURE PLAN
 
-1. `source:` **yawp-gordon-scourged-back** — save as `gordon-scourged-back-1863`.
+1. `source:` **eli-whitney-cotton-gin-patent-1794** — no pool candidate — hunt:
+   National Archives, "Cotton Gin Patent" (Eli Whitney, Patent X72, March 14,
+   1794), digitized patent drawing and specification; also on Wikimedia Commons
+   ("Eli Whitney cotton gin patent"). Reader must be able to see: the hand-drawn
+   mechanical diagram (cylinder, wire teeth, brush) and Whitney's signature with
+   the 1794 date, anchoring the causal chain in an actual dated document rather
+   than a paraphrase. Placement: float-right, opening the numbers section (key
+   point 1), beside the "5 million pounds in 1793" claim.
+2. `source:` **slave-sale-broadside-antebellum** — no pool candidate — hunt:
+   Library of Congress Rare Book and Special Collections or Wikimedia Commons
+   for a 19th-century slave-sale broadside or newspaper advertisement (search
+   terms: "slave auction broadside," "valuable gang of negroes for sale," "New
+   Orleans slave sale poster Wikimedia Commons"). Reader must be able to see:
+   the printed list format — names, ages, prices, or the word "gang" — that
+   reduced people to a sale listing. Placement: centered, opening the
+   market-and-labor-discipline section, as the start of the Yawp's own
+   sale-poster-to-Gordon-photograph escalation the brief asks to reproduce.
+3. `source:` **yawp-gordon-scourged-back** — save as `gordon-scourged-back-1863`.
    Reader must be able to see: the raised scar tissue across the back, the studio
    card border, and the Brady imprint. Placement: centered, at the end of the
-   labor-discipline section, following the drawn escalation sequence. Caption
+   labor-discipline section, the escalation's end point after entry 2. Caption
    must state what the image was made for (1863 abolitionist circulation) and
    that "Gordon" is the name recorded by the photographer.
-2. `source:` **panorama-forced-migration-map** — save as
+4. `source:` **panorama-forced-migration-map** — save as
    `panorama-forced-migration-1830s`. Reader must be able to see: the
    outmigration/immigration dot density across the South and the paired charts,
    with the decade selector visible. Placement: centered in the methodology
    section, credited to DSL/Stamen with a link. NOTE: publisher-copyright
    screenshot; if publication licensing is a concern, drop it and rely on the
-   drawn figures 3 and 4, linking the live atlas instead.
-3. `draw:` single `<Figure>` — **two curves, one system**: cotton exports (lbs)
+   drawn figure 6, linking the live atlas instead.
+5. `draw:` single `<Figure>` — **two curves, one system**: cotton exports (lbs)
    and enslaved population, 1790-1860, on a shared time axis with the cotton gin,
    1808 ban, and 1830s removal annotated. The demo animates this; the figure
    fixes it.
-4. `draw:` `<FigureSequence>` (5 frames) — **the forced migration by decade**:
+6. `draw:` `<FigureSequence>` (5 frames) — **the forced migration by decade**:
    the same Southern map for the 1810s, 20s, 30s, 40s, 50s, with net export and
    net import counties shaded and the decade's total annotated; the 1830s frame
-   the largest. Built from the Panorama data, drawn by us.
-5. `draw:` single `<Figure>` — **the planter's cycle**: a closed loop — cotton
+   the largest. Built from the Panorama data, drawn by us — a data
+   visualization of the estimate, not a reproduction of a found map.
+7. `draw:` single `<Figure>` — **the planter's cycle**: a closed loop — cotton
    sold → capital → people purchased → land cleared → more cotton — with the
    quoted planter sentence as the caption claim.
-6. `draw:` single `<Figure>` — **cotton's share of US exports, 1800-1860**: a
+8. `draw:` single `<Figure>` — **cotton's share of US exports, 1800-1860**: a
    stacked area of export categories with cotton crossing 60%. One idea: the
    national economy, not just the Southern one, ran on this.
-7. `draw:` single `<Figure>` — **the Celia case, step by step**: a four-box legal
-   chain (the law's definition of property → the act → the defense disallowed →
-   the sentence), stated flatly.
+9. `source:` **fitzhugh-sociology-for-the-south-title-page-1854** — no pool
+   candidate — hunt: Internet Archive / HathiTrust scan of George Fitzhugh,
+   *Sociology for the South, or the Failure of Free Society* (Richmond: A.
+   Morris, 1854), title page. Reader must be able to see: the actual title,
+   author, publisher, and 1854 date — proof the proslavery sociology (key point
+   6) is a real published argument, not a paraphrase. Placement: float-left
+   beside the proslavery-argument section.
+10. `draw:` single `<Figure>` — **the Celia case, step by step**: a four-box
+    legal chain (the law's definition of property → the act → the defense
+    disallowed → the sentence), stated flatly.

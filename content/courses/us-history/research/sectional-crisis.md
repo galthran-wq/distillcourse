@@ -118,35 +118,51 @@ them. Reinforces the contingency concept (the 1860 four-way split).
 
 ## FIGURE PLAN
 
-1. `source:` **bcf-brooks-sumner-cartoon** — save as `southern-chivalry-1856`.
+1. `source:` **blight-douglass-portrait-1879** — save as
+   `douglass-portrait-1879`. Reader must be able to see: Douglass's face in the
+   studio-portrait style of the era — per the record, the most photographed
+   American of the 19th century, photography as self-representation.
+   Placement: float-right, opening the Douglass-on-the-Constitution set piece
+   (the 1852 Rochester address and 1860 Glasgow "GLORIOUS LIBERTY DOCUMENT"
+   reading), set against Taney's reading below.
+2. `source:` **uncle-toms-cabin-1852-title-page** — no pool candidate — hunt:
+   Library of Congress or Wikimedia Commons scan of the first-edition title
+   page, Harriet Beecher Stowe, *Uncle Tom's Cabin; or, Life Among the Lowly*
+   (Boston: John P. Jewett & Co., 1852), Vol. I — matches this course's
+   established title-page convention (cf. `fedpapers-1788-title-page`,
+   `mccullough76-common-sense-title`). Reader must be able to see: the actual
+   1852 imprint and publisher, grounding "sales figures" and "a political
+   event" (key point 2) in the real object that sold. Placement: centered,
+   opening the Uncle Tom's Cabin subsection.
+3. `source:` **bcf-brooks-sumner-cartoon** — save as `southern-chivalry-1856`.
    Reader must be able to see: Brooks's raised cane, Sumner at his desk, the
    watching members, and the caption. Placement: centered in the political-
    violence section. It is 1856 propaganda; the caption must say so.
-2. `source:` **milestone-dred-scott-judgment** — save as `dred-scott-docket-cover`.
+4. `source:` **milestone-dred-scott-judgment** — save as `dred-scott-docket-cover`.
    Reader must be able to see: the case caption and the handwritten filing and
    dismissal dates spanning 1854-1857. Placement: float left beside the Dred
    Scott section.
-3. `source:` **blight-john-brown-portrait-1859** — save as `john-brown-1859`.
+5. `source:` **blight-john-brown-portrait-1859** — save as `john-brown-1859`.
    Reader must be able to see: Brown's face as contemporaries saw it, weeks
    before execution. Placement: float right in the Harpers Ferry section, as the
    documentary baseline against the mythologized images analyzed in
    civil-war-memory.
-4. `draw:` `<FigureSequence>` (6 frames) — **the escalation ladder, 1850-1861**:
+6. `draw:` `<FigureSequence>` (6 frames) — **the escalation ladder, 1850-1861**:
    one event added per frame along a single time axis (Compromise of 1850 →
    Uncle Tom's Cabin → Kansas-Nebraska → Sumner caning and Bleeding Kansas →
    Dred Scott → Harpers Ferry → 1860). Each frame annotates what became
    impossible after that event. This is the lesson's spine figure.
-5. `draw:` single `<Figure>` — **the party system breaks**: congressional seat
+7. `draw:` single `<Figure>` — **the party system breaks**: congressional seat
    composition in 1852, 1856, and 1860 as three stacked bars showing Whig
    collapse, Know-Nothing spike, and Republican consolidation.
-6. `draw:` single `<Figure>` — **what Dred Scott held**: three boxed holdings
+8. `draw:` single `<Figure>` — **what Dred Scott held**: three boxed holdings
    (no Black citizenship, no federal power to bar slavery in territories,
    Missouri Compromise void) with the political position each one destroyed
    listed beneath.
-7. `draw:` single `<Figure>` — **the 1860 four-way race**: electoral map plus a
+9. `draw:` single `<Figure>` — **the 1860 four-way race**: electoral map plus a
    popular-vote bar showing Lincoln's under-40% plurality and the states where
    he was not on the ballot.
-8. `draw:` single `<Figure>` — **secession in two waves**: the seven Deep South
-   states (Dec 1860-Feb 1861) and the four upper South states (after Sumter),
-   with the border states that stayed marked separately. Idea from McPherson
-   Ch.8-9.
+10. `draw:` single `<Figure>` — **secession in two waves**: the seven Deep South
+    states (Dec 1860-Feb 1861) and the four upper South states (after Sumter),
+    with the border states that stayed marked separately. Idea from McPherson
+    Ch.8-9.

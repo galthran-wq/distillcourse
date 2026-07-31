@@ -92,31 +92,84 @@ draft; 1945's acceptance is the contrast world-war-two sets up.
 
 ## FIGURE PLAN
 
-No `source:` figures in the pool for this lesson. If one is wanted later, the
-NARA Zimmermann Telegram decrypt page is the obvious capture — it is a real
-decoded document whose materiality carries the story.
+No pool candidates for this lesson; the pool was built from other modules'
+reading. Five sourced artifacts have been hunted below — real documents,
+posters, and photographs — to run alongside the lesson's own diagrams.
 
-1. `draw:` `<FigureSequence>` (5 frames) — **the road to April 1917**: one event
+1. `source:` no pool candidate — hunt: NARA's decrypted, annotated Zimmermann
+   Telegram (the State Department decode, RG 59, reproduced on
+   archives.gov/milestone-documents and Wikimedia Commons under "Zimmermann
+   Telegram decrypt"). Save as `zimmermann-telegram-decrypt`. Reader must be
+   able to see: the coded groups struck through and replaced with the
+   decrypted English text, and the routing stamps. Why real: the set piece
+   here is separating the telegram's actual content from the interpretation
+   placed on it — that only works if the reader sees the real decoded page,
+   not a typeset reconstruction. Placement: float-right within the road-to-war
+   sequence (item 2), at the Zimmermann Telegram frame.
+2. `draw:` `<FigureSequence>` (5 frames) — **the road to April 1917**: one event
    per frame on a fixed timeline (trade and loans → *Lusitania* → 1916 election →
    unrestricted submarine warfare → Zimmermann Telegram → declaration), with a
    small public-opinion gauge shifting each frame.
-2. `draw:` single `<Figure>` — **deaths, compared**: US battle deaths, US
+3. `draw:` single `<Figure>` — **deaths, compared**: US battle deaths, US
    disease deaths in service, and US influenza deaths at home as three bars.
    One idea: the pandemic dwarfed the war.
-3. `draw:` single `<Figure>` — **the wartime state, assembled**: agencies created
+4. `source:` no pool candidate — hunt: a Committee on Public Information war
+   poster, e.g. James Montgomery Flagg's "Destroy This Mad Brute" (1917) or a
+   Four-Minute-Men CPI poster; LOC Prints & Photographs and Wikimedia Commons
+   hold high-resolution scans under "WWI propaganda poster 1917 Committee on
+   Public Information". Save as `cpi-propaganda-poster`. Reader must be able
+   to see: the poster's full illustration and slogan at legible size. Why
+   real: "manufacturing consent" is a claim about a specific persuasion
+   apparatus and its actual visual register (the Hun-as-brute imagery) — a
+   drawn approximation would blunt exactly the point the lesson makes about
+   wartime propaganda's tone. Placement: centered in the manufacturing-consent
+   section, before item 6.
+5. `draw:` single `<Figure>` — **the wartime state, assembled**: agencies created
    1917-18 (WIB, Food Administration, Railroad Administration, CPI, Selective
    Service) with each one's power over prices, production, labor, or speech, and
    a note on which returned in 1933 and 1942.
-4. `draw:` single `<Figure>` — **prosecuting speech**: Espionage and Sedition Act
+6. `source:` no pool candidate — hunt: a completed WWI Selective Service draft
+   registration card (facsimiles at the National Archives' "World War I
+   Draft Registration Cards" collection, familysearch.org, and Wikimedia
+   Commons). Save as `wwi-draft-registration-card`. Reader must be able to
+   see: the card's actual printed questions and a filled-in hand. Why real:
+   "24 million registered, 2.8 million drafted" is an abstraction until the
+   reader sees the paper instrument that number is counting — the real form,
+   not a drawn facsimile. Placement: float-left near the wartime-state figure
+   (item 5), in the Selective Service discussion.
+7. `draw:` single `<Figure>` — **prosecuting speech**: Espionage and Sedition Act
    prosecutions by year with named cases (Debs, Schenck, Abrams) marked and the
    resulting doctrine noted.
-5. `draw:` single `<Figure>` — **the Great Migration begins**: arrow map of
+8. `source:` no pool candidate — hunt: a photographic portrait of Eugene Debs
+   from his imprisonment period (1918-1921), e.g. his Atlanta Federal
+   Penitentiary intake photograph or a contemporary press portrait taken
+   around the Canton speech; LOC and Wikimedia Commons hold period Debs
+   photographs — search "Eugene Debs photograph 1918" or "Eugene Debs prison
+   Atlanta". Save as `debs-1918-portrait`. Reader must be able to see: Debs's
+   face, captioned with the sentence and the 1920 prison vote total. Why
+   real: the set piece is "two facts, no commentary needed" — the actual
+   photograph of the man sentenced for a speech is the third fact a drawing
+   cannot add. Placement: float-right beside item 7.
+9. `draw:` single `<Figure>` — **the Great Migration begins**: arrow map of
    Southern origins to Northern destinations, 1916-1919, with Chicago, Detroit,
    and New York Black populations in 1910 vs. 1920 tabulated. Idea from the Give
    Me Liberty migration maps; drawn by us.
-6. `draw:` single `<Figure>` — **Fourteen Points vs. Versailles**: a two-column
-   audit of Wilson's points against the treaty's terms, each row marked kept,
-   diluted, or dropped — with the tally as the payoff.
+10. `source:` no pool candidate — hunt: a 1910s photograph of Black Southern
+    migrants arriving at a Northern rail terminal (Chicago or Detroit), held
+    by the Chicago History Museum, the Schomburg Center, or LOC — search
+    "Great Migration photograph arrival Chicago 1910s"; alternatively, a
+    front page of the *Chicago Defender* from 1917-1919 urging Southern
+    readers north (Defender archives, ProQuest Historical Newspapers, or
+    library microfilm reproductions). Save as `great-migration-arrival` or
+    `chicago-defender-front-page`. Reader must be able to see: identifiable
+    migrants and luggage, or the Defender's actual masthead and headline
+    text. Why real: the arrow map states the migration's scale; this
+    photograph or masthead is the document that caused it or recorded it —
+    the artifact the arrow map is summarizing. Placement: centered,
+    immediately after item 9.
+11. `draw:` single `<Figure>` — **Fourteen Points vs. Versailles**: a two-column
+    audit of Wilson's points against the treaty's terms, each row marked kept,
+    diluted, or dropped — with the tally as the payoff.
 
 ## Canon additions (curated expansion, July 2026)
 

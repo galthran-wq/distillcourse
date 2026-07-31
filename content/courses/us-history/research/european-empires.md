@@ -111,10 +111,20 @@ first empires operating on it.
    comparison (New Spain / New France / New Netherland) across five rows
    (population by 1750, labor system, church, Native relations, main export).
    The lesson's spine figure.
-2. `draw:` single `<Figure>` — **the map of empires, c. 1700**: North America
-   with Spanish borderlands, French river-and-lakes arc, Dutch-then-English
-   Hudson, and the thin English coastal strip — the strip that will win drawn
-   deliberately small.
+2. `source:` single `<Figure>` — **the map of empires, c. 1700**: file-stem
+   `european-empires-territorial-claims-1700`; the reader must see Spanish,
+   French, and Dutch-then-English claims laid over real North American
+   geography, including the thin English coastal strip — a genuine
+   territorial-claims map, not a course locator, because this exact
+   contested geography is what period cartographers drew maps to record; a
+   redrawn version would be a fabrication of a real object. No pool
+   candidate — hunt: Herman Moll, "A New Map of the North Parts of America
+   Claimed by France" (1715/1720 state) or Henry Popple, "A Map of the
+   British Empire in America" (1733) — both digitized at high resolution on
+   Wikimedia Commons and in the Library of Congress Geography & Map Division
+   (search "Herman Moll North America 1720 Wikimedia Commons" or "Popple
+   map British Empire in America 1733 Library of Congress"). Placement:
+   centered.
 3. `draw:` `<FigureSequence>` (3-4 frames) — **the population race**: British
    vs French vs Spanish-borderlands colonial populations at 1650, 1700, 1750,
    one frame per date, the divergence compounding. Franklin's doubling rule
@@ -126,3 +136,36 @@ first empires operating on it.
 5. `draw:` single `<Figure>` — **the Pueblo Revolt, 1680-1692**: a compact
    timeline-map of the rising, the expulsion, and the return, with the horse
    dispersal arrow pointing to the Plains (back-reference to lesson 1).
+6. `source:` single `<Figure>` — **Bartolomé de las Casas, portrait**:
+   file-stem `european-empires-las-casas-portrait`; the reader must see the
+   Dominican friar's own face beside the printing-circuit figure — the Black
+   Legend has an author, not just a pamphlet, and a real likeness makes that
+   concrete. No pool candidate — hunt: the standard posthumous oil portrait
+   of Bartolomé de las Casas (multiple period and 19th-century versions
+   circulate; search "Bartolomé de las Casas portrait Wikimedia Commons" and
+   verify the specific version's public-domain status before capture).
+   Placement: float-left, beside the printing-circuit figure's opening node.
+7. `source:` single `<Figure>` — **a De Bry engraving of the Black Legend**:
+   file-stem `european-empires-debry-engraving`; the reader must see one of
+   Theodor de Bry's 1590s copperplate engravings illustrating Las Casas's
+   *Brevísima relación* — the actual amplification artifact the printing-
+   circuit figure only diagrams. Real because the engraving itself, not a
+   redrawing of it, is the propaganda object under discussion — tracing it
+   would misrepresent what a 16th-century reader actually saw. No pool
+   candidate — hunt: Theodor de Bry, engravings for "Narratio Regionum
+   Indicarum per Hispanos Quosdam Devastatarum" (Frankfurt, 1598) — widely
+   reproduced on Wikimedia Commons (search "De Bry Las Casas engraving
+   Wikimedia Commons"); pick one clearly captioned plate. Placement:
+   centered, directly after the printing-circuit figure.
+8. `source:` single `<Figure>` — **a surviving Spanish mission church**:
+   file-stem `european-empires-spanish-mission-surviving`; the reader must
+   see an actual Spanish colonial mission still standing in the present-day
+   US — what the empire physically left behind, per key point 5. Real
+   because the building is the artifact; a drawing of a mission would lose
+   the point that it survives. No pool candidate — hunt: a modern photograph
+   of San Esteban del Rey Mission, Acoma Pueblo, NM (built 1629, survived
+   the Pueblo Revolt and stands today) or the Castillo de San Marcos, St.
+   Augustine, FL (begun 1672, oldest masonry fort in the continental US) —
+   both well photographed on Wikimedia Commons (search "San Esteban del Rey
+   Mission Acoma Wikimedia" or "Castillo de San Marcos Wikimedia Commons").
+   Placement: float-right, beside the "what each empire left" paragraph.

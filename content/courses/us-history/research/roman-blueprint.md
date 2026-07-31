@@ -153,38 +153,60 @@ the top-down classical design meet in 1787.
 1. `source:` **woodcar-adams-portrait-stuart** — save as
    `john-adams-stuart`. Reader must be able to see: the period portrait
    register of the man whose mixed-government theory the lesson dissects.
-   Placement: float right beside the Adams-paradox passage.
+   Why it must be the real artifact: a real oil-portrait likeness, not an
+   abstraction, for the Adams paradox discussion. Placement: float right
+   beside the Adams-paradox passage.
 2. `source:` **woodcar-pa-constitution-1776-title** — save as
    `pennsylvania-constitution-1776`. Reader must be able to see: the
    manuscript preamble and Franklin's convention presidency — the radical
    unicameral constitution that is Wood's paradigm of 1776's assumptions.
-   Placement: centered in the virtue-to-interest section, as the "before"
-   artifact the 1780s discredited.
-3. `draw:` single `<Figure>` — **Polybius's cycle and its cure**: the
+   Why it must be the real artifact: the actual manuscript IS the "before"
+   object the 1780s vices discredited; a redraw would fabricate a founding
+   document. Placement: centered in the virtue-to-interest section, as the
+   "before" artifact the 1780s discredited.
+3. `source:` **bailyn-catos-letters-title-page** — save as
+   `catos-letters-1723-title`. Reader must be able to see: the 1723 Vol. II
+   title page and its period woodcut vignette, John Adams Library copy. Why
+   it must be the real artifact: this is the pamphlet Bailyn identifies as
+   the transmission channel that made Cato, Cincinnatus, and Publius
+   "working equipment" rather than ornament — the physical copy's
+   provenance (Adams's own library) is part of the evidence. Placement:
+   float-left at key point 1 (the classical vocabulary as documented working
+   equipment).
+4. `draw:` single `<Figure>` — **Polybius's cycle and its cure**: the
    six-stage anacyclosis wheel with the mixed-government brake drawn as the
    three forms checking one another, then the 1787 mapping (president /
    Senate / House) beside it with the one changed premise (all elective)
    highlighted.
-4. `draw:` single `<Figure>` — **the clause genealogy**: the centerpiece
+5. `draw:` single `<Figure>` — **the clause genealogy**: the centerpiece
    table — 1787-91 clauses against named sources with textual evidence, the
    worked clause (cruel and unusual) traced in full.
-5. `draw:` `<FigureSequence>` (4 frames) — **sovereignty moves, 1776-1787**
+6. `draw:` `<FigureSequence>` (4 frames) — **sovereignty moves, 1776-1787**
    (Wood Ch.VIII-IX, XV): frame 1 legislature-as-the-people (PA 1776);
    frame 2 constitution as fundamental law (MA 1780, drafted by convention,
    ratified by towns); frame 3 the convention as the people's constituent
    device (Philadelphia and the ratifying conventions); frame 4 courts as
    sovereignty's guards (Trevett; Federalist 78 pointer). One relocation per
    frame — the diagram Wood never drew.
-6. `draw:` single `<Figure>` — **the ladder completed**: the
+7. `draw:` single `<Figure>` — **the ladder completed**: the
    compact-to-constitution ladder from new-england-covenant re-drawn with
    the top rungs filled in (state constitutions 1776-80 → Articles →
    Constitution 1787 → Bill of Rights 1791), and the two feeder channels —
    bottom-up colonial practice, top-down classical/English design — joining
    at 1787.
-7. `draw:` single `<Figure>` — **imitation measured**: a compact tally of
+8. `draw:` single `<Figure>` — **imitation measured**: a compact tally of
    the design's exports (written constitutions worldwide, separation of
    powers, judicial review, federal structures) with dates of first
    adoptions — the "most imitated" claim as a figure, sourced.
+
+**Note on balance**: this lesson stays drawing-heavy by design (3 source /
+5 draw, ~38%) — its content past the two portraits and the Cato's Letters
+title page is the course's own intellectual-history apparatus (a cycle
+model, a clause-genealogy table, a sovereignty-relocation sequence, an
+imitation tally): constructs explaining an argument, not real-world
+artifacts to photograph. There is no further pool candidate or obvious hunt
+target that would depict Polybius, Montesquieu, or the "vices of the
+1780s" any more concretely than the drawn figures already do.
 
 ## Canon additions (curated expansion, July 2026)
 

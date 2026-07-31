@@ -96,27 +96,64 @@ an institutional technology as consequential as the constitutional ones.
    Reader must be able to see: the stacked bunks, the crowding, and the harsh
    flash lighting. Placement: centered in the inequality section; the caption
    must note it was made as reform argument, using a new flash technology.
-2. `draw:` single `<Figure>` — **the incorporation framework**: three columns
+2. `source:` no pool candidate — hunt: Udo J. Keppler, "Next!" (Puck, Sept. 7,
+   1904) — the Standard Oil octopus cartoon, one tentacle around the Capitol,
+   on Wikimedia Commons / LOC Prints & Photographs. Save as
+   `standard-oil-octopus-cartoon-1904`. Reader must be able to see: the octopus
+   body labeled Standard Oil, tentacles reaching the Capitol and state
+   legislatures, and the caption. Why sourced: a real, dated piece of political
+   iconography contemporaries actually published and read — not a modern
+   illustration of "monopoly," which would flatten the argument to an idea we
+   invented. Placement: float-right beside the "scale and its instruments"
+   passage on trusts and holding companies (key point 1).
+3. `draw:` single `<Figure>` — **the incorporation framework**: three columns
    (space, labor, people) with two or three concrete instruments listed under
    each — railroads and time zones; mechanization and scientific management;
    immigration and tenements. Idea from Trachtenberg via MIT Lecture 6.
-3. `draw:` `<FigureSequence>` (4 frames) — **how a trust was built**: a single
+4. `draw:` `<FigureSequence>` (4 frames) — **how a trust was built**: a single
    industry drawn as competing firms, then horizontal combination, then vertical
    integration into supply and distribution, then the holding-company structure.
    One structural change per frame.
-4. `draw:` single `<Figure>` — **wages and wealth**: index of real wages against
+5. `draw:` single `<Figure>` — **wages and wealth**: index of real wages against
    the top 1% wealth share, 1870-1900, on one chart, with the two slopes as the
    payoff.
-5. `draw:` single `<Figure>` — **the strike pattern**: 1877, Homestead 1892, and
+6. `source:` no pool candidate — hunt: Harper's Weekly, July 1892 illustrated
+   coverage of the Homestead lockout (e.g. the Pinkerton barges under fire on
+   the Monongahela, or W. P. Snyder's widely reproduced engraving of the
+   battle), via Wikimedia Commons / LOC. Save as `homestead-strike-1892`.
+   Reader must be able to see: the barge, the river, and the armed crowd on the
+   bank — the moment the causal chain (wage cut → lockout → Pinkerton barge →
+   battle) turns violent. Why sourced: contemporaneous illustrated reportage of
+   a real, named event, not a generic strike scene. Placement: centered,
+   directly beside the strike-pattern figure below, anchoring its "Homestead
+   1892" row to an image.
+7. `draw:` single `<Figure>` — **the strike pattern**: 1877, Homestead 1892, and
    Pullman 1894 as three rows against columns (trigger, tactic, force deployed,
    outcome). The repeated cell — state force — is the point.
-6. `draw:` single `<Figure>` — **Carnegie vs. George**: two side-by-side argument
+8. `source:` no pool candidate — hunt: Harper's Weekly, May 15, 1886 engraving of
+   the Haymarket Square bombing and riot (the bomb burst, police and crowd in
+   confusion), via Wikimedia Commons / LOC. Save as `haymarket-riot-1886`.
+   Reader must be able to see: the square, the police line, and the moment of
+   the explosion as contemporaries illustrated it. Why sourced: the actual
+   press image that shaped public reaction and helped destroy the Knights of
+   Labor's standing — a drawn recreation would misrepresent what the public
+   actually saw. Placement: float-left in the "labor's answers" passage,
+   beside the Knights-of-Labor-collapses-after-Haymarket point.
+9. `draw:` single `<Figure>` — **Carnegie vs. George**: two side-by-side argument
    cards (premise / mechanism / policy) with the single point of disagreement
    highlighted.
-7. `draw:` single `<Figure>` — **the Populist platform**: 1892 Omaha planks
-   listed with a marker on each showing whether it was enacted later (income tax,
-   direct election of senators, regulation) — Populism as a legislative
-   forerunner.
+10. `source:` no pool candidate — hunt: an 1896 McKinley-Bryan campaign artifact
+    — either a "Cross of Gold" era Puck/Judge cartoon on free silver, or a
+    period McKinley "front porch campaign" photograph (both widely reproduced,
+    LOC / Wikimedia Commons). Save as `1896-election-artifact`. Reader must be
+    able to see: period campaign iconography of the fusion-ticket defeat that
+    ended Populism as an independent force. Why sourced: an actual artifact of
+    the 1896 contest, not an invented campaign scene. Placement: centered,
+    closing the Populist-platform passage (key point 5).
+11. `draw:` single `<Figure>` — **the Populist platform**: 1892 Omaha planks
+    listed with a marker on each showing whether it was enacted later (income
+    tax, direct election of senators, regulation) — Populism as a legislative
+    forerunner.
 
 ## Canon additions (curated expansion, July 2026)
 

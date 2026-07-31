@@ -144,26 +144,38 @@ working before the government even existed.
 4. `source:` **maier-madison-stuart-portrait** — save as
    `madison-stuart-1821`, and **maier-patrick-henry-sully-portrait** — save
    as `patrick-henry-matthews`. Reader must be able to see: the two
-   principals of the Virginia fight. Placement: paired floats in the
-   Virginia section; the Henry caption must state it is an 1891 copy after
-   Sully, not a life portrait. Optional pair.
-5. `draw:` single `<Figure>` — **the vote table**: all thirteen states with
+   principals of the Virginia fight. Why they must be the real artifacts:
+   Madison and Henry are named, opposing historical actors whose actual
+   likenesses anchor the 89-79 fight; the Henry caption must state it is an
+   1891 copy after Sully, not a life portrait. Placement: paired floats in
+   the Virginia section. Optional pair.
+5. `source:` no pool candidate — hunt: a portrait of Alexander Hamilton —
+   e.g. John Trumbull's 1792 or 1806 half-length (National Gallery of Art)
+   or the Ceracchi bust, via Wikimedia Commons (search "Alexander Hamilton
+   Trumbull portrait"). Reader must be able to see: the standard reference
+   likeness. Why it must be the real artifact: Hamilton drives the entire
+   New York section narrated here (the express riders, the city's secession
+   threat, No. 84's anti-bill-of-rights argument) yet has no portrait in this
+   lesson's plan, unlike Madison and Henry in the Virginia section — a real
+   likeness matches the same treatment. Placement: float-right at the New
+   York section.
+6. `draw:` single `<Figure>` — **the vote table**: all thirteen states with
    date, margin, and method, the big-three razors highlighted — the
    contingency spine figure.
-6. `draw:` single `<Figure>` — **the two cures for faction (No. 10)** —
+7. `draw:` single `<Figure>` — **the two cures for faction (No. 10)** —
    kept.
-7. `draw:` single `<Figure>` — **small vs extended republic** — kept.
-8. `draw:` single `<Figure>` — **the double security (No. 51)** — kept.
-9. `draw:` `<FigureSequence>` (4-5 frames) — **the ratification race** —
-   kept: the map filling in Delaware (Dec 1787) → New Hampshire ninth
-   (July 1788) → Virginia, New York → North Carolina (1789), Rhode Island
-   (1790), margins annotated per frame; now explicitly the drawn counterpart
-   of the pillars woodcut.
-10. `draw:` single `<Figure>` — **the amendments funnel**: states'
+8. `draw:` single `<Figure>` — **small vs extended republic** — kept.
+9. `draw:` single `<Figure>` — **the double security (No. 51)** — kept.
+10. `draw:` `<FigureSequence>` (4-5 frames) — **the ratification race** —
+    kept: the map filling in Delaware (Dec 1787) → New Hampshire ninth
+    (July 1788) → Virginia, New York → North Carolina (1789), Rhode Island
+    (1790), margins annotated per frame; now explicitly the drawn counterpart
+    of the pillars woodcut.
+11. `draw:` single `<Figure>` — **the amendments funnel**: states'
     recommended amendments (rights vs structural, tallied) → Madison's
     twelve → the ten ratified — with the blocked structural column visibly
     dropped. Idea from Maier's Epilogue.
-11. `draw:` single `<Figure>` — **twelve proposed, ten ratified** — kept
+12. `draw:` single `<Figure>` — **twelve proposed, ten ratified** — kept
     (composes with the parchment scan).
 
 ## Canon additions (curated expansion, July 2026)
