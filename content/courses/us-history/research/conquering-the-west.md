@@ -143,11 +143,88 @@ editorializing in either direction.
   - Ch. XIV: railroad checkerboard grants and Gates's own historiographical
     strike — "not a scintilla of evidence" the double-minimum price
     recouped the grants: a named, citable myth correction.
-- **Anderson & Hill, *The Not So Wild, Wild West*** (print; NOT read by the
-  swarm — no cached text; verify every claim against a library copy before
-  quoting) — frontier self-government as this course's institutions thesis
-  past the 100th meridian: wagon-train constitutions drafted on the trail,
-  mining-district codes, claim clubs, cattlemen's associations — private
-  order preceding formal government, and a documented corrective to the
-  lawless-frontier myth. Use for named set pieces; pair with Gates's claims
-  associations (Ch. VIII/X) which ARE verifiable from the cached text.
+- **Anderson & Hill, frontier self-government corpus** — the 2004 Stanford
+  UP book itself remains print-only and unread; unread book-only claims
+  (e.g. the water-rights and Native-property-rights chapters' specific
+  numbers) must still be flagged unverified before quoting. But the FREE
+  corpus around the book has now been read in full (cached under
+  `texts/wildwest-*`, see `research/sources.yaml` for the complete access
+  ledger) and yields verified claims and two real primary documents:
+  - **Verified thesis statement**, straight from Anderson & Hill's own 1979
+    article (`texts/wildwest-jls1979.txt`, the free original of the book's
+    core argument): "The West during this time often is perceived as a
+    place of great chaos... Our research indicates that this was not the
+    case; property rights were protected and civil order prevailed."
+    Four case studies, each with quoted primary language: land claims
+    clubs, cattlemen's associations, mining camps, and wagon trains.
+  - **Land claims clubs (verified).** The Claim Association of Johnson
+    County, Iowa (est. 1839) elected a President, Vice-President, Clerk/
+    Recorder, seven Judges of Claims (any five composed a court, three of
+    those had to agree), and two Marshals; sanctions ran from arbitration
+    fees to social ostracism ("we will neither neighbor with them...
+    Trade barter deal with them in any way whatever"). Set piece: **cache
+    the actual 1839 constitution**, reprinted verbatim from the original
+    manuscript in Benjamin F. Shambaugh, "Frontier Land Clubs, or Claim
+    Associations," *Annual Report of the American Historical Association
+    for the Year 1900*, Vol. 1 (GPO, 1901), pp. 67-84 (constitution text
+    at pp. 73-79) — `texts/wildwest-shambaugh-claimclubs-1900.txt`, page
+    scan `images/wildwest-shambaugh-johnson-county-constitution.png`
+    (printed p. 73, "ARTICLE 1ST" opening).
+  - **Wagon-train constitutions (verified).** Wagon companies typically
+    waited until past the US jurisdictional edge, then elected a Captain,
+    Assistant Captain, Treasurer, and Secretary, and adopted a written
+    constitution plus numbered by-laws covering jury trial (5 jurors for
+    ordinary disputes, 12 requiring unanimity for capital crimes),
+    banishment, gambling and firearm-safety rules, guard-duty rotation,
+    and disposition of a deceased member's property. Set piece: **cache
+    the actual constitution**, the 1849 "Constitution and By-Laws of the
+    Green and Jersey County Company" (a California-bound company that
+    organized at St. Joseph, Missouri), reprinted verbatim in Elizabeth
+    Page, *Wagon West: A Story of the Oregon Trail* (Farrar & Rinehart,
+    1930), Appendix C, pp. 336-341, signed by committee members Elon
+    Eldred and A. R. Knapp — `texts/wildwest-page1930-greenjersey-
+    constitution.txt`, page scan `images/wildwest-greenjersey-wagontrain-
+    constitution.png` (printed p. 337, "Art. 1" through "Art. 8," opening
+    of the By-Laws).
+  - **Mining-district codes (verified, via Charles Howard Shinn, *Mining
+    Camps: A Study in American Frontier Government*, 1885, cached
+    `texts/wildwest-shinn1885-districtcodes-excerpt.txt` pp. 233-257 and
+    `texts/wildwest-shinn1885-lawyers-excerpt.txt` pp. 118-122 — the exact
+    source Anderson & Hill cite for their mining-camp case study).
+    Springfield District restricted arbitration and jury service to
+    American citizens; the Union Mining District barred lawyers outright
+    ("Resolved, that no lawyer be permitted to practice law in this
+    district, under penalty of not more than fifty nor less than twenty
+    lashes, and he forever banished," quoted in Anderson & Hill 1979 from
+    Shinn). Pitfall to flag alongside the "not so wild" thesis: Columbia
+    District's code (in force by 1856, population 5,000+) explicitly
+    barred "Asiatics [and] South-Sea Islanders" and non-naturalized
+    non-Europeans from mining claims — bottom-up frontier self-government
+    could be exclusionary as readily as it could be orderly; use this to
+    complicate, not contradict, the institutions thesis and to connect
+    directly to this lesson's Chinese-exclusion point.
+  - **Cattlemen's associations (verified).** An 1883 Musselshell-range
+    (Montana) association published a notice in the *Helena Daily Herald*:
+    "We the undersigned, stock growers of the above described range,
+    hereby give notice that we consider said range already overstocked;
+    therefore we positively decline allowing any outside parties... the
+    use of our corrals, nor will they be permitted to join us in any
+    roundup." Quoted with exact book-page citations (Anderson & Hill 2004,
+    pp. 148-56, 165, 202) in Robert Higgs, "How the Western Cattlemen
+    Created Property Rights" (Independent Institute / *The Freeman*, 2005),
+    `texts/wildwest-higgs-cattlemen.txt` — a free source that quotes the
+    still-unread book directly and can be cited for those specific pages.
+  - **Free article-version ledger** (see `research/sources.yaml` for full
+    detail): Anderson & Hill 1979 JLS article (full text); Lee J. Alston's
+    chapter-by-chapter book review, *The Independent Review*, Fall 2005,
+    Vol. 10 No. 2 (this is what the free corpus offers in place of an
+    Anderson/Hill-authored TIR article — none exists; confirmed by an
+    exhaustive Wayback-CDX search of independent.org's TIR archive); P. J.
+    Hill's own 2010 first-person PERC retrospective essay. Book chapters
+    NOT covered by any of the above (Native American property rights pre-
+    contact, ch. 3; beaver and buffalo, ch. 5; gold and silver mining
+    specifics, ch. 6; water rights, ch. 10; "New Frontiers"/developing-
+    world argument, ch. 11) remain book-only and unverified — flag any
+    lesson claim drawn only from those chapters accordingly. Pair the
+    verified material above with Gates's claims associations (Ch. VIII/X)
+    which ARE independently verifiable from the cached Gates text.
