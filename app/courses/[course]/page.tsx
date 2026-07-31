@@ -13,7 +13,6 @@ import FigureSequence from "@/components/mdx/FigureSequence";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl } from "@/lib/content/images";
 import Lightbox from "@/components/mdx/Lightbox";
-import { courseMaps } from "@/components/course-maps";
 
 interface Params {
   course: string;
@@ -94,74 +93,6 @@ export default async function CoursePage({
           <div className={`course-intro leading-relaxed ${loaded.introMdx !== undefined ? "prose-lesson max-w-none" : "max-w-2xl"}`}>
             <Intro components={introComponents} />
           </div>
-        </section>
-      )}
-
-      {course.spine.length > 0 && (
-        <section className="border-b border-line py-8">
-          <SectionLabel>The argument, mapped</SectionLabel>
-          {courseMaps[course.slug] !== undefined ? (
-            (() => {
-              const MapComp = courseMaps[course.slug];
-              const lessonThumbs = Object.fromEntries(
-                loaded.lessons
-                  .filter((l) => l.lesson.key_image !== undefined)
-                  .map((l) => [
-                    l.lesson.slug,
-                    assetUrl(course.slug, l.lesson.slug, l.lesson.key_image as string),
-                  ]),
-              );
-              const readable = loaded.lessons
-                .filter((l) => isReadable(l))
-                .map((l) => l.lesson.slug);
-              return (
-                <MapComp
-                  spine={course.spine}
-                  courseSlug={course.slug}
-                  lessonThumbs={lessonThumbs}
-                  readable={readable}
-                />
-              );
-            })()
-          ) : (
-          <ol className="flex flex-col gap-4">
-            {course.spine.map((step, i) => (
-              <li key={i} className="flex gap-4">
-                <span className="mt-0.5 shrink-0 font-mono text-[0.8rem] text-faint">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[0.95rem] leading-relaxed text-soft">{step.step}</p>
-                  <p className="mt-1.5 flex flex-wrap gap-1.5">
-                    {step.lessons.map((slug) => {
-                      const entry = bySlug.get(slug);
-                      if (entry === undefined) return null;
-                      const readable = isReadable(entry);
-                      const pill = (
-                        <span
-                          className={`inline-block rounded border px-2 py-0.5 font-mono text-[11px] ${
-                            readable
-                              ? "border-line text-soft hover:border-accent hover:text-accent"
-                              : "border-line/60 text-faint"
-                          }`}
-                        >
-                          {entry.lesson.title}
-                        </span>
-                      );
-                      return readable ? (
-                        <Link key={slug} href={`/courses/${course.slug}/lessons/${slug}`}>
-                          {pill}
-                        </Link>
-                      ) : (
-                        <span key={slug}>{pill}</span>
-                      );
-                    })}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          )}
         </section>
       )}
 
