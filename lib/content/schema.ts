@@ -106,6 +106,20 @@ export const CourseSchema = z.object({
   intro: z.string().min(1).optional(),
   prerequisites: z.array(CoursePrereqSchema).default([]),
   key_results: z.array(KeyResultSchema).default([]),
+  /**
+   * The course's argument as an ordered chain of moves (pedagogy L10).
+   * Every lesson states its place in this chain; the human curates it.
+   */
+  spine: z
+    .array(
+      z.object({
+        /** One argument step, declarative ("Selected settlers compounded"). */
+        step: z.string().min(1),
+        /** Lessons that carry this step, in course order. */
+        lessons: z.array(slug).min(1),
+      }),
+    )
+    .default([]),
   /** Main sources used to compile the course (course page bibliography). */
   sources: z.array(z.string().min(1)).default([]),
   outcomes: z.array(OutcomeSchema).min(1),

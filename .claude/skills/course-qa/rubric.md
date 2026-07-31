@@ -57,3 +57,20 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 15. No count cap, but no padding or micro-slicing either (C2 — each lesson
     has one substantive goal); every outcome claimed and actually served (C1); all
     titles are precise technical noun phrases (C6).
+
+## Arc (L10 — throughline)
+
+- **A1 (required)**: the paragraph after the opening places the lesson in the
+  course's argument — inherits / open question / contribution — consistent
+  with the `spine` in course.yaml. A content-map paragraph ("The route: …")
+  alone fails this.
+- **A2 (required)**: sample three `##` seams: each section's first sentence
+  ties to the running question or the previous section. A cold definition or
+  fresh-start fact fails the seam.
+- **A3 (required)**: the last content section ends with the hand-off — what is
+  established, what the next lesson takes up — and it matches the spine.
+- **A4 (advisory)**: section headings are claims where the material allows
+  ("Tobacco set the Chesapeake's demography"), not bare topics ("Tobacco").
+- **Read-through test (required)**: read the CLOSING section of the previous
+  lesson, then this lesson's opening — judge the join as a reader. A join
+  that requires the reader to guess why this lesson follows fails.

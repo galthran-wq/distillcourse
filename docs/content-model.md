@@ -14,9 +14,6 @@ content/courses/<course-slug>/
   research/            # the factory's dossier (see README)
     images.yaml        # index of real-image candidates found while reading
     images/            # their captures: whole pages / downloaded files
-    texts/             # git-ignored cache of raw fetched sources; every file
-                       # carries a .meta.yaml sidecar (what it holds, url,
-                       # fetch method) — writers read here before the web
   lessons/<lesson-slug>/
     lesson.mdx         # the chapter; NO frontmatter (directory name = slug)
     figures/           # SVGs and sourced raster images used by <Figure>
@@ -37,6 +34,7 @@ style YAML, one lesson per list entry, slugs immutable once status ≥ `drafted`
 | `intro` | short markdown introduction (the course page's TL;DR: overall idea + scope); warn if absent |
 | `prerequisites` (course-level) | list of `{text, course?}` — what the reader needs first; `course` optionally links another course by slug |
 | `key_results` | list of `{text, lesson}` — the course's headline theorems/facts, each linking the lesson that establishes it (lesson must exist) |
+| `spine` | the course's argument as an ordered chain of steps, each `{step, lessons: [slugs]}` — every core lesson belongs to a step (L10); errors on unknown slugs, warns on uncovered core lessons |
 | `sources` | main sources used to compile the course (course page bibliography); warn if empty |
 | `slug`, `title`, `tagline` | identity |
 | `status` | `planned \| in_progress \| published \| archived` |

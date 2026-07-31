@@ -50,8 +50,16 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
    `<References>`.
 
 4. **Write `lesson.mdx`:**
-   - First paragraph opens with the `opening` **verbatim**, then states in
-     one or two factual sentences what the lesson establishes (L3).
+   - First paragraph opens with the `opening` **verbatim**, then the
+     throughline paragraph (L10): two to four declarative sentences placing
+     this lesson in the course's argument — what the spine (course.yaml) has
+     established so far, what stands open, what this lesson contributes. To
+     write it you MUST read the course `spine` and the CLOSING section of the
+     immediately preceding lesson's lesson.mdx. Every `##` section opens with
+     a sentence tying it to the lesson's running question or the previous
+     section — never a cold definition. The final section (before Exercises)
+     ends by naming what is now established and what the next lesson takes
+     up, as fact (no suspense).
    - Free-form `##` sections; substantial is good — depth over brevity, but
      every sentence carries a fact (L9: dry engineering register — no
      rhetorical questions, no teasers, no chattiness, no narrative framing;
@@ -79,6 +87,17 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      candidate (no candidate = the figure agent hunts one; name the likely
      source if you know it). The bar is the same: the artefact must carry
      material, not decorate it.
+   - **Never hand-draw what exists as an artifact.** Geographic maps,
+     portraits, paintings, photographs, posters, and document pages are
+     ALWAYS sourced (`{/* img */}` handoff) — a hand-drawn SVG map is a
+     defect, not a figure. The drawn tiers exist for the course's OWN
+     constructs: comparisons, causal diagrams, data charts, step-throughs.
+     For artifact-rich subjects (history, art, biology) the brief's FIGURE
+     PLAN is a floor, not a ceiling: add `{/* img */}` handoffs liberally
+     wherever a real artifact carries material — for this kind of course,
+     sourced images should carry roughly half the lesson's visuals, and
+     Wikimedia Commons / LoC hold canonical public-domain copies of nearly
+     every map, portrait, and painting you will want.
    - For every PascalCase component-figure reference you do NOT build
      yourself, put an MDX comment directly above it — your handoff to the
      figure builder:

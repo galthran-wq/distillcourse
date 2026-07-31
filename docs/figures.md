@@ -80,6 +80,11 @@ original paper, published plots of real data, canonical diagrams. Do NOT use
 it for schematics, pipelines, or anything math-bound: a foreign-style diagram
 with 8px labels is worse than a house-style drawing of the same idea.
 
+- **Absolute rule: artifacts are sourced, never drawn.** Geographic maps,
+  portraits, paintings, photographs, posters, and document pages are never
+  hand-drawn — canonical public-domain copies exist (Commons, LoC, archives)
+  and a redrawn map is a defect. The drawn tiers are for the course's own
+  diagrams, charts, and step-throughs.
 - **Files.** `figures/<name>.{png,jpg,jpeg,webp,gif}` in the lesson dir, same
   place as the SVGs. Embedded with `<Figure src="./figures/<name>.jpg" …/>`;
   a raster `<FigureSequence>` uses `<name>-1.png`, `<name>-2.png`, … and gets
