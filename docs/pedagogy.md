@@ -75,6 +75,15 @@ being finished.
 - **L8 — References.** Every lesson ends with a `<References>` section:
   the primary sources and one or two canonical texts, with chapter-level
   pointers. Real references, verified — never invented.
+- **L8a — Inline attribution only when provenance is content.** Narrative
+  facts are stated directly and sourced in `<References>` — never "Textbook
+  X's chapter describes…" mid-prose; the reader came for the material, not
+  for the compilation's scaffolding. Inline naming is reserved for cases
+  where the WHO is part of the claim: a primary artifact being read or
+  quoted (Las Casas's tract, Franklin's pamphlet), a measurement whose
+  method carries the argument (a tribute-register series), or a named thesis
+  under discussion (Turner's). Secondary surveys and syntheses appear once,
+  in References, with chapter pointers.
 - **L9 — Dry engineering register.** Declarative sentences; facts carry the
   text. No rhetorical questions, no exclamations, no chattiness ("almost
   embarrassingly simple"), no invented scenes or personas ("a friend says…"),

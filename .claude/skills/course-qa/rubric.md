@@ -78,3 +78,12 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 - **Read-through test (required)**: read the CLOSING section of the previous
   lesson, then this lesson's opening — judge the join as a reader. A join
   that requires the reader to guess why this lesson follows fails.
+
+## Attribution (L8a)
+
+- **T1 (required)**: no mid-prose citations of the course's secondary
+  surveys or syntheses ("The American Yawp describes…", "Johnson's history
+  opens with…") — narrative facts are stated directly and sourced in
+  References. Inline naming passes only where provenance is content: primary
+  artifacts read or quoted, measurements whose method carries the argument,
+  named theses under discussion.
