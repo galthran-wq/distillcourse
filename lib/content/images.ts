@@ -211,6 +211,13 @@ export function slugsFromLessonDir(
 ): { course: string; lesson: string } | undefined {
   const parts = lessonDir.split(/[/\\]/).filter((p) => p.length > 0);
   const i = parts.lastIndexOf("lessons");
-  if (i < 1 || i + 1 >= parts.length) return undefined;
-  return { course: parts[i - 1], lesson: parts[i + 1] };
+  if (i >= 1 && i + 1 < parts.length) {
+    return { course: parts[i - 1], lesson: parts[i + 1] };
+  }
+  // Course root (intro.mdx figures): …/content/courses/<course>
+  const c = parts.lastIndexOf("courses");
+  if (c >= 0 && c + 1 === parts.length - 1 && parts[c - 1] === "content") {
+    return { course: parts[c + 1], lesson: "_course" };
+  }
+  return undefined;
 }

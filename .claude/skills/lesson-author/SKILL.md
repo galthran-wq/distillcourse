@@ -135,8 +135,13 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      chapter's mass behind folds — `<Aside>` deep-dives, collapsed proofs,
      solutions. The fold-stripped skeleton must still carry the argument.
 
-5. **Flip status.** In course.yaml set THIS lesson's `status: planned` →
-   `drafted`. That is the only course.yaml edit you may ever make.
+5. **Flip status and pick the key image.** In course.yaml set THIS lesson's
+   `status: planned` → `drafted`, and set its `key_image` — the lesson's
+   signature visual, rendered as the thumbnail in the course contents.
+   Prefer the strongest sourced image; a raster key_image must already have
+   its credits.yaml entry (a not-yet-landed handoff image cannot be the key
+   image — pick a drawn figure and note the intended swap in your report).
+   These are the only course.yaml edits you may ever make.
 
 6. **Validate:** `npm run validate <course> <lesson>` — zero errors; justify
    any remaining warning in one line or fix it.

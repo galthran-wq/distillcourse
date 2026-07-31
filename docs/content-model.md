@@ -10,6 +10,9 @@ code wins and this file needs fixing. Cross-file rules are enforced by
 ```
 content/courses/<course-slug>/
   course.yaml          # curation surface — the human owns this file
+  intro.mdx            # optional rich introduction (full component vocabulary;
+                       #   figures resolve against course-level figures/)
+  figures/             # course-level figures for intro.mdx (+ credits.yaml)
   concepts.yaml        # concept registry (append-mostly)
   research/            # the factory's dossier (see README)
     images.yaml        # index of real-image candidates found while reading
@@ -55,6 +58,7 @@ Per lesson:
 | `prerequisites` | lesson slugs; forms an acyclic knowledge graph |
 | `concepts.introduces / reinforces` | concept ids; spiral revisits visible here |
 | `key_ideas` | 1–5 (schema); the author's planning aid, never a mandated section list (pedagogy L2) |
+| `key_image` | optional path relative to the lesson dir — the lesson's signature visual, shown as the contents thumbnail; errors if missing/uncredited raster, warns when a drafted lesson has none |
 | `demo` | optional `{component: PascalCase, spec: prose}` consumed by demo-builder; `null` if none |
 | `notes` | optional free-form instructions to skills |
 

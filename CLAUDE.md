@@ -9,7 +9,8 @@ it is the constitution for all content generation.
 Rules that override defaults:
 
 - `content/courses/*/course.yaml` is the human's curation surface. Skills and
-  agents may only flip a lesson's `status` from `planned` to `drafted` there;
+  agents may only flip a lesson's `status` from `planned` to `drafted` and
+  set that lesson's `key_image` there;
   never set `reviewed`/`published`, never restructure modules/lessons without
   being explicitly asked.
 - Lesson slugs are immutable once status ≥ `drafted`.

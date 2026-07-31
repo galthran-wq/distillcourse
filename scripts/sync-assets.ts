@@ -18,11 +18,13 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
 } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
+import { parse } from "yaml";
 import { isRasterFile } from "../lib/content/images";
 
 const repoRoot = resolve(__dirname, "..");
@@ -38,6 +40,17 @@ function dirs(path: string): string[] {
 const wanted = new Map<string, string>(); // destination -> source
 
 for (const course of dirs(coursesRoot)) {
+  // Course-level figures (intro.mdx) land under the _course bucket.
+  const courseFigures = join(coursesRoot, course, "figures");
+  if (existsSync(courseFigures)) {
+    for (const file of readdirSync(courseFigures)) {
+      if (!isRasterFile(file)) continue;
+      wanted.set(
+        join(publicRoot, course, "_course", basename(file)),
+        join(courseFigures, file),
+      );
+    }
+  }
   const lessonsDir = join(coursesRoot, course, "lessons");
   for (const lesson of dirs(lessonsDir)) {
     const figuresDir = join(lessonsDir, lesson, "figures");
@@ -49,6 +62,26 @@ for (const course of dirs(coursesRoot)) {
         join(figuresDir, file),
       );
     }
+  }
+  // key_image may be an SVG — those are not rasters, copy them explicitly.
+  try {
+    const courseYaml = parse(
+      readFileSync(join(coursesRoot, course, "course.yaml"), "utf8"),
+    ) as { modules?: { lessons?: { slug?: string; key_image?: string }[] }[] };
+    for (const mod of courseYaml.modules ?? []) {
+      for (const lesson of mod.lessons ?? []) {
+        if (lesson.slug === undefined || lesson.key_image === undefined) continue;
+        const src = join(lessonsDir, lesson.slug, lesson.key_image);
+        if (existsSync(src)) {
+          wanted.set(
+            join(publicRoot, course, lesson.slug, basename(lesson.key_image)),
+            src,
+          );
+        }
+      }
+    }
+  } catch {
+    /* an unparsable course.yaml is validate's problem, not the asset sync's */
   }
 }
 

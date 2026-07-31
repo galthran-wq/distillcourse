@@ -30,6 +30,8 @@ export interface LoadedLesson {
 export interface LoadedCourse {
   dir: string;
   course: Course;
+  /** Raw content of intro.mdx when present — the rich course introduction. */
+  introMdx?: string;
   concepts: ConceptsFile;
   /** All lessons in course order. */
   lessons: LoadedLesson[];
@@ -75,6 +77,10 @@ export function loadCourse(dir: string): LoadedCourse {
   }
 
   const course = courseParsed.data;
+  const introPath = join(dir, "intro.mdx");
+  const introMdx = existsSync(introPath)
+    ? readFileSync(introPath, "utf8")
+    : undefined;
   const lessons: LoadedLesson[] = [];
   let index = 0;
   for (const mod of course.modules) {
@@ -92,7 +98,7 @@ export function loadCourse(dir: string): LoadedCourse {
     }
   }
 
-  return { dir, course, concepts: conceptsParsed.data, lessons };
+  return { dir, course, introMdx, concepts: conceptsParsed.data, lessons };
 }
 
 /** Lists lesson directories on disk (for orphan detection). */

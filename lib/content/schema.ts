@@ -66,6 +66,12 @@ export const LessonSchema = z.object({
   opening: z.string().min(1),
   est_minutes: z.number().int().positive().max(60),
   prerequisites: z.array(slug).default([]),
+  /**
+   * The lesson's signature visual, path relative to the lesson dir
+   * ("figures/cantino-planisphere-1502.jpg") — rendered as the thumbnail in
+   * the course contents. Prefer the lesson's strongest sourced image.
+   */
+  key_image: z.string().min(1).optional(),
   concepts: z.object({
     introduces: z.array(slug).default([]),
     reinforces: z.array(slug).default([]),
