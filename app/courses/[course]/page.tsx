@@ -103,10 +103,24 @@ export default async function CoursePage({
           {courseMaps[course.slug] !== undefined ? (
             (() => {
               const MapComp = courseMaps[course.slug];
+              const lessonThumbs = Object.fromEntries(
+                loaded.lessons
+                  .filter((l) => l.lesson.key_image !== undefined)
+                  .map((l) => [
+                    l.lesson.slug,
+                    assetUrl(course.slug, l.lesson.slug, l.lesson.key_image as string),
+                  ]),
+              );
+              const readable = loaded.lessons
+                .filter((l) => isReadable(l))
+                .map((l) => l.lesson.slug);
               return (
-                <div className="figure-svg mx-auto max-w-3xl">
-                  <MapComp spine={course.spine} />
-                </div>
+                <MapComp
+                  spine={course.spine}
+                  courseSlug={course.slug}
+                  lessonThumbs={lessonThumbs}
+                  readable={readable}
+                />
               );
             })()
           ) : (

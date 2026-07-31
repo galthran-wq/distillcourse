@@ -125,6 +125,8 @@ export const CourseSchema = z.object({
         label: z.string().min(1).optional(),
         /** Display period ("1620–1700"). */
         years: z.string().min(1).optional(),
+        /** Concrete newcomer-facing line ("2,400 men cross the Delaware…"). */
+        caption: z.string().min(1).optional(),
         /** Lessons that carry this step, in course order. */
         lessons: z.array(slug).min(1),
       }),
