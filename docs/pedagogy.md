@@ -94,6 +94,13 @@ being finished.
   lesson closes by naming what is now established and what the next lesson
   takes up, stated as fact. (d) Clarifying L3: stating what comes next is
   required; manufacturing suspense ("you'll soon see…") stays banned.
+  (e) Sections argue, not inventory: within a section, paragraphs run
+  claim → evidence → bearing on the lesson's question, and every section
+  ends with its bearing visible in the body itself. The test: cover the
+  section's seam sentence and its last sentence — if the body no longer
+  shows what the section contributes to the argument, the section is an
+  inventory and gets re-argued. Material that bears on nothing gets cut,
+  however good the source it came from.
 
 ## Exercise rules (E)
 

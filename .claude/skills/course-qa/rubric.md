@@ -71,6 +71,10 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   established, what the next lesson takes up — and it matches the spine.
 - **A4 (advisory)**: section headings are claims where the material allows
   ("Tobacco set the Chesapeake's demography"), not bare topics ("Tobacco").
+- **A5 (required)**: sample two body sections and apply the L10e cover
+  test — hide the seam sentence and the section's last sentence; the body
+  must still show its bearing on the lesson's argument. An inventory-shaped
+  section (facts cataloged, bearing invisible) is a required fix.
 - **Read-through test (required)**: read the CLOSING section of the previous
   lesson, then this lesson's opening — judge the join as a reader. A join
   that requires the reader to guess why this lesson follows fails.

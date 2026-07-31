@@ -59,7 +59,11 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      a sentence tying it to the lesson's running question or the previous
      section — never a cold definition. The final section (before Exercises)
      ends by naming what is now established and what the next lesson takes
-     up, as fact (no suspense).
+     up, as fact (no suspense). Sections ARGUE, not inventory (L10e):
+     paragraphs run claim → evidence → bearing on the lesson's question;
+     apply the cover test (hide the seam and the last sentence — the body
+     must still show what the section contributes) before calling a
+     section done.
    - Free-form `##` sections; substantial is good — depth over brevity, but
      every sentence carries a fact (L9: dry engineering register — no
      rhetorical questions, no teasers, no chattiness, no narrative framing;
