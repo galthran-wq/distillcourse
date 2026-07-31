@@ -121,6 +121,10 @@ export const CourseSchema = z.object({
       z.object({
         /** One argument step, declarative ("Selected settlers compounded"). */
         step: z.string().min(1),
+        /** Short display handle for the course-page map ("The settler engine"). */
+        label: z.string().min(1).optional(),
+        /** Display period ("1620–1700"). */
+        years: z.string().min(1).optional(),
         /** Lessons that carry this step, in course order. */
         lessons: z.array(slug).min(1),
       }),

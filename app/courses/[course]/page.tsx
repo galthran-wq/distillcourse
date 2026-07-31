@@ -13,6 +13,7 @@ import FigureSequence from "@/components/mdx/FigureSequence";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl } from "@/lib/content/images";
 import Lightbox from "@/components/mdx/Lightbox";
+import { courseMaps } from "@/components/course-maps";
 
 interface Params {
   course: string;
@@ -99,6 +100,16 @@ export default async function CoursePage({
       {course.spine.length > 0 && (
         <section className="border-b border-line py-8">
           <SectionLabel>The argument, mapped</SectionLabel>
+          {courseMaps[course.slug] !== undefined ? (
+            (() => {
+              const MapComp = courseMaps[course.slug];
+              return (
+                <div className="figure-svg mx-auto max-w-3xl">
+                  <MapComp spine={course.spine} />
+                </div>
+              );
+            })()
+          ) : (
           <ol className="flex flex-col gap-4">
             {course.spine.map((step, i) => (
               <li key={i} className="flex gap-4">
@@ -136,6 +147,7 @@ export default async function CoursePage({
               </li>
             ))}
           </ol>
+          )}
         </section>
       )}
 
