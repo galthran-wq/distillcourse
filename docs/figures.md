@@ -16,12 +16,13 @@ and always ships with its provenance. Three tiers:
   `docs/voita-playbook.md`.
 - **Raw SVG figures** (simple plots and diagrams with few short labels):
   the rules below. /figure-artist is the skill for both.
-- **Sourced images** (photographs, portraits, apparatus, page scans,
-  published plots of real data, canonical diagrams): raster files in the
+- **Sourced images** (photographs, portraits, objects, places, scenes,
+  artifact maps, published plots of real data): raster files in the
   lesson's `figures/`, credited in `figures/credits.yaml`, embedded with the
   same `<Figure src>`/`<FigureSequence>` API. The reading swarm captures
   them during research; /figure-artist cuts, verifies and credits them.
-  See §Sourced images.
+  See §Sourced images — and the visible-not-legible test there: a scan of
+  a text document is almost never a figure.
 
 ## Principles
 
@@ -75,10 +76,19 @@ and always ships with its provenance. Three tiers:
 ## Sourced images
 
 The third tier: a real image we did not make. Use it when authenticity is the
-content — historical photographs and portraits, apparatus, page scans of the
-original paper, published plots of real data, canonical diagrams. Do NOT use
-it for schematics, pipelines, or anything math-bound: a foreign-style diagram
-with 8px labels is worse than a house-style drawing of the same idea.
+content — and pass the **visible-not-legible test**: an image earns its slot
+only if LOOKING at it transmits something prose cannot — a face, a place, an
+object, dress, a scene, a map's shape, a plotted curve. The caption must
+name the visible fact the reader is meant to see. If what an artifact
+carries is its TEXT, the text belongs in the prose as a typeset quotation
+and the scan is decoration: title pages, manuscript leaves, and printed
+pages are defects unless the visible (not readable) features are themselves
+the evidence — signatures in different hands, marks in place of names,
+struck-through entries, fire damage, a mourning border being the point.
+Sourced images are windows into the world of the material: people, places,
+objects, scenes, maps. Do NOT use the tier for schematics, pipelines, or
+anything math-bound: a foreign-style diagram with 8px labels is worse than a
+house-style drawing of the same idea.
 
 - **Absolute rule: artifacts are sourced, never drawn.** Geographic maps,
   portraits, paintings, photographs, posters, and document pages are never

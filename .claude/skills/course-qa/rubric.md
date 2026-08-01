@@ -19,10 +19,17 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
    non-mathematical material.
 
 ## Exercises
-6. Most exercises require production — a computation, derivation, or stated
-   argument (E2); at least one is genuinely parallel to a worked example (L7).
+6. Most exercises require production IN THE DISCIPLINE'S METHOD (E2, domain
+   overlay): math — computation / strategy-choice / explain-why / error
+   diagnosis / transfer; history — retrieval-chronology / document
+   reasoning / synthesis-argument. At least one is genuinely parallel to a
+   worked example (L7). Flag as FAIL any transplanted-arithmetic exercise
+   (plug-constant estimates whose calculation tests nothing the discipline
+   cares about); in history, a computation passes only if the calculation
+   is itself the historical argument and the solution states uncertainty.
 7. From the course's 3rd lesson on: ≥1 exercise requires an earlier lesson's
-   concept to solve, not just mentions it (E3).
+   concept to solve, not just mentions it (E3); mid-course lessons mix
+   confusable types without naming the required method.
 8. Every solution shows the full path, to the worked-example standard (E4);
    no trick questions (E5).
 
@@ -66,7 +73,11 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   alone fails this.
 - **A2 (required)**: sample three `##` seams: each section's first sentence
   ties to the running question or the previous section. A cold definition or
-  fresh-start fact fails the seam.
+  fresh-start fact fails the seam. Where the section's material breaks the
+  reader's natural expectation, the seam must state the expectation and
+  break it (L10b reversal) — an itinerary seam in front of
+  expectation-breaking material is a WEAK; a manufactured reversal in front
+  of neutral material is a FAIL.
 - **A3 (required)**: the last content section ends with the hand-off — what is
   established, what the next lesson takes up — and it matches the spine.
 - **A4 (advisory)**: section headings are claims where the material allows
@@ -100,14 +111,37 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   with an explicit <Ref> and a reminder clause, not assumed ("the conquests
   of Mexico and Peru" without date or Ref fails).
 
-## Numbers (L12)
+## Evidence budget (L12)
 
 - **M1 (required)**: sample numeric sentences — every number in prose
-  carries its frame (denominator, comparison, or consequence) in the same
-  sentence. An unframed count ("about 400 were killed") is a required fix.
+  carries its frame (unit, denominator, comparison, or consequence) in the
+  same sentence. An unframed count ("about 400 were killed") is a required
+  fix.
 - **M2 (required)**: the lesson's keeper numbers are identifiable and live
   in KeyFacts/figures; prose is not carrying unframed precision that a
   figure or aside should hold.
 - **M3 (required)**: no data-row narration of human events — casualties,
   migrations, and battles are scenes or judgments with at most one framed
   number each.
+- **M4 (required)**: deletion test — sample five body-prose details
+  (numbers, dimensions, names, curios) and ask: would deleting this impair
+  an objective, an inference, or a later exercise? Each "no" is a seductive
+  detail: required fix (cut, or move to a labeled Aside). Charts and
+  figures are exempt — a dense series in a figure is the correct home.
+- **M5 (required)**: visible-not-legible — every sourced raster passes the
+  figures.md test: the caption names a VISIBLE fact the reader is meant to
+  see (a face, place, object, scene, map shape, mark). A scan whose content
+  is its text (title page, manuscript leaf, printed page) is a required
+  fix: quote the text in prose, cut the scan — unless the visible features
+  themselves are the evidence and the caption reads them.
+
+## Refutation & register (L13, L14)
+
+- **R1 (advisory)**: where the material meets a documented popular
+  misconception, the lesson refutes it explicitly (schema: misconception
+  stated once → rejection → why it fails → replacement). A strawman "some
+  believe…" with no documented currency is an L9 FAIL.
+- **R2 (advisory)**: importance is marked by device shift (withdrawn
+  apparatus, stable container grammar — never the same box style for
+  essential and optional material), not by intensifying adjectives. Flag
+  intensifier-marked importance with quotes.
