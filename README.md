@@ -5,8 +5,10 @@ engineers who keep starting textbooks and never finishing them.
 
 The human curates course structure by editing files in git; Claude Code
 skills and workflows generate the content. `docs/pedagogy.md` is the
-constitution; `docs/voita-playbook.md` holds the structural mechanics both
-follow.
+constitution; the playbook stack holds the mechanics behind it —
+`docs/playbook-core.md` (universal invariants), `docs/voita-playbook.md`
+(exposition layer), `docs/playbook-math.md` / `docs/playbook-history.md`
+(domain overlays).
 
 ## How content works
 
@@ -92,4 +94,5 @@ stays dependency-free.
 Key code: `lib/content/schema.ts` (Zod schemas — normative),
 `lib/content/lint.ts` (shell rules), `docs/content-model.md` (schema guide),
 `docs/components.md` (MDX vocabulary), `docs/figures.md` +
-`docs/voita-playbook.md` (figure and structure mechanics).
+`docs/voita-playbook.md` (figure and structure mechanics),
+`docs/playbook-core.md` + domain overlays (argument and evidence mechanics).

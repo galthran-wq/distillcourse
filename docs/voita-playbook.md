@@ -1,12 +1,15 @@
-# Course mechanics reference
+# Playbook — exposition layer (Voita dissection)
 
-Rules for how lessons are structured, paced, and illustrated. They are
-distilled from a statistical dissection of the best reference course we know
-(Lena Voita, "NLP Course For You": five lesson pages, the landing page, and
-a corpus of figures were analyzed in July 2026). Everything below is stated
-as OUR rule, ready to apply. One deliberate divergence from the reference:
-its friendly conversational voice is not adopted — our register stays dry
-and declarative (pedagogy L9).
+Rules for how lessons are structured, paced, and illustrated — the
+EXPOSITION layer of the playbook stack: `docs/playbook-core.md` holds the
+universal invariants (two-corpus convergence + learning-science audit), and
+`docs/playbook-math.md` / `docs/playbook-history.md` hold the domain
+overlays. This file is distilled from a statistical dissection of one of
+the two reference corpora (Lena Voita, "NLP Course For You": five lesson
+pages, the landing page, and a corpus of figures, analyzed July 2026).
+Everything below is stated as OUR rule, ready to apply. One deliberate
+divergence from the reference: its friendly conversational voice is not
+adopted — our register stays dry and declarative (pedagogy L9).
 
 ## Course-level principles
 

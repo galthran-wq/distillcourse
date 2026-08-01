@@ -14,9 +14,14 @@ where the material allows — with exercises and references, not quizzes.
 
 The constitution: @docs/pedagogy.md (L and E rules are yours).
 Component APIs: @docs/components.md.
-Structural mechanics (skeleton, density norms, task/reference mechanics —
-distilled from the best reference course): @docs/voita-playbook.md. Adopt
-its STRUCTURE; the register stays dry per L9.
+The playbook stack — read the core plus YOUR course's domain overlay:
+universal invariants @docs/playbook-core.md; exposition mechanics
+(skeleton, density norms, task/reference mechanics) @docs/voita-playbook.md;
+domain overlays @docs/playbook-math.md (mathematical courses) and
+@docs/playbook-history.md (history courses) — the overlay governs your
+exercise types, your numbers/notation discipline, and your definition/proof
+or sourcing apparatus. Adopt STRUCTURE from all of them; the register stays
+dry per L9.
 For figures beyond simple SVGs, delegate to or follow /figure-artist
 (component figures with real KaTeX, verified by render-and-look). For a
 figure that must be the real artefact — a historical photograph, a scan, a
@@ -41,13 +46,20 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      `content/courses/information-theory/lessons/what-is-surprise/` — match
      its density, register, and structure.
 
-3. **Plan briefly.** Sections follow the material (key_ideas are your plan,
-   not a mandated section list). Decide: which statements become
-   `<Definition>`/`<Theorem>`/`<Proof>` (only where genuinely mathematical —
-   L5; for non-mathematical material use `<Remark>` and prose), where the
-   worked `<Example>`s go, where the `<Demo>` embed goes (if specced), which
-   earlier concept the review exercise drills, and which sources go in
-   `<References>`.
+3. **Plan the argument BEFORE touching the evidence (L12).** Draft the
+   argument skeleton first: the lesson's claims, the section seams (naming
+   any expectation-reversals — L10b), and the 2–3 keeper facts/numbers.
+   Only THEN quarry the research brief for the specific evidence each claim
+   needs. The brief is a quarry, not a coverage checklist: a fact no claim
+   needs does not enter the prose, however good it is. Then decide the
+   apparatus: which statements become `<Definition>`/`<Theorem>`/`<Proof>`
+   (only where genuinely mathematical — L5; for non-mathematical material
+   use `<Remark>` and prose), where the worked `<Example>`s and their
+   paired in-body exercises go (math overlay), where the `<Demo>` embed
+   goes (if specced), whether the material meets a GENUINE documented
+   misconception (L13 — if yes, plan the refutation; if no, no slot),
+   which earlier concept the review exercise drills, and which sources go
+   in `<References>`.
 
 4. **Write `lesson.mdx`:**
    - First paragraph opens with the `opening` **verbatim**, then the
@@ -69,6 +81,20 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      rhetorical questions, no teasers, no chattiness, no narrative framing;
      second person only in instructions).
    - A concrete instance or computation precedes every general formula (L4).
+   - First exposure is the contract (L11): anchor every first-mention place
+     (locator figure or relative clause), date every first-mention event
+     with a half-sentence of what happened, introduce at most ~3 new named
+     terms per section, and re-anchor earlier lessons' material with <Ref>
+     plus a reminder clause — never assume the reader remembers or knows.
+   - Evidence budget (L12): a number/name/detail enters body prose only if
+     some claim fails without it (inclusion test); everything else faces
+     the counterfactual deletion test — cut, or move to a labeled Aside.
+     Pick the lesson's 2-3 keeper numbers and privilege them (KeyFacts,
+     figures); every surviving quantity is framed in-sentence (unit /
+     denominator / comparison / consequence) or rounded to words; human
+     events are scenes or judgments, never data rows; dense series go to
+     figures (charts are never rationed). Domain sharpening lives in your
+     overlay (history: numbers-in-history; math: notation ledger).
    - Environments numbered automatically — never hand-number them.
    - Visuals dense per L6 — roughly one every 3–4 paragraphs: `<Demo>` where
      specced; `<Figure>` SVGs you author in `figures/`; `<FigureSequence>`
@@ -111,9 +137,16 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      builder sees only this comment, the research-brief figure plan, and
      the surrounding prose.
    - `## Exercises` before the references: numbered `<Exercise>` blocks, each
-     with a complete `<Solution>` (E1, E4); most require producing a
-     computation or argument (E2); from the course's 3rd lesson on, ≥1
-     exercise drills a prerequisite lesson's concept (E3).
+     with a complete `<Solution>` (E1, E4). The exercise MIX comes from your
+     domain overlay (E2): mathematics — computation / strategy-choice /
+     explain-why / error-diagnosis / transfer, with example–problem pairs
+     already placed in the body and confusable types interleaved without
+     naming the method; history — retrieval-and-chronology / short document
+     reasoning (sourcing, corroboration) / synthesis-and-argument, with
+     arithmetic ONLY where the calculation is itself the historical
+     argument. Plug-constant estimate drills are a defect in any domain.
+     From the course's 3rd lesson on, ≥1 exercise drills a prerequisite
+     lesson's concept (E3).
    - Attribution follows L8a: state narrative facts directly — no
      "the Yawp's chapter describes…" scaffolding mid-prose. Name a source
      inline ONLY when the source is the subject: a primary document read or
@@ -135,8 +168,13 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      chapter's mass behind folds — `<Aside>` deep-dives, collapsed proofs,
      solutions. The fold-stripped skeleton must still carry the argument.
 
-5. **Flip status.** In course.yaml set THIS lesson's `status: planned` →
-   `drafted`. That is the only course.yaml edit you may ever make.
+5. **Flip status and pick the key image.** In course.yaml set THIS lesson's
+   `status: planned` → `drafted`, and set its `key_image` — the lesson's
+   signature visual, rendered as the thumbnail in the course contents.
+   Prefer the strongest sourced image; a raster key_image must already have
+   its credits.yaml entry (a not-yet-landed handoff image cannot be the key
+   image — pick a drawn figure and note the intended swap in your report).
+   These are the only course.yaml edits you may ever make.
 
 6. **Validate:** `npm run validate <course> <lesson>` — zero errors; justify
    any remaining warning in one line or fix it.
