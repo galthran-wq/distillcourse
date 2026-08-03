@@ -101,6 +101,7 @@ import LandauerErasure from "./information-theory/LandauerErasure";
 import FeedbackSecondLaw from "./information-theory/FeedbackSecondLaw";
 import TwoPhysicsFaces from "./information-theory/TwoPhysicsFaces";
 import GroupingTree from "./information-theory/GroupingTree";
+import CapacityPacking from "./information-theory/CapacityPacking";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -225,4 +226,5 @@ export const figures: Record<string, RegisteredFigure> = {
   FeedbackSecondLaw: { component: FeedbackSecondLaw },
   TwoPhysicsFaces: { component: TwoPhysicsFaces },
   GroupingTree: { component: GroupingTree },
+  CapacityPacking: { component: CapacityPacking },
 };
