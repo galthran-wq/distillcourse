@@ -124,3 +124,32 @@ decision point; one error-diagnosis or true/false-with-justification; one
 transfer/proof/modeling task. Compute-only banks train execution after the
 method has been signaled — they underassess recognition, conditions, and
 justification. All-prose banks are the equal and opposite error.
+
+### The difficulty floor (E6/E7 in mathematical terms)
+
+A set whose items are all "substitute these numbers into the displayed
+formula" is a defect, however clean the arithmetic. Concretely, for a
+quantitative course:
+
+- **Boundary probes.** Push the parameter to the edge the theorem excludes:
+  a distribution with a zero-probability symbol, a channel with zero
+  capacity, a code that saturates the bound. Ask what breaks and which
+  hypothesis was doing the work.
+- **Claims to refute.** State something plausible and false — "conditioning
+  can only reduce entropy, so H(X|Y=y) ≤ H(X) for every y" — and require
+  the counterexample plus the name of the step that fails.
+- **Derivations the lesson skipped.** The corollary, the reverse direction,
+  the second proof, the tight case of an inequality, the version for a
+  different base or alphabet.
+- **Research-shaped tasks.** Reproduce a number from the source paper,
+  estimate a quantity from a real file or dataset, or design the experiment
+  that separates two candidate explanations. State what would count as
+  agreement.
+- **Forward-reaching items (E7).** The exercise computes, in a special
+  case, the object the next lesson defines — the reader meets Kraft's
+  inequality as an accounting constraint before it has a name, or watches
+  a mismatched code's overhead behave exactly like a divergence they have
+  not yet been shown. The solution names the connection and `<Ref>`s it.
+
+Solutions carry the same standard as worked examples (E4) and end by naming
+the transferable move, not just the answer.

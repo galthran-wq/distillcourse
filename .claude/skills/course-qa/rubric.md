@@ -33,11 +33,40 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
 8. Every solution shows the full path, to the worked-example standard (E4);
    no trick questions (E5).
 
+## Exercise difficulty (E6, E7)
+
+- **X1 (required)**: count the mechanical items — exercises whose work is
+  substituting numbers into a formula the lesson displayed. More than one
+  per set is a required fix. Quote them.
+- **X2 (required)**: the set carries ≥2 of {boundary probe at a degenerate
+  case; plausible false claim to refute; derivation the lesson skipped;
+  research-shaped task}. Name which, or fail.
+- **X3 (required)**: exactly one exercise reaches forward (E7) — the reader
+  computes the object a later lesson names, or hits the wall its mechanism
+  removes — and the solution says so with a `<Ref>`.
+
+## Callouts & citations (L15, L8a a/b, L9a)
+
+- **K1 (required)**: apply the deletion test to every `<KeyFact>`,
+  `<Remark>`, `<Aside>`: does it carry a synthesis, a boundary, or a
+  forward consequence the body lacks? A restatement of the preceding result
+  is a required fix (cut or upgrade). Quote the worst offender.
+- **K2 (required)**: no citation-for-its-own-sake — every inline source
+  pointer buys the reader an alternative proof, a stronger statement, the
+  origin of the notation, or something checkable. Borrowed proofs are
+  attributed in the environment title, not in prose.
+- **K3 (required)**: no narration of the obvious ("in expectation
+  notation…", "recreated below", "does the work") and no idiom-for-flavour.
+  Quote every instance.
+
 ## Visuals & demos
 9. Each visual carries an idea; captions state facts or tasks, not
    descriptions (L6).
 10. Demo (if present) makes dynamic behavior visible that a figure couldn't
     (D1), starts alive (D3), and any task stated in prose is achievable (D4).
+    FAIL a demo whose only content is knobs on a curve the lesson already
+    plots: it must let the reader hit a target, falsify a claim, find a
+    threshold, or lose against a bound, with the prose asking for it first.
 
 ## Density & scannability (voita-playbook norms)
 11a. Cadence: no more than 3 consecutive prose paragraphs anywhere without

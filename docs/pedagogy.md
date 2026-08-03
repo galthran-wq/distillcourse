@@ -52,6 +52,15 @@ being finished.
   beats brevity; cutting scope is the syllabus's job, not the chapter's.
   `key_ideas` in course.yaml are the author's plan, not a mandated section
   list. The validator never dictates prose shape.
+  (a) **Target depth.** A core lesson aims at 30–40 minutes of reading where
+  the material warrants it — derivations carried through, worked examples
+  computed, boundary cases examined, not a summary of results. A 15-minute
+  chapter is a signal to deepen, never a reason to split a coherent lesson
+  in two or to pad with restatement.
+  (b) **Starred sections.** Material that is genuinely off the main line —
+  a sharper proof, a tangent, a historical detour — becomes a `## ★`-prefixed
+  section inside the lesson. The core path must read correctly when every
+  starred section is skipped; nothing after them may depend on them.
 - **L3 — Opening statement first.** The lesson opens with the `opening` from
   course.yaml verbatim: a precise, declarative statement of the problem the
   lesson solves or the fact it establishes. No rhetorical questions, no
@@ -90,6 +99,16 @@ being finished.
   method carries the argument (a tribute-register series), or a named thesis
   under discussion (Turner's). Secondary surveys and syntheses appear once,
   in References, with chapter pointers.
+  (a) **A citation must change something.** "Shannon's 1948 paper (§6)
+  introduces exactly this sum" after the sum is derived tells the reader
+  nothing they can use — it is provenance theatre. Cite where the pointer
+  buys the reader something: a different proof they may want, a stronger
+  version of the result, the place the notation comes from, a claim they
+  should be able to check. Everything else lives in `<References>`.
+  (b) **Attribution rides on the object, not in the prose.** A proof taken
+  from a text names it in the environment title —
+  `<Theorem title="Jensen bound (Cover & Thomas 2.6.4)">` — never as a
+  sentence of prose ("the argument below follows Cover & Thomas").
 - **L9 — Dry engineering register.** Declarative sentences; facts carry the
   text. No rhetorical questions, no exclamations, no chattiness ("almost
   embarrassingly simple"), no invented scenes or personas ("a friend says…"),
@@ -99,6 +118,14 @@ being finished.
   facts — or gets cut: connective declaratives ("the previous section
   established X; what it leaves unexplained is Y") are load-bearing prose,
   not filler. Italics only for standard emphasis of a single term, sparingly.
+  (a) **No narration of the obvious.** Naming the notation you are already
+  writing ("in expectation notation, H(X) = E[…]"), announcing a figure the
+  reader can see ("the full curve is recreated below"), or labelling a step
+  you are about to take ("Jensen's inequality does the work here") adds
+  words and no information. State the thing; the reader sees the rest.
+  (b) **No idiom-for-flavour.** "Does the work", "the magic happens",
+  "under the hood" — replace with what actually happens ("Jensen's
+  inequality gives the bound because log is concave").
 - **L10 — Throughline.** A lesson is one move in the course's argument, and
   says so. (a) Directly after the opening: two to four declarative sentences
   placing the move — what the argument has established so far, what stands
@@ -172,6 +199,24 @@ being finished.
   optional aside; never the same container for essential and optional
   material), and gravity is signaled by withdrawing apparatus — shorter
   sentences, no asides, no folds — not by adjectives.
+- **L15 — A callout carries load the prose does not.** `<KeyFact>` is for
+  what the reader would otherwise leave without: a synthesis across
+  sections, a boundary the result silently assumes, a consequence that
+  arrives later in the course. Restating the theorem just proved — "entropy
+  is maximal exactly when you know least: only the uniform distribution
+  attains log₂n" one paragraph after proving it — is a tautology in a box:
+  cut it, or make it earn its place by adding the condition, the
+  counterexample, or the forward consequence. The test: delete the callout;
+  if nothing is lost, it was never a fact worth boxing. Same for `<Remark>`
+  and `<Aside>` — a fold that repeats the body is noise the reader has to
+  open to discover is empty.
+- **L16 — Application closes a module.** Every module ends by cashing its
+  results out on something real: a deployed system read against the theory
+  (JPEG's quantisation tables, zstd's entropy stage, a codec's rate
+  control), a paper's central result reproduced or checked, or a short
+  computational study the reader can run. The section states which of the
+  module's results the artifact uses and where the artifact departs from
+  the idealisation. A list of further reading is not an application.
 
 ## Exercise rules (E)
 
@@ -199,12 +244,38 @@ being finished.
   to the reader" is a missing solution.
 - **E5 — No trick questions.** Difficulty comes from the material, not from
   ambiguity or gotchas.
+- **E6 — Every exercise set earns its difficulty.** Plugging numbers into a
+  formula the lesson just demonstrated tests transcription, not
+  understanding; at most one such warm-up per set, and only where the
+  computation itself is unfamiliar. The rest must make the reader decide,
+  derive, or judge. Each set carries **at least two** of:
+  (a) a **boundary probe** — what happens at the degenerate case, and why
+  the theorem's hypothesis is exactly what rules it out;
+  (b) a **claim to refute** — a plausible false statement the reader must
+  break, naming the step that fails;
+  (c) a **derivation the lesson did not do** — a corollary, a special case,
+  a second proof, an inequality run backwards;
+  (d) a **research-shaped task** — reproduce a small published result,
+  estimate a quantity from real data, design the experiment that would
+  distinguish two explanations.
+- **E7 — Exercises reach forward.** At least one exercise per lesson lands
+  the reader on the doorstep of a later result: they compute the thing the
+  next lesson will name, hit the wall the next mechanism removes, or notice
+  the pattern the coming theorem explains. The solution says so in one
+  sentence, with a `<Ref>`. This is what makes an exercise feel like a
+  discovery instead of homework.
 
 ## Demo rules (D)
 
 - **D1 — Objective or nothing.** A demo exists only if the concept is dynamic
   or multi-parameter and the demo makes *that* visible. If a static figure
   teaches it, use a figure. ("Toy that teaches nothing" is the failure mode.)
+  Sliders bolted onto a diagram the lesson already shows are the commonest
+  form of this failure: if the demo's only content is that a curve moves,
+  it is a figure with extra steps. A demo earns its place when the reader
+  can DO something — hit a stated target, falsify a claim, find the
+  threshold where behaviour changes, or lose against a bound they cannot
+  beat — and the prose asks them to do it before it explains the result.
 - **D2 — Instant feedback.** Manipulation → visible response in <200ms, all
   client-side. No network calls.
 - **D3 — Alive on arrival.** The initial state already shows the interesting

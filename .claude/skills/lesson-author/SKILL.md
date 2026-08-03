@@ -140,8 +140,31 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      changes per frame */}`. Be as specific as you are in your head — the
      builder sees only this comment, the research-brief figure plan, and
      the surrounding prose.
+   - Callouts carry load the prose does not (L15): a `<KeyFact>` that
+     restates the result just proved is a tautology in a box — cut it, or
+     make it add the condition, the counterexample, or the consequence the
+     course reaches later. Same test for `<Remark>`/`<Aside>`: delete it; if
+     nothing is lost, it was never worth boxing.
+   - Citation discipline (L8a a/b): no provenance theatre ("Shannon's 1948
+     paper introduces exactly this sum") — cite where the pointer buys the
+     reader a different proof, a stronger result, or something to check.
+     Attribution for a borrowed proof rides in the environment title
+     (`<Theorem title="… (Cover & Thomas 2.6.4)">`), never as prose.
+   - Never narrate the obvious (L9a): no "in expectation notation…", no "the
+     curve is recreated below", no "Jensen's inequality does the work" —
+     state the thing, or state what actually happens and why.
+   - Optional depth is a `## ★` starred section inside the lesson (L2b), and
+     the core path must read correctly with every starred section skipped.
+   - A module-final lesson carries the application (L16): a deployed system,
+     a reproduced paper result, or a runnable study, naming which of the
+     module's results it uses and where reality departs from the idealisation.
    - `## Exercises` before the references: numbered `<Exercise>` blocks, each
-     with a complete `<Solution>` (E1, E4). The exercise MIX comes from your
+     with a complete `<Solution>` (E1, E4). The set must clear the difficulty
+     floor (E6): at most ONE mechanical warm-up, and ≥2 of {boundary probe;
+     false claim to refute; derivation the lesson skipped; research-shaped
+     task}. Exactly one exercise reaches FORWARD (E7) — it lands the reader
+     on the doorstep of a later lesson's result, and its solution names the
+     connection with a `<Ref>`. The exercise MIX comes from your
      domain overlay (E2): mathematics — computation / strategy-choice /
      explain-why / error-diagnosis / transfer, with example–problem pairs
      already placed in the body and confusable types interleaved without
