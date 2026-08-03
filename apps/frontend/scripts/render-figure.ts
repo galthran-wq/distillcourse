@@ -8,7 +8,7 @@
  * fix -> repeat.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -27,6 +27,32 @@ let component: ComponentType<{ frame?: number }>;
 if (target !== undefined && target in figures) {
   name = target;
   component = figures[target].component;
+} else if (target !== undefined && /\.svg$/.test(target)) {
+  // Raw-SVG mode: no browser at all. librsvg rasterizes a house-style SVG in
+  // ~0.1s and ~25 MB, against seconds and hundreds of megabytes for headless
+  // chrome — and chrome's only job here was turning vectors into pixels the
+  // reviewer can look at. `currentColor` has no meaning outside a document,
+  // so the theme's text colour is injected on the root element.
+  const svgPath = resolve(target);
+  const src = readFileSync(svgPath, "utf8");
+  const ink = dark ? "#e9e9e7" : "#131312";
+  const paper = dark ? "#131312" : "#fdfdfc";
+  const themed = src.replace(/<svg\b/, `<svg style="color:${ink}"`);
+  const outDir = join(resolve(__dirname, ".."), ".preview");
+  mkdirSync(outDir, { recursive: true });
+  const tmp = join(outDir, `.themed-${basename(svgPath)}`);
+  const png = join(
+    outDir,
+    `${basename(svgPath).replace(/\.svg$/, "")}${dark ? "-dark" : ""}.png`,
+  );
+  writeFileSync(tmp, themed);
+  execFileSync(
+    "rsvg-convert",
+    ["-w", "1200", "-b", paper, tmp, "-o", png],
+    { timeout: 30_000, killSignal: "SIGKILL" },
+  );
+  console.log(png);
+  process.exit(0);
 } else if (target !== undefined && /\.tsx?$/.test(target)) {
   // Path mode: render a not-yet-registered figure straight from its module.
   // Used when figures are built in parallel and registration is a single
