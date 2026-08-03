@@ -100,6 +100,7 @@ import UnitsBridge from "./information-theory/UnitsBridge";
 import LandauerErasure from "./information-theory/LandauerErasure";
 import FeedbackSecondLaw from "./information-theory/FeedbackSecondLaw";
 import TwoPhysicsFaces from "./information-theory/TwoPhysicsFaces";
+import GroupingTree from "./information-theory/GroupingTree";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -223,4 +224,5 @@ export const figures: Record<string, RegisteredFigure> = {
   LandauerErasure: { component: LandauerErasure },
   FeedbackSecondLaw: { component: FeedbackSecondLaw },
   TwoPhysicsFaces: { component: TwoPhysicsFaces },
+  GroupingTree: { component: GroupingTree },
 };
