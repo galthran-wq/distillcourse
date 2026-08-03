@@ -4,7 +4,10 @@ Every piece of content in this project is generated under these rules. They are
 not style preferences; each one is backed by learning-science evidence
 (summarized at the bottom). Skills MUST treat the numbered rules as checkable
 requirements — `lib/content/lint.ts` enforces the mechanical ones, `/course-qa`
-audits the judgment ones.
+audits the judgment ones. The mechanics behind the rules live in the playbook
+stack: `docs/playbook-core.md` (universal invariants), `docs/voita-playbook.md`
+(exposition layer), and the domain overlays `docs/playbook-math.md` /
+`docs/playbook-history.md` — authors read the core plus their course's overlay.
 
 **The learner model:** a busy, smart engineer who has started and abandoned
 this topic before. They will quit at the first boring paragraph. Assume zero
@@ -53,10 +56,13 @@ being finished.
   course.yaml verbatim: a precise, declarative statement of the problem the
   lesson solves or the fact it establishes. No rhetorical questions, no
   teasers, no "by the end you'll love this".
-- **L4 — Concrete before general.** A concrete instance or computation
-  precedes the general formula; the formalism then names what was just
-  computed. This is a structural (evidence-based) rule, not a stylistic one —
-  it holds in the dry register too.
+- **L4 — Concrete before general, conditionally.** The default: a concrete
+  instance or computation precedes the general formula, and the formalism
+  names what was just computed. The evidence-backed exception: when every
+  term in a definition is already familiar and precision itself is the
+  lesson, formal-first is legitimate — followed immediately by boundary
+  cases. Neither order is a dogma; the choice is per-concept
+  (playbook-core invariant 5).
 - **L5 — Textbook environments where natural.** Mathematical material uses
   numbered `<Definition>`, `<Theorem>`, `<Proof>`, `<Example>`; key facts in
   non-mathematical courses (history, philosophy, speech, music) use
@@ -75,13 +81,97 @@ being finished.
 - **L8 — References.** Every lesson ends with a `<References>` section:
   the primary sources and one or two canonical texts, with chapter-level
   pointers. Real references, verified — never invented.
+- **L8a — Inline attribution only when provenance is content.** Narrative
+  facts are stated directly and sourced in `<References>` — never "Textbook
+  X's chapter describes…" mid-prose; the reader came for the material, not
+  for the compilation's scaffolding. Inline naming is reserved for cases
+  where the WHO is part of the claim: a primary artifact being read or
+  quoted (Las Casas's tract, Franklin's pamphlet), a measurement whose
+  method carries the argument (a tribute-register series), or a named thesis
+  under discussion (Turner's). Secondary surveys and syntheses appear once,
+  in References, with chapter pointers.
 - **L9 — Dry engineering register.** Declarative sentences; facts carry the
   text. No rhetorical questions, no exclamations, no chattiness ("almost
-  embarrassingly simple"), no narrative framing ("a friend says…"), no filler.
-  Second person only for instructions ("compute", "drag", "verify"). Define
-  jargon at the point of first use or don't use it. Every sentence either
-  states a fact that advances the one objective or gets cut. Italics only for
-  standard emphasis of a single term, sparingly.
+  embarrassingly simple"), no invented scenes or personas ("a friend says…"),
+  no filler. Second person only for instructions ("compute", "drag",
+  "verify"). Define jargon at the point of first use or don't use it. Every
+  sentence either advances the argument — a fact, or the connection between
+  facts — or gets cut: connective declaratives ("the previous section
+  established X; what it leaves unexplained is Y") are load-bearing prose,
+  not filler. Italics only for standard emphasis of a single term, sparingly.
+- **L10 — Throughline.** A lesson is one move in the course's argument, and
+  says so. (a) Directly after the opening: two to four declarative sentences
+  placing the move — what the argument has established so far, what stands
+  open, what this lesson contributes; the course `spine` in course.yaml is
+  the reference for the sequence of moves. (b) Sections chain: every `##`
+  opens with a sentence tying it to the lesson's running question or to what
+  the previous section established — never with a cold definition. Where
+  the material breaks the reader's natural expectation, the seam SAYS so —
+  states the expectation, then breaks it ("from X one would expect Z; the
+  record shows the opposite") — in the dry register; itinerary seams are
+  for genuinely neutral hand-offs only, and no reversal is manufactured
+  where the material contains none. (c) The
+  lesson closes by naming what is now established and what the next lesson
+  takes up, stated as fact. (d) Clarifying L3: stating what comes next is
+  required; manufacturing suspense ("you'll soon see…") stays banned.
+  (e) Sections argue, not inventory: within a section, paragraphs run
+  claim → evidence → bearing on the lesson's question, and every section
+  ends with its bearing visible in the body itself. The test: cover the
+  section's seam sentence and its last sentence — if the body no longer
+  shows what the section contributes to the argument, the section is an
+  inventory and gets re-argued. Material that bears on nothing gets cut,
+  however good the source it came from.
+- **L11 — First exposure is the contract.** The audience field defines a
+  reader with no prior coursework; every first mention is written for that
+  reader. (a) Places: anchored at first mention — a locator figure nearby,
+  or a relative clause ("Madeira, 600 km off the Moroccan coast"). (b)
+  Events: date plus a half-sentence of what-happened at first mention;
+  never a bare name-drop ("the strikes at Potosí (1545)" needs "a mountain
+  of silver ore in the high Andes"). (c) New named terms: defined at first
+  use (L9), and no more than about three introduced per section — a
+  paragraph that introduces three foreign institutions at once is three
+  paragraphs. (d) Cross-lesson recall: anything established in an earlier
+  lesson is re-anchored with a <Ref> plus a clause of reminder, never
+  assumed remembered. The test: every proper noun either carries its anchor
+  in the sentence, was anchored earlier in the lesson, or is Ref'd to the
+  lesson that anchored it.
+- **L12 — Evidence budget.** Evidence is pulled by the argument, never
+  pushed by the source (selection runs argument → evidence; the research
+  brief is a quarry, not a coverage checklist). (a) Inclusion test: a
+  number, name, or detail enters body prose only if some claim fails
+  without it — if the reader must compare, estimate, calibrate, or weigh
+  evidence with it. Everything else passes the counterfactual deletion
+  test (would removing it impair an objective, an inference, or a later
+  exercise? no → cut it or move it to a labeled Aside) — interesting-but-
+  irrelevant detail measurably harms learning. (b) Every number that stays
+  carries its frame in the same sentence — unit, denominator, comparison,
+  or consequence: "about 400 colonists killed" is unevaluable; "one
+  colonist in six killed, the colony annihilated" is not. Round to the
+  precision the claim supports; exact values live in tables and source
+  notes. (c) Each lesson has two or three KEEPER numbers — what the reader
+  should leave with — privileged in KeyFacts and figures; other quantities
+  default to order-of-magnitude words. Relations before values: "the size
+  of contemporary London" before — or instead of — "10–20,000". (d) Events
+  involving people are scenes or judgments, never data rows; date precision
+  follows function (decade by default, the exact day only where contingency
+  is the point). (e) Dense numeric series live in figures, tables, and
+  asides — charts are never rationed by this rule; prose states what they
+  mean. Domain sharpening: docs/playbook-history.md (numbers-in-history),
+  docs/playbook-math.md (notation ledger).
+- **L13 — Refutation, only where the misconception is real.** Where the
+  material meets a documented, prevalent misconception, the lesson refutes
+  it explicitly (schema in playbook-core: correct claim → the misconception
+  stated once → rejection → causal explanation of why it fails →
+  replacement model → discriminating example → delayed retrieval); explicit
+  refutation beats silently presenting the correct account. Where no real
+  misconception exists, there is no slot — an invented "some believe…"
+  strawman is an L9 violation.
+- **L14 — Register modulation by layout.** Importance is marked by a shift
+  of device, never by intensifiers: the visual grammar is stable (one
+  container style per role — definition, claim, example, warning, exercise,
+  optional aside; never the same container for essential and optional
+  material), and gravity is signaled by withdrawing apparatus — shorter
+  sentences, no asides, no folds — not by adjectives.
 
 ## Exercise rules (E)
 
@@ -89,12 +179,21 @@ being finished.
   numbered `<Exercise>` blocks, each containing a collapsible `<Solution>` —
   textbook style, no interactive grading. Retrieval practice happens by
   solving, not by clicking.
-- **E2 — Production over recognition.** Most exercises require producing
-  something — a computation, a derivation, a stated argument. Recognition
-  questions are the exception, not the rule.
-- **E3 — Spaced review.** From a course's third lesson on, at least one
-  exercise requires a concept from an earlier lesson. This is the spiral made
-  mechanical.
+- **E2 — Production in the discipline's method.** Most exercises require
+  producing something, and what counts as production is the DISCIPLINE'S
+  method, per the domain overlay: in mathematics — computation, strategy
+  choice, proof steps, error diagnosis (playbook-math exercise mix); in
+  history — sourcing, corroboration, causal ranking, claim–evidence–
+  reasoning argument (playbook-history exercise mix). Arithmetic
+  transplanted into a non-quantitative discipline (plug-constant estimates
+  that test nothing) is a defect, not rigor. Recognition questions are the
+  exception, not the rule.
+- **E3 — Spaced, mixed review.** From a course's third lesson on, at least
+  one exercise requires a concept from an earlier lesson. Every core idea
+  gets ≥3 encounters across the course (its own lesson, 1–2 lessons later,
+  near the module end), later encounters as retrieval-plus-application.
+  From mid-course on, exercise sets mix confusable types without naming
+  the method — the first question is "which kind of problem is this?".
 - **E4 — Complete solutions.** Every solution shows the full path to the
   answer — the same standard as worked examples. A solution that says "left
   to the reader" is a missing solution.
@@ -142,3 +241,21 @@ being finished.
   textbook exercises with full solutions → E1, E4.
 - **Explorable explanations practice** (Victor, Case, distill.pub) — tight
   feedback loops, prediction-before-reveal, sandbox-as-culmination → D1–D5.
+- **Seductive-details effect** — interesting-but-irrelevant details harm
+  retention (d≈.30) and transfer (d≈.48) (Rey meta-analysis; later
+  syntheses concur) → L12a deletion test.
+- **Refutation texts** — explicitly stating-and-refuting a genuine
+  misconception beats plain correct exposition, g=.41 over 44 comparisons;
+  familiarity "backfire" largely fails to replicate → L13.
+- **Interleaving** — g=.42 overall; d=.83 in a preregistered mathematics
+  cluster RCT (Rohrer); benefit is discrimination between confusable
+  types → E3.
+- **Self-explanation** — g=.55 when prompts target a specific inference at
+  a decision point; generic "explain" prompts underperform → E2, playbooks.
+- **Narrative vs exposition** — controlled science-content comparisons show
+  only g=.16 for narrative, and documented person-centered accounts beat
+  fictional stories → L9's ban on invented scenes stands.
+- **Two-corpus convergence** — the reference-course dissections (Voita
+  2026; CrashCourse US History, 52 episodes, 2026) independently converge
+  on the invariants in playbook-core (format contract, claim-units,
+  flaw-first progression, no unbound tokens) → L10–L14 framing.

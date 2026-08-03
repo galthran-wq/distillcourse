@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   // The dev server is reviewed from the public host, not localhost; without
   // this Next blocks cross-origin /_next/* requests (dead HMR socket, and on
   // some paths broken hydration) for any origin but localhost.
-  allowedDevOrigins: ["91.194.2.214"],
+  allowedDevOrigins: ["91.194.2.214", "199.231.235.204"],
 };
 
 // Plugins are referenced by name (string form) so they can run under Turbopack;

@@ -7,6 +7,12 @@ import { lintCourse, type Diagnostic } from "@/lib/content/lint";
 
 const FIXTURE = join(__dirname, "fixtures", "lint-course");
 
+/** Smallest valid PNG — stands in for a sourced image in the raster tests. */
+const PNG_1PX = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
 function lintDir(dir: string): Diagnostic[] {
   return lintCourse(loadCourse(dir), { lessonDirsOnDisk: listLessonDirs(dir) });
 }
@@ -142,6 +148,80 @@ describe("lintCourse", () => {
     const render = errors(lintDir(dir)).filter((d) => d.rule === "mdx-render");
     expect(render.length).toBeGreaterThan(0);
     expect(render[0].message).toContain("p is not defined");
+  });
+
+  it("flags a <Figure src> with no file behind it (figure-src)", () => {
+    const dir = brokenCopy((d) =>
+      rmSync(join(d, "lessons/intro-surprise/figures/rarity.svg")),
+    );
+    expect(errors(lintDir(dir)).map((d) => d.rule)).toContain("figure-src");
+  });
+
+  it("flags a sourced image with no credits entry (image-credit)", () => {
+    const dir = brokenCopy((d) => {
+      writeFileSync(join(d, "lessons/intro-surprise/figures/photo.png"), PNG_1PX);
+      rewrite(
+        join(d, "lessons/intro-surprise/lesson.mdx"),
+        '<Figure src="./figures/rarity.svg"',
+        '<Figure src="./figures/photo.png" alt="A photograph" />\n\n<Figure src="./figures/rarity.svg"',
+      );
+    });
+    const diags = errors(lintDir(dir));
+    expect(diags.map((d) => d.rule)).toContain("image-credit");
+    expect(diags.find((d) => d.rule === "image-credit")?.message).toContain("photo.png");
+  });
+
+  it("flags a truncated sourced image (image-broken)", () => {
+    const dir = brokenCopy((d) => {
+      writeFileSync(
+        join(d, "lessons/intro-surprise/figures/photo.png"),
+        PNG_1PX.subarray(0, 40),
+      );
+      writeFileSync(
+        join(d, "lessons/intro-surprise/figures/credits.yaml"),
+        [
+          "schema_version: 1",
+          "images:",
+          "  - file: photo.png",
+          "    title: A photograph",
+          "    credit: Someone",
+          "    source_url: https://example.org/photo",
+          "    license: public domain",
+          "    retrieved: 2026-07-30",
+          "",
+        ].join("\n"),
+      );
+      rewrite(
+        join(d, "lessons/intro-surprise/lesson.mdx"),
+        '<Figure src="./figures/rarity.svg"',
+        '<Figure src="./figures/photo.png" alt="A photograph" />\n\n<Figure src="./figures/rarity.svg"',
+      );
+    });
+    const diags = errors(lintDir(dir));
+    expect(diags.map((d) => d.rule)).toContain("image-broken");
+    expect(diags.find((d) => d.rule === "image-broken")?.message).toContain("truncated");
+  });
+
+  it("flags a credits entry whose file is gone (image-credit)", () => {
+    const dir = brokenCopy((d) =>
+      writeFileSync(
+        join(d, "lessons/intro-surprise/figures/credits.yaml"),
+        [
+          "schema_version: 1",
+          "images:",
+          "  - file: vanished.jpg",
+          "    title: A photograph",
+          "    credit: Someone",
+          "    source_url: https://example.org/photo",
+          "    license: public domain",
+          "    retrieved: 2026-07-30",
+          "",
+        ].join("\n"),
+      ),
+    );
+    const diags = errors(lintDir(dir));
+    expect(diags.map((d) => d.rule)).toContain("image-credit");
+    expect(diags.find((d) => d.rule === "image-credit")?.message).toContain("vanished.jpg");
   });
 
   it("flags MDX that parses but fails full compilation (mdx-compile)", () => {

@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
-import { join, normalize } from "node:path";
+import { basename, join, normalize } from "node:path";
 import { figures } from "@/components/figures";
+import { creditFor, loadCredits } from "@/lib/content/credits";
+import { isRasterFile } from "@/lib/content/images";
+import SourcedImage, { resolveImage } from "./SourcedImage";
 
 /** Props authored in MDX (the lesson page injects lessonDir). */
 export interface FigureProps {
@@ -22,9 +25,11 @@ interface Props extends FigureProps {
 }
 
 /**
- * Two figure tiers (docs/figures.md): simple raw SVGs inlined from the
- * lesson's figures/ dir (currentColor -> theme-aware), and rich component
- * figures (HTML + KaTeX + SVG) resolved from the registry.
+ * Three figure tiers (docs/figures.md): simple raw SVGs inlined from the
+ * lesson's figures/ dir (currentColor -> theme-aware), rich component figures
+ * (HTML + KaTeX + SVG) resolved from the registry, and sourced raster images
+ * (photographs, scans, published plots) served from public/course-assets with
+ * their credit line.
  */
 export default function Figure({
   src,
@@ -37,7 +42,19 @@ export default function Figure({
 }: Props) {
   let body: React.ReactNode = null;
 
-  if (name !== undefined) {
+  if (src !== undefined && isRasterFile(src)) {
+    const image = resolveImage(lessonDir, src);
+    // Only the rendering hint is needed here; the provenance itself is
+    // printed once, in <References> (docs/figures.md §Sourced images).
+    const credit = creditFor(loadCredits(lessonDir), basename(src));
+    if (image !== undefined) {
+      body = (
+        <div className="mx-auto max-w-2xl">
+          <SourcedImage image={image} alt={alt} background={credit?.background} />
+        </div>
+      );
+    }
+  } else if (name !== undefined) {
     const reg = figures[name];
     if (reg !== undefined) {
       const Comp = reg.component;

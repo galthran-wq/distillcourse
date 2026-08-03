@@ -5,8 +5,10 @@ engineers who keep starting textbooks and never finishing them.
 
 The human curates course structure by editing files in git; Claude Code
 skills and workflows generate the content. `docs/pedagogy.md` is the
-constitution; `docs/voita-playbook.md` holds the structural mechanics both
-follow.
+constitution; the playbook stack holds the mechanics behind it —
+`docs/playbook-core.md` (universal invariants), `docs/voita-playbook.md`
+(exposition layer), `docs/playbook-math.md` / `docs/playbook-history.md`
+(domain overlays).
 
 ## How content works
 
@@ -16,14 +18,21 @@ content/courses/<course>/
   concepts.yaml      # concept registry
   research/          # the factory's resumable dossier:
     sources.yaml     #   canon list with roles and URLs
-    <lesson>.md      #   per-lesson brief: which chapters to consult,
-                     #   key points, figure plan
+    images.yaml      #   real-image candidates the readers found worth using
+    images/          #   their captures — the source is never re-read
+    texts/           #   raw fetched material (PDFs, extracted text) with
+                     #   .meta.yaml sidecars — git-ignored; writers read from
+                     #   here instead of re-fetching the sources
+    <lesson>.md      #   per-lesson brief: which chapters to consult, key
+                     #   points, figure plan (each visual draw: or source:)
   lessons/<slug>/
     lesson.mdx       # a textbook chapter: free-form MDX, no frontmatter —
                      # numbered Definition/Theorem/Proof/Example/Remark
                      # environments, KeyFact/Task callouts, figures and
                      # step-through sequences, Exercises with collapsible
                      # Solutions, References; right ToC rendered automatically
+    figures/         # SVGs we drew + sourced images (photos, scans, real
+      credits.yaml   #   plots), each credited here — provenance or no image
 ```
 
 - `course.yaml` is the single source of structural truth (no MDX frontmatter).
@@ -42,20 +51,26 @@ buttons refuse to run on other models), inside a git worktree on branch
 `course/<slug>` — nothing lands on master until the human merges.
 
 1. `/course-architect "<topic>"` — canon discovery (perplexity deep
-   research) → a sonnet swarm reads the sources → synthesis writes
-   `course.yaml`, `concepts.yaml`, and the `research/` dossier.
+   research) → a sonnet swarm reads the sources, each reader also scouting
+   the few images that would have to be the real artefact → synthesis writes
+   `course.yaml`, `concepts.yaml`, and the `research/` dossier (including
+   `images.yaml`, the shortlist, and per-lesson figure plans that say which
+   visuals we draw and which we source).
 2. **Human curates** `course.yaml` AND the per-lesson `research/` briefs in
    the worktree — the main editorial checkpoint.
 3. `/lesson-factory <slug> [n]` — per planned lesson, sequentially:
-   lesson-writer (session model, grounded in the brief) → demo-builder where
-   specced → opus QA → one fix cycle. Requires the `research/` dossier.
+   lesson-writer (session model, grounded in the brief) → figure-artist
+   agents in parallel (drawn figures, and sourced images cut from the
+   research captures) → demo-builder where specced → opus QA → one fix
+   cycle. Requires the `research/` dossier.
 4. Human reviews in `npm run dev`, flips statuses, merges the branch.
 
 ## Manual single-lesson tools (escape hatch)
 
 `/lesson-author <course> <lesson|next>`, `/demo-builder <course> <lesson>`,
-`/figure-artist <Name>`, `/course-qa <course> [lesson]` — the same skills
-the factory drives, invocable directly for one-off writing or revision.
+`/figure-artist <Name|file-stem>`, `/course-qa <course> [lesson]` — the same
+skills the factory drives,
+invocable directly for one-off writing or revision.
 
 ## Development
 
@@ -64,10 +79,20 @@ npm run dev        # dev server (renders drafted + reviewed + published)
 npm run validate   # schema + shell lint over all content
 npm test           # vitest
 npm run figure -- <Name> [frame] [--dark]   # render a component figure to .preview/
+npm run image -- check <file>               # sourced-image toolkit: verify,
+                                            # fetch, PDF-extract, crop, fit
+npm run preview -- <course> <lesson>        # render a chapter (both themes) to
+                                            # .preview/ and screenshot it
+npm run sync-assets  # copy lesson raster figures into public/course-assets
 npm run build      # production build
 ```
+
+Sourced images (photographs, scans, published plots) need `poppler-utils`
+and `imagemagick` for extraction and resizing; `npm run validate` itself
+stays dependency-free.
 
 Key code: `lib/content/schema.ts` (Zod schemas — normative),
 `lib/content/lint.ts` (shell rules), `docs/content-model.md` (schema guide),
 `docs/components.md` (MDX vocabulary), `docs/figures.md` +
-`docs/voita-playbook.md` (figure and structure mechanics).
+`docs/voita-playbook.md` (figure and structure mechanics),
+`docs/playbook-core.md` + domain overlays (argument and evidence mechanics).

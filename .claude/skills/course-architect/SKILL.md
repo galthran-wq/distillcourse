@@ -42,15 +42,21 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
    The workflow runs: canon discovery (perplexity deep research) → a
    sonnet reading swarm (one source-reader agent per source) → synthesis on
    the session model, producing `course.yaml`, `concepts.yaml`, and the
-   **research dossier** (`research/sources.yaml` + `research/<lesson>.md`
-   per lesson — the resumable state that later grounds lesson writing).
+   **research dossier** (`research/sources.yaml`, `research/images.yaml` —
+   the shortlist of real images the readers found worth sourcing — and
+   `research/<lesson>.md` per lesson, whose FIGURE PLAN tags each visual
+   `draw:` (house style) or `source:` (a real artefact, already captured
+   under `research/images/`) — the resumable state that later grounds
+   lesson writing).
 
 4. **On completion:** run `npm run validate <slug>`; then report to the
    human: the outcomes, the module arc (one line each), the source list with
    roles, and where the dossier lives. Remind them:
    - curate `course.yaml` AND the per-lesson research briefs in the worktree
      (this is the main editorial checkpoint — the briefs steer every future
-     lesson);
+     lesson), including which planned visuals are `source:` real images and
+     which are `draw:` — that choice is cheap to change now and expensive
+     later;
    - when satisfied, run `/lesson-factory <slug>` to write lessons;
    - merge the `course/<slug>` branch only when the course is worth shipping.
 
