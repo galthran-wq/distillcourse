@@ -1,0 +1,210 @@
+# Research brief: reconstruction (Reconstruction: The Second Founding, 1865-1870)
+
+status: planned
+module: civil-war-and-reconstruction
+type: core
+goal: Explain how freedpeople, Congress, and the Reconstruction Amendments refounded American citizenship.
+
+Foner's organizing method is the one to borrow: build the lesson from what
+freedpeople *did*, then layer elite politics on top.
+
+THESIS ROLE. The self-correction written into the Constitution: more
+constitutional content added in five years than in the previous seventy —
+abolition, birthright citizenship, equal protection, suffrage — the
+amendment machinery from Article V used to complete what the war paid for.
+The register holds: the amendments as the system's second founding, the land
+question's defeat and sharecropping as its documented limits, both stated
+from the documents and the numbers.
+
+## ARC (L10)
+
+- **Inherits:** union-victory has established the war as won and its price
+  fixed in Lincoln's own words, leaving the amendment machinery of Article
+  V — introduced in constitutional-convention — available to complete what
+  the war paid for.
+- **Contributes:** This lesson delivers the spine's constitutional clause
+  directly: the war's outcome is written into the Constitution as a second
+  founding — abolition, birthright citizenship, equal protection, and Black
+  male suffrage.
+- **Hands off:** The next lesson, redemption, takes up how that second
+  founding was overthrown.
+
+## Sources to consult
+
+- **Foner, *Reconstruction: America's Unfinished Revolution*** — **Ch.3** "The
+  Meaning of Freedom" (family, community, economics, politics, violence),
+  **Ch.4** "Ambiguities of Free Labor" (the Freedmen's Bureau between planters
+  and freedpeople), **Ch.5** "The Failure of Presidential Reconstruction"
+  (Johnson, Black Codes, Northern reaction), **Ch.6** "The Making of Radical
+  Reconstruction" (the 14th Amendment, the 1866 campaign, Black suffrage),
+  **Ch.7-8** (political mobilization, constitutional conventions, Reconstruction
+  governments in power).
+- **Blight, HIST 119 Lectures 20-23** — wartime Reconstruction, Johnson vs. the
+  Radicals, impeachment, and Black Reconstruction: land, labor, and the economics
+  of freedom.
+- **MIT 21H.102 Session 2-3 lecture notes** — the "what did freedom mean?" frame
+  and the primary-source set (freedpeople's letters, Black Codes, KKK testimony,
+  Jourdan Anderson's 1865 letter to his old master).
+- **American Yawp Ch.15 "Reconstruction"**; **Give Me Liberty Ch.15**
+  ("What Is Freedom?") and its Voices of Freedom documents #95-101, including the
+  1866 Rosstown Plantation sharecropping contract and the Mississippi Black Code.
+- **Milestone Documents** #34 Wade-Davis Bill, #36 13th, #39 14th, #40 15th
+  Amendments.
+
+## Key points the lesson must cover
+
+1. **What freedom meant to freedpeople.** Reuniting families separated by sale
+   (including newspaper advertisements searching for relatives); legalizing
+   marriages; founding independent Black churches and schools; refusing gang
+   labor; moving; and, above all, seeking land. Over 2,000 Black men held public
+   office during Reconstruction — state the number.
+2. **The land question, and its defeat.** Sherman's Special Field Order No. 15
+   (January 1865) settling freedpeople on Sea Islands land; Johnson's restoration
+   of that land to pardoned owners; Thaddeus Stevens's 1867 confiscation bill
+   defeated in Congress. Freedman Bailey Wyatt's claim that those whose labor
+   built Southern wealth had a moral claim to the land — Foner reads it as an
+   intuitive labor theory of value.
+3. **The Freedmen's Bureau.** Undermanned and temporary, mediating labor
+   contracts between planters seeking discipline and freedpeople seeking
+   autonomy, running schools and courts, and structurally too weak for the task.
+4. **Presidential Reconstruction fails.** Johnson's lenient terms and mass
+   individual pardons of wealthy ex-Confederates; the Black Codes (Mississippi,
+   1865) recreating coerced labor by statute; the 1866 New Orleans and Memphis
+   massacres; Northern opinion turning; the 1866 midterms delivering veto-proof
+   Republican majorities.
+5. **The constitutional refounding.** Civil Rights Act of 1866 (over veto); the
+   Fourteenth Amendment — birthright citizenship, due process, equal protection —
+   drafted principally by John Bingham; the Reconstruction Acts of 1867 imposing
+   military districts and requiring Black male suffrage and 14th Amendment
+   ratification for readmission; Johnson's impeachment and one-vote acquittal;
+   the Fifteenth Amendment (1870).
+6. **Reconstruction governments in power.** Biracial legislatures wrote the
+   South's first tax-funded public school systems, civil rights statutes, and
+   infrastructure programs — plus railroad subsidy schemes ("the Gospel of
+   Prosperity") that produced real corruption and a usable grievance.
+7. **Sharecropping as the outcome.** With land denied and wages distrusted, the
+   compromise was tenancy for a crop share under planter-supplied credit —
+   legal freedom coexisting with near-total economic dependence.
+
+## Set pieces and worked examples to recreate
+
+- **Jourdan Anderson's 1865 letter to his old master** — the sardonic itemized
+  demand for back wages. Read it closely as the lesson's opening document: it
+  states what freedom meant to one freedman better than any summary.
+- **The 1866 Rosstown Plantation sharecropping contract** (Voices of Freedom
+  #98): laborers signing with an X, working under the planter's "management,
+  control and Superintendence" for half the crop with provisions charged against
+  them. Worked example: compute a plausible year-end settlement and show how the
+  arithmetic produces debt; parallel exercise with different numbers.
+- **The Mississippi Black Code (1865)** read against the 13th Amendment ratified
+  the same year — a direct textual confrontation.
+- **"The First Vote" (Harper's Weekly, Nov 1867)** as period print culture staking
+  a claim about Black citizenship.
+- **The Waud Freedmen's Bureau engraving (1868)**: a lone officer between two
+  armed crowds — the Bureau's structural position in one image.
+
+## Pitfalls / subtleties to flag
+
+- The Dunning-School story (corrupt carpetbaggers, incapable freedpeople,
+  vindictive Radicals) is wrong and was the dominant account for fifty years;
+  name it as a discredited historiography and connect it to civil-war-memory.
+- Corruption existed but was not distinctive to Reconstruction governments; the
+  comparison class is Gilded Age government generally.
+- "Radical" Republicans were a minority faction, not the whole party; most
+  Republican support for Black suffrage was pragmatic as well as principled.
+- The Fourteenth Amendment's Section 2 penalty for disenfranchisement was never
+  enforced — an important fact for the jim-crow lesson.
+- Do not present Reconstruction as doomed from the start; Foner's thesis is that
+  it was a real revolution that was overthrown, which is the next lesson.
+
+## FIGURE PLAN
+
+1. `source:` **foner-recon-first-vote-1867** — save as `the-first-vote-1867`.
+   Reader must be able to see: the three men in line — laborer, businessman,
+   soldier — and the ballot box. Placement: centered in the political
+   mobilization section. Small file: check print size; upscale from Commons if
+   needed.
+2. `source:` **foner-recon-freedmens-bureau-waud-1868** — save as
+   `freedmens-bureau-waud-1868`. Reader must be able to see: the lone officer,
+   the armed white crowd on one side and armed freedmen on the other, and the
+   flag. Placement: centered in the Bureau section. Crop from the full page to
+   the illustration.
+3. `source:` **foner-recon-first-colored-senator-reps-1872** — save as
+   `first-black-members-of-congress-1872`. Reader must be able to see: the seven
+   named portraits with their states. Placement: float right beside the 2,000
+   officeholders statistic.
+4. `source:` **milestone-14th-amendment-resolution** — save as
+   `fourteenth-amendment-resolution`. Reader must be able to see: the opening
+   text of Section 1. Placement: centered in the constitutional section.
+5. `source:` **no pool candidate — hunt:** Jourdan Anderson's 1865 letter to
+   his old master, first printed in the *Cincinnati Commercial* (Aug 22, 1865)
+   and reprinted in Lydia Maria Child's *The Freedmen's Book* (1865). Search
+   Wikimedia Commons / the Vermont Historical Society (Anderson's postwar home
+   was Dayton, Ohio, but the letter circulated nationally) for a period-printed
+   facsimile page, or the National Archives/Library of Congress digitized
+   newspaper column. If no period facsimile is locatable, the fallback is a
+   library scan of the 1865 pamphlet reprint credited accordingly — prefer the
+   period newspaper column if found. Save as `jourdan-anderson-letter-1865`.
+   Reader must be able to see: the letter's actual salutation and itemized
+   wage demand, in period type. Why it must be the real thing: this document
+   *is* the lesson's opening set piece — the brief says to "read it closely";
+   the reader should read Jourdan Anderson's own words as a printed artifact,
+   not a paraphrase. Placement: centered, opening the lesson, above the "what
+   freedom meant" section.
+6. `source:` **no pool candidate — hunt:** the Mississippi Black Code of 1865
+   ("An Act to Confer Civil Rights on Freedmen"), printed in *Laws of the
+   State of Mississippi, Called Session, 1865*. Search the University of North
+   Carolina's "Documenting the American South", the Mississippi Department of
+   Archives and History, or Wikimedia Commons for a period-printed statute
+   page ("Mississippi Black Code 1865"). Save as
+   `mississippi-black-code-1865`. Reader must be able to see: the statute's
+   actual vagrancy and labor-contract clauses in period print. Why it must be
+   the real thing: the lesson reads the Black Code "against the 13th Amendment
+   ratified the same year" — that confrontation is textual and needs the
+   actual statute page, not a summary of it. Placement: float right beside the
+   Black Codes paragraph in the Presidential Reconstruction section.
+7. `draw:` single `<Figure>` — **three amendments, three additions**: 13th
+   (abolition), 14th (citizenship, due process, equal protection), 15th
+   (suffrage), each with a one-line statement of what federal power it created
+   and what it left out.
+8. `draw:` `<FigureSequence>` (5 frames) — **four Reconstructions**: wartime →
+   presidential (Johnson) → congressional/Radical → Redemption (foreshadowed).
+   Each frame changes who holds authority in the South and what freedpeople can
+   legally do. Frame 4 ends with a forward pointer to the next lesson.
+9. `draw:` single `<Figure>` — **the spectrum of labor arrangements**: slavery →
+   gang wage labor → sharecropping → tenancy → landownership, with the share of
+   Black Southern farmers at each position by 1880 and by 1900 (~15-20%
+   landowning).
+10. `draw:` single `<Figure>` — **the sharecropping settlement, computed**: a
+    worked year-end ledger from the Rosstown-style contract, showing crop value,
+    the half share, and the deductions producing a debt balance.
+11. `draw:` single `<Figure>` — **Black officeholding, 1868-1877**: officeholders
+    by state and level over time, drawn so the later collapse (next lesson) has a
+    baseline to fall from.
+
+## Canon additions (curated expansion, July 2026)
+
+- **Guelzo, *Reconstruction: A Concise History*** (PARTIAL: Introduction
+  pp.1-13 read in full, cached `texts/guelzorecon.pdf`/`.txt`; Ch.1-7 and
+  Epilogue are TOC-only — cite nothing from them beyond titles without
+  library verification) — the deliberate counterweight to Foner this lesson
+  should pair, not replace:
+  - The four-part periodization (Early 1862-65 / Presidential 1865-67 /
+    Congressional 1867-70 / Overthrow 1870-77, plus Aftermath to Plessy) as
+    an alternative scaffold to test against Foner's.
+  - The two structural problems built in from the start: freedpeople's
+    undefined legal status, and the end of the three-fifths clause —
+    Stevens's arithmetic that the defeated South could gain up to 13 House
+    seats explains Republican strategy without imputing motives.
+  - Lincoln's constitutional theory (states never left) vs Sumner's
+    state-suicide theory — the executive-vs-Congress fight as a legal
+    argument, in the course's statute-and-holding register.
+  - Guelzo's "four successes" (Union restored; generosity over vengeance;
+    economic beachheads; permanent constitutional equality of citizenship)
+    against the overthrow narrative — state both, sourced, and let the
+    reader weigh them; his explicit rejection of the bourgeois-revolution
+    frame belongs in the historiographical footnote alongside Foner and Du
+    Bois (cross-reference historiographical-lenses).
+  - Quotable Introduction gems (all page-cited in the read text): Lincoln's
+    April 11, 1865 limited-black-suffrage speech three days before the
+    assassination; Whitman on leniency "paralleled nowhere in the world."

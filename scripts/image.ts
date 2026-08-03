@@ -19,7 +19,7 @@
  *   crop <src> <dest> <WxH+X+Y|--trim>   cut a figure out of a page render
  *                                        [--extent WxH] pad to a common size
  *   fit <src> <dest>                     normalize for the web
- *                                        [--max-width 1400] [--quality 82]
+ *                                        [--max-width 2400] [--quality 82]
  *                                        [--flatten] (transparent -> white)
  *
  * `check` is dependency-free (lib/content/images.ts) except for the optional
@@ -205,7 +205,7 @@ function shrink(file: string, maxWidth: string): void {
  * finally puts the figure.
  */
 function capture(src: string, dest: string, page: string | undefined): void {
-  const maxWidth = flag("max-width", "1600");
+  const maxWidth = flag("max-width", "2400");
   mkdirSync(dirname(resolve(dest)), { recursive: true });
 
   if (/^https?:\/\//.test(src) && page === undefined) {
@@ -328,7 +328,7 @@ function crop(src: string, dest: string, geometry: string | undefined): void {
 }
 
 function fit(src: string, dest: string): void {
-  const maxWidth = flag("max-width", "1400");
+  const maxWidth = flag("max-width", "2400");
   const quality = flag("quality", "82");
   mkdirSync(dirname(resolve(dest)), { recursive: true });
   const args = [src, "-strip"];
@@ -381,14 +381,14 @@ switch (command) {
         "  fetch <url> <dest>                  download, then check",
         "  capture <url|pdf> <dest> [page]     grab raw material for the dossier:",
         "                                      stored PDF figures + the page render",
-        "                                      [--dpi 200] [--max-width 1600] [--no-embedded]",
+        "                                      [--dpi 200] [--max-width 2400] [--no-embedded]",
         "  pdf-list <pdf> [--pages 1-9]        list images stored in a PDF page",
         "  pdf-extract <pdf> <page> <outdir>   pull embedded images out of a page",
         "  pdf-page <pdf> <page> <dest.png>    render a page      [--dpi 200]",
         "  crop <src> <dest> <WxH+X+Y|--trim>  cut a figure out of a page render",
         "                                      [--extent WxH] pad frames to one size",
         "  fit <src> <dest>                    normalize for the web",
-        "                                      [--max-width 1400] [--quality 82] [--flatten]",
+        "                                      [--max-width 2400] [--quality 82] [--flatten]",
       ].join("\n"),
     );
     process.exit(command === undefined ? 0 : 1);

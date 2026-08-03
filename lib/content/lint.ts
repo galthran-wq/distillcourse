@@ -656,6 +656,44 @@ export function lintCourse(
       });
     }
 
+    // key-image: the contents thumbnail must exist; rasters must be credited.
+    if (lesson.key_image !== undefined) {
+      const kiPath = join(entry.dir, lesson.key_image);
+      if (!existsSync(kiPath)) {
+        diags.push({
+          level: "error",
+          rule: "key-image",
+          file: coursePath,
+          message: `lesson "${lesson.slug}": key_image "${lesson.key_image}" does not exist in the lesson directory`,
+        });
+      } else if (isRasterFile(lesson.key_image)) {
+        const probe = probeImageFile(kiPath);
+        if (isProbeError(probe)) {
+          diags.push({
+            level: "error",
+            rule: "key-image",
+            file: kiPath,
+            message: `lesson "${lesson.slug}": key_image is not a usable image: ${probe.error}`,
+          });
+        }
+        if (creditFor(loadCredits(entry.dir), basename(lesson.key_image)) === undefined) {
+          diags.push({
+            level: "error",
+            rule: "key-image",
+            file: creditsPath(entry.dir),
+            message: `lesson "${lesson.slug}": key_image "${basename(lesson.key_image)}" has no credits.yaml entry`,
+          });
+        }
+      }
+    } else if (STATUS_RANK[lesson.status] >= STATUS_RANK.drafted) {
+      diags.push({
+        level: "warn",
+        rule: "key-image",
+        file: coursePath,
+        message: `lesson "${lesson.slug}" is ${lesson.status} but has no key_image — pick the lesson's signature visual for the course contents`,
+      });
+    }
+
     if (STATUS_RANK[lesson.status] >= STATUS_RANK.drafted && entry.mdx === undefined) {
       diags.push({
         level: "error",
@@ -686,6 +724,35 @@ export function lintCourse(
     }
 
     lintLessonMdx(entry, new Set(bySlug.keys()), diags, options);
+  }
+
+  // intro.mdx: must compile and render like any lesson document.
+  if (loaded.introMdx !== undefined) {
+    const introPath = join(loaded.dir, "intro.mdx");
+    try {
+      compileSync(loaded.introMdx, { remarkPlugins: [remarkMath] });
+      const mod = evaluateSync(loaded.introMdx, {
+        ...jsxRuntime,
+        remarkPlugins: [remarkGfm, remarkMath],
+      } as never);
+      const Stub = (props: { children?: unknown }) =>
+        createElement(Fragment, null, props.children as never);
+      const components = Object.fromEntries(
+        [...ALLOWED_COMPONENTS].map((name) => [name, Stub]),
+      ) as Record<string, ComponentType>;
+      renderToString(
+        createElement(mod.default as ComponentType<{ components: unknown }>, {
+          components,
+        }),
+      );
+    } catch (err) {
+      diags.push({
+        level: "error",
+        rule: "intro-mdx",
+        file: introPath,
+        message: `intro.mdx fails to compile or render: ${(err as Error).message}`,
+      });
+    }
   }
 
   // unknown-lesson-dir: directories on disk not declared in course.yaml.

@@ -105,7 +105,7 @@ capture.
    - Land it as `content/courses/<c>/lessons/<l>/figures/<file-stem>.png`.
 4. **THE LOOP — mandatory. Machine, then eyes:**
    - `npm run image -- check <file>`: real format, complete file, ≥480px
-     wide, under 2.5 MB, not blank.
+     wide, under 6 MB, not blank.
    - Read the file and answer every line of
      [checklists/image-checklist.md](checklists/image-checklist.md) — right
      subject, nothing clipped, labels legible at the placement width, no

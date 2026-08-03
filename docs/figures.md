@@ -16,12 +16,13 @@ and always ships with its provenance. Three tiers:
   `docs/voita-playbook.md`.
 - **Raw SVG figures** (simple plots and diagrams with few short labels):
   the rules below. /figure-artist is the skill for both.
-- **Sourced images** (photographs, portraits, apparatus, page scans,
-  published plots of real data, canonical diagrams): raster files in the
+- **Sourced images** (photographs, portraits, objects, places, scenes,
+  artifact maps, published plots of real data): raster files in the
   lesson's `figures/`, credited in `figures/credits.yaml`, embedded with the
   same `<Figure src>`/`<FigureSequence>` API. The reading swarm captures
   them during research; /figure-artist cuts, verifies and credits them.
-  See §Sourced images.
+  See §Sourced images — and the visible-not-legible test there: a scan of
+  a text document is almost never a figure.
 
 ## Principles
 
@@ -75,16 +76,29 @@ and always ships with its provenance. Three tiers:
 ## Sourced images
 
 The third tier: a real image we did not make. Use it when authenticity is the
-content — historical photographs and portraits, apparatus, page scans of the
-original paper, published plots of real data, canonical diagrams. Do NOT use
-it for schematics, pipelines, or anything math-bound: a foreign-style diagram
-with 8px labels is worse than a house-style drawing of the same idea.
+content — and pass the **visible-not-legible test**: an image earns its slot
+only if LOOKING at it transmits something prose cannot — a face, a place, an
+object, dress, a scene, a map's shape, a plotted curve. The caption must
+name the visible fact the reader is meant to see. If what an artifact
+carries is its TEXT, the text belongs in the prose as a typeset quotation
+and the scan is decoration: title pages, manuscript leaves, and printed
+pages are defects unless the visible (not readable) features are themselves
+the evidence — signatures in different hands, marks in place of names,
+struck-through entries, fire damage, a mourning border being the point.
+Sourced images are windows into the world of the material: people, places,
+objects, scenes, maps. Do NOT use the tier for schematics, pipelines, or
+anything math-bound: a foreign-style diagram with 8px labels is worse than a
+house-style drawing of the same idea.
 
 - **Absolute rule: artifacts are sourced, never drawn.** Geographic maps,
   portraits, paintings, photographs, posters, and document pages are never
   hand-drawn — canonical public-domain copies exist (Commons, LoC, archives)
   and a redrawn map is a defect. The drawn tiers are for the course's own
-  diagrams, charts, and step-throughs.
+  diagrams, charts, and step-throughs. Distinction for maps: ARTIFACT
+  maps (historical, canonical, data-bearing) are sourced; minimal LOCATOR
+  sketches — an outline, a handful of labeled points, a route, drawn to
+  anchor place names per L11 — are the course's own diagrams and belong to
+  the drawn tiers.
 - **Files.** `figures/<name>.{png,jpg,jpeg,webp,gif}` in the lesson dir, same
   place as the SVGs. Embedded with `<Figure src="./figures/<name>.jpg" …/>`;
   a raster `<FigureSequence>` uses `<name>-1.png`, `<name>-2.png`, … and gets
@@ -96,8 +110,11 @@ with 8px labels is worse than a house-style drawing of the same idea.
   `<References>` — never under the figure, where licence text buries the
   caption. One entry may cover a whole sequence via a `*` pattern
   (`shannon-1948-approximations-*.png`). No entry ⇒ `npm run validate` fails.
-- **Quality floor.** ≥480px wide (the validator warns below it), ≤2.5 MB,
-  never upscaled. `npm run image -- check <file>` proves the file is a
+- **Quality floor and ceiling.** ≥480px wide (the validator warns below it),
+  ≤6 MB, never upscaled — and never DOWNSCALED to display size either:
+  images open in a full-viewport lightbox on click, so the stored file is
+  the zoom. Keep the best resolution the source offers (fit's default cap
+  is 2400px). `npm run image -- check <file>` proves the file is a
   complete, non-blank image of the format it claims; looking at it is what
   proves it is the right image, and that step is not optional.
   `npm run preview -- <course> <lesson>` renders the whole chapter to

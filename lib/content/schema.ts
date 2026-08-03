@@ -66,6 +66,12 @@ export const LessonSchema = z.object({
   opening: z.string().min(1),
   est_minutes: z.number().int().positive().max(60),
   prerequisites: z.array(slug).default([]),
+  /**
+   * The lesson's signature visual, path relative to the lesson dir
+   * ("figures/cantino-planisphere-1502.jpg") — rendered as the thumbnail in
+   * the course contents. Prefer the lesson's strongest sourced image.
+   */
+  key_image: z.string().min(1).optional(),
   concepts: z.object({
     introduces: z.array(slug).default([]),
     reinforces: z.array(slug).default([]),
@@ -115,6 +121,12 @@ export const CourseSchema = z.object({
       z.object({
         /** One argument step, declarative ("Selected settlers compounded"). */
         step: z.string().min(1),
+        /** Short display handle for the course-page map ("The settler engine"). */
+        label: z.string().min(1).optional(),
+        /** Display period ("1620–1700"). */
+        years: z.string().min(1).optional(),
+        /** Concrete newcomer-facing line ("2,400 men cross the Delaware…"). */
+        caption: z.string().min(1).optional(),
         /** Lessons that carry this step, in course order. */
         lessons: z.array(slug).min(1),
       }),

@@ -6,7 +6,13 @@ import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import type { MDXComponents } from "mdx/types";
 import { getCourse, getCourses, isReadable, previewMode } from "@/lib/content/site";
+import Figure from "@/components/mdx/Figure";
+import FigureSequence from "@/components/mdx/FigureSequence";
+import * as Blocks from "@/components/mdx/Blocks";
+import { assetUrl } from "@/lib/content/images";
+import Lightbox from "@/components/mdx/Lightbox";
 
 interface Params {
   course: string;
@@ -45,14 +51,33 @@ export default async function CoursePage({
   const { course } = loaded;
   const bySlug = new Map(loaded.lessons.map((l) => [l.lesson.slug, l]));
 
-  let Intro: React.ComponentType | null = null;
-  if (course.intro !== undefined) {
-    const compiled = await evaluate(course.intro, {
+  // intro.mdx (rich: figures, images, callouts) wins over the YAML prose.
+  let Intro: React.ComponentType<{ components?: MDXComponents }> | null = null;
+  let introComponents: MDXComponents | undefined;
+  const introSource = loaded.introMdx ?? course.intro;
+  if (introSource !== undefined) {
+    const compiled = await evaluate(introSource, {
       ...runtime,
       remarkPlugins: [remarkGfm, remarkMath],
       rehypePlugins: [rehypeKatex],
     } as Parameters<typeof evaluate>[1]);
     Intro = compiled.default;
+    if (loaded.introMdx !== undefined) {
+      // Course-root figures resolve against the course dir (assets bucket
+      // "_course"); Ref renders as plain text here (no lesson context).
+      introComponents = {
+        ...Blocks,
+        Figure: (props: React.ComponentProps<typeof Figure>) => (
+          <Figure {...props} lessonDir={loaded.dir} />
+        ),
+        FigureSequence: (props: React.ComponentProps<typeof FigureSequence>) => (
+          <FigureSequence {...props} lessonDir={loaded.dir} />
+        ),
+        Ref: ({ children }: { children?: React.ReactNode; lesson: string }) => (
+          <span>{children}</span>
+        ),
+      } as MDXComponents;
+    }
   }
 
   return (
@@ -65,8 +90,8 @@ export default async function CoursePage({
       {Intro !== null && (
         <section className="border-b border-line py-8">
           <SectionLabel>Introduction</SectionLabel>
-          <div className="course-intro max-w-2xl leading-relaxed">
-            <Intro />
+          <div className={`course-intro leading-relaxed ${loaded.introMdx !== undefined ? "prose-lesson max-w-none" : "max-w-2xl"}`}>
+            <Intro components={introComponents} />
           </div>
         </section>
       )}
@@ -166,9 +191,20 @@ export default async function CoursePage({
                 const readable = isReadable(entry);
                 const number = String(entry.index + 1).padStart(2, "0");
 
+                const thumb =
+                  lesson.key_image !== undefined
+                    ? assetUrl(course.slug, lesson.slug, lesson.key_image)
+                    : undefined;
                 const row = (
-                  <div className="flex items-baseline gap-4 py-2.5">
+                  <div className="flex items-center gap-4 py-2.5">
                     <span className="font-mono text-[0.8rem] text-faint">{number}</span>
+                    {thumb !== undefined && (
+                      <Lightbox
+                        src={thumb}
+                        alt={`${lesson.title} — key image`}
+                        className={`h-14 w-20 shrink-0 rounded border border-line object-cover ${readable ? "" : "opacity-50"} ${(lesson.key_image ?? "").endsWith(".svg") ? "bg-white object-contain p-1" : ""}`}
+                      />
+                    )}
                     <span className="min-w-0 flex-1">
                       <span
                         className={`block text-[1rem] font-medium leading-snug ${

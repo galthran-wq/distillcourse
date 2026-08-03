@@ -128,6 +128,12 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   an objective, an inference, or a later exercise? Each "no" is a seductive
   detail: required fix (cut, or move to a labeled Aside). Charts and
   figures are exempt — a dense series in a figure is the correct home.
+- **M5 (required)**: visible-not-legible — every sourced raster passes the
+  figures.md test: the caption names a VISIBLE fact the reader is meant to
+  see (a face, place, object, scene, map shape, mark). A scan whose content
+  is its text (title page, manuscript leaf, printed page) is a required
+  fix: quote the text in prose, cut the scan — unless the visible features
+  themselves are the evidence and the caption reads them.
 
 ## Refutation & register (L13, L14)
 

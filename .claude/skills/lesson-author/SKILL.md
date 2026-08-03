@@ -118,10 +118,14 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      source if you know it). The bar is the same: the artefact must carry
      material, not decorate it.
    - **Never hand-draw what exists as an artifact.** Geographic maps,
-     portraits, paintings, photographs, posters, and document pages are
-     ALWAYS sourced (`{/* img */}` handoff) — a hand-drawn SVG map is a
-     defect, not a figure. The drawn tiers exist for the course's OWN
-     constructs: comparisons, causal diagrams, data charts, step-throughs.
+     portraits, paintings, photographs, and posters are ALWAYS sourced
+     (`{/* img */}` handoff) — a hand-drawn SVG map is a defect, not a
+     figure. But every sourced image must pass figures.md's
+     visible-not-legible test: it earns its slot only if LOOKING transmits
+     something (people, places, objects, dress, scenes, map shapes) — a
+     scan of a text document is decoration; quote its text in prose
+     instead. The drawn tiers exist for the course's OWN constructs:
+     comparisons, causal diagrams, data charts, step-throughs.
      For artifact-rich subjects (history, art, biology) the brief's FIGURE
      PLAN is a floor, not a ceiling: add `{/* img */}` handoffs liberally
      wherever a real artifact carries material — for this kind of course,
