@@ -127,16 +127,23 @@ async function main(): Promise<void> {
       if (!shoot) continue;
       const png = join(previewDir, `${lesson}-${suffix}.png`);
       try {
-        execFileSync(chromePath(), [
-          "--headless=new",
-          "--disable-gpu",
-          "--no-sandbox",
-          "--hide-scrollbars",
-          "--allow-file-access-from-files",
-          `--window-size=1100,${height}`,
-          `--screenshot=${png}`,
-          `file://${htmlPath}`,
-        ]);
+        execFileSync(
+          chromePath(),
+          [
+            "--headless=new",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--no-zygote",
+            "--hide-scrollbars",
+            "--allow-file-access-from-files",
+            `--window-size=1100,${height}`,
+            `--screenshot=${png}`,
+            `file://${htmlPath}`,
+          ],
+          // Kill a hung render instead of leaving orphaned chrome processes
+          // behind — a few dozen of them exhaust this box's memory.
+          { timeout: 120_000, killSignal: "SIGKILL" },
+        );
         // Trim the empty page below the content so the PNG is readable.
         try {
           execFileSync("convert", [png, "-trim", "+repage", "-bordercolor", "none", "-border", "24", png]);

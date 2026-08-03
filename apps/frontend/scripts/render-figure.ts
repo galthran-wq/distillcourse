@@ -75,16 +75,24 @@ const out = join(
   previewDir,
   `${name}${frame !== undefined ? `-f${frame}` : ""}${dark ? "-dark" : ""}.png`,
 );
-execFileSync("google-chrome", [
-  "--headless=new",
-  "--disable-gpu",
-  "--no-sandbox",
-  "--hide-scrollbars",
-  "--force-device-scale-factor=2",
-  "--window-size=900,1400",
-  `--screenshot=${out}`,
-  `file://${htmlPath}`,
-]);
+execFileSync(
+  "google-chrome",
+  [
+    "--headless=new",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--no-zygote",
+    "--hide-scrollbars",
+    "--force-device-scale-factor=2",
+    "--window-size=900,1400",
+    `--screenshot=${out}`,
+    `file://${htmlPath}`,
+  ],
+  // A hung renderer used to linger until the box ran out of memory: kill it
+  // outright rather than leaving orphans behind. --no-zygote keeps chrome
+  // from forking a process tree that outlives the parent.
+  { timeout: 90_000, killSignal: "SIGKILL" },
+);
 
 // Trim the empty page area around the figure, keep a small margin.
 const paper = dark ? "#131312" : "#fdfdfc";
