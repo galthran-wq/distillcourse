@@ -64,8 +64,8 @@ length of the codeword this model's code would have spent on this label.
 The loss reads exactly one coordinate of $q$: the true label's. The other
 coordinates enter only through the normalization that forces $q$ to sum to
 one, which is why a model can lower its loss while getting fewer labels right
-(exercise 3): the loss scores the probability attached to the truth, not the
-ranking.
+(the loss-versus-accuracy counterexample in the exercises): the loss scores
+the probability attached to the truth, not the ranking.
 </KeyFact>
 
 ## Cross-entropy: the expected log-loss, and the price of a wrong code
@@ -200,7 +200,7 @@ Every mismatched pair in the grid cost strictly more than the entropy, and the
 excess was exactly the divergence computed in the previous lesson. That
 accounting is general, and it is this lesson's headline identity.
 
-<Theorem title="cross-entropy decomposition (Cover &amp; Thomas 5.4.3)">
+<Theorem title="cross-entropy decomposition">
 For probability distributions $p$ and $q$ on a finite set,
 
 $$
@@ -422,8 +422,9 @@ $$
 The same sum is $-\tfrac{1}{N}\log_2 \prod_i q(x_i)$, so minimizing the
 average log-loss is maximizing the likelihood $\prod_i q(x_i)$ of the dataset.
 Cross-entropy minimization, KL minimization and maximum-likelihood estimation
-are one procedure in three vocabularies; exercise 5 does the derivation and
-identifies the independence assumption that licenses the product.
+are one procedure in three vocabularies; the maximum-likelihood exercise below
+does the derivation and identifies the independence assumption that licenses
+the product.
 
 The empirical distribution in the first slot is not a technicality. The
 theorem's minimizer is whatever sits in that slot, and on finite data that is
@@ -435,10 +436,17 @@ description-length penalty of <Ref lesson="minimum-description-length"/>
 address, and none of it is visible inside the identity.
 
 <KeyFact>
-The identity is exact for whatever distribution is written in the data slot.
-Put the truth there and the minimizer is the truth; put a finite sample there
-and the minimizer is the sample. Overfitting is not a failure of the loss: it
-is the loss working correctly on the wrong first argument.
+Whether the training loss says anything about $p$ is a condition on the model
+class, not on the loss. On a fixed finite alphabet $\hat{p} \to p$ as $N$
+grows, so a class fixed in advance and too small to fit the sample's noise has
+its training minimizer converge to the minimizer against $p$. A class rich
+enough to realize any assignment of labels to the $N$ training inputs drives
+$H(\hat{p}, q)$ to $0$ whatever $p$ is, and the training loss then carries no
+information about $D(p\,\|\,q)$. The missing term is the cost of naming which
+member of the class was selected: <Ref lesson="minimum-description-length"/>
+charges it explicitly, at about $(k/2)\log_2 N$ bits for $k$ parameters.
+Overfitting is not a failure of the loss: it is the loss working correctly on
+the wrong first argument.
 </KeyFact>
 
 ## Confident and wrong: the price, and the gradient it produces
@@ -493,7 +501,9 @@ and the reason is where the loss meets the output layer.
 
 <Example title="the gradient of a logistic neuron (MacKay 39.3)">
 A binary classifier outputs $y = \sigma(a) = 1/(1 + e^{-a})$ from a scalar
-logit $a$, and the target is $t \in \{0, 1\}$. In nats, the loss is
+*logit* $a$ — the unnormalized real-valued score the last layer emits, which
+$\sigma$ squashes into a probability — and the target is $t \in \{0, 1\}$. In
+nats, the loss is
 
 $$
 \mathcal{L} = -\bigl[\,t \ln y + (1-t) \ln (1 - y)\,\bigr] .
@@ -522,14 +532,18 @@ $-0.1$. The loss ratio is about $65$; the gradient ratio is about $10$, and no
 output can push the logit gradient past $1$.
 </Example>
 
-The same computation with a softmax over $k$ classes gives
+The same computation runs on the multi-class output layer. A *softmax* is the
+$k$-class counterpart of the logistic function, the map that turns a vector of
+logits $z$ into a distribution by exponentiating and normalizing,
+$q_j = e^{z_j} / \sum_i e^{z_i}$; it gives
 $\partial \mathcal{L} / \partial z_j = q_j - p_j$, prediction minus target,
-per logit (exercise 4). Two facts follow, and they pull in opposite
-directions. The loss on one example is unbounded, so a single confidently
-wrong prediction dominates the reported value of a batch's loss. The gradient on one
-example is bounded by $1$ per logit, so that same prediction contributes at
-most about ten times the pull of a mildly wrong one. Confident errors dominate
-the reported number far more than they dominate the update.
+per logit (the softmax-gradient exercise below derives it). Two facts follow,
+and they pull in opposite directions. The loss on one example is unbounded, so
+a single confidently wrong prediction dominates the reported value of a
+batch's loss. The gradient on one example is bounded by $1$ per logit, so that
+same prediction contributes at most about ten times the pull of a mildly wrong
+one. Confident errors dominate the reported number far more than they dominate
+the update.
 
 The cancellation is what makes the pairing work. The derivative of the loss
 with respect to the probability, $\partial \mathcal{L}/\partial q = -1/q$,
@@ -726,8 +740,8 @@ $$
 That is the unit in which a model's loss can be set beside a compressor's
 output on the same file, which is what <Ref lesson="compression-is-prediction"/>
 does with an arithmetic coder and what
-<Ref lesson="language-models-as-compressors"/> measures on real corpora.
-Exercise 7 runs the conversion.
+<Ref lesson="language-models-as-compressors"/> measures on real corpora. The
+last exercise runs the conversion on a reported training loss.
 
 What is established: the training loss of a probabilistic classifier is the
 cross-entropy $H(p,q)$, which splits into an entropy floor set by the labels
@@ -741,19 +755,45 @@ the file it produces is the loss of this lesson written out.
 ## Exercises
 
 <Exercise>
-A three-class model outputs $q = (0.7,\ 0.2,\ 0.1)$ and the true class is the
-second. Report the loss in bits and in nats, and state which of the two
-numbers a PyTorch or JAX training log would print.
+Two models are evaluated on the same five-class test set. Model A's framework
+log reports $0.85$ nats per example, scored against smoothed targets carrying
+$0.8$ on the true class and $0.05$ on each of the other four. Model B's log
+reports $1.05$ bits per example, scored against hard one-hot labels. Decide
+which model has the smaller mismatch with the target it was scored against,
+giving the number that decides it; check that model A's reported value is
+even admissible; and state what would have to be recomputed before the two
+can be ranked as models of the same thing.
 
 <Solution>
-Bits: $-\log_2 0.2 = \log_2 5 \approx 2.322$ bits.
+**One unit.** $0.85$ nats $\times\, 1.443 = 1.226$ bits per example for A,
+against $1.05$ bits for B. On the reported numbers B is ahead by $0.18$ bits.
 
-Nats: $-\ln 0.2 \approx 1.609$ nats. Check: $2.322 \times \ln 2 = 2.322
-\times 0.693 \approx 1.609$.
+**The floors differ.** A's target has
 
-A framework log prints the nats, $1.609$: the standard implementations use
-natural logarithms. Multiply by $1.443$ to read a training curve in bits, and
-therefore in code length.
+$$
+H(p) = 0.8\log_2\tfrac{1}{0.8} + 4 \times 0.05\log_2\tfrac{1}{0.05}
+= 0.258 + 0.864 = 1.122 \text{ bits,}
+$$
+
+while B's one-hot target has $H(p) = 0$. Subtracting: $D(p\,\|\,q) = 1.226 -
+1.122 = 0.104$ bits for A and $1.05 - 0 = 1.05$ bits for B. A's own mismatch
+is about a tenth of B's, and the ranking by reported loss is the reverse of
+the ranking by divergence.
+
+**Admissibility.** $H(p,q) \ge H(p)$ always, so any value below $1.122$ bits
+($0.778$ nats) reported against A's targets would be arithmetically
+impossible: a bug in the loss, in the logging, or in the targets as described.
+A's $1.226$ clears the floor, and clears it by little.
+
+**What is still not comparable.** The two divergences are measured against
+two different targets, so "A is ten times closer" is a statement about
+different questions. Ranking them as models of the same thing requires
+scoring both against one target — in practice the hard labels, which is why
+validation loss is normally computed on hard labels even when training used
+soft ones. Rescored that way A's number falls, because the $1.122$-bit floor
+it was carrying disappears and only $-\log_2 q(\text{true})$ remains: a model
+holding exactly the $0.8$ it was trained to hold on the true class reports
+$0.322$ bits. That is the number to set beside B's $1.05$.
 </Solution>
 </Exercise>
 
@@ -998,5 +1038,5 @@ corpora, including the two-part accounting that charges for the model.
 5. C. Szegedy, V. Vanhoucke, S. Ioffe, J. Shlens, Z. Wojna, "Rethinking the Inception Architecture for Computer Vision," CVPR 2016 — §7 introduces label smoothing and reports the $\varepsilon = 0.1$, 1000-class setting whose entropy floor is computed above. https://arxiv.org/abs/1512.00567
 6. R. Müller, S. Kornblith, G. Hinton, "When Does Label Smoothing Help?", NeurIPS 2019 — measures what the raised floor does to calibration and to distillation, and is the paper to read before comparing smoothed and unsmoothed loss values. https://arxiv.org/abs/1906.02629
 7. J. M. Bernardo, "Expected Information as Expected Utility," *Annals of Statistics* 7(3), 1979 — proves that the only smooth local proper scoring rules are $a \log r(x) + b(x)$, the uniqueness claim in the starred section. https://projecteuclid.org/journals/annals-of-statistics/volume-7/issue-3/Expected-Information-as-Expected-Utility/10.1214/aos/1176344689.full
-8. G. Delétang, A. Ruoss, et al., "Language Modeling Is Compression," ICLR 2024 — §2 states that a model's expected log-loss on a stream equals its achievable code length, the identity exercise 7 uses. https://arxiv.org/abs/2309.10668
+8. G. Delétang, A. Ruoss, et al., "Language Modeling Is Compression," ICLR 2024 — §2 states that a model's expected log-loss on a stream equals its achievable code length, the identity behind the bits-per-byte exercise above. https://arxiv.org/abs/2309.10668
 </References>
