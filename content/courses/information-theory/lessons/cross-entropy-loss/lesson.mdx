@@ -1,80 +1,83 @@
 Cross-entropy decomposes as H(p,q) = H(p) + KL(p||q); minimizing
 cross-entropy loss minimizes the divergence of the model from the data
-distribution. This lesson identifies the training loss of probabilistic
-classifiers and language models with the coding cost of
-<Ref lesson="kl-divergence"/> and works out the consequences: the loss has a
-floor the model cannot lower, the part the model controls is exactly
-$D(p\,\|\,q)$, and the unique minimizer is $q = p$. The route: the
-single-example loss as the model's surprisal at the truth, cross-entropy as
-its average, the decomposition into entropy plus divergence, the collapse to
-negative log-likelihood under one-hot labels, and the unbounded penalty for
-confident wrong predictions.
+distribution.
+
+The coding module established that a set of codeword lengths is a bet on a
+distribution and that a wrong bet costs exactly $D(p\,\|\,q)$ extra bits per
+symbol (<Ref lesson="kl-divergence"/>). What that leaves open is the object
+machine learning actually minimizes, which is not a code length averaged over
+a known source but a number computed from one observed label at a time. This
+lesson closes the gap: the training loss of every probabilistic classifier and
+language model is the expected code length of the previous lesson, unchanged,
+so the number a practitioner watches fall during training is a compressed file
+size and the only part of it an optimizer can move is the divergence. The
+identity is an equality, not an analogy, and
+<Ref lesson="compression-is-prediction"/> turns it into a working compressor.
+
+The route: the loss on one example as the model's surprisal at the truth; the
+average of that loss under the data, which is the cross-entropy; the
+decomposition into an entropy floor plus a divergence and what it says about
+the minimizer; the collapse to negative log-likelihood under one-hot labels;
+the unbounded penalty on confident errors and the bounded gradient it
+produces; and which comparisons a reported loss value permits.
 
 ## The loss on one example: the model's surprisal at the truth
 
-A three-class image classifier ends its forward pass in a probability
-distribution over labels. On one input it outputs $q = (0.70,\ 0.20,\ 0.10)$
-over $\{\text{cat}, \text{dog}, \text{fox}\}$. The true label is then
-revealed, and training charges the model for that one outcome: the *log-loss*
-on the example is $-\log_2 q(\text{truth})$. Nothing else in $q$ is billed.
+Training begins with a bill charged for a single prediction, so that is where
+the accounting starts. A three-class image classifier ends its forward pass in
+a probability distribution over labels; on one input it outputs
+$q = (0.70,\ 0.20,\ 0.10)$ over $\{\text{cat}, \text{dog}, \text{fox}\}$. The
+true label is then revealed, and the *log-loss* on that example is
+$-\log_2 q(\text{truth})$ bits. Nothing else in $q$ is billed.
 
 <Example title="one prediction, three possible bills">
-The output is $q = (0.70,\ 0.20,\ 0.10)$; the loss depends on which label is
-true.
+The output is $q = (0.70,\ 0.20,\ 0.10)$; the loss depends on which label
+turns out to be true.
 
-- Truth = cat: $-\log_2 0.70 \approx 0.51$ bits. Confident and right: near
-  zero.
+- Truth = cat: $-\log_2 0.70 \approx 0.51$ bits. Confident and right, so
+  nearly free.
 - Truth = dog: $-\log_2 0.20 \approx 2.32$ bits.
 - Truth = fox: $-\log_2 0.10 \approx 3.32$ bits. The model rated the true
   label least likely and pays the most.
 
-The loss is small exactly when the model put high probability on what
-happened; the probabilities assigned to the labels that did not occur enter
-only through normalization.
+Three different bills for one unchanged prediction. The loss is small exactly
+when the model put high probability on what happened.
 </Example>
 
-The formula is not new. <Ref lesson="what-is-surprise"/> defined the
-surprisal of an event with probability $p(x)$ as $I(x) = -\log_2 p(x)$; the
-log-loss is the same curve evaluated at the **model's** probability of the
-observed outcome. The loss on one example is the model's surprisal at the
-truth: how surprised $q$ is that this label occurred.
-
-{/* fig LogLossSurprisal: log-loss = surprisal, side by side. Two panels
-   sharing one layout, each plotting the identical curve y = −log₂ x on
-   (0,1], axes x from 0 to 1, y from 0 to ~5 bits. Left panel header
-   "surprisal (lesson 1)": curve in blue, y-axis label "$I(x) = -\log_2
-   p(x)$", x-axis label "$p(x)$ — the true probability of the event"; a blue
-   dot at (0.5, 1) labeled "coin flip: 1 bit". Right panel header "log-loss
-   (this lesson)": the same curve in amber, y-axis label
-   "$\ell = -\log_2 q(x_{\text{true}})$", x-axis label
-   "$q(x_{\text{true}})$ — the model's probability of the truth"; an amber
-   dot at (0.7, 0.51) labeled "cat example: 0.51 bits". Between the panels a
-   bold "=" sign with the gloss "same curve, model's probability substituted".
-   Colors: blue = the truth's probability (lesson-1 role), amber = the model.
-   One idea: the loss is the surprisal curve with q in place of p. */}
 <Figure
-  name="LogLossSurprisal"
-  alt="Two panels with the identical curve minus log base two of x: the left labeled as surprisal of the true probability, the right labeled as log-loss at the model's probability of the truth, joined by an equals sign"
-  caption="One curve, two readings: surprisal −log₂ p(x) from lesson 1, and the log-loss −log₂ q(x_true) — the model's surprisal at the truth."
+  src="./figures/one-example-loss.svg"
+  alt="A three-bar prediction with the true class marked, and an arrow carrying that single probability to a loss axis where minus log base two of 0.20 stands as a 2.32-bit column"
+  caption="The loss reads one number off one bar: −log₂ of the probability the model gave the label that occurred."
 />
 
+The function is not new. <Ref lesson="what-is-surprise"/> fixed the
+information content of an event of probability $p(x)$ as its *surprisal*
+$I(x) = -\log_2 p(x)$, the unique measure that adds over independent events;
+the log-loss is that same function evaluated at the **model's** probability
+for the outcome that occurred. In the first lesson the argument of the
+logarithm was the world's probability; here it is the model's claim about it.
+Nothing else changed, which is why the loss inherits the unit: a log-loss of
+$2.32$ is $2.32$ bits, and by <Ref lesson="kl-divergence"/> those bits are the
+length of the codeword this model's code would have spent on this label.
+
 <KeyFact>
-The log-loss on one example is $-\log_2 q(x_{\text{true}})$: the surprisal
-the model assigns to the outcome that occurred. The model is billed by its
-own probability for what actually happened.
+The loss reads exactly one coordinate of $q$: the true label's. The other
+coordinates enter only through the normalization that forces $q$ to sum to
+one, which is why a model can lower its loss while getting fewer labels right
+(exercise 3): the loss scores the probability attached to the truth, not the
+ranking.
 </KeyFact>
 
-## Cross-entropy: the expected log-loss under the truth
+## Cross-entropy: the expected log-loss, and the price of a wrong code
 
-One example gives one bill. Averaging the bill over the data distribution
-gives the quantity that training actually minimizes.
-
-The average appeared already in <Ref lesson="kl-divergence"/>: the expected
-bits spent when events from $p$ are coded with the exact code for $q$ is
-$\sum_x p(x)(-\log_2 q(x))$, and on the running source
-$p = (.5, .25, .15, .1)$ the uniform model $q = (\tfrac14, \tfrac14,
-\tfrac14, \tfrac14)$ pays $2.000$ bits per symbol against the entropy
-$H(p) \approx 1.743$. That expected cost gets the name.
+One example gives one bill. Averaging the bill over the distribution the
+examples are drawn from gives the quantity training actually minimizes, and
+that average is already in the course. <Ref lesson="kl-divergence"/> computed
+the expected cost of coding $p$-data with the exact code for $q$ as
+$\sum_x p(x)\bigl(-\log_2 q(x)\bigr)$; on the running source
+$p = (.5, .25, .15, .1)$ the uniform model
+$q = (\tfrac14, \tfrac14, \tfrac14, \tfrac14)$ paid $2.000$ bits per symbol
+against an entropy of $1.743$. That expected cost now gets its name.
 
 <Definition title="cross-entropy">
 For probability distributions $p$ and $q$ on a finite set $\mathcal{X}$, the
@@ -84,32 +87,120 @@ $$
 H(p, q) = -\sum_{x \in \mathcal{X}} p(x) \log_2 q(x) \quad \text{bits,}
 $$
 
-the expected surprisal under the model $q$ when outcomes are drawn from $p$.
+the expected surprisal under the model $q$ when outcomes are drawn from $p$,
+with the conventions of <Ref lesson="kl-divergence"/> at the edges: a term
+with $p(x) = 0$ contributes nothing, and $H(p,q) = +\infty$ if some outcome
+has $q(x) = 0 < p(x)$.
 </Definition>
 
-Three immediate readings of the same sum:
+Three readings of the one sum, in the three settings the course uses it in:
 
-- **Coding:** the expected codeword length when $p$-data is coded with $q$'s
+- **Coding.** The expected codeword length when $p$-data is sent with $q$'s
   code (<Ref lesson="kl-divergence"/>).
-- **Learning:** the expected log-loss of model $q$ on examples drawn from
+- **Learning.** The expected log-loss of the model $q$ on examples drawn from
   the data distribution $p$.
-- **Sanity check:** $H(p, p) = -\sum_x p(x)\log_2 p(x) = H(p)$: a model that
-  matches the truth pays exactly the entropy.
+- **The matched case.** $H(p, p) = -\sum_x p(x)\log_2 p(x) = H(p)$: a model
+  that matches the truth pays exactly the entropy, and nothing pays less.
 
-**Direction convention.** Cross-entropy is not symmetric:
-$H(p, q) \ne H(q, p)$ in general, because the first argument supplies the
-expectation weights and the second supplies the surprisals. The loss is
-always $H(\text{data}, \text{model})$ — data first, model second, the same
-order as $D(p\,\|\,q)$ in <Ref lesson="kl-divergence"/>. Exercise 6
-computes both directions on a concrete pair.
+### Two speakers, two codes, four bills
 
-## The decomposition: entropy floor plus divergence
+The two arguments do different jobs, and the cleanest demonstration uses one
+pair of distributions in all four combinations of data and code.
 
-The gap between the uniform model's $2.000$ bits and the floor $1.743$ was
-computed in <Ref lesson="kl-divergence"/> to be $D(p\,\|\,q) = 0.257$ bits.
-That accounting is fully general, and it is the lesson's headline identity.
+<Example title="four cross-entropies on one pair">
+Two speakers use the same four words $\{\text{dog}, \text{cat},
+\text{fish}, \text{bird}\}$ at different rates. Bob says
+$p = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$; Alice says
+$q = (\tfrac18, \tfrac12, \tfrac14, \tfrac18)$. Both distributions are
+dyadic, so each has an exact matched code
+(<Ref lesson="prefix-codes"/>): Bob's lengths are $(1, 2, 3, 3)$ in word
+order, Alice's are $(3, 1, 2, 3)$.
 
-<Theorem title="cross-entropy decomposition">
+The two entropies are equal: $H(p) = H(q) = 1.75$ bits. The two mismatches
+are not.
+
+$$
+H(q, p) = \tfrac18(1) + \tfrac12(2) + \tfrac14(3) + \tfrac18(3) = 2.25
+\text{ bits (Alice's words, Bob's code),}
+$$
+
+$$
+H(p, q) = \tfrac12(3) + \tfrac14(1) + \tfrac18(2) + \tfrac18(3) = 2.375
+\text{ bits (Bob's words, Alice's code).}
+$$
+
+The overheads are $0.500$ and $0.625$ bits per word. The larger one is Bob's,
+and the reason is visible term by term: his commonest word, said half the
+time, is the one Alice's code gives a 3-bit codeword. Alice's commonest word
+gets 2 bits under Bob's code, and she says it half the time, so her penalty is
+smaller.
+</Example>
+
+<Figure
+  src="./figures/four-scenarios.svg"
+  alt="A two-by-two grid of stacked area diagrams: each column is one speaker's word frequencies, each row is one speaker's code, and the four areas give 1.75, 2.25, 2.375 and 1.75 bits per word"
+  caption="Same two distributions, four bills: both entropies are 1.75 bits, but the wrong code costs Bob 0.625 bits per word and Alice only 0.500."
+/>
+
+<Task>
+Read the asymmetry off the layout rather than off the arithmetic. In the
+bottom-left panel (Bob's words, Alice's code) find the tallest block, "dog",
+half of everything he says, and check that it is also the widest: three bits.
+Then find the tallest block of the top-right panel (Alice's words, Bob's
+code), "cat", and check that it is only two bits wide. Every panel has the
+same total height; what differs is whether the stretched block is a tall one.
+</Task>
+
+**Direction convention.** Cross-entropy is not symmetric, and the example is
+the proof: $H(p,q) = 2.375 \ne 2.25 = H(q,p)$. The first argument supplies
+the weights, because reality decides how often each outcome occurs; the second
+supplies the surprisals, because the model decides what each outcome costs.
+The training loss is always $H(\text{data}, \text{model})$, data first, in the
+same order as $D(p\,\|\,q)$ in <Ref lesson="kl-divergence"/>.
+
+<Exercise>
+Bob and Alice agree to share a single code, built for the average
+distribution $m = \tfrac12(p + q) = (0.3125,\ 0.375,\ 0.1875,\ 0.125)$.
+Compute $H(p, m)$ and $H(q, m)$ in bits, and state each speaker's overhead
+against their own entropy of $1.75$. Before opening the solution, predict
+which of the two pays more.
+
+<Solution>
+The shared code's lengths are the surprisals under $m$:
+$-\log_2 0.3125 = 1.678$, $-\log_2 0.375 = 1.415$,
+$-\log_2 0.1875 = 2.415$, $-\log_2 0.125 = 3$.
+
+$$
+H(p, m) = \tfrac12(1.678) + \tfrac14(1.415) + \tfrac18(2.415) + \tfrac18(3)
+= 1.870 \text{ bits,}
+$$
+
+$$
+H(q, m) = \tfrac18(1.678) + \tfrac12(1.415) + \tfrac14(2.415) + \tfrac18(3)
+= 1.896 \text{ bits.}
+$$
+
+Overheads: $0.120$ bits for Bob, $0.146$ for Alice. Both are far below the
+$0.625$ and $0.500$ they paid under each other's codes, and the order between
+them has reversed. Bob's mass is concentrated on one word, so he loses on that
+word ($0.5 \times 0.678$ bits) and is refunded on the two words where $m$ is
+more generous than he needs; Alice's mass sits on two words, both of which $m$
+dilutes, and she is refunded only on the word she almost never says.
+
+The transferable move: a code (or model) fitted to a mixture serves every
+component of the mixture at a bounded cost, whereas a code fitted to one
+component can be arbitrarily bad on another. This is the accounting behind
+using one model for several sources at once.
+</Solution>
+</Exercise>
+
+## The decomposition: a floor the model cannot move
+
+Every mismatched pair in the grid cost strictly more than the entropy, and the
+excess was exactly the divergence computed in the previous lesson. That
+accounting is general, and it is this lesson's headline identity.
+
+<Theorem title="cross-entropy decomposition (Cover &amp; Thomas 5.4.3)">
 For probability distributions $p$ and $q$ on a finite set,
 
 $$
@@ -117,208 +208,244 @@ H(p, q) = H(p) + D(p \,\|\, q).
 $$
 
 <Proof>
-Split the logarithm inside the definition:
-$\log_2 \tfrac{1}{q(x)} = \log_2 \tfrac{1}{p(x)} + \log_2
-\tfrac{p(x)}{q(x)}$ for every $x$ with $p(x) > 0$. Multiplying by $p(x)$ and
-summing,
+Direct, by splitting one logarithm. For every $x$ with $p(x) > 0$,
+
+$$
+\log_2 \frac{1}{q(x)} = \log_2 \frac{1}{p(x)} + \log_2 \frac{p(x)}{q(x)} .
+$$
+
+Multiply by $p(x)$ and sum over $x$:
 
 $$
 -\sum_x p(x) \log_2 q(x)
 = \underbrace{-\sum_x p(x) \log_2 p(x)}_{H(p)}
-+ \underbrace{\sum_x p(x) \log_2 \frac{p(x)}{q(x)}}_{D(p \,\|\, q)},
++ \underbrace{\sum_x p(x) \log_2 \frac{p(x)}{q(x)}}_{D(p \,\|\, q)} .
 $$
 
-with the conventions of <Ref lesson="kl-divergence"/> covering $p(x) = 0$
-terms (they contribute $0$ to every sum) and $q(x) = 0$ terms (both sides
-are $+\infty$).
+The conventions of <Ref lesson="kl-divergence"/> cover the edges: terms with
+$p(x) = 0$ contribute $0$ to all three sums, and a $q(x) = 0$ with
+$p(x) > 0$ makes both sides $+\infty$.
 </Proof>
 </Theorem>
 
-{/* fig CrossEntropyStack: the centerpiece — the identity dissected in
-   place (playbook rule 7). Top: the equation $H(p,q) = H(p) + D(p\,\|\,q)$
-   in large KaTeX, with three short labels above, each with a thin arrow
-   onto its exact term: "average log-loss / coding cost" onto $H(p,q)$;
-   "data's entropy — irreducible floor" onto $H(p)$ (label and symbol in
-   blue); "model's excess — $\ge 0$, zero iff $q = p$" onto $D(p\,\|\,q)$
-   (label and symbol in amber). Below: one horizontal stacked bar on a
-   bits-axis 0 to 2.1, grounding the identity in the running example: blue
-   segment 0 to 1.743 labeled "$H(p) = 1.743$", amber segment 1.743 to
-   2.000 labeled "$D = 0.257$", a bracket over the whole bar labeled
-   "$H(p,q) = 2.000$ bits (uniform model on $p = (.5,.25,.15,.1)$)".
-   Payoff line under the bar: "training can shrink only the amber part".
-   Colors: blue = the floor/data, amber = the excess/model, currentColor
-   text and axis. One idea: the loss splits into a floor the model cannot
-   touch plus a mismatch the model can remove. */}
+{/* fig CrossEntropyStack: the identity dissected in place (playbook rule 7).
+   Top: the equation $H(p,q) = H(p) + D(p\,\|\,q)$ in large KaTeX, with three
+   short labels above, each with a thin arrow onto its exact term: "average
+   log-loss = coding cost" onto $H(p,q)$; "the data's entropy — irreducible
+   floor" onto $H(p)$ (label and symbol in blue); "the model's excess —
+   $\ge 0$, zero iff $q = p$" onto $D(p\,\|\,q)$ (label and symbol in amber).
+   Below: one horizontal stacked bar on a bits-axis 0 to 2.1, grounding the
+   identity in the running example: blue segment 0 to 1.743 labeled
+   "$H(p) = 1.743$", amber segment 1.743 to 2.000 labeled "$D = 0.257$", a
+   bracket over the whole bar labeled "$H(p,q) = 2.000$ bits (uniform model
+   on $p = (.5,.25,.15,.1)$)". Payoff line under the bar: "training can shrink
+   only the amber part". Colors: blue = the floor/data, amber = the
+   excess/model, currentColor text and axis. One idea: the loss splits into a
+   floor the model cannot touch plus a mismatch the model can remove. */}
 <Figure
   name="CrossEntropyStack"
   alt="The identity cross-entropy equals entropy plus KL divergence with labels arrowed onto each term, above a stacked bar splitting the uniform model's 2.000 bits into the 1.743-bit entropy floor plus 0.257 bits of divergence"
-  caption="The decomposition dissected: cross-entropy = entropy floor + divergence. Only the divergence term depends on the model."
+  caption="The decomposition dissected: cross-entropy = entropy floor + divergence. Only the second term depends on the model."
 />
 
 ### The minimizer: training targets the divergence
 
 The two terms have different owners. $H(p)$ is a property of the data
-distribution alone; no choice of $q$ moves it. $D(p\,\|\,q)$ is the model's
-mismatch, and Gibbs' inequality (<Ref lesson="kl-divergence"/>) states
-$D(p\,\|\,q) \ge 0$ with equality if and only if $q = p$. Therefore
+distribution alone, and no choice of $q$ moves it. $D(p\,\|\,q)$ is the
+model's mismatch, and Gibbs' inequality (<Ref lesson="kl-divergence"/>, proved
+there from the concavity of the logarithm) gives $D(p\,\|\,q) \ge 0$ with
+equality if and only if $q = p$. Therefore
 
 $$
-\argmin_q H(p, q) = \argmin_q D(p \,\|\, q) = p :
+\arg\min_q H(p, q) = \arg\min_q D(p \,\|\, q) = p .
 $$
 
-minimizing cross-entropy over models and minimizing model–data divergence
-are the **same optimization**, and its unique solution is the data
-distribution itself. A model trained to convergence on cross-entropy loss is
-being pushed, in bits, toward $q = p$.
+Minimizing the loss and minimizing model–data divergence are the same
+optimization, and its unique solution is the data distribution itself. The
+statement is stronger than a shared minimizer: the two objectives differ by a
+constant, so for a model $q_\theta$ with parameters $\theta$,
 
-<KeyFact>
-$H(p)$ does not depend on the model, so minimizing cross-entropy minimizes
-$D(p\,\|\,q)$, and the unique minimizer is $q = p$: cross-entropy training
-is divergence minimization under another name.
-</KeyFact>
+$$
+\nabla_\theta H(p, q_\theta) = \nabla_\theta D(p \,\|\, q_\theta)
+$$
 
-{/* fig TrainingShrinksKl, FigureSequence, 4 frames — training drives q
-   toward p. Shared layout, one delta per frame. Left: bar chart over
-   symbols A, B, C, D; solid blue bars are the fixed truth
-   p = (.5, .25, .15, .1) (label "truth $p$", values printed once); amber
-   outlined bars overlay the current model q (label "model $q$"). Right: one
-   vertical stacked cost bar on a bits-axis 0 to 2.1: blue segment always
-   exactly 1.743 labeled "$H(p)$" (pixel-identical in all frames), amber
-   segment on top = current $D(p\,\|\,q)$, with a numeric readout
-   "$H(p,q) = \dots$" above the bar. Frames: (1) q uniform
-   (.25,.25,.25,.25): amber D = 0.257, readout 2.000 bits, header "step 0:
-   uniform model"; (2) q = (.35,.25,.20,.20): D = 0.095, readout 1.838,
-   header "step 1"; (3) q = (.45,.25,.17,.13): D = 0.011, readout 1.753,
-   header "step 2"; (4) q = p = (.5,.25,.15,.1): amber segment gone, D = 0,
-   readout 1.743, header "converged: $q = p$", annotation at the bar top
-   "floor reached — Gibbs' equality case". Only the amber q-bars and the
-   amber segment change between frames; blue stays fixed. Colors: blue =
-   truth/floor, amber = model/excess. One idea: gradient steps shrink only
-   the divergence, down to the fixed entropy floor. */}
+at every $\theta$, not merely at the optimum. Every gradient step a trainer
+takes on the loss is, step for step, a gradient step on the divergence.
+
 <FigureSequence
-  name="TrainingShrinksKl"
-  alt="Four frames of a model distribution stepping toward the fixed truth while the stacked loss bar's divergence segment shrinks from 0.257 bits to zero above the constant 1.743-bit entropy floor"
+  name="training-descent"
+  alt="Three frames of a model distribution stepping toward the fixed truth while the stacked loss bar's divergence segment shrinks from 0.257 bits to zero above a constant 1.743-bit entropy floor"
   caption="Training drives q toward p: each step shrinks D(p‖q) while the entropy floor H(p) stays fixed. At q = p the loss equals the entropy."
 />
 
 <Task>
-Step through the four frames and check one number per frame: subtract the
-fixed floor $1.743$ from the $H(p,q)$ readout and confirm the amber segment
-is exactly the difference — $0.257$, $0.095$, $0.011$, then $0$. The floor
-never moves; only the model's excess shrinks.
+Step through the three frames and check one subtraction per frame: the
+$H(p,q)$ readout minus the fixed floor $1.743$ must equal the amber segment:
+$0.257$, then $0.095$, then $0$. Then check the left panel for the reason
+frame 2 still owes $0.095$ bits: the amber outline is short on symbol $A$,
+which the source emits half the time.
 </Task>
 
-### The floor is not zero: reading a loss value
+<KeyFact>
+$H(p)$ is not observable from a training log. A loss of $0.9$ bits is
+consistent with a perfect model on noisy labels and with a bad model on clean
+ones, so an absolute loss value carries no information about model quality:
+only differences between models scored on the same data with the same labels
+do. The quantity that would answer the question, $D(p\,\|\,q)$, is exactly the
+one that requires knowing $p$.
+</KeyFact>
 
-A common misreading: "the loss is $0.9$, so the model is still wrong."
-Whether $0.9$ is bad depends entirely on $H(p)$, and $H(p) > 0$ whenever the
-labels carry genuine randomness.
+## ★ Why the logarithm and not some other penalty
 
-Concrete case: a binary task where annotators genuinely disagree, with
-soft label $p = (0.7, 0.3)$ on some input. The hedging model
-$q = (\tfrac12, \tfrac12)$ pays $H(p,q) = 1.000$ bit. The **perfect** model
-$q = p$ still pays $H(p) = 0.7 \log_2 \tfrac{1}{0.7} + 0.3 \log_2
-\tfrac{1}{0.3} \approx 0.881$ bits. Only $0.119$ of the hedger's bill was
-its own fault; the remaining $0.881$ bits are the label noise, and no model
-recovers them. A loss above zero is not evidence of a bad model — the
-model's true score is the distance above the floor, $D(p\,\|\,q)$, not the
-loss itself.
+The identity says what minimizing $-\log q(\text{truth})$ achieves. It does
+not say why that penalty rather than another; this section answers that and is
+not used later.
 
-<Aside>
-Sometimes the floor is raised on purpose. *Label smoothing* (Szegedy et al.,
-["Rethinking the Inception Architecture"](https://arxiv.org/abs/1512.00567),
-2016) replaces the one-hot target $(1, 0, \ldots, 0)$ with the softened
-$(1-\varepsilon, \tfrac{\varepsilon}{k-1}, \ldots)$, deliberately making
-$H(p) > 0$. The decomposition explains both effects at once: the achievable
-loss floor rises from $0$ to $H(p_{\text{smooth}})$, and the minimizer moves
-from the point mass to the smoothed target, so the model is no longer pushed
-toward infinite logits on the true class. The identity, not the training
-loop, is what changed.
-</Aside>
+### Honesty: the log score is strictly proper
 
-## One-hot labels: cross-entropy is the negative log-likelihood
+<Definition title="proper scoring rule">
+A *scoring rule* charges a forecaster $S(r, x)$ when they report the
+distribution $r$ and the outcome $x$ occurs. The rule is **proper** if every
+forecaster whose actual belief is $p$ minimizes their expected charge
+$\mathbb{E}_{x \sim p}[S(r,x)]$ by reporting $r = p$, and **strictly proper**
+if $r = p$ is the only report attaining that minimum.
+</Definition>
 
-Classification datasets rarely ship soft labels. The recorded target is a
-single class $c$, encoded as the point mass $p = (0, \ldots, 1, \ldots, 0)$
-with the $1$ at position $c$. The general sum then collapses: every term with
-$p(x) = 0$ vanishes, leaving
+<Theorem title="the log score is strictly proper">
+The rule $S(r, x) = -\log_2 r(x)$ is strictly proper on any finite outcome
+set.
+
+<Proof>
+The expected charge is the cross-entropy, which the decomposition splits:
 
 $$
-H(p, q) = -\log_2 q(c),
+\mathbb{E}_{x \sim p}\bigl[-\log_2 r(x)\bigr] = H(p, r) = H(p) + D(p\,\|\,r)
+\;\ge\; H(p) .
 $$
 
-the plain log-loss of the first section. The decomposition sharpens
-accordingly: a point mass is the certain distribution, so $H(p) = 0$
-(<Ref lesson="entropy-as-average-surprise"/>), and
+The first term does not depend on the report, so the charge is minimized
+exactly when $D(p\,\|\,r) = 0$, which by Gibbs' inequality
+(<Ref lesson="kl-divergence"/>) happens only at $r = p$.
+</Proof>
+</Theorem>
+
+A model rewarded this way has no strategy available except honesty: hedging
+away from its own belief always costs it bits.
+
+### Locality: the bill reads one coordinate
+
+Properness alone does not single out the logarithm. The Brier score
+$S(r,x) = \sum_y \bigl(r(y) - \mathbf{1}[y = x]\bigr)^2$ is also strictly
+proper. What separates them is **locality**: the log score depends only on
+$r(x)$, the probability assigned to the outcome that happened, while the Brier
+score also charges for how the remaining mass was distributed among outcomes
+that did not happen.
+
+<Example title="two reports the log score cannot tell apart">
+Three classes $\{\text{cat}, \text{dog}, \text{fox}\}$, truth = cat.
+Prediction A is $(0.70,\ 0.20,\ 0.10)$ and prediction B is
+$(0.70,\ 0.05,\ 0.25)$.
+
+Log score, both: $-\log_2 0.70 = 0.515$ bits.
+
+Brier score, A: $(0.70-1)^2 + 0.20^2 + 0.10^2 = 0.09 + 0.04 + 0.01 = 0.140$.
+
+Brier score, B: $0.09 + 0.0025 + 0.0625 = 0.155$.
+
+The two reports differ only in outcomes that did not occur, and only the
+non-local rule charges for the difference.
+</Example>
+
+<Figure
+  src="./figures/locality.svg"
+  alt="Two three-bar predictions sharing an identical 0.70 bar on the true class cat and differing on dog and fox, with the same log score of 0.515 bits under each and Brier scores of 0.140 and 0.155"
+  caption="Locality: the log score reads only the true class's bar, so A and B cost the same; the Brier score charges 0.140 against 0.155."
+/>
+
+For sample spaces with at least three outcomes, the only smooth local proper
+scoring rules are $a \log r(x) + b(x)$ with $a > 0$, affine relabelings of the
+log score
+([Bernardo 1979](https://projecteuclid.org/journals/annals-of-statistics/volume-7/issue-3/Expected-Information-as-Expected-Utility/10.1214/aos/1176344689.full)).
+
+So the first section's observation that the loss bills exactly one coordinate
+of $q$ was not a quirk of the definition. Demanding a penalty that is honest
+and that looks only at what actually happened forces the logarithm, in the
+same way that demanding additivity over independent events forced it in
+<Ref lesson="what-is-surprise"/>. A locality-violating alternative such as the
+Brier score is a legitimate loss with different behaviour: it is bounded, so
+it cannot produce the blowup of the section after next, and it therefore
+tolerates a confidently wrong prediction that the log score treats as a
+catastrophe.
+
+## One-hot labels: three names for one number
+
+Classification datasets rarely ship a distribution over labels. The recorded
+target is a single class $c$, which as a distribution is the point mass
+$p = (0, \ldots, 1, \ldots, 0)$ with the $1$ in position $c$. Every term of
+the general sum with $p(x) = 0$ vanishes, leaving
 
 $$
-H(p, q) = D(p \,\|\, q) :
+H(p, q) = -\log_2 q(c) ,
 $$
 
-for hard labels the cross-entropy **is** the divergence. There is no floor,
-the minimum loss is $0$, and it is reached only at $q(c) = 1$.
+the log-loss of the first section. The decomposition sharpens too: a point
+mass is the certain distribution, so $H(p) = 0$
+(<Ref lesson="entropy-as-average-surprise"/>, where entropy was shown to
+vanish exactly at certainty), and therefore
 
-{/* fig OneHotCollapse: two near-identical panels side by side (playbook
-   rule 8), soft target vs one-hot target. Left panel header "soft label":
-   blue bars p = (0.7, 0.3) over two classes; below, a horizontal stacked
-   cost bar: blue segment "$H(p) = 0.881$" plus amber segment
-   "$D(p\,\|\,q)$"; gloss line "floor $> 0$: perfect model still pays
-   0.881 bits". Right panel header "one-hot label": blue bars p = (1, 0) —
-   a single full-height bar at class 1, an empty slot at class 2; below,
-   the same cost-bar layout but the blue segment has collapsed to zero
-   width (its vanishing is the highlighted delta, marked "$H(p) = 0$"),
-   the entire bar amber, labeled "$H(p,q) = D(p\,\|\,q) = -\log_2
-   q(\text{true})$"; gloss line "no floor: loss is pure divergence".
-   Between panels a bold arrow labeled "harden the label". Colors: blue =
-   truth/floor, amber = model's excess; the disappearing blue segment is
-   the single changed piece. One idea: one-hot labels erase the entropy
-   floor, so cross-entropy equals KL equals negative log-likelihood. */}
+$$
+H(p, q) = D(p \,\|\, q) = -\log_2 q(c) .
+$$
+
+For hard labels the cross-entropy **is** the divergence: no floor, minimum
+loss $0$, attained only at $q(c) = 1$. One number carries three names:
+cross-entropy loss, KL divergence from the label, negative log-likelihood.
+
 <Figure
   name="OneHotCollapse"
   alt="Two panels comparing a soft label, whose loss bar contains a nonzero entropy floor plus divergence, with a one-hot label, whose floor collapses to zero leaving the loss equal to the divergence, minus log base two of the true class probability"
   caption="Hardening the label to one-hot sets H(p) = 0: the loss loses its floor and equals D(p‖q) = −log₂ q(true class)."
 />
 
-### Over a dataset: minimizing the loss is maximizing likelihood
+### Over a dataset: the loss is the likelihood in another unit
 
-Training averages the per-example loss over a dataset $x_1, \ldots, x_N$:
+Training averages the per-example loss over examples $x_1, \ldots, x_N$.
+Grouping identical values turns that average into a cross-entropy against the
+*empirical distribution* $\hat{p}(x) = \tfrac{1}{N}\#\{i : x_i = x\}$, the
+fraction of the dataset equal to $x$:
 
 $$
 \mathcal{L} = \frac{1}{N} \sum_{i=1}^{N} \bigl(-\log_2 q(x_i)\bigr)
-= \sum_{x} \hat{p}(x) \bigl(-\log_2 q(x)\bigr) = H(\hat{p}, q),
+= \sum_{x} \hat{p}(x) \bigl(-\log_2 q(x)\bigr) = H(\hat{p}, q) .
 $$
 
-where $\hat{p}(x)$ is the empirical distribution, the fraction of the
-dataset equal to $x$. The training objective is literally a cross-entropy,
-with the empirical distribution in the data slot. The same sum is
-$-\tfrac{1}{N}\log_2 \prod_i q(x_i)$: minimizing the average log-loss is
-**maximizing the likelihood** $\prod_i q(x_i)$ of the dataset. Cross-entropy
-minimization, KL minimization, and maximum-likelihood estimation are one
-procedure in three vocabularies.
+The same sum is $-\tfrac{1}{N}\log_2 \prod_i q(x_i)$, so minimizing the
+average log-loss is maximizing the likelihood $\prod_i q(x_i)$ of the dataset.
+Cross-entropy minimization, KL minimization and maximum-likelihood estimation
+are one procedure in three vocabularies; exercise 5 does the derivation and
+identifies the independence assumption that licenses the product.
 
-<Remark title="nats and the softmax gradient">
-Two implementation facts. Libraries compute the loss with natural
-logarithms, so reported values are in nats: multiply by
-$1/\ln 2 \approx 1.443$ to get bits, the same unit change as in
-<Ref lesson="what-is-surprise"/>. And when $q$ is produced by a softmax
-layer with logits $z$, the gradient of the (natural-log) loss on a one-hot
-target $p$ is $\partial \mathcal{L} / \partial z_j = q_j - p_j$ — prediction
-minus target, derived in Bishop, *Pattern Recognition and Machine Learning*,
-§4.3.4. The clean form is one reason softmax and cross-entropy are paired.
-</Remark>
+The empirical distribution in the first slot is not a technicality. The
+theorem's minimizer is whatever sits in that slot, and on finite data that is
+$\hat{p}$ rather than $p$: a model with enough capacity minimizes the training
+loss by reproducing the empirical distribution exactly, which for one-hot
+labels means driving the training loss to $0$ while its divergence from the
+real $p$ stays large. That gap is what regularization, early stopping and the
+description-length penalty of <Ref lesson="minimum-description-length"/>
+address, and none of it is visible inside the identity.
 
 <KeyFact>
-For one-hot labels, $H(p) = 0$ and the cross-entropy equals both
-$D(p\,\|\,q)$ and the negative log-likelihood $-\log_2 q(\text{true
-class})$: the three standard descriptions of the classification loss are
-the same number.
+The identity is exact for whatever distribution is written in the data slot.
+Put the truth there and the minimizer is the truth; put a finite sample there
+and the minimizer is the sample. Overfitting is not a failure of the loss: it
+is the loss working correctly on the wrong first argument.
 </KeyFact>
 
-## Confident and wrong: the blowup
+## Confident and wrong: the price, and the gradient it produces
 
-The log in the loss is gentle near $q(\text{true}) = 1$ and violent near
-$0$. The same table that priced rare events in
-<Ref lesson="what-is-surprise"/> now prices predictions.
+The logarithm is gentle near $q(\text{true}) = 1$ and violent near $0$. The
+table that priced rare events in <Ref lesson="what-is-surprise"/> now prices
+predictions.
 
 <Example title="the price of confidence">
 Per-example loss $-\log_2 q(\text{true})$ as the model's probability on the
@@ -330,240 +457,546 @@ truth falls:
 | $0.5$            | $1$         |
 | $0.1$            | $3.32$      |
 | $0.01$           | $6.64$      |
-| $10^{-6}$        | $19.9$      |
+| $10^{-6}$        | $19.93$     |
 
-The scale is logarithmic in both directions. Being right confidently is
-cheap: $131$ predictions at $q(\text{true}) = 0.9$ cost about as much as
-**one** prediction at $q(\text{true}) = 10^{-6}$
-($131 \times 0.152 \approx 19.9$). A model that is nearly always confidently
-right and once confidently wrong can lose, on average, to a model that
-merely hedges — exercise 5 runs the numbers.
+Each factor of ten costs $\log_2 10 = 3.32$ bits, whatever the starting
+point. One consequence is arithmetical: $131$ predictions at
+$q(\text{true}) = 0.9$ cost about as much in total as a **single** prediction
+at $q(\text{true}) = 10^{-6}$, since $131 \times 0.152 \approx 19.9$.
+
+Two models on ten test examples with one-hot labels make the effect concrete.
+Model A assigns $0.9$ to the true class on nine examples and $10^{-6}$ on the
+tenth: average loss $(9 \times 0.152 + 19.93)/10 \approx 2.13$ bits. Model B
+assigns $0.6$ to the true class on all ten: average loss
+$-\log_2 0.6 \approx 0.737$ bits. Model B wins by a factor of nearly three
+while being far less often confidently correct.
 </Example>
 
-{/* fig ConfidentWrongBlowup: the −log₂ q curve as a loss. Axes: x =
-   $q(\text{true})$ from 0 to 1, y = loss in bits from 0 to ~10. The curve
-   y = −log₂ x in amber. Amber dots on the curve at q = 0.9, 0.5, 0.1,
-   0.01, 0.001 with the losses 0.15, 1, 3.3, 6.6, 10 printed beside the
-   lower dots. Near x → 1 an annotation in currentColor: "confident and
-   right: loss → 0". Near x → 0 the curve runs off the top of the frame
-   with a warning-treatment annotation (warning color per playbook rule
-   10): "confident and wrong: large surprisal = large loss, unbounded";
-   dashed vertical asymptote guide at x = 0 labeled
-   "$q(\text{true}) = 0 \Rightarrow$ loss $= \infty$". Colors: amber = the
-   loss curve and its dots, warning color only on the blowup annotation
-   and asymptote label. One idea: the log punishes overconfidence without
-   bound — same curve, same reason, as a rare event's surprisal. */}
 <Figure
-  name="ConfidentWrongBlowup"
-  alt="The loss curve minus log base two of the model's probability on the truth, near zero on the right where the model is confident and right and diverging to infinity as that probability approaches zero"
-  caption="The loss −log₂ q(true): flat where the model is confidently right, unbounded where it is confidently wrong. At q(true) = 0 the loss is infinite."
+  src="./figures/blowup.svg"
+  alt="The loss minus log base two of the model's probability on the truth, plotted against that probability on a logarithmic axis, giving a straight line from zero bits at probability one to about twenty bits at one in a million"
+  caption="On a log axis the loss is a straight line: every tenfold drop in the probability assigned to the truth adds 3.32 bits, without limit."
 />
 
 <Task>
-Read one point off the curve: find where the loss crosses $10$ bits and
-verify it sits at $q(\text{true}) = 2^{-10} \approx 0.001$. Each further
-halving of the model's probability on the truth adds exactly one bit of
-loss.
+Find the point on the line where the loss crosses $10$ bits, and check that it
+sits at $q(\text{true}) = 2^{-10} \approx 0.001$. Then verify the slope from
+two marked points rather than from the annotation: from $0.01$ at $6.64$ bits
+to $10^{-6}$ at $19.93$ bits is four decades and $13.3$ bits.
 </Task>
 
-The endpoint $q(\text{true}) = 0$ is the missing-outcome disaster of
-<Ref lesson="kl-divergence"/> arriving in training: a model that assigns an
-occurring outcome probability zero takes an infinite loss on that single
-example, and no accuracy elsewhere compensates. This is why a softmax never
-emits an exact zero and why count-based language models are smoothed — the
-support condition of the previous lesson, enforced by the loss itself on
-every gradient step.
+### The gradient: unbounded loss, bounded step
+
+An unbounded loss suggests an unbounded gradient, and a training run in which
+one catastrophic example destroys the parameters. That is not what happens,
+and the reason is where the loss meets the output layer.
+
+<Example title="the gradient of a logistic neuron (MacKay 39.3)">
+A binary classifier outputs $y = \sigma(a) = 1/(1 + e^{-a})$ from a scalar
+logit $a$, and the target is $t \in \{0, 1\}$. In nats, the loss is
+
+$$
+\mathcal{L} = -\bigl[\,t \ln y + (1-t) \ln (1 - y)\,\bigr] .
+$$
+
+Differentiate in two pieces. The logistic derivative is
+$\mathrm{d}y/\mathrm{d}a = y(1-y)$, and
+
+$$
+\frac{\partial \mathcal{L}}{\partial y}
+= -\frac{t}{y} + \frac{1-t}{1-y}
+= \frac{y - t}{y(1-y)} .
+$$
+
+The product cancels exactly:
+
+$$
+\frac{\partial \mathcal{L}}{\partial a}
+= \frac{y - t}{y(1-y)} \cdot y(1-y) = y - t .
+$$
+
+Numbers. A confidently wrong prediction, $y = 0.999$ with $t = 0$, costs
+$-\log_2 0.001 = 9.97$ bits and produces a gradient of $0.999$. A
+well-fitted example, $y = 0.9$ with $t = 1$, costs $0.152$ bits and produces
+$-0.1$. The loss ratio is about $65$; the gradient ratio is about $10$, and no
+output can push the logit gradient past $1$.
+</Example>
+
+The same computation with a softmax over $k$ classes gives
+$\partial \mathcal{L} / \partial z_j = q_j - p_j$, prediction minus target,
+per logit (exercise 4). Two facts follow, and they pull in opposite
+directions. The loss on one example is unbounded, so a single confidently
+wrong prediction dominates the reported value of a batch's loss. The gradient on one
+example is bounded by $1$ per logit, so that same prediction contributes at
+most about ten times the pull of a mildly wrong one. Confident errors dominate
+the reported number far more than they dominate the update.
+
+The cancellation is what makes the pairing work. The derivative of the loss
+with respect to the probability, $\partial \mathcal{L}/\partial q = -1/q$,
+does blow up as $q \to 0$; the softmax Jacobian contributes precisely the
+factor that removes it. Replace the log-loss with squared error on the same
+sigmoid output and the cancellation fails: the gradient picks up a factor
+$y(1-y)$, which vanishes for exactly the confidently wrong predictions that
+most need correcting.
+
+{/* fig LossVsGradient: one plot, two curves against a shared x-axis
+   $q(\text{true})$ from 0 to 1, showing that the loss is unbounded while the
+   step is not. Left y-axis "loss (bits)" 0 to 10, amber curve
+   $-\log_2 q$ rising to the top-left corner and running off frame, labeled
+   "loss: unbounded". Right y-axis "|gradient| per logit" 0 to 1, blue curve
+   $1 - q$ (a straight line from (0,1) to (1,0)), labeled
+   "$|\partial \mathcal{L}/\partial z_{\text{true}}| = 1 - q$: capped at 1".
+   Two vertical dashed guides at $q = 0.9$ and $q = 0.001$ with a small table
+   between them, in currentColor: at 0.9, "0.15 bits / 0.10"; at 0.001,
+   "9.97 bits / 0.999"; the pair of readouts is the point (65x the loss, 10x
+   the step). Beneath, one gloss line: "the softmax Jacobian cancels the
+   $1/q$; squared error does not". Colors: amber = loss, blue = gradient,
+   currentColor axes and readouts. One idea: the penalty is unbounded, the
+   update is not. */}
+<Figure
+  name="LossVsGradient"
+  alt="Two curves against the model's probability on the true class: the loss rising without limit as that probability falls, and the per-logit gradient magnitude rising only to one"
+  caption="Unbounded loss, bounded step: as q(true) falls the bill grows without limit while the logit gradient approaches 1 and stops."
+/>
+
+<Exercise>
+Same setup as the worked example: a logistic neuron with logit $a$ and target
+$t$. The model outputs $y = 0.02$ on an example whose target is $t = 1$.
+Compute this example's loss in bits and its gradient. Then take a batch of
+mildly wrong examples, each with $y = 0.9$ and $t = 1$, and count how many are
+needed to match this one example's contribution to the batch's summed gradient
+and how many to match its contribution to the batch's summed loss. Write down
+which of the two counts you expect to be larger before opening the solution.
+
+<Solution>
+This example: loss $-\log_2 0.02 = \log_2 50 = 5.64$ bits, gradient
+$y - t = -0.98$.
+
+One mild example: loss $-\log_2 0.9 = 0.152$ bits, gradient $0.9 - 1 = -0.1$.
+
+Counts. Gradient: $0.98 / 0.10 \approx 10$ mild examples. Loss:
+$5.64 / 0.152 \approx 37$ mild examples. The loss count is the larger, and it
+is larger by the same mechanism as in the worked example: the logarithm
+appears in the loss and cancels out of the gradient.
+
+The transferable move: a batch's loss and a batch's update are dominated by
+different examples, so "which examples dominate training" and "which examples
+dominate the loss curve" are two questions with two answers.
+</Solution>
+</Exercise>
+
+### The endpoint: an exact zero costs everything
+
+At $q(\text{true}) = 0$ the loss is $+\infty$. That is the missing-outcome
+failure of <Ref lesson="kl-divergence"/>, a model whose support fails to cover
+the data's, arriving inside a training loop. One example on which the model
+assigned probability zero to what happened makes the average loss infinite,
+and no accuracy elsewhere compensates.
+
+Two mechanisms keep it from happening. A softmax cannot emit an exact zero in
+exact arithmetic, since $e^{z}$ is positive for every finite logit; it can
+underflow to zero in float32 below about $10^{-38}$, which is why the loss is
+computed as $\log q = z_c - \log \sum_j e^{z_j}$ rather than by taking the
+logarithm of a computed probability. That is the log-domain discipline of
+<Ref lesson="what-is-surprise"/> in its numerical form: surprisals stay
+representable where probabilities do not. Count-based models have no such
+guarantee: an $n$-gram table assigns zero to every unseen symbol, so it must
+be smoothed explicitly, as the previous lesson's mixing bound quantified.
 
 <KeyFact>
-The loss on one example is unbounded as $q(\text{true}) \to 0$:
-overconfidence on a wrong prediction is punished by the same logarithm that
-makes rare events highly surprising, and an exact zero on a real outcome
-costs $\infty$.
+Support coverage is a condition on the model, not a tuning parameter: the loss
+is finite only if $q(x) > 0$ at every outcome the data can produce. The same
+condition returns as a hard requirement in
+<Ref lesson="compression-is-prediction"/>, where the coder must reserve a
+nonzero interval for every symbol it might have to write, which is why the
+compressor built there smooths its counts before coding a single bit.
 </KeyFact>
+
+## Reading a loss number: floors, label schemes and units
+
+The identity makes the loss interpretable, and it also limits what may be
+compared. Two loss values are comparable when they are computed on the same
+data, against the same labels, in the same unit; published numbers routinely
+differ in the second and third of those, and the decomposition says exactly
+what changes.
+
+### The floor is the label noise
+
+Labels are not always certain. Where annotators genuinely disagree, the target
+on an input is a distribution: with $p = (0.7, 0.3)$ on a binary task, the
+best possible model $q = p$ still pays
+
+$$
+H(p) = 0.7 \log_2 \tfrac{1}{0.7} + 0.3 \log_2 \tfrac{1}{0.3} \approx 0.881
+\text{ bits,}
+$$
+
+and a hedging model $q = (\tfrac12, \tfrac12)$ pays $1.000$ bit, of which only
+$0.119$ is its own fault. A loss that stops falling at $0.9$ bits on this task
+is a model that has finished learning, not one that has stalled.
+
+The floor also moves on purpose. *Label smoothing*
+([Szegedy et al. 2016](https://arxiv.org/abs/1512.00567), §7) replaces the
+one-hot target with $(1-\varepsilon)$ on the true class and the remaining
+$\varepsilon$ spread over the others; *distillation* replaces it with a
+teacher model's output distribution. Both give the target a positive entropy,
+and the reported loss inherits it.
+
+<Example title="the same prediction, scored two ways">
+A three-class model predicts $q = (0.70,\ 0.20,\ 0.10)$ and class 1 is
+correct. Score it against a one-hot label and against a smoothed label with
+$\varepsilon = 0.1$, that is $p = (0.90,\ 0.05,\ 0.05)$.
+
+**One-hot.** $H(p) = 0$ and the loss is $-\log_2 0.70 = 0.515$ bits, all of it
+divergence.
+
+**Smoothed.** The floor is
+
+$$
+H(p) = 0.9 \log_2 \tfrac{1}{0.9} + 2 \times 0.05 \log_2 \tfrac{1}{0.05}
+= 0.137 + 0.432 = 0.569 \text{ bits,}
+$$
+
+and the loss is
+
+$$
+H(p,q) = 0.9(0.515) + 0.05(2.322) + 0.05(3.322) = 0.745 \text{ bits.}
+$$
+
+The divergence is the difference, $0.745 - 0.569 = 0.176$ bits, which is also
+what the direct sum gives:
+
+$$
+D(p\,\|\,q) = 0.9\log_2\tfrac{0.9}{0.7} + 0.05\log_2\tfrac{0.05}{0.2}
++ 0.05\log_2\tfrac{0.05}{0.1} = 0.326 - 0.100 - 0.050 = 0.176 .
+$$
+
+The prediction never changed. The reported loss rose by $45\%$ and the
+model's own mismatch fell by $66\%$.
+</Example>
+
+<Figure
+  src="./figures/soft-label-floor.svg"
+  alt="Two horizontal cost bars for one unchanged prediction: against a hard label the whole 0.515-bit bill is divergence, and against a smoothed label a 0.569-bit floor is followed by only 0.176 bits of divergence for a total of 0.745"
+  caption="One prediction, two label schemes: smoothing raises the reported loss to 0.745 bits while cutting the model's own excess to 0.176. The numbers are not comparable."
+/>
+
+At realistic scale the floor is large. Smoothing a $1000$-class problem with
+$\varepsilon = 0.1$ gives the target entropy
+
+$$
+H(p) = 0.9 \log_2 \tfrac{1}{0.9} + 0.1 \log_2 \tfrac{999}{0.1}
+\approx 1.47 \text{ bits} = 1.02 \text{ nats,}
+$$
+
+so a smoothed ImageNet classifier that predicts its target perfectly still
+reports about one nat. A published loss of $1.3$ nats with smoothing and one
+of $0.9$ nats without describe models whose divergences are $0.3$ and $0.9$
+nats: the ordering of the reported numbers is the reverse of the ordering of
+the models.
+
+<KeyFact>
+Smoothing and distillation change the training target, not the model, so two
+such models are compared by scoring both against the same targets, which is
+why validation loss is normally computed on hard labels even when training
+used soft ones. The quantity that would be comparable across schemes,
+$D(p\,\|\,q)$, needs the floor, and the floor is only known when the labels
+were constructed rather than collected.
+</KeyFact>
+
+### Units: nats, bits per token, bits per byte
+
+Frameworks compute the loss with natural logarithms and report **nats**. One
+nat is $1/\ln 2 \approx 1.443$ bits (<Ref lesson="what-is-surprise"/>, where
+the base was shown to be a choice of unit and nothing more), so a language
+model at $2.1$ nats per token is at $3.03$ bits per token.
+
+Bits per token is still not comparable across models, because the token is a
+property of the tokenizer: a model with a larger vocabulary spends more bits
+on each of fewer tokens for the same text. The comparable unit divides by
+something the text has and the model does not choose, its length in characters
+or bytes:
+
+$$
+\text{bits per byte}
+= \frac{\text{bits per token} \times \text{number of tokens}}
+       {\text{number of bytes}} .
+$$
+
+That is the unit in which a model's loss can be set beside a compressor's
+output on the same file, which is what <Ref lesson="compression-is-prediction"/>
+does with an arithmetic coder and what
+<Ref lesson="language-models-as-compressors"/> measures on real corpora.
+Exercise 7 runs the conversion.
+
+What is established: the training loss of a probabilistic classifier is the
+cross-entropy $H(p,q)$, which splits into an entropy floor set by the labels
+and a divergence owned by the model; minimizing it is minimizing that
+divergence, is maximizing likelihood, and on one-hot labels is charging the
+model its own surprisal at the truth. What is not yet built is the coder. The
+identity says a model's loss equals a code length, but not how to obtain the
+bits; <Ref lesson="compression-is-prediction"/> supplies the construction, and
+the file it produces is the loss of this lesson written out.
 
 ## Exercises
 
 <Exercise>
-Let $p = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$ and let $q$ be uniform on
-the four symbols. Compute $H(p, q)$, $H(p)$, and $D(p\,\|\,q)$ term by term,
-and verify the decomposition $H(p,q) = H(p) + D(p\,\|\,q)$.
+A three-class model outputs $q = (0.7,\ 0.2,\ 0.1)$ and the true class is the
+second. Report the loss in bits and in nats, and state which of the two
+numbers a PyTorch or JAX training log would print.
 
 <Solution>
-Cross-entropy: every symbol has $-\log_2 q(x) = \log_2 4 = 2$ bits, so
-$H(p, q) = 2 \sum_x p(x) = 2.000$ bits regardless of $p$.
+Bits: $-\log_2 0.2 = \log_2 5 \approx 2.322$ bits.
 
-Entropy: $H(p) = \tfrac12 \cdot 1 + \tfrac14 \cdot 2 + \tfrac18 \cdot 3 +
-\tfrac18 \cdot 3 = 1.75$ bits.
+Nats: $-\ln 0.2 \approx 1.609$ nats. Check: $2.322 \times \ln 2 = 2.322
+\times 0.693 \approx 1.609$.
 
-Divergence terms:
-$\tfrac12 \log_2 \tfrac{1/2}{1/4} = 0.5$;
-$\tfrac14 \log_2 \tfrac{1/4}{1/4} = 0$;
-$\tfrac18 \log_2 \tfrac{1/8}{1/4} = -0.125$, twice.
-Sum: $D(p\,\|\,q) = 0.5 + 0 - 0.25 = 0.25$ bits.
-
-Verification: $H(p) + D(p\,\|\,q) = 1.75 + 0.25 = 2.000 = H(p,q)$.
+A framework log prints the nats, $1.609$: the standard implementations use
+natural logarithms. Multiply by $1.443$ to read a training curve in bits, and
+therefore in code length.
 </Solution>
 </Exercise>
 
 <Exercise>
-A classifier outputs $q = (0.7, 0.2, 0.1)$ over three classes. Compute the
-log-loss in bits for each possible true class, then convert the three values
-to nats.
+Consider the per-example loss $-\log_2 q(\text{true})$ as $q(\text{true})$
+approaches each end of $[0, 1]$. State both limits. Then consider the standard
+implementation guard, clipping $q(\text{true})$ to $[\varepsilon, 1]$ with
+$\varepsilon = 10^{-7}$: give the largest loss it permits, and state what the
+guard does to the objective being minimized, specifically whether $q = p$ is
+still the unique minimizer of the clipped loss.
 
 <Solution>
-Bits: $-\log_2 0.7 \approx 0.515$; $-\log_2 0.2 \approx 2.322$;
-$-\log_2 0.1 \approx 3.322$.
+**Limits.** As $q(\text{true}) \to 1$ the loss $\to 0$: a certain and correct
+model is free. As $q(\text{true}) \to 0^+$ the loss $\to +\infty$, and at
+exactly $0$ it is $+\infty$, matching the convention of
+<Ref lesson="kl-divergence"/> and the fact that a code for $q$ reserves no
+codeword for an outcome $q$ calls impossible.
 
-Nats (multiply by $\ln 2 \approx 0.693$, or compute $-\ln q$ directly):
-$-\ln 0.7 \approx 0.357$; $-\ln 0.2 \approx 1.609$;
-$-\ln 0.1 \approx 2.303$.
+**With clipping.** The largest permitted loss is
+$-\log_2 10^{-7} = 7 \log_2 10 \approx 23.3$ bits per example, so no single
+example can contribute more than that.
 
-Check on the first value: $0.515 \times 0.693 \approx 0.357$ nats.
+**What it changes.** Below $\varepsilon$ the clipped loss is constant, so its
+derivative there is zero: a model that assigns $10^{-9}$ to an outcome that
+occurs receives no gradient pushing it up, and the failure is invisible to the
+optimizer. Uniqueness of the minimizer goes too. If $p$ has a component below
+$\varepsilon$, then every $q$ that agrees with $p$ above $\varepsilon$ and is
+arbitrary below it achieves the same expected loss, so $q = p$ is still a
+minimizer but no longer the only one. The decomposition's equality case no
+longer applies either, because the clipped loss is not $H(p,q)$. The guard
+buys numerical safety by flattening exactly the region where the log score
+does its distinctive work. Flooring the model instead, as with the mixture
+$q_\lambda = (1-\lambda)q + \lambda u$ bounded in
+<Ref lesson="kl-divergence"/>, leaves the objective itself intact and keeps
+$q_\lambda = p$ the unique optimum whenever $p$ is reachable.
 </Solution>
 </Exercise>
 
 <Exercise>
-A dataset $x_1, \ldots, x_N$ has empirical distribution
-$\hat{p}(x) = \tfrac{1}{N}\,\#\{i : x_i = x\}$. Show that the average
-log-loss $\tfrac{1}{N} \sum_i (-\log_2 q(x_i))$ equals $H(\hat{p}, q)$, and
-conclude that minimizing it over $q$ is equivalent to maximizing the
-likelihood $\prod_i q(x_i)$.
+"Model A has lower average cross-entropy than model B on the same dataset, so
+model A puts the highest probability on the correct class more often." Give a
+two-example binary dataset with one-hot labels on which the two orderings
+disagree, and name the property of the loss that permits it.
 
 <Solution>
-Group the sum by distinct values: each $x$ appears $N \hat{p}(x)$ times, so
+**A counterexample.** Two examples, one-hot labels, binary classes; report
+each model's probability on the true class.
+
+- Model A: $0.51$ and $0.51$. Correct top class on both examples, so accuracy
+  $100\%$. Average loss: $-\log_2 0.51 = 0.971$ bits.
+- Model B: $0.90$ and $0.30$. Correct top class on the first only, so accuracy
+  $50\%$. Average loss: $(0.152 + 1.737)/2 = 0.944$ bits.
+
+Model B has the lower loss and half the accuracy.
+
+**Why it is possible.** Accuracy sees only whether $q(\text{true})$ clears
+$\tfrac12$: a threshold crossing and nothing else. The loss is a
+function of $q(\text{true})$ itself, grows without limit as that probability
+falls, and is averaged. A model can therefore buy a large improvement on one
+example by being very confident and correct there, and pay only a bounded
+penalty for falling just under the threshold elsewhere. The step that fails in the claim is the
+move from "smaller average of a nonlinear function of $q(\text{true})$" to
+"more frequent $q(\text{true}) > \tfrac12$"; nothing connects the two, and
+this is the same one-coordinate reading noted in the first section.
+
+Practical form: loss and accuracy can move in opposite directions during
+training, and a model tuned for one is not tuned for the other.
+</Solution>
+</Exercise>
+
+<Exercise>
+A network produces logits
+$z = (z_1, \ldots, z_k)$, the model is $q_j = e^{z_j} / \sum_i e^{z_i}$, and
+the target is a distribution $p$ over the $k$ classes (one-hot or not). With
+the loss in nats, $\mathcal{L} = -\sum_j p_j \ln q_j$, show that
 
 $$
-\frac{1}{N} \sum_{i=1}^{N} \bigl(-\log_2 q(x_i)\bigr)
-= \frac{1}{N} \sum_{x} N \hat{p}(x) \bigl(-\log_2 q(x)\bigr)
+\frac{\partial \mathcal{L}}{\partial z_j} = q_j - p_j .
+$$
+
+Then state what the expression gives for a confidently wrong one-hot
+prediction, and what it gives once the model is correct and certain.
+
+<Solution>
+Write $Z = \sum_i e^{z_i}$, so $\ln q_i = z_i - \ln Z$ and
+
+$$
+\mathcal{L} = -\sum_i p_i (z_i - \ln Z) = -\sum_i p_i z_i + \ln Z ,
+$$
+
+using $\sum_i p_i = 1$. Differentiate the two pieces with respect to $z_j$.
+The first gives $-p_j$. For the second,
+
+$$
+\frac{\partial}{\partial z_j} \ln Z = \frac{1}{Z} \frac{\partial Z}{\partial
+z_j} = \frac{e^{z_j}}{Z} = q_j .
+$$
+
+Hence $\partial \mathcal{L}/\partial z_j = q_j - p_j$, and in vector form the
+gradient is $q - p$: the prediction minus the target.
+
+**Confidently wrong, one-hot.** Say the truth is class $c$ and $q_c = 10^{-6}$
+with the mass sitting on some class $m$. Then
+$\partial \mathcal{L}/\partial z_c \approx -1$ and
+$\partial \mathcal{L}/\partial z_m \approx +1$: the update pushes the true
+logit up and the wrongly favoured one down, both at essentially the maximum
+rate the loss can ask for. The loss itself is $19.93$ bits, but the gradient
+is bounded by $1$ per coordinate.
+
+**Correct and certain.** $q \to p$ makes the gradient vanish componentwise, so
+a converged model receives no update, which is $q = p$ being the unique
+minimizer, read one logit at a time. Note also that the components of
+$q - p$ sum to zero: the update never changes the total logit mass, which is
+the gradient-level counterpart of the fact that adding a constant to all
+logits leaves $q$ unchanged.
+</Solution>
+</Exercise>
+
+<Exercise>
+A dataset $x_1, \ldots, x_N$ is
+drawn and a model $q$ scores it. Show that minimizing the average log-loss
+$\tfrac{1}{N}\sum_i (-\log_2 q(x_i))$ over $q$ is exactly maximizing the
+likelihood $\prod_i q(x_i)$, and identify the assumption that licenses writing
+the dataset's probability as that product. State one modelling situation in
+which the assumption fails and what replaces the product there.
+
+<Solution>
+Group the sum by distinct values: each value $x$ occurs $N\hat{p}(x)$ times,
+so
+
+$$
+\frac{1}{N}\sum_{i=1}^{N}\bigl(-\log_2 q(x_i)\bigr)
 = \sum_x \hat{p}(x)\bigl(-\log_2 q(x)\bigr) = H(\hat{p}, q).
 $$
 
-For the likelihood: $-\log_2 \prod_i q(x_i) = \sum_i (-\log_2 q(x_i)) =
-N \cdot H(\hat{p}, q)$. Since $-\log_2$ is strictly decreasing and $N$ is a
-positive constant, minimizing $H(\hat{p}, q)$ over $q$ and maximizing
-$\prod_i q(x_i)$ over $q$ have identical solutions: cross-entropy
-minimization is maximum-likelihood estimation.
-</Solution>
-</Exercise>
+For the likelihood, $-\log_2 \prod_i q(x_i) = \sum_i (-\log_2 q(x_i)) = N
+\cdot H(\hat{p}, q)$. Since $-\log_2$ is strictly decreasing and $N > 0$ is
+constant, the $q$ minimizing $H(\hat{p}, q)$ is the $q$ maximizing
+$\prod_i q(x_i)$.
 
-<Exercise>
-On a binary task, human annotators genuinely disagree on some input: the
-soft label is $p = (0.8, 0.2)$. State the smallest cross-entropy loss any
-model can achieve on this input, name the model that achieves it, and
-explain why a reported loss of $0.75$ bits here would signal a nearly
-optimal model rather than a poor one.
+**The assumption.** Writing the dataset's probability as $\prod_i q(x_i)$
+requires the examples to be independent under the model. Only then does the
+joint probability factor into per-example terms, and only then is the total
+loss a sum.
 
-<Solution>
-By the decomposition, $H(p, q) = H(p) + D(p\,\|\,q) \ge H(p)$ with equality
-iff $q = p$. The floor is
+**Where it fails.** In sequence modelling the examples are the successive
+tokens of one text and are emphatically not independent. What replaces the
+product is the chain rule of probability,
 
 $$
-H(p) = 0.8 \log_2 \tfrac{1}{0.8} + 0.2 \log_2 \tfrac{1}{0.2}
-= 0.8 \cdot 0.322 + 0.2 \cdot 2.322 \approx 0.722 \text{ bits,}
+q(x_{1:n}) = \prod_{t=1}^{n} q(x_t \mid x_{<t}) ,
 $$
 
-achieved by the model $q = (0.8, 0.2)$ that reports the annotator
-distribution exactly. A loss of $0.75$ bits is only
-$0.75 - 0.722 = 0.028$ bits of divergence above the irreducible label
-noise: the model is nearly perfect. Loss values are meaningful only
-relative to $H(p)$, which is zero exclusively for deterministic (one-hot)
-labels.
+a product of conditional probabilities. The total loss is again a
+sum of per-token surprisals, which is why the accounting survives, and the
+conditioning is what <Ref lesson="joint-and-conditional-entropy"/> priced when
+it replaced $H(X)$ with $H(X \mid Y)$.
 </Solution>
 </Exercise>
 
 <Exercise>
-Two models process the same $10$ test examples with one-hot labels. Model A
-assigns probability $0.9$ to the true class on $9$ examples and $10^{-6}$ on
-the remaining one. Model B assigns $0.6$ to the true class on all $10$.
-Compute each model's average loss in bits and compare.
+A source emits $p = (0.4,\ 0.3,\ 0.2,\ 0.1)$ over
+$\{A, B, C, D\}$ and a model claims $q = (0.5,\ 0.25,\ 0.125,\ 0.125)$.
+Compute $H(p)$, $H(p, q)$ and $D(p\,\|\,q)$, then build the Huffman code for
+$q$ (<Ref lesson="huffman-by-hand"/>) and compute its expected length on
+$p$-data. Report all four numbers, say which two coincide, and say why the
+coincidence would fail for a non-dyadic $q$. Use $H(p) = 1.846$ bits.
 
 <Solution>
-Model A: nine examples cost $-\log_2 0.9 \approx 0.152$ bits each, the
-tenth costs $-\log_2 10^{-6} = 6 \log_2 10 \approx 19.93$ bits. Average:
-$(9 \times 0.152 + 19.93)/10 \approx (1.37 + 19.93)/10 \approx 2.13$ bits.
-
-Model B: every example costs $-\log_2 0.6 \approx 0.737$ bits. Average:
-$0.737$ bits.
-
-Model B wins by a factor of almost three, although Model A is confidently
-correct $90\%$ of the time: the single confident miss contributes $19.93$
-bits, more than $14$ times the total cost of Model A's nine successes. The
-log-loss average is dominated by the worst confident error, which is exactly
-the incentive it is designed to create.
-</Solution>
-</Exercise>
-
-<Exercise>
-Let $p = (0.9, 0.1)$ and $q = (\tfrac12, \tfrac12)$. Compute both
-directions $H(p, q)$ and $H(q, p)$, and state which one is the training
-loss when the data is $90/10$ and the model hedges fair.
-
-<Solution>
-Forward: $H(p, q) = 0.9 \cdot (-\log_2 0.5) + 0.1 \cdot (-\log_2 0.5) = 1$
-bit: the fair-coin code spends exactly one bit whatever happens.
-
-Reverse: $H(q, p) = 0.5 \cdot (-\log_2 0.9) + 0.5 \cdot (-\log_2 0.1)
-= 0.5 \cdot 0.152 + 0.5 \cdot 3.322 \approx 1.737$ bits.
-
-The two differ: cross-entropy is not symmetric. The training loss is
-$H(\text{data}, \text{model}) = H(p, q) = 1$ bit: the data distribution
-supplies the expectation weights (reality decides how often each label
-occurs), the model supplies the surprisals.
-</Solution>
-</Exercise>
-
-<Exercise>
-A character-level language model achieves a cross-entropy of $1.2$ bits per
-character on a $10^6$-character test text. Using the code-length reading of
-cross-entropy from <Ref lesson="source-coding-theorem-lite"/>, compute the
-size in bytes to which the model could losslessly compress the text, and
-compare with the $8$ bits per character of raw ASCII. Given the estimate
-from <Ref lesson="entropy-of-english"/> that English carries roughly $1$ bit
-per letter, bound the part of the model's rate that is mismatch rather than
-irreducible content.
-
-<Solution>
-Coding at the model's cross-entropy costs $1.2 \times 10^6$ bits total,
-i.e. $1.2 \times 10^6 / 8 = 150{,}000$ bytes, against $10^6$ bytes for
-ASCII: a $6.7{:}1$ compression ratio.
-
-With the entropy rate of English near $1$ bit per character, the floor for
-this text is about $10^6$ bits $= 125{,}000$ bytes. The model's excess is
-about $1.2 - 1.0 = 0.2$ bits per character: its divergence from the true
-text distribution, roughly $17\%$ of its rate. The next lesson
-(<Ref lesson="compression-is-prediction"/>) makes the model-to-compressor
-construction explicit.
-</Solution>
-</Exercise>
-
-<Exercise>
-A forecaster privately believes the outcome distribution is $p$ but reports
-a distribution $r$, and is penalized $-\log_2 r(x)$ when outcome $x$ occurs.
-Using Gibbs' inequality from <Ref lesson="kl-divergence"/>, prove that the
-expected penalty is uniquely minimized by reporting $r = p$.
-
-<Solution>
-The expected penalty under the forecaster's belief is
+**Cross-entropy.** The surprisals under $q$ are $1, 2, 3, 3$ bits, so
 
 $$
-\mathbb{E}_{x \sim p}\bigl[-\log_2 r(x)\bigr] = H(p, r) = H(p) +
-D(p \,\|\, r).
+H(p,q) = 0.4(1) + 0.3(2) + 0.2(3) + 0.1(3) = 1.900 \text{ bits.}
 $$
 
-$H(p)$ is fixed by the belief, and Gibbs' inequality gives
-$D(p\,\|\,r) \ge 0$ with equality if and only if $r = p$. The expected
-penalty is therefore at least $H(p)$, with the minimum attained exactly at
-the honest report $r = p$. The log penalty is a *strictly proper scoring
-rule*: it makes truthful reporting of probabilities the unique optimal
-strategy, which is the decision-theoretic face of using cross-entropy as a
-training loss.
+**Divergence.** $D(p\,\|\,q) = H(p,q) - H(p) = 1.900 - 1.846 = 0.054$ bits.
+Direct check:
+
+$$
+0.4\log_2 0.8 + 0.3\log_2 1.2 + 0.2\log_2 1.6 + 0.1\log_2 0.8
+= -0.129 + 0.079 + 0.136 - 0.032 = 0.054 .
+$$
+
+**The Huffman code for $q$.** Merge the two smallest, $0.125 + 0.125 = 0.25$;
+merge that with $0.25$ to get $0.5$; merge with $0.5$. Codeword lengths
+$(1, 2, 3, 3)$ for $(A, B, C, D)$. Expected length on $p$-data:
+$0.4(1) + 0.3(2) + 0.2(3) + 0.1(3) = 1.900$ bits.
+
+**Which coincide.** $H(p,q)$ and the Huffman code's expected length, both
+$1.900$ bits. $H(p) = 1.846$ is lower, since no code for the wrong
+distribution reaches it, and $D = 0.054$ is the difference.
+
+**Why the coincidence is special.** Every probability in $q$ is a power of
+$\tfrac12$, so each ideal length $-\log_2 q(x)$ is already a whole number and
+Huffman assigns exactly that. For a non-dyadic $q$ the code must round, its
+lengths differ from the surprisals, and its expected length on $p$-data
+differs from $H(p,q)$ by up to one bit per symbol
+(<Ref lesson="source-coding-theorem-lite"/>). The cross-entropy is the
+fractional-length idealization; the Huffman code is what integers permit.
+</Solution>
+</Exercise>
+
+<Exercise>
+A language model reports an average loss of $2.1$ nats per token on a test set
+of $10{,}000$ tokens covering $46{,}000$ bytes of text. Convert to bits per
+token and bits per byte, compute the size in bytes of the file an ideal coder
+driven by this model would produce, and compare it with gzip, which reaches
+roughly $2.6$–$3.0$ bits per byte on English prose. State what the comparison
+does not charge for.
+
+<Solution>
+**Units.** $2.1 \times 1.443 = 3.03$ bits per token. Total:
+$10{,}000 \times 3.03 = 30{,}300$ bits. Per byte:
+$30{,}300 / 46{,}000 = 0.659$ bits per byte.
+
+**File size.** $30{,}300$ bits $= 3{,}788$ bytes, against $46{,}000$ bytes of
+raw text: a ratio of about $12{:}1$.
+
+**Against gzip.** At $2.8$ bits per byte gzip produces about
+$46{,}000 \times 2.8 / 8 \approx 16{,}100$ bytes, a ratio near $2.9{:}1$. The
+model's file is roughly four times smaller.
+
+**What is not charged.** The decoder needs the identical model to reproduce
+the probabilities, and none of the above counts the model's own description
+length. Under an accounting that does count it, a large model stops winning on
+a test set this small.
+
+This exercise computed a compressed file size from a training loss and nothing
+else, which is the whole content of
+<Ref lesson="compression-is-prediction"/>: an arithmetic coder driven by the
+model realizes $-\log_2 q$ bits, within two bits for the entire stream, and
+<Ref lesson="language-models-as-compressors"/> measures the result on real
+corpora, including the two-part accounting that charges for the model.
 </Solution>
 </Exercise>
 
 <References>
-1. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §5.4 derives the wrong-code cost $H(p) + D(p\|q)$ (the decomposition, Theorem 5.4.3); §2.6 proves the information inequality $D \ge 0$ used for the minimizer.
-2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §2.6 relates entropy and relative entropy; ch. 6 (stream codes) turns a predictive distribution into an actual code, the operational reading of the log-loss. Free online: https://www.inference.org.uk/mackay/itila/
-3. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §4.3.4 derives the softmax cross-entropy gradient $q - p$ for multiclass logistic regression.
-4. G. Delétang, A. Ruoss, et al., "Language Modeling Is Compression," ICLR 2024 — §2 states the identity between a model's expected log-loss on data and its coding cost, framing log-loss training as compression. https://arxiv.org/abs/2309.10668
-5. I. J. Good, "Rational Decisions," *Journal of the Royal Statistical Society B*, 14(1), 1952 — the logarithmic scoring rule and its properness, background for exercise 8.
+1. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — Theorem 5.4.3 ("wrong code") is this lesson's decomposition in coding form, with the extra rounding term for integer lengths: $H(p) + D(p\|q) \le \mathbb{E}_p \ell(X) < H(p) + D(p\|q) + 1$. §2.6 proves the information inequality used for the minimizer. Note the terminology trap: the historical notes to ch. 2 list "cross entropy" as one of the older names for *relative entropy* itself, so pre-1990 papers using the term may mean $D(p\|q)$, not $H(p,q)$.
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §39.3 trains a single neuron by minimizing the cross-entropy error (eq. 39.11) and derives the gradient $\sum_n (y^{(n)} - t^{(n)})x^{(n)}$ (eq. 39.12) set as exercise 39.2; §44.3 gives the multi-class softmax version (eqs. 44.10–44.11). Free online: https://www.inference.org.uk/mackay/itila/
+3. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §4.3.4 derives the softmax cross-entropy gradient $q - p$ for multiclass logistic regression, with the softmax Jacobian written out; §4.3.2 does the binary case.
+4. C. Olah, "Visual Information Theory," 2015 — the *Cross-Entropy* section is the source of the four-scenario comparison recreated above (1.75 / 2.25 / 2.375 bits). Its notation is reversed relative to this course: Olah writes $H_p(q)$ where we write $H(q,p)$, and says so in his own footnote. https://colah.github.io/posts/2015-09-Visual-Information/
+5. C. Szegedy, V. Vanhoucke, S. Ioffe, J. Shlens, Z. Wojna, "Rethinking the Inception Architecture for Computer Vision," CVPR 2016 — §7 introduces label smoothing and reports the $\varepsilon = 0.1$, 1000-class setting whose entropy floor is computed above. https://arxiv.org/abs/1512.00567
+6. R. Müller, S. Kornblith, G. Hinton, "When Does Label Smoothing Help?", NeurIPS 2019 — measures what the raised floor does to calibration and to distillation, and is the paper to read before comparing smoothed and unsmoothed loss values. https://arxiv.org/abs/1906.02629
+7. J. M. Bernardo, "Expected Information as Expected Utility," *Annals of Statistics* 7(3), 1979 — proves that the only smooth local proper scoring rules are $a \log r(x) + b(x)$, the uniqueness claim in the starred section. https://projecteuclid.org/journals/annals-of-statistics/volume-7/issue-3/Expected-Information-as-Expected-Utility/10.1214/aos/1176344689.full
+8. G. Delétang, A. Ruoss, et al., "Language Modeling Is Compression," ICLR 2024 — §2 states that a model's expected log-loss on a stream equals its achievable code length, the identity exercise 7 uses. https://arxiv.org/abs/2309.10668
 </References>
