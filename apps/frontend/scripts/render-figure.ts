@@ -38,7 +38,7 @@ if (target !== undefined && target in figures) {
   const ink = dark ? "#e9e9e7" : "#131312";
   const paper = dark ? "#131312" : "#fdfdfc";
   const themed = src.replace(/<svg\b/, `<svg style="color:${ink}"`);
-  const outDir = join(resolve(__dirname, ".."), ".preview");
+  const outDir = join(appRoot, ".preview");
   mkdirSync(outDir, { recursive: true });
   const tmp = join(outDir, `.themed-${basename(svgPath)}`);
   const png = join(
@@ -77,7 +77,12 @@ if (target !== undefined && target in figures) {
 const frame = frameArg !== undefined ? Number(frameArg) : undefined;
 const markup = renderToStaticMarkup(createElement(component, { frame }));
 
-const katexCss = join(appRoot, "node_modules/katex/dist/katex.min.css");
+// Resolve through node's own lookup rather than assuming node_modules sits at
+// the app root: a git worktree has none, and node walks up to the main
+// checkout's. Guessing the path silently produced a dead <link>, KaTeX's CSS
+// never loaded, `.katex-mathml` was left visible, and every formula rendered
+// twice — a defect of the harness that reviewers saw as a defect of the figure.
+const katexCss = require.resolve("katex/dist/katex.min.css");
 const tokens = dark
   ? "--paper:#131312;--panel:#1d1d1b;--ink:#eaeae6;--line:#34342f;"
   : "--paper:#fdfdfc;--panel:#f4f4f1;--ink:#191918;--line:#d9d9d3;";

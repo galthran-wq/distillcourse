@@ -94,10 +94,9 @@ async function main(): Promise<void> {
     createElement(MDXContent as never, { components } as never),
   ).replaceAll('src="/course-assets/', `src="file://${appRoot}/public/course-assets/`);
 
-  const katex = readFileSync(
-    join(appRoot, "node_modules/katex/dist/katex.min.css"),
-    "utf8",
-  );
+  // Resolved through node, not assumed at the app root: a git worktree has
+  // no node_modules of its own and resolution walks up to the main checkout.
+  const katex = readFileSync(require.resolve("katex/dist/katex.min.css"), "utf8");
   const previewDir = join(appRoot, ".preview");
   mkdirSync(previewDir, { recursive: true });
 
