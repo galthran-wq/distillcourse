@@ -1,102 +1,142 @@
 # Research brief: neural-coding (Mutual information of a neural code)
 
-status: planned
-module: natural-sciences
-type: worked-practice
+status: drafted (kept slug — revise; the lesson MOVES module, from
+natural-sciences to channels, and stays `type: extra`)
+module: channels
+type: extra
 goal: Estimate the information a neural spike code carries about a stimulus.
+est_minutes: 30
 
-New worked-application lesson. The first of a two-lesson closing module applying
-information measures outside engineering. A neuron is a noisy channel from
-stimulus to spike train; mutual information measures what the spikes reveal, and
-coding efficiency measures how much of the channel the code uses. Keep it
-discrete and computable — the direct method on a small table — and cite the
-continuous Gaussian-channel machinery without deriving it.
+## ARC
+
+- **Inherits:** `I(X;Y)` (`mutual-information`), capacity as a maximised mutual
+  information (`channel-capacity`), and the estimator warnings from
+  `estimating-mutual-information`.
+- **Spine step:** step 6, *The second limit* — carried as an off-path chapter.
+  The core path survives skipping it entirely; nothing downstream requires it.
+- **Contributes:** a demonstration that the channel formalism applies to a
+  system nobody designed, with real measured numbers.
+- **Hands off to:** nothing required. Read after `channel-capacity` and
+  `estimating-mutual-information`.
+
+## Why it moved
+
+The previous plan gave it a `natural-sciences` module of its own alongside
+`thermodynamics-of-information`. Two off-path chapters do not make a module, and
+neither can close a module with an application. Re-homed as an `extra` inside
+the channels module, where "a neuron is a noisy channel" is the sentence it
+starts from. `thermodynamics-of-information` moves to the principles module for
+the same reason. Neither lesson is dropped.
 
 ## Sources to consult
 
-- Borst & Theunissen 1999, "Information Theory and Neural Coding" (Nat.
-  Neurosci. 2, 947-957) — the primary source.
-  - **General concepts + Box 1-2** — mutual information replacing the tuning
-    curve; the three decompositions `I(R,S) = H(R) - H(R|S) = H(S) - H(S|R) =
-    H(R) + H(S) - H(R,S)`.
-  - **"Calculating information transfer directly"** — the direct method:
-    estimate `H(R)` and the noise entropy `H(R|S)` from repeated-trial
-    (binarized) spike counts, subtract.
-  - **Data-processing inequality (p. 949)** — why a reconstruction/decoding model
-    can only lower-bound the true `I(S;R)` (reuse `data-processing-inequality`).
-  - **Table 2** — the cross-species numbers: bits/second, **bits/spike (~1,
-    range 0.6-3.2)**, coding efficiency, spike-timing precision. Cite as the
-    source's measurements, not universal constants.
-  - **Box 3 + upper/lower-bound methods** — the Gaussian-channel bound
-    `C = ∫ log₂(1 + SNR(f)) df` and coherence-based bounds: mention, do not
-    derive (continuous channel capacity is out of scope).
-- Cover & Thomas, **§2.2-2.4** — the entropy/MI identities reused; **§7** for
-  channel capacity, reused from `channel-capacity` to define efficiency.
+- **Borst & Theunissen 1999** (primary) — Box 2 for the three equivalent
+  decompositions `I(R,S) = H(R) - H(R|S) = H(S) - H(S|R) = H(R)+H(S)-H(R,S)`;
+  the direct method for estimating `H(R)` and `H(R|S)` from binarised spike
+  trains; the definition of coding efficiency as transmitted information over
+  channel capacity; and **Table 2** for the cross-species numbers (fly H1 and
+  others, on the order of 1 bit per spike, efficiency strongly
+  stimulus-dependent).
+- Cover & Thomas, **§2.3-2.4** for the identities being used; nothing new.
+- Goldfeld & Polyanskiy §V-C for the estimator caveats, already covered in
+  `estimating-mutual-information` and cited by `<Ref>` rather than restated.
 
 ## Key points the lesson must cover
 
-1. **A neuron is a noisy channel** `S → R`: stimulus in, spike response out.
-   Concrete opener: a small stimulus-response joint (e.g. 2 stimuli × a few
-   spike-count outcomes) with an explicit table.
-2. **The direct method**: `I(S;R) = H(R) - H(R|S)`, where `H(R)` is the total
-   response entropy and `H(R|S)` the average per-stimulus (noise) entropy.
-   Compute both from the table, subtract — this is the entropy/conditional-
-   entropy machinery applied verbatim. Also verify via `H(S) - H(S|R)`.
-3. **Bits per spike**: divide `I(S;R)` by the mean spike count; recorded single
-   neurons land near **~1 bit/spike** (Table 2). Every spike is an
-   information-bearing unit, not just an average-rate carrier.
-4. **Coding efficiency** = `I(S;R) / C`, the fraction of the neuron's channel
-   capacity the code actually uses. Efficiency is strongly stimulus-dependent —
-   naturalistic stimuli push it up (Table 2's frog-auditory example, ~20% for
-   noise vs ~90% for a natural call). Reuse `channel-capacity` for C.
-5. **Estimation caveats** (honest, precise): finite samples **overestimate** MI
-   (entropy estimators are positively biased); MI is only meaningful **relative
-   to a stimulus ensemble**; decoding-based estimates only lower-bound the true
-   MI (data-processing inequality). One paragraph.
-6. **The bridge to the rest of the course**: the same finite-sample MI-estimation
-   problem is what InfoNCE (already seen) sidesteps with a sampling bound — one
-   sentence back-reference.
+1. **The model.** Stimulus `S`, response `R` (a binned spike train). The neuron
+   is a channel `p(r|s)`. Nothing in the formalism cares that the channel is
+   made of protein.
+2. **The direct method.** Bin the spike train into words of `T/Δt` bins; estimate
+   `H(R)` from the word distribution across all stimuli and `H(R|S)` from the
+   word distribution at each fixed stimulus, averaged. `I = H(R) - H(R|S)`.
+   Work a small joint table end to end.
+3. **Bits per spike.** Divide by the mean spike count. Report the measured
+   order of magnitude — about 1 bit per spike across several preparations — and
+   say what it is a measurement *of*: this neuron, this stimulus ensemble, this
+   bin width.
+4. **Coding efficiency** `I / C`: how much of the channel the code actually
+   uses. State the capacity side honestly — for a spike train the natural
+   capacity bound is the entropy of the binned word distribution at the maximum
+   attainable rate, and comparing against it requires assumptions the lesson
+   should name.
+5. **Ensemble dependence.** `I(S;R)` is meaningless without specifying the
+   stimulus distribution. Naturalistic stimuli raise measured efficiency
+   substantially. This is not a technicality; it is the central caveat and it is
+   the same point `channel-capacity` made about the maximising input.
 
 ## Pitfalls / subtleties to flag
 
-- MI estimates from finite data are **biased upward**; a nonzero MI on shuffled
-  controls is bias, not signal. State the correction exists (jackknife) without
-  deriving it.
-- **Information is relative to the stimulus ensemble**: absolute bit numbers do
-  not transfer across experiments; efficiency and bits/spike are the comparable
-  quantities.
-- The continuous Gaussian-channel formula is cited, not derived — this course is
-  discrete. Keep the worked computation on the discrete table.
-- Bits/spike ~1 is an empirical range across specific preparations (Table 2), not
-  a law; hedge it as the review does.
-- A decoder that reconstructs the stimulus gives a **lower** bound on `I(S;R)`
-  (data-processing) — do not present a decoding estimate as the true value.
-- Do not claim the neuron "chooses" a max-entropy or capacity-achieving code;
-  efficiency < 1 is the norm.
+- Every estimate here is a plug-in estimate from limited trials, so it is biased
+  upward. `<Ref>` `estimating-mutual-information` and state the direction of the
+  bias, with the number of trials required for the reported precision.
+- Bin width `Δt` is a choice and the answer depends on it — the same disease as
+  the information plane, in a respectable clinical setting.
+- Do not derive continuous-channel capacity. The Gaussian-channel bound methods
+  in the source exist and are out of scope; state their existence and move on.
+- Cite the measured numbers as the source's, for the specific preparation, never
+  as biological constants.
+- "The neuron transmits 1 bit per spike" is not a claim about what the animal
+  perceives; it bounds what a downstream decoder could recover.
 
 ## FIGURE PLAN
 
-1. **single `<Figure>` (component)** — the neuron as a channel: stimulus S →
-   `p(r|s)` → spike train R, drawn like the BSC transition diagram from
-   `channel-capacity`. One idea: a neuron is a transition table. Inspiration:
-   Borst & Theunissen fig. 2 (recreate schematically).
-2. **`<FigureSequence>` (3 frames)** — the direct method on a small table:
-   frame 1 the response distribution and `H(R)`; frame 2 the two per-stimulus
-   rows and the weighted noise entropy `H(R|S)`; frame 3 subtract to `I(S;R)`.
-   Delta = one step. Inspiration: Box 2 decomposition.
-3. **single `<Figure>` (component)** — MI beats the tuning curve: left, a mean±sd
-   tuning curve that hides overlap; right, the full response distributions per
-   stimulus with their MI. One idea: variance summaries lose what MI keeps.
-   Inspiration: Borst & Theunissen fig. 1 (recreate with a synthetic example).
-4. **single `<Figure>` (component)** — bits per spike: a short spike train with
-   the running information tally ticking up ~1 bit per spike. One idea: every
-   spike carries information. Inspiration: Table 2 bits/spike column.
-5. **single `<Figure>` (component)** — coding efficiency: a capacity bar `C` with
-   the transmitted `I(S;R)` shaded inside it, two versions (noise stimulus ~20%,
-   natural stimulus ~90%). One idea: efficiency depends on the stimulus.
-   Inspiration: Borst & Theunissen efficiency discussion / Table 2.
-6. **single `<Figure>` (component)** — the estimation trap: MI vs sample size,
-   the raw estimate biased above the true value and decaying toward it, with a
-   shuffled-control line sitting above 0. One idea: small samples fake
-   information. Warning-color the bias gap. Inspiration: the review's
-   finite-sample-bias caveat.
+1. `draw:` **single `<Figure>`** — the neuron as a channel: stimulus ensemble on
+   the left, spike train on the right, `p(r|s)` on the arrow, `H(R|S)` labelled
+   as the noise. One idea: the diagram from `channel-capacity`, relabelled.
+2. `draw:` **`<FigureSequence>` (4 frames)** — the direct method: frame 1 a raster
+   of spike trains across repeated trials; frame 2 binning into words; frame 3
+   the word histogram at one stimulus giving `H(R|S=s)`; frame 4 the pooled
+   histogram giving `H(R)`, with `I` read off as the difference.
+3. `draw:` **single `<Figure>`** — bits per spike across the preparations in the
+   source's Table 2, as a labelled dot plot with the ensemble type noted beside
+   each point. One idea: the number is around one bit and it varies by a factor
+   of a few.
+4. `draw:` **single `<Figure>`** — the bin-width dependence: estimated `I`
+   against `Δt` on a fixed synthetic dataset, with the plug-in bias direction
+   arrowed. One idea: the same caveat as the information plane, in a lab.
+5. `draw:` **single `<Figure>`** — coding efficiency as a filled bar: `I`
+   shaded inside the capacity bar, with the ensemble named. One idea:
+   efficiency is a ratio and both terms need a stated ensemble.
+
+No `source:` entry — the review is paywalled and its figures are not in the
+image pool; the numbers are quoted in text with a full citation.
+
+## EXERCISE PLAN
+
+1. *(warm-up)* From a supplied stimulus-response table, compute `H(R)`,
+   `H(R|S)`, `I(S;R)` and bits per spike.
+2. **Boundary probe.** A neuron fires with the same rate regardless of stimulus
+   but with different timing precision. Construct a small table where the rate
+   carries zero information and the timing carries one bit, and state what bin
+   width is required to see it.
+3. **Claim to refute.** "This neuron carries 1.2 bits per spike, so it carries
+   1.2 bits per spike about any stimulus." Refute it, and name the quantity that
+   would have to be specified for the claim to be well posed.
+4. **Derivation the lesson skipped.** Show that the three decompositions in the
+   source's Box 2 are algebraically identical, starting from the definition of
+   `I` as a divergence.
+5. **Research-shaped.** Using published spike-count data or a simulated
+   Poisson neuron with a stimulus-dependent rate, estimate `I(S;R)` by the direct
+   method at three bin widths and three trial counts. Report the nine numbers as
+   a grid and state which axis moves the estimate more.
+6. **FORWARD / cross-link (E7).** Compute the plug-in bias for your grid in
+   exercise 5 using the `(r-1)(c-1)/(2n ln 2)` formula and subtract it. Report
+   how much of the apparent information survives. This reaches back to
+   `estimating-mutual-information` rather than forward — for an off-path chapter
+   that is the right direction, and the solution `<Ref>`s it.
+
+## REVISION (kept slug)
+
+**Gain**
+- ARC paragraph stating that this is an off-path chapter and what it assumes.
+- `estimating-mutual-information` as a prerequisite, with the estimator caveats
+  cited rather than re-derived — the current draft either omits them or repeats
+  them.
+- Figures 3 and 4 (the cross-preparation dot plot and the bin-width dependence).
+- Explicit statement of the ensemble-dependence caveat in the body, at the point
+  the headline number is first quoted.
+- Depth toward 30 minutes.
+
+**Lose**
+- Any statement of a bits-per-spike figure without its preparation and ensemble.
+- Any hint of continuous channel capacity being derived.

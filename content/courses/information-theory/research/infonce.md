@@ -1,116 +1,151 @@
 # Research brief: infonce (The InfoNCE bound)
 
-status: planned
-module: applications
+status: drafted (kept slug — revise, do not rewrite)
+module: principles
 type: core
 goal: Derive the InfoNCE lower bound on mutual information from a contrastive classification loss.
+est_minutes: 34
+
+## ARC
+
+- **Inherits:** `I(X;Y)` (`mutual-information`), cross-entropy as a loss
+  (`cross-entropy-loss`), and the demonstration that direct estimation fails
+  (`estimating-mutual-information`).
+- **Spine step:** step 11, *Compression aimed at a target* — "…a contrastive
+  loss bounds that quantity where it cannot be computed…"
+- **Contributes:** a mutual-information quantity that is computable from samples
+  by training a classifier, together with the ceiling that makes it a limited
+  instrument.
+- **Hands off to:** `learned-image-compression`, which closes the module, and to
+  the reader's own practice — this is the form in which information theory
+  actually appears in current representation learning.
 
 ## Sources to consult
 
-- **van den Oord, Li & Vinyals 2018, "Representation Learning with
-  Contrastive Predictive Coding"** (arXiv:1807.03748) — the primary source.
-  - **§2.1** — why not model p(y|x) generatively: mutual information
-    `I(x;c) = Σ p(x,c) log [p(x|c)/p(x)]` as the objective; reconstruction
-    losses waste capacity on irrelevant detail.
-  - **§2.3 "InfoNCE Loss and Mutual Information Estimation"** — the loss
-    `L_N = -E[ log f(x_pos,c) / Σ_j f(x_j,c) ]` (categorical cross-entropy
-    over 1 positive + N-1 negatives); proof that the optimal `f` is
-    proportional to the density ratio `p(x|c)/p(x)`.
-  - **Appendix A.1 (eqs. 6-11)** — the full derivation of
-    `I(x;c) ≥ log N - L_N`; also the MINE remark (alternative estimator,
-    stability comparison) for one sentence of context.
-  - **§3** — cross-modal experiments (audio, vision, text, RL): cite
-    precisely for the applications paragraph (LibriSpeech phone accuracy
-    64.6 vs 39.7 MFCC baseline; ImageNet linear-probe top-1 48.7).
-- Cover & Thomas, **§2.3** — mutual information as the expected log
-  density-ratio `E[log p(x,y)/(p(x)p(y))]`: the identity the derivation
-  turns on; reuse from the mutual-information lesson.
-- Tishby et al. 1999 — one-sentence link back: IB says maximize I(T;Y); the
-  practical question this lesson answers is how to estimate/optimize such an
-  I from samples.
+- **van den Oord, Li & Vinyals 2018** (primary) — §2.3 and **Appendix A.1**: the
+  InfoNCE loss, the proof that the optimal critic recovers the density ratio
+  `p(y|x)/p(y)`, and the derivation of `I(X;Y) ≥ log N - L_N` (eqs. 6-11). §3
+  for the cross-modal empirical validation.
+- **Goldfeld & Polyanskiy 2020, §V** — for the honest framing of what
+  sample-based mutual-information estimates can and cannot certify; the `log N`
+  ceiling is the same phenomenon as the estimator's finite-sample limits.
+- Cover & Thomas, **§2.3 and §11.7-11.8** — the density-ratio object is a
+  likelihood ratio, and the Neyman-Pearson / Chernoff-Stein machinery is where
+  it comes from. One `## ★` starred paragraph, if wanted.
+- Alemi et al. 2017, §3 — the variational-bound pattern (bound both mutual
+  informations, optimise the bound) which this lesson shares.
 
 ## Key points the lesson must cover
 
-1. **The estimation problem** (the flaw motivating the mechanism): the
-   course computed I(X;Y) from small joint tables; for images/audio/text the
-   joint is unavailable and counting fails. Needed: a quantity computable
-   from *samples* of pairs that certifies mutual information.
-2. **The contrastive setup**: draw one true pair (x, y_pos) and N-1
-   "negatives" y_j from the marginal p(y); train a scoring function
-   f(x, y) and classify which candidate is the positive via softmax over
-   scores. The loss L_N is an N-way cross-entropy — reuse cross-entropy-loss
-   machinery directly.
-3. **The optimal classifier recovers a density ratio**: the posterior that
-   candidate i is the positive is
-   `p(y_i|x) Π_{j≠i} p(y_j) / Σ_k [p(y_k|x) Π_{j≠k} p(y_j)]`, which
-   simplifies to `[p(y_i|x)/p(y_i)] / Σ_k [p(y_k|x)/p(y_k)]` — so the loss
-   is minimized when `f(x,y) ∝ p(y|x)/p(y)`. Full algebra shown; note the
-   ratio is learned without ever modeling p(y|x) or p(y) separately.
-4. **The bound**: substituting the optimal f gives
-   `L_N ≥ log2 N - I(X;Y)` hence `I(X;Y) ≥ log2 N - L_N` (Appendix A.1
-   route: the expectation over negatives concentrates the denominator around
-   `1 + (N-1)·E[ratio] `-style terms; present the derivation at the paper's
-   level of rigor and flag the approximation step explicitly).
-5. **Worked toy example, exact numbers**: a small discrete pair (e.g. 4×4
-   joint from the mutual-information lesson) where p(y|x)/p(y) is computable
-   by hand; evaluate L_N with the optimal critic for N = 2 and N = 4 and
-   compare `log2 N - L_N` to the true I(X;Y). Shows both the bound holding
-   and its looseness.
-6. **Saturation**: the bound never exceeds log2 N — with I(X;Y) > log2 N even
-   a perfect critic saturates (the classification task becomes too easy to
-   certify more bits). More negatives raise the ceiling; this is why
-   contrastive methods use large batches.
-7. **The applications payoff** (one section, precise): the same loss trains
-   representations across audio/vision/text/RL (CPC), and the density-ratio
-   trick is the common core of modern contrastive representation learning;
-   link back to IB — InfoNCE is a trainable surrogate for the I(T;Y) term.
+1. **The flaw, restated.** For images, audio or text, `p(x,y)` is unavailable
+   and binning is hopeless — established two modules earlier. What is available
+   is samples and a function approximator.
+2. **The task.** Given a context `x` and `N` candidates of which exactly one is
+   the true partner `y`, train a critic `f(x,y)` and classify by softmax over
+   the `N` scores. The loss `L_N` is an ordinary cross-entropy.
+3. **The optimal critic.** Minimising `L_N` drives `f(x,y)` to be proportional
+   to the density ratio `p(y|x)/p(y)` — not to `p(y|x)` and not to `p(x,y)`.
+   Carry the derivation; it is short and it is the reason the bound holds.
+4. **The bound.** `I(X;Y) ≥ log2 N - L_N`. Derive it from the optimal-critic
+   substitution, marking where Jensen's inequality enters.
+5. **The ceiling, stated as the lesson's real content.** Because `L_N ≥ 0`, the
+   bound can never certify more than `log2 N` bits. With `N = 256` the maximum
+   certifiable value is 8 bits, no matter how strong the dependence. A
+   representation carrying 20 bits and one carrying 8 look identical to this
+   instrument. This is a genuine reversal — the reader expects a better
+   representation to score better — and it must be stated as one.
+6. **Consequences in practice.** Bigger batches raise the ceiling, which is why
+   contrastive methods are batch-size hungry; and a saturated bound tells you
+   nothing about which of two good representations is better. Say both.
+7. **What the loss is good for anyway.** Even where the bound is loose, the
+   objective produces useful representations. Bound quality and representation
+   quality are different questions and the literature has conflated them; state
+   this carefully and without overreach.
 
 ## Pitfalls / subtleties to flag
 
-- **It is a lower bound**: low loss certifies high MI; high loss certifies
-  nothing (the critic may just be bad). Direction matters — state it as a
-  one-way certificate.
-- **Negatives must come from the marginal p(y)**, not an arbitrary noise
-  distribution — otherwise the recovered ratio is against the wrong
-  reference. (Contrast with generic NCE in one sentence.)
-- **Bits vs nats**: the paper works in nats (`log N`); the course states the
-  bound in bits (`log2 N`). Convert consistently; ML implementations report
-  nats.
-- The optimal critic is independent of N, but the *bound's tightness* is not:
-  it degrades when true MI approaches or exceeds log N — the toy example
-  must exhibit this.
-- `log2 N - L_N` is an estimate derived from a bound, and finite-sample
-  estimates are biased; do not present it as an unbiased MI estimator.
-- Do not derive the full CPC architecture (encoder + autoregressive context);
-  a one-figure sketch suffices — the lesson's object is the bound, not the
-  network.
+- InfoNCE is a **lower** bound. A low value means the bound is weak, not that
+  the mutual information is low.
+- The bound is on `I(X;Y)` for the *distribution the negatives are drawn from*.
+  Sampling negatives from a different distribution changes what is being
+  bounded.
+- The critic's capacity matters: the bound holds for the optimal critic, and a
+  trained critic gives a bound on the bound.
+- `log N` versus `log2 N`: the papers use nats. State the convention once.
+- Do not claim InfoNCE estimates mutual information. It bounds it, from below,
+  with a hard ceiling.
 
 ## FIGURE PLAN
 
-1. **single `<Figure>` (component)** — the contrastive setup: a context x on
-   the left, N candidate y's on the right (one highlighted as the true
-   partner, the rest marked "drawn from p(y)"), the scorer f(x,y) fanning
-   over candidates into a softmax. One idea: MI estimation as an N-way quiz.
-   Inspiration: CPC §2.2-2.3 setup (recreate schematically).
-2. **`<FigureSequence>` (4 frames)** — the derivation: frame 1 the N-way
-   posterior over "which candidate is real"; frame 2 products of marginals
-   cancel, leaving density ratios; frame 3 optimal `f ∝ p(y|x)/p(y)`
-   boxed; frame 4 substitution yields `I ≥ log2 N - L_N`. Delta = one
-   algebraic move per frame. Inspiration: Appendix A.1 (eqs. 6-11).
-3. **single `<Figure>` (component)** — the bound dissected:
-   `I(X;Y) ≥ log2 N - L_N` with labels-above-symbols — "budget: bits to name
-   1 of N", "what the classifier pays", "what is left is certified
-   information". One idea: certified bits = budget minus loss.
-4. **single `<Figure>` (component)** — worked toy tally: the 4×4 joint, its
-   ratio table p(y|x)/p(y), and computed rows for N=2 and N=4: L_N, bound,
-   true I. One idea: the bound holds and tightens with N. Real numbers
-   plugged in (playbook rule 4).
-5. **single `<Figure>` (component)** — saturation: bound value vs true MI
-   for N = 2, 16, 256 as three curves clipping at 1, 4, 8 bits. Static twin
-   of the InfoNCESaturation demo. One idea: you cannot certify more than
-   log2 N bits.
-6. **single `<Figure>` (component)** — the CPC pipeline in one strip:
-   waveform/patches → encoder z_t → context c_t → score future z_{t+k}
-   against negatives; the InfoNCE box highlighted as "the only loss". One
-   idea: where the bound sits in a real system. Inspiration: CPC fig. 1
-   (recreate, simplify, never copy).
+1. `draw:` **single `<Figure>`** — the contrastive task: a context on the left,
+   `N` candidates on the right with one true partner marked, the critic scoring
+   each and a softmax over the scores. One idea: the estimator is a
+   classification problem.
+2. `draw:` **single `<Figure>`** — the optimal critic: three bar sets —
+   `p(y|x)`, `p(y)`, and their ratio — with the ratio marked as what the critic
+   converges to. One idea: the critic learns a ratio, not a distribution.
+3. `draw:` **`<FigureSequence>` (3 frames)** — the derivation: frame 1 the loss
+   written out; frame 2 the optimal critic substituted; frame 3 Jensen applied
+   and the bound read off, with the inequality step highlighted.
+4. `draw:` **single `<Figure>`** — the ceiling: true `I(X;Y)` on the horizontal
+   axis and the bound on the vertical, with the `y = x` line and three
+   horizontal ceilings at `log2 N` for `N = 8, 64, 512`, showing where each
+   clips. One idea: past the ceiling, the instrument is blind.
+5. `draw:` **single `<Figure>`** — batch size against certifiable bits, a log
+   curve, with three real batch sizes from published contrastive methods marked.
+   One idea: the ceiling is a design constraint, not a nuisance.
+6. `draw:` **single `<Figure>`** — the two questions separated: two
+   representations with equal bound values but different downstream accuracy,
+   drawn as a two-panel comparison. One idea: bound quality and representation
+   quality are different measurements.
+
+No `source:` entry.
+
+## EXERCISE PLAN
+
+1. *(warm-up)* With `N = 64` and a measured contrastive loss of 1.2 nats,
+   compute the bound in bits. Then repeat for `N = 256` and the same loss.
+2. **Boundary probe.** Evaluate the bound at `N = 1` and at `L_N = 0`. Report
+   what each says, and explain why `N = 1` makes the loss identically zero and
+   the bound vacuous.
+3. **Claim to refute.** "Our method achieves an InfoNCE value of 7.9 bits with
+   `N = 256`, so our representation captures 7.9 bits about the target." State
+   what is wrong, and what experiment would distinguish a representation
+   carrying 8 bits from one carrying 30.
+4. **Claim to refute, second kind.** "A lower InfoNCE bound means a worse
+   representation." Refute, and name the two independent causes of a low bound.
+5. **Derivation the lesson skipped.** Prove that the loss is minimised when
+   `f(x,y) ∝ p(y|x)/p(y)`, by treating the softmax classification as a standard
+   maximum-likelihood problem over which candidate is the true one.
+6. **Research-shaped.** On a toy joint where `I(X;Y)` is known exactly, train (or
+   simulate an optimal) critic at `N = 4, 16, 64, 256` and plot the bound against
+   the true value. Report the `N` at which the bound stops improving and compare
+   it with `2^{I(X;Y)}`.
+7. **FORWARD (E7).** A learned image codec must decide how many bits to spend on
+   each part of an image. Write down an objective in which the rate term is a
+   cross-entropy against a learned distribution over codes and the fidelity term
+   is a distortion. Compare its shape with the bottleneck objective and with
+   `R(D)`. Reaches `learned-image-compression` — the solution names the
+   Lagrangian and `<Ref>`s it.
+
+## REVISION (kept slug)
+
+**Gain**
+- ARC paragraph, and `estimating-mutual-information` as a prerequisite: the
+  motivation for InfoNCE is that direct estimation fails, and that is now a
+  lesson rather than an assertion.
+- Figures 2, 4, 5, 6 above. The ceiling figure is the lesson's most important
+  visual and is currently missing.
+- The ceiling stated as an explicit reversal seam, with the numbers (`N = 256`
+  ⇒ at most 8 bits).
+- The separation of "bound quality" from "representation quality", which the
+  current draft blurs.
+- Depth toward 34 minutes.
+
+**Lose**
+- Any language calling InfoNCE an estimator of mutual information.
+- The `information-bottleneck` prerequisite as a *conceptual* dependency: the
+  bound stands alone and the lesson should not require the bottleneck's
+  machinery to be understood. (The prerequisite list keeps
+  `estimating-mutual-information` and `cross-entropy-loss`.)
+- Callouts restating the bound (L15).

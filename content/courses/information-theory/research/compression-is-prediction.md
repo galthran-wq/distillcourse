@@ -1,92 +1,155 @@
 # Research brief: compression-is-prediction (Compression as prediction)
 
-status: planned
+status: drafted (kept slug — revise, do not rewrite)
 module: information-in-ml
 type: synthesis
 goal: Explain why a better predictive model is exactly a better compressor, and vice versa.
+est_minutes: 34
+
+## ARC
+
+- **Inherits:** cross-entropy as an expected code length (`cross-entropy-loss`),
+  a coder that consumes arbitrary per-symbol probabilities (`arithmetic-coding`),
+  and the measured entropy rate of a real source (`entropy-of-english`).
+- **Spine step:** step 7, *The price of a wrong model*.
+- **Contributes:** the two-way construction. Given a model, build a compressor;
+  given a compressor, read off a model. Not an analogy — an algorithm in each
+  direction.
+- **Hands off to:** `kolmogorov-complexity` (what happens when the model is
+  allowed to be any program) and `language-models-as-compressors` (the
+  measurement).
 
 ## Sources to consult
 
-- **Deletang et al. 2023, "Language Modeling Is Compression"** (arXiv:2309.10668)
-  — the primary ML-tail source. §2 states the predictor <-> lossless-compressor
-  equivalence (via arithmetic coding), and the experiments measure a large
-  language model as a general-purpose compressor (Chinchilla-70B compressing
-  ImageNet to 43.4%, LibriSpeech to 16.4% of raw). Use for the modern statement
-  and the empirical payoff.
-- MacKay, **ch. 6 "Stream Codes"** — arithmetic coding as the mechanism that
-  turns a probabilistic predictor into a near-optimal compressor (coding cost
-  `≈ -log2 q(sequence)`, within O(1) bits total). This is the *how* behind the
-  equivalence. Also **§6 intro** on why symbol codes (Huffman) fall short and
-  stream codes reach the entropy rate.
-- Cover & Thomas, **§5.10 "Arithmetic Coding"** and **§5.4** (wrong-code /
-  `H(p)+D(p||q)`) — the coding-cost accounting.
-- Reuse: `source-coding-theorem-lite` (entropy floor), `cross-entropy-loss`
-  (log-loss = coding cost), `entropy-of-english` (entropy rate), `prefix-codes`
-  (Kraft budget), `kl-divergence` (mismatch cost).
+- **Delétang et al. 2024, §2** — the predictor/compressor equivalence stated
+  precisely, with eq. 2 (cross-entropy = expected code length) and the
+  arithmetic-coding construction; also §2's "Universal Coding" paragraph tying
+  the ceiling to Solomonoff and Kolmogorov.
+- MacKay, **ch. 6** — stream codes as the practical realisation, and §6.5's
+  benchmark tables (a simple Laplace-model arithmetic coder against gzip,
+  compress, bzip2, ppmz on a text file and a sparse binary file, with actual
+  sizes and times).
+- Witten, Neal & Cleary 1987 — the model/coder interface, already established in
+  `arithmetic-coding`; cite by `<Ref>`, do not re-derive.
+- Cover & Thomas, **§13.2-13.3** — universal coding and the sequential
+  probability assignment view; **§6.5** for the gambling/compression duality if
+  a starred section wants it.
+- Polyanskiy & Wu, **§9.5** — the Krichevsky-Trofimov "add 1/2" sequential
+  assignment, the principled version of the adaptive counting model the lesson
+  builds.
 
 ## Key points the lesson must cover
 
-1. **A predictor defines a compressor**: feed the model's next-symbol
-   probabilities `q(x_t | x_{<t})` to an arithmetic coder; the coded length of a
-   stream is `≈ -Σ_t log2 q(x_t | x_{<t})` bits = the model's **cross-entropy on
-   the stream**. Better predictions (lower cross-entropy) = shorter files.
-2. **A compressor defines a predictor**: any lossless coder implicitly assigns
-   `q(x) = 2^{-length(x)}` (Kraft budget), so the code *is* a probability model;
-   decompressing shortest-first is a maximum-probability prediction.
-3. **The entropy floor**: no compressor beats the source's entropy rate
-   (`source-coding-theorem-lite`); a perfect predictor hits it, and the shortfall
-   of any model is `D(p||q)` extra bits per symbol (`kl-divergence`) — the exact
-   mismatch cost.
-4. **The whole course in one line**: entropy sets the floor, model mismatch costs
-   KL, and prediction is paid for in bits. State it as the synthesis.
-5. **Empirical reality** (Deletang): modern language models are strong
-   general-purpose compressors, and compression ratio is a clean, label-free
-   measure of predictive quality — "compression as an evaluation of intelligence".
-6. Worked with the PredictiveCompressor sandbox: same text, three models (uniform
-   bytes -> letter frequencies -> bigram), watch bits/char and total size drop as
-   the model improves.
+1. **Direction one: model → compressor.** A model that assigns `q(x_t | x_{<t})`
+   plus an arithmetic coder gives a lossless compressor whose output length is
+   `Σ_t -log2 q(x_t | x_{<t})` plus at most two bits. Nothing else is required.
+   Build it explicitly on a short string.
+2. **Direction two: compressor → model.** Any lossless compressor `C` defines
+   `q(x) = 2^{-|C(x)|}` (normalized), and Kraft guarantees the total is at most
+   one. So a compressor cannot avoid having a probability model; it can only
+   avoid admitting to it. Work the reverse on a small code table.
+3. **The equality.** Expected compressed size per symbol equals the
+   cross-entropy of the model against the source. Therefore a lower loss is a
+   smaller file, exactly, and the two objectives are the same objective in
+   different units.
+4. **Adaptivity is free.** If the model updates on the symbols already
+   transmitted, the decoder can run the identical update, so no header is
+   needed. This is why online models beat two-pass ones at equal quality, and it
+   is the sentence `minimum-description-length` will complicate.
+5. **A worked ladder.** On one paragraph of English, measure: uniform bytes
+   (8 bits/char), letter frequencies (~4.1), bigram (~3.3), and the ~1 bit/char
+   entropy-rate estimate from module 1. Each row is a model and a file size.
+   This is the same ladder as `entropy-of-english`, now with the coder attached
+   — a deliberate spiral revisit.
+6. **The scoreboard is honest.** Compression ratio is a held-out, non-gameable
+   measure of model quality: no hyperparameter of the evaluation, no arbitrary
+   metric choice. Say why this matters, briefly.
 
 ## Pitfalls / subtleties to flag
 
-- **The model must be shared or transmitted**: the equivalence is about *coding
-  cost given the model*. A fair accounting either fixes the model on both ends or
-  includes the model's description length (two-part / MDL code). For a fixed
-  pretrained model this is amortized; say so to avoid the "but you cheated by
-  shipping a 70B model" objection. Forward-ref `minimum-description-length`,
-  which makes exactly this accounting the object of study.
-- **Arithmetic coding overhead is O(1) total**, not per symbol — this is why
-  stream codes reach the entropy rate where Huffman's per-symbol 1-bit gap does
-  not (callback to huffman-by-hand's motivating flaw).
-- **Lossless only**: this equivalence is exact for lossless compression;
-  lossy compression (JPEG, VAEs as rate-distortion) is a different, related story
-  — mention as beyond scope, do not conflate.
-- Cross-entropy in *nats* (ML default) vs. *bits* (file size): convert by
-  `1 nat = 1.443 bits`. A model's nats/token is its bits/token up to that factor.
-- "Better predictor = better compressor" holds for the *achievable* size; a real
-  compressor also has implementation overhead. Keep the claim about the coding
-  cost, not a specific gzip number.
+- The equivalence is per stream and in expectation. A single file can be
+  compressed below its model's cross-entropy by luck.
+- The compressor must be lossless for the correspondence to hold. Lossy
+  compressors correspond to something else — `rate-distortion`, later.
+- A model's size counts if it must be transmitted. The adaptive construction
+  dodges this; a model with 70 billion parameters does not, and that tension is
+  deferred to `minimum-description-length`. Name the debt here.
+- `q(x) = 2^{-|C(x)|}` may sum to less than one (Kraft slack), so the induced
+  model is a sub-probability. Say so; the slack is wasted bits.
+- Do not claim gzip "is" a model in a useful sense — the induced distribution is
+  intractable to evaluate. The construction is a proof of existence, not a
+  practical extraction.
 
 ## FIGURE PLAN
 
-1. **`<FigureSequence>` (4-5 frames)** — the predict-then-code pipeline on a short
-   string: frame per symbol, the model emits `q(next | context)`, the arithmetic
-   coder narrows its interval, the running bit-count ticks up by `-log2 q`. Delta
-   = one symbol per frame. The house-signature process sequence. Inspiration:
-   MacKay ch. 6 arithmetic-coding interval diagram (recreate).
-2. **single `<Figure>` (component)** — the two-way equivalence: left "predictor ->
-   probabilities -> arithmetic coder -> bits", right "bits -> code lengths ->
-   `q = 2^{-len}` -> predictor", a bidirectional arrow labeled "same object". One
-   idea: prediction and compression are one map. Inspiration: Deletang §2.
-3. **single `<Figure>` (component)** — bits/char across three models on the same
-   sentence: uniform bytes (8), letter frequencies (~4.1), bigram (~3.x),
-   descending toward the English entropy rate line (~1). Static twin of the
-   PredictiveCompressor demo. One idea: better model, smaller file.
-4. **single `<Figure>` (component)** — coding cost = `H(rate) + D(p||q)` on a
-   stream: the entropy-rate floor plus the model's KL excess, as a stacked bar,
-   tying the file size to the two quantities the course built. One idea: file
-   size = floor + mismatch.
-5. **single `<Figure>` (component)** — course capstone map: entropy (floor) ->
-   codes/Kraft (spend the budget) -> KL (mismatch cost) -> cross-entropy
-   (training) -> compression (prediction), a single left-to-right spine with each
-   node labeled by its lesson. One idea: the whole course in one picture. This is
-   the synthesis figure.
+1. `draw:` **single `<Figure>`** — the two-way arrow: MODEL ⇄ COMPRESSOR, with
+   the construction in each direction written under its arrow (arithmetic coder
+   one way, `2^{-|C(x)|}` the other). One idea: the correspondence is
+   constructive both ways.
+2. `draw:` **`<FigureSequence>` (4 frames)** — compressing a short string with an
+   adaptive model: each frame shows the current counts, the predicted
+   distribution, the symbol arriving, the bits charged, and the counts updated.
+   Delta = one symbol per frame. Binds the PredictiveCompressor demo.
+3. `draw:` **single `<Figure>`** — the ladder: four bars for uniform, monogram,
+   bigram and entropy-rate models on the same paragraph, each labelled with
+   bits/char and the resulting file size in bytes. One idea: a better model is
+   a smaller file, measured.
+4. `draw:` **single `<Figure>`** — the adaptive-versus-two-pass comparison: two
+   bitstreams drawn to scale, one with a header block shaded and one without,
+   with the crossover file size annotated. One idea: the header is the price of
+   not being adaptive.
+5. `draw:` **single `<Figure>`** — the Kraft slack in a real compressor: the
+   induced `q` bars summing to less than one, with the deficit shaded "wasted".
+   One idea: every compressor is a bet, and a sloppy one leaves money on the
+   table.
+
+No `source:` entry.
+
+## EXERCISE PLAN
+
+1. *(warm-up)* Given a per-symbol model and a 12-symbol message, compute the
+   arithmetic-coded length and the cross-entropy, and confirm they agree to
+   within two bits.
+2. **Boundary probe.** Apply the construction to a model that assigns
+   probability 1 to the observed symbol at every step. Report the file size,
+   then explain what such a model implies about the source and why it is
+   unattainable for any source with positive entropy rate.
+3. **Claim to refute.** "gzip compresses this file to 30%, so the file's entropy
+   rate is about 2.4 bits per byte." Give two reasons the inference is invalid,
+   one about the direction of the inequality and one about what gzip's model can
+   represent.
+4. **Derivation the lesson skipped.** Show that for any uniquely decodable code
+   `C`, the induced `q(x) = 2^{-|C(x)|}` satisfies `Σ q ≤ 1`, and hence that no
+   compressor can beat the entropy in expectation. State which earlier theorem
+   is doing the work.
+5. **Research-shaped.** Build the ladder yourself: on a text file of at least
+   10 KB, compute the compressed size under a uniform model, a letter-frequency
+   model and a bigram model with a small smoothing constant. Report four numbers
+   (the three plus gzip) and state which model gzip's performance sits between.
+6. **Mixed review (E3).** You are given two models and one test stream. Decide
+   which model compresses better *without* running the coder, then run it and
+   check. State what quantity you compared.
+7. **FORWARD (E7).** Your bigram model needs a table of 26x26 counts. Estimate
+   the bits required to transmit that table alongside the compressed file, and
+   compute the total. Then find the file size at which the bigram model stops
+   paying for itself against the monogram model. Reaches
+   `minimum-description-length` — the solution names the two-part code and
+   `<Ref>`s it.
+
+## REVISION (kept slug)
+
+**Gain**
+- ARC paragraph; and `arithmetic-coding` now available as a prerequisite. The
+  current draft has to hand-wave the coder because arithmetic coding did not
+  exist in the syllabus — it now does, and the construction should be stated
+  concretely with a `<Ref>` rather than described.
+- Direction two (compressor → model) given equal weight; the current draft is
+  lopsided toward direction one.
+- Figures 1, 4, 5 above.
+- The explicit debt to `minimum-description-length` about model size, stated as
+  an open question rather than left silent.
+- Depth toward 34 minutes.
+
+**Lose**
+- Any claim that the correspondence is approximate or metaphorical.
+- Restating the equality in a callout after deriving it (L15).

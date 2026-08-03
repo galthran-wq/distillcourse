@@ -1,97 +1,148 @@
 # Research brief: channel-capacity (Channel capacity)
 
-status: planned
+status: drafted (kept slug — revise, do not rewrite)
 module: channels
 type: core
 goal: Compute the capacity of a discrete memoryless channel.
+est_minutes: 34
 
-New lesson opening the scope expansion into the second half of Shannon's theory.
-Entropy gave the source-coding limit; capacity gives mutual information its own
-operational limit. Cover & Thomas fig. 1.2's "two extreme points" (min I =
-compression, max I = capacity) is the framing. This lesson is computational:
-define the channel, then compute C for the two canonical channels by hand.
+## ARC
+
+- **Inherits:** `I(X;Y)` as the information one variable carries about another
+  (`mutual-information`).
+- **Spine step:** "Noise makes distinct inputs produce overlapping outputs;
+  maximizing mutual information over the input distribution gives a rate that is
+  achievable and above which reliable communication is impossible." (step 6,
+  *The second limit*, 1948–2020)
+- **Contributes:** `C = max_{p(x)} I(X;Y)` and the closed forms for the two
+  channels used everywhere after (BSC and BEC).
+- **Hands off to:** `noisy-channel-coding`, which supplies the operational
+  meaning without which `C` is just a maximisation.
 
 ## Sources to consult
 
-- Shannon 1948, **Part II, §11-12** — the noisy channel, equivocation
-  `H_y(x)`, rate `R = H(x) - H_y(x)`, and capacity `C = max[H(x) - H_y(x)]`;
-  **§15-16** work explicit capacity calculations (symmetric channels
-  `C = log m + Σ p_i log p_i`).
-- Cover & Thomas, **§7.1 "Examples of Channels"** (noiseless binary, noisy
-  typewriter, BSC §7.1.4, BEC §7.1.5), **§7.2 "Symmetric Channels"**, **§7.3
-  "Properties of Channel Capacity"** — capacity `C = max_{p(x)} I(X;Y)`,
-  `0 ≤ C ≤ log|X|`, concavity of I in the input.
-- MacKay, **ch. 9, §9.5-9.6** — mutual information of a channel, capacity, worked
-  BSC / Z-channel / binary-erasure examples with the maximizing input.
-- Polyanskiy & Wu, **ch. 4** (capacity as an information radius / saddle point)
-  and **§16.4** (BSC/BEC capacities) — cross-check.
+- Cover & Thomas, **§7.1** — the five worked example channels (noiseless binary,
+  non-overlapping outputs, noisy typewriter, BSC, BEC) each with its capacity
+  computed; **§7.2** symmetric channels and the shortcut formula; **§7.3**
+  properties of `C` (non-negative, bounded by `log|X|` and `log|Y|`, concave in
+  `p(x)`).
+- MacKay, **ch. 9 §9.3-9.5** — the same channels plus the Z channel, the
+  `I(X;Y)`-against-input-bias curves (his figs 9.2-9.3), and the noisy
+  typewriter's exact capacity `log2 9` achieved by a length-1 code.
+- Weissman (EE376A), **§5.2.1** — BSC and BEC capacity derived compactly.
+- Polyanskiy & Wu, **§4.4-4.5** — capacity as an information radius and the
+  saddle-point characterisation, with the unique capacity-achieving *output*
+  distribution. Good material for a starred section.
+- Shannon 1948 Part II, **§12** (equivocation, and the 1000 bits/sec 1%-error
+  worked example giving 919 bits/sec) and **§16** (symmetric-channel formulas).
 
 ## Key points the lesson must cover
 
-1. **A discrete channel is a transition table** `p(y|x)`: input alphabet X,
-   output alphabet Y, one conditional distribution per input. Memoryless = each
-   use independent. Concrete opener: the BSC, a bit flipped with probability p.
-2. **The channel's noise is `H(Y|X)`**; what the output tells you about the input
-   is `I(X;Y) = H(Y) - H(Y|X)`. I depends on both the channel and the chosen
-   input distribution `p(x)`.
-3. **Capacity** `C = max_{p(x)} I(X;Y)`, in bits per channel use — the most
-   information any input can push through. Bound `0 ≤ C ≤ log|X|`.
-4. **Binary symmetric channel**: with a uniform input, `I = 1 - H(p)`, and
-   uniform is the maximizer (symmetry), so `C_BSC = 1 - H(p)`. Compute at
-   p = 0 (C = 1), p = 0.1 (C ≈ 0.53), p = 0.5 (C = 0, useless channel). Show the
-   full derivation: `H(Y|X) = H(p)` for any input, `H(Y) ≤ 1` maximized at
-   uniform.
-5. **Binary erasure channel**: fraction e of symbols erased; `C_BEC = 1 - e`.
-   Derive: a received non-erasure is the input exactly; the receiver learns
-   `(1-e)` bits per use on average. Contrast the two channels — erasure is
-   "easier" than flipping at the same noise level.
-6. **The maximizing input is not always uniform**: state that in general C is a
-   concave maximization (Blahut-Arimoto computes it) but our two channels are
-   symmetric, so uniform wins; the neural-coding lesson uses this again.
+1. **A channel is a conditional distribution** `p(y|x)`, nothing more. Draw the
+   transition diagram; the noise is `H(Y|X)`.
+2. **Why a maximisation.** The channel is fixed; the input distribution is the
+   engineer's choice. `I(X;Y)` depends on both, so the channel's own figure of
+   merit is the maximum over inputs. Show `I` against input bias for a fixed BSC
+   so the maximum is visible.
+3. **BSC**: `C = 1 - H(p)`, attained at a uniform input. Derive it. Note the two
+   noiseless cases `p = 0` and `p = 1` and why both give `C = 1`.
+4. **BEC**: `C = 1 - e`. Derive it, and note that the answer is exactly the
+   fraction of symbols that survive — the erasure channel is the one case where
+   the intuitive answer is right.
+5. **A channel where intuition fails**: the noisy typewriter (27 letters, each
+   received as itself or its neighbour). Capacity is `log2 27 - 1 = log2 13.5`,
+   but the achievable-by-inspection code (use every other letter) gives
+   `log2 13`. Work both. Alternatively use the Z channel, whose optimal input is
+   *not* uniform — a good reversal seam, since the reader will expect symmetry.
+6. **Equivocation.** Shannon's own framing: the useful rate is
+   `H(X) - H(X|Y)`, and his 1000 bits/sec at 1% error example (919 bits/sec, not
+   990) is the sharpest available demonstration that the naive subtraction is
+   wrong. Work it.
+7. **Properties**: `0 ≤ C ≤ min(log|X|, log|Y|)`; `I(X;Y)` is concave in `p(x)`
+   so the maximum is well defined and reachable by hill climbing.
 
 ## Pitfalls / subtleties to flag
 
-- Capacity maximizes over the **input distribution**, a design choice; it is not
-  a property of the channel's noise alone the way `H(Y|X)` is.
-- `I(X;Y)` here uses the same MI the course built; capacity is just its maximum
-  over inputs. Do not introduce a new information quantity.
-- BSC at p = 0.5 has **zero** capacity even though bits still arrive — the output
-  is independent of the input. Good `<KeyFact>`: a noisy channel and a useless
-  channel are different, and the boundary is C = 0.
-- BSC capacity `1 - H(p)` is symmetric in p and 1-p (a channel that flips with
-  prob 0.9 is as good as 0.1: just invert the output). Note it.
-- Units: bits per channel use (log base 2). The Gaussian channel
-  `C = ½ log(1 + P/N)` is out of scope here — one-sentence forward pointer to
-  neural-coding, where it is cited not derived.
-- Capacity is an *achievable* limit; that it can actually be reached is the next
-  lesson's theorem, not assumed here.
+- `C` has units of bits **per channel use**, not per second, until a symbol rate
+  is supplied.
+- `C = 0` for the BSC at `p = 1/2` and only there; at `p = 1` the channel is
+  perfect (invert every bit).
+- The maximising input is uniform for symmetric channels and generally not
+  otherwise. Say it once with the Z channel as the counter-instance.
+- Capacity says nothing yet about whether the rate is achievable. That is next
+  lesson, and this lesson must not borrow it.
+- Memorylessness is an assumption: `p(y^n | x^n) = Π p(y_i|x_i)`. Real channels
+  with memory have different capacities and the same theory applies to the
+  extended channel.
 
 ## FIGURE PLAN
 
-1. **single `<Figure>` (component)** — the BSC as a two-node transition diagram:
-   inputs 0/1 on the left, outputs 0/1 on the right, straight-through arrows
-   labeled `1-p` and crossing arrows labeled `p`. One idea: a channel is a
-   transition table. Inspiration: Cover & Thomas §7.1.4 / MacKay ch. 9.
-2. **single `<Figure>` (component)** — the BEC transition diagram: 0/1 in, 0/`?`/1
-   out, erasure arrows to `?` labeled `e`. One idea: erasure flags its own
-   failures. Inspiration: Cover & Thomas §7.1.5.
-3. **single `<Figure>` (component)** — capacity of the BSC as `1 - H(p)`: the
-   binary-entropy curve subtracted from 1, plotted over p, with p = 0, 0.1, 0.5
-   marked (C = 1, 0.53, 0). One idea: capacity collapses to 0 at p = 1/2. Reuses
-   the binary entropy curve from `entropy-as-average-surprise`.
-4. **single `<Figure>` (component)** — `I(X;Y)` vs input bias for a fixed BSC: an
-   inverted-U over `p(x=1)`, peaking at the uniform input where I = C. Static
-   twin of the ChannelCapacityDial demo. One idea: capacity is a maximum over
-   inputs.
-5. **`<FigureSequence>` (3 frames)** — the BSC derivation: frame 1 `H(Y|X) = H(p)`
-   (same for any input); frame 2 `H(Y) ≤ 1`, maximized at the uniform input;
-   frame 3 subtract to `C = 1 - H(p)`. Delta = one line of the derivation per
-   frame.
-6. **single `<Figure>` (component)** — BSC vs BEC at matched noise: two capacity
-   bars for p = e = 0.2 (`C_BSC = 1 - H(0.2) ≈ 0.28` vs `C_BEC = 0.8`), payoff
-   "knowing which symbols failed is worth a lot". One idea: erasure beats
-   flipping. Inspiration: playbook two-panel comparison.
-7. **single `<Figure>` (component)** — the two limits map: a spine
-   `min I(X;X̂) = source coding` … `max I(X;Y) = channel capacity`, entropy and
-   capacity as the two extreme points of the same quantity. One idea: capacity
-   is entropy's mirror. Inspiration: Cover & Thomas fig. 1.2 (recreate).
+1. `draw:` **single `<Figure>`** — the BSC transition diagram with crossover `p`
+   labelled on the diagonal arrows, and `H(Y|X) = H(p)` written beside it.
+2. `draw:` **single `<Figure>`** — the channel gallery: BSC, BEC, noisy
+   typewriter and Z channel as four small bipartite diagrams, each annotated
+   with its capacity formula. One idea: capacity is a property of the arrow
+   pattern. Inspiration: Cover & Thomas §7.1's family of five.
+3. `draw:` **`<FigureSequence>` (3 frames)** — the maximisation: frame 1 fixes a
+   BSC and plots `I(X;Y)` against input bias with a marked non-optimal point;
+   frame 2 slides to the maximum; frame 3 labels the maximum `C`. One idea: `C`
+   is the top of a curve, and the curve belongs to the channel.
+4. `draw:` **single `<Figure>`** — `C = 1 - H(p)` plotted against `p` for the
+   BSC beside `C = 1 - e` for the BEC, on shared axes. One idea: the same noise
+   level costs very differently depending on whether you know it happened.
+5. `draw:` **single `<Figure>`** — Shannon's equivocation example as a bar:
+   1000 bits/sec sent, the naive 990 marked wrong, and the correct 919 with the
+   equivocation `H(X|Y)` shaded. One idea: an error costs more than the bit it
+   destroyed.
+6. `draw:` **single `<Figure>`** — the Z channel's asymmetry: the transition
+   diagram beside the `I`-against-input-bias curve peaking away from 1/2, with
+   the optimal bias marked. One idea: symmetry of the input is a consequence,
+   not a rule.
+
+No `source:` entry; every figure here is a diagram or a curve.
+
+## EXERCISE PLAN
+
+1. *(warm-up)* Compute the capacity of a BSC with `p = 0.11` and of a BEC with
+   `e = 0.11`, and state which channel is worse and by how much.
+2. **Boundary probe.** Compute the capacity of a BSC at `p = 0.5` and at
+   `p = 1`. Explain why the two answers differ, and state what physical
+   operation rescues the second case.
+3. **Claim to refute.** "A channel that corrupts 10% of bits can carry at most
+   90% of a bit per use." Refute it in both directions: give the true BSC
+   capacity at `p = 0.1`, and give a channel where the naive figure is exactly
+   right.
+4. **Derivation the lesson skipped.** Derive the BEC capacity from scratch, and
+   then derive it a second way by noticing that the receiver knows which symbols
+   were erased. State which step of the first derivation the second replaces.
+5. **Derivation, harder.** For the Z channel with `p(1→0) = a` and `p(0→0) = 1`,
+   maximise `I(X;Y)` over the input bias and show the optimum is not 1/2. Report
+   the optimal bias for `a = 0.5`.
+6. **Research-shaped.** Model a real link you can measure — a noisy serial line,
+   a lossy UDP path, a QR code photographed at an angle — as a BSC or BEC,
+   estimate the parameter from a few hundred trials, and report the capacity
+   with an honest error range.
+7. **FORWARD (E7).** For a BSC with `p = 0.11`, capacity is exactly 0.5 bits per
+   use. A repetition code of length 3 achieves rate 1/3. Compute its block error
+   probability, then for length 5, then 7. Report whether the error goes to zero
+   and what the rate does. Reaches `noisy-channel-coding` — the solution notes
+   that repetition buys reliability only by giving up all the rate, and that the
+   theorem promises something strictly better, with a `<Ref>`.
+
+## REVISION (kept slug)
+
+**Gain**
+- ARC paragraph placing this at the head of spine step 6.
+- Figures 2, 5, 6 above. The Z channel and the equivocation example are both
+  missing from the current draft and both do real work: one breaks the
+  symmetry expectation, the other shows why capacity is not "bits minus errors".
+- The noisy typewriter or Z channel as an explicit reversal seam.
+- Shannon's 1000 bits/sec worked example.
+- Depth toward 34 minutes.
+
+**Lose**
+- Any leak of the coding theorem: the current draft's framing of capacity as
+  "the rate you can achieve" pre-empts the next lesson. Capacity here is a
+  maximised mutual information whose operational meaning is still open — state
+  that as the open question.
+- Restatement callouts for `C = 1 - H(p)` (L15).
