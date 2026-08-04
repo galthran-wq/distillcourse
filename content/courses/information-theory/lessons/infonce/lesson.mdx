@@ -4,15 +4,23 @@ where L_N is the contrastive cross-entropy loss.
 
 The course's argument reached mutual information as a number computed from
 a joint table, and then established that the table is exactly what a
-practitioner does not have: <Ref lesson="estimating-mutual-information"/>
-showed that plug-in estimates of $I(X;Y)$ from binned samples manufacture
-bits that are not there, and that the sample cost of getting them right
-grows exponentially with dimension. What stands open is whether anything
-about $I(X;Y)$ can be certified for images, audio or text at all. This
-lesson answers with a construction that touches no density: pose the
-estimation as a classification problem, train a critic, and read a floor
-under $I(X;Y)$ off the loss. The floor is genuine and the instrument is
-narrow, and the second fact is the more useful one.
+practitioner does not have: plug-in estimates of $I(X;Y)$ from binned
+samples manufacture bits that are not there, and the sample cost of getting
+them right grows exponentially with dimension
+(<Ref lesson="estimating-mutual-information"/>). The information bottleneck
+of <Ref lesson="information-bottleneck"/>, which keeps the bits of $X$ that
+inform a target $Y$ and discards the rest, left that gap in its sharpest
+form: its relevance bound subtracts a decoder's cross-entropy loss from
+$H(Y)$, and $H(Y)$ is an unknown offset the moment $Y$ is a caption rather
+than a label, so the bound ranks representations and certifies no number of
+bits. What stands open is
+therefore whether anything about $I(X;Y)$ can be certified for images,
+audio or text at all. This lesson answers with a construction that touches
+no density: ask the decoder to pick $Y$ out of $N$ candidates instead of to
+reconstruct it, which replaces the unevaluable $H(Y)$ by $\log_2 N$, the
+entropy of a uniform choice the experimenter sets, and leaves a floor under
+$I(X;Y)$ readable off a classification loss. The floor is genuine and the
+instrument is narrow, and the second fact is the more useful one.
 
 The route: what a sample-only estimator has to work with, the $N$-way
 contrastive task and its loss, the proof that the loss-minimizing critic
@@ -152,11 +160,9 @@ Everything derived below identifies ratios **against $p(y)$**, so the
 negatives must be marginal draws, which in practice means real partners
 borrowed from other pairs in the batch. This is the single hypothesis every
 result in this lesson is conditional on. Sampling the negatives from a
-convenient noise model $q$ instead changes what the loss bounds, and
-changes it upward: the certificate then converges on a value that *exceeds*
-$I(X;Y)$ by the mismatch between $q$ and $p(y)$, so the one-way guarantee
-that makes the number safe to report is gone. The closing exercises price
-the mismatch exactly. This is also the difference between InfoNCE and
+convenient noise model $q$ instead changes what the loss bounds; the
+closing exercises derive by how much, and in which direction. This is also
+the difference between InfoNCE and
 generic noise-contrastive estimation, where the noise distribution is
 chosen by the designer to make an unnormalized model fittable.
 </Remark>
@@ -662,10 +668,18 @@ as the lineup average $A$ concentrates on $1$.
 />
 
 <KeyFact>
-The gap between the truth and the certificate is not mysterious: it equals
-$\mathbb{E}_Q[A \log_2 A]$, the price of lineups whose average ratio
-strays from $1$. Enlarging the lineup is the only lever that closes it, and
-the next section shows what that lever cannot do.
+Enlarging the lineup is the only lever on the slack, and how fast it works
+is set by how far $r$ spreads under the marginal: at a fixed context the
+$N$ terms averaged in $A$ each have variance
+$\chi^2 = \sum_y p(y \mid x)^2/p(y) - 1$, so the slack stays open until $N$
+passes that number. For the toy pair $\chi^2 = 0.25$, which is why the
+slack is already down to a hundredth of a bit at $N = 16$; for a lockstep
+pair on $M$ symbols it is $M - 1 = 2^{I(X;Y)} - 1$. Since
+$1 + \chi^2 = 2^{D_2}$ for the Rényi-2 divergence $D_2$ between
+$p(y \mid x)$ and $p(y)$, and $D_2$ is never below the KL divergence that
+averages to $I(X;Y)$, closing the slack on a strongly dependent pair takes
+a lineup exponential in the bits being certified — the threshold $2^{I}$
+that the next section meets again, there as a hard cap rather than a rate.
 </KeyFact>
 
 ## The ceiling: nothing above log₂ N is certifiable
@@ -762,8 +776,8 @@ pursue $20$ bits requires over a million candidates.
 
 <Figure
   src="./figures/batch-ceiling.svg"
-  alt="Certifiable bits against candidate count on a log axis: a straight line log2 N marked at 64 candidates for a CPC minibatch (6 bits), 8,191 for SimCLR (13 bits), 32,768 for CLIP (15 bits), and 65,536 for the MoCo queue (16 bits)"
-  caption="One bit per doubling: the deployed candidate counts of published contrastive systems buy 6 to 16 bits of ceiling."
+  alt="Certifiable bits against candidate count on a log axis: a straight line log2 N carrying a band from 8 to about 1,000 candidates for CPC's minibatch negatives (3 to 10 bits), and marks at 8,191 for SimCLR (13 bits), 32,768 for CLIP (15 bits), and 65,536 for the MoCo queue (16 bits)"
+  caption="One bit per doubling: the minibatch negatives of contrastive predictive coding (CPC, the 2018 system this bound comes from) buy at most ten bits of ceiling; the queues and large batches of later systems buy 13 to 16."
 />
 
 The published numbers sit exactly where the constraint predicts.
@@ -849,11 +863,16 @@ probe. The comparisons are $39.7\%$ for MFCC features, the hand-designed
 spectral descriptors that preceded learned ones, and $74.6\%$ for a
 network trained on the labels directly: most of the supervised gap closed
 without labels. On ImageNet the same recipe gives a linear probe $48.7\%$
-top-1 accuracy. Those runs drew their negatives from minibatches of eight
-examples, so the candidate count was in the tens and the certificate was
-capped near $6$ bits, below any plausible figure for what a waveform shares
-with its own future. The representations are good anyway: the objective's
-usefulness never depended on the bound being tight.
+top-1 accuracy. Those runs drew their negatives from inside a minibatch —
+eight audio windows per GPU on LibriSpeech, sixteen images on ImageNet —
+taking them both from the other examples and from other time positions of
+the same sequence. No candidate count is reported, and the minibatch bounds
+it at both ends: at least the seven other examples, at most the
+thousand-odd latents that eight $1.3$-second windows encode to, so the
+ceiling on the certificate lay between $3$ and $10$ bits, below any
+plausible figure for what a second of waveform shares with the $120$ ms it
+predicts. The representations are good anyway: the objective's usefulness
+never depended on the bound being tight.
 
 {/* fig CpcPipeline: the CPC system in one left-to-right strip, tiers
     per playbook rule 5 (data → representation → computation →
