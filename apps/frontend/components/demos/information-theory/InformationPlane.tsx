@@ -5,7 +5,14 @@
  * X uniform on {a,b,c,d}, p(y=1|x) = 0, 1/4, 3/4, 1.
  * A beta slider moves the optimal encoder's point along the frontier,
  * computed once at load by the self-consistent Gibbs iteration
- * (Tishby-Pereira-Bialek Theorem 4), annealed upward in beta.
+ * (Tishby-Pereira-Bialek Theorem 4).
+ *
+ * The two-cluster and four-cluster branches are both stable fixed points for
+ * 5.11 < beta < ~7, so annealing in ONE direction reports a local optimum:
+ * an upward sweep clings to the two-cluster branch until it loses stability
+ * near beta = 7, long after the four-cluster branch has overtaken it. The
+ * sweep therefore anneals both ways and keeps, at each beta, whichever fixed
+ * point has the smaller L = I(X;T) - beta I(T;Y).
  */
 import { useState } from "react";
 import { Panel, PresetGroup, Readout, Slider } from "@/components/ui";
@@ -72,18 +79,44 @@ function planePoint(enc: Enc) {
   return { ixt, ity };
 }
 
-/** Frontier sweep: anneal beta upward, warm-starting each step and nudging
- * toward the identity encoder so the trivial fixed point can be escaped. */
+/** Iterate the Gibbs update to a fixed point. */
+function relax(enc: Enc, beta: number): Enc {
+  for (let k = 0; k < 2000; k++) {
+    const next = ibStep(enc, beta);
+    let d = 0;
+    for (let x = 0; x < N; x++)
+      for (let t = 0; t < N; t++) d = Math.max(d, Math.abs(next[x][t] - enc[x][t]));
+    enc = next;
+    if (d < 1e-10) break;
+  }
+  return enc;
+}
+
+/** Frontier sweep: anneal beta both ways, then keep the lower-L branch. */
 const SWEEP = (() => {
+  const steps = Math.round(BETA_MAX / BETA_STEP);
+  // upward from the uniform encoder, nudged toward the identity so the
+  // trivial fixed point can be escaped
+  const up: { beta: number; ixt: number; ity: number }[] = [];
   let enc: Enc = Array.from({ length: N }, () => Array<number>(N).fill(1 / N));
-  const points: { beta: number; ixt: number; ity: number }[] = [];
-  for (let i = 0; i <= Math.round(BETA_MAX / BETA_STEP); i++) {
+  for (let i = 0; i <= steps; i++) {
     const beta = i * BETA_STEP;
     enc = enc.map((row, x) => row.map((v, t) => 0.98 * v + (t === x ? 0.02 : 0)));
-    for (let k = 0; k < 200; k++) enc = ibStep(enc, beta);
-    points.push({ beta, ...planePoint(enc) });
+    enc = relax(enc, beta);
+    up.push({ beta, ...planePoint(enc) });
   }
-  return points;
+  // downward from the identity encoder at BETA_MAX
+  const down = new Array<{ beta: number; ixt: number; ity: number }>(steps + 1);
+  enc = Array.from({ length: N }, (_, x) =>
+    Array.from({ length: N }, (_, t) => (t === x ? 0.97 : 0.01)),
+  );
+  for (let i = steps; i >= 0; i--) {
+    const beta = i * BETA_STEP;
+    enc = relax(enc, beta);
+    down[i] = { beta, ...planePoint(enc) };
+  }
+  const cost = (p: { beta: number; ixt: number; ity: number }) => p.ixt - p.beta * p.ity;
+  return up.map((u, i) => (cost(down[i]) < cost(u) ? down[i] : u));
 })();
 
 // Plane geometry: I(X;T) in [0, 2.2] -> x px, I(T;Y) in [0, 0.7] -> y px.

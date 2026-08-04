@@ -1,87 +1,97 @@
 A classifier trained to pick the true partner of a context out of N
 candidates yields a mutual-information estimate: I(X;Y) >= log2 N - L_N,
-where L_N is the contrastive cross-entropy loss. This lesson turns the
-mutual information of <Ref lesson="mutual-information"/> into a quantity
-trainable from samples. The route: why joint-table estimation fails at
-scale, the N-way contrastive task and its loss, the proof that the optimal
-classifier scores candidates by the density ratio $p(y \mid x)/p(y)$, the
-derivation of the bound, exact numbers on a toy pair, the $\log_2 N$
-ceiling that forces large candidate counts, and the loss's role in
-contrastive representation learning.
+where L_N is the contrastive cross-entropy loss.
 
-## Joint tables do not scale: the estimation problem
+The course's argument reached mutual information as a number computed from
+a joint table, and then established that the table is exactly what a
+practitioner does not have: <Ref lesson="estimating-mutual-information"/>
+showed that plug-in estimates of $I(X;Y)$ from binned samples manufacture
+bits that are not there, and that the sample cost of getting them right
+grows exponentially with dimension. What stands open is whether anything
+about $I(X;Y)$ can be certified for images, audio or text at all. This
+lesson answers with a construction that touches no density: pose the
+estimation as a classification problem, train a critic, and read a floor
+under $I(X;Y)$ off the loss. The floor is genuine and the instrument is
+narrow, and the second fact is the more useful one.
 
-Every mutual information computed in this course came out of a complete
-joint table: the $2\times 2$ weather table of
-<Ref lesson="joint-and-conditional-entropy"/>, the $2\times 4$ source of
-<Ref lesson="information-bottleneck"/>. The recipe reads $p(x,y)$ off
-every cell, takes marginals by summing and conditionals by renormalizing,
-and evaluates $I(X;Y)$ by the formulas of
-<Ref lesson="mutual-information"/>.
+The route: what a sample-only estimator has to work with, the $N$-way
+contrastive task and its loss, the proof that the loss-minimizing critic
+scores candidates by the density ratio $p(y \mid x)/p(y)$, an exact
+derivation of the bound with its slack in closed form, the numbers on a toy
+pair, the $\log_2 N$ ceiling that no amount of dependence can lift, and the
+separation between what the bound measures and what a representation is
+worth.
 
-For the pairs modern learning cares about, the table does not exist. Let
-$X$ be a $32 \times 32$ RGB image and $Y$ a sentence describing it: $X$
-alone ranges over $256^{3072}$ values, so the joint table has more cells
-than there are atoms in the observable universe (about $10^{80}$).
-Estimating a cell probability by counting requires observing that cell
-many times; no dataset visits more than a vanishing fraction of cells even
-once. The counting recipe is not merely expensive at this scale: it is
-undefined.
+## What a sample-only estimator has to work with
 
-What a dataset does provide is **samples**. It provides draws from the
-joint: the recorded pairs $(x_i, y_i) \sim p(x,y)$. And it provides draws
-from the marginal for free: shuffling the pairing detaches each $y_i$ from
-its context, giving samples of $p(y)$ alone. The estimation problem is to
-build, from these two kinds of samples, a computable quantity whose value
-certifies something about $I(X;Y)$.
+The obstacle is not that the joint table is large. It is that it does not
+exist. Let $X$ be a $32 \times 32$ RGB image and $Y$ a sentence describing
+it: $X$ alone ranges over $256^{3072}$ values, so the table has
+astronomically more cells than the observable universe has atoms
+($10^{80}$). Estimating a cell's probability by counting requires observing
+that cell many times, and no dataset visits more than a vanishing fraction
+of cells even once. Binning the space coarsely enough to fill the cells
+does not rescue the estimate; it replaces it with a measurement of the bin
+width.
 
-The problem is exactly where the previous lesson stopped:
-<Ref lesson="information-bottleneck"/> defined the objective
-$I(X;T) - \beta\, I(T;Y)$ and noted that estimating its mutual
-informations from high-dimensional samples gates every practical use.
-[Contrastive predictive coding](https://arxiv.org/abs/1807.03748)
-(van den Oord, Li & Vinyals, 2018) supplies the tool this lesson derives;
-its motivating observation (§2.1 of the paper) is that mutual information
-is the right training objective for representations, and that modeling
-$p(y \mid x)$ generatively (reconstructing every pixel of $y$) spends
-model capacity on detail the shared information does not contain.
+What a dataset does provide is two streams of samples, and every method in
+this lesson is built from them alone.
+
+- **Paired draws.** The recorded pairs $(x_i, y_i) \sim p(x,y)$: an image
+  with its caption, a waveform window with the window that follows it.
+- **Shuffled draws.** Detaching each $y_i$ from its own context turns it
+  into a draw from the marginal $p(y)$, because a caption picked at random
+  from the dataset is exactly that. Marginal samples are free.
+
+<Task>
+Before reading on, state from memory: (a) the divergence form of $I(X;Y)$
+as an expectation of a log ratio; (b) which distribution minimizes a
+cross-entropy loss when the labels come from a fixed distribution; (c) one
+reason a plug-in estimate of $I$ from binned samples reads high. All three
+are used below, each restated where it is used.
+</Task>
+
+The estimation problem is therefore: build, out of paired and shuffled
+samples plus a trainable function, a computable number that says something
+true about $I(X;Y)$. "Something true" will turn out to mean a lower bound,
+and the restriction is not a weakness of the particular construction below.
+Any procedure that certifies a lower bound on mutual information from $n$
+samples with high confidence, without assuming anything about the
+distribution, is capped at about $\log n$ bits
+([McAllester & Stratos, 2020](https://arxiv.org/abs/1811.04251)).
 
 <KeyFact>
-Every $I(X;Y)$ so far came from a full joint table; for images, audio,
-and text the table is unavailable. InfoNCE replaces it with a quantity
-computable from two things every dataset has: paired samples and shuffled
-samples.
+The $\log_2 N$ ceiling derived later in this lesson is one instance of that
+limit rather than a defect of the particular construction, which is why a
+reported "30 bits of mutual information" between high-dimensional variables
+is a statement about the method used, not about the data.
 </KeyFact>
 
-## The contrastive setup: one true partner among N candidates
+## The contrastive task: one true partner among N candidates
 
-### The running toy pair
+The two sample streams admit exactly one natural game: mix them and ask
+which is which. Present a context together with $N$ candidates, one of them
+its recorded partner and the rest shuffled in, and require the true one to
+be identified.
 
-The toy joint for the whole lesson is the dependence-dial table of
-<Ref lesson="mutual-information"/> at agreement $q = 0.75$: binary $X$ and
-$Y$ with uniform marginals, diagonal cells $\tfrac38$, off-diagonal cells
-$\tfrac18$. Its conditionals are $p(y{=}x \mid x) = 0.75$, and its mutual
-information is $I(X;Y) = 1 - H_2(0.75) \approx 0.189$ bits. Small enough
-to enumerate exactly, so every claim below can be checked by hand.
+### One round: sample, shuffle, classify
 
-### The protocol: sample, shuffle, classify
-
-One round of the contrastive task is built from the two available sample
-types:
+One round runs in three steps.
 
 1. **Draw the positive.** One pair $(x, y_{\text{pos}}) \sim p(x,y)$: the
    context and its true partner.
-2. **Draw the negatives.** $N-1$ candidates $y_1, \ldots, y_{N-1}$,
-   independent draws from the marginal $p(y)$.
+2. **Draw the negatives.** $N-1$ candidates $y_1, \ldots, y_{N-1}$, each an
+   independent draw from the marginal $p(y)$.
 3. **Classify.** Present $x$ and the $N$ candidates in random order; the
-   classifier must identify which candidate is the partner.
+   classifier names the position it believes holds the partner.
 
 A classifier for this task is built from a *critic*: a function
-$f(x, y) > 0$ scoring how well $y$ fits $x$. The scores over the $N$
-candidates are normalized by a softmax into a distribution over positions,
-and the round bills the classifier the surprisal of the softmax weight it
-placed on the true partner: a one-hot cross-entropy, the exact loss of
-<Ref lesson="cross-entropy-loss"/> with $N$ classes.
+$f(x, y) > 0$ scoring how well $y$ fits $x$. The $N$ scores are normalized
+by a softmax into a distribution over positions, and the round bills the
+classifier the surprisal of the weight it placed on the true position. That
+is a one-hot cross-entropy with $N$ classes, the loss of
+<Ref lesson="cross-entropy-loss"/>, computed on a label the dataset
+generates for itself.
 
 {/* fig ContrastiveLineup: the contrastive setup as one diagram. Left: a
     rounded box labeled "context $x$" (currentColor). Right: a column of
@@ -106,8 +116,10 @@ placed on the true partner: a one-hot cross-entropy, the exact loss of
   caption="One round: score every candidate against the context, softmax the scores, pay the surprisal of the weight placed on the true partner."
 />
 
+### The loss, and what chance costs
+
 <Definition title="InfoNCE loss">
-Given a joint distribution $p(x,y)$, a candidate count $N \ge 2$, and a
+Given a joint distribution $p(x,y)$, a candidate count $N \ge 1$, and a
 critic $f(x,y) > 0$, the **InfoNCE loss** is
 $$
 L_N[f] = \mathbb{E}\left[
@@ -120,38 +132,46 @@ $(x, y_{\text{pos}}) \sim p(x,y)$ and the negatives
 $y_1, \ldots, y_{N-1} \sim p(y)$, drawn independently.
 </Definition>
 
-**Chance baseline:** a critic that has learned nothing, a constant
-$f$, makes the softmax uniform, weight $\tfrac1N$ on every candidate,
-and pays $L_N = \log_2 N$ bits. Any smaller loss is evidence that the
-critic distinguishes true pairs from shuffled ones; the bound below turns
-that evidence into a certified number of bits.
+**Chance baseline:** a critic that has learned nothing, a constant $f$,
+makes the softmax uniform, puts weight $\tfrac1N$ on every candidate, and
+pays $L_N = \log_2 N$ bits per round. Any smaller loss is evidence that the
+critic tells recorded pairs from shuffled ones.
 
-<Remark title="negatives must be marginal draws">
-The negatives' distribution is not a free design choice: everything
-derived below identifies ratios **against $p(y)$**, so the negatives
-must come from the marginal itself. In practice this is what a training
-batch provides: for each context, the other pairs' partners are marginal
-draws. This is the point of contrast with generic noise-contrastive
-estimation ([Gutmann & Hyvärinen, 2010](https://proceedings.mlr.press/v9/gutmann10a.html)),
-which discriminates data from a designer-chosen noise distribution to fit
-unnormalized models. Exercise 7 prices the mismatch when negatives come
-from the wrong distribution.
+### The running toy pair
+
+The running example is the dependence-dial table of
+<Ref lesson="mutual-information"/> at agreement $q = 0.75$: binary $X$ and
+$Y$ with uniform marginals, diagonal cells $\tfrac38$, off-diagonal cells
+$\tfrac18$. Its conditionals are $p(y{=}x \mid x) = 0.75$ and its mutual
+information is $I(X;Y) = 1 - H_2(0.75) \approx 0.189$ bits. It is small
+enough to enumerate exactly, so every claim below can be checked by hand
+rather than sampled.
+
+<Remark title="the negatives are not a free design choice">
+Everything derived below identifies ratios **against $p(y)$**, so the
+negatives must be marginal draws, which in practice means real partners
+borrowed from other pairs in the batch. This is the single hypothesis every
+result in this lesson is conditional on. Sampling the negatives from a
+convenient noise model $q$ instead changes what the loss bounds, and
+changes it upward: the certificate then converges on a value that *exceeds*
+$I(X;Y)$ by the mismatch between $q$ and $p(y)$, so the one-way guarantee
+that makes the number safe to report is gone. The closing exercises price
+the mismatch exactly. This is also the difference between InfoNCE and
+generic noise-contrastive estimation, where the noise distribution is
+chosen by the designer to make an unnormalized model fittable.
 </Remark>
 
-<KeyFact>
-The InfoNCE loss is an $N$-way cross-entropy: one candidate from
-$p(y \mid x)$, $N-1$ from $p(y)$, and the classifier is billed
-$-\log_2$ of the softmax weight it put on the true partner. Chance costs
-$\log_2 N$ bits.
-</KeyFact>
+## The optimal critic is a density ratio
 
-## The optimal critic recovers the density ratio
+The loss is defined for any critic. What the classifier is forced to learn
+is fixed by which critic minimizes it, and the answer is neither of the
+distributions involved.
 
 ### Bayes on one concrete round
 
 Take the toy pair at $N = 2$, context $x = 0$, and suppose the two
-candidates presented are $y_1 = 0$ and $y_2 = 1$. Bayes' rule identifies
-the partner, over the two position hypotheses with a uniform prior:
+candidates presented are $y_1 = 0$ and $y_2 = 1$. Over the two position
+hypotheses, with a uniform prior, Bayes' rule gives
 
 $$
 p(\text{pos}{=}1 \mid \text{data})
@@ -159,8 +179,10 @@ p(\text{pos}{=}1 \mid \text{data})
 = \frac{0.75 \cdot 0.5}{0.75 \cdot 0.5 + 0.25 \cdot 0.5} = 0.75.
 $$
 
-Dividing numerator and denominator by $p(y_1)\,p(y_2) = 0.25$ rewrites
-the same posterior in a more portable form:
+Each hypothesis contributes one conditional factor (for the candidate
+claimed to be the partner) and one marginal factor (for the other).
+Dividing numerator and denominator by $p(y_1)\,p(y_2) = 0.25$ rewrites the
+posterior in a portable form:
 
 $$
 p(\text{pos}{=}1 \mid \text{data})
@@ -169,29 +191,39 @@ p(\text{pos}{=}1 \mid \text{data})
 $$
 
 The posterior depends on the candidates only through the ratios
-$p(y \mid x)/p(y)$: the per-cell departure from independence, which
-<Ref lesson="mutual-information"/> met as the pointwise mutual
-information's argument. The general statement:
+$p(y \mid x)/p(y)$: the per-cell departure from independence, whose
+logarithm is the pointwise mutual information of
+<Ref lesson="mutual-information"/>. Write
+
+$$
+r(x,y) = \frac{p(y \mid x)}{p(y)},
+$$
+
+so that $r = 1.5$ on the toy's agreeing cells and $r = 0.5$ on the
+disagreeing ones.
+
+<Figure
+  src="./figures/ratio-bars.svg"
+  alt="Three bar pairs: the conditional p(y|x=0) at 0.75 and 0.25, the marginal p(y) at 0.5 and 0.5, and their ratio at 1.5 and 0.5, the ratio panel marked as what the critic learns"
+  caption="Divide the conditional by the marginal and the critic's target appears: 1.5 where the pair agrees, 0.5 where it does not."
+/>
 
 <Theorem title="the optimal critic is a density-ratio softmax">
-In one round with candidates $y_1, \ldots, y_N$ (the positive at a
-uniformly random position), the posterior probability that position $i$
+In one round with candidates $y_1, \ldots, y_N$, the positive at a
+uniformly random position, the posterior probability that position $i$
 holds the true partner is
 $$
 p(\text{pos}{=}i \mid x, y_1, \ldots, y_N)
 = \frac{r(x, y_i)}{\sum_{k=1}^{N} r(x, y_k)},
-\qquad
-r(x,y) = \frac{p(y \mid x)}{p(y)},
 $$
 and $L_N[f]$ is minimized exactly when the score softmax equals this
-posterior. In particular every critic of the form
-$f(x,y) = h(x)\, r(x,y)$ with $h > 0$ is optimal, for every $N$
-simultaneously.
+posterior. Every critic of the form $f(x,y) = h(x)\, r(x,y)$ with $h > 0$
+is optimal, for every $N$ simultaneously.
 
 <Proof>
 **The posterior.** Given $\text{pos} = i$ and the context $x$, the
 candidate values have density
-$p(y_i \mid x) \prod_{j \ne i} p(y_j)$: the positive is drawn from the
+$p(y_i \mid x) \prod_{j \ne i} p(y_j)$: the positive comes from the
 conditional, the negatives from the marginal. The prior over $i$ is
 uniform, so Bayes' rule gives
 $$
@@ -204,115 +236,195 @@ constant not depending on $i$: each term
 $p(y_k \mid x) \prod_{j \ne k} p(y_j)$ becomes
 $p(y_k \mid x)/p(y_k) = r(x, y_k)$, which is the stated softmax.
 
-**Minimality.** Condition on $x$ and the candidate values. The true
-position is distributed by the posterior $\pi$, and the classifier's
+**Minimality.** Condition on $x$ and on the candidate values. The true
+position is then distributed by the posterior $\pi$, and the classifier's
 softmax $s_f$ is billed $-\log_2 s_f(i)$ when the truth is $i$, so the
-conditional expected loss is $\sum_i \pi(i)(-\log_2 s_f(i)) =
-H(\pi, s_f)$: a cross-entropy, minimized uniquely at $s_f = \pi$
-(Gibbs' inequality, as in <Ref lesson="cross-entropy-loss"/>). Averaging
-over rounds preserves the minimizer. The softmax is unchanged by
-rescaling $f$ by any factor constant in the candidate, so
-$f = h(x)\, r$ attains it; $r$ does not depend on $N$, so one critic is
-optimal at every $N$.
+conditional expected loss is
+$\sum_i \pi(i)\bigl(-\log_2 s_f(i)\bigr) = H(\pi, s_f)$: a cross-entropy,
+minimized uniquely at $s_f = \pi$ by Gibbs' inequality
+(<Ref lesson="cross-entropy-loss"/>). Averaging over rounds preserves the
+minimizer. A softmax is unchanged by rescaling every score by one factor,
+and $h(x)$ is constant across the candidates of a round, so $f = h\,r$
+attains the posterior. Since $r$ does not depend on $N$, one critic is
+optimal at every candidate count.
 </Proof>
 </Theorem>
 
-The theorem is the mechanism's core. Training the classifier drives the
-critic toward the ratio $p(y \mid x)/p(y)$, and the ratio is obtained
-**without modeling either distribution**. No density over images, no
-density over sentences: only a scoring function whose softmax matches an
-$N$-way posterior. That is what makes the construction usable exactly
-where the joint table is not.
+Two consequences of the $h(x)$ freedom are worth stating, because both are
+routinely misread. The critic's numerical scale carries no information:
+$f = 1000\,r$ and $f = r$ are the same classifier. And no amount of
+training recovers $p(y \mid x)$ from a trained critic, because the critic
+never separated the conditional from the marginal in the first place.
+
+<Exercise>
+On the toy pair, take context $x = 1$ and a round with $N = 3$ whose
+candidates are $y_1 = 1$, $y_2 = 1$, $y_3 = 0$, with the true partner at
+position 1. Write the three ratios, the optimal critic's softmax weights,
+and the bits this round costs. Then say what the round would have cost had
+the true partner sat at position 3.
+
+<Solution>
+**Ratios.** With $x = 1$, agreement means $y = 1$: $r(1,1) = 1.5$ and
+$r(1,0) = 0.5$. So the three candidates carry $r = 1.5,\ 1.5,\ 0.5$ and
+their total is $3.5$.
+
+**Softmax.** The optimal weights are $1.5/3.5 = 0.4286$,
+$1.5/3.5 = 0.4286$, and $0.5/3.5 = 0.1429$.
+
+**Cost.** The true partner is at position 1, so the round costs
+$-\log_2 0.4286 \approx 1.222$ bits. Two candidates are indistinguishable
+by value here, and no critic can do better than split the weight between
+them.
+
+**If the partner were at position 3**, the round would cost
+$-\log_2 0.1429 \approx 2.807$ bits. The same critic pays far more, and
+correctly: a partner sitting on a cell that occurs *less* often than
+independence predicts is genuinely hard to pick out. Averaged over rounds
+these two cases weight themselves, which is what the loss computes.
+</Solution>
+</Exercise>
 
 <KeyFact>
-The loss-minimizing critic scores candidates by the density ratio
-$p(y \mid x)/p(y)$, the joint's cell-by-cell departure from independence,
-learned without ever modeling $p(y \mid x)$ or $p(y)$ separately.
+Non-identifiability has a downstream price: $h(x)$ can inflate every score
+for one context and leave the loss unchanged, so a trained critic's numbers
+are comparable within one lineup and meaningless across contexts. It is
+therefore neither a density model for $y$ nor a calibrated retrieval score
+— it can rank captions for one image and cannot set a single threshold
+across images — and no post-hoc rescaling repairs this, because the loss
+never constrained the scale in the first place. This is one half of the
+division of labour the closing section draws: the loss is a training signal
+and its value a diagnostic, and neither role requires the critic to be a
+probability.
 </KeyFact>
 
-## The bound: log₂ N minus the loss never overstates I
+## ★ The ratio is a likelihood ratio
 
-The last ingredient is the identity the whole derivation turns on.
-<Ref lesson="mutual-information"/> proved the divergence form
-$I(X;Y) = \sum_{x,y} p(x,y) \log_2 \tfrac{p(x,y)}{p(x)p(y)}$; since
-$\tfrac{p(x,y)}{p(x)p(y)} = \tfrac{p(y \mid x)}{p(y)} = r(x,y)$, this
-reads: **mutual information is the expected log ratio at true pairs**,
-$$
-I(X;Y) = \mathbb{E}_{p(x,y)}\bigl[\log_2 r(x, y)\bigr]
-$$
-([Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
-§2.3). The critic has just learned $r$; the loss it pays is therefore an
-expectation of the same logarithms, and comparing the two gives the
-bound.
+The ratio the critic converges to is a standard object of hypothesis
+testing, and that reading accounts for the coincidence at the heart of the
+lesson: that a classification loss can bound an information quantity.
+Deciding
+whether a presented pair was recorded together or shuffled together is a
+hypothesis test between $p(x,y)$ and $p(x)p(y)$, and the
+[Neyman–Pearson lemma](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
+(Cover & Thomas §11.7) says the optimal test thresholds the likelihood
+ratio
 
-<Theorem title="InfoNCE bound">
-For every critic $f$ and every $N \ge 2$, with $L_N$ in bits,
+$$
+\frac{p(x,y)}{p(x)\,p(y)} = \frac{p(y \mid x)}{p(y)} = r(x,y).
+$$
+
+The critic is therefore the optimal test statistic for "is this pair
+real?", and the $N$-way lineup is that test posed as a multiple choice.
+The Chernoff-Stein lemma (§11.8) supplies the payoff: given $n$
+independent pairs, the best test's error probability falls exponentially in
+$n$ at a rate per pair equal to the KL divergence between the two
+hypotheses, which here is
+$D\bigl(p(x,y) \,\|\, p(x)p(y)\bigr) = I(X;Y)$. Mutual information is the
+error exponent of exactly the discrimination the critic is trained to
+perform, which is why an accuracy on that task converts into bits.
+
+## The bound: log₂ N minus the loss
+
+The optimal critic learns $r$, and $r$ is also what mutual information is
+made of. <Ref lesson="mutual-information"/> proved the divergence form
+$I(X;Y) = \sum_{x,y} p(x,y) \log_2 \tfrac{p(x,y)}{p(x)p(y)}$, and since
+$\tfrac{p(x,y)}{p(x)p(y)} = r(x,y)$ this reads
+
+$$
+I(X;Y) = \mathbb{E}_{p(x,y)}\bigl[\log_2 r(x, y)\bigr]:
+$$
+
+mutual information is the expected log ratio at true pairs. The loss is an
+expectation of the same logarithms over the same objects, so the two are
+comparable, and the comparison is an inequality in one direction only.
+
+<Theorem title="InfoNCE bound (exact form: Poole et al. 2019)">
+For every critic $f > 0$ and every $N \ge 1$, with $L_N$ measured in bits,
 $$
 I(X;Y) \;\ge\; \log_2 N - L_N[f].
 $$
 
 <Proof>
-Derivation at the level of rigor of
-[van den Oord et al., Appendix A.1](https://arxiv.org/abs/1807.03748);
-two steps are approximations, flagged where they occur and discussed in
-the remark below.
+Three moves: replace an arbitrary critic by the optimal one; recognize the
+optimal loss as a conditional entropy, which turns the certificate into a
+mutual information about the lineup; and bound that mutual information by
+$I(X;Y)$, which is where Jensen's inequality enters. Write $D$ for the
+position of the true partner, uniform on $\{1, \ldots, N\}$ by
+construction, and $W = (x, y_1, \ldots, y_N)$ for everything the classifier
+sees.
 
-**Step 1: reduce to the optimal critic.** By the previous theorem,
-$L_N[f] \ge L_N[r]$ for every $f$: a lower bound established for the
-optimal critic transfers to all critics.
+**Step 1: the optimal critic suffices.** By the previous theorem
+$L_N[f] \ge L_N[r]$, so proving the bound for $r$ proves it for every $f$.
 
-**Step 2: the optimal loss.** With $f = r$, writing $\rho = r(x,
-y_{\text{pos}})$ for the positive's ratio and
-$S = \sum_{j=1}^{N-1} r(x, y_j)$ for the negatives' total,
+**Step 2: the optimal loss is a conditional entropy.** With $f = r$ the
+softmax is the true posterior $p(D \mid W)$, and the expected surprisal of
+a distribution under itself is its entropy, so
+$L_N[r] = H(D \mid W)$. Since $D$ is uniform, $H(D) = \log_2 N$, and
 $$
-L_N[r] = \mathbb{E}\left[\log_2\!\left(1 + \frac{S}{\rho}\right)\right].
+\log_2 N - L_N[r] = H(D) - H(D \mid W) = I(D; W).
+$$
+The certificate *is* the information the lineup carries about which
+position is the true one.
+
+**Step 3: what that information is.** Conditioned on $D = i$, the lineup
+has density $p(x)\, p(y_i \mid x) \prod_{j \ne i} p(y_j) =
+p(x) \bigl(\prod_j p(y_j)\bigr)\, r(x,y_i)$. Averaging over the uniform
+$D$ gives $p(W) = p(x)\bigl(\prod_j p(y_j)\bigr) A$, where
+$$
+A = \frac{1}{N}\sum_{k=1}^{N} r(x, y_k)
+$$
+is the lineup's average ratio. Hence
+$p(W \mid D)/p(W) = r(x, y_D)/A$ and
+$$
+I(D;W) = \mathbb{E}\left[\log_2 \frac{r(x,y_D)}{A}\right]
+= I(X;Y) - \mathbb{E}\bigl[\log_2 A\bigr],
+$$
+the first term because $(x, y_D)$ is a draw from the joint, which is the
+divergence form above.
+
+**Step 4: the slack is non-negative (Jensen).** Let $Q$ be the reference
+draw in which *all* $N$ candidates come from the marginal, $D$ still
+uniform and now independent of everything. The task's law $P$ differs from
+$Q$ in one factor, the positive being conditional rather than marginal, so
+$\mathrm{d}P/\mathrm{d}Q = r(x, y_D)$. For any function $g$ of the lineup,
+$\mathbb{E}_P[g] = \mathbb{E}_Q[r(x,y_D)\, g]$, and under $Q$ the position
+$D$ is independent of the candidates, so averaging over it replaces
+$r(x,y_D)$ by $A$. With $g = \log_2 A$,
+$$
+\mathbb{E}_P\bigl[\log_2 A\bigr] = \mathbb{E}_Q\bigl[A \log_2 A\bigr].
+$$
+Under $Q$ every candidate is a marginal draw, so for each $k$ and each $x$,
+$\mathbb{E}_Q[r(x,y_k)] = \sum_y p(y)\,\tfrac{p(y \mid x)}{p(y)} =
+\sum_y p(y \mid x) = 1$, giving $\mathbb{E}_Q[A] = 1$. The map
+$t \mapsto t \log_2 t$ is convex, so Jensen's inequality gives
+$$
+\mathbb{E}_Q\bigl[A \log_2 A\bigr] \;\ge\;
+\mathbb{E}_Q[A]\, \log_2 \mathbb{E}_Q[A] = 0.
 $$
 
-**Step 3: the negatives sum to about $N-1$.** Each negative is an
-independent draw from $p(y)$, and the ratio has unit mean under the
-marginal:
-$$
-\mathbb{E}_{y \sim p(y)}\bigl[r(x, y)\bigr]
-= \sum_y p(y)\, \frac{p(y \mid x)}{p(y)} = \sum_y p(y \mid x) = 1
-$$
-(Exercise 3). So $\mathbb{E}[S] = N - 1$, and the first approximation
-replaces $S$ by its mean (the relative fluctuation of a sum of $N-1$
-independent unit-mean terms shrinks as $N$ grows):
-$$
-L_N[r] \approx \mathbb{E}\left[\log_2\!\left(1 + \frac{N-1}{\rho}\right)\right].
-$$
-
-**Step 4: round $N-1$ up to $N$.** Pointwise,
-$1 + (N-1)/\rho \ge N/\rho$ exactly when $\rho \ge 1$; the second
-informal step applies it inside the expectation wholesale:
-$$
-\mathbb{E}\left[\log_2\!\left(1 + \frac{N-1}{\rho}\right)\right]
-\;\ge\; \mathbb{E}\left[\log_2 \frac{N}{\rho}\right].
-$$
-
-**Step 5: the divergence form finishes.**
-$$
-\mathbb{E}\left[\log_2 \frac{N}{\rho}\right]
-= \log_2 N - \mathbb{E}_{p(x,y)}\bigl[\log_2 r(x, y_{\text{pos}})\bigr]
-= \log_2 N - I(X;Y),
-$$
-since the positive pair is a draw from the joint. Chaining:
-$L_N[f] \ge L_N[r] \gtrsim \log_2 N - I(X;Y)$, which rearranges to the
-statement.
+Combining steps 2 to 4, $\log_2 N - L_N[r] = I(X;Y) -
+\mathbb{E}_Q[A \log_2 A] \le I(X;Y)$, and step 1 extends it to every
+critic.
 </Proof>
 </Theorem>
 
-<Remark title="what the derivation assumes">
-Two steps were informal: replacing the negatives' sum by its mean
-(step 3, accurate for large $N$), and applying the $\rho \ge 1$
-inequality under the expectation (step 4; $\rho < 1$ occurs whenever the
-positive pair is an anti-correlated cell). The conclusion survives both:
-[Poole et al. (2019)](https://arxiv.org/abs/1905.06922) prove
-$I(X;Y) \ge \log_2 N - L_N[f]$ exactly, for every critic and every $N$,
-placing InfoNCE in a family of variational mutual-information bounds.
-The paper-level derivation is kept here because it shows where each term
-comes from; the exact enumerations below use no approximation at all.
-</Remark>
+The proof hands over more than the inequality: it names the gap. For the
+optimal critic,
+
+$$
+\underbrace{I(X;Y)}_{\text{what is true}}
+\;-\;
+\underbrace{\bigl(\log_2 N - L_N[r]\bigr)}_{\text{what is certified}}
+\;=\;
+\mathbb{E}_Q\bigl[A \log_2 A\bigr],
+$$
+
+the slack being an expectation of $A \log_2 A$ over lineups drawn entirely
+from the marginal. It vanishes exactly when $A = 1$ with probability one.
+Since $A$ is an average of $N$ independent unit-mean terms, the law of
+large numbers pushes it to $1$ as the lineup grows, and the certificate
+climbs toward the truth. That is the mechanism behind "larger $N$ is
+tighter", and it is checkable on the toy pair below.
 
 {/* fig InfonceDerivation: FigureSequence, 4 frames, component tier
     (register with frames: 4). The derivation compressed to one algebraic
@@ -329,40 +441,44 @@ comes from; the exact enumerations below use no approximation at all.
     $= \dfrac{r(x,y_i)}{\sum_k r(x,y_k)}$ with $r(x,y) =
     \tfrac{p(y \mid x)}{p(y)}$ in amber; gloss "divide by
     $\prod_j p(y_j)$: only density ratios survive". Frame 3 — badge
-    "step 3", equation: $f^\ast(x,y) \propto \dfrac{p(y \mid x)}{p(y)}$
-    inside an amber rounded box; gloss "the optimal critic is the ratio —
-    no density is ever modeled". Frame 4 — badge "step 4", equation:
-    $L_N \gtrsim \log_2 N - I(X;Y)$ on one line, then rearranged and
-    boxed in amber: $I(X;Y) \ge \log_2 N - L_N$; gloss "substitute
-    $f^\ast$, use $\mathbb{E}[r] = 1$ over negatives and
-    $I = \mathbb{E}[\log_2 r]$ over positives". Color roles: amber = the
-    ratio and the final bound (subject), currentColor = everything else;
-    no second hue needed. One idea: four moves from Bayes' rule to the
-    bound. Inspiration: CPC Appendix A.1, eqs. 6–11 (recreated). */}
+    "step 3", equation: $\log_2 N - L_N[r] = H(D) - H(D \mid W) = I(D;W)$
+    with $I(D;W)$ in an amber rounded box; gloss "the certificate is the
+    information the lineup carries about which position is true".
+    Frame 4 — badge "step 4", equation on two lines: first
+    $I(D;W) = I(X;Y) - \mathbb{E}_Q[A \log_2 A]$ with
+    $A = \tfrac1N \sum_k r(x,y_k)$ noted beneath in muted text, then the
+    boxed amber conclusion $I(X;Y) \ge \log_2 N - L_N$ (exact, not
+    approximate: use \ge, never \gtrsim); gloss "$\mathbb{E}_Q[A] = 1$ and
+    $t\log_2 t$ convex, so the slack is $\ge 0$ by Jensen". Color roles:
+    amber = the ratio, the certificate and the final bound (subject),
+    currentColor = everything else; no second hue needed. One idea: four
+    moves from Bayes' rule to an exact bound. NOTE: this replaces an
+    earlier version whose frames 3–4 followed the paper's approximate
+    route; the prose now proves the bound exactly, so frame 4 must show
+    the slack identity and a plain $\ge$. */}
 <FigureSequence
   name="InfonceDerivation"
-  alt="Four frames: the Bayes posterior over which candidate is the true partner, the cancellation of marginal products leaving density ratios, the optimal critic proportional to p(y|x)/p(y) boxed, and the substitution yielding the bound I(X;Y) at least log2 N minus L_N"
-  caption="The derivation in four moves: Bayes over the candidates, marginals cancel, the ratio is the optimal critic, substitution gives the bound."
+  alt="Four frames: the Bayes posterior over which candidate is the true partner, the cancellation of marginal products leaving density ratios, the certificate rewritten as the information the lineup carries about the true position, and the slack identity giving I(X;Y) at least log2 N minus L_N"
+  caption="Four moves: Bayes over the candidates, marginals cancel, the certificate is an information about the lineup, and Jensen makes the slack non-negative."
 />
 
 <Task>
-Step through the four frames and name the source of each move: frame 2
-is division by $\prod_j p(y_j)$, frame 4 uses the unit-mean identity
-$\mathbb{E}_{p(y)}[r] = 1$ (Exercise 3) and the divergence form
+Step through the four frames and name the source of each move: frame 2 is
+division by $\prod_j p(y_j)$; frame 3 uses only that a cross-entropy under
+the true posterior is an entropy; frame 4 uses $\mathbb{E}_Q[r] = 1$ over
+marginal draws and the divergence form
 $I = \mathbb{E}_{p(x,y)}[\log_2 r]$ from
 <Ref lesson="mutual-information"/>.
 </Task>
 
 ### Reading the inequality: a budget minus a bill
 
-The three quantities in $I(X;Y) \ge \log_2 N - L_N$ each have an
-operational reading. $\log_2 N$ is the bits needed to name one candidate
-out of $N$, and it is exactly what the chance classifier pays: the
-budget of the task. $L_N$ is what the trained classifier actually pays.
-The difference, the classifier's edge over chance, is a certified floor
-under the mutual information: the partner can only be found faster than
-chance if $x$ and $y$ share information, and every bit of edge is backed
-by a shared bit.
+Each of the three quantities in $I(X;Y) \ge \log_2 N - L_N$ has an
+operational reading. $\log_2 N$ is the cost of naming one candidate out of
+$N$ with no information at all, which is what the chance classifier pays:
+the budget of the task. $L_N$ is what the trained classifier actually pays.
+The difference, its edge over chance, is a certified floor under the mutual
+information, because nothing except shared bits can produce an edge.
 
 {/* fig CertifiedBitsBudget: the bound dissected in place (playbook rule
     7: short labels above the formula, thin arrows onto exact symbols).
@@ -385,56 +501,51 @@ by a shared bit.
   caption="Budget minus bill: the classifier's edge over the log₂ N chance loss is a certified floor under I(X;Y)."
 />
 
-The inequality is a **one-way certificate**. A low loss proves high
-mutual information: nothing but shared bits can produce an edge over
-chance. A high loss proves nothing: it may mean the variables are nearly
-independent, or only that the critic is bad. The direction matters in
-practice: a trained InfoNCE loss reported as $\log_2 N - L_N$ bits is a
-floor under $I$, never a measurement of it.
+The certificate is one-way, and the asymmetry is the whole practical
+content. A low loss proves high mutual information. A high loss proves
+nothing at all: it is equally consistent with near-independent variables
+and with a critic that failed to train. Reporting $\log_2 N - L_N$ as "the
+mutual information" therefore overstates twice, once by ignoring the slack
+and once by ignoring the critic.
 
 <Remark title="bits, nats, and reported losses">
 The paper and every deep-learning framework compute $L_N$ with natural
-logarithms; the bound there reads $I \ge \ln N - L_N$ in nats. The
-conversion is the usual factor of <Ref lesson="what-is-surprise"/>:
-divide nats by $\ln 2 \approx 0.693$ to get bits. A reported InfoNCE
-loss of $2.30$ nats at $N = 1024$ certifies
-$10 - 2.30/0.693 \approx 6.7$ bits (Exercise 6).
+logarithms, so the bound is usually written $I \ge \ln N - L_N$ in nats.
+Divide nats by $\ln 2 \approx 0.693$ to get bits
+(<Ref lesson="what-is-surprise"/>). A loss of $2.30$ nats at $N = 1024$
+certifies $10 - 2.30/0.693 \approx 6.7$ bits. Mixing the conventions is the
+commonest arithmetic error in reported InfoNCE numbers, and it is worth
+about $1.44\times$.
 </Remark>
 
 <Aside>
-InfoNCE is one point in a family of sample-based mutual-information
-estimators. [MINE](https://arxiv.org/abs/1801.04062) (Belghazi et al.,
-2018) bounds $I$ through the Donsker–Varadhan representation of the KL
-divergence, training a single unnormalized critic without the $N$-way
-softmax; its estimates can exceed $\log_2 N$ but carry high variance.
-[Poole et al. (2019)](https://arxiv.org/abs/1905.06922) unify both: the
-trade is variance against bias, with InfoNCE the low-variance,
-ceiling-limited end. The limits are not an artifact of these particular
-estimators: [McAllester & Stratos (2020)](https://arxiv.org/abs/1811.04251)
-prove that any distribution-free high-confidence lower bound on mutual
-information computed from $n$ samples cannot certify more than
-$O(\log n)$ bits. Certifying many bits is intrinsically expensive.
+The derivation above is not the one in the source. van den Oord, Li &
+Vinyals reach the bound (Appendix A.1, eqs. 6-11) by two informal steps:
+replacing the negatives' ratio sum by $(N-1)$ times its mean, and applying
+$1 + (N-1)/\rho \ge N/\rho$ inside an expectation where $\rho < 1$ is
+possible. Both steps are accurate for large $N$ and neither is needed:
+[Poole et al. (2019)](https://arxiv.org/abs/1905.06922) place InfoNCE in a
+family of variational mutual-information bounds and prove the inequality
+exactly, as does the $A \log_2 A$ argument above. The same survey maps the
+trade the family makes: estimators like
+[MINE](https://arxiv.org/abs/1801.04062), built on the Donsker-Varadhan
+representation, are not capped at $\log_2 N$ but pay for it in variance,
+and InfoNCE sits at the low-variance, ceiling-limited end.
 </Aside>
 
-<KeyFact>
-$I(X;Y) \ge \log_2 N - L_N$ for every critic and every $N$: the
-certificate can undershoot but never overstate. Low loss proves high
-mutual information; high loss proves nothing.
-</KeyFact>
+## Exact numbers: the toy pair at N = 2, 4, 16
 
-## Exact numbers: the bound on the toy pair
-
-The toy pair is small enough to evaluate $L_N$ exactly, with no sampling
-and no approximation, using the optimal critic $f = r$. The ratio table has two
-values: $r = \tfrac{0.75}{0.5} = 1.5$ on agreeing cells,
-$r = \tfrac{0.25}{0.5} = 0.5$ on disagreeing cells.
+An inequality with an unknown gap is not yet an instrument. The toy pair is
+small enough to evaluate $L_N$ exactly for the optimal critic, with no
+sampling and no approximation, so the gap can be measured rather than
+guessed. The ratio table has two values: $r = \tfrac{0.75}{0.5} = 1.5$ on
+agreeing cells and $r = \tfrac{0.25}{0.5} = 0.5$ on disagreeing ones.
 
 <Example title="the bound at N = 2, enumerated">
 One positive and one negative. The positive's ratio $\rho$ is $1.5$ with
-probability $0.75$ (the pair agrees) and $0.5$ with probability $0.25$.
-The negative is a uniform marginal draw, independent of the pair: its
-ratio $r_2$ is $1.5$ or $0.5$ with probability $\tfrac12$ each. Four
-cases:
+probability $0.75$ (the pair agrees) and $0.5$ with probability $0.25$. The
+negative is a marginal draw independent of the pair, so its ratio $r_2$ is
+$1.5$ or $0.5$ with probability $\tfrac12$ each. Four cases:
 
 | $\rho$ | $r_2$ | prob. | softmax $\tfrac{\rho}{\rho + r_2}$ | loss (bits) |
 | --- | --- | --- | --- | --- |
@@ -449,31 +560,72 @@ L_2 = 0.375 \cdot 1 + 0.375 \cdot 0.415 + 0.125 \cdot 2 + 0.125 \cdot 1
 $$
 
 Certified: $\log_2 2 - L_2 \approx 1 - 0.906 = 0.094$ bits, against the
-true $I = 0.189$. The bound holds and captures about half the
+true $I \approx 0.189$. The bound holds and captures about half the
 information.
 </Example>
 
-The first row explains the slack. With probability $\tfrac12$ the
-negative **equals** the positive's value: the two candidates are
-identical, no classifier can beat the coin flip, and a full bit is paid.
-Even the exact ratio critic pays for collisions between the marginal and
-the conditional.
+The first row explains where the other half went. With probability
+$\tfrac12$ the negative takes the same value as the positive: the two
+candidates are then identical, no critic can beat the coin flip, and a full
+bit is paid. Collisions between a marginal draw and the conditional are
+unavoidable on a two-symbol alphabet, and they are exactly what the slack
+formula prices. Evaluating $\mathbb{E}_Q[A \log_2 A]$ on this lineup, where
+$A$ takes the values $1.5, 1, 0.5$ with probabilities
+$\tfrac14, \tfrac12, \tfrac14$, gives
+$\tfrac14(1.5)(0.585) + 0 + \tfrac14(0.5)(-1) = 0.0943$ bits, which is
+exactly the gap between the true $0.1887$ and the certified $0.0944$.
+
+<Exercise>
+Repeat the $N = 2$ enumeration on the same table at $q = 0.9$ (diagonal
+cells $0.45$, off-diagonal $0.05$, $I(X;Y) \approx 0.531$ bits). Write the
+ratio table, enumerate the four cases, and report the certificate. Predict
+before computing whether the certificate will capture a larger or smaller
+*fraction* of $I$ than at $q = 0.75$, and say why. Use
+$-\log_2 0.9 \approx 0.152$ and $\log_2 10 \approx 3.322$.
+
+<Solution>
+**Ratios.** Diagonal $r = 0.9/0.5 = 1.8$; off-diagonal $r = 0.1/0.5 = 0.2$.
+
+**Cases.** The positive's ratio is $1.8$ with probability $0.9$ and $0.2$
+with probability $0.1$; the negative's is $1.8$ or $0.2$ with probability
+$\tfrac12$ each, independently:
+
+| $\rho$ | $r_2$ | prob. | softmax | loss (bits) |
+| --- | --- | --- | --- | --- |
+| $1.8$ | $1.8$ | $0.45$ | $0.5$ | $1$ |
+| $1.8$ | $0.2$ | $0.45$ | $0.9$ | $0.152$ |
+| $0.2$ | $1.8$ | $0.05$ | $0.1$ | $3.322$ |
+| $0.2$ | $0.2$ | $0.05$ | $0.5$ | $1$ |
+
+$$
+L_2 = 0.45 + 0.45 \cdot 0.152 + 0.05 \cdot 3.322 + 0.05 \cdot 1
+\approx 0.734 \text{ bits},
+$$
+so the certificate is $1 - 0.734 = 0.266$ bits against a true $0.531$.
+
+**The fraction.** It is essentially unchanged, about one half, and the
+reason is the ceiling rather than the dependence: at $N = 2$ nothing above
+$1$ bit is certifiable at all, and the collision row still costs a full bit
+half the time. Strengthening the dependence raises what could be certified
+but not what a two-candidate question can ask.
+</Solution>
+</Exercise>
 
 <Example title="the bound at N = 4">
 One positive, three negatives. Let $k$ be the number of negatives whose
-value agrees with $x$; each negative agrees independently with
-probability $\tfrac12$, so $k \sim \mathrm{Bin}(3, \tfrac12)$ with
-weights $\tfrac18, \tfrac38, \tfrac38, \tfrac18$. The denominator is
+value agrees with $x$; each agrees independently with probability
+$\tfrac12$, so $k \sim \mathrm{Bin}(3, \tfrac12)$ with weights
+$\tfrac18, \tfrac38, \tfrac38, \tfrac18$. The softmax denominator is
 $\rho + 1.5k + 0.5(3-k)$.
 
-**Branch $\rho = 1.5$** (probability $0.75$): denominator $3 + k$,
-losses $-\log_2 \tfrac{1.5}{3+k}$ for $k = 0..3$: $1$, $1.415$, $1.737$,
-$2$ bits. Weighted:
+**Branch $\rho = 1.5$** (probability $0.75$): denominator $3 + k$, losses
+$-\log_2 \tfrac{1.5}{3+k}$ for $k = 0 \ldots 3$, that is $1$, $1.415$,
+$1.737$, $2$ bits. Weighted:
 $\tfrac18(1) + \tfrac38(1.415) + \tfrac38(1.737) + \tfrac18(2) = 1.557$
 bits.
 
-**Branch $\rho = 0.5$** (probability $0.25$): denominator $2 + k$,
-losses $2$, $2.585$, $3$, $3.322$ bits. Weighted: $2.760$ bits.
+**Branch $\rho = 0.5$** (probability $0.25$): denominator $2 + k$, losses
+$2$, $2.585$, $3$, $3.322$ bits. Weighted: $2.760$ bits.
 
 $$
 L_4 = 0.75 \cdot 1.557 + 0.25 \cdot 2.760 \approx 1.858 \text{ bits},
@@ -483,9 +635,10 @@ $$
 </Example>
 
 The same enumeration at $N = 16$ gives $L_{16} \approx 3.823$ bits and a
-certificate of $0.177$ bits. The loss itself **rises** with $N$, since the
-task has more distractors, but the budget $\log_2 N$ rises faster, and
-the certified difference climbs toward the true $0.189$:
+certificate of $0.177$ bits. The loss itself **rises** with $N$, since
+there are more distractors to be confused by, but the budget $\log_2 N$
+rises faster, and the slack falls from $0.094$ to $0.046$ to $0.011$ bits
+as the lineup average $A$ concentrates on $1$.
 
 {/* fig InfonceToyTally: the worked toy in one panel. Left: the 2×2
     joint table (rows x = 0,1; columns y = 0,1; cells 3/8, 1/8 / 1/8,
@@ -509,53 +662,55 @@ the certified difference climbs toward the true $0.189$:
 />
 
 <KeyFact>
-On the toy pair the certificate holds at every $N$ and tightens with
-more negatives: $0.094$ bits at $N{=}2$, $0.142$ at $N{=}4$, $0.177$ at
-$N{=}16$, against the true $0.189$.
+The gap between the truth and the certificate is not mysterious: it equals
+$\mathbb{E}_Q[A \log_2 A]$, the price of lineups whose average ratio
+strays from $1$. Enlarging the lineup is the only lever that closes it, and
+the next section shows what that lever cannot do.
 </KeyFact>
 
-## Saturation: nothing above log₂ N is certifiable
+## The ceiling: nothing above log₂ N is certifiable
 
-The softmax weight on the true partner is at most $1$, so the loss is
-never negative, and
+From a stronger dependence one expects a stronger reading, the way a longer
+ruler measures a longer object. This instrument does not behave that way.
+Step 2 of the proof already contains the reason: the certificate equals
+$I(D;W)$, an information about a variable $D$ that is uniform on $N$
+positions, and no information about such a variable can exceed its entropy.
+Hence
+
 $$
-\log_2 N - L_N \;\le\; \log_2 N
+\log_2 N - L_N \;=\; I(D;W) \;\le\; H(D) \;=\; \log_2 N
 $$
-always. An $N$-way question can certify at most the bits it takes to
-answer it. When the true mutual information exceeds $\log_2 N$, the
-classification task is simply too easy to be informative: the classifier
-answers nearly perfectly, the loss sits near its floor, and the
-certificate pins at the ceiling whatever the surplus dependence.
+
+for every pair, every critic and every dependence strength. With
+$N = 256$ candidates the largest certificate that can ever be printed is
+$8$ bits. A representation carrying $8$ bits about the target and one
+carrying $20$ are, to this instrument, the same representation.
 
 <Example title="a perfect critic, saturated">
-Let $X$ be uniform on four symbols and $Y = X$ in lockstep:
+Let $X$ be uniform on four symbols and $Y = X$ in lockstep, so
 $I(X;Y) = H(X) = 2$ bits. The ratio is $r = 4$ when $y = x$ and $0$
-otherwise, so the optimal critic solves every round in which no negative
-collides with the positive: the loss comes entirely from collisions.
-With $k$ colliding negatives the softmax weight on the positive is
+otherwise, a limiting case of the strictly positive critics the definition
+allows, with the softmax still well defined because the positive always
+scores $4$. The optimal critic therefore answers every round in which no
+negative collides with the positive, and the whole loss comes from
+collisions. With
+$k$ colliding negatives the weight on the positive is
 $\tfrac{4}{4(1+k)} = \tfrac{1}{1+k}$, and
-$k \sim \mathrm{Bin}(N-1, \tfrac14)$:
+$k \sim \mathrm{Bin}(N-1, \tfrac14)$, so $L_N = \mathbb{E}[\log_2 (1+k)]$:
 
-$$
-L_N = \mathbb{E}\bigl[\log_2 (1 + k)\bigr].
-$$
+| $N$ | ceiling $\log_2 N$ | $L_N$ (bits) | certified | true $I$ |
+| --- | --- | --- | --- | --- |
+| $2$ | $1$ | $0.250$ | $0.750$ | $2$ |
+| $4$ | $2$ | $0.676$ | $1.324$ | $2$ |
+| $16$ | $4$ | $2.145$ | $1.855$ | $2$ |
+| $256$ | $8$ | $6.008$ | $1.992$ | $2$ |
 
-| $N$ | $L_N$ (bits) | certified $\log_2 N - L_N$ | true $I$ |
-| --- | --- | --- | --- |
-| $2$ | $0.250$ | $0.750$ | $2$ |
-| $4$ | $0.676$ | $1.324$ | $2$ |
-| $16$ | $2.145$ | $1.855$ | $2$ |
-| $256$ | $6.008$ | $1.992$ | $2$ |
-
-At $N = 2$ the ceiling is $\log_2 2 = 1$ bit and the certificate cannot
-even reach that: half the true information is invisible. Only at
-$N = 256$ does the certificate approach the true $2$ bits.
+At $N = 2$ the ceiling is $1$ bit, below the true $2$: more than half the
+dependence is invisible however perfect the critic. At $N = 256$ the same
+pair, read with the same critic, gives back $1.992$ of its $2$ bits.
+Nothing about the variables changed between the rows. Only the question
+did.
 </Example>
-
-More negatives raise the ceiling, at the rate of one extra bit per
-doubling of $N$. Certifying $8$ bits requires $N > 256$; certifying the
-$\sim\!10$ bits a rich image–caption pair might share requires
-candidate counts in the thousands.
 
 {/* fig InfonceSaturationCurves: static twin of the InfoNCESaturation
     demo. Axes: horizontal = true I(X;Y) in bits, 0 to 10 (ticks 0, 2,
@@ -584,54 +739,121 @@ candidate counts in the thousands.
 />
 
 <Task>
-Load the *strong dependence, small N* preset: the plotted bound clips at
-$\log_2 N$ well below the true $I$. Raise $N$ and watch the ceiling
-lift by one bit per doubling; then lower the dependence and check the
-regime where the bound tracks $I$ closely: saturation only bites when
-$I$ approaches $\log_2 N$.
+Two targets, in order, and the observable in both is the *gain per
+doubling* of $N$. Load **weak dependence** ($N = 16$, certificate $1.14$
+bits against a true $2.13$) and raise $N$ to the maximum: the certificate
+climbs to $2.07$ bits and the last doubling buys $0.05$. Then load
+**strong dependence, small N** ($N = 4$, certificate $1.90$ bits against a
+true $9.21$, with the saturation flag lit) and raise $N$ the same way: every
+doubling buys most of a bit — $0.94$ for the first, falling only to $0.53$
+for the last — and the certificate is still climbing when it reaches $8.52$
+at $N = 1024$. Decide from the gains alone which of the two runs has measured
+its pair and which has only measured its own budget.
 </Task>
 
-<Remark title="an estimate of a bound, not an estimator of I">
-In practice $L_N$ is itself estimated from a finite batch, so
-$\log_2 N - \hat L_N$ is a noisy estimate of a lower bound, not an
-unbiased estimator of $I$, and on any given batch it can fluctuate above
-the true value even though its target sits below. The two qualifications
-compound: the quantity is (an estimate of) (a floor). Reporting it as
-"the mutual information" overstates on both counts.
-</Remark>
+### The ceiling as a design constraint
 
-<Aside>
-The ceiling is why contrastive training runs at extreme batch sizes.
-In-batch negatives put $N$ equal to the batch size, so the batch caps
-the bits the loss can see:
-[SimCLR](https://arxiv.org/abs/2002.05709) (Chen et al., 2020) trains
-with batches up to $4096$ ($\log_2 4096 = 12$ bits of ceiling), and
-[CLIP](https://arxiv.org/abs/2103.00020) (Radford et al., 2021) uses
-$32{,}768$ ($15$ bits). The gain per doubling is a single bit, which is
-also why returns diminish: the jump from $256$ to $32{,}768$ negatives
-buys $7$ bits of ceiling, not a hundredfold improvement.
-</Aside>
+The ceiling explains an otherwise strange fact about contrastive training:
+these methods are hungry for batch size in a way that supervised training
+is not. Implementations take the negatives from the batch itself, which
+makes $N$ the batch size, which makes the batch a cap on the bits the loss
+can see. A batch of $256$ can pursue at most $8$ bits of dependence; to
+pursue $20$ bits requires over a million candidates.
+
+<Figure
+  src="./figures/batch-ceiling.svg"
+  alt="Certifiable bits against candidate count on a log axis: a straight line log2 N marked at 64 candidates for a CPC minibatch (6 bits), 8,191 for SimCLR (13 bits), 32,768 for CLIP (15 bits), and 65,536 for the MoCo queue (16 bits)"
+  caption="One bit per doubling: the deployed candidate counts of published contrastive systems buy 6 to 16 bits of ceiling."
+/>
+
+The published numbers sit exactly where the constraint predicts.
+[SimCLR](https://arxiv.org/abs/2002.05709) trains at a batch of $4{,}096$
+images, giving $8{,}190$ negatives per positive and a ceiling near $13$
+bits; [CLIP](https://arxiv.org/abs/2103.00020) uses a minibatch of
+$32{,}768$ image-text pairs, a $15$-bit ceiling;
+[MoCo](https://arxiv.org/abs/1911.05722) keeps a queue of $65{,}536$
+encoded negatives precisely so that $N$ can exceed what fits in a batch,
+buying a $16$-bit ceiling on ordinary hardware. The returns are
+logarithmic, which is the honest reading of a decade of scaling the batch:
+going from $256$ to $32{,}768$ candidates, a factor of $128$ in compute per
+step, raises the ceiling by $7$ bits.
 
 <KeyFact>
-$\log_2 N - L_N \le \log_2 N$ always: an $N$-way classification can
-certify at most the bits needed to answer it, so dependence beyond the
-ceiling stays invisible until $N$ grows. This is why contrastive methods
-use large batches.
+The ceiling belongs to the question, not to the data: an $N$-way
+multiple-choice test cannot reveal more than $\log_2 N$ bits, so a
+saturated bound carries no information about which of two good
+representations is better. Ranking representations by their InfoNCE value
+past saturation is ranking them by nothing.
 </KeyFact>
 
-## The payoff: one loss across audio, vision, text, and RL
+## Bound quality and representation quality are different measurements
 
-The bound was derived for representation learning, and the deriving
-system shows where it sits in practice. Contrastive predictive coding
-(CPC) processes a signal (raw speech, image patches read as a sequence,
-text, an agent's observations) with an encoder producing latents $z_t$,
-summarizes the past into a context $c_t$ with an autoregressive network,
-and scores future latents $z_{t+k}$ against negatives from other
-positions with a critic $f_k(z_{t+k}, c_t)$. The InfoNCE loss on this
-lineup is the system's **only training signal**: minimizing it maximizes
-a certified floor under $I(z_{t+k}; c_t)$, forcing the context to carry
-the bits that predict the future, without reconstructing a single
-sample of it.
+The saturated regime is where contrastive systems are actually trained, so
+the previous section's verdict has a consequence for how their numbers are
+read. The InfoNCE value certifies bits of dependence. It does not measure
+how usable a representation is, and the two are separated by more than the
+ceiling.
+
+### The claim to reject
+
+The prevalent reading in the literature is that a higher InfoNCE value
+means a better representation, and it fails for two independent reasons.
+
+The first is the ceiling: past $\log_2 N$ the value stops responding to the
+quantity it is supposed to track, so differences between strong
+representations are invisible by construction.
+
+The second survives even when the bound is tight, and it is a property of
+mutual information itself rather than of the estimator. Mutual information
+is invariant under invertible transformations: if $T' = \phi(T)$ for an
+invertible $\phi$, then $I(X;T') = I(X;T)$ exactly. A representation and
+any scrambling of it are indistinguishable to any mutual-information
+criterion, while a *linear probe*, a linear classifier trained on the
+frozen representation and the standard way of asking whether it is usable,
+reads one and fails on the other.
+[Tschannen et al.](https://arxiv.org/abs/1907.13625) make this concrete:
+over a family of invertible encoders the true $I$ is constant by
+construction, yet downstream classification accuracy rises steadily during
+training, and among that same family there exist encoders that maximize $I$
+while scoring no better than raw pixels.
+
+<Figure
+  src="./figures/two-questions.svg"
+  alt="Two panels: a representation whose two classes are linearly separable and an invertible scramble of it whose classes are interleaved, both carrying an identical 8-bit InfoNCE certificate"
+  caption="An invertible scramble preserves I(X;T) exactly, so the certificate is identical while the linear probe collapses."
+/>
+
+The same paper closes the loop from the other side: higher-capacity critics
+give tighter bounds and worse representations. Comparing a bilinear, a
+separable and an MLP critic on the same encoders, the MLP critic reaches
+the highest estimator value while its representations barely beat the
+pixel-space baseline. Tightening the bound and improving the representation
+are not merely different objectives; on this evidence they can conflict.
+
+### What to conclude instead
+
+The replacement model is a division of labour. The loss is a **training
+signal**, whose gradient shapes the encoder and whose usefulness comes from
+the architecture and the choice of what counts as a positive pair. The
+value $\log_2 N - L_N$ is a **diagnostic** with a hard ceiling, useful for
+detecting a critic that has not trained and useless for ranking
+representations. Answering "how many bits does this pair share?" and "is
+this representation any good?" requires two measurements, and only the
+second is answered by a probe on the downstream task.
+
+None of which makes the objective a poor one. Trained across four
+modalities with nothing but this loss, contrastive predictive coding
+reaches $64.6\%$ accuracy at labelling which speech sound is present in a
+window of LibriSpeech audio, read off its representations by a linear
+probe. The comparisons are $39.7\%$ for MFCC features, the hand-designed
+spectral descriptors that preceded learned ones, and $74.6\%$ for a
+network trained on the labels directly: most of the supervised gap closed
+without labels. On ImageNet the same recipe gives a linear probe $48.7\%$
+top-1 accuracy. Those runs drew their negatives from minibatches of eight
+examples, so the candidate count was in the tens and the certificate was
+capped near $6$ bits, below any plausible figure for what a waveform shares
+with its own future. The representations are good anyway: the objective's
+usefulness never depended on the bound being tight.
 
 {/* fig CpcPipeline: the CPC system in one left-to-right strip, tiers
     per playbook rule 5 (data → representation → computation →
@@ -658,250 +880,175 @@ sample of it.
   caption="CPC in one strip: encode, summarize, score the signal's own future against negatives. The InfoNCE lineup is the only loss in the system."
 />
 
-The same loss, unchanged, works across modalities: the paper's
-experiments (§3) train the identical objective on four domains. On
-LibriSpeech speech, a linear classifier on CPC representations reaches
-$64.6\%$ phone accuracy against $39.7\%$ for MFCC features and $74.6\%$
-for a fully supervised network: most of the supervised gap closed with
-no labels. On ImageNet, a linear probe on CPC features reaches $48.7\%$
-top-1 accuracy; in reinforcement learning, adding the loss as an
-auxiliary objective improves A2C agents on DeepMind Lab tasks. The
-critic's density-ratio trick, with the pair $(x, y)$ instantiated as
-context–future, image–image view, or image–caption, is the shared core
-of the contrastive representation learning that followed, SimCLR and
-CLIP among it.
-
-The lesson also closes the arc of this module.
-<Ref lesson="information-bottleneck"/> prescribed what a good
-representation should optimize: keep $I(T;Y)$, spend little $I(X;T)$.
-Both terms were uncomputable outside toy tables. InfoNCE makes the relevance
-term trainable: $\log_2 N - L_N$ is a differentiable floor under a
-mutual information, maximized by gradient descent on the critic and
-encoder jointly. A prescription became a loss function.
-
 <KeyFact>
-One InfoNCE loss trains representations in speech, vision, text, and RL;
-the density-ratio critic is the common core of contrastive
-representation learning, and the bound is the trainable surrogate for
-the bottleneck's relevance term $I(T;Y)$.
+A reported InfoNCE value is unreadable without two companions: the
+candidate count $N$ it was measured at, and how the value moves when $N$
+doubles. Without both, two such values cannot be compared, not even between
+two runs of the same system.
 </KeyFact>
+
+What is established: a mutual information can be lower-bounded from paired
+and shuffled samples alone, by training an $N$-way classifier and reading
+$\log_2 N - L_N$; the bound is exact, its slack is
+$\mathbb{E}_Q[A \log_2 A]$, and its ceiling is $\log_2 N$ whatever the
+data. That is the form in which information theory enters current
+representation learning, and the ceiling is why the field reports
+downstream accuracies rather than bits. What remains is to spend the bits
+rather than count them.
+<Ref lesson="learned-image-compression"/> takes up a system that does:
+a learned codec trains an encoder, a quantizer, an entropy model and a
+decoder against rate plus $\lambda$ times distortion, where the rate term
+is once again a cross-entropy standing in for an information quantity that
+cannot be computed directly.
 
 ## Exercises
 
 <Exercise>
-Repeat the $N = 2$ enumeration on the dependence-dial table at
-$q = 0.9$ (diagonal cells $0.45$, off-diagonal $0.05$; the table of
-<Ref lesson="mutual-information"/>, Exercise 3, with
-$I(X;Y) \approx 0.531$ bits). Write the ratio table, enumerate the four
-cases for the optimal critic, compute $L_2$ and the certificate
-$\log_2 2 - L_2$, and compare with the true $I$. Use
-$-\log_2 0.9 \approx 0.152$ and $\log_2 10 \approx 3.322$.
+A contrastive model trained with $N = 64$ candidates reports a loss of
+$1.2$ nats. Convert the certificate to bits. Then report the certificate
+for the same loss at $N = 256$, and state which of the two runs, on this
+evidence alone, has the better critic.
 
 <Solution>
-**Ratios.** Diagonal: $r = 0.9/0.5 = 1.8$; off-diagonal:
-$r = 0.1/0.5 = 0.2$.
+In nats the bound reads $I \ge \ln N - L_N$; converting through
+$1 \text{ bit} = \ln 2 \approx 0.693$ nats gives a loss of
+$1.2/0.693 \approx 1.73$ bits.
 
-**Cases.** The positive's ratio is $1.8$ with probability $0.9$, $0.2$
-with probability $0.1$; the negative's is $1.8$ or $0.2$ with
-probability $\tfrac12$ each, independently:
+At $N = 64$: the budget is $\log_2 64 = 6$ bits, so
+$I \ge 6 - 1.73 \approx 4.27$ bits.
 
-| $\rho$ | $r_2$ | prob. | softmax | loss (bits) |
-| --- | --- | --- | --- | --- |
-| $1.8$ | $1.8$ | $0.45$ | $0.5$ | $1$ |
-| $1.8$ | $0.2$ | $0.45$ | $0.9$ | $0.152$ |
-| $0.2$ | $1.8$ | $0.05$ | $0.1$ | $3.322$ |
-| $0.2$ | $0.2$ | $0.05$ | $0.5$ | $1$ |
+At $N = 256$: the budget is $8$ bits, so $I \ge 8 - 1.73 \approx 6.27$
+bits.
 
-$$
-L_2 = 0.45 + 0.45 \cdot 0.152 + 0.05 \cdot 3.322 + 0.05 \cdot 1
-\approx 0.734 \text{ bits}.
-$$
-
-**Certificate.** $1 - 0.734 = 0.266$ bits, against the true
-$I \approx 0.531$: the bound holds and captures about half the
-information. As in the lesson's toy, the dominant slack is the
-collision row ($\rho = r_2 = 1.8$), where the candidates are identical
-and a full bit is paid regardless of the critic.
+**Which critic is better?** The question cannot be answered from these
+numbers. The second run certifies two bits more purely because it was asked
+a harder question, and an equal loss on a harder task is in fact the
+stronger performance, but "better critic" is a claim about the loss at a
+fixed $N$, not about the certificate. Comparing certificates across
+different $N$ compares budgets.
 </Solution>
 </Exercise>
 
 <Exercise>
-Derive the optimal posterior for $N = 2$ directly. One candidate pair
-$(y_1, y_2)$ is presented for context $x$; with probability $\tfrac12$
-the partner is $y_1$ (then $y_2 \sim p(y)$), otherwise $y_2$. Show from
-Bayes' rule that
-$$
-p(\text{pos}{=}1 \mid x, y_1, y_2)
-= \frac{r(x,y_1)}{r(x,y_1) + r(x,y_2)},
-$$
-and verify the formula on the lesson's concrete round ($x = 0$,
-$y_1 = 0$, $y_2 = 1$, toy table at $q = 0.75$).
+Push the construction to its two degenerate ends. (a) Evaluate the bound at
+$N = 1$: compute $L_1$ for an arbitrary critic and state what the bound
+then asserts. (b) Evaluate it at $L_N = 0$ for $N \ge 2$: state what the
+critic must be doing, and what the bound asserts. In each case name the
+hypothesis of the theorem that is doing the work.
 
 <Solution>
-The two hypotheses have likelihoods
-$p(y_1 \mid x)\, p(y_2)$ and $p(y_2 \mid x)\, p(y_1)$, each with prior
-$\tfrac12$. Bayes' rule:
-$$
-p(\text{pos}{=}1 \mid x, y_1, y_2)
-= \frac{p(y_1 \mid x)\, p(y_2)}
-{p(y_1 \mid x)\, p(y_2) + p(y_2 \mid x)\, p(y_1)}.
-$$
-Divide numerator and denominator by $p(y_1)\, p(y_2) > 0$:
-$$
-= \frac{p(y_1 \mid x)/p(y_1)}
-{p(y_1 \mid x)/p(y_1) + p(y_2 \mid x)/p(y_2)}
-= \frac{r(x,y_1)}{r(x,y_1) + r(x,y_2)}.
-$$
-On the concrete round: $r(0,0) = 1.5$, $r(0,1) = 0.5$, so the posterior
-is $\tfrac{1.5}{1.5 + 0.5} = 0.75$, matching the direct Bayes
-computation in the lesson: $\tfrac{0.75 \cdot 0.5}{0.75 \cdot 0.5 +
-0.25 \cdot 0.5} = 0.75$.
+**(a) $N = 1$.** With one candidate the softmax has a single term, so the
+weight on the true partner is $f/f = 1$ regardless of the critic, and
+$L_1 = -\log_2 1 = 0$ bits for every $f$. The bound reads
+$I(X;Y) \ge \log_2 1 - 0 = 0$, which is true and empty. Nothing broke: the
+theorem holds at $N = 1$, and the derivation shows why it must be vacuous.
+The certificate is $I(D;W)$ with $D$ constant, so $H(D) = 0$ and there is
+nothing to learn about the position. A task with no alternatives asks no
+question.
+
+**(b) $L_N = 0$.** A zero loss means the softmax puts weight $1$ on the
+true partner in every round, so the critic assigns zero score to every
+negative that is ever drawn. The bound then certifies the full budget,
+$I(X;Y) \ge \log_2 N$. This is attainable: for $X$ uniform on $M$ symbols
+with $Y = X$ and $N \le M$ small enough that collisions never occur,
+$L_N$ is genuinely $0$. In general collisions make $L_N > 0$ whenever a
+negative can take the positive's value, which is why the lockstep example
+pays $0.250$ bits at $N = 2$ rather than nothing.
+
+**The hypothesis at work** in both cases is that the negatives are drawn
+from $p(y)$, independently of the positive. It is what makes collisions
+occur with the marginal's own probability, and thus what ties the
+attainable loss to the true dependence rather than to the critic's skill.
 </Solution>
 </Exercise>
 
 <Exercise>
-Prove the unit-mean identity used in step 3 of the bound's derivation:
-for every $x$,
-$$
-\mathbb{E}_{y \sim p(y)}\left[\frac{p(y \mid x)}{p(y)}\right] = 1,
-$$
-and state in one sentence why it makes the negatives' score sum
-concentrate near $N - 1$.
+Break this claim, from a paper's results table: "Our method achieves an
+InfoNCE value of $7.9$ bits with $N = 256$, so our representation captures
+$7.9$ bits about the target." State precisely what is wrong, and then
+design the experiment that would distinguish a representation carrying $8$
+bits from one carrying $30$.
 
 <Solution>
-Expand the expectation over the marginal:
-$$
-\mathbb{E}_{y \sim p(y)}\left[\frac{p(y \mid x)}{p(y)}\right]
-= \sum_y p(y)\, \frac{p(y \mid x)}{p(y)}
-= \sum_y p(y \mid x) = 1,
-$$
-since $p(y \mid x)$ is a probability distribution over $y$ for each
-fixed $x$ (terms with $p(y) = 0$ contribute nothing: such $y$ is never
-drawn). The negatives' total $S = \sum_{j=1}^{N-1} r(x, y_j)$ is a sum
-of $N-1$ independent terms each with mean $1$, so
-$\mathbb{E}[S] = N-1$ and the relative fluctuation of $S$ around $N-1$
-shrinks as $N$ grows: the justification for replacing $S$ by $N-1$ in
-the derivation.
+**What is wrong.** Three things, in increasing severity.
+
+1. *Direction.* $7.9$ bits is a lower bound, not a measurement: the true
+   $I$ is at least $7.9$ bits and may be anything above it.
+2. *Saturation.* The ceiling at $N = 256$ is $\log_2 256 = 8$ bits, and
+   $7.9$ sits $0.1$ bits below it. A value pinned to its ceiling is
+   consistent with $I = 8$ bits and with $I = 300$ bits. The number
+   reported is a property of the batch size.
+3. *Estimation.* $L_N$ is itself estimated from finite batches, so the
+   quantity is an estimate of a bound. On a given batch it can fluctuate
+   above its own target.
+
+**The experiment.** Raise $N$ and watch. Retrain (or merely re-evaluate the
+frozen critic) at $N = 2^{10}, 2^{12}, 2^{14}, 2^{16}$ and plot the
+certificate against $\log_2 N$. A pair with $I = 8$ bits produces a curve
+that flattens near $8$ and stops responding. A pair with $I = 30$ bits
+produces a curve that keeps climbing roughly one bit per doubling, still
+pinned near its ceiling at $16$ bits. The diagnostic is the *slope* of the
+certificate in $\log_2 N$: near $1$ means still saturated, near $0$ means
+the bound has found the true value. Reporting a single $N$ discards exactly
+this information.
 </Solution>
 </Exercise>
 
 <Exercise>
-Prove that the certificate never exceeds the budget:
-$\log_2 N - L_N[f] \le \log_2 N$ for every critic $f$. Then compute the
-saturation exactly for a binary lockstep pair ($X$ uniform on
-$\{0,1\}$, $Y = X$, so $I(X;Y) = 1$ bit) at $N = 2$ with the optimal
-critic, and state what fraction of the true information is certified.
+Refute the converse claim: "a lower InfoNCE bound means a worse
+representation." Give the two independent causes of a low value, and
+construct a case where the representation with the *lower* bound is the
+better one for a downstream classifier.
 
 <Solution>
-**Ceiling.** The softmax weight on the true partner is a term of a
-distribution, hence at most $1$, so every round's bill
-$-\log_2(\text{weight}) \ge 0$ and $L_N[f] \ge 0$. Subtracting,
-$\log_2 N - L_N \le \log_2 N$.
+**Two causes of a low value.** (i) The dependence really is small, so
+$I(X;Y)$ itself is low. (ii) The critic is weak or undertrained, so
+$L_N[f] > L_N[r]$ and the certificate falls short of what the same data
+could support. The bound is one-way: a low value distinguishes neither
+case, since $\log_2 N - L_N[f]$ is a floor under $I$ and a floor can be
+arbitrarily far below.
 
-**Binary lockstep at $N = 2$.** The ratio is $r = \tfrac{1}{1/2} = 2$
-when $y = x$ and $0$ otherwise; the positive always has $\rho = 2$. The
-single negative is a fair marginal draw: with probability $\tfrac12$ it
-collides ($y = x$), making the candidates identical: softmax
-$\tfrac{2}{2+2} = \tfrac12$, loss $1$ bit. With probability $\tfrac12$
-it differs: softmax $\tfrac{2}{2+0} = 1$, loss $0$.
-$$
-L_2 = \tfrac12 \cdot 1 + \tfrac12 \cdot 0 = 0.5 \text{ bits},
-\qquad
-\log_2 2 - L_2 = 0.5 \text{ bits}.
-$$
-The certificate is $0.5$ of the true $1$ bit: exactly half. Even a
-perfect critic loses a full bit whenever the marginal draw duplicates
-the positive, and at $N = 2$ that happens half the time. (Raising $N$
-recovers the rest: the ceiling $\log_2 N$ grows while collisions cost
-only $\log_2(1+k)$.)
+A third, quieter cause is a small $N$: at $N = 2$ nothing above $1$ bit can
+be reported at all.
+
+**A case where lower is better.** Take the critic comparison of
+[Tschannen et al.](https://arxiv.org/abs/1907.13625): with the encoder
+fixed, a high-capacity MLP critic reaches a higher estimator value than a
+bilinear or separable critic, yet the representations trained with the MLP
+critic barely beat raw pixels on a linear probe while the simpler critics
+clearly beat it. The mechanism is that the critic is not only a measuring
+device but also the source of the gradient reaching the encoder: a critic
+powerful enough to exploit any arrangement of features imposes no pressure
+on the encoder to arrange them usefully. Constructing the case by hand is
+easier still: take any representation $T$ and any invertible scramble
+$T' = \phi(T)$. Both have identical $I(X;T)$ and therefore identical
+attainable bounds, while a linear probe separates one and not the other.
 </Solution>
 </Exercise>
 
 <Exercise>
-Review of <Ref lesson="mutual-information"/>: for the weather table
-($p(\text{clear},\text{dry}) = \tfrac12$,
-$p(\text{clear},\text{wet}) = 0$,
-$p(\text{overcast},\text{dry}) = p(\text{overcast},\text{wet}) =
-\tfrac14$, with $X$ the sky and $Y$ the ground), compute the ratio
-$r(x,y) = p(y \mid x)/p(y)$ for each nonzero cell and verify the
-identity the bound's derivation turns on:
-$\mathbb{E}_{p(x,y)}[\log_2 r] = I(X;Y) \approx 0.311$ bits. Use
-$\log_2 3 \approx 1.585$.
-
-<Solution>
-Marginals: $p(\text{dry}) = \tfrac34$, $p(\text{wet}) = \tfrac14$.
-Conditionals given the sky: clear $\Rightarrow$ dry certain
-($p(\text{dry} \mid \text{clear}) = 1$); overcast $\Rightarrow$ each
-with probability $\tfrac12$.
-
-Ratios:
-$r(\text{clear}, \text{dry}) = \tfrac{1}{3/4} = \tfrac43$;
-$r(\text{overcast}, \text{dry}) = \tfrac{1/2}{3/4} = \tfrac23$;
-$r(\text{overcast}, \text{wet}) = \tfrac{1/2}{1/4} = 2$. The
-zero-probability cell (clear, wet) never occurs and is skipped.
-
-Expected log ratio, weighted by the joint:
-$$
-\tfrac12 \log_2 \tfrac43 + \tfrac14 \log_2 \tfrac23 + \tfrac14 \log_2 2
-= \tfrac12 (0.415) + \tfrac14 (-0.585) + \tfrac14 (1)
-\approx 0.208 - 0.146 + 0.250 = 0.311 \text{ bits},
-$$
-matching $I(X;Y) \approx 0.311$ from the mutual-information lesson: the
-log ratios are the pointwise mutual informations, and their
-joint-weighted average is $I$. An optimal contrastive critic on this
-table would score (overcast, wet) highest ($r = 2$) and
-(overcast, dry) below $1$: the cell that occurs less often than
-independence predicts.
-</Solution>
-</Exercise>
-
-<Exercise>
-A contrastive model trained with $N = 1024$ candidates reports an
-InfoNCE loss of $2.30$ nats. Convert the certificate to bits. Then state
-what a reported loss of $\ln 1024 \approx 6.93$ nats would certify, and
-why.
-
-<Solution>
-In nats the bound reads $I \ge \ln N - L_N$. Converting via
-$1 \text{ bit} = \ln 2 \approx 0.693$ nats
-(<Ref lesson="what-is-surprise"/>): the loss is
-$2.30 / 0.693 \approx 3.32$ bits, the budget is
-$\log_2 1024 = 10$ bits, so
-$$
-I(X;Y) \ge 10 - 3.32 \approx 6.7 \text{ bits}.
-$$
-(Equivalently in nats: $6.93 - 2.30 = 4.63$ nats $= 6.7$ bits.)
-
-A loss of $\ln 1024$ nats is exactly the chance loss $\log_2 1024$ bits:
-the certificate is $10 - 10 = 0$ bits. It certifies nothing, consistent
-both with independent variables and with a critic that has learned
-nothing, which is the one-way direction of the bound.
-</Solution>
-</Exercise>
-
-<Exercise>
-Suppose the negatives are drawn not from the marginal $p(y)$ but from
-some other distribution $q(y)$ with full support. Show that the
-Bayes-optimal critic becomes $f(x,y) \propto p(y \mid x)/q(y)$, and
-that the expected log of this ratio at true pairs is
+A derivation the lesson skipped. Suppose the negatives are drawn not from
+$p(y)$ but from some other distribution $q(y)$ with full support, everything
+else unchanged. Show that the Bayes-optimal critic becomes
+$f(x,y) \propto p(y \mid x)/q(y)$, that the expected log of this ratio at
+true pairs equals
 $$
 \mathbb{E}_{p(x,y)}\left[\log_2 \frac{p(y \mid x)}{q(y)}\right]
 = I(X;Y) + D\bigl(p_Y \,\|\, q\bigr),
 $$
-where $p_Y$ is the true marginal and $D$ is the KL divergence of
-<Ref lesson="kl-divergence"/>. Conclude what goes wrong with the
-certificate.
+with $D$ the KL divergence of <Ref lesson="kl-divergence"/>, and conclude
+what happens to the certificate.
 
 <Solution>
 **The critic.** Rerun the posterior derivation with negatives from $q$:
 given $\text{pos} = i$, the candidates have density
-$p(y_i \mid x) \prod_{j \ne i} q(y_j)$. Dividing numerator and
-denominator of Bayes' rule by $\prod_j q(y_j)$ leaves
+$p(y_i \mid x) \prod_{j \ne i} q(y_j)$. Dividing numerator and denominator
+of Bayes' rule by $\prod_j q(y_j)$ leaves
 $$
 p(\text{pos}{=}i \mid x, y_{1..N})
 = \frac{p(y_i \mid x)/q(y_i)}{\sum_k p(y_k \mid x)/q(y_k)},
 $$
-so the optimal critic is the ratio against the **wrong reference**,
+so the optimal critic is the ratio against the wrong reference,
 $r'(x,y) = p(y \mid x)/q(y)$.
 
 **The expectation.** Split the logarithm:
@@ -910,26 +1057,160 @@ $$
 = \mathbb{E}_{p(x,y)}\left[\log_2 \frac{p(y \mid x)}{p(y)}\right]
 + \mathbb{E}_{p(x,y)}\left[\log_2 \frac{p(y)}{q(y)}\right].
 $$
-The first term is $I(X;Y)$ (divergence form). In the second, the
-integrand depends only on $y$, so the expectation collapses to the
+The first term is $I(X;Y)$ by the divergence form. In the second the
+integrand depends on $y$ alone, so the expectation collapses onto the
 marginal: $\sum_y p(y) \log_2 \tfrac{p(y)}{q(y)} = D(p_Y \| q)$.
 
-**Conclusion.** The role that $I$ played in the derivation is now
-played by $I(X;Y) + D(p_Y \| q) \ge I(X;Y)$: for large $N$ the quantity
-$\log_2 N - L_N$ approaches the inflated value, exceeding the true
-mutual information by exactly the marginal mismatch. The one-way
-certificate is broken: the reported number can overstate $I$. This is
-why implementations build negatives by shuffling real partners (exact
-marginal draws) rather than sampling from a convenient noise model.
+**The conclusion.** Every step of the bound's proof goes through with $q$
+in place of $p_Y$, and the quantity bounded is the inflated
+$I(X;Y) + D(p_Y \| q) \ge I(X;Y)$. So for large $N$ the reported
+$\log_2 N - L_N$ converges to a value that *exceeds* the true mutual
+information by exactly the marginal mismatch, and the one-way guarantee is
+gone: the number can now overstate. This is why implementations build
+negatives by borrowing real partners from the batch rather than sampling
+from a convenient noise model, and it is the sharpest practical difference
+between InfoNCE and noise-contrastive estimation generally.
+</Solution>
+</Exercise>
+
+<Exercise>
+Here is a joint distribution: $X$ is the sky (clear or overcast), $Y$ is
+the ground (dry or wet), with
+$p(\text{clear},\text{dry}) = \tfrac12$,
+$p(\text{clear},\text{wet}) = 0$, and
+$p(\text{overcast},\text{dry}) = p(\text{overcast},\text{wet}) = \tfrac14$.
+Decide which quantity of this lesson is computable here without any
+training at all, compute it for every cell, and use it to obtain
+$I(X;Y)$ by a route other than the entropy difference. Then name the cell
+an optimal critic would score highest. Use $\log_2 3 \approx 1.585$.
+
+<Solution>
+**Which quantity.** With the joint table in hand the density ratio
+$r(x,y) = p(y \mid x)/p(y)$ is computable cell by cell, and the divergence
+form $I(X;Y) = \mathbb{E}_{p(x,y)}[\log_2 r]$ then gives the mutual
+information without computing $H(Y)$ and $H(Y \mid X)$ separately.
+
+**Marginals and conditionals.** $p(\text{dry}) = \tfrac34$,
+$p(\text{wet}) = \tfrac14$. Clear implies dry
+($p(\text{dry} \mid \text{clear}) = 1$); overcast splits evenly.
+
+**Ratios.** $r(\text{clear}, \text{dry}) = \tfrac{1}{3/4} = \tfrac43$;
+$r(\text{overcast}, \text{dry}) = \tfrac{1/2}{3/4} = \tfrac23$;
+$r(\text{overcast}, \text{wet}) = \tfrac{1/2}{1/4} = 2$. The cell
+(clear, wet) has probability zero and never enters the average.
+
+**Mutual information.**
+$$
+\tfrac12 \log_2 \tfrac43 + \tfrac14 \log_2 \tfrac23 + \tfrac14 \log_2 2
+= \tfrac12 (0.415) + \tfrac14 (-0.585) + \tfrac14 (1)
+\approx 0.311 \text{ bits},
+$$
+matching the value computed by entropies in
+<Ref lesson="mutual-information"/>.
+
+**Highest-scoring cell.** (overcast, wet), with $r = 2$: it is the cell
+that occurs twice as often as independence predicts. Note that
+(overcast, dry) scores *below* $1$ even though it is the more probable
+outcome, which is the distinction between a conditional and a ratio: the
+critic ranks surprise-relative-to-the-marginal, not frequency.
+</Solution>
+</Exercise>
+
+<Exercise>
+A research-shaped task. Choose a joint whose $I(X;Y)$ you can compute
+exactly (the dependence dial at any $q$, or $X$ uniform on $M$ symbols with
+$Y$ a noisy copy). Evaluate the optimal-critic loss $L_N$ by enumeration or
+Monte Carlo at $N = 4, 16, 64, 256$, and plot the certificate against
+$\log_2 N$ alongside the true value. Report the $N$ at which the
+certificate stops improving by more than $0.01$ bits per doubling, and
+compare that $N$ with $2^{I(X;Y)}$. State in advance what agreement would
+look like.
+
+<Solution>
+**Setup.** For a discrete joint the loss needs no training: the optimal
+critic is $r(x,y) = p(y \mid x)/p(y)$, available in closed form, so
+$L_N$ is either an exact enumeration (small alphabets) or an average over
+sampled lineups (a few $10^5$ rounds gives three decimals).
+
+**What to expect.** The certificate rises with $\log_2 N$ and levels off
+just below $I(X;Y)$. The knee sits near $N \approx 2^{I(X;Y)}$, and this is
+the prediction to test: the ceiling $\log_2 N$ must clear $I$ before the
+bound can be tight, so the transition happens where $\log_2 N \approx I$.
+On the dependence dial at $q = 0.75$, with $I = 0.189$ bits, the knee is
+essentially immediate: the certificate is already $0.177$ at $N = 16$ and
+gains $0.01$ bits or less per doubling after that. On a $16$-symbol
+lockstep pair with $I = 4$ bits, the certificate is still climbing at
+$N = 16$ and flattens only past $N \approx 64$.
+
+**What agreement looks like.** The certificate at the knee should reach
+$80$-$90\%$ of the true $I$, and doubling $N$ past it should add under
+$0.05$ bits while the ceiling still rises by a full bit. Disagreement in
+one specific direction is the informative failure: if the certificate keeps
+climbing one bit per doubling with no sign of a knee, the pair's $I$ is
+larger than every $N$ tried, and no run at these candidate counts can
+report its value.
+</Solution>
+</Exercise>
+
+<Exercise>
+A learned image codec must decide how many bits to spend on each part of an
+image. Write down a training objective for it, in the same shape as the
+losses of this course: the rate term is a cross-entropy of the true
+distribution over codes against a learned model of that distribution, and
+the fidelity term is a distortion between the input and its
+reconstruction. State the units of each term, say what the trade-off
+parameter multiplies, and compare the objective's shape with
+$R(D)$ from <Ref lesson="rate-distortion"/>.
+
+<Solution>
+**The objective.** With an encoder producing a discrete code $\hat{z}$ from
+an image $x$, a learned distribution $q(\hat{z})$ over codes, and a decoder
+producing $\hat{x}$:
+$$
+\mathcal{L} = \underbrace{\mathbb{E}\bigl[-\log_2 q(\hat{z})\bigr]}_{\text{rate, bits}}
+\;+\; \lambda \underbrace{\mathbb{E}\bigl[d(x, \hat{x})\bigr]}_{\text{distortion}}.
+$$
+The rate term is the expected code length an entropy coder achieves against
+the model $q$, which is the cross-entropy of
+<Ref lesson="cross-entropy-loss"/>: it exceeds the true entropy of the code
+distribution by the divergence between the model and the truth
+(<Ref lesson="kl-divergence"/>), so improving the entropy model is
+literally shortening the file. Its units are bits (per image, or divided
+through by pixel count, bits per pixel). The distortion term carries
+whatever units $d$ has, squared error or one minus a similarity index, and
+$\lambda$ multiplies it, converting distortion into bits so that the sum is
+meaningful.
+
+**Comparison with $R(D)$.** Sweeping $\lambda$ traces a curve of achieved
+(rate, distortion) pairs, which is the same construction as the
+rate-distortion function of <Ref lesson="rate-distortion"/>, with two
+differences. $R(D)$ is an infimum over all test channels, attained by no
+particular algorithm; the sweep here is over one parametric family, so the
+achieved curve lies on or above $R(D)$. And $R(D)$ measures rate as a
+mutual information $I(X;\hat{X})$, whereas the objective above measures it
+as a cross-entropy against a learned model, which is a computable quantity
+for the same reason $L_N$ is: an information quantity has been replaced by
+a loss whose optimum recovers it.
+
+**The shape.** $\mathcal{L} = \text{rate} + \lambda \cdot \text{distortion}$
+is a Lagrangian for the constrained problem "minimize rate subject to a
+distortion budget", the same algebraic form as the bottleneck objective and
+the same form the entire codec of
+<Ref lesson="learned-image-compression"/> is trained against. That lesson
+identifies each of its four learned components with one of this course's
+results.
 </Solution>
 </Exercise>
 
 <References>
-1. A. van den Oord, Y. Li, O. Vinyals, "Representation Learning with Contrastive Predictive Coding," 2018 — §2.1 mutual information as the representation-learning objective and the case against generative reconstruction; §2.3 the InfoNCE loss and the optimal critic as a density ratio; Appendix A.1 (eqs. 6–11) the derivation of $I \ge \log N - L_N$; §3 the audio, vision, language, and RL experiments quoted here. https://arxiv.org/abs/1807.03748
-2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §2.3: mutual information as the expected log density ratio, the identity the derivation turns on.
-3. B. Poole, S. Ozair, A. van den Oord, A. A. Alemi, G. Tucker, "On Variational Bounds of Mutual Information," ICML 2019 — the exact proof that InfoNCE lower-bounds $I$ for every critic, and the bias–variance map of the estimator family. https://arxiv.org/abs/1905.06922
-4. M. I. Belghazi, A. Baratin, S. Rajeswar, S. Ozair, Y. Bengio, A. Courville, R. D. Hjelm, "MINE: Mutual Information Neural Estimation," ICML 2018 — the Donsker–Varadhan alternative estimator discussed in the aside. https://arxiv.org/abs/1801.04062
-5. M. Gutmann, A. Hyvärinen, "Noise-contrastive estimation: A new estimation principle for unnormalized statistical models," AISTATS 2010 — generic NCE with designer noise, the contrast for the marginal-negatives requirement. https://proceedings.mlr.press/v9/gutmann10a.html
-6. D. McAllester, K. Stratos, "Formal Limitations on the Measurement of Mutual Information," AISTATS 2020 — distribution-free lower bounds from $n$ samples cannot certify more than $O(\log n)$ bits. https://arxiv.org/abs/1811.04251
-7. N. Tishby, F. C. Pereira, W. Bialek, "The Information Bottleneck Method," 1999 — the objective whose relevance term $I(T;Y)$ InfoNCE makes trainable. https://arxiv.org/abs/physics/0004057
+1. A. van den Oord, Y. Li, O. Vinyals, "Representation Learning with Contrastive Predictive Coding," 2018 — §2.2 the density-ratio critic and its log-bilinear parameterization; §2.3 the InfoNCE loss with the optimal-classifier derivation; Appendix A.1 (eqs. 6–11) the original approximate derivation of $I \ge \log N - L_N$; §3.1–3.2 the LibriSpeech and ImageNet numbers quoted here. https://arxiv.org/abs/1807.03748
+2. B. Poole, S. Ozair, A. van den Oord, A. A. Alemi, G. Tucker, "On Variational Bounds of Mutual Information," ICML 2019 — the exact proof that InfoNCE lower-bounds $I$ for every critic, and the bias–variance map of the estimator family including MINE. https://arxiv.org/abs/1905.06922
+3. M. Tschannen, J. Djolonga, P. K. Rubenstein, S. Gelly, M. Lucic, "On Mutual Information Maximization for Representation Learning," ICLR 2020 — §3.1 invertible encoders with constant $I$ and varying downstream accuracy; §3.2 higher-capacity critics giving tighter bounds and worse representations; §4 the metric-learning reading. https://arxiv.org/abs/1907.13625
+4. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §2.3 mutual information as the expected log density ratio; §11.7 the Neyman–Pearson lemma and §11.8 Stein's lemma, the hypothesis-testing reading of the critic.
+5. D. McAllester, K. Stratos, "Formal Limitations on the Measurement of Mutual Information," AISTATS 2020 — distribution-free lower bounds from $n$ samples cannot certify more than $O(\log n)$ bits. https://arxiv.org/abs/1811.04251
+6. M. Gutmann, A. Hyvärinen, "Noise-contrastive estimation: A new estimation principle for unnormalized statistical models," AISTATS 2010 — the general technique with a designer-chosen noise distribution, the contrast case for the marginal-negatives requirement. https://proceedings.mlr.press/v9/gutmann10a.html
+7. Z. Goldfeld, Y. Polyanskiy, "The Information Bottleneck Problem and Its Applications in Machine Learning," IEEE JSAIT, 2020 — §V on what sample-based mutual-information estimates can certify, including the exponential dependence of sample complexity on dimension. https://arxiv.org/abs/2004.14941
+8. T. Chen, S. Kornblith, M. Norouzi, G. Hinton, "A Simple Framework for Contrastive Learning of Visual Representations," ICML 2020 — §2.1 for the framework and the count of negatives a batch supplies (a batch of 8,192 gives 16,382 negatives per positive, so the default batch of 4,096 used for the main results gives 8,190); Appendix B.1, "Batch Size and Training Steps", for the sweep over batch sizes. https://arxiv.org/abs/2002.05709
+9. A. Radford et al., "Learning Transferable Visual Models From Natural Language Supervision," ICML 2021 — §2.5 for the 32,768-pair minibatch used in CLIP's contrastive objective. https://arxiv.org/abs/2103.00020
+10. K. He, H. Fan, Y. Wu, S. Xie, R. Girshick, "Momentum Contrast for Unsupervised Visual Representation Learning," CVPR 2020 — the 65,536-entry queue that decouples the candidate count from the batch size. https://arxiv.org/abs/1911.05722
 </References>

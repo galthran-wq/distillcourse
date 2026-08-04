@@ -78,12 +78,15 @@ import PolyFitTally from "./information-theory/PolyFitTally";
 import MarkovUCurve from "./information-theory/MarkovUCurve";
 import ParameterPrecision from "./information-theory/ParameterPrecision";
 import AdjustedRateUCurves from "./information-theory/AdjustedRateUCurves";
+import OccamFactorSplit from "./information-theory/OccamFactorSplit";
+import RegularVsSingular from "./information-theory/RegularVsSingular";
 import IbVsRd from "./information-theory/IbVsRd";
 import IbObjective from "./information-theory/IbObjective";
 import IbToyMerges from "./information-theory/IbToyMerges";
 import IbPlane from "./information-theory/IbPlane";
 import IbGibbsEncoder from "./information-theory/IbGibbsEncoder";
 import IbBetaExtremes from "./information-theory/IbBetaExtremes";
+import VibVsVae from "./information-theory/VibVsVae";
 import ContrastiveLineup from "./information-theory/ContrastiveLineup";
 import InfonceDerivation from "./information-theory/InfonceDerivation";
 import CertifiedBitsBudget from "./information-theory/CertifiedBitsBudget";
@@ -207,12 +210,15 @@ export const figures: Record<string, RegisteredFigure> = {
   MarkovUCurve: { component: MarkovUCurve },
   ParameterPrecision: { component: ParameterPrecision },
   AdjustedRateUCurves: { component: AdjustedRateUCurves },
+  OccamFactorSplit: { component: OccamFactorSplit },
+  RegularVsSingular: { component: RegularVsSingular },
   IbVsRd: { component: IbVsRd },
   IbObjective: { component: IbObjective },
   IbToyMerges: { component: IbToyMerges, frames: 4 },
   IbPlane: { component: IbPlane },
   IbGibbsEncoder: { component: IbGibbsEncoder },
   IbBetaExtremes: { component: IbBetaExtremes },
+  VibVsVae: { component: VibVsVae },
   ContrastiveLineup: { component: ContrastiveLineup },
   InfonceDerivation: { component: InfonceDerivation, frames: 4 },
   CertifiedBitsBudget: { component: CertifiedBitsBudget },
