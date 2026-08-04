@@ -118,8 +118,10 @@ fixed cost of the quoting code. Four cases fix what the definition covers.
   forever can be shorter than any halting program for $x$, and it does not
   count: the clause it violates is $U(p) = x$, which demands halting with
   exactly $x$ on the output. That one clause is what makes the shortest
-  program impossible to identify by running candidates, and the
-  uncomputability proof below is built on it.
+  program impossible to identify by running candidates: a candidate still
+  running may yet halt with $x$, so a search can lower its current best but
+  never certify it, which is the one-sidedness set out in the remark
+  *uncomputable is not undefined* below.
 
 <Task>
 Take a file from your own disk and write down two descriptions of it: the
@@ -181,8 +183,8 @@ anything.
 
 The subscript $U$ looks like a defect. A "Python complexity" and a "C
 complexity" could disagree, and a quantity that depends on a taste in
-languages would not be a property of the string. The rescue is concrete: a
-Python interpreter can be written in C, once, as a fixed file of $c$ bits.
+languages would not be a property of the string. A Python interpreter can be
+written in C, once, as a fixed file of $c$ bits.
 Prepending that interpreter to any Python program $p$ yields a C program of
 length $\ell(p) + c$ with identical output. Whatever Python saves, C recovers
 at a one-time cost of $c$.
@@ -282,7 +284,12 @@ itself.
 </Theorem>
 
 Nothing in the proof mentions a probability distribution, but the fraction
-converts into one the moment the string is drawn at random. For $X^n$ a
+converts into one the moment the string is drawn at random. The standard form
+of that statement uses a *conditional complexity*: $K(x \mid y)$ is the length
+of the shortest program that prints $x$ when $y$ is supplied to it as input,
+so the bar marks an input to a program and not an event conditioning a
+probability. Conditioning on the length $n$ hands the machine that length for
+free and charges only for the string's content. For $X^n$ a
 sequence of fair coin flips, every $n$-bit string has probability $2^{-n}$,
 so the theorem reads $\Pr[K(X^n \mid n) < n - c] < 2^{-c}$: the chance that a
 recorded coin sequence compresses by 10 bits is under one in a thousand, and
@@ -458,19 +465,25 @@ phrases, which is the largest number of distinct phrases any string of that
 length admits. The sequence is built out of the dictionary the parser is
 trying to build.
 
-Phrase number $j$ costs about $\log_2 j$ bits of index plus one bit of
+Phrase number $j$ costs $\lceil \log_2 j \rceil$ bits of index plus one bit of
 symbol, so the output is about $c \log_2 c$ bits. At $k = 20$ the parse has
-$c \approx 2.10$ million phrases at roughly $21$ bits each, for an output near
-$43$ megabits against an input of $39.8$ megabits. The compressor expands the
-file, and as $k$ grows the ratio falls to $1$ from above rather than dropping
-below it:
+$c = 2^{21} - 2 \approx 2.10$ million phrases, whose indices average $20$ bits
+apiece: $21$ bits per phrase, for an output of $44.0$ megabits against an
+input of $39.8$ megabits, or $1.10$ bits out per bit in. The compressor
+expands the file, and as $k$ grows the ratio falls to $1$ from above rather
+than dropping below it:
 $$
 \frac{c \log_2 c}{n(k)} \;\longrightarrow\;
 \frac{(k+1)\,2^{k+1}}{(k-1)\,2^{k+1}} \;=\; \frac{k+1}{k-1} \;\to\; 1 .
 $$
 
 This is not a defect of LZ78. The same phrase count lower-bounds every
-encoder with a fixed finite memory.
+*finite-state information-lossless encoder*: a machine with a fixed finite
+set of states that reads the input one symbol at a time, emitting output as it
+goes, and is lossless in the sense that the output together with the machine's
+initial and final states determines the input uniquely. Any compressor running
+in bounded memory is such a machine — gzip with its 32 KB window, LZ78 with a
+capped dictionary — with a state count $s$ that is astronomical but fixed.
 
 <Theorem title="describable and incompressible (Ziv–Lempel 1978, Corollary 1)">
 Let $\rho(x)$ be the best compression ratio attainable on the infinite
@@ -602,9 +615,9 @@ $$
 H(X) \;\le\; \frac{1}{n}\, \mathbb{E}\left[ K(X^n \mid n) \right]
 \;\le\; H(X) + \frac{(|\mathcal{X}|-1)\log_2 n}{n} + \frac{c}{n},
 $$
-so $\tfrac{1}{n}\mathbb{E}[K(X^n \mid n)] \to H(X)$. The conditioning on $n$
-hands the machine the length for free, which removes the cost of framing it
-and changes nothing in the limit.
+so $\tfrac{1}{n}\mathbb{E}[K(X^n \mid n)] \to H(X)$. Stating the length
+instead of receiving it costs $O(\log n)$ bits, which the division by $n$
+erases, so the unconditional complexity has the same limit.
 
 <Proof>
 *Upper bound.* Generalize the two-part description. First state the type of
@@ -616,13 +629,18 @@ $K(x^n \mid n) \le n H(\hat p) + (|\mathcal{X}|-1)\log_2 n + c$. Take
 expectations: $\mathbb{E}[H(\hat p)] \le H(\mathbb{E}[\hat p]) = H(f)$,
 because entropy is concave and $\hat p$ is unbiased.
 
-*Lower bound.* A halting program is never a prefix of another halting
-program, since the machine stops reading once it halts, so program lengths
-satisfy the Kraft budget of <Ref lesson="kraft-inequality"/>. The map from
-$x^n$ to its shortest program is therefore a lossless code with codeword
-lengths $K(x^n \mid n)$, and <Ref lesson="source-coding-theorem-lite">the
-source coding theorem</Ref> floors any such code's expected length at
-$H(X_1 \ldots X_n) = nH(X)$.
+*Lower bound.* Take $U$ prefix-free: its valid programs are required to form
+a prefix-free set, which is a property of the machine assumed here and not
+something halting supplies, as the remark *which K the Kraft step needs*
+below sets out. Distinct strings have distinct shortest programs, so for fixed
+$n$ the shortest programs of the $x^n$ are distinct members of that
+prefix-free set and their lengths obey the budget of
+<Ref lesson="kraft-inequality"/>:
+$\sum_{x^n} 2^{-K(x^n \mid n)} \le 1$. That inequality on the lengths is the
+whole hypothesis of the entropy floor in
+<Ref lesson="source-coding-theorem-lite">the source coding theorem</Ref>,
+which therefore applies to the map $x^n \mapsto$ its shortest program and
+puts its expected length at or above $H(X_1 \ldots X_n) = nH(X)$.
 </Proof>
 </Theorem>
 
@@ -644,7 +662,7 @@ by $O(\log n)$ on $n$-bit strings, which the division by $n$ erases, so no
 asymptotic claim in this lesson depends on the choice.
 </Remark>
 
-Both hypotheses in the theorem earn their keep. *Computable source:* the
+Dropping either hypothesis breaks the theorem. *Computable source:* the
 decoder in the upper bound has to work with $f$'s structure, and for sources
 with no computable description the route fails. *Expectation:* the agreement
 is an average over draws, and an individual string can sit far below it, as
@@ -683,8 +701,10 @@ $M(\text{next bit} = 1 \mid x) = M(x1)/M(x)$.
 </Definition>
 
 Every program is a hypothesis about the data's law, weighted by $2^{-\ell}$,
-so short programs carry exponentially more prior weight than long ones. The
-consequence is a domination argument in one line.
+so short programs carry exponentially more prior weight than long ones. Every
+computable law $\mu$ is itself among those programs, so $M$ retains at least
+the fraction $2^{-K(\mu)}$ of whatever probability $\mu$ assigns to any
+string.
 
 <Theorem title="the mixture's total regret is a constant">
 Let $\mu$ be any computable distribution over binary streams, computed by
