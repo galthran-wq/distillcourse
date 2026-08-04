@@ -104,6 +104,8 @@ import GroupingTree from "./information-theory/GroupingTree";
 import CapacityPacking from "./information-theory/CapacityPacking";
 import LossVsGradient from "./information-theory/LossVsGradient";
 import AdaptiveCoderStep from "./information-theory/AdaptiveCoderStep";
+import UkSeparation from "./information-theory/UkSeparation";
+import SzilardFreeEnergy from "./information-theory/SzilardFreeEnergy";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -231,4 +233,6 @@ export const figures: Record<string, RegisteredFigure> = {
   CapacityPacking: { component: CapacityPacking },
   LossVsGradient: { component: LossVsGradient },
   AdaptiveCoderStep: { component: AdaptiveCoderStep, frames: 4 },
+  UkSeparation: { component: UkSeparation },
+  SzilardFreeEnergy: { component: SzilardFreeEnergy },
 };
