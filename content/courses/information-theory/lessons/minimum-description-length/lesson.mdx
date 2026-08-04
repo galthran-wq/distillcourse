@@ -302,24 +302,38 @@ parts concatenate into one message a receiver can actually decode.
 <Theorem title="the two-part code is a code">
 If the lengths $L(H)$ belong to a prefix-free code over $\mathcal{H}$ and,
 for each $H$, the data lengths are $L(D \mid H) = -\log_2 P(D \mid H)$,
-then the concatenated descriptions are uniquely decodable and their total
-lengths satisfy the Kraft budget:
+then the two-part lengths satisfy the Kraft budget
 $$
-\sum_{H} \sum_{D} 2^{-[L(H) + L(D \mid H)]} \;\le\; 1 .
+\sum_{H} \sum_{D} 2^{-[L(H) + L(D \mid H)]} \;\le\; 1 ,
 $$
+and an implementable, sequentially decodable code attains every total
+$L(H) + L(D \mid H)$ to within two bits.
 
 <Proof>
-Decoding is sequential: the hypothesis code is prefix-free, so the receiver
-reads it to completion unambiguously, learns $H$, and then knows which data
-code governs the remaining bits. For the budget,
-$\sum_H 2^{-L(H)} \le 1$ by the Kraft inequality of
+For the budget, $\sum_H 2^{-L(H)} \le 1$ by the Kraft inequality of
 <Ref lesson="kraft-inequality"/>, and for each $H$,
 $\sum_D 2^{-L(D \mid H)} = \sum_D P(D \mid H) \le 1$; the double sum
-factors as $\sum_H 2^{-L(H)} \sum_D P(D \mid H) \le 1$. By the
-achievability direction of the Kraft inequality, an actual prefix code with
-these total lengths exists.
+factors as $\sum_H 2^{-L(H)} \sum_D P(D \mid H) \le 1$.
+
+Realization needs one more step, because $-\log_2 P(D \mid H)$ is a real
+number and the achievability direction of Kraft builds codes from *integer*
+lengths. The model part is already integral: $L(H)$ are the lengths of an
+actual prefix-free code. For the data part, either round up — the integers
+$\lceil L(D \mid H)\rceil$ satisfy
+$\sum_D 2^{-\lceil L(D \mid H)\rceil} \le \sum_D 2^{-L(D \mid H)} \le 1$, so
+Kraft supplies a prefix code costing under one extra bit — or encode $D$ with
+the arithmetic coder of <Ref lesson="compression-is-prediction"/> driven by
+$P(\cdot \mid H)$, which spends within two bits of $-\log_2 P(D \mid H)$ on
+the whole message. Decoding is sequential either way: the hypothesis code is
+prefix-free, so the receiver reads it to completion unambiguously, learns
+$H$, and then knows which data code governs the remaining bits.
 </Proof>
 </Theorem>
+
+The overhead is at most two bits whatever $H$ is, so it shifts every
+candidate's total by the same bounded amount and cannot reverse a comparison
+decided by more than two bits — which is why the rest of the lesson prices
+hypotheses with the idealized real-valued lengths and ignores the rounding.
 
 <Remark title="the hypothesis code is fixed in advance">
 The clause "chosen before seeing the data" is load-bearing, and the failure
@@ -436,14 +450,12 @@ coefficients dominate the total instead.
   caption="One scatter, three candidates: the constant underpays in model bits and overpays in fit; the interpolator does the reverse; the quadratic minimizes the sum. The tallies are schematic; the demo below prices a different record."
 />
 
-Across the four frames the blue fit bar shrinks monotonically with degree,
-the amber model bar grows monotonically, and the printed total falls from
-$78$ to $50$ before rising back to $80$. Those tallies are round numbers
-chosen to be read off the bars. The demo runs the same accounting on its own
-ten-point record, charging $8$ bits per coefficient and pricing residuals
-against a recording precision of $1/16$, and prints $72.1$, $65.0$ and $80.0$
-bits for the same three degrees. Both put the minimum at degree $2$, the
-trend actually present in the points.
+Those tallies are round numbers chosen to be read off the bars. The demo
+prices a record generated on the spot, charging $8$ bits per coefficient and
+pricing residuals against a recording precision of $1/16$. Its source is a
+quartic — four coefficients beyond the constant — and at ten points the
+two-part minimum still lands at degree $2$: degree $2$ is what a short record
+can pay for, not the trend present in the source.
 
 <Demo
   name="TwoPartCode"
@@ -451,14 +463,16 @@ trend actually present in the points.
 />
 
 <Task>
-On the ten-point record, drag $k$ upward from $0$ and find the degree where
-the total bottoms out; it should match the sweet-spot preset at $k = 2$. Then
-push $k$ to $9$ and confirm the signature of overfitting in coding terms:
-$L(D \mid H)$ pinned at zero while the total climbs to $80$ bits, past the
-$72.1$ of the $k = 0$ underfit. Now switch the record to $25$ points and then
-to $60$ and repeat the sweep: the minimum moves to $k = 3$ and then $k = 4$.
-Each halving of the mean squared residual is worth $n/2$ bits, so a longer
-record buys more coefficients at the same $8$ bits each.
+Three readings on the ten-point record, then a prediction. Drag $k$ upward
+from $0$ and write down the total at the underfit, the total at the degree
+where it bottoms out, and the total at $k = 9$: those three numbers are the
+U-curve. At $k = 9$ check the signature of overfitting in coding terms —
+$L(D \mid H)$ pinned at zero, the whole total sitting in the model bar — and
+compare it against the underfit total you wrote down. Then predict before you
+switch: a longer record multiplies the fit term by more symbols while a
+coefficient still costs $8$ bits, so state which way the minimizing degree
+moves. Switch the record to $25$ points and then to $60$, repeat the sweep,
+and report the minimizing degree at each length.
 </Task>
 
 ## A selection by hand: Markov orders on a 41-bit record
@@ -789,11 +803,12 @@ last such term over re-orderings. They agree often and are not the same
 quantity.
 
 <KeyFact>
-Underfitting costs $\Theta(n)$ bits and overfitting costs $\Theta(\log n)$,
-so preferring the simpler model at small sample size is a bounded-loss
-strategy that self-corrects as data arrives. The bound is on excess code
-length, not on error: for classification tasks under misspecification the
-same criterion can select badly, which is where MDL is known to be weakest.
+Both bills are bills in bits: the asymmetry bounds excess **code length**,
+not error. A model that overpays only $\log_2 n$ bits can still be the worse
+classifier, since nothing in the total mentions a downstream decision — which
+is where MDL is known to be weakest, and why the next lesson scores a
+representation against a target variable instead of against the input's own
+bit count.
 </KeyFact>
 
 ## Where (k/2) log₂ n stops being valid: singular models
