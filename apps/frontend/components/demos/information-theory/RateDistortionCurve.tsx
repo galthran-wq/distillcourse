@@ -21,6 +21,10 @@ const AMBER = "#e2903a"; // the frontier R(D) — the subject
 const BLUE = "#4c8dd6"; // schemes: the reader's accepted point, the naive scheme
 const WARN = "#c0392b"; // a proposal the converse rejects
 const ECSQ = 0.254; // bits/sample an entropy-coded uniform scalar quantizer wastes
+/** Accept anything within a millibit of the frontier: the slider grid is coarser
+ *  than the curve, and the lesson's own headline point (fair source, D = 0.11,
+ *  R = 0.50) needs R(D) = 0.500084 — it must read as achievable, not rejected. */
+const TOL = 1e-3;
 
 const PRESETS: { label: string; s: Omit<S, "hit"> }[] = [
   { label: "Fair source", s: { mode: "bernoulli", p: 0.5, bd: 0.25, br: 0.5, s2: 1, gd: 0.25, gr: 1.25 } },
@@ -61,7 +65,7 @@ function measure(s: S) {
   };
   const need = rAt(D);
   const slack = R - need; // bits per symbol above the frontier; negative = impossible
-  const met = [slack < -1e-9, Math.abs(slack) <= 0.01, slack >= -1e-9 && slack < ECSQ];
+  const met = [slack < -TOL, Math.abs(slack) <= 0.01, slack >= -TOL && slack < ECSQ];
   return { bern, D, R, rAt, need, slack, dMin: dAt(R), met };
 }
 
@@ -76,7 +80,8 @@ export default function RateDistortionCurve() {
     });
 
   const { bern, D, R, rAt, need, slack, dMin, met } = measure(s);
-  const rejected = slack < -1e-9;
+  const rejected = slack < -TOL;
+  const over = Math.max(0, slack); // what an accepted scheme overspends, never "-0.000"
   const xMax = bern ? 0.5 : 2.1;
   const yMax = bern ? 1 : 4;
   const unit = bern ? "bits/symbol" : "bits/sample";
@@ -150,7 +155,7 @@ export default function RateDistortionCurve() {
         ) : (
           <>
             <strong>Achievable</strong> at long block length, and you overspend{" "}
-            {slack.toFixed(3)} {unit} against R(D) = {need.toFixed(3)}. The same rate buys
+            {over.toFixed(3)} {unit} against R(D) = {need.toFixed(3)}. The same rate buys
             D = {fmtD(dMin)} on the frontier.
           </>
         )}
@@ -205,7 +210,7 @@ export default function RateDistortionCurve() {
         <line x1={PX} y1={yOf(R)} x2={xOf(D)} y2={yOf(R)} stroke="currentColor" opacity="0.35" strokeDasharray="3 3" />
         <circle cx={xOf(D)} cy={yOf(R)} r="5" fill={rejected ? WARN : BLUE} />
         <text x={Math.min(xOf(D) + 10, PX + PW - 130)} y={Math.max(yOf(R) + 17, PY + 30)} fontSize="12" fontWeight="bold" fill={rejected ? WARN : BLUE}>
-          {rejected ? "your scheme: impossible" : `your scheme: +${slack.toFixed(3)} bit`}
+          {rejected ? "your scheme: impossible" : `your scheme: +${over.toFixed(3)} bit`}
         </text>
       </svg>
     </Panel>
