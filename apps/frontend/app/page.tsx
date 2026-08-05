@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getCourses, isReadable } from "@/lib/content/site";
+import { getCourses } from "@/lib/content/site";
+import { isReadable } from "@/lib/content/visibility";
 
 export default function Home() {
   const courses = getCourses();

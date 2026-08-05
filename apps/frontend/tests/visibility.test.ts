@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isReadable, previewMode } from "@/lib/content/site";
+import { isReadable, previewMode } from "@/lib/content/visibility";
 import type { LoadedLesson } from "@/lib/content/load";
 
 function lesson(status: LoadedLesson["lesson"]["status"], mdx?: string): LoadedLesson {
