@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, Text, func
-from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -43,3 +44,47 @@ class UserSession(Base):
     user_agent: Mapped[str | None] = mapped_column(String(400), default=None)
 
     user: Mapped[User] = relationship()
+
+
+class Chat(Base):
+    __tablename__ = "chats"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    model: Mapped[str] = mapped_column(String(128))
+    title: Mapped[str | None] = mapped_column(String(60), default=None)
+    # A run holds the chat for as long as the claim is fresh; the deadline is
+    # what releases a chat whose worker died mid-stream.
+    active_run_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
+    claimed_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    # uuid7 is time-ordered, so `ORDER BY id` is the chat's message order and
+    # no separate sequence column is needed.
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
+    chat_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chats.id", ondelete="CASCADE"), index=True
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
+    role: Mapped[str] = mapped_column(String(16))
+    pydantic_ai: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    projection: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    usage: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # Set when the run this row belongs to failed; errored rows stay visible in
+    # the UI but are kept out of the model's context.
+    error: Mapped[str | None] = mapped_column(default=None)
+    marker: Mapped[str | None] = mapped_column(String(16), default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
