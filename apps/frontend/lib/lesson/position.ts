@@ -1,8 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-
 import { lessonKey } from "@/lib/content/locator";
+import { createStore } from "@/lib/store";
 
 export interface LessonPosition {
   course: string;
@@ -14,40 +13,28 @@ export interface LessonPosition {
 // Where the reader is, kept outside React because two unrelated trees consume
 // it: the table of contents highlights it, and the chat widget — mounted in
 // the root layout, far from any lesson — sends it with every message.
-let position: LessonPosition | null = null;
-const listeners = new Set<() => void>();
+const position = createStore<LessonPosition | null>(null);
 
 export function setPosition(next: LessonPosition): void {
-  position = next;
-  listeners.forEach((listener) => listener());
+  position.set(next);
 }
 
 export function clearPosition(course: string, lesson: string): void {
+  const current = position.get();
   // Leaving a lesson must not erase the position of the one just entered: on a
   // navigation both lessons are mounted for a moment, in no guaranteed order.
-  if (position?.course !== course || position.lesson !== lesson) return;
-  position = null;
-  listeners.forEach((listener) => listener());
+  if (current?.course !== course || current.lesson !== lesson) return;
+  position.set(null);
 }
 
 /** The reader's position in the locator namespace the harness tools speak. */
 export function currentLocator(): string | null {
-  if (position === null) return null;
-  const anchor = position.anchor === null ? "" : `#${position.anchor}`;
-  return `${lessonKey(position.course, position.lesson)}${anchor}`;
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
+  const current = position.get();
+  if (current === null) return null;
+  const anchor = current.anchor === null ? "" : `#${current.anchor}`;
+  return `${lessonKey(current.course, current.lesson)}${anchor}`;
 }
 
 export function useLessonPosition(): LessonPosition | null {
-  return useSyncExternalStore(
-    subscribe,
-    () => position,
-    () => null,
-  );
+  return position.use();
 }

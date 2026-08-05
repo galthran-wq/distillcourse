@@ -100,8 +100,10 @@ afterEach(() => {
 
 describe("the chat session", () => {
   it("resumes the reader's most recent web chat", async () => {
+    // Telegram first on purpose: without the filter the widget would resume
+    // into the reader's Telegram thread, and this is where that shows.
     served({
-      "GET /api/v1/chats": json([WEB, TELEGRAM]),
+      "GET /api/v1/chats": json([TELEGRAM, WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
     });
     const { resumeSession } = await session();
@@ -270,6 +272,54 @@ describe("the chat session", () => {
     await compactSession();
 
     expect(sent("POST", "/api/v1/chats/c1/compact")).toHaveLength(1);
+  });
+
+  it("takes the title the backend wrote from the first message", async () => {
+    const listing = [FRESH];
+    served({
+      "GET /api/v1/chats": json(listing),
+      "GET /api/v1/chats/c2/messages": json([]),
+    });
+    const { refreshSummary, resumeSession } = await session();
+    const untitled = await resumeSession();
+    expect(untitled.summary.title).toBeNull();
+
+    listing[0] = { ...FRESH, title: "why is this true?" };
+    await refreshSummary();
+
+    const titled = await resumeSession();
+    expect(titled.summary.title).toBe("why is this true?");
+    expect(titled.chat).toBe(untitled.chat);
+  });
+
+  it("leaves the session alone when the title has not changed", async () => {
+    served({
+      "GET /api/v1/chats": json([FRESH]),
+      "GET /api/v1/chats/c2/messages": json([]),
+    });
+    const { refreshSummary, resumeSession } = await session();
+    const open = await resumeSession();
+
+    await refreshSummary();
+
+    // A republished session re-renders the panel, which asks for the title
+    // again: an unchanged one has to leave the store untouched.
+    expect(await resumeSession()).toBe(open);
+  });
+
+  it("does not hand the conversation to whoever signs in next", async () => {
+    served({
+      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+    });
+    const { resumeSession } = await session();
+    const { setUser } = await import("@/lib/auth/store");
+    const mine = await resumeSession();
+
+    setUser({ id: "u2", email: "other@example.com", full_name: null, timezone: "UTC" });
+
+    expect(await resumeSession()).not.toBe(mine);
+    expect(sent("GET", "/api/v1/chats")).toHaveLength(2);
   });
 });
 

@@ -12,6 +12,7 @@ import {
   changeModel,
   clearSession,
   compactSession,
+  refreshSummary,
   selectSession,
   streamFailure,
   type Session,
@@ -34,6 +35,14 @@ export default function ChatPanel({ session }: { session: Session }) {
       failure instanceof ApiError ? failure.message : "the server is unreachable",
     );
   }
+
+  // The backend names a chat after its first message, so the header can only
+  // learn the name once an answer is in. `useChat`'s onFinish is no use here:
+  // the SDK ignores its callbacks when it is handed a `chat` to drive.
+  useEffect(() => {
+    if (status !== "ready" || session.summary.title !== null) return;
+    refreshSummary().catch(report);
+  }, [status, session]);
 
   function run(work: Promise<unknown>, done: string | null = null): void {
     setMenu(false);

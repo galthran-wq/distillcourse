@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import { me, type User } from "@/lib/auth/api";
+import { resetSession } from "@/lib/chat/session";
+import { createStore } from "@/lib/store";
 
 export type AuthState =
   | { status: "loading"; user: null }
@@ -13,31 +15,28 @@ export type AuthState =
 const LOADING: AuthState = { status: "loading", user: null };
 const ANONYMOUS: AuthState = { status: "anonymous", user: null };
 
-let state: AuthState = LOADING;
+const auth = createStore<AuthState>(LOADING);
 let asked = false;
-const listeners = new Set<() => void>();
 
 export function setUser(user: User | null): void {
   asked = true;
-  state = user ? { status: "signed-in", user } : ANONYMOUS;
-  listeners.forEach((listener) => listener());
+  // Everything held for the reader outside React belongs to this identity:
+  // whoever signs in next on this tab must not inherit the previous one's
+  // conversation with the tutor.
+  if (user?.id !== auth.get().user?.id) resetSession();
+  auth.set(user ? { status: "signed-in", user } : ANONYMOUS);
 }
 
+// Wrapped rather than used directly: the first component to read the store is
+// what triggers the one request that answers who is signed in.
 function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
   if (!asked) {
     asked = true;
     me().then(setUser, () => setUser(null));
   }
-  return () => {
-    listeners.delete(listener);
-  };
+  return auth.subscribe(listener);
 }
 
 export function useAuth(): AuthState {
-  return useSyncExternalStore(
-    subscribe,
-    () => state,
-    () => LOADING,
-  );
+  return useSyncExternalStore(subscribe, auth.get, () => LOADING);
 }
