@@ -3,6 +3,7 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     AnyUrl,
+    BaseModel,
     BeforeValidator,
     EmailStr,
     PostgresDsn,
@@ -18,6 +19,12 @@ def parse_cors(v: Any) -> list[str] | str:
     if isinstance(v, list | str):
         return v
     raise ValueError(v)
+
+
+class ChatModel(BaseModel):
+    openrouter_id: str
+    display_name: str
+    context_window: int
 
 
 class Settings(BaseSettings):
@@ -45,6 +52,36 @@ class Settings(BaseSettings):
     INVITE_CODE: str = "local-invite"
 
     LOGFIRE_TOKEN: str | None = None
+
+    OPENROUTER_API_KEY: str | None = None
+    CHAT_MODELS: list[ChatModel] = [
+        ChatModel(
+            openrouter_id="moonshotai/kimi-k3",
+            display_name="Kimi K3",
+            context_window=1_048_576,
+        ),
+        ChatModel(
+            openrouter_id="anthropic/claude-opus-5",
+            display_name="Claude Opus 5",
+            context_window=1_000_000,
+        ),
+        ChatModel(
+            openrouter_id="google/gemini-3.6-flash",
+            display_name="Gemini 3.6 Flash",
+            context_window=1_048_576,
+        ),
+    ]
+    DEFAULT_CHAT_MODEL: str = "moonshotai/kimi-k3"
+
+    DAILY_MESSAGE_CAP: int = 100
+    DAILY_WEB_SEARCH_CAP: int = 20
+    # The instance-wide ceiling is the software half of the budget; the other
+    # half is a spend limit on the OpenRouter key itself.
+    MONTHLY_COST_CEILING_USD: float = 50.0
+    RUN_CLAIM_TTL_SECONDS: int = 600
+    COMPACT_AT_TOKENS: int = 200_000
+    # Headroom for the next turn's system prompt, tools and reply.
+    CONTEXT_RESERVE_TOKENS: int = 32_000
 
     SMTP_TLS: bool = True
     SMTP_SSL: bool = False
@@ -74,10 +111,19 @@ class Settings(BaseSettings):
             path=self.POSTGRES_DB,
         )
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def chat_model_pool(self) -> dict[str, ChatModel]:
+        return {model.openrouter_id: model for model in self.CHAT_MODELS}
+
     @model_validator(mode="after")
     def _apply_defaults_and_guard_deployments(self) -> Self:
         if not self.EMAILS_FROM_NAME:
             self.EMAILS_FROM_NAME = self.PROJECT_NAME
+        if self.DEFAULT_CHAT_MODEL not in self.chat_model_pool:
+            raise ValueError(
+                f"DEFAULT_CHAT_MODEL={self.DEFAULT_CHAT_MODEL} is not in CHAT_MODELS"
+            )
         # The defaults above exist so tests and a bare `uv run` work with no
         # environment at all; carrying them into a deployment must be loud.
         if self.ENVIRONMENT != "local":
