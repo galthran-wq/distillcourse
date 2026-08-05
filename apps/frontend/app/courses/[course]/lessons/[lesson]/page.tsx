@@ -28,7 +28,8 @@ import {
   Task,
   Theorem,
 } from "@/components/mdx/Blocks";
-import { getCourses, getLessonView, isReadable } from "@/lib/content/site";
+import { getCourses, getLessonView } from "@/lib/content/site";
+import { isReadable } from "@/lib/content/visibility";
 import { rehypeCollectToc, type TocEntry } from "@/lib/content/toc";
 
 interface Params {

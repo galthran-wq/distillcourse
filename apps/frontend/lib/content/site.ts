@@ -1,13 +1,8 @@
 import "server-only";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import {
-  STATUS_RANK,
-  loadCourse,
-  listCourseDirs,
-  type LoadedCourse,
-  type LoadedLesson,
-} from "./load";
+import { loadCourse, listCourseDirs, type LoadedCourse, type LoadedLesson } from "./load";
+import { isReadable } from "./visibility";
 
 // content/ lives at the repo ROOT (it is the human curation surface, shared
 // with the content factory), while this app lives in apps/frontend — hence the
@@ -17,24 +12,6 @@ import {
 // that build from somewhere else.
 const CONTENT_ROOT =
   process.env.CONTENT_ROOT ?? join(process.cwd(), "..", "..", "content");
-
-/**
- * Visibility: production renders `published` lessons only. Dev — and any
- * deployment with CONTENT_PREVIEW=1 (the personal-server staging mode) —
- * also renders `drafted` and `reviewed` so the authoring loop can review in
- * the real site. `planned` lessons are listed as upcoming but never render.
- */
-export function previewMode(): boolean {
-  return (
-    process.env.NODE_ENV === "development" ||
-    process.env.CONTENT_PREVIEW === "1"
-  );
-}
-
-export function isReadable(lesson: LoadedLesson): boolean {
-  const min = previewMode() ? STATUS_RANK.drafted : STATUS_RANK.published;
-  return STATUS_RANK[lesson.lesson.status] >= min && lesson.mdx !== undefined;
-}
 
 /**
  * Content is immutable within a build process, so the tree is read from disk

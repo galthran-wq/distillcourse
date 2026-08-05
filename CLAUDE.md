@@ -9,7 +9,7 @@ content — it is the constitution for all content generation.
 Monorepo: `content/` and `docs/` at the root, the Next site in
 `apps/frontend/`, the FastAPI backend in `apps/backend/`, deployment in
 `compose.yml` + `ops/` + `Makefile`. The root `package.json` proxies
-`npm run dev|build|test|validate|figure|preview|image|generate-client`
+`npm run dev|build|test|validate|figure|preview|image|generate-client|export-index`
 into the frontend — run them from the repo root, with paths written from the
 repo root.
 
@@ -39,6 +39,12 @@ Rules that override defaults:
 - `apps/frontend/lib/content/schema.ts` is the normative schema;
   `docs/content-model.md` is the human-readable guide — keep them in sync when
   either changes.
+- The backend reaches content ONLY through the `documents` table. It is filled
+  by `npm run export-index` → `python -m app.content.ingest` (`make reindex`),
+  never by reading `content/`. The export decides visibility with the site's
+  own `isReadable`, and chunk anchors come from the site's own rehype-slug —
+  if you change how lessons are rendered or which ones render, the export
+  follows automatically; if you fork either, search starts lying.
 - Code style is binding for ALL code in this repo:
   `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
   only, grep before writing (no duplicated functionality), domain-separated
