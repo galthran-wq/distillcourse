@@ -8,8 +8,9 @@ export interface Passage {
   text: string;
   /** Where it was selected: a lesson locator carrying the section's anchor. */
   locator: string;
-  /** Viewport coordinates of the top centre of the selection. */
+  /** Viewport coordinates of the selection: its edges and its horizontal centre. */
   top: number;
+  bottom: number;
   left: number;
 }
 
@@ -38,6 +39,27 @@ export function selectedPassage(course: string, lesson: string): Passage | null 
     text: text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS)}…` : text,
     locator: sectionKey(course, lesson, sectionAnchor(element)),
     top: box.top,
+    bottom: box.bottom,
     left: box.left + box.width / 2,
   };
+}
+
+// The button that offers the passage is placed against the selection rather
+// than laid out, so its height is fixed here and set on the element: a clamp
+// cannot be computed from a height layout has not produced yet.
+export const BUTTON_HEIGHT = 28;
+const GAP = 8;
+
+/**
+ * Where that button goes: above the selection when there is room, below it
+ * otherwise, and inside the viewport either way. A selection dragged past the
+ * fold starts above the viewport — the browser scrolls under the held pointer
+ * — so `top` is routinely negative, and a button placed off-screen is one the
+ * reader cannot press.
+ */
+export function buttonPosition(passage: Passage): { top: number; left: number } {
+  const above = passage.top - GAP - BUTTON_HEIGHT;
+  const lowest = window.innerHeight - GAP - BUTTON_HEIGHT;
+  const top = above >= GAP ? above : Math.min(passage.bottom + GAP, lowest);
+  return { top: Math.max(top, GAP), left: passage.left };
 }

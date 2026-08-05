@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { openPanel } from "@/lib/chat/panel";
 import { setQuote } from "@/lib/chat/quote";
-import { selectedPassage, type Passage } from "@/lib/lesson/selection";
+import {
+  BUTTON_HEIGHT,
+  buttonPosition,
+  selectedPassage,
+  type Passage,
+} from "@/lib/lesson/selection";
 
 /** Offers the passage the reader selected to the tutor, with its locator. */
 export default function SelectionReference({
@@ -41,8 +46,8 @@ export default function SelectionReference({
         setPassage(null);
         window.getSelection()?.removeAllRanges();
       }}
-      style={{ top: passage.top - 8, left: passage.left }}
-      className="fixed z-40 -translate-x-1/2 -translate-y-full rounded border border-line bg-paper px-2 py-1 font-mono text-[11px] text-soft shadow-sm hover:border-accent hover:text-accent"
+      style={{ ...buttonPosition(passage), height: BUTTON_HEIGHT }}
+      className="fixed z-40 flex -translate-x-1/2 items-center rounded border border-line bg-paper px-2 font-mono text-[11px] text-soft shadow-sm hover:border-accent hover:text-accent"
     >
       reference in chat
     </button>

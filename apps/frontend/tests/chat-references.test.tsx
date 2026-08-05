@@ -1,26 +1,9 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { UIMessage } from "ai";
-import Messages from "@/components/chat/Messages";
-import { LessonsProvider, type Lessons } from "@/lib/content/links";
-
-const LESSONS: Lessons = {
-  "lesson:info-theory/entropy": {
-    title: "Entropy",
-    course: "Information theory",
-    href: "/courses/info-theory/lessons/entropy",
-  },
-};
+import type { Lessons } from "@/lib/content/links";
+import { LESSONS, rendered, turn } from "./chat-fixture";
 
 function reply(text: string, lessons: Lessons = LESSONS): string {
-  const messages: UIMessage[] = [
-    { id: "m1", role: "assistant", parts: [{ type: "text", text }] },
-  ];
-  return renderToStaticMarkup(
-    <LessonsProvider value={lessons}>
-      <Messages messages={messages} status="ready" />
-    </LessonsProvider>,
-  );
+  return rendered([turn("assistant", { type: "text", text })], lessons);
 }
 
 describe("a reference in a reply", () => {
@@ -64,6 +47,27 @@ describe("a reference in a reply", () => {
     const html = reply("Shown in [[research:info-theory/infonce|the InfoNCE note]].");
 
     expect(html).toContain("<cite>the InfoNCE note</cite>");
+    expect(html).not.toContain("<a");
+  });
+
+  it("renders a concept the search returned as a source, not as brackets", () => {
+    const html = reply("See [[concept:info-theory/mutual-information]].");
+
+    expect(html).toContain("<cite>concept:info-theory/mutual-information</cite>");
+    expect(html).not.toContain("[[");
+  });
+
+  it("links a course locator to the course, under its title", () => {
+    const html = reply("Covered in [[course:info-theory]].");
+
+    expect(html).toContain('href="/courses/info-theory"');
+    expect(html).toContain(">Information theory</a>");
+  });
+
+  it("leaves a course the site does not render as text", () => {
+    const html = reply("[[course:not-a-course]]");
+
+    expect(html).toContain("[[course:not-a-course]]");
     expect(html).not.toContain("<a");
   });
 

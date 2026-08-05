@@ -27,9 +27,27 @@ const LESSON_SECTION = new RegExp(
   `^${LESSON_PREFIX}(${SLUG})/(${SLUG})(?:#([^\\s#]{1,200}))?$`,
 );
 
-// Corpora that have no page on the site: the tutor may cite them, and the
-// reader can only be shown where the claim came from.
-const SOURCE_CORPORA = ["research:", "pdf:"];
+const COURSE = new RegExp(`^course:(${SLUG})$`);
+
+/** A corpus of the index (index-export.ts) — the prefix of every locator. */
+export type Corpus = "lesson" | "research" | "concept" | "course";
+
+// What the reader gets for a locator in each corpus: a page of the site to
+// open, or a source that can only say where the claim came from. The tutor
+// cites what a tool returned and `search_content` searches every corpus by
+// default, so all of them have to be here — exhaustive over `Corpus` on
+// purpose, so a corpus added to the index does not compile until it is
+// given a rendering.
+const RENDERING: Record<Corpus, "page" | "source"> = {
+  lesson: "page",
+  course: "page",
+  research: "source",
+  concept: "source",
+};
+
+const SOURCE_CORPORA = Object.entries(RENDERING)
+  .filter(([, rendering]) => rendering === "source")
+  .map(([corpus]) => `${corpus}:`);
 
 export interface LessonLocator {
   /** The lesson it names, under the key the rest of the platform uses. */
@@ -42,6 +60,12 @@ export function parseLessonLocator(locator: string): LessonLocator | null {
   if (match === null) return null;
   const [, course, lesson, anchor] = match;
   return { key: lessonKey(course, lesson), anchor: anchor ?? null };
+}
+
+/** The course a `course:` locator names, or null when it names something else. */
+export function parseCourseLocator(locator: string): string | null {
+  const match = COURSE.exec(locator);
+  return match === null ? null : match[1];
 }
 
 export function isSourceLocator(locator: string): boolean {

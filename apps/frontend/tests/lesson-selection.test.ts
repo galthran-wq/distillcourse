@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import { selectedPassage } from "@/lib/lesson/selection";
+import {
+  BUTTON_HEIGHT,
+  buttonPosition,
+  selectedPassage,
+  type Passage,
+} from "@/lib/lesson/selection";
 
 // A lesson as far as a selection is concerned: prose under two headings, and
 // the surrounding page, which is not the material.
@@ -32,7 +37,7 @@ beforeEach(() => {
   // jsdom does no layout, so a range cannot measure itself; the button's
   // position is the only thing that reads these.
   Range.prototype.getBoundingClientRect = () =>
-    ({ top: 120, left: 40, width: 60 }) as DOMRect;
+    ({ top: 120, bottom: 140, left: 40, width: 60 }) as DOMRect;
 });
 
 describe("the passage a reader selects", () => {
@@ -68,5 +73,34 @@ describe("the passage a reader selects", () => {
 
   it("is nothing when nothing is selected", () => {
     expect(selectedPassage("info-theory", "entropy")).toBeNull();
+  });
+});
+
+function at(top: number, bottom: number): Passage {
+  return { text: "quoted", locator: "lesson:info-theory/entropy", top, bottom, left: 70 };
+}
+
+describe("the button that offers the passage", () => {
+  const height = window.innerHeight;
+
+  it("sits above the selection when there is room", () => {
+    expect(buttonPosition(at(120, 140)).top).toBe(120 - 8 - BUTTON_HEIGHT);
+  });
+
+  it("flips below a selection that starts off the top of the viewport", () => {
+    // What a downward drag past the fold leaves: the browser scrolled the
+    // start of the selection out of sight while the pointer was held.
+    expect(buttonPosition(at(-260, 300)).top).toBe(308);
+  });
+
+  it("stays in the viewport when the selection covers the whole of it", () => {
+    const top = buttonPosition(at(-100, height + 200)).top;
+
+    expect(top).toBeLessThanOrEqual(height - BUTTON_HEIGHT);
+    expect(top).toBeGreaterThanOrEqual(0);
+  });
+
+  it("stays in the viewport when the selection is entirely above it", () => {
+    expect(buttonPosition(at(-400, -300)).top).toBe(8);
   });
 });

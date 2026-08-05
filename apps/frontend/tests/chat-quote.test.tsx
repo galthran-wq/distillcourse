@@ -1,31 +1,13 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
-import type { UIMessage } from "ai";
-import Messages from "@/components/chat/Messages";
 import { attachQuote, dropQuote, setQuote } from "@/lib/chat/quote";
-import { LessonsProvider, type Lessons } from "@/lib/content/links";
-
-const LESSONS: Lessons = {
-  "lesson:info-theory/entropy": {
-    title: "Entropy",
-    course: "Information theory",
-    href: "/courses/info-theory/lessons/entropy",
-  },
-};
+import { rendered, turn } from "./chat-fixture";
 
 afterEach(() => {
   dropQuote();
 });
 
 function asked(text: string): string {
-  const messages: UIMessage[] = [
-    { id: "m1", role: "user", parts: [{ type: "text", text }] },
-  ];
-  return renderToStaticMarkup(
-    <LessonsProvider value={LESSONS}>
-      <Messages messages={messages} status="ready" />
-    </LessonsProvider>,
-  );
+  return rendered([turn("user", { type: "text", text })]);
 }
 
 describe("a passage referenced from the lesson", () => {

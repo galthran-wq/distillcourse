@@ -10,7 +10,7 @@ import rehypeSlug from "rehype-slug";
 import { visit } from "unist-util-visit";
 import type { Root, RootContent, Element } from "hast";
 import type { LoadedCourse, LoadedLesson } from "./load";
-import { lessonKey } from "./locator";
+import { lessonKey, type Corpus } from "./locator";
 import { isMdxJsxNode, stringAttr, type MdxJsxNode } from "./mdx-jsx";
 import { isReadable } from "./visibility";
 
@@ -24,9 +24,9 @@ import { isReadable } from "./visibility";
 
 export const INDEX_SCHEMA_VERSION = 1;
 
-/** `<corpus>:<path>[#<anchor>]`; `pdf` is reserved for the PDF corpus. */
-export type Corpus = "lesson" | "research" | "concept" | "course";
-
+// `<corpus>:<path>[#<anchor>]`. The corpora are declared with the locator
+// grammar (./locator), because what the tutor may cite and what the site can
+// render a citation as are the same list.
 export interface IndexDocument {
   corpus: Corpus;
   course_slug: string;
