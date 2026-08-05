@@ -6,10 +6,11 @@ from typing import Any, Literal
 
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
-from sqlalchemy import ColumnElement, func, or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.harness.usage import INPUT_TOKENS, OUTPUT_TOKENS
 from app.models import Chat, Message
 
 Role = Literal["user", "agent", "system"]
@@ -18,13 +19,11 @@ Marker = Literal["clear", "compact"]
 TITLE_LENGTH = 60
 
 
-def _dump(message: ModelMessage) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    payload = ModelMessagesTypeAdapter.dump_python([message], mode="json")[0]
-    projection = [
+def _projection(messages: Sequence[ModelMessage]) -> list[dict[str, Any]]:
+    return [
         ui.model_dump(mode="json", by_alias=True)
-        for ui in VercelAIAdapter.dump_messages([message])
+        for ui in VercelAIAdapter.dump_messages(messages)
     ]
-    return payload, projection
 
 
 @dataclass(frozen=True)
@@ -95,31 +94,39 @@ class HarnessRepository:
         )
         await self.session.commit()
 
-    async def add_message(
+    async def add_messages(
         self,
         chat: Chat,
-        message: ModelMessage,
+        messages: Sequence[ModelMessage],
         *,
         role: Role,
         run_id: uuid.UUID | None = None,
         usage: dict[str, Any] | None = None,
-        error: str | None = None,
         marker: Marker | None = None,
-    ) -> Message:
-        payload, projection = _dump(message)
-        row = Message(
-            chat_id=chat.id,
-            run_id=run_id,
-            role=role,
-            pydantic_ai=payload,
-            projection=projection,
-            usage=usage,
-            error=error,
-            marker=marker,
-        )
-        self.session.add(row)
+    ) -> None:
+        """Store messages that belong to one turn.
+
+        The UI projection is dumped over the whole sequence and kept on its
+        last row: the library resolves a tool call against the return that
+        follows it, which a message-at-a-time dump never sees. Usage lands on
+        the same row — it is one number for the run, not one per message.
+        """
+        payloads = ModelMessagesTypeAdapter.dump_python(list(messages), mode="json")
+        projection = _projection(messages)
+        for index, payload in enumerate(payloads):
+            last = index == len(payloads) - 1
+            self.session.add(
+                Message(
+                    chat_id=chat.id,
+                    run_id=run_id,
+                    role=role,
+                    pydantic_ai=payload,
+                    projection=projection if last else [],
+                    usage=usage if last else None,
+                    marker=marker,
+                )
+            )
         await self.session.commit()
-        return row
 
     async def fail_run(self, chat: Chat, run_id: uuid.UUID, error: str) -> None:
         await self.session.execute(
@@ -168,31 +175,20 @@ class HarnessRepository:
         """
         for row in reversed(await self.live_rows(chat)):
             if row.marker is None and row.usage is not None:
-                return int(row.usage.get("input_tokens", 0)) + int(
-                    row.usage.get("output_tokens", 0)
+                return int(row.usage.get(INPUT_TOKENS, 0)) + int(
+                    row.usage.get(OUTPUT_TOKENS, 0)
                 )
         return 0
-
-    def _mine_today(self) -> tuple[ColumnElement[bool], ...]:
-        return (
-            Chat.user_id == self.user_id,
-            Message.created_at >= func.date_trunc("day", func.now()),
-        )
 
     async def messages_today(self) -> int:
         total = await self.session.scalar(
             select(func.count())
             .select_from(Message)
             .join(Chat, Chat.id == Message.chat_id)
-            .where(Message.role == "user", *self._mine_today())
-        )
-        return int(total or 0)
-
-    async def web_searches_today(self) -> int:
-        total = await self.session.scalar(
-            select(func.sum(Message.usage["web_search_calls"].as_integer()))
-            .select_from(Message)
-            .join(Chat, Chat.id == Message.chat_id)
-            .where(*self._mine_today())
+            .where(
+                Message.role == "user",
+                Chat.user_id == self.user_id,
+                Message.created_at >= func.date_trunc("day", func.now()),
+            )
         )
         return int(total or 0)

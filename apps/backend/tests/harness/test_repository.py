@@ -15,7 +15,7 @@ async def test_a_chat_of_another_user_is_out_of_reach(
     repo: HarnessRepository, other_repo: HarnessRepository
 ) -> None:
     theirs = await other_repo.create_chat(kind="web")
-    await other_repo.add_message(theirs, QUESTION, role="user")
+    await other_repo.add_messages(theirs, [QUESTION], role="user")
 
     assert await repo.get_chat(theirs.id) is None
     assert theirs.id not in [chat.id for chat in await repo.list_chats()]
@@ -25,8 +25,8 @@ async def test_a_chat_of_another_user_is_out_of_reach(
 async def test_history_round_trips_through_the_database(
     repo: HarnessRepository, chat: Chat
 ) -> None:
-    await repo.add_message(chat, QUESTION, role="user")
-    await repo.add_message(chat, ANSWER, role="agent")
+    await repo.add_messages(chat, [QUESTION], role="user")
+    await repo.add_messages(chat, [ANSWER], role="agent")
 
     assert await repo.history(chat) == [QUESTION, ANSWER]
 
@@ -34,10 +34,10 @@ async def test_history_round_trips_through_the_database(
 async def test_a_clear_marker_cuts_everything_before_it(
     repo: HarnessRepository, chat: Chat
 ) -> None:
-    await repo.add_message(chat, QUESTION, role="user")
-    await repo.add_message(chat, ANSWER, role="agent")
-    await repo.add_message(chat, QUESTION, role="system", marker="clear")
-    await repo.add_message(chat, ANSWER, role="agent")
+    await repo.add_messages(chat, [QUESTION], role="user")
+    await repo.add_messages(chat, [ANSWER], role="agent")
+    await repo.add_messages(chat, [QUESTION], role="system", marker="clear")
+    await repo.add_messages(chat, [ANSWER], role="agent")
 
     assert await repo.history(chat) == [ANSWER]
 
@@ -46,9 +46,9 @@ async def test_a_compact_marker_keeps_its_own_summary(
     repo: HarnessRepository, chat: Chat
 ) -> None:
     summary = ModelRequest(parts=[UserPromptPart(content="Summary: entropy.")])
-    await repo.add_message(chat, QUESTION, role="user")
-    await repo.add_message(chat, summary, role="system", marker="compact")
-    await repo.add_message(chat, ANSWER, role="agent")
+    await repo.add_messages(chat, [QUESTION], role="user")
+    await repo.add_messages(chat, [summary], role="system", marker="compact")
+    await repo.add_messages(chat, [ANSWER], role="agent")
 
     assert await repo.history(chat) == [summary, ANSWER]
 
@@ -57,7 +57,7 @@ async def test_errored_rows_stay_out_of_the_context(
     repo: HarnessRepository, chat: Chat
 ) -> None:
     run_id = uuid.uuid4()
-    await repo.add_message(chat, QUESTION, role="user", run_id=run_id)
+    await repo.add_messages(chat, [QUESTION], role="user", run_id=run_id)
     await repo.fail_run(chat, run_id, "openrouter said no")
 
     assert await repo.history(chat) == []

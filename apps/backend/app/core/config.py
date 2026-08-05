@@ -74,7 +74,6 @@ class Settings(BaseSettings):
     DEFAULT_CHAT_MODEL: str = "moonshotai/kimi-k3"
 
     DAILY_MESSAGE_CAP: int = 100
-    DAILY_WEB_SEARCH_CAP: int = 20
     # The instance-wide ceiling is the software half of the budget; the other
     # half is a spend limit on the OpenRouter key itself.
     MONTHLY_COST_CEILING_USD: float = 50.0
@@ -132,6 +131,12 @@ class Settings(BaseSettings):
                     raise ValueError(
                         f"{name} is still the local default in ENVIRONMENT={self.ENVIRONMENT}"
                     )
+            # Without it the service boots green and fails on the learner's
+            # first message, which is the worst place to find out.
+            if not self.OPENROUTER_API_KEY:
+                raise ValueError(
+                    f"OPENROUTER_API_KEY is unset in ENVIRONMENT={self.ENVIRONMENT}"
+                )
             if not self.LOGFIRE_TOKEN:
                 warnings.warn(
                     f"LOGFIRE_TOKEN unset in ENVIRONMENT={self.ENVIRONMENT}: traces stay local",

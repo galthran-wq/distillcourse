@@ -77,12 +77,16 @@ def session_factory(
 
 @pytest.fixture
 async def user(session: AsyncSession) -> User:
-    return await crud.create_user(session, email="learner@test", password="secret")
+    return await crud.create_user(
+        session, email="learner@test", password="secret", timezone="UTC"
+    )
 
 
 @pytest.fixture
 async def other_user(session: AsyncSession) -> User:
-    return await crud.create_user(session, email="stranger@test", password="secret")
+    return await crud.create_user(
+        session, email="stranger@test", password="secret", timezone="UTC"
+    )
 
 
 @pytest.fixture

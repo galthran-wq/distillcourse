@@ -24,7 +24,8 @@ app/
     prompts/         # the prompt modules themselves (see below)
     deps.py          # HarnessDeps — what a tool receives
     repository.py    # user-scoped reads and writes over chats and messages
-    limits.py        # daily caps and the monthly cost ceiling
+    usage.py         # the shape of messages.usage, written once, read by caps
+    limits.py        # the daily cap and the monthly cost ceiling
     runner.py        # claim, persist, stream, compact
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
@@ -111,6 +112,11 @@ which is what the next run replays, and as the Vercel AI projection the widget
 renders. A failed run marks its rows, which keeps them on screen and out of
 the model's context.
 
+The history a run is given is the one in the database. A Vercel AI client
+posts every message it holds on every turn; `POST /chats/{id}/stream` takes
+only the last one from the request, so a client with a stale or edited
+transcript cannot rewrite what the tutor remembers.
+
 Prompts are assembled per run from `harness/prompts/`: `base.md`, the medium
 (`web`, `telegram`), then the modules the run kind calls for, then context
 blocks. They are content, so `docs/pedagogy.md` governs them the way it
@@ -118,10 +124,11 @@ governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
 inside such a fence is data.
 
-Caps are enforcement, not telemetry: messages per user per day, web searches
-per user per day, and an instance-wide monthly ceiling computed from the cost
-recorded on every run. Set a spend limit on the OpenRouter key too — that one
-holds even if this code is wrong.
+Caps are enforcement, not telemetry: messages per user per day, and an
+instance-wide monthly ceiling computed from the cost recorded on every run.
+Set a spend limit on the OpenRouter key too — that one holds even if this code
+is wrong. The per-user web search cap belongs to the search tool that spends
+it and lands with it.
 
 ## Dormant mail
 

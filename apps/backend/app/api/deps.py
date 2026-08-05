@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core import sessions
 from app.core.db import session_factory
+from app.harness.repository import HarnessRepository
 from app.models import User, UserSession
 
 
@@ -49,3 +50,12 @@ async def get_current_user(user_session: CurrentSession) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+# A route asks for the repository rather than building one, so no route can
+# reach the database without the user it is scoped to.
+def get_repository(session: SessionDep, user: CurrentUser) -> HarnessRepository:
+    return HarnessRepository(session, user.id)
+
+
+RepositoryDep = Annotated[HarnessRepository, Depends(get_repository)]
