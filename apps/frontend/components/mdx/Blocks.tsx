@@ -5,6 +5,10 @@ import type { ReactNode } from "react";
  * globals.css): each environment class increments its own counter and the
  * label ("Definition 2", "Exercise 1", …) is injected via ::before on
  * .env-head. Optional `title` renders in parentheses after the label.
+ *
+ * `data-toggle` on the collapsible ones is telemetry's hook
+ * (lib/telemetry/targets.ts), kept separate from the class names so that
+ * restyling cannot silently stop the counting.
  */
 
 function Env({
@@ -44,7 +48,7 @@ export function Proof({ children }: { children: ReactNode }) {
   // Collapsed by default — the statement matters to every reader, the proof
   // only to some.
   return (
-    <details className="env env-proof">
+    <details className="env env-proof" data-toggle="proof">
       <summary>Proof</summary>
       <div className="env-body">{children}</div>
     </details>
@@ -62,7 +66,7 @@ export function Exercise({ children }: { children: ReactNode }) {
 
 export function Solution({ children }: { children: ReactNode }) {
   return (
-    <details className="solution">
+    <details className="solution" data-toggle="solution">
       <summary>Solution</summary>
       <div className="solution-body">{children}</div>
     </details>
@@ -115,7 +119,10 @@ export function Task({ children }: { children: ReactNode }) {
 
 export function Aside({ children }: { children: ReactNode }) {
   return (
-    <details className="aside my-8 rounded border border-dashed border-line px-5 py-3">
+    <details
+      className="aside my-8 rounded border border-dashed border-line px-5 py-3"
+      data-toggle="aside"
+    >
       <summary className="cursor-pointer font-mono text-[12px] text-faint">
         Aside
       </summary>

@@ -1,20 +1,16 @@
 import json
 import uuid
-from collections.abc import AsyncGenerator
 
-import pytest
 from httpx import AsyncClient
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.api.routes.chats import _current_locator
 from app.core.config import settings
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
-from app.main import app
 from app.models import User
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
@@ -51,12 +47,6 @@ def streamed_text(sse: str) -> str:
         if line.startswith("data: ") and line != "data: [DONE]"
     ]
     return "".join(chunk["delta"] for chunk in chunks if chunk["type"] == "text-delta")
-
-
-@pytest.fixture
-async def signed_in(client: AsyncClient, user: User) -> AsyncGenerator[AsyncClient]:
-    app.dependency_overrides[get_current_user] = lambda: user
-    yield client
 
 
 async def test_an_anonymous_visitor_gets_nothing(client: AsyncClient) -> None:

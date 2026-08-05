@@ -15,6 +15,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from app.content.locators import LESSON_LENGTH
+
 
 class Base(DeclarativeBase):
     pass
@@ -96,6 +98,58 @@ class Message(Base):
     marker: Mapped[str | None] = mapped_column(String(16), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Event(Base):
+    """One thing a signed-in reader did on a lesson page.
+
+    Append-only and the source of truth for everything derived from reading:
+    the aggregate below is a projection that `rebuild-progress` recomputes from
+    these rows whenever the heuristics change.
+    """
+
+    __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_user_lesson_ts", "user_id", "lesson", "server_ts"),
+    )
+
+    # Minted by the browser, which is what makes a retried flush a no-op
+    # instead of a second reading of the same ten seconds.
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH))
+    type: Mapped[str] = mapped_column(String(24))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # Both clocks are kept: the client's says when the reader did it, the
+    # server's is the one every derivation orders by, because a browser clock
+    # can be wrong by hours or forged outright.
+    client_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    server_ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class LessonProgress(Base):
+    """What the events add up to, per reader and lesson."""
+
+    __tablename__ = "lesson_progress"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    active_seconds: Mapped[int]
+    max_scroll_pct: Mapped[int]
+    proofs_opened: Mapped[int]
+    solutions_opened: Mapped[int]
+    demos_touched: Mapped[int]
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
     )
 
 

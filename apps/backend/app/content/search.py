@@ -1,7 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Document
@@ -13,6 +13,19 @@ CONFIG = "english"
 SNIPPET_OPTIONS = "MaxFragments=2, MaxWords=28, MinWords=12, FragmentDelimiter= … "
 # ts_rank_cd normalization: divide the rank by the document length.
 RANK_NORMALIZATION = 2
+
+
+def chunks_of(document: str) -> ColumnElement[bool]:
+    """Every row the document at this locator was split into.
+
+    A document with headings becomes one row per h2 section, so "the chunks of
+    this lesson" is the anchorless locator or any anchor under it. The rule
+    lives here because it is the index's, and both search and the telemetry
+    threshold ask it.
+    """
+    return or_(
+        Document.locator == document, Document.locator.startswith(f"{document}#")
+    )
 
 
 class SearchHit(BaseModel):
@@ -83,13 +96,7 @@ async def fetch(session: AsyncSession, locator: str) -> Document | None:
     return (
         await session.scalars(
             select(Document)
-            .where(
-                or_(
-                    Document.locator == document,
-                    Document.locator.startswith(f"{document}#"),
-                ),
-                Document.anchors.bool_op("@>")([anchor]),
-            )
+            .where(chunks_of(document), Document.anchors.bool_op("@>")([anchor]))
             .order_by(Document.position)
         )
     ).first()

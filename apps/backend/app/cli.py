@@ -14,6 +14,7 @@ from app.core.security import (
     get_password_hash,
 )
 from app.models import User
+from app.telemetry import progress
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -43,6 +44,10 @@ async def delete_user(session: AsyncSession, email: str) -> None:
     logger.info("deleted %s", email)
 
 
+async def rebuild_progress(session: AsyncSession) -> None:
+    logger.info("rebuilt %d lesson aggregates", await progress.rebuild(session))
+
+
 def _prompt_new_password() -> str:
     password = getpass.getpass("new password: ")
     if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
@@ -54,12 +59,16 @@ def _prompt_new_password() -> str:
     return password
 
 
-async def _run(command: str, email: str) -> None:
+async def _run(arguments: argparse.Namespace) -> None:
     async with session_factory() as session:
-        if command == "reset-password":
-            await reset_password(session, email, _prompt_new_password())
+        if arguments.command == "reset-password":
+            await reset_password(session, arguments.email, _prompt_new_password())
+        elif arguments.command == "delete-user":
+            await delete_user(session, arguments.email)
+        elif arguments.command == "rebuild-progress":
+            await rebuild_progress(session)
         else:
-            await delete_user(session, email)
+            raise SystemExit(f"unknown command: {arguments.command}")
     await engine.dispose()
 
 
@@ -68,8 +77,8 @@ def main() -> None:
     subcommands = parser.add_subparsers(dest="command", required=True)
     for name in ("reset-password", "delete-user"):
         subcommands.add_parser(name).add_argument("email")
-    arguments = parser.parse_args()
-    asyncio.run(_run(arguments.command, arguments.email))
+    subcommands.add_parser("rebuild-progress")
+    asyncio.run(_run(parser.parse_args()))
 
 
 if __name__ == "__main__":

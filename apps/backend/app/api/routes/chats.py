@@ -1,4 +1,3 @@
-import re
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -9,6 +8,7 @@ from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.request_types import RequestData, UIMessage
 
 from app.api.deps import RepositoryDep, SessionFactoryDep, get_current_user
+from app.content import locators
 from app.core.config import ChatModel, settings
 from app.harness import runner
 from app.harness.agent import tutor
@@ -18,11 +18,6 @@ from app.harness.repository import HarnessRepository
 from app.models import Chat
 
 router = APIRouter(prefix="/chats", tags=["chats"])
-
-# The widget names a place in the course, and the block it feeds is a platform
-# statement about the learner rather than quoted content — so anything that is
-# not a locator is dropped instead of fenced.
-LOCATOR = re.compile(r"lesson:[a-z0-9-]{1,80}/[a-z0-9-]{1,80}(#[a-z0-9-]{1,80})?")
 
 
 class ChatSummary(BaseModel):
@@ -49,9 +44,13 @@ class Summary(BaseModel):
 
 
 def _current_locator(run_input: RequestData) -> str | None:
-    """The reader's position, sent by the widget alongside the messages."""
+    """The reader's position, sent by the widget alongside the messages.
+
+    The block it feeds is a platform statement about the learner rather than
+    quoted content, so anything that is not a locator is dropped, not fenced.
+    """
     locator = (run_input.model_extra or {}).get("currentLocator")
-    if isinstance(locator, str) and LOCATOR.fullmatch(locator):
+    if isinstance(locator, str) and locators.LESSON_SECTION.fullmatch(locator):
         return locator
     return None
 
