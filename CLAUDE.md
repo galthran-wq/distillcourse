@@ -20,7 +20,9 @@ routes), SQLAlchemy 2.0 typed models — never SQLModel, never a sync session.
 what CI runs. Migrations are explicit and always reversible — autogenerate is
 a draft to rewrite, never the artefact. `apps/backend/README.md` is the guide.
 
-The tutor harness lives in `apps/backend/app/harness/`. Its prompt modules
+The tutor harness lives in `apps/backend/app/harness/`; everything about
+messages the platform starts by itself — the poller process, quiet hours, the
+proactive slot — lives in `apps/backend/app/scheduling/`. Its prompt modules
 (`app/harness/prompts/*.md`) are content, not configuration: `docs/pedagogy.md`
 governs them exactly as it governs lessons, and they are written in the same
 dry register.
