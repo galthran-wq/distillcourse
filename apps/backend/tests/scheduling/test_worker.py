@@ -1,7 +1,7 @@
 import asyncio
 import json
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -18,7 +18,7 @@ from app.models import Chat, Message, Schedule, User, UserSession
 from app.scheduling import policy, repository, worker
 from tests.scheduling.conftest import NOON, replying
 
-UTC_ZONE = ZoneInfo("UTC")
+WAKING = policy.Hours(ZoneInfo("UTC"), time(9), time(22))
 
 
 async def due_review(
@@ -57,7 +57,7 @@ async def test_a_due_review_is_delivered_and_waits_for_a_reply(
 
     await session.refresh(row)
     assert row.status == "awaiting_reply"
-    assert row.due_at == policy.slot_deadline(NOON, UTC_ZONE)
+    assert row.due_at == policy.slot_deadline(NOON, WAKING)
     assert row.claimed_at == NOON
     assert "entropy is what you owe me" in await thread_messages(session, user, thread)
 
@@ -145,7 +145,7 @@ async def test_quiet_hours_hold_the_message_until_morning(
 
     await session.refresh(row)
     assert row.status == "deferred"
-    assert row.due_at == policy.next_open(night, UTC_ZONE)
+    assert row.due_at == policy.next_open(night, WAKING)
     assert await HarnessRepository(session, user.id).rows(thread) == []
 
 
@@ -166,7 +166,7 @@ async def test_the_daily_budget_holds_the_fourth_message(
 
     await session.refresh(row)
     assert row.status == "deferred"
-    assert row.due_at == policy.tomorrow_open(NOON, UTC_ZONE)
+    assert row.due_at == policy.tomorrow_open(NOON, WAKING)
 
 
 async def test_three_items_travel_together_and_the_rest_wait(
@@ -183,7 +183,7 @@ async def test_three_items_travel_together_and_the_rest_wait(
     postponed = [row for row in rows if row.status == "deferred"]
     prompt = await thread_messages(session, user, thread)
     assert len(delivered) == policy.SESSION_ITEMS
-    assert [row.due_at for row in postponed] == [policy.tomorrow_open(NOON, UTC_ZONE)]
+    assert [row.due_at for row in postponed] == [policy.tomorrow_open(NOON, WAKING)]
     # One message carrying all three, not three messages.
     assert prompt.count("What is due now") == 1
     assert repository.CLAIM_BATCH > len(rows)
@@ -295,7 +295,7 @@ async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
     assert (first.status, first.outcome) == ("awaiting_reply", None)
     assert "entropy is what you owe me" in await thread_messages(session, user, thread)
 
-    timeout = policy.slot_deadline(NOON, UTC_ZONE)
+    timeout = policy.slot_deadline(NOON, WAKING)
     same = await due_review(
         session,
         user,
@@ -459,7 +459,7 @@ async def test_a_spent_budget_holds_the_message_rather_than_failing_it(
     await session.refresh(row)
     assert row.status == "deferred"
     assert row.attempts == 0
-    assert row.due_at == policy.tomorrow_open(NOON, UTC_ZONE)
+    assert row.due_at == policy.tomorrow_open(NOON, WAKING)
 
 
 async def test_a_failed_cycle_does_not_stop_the_poller(

@@ -1,11 +1,12 @@
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from app.models import Schedule
 from app.scheduling import policy
 
 MOSCOW = ZoneInfo("Europe/Moscow")
+WAKING = policy.Hours(MOSCOW, time(9), time(22))
 
 
 def moment(hour: int, minute: int = 0, *, day: int = 5) -> datetime:
@@ -25,10 +26,10 @@ def schedule(
 
 
 def test_the_window_is_the_learners_waking_day() -> None:
-    assert policy.in_window(moment(9), MOSCOW)
-    assert policy.in_window(moment(21, 59), MOSCOW)
-    assert not policy.in_window(moment(8, 59), MOSCOW)
-    assert not policy.in_window(moment(22), MOSCOW)
+    assert policy.in_window(moment(9), WAKING)
+    assert policy.in_window(moment(21, 59), WAKING)
+    assert not policy.in_window(moment(8, 59), WAKING)
+    assert not policy.in_window(moment(22), WAKING)
 
 
 def test_the_window_follows_the_learner_not_the_server() -> None:
@@ -36,32 +37,43 @@ def test_the_window_follows_the_learner_not_the_server() -> None:
     learner and not for the other."""
     late = moment(22)
 
-    assert not policy.in_window(late, MOSCOW)
-    assert policy.in_window(late, ZoneInfo("UTC"))
+    assert not policy.in_window(late, WAKING)
+    assert policy.in_window(late, policy.Hours(ZoneInfo("UTC"), time(9), time(22)))
+
+
+def test_the_learner_moves_both_ends_of_the_window() -> None:
+    """The window is the learner's to set: the same 07:00 is quiet hours under
+    the default one and the start of the day under an early riser's."""
+    early = policy.Hours(MOSCOW, time(6), time(18))
+
+    assert not policy.in_window(moment(7), WAKING)
+    assert policy.in_window(moment(7), early)
+    assert not policy.in_window(moment(20), early)
+    assert policy.next_open(moment(20), early) == moment(6, day=6)
 
 
 def test_work_that_arrives_at_night_waits_for_the_morning() -> None:
-    assert policy.next_open(moment(3), MOSCOW) == moment(9)
-    assert policy.next_open(moment(23), MOSCOW) == moment(9, day=6)
+    assert policy.next_open(moment(3), WAKING) == moment(9)
+    assert policy.next_open(moment(23), WAKING) == moment(9, day=6)
 
 
 def test_work_inside_the_window_is_not_postponed() -> None:
-    assert policy.next_open(moment(14), MOSCOW) == moment(14)
+    assert policy.next_open(moment(14), WAKING) == moment(14)
 
 
 def test_tomorrow_is_the_next_morning_wherever_the_learner_is() -> None:
-    assert policy.tomorrow_open(moment(23), MOSCOW) == moment(9, day=6)
-    assert policy.day_start(moment(23), MOSCOW) == moment(0)
+    assert policy.tomorrow_open(moment(23), WAKING) == moment(9, day=6)
+    assert policy.day_start(moment(23), WAKING) == moment(0)
 
 
 def test_the_slot_times_out_after_four_waking_hours() -> None:
-    assert policy.slot_deadline(moment(10), MOSCOW) == moment(14)
+    assert policy.slot_deadline(moment(10), WAKING) == moment(14)
 
 
 def test_the_night_does_not_count_against_the_slot() -> None:
     """Sent at 21:00, one hour of the day is left; the other three are the next
     morning's, so an unanswered message is not ignored at 01:00."""
-    assert policy.slot_deadline(moment(21), MOSCOW) == moment(12, day=6)
+    assert policy.slot_deadline(moment(21), WAKING) == moment(12, day=6)
 
 
 def test_retries_back_off() -> None:

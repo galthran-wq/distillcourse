@@ -1,14 +1,12 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from typing import Self
 from zoneinfo import ZoneInfo
 
-from app.models import Schedule
+from app.core.clock import zone
+from app.models import Schedule, User
 
-# Quiet hours, on the learner's own clock. The window is also the clock the
-# slot timeout runs on, so a message sent late in the evening is not counted
-# as ignored while they sleep.
-WINDOW_OPEN = time(9)
-WINDOW_CLOSE = time(22)
 SLOT_TIMEOUT = timedelta(hours=4)
 # Per user per day: how many times the platform may open the conversation, and
 # how many items one of those messages may carry.
@@ -21,49 +19,66 @@ RETRY_DELAY = timedelta(minutes=5)
 INDEFINITE = datetime(9999, 12, 31, tzinfo=UTC)
 
 
-def _open_at(day: date, tz: ZoneInfo) -> datetime:
-    return datetime.combine(day, WINDOW_OPEN, tz)
+@dataclass(frozen=True)
+class Hours:
+    """The learner's waking day: their clock and the two ends of the window.
+
+    Every decision about *when* is made in these terms, and both ends are the
+    learner's to move. The window is also the clock the slot timeout runs on,
+    so a message sent late in the evening is not counted as ignored while they
+    sleep.
+    """
+
+    tz: ZoneInfo
+    opens: time
+    closes: time
+
+    @classmethod
+    def of(cls, user: User) -> Self:
+        return cls(zone(user.timezone), user.quiet_start, user.quiet_end)
+
+    def open_at(self, day: date) -> datetime:
+        return datetime.combine(day, self.opens, self.tz)
+
+    def close_at(self, day: date) -> datetime:
+        return datetime.combine(day, self.closes, self.tz)
 
 
-def _close_at(day: date, tz: ZoneInfo) -> datetime:
-    return datetime.combine(day, WINDOW_CLOSE, tz)
+def in_window(moment: datetime, hours: Hours) -> bool:
+    return hours.opens <= moment.astimezone(hours.tz).time() < hours.closes
 
 
-def in_window(moment: datetime, tz: ZoneInfo) -> bool:
-    return WINDOW_OPEN <= moment.astimezone(tz).time() < WINDOW_CLOSE
-
-
-def next_open(moment: datetime, tz: ZoneInfo) -> datetime:
+def next_open(moment: datetime, hours: Hours) -> datetime:
     """The first moment from `moment` on at which the window is open."""
-    local = moment.astimezone(tz)
-    if local.time() < WINDOW_OPEN:
-        return _open_at(local.date(), tz)
-    if local.time() >= WINDOW_CLOSE:
-        return _open_at(local.date() + timedelta(days=1), tz)
+    local = moment.astimezone(hours.tz)
+    if local.time() < hours.opens:
+        return hours.open_at(local.date())
+    if local.time() >= hours.closes:
+        return hours.open_at(local.date() + timedelta(days=1))
     return moment
 
 
-def tomorrow_open(moment: datetime, tz: ZoneInfo) -> datetime:
+def tomorrow_open(moment: datetime, hours: Hours) -> datetime:
     """When work that has no room left today is offered again."""
-    return _open_at(moment.astimezone(tz).date() + timedelta(days=1), tz)
+    return hours.open_at(moment.astimezone(hours.tz).date() + timedelta(days=1))
 
 
-def day_start(moment: datetime, tz: ZoneInfo) -> datetime:
+def day_start(moment: datetime, hours: Hours) -> datetime:
     """Local midnight — the daily budget is spent on the learner's calendar."""
-    return datetime.combine(moment.astimezone(tz).date(), time(), tz)
+    return datetime.combine(moment.astimezone(hours.tz).date(), time(), hours.tz)
 
 
-def slot_deadline(sent_at: datetime, tz: ZoneInfo) -> datetime:
+def slot_deadline(sent_at: datetime, hours: Hours) -> datetime:
     """When an unanswered message counts as ignored: `SLOT_TIMEOUT` of waking
     hours after it was sent, carried over the night if it runs out of day."""
     remaining = SLOT_TIMEOUT
-    cursor = next_open(sent_at, tz)
+    cursor = next_open(sent_at, hours)
     while True:
-        closes = _close_at(cursor.astimezone(tz).date(), tz)
+        closes = hours.close_at(cursor.astimezone(hours.tz).date())
         if closes - cursor >= remaining:
             return cursor + remaining
         remaining -= closes - cursor
-        cursor = next_open(closes, tz)
+        cursor = next_open(closes, hours)
 
 
 def retry_at(moment: datetime, attempts: int) -> datetime:

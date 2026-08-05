@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any
 
 from sqlalchemy import (
@@ -12,6 +12,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
@@ -26,6 +27,11 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = "users"
+    # The window is read as `opens <= t < closes`, which says nothing at all
+    # when the two are the wrong way round.
+    __table_args__ = (
+        CheckConstraint("quiet_start < quiet_end", name="ck_users_quiet_hours"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     # citext: "Ann@x.com" and "ann@x.com" are one account and one login.
@@ -35,6 +41,18 @@ class User(Base):
     # Re-read from the browser at every login: a user who relocates must not
     # keep getting proactive messages on their old clock.
     timezone: Mapped[str] = mapped_column(Text, server_default="UTC")
+    # The waking window the platform may write in, on the clock above. Stored
+    # per learner because it is theirs to set (the settings page), and read by
+    # every decision the poller makes about when.
+    # The default is stated on both sides: the column answers for rows that
+    # already exist, the mapper for a row this process inserts, which must not
+    # have to read the value back before the poller can use it.
+    quiet_start: Mapped[time] = mapped_column(
+        Time, default=time(9), server_default="09:00"
+    )
+    quiet_end: Mapped[time] = mapped_column(
+        Time, default=time(22), server_default="22:00"
+    )
     # NULL is "not muted": until this moment the platform answers but never
     # opens the conversation itself.
     muted_until: Mapped[datetime | None] = mapped_column(

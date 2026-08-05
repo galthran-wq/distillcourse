@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import logfire
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core import clock, sessions
+from app.core import sessions
 from app.core.db import session_factory
 from app.core.observability import configure
 from app.harness import runner
@@ -36,9 +36,9 @@ def _run_kind(rows: Sequence[Schedule]) -> RunKind:
 async def _fire(
     session: AsyncSession, user: User, rows: list[Schedule], now: datetime
 ) -> None:
-    tz = clock.zone(user.timezone)
-    if not policy.in_window(now, tz):
-        await repository.defer(session, rows, due_at=policy.next_open(now, tz))
+    hours = policy.Hours.of(user)
+    if not policy.in_window(now, hours):
+        await repository.defer(session, rows, due_at=policy.next_open(now, hours))
         return
     deadline = await repository.open_slot_deadline(session, user.id)
     if deadline is not None:
@@ -47,10 +47,10 @@ async def _fire(
         await repository.defer(session, rows, due_at=deadline)
         return
     spent = await repository.initiations_today(
-        session, user.id, policy.day_start(now, tz)
+        session, user.id, policy.day_start(now, hours)
     )
     if spent >= policy.DAILY_INITIATIONS:
-        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, tz))
+        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
         return
     thread = await repository.thread(session, user.id)
     if thread is None:
@@ -73,7 +73,7 @@ async def _fire(
         await repository.defer(session, rows, due_at=now + BUSY_RETRY)
         return
     except LimitExceeded:
-        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, tz))
+        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
         return
     except Exception as exc:
         # Whatever the model, the network or the database did is the attempted
@@ -86,9 +86,9 @@ async def _fire(
     # Only now, with the message out: a run that never happened must not spend
     # the overflow's day.
     if later:
-        await repository.defer(session, later, due_at=policy.tomorrow_open(now, tz))
+        await repository.defer(session, later, due_at=policy.tomorrow_open(now, hours))
     await repository.open_slot(
-        session, now_items, deadline=policy.slot_deadline(now, tz)
+        session, now_items, deadline=policy.slot_deadline(now, hours)
     )
 
 
