@@ -10,6 +10,18 @@ const nextConfig: NextConfig = {
   // resolve modules under two different roots and hydration dies, killing
   // every client component (theme toggle, demos, steppers).
   turbopack: { root: __dirname },
+  // In the deployed stack caddy routes /api/* to the backend before Next sees
+  // it; the dev server has no caddy, so it proxies the same paths itself. The
+  // session cookie is then first-party in both, and the browser code needs no
+  // origin switch.
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${process.env.API_ORIGIN ?? "http://localhost:8000"}/api/:path*`,
+      },
+    ];
+  },
   // The dev server is reviewed from the public host, not localhost; without
   // this Next blocks cross-origin /_next/* requests (dead HMR socket, and on
   // some paths broken hydration) for any origin but localhost.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import ThemeToggle from "@/components/ThemeToggle";
+import UserMenu from "@/components/auth/UserMenu";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
@@ -49,7 +50,10 @@ export default function RootLayout({
             <Link href="/" className="text-[15px] font-semibold tracking-tight hover:text-accent">
               distillcourse
             </Link>
-            <ThemeToggle />
+            <div className="flex items-center gap-4">
+              <UserMenu />
+              <ThemeToggle />
+            </div>
           </div>
         </header>
         <main className="flex-1">{children}</main>

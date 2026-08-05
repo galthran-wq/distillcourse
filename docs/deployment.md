@@ -44,6 +44,20 @@ startup rather than silently accepted.
 make deploy      # git pull --ff-only, build, migrate, restart, show status
 ```
 
+## Accounts
+
+Signup requires `INVITE_CODE` from `.env`; hand that string to whoever should
+get an account. There is no password-reset mail and no email verification, so
+account recovery is an operator command:
+
+```bash
+docker compose exec backend python -m app.cli reset-password someone@example.com
+docker compose exec backend python -m app.cli delete-user someone@example.com
+```
+
+A reset revokes every session of that account, on the assumption that control
+of it is in doubt; a delete takes the sessions with it.
+
 ## Backups and recovery
 
 `prodrigestivill/postgres-backup-local` writes a compressed `pg_dump` to

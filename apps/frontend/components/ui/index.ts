@@ -9,4 +9,5 @@ export { Button } from "./Button";
 export { PresetGroup } from "./PresetGroup";
 export { Slider } from "./Slider";
 export { Readout } from "./Readout";
+export { Input } from "./Input";
 export { TextArea } from "./TextArea";
