@@ -1,4 +1,4 @@
-import { API } from "@/lib/api-base";
+import { call } from "@/lib/http";
 
 export interface User {
   id: string;
@@ -21,56 +21,9 @@ export interface LoginBody {
   timezone: string;
 }
 
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-// Hand-written rather than taken from the generated client in lib/api: that
-// client needs uv and the backend source to exist, which the frontend image
-// build (apps/frontend/Dockerfile) has neither of, and these four calls are
-// what the site itself needs. Generated types stay for code that runs outside
-// the image build. The session cookie is httpOnly and first-party, so no code
-// here ever touches it.
-
 // Mirrors the backend bound (app/core/security.py): the browser refusing a
 // short password beats a round trip that comes back as a 422.
 export const MIN_PASSWORD_LENGTH = 8;
-
-async function call<T>(
-  path: string,
-  method: "GET" | "POST" = "GET",
-  body?: unknown,
-): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    method,
-    credentials: "same-origin",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!response.ok) throw new ApiError(response.status, await failure(response));
-  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
-}
-
-interface FieldError {
-  loc?: unknown[];
-  msg?: string;
-}
-
-async function failure(response: Response): Promise<string> {
-  const payload: unknown = await response.json().catch(() => null);
-  const detail = (payload as { detail?: unknown } | null)?.detail;
-  if (typeof detail === "string") return detail;
-  // A 422 carries `detail` as a list of {loc, msg} instead: without this the
-  // form can only show the bare status, naming neither field nor reason.
-  const invalid: FieldError | undefined = Array.isArray(detail) ? detail[0] : undefined;
-  if (invalid?.msg) return `${String(invalid.loc?.at(-1) ?? "request")}: ${invalid.msg}`;
-  return `request failed (${response.status})`;
-}
 
 export function signup(body: SignupBody): Promise<User> {
   return call<User>("/auth/signup", "POST", body);
