@@ -32,7 +32,9 @@ import { ImageCredits } from "../components/mdx/SourcedImage";
 import * as Blocks from "../components/mdx/Blocks";
 import { loadCredits } from "../lib/content/credits";
 
-const repoRoot = resolve(__dirname, "..");
+// This app is apps/frontend; content/ lives at the repo root above it.
+const appRoot = resolve(__dirname, "..");
+const repoRoot = resolve(appRoot, "..", "..");
 const [course, lesson] = process.argv.slice(2);
 const shoot = !process.argv.includes("--no-screenshot");
 
@@ -48,7 +50,7 @@ if (!existsSync(join(lessonDir, "lesson.mdx"))) {
 }
 
 async function main(): Promise<void> {
-  const cssPath = join(repoRoot, "app/globals.css");
+  const cssPath = join(appRoot, "app/globals.css");
   const css = (
     await postcss([tailwind()]).process(readFileSync(cssPath, "utf8"), {
       from: cssPath,
@@ -92,13 +94,13 @@ async function main(): Promise<void> {
   // preview they resolve straight out of public/.
   const body = renderToStaticMarkup(
     createElement(MDXContent as never, { components } as never),
-  ).replaceAll('src="/course-assets/', `src="file://${repoRoot}/public/course-assets/`);
+  ).replaceAll('src="/course-assets/', `src="file://${appRoot}/public/course-assets/`);
 
   const katex = readFileSync(
-    join(repoRoot, "node_modules/katex/dist/katex.min.css"),
+    join(appRoot, "node_modules/katex/dist/katex.min.css"),
     "utf8",
   );
-  const previewDir = join(repoRoot, ".preview");
+  const previewDir = join(appRoot, ".preview");
   mkdirSync(previewDir, { recursive: true });
 
   // The chapter is long; a second, short page holds just its figures, which

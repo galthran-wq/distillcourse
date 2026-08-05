@@ -258,7 +258,7 @@ export default function IbGibbsEncoder() {
         {/* legend for the bar outcomes + the gloss */}
         <div style={{ ...labelMuted, fontSize: 11.5, marginTop: 8 }}>
           bars: left block <M tex={String.raw`P(y{=}y_0)`} size={11} />, right block{" "}
-          <M tex={String.raw`P(y{=}y_1)`} size={11} /> — the closer a cluster's block pattern is to{" "}
+          <M tex={String.raw`P(y{=}y_1)`} size={11} /> — the closer a cluster&rsquo;s block pattern is to{" "}
           <M tex={String.raw`a`} size={11} />&rsquo;s, the smaller <M tex={String.raw`D`} size={11} />
         </div>
         <div style={{ fontSize: 13, marginTop: 10, lineHeight: 1.4, maxWidth: 640 }}>

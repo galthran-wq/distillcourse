@@ -311,8 +311,8 @@ function lintLessonMdx(
 
     if (name !== undefined && /^[A-Z][A-Za-z0-9]*$/.test(name)) {
       let registered = false;
-      if (options.repoRoot !== undefined) {
-        const registry = join(options.repoRoot, "components", "figures", "index.ts");
+      if (options.appRoot !== undefined) {
+        const registry = join(options.appRoot, "components", "figures", "index.ts");
         if (existsSync(registry)) {
           const source = readFileSync(registry, "utf8");
           // Cheap textual check, mirroring demo-registered: the name appears
@@ -430,8 +430,8 @@ function lintLessonMdx(
 }
 
 export interface LintOptions {
-  /** Repo root; enables the demo-registered check. */
-  repoRoot?: string;
+  /** Frontend app root (apps/frontend); enables the registry checks. */
+  appRoot?: string;
   /** Extra lesson directories found on disk (orphan check). */
   lessonDirsOnDisk?: string[];
   /** All course slugs in the content tree (cross-course prereq check). */
@@ -707,9 +707,9 @@ export function lintCourse(
     if (
       lesson.demo !== null &&
       STATUS_RANK[lesson.status] >= STATUS_RANK.reviewed &&
-      options.repoRoot !== undefined
+      options.appRoot !== undefined
     ) {
-      const registry = join(options.repoRoot, "components", "demos", "index.ts");
+      const registry = join(options.appRoot, "components", "demos", "index.ts");
       const registered =
         existsSync(registry) &&
         readFileSync(registry, "utf8").includes(lesson.demo.component);

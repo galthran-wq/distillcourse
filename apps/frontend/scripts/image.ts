@@ -35,6 +35,9 @@ import {
   isProbeError,
   probeImageFile,
 } from "../lib/content/images";
+import { restoreInvocationDir } from "./invocation-dir";
+
+restoreInvocationDir();
 
 const [command, ...rest] = process.argv.slice(2);
 

@@ -13,6 +13,9 @@ import { basename, join, resolve } from "node:path";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { figures } from "../components/figures";
+import { restoreInvocationDir } from "./invocation-dir";
+
+restoreInvocationDir();
 
 const args = process.argv.slice(2).filter((a) => a !== "--dark");
 const dark = process.argv.includes("--dark");
@@ -47,8 +50,8 @@ if (target !== undefined && target in figures) {
 const frame = frameArg !== undefined ? Number(frameArg) : undefined;
 const markup = renderToStaticMarkup(createElement(component, { frame }));
 
-const repoRoot = resolve(__dirname, "..");
-const katexCss = join(repoRoot, "node_modules/katex/dist/katex.min.css");
+const appRoot = resolve(__dirname, "..");
+const katexCss = join(appRoot, "node_modules/katex/dist/katex.min.css");
 const tokens = dark
   ? "--paper:#131312;--panel:#1d1d1b;--ink:#eaeae6;--line:#34342f;"
   : "--paper:#fdfdfc;--panel:#f4f4f1;--ink:#191918;--line:#d9d9d3;";
@@ -63,7 +66,7 @@ const html = `<!doctype html>
 </style>
 </head><body>${markup}</body></html>`;
 
-const previewDir = join(repoRoot, ".preview");
+const previewDir = join(appRoot, ".preview");
 mkdirSync(previewDir, { recursive: true });
 const htmlPath = join(previewDir, `${name}.html`);
 writeFileSync(htmlPath, html);

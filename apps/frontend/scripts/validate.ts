@@ -20,7 +20,9 @@ import {
 } from "../lib/content/load";
 import { lintCourse, type Diagnostic } from "../lib/content/lint";
 
-const repoRoot = resolve(__dirname, "..");
+// This app is apps/frontend; content/ lives at the repo root above it.
+const appRoot = resolve(__dirname, "..");
+const repoRoot = resolve(appRoot, "..", "..");
 const contentRoot = join(repoRoot, "content");
 const [courseArg, lessonArg] = process.argv.slice(2);
 
@@ -60,7 +62,7 @@ for (const dir of courseDirs) {
   try {
     const loaded = loadCourse(dir);
     diags = lintCourse(loaded, {
-      repoRoot,
+      appRoot,
       lessonDirsOnDisk: listLessonDirs(dir),
       allCourseSlugs: listCourseDirs(contentRoot).map((d) => basename(d)),
     });

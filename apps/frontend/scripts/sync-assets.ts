@@ -27,9 +27,11 @@ import { basename, join, relative, resolve } from "node:path";
 import { parse } from "yaml";
 import { isRasterFile } from "../lib/content/images";
 
-const repoRoot = resolve(__dirname, "..");
+// This app is apps/frontend; content/ lives at the repo root above it.
+const appRoot = resolve(__dirname, "..");
+const repoRoot = resolve(appRoot, "..", "..");
 const coursesRoot = join(repoRoot, "content", "courses");
-const publicRoot = join(repoRoot, "public", "course-assets");
+const publicRoot = join(appRoot, "public", "course-assets");
 
 function dirs(path: string): string[] {
   if (!existsSync(path)) return [];

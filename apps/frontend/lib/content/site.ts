@@ -8,7 +8,10 @@ import {
   type LoadedLesson,
 } from "./load";
 
-const CONTENT_ROOT = join(process.cwd(), "content");
+// content/ lives at the repo ROOT (it is the human curation surface, shared
+// with the content factory), while this app lives in apps/frontend — hence the
+// climb out. Next runs with cwd = the app directory in dev, build and start.
+const CONTENT_ROOT = join(process.cwd(), "..", "..", "content");
 
 /**
  * Visibility: production renders `published` lessons only. Dev — and any
