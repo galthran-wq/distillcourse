@@ -65,8 +65,10 @@ async def _run(arguments: argparse.Namespace) -> None:
             await reset_password(session, arguments.email, _prompt_new_password())
         elif arguments.command == "delete-user":
             await delete_user(session, arguments.email)
-        else:
+        elif arguments.command == "rebuild-progress":
             await rebuild_progress(session)
+        else:
+            raise SystemExit(f"unknown command: {arguments.command}")
     await engine.dispose()
 
 

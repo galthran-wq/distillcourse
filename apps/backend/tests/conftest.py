@@ -9,7 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker
 
 from app import crud
-from app.api.deps import get_session, get_session_factory
+from app.api.deps import get_current_user, get_session, get_session_factory
 from app.core import rate_limit
 from app.core.config import settings
 from app.core.db import engine
@@ -115,3 +115,11 @@ async def other_client(app_on_test_session: FastAPI) -> AsyncGenerator[AsyncClie
     # independent sessions of the same user.
     async with browser(app_on_test_session) as client:
         yield client
+
+
+@pytest.fixture
+async def signed_in(client: AsyncClient, user: User) -> AsyncGenerator[AsyncClient]:
+    """A client the routes see as `user`, without a login round trip."""
+    # app_on_test_session clears the overrides when the test ends.
+    app.dependency_overrides[get_current_user] = lambda: user
+    yield client

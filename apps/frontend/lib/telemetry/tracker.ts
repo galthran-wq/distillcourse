@@ -1,10 +1,12 @@
 /**
  * What a reading session sends home. The tracker is deliberately free of the
- * DOM and of React: the page wires browser events to these calls, and the
- * rules for what becomes an event live here, where they can be tested.
+ * DOM and of React — `watch.ts` turns browser events into these calls — and
+ * the rules for what becomes an event live here, where they can be tested.
  */
 
-export const ENDPOINT = "/api/v1/telemetry/events";
+import { API } from "@/lib/api-base";
+
+export const ENDPOINT = `${API}/telemetry/events`;
 export const HEARTBEAT_SECONDS = 10;
 /** No input, scroll or pointer movement for this long and the reader is gone. */
 export const IDLE_MS = 60_000;

@@ -1,10 +1,13 @@
 import uuid
+from datetime import datetime
+from hashlib import sha256
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, and_, case, distinct, func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, case, distinct, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content import search
 from app.models import Document, Event, LessonProgress
 from app.telemetry import schemas
 
@@ -24,6 +27,21 @@ _SECONDS = case(
 )
 _PCT = case((Event.type == schemas.SCROLL, Event.payload["pct"].as_integer()), else_=0)
 _EVENT_ORDER = (Event.server_ts, Event.id)
+
+
+async def lock(session: AsyncSession, user_id: uuid.UUID, lesson: str) -> None:
+    """Serialises everything that writes this reader's aggregate for a lesson.
+
+    Two tabs of the same lesson flush concurrently, and a rebuild can land in
+    the middle. Without this, each would recompute from what it can see and the
+    later upsert would overwrite the other's events with a total missing them.
+    """
+    # pg_advisory_xact_lock takes a bigint; hashing here rather than with
+    # Postgres's own hashtext keeps the key computable from either side.
+    key = int.from_bytes(
+        sha256(f"{user_id}:{lesson}".encode()).digest()[:8], "big", signed=True
+    )
+    await session.execute(select(func.pg_advisory_xact_lock(key)))
 
 
 def _toggle_target(kind: str) -> ColumnElement[str | None]:
@@ -91,12 +109,7 @@ async def threshold_seconds(session: AsyncSession, lesson: str) -> int:
     # and therefore has no anchorless chunk.
     words: int | None = await session.scalar(
         select(Document.meta["document_word_count"].as_integer())
-        .where(
-            or_(
-                Document.locator == lesson,
-                Document.locator.startswith(f"{lesson}#"),
-            )
-        )
+        .where(search.chunks_of(lesson))
         .order_by(Document.position)
         .limit(1)
     )
@@ -110,12 +123,13 @@ async def threshold_seconds(session: AsyncSession, lesson: str) -> int:
 
 async def recompute(
     session: AsyncSession, user_id: uuid.UUID, lesson: str
-) -> LessonProgress | None:
+) -> datetime | None:
     """Rebuilds the aggregate for one reader and lesson from its events.
 
     Full recompute rather than an increment, so the projection cannot drift
     from the log it projects and `rebuild-progress` is this same function.
     Emits nothing: the completion side effect is the caller's (see `ingest`).
+    Returns the completion instant it derived, which is all a caller needs.
     """
     totals = (await session.execute(_totals(user_id, lesson))).one()
     if totals.last_seen is None:
@@ -129,7 +143,7 @@ async def recompute(
         ),
     }
     statement = insert(LessonProgress).values(values)
-    await session.execute(
+    return await session.scalar(
         statement.on_conflict_do_update(
             index_elements=["user_id", "lesson"],
             set_={
@@ -137,9 +151,8 @@ async def recompute(
                 for name in values
                 if name not in ("user_id", "lesson")
             },
-        )
+        ).returning(LessonProgress.completed_at)
     )
-    return await session.get(LessonProgress, (user_id, lesson), populate_existing=True)
 
 
 async def rebuild(session: AsyncSession) -> int:
@@ -153,6 +166,10 @@ async def rebuild(session: AsyncSession) -> int:
         await session.execute(select(Event.user_id, Event.lesson).distinct())
     ).all()
     for user_id, lesson in pairs:
+        # One transaction per pair, so a reader flushing mid-rebuild waits for
+        # their own pair and no longer than that: a rebuild that held one lock
+        # for the whole corpus would stall every reader on the site.
+        await lock(session, user_id, lesson)
         await recompute(session, user_id, lesson)
-    await session.commit()
+        await session.commit()
     return len(pairs)

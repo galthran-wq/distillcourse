@@ -11,6 +11,15 @@ MAX_PAYLOAD_BYTES = 2048
 # Reading one lesson flushes six times a minute per tab; the ceiling leaves
 # room for several open tabs and still bounds what one account can write.
 MAX_BATCHES_PER_MINUTE = 60
+# What the largest batch this module accepts can weigh, its JSON envelope
+# included. The two caps above are pydantic's and only apply to a body already
+# read and parsed, so this is the one the route checks against Content-Length
+# before that happens.
+MAX_BATCH_BYTES = MAX_BATCH_EVENTS * (MAX_PAYLOAD_BYTES + 256)
+# One heartbeat covers at most this much attention. It bounds a single event
+# and nothing more — fifty of them fit in one batch, so what actually bounds
+# the reading time an account can claim is the server clock (see `ingest`).
+MAX_HEARTBEAT_SECONDS = 60
 
 # `<section-anchor>/<kind><n>`: the anchor namespace is the index's
 # (app/content/locators.py), and the ordinal disambiguates two proofs in one
@@ -33,9 +42,9 @@ class Opened(BaseModel):
 
 
 class Heartbeat(BaseModel):
-    # The client sends one every ten seconds of attention. The cap is what
-    # stops a forged batch from completing a lesson nobody read.
-    seconds: Annotated[int, Field(ge=1, le=60)]
+    # The client sends one every ten seconds of attention; what is stored is
+    # whatever of it `ingest` could back with elapsed server time.
+    seconds: Annotated[int, Field(ge=1, le=MAX_HEARTBEAT_SECONDS)]
 
 
 class Scroll(BaseModel):

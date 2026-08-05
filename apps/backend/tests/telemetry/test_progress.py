@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import update
@@ -6,14 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import LessonProgress, User
 from app.telemetry import progress, schemas
 from tests.telemetry.conftest import (
-    EVENTS,
     HEARTBEATS_TO_COMPLETE,
     LESSON,
     WORD_COUNT,
     aggregate,
-    batch,
+    event,
+    flush,
     index_lesson,
-    reading,
+    read,
     snapshot,
     stored_events,
 )
@@ -24,10 +26,10 @@ pytestmark = pytest.mark.usefixtures("indexed_lesson")
 async def test_reading_a_lesson_through_completes_it_exactly_once(
     signed_in: AsyncClient, session: AsyncSession, user: User
 ) -> None:
-    await signed_in.post(EVENTS, json=batch(*reading(HEARTBEATS_TO_COMPLETE, depth=90)))
+    await read(signed_in, session, heartbeats=HEARTBEATS_TO_COMPLETE, depth=90)
     first = snapshot(await aggregate(session, user))
 
-    await signed_in.post(EVENTS, json=batch(*reading(4, depth=100)))
+    await read(signed_in, session, heartbeats=4, depth=100)
 
     again = await aggregate(session, user)
     assert first["completed_at"] is not None
@@ -35,10 +37,29 @@ async def test_reading_a_lesson_through_completes_it_exactly_once(
     assert await stored_events(session, schemas.COMPLETED) == 1
 
 
+async def test_a_client_cannot_squat_the_id_a_completion_would_take(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    # The id a derivation from (user, lesson) would land on. Event ids are the
+    # client's to mint, so it must not be the one the completion needs.
+    squatted = event(schemas.HEARTBEAT, {"seconds": 10})
+    squatted["id"] = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL, f"distillcourse:lesson_completed:{user.id}:{LESSON}"
+        )
+    )
+
+    await flush(signed_in, session, squatted)
+    await read(signed_in, session, heartbeats=HEARTBEATS_TO_COMPLETE, depth=90)
+
+    assert (await aggregate(session, user)).completed_at is not None
+    assert await stored_events(session, schemas.COMPLETED) == 1
+
+
 async def test_a_lesson_skimmed_in_forty_seconds_is_not_complete(
     signed_in: AsyncClient, session: AsyncSession, user: User
 ) -> None:
-    await signed_in.post(EVENTS, json=batch(*reading(4, depth=100)))
+    await read(signed_in, session, heartbeats=4, depth=100)
 
     row = await aggregate(session, user)
     assert (row.active_seconds, row.max_scroll_pct) == (40, 100)
@@ -49,7 +70,7 @@ async def test_a_lesson_skimmed_in_forty_seconds_is_not_complete(
 async def test_time_without_reaching_the_end_is_not_complete(
     signed_in: AsyncClient, session: AsyncSession, user: User
 ) -> None:
-    await signed_in.post(EVENTS, json=batch(*reading(HEARTBEATS_TO_COMPLETE, depth=75)))
+    await read(signed_in, session, heartbeats=HEARTBEATS_TO_COMPLETE, depth=75)
 
     assert (await aggregate(session, user)).completed_at is None
 
@@ -57,7 +78,7 @@ async def test_time_without_reaching_the_end_is_not_complete(
 async def test_rebuild_reproduces_the_aggregate_and_emits_nothing(
     signed_in: AsyncClient, session: AsyncSession, user: User
 ) -> None:
-    await signed_in.post(EVENTS, json=batch(*reading(HEARTBEATS_TO_COMPLETE, depth=90)))
+    await read(signed_in, session, heartbeats=HEARTBEATS_TO_COMPLETE, depth=90)
     expected = snapshot(await aggregate(session, user))
     await session.execute(
         update(LessonProgress).values(

@@ -1,3 +1,5 @@
+import { API } from "@/lib/api-base";
+
 export interface User {
   id: string;
   email: string;
@@ -32,12 +34,8 @@ export class ApiError extends Error {
 // client needs uv and the backend source to exist, which the frontend image
 // build (apps/frontend/Dockerfile) has neither of, and these four calls are
 // what the site itself needs. Generated types stay for code that runs outside
-// the image build.
-//
-// Same origin on purpose: caddy serves the site and /api/* from one host, and
-// `next dev` rewrites /api the same way (next.config.ts). The session cookie is
-// httpOnly and first-party, so no code here ever touches it.
-const API = "/api/v1";
+// the image build. The session cookie is httpOnly and first-party, so no code
+// here ever touches it.
 
 // Mirrors the backend bound (app/core/security.py): the browser refusing a
 // short password beats a round trip that comes back as a 422.

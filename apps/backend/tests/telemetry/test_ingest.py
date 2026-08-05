@@ -8,11 +8,13 @@ from app.models import Event, LessonProgress, User
 from app.telemetry import schemas
 from tests.telemetry.conftest import (
     EVENTS,
+    HEARTBEAT_SECONDS,
     LESSON,
     aggregate,
     batch,
+    beats,
     event,
-    reading,
+    flush,
     stored_events,
 )
 
@@ -20,7 +22,7 @@ from tests.telemetry.conftest import (
 async def test_an_anonymous_visitor_is_refused_and_leaves_no_rows(
     client: AsyncClient, session: AsyncSession
 ) -> None:
-    response = await client.post(EVENTS, json=batch(*reading(3, depth=50)))
+    response = await client.post(EVENTS, json=batch(*beats(3, depth=50)))
 
     assert response.status_code == 401
     assert await stored_events(session) == 0
@@ -30,14 +32,15 @@ async def test_a_reading_session_becomes_events_and_an_aggregate(
     signed_in: AsyncClient, session: AsyncSession, user: User
 ) -> None:
     events = [
-        *reading(4, depth=75),
+        event(schemas.OPENED),
+        *beats(4, depth=75),
         event(schemas.TOGGLE_OPENED, {"kind": "proof", "target": "surprise/proof1"}),
         event(schemas.TOGGLE_OPENED, {"kind": "solution", "target": "drill/solution1"}),
         event(schemas.TOGGLE_OPENED, {"kind": "aside", "target": "drill/aside1"}),
         event(schemas.DEMO_INTERACTED, {"demo": "Surprisal", "target": "drill/demo1"}),
     ]
 
-    response = await signed_in.post(EVENTS, json=batch(*events))
+    response = await flush(signed_in, session, *events)
 
     progress = await aggregate(session, user)
     assert response.status_code == 204
@@ -52,14 +55,34 @@ async def test_a_reading_session_becomes_events_and_an_aggregate(
 async def test_a_retried_flush_is_not_counted_twice(
     signed_in: AsyncClient, session: AsyncSession, user: User
 ) -> None:
-    flush = batch(*reading(4, depth=50))
+    events = beats(4, depth=50)
 
-    await signed_in.post(EVENTS, json=flush)
-    await signed_in.post(EVENTS, json=flush)
+    await flush(signed_in, session, *events)
+    # Time enough for the retry to be credited, if the ids did not stop it.
+    await flush(signed_in, session, *events, after=4 * HEARTBEAT_SECONDS)
 
     progress = await aggregate(session, user)
-    assert await stored_events(session) == len(flush["events"])
+    assert await stored_events(session) == len(events)
     assert progress.active_seconds == 40
+
+
+async def test_a_batch_cannot_claim_more_time_than_has_passed(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    forged = [
+        event(schemas.HEARTBEAT, {"seconds": schemas.MAX_HEARTBEAT_SECONDS})
+        for _ in range(schemas.MAX_BATCH_EVENTS)
+    ]
+
+    # Fifty minutes of reading claimed twice, a moment apart. The first flush
+    # is credited one heartbeat, having nothing to be measured against; the
+    # second is measured, and no time has passed.
+    await flush(signed_in, session, *forged)
+    await flush(signed_in, session, *forged)
+
+    progress = await aggregate(session, user)
+    assert progress.active_seconds == schemas.MAX_HEARTBEAT_SECONDS
+    assert await stored_events(session) == 1
 
 
 async def test_the_same_toggle_from_two_tabs_counts_once(
@@ -67,8 +90,8 @@ async def test_the_same_toggle_from_two_tabs_counts_once(
 ) -> None:
     opened: dict[str, Any] = {"kind": "proof", "target": "surprise/proof1"}
 
-    await signed_in.post(EVENTS, json=batch(event(schemas.TOGGLE_OPENED, opened)))
-    await signed_in.post(EVENTS, json=batch(event(schemas.TOGGLE_OPENED, opened)))
+    await flush(signed_in, session, event(schemas.TOGGLE_OPENED, opened))
+    await flush(signed_in, session, event(schemas.TOGGLE_OPENED, opened))
 
     assert await stored_events(session) == 2
     assert (await aggregate(session, user)).proofs_opened == 1
@@ -82,10 +105,34 @@ async def test_a_batch_over_the_size_limit_is_refused_whole(
         for _ in range(schemas.MAX_BATCH_EVENTS + 1)
     ]
 
-    response = await signed_in.post(EVENTS, json=batch(*oversize))
+    response = await flush(signed_in, session, *oversize)
 
     assert response.status_code == 422
     assert await stored_events(session) == 0
+
+
+async def test_a_body_too_large_for_any_batch_is_refused_unread(
+    signed_in: AsyncClient, session: AsyncSession
+) -> None:
+    response = await signed_in.post(
+        EVENTS,
+        content=b"[" * (schemas.MAX_BATCH_BYTES + 1),
+        headers={"Content-Type": "application/json"},
+    )
+
+    # 413, not the 422 this body would have earned had anything parsed it.
+    assert response.status_code == 413
+    assert await stored_events(session) == 0
+
+
+async def test_an_empty_batch_writes_nothing(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    response = await flush(signed_in, session)
+
+    assert response.status_code == 204
+    assert await stored_events(session) == 0
+    assert await session.get(LessonProgress, (user.id, LESSON)) is None
 
 
 async def test_events_the_server_cannot_read_are_dropped_and_the_rest_kept(
@@ -101,7 +148,7 @@ async def test_events_the_server_cannot_read_are_dropped_and_the_rest_kept(
         event(schemas.OPENED, {"referrer": "x" * schemas.MAX_PAYLOAD_BYTES}),
     ]
 
-    response = await signed_in.post(EVENTS, json=batch(*events))
+    response = await flush(signed_in, session, *events)
 
     stored = (await session.scalars(select(Event.type))).all()
     assert response.status_code == 204
@@ -114,7 +161,7 @@ async def test_a_payload_over_the_byte_limit_is_dropped(
     padded = event(schemas.OPENED)
     padded["payload"] = {"junk": "x" * schemas.MAX_PAYLOAD_BYTES}
 
-    await signed_in.post(EVENTS, json=batch(padded))
+    await flush(signed_in, session, padded)
 
     assert await stored_events(session) == 0
 
@@ -122,9 +169,11 @@ async def test_a_payload_over_the_byte_limit_is_dropped(
 async def test_a_lesson_that_is_not_a_locator_is_refused(
     signed_in: AsyncClient, session: AsyncSession
 ) -> None:
-    response = await signed_in.post(
-        EVENTS,
-        json=batch(event(schemas.OPENED), lesson="lesson:x/y; DROP TABLE events"),
+    response = await flush(
+        signed_in,
+        session,
+        event(schemas.OPENED),
+        lesson="lesson:x/y; DROP TABLE events",
     )
 
     assert response.status_code == 422
@@ -132,16 +181,16 @@ async def test_a_lesson_that_is_not_a_locator_is_refused(
 
 
 async def test_the_flush_rate_limit_answers_429(signed_in: AsyncClient) -> None:
-    flush = batch(event(schemas.HEARTBEAT, {"seconds": 10}))
+    flushed = batch(event(schemas.HEARTBEAT, {"seconds": 10}))
     for _ in range(schemas.MAX_BATCHES_PER_MINUTE):
-        assert (await signed_in.post(EVENTS, json=flush)).status_code == 204
+        assert (await signed_in.post(EVENTS, json=flushed)).status_code == 204
 
-    assert (await signed_in.post(EVENTS, json=flush)).status_code == 429
+    assert (await signed_in.post(EVENTS, json=flushed)).status_code == 429
 
 
 async def test_events_of_one_reader_never_reach_another_aggregate(
     signed_in: AsyncClient, session: AsyncSession, other_user: User
 ) -> None:
-    await signed_in.post(EVENTS, json=batch(*reading(4, depth=50)))
+    await flush(signed_in, session, *beats(4, depth=50))
 
     assert await session.get(LessonProgress, (other_user.id, LESSON)) is None

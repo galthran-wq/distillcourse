@@ -20,7 +20,6 @@ class FixedWindow:
         self.max_requests = max_requests
         self._window_start = datetime.now(UTC)
         self._hits: dict[str, int] = {}
-        _limiters.append(self)
 
     def check(self, key: str) -> None:
         now = datetime.now(UTC)
@@ -39,10 +38,20 @@ class FixedWindow:
         self._window_start = datetime.now(UTC)
 
 
-# Every limiter registers itself so the test suite can empty all the windows
-# between tests without knowing where each one lives.
 _limiters: list[FixedWindow] = []
-_signup_and_login = FixedWindow(MAX_REQUESTS)
+
+
+def register(limiter: FixedWindow) -> FixedWindow:
+    """Adds a limiter to the set `reset()` empties between tests.
+
+    Explicit rather than done in the constructor, which would keep every
+    window ever built alive for the life of the process.
+    """
+    _limiters.append(limiter)
+    return limiter
+
+
+_signup_and_login = register(FixedWindow(MAX_REQUESTS))
 
 
 def rate_limit(request: Request) -> None:

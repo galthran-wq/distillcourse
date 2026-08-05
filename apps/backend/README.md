@@ -168,7 +168,16 @@ already there. A batch is capped at 50 events and each payload is validated
 against its type and re-emitted from the model, so what the aggregate casts in
 SQL is always the declared shape; an event the server cannot read is dropped
 rather than answered with an error, because telemetry must not interrupt
-reading.
+reading. A body larger than any legitimate batch is refused with 413 before it
+is read at all, in the route class and again in caddy.
+
+The `seconds` in a heartbeat are a claim, and the per-event cap bounds nothing
+on its own — 50 events per batch times 60 batches a minute is more reading than
+there are minutes. What bounds it is the server's clock: a flush is credited at
+most the seconds that passed since this reader last flushed this lesson, and a
+beat that is not covered is not stored. The first flush has nothing to be
+measured against and is allowed one heartbeat's worth, below every threshold
+there is.
 
 The aggregate is a full recompute from the events of one (reader, lesson), not
 an increment: the projection cannot drift from the log, and
@@ -186,9 +195,11 @@ past a threshold of `document_word_count / 250 wpm / 2`, clamped to 3–20
 minutes and read from `documents` (5 minutes for a lesson the index has never
 seen). The completion instant is derived from running totals over the events
 rather than from `now()`, so deriving it twice gives the same answer. It is
-recorded as a `lesson_completed` event whose id is derived from (user,
-lesson): the insert itself is the exactly-once check, and that row is where
-spaced repetition subscribes.
+recorded as a `lesson_completed` event with a random id — the ids in `events`
+are the client's to choose, so a derived one could be squatted to suppress the
+completion. What makes the emit exactly-once is the absence of the event,
+checked under the same advisory lock the flush holds. That row is where spaced
+repetition subscribes.
 
 ## Dormant mail
 
