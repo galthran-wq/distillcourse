@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncGenerator, Sequence
 from datetime import datetime
 
+from pydantic import BaseModel
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
     ModelMessage,
@@ -20,12 +21,15 @@ from pydantic_ai.ui.vercel_ai.response_types import (
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.clock import zone
+from app.core.config import settings
 from app.harness.agent import compact_threshold, model_for, tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import check_cost_ceiling, check_run_allowed
 from app.harness.prompts import ContextBlock, Medium, RunKind, assemble
 from app.harness.repository import HarnessRepository, Role
 from app.harness.usage import usage_row
+from app.memory import repository as memory
+from app.memory.repository import Recollection
 from app.models import Chat
 from app.telegram.outbox import Outbox
 
@@ -58,11 +62,38 @@ def _blocks(current_locator: str | None) -> tuple[ContextBlock, ...]:
     )
 
 
+async def _memory_index(repo: HarnessRepository) -> tuple[ContextBlock, ...]:
+    """What the tutor remembers about the learner, as slugs and descriptions.
+
+    The bodies stay out: a memory is a paragraph, and the whole design is that
+    the model fetches the few its descriptions say bear on the question.
+    """
+    rows = await memory.index(repo.session, repo.user_id)
+    if not rows:
+        return ()
+    lines = [f"- `{row.slug}`: {row.description}" for row in rows]
+    if len(rows) > settings.MEMORY_INDEX_SOFT_CAP:
+        lines.append(
+            f"\nThis is more than the {settings.MEMORY_INDEX_SOFT_CAP} lines this "
+            "profile is meant to be: merge the memories that overlap and delete "
+            "the ones that no longer hold, rather than adding another."
+        )
+    return (
+        ContextBlock(
+            title="What you remember about the learner",
+            body="\n".join(lines),
+        ),
+    )
+
+
 async def _context(
     repo: HarnessRepository, blocks: tuple[ContextBlock, ...]
 ) -> tuple[ContextBlock, ...]:
     """Every run carries the learner's clock: a reminder they ask for is set
-    from the model's reading of "Friday", and the model has no clock at all."""
+    from the model's reading of "Friday", and the model has no clock at all.
+    The memory index rides on every run for the same reason — it is a profile
+    of the learner, not of the chat it was written in.
+    """
     user = await repo.user()
     now = datetime.now(zone(user.timezone))
     return (
@@ -70,8 +101,19 @@ async def _context(
             title="The learner's clock",
             body=f"Their timezone is `{user.timezone}`; it is {now:%A %Y-%m-%d %H:%M} there.",
         ),
+        *await _memory_index(repo),
         *blocks,
     )
+
+
+class Compaction(BaseModel):
+    """What a compaction returns: the summary that replaces the history, and
+    what the conversation turned out to be worth remembering about the
+    learner. Compaction is where everything they said is in front of the model
+    at once, which is the moment a profile is worth revising."""
+
+    summary: str
+    memories: list[Recollection] = []
 
 
 async def summarize(
@@ -85,7 +127,10 @@ async def summarize(
         message_history=history,
         model=model_for(chat.model),
         deps=HarnessDeps(repo=repo, chat=chat),
-        instructions=assemble(medium, "compact"),
+        # The index comes along so a candidate can reuse a slug: that is what
+        # makes this pass consolidate the profile instead of growing it.
+        instructions=assemble(medium, "compact", await _memory_index(repo)),
+        output_type=Compaction,
     )
     await repo.add_messages(
         chat,
@@ -95,7 +140,7 @@ async def summarize(
             ModelRequest(
                 parts=[
                     UserPromptPart(
-                        content=f"Summary of the conversation so far:\n\n{result.output}"
+                        content=f"Summary of the conversation so far:\n\n{result.output.summary}"
                     )
                 ]
             )
@@ -104,7 +149,11 @@ async def summarize(
         marker="compact",
         usage=usage_row(result.usage),
     )
-    return result.output
+    # A compaction is a run, so what it may write about the learner is the
+    # bound every other run gets.
+    for candidate in result.output.memories[: settings.MEMORY_WRITES_PER_RUN]:
+        await memory.save(repo.session, repo.user_id, candidate, source="agent")
+    return result.output.summary
 
 
 async def compact(

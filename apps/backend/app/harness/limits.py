@@ -7,6 +7,8 @@ from app.harness.repository import HarnessRepository
 from app.harness.usage import COST_USD, WEB_SEARCH_CALLS
 from app.models import Message
 
+MEMORY_WRITES = "memory_writes"
+
 
 class LimitExceeded(Exception):
     pass
@@ -33,6 +35,17 @@ async def check_web_search_allowed(repo: HarnessRepository, usage: RunUsage) -> 
     if spent >= settings.WEB_SEARCH_DAILY_CAP:
         raise LimitExceeded(
             f"daily web search cap reached ({settings.WEB_SEARCH_DAILY_CAP} per day)"
+        )
+
+
+def check_memory_write_allowed(usage: RunUsage) -> None:
+    # An injection guard rather than a budget: text the run read — a web
+    # result, a pasted quote — can talk it into rewriting the learner's
+    # profile, and this bounds how much of it one run can rewrite. Counted in
+    # the run's own usage details and never stored: the cap ends with the run.
+    if usage.details.get(MEMORY_WRITES, 0) >= settings.MEMORY_WRITES_PER_RUN:
+        raise LimitExceeded(
+            f"memory writes are capped at {settings.MEMORY_WRITES_PER_RUN} per run"
         )
 
 

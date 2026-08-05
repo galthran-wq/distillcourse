@@ -1,16 +1,6 @@
-from typing import Any
-
 import pytest
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelRequest,
-    ModelResponse,
-    TextPart,
-    ToolCallPart,
-    ToolReturnPart,
-)
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from pydantic_core import to_jsonable_python
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,27 +14,9 @@ from app.harness.repository import HarnessRepository
 from app.harness.usage import WEB_SEARCH_CALLS
 from app.models import Chat, Incident
 from tests.content.conftest import corpus_index  # noqa: F401  (a shared fixture)
+from tests.harness.conftest import call, returns
 
 KL = "lesson:information-theory/kl-divergence"
-
-
-def returns(messages: list[ModelMessage], name: str) -> list[Any]:
-    """What the named tool has returned so far, as the model sees it.
-
-    Serialized, because the same content is a pydantic model while the run is
-    live and plain json once it has been through the database.
-    """
-    return [
-        to_jsonable_python(part.content)
-        for message in messages
-        if isinstance(message, ModelRequest)
-        for part in message.parts
-        if isinstance(part, ToolReturnPart) and part.tool_name == name
-    ]
-
-
-def call(name: str, **args: object) -> ModelResponse:
-    return ModelResponse(parts=[ToolCallPart(tool_name=name, args=args)])
 
 
 async def test_a_question_is_answered_from_the_index_with_a_locator_that_resolves(

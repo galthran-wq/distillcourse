@@ -22,6 +22,7 @@ app/
     routes/profile.py # visit history + bookmarks for the profile page
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
+    routes/memories.py # what the tutor remembers: list, edit, delete
   harness/
     agent.py         # the tutor agent, the model pool, the compaction threshold
     prompts.py       # module concatenation + context blocks
@@ -53,6 +54,9 @@ app/
     thread.py        # the one thread and the run that speaks into it
     updates.py       # one incoming message, end to end; bot commands
     tools.py         # send_message, run by the tutor
+  memory/
+    repository.py    # the learner profile: index, read, upsert, delete
+    tools.py         # read_memory / save_memory / delete_memory
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
@@ -149,8 +153,8 @@ inside such a fence is data.
 
 Caps are enforcement, not telemetry: messages per user per day, an
 instance-wide monthly ceiling computed from the cost recorded on every run,
-and web searches per user per day. Set a spend limit on the OpenRouter key
-too — that one holds even if this code is wrong.
+web searches per user per day, and memory writes per run. Set a spend limit on
+the OpenRouter key too — that one holds even if this code is wrong.
 
 ## The tutor's tools
 
@@ -178,9 +182,48 @@ so the only chats it can write to are the ones that repository can see.
   nothing has its final answer delivered for it, and one that sent something
   does not get its answer sent on top. On the site the tool says there is
   nothing to send: the answer is the delivery there.
+- `read_memory` / `save_memory` / `delete_memory` — the learner profile below.
 - `get_user_progress` is specified with these but not implemented here: it
   reads the `lesson_progress` aggregate that telemetry owns, and lands with it
   (#37).
+
+## Memory
+
+`memories` is what the tutor knows about a learner — their background, the goal
+that brought them here, notation that worked, a misconception it had to
+correct. It is keyed by `(user_id, slug)` and belongs to the learner, not to a
+chat or a medium: a fact stated on the site is in front of the tutor on
+Telegram the same evening.
+
+**The index is in context, the body is fetched.** Every run's prompt carries
+one line per memory — slug and a one-line description — and `read_memory`
+returns the bodies of the ones whose description bears on the question. That is
+what lets a memory be a paragraph of real context without the profile growing
+every prompt it rides in. The cost is the "didn't read it" risk, paid down by
+requiring descriptions that are decidable at a glance (`prompts/memory.md`) and
+by asking for a read before answering.
+
+There is no vector store and no memory library. This is a profile of dozens of
+lines, and retrieval over dozens of lines is a `SELECT`; the upgrade path, if a
+learner's corpus ever becomes one, is the `documents` index that already
+exists.
+
+Nothing derivable from telemetry is stored here — what they opened, how far
+they read, which solutions they revealed is `lesson_progress`, and the tutor
+asks for it.
+
+Writes happen two ways: `save_memory` during a dialogue, and the `/compact`
+hook — the summarization run returns memory candidates alongside the summary,
+which is the one moment the whole conversation is in front of the model. Both
+are bounded by `MEMORY_WRITES_PER_RUN`: an injection guard, because the text a
+run reads can talk it into rewriting the profile. Past
+`MEMORY_INDEX_SOFT_CAP` lines the index carries an instruction to consolidate
+rather than extend — a slug written again replaces what was there, which is how
+two overlapping memories become one.
+
+The learner reads the whole profile at `/profile/memories` and edits or deletes
+any line of it; an edit marks the row `source = user`. A proactive tutor that
+remembers things is only trustworthy if what it remembers is visible.
 
 ## Lesson user state
 

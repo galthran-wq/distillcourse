@@ -368,3 +368,40 @@ class Bookmark(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+# The handle the tutor writes a memory under and asks for it back by; long
+# enough to name a fact in words, short enough that an index of them is a few
+# lines of prompt. app/memory/repository.py validates the grammar.
+MEMORY_SLUG_LENGTH = 64
+
+
+class Memory(Base):
+    """What the tutor knows about a learner, across every chat and medium.
+
+    Only the index — slug and description — is in the system prompt of every
+    run; `content` is fetched by `read_memory` when a description says it bears
+    on the question. That is what lets a memory be a paragraph of context
+    without the profile growing the prompt it rides in.
+
+    Nothing derivable from telemetry belongs here: how far they read and which
+    solutions they opened is `lesson_progress`, and the tutor asks for it.
+    """
+
+    __tablename__ = "memories"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    slug: Mapped[str] = mapped_column(String(MEMORY_SLUG_LENGTH), primary_key=True)
+    description: Mapped[str] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text)
+    # Who last wrote it. A learner who corrects their profile is telling the
+    # tutor it got something wrong, and the page shows which lines are theirs.
+    source: Mapped[str] = mapped_column(String(8))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

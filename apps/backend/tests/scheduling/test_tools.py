@@ -1,15 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelRequest,
-    ModelResponse,
-    TextPart,
-    ToolCallPart,
-    ToolReturnPart,
-)
-from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,28 +10,10 @@ from app.harness.repository import HarnessRepository
 from app.models import Chat, Schedule, User
 from app.scheduling import policy, repository, worker
 from tests.conftest import replying
+from tests.harness.conftest import calling, echoing
 from tests.scheduling.conftest import NOON
 
 FRIDAY = NOON + timedelta(days=2)
-
-
-def calling(tool: str, **arguments: object) -> FunctionModel:
-    """A model that calls one tool and then reports what it returned, which is
-    what the learner would be told."""
-
-    def respond(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
-        # Only the last message: an earlier turn in the thread may carry a tool
-        # return of its own, and this run has not called anything yet.
-        returns = [
-            str(part.content)
-            for part in messages[-1].parts
-            if isinstance(part, ToolReturnPart)
-        ]
-        if returns:
-            return ModelResponse(parts=[TextPart(content=returns[-1])])
-        return ModelResponse(parts=[ToolCallPart(tool_name=tool, args=arguments)])
-
-    return FunctionModel(respond)
 
 
 async def only_schedule(session: AsyncSession) -> Schedule:
@@ -97,14 +70,7 @@ async def test_the_prompt_tells_the_agent_what_time_it_is_for_the_learner(
     user.timezone = "Europe/Moscow"
     await session.commit()
 
-    def echo_instructions(
-        messages: list[ModelMessage], _info: AgentInfo
-    ) -> ModelResponse:
-        request = messages[-1]
-        assert isinstance(request, ModelRequest)
-        return ModelResponse(parts=[TextPart(content=request.instructions or "")])
-
-    with tutor.override(model=FunctionModel(echo_instructions)):
+    with tutor.override(model=echoing()):
         prompt = await runner.run(
             HarnessRepository(session, user.id), thread, "what day is it?"
         )

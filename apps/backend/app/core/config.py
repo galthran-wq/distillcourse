@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     # half is a spend limit on the OpenRouter key itself.
     MONTHLY_COST_CEILING_USD: float = 50.0
     RUN_CLAIM_TTL_SECONDS: int = 600
+    # What one run may write about the learner, and how long their profile
+    # grows before the tutor is asked to consolidate it instead of extending
+    # it (a soft cap: the index is instruction, not enforcement).
+    MEMORY_WRITES_PER_RUN: int = 5
+    MEMORY_INDEX_SOFT_CAP: int = 40
     COMPACT_AT_TOKENS: int = 200_000
     # Headroom for the next turn's system prompt, tools and reply.
     CONTEXT_RESERVE_TOKENS: int = 32_000

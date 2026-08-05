@@ -6,6 +6,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.core.config import ChatModel, settings
 from app.harness.deps import HarnessDeps
+from app.memory.tools import delete_memory, read_memory, save_memory
 from app.scheduling.tools import (
     cancel_reminder,
     create_reminder,
@@ -25,6 +26,9 @@ tutor = Agent(
         mute_proactive,
         unmute_proactive,
         send_message,
+        read_memory,
+        save_memory,
+        delete_memory,
     ],
 )
 

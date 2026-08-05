@@ -12,7 +12,9 @@ _MODULES: dict[RunKind, tuple[str, ...]] = {
     "chat": ("memory.md", "courses.md"),
     "review": ("memory.md", "courses.md", "review.md"),
     "proactive": ("memory.md", "courses.md", "proactive.md"),
-    "compact": ("compact.md",),
+    # A compaction returns memory candidates, so it is held to the same rules
+    # about them as a dialogue is.
+    "compact": ("memory.md", "compact.md"),
 }
 
 
