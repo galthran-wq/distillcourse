@@ -171,3 +171,16 @@ async def test_a_position_that_is_not_a_locator_is_dropped() -> None:
         _current_locator(reading("lesson:information-theory/entropy#surprise"))
         == "lesson:information-theory/entropy#surprise"
     )
+
+
+async def test_an_anchor_the_slugger_produced_keeps_its_lesson() -> None:
+    # The index stores whatever the site's rehype-slug wrote, which is neither
+    # ASCII-only nor bounded the way this endpoint's pattern is.
+    assert (
+        _current_locator(reading("lesson:info-theory/entropy#энтропия-как-среднее"))
+        == "lesson:info-theory/entropy#энтропия-как-среднее"
+    )
+    assert (
+        _current_locator(reading("lesson:info-theory/entropy#" + "a" * 300))
+        == "lesson:info-theory/entropy"
+    )

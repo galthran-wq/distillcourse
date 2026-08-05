@@ -17,7 +17,7 @@ export class ApiError extends Error {
 // touches it.
 export async function call<T>(
   path: string,
-  method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",
   body?: unknown,
 ): Promise<T> {
   const response = await fetch(`${API}${path}`, {
@@ -35,13 +35,19 @@ interface FieldError {
   msg?: string;
 }
 
-async function failure(response: Response): Promise<string> {
-  const payload: unknown = await response.json().catch(() => null);
+// Exported because a chat stream fails through the AI SDK transport instead of
+// through `call`, and it reaches the widget as the response body verbatim.
+export function errorDetail(payload: unknown): string | null {
   const detail = (payload as { detail?: unknown } | null)?.detail;
   if (typeof detail === "string") return detail;
   // A 422 carries `detail` as a list of {loc, msg} instead: without this the
   // form can only show the bare status, naming neither field nor reason.
   const invalid: FieldError | undefined = Array.isArray(detail) ? detail[0] : undefined;
   if (invalid?.msg) return `${String(invalid.loc?.at(-1) ?? "request")}: ${invalid.msg}`;
-  return `request failed (${response.status})`;
+  return null;
+}
+
+async function failure(response: Response): Promise<string> {
+  const payload: unknown = await response.json().catch(() => null);
+  return errorDetail(payload) ?? `request failed (${response.status})`;
 }

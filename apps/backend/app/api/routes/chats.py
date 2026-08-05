@@ -50,9 +50,14 @@ def _current_locator(run_input: RequestData) -> str | None:
     quoted content, so anything that is not a locator is dropped, not fenced.
     """
     locator = (run_input.model_extra or {}).get("currentLocator")
-    if isinstance(locator, str) and locators.LESSON_SECTION.fullmatch(locator):
+    if not isinstance(locator, str):
+        return None
+    if locators.LESSON_SECTION.fullmatch(locator):
         return locator
-    return None
+    # An anchor this pattern will not admit still hangs off a lesson the tutor
+    # should know the reader is on: drop the anchor, not the lesson.
+    lesson = locator.split("#")[0]
+    return lesson if locators.LESSON.fullmatch(lesson) else None
 
 
 async def _owned_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:

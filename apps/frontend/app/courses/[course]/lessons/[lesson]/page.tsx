@@ -11,6 +11,7 @@ import rehypePrettyCode from "rehype-pretty-code";
 import type { MDXComponents } from "mdx/types";
 import DemoHost from "@/components/mdx/DemoHost";
 import LessonTelemetry from "@/components/LessonTelemetry";
+import LessonPosition from "@/components/LessonPosition";
 import LessonToc from "@/components/LessonToc";
 import {
   BookmarkToggle,
@@ -154,6 +155,13 @@ export default async function LessonPage({
       {/* The locator is the index's, so an event names the same place a
           search hit or a tutor citation does. */}
       <LessonTelemetry lesson={key} />
+      {/* Mounted whether or not the lesson has headings: the tutor is told
+          which lesson is on screen even when there is no section to name. */}
+      <LessonPosition
+        course={course.course.slug}
+        lesson={lesson.slug}
+        headings={toc.map((h) => h.id)}
+      />
       <article className="min-w-0">
         {/* Keyed by the lesson: moving to the next one must not show the
             previous one's bookmark while the new state loads. */}

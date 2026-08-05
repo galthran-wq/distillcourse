@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import ThemeToggle from "@/components/ThemeToggle";
+import ChatWidget from "@/components/chat/ChatWidget";
 import UserMenu from "@/components/auth/UserMenu";
 import "./globals.css";
 import "katex/dist/katex.min.css";
@@ -62,6 +63,9 @@ export default function RootLayout({
             distillcourse
           </div>
         </footer>
+        {/* In the layout rather than on the lesson page: the conversation
+            outlives the page it was started on. */}
+        <ChatWidget />
       </body>
     </html>
   );
