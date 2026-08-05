@@ -10,10 +10,18 @@ DUMMY_HASH = get_password_hash("not-a-real-password")
 
 
 async def create_user(
-    session: AsyncSession, *, email: str, password: str, full_name: str | None = None
+    session: AsyncSession,
+    *,
+    email: str,
+    password: str,
+    timezone: str,
+    full_name: str | None = None,
 ) -> User:
     user = User(
-        email=email, hashed_password=get_password_hash(password), full_name=full_name
+        email=email,
+        hashed_password=get_password_hash(password),
+        timezone=timezone,
+        full_name=full_name,
     )
     session.add(user)
     await session.commit()

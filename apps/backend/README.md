@@ -14,17 +14,42 @@ app/
   main.py            # FastAPI app: instrumentation, CORS, router mount
   api/
     main.py          # the router tree
-    deps.py          # SessionDep — one AsyncSession per request
+    deps.py          # SessionDep, CurrentSession, CurrentUser
     routes/health.py # GET /api/v1/health (also the compose healthcheck)
+    routes/auth.py   # signup / login / logout / me / password
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
     db.py            # async engine + session factory
     security.py      # password hashing (argon2, bcrypt kept for verification)
+    sessions.py      # session lifecycle: token, row, cookie, sliding expiry
+    rate_limit.py    # fixed-window limiter for signup and login
     observability.py # logfire: fastapi + sqlalchemy + httpx
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
+  cli.py             # operator commands (reset-password, delete-user)
   alembic/           # migrations; explicit, hand-reviewed, always reversible
   mail/              # SMTP sender + templates — dormant, see below
+```
+
+## Auth
+
+Server-side sessions, not JWT: the browser holds an httpOnly cookie carrying a
+256-bit random token, and the row holds `sha256(token)`. Every request already
+reaches Postgres, revocation is a `DELETE`, and `EventSource` — which cannot
+send an `Authorization` header — authenticates over the same cookie for free.
+
+- Expiry slides: 30 days, refreshed on use at most once a day.
+- Signup requires `INVITE_CODE`. Without billing or email verification, open
+  registration would make the tutor harness a free LLM proxy.
+- `users.timezone` is read from the browser at signup and at every login,
+  because proactive messages are scheduled against the user's own clock.
+- Password reset and email verification do not exist; the operator resets a
+  password from the CLI below.
+
+```bash
+uv run python -m app.cli reset-password someone@example.com   # prompts, then
+                                                              # revokes their sessions
+uv run python -m app.cli delete-user someone@example.com      # sessions cascade
 ```
 
 ## Running
