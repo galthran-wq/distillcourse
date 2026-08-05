@@ -1,13 +1,18 @@
+import asyncio
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
+from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core import sessions
+from app.core.config import settings
+from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import Chat, Message, Schedule, User, UserSession
 from app.scheduling import policy, repository, worker
@@ -320,3 +325,65 @@ async def test_housekeeping_removes_the_sessions_nothing_will_read(
     await worker.housekeep(session)
 
     assert await session.scalar(select(UserSession).limit(1)) is None
+
+
+@pytest.mark.usefixtures("thread")
+async def test_a_run_that_fails_is_tried_again_later(
+    session: AsyncSession, user: User
+) -> None:
+    def refuse(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        raise RuntimeError("openrouter is down")
+
+    row = await due_review(session, user)
+
+    with tutor.override(model=FunctionModel(refuse), tools=[]):
+        await worker.cycle(session, NOON)
+
+    await session.refresh(row)
+    assert row.status == "pending"
+    assert row.attempts == 1
+    assert row.due_at == policy.retry_at(NOON, 1)
+
+
+async def test_a_spent_budget_holds_the_message_rather_than_failing_it(
+    session: AsyncSession, user: User, thread: Chat
+) -> None:
+    row = await due_review(session, user)
+    session.add(
+        Message(
+            chat_id=thread.id,
+            role="agent",
+            pydantic_ai={},
+            projection=[],
+            usage={"cost_usd": settings.MONTHLY_COST_CEILING_USD},
+        )
+    )
+    await session.commit()
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(row)
+    assert row.status == "deferred"
+    assert row.attempts == 0
+    assert row.due_at == policy.tomorrow_open(NOON, UTC_ZONE)
+
+
+async def test_a_failed_cycle_does_not_stop_the_poller(
+    monkeypatch: pytest.MonkeyPatch, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The loop is the process: it has to survive a database that went away."""
+    cycles: list[datetime] = []
+
+    async def one_bad_cycle(_session: AsyncSession, now: datetime) -> None:
+        cycles.append(now)
+        if len(cycles) == 1:
+            raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(worker, "cycle", one_bad_cycle)
+    monkeypatch.setattr(worker, "POLL", timedelta(seconds=0.01))
+    poller = asyncio.create_task(worker.poll(session_factory))
+    await asyncio.sleep(0.05)
+    poller.cancel()
+
+    assert len(cycles) > 1
