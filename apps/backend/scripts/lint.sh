@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-set -e
-set -x
-
-mypy app
-ty check app
-ruff check app
-ruff format app --check
+cd "$(dirname "$0")/.."
+uv run ruff check app tests
+uv run ruff format --check app tests
+uv run mypy app tests

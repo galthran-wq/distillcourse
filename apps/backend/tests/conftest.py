@@ -1,42 +1,47 @@
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
+from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlmodel import Session, delete
+from alembic import command
+from alembic.config import Config
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_session
 from app.core.config import settings
-from app.core.db import engine, init_db
+from app.core.db import engine
 from app.main import app
-from app.models import Item, User
-from tests.utils.user import authentication_token_from_email
-from tests.utils.utils import get_superuser_token_headers
+
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture(scope="session", autouse=True)
-def db() -> Generator[Session]:
-    with Session(engine) as session:
-        init_db(session)
-        yield session
-        statement = delete(Item)
-        session.execute(statement)
-        statement = delete(User)
-        session.execute(statement)
-        session.commit()
+def migrated_database() -> Generator[None]:
+    # The teardown drops every table this project owns, so refuse to point the
+    # suite at anything that could be a development or production database.
+    if not settings.POSTGRES_DB.endswith("_test"):
+        pytest.exit(f"refusing to run against POSTGRES_DB={settings.POSTGRES_DB}")
+    config = Config(BACKEND_ROOT / "alembic.ini")
+    command.upgrade(config, "head")
+    yield
+    command.downgrade(config, "base")
 
 
-@pytest.fixture(scope="module")
-def client() -> Generator[TestClient]:
-    with TestClient(app) as c:
-        yield c
+@pytest.fixture
+async def session() -> AsyncGenerator[AsyncSession]:
+    # Each test runs inside an outer transaction that is rolled back, so
+    # committed writes never leak into the next test.
+    async with engine.connect() as connection:
+        transaction = await connection.begin()
+        async with AsyncSession(bind=connection, expire_on_commit=False) as session:
+            yield session
+        await transaction.rollback()
 
 
-@pytest.fixture(scope="module")
-def superuser_token_headers(client: TestClient) -> dict[str, str]:
-    return get_superuser_token_headers(client)
-
-
-@pytest.fixture(scope="module")
-def normal_user_token_headers(client: TestClient, db: Session) -> dict[str, str]:
-    return authentication_token_from_email(
-        client=client, email=settings.EMAIL_TEST_USER, db=db
-    )
+@pytest.fixture
+async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient]:
+    app.dependency_overrides[get_session] = lambda: session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+    app.dependency_overrides.clear()

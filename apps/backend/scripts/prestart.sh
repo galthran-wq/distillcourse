@@ -1,13 +1,5 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
-set -x
-
-# Let the DB start
-python app/backend_pre_start.py
-
-# Run migrations
+python -m app.backend_pre_start
 alembic upgrade head
-
-# Create initial data in DB
-python app/initial_data.py
