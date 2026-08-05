@@ -30,6 +30,9 @@ export default function UserMenu() {
       <Link href="/profile" className="text-[13px] text-soft hover:text-accent">
         Profile
       </Link>
+      <Link href="/settings" className="text-[13px] text-soft hover:text-accent">
+        Settings
+      </Link>
       <span className="font-mono text-[11px] text-faint">{auth.user.email}</span>
       <button
         type="button"
