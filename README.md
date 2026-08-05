@@ -102,6 +102,7 @@ npm run image -- check <file>               # sourced-image toolkit: verify,
                                             # fetch, PDF-extract, crop, fit
 npm run preview -- <course> <lesson>        # render a chapter, both themes
 npm run sync-assets  # copy lesson raster figures into the frontend's public/
+npm run export-index # write the search index the backend ingests (index.json)
 npm run build      # production build
 ```
 

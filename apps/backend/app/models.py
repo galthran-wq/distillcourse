@@ -2,8 +2,17 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, Text, func
-from sqlalchemy.dialects.postgresql import CITEXT, JSONB
+from sqlalchemy import (
+    Computed,
+    DateTime,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    String,
+    Text,
+    func,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -88,3 +97,37 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+# Title over body, and the config is spelled out: a generated column may only
+# call immutable functions, which to_tsvector is exactly when given one.
+DOCUMENT_TSV = (
+    "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+    "setweight(to_tsvector('english', coalesce(text, '')), 'B')"
+)
+
+
+class Document(Base):
+    """One chunk of indexed content — the harness's only route to the corpus.
+
+    Rows are written by `app.content.ingest` from the frontend's export and
+    are otherwise read-only; `locator` (`<corpus>:<path>[#<anchor>]`) is the
+    identity a consumer quotes back.
+    """
+
+    __tablename__ = "documents"
+    __table_args__ = (Index("ix_documents_tsv", "tsv", postgresql_using="gin"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    corpus: Mapped[str] = mapped_column(String(16), index=True)
+    course_slug: Mapped[str | None] = mapped_column(String(64), index=True)
+    locator: Mapped[str] = mapped_column(String(512), unique=True)
+    title: Mapped[str] = mapped_column(Text)
+    breadcrumb: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)
+    anchors: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    position: Mapped[int]
+    # `metadata` is taken by Declarative, so the attribute is `meta`.
+    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    tsv: Mapped[str] = mapped_column(TSVECTOR, Computed(DOCUMENT_TSV, persisted=True))

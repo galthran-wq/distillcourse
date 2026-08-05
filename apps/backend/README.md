@@ -36,6 +36,7 @@ app/
     observability.py # logfire: fastapi + sqlalchemy + httpx
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
+  content/           # the indexed corpus: ingest CLI + tier-1 FTS search
   cli.py             # operator commands (reset-password, delete-user)
   alembic/           # migrations; explicit, hand-reviewed, always reversible
   mail/              # SMTP sender + templates — dormant, see below
@@ -129,6 +130,29 @@ instance-wide monthly ceiling computed from the cost recorded on every run.
 Set a spend limit on the OpenRouter key too — that one holds even if this code
 is wrong. The per-user web search cap belongs to the search tool that spends
 it and lands with it.
+
+## The content index
+
+`documents` is the only route from the service to the courses: which files
+exist and where they live is unknown here. Rows arrive from the frontend's
+`npm run export-index`, which chunks lessons through the site's own MDX
+pipeline, and are written by
+
+```bash
+python -m app.content.ingest <index.json>     # `make reindex` from the root
+```
+
+Ingest is a hash-based upsert: re-running it on an unchanged export writes
+nothing, and a chunk the export no longer lists is deleted, so a locator can
+never outlive the passage it names. It refuses an empty index rather than
+emptying the table, and leaves corpora the file does not mention alone.
+
+Search is tier 1: a generated `tsvector` (title weight A, body B), a GIN
+index, `websearch_to_tsquery` and `ts_rank_cd`. No idf, deliberately — the
+corpus is hundreds of chunks and the consumer is an agent that reformulates
+its query, so recall matters more than the order of the top few. If that
+stops being good enough, the next step is a BM25 rerank of the top 50 in
+memory, and only then a vector tier.
 
 ## Dormant mail
 

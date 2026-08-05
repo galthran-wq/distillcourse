@@ -1,7 +1,8 @@
 # Deployment
 
 One VPS, one operator, `docker compose`. There is no CD: nothing deploys
-itself, and `make deploy` is the whole procedure.
+itself. `make deploy` is the whole procedure, plus `make reindex` when the
+content changed.
 
 ## Topology
 
@@ -42,7 +43,19 @@ startup rather than silently accepted.
 
 ```bash
 make deploy      # git pull --ff-only, build, migrate, restart, show status
+make reindex     # content changed: rebuild the search index the tutor reads
 ```
+
+`make reindex` exports `index.json` from the content tree and feeds it to the
+backend's ingest CLI. It is separate from `make deploy` because it needs Node
+on the box, not just Docker: the export runs the site's own MDX pipeline, the
+only way an indexed anchor and a page anchor cannot diverge. Set
+`CONTENT_PREVIEW` to whatever the frontend image was built with, or the index
+and the site will disagree about which lessons exist.
+
+The export is the complete index, and ingest deletes every row of the corpora
+it mentions that the file no longer lists — that is how a renamed heading or a
+deleted lesson stops being a search result the tutor can quote.
 
 ## Accounts
 
