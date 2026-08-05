@@ -7,6 +7,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content.locators import SLUG_PATTERN
 from app.models import MEMORY_SLUG_LENGTH, Memory
 
 Source = Literal["agent", "user"]
@@ -19,10 +20,7 @@ Source = Literal["agent", "user"]
 DESCRIPTION_LENGTH = 160
 CONTENT_LENGTH = 2000
 
-Slug = Annotated[
-    str,
-    Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=MEMORY_SLUG_LENGTH),
-]
+Slug = Annotated[str, Field(pattern=SLUG_PATTERN, max_length=MEMORY_SLUG_LENGTH)]
 Description = Annotated[str, Field(min_length=1, max_length=DESCRIPTION_LENGTH)]
 Content = Annotated[str, Field(min_length=1, max_length=CONTENT_LENGTH)]
 

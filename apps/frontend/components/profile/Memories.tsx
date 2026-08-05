@@ -2,22 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { FIELD_CLASS } from "@/components/ui/field";
+import { CONTROL_CLASS, FIELD_CLASS } from "@/components/ui/field";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
+import { day } from "@/lib/day";
 import { editMemory, forgetMemory, getMemories, type Memory } from "@/lib/memories/api";
 
-const CONTROL = "font-mono text-[11px] tracking-wide transition-colors";
-
-function day(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function Row({
+export function MemoryRow({
   memory,
   onEdited,
   onForgotten,
@@ -38,7 +29,16 @@ function Row({
     setFailure(null);
     try {
       await editMemory(memory.slug, description, content);
-      onEdited({ ...memory, description, content, source: "user" });
+      // The row carries the moment of the write it just made: the line reads
+      // "edited by you" beside the date, and the tutor's original date under
+      // that wording is a claim the page would be making up.
+      onEdited({
+        ...memory,
+        description,
+        content,
+        source: "user",
+        updated_at: new Date().toISOString(),
+      });
     } catch {
       setFailure("could not save that");
     }
@@ -85,19 +85,19 @@ function Row({
           type="button"
           onClick={save}
           disabled={!edited}
-          className={`${CONTROL} text-faint hover:text-accent disabled:opacity-40 disabled:hover:text-faint`}
+          className={`${CONTROL_CLASS} text-faint hover:text-accent disabled:opacity-40 disabled:hover:text-faint`}
         >
           save
         </button>
         <button
           type="button"
           onClick={forget}
-          className={`${CONTROL} text-faint hover:text-accent`}
+          className={`${CONTROL_CLASS} text-faint hover:text-accent`}
         >
           forget this
         </button>
         {failure !== null && (
-          <span role="alert" className={`${CONTROL} text-accent`}>
+          <span role="alert" className={`${CONTROL_CLASS} text-accent`}>
             {failure}
           </span>
         )}
@@ -134,7 +134,7 @@ export default function Memories() {
   return (
     <ul className="mt-6">
       {memories.map((memory) => (
-        <Row
+        <MemoryRow
           key={memory.slug}
           memory={memory}
           onEdited={(edited) =>

@@ -1,3 +1,5 @@
+from pydantic_ai.toolsets import FunctionToolset
+
 from app.core.config import settings
 from app.harness import runner
 from app.harness.agent import tutor
@@ -6,6 +8,20 @@ from app.memory import repository
 from app.models import Chat
 from tests.harness.conftest import calling
 from tests.memory.conftest import GOAL, NOTATION, saving
+
+
+def test_the_memory_tools_never_overlap_on_the_run_session() -> None:
+    """All three drive the run's one AsyncSession, which two coroutines may not
+    share. The tool calls of a single model response are concurrent tasks
+    unless a tool declares itself a barrier, and a response that reads a memory
+    and saves one is ordinary."""
+    toolset = tutor.toolsets[0]
+    assert isinstance(toolset, FunctionToolset)
+
+    assert [
+        toolset.tools[name].sequential
+        for name in ("read_memory", "save_memory", "delete_memory")
+    ] == [True, True, True]
 
 
 async def test_a_fact_from_the_dialogue_is_remembered(

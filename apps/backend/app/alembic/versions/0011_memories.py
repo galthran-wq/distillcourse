@@ -1,6 +1,6 @@
 """the tutor's memory of a learner
 
-Revision ID: 0009
+Revision ID: 0011
 Revises: 0008
 Create Date: 2026-08-05
 
@@ -9,7 +9,10 @@ Create Date: 2026-08-05
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0009"
+# 0009 and 0010 belong to migrations written in parallel with this one. A
+# revision id is never reused, so the gap stays: two files claiming one id do
+# not conflict in git and surface only as a duplicate revision at upgrade.
+revision = "0011"
 down_revision = "0008"
 branch_labels = None
 depends_on = None

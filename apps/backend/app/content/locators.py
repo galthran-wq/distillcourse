@@ -6,6 +6,13 @@ import re
 SLUG_LENGTH = 80
 SLUG = rf"[a-z0-9-]{{1,{SLUG_LENGTH}}}"
 
+# Kebab-case, anchored: the shape anything a client or a model *writes* must
+# have, as opposed to SLUG above, which matches a segment of an already-stored
+# locator inside a larger pattern. Every route path parameter and every tool
+# argument that takes a slug is this one expression, so the grammar cannot
+# drift between the two ends of the same value.
+SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+
 # An anchor is not a slug: it is whatever the site's rehype-slug wrote for a
 # heading, so it keeps the alphabet that heading was written in and is longer
 # than a slug is allowed to be — the same reason a telemetry target is matched

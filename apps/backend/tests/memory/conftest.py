@@ -1,4 +1,6 @@
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+from typing import Any
+
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from app.memory.repository import Recollection
@@ -38,6 +40,41 @@ def saving(times: int) -> FunctionModel:
             )
         return ModelResponse(
             parts=[TextPart(content=str(returns(messages, "save_memory")[-1]))]
+        )
+
+    return FunctionModel(turn)
+
+
+def compacting_and_saving(
+    summary: str, writes: int, *memories: dict[str, Any]
+) -> FunctionModel:
+    """A compaction that writes the profile by both routes at once: that many
+    `save_memory` calls, and then the candidates it returns with the summary.
+
+    The tool calls are held back until the run that asks for structured output,
+    so the same override answers the dialogue turn these tests compact.
+    """
+    saved = 0
+
+    def turn(_messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        nonlocal saved
+        if not info.output_tools:
+            return ModelResponse(parts=[TextPart(content=summary)])
+        if saved < writes:
+            saved += 1
+            return call(
+                "save_memory",
+                slug=f"tool-{saved}",
+                description=f"the {saved}th thing worth knowing",
+                content=f"fact number {saved}",
+            )
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name=info.output_tools[0].name,
+                    args={"summary": summary, "memories": list(memories)},
+                )
+            ]
         )
 
     return FunctionModel(turn)

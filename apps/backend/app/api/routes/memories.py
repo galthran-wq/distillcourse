@@ -5,15 +5,14 @@ from fastapi import APIRouter, HTTPException, Path, status
 from pydantic import BaseModel, ConfigDict
 
 from app.api.deps import CurrentUser, SessionDep
+from app.content.locators import SLUG_PATTERN
 from app.memory import repository
-from app.memory.repository import Content, Description
+from app.memory.repository import Content, Description, Source
 from app.models import MEMORY_SLUG_LENGTH
 
 router = APIRouter(prefix="/memories", tags=["memories"])
 
-MemorySlug = Annotated[
-    str, Path(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=MEMORY_SLUG_LENGTH)
-]
+MemorySlug = Annotated[str, Path(pattern=SLUG_PATTERN, max_length=MEMORY_SLUG_LENGTH)]
 
 
 class MemoryOut(BaseModel):
@@ -22,7 +21,7 @@ class MemoryOut(BaseModel):
     slug: str
     description: str
     content: str
-    source: str
+    source: Source
     updated_at: datetime
 
 

@@ -32,6 +32,26 @@ async def test_a_fact_saved_in_web_chat_reaches_a_telegram_run(
     assert GOAL.content not in prompt
 
 
+async def test_a_memory_the_learner_corrected_says_so_in_the_index(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """The index is the only place a run could learn which lines were rewritten
+    by hand, and saving that slug again puts the tutor's wording back."""
+    await repository.save(repo.session, repo.user_id, GOAL, source="agent")
+    await repository.edit(
+        repo.session,
+        repo.user_id,
+        GOAL.slug,
+        description="the interview is in October",
+        content="Not six weeks; October.",
+    )
+
+    with tutor.override(model=echoing()):
+        prompt = await runner.run(repo, chat, "what were we doing?")
+
+    assert f"- `{GOAL.slug}` (the learner corrected this):" in prompt
+
+
 async def test_a_profile_past_the_soft_cap_is_told_to_consolidate(
     repo: HarnessRepository, chat: Chat
 ) -> None:

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, Tool
 from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
@@ -26,9 +26,14 @@ tutor = Agent(
         mute_proactive,
         unmute_proactive,
         send_message,
-        read_memory,
-        save_memory,
-        delete_memory,
+        # Barriers: the tool calls of one model response run as concurrent
+        # tasks, and these three drive the run's single AsyncSession, which is
+        # not safe to use from two coroutines at once. A response that both
+        # reads a memory and saves one is ordinary, so the overlap is not a
+        # corner case.
+        Tool(read_memory, sequential=True),
+        Tool(save_memory, sequential=True),
+        Tool(delete_memory, sequential=True),
     ],
 )
 

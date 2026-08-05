@@ -4,15 +4,8 @@ import Link from "next/link";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import type { LessonLink } from "@/lib/content/site";
+import { day } from "@/lib/day";
 import { getProfile } from "@/lib/lessons/api";
-
-function day(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function Row({ link, lesson, note }: { link?: LessonLink; lesson: string; note: string }) {
   return (

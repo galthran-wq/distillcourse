@@ -20,9 +20,8 @@ from app.content.structure import CourseStructure, structure
 from app.harness import web_search as web
 from app.harness.agent import tutor
 from app.harness.deps import HarnessDeps
-from app.harness.limits import LimitExceeded, check_web_search_allowed
+from app.harness.limits import LimitExceeded, spend_web_search
 from app.harness.prompts import untrusted
-from app.harness.usage import WEB_SEARCH_CALLS
 
 Corpus = Literal["lesson", "research", "concept"]
 IncidentKind = Literal["error", "unclear", "other"]
@@ -198,12 +197,9 @@ async def web_search(ctx: RunContext[HarnessDeps], query: str) -> str:
         query: the search query.
     """
     try:
-        await check_web_search_allowed(ctx.deps.repo, ctx.usage)
+        await spend_web_search(ctx.deps.repo, ctx.usage)
     except LimitExceeded as exc:
-        raise ToolFailed(str(exc))
-    # Counted on the attempt, not on the answer: a provider that fails must not
-    # turn into an unbounded retry loop against the cap.
-    ctx.usage.details[WEB_SEARCH_CALLS] = ctx.usage.details.get(WEB_SEARCH_CALLS, 0) + 1
+        raise ToolFailed(str(exc)) from exc
     try:
         answer = await web.ask(query)
     except web.WebSearchUnavailable as exc:

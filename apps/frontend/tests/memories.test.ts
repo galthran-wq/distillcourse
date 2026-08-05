@@ -1,25 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { editMemory, forgetMemory, getMemories } from "@/lib/memories/api";
-
-function stubFetch(body: unknown = null): ReturnType<typeof vi.fn> {
-  const fetch = vi.fn(
-    async () =>
-      new Response(body === null ? null : JSON.stringify(body), {
-        status: body === null ? 204 : 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-  );
-  vi.stubGlobal("fetch", fetch);
-  return fetch;
-}
-
-function requestOf(fetch: ReturnType<typeof vi.fn>): [string, RequestInit] {
-  return fetch.mock.calls[0] as unknown as [string, RequestInit];
-}
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+import { requestOf, stubFetch } from "./utils/fetch";
 
 const REMEMBERED = {
   slug: "goal-information-theory",

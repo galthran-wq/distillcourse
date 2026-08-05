@@ -1,17 +1,16 @@
 from pydantic_ai import RunContext, ToolFailed
 
 from app.harness.deps import HarnessDeps
-from app.harness.limits import MEMORY_WRITES, LimitExceeded, check_memory_write_allowed
+from app.harness.limits import LimitExceeded, spend_memory_write
 from app.memory import repository
 from app.memory.repository import Content, Description, Recollection, Slug
 
 
 def _spend_write(ctx: RunContext[HarnessDeps]) -> None:
     try:
-        check_memory_write_allowed(ctx.usage)
+        spend_memory_write(ctx.usage)
     except LimitExceeded as exc:
-        raise ToolFailed(str(exc))
-    ctx.usage.details[MEMORY_WRITES] = ctx.usage.details.get(MEMORY_WRITES, 0) + 1
+        raise ToolFailed(str(exc)) from exc
 
 
 async def read_memory(ctx: RunContext[HarnessDeps], slugs: list[str]) -> dict[str, str]:
@@ -61,7 +60,7 @@ async def save_memory(
     return f"remembered as {slug}"
 
 
-async def delete_memory(ctx: RunContext[HarnessDeps], slug: str) -> str:
+async def delete_memory(ctx: RunContext[HarnessDeps], slug: Slug) -> str:
     """Forget a memory that no longer holds or has been merged into another.
 
     Counts against the same per-run cap as saving.
