@@ -3,11 +3,13 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    CheckConstraint,
     Computed,
     DateTime,
     ForeignKey,
     Index,
     LargeBinary,
+    SmallInteger,
     String,
     Text,
     func,
@@ -187,3 +189,68 @@ class Document(Base):
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB)
     content_hash: Mapped[str] = mapped_column(String(64))
     tsv: Mapped[str] = mapped_column(TSVECTOR, Computed(DOCUMENT_TSV, persisted=True))
+
+
+# Everything a user does to a lesson is keyed by "<course-slug>/<lesson-slug>":
+# the path half of the content index's `lesson:` locator, so user state and the
+# corpus name the same places without either owning the other's table.
+SLUG_MAX_LENGTH = 80
+LESSON_KEY_MAX_LENGTH = 2 * SLUG_MAX_LENGTH + 1
+
+
+class LessonProgress(Base):
+    """Reading aggregate per (user, lesson), derived from telemetry events.
+
+    Telemetry ingest owns the writes; the visit history is the only reader, and
+    it exposes the timestamps rather than the counters — a reader is shown
+    where they have been, never the measurements taken while they read.
+    """
+
+    __tablename__ = "lesson_progress"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_KEY_MAX_LENGTH), primary_key=True)
+    active_seconds: Mapped[int] = mapped_column(server_default="0")
+    max_scroll_pct: Mapped[int] = mapped_column(server_default="0")
+    proofs_opened: Mapped[int] = mapped_column(server_default="0")
+    solutions_opened: Mapped[int] = mapped_column(server_default="0")
+    demos_touched: Mapped[int] = mapped_column(server_default="0")
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class LessonRating(Base):
+    __tablename__ = "lesson_ratings"
+    # The API rejects anything else already; the constraint is what keeps the
+    # column readable as a sum for the curator, who queries it in psql.
+    __table_args__ = (CheckConstraint("value IN (-1, 1)", name="ck_rating_value"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_KEY_MAX_LENGTH), primary_key=True)
+    value: Mapped[int] = mapped_column(SmallInteger)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Bookmark(Base):
+    __tablename__ = "bookmarks"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_KEY_MAX_LENGTH), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
