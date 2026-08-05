@@ -3,7 +3,7 @@
 Every piece of content in this project is generated under these rules. They are
 not style preferences; each one is backed by learning-science evidence
 (summarized at the bottom). Skills MUST treat the numbered rules as checkable
-requirements — `lib/content/lint.ts` enforces the mechanical ones, `/course-qa`
+requirements — `apps/frontend/lib/content/lint.ts` enforces the mechanical ones, `/course-qa`
 audits the judgment ones. The mechanics behind the rules live in the playbook
 stack: `docs/playbook-core.md` (universal invariants), `docs/voita-playbook.md`
 (exposition layer), and the domain overlays `docs/playbook-math.md` /

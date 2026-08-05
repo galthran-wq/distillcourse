@@ -10,6 +10,20 @@ constitution; the playbook stack holds the mechanics behind it —
 (exposition layer), `docs/playbook-math.md` / `docs/playbook-history.md`
 (domain overlays).
 
+## Repo layout
+
+```
+content/          # THE curation surface — courses, lessons, figures (see below)
+apps/frontend/    # the Next site: app/ components/ lib/ public/ scripts/ tests/
+apps/backend/     # the FastAPI backend + tutor harness (#6 onwards)
+docs/ .claude/    # the constitution and the authoring skills/workflows
+```
+
+`content/` sits at the root rather than inside the frontend because it is what
+the human curates and what the content factory writes; the site is one consumer
+of it. The root `package.json` proxies the everyday scripts into
+`apps/frontend`, so every command below runs from the repo root.
+
 ## How content works
 
 ```
@@ -39,9 +53,9 @@ content/courses/<course>/
 - Lesson status flow: `planned → drafted → reviewed → published`. Skills may
   only set `drafted`; `reviewed`/`published` are manual human sign-offs.
 - **Visibility:** production renders `published` only. Dev — and any build
-  with `CONTENT_PREVIEW=1` (the Docker staging default, see Dockerfile) —
-  renders `drafted` and `reviewed` too, so drafts are reviewed in the real
-  site before any status flip.
+  with `CONTENT_PREVIEW=1` (the Docker staging default, see
+  `apps/frontend/Dockerfile`) — renders `drafted` and `reviewed` too, so
+  drafts are reviewed in the real site before any status flip.
 - `npm run validate` gates every build (Docker runs validate && build).
 
 ## Authoring: the course factory (primary path)
@@ -75,24 +89,34 @@ invocable directly for one-off writing or revision.
 ## Development
 
 ```bash
+npm run install:frontend   # first time only: installs apps/frontend/node_modules
 npm run dev        # dev server (renders drafted + reviewed + published)
 npm run validate   # schema + shell lint over all content
 npm test           # vitest
-npm run figure -- <Name> [frame] [--dark]   # render a component figure to .preview/
+npm run lint       # eslint over the frontend
+npm run typecheck  # tsc --noEmit
+npm run figure -- <Name> [frame] [--dark]   # render a component figure
 npm run image -- check <file>               # sourced-image toolkit: verify,
                                             # fetch, PDF-extract, crop, fit
-npm run preview -- <course> <lesson>        # render a chapter (both themes) to
-                                            # .preview/ and screenshot it
-npm run sync-assets  # copy lesson raster figures into public/course-assets
+npm run preview -- <course> <lesson>        # render a chapter, both themes
+npm run sync-assets  # copy lesson raster figures into the frontend's public/
 npm run build      # production build
 ```
+
+Rendered previews (`figure`, `preview`) land in `apps/frontend/.preview/`.
+
+The frontend finds `content/` by climbing out of `apps/frontend`, so it must
+be built with that as the working directory (what the root `npm run build`
+does). A host that builds from somewhere else fails the build with an
+explicit message; point it at the tree with `CONTENT_ROOT=/abs/path/content`.
 
 Sourced images (photographs, scans, published plots) need `poppler-utils`
 and `imagemagick` for extraction and resizing; `npm run validate` itself
 stays dependency-free.
 
-Key code: `lib/content/schema.ts` (Zod schemas — normative),
-`lib/content/lint.ts` (shell rules), `docs/content-model.md` (schema guide),
+Key code (all under `apps/frontend/`): `lib/content/schema.ts` (Zod schemas —
+normative), `lib/content/lint.ts` (shell rules). Guides:
+`docs/content-model.md` (schema guide),
 `docs/components.md` (MDX vocabulary), `docs/figures.md` +
 `docs/voita-playbook.md` (figure and structure mechanics),
 `docs/playbook-core.md` + domain overlays (argument and evidence mechanics).

@@ -23,13 +23,13 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, join, relative } from "node:path";
 import { parse } from "yaml";
 import { isRasterFile } from "../lib/content/images";
+import { appRoot, contentRoot, repoRoot } from "./paths";
 
-const repoRoot = resolve(__dirname, "..");
-const coursesRoot = join(repoRoot, "content", "courses");
-const publicRoot = join(repoRoot, "public", "course-assets");
+const coursesRoot = join(contentRoot, "courses");
+const publicRoot = join(appRoot, "public", "course-assets");
 
 function dirs(path: string): string[] {
   if (!existsSync(path)) return [];

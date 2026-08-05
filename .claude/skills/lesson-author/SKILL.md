@@ -191,8 +191,8 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
 
 - Touch only: this lesson's directory + the one status field in course.yaml
   + component figures authored by following /figure-artist (new
-  `components/figures/<course>/*.tsx` files and their registry entries in
-  `components/figures/index.ts`). Everything else stays forbidden.
+  `apps/frontend/components/figures/<course>/*.tsx` files and their registry entries in
+  `apps/frontend/components/figures/index.ts`). Everything else stays forbidden.
 - Never restructure the syllabus, rename slugs, or edit other lessons.
 - Never fabricate references — cite only sources you can verify exist.
 - If the goal/key_ideas seem wrong while writing, STOP and report — the

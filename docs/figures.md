@@ -8,11 +8,11 @@ and always ships with its provenance. Three tiers:
 
 - **Component figures** (default for anything with formulas, running
   sentences, labeled pipelines, comparisons): pure React components in
-  `components/figures/` — HTML/flex layout for text, KaTeX (`<M>`) for math,
+  `apps/frontend/components/figures/` — HTML/flex layout for text, KaTeX (`<M>`) for math,
   inline SVG for graphics, `palette.ts` constants, NO Tailwind. Registered
-  in `components/figures/index.ts`, embedded via `<Figure name="…"/>`,
+  in `apps/frontend/components/figures/index.ts`, embedded via `<Figure name="…"/>`,
   verified with `npm run figure -- <Name>` + looking at the PNG. Gold
-  example: `components/figures/examples/W2vOneStep.tsx`. Composition rules:
+  example: `apps/frontend/components/figures/examples/W2vOneStep.tsx`. Composition rules:
   `docs/voita-playbook.md`.
 - **Raw SVG figures** (simple plots and diagrams with few short labels):
   the rules below. /figure-artist is the skill for both.
@@ -118,22 +118,22 @@ house-style drawing of the same idea.
   complete, non-blank image of the format it claims; looking at it is what
   proves it is the right image, and that step is not optional.
   `npm run preview -- <course> <lesson>` renders the whole chapter to
-  `.preview/` in both themes — the loop for judging a figure in place
+  `apps/frontend/.preview/` in both themes — the loop for judging a figure in place
   (text wrap, credit line, carousel) without a dev server.
 - **Both themes.** Line art with a white or transparent background needs
   `background: light` in credits.yaml, which renders it on a light card.
 - **Edits.** Cropping, trimming margins, resizing and flattening
   transparency only (`npm run image -- crop|fit`). Removing a curve, an axis
   or a label from a published plot is falsification.
-- **Serving.** `scripts/sync-assets.ts` copies the files into
-  `public/course-assets/<course>/<lesson>/` at `predev`/`prebuild`/
+- **Serving.** `apps/frontend/scripts/sync-assets.ts` copies the files into
+  `apps/frontend/public/course-assets/<course>/<lesson>/` at `predev`/`prebuild`/
   `prevalidate`; run `npm run sync-assets` by hand when a dev server is
   already up. The copy is git-ignored — the content tree stays the source of
   truth.
 
 ## Worked references
 
-- Component figure (gold): `components/figures/examples/W2vOneStep.tsx` —
+- Component figure (gold): `apps/frontend/components/figures/examples/W2vOneStep.tsx` —
   aligned grid composition, KaTeX with role-bound colors, SVG matrix graphic,
   step badges reused in the loss formula.
 - Raw SVG: `content/courses/information-theory/lessons/what-is-surprise/figures/rarity.svg`

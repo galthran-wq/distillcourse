@@ -10,7 +10,7 @@
  * the ESM-only @mdx-js/mdx (whose dep estree-walker exports no `require`
  * condition), and the extra condition lets tsx's CJS transform resolve it.
  */
-import { basename, join, relative, resolve } from "node:path";
+import { basename, join, relative } from "node:path";
 import { existsSync } from "node:fs";
 import {
   ContentError,
@@ -19,9 +19,8 @@ import {
   loadCourse,
 } from "../lib/content/load";
 import { lintCourse, type Diagnostic } from "../lib/content/lint";
+import { appRoot, contentRoot, repoRoot } from "./paths";
 
-const repoRoot = resolve(__dirname, "..");
-const contentRoot = join(repoRoot, "content");
 const [courseArg, lessonArg] = process.argv.slice(2);
 
 function report(diags: Diagnostic[]): { errors: number; warns: number } {
@@ -60,7 +59,7 @@ for (const dir of courseDirs) {
   try {
     const loaded = loadCourse(dir);
     diags = lintCourse(loaded, {
-      repoRoot,
+      appRoot,
       lessonDirsOnDisk: listLessonDirs(dir),
       allCourseSlugs: listCourseDirs(contentRoot).map((d) => basename(d)),
     });

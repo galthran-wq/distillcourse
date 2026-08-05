@@ -1,8 +1,8 @@
 # MDX component vocabulary
 
 The contract between lesson content and the site. Components live in
-`components/mdx/` (mapped in the lesson page); demos live in
-`components/demos/<course>/` (registered in `components/demos/index.ts`).
+`apps/frontend/components/mdx/` (mapped in the lesson page); demos live in
+`apps/frontend/components/demos/<course>/` (registered in `apps/frontend/components/demos/index.ts`).
 Lesson MDX may use ONLY these components — the validator errors on anything
 else. Lesson prose is otherwise free-form markdown + KaTeX math; the page
 renders a right-hand table of contents from `##`/`###` headings
@@ -60,7 +60,7 @@ Static visual, three tiers (docs/figures.md): `src` = a file relative to the
 lesson directory — a raw SVG (inlined, `currentColor` themes) or a sourced
 raster image (`.png/.jpg/.jpeg/.webp/.gif`, credited in
 `figures/credits.yaml`, cut and credited via /figure-artist); `name` = a component
-figure registered in `components/figures/index.ts` (HTML + KaTeX + SVG, for
+figure registered in `apps/frontend/components/figures/index.ts` (HTML + KaTeX + SVG, for
 math/text-rich figures — authored via /figure-artist). Exactly one of
 `src`/`name`. `float` sets the figure beside the prose (`width="s"` ≈ 260px,
 `"m"` ≈ 380px). Labels belong inside the figure (L6); a sourced image's

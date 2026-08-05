@@ -1,9 +1,9 @@
 # Content model
 
 Human-readable guide to the content schema. The normative source is
-`lib/content/schema.ts` (Zod) — if this document and the code disagree, the
+`apps/frontend/lib/content/schema.ts` (Zod) — if this document and the code disagree, the
 code wins and this file needs fixing. Cross-file rules are enforced by
-`lib/content/lint.ts` via `npm run validate`.
+`apps/frontend/lib/content/lint.ts` via `npm run validate`.
 
 ## Layout
 
@@ -100,8 +100,8 @@ images:
 
 Rendered as an "Image credits" list at the end of the lesson's
 `<References>` — one entry per line, linked to the source page. The image
-bytes stay in the content tree; `scripts/sync-assets.ts` copies them into
-`public/course-assets/<course>/<lesson>/` at `predev`/`prebuild`/`prevalidate`
+bytes stay in the content tree; `apps/frontend/scripts/sync-assets.ts` copies them into
+`apps/frontend/public/course-assets/<course>/<lesson>/` at `predev`/`prebuild`/`prevalidate`
 (the copy is git-ignored).
 
 ## lesson.mdx
