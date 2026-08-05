@@ -7,10 +7,18 @@ layout and the authoring loop, and `docs/pedagogy.md` before writing ANY lesson
 content — it is the constitution for all content generation.
 
 Monorepo: `content/` and `docs/` at the root, the Next site in
-`apps/frontend/`, the FastAPI backend in `apps/backend/`. The root
-`package.json` proxies `npm run dev|build|test|validate|figure|preview|image`
+`apps/frontend/`, the FastAPI backend in `apps/backend/`, deployment in
+`compose.yml` + `ops/` + `Makefile`. The root `package.json` proxies
+`npm run dev|build|test|validate|figure|preview|image|generate-client`
 into the frontend — run them from the repo root, with paths written from the
 repo root.
+
+Backend work: Python 3.14 + uv, async everywhere (`AsyncSession`, async
+routes), SQLAlchemy 2.0 typed models — never SQLModel, never a sync session.
+`./apps/backend/scripts/lint.sh` (ruff + mypy strict) and
+`./apps/backend/scripts/test.sh` must pass before reporting done; both are
+what CI runs. Migrations are explicit and always reversible — autogenerate is
+a draft to rewrite, never the artefact. `apps/backend/README.md` is the guide.
 
 Rules that override defaults:
 
