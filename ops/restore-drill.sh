@@ -32,19 +32,18 @@ docker exec "$CONTAINER" pg_isready -U postgres >/dev/null
 docker exec "$CONTAINER" createdb -U postgres "$TARGET_DB"
 gunzip -c "$DUMP" | docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -q -o /dev/null -U postgres -d "$TARGET_DB"
 
-TABLES=$(docker exec "$CONTAINER" psql -U postgres -d "$TARGET_DB" -tAc \
-	"SELECT string_agg(tablename, ',' ORDER BY tablename) FROM pg_tables WHERE schemaname = 'public'")
-echo "restored tables: $TABLES"
+query() { docker exec "$CONTAINER" psql -U postgres -d "$TARGET_DB" -tAc "$1"; }
 
-for required in alembic_version users; do
-	case ",$TABLES," in
-	*",$required,"*) ;;
-	*)
-		echo "restore drill FAILED: table '$required' missing" >&2
-		exit 1
-		;;
-	esac
-done
+if [ "$(query "SELECT to_regclass('public.users') IS NOT NULL AND to_regclass('public.alembic_version') IS NOT NULL")" != t ]; then
+	echo "restore drill FAILED: 'users' or 'alembic_version' missing" >&2
+	exit 1
+fi
 
-REVISION=$(docker exec "$CONTAINER" psql -U postgres -d "$TARGET_DB" -tAc "SELECT version_num FROM alembic_version")
+# An empty alembic_version restores without error and means the dump carries no
+# migration history, so assert the row rather than reporting whatever came back.
+REVISION=$(query "SELECT version_num FROM alembic_version")
+if [ -z "$REVISION" ]; then
+	echo "restore drill FAILED: alembic_version is empty" >&2
+	exit 1
+fi
 echo "restore drill OK: schema at migration $REVISION"

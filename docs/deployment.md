@@ -63,7 +63,9 @@ make restore-drill   # restore the newest dump into a throwaway Postgres
 volume and fails unless `users` and `alembic_version` come back. Run it after
 any change to the backup configuration — an untested backup is not a backup.
 
-Real recovery is the same restore aimed at the live database:
+Real recovery is the same restore aimed at the live database. The dump is taken
+with `--clean --if-exists`, so it drops each object before recreating it and can
+be piped straight into a database that already has a schema:
 
 ```bash
 docker compose stop backend
