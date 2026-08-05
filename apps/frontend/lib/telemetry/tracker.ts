@@ -10,6 +10,10 @@ export const HEARTBEAT_SECONDS = 10;
 export const IDLE_MS = 60_000;
 export const FLUSH_AT_EVENTS = 20;
 export const SCROLL_MARKS = [25, 50, 75, 90, 100];
+// Mirrors the bound in app/telemetry/schemas.py: a referrer longer than this
+// would cost the whole event, and where the reader came from is worth less
+// than knowing they arrived.
+export const MAX_REFERRER = 200;
 
 export type ToggleKind = "proof" | "solution" | "aside";
 
@@ -52,7 +56,10 @@ export class ReadingTracker {
   }
 
   opened(referrer?: string): void {
-    this.push("lesson_opened", referrer === undefined ? {} : { referrer });
+    this.push(
+      "lesson_opened",
+      referrer === undefined ? {} : { referrer: referrer.slice(0, MAX_REFERRER) },
+    );
   }
 
   activity(): void {

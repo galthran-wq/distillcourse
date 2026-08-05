@@ -3,6 +3,7 @@ import {
   FLUSH_AT_EVENTS,
   HEARTBEAT_SECONDS,
   IDLE_MS,
+  MAX_REFERRER,
   ReadingTracker,
   type EventBatch,
 } from "@/lib/telemetry/tracker";
@@ -51,6 +52,15 @@ describe("the reading tracker", () => {
     expect(batch.events[0].type).toBe("lesson_opened");
     expect(batch.events[0].client_ts).toBe("2026-08-05T10:00:00.000Z");
     expect(batch.events[0].payload).toEqual({ referrer: "https://example.com/courses" });
+  });
+
+  it("cuts a referrer the endpoint would refuse", () => {
+    const reading = session();
+
+    reading.tracker.opened(`https://example.com/${"x".repeat(MAX_REFERRER)}`);
+    reading.tracker.flush();
+
+    expect(String(reading.events()[0].payload.referrer)).toHaveLength(MAX_REFERRER);
   });
 
   it("buffers until something asks it to flush", () => {
