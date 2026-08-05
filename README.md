@@ -15,7 +15,9 @@ constitution; the playbook stack holds the mechanics behind it —
 ```
 content/          # THE curation surface — courses, lessons, figures (see below)
 apps/frontend/    # the Next site: app/ components/ lib/ public/ scripts/ tests/
-apps/backend/     # the FastAPI backend + tutor harness (#6 onwards)
+apps/backend/     # the FastAPI service: API, and later the tutor harness
+ops/              # caddy config, postgres init, the backup restore drill
+compose.yml       # caddy · frontend · backend · postgres · backup
 docs/ .claude/    # the constitution and the authoring skills/workflows
 ```
 
@@ -104,6 +106,28 @@ npm run build      # production build
 ```
 
 Rendered previews (`figure`, `preview`) land in `apps/frontend/.preview/`.
+
+The backend needs `uv` and a Postgres; `docker compose up -d db` gives one,
+plus the `_test` database its suite insists on. `apps/backend/README.md` covers
+the service, migrations and the dormant mail module.
+
+```bash
+docker compose up -d db          # postgres 17 + the test database
+./apps/backend/scripts/lint.sh   # ruff + mypy strict
+./apps/backend/scripts/test.sh   # pytest, on a database built by the migrations
+npm run generate-client          # backend OpenAPI -> apps/frontend/lib/api
+```
+
+`lib/api/` and the spec it comes from are generated, not committed: run
+`npm run generate-client` after a clone and after any API change.
+
+## Running the whole thing
+
+`compose.yml` is the deployment and the way to run the full stack locally:
+caddy in front, the Next site, the API, Postgres, and a daily backup
+container. `cp .env.example .env`, then `make up`. `docs/deployment.md` has
+the topology, the manual `make deploy` procedure, and the backup and restore
+drill.
 
 The frontend finds `content/` by climbing out of `apps/frontend`, so it must
 be built with that as the working directory (what the root `npm run build`
