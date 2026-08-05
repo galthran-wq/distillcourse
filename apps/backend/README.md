@@ -18,6 +18,8 @@ app/
     routes/health.py # GET /api/v1/health (also the compose healthcheck)
     routes/auth.py   # signup / login / logout / me / password
     routes/chats.py  # chat CRUD + the Vercel AI data stream
+    routes/lessons.py # per-lesson user state: rating, bookmark
+    routes/profile.py # visit history + bookmarks for the profile page
   harness/
     agent.py         # the tutor agent, the model pool, the compaction threshold
     prompts.py       # module concatenation + context blocks
@@ -36,6 +38,7 @@ app/
     observability.py # logfire: fastapi + sqlalchemy + httpx
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
+  lessons/state.py   # what a user did to a lesson: history, rating, bookmark
   content/           # the indexed corpus: ingest CLI + tier-1 FTS search
   telemetry/         # reading events, the lesson aggregate, completion
   cli.py             # operator commands (reset-password, delete-user,
@@ -132,6 +135,19 @@ instance-wide monthly ceiling computed from the cost recorded on every run.
 Set a spend limit on the OpenRouter key too — that one holds even if this code
 is wrong. The per-user web search cap belongs to the search tool that spends
 it and lands with it.
+
+## Lesson user state
+
+Three tables keyed by `(user_id, "<course-slug>/<lesson-slug>")`:
+`lesson_progress` (the reading aggregate telemetry writes and the profile's
+visit history reads), `lesson_ratings` (one changeable ±1 per lesson) and
+`bookmarks`. The service does not know which lessons exist — that is the
+content index's business — so the routes validate the shape of the two slugs
+and nothing more.
+
+Every route requires a session: an anonymous visitor reads the site and leaves
+no row anywhere. Ratings have no public counter and no dashboard; the curator
+queries them in psql (`docs/deployment.md`).
 
 ## The content index
 

@@ -45,6 +45,31 @@ export function getCourse(slug: string): LoadedCourse | undefined {
   return getCourses().find((c) => c.course.slug === slug);
 }
 
+export interface LessonLink {
+  title: string;
+  course: string;
+  href: string;
+}
+
+/**
+ * Every readable lesson under the `<course>/<lesson>` key the API stores user
+ * state against, so a profile row can be named and linked without the backend
+ * knowing any of it.
+ */
+export function getLessonLinks(): Record<string, LessonLink> {
+  const links: Record<string, LessonLink> = {};
+  for (const course of getCourses()) {
+    for (const entry of course.lessons.filter(isReadable)) {
+      links[`${course.course.slug}/${entry.lesson.slug}`] = {
+        title: entry.lesson.title,
+        course: course.course.title,
+        href: `/courses/${course.course.slug}/lessons/${entry.lesson.slug}`,
+      };
+    }
+  }
+  return links;
+}
+
 export interface LessonView {
   course: LoadedCourse;
   entry: LoadedLesson;

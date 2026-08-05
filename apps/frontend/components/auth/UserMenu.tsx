@@ -27,6 +27,9 @@ export default function UserMenu() {
 
   return (
     <div className="flex items-center gap-3">
+      <Link href="/profile" className="text-[13px] text-soft hover:text-accent">
+        Profile
+      </Link>
       <span className="font-mono text-[11px] text-faint">{auth.user.email}</span>
       <button
         type="button"
