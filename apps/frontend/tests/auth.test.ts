@@ -56,6 +56,23 @@ describe("the auth client", () => {
     await expect(me()).rejects.toThrow(new ApiError(403, "invalid invite code"));
   });
 
+  it("names the field a 422 rejected instead of showing the status", async () => {
+    stubFetch(
+      respond(422, {
+        detail: [
+          {
+            loc: ["body", "password"],
+            msg: "String should have at least 8 characters",
+          },
+        ],
+      }),
+    );
+
+    await expect(me()).rejects.toThrow(
+      "password: String should have at least 8 characters",
+    );
+  });
+
   it("falls back to the status when the body carries no detail", async () => {
     stubFetch(respond(500, { oops: true }));
 

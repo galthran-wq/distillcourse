@@ -39,6 +39,10 @@ export class ApiError extends Error {
 // httpOnly and first-party, so no code here ever touches it.
 const API = "/api/v1";
 
+// Mirrors the backend bound (app/core/security.py): the browser refusing a
+// short password beats a round trip that comes back as a 422.
+export const MIN_PASSWORD_LENGTH = 8;
+
 async function call<T>(
   path: string,
   method: "GET" | "POST" = "GET",
@@ -54,10 +58,20 @@ async function call<T>(
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
 
+interface FieldError {
+  loc?: unknown[];
+  msg?: string;
+}
+
 async function failure(response: Response): Promise<string> {
   const payload: unknown = await response.json().catch(() => null);
   const detail = (payload as { detail?: unknown } | null)?.detail;
-  return typeof detail === "string" ? detail : `request failed (${response.status})`;
+  if (typeof detail === "string") return detail;
+  // A 422 carries `detail` as a list of {loc, msg} instead: without this the
+  // form can only show the bare status, naming neither field nor reason.
+  const invalid: FieldError | undefined = Array.isArray(detail) ? detail[0] : undefined;
+  if (invalid?.msg) return `${String(invalid.loc?.at(-1) ?? "request")}: ${invalid.msg}`;
+  return `request failed (${response.status})`;
 }
 
 export function signup(body: SignupBody): Promise<User> {

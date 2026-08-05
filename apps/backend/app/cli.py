@@ -8,13 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud
 from app.core import sessions
 from app.core.db import engine, session_factory
-from app.core.security import get_password_hash
+from app.core.security import (
+    MAX_PASSWORD_LENGTH,
+    MIN_PASSWORD_LENGTH,
+    get_password_hash,
+)
 from app.models import User
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
-
-MIN_PASSWORD_LENGTH = 8
 
 
 async def _require_user(session: AsyncSession, email: str) -> User:
@@ -27,10 +29,10 @@ async def _require_user(session: AsyncSession, email: str) -> User:
 async def reset_password(session: AsyncSession, email: str, password: str) -> None:
     user = await _require_user(session, email)
     user.hashed_password = get_password_hash(password)
-    await session.commit()
     # Whoever knew the old password may still hold a live cookie, and the reset
     # exists precisely because control of the account is in doubt.
     await sessions.revoke_user(session, user.id)
+    await session.commit()
     logger.info("password reset for %s; all sessions revoked", email)
 
 
@@ -43,8 +45,10 @@ async def delete_user(session: AsyncSession, email: str) -> None:
 
 def _prompt_new_password() -> str:
     password = getpass.getpass("new password: ")
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise SystemExit(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
+    if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
+        raise SystemExit(
+            f"password must be {MIN_PASSWORD_LENGTH}-{MAX_PASSWORD_LENGTH} characters"
+        )
     if password != getpass.getpass("repeat: "):
         raise SystemExit("passwords do not match")
     return password

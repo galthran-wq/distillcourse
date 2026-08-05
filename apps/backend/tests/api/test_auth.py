@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
-from app.core import rate_limit, sessions
+from app.core import rate_limit, security, sessions
 from app.core.config import settings
 from app.models import UserSession
 from tests.utils.utils import random_email, random_password
@@ -98,6 +98,40 @@ async def test_signup_rejects_an_unknown_timezone(client: AsyncClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+async def test_signup_rejects_an_oversized_timezone(client: AsyncClient) -> None:
+    # Long enough that zoneinfo's own lookup would raise OSError rather than
+    # the ZoneInfoNotFoundError the validator translates.
+    response = await client.post(
+        f"{AUTH}/signup", json=signup_body(timezone="Europe/" + "x" * 300)
+    )
+
+    assert response.status_code == 422
+
+
+async def test_signup_rejects_a_full_name_longer_than_the_column(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        f"{AUTH}/signup", json=signup_body(full_name="x" * 256)
+    )
+
+    assert response.status_code == 422
+
+
+async def test_signup_rejects_a_password_below_the_policy(client: AsyncClient) -> None:
+    body = signup_body(password="x" * (security.MIN_PASSWORD_LENGTH - 1))
+
+    assert (await client.post(f"{AUTH}/signup", json=body)).status_code == 422
+
+
+async def test_signup_rejects_a_non_ascii_invite_code(client: AsyncClient) -> None:
+    response = await client.post(
+        f"{AUTH}/signup", json=signup_body(invite_code="пароль")
+    )
+
+    assert response.status_code == 403
 
 
 async def test_login_rejects_the_wrong_password(client: AsyncClient) -> None:

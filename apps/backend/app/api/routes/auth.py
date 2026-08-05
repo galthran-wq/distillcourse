@@ -12,7 +12,12 @@ from app.api.deps import CurrentSession, CurrentUser, SessionDep
 from app.core import sessions
 from app.core.config import settings
 from app.core.rate_limit import rate_limit
-from app.core.security import get_password_hash, verify_password
+from app.core.security import (
+    MAX_PASSWORD_LENGTH,
+    MIN_PASSWORD_LENGTH,
+    get_password_hash,
+    verify_password,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -20,15 +25,19 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def _known_timezone(value: str) -> str:
     try:
         ZoneInfo(value)
-    except ZoneInfoNotFoundError, ValueError:
-        raise ValueError(f"unknown timezone: {value}")
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(f"unknown timezone: {value}") from exc
     return value
 
 
 # Scheduling (quiet hours, proactive reviews) reads this straight from the row,
-# so anything that is not an IANA zone has to be rejected at the door.
-TimezoneName = Annotated[str, AfterValidator(_known_timezone)]
-Password = Annotated[str, Field(min_length=8, max_length=128)]
+# so anything that is not an IANA zone has to be rejected at the door. The
+# length bound runs first because ZoneInfo turns the name into a filesystem
+# path, and an over-long one raises OSError, which no validator here catches.
+TimezoneName = Annotated[str, Field(max_length=64), AfterValidator(_known_timezone)]
+Password = Annotated[
+    str, Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
+]
 
 
 class UserPublic(BaseModel):
@@ -45,7 +54,9 @@ class SignupRequest(BaseModel):
     password: Password
     timezone: TimezoneName
     invite_code: str
-    full_name: str | None = None
+    # Bounded to the column width: a longer value reaches the database as a
+    # DataError, which is not the IntegrityError signup knows how to answer.
+    full_name: Annotated[str, Field(max_length=255)] | None = None
 
 
 class LoginRequest(BaseModel):
@@ -66,7 +77,11 @@ class PasswordChange(BaseModel):
 async def signup(
     body: SignupRequest, request: Request, response: Response, session: SessionDep
 ) -> UserPublic:
-    if not secrets.compare_digest(body.invite_code, settings.INVITE_CODE):
+    # Bytes, not str: compare_digest rejects str operands that are not pure
+    # ASCII, so a non-ASCII code — sent or configured — would raise TypeError.
+    if not secrets.compare_digest(
+        body.invite_code.encode(), settings.INVITE_CODE.encode()
+    ):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid invite code")
     try:
         user = await crud.create_user(
@@ -81,7 +96,8 @@ async def signup(
         # simultaneous signups cannot both pass the check.
         await session.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
-    await sessions.issue(session, response, user=user, request=request)
+    sessions.issue(session, response, user=user, request=request)
+    await session.commit()
     return UserPublic.model_validate(user)
 
 
@@ -94,7 +110,8 @@ async def login(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "incorrect email or password")
     user.timezone = body.timezone
     await sessions.delete_expired(session)
-    await sessions.issue(session, response, user=user, request=request)
+    sessions.issue(session, response, user=user, request=request)
+    await session.commit()
     return UserPublic.model_validate(user)
 
 
@@ -103,6 +120,7 @@ async def logout(request: Request, response: Response, session: SessionDep) -> N
     token = request.cookies.get(sessions.COOKIE_NAME)
     if token:
         await sessions.revoke(session, token)
+        await session.commit()
     sessions.clear_cookie(response)
 
 
@@ -111,6 +129,7 @@ async def logout_all(
     current: CurrentSession, response: Response, session: SessionDep
 ) -> None:
     await sessions.revoke_user(session, current.user_id)
+    await session.commit()
     sessions.clear_cookie(response)
 
 
@@ -127,5 +146,5 @@ async def change_password(
     if not verified:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "incorrect password")
     current.user.hashed_password = get_password_hash(body.new_password)
-    await session.commit()
     await sessions.revoke_user(session, current.user_id, keep=current.token_hash)
+    await session.commit()

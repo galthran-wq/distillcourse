@@ -20,7 +20,7 @@ app/
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
     db.py            # async engine + session factory
-    security.py      # password hashing (argon2, bcrypt kept for verification)
+    security.py      # password hashing (argon2, bcrypt kept) + length policy
     sessions.py      # session lifecycle: token, row, cookie, sliding expiry
     rate_limit.py    # fixed-window limiter for signup and login
     observability.py # logfire: fastapi + sqlalchemy + httpx
@@ -45,6 +45,9 @@ send an `Authorization` header — authenticates over the same cookie for free.
   because proactive messages are scheduled against the user's own clock.
 - Password reset and email verification do not exist; the operator resets a
   password from the CLI below.
+- `crud.py` and `core/sessions.py` stage writes and never commit. The route (or
+  CLI command) owns the transaction and commits once, so a password change and
+  the session revocation it implies cannot land apart.
 
 ```bash
 uv run python -m app.cli reset-password someone@example.com   # prompts, then

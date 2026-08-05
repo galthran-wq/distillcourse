@@ -27,7 +27,8 @@ async def get_current_session(
     user_session = await sessions.load(session, token)
     if user_session is None or not user_session.user.is_active:
         raise unauthenticated
-    await sessions.renew_if_stale(session, response, user_session, token)
+    if sessions.renew_if_stale(response, user_session, token):
+        await session.commit()
     return user_session
 
 

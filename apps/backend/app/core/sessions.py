@@ -28,7 +28,9 @@ def token_hash(token: str) -> bytes:
     return sha256(token.encode()).digest()
 
 
-async def issue(
+# None of the writes below commit: the route owns the transaction, so a
+# password change and the revocation it implies land together or not at all.
+def issue(
     db: AsyncSession, response: Response, *, user: User, request: Request
 ) -> None:
     token = secrets.token_urlsafe(32)
@@ -43,7 +45,6 @@ async def issue(
             user_agent=request.headers.get("user-agent", "")[:USER_AGENT_LIMIT] or None,
         )
     )
-    await db.commit()
     _set_cookie(response, token)
 
 
@@ -59,23 +60,20 @@ async def load(db: AsyncSession, token: str) -> UserSession | None:
     return result.first()
 
 
-async def renew_if_stale(
-    db: AsyncSession, response: Response, user_session: UserSession, token: str
-) -> None:
+def renew_if_stale(response: Response, user_session: UserSession, token: str) -> bool:
     now = datetime.now(UTC)
     if now - user_session.last_used_at < RENEWAL_INTERVAL:
-        return
+        return False
     user_session.last_used_at = now
     user_session.expires_at = now + LIFETIME
-    await db.commit()
     _set_cookie(response, token)
+    return True
 
 
 async def revoke(db: AsyncSession, token: str) -> None:
     await db.execute(
         delete(UserSession).where(UserSession.token_hash == token_hash(token))
     )
-    await db.commit()
 
 
 async def revoke_user(
@@ -85,14 +83,12 @@ async def revoke_user(
     if keep is not None:
         statement = statement.where(UserSession.token_hash != keep)
     await db.execute(statement)
-    await db.commit()
 
 
 async def delete_expired(db: AsyncSession) -> None:
     await db.execute(
         delete(UserSession).where(UserSession.expires_at <= datetime.now(UTC))
     )
-    await db.commit()
 
 
 def _set_cookie(response: Response, token: str) -> None:

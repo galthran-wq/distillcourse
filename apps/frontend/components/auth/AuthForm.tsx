@@ -2,30 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ApiError, login, signup } from "@/lib/auth/api";
+import { Input } from "@/components/ui";
+import { ApiError, login, signup, MIN_PASSWORD_LENGTH } from "@/lib/auth/api";
 import { setUser } from "@/lib/auth/store";
-
-const FIELD =
-  "mt-1 block w-full rounded border border-line bg-panel p-2 text-sm focus:border-accent focus:outline-none";
-
-function Field({
-  name,
-  label,
-  type = "text",
-  required = true,
-}: {
-  name: string;
-  label: string;
-  type?: string;
-  required?: boolean;
-}) {
-  return (
-    <label className="block text-sm">
-      <span className="text-soft">{label}</span>
-      <input name={name} type={type} required={required} className={FIELD} />
-    </label>
-  );
-}
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -68,12 +47,20 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
   return (
     <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
-      <Field name="email" label="Email" type="email" />
-      <Field name="password" label="Password" type="password" />
+      <Input name="email" label="Email" type="email" required />
+      <Input
+        name="password"
+        label="Password"
+        type="password"
+        required
+        // Only on signup: the login form must not describe the policy, and a
+        // browser that enforces it beats a 422 the form can only show verbatim.
+        minLength={mode === "signup" ? MIN_PASSWORD_LENGTH : undefined}
+      />
       {mode === "signup" && (
         <>
-          <Field name="full_name" label="Name (optional)" required={false} />
-          <Field name="invite_code" label="Invite code" />
+          <Input name="full_name" label="Name (optional)" />
+          <Input name="invite_code" label="Invite code" required />
         </>
       )}
       {error && (

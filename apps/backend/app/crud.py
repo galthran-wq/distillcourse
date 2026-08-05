@@ -24,7 +24,9 @@ async def create_user(
         full_name=full_name,
     )
     session.add(user)
-    await session.commit()
+    # Flush, not commit: the caller owns the transaction, and the INSERT still
+    # happens here, so a duplicate email raises IntegrityError at this line.
+    await session.flush()
     return user
 
 
@@ -44,5 +46,4 @@ async def authenticate(
         return None
     if upgraded_hash:
         user.hashed_password = upgraded_hash
-        await session.commit()
     return user
