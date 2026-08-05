@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  DEMO,
-  TOGGLES,
-  readingDepth,
-  sectionAnchor,
-  targetOf,
-} from "@/lib/telemetry/targets";
+import { sectionAnchor } from "@/lib/lesson/anchor";
+import { DEMO, TOGGLES, readingDepth, targetOf } from "@/lib/telemetry/targets";
 
 // A lesson's shape as far as targets are concerned: something collapsible
 // before the first h2, two proofs in one section (the second nested, as MDX
