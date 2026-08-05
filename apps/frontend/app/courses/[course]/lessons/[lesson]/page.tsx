@@ -18,6 +18,7 @@ import {
   LessonRating,
   LessonStateProvider,
 } from "@/components/lessons/LessonState";
+import SelectionReference from "@/components/lessons/SelectionReference";
 import Figure, { type FigureProps } from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
 import { ImageCredits } from "@/components/mdx/SourcedImage";
@@ -162,6 +163,7 @@ export default async function LessonPage({
         lesson={lesson.slug}
         headings={toc.map((h) => h.id)}
       />
+      <SelectionReference course={course.course.slug} lesson={lesson.slug} />
       <article className="min-w-0">
         {/* Keyed by the lesson: moving to the next one must not show the
             previous one's bookmark while the new state loads. */}

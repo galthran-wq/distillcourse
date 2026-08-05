@@ -4,6 +4,7 @@ import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import ThemeToggle from "@/components/ThemeToggle";
 import ChatWidget from "@/components/chat/ChatWidget";
 import UserMenu from "@/components/auth/UserMenu";
+import { getLessonLinks } from "@/lib/content/site";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
@@ -64,8 +65,10 @@ export default function RootLayout({
           </div>
         </footer>
         {/* In the layout rather than on the lesson page: the conversation
-            outlives the page it was started on. */}
-        <ChatWidget />
+            outlives the page it was started on. The lesson set comes from the
+            build, as on the profile — it is what a locator in a reply is
+            resolved against. */}
+        <ChatWidget lessons={getLessonLinks()} />
       </body>
     </html>
   );
