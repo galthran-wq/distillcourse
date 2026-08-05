@@ -101,6 +101,8 @@ class Message(Base):
 
 # Title over body, and the config is spelled out: a generated column may only
 # call immutable functions, which to_tsvector is exactly when given one.
+# Migrations carry their own frozen copy (0002_documents.py); changing this
+# expression means writing a migration that alters the column to match.
 DOCUMENT_TSV = (
     "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
     "setweight(to_tsvector('english', coalesce(text, '')), 'B')"

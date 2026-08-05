@@ -27,6 +27,7 @@ import {
   isRasterFile,
   probeImageFile,
 } from "./images";
+import { collectJsx, stringAttr } from "./mdx-jsx";
 
 export interface Diagnostic {
   level: "error" | "warn";
@@ -73,46 +74,9 @@ const BLOOM_VERBS = new Set(
   ).split(" "),
 );
 
-interface MdxJsxAttribute {
-  type: string;
-  name?: string;
-  value?: unknown;
-}
-
-interface MdxJsxNode {
-  type: string;
-  name?: string | null;
-  attributes?: MdxJsxAttribute[];
-  children?: unknown[];
-}
-
 // remark-math is included so $...$ spans parse as math exactly like the real
 // @next/mdx pipeline — otherwise TeX braces get misread as JSX expressions.
 const mdxParser = unified().use(remarkParse).use(remarkMdx).use(remarkMath);
-
-function isJsxNode(node: unknown): node is MdxJsxNode {
-  const t = (node as { type?: string }).type;
-  return t === "mdxJsxFlowElement" || t === "mdxJsxTextElement";
-}
-
-/** Depth-first collection of JSX elements within the tree. */
-function collectJsx(nodes: unknown[]): MdxJsxNode[] {
-  const out: MdxJsxNode[] = [];
-  const stack = [...nodes];
-  while (stack.length > 0) {
-    const node = stack.pop() as MdxJsxNode & { children?: unknown[] };
-    if (isJsxNode(node)) out.push(node);
-    if (Array.isArray(node.children)) stack.push(...node.children);
-  }
-  return out;
-}
-
-function stringAttr(node: MdxJsxNode, name: string): string | undefined {
-  const attr = node.attributes?.find(
-    (a) => a.type === "mdxJsxAttribute" && a.name === name,
-  );
-  return typeof attr?.value === "string" ? attr.value : undefined;
-}
 
 /** Normalizes prose for opening-line comparison: quotes, dashes, whitespace. */
 function normalizeProse(text: string): string {

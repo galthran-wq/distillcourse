@@ -10,12 +10,20 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from app.models import DOCUMENT_TSV
-
 revision = "0002"
 down_revision = "0001"
 branch_labels = None
 depends_on = None
+
+# A frozen copy of DOCUMENT_TSV in app.models as of this revision. It is spelled
+# out rather than imported because a migration is a snapshot: re-weighting the
+# expression in the model must produce a new migration, or a fresh database and
+# an already-migrated one would generate different tsvectors and rank the same
+# query differently with nothing to flag it.
+DOCUMENT_TSV = (
+    "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+    "setweight(to_tsvector('english', coalesce(text, '')), 'B')"
+)
 
 
 def upgrade() -> None:

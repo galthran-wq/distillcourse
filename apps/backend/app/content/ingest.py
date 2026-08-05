@@ -19,17 +19,6 @@ logger = logging.getLogger(__name__)
 # The upsert runs against the Table, not the mapped class: "metadata" is a
 # column here and an attribute of Declarative itself on the class.
 DOCUMENTS = Base.metadata.tables["documents"]
-UPSERT_COLUMNS = (
-    "corpus",
-    "course_slug",
-    "title",
-    "breadcrumb",
-    "text",
-    "anchors",
-    "position",
-    "metadata",
-    "content_hash",
-)
 
 
 @dataclass
@@ -74,27 +63,32 @@ async def ingest(session: AsyncSession, index: ContentIndex) -> IngestReport:
         d for d in index.documents if existing.get(d.locator) != hashes[d.locator]
     ]
     if changed:
-        statement = insert(DOCUMENTS).values(
-            [
-                {
-                    "corpus": d.corpus,
-                    "course_slug": d.course_slug,
-                    "locator": d.locator,
-                    "title": d.title,
-                    "breadcrumb": d.breadcrumb,
-                    "text": d.text,
-                    "anchors": d.anchors,
-                    "position": d.position,
-                    "metadata": d.metadata,
-                    "content_hash": hashes[d.locator],
-                }
-                for d in changed
-            ]
-        )
+        rows = [
+            {
+                "corpus": d.corpus,
+                "course_slug": d.course_slug,
+                "locator": d.locator,
+                "title": d.title,
+                "breadcrumb": d.breadcrumb,
+                "text": d.text,
+                "anchors": d.anchors,
+                "position": d.position,
+                "metadata": d.metadata,
+                "content_hash": hashes[d.locator],
+            }
+            for d in changed
+        ]
+        statement = insert(DOCUMENTS).values(rows)
+        # The update set is derived from the row itself, so a column added above
+        # is updated on re-ingest and not only on first insert.
         await session.execute(
             statement.on_conflict_do_update(
                 index_elements=["locator"],
-                set_={name: statement.excluded[name] for name in UPSERT_COLUMNS},
+                set_={
+                    name: statement.excluded[name]
+                    for name in rows[0]
+                    if name != "locator"
+                },
             )
         )
 

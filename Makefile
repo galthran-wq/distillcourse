@@ -21,7 +21,7 @@ deploy:
 # diverge. CONTENT_PREVIEW must match the frontend build or the index and the
 # site disagree about which lessons exist.
 reindex:
-	CONTENT_PREVIEW=$${CONTENT_PREVIEW:-1} npm run export-index -- index.json
+	CONTENT_PREVIEW=$${CONTENT_PREVIEW:-1} npm run export-index
 	docker compose cp index.json backend:/tmp/index.json
 	docker compose exec -T backend python -m app.content.ingest /tmp/index.json
 

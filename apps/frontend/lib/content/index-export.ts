@@ -7,8 +7,10 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkRehype from "remark-rehype";
 import rehypeSlug from "rehype-slug";
+import { visit } from "unist-util-visit";
 import type { Root, RootContent, Element } from "hast";
 import type { LoadedCourse, LoadedLesson } from "./load";
+import { isMdxJsxNode, stringAttr, type MdxJsxNode } from "./mdx-jsx";
 import { isReadable } from "./visibility";
 
 /**
@@ -99,24 +101,18 @@ const INLINE_TAGS = new Set([
   "var",
 ]);
 
-interface JsxNode {
-  type: string;
-  name?: string | null;
-  attributes?: { type: string; name?: string; value?: unknown }[];
-  children?: RootContent[];
-}
-
 interface Segment {
   text: string;
   /** Code contributes to the indexed text but never to word_count. */
   code: boolean;
 }
 
-function jsxAttribute(node: JsxNode, name: string): string | undefined {
-  const attr = node.attributes?.find(
-    (a) => a.type === "mdxJsxAttribute" && a.name === name,
-  );
-  return typeof attr?.value === "string" ? attr.value : undefined;
+/** The MDX nodes remark-rehype passed through, typed against the hast tree. */
+type JsxNode = MdxJsxNode<RootContent>;
+
+/** visit() takes a tree, and a chunk is a bare node list. */
+function treeOf(nodes: RootContent[]): Root {
+  return { type: "root", children: nodes };
 }
 
 function extract(nodes: RootContent[], out: Segment[]): void {
@@ -178,7 +174,7 @@ function extractJsx(node: JsxNode, out: Segment[]): void {
   if (name === "Figure" || name === "FigureSequence") {
     // Figure JSX stripped, caption kept: the caption is the sentence the
     // reader is meant to take away, the src/alt plumbing is not content.
-    const caption = jsxAttribute(node, "caption") ?? jsxAttribute(node, "alt");
+    const caption = stringAttr(node, "caption") ?? stringAttr(node, "alt");
     if (caption !== undefined) out.push({ text: `\n\n${caption}\n\n`, code: false });
     return;
   }
@@ -194,18 +190,12 @@ function extractJsx(node: JsxNode, out: Segment[]): void {
  * established…" on the page is indexed with a hole in it.
  */
 function resolveRefs(nodes: RootContent[], titles: Map<string, string>): void {
-  for (const node of nodes) {
-    const children = (node as { children?: RootContent[] }).children;
-    const jsx = node as unknown as JsxNode;
-    if (jsx.name === "Ref" && (children === undefined || children.length === 0)) {
-      const target = jsxAttribute(jsx, "lesson") ?? "";
-      jsx.children = [
-        { type: "text", value: titles.get(target) ?? target } as RootContent,
-      ];
-      continue;
-    }
-    if (children !== undefined) resolveRefs(children, titles);
-  }
+  visit(treeOf(nodes), (node: unknown) => {
+    if (!isMdxJsxNode(node)) return;
+    if (node.name !== "Ref" || (node.children?.length ?? 0) > 0) return;
+    const target = stringAttr(node, "lesson") ?? "";
+    node.children = [{ type: "text", value: titles.get(target) ?? target }];
+  });
 }
 
 function render(segments: Segment[]): string {
@@ -235,16 +225,9 @@ function headingText(node: Element): string {
 /** Every id rehype-slug put on the subtree — the chunk's usable anchors. */
 function anchorsIn(nodes: RootContent[]): string[] {
   const found: string[] = [];
-  const walk = (list: RootContent[]): void => {
-    for (const node of list) {
-      const children = (node as { children?: RootContent[] }).children;
-      if (node.type === "element" && typeof node.properties?.id === "string") {
-        found.push(node.properties.id);
-      }
-      if (children !== undefined) walk(children);
-    }
-  };
-  walk(nodes);
+  visit(treeOf(nodes), "element", (node: Element) => {
+    if (typeof node.properties?.id === "string") found.push(node.properties.id);
+  });
   return found;
 }
 
@@ -290,19 +273,9 @@ function segmentsOf(nodes: RootContent[]): Segment[] {
 
 function countJsx(nodes: RootContent[], name: string): number {
   let total = 0;
-  const walk = (list: RootContent[]): void => {
-    for (const node of list) {
-      if (
-        (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
-        (node as unknown as JsxNode).name === name
-      ) {
-        total++;
-      }
-      const children = (node as { children?: RootContent[] }).children;
-      if (children !== undefined) walk(children);
-    }
-  };
-  walk(nodes);
+  visit(treeOf(nodes), (node: unknown) => {
+    if (isMdxJsxNode(node) && node.name === name) total++;
+  });
   return total;
 }
 

@@ -2,10 +2,6 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-# Bumped in lockstep with INDEX_SCHEMA_VERSION in
-# apps/frontend/lib/content/index-export.ts, which produces these files.
-INDEX_SCHEMA_VERSION = 1
-
 
 class IndexDocument(BaseModel):
     """One chunk of content as exported by the frontend."""
@@ -22,5 +18,8 @@ class IndexDocument(BaseModel):
 
 
 class ContentIndex(BaseModel):
+    # The Literal is the version check: an index written by a newer exporter is
+    # rejected here rather than half-ingested. Bump it in the same commit that
+    # bumps INDEX_SCHEMA_VERSION in apps/frontend/lib/content/index-export.ts.
     schema_version: Literal[1]
     documents: list[IndexDocument]

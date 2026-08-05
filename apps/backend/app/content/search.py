@@ -11,6 +11,8 @@ from app.models import Document
 # reformulates its query, so recall matters more than the order of the top few.
 CONFIG = "english"
 SNIPPET_OPTIONS = "MaxFragments=2, MaxWords=28, MinWords=12, FragmentDelimiter= … "
+# ts_rank_cd normalization: divide the rank by the document length.
+RANK_NORMALIZATION = 2
 
 
 class SearchHit(BaseModel):
@@ -33,8 +35,13 @@ async def search(
     limit: int = 10,
 ) -> list[SearchHit]:
     tsquery = func.websearch_to_tsquery(CONFIG, query)
-    rank = func.ts_rank_cd(Document.tsv, tsquery)
-    snippet = func.ts_headline(CONFIG, Document.text, tsquery, SNIPPET_OPTIONS)
+    # Flag 2 divides the rank by the document length. Without it ts_rank_cd
+    # rewards long chunks for nothing but their length, so on the real corpus a
+    # rambling section outranks the short one that answers the query.
+    rank = func.ts_rank_cd(Document.tsv, tsquery, RANK_NORMALIZATION).label("rank")
+    snippet = func.ts_headline(CONFIG, Document.text, tsquery, SNIPPET_OPTIONS).label(
+        "snippet"
+    )
 
     statement = select(
         Document.locator,
@@ -43,7 +50,7 @@ async def search(
         Document.breadcrumb,
         snippet,
         Document.anchors,
-        Document.meta,
+        Document.meta.label("metadata"),
         rank,
     ).where(Document.tsv.bool_op("@@")(tsquery))
     if corpus is not None:
@@ -53,18 +60,10 @@ async def search(
     # Locator breaks ties so that repeating a query repeats its answer.
     statement = statement.order_by(rank.desc(), Document.locator).limit(limit)
 
+    # By name, not by position: adding a column to the select above must not
+    # silently shift every field after it into its neighbour.
     return [
-        SearchHit(
-            locator=row[0],
-            corpus=row[1],
-            title=row[2],
-            breadcrumb=row[3],
-            snippet=row[4],
-            anchors=row[5],
-            metadata=row[6],
-            rank=row[7],
-        )
-        for row in (await session.execute(statement)).all()
+        SearchHit(**row._mapping) for row in (await session.execute(statement)).all()
     ]
 
 
