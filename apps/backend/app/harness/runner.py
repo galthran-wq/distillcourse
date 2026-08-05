@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from collections.abc import AsyncGenerator, Sequence
+from datetime import datetime
 
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import (
@@ -18,6 +19,7 @@ from pydantic_ai.ui.vercel_ai.response_types import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.clock import zone
 from app.harness.agent import compact_threshold, model_for, tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import check_cost_ceiling, check_run_allowed
@@ -52,6 +54,22 @@ def _blocks(current_locator: str | None) -> tuple[ContextBlock, ...]:
             title="Where the learner is",
             body=f"They are reading `{current_locator}`.",
         ),
+    )
+
+
+async def _context(
+    repo: HarnessRepository, blocks: tuple[ContextBlock, ...]
+) -> tuple[ContextBlock, ...]:
+    """Every run carries the learner's clock: a reminder they ask for is set
+    from the model's reading of "Friday", and the model has no clock at all."""
+    user = await repo.user()
+    now = datetime.now(zone(user.timezone))
+    return (
+        ContextBlock(
+            title="The learner's clock",
+            body=f"Their timezone is `{user.timezone}`; it is {now:%A %Y-%m-%d %H:%M} there.",
+        ),
+        *blocks,
     )
 
 
@@ -190,7 +208,7 @@ async def run(
             message_history=[*history, user_message],
             model=model_for(chat.model),
             deps=deps,
-            instructions=assemble(medium, run_kind, blocks),
+            instructions=assemble(medium, run_kind, await _context(repo, blocks)),
             run_id=str(run_id),
         )
         await _close_run(
@@ -233,11 +251,14 @@ async def _drain(
             result = completed
 
         try:
+            instructions = assemble(
+                "web", "chat", await _context(repo, _blocks(current_locator))
+            )
             async for chunk in adapter.run_stream(
                 message_history=history,
                 deps=deps,
                 model=model_for(chat.model),
-                instructions=assemble("web", "chat", _blocks(current_locator)),
+                instructions=instructions,
                 run_id=str(run_id),
                 on_complete=capture,
             ):

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.harness.usage import INPUT_TOKENS, OUTPUT_TOKENS, WEB_SEARCH_CALLS
-from app.models import Chat, Incident, Message
+from app.models import Chat, Incident, Message, User
 
 Role = Literal["user", "agent", "system"]
 Marker = Literal["clear", "compact"]
@@ -46,6 +46,9 @@ class HarnessRepository:
         self.session.add(chat)
         await self.session.commit()
         return chat
+
+    async def user(self) -> User:
+        return await self.session.get_one(User, self.user_id)
 
     async def get_chat(self, chat_id: uuid.UUID) -> Chat | None:
         chat: Chat | None = await self.session.scalar(

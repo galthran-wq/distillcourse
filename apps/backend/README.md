@@ -34,10 +34,16 @@ app/
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
     db.py            # async engine + session factory
+    clock.py         # users.timezone -> ZoneInfo, for every run and the poller
     security.py      # password hashing (argon2, bcrypt kept) + length policy
     sessions.py      # session lifecycle: token, row, cookie, sliding expiry
     rate_limit.py    # fixed-window limiter for signup and login
     observability.py # logfire: fastapi + sqlalchemy + httpx
+  scheduling/
+    policy.py        # quiet hours, the slot timeout, the budget, coalescing
+    repository.py    # schedules: claim, lease, defer, slot, outcome
+    worker.py        # the poller process + the daily housekeeping sweep
+    tools.py         # reminder and mute tools, run by the tutor
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
@@ -176,6 +182,55 @@ compose the locator themselves.
 Every route requires a session: an anonymous visitor reads the site and leaves
 no row anywhere. Ratings have no public counter and no dashboard; the curator
 queries them in psql (`docs/deployment.md`).
+
+## Proactive scheduling
+
+`schedules` is the queue of everything the platform intends to say on its own:
+reviews that come due and reminders a learner asked for. A second process of
+this same image (`python -m app.scheduling.worker`, the `scheduler` compose
+service) polls it every 30 seconds. There is no broker — Postgres is the queue,
+and one table beats a Redis and a Celery for a handful of messages a day.
+
+A cycle claims what is due in one statement (`FOR UPDATE SKIP LOCKED`, then a
+lease) and commits before running anything, so a lock is never held for as long
+as a model takes to answer and two pollers cannot pick up the same row. The
+lease outlasts the run it holds inside it (`RUN_CLAIM_TTL_SECONDS` plus a
+margin), or a second poller would reclaim a row whose run is still in flight
+and send the same message twice. Every transition clears the lease, which makes
+an expired lease exactly the set of rows a dead worker was holding: they go back
+to pending, one attempt poorer, and a row that fails three times is failed with
+a logfire error.
+
+What reaches the learner is decided per user, in `policy.py`:
+
+- **Quiet hours** 09:00–22:00 on `users.timezone`; outside them the row waits
+  for the next morning.
+- **One open slot.** A delivered message sets `awaiting_reply`, and `due_at`
+  then means the moment it counts as ignored — four *waking* hours later, so a
+  message at 21:30 is not written off overnight. Everything else due waits for
+  that slot to close.
+- **Three initiations a day**, counted as messages rather than items: what is
+  due for one learner is coalesced into a single message of at most three
+  items, and the rest wait for tomorrow.
+- **Rotation.** After a message the learner let time out, the next one leads
+  with a different `payload.topic`.
+- **Mute.** `users.muted_until` pauses everything the platform starts; the
+  learner sets it in conversation (the tutor's mute tool), and answers to what
+  they write are unaffected. A muted learner's rows are not claimed rather than
+  pushed past the mute, so they keep the time they were meant for and an
+  open-ended mute — a timestamp in the year 9999 — is undone by clearing one
+  column.
+
+Delivery goes into the learner's eternal Telegram thread through the ordinary
+harness `run()`, with the `proactive` or `review` prompt module. Rows exist only
+for a learner who has paired Telegram: the reminder tool refuses to create one
+otherwise, and a row that reaches the poller with no thread behind it is
+cancelled rather than rescheduled — a row with nowhere to go would come back
+every morning forever. Whether they replied is read back from the thread, so the
+outcome (`answered` / `ignored`) is recorded whichever way a message arrived.
+
+The worker also owns the daily housekeeping sweep of rows nothing will read
+again; today that is expired sessions.
 
 ## The content index
 

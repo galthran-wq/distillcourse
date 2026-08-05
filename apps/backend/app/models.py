@@ -35,6 +35,11 @@ class User(Base):
     # Re-read from the browser at every login: a user who relocates must not
     # keep getting proactive messages on their old clock.
     timezone: Mapped[str] = mapped_column(Text, server_default="UTC")
+    # NULL is "not muted": until this moment the platform answers but never
+    # opens the conversation itself.
+    muted_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
     is_active: Mapped[bool] = mapped_column(default=True)
     is_superuser: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -177,6 +182,45 @@ class Incident(Base):
     kind: Mapped[str] = mapped_column(String(16))
     summary: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(16), server_default="open")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Schedule(Base):
+    """One thing the platform intends to say to a learner on its own.
+
+    `due_at` is when the row next needs attention and its status says what
+    that attention is: a `pending` row fires, an `awaiting_reply` row counts
+    as ignored. `payload` carries `note` — what the message is about, in
+    words the run is given — and `topic`, the course or subject the rotation
+    steers away from after an ignored message.
+    """
+
+    __tablename__ = "schedules"
+    __table_args__ = (Index("ix_schedules_status_due_at", "status", "due_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    # Only a row a worker is holding carries a lease, which is what makes an
+    # expired one exactly the set a dead worker left behind.
+    claimed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    lease_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    created_by: Mapped[str] = mapped_column(String(8))
+    attempts: Mapped[int] = mapped_column(default=0)
+    # How a delivered message ended. Kept because the engagement machine that
+    # reads it is designed from real ignore data, not guessed at now.
+    outcome: Mapped[str | None] = mapped_column(String(16), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -112,7 +112,7 @@ async def test_a_failed_run_is_marked_and_left_out_of_the_context(
     def refuse(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
         raise RuntimeError("openrouter is down")
 
-    with tutor.override(model=FunctionModel(refuse)):
+    with tutor.override(model=FunctionModel(refuse), tools=[]):
         with pytest.raises(RuntimeError, match="openrouter is down"):
             await runner.run(repo, chat, "what is entropy?")
 

@@ -13,6 +13,8 @@ content changed.
                   └────── everything else ──> frontend :3000
                                                         │
                           migrate (runs once, exits) ───┤
+                                                        │
+                          scheduler (proactive poller) ─┤
                                                         ▼
                                                    postgres:17
                                                         ▲
@@ -25,6 +27,9 @@ content changed.
   head`) and exits; `backend` will not start until it has exited successfully,
   so a failed migration stops the deploy instead of half-applying it.
 - `backend` is healthy only when `GET /api/v1/health` reaches Postgres.
+- `scheduler` is the same image running the proactive poller instead of the
+  API (`apps/backend/README.md` describes what it decides). It has no port and
+  no healthcheck: what it does is visible in `schedules` and in logfire.
 - The frontend image is built with `CONTENT_PREVIEW=1` by default, which
   renders drafted and reviewed lessons. Build the public site with
   `CONTENT_PREVIEW=0`.
