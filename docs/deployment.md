@@ -71,6 +71,24 @@ docker compose exec backend python -m app.cli delete-user someone@example.com
 A reset revokes every session of that account, on the assumption that control
 of it is in doubt; a delete takes the sessions with it.
 
+## Reading the ratings
+
+Lesson ratings are curation signal, not a product feature: there is no
+dashboard and no public counter, and the reader who voted sees only their own
+vote. The curator reads them in psql.
+
+```bash
+docker compose exec db psql -U postgres -d distillcourse -c "
+  SELECT lesson,
+         count(*) FILTER (WHERE value = 1)  AS useful,
+         count(*) FILTER (WHERE value = -1) AS not_useful,
+         max(updated_at)                    AS last_vote
+  FROM lesson_ratings GROUP BY lesson ORDER BY not_useful DESC, useful DESC;"
+```
+
+`bookmarks` and `lesson_progress` are readable the same way. Deleting a user
+takes all three with it.
+
 ## Backups and recovery
 
 `prodrigestivill/postgres-backup-local` writes a compressed `pg_dump` to

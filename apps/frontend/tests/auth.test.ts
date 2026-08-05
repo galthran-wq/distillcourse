@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, login, logout, me } from "@/lib/auth/api";
+import { login, logout, me } from "@/lib/auth/api";
+import { ApiError } from "@/lib/http";
 
 function respond(status: number, body?: unknown): Response {
   return new Response(body === undefined ? null : JSON.stringify(body), {

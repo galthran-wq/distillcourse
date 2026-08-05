@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui";
-import { ApiError, login, signup, MIN_PASSWORD_LENGTH } from "@/lib/auth/api";
+import { login, signup, MIN_PASSWORD_LENGTH } from "@/lib/auth/api";
+import { ApiError } from "@/lib/http";
 import { setUser } from "@/lib/auth/store";
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {

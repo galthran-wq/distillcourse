@@ -3,11 +3,13 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    CheckConstraint,
     Computed,
     DateTime,
     ForeignKey,
     Index,
     LargeBinary,
+    SmallInteger,
     String,
     Text,
     func,
@@ -15,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.content.locators import LESSON_LENGTH
+from app.content.locators import LESSON_LENGTH, SLUG_LENGTH
 
 
 class Base(DeclarativeBase):
@@ -176,7 +178,7 @@ class Document(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     corpus: Mapped[str] = mapped_column(String(16), index=True)
-    course_slug: Mapped[str | None] = mapped_column(String(64), index=True)
+    course_slug: Mapped[str | None] = mapped_column(String(SLUG_LENGTH), index=True)
     locator: Mapped[str] = mapped_column(String(512), unique=True)
     title: Mapped[str] = mapped_column(Text)
     breadcrumb: Mapped[str] = mapped_column(Text)
@@ -187,3 +189,34 @@ class Document(Base):
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB)
     content_hash: Mapped[str] = mapped_column(String(64))
     tsv: Mapped[str] = mapped_column(TSVECTOR, Computed(DOCUMENT_TSV, persisted=True))
+
+
+# Rating and bookmark are keyed by the same `lesson:` locator `events` and
+# `lesson_progress` carry, so a reader's votes, their reading and the corpus
+# all name a lesson with one string.
+class LessonRating(Base):
+    __tablename__ = "lesson_ratings"
+    # The API rejects anything else already; the constraint is what keeps the
+    # column readable as a sum for the curator, who queries it in psql.
+    __table_args__ = (CheckConstraint("value IN (-1, 1)", name="ck_rating_value"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    value: Mapped[int] = mapped_column(SmallInteger)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Bookmark(Base):
+    __tablename__ = "bookmarks"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

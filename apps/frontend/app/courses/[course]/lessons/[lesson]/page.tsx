@@ -12,6 +12,11 @@ import type { MDXComponents } from "mdx/types";
 import DemoHost from "@/components/mdx/DemoHost";
 import LessonTelemetry from "@/components/LessonTelemetry";
 import LessonToc from "@/components/LessonToc";
+import {
+  BookmarkToggle,
+  LessonRating,
+  LessonStateProvider,
+} from "@/components/lessons/LessonState";
 import Figure, { type FigureProps } from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
 import { ImageCredits } from "@/components/mdx/SourcedImage";
@@ -29,6 +34,7 @@ import {
   Task,
   Theorem,
 } from "@/components/mdx/Blocks";
+import { lessonKey } from "@/lib/content/locator";
 import { getCourses, getLessonView } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
 import { rehypeCollectToc, type TocEntry } from "@/lib/content/toc";
@@ -70,6 +76,9 @@ export default async function LessonPage({
   const { course, entry, moduleTitle, prev, next } = view;
   const lesson = entry.lesson;
   const number = String(entry.index + 1).padStart(2, "0");
+  // The one name this lesson has on the API — telemetry, rating and bookmark
+  // all send it, and the profile looks a row up by it.
+  const key = lessonKey(course.course.slug, lesson.slug);
 
   const imageCredits = loadCredits(entry.dir).entries;
 
@@ -144,59 +153,66 @@ export default async function LessonPage({
     <div className="lesson-grid mx-auto w-full max-w-7xl px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_230px] lg:gap-14">
       {/* The locator is the index's, so an event names the same place a
           search hit or a tutor citation does. */}
-      <LessonTelemetry lesson={`lesson:${course.course.slug}/${lesson.slug}`} />
+      <LessonTelemetry lesson={key} />
       <article className="min-w-0">
-        <header className="border-b border-line py-10">
-          <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
-            <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
-              {course.course.title}
-            </Link>{" "}
-            · {moduleTitle}
-          </p>
-          <h1 className="mt-3 flex items-baseline gap-3">
-            <span className="font-mono text-sm text-faint">{number}</span>
-            <span className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-              {lesson.title}
-            </span>
-          </h1>
-          <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
-            <span className="text-soft">{lesson.goal}</span>
-            <span>~{lesson.est_minutes} min</span>
-          </p>
-        </header>
-
-        <div className="prose-lesson py-10">
-          <MDXContent components={components} />
-        </div>
-
-        <nav className="mb-16 flex items-stretch justify-between gap-4 border-t border-line pt-6">
-          {prev !== undefined ? (
-            <Link
-              href={`/courses/${course.course.slug}/lessons/${prev.lesson.slug}`}
-              className="group max-w-[45%]"
-            >
-              <span className="font-mono text-[11px] tracking-wide text-faint">← previous</span>
-              <span className="block font-medium leading-snug group-hover:text-accent">
-                {prev.lesson.title}
+        {/* Keyed by the lesson: moving to the next one must not show the
+            previous one's bookmark while the new state loads. */}
+        <LessonStateProvider key={key} lesson={key}>
+          <header className="border-b border-line py-10">
+            <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
+              <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
+                {course.course.title}
+              </Link>{" "}
+              · {moduleTitle}
+            </p>
+            <h1 className="mt-3 flex items-baseline gap-3">
+              <span className="font-mono text-sm text-faint">{number}</span>
+              <span className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+                {lesson.title}
               </span>
-            </Link>
-          ) : (
-            <span />
-          )}
-          {next !== undefined ? (
-            <Link
-              href={`/courses/${course.course.slug}/lessons/${next.lesson.slug}`}
-              className="group max-w-[45%] text-right"
-            >
-              <span className="font-mono text-[11px] tracking-wide text-faint">next →</span>
-              <span className="block font-medium leading-snug group-hover:text-accent">
-                {next.lesson.title}
-              </span>
-            </Link>
-          ) : (
-            <span />
-          )}
-        </nav>
+            </h1>
+            <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
+              <span className="text-soft">{lesson.goal}</span>
+              <span>~{lesson.est_minutes} min</span>
+              <BookmarkToggle />
+            </p>
+          </header>
+
+          <div className="prose-lesson py-10">
+            <MDXContent components={components} />
+          </div>
+
+          <LessonRating />
+
+          <nav className="mt-10 mb-16 flex items-stretch justify-between gap-4 border-t border-line pt-6">
+            {prev !== undefined ? (
+              <Link
+                href={`/courses/${course.course.slug}/lessons/${prev.lesson.slug}`}
+                className="group max-w-[45%]"
+              >
+                <span className="font-mono text-[11px] tracking-wide text-faint">← previous</span>
+                <span className="block font-medium leading-snug group-hover:text-accent">
+                  {prev.lesson.title}
+                </span>
+              </Link>
+            ) : (
+              <span />
+            )}
+            {next !== undefined ? (
+              <Link
+                href={`/courses/${course.course.slug}/lessons/${next.lesson.slug}`}
+                className="group max-w-[45%] text-right"
+              >
+                <span className="font-mono text-[11px] tracking-wide text-faint">next →</span>
+                <span className="block font-medium leading-snug group-hover:text-accent">
+                  {next.lesson.title}
+                </span>
+              </Link>
+            ) : (
+              <span />
+            )}
+          </nav>
+        </LessonStateProvider>
       </article>
 
       {toc.length > 0 && (
