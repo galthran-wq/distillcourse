@@ -36,7 +36,7 @@ def corpus_index() -> ContentIndex:
     Regenerate with `CONTENT_PREVIEW=1 npm run export-index` and keep the
     documents whose `course_slug` is `information-theory`. It is a frozen
     snapshot on purpose — the ranking thresholds in test_search.py are measured
-    against these 231 chunks, so refreshing it means re-measuring them.
+    against these 232 chunks, so refreshing it means re-measuring them.
 
     Session-scoped because it is read-only and parsing 800 kB of JSON per test
     is pure overhead; each test still ingests it into its own transaction.
