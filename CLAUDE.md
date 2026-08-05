@@ -19,3 +19,8 @@ Rules that override defaults:
 - Lesson MDX has no frontmatter; structural metadata lives in `course.yaml` only.
 - `lib/content/schema.ts` is the normative schema; `docs/content-model.md` is
   the human-readable guide — keep them in sync when either changes.
+- Code style is binding for ALL code in this repo:
+  `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
+  only, grep before writing (no duplicated functionality), domain-separated
+  file tree. Keep this CLAUDE.md current: a change that invalidates it
+  updates it in the same PR.
