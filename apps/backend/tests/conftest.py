@@ -6,13 +6,15 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker
 
-from app.api.deps import get_session
+from app import crud
+from app.api.deps import get_session, get_session_factory
 from app.core import rate_limit
 from app.core.config import settings
 from app.core.db import engine
 from app.main import app
+from app.models import User
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
@@ -35,26 +37,64 @@ def migrated_database() -> Generator[None]:
     command.downgrade(config, "base")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def openrouter_key() -> None:
+    # Models are constructed even in tests that never reach the network; every
+    # run is served by an overridden test model.
+    settings.OPENROUTER_API_KEY = "not-a-real-key"
+
+
 @pytest.fixture
-async def session() -> AsyncGenerator[AsyncSession]:
+async def connection() -> AsyncGenerator[AsyncConnection]:
     # Each test runs inside an outer transaction that is rolled back, so
-    # committed writes never leak into the next test. create_savepoint keeps a
-    # rollback inside the request (a duplicate signup, say) from taking that
-    # outer transaction down with it.
+    # committed writes never leak into the next test.
     async with engine.connect() as connection:
         transaction = await connection.begin()
-        async with AsyncSession(
-            bind=connection,
-            expire_on_commit=False,
-            join_transaction_mode="create_savepoint",
-        ) as session:
-            yield session
+        yield connection
         await transaction.rollback()
 
 
 @pytest.fixture
-def app_on_test_session(session: AsyncSession) -> Generator[FastAPI]:
+async def session(connection: AsyncConnection) -> AsyncGenerator[AsyncSession]:
+    # create_savepoint keeps a rollback inside the request (a duplicate signup,
+    # say) from taking the test's outer transaction down with it.
+    async with AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    ) as session:
+        yield session
+
+
+@pytest.fixture
+def session_factory(
+    connection: AsyncConnection,
+) -> async_sessionmaker[AsyncSession]:
+    # Sessions the app opens for work that outlives a request join the test's
+    # transaction, so their commits are rolled back with everything else.
+    return async_sessionmaker(bind=connection, expire_on_commit=False)
+
+
+@pytest.fixture
+async def user(session: AsyncSession) -> User:
+    return await crud.create_user(
+        session, email="learner@test", password="secret", timezone="UTC"
+    )
+
+
+@pytest.fixture
+async def other_user(session: AsyncSession) -> User:
+    return await crud.create_user(
+        session, email="stranger@test", password="secret", timezone="UTC"
+    )
+
+
+@pytest.fixture
+def app_on_test_session(
+    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+) -> Generator[FastAPI]:
     app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[get_session_factory] = lambda: session_factory
     yield app
     app.dependency_overrides.clear()
 

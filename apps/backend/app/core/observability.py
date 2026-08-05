@@ -13,6 +13,9 @@ def instrument(app: FastAPI) -> None:
         send_to_logfire="if-token-present",
     )
     logfire.instrument_fastapi(app)
+    # Agent runs record the assembled prompt, the tool calls and the usage of
+    # every step — the trace is how a run is read after the fact.
+    logfire.instrument_pydantic_ai()
     # The asyncio engine wraps a sync one; the instrumentation hooks the latter.
     logfire.instrument_sqlalchemy(engine=engine.sync_engine)
     logfire.instrument_httpx()

@@ -2,10 +2,11 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, Response, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core import sessions
 from app.core.db import session_factory
+from app.harness.repository import HarnessRepository
 from app.models import User, UserSession
 
 
@@ -14,7 +15,16 @@ async def get_session() -> AsyncGenerator[AsyncSession]:
         yield session
 
 
+# Work that outlives its request — the agent run behind a chat stream — opens
+# its own session, so it needs the factory rather than a request-scoped one.
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    return session_factory
+
+
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SessionFactoryDep = Annotated[
+    async_sessionmaker[AsyncSession], Depends(get_session_factory)
+]
 
 
 async def get_current_session(
@@ -40,3 +50,12 @@ async def get_current_user(user_session: CurrentSession) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+# A route asks for the repository rather than building one, so no route can
+# reach the database without the user it is scoped to.
+def get_repository(session: SessionDep, user: CurrentUser) -> HarnessRepository:
+    return HarnessRepository(session, user.id)
+
+
+RepositoryDep = Annotated[HarnessRepository, Depends(get_repository)]

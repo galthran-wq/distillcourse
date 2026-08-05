@@ -1,0 +1,35 @@
+from functools import lru_cache
+
+from pydantic_ai import Agent
+from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+
+from app.core.config import ChatModel, settings
+from app.harness.deps import HarnessDeps
+
+tutor = Agent(name="tutor", deps_type=HarnessDeps)
+
+
+def chat_model(openrouter_id: str) -> ChatModel:
+    # A chat outlives the pool it chose from: a model dropped from the config
+    # falls back to the default instead of failing the run.
+    pool = settings.chat_model_pool
+    return pool.get(openrouter_id, pool[settings.DEFAULT_CHAT_MODEL])
+
+
+@lru_cache
+def model_for(openrouter_id: str) -> OpenRouterModel:
+    return OpenRouterModel(
+        chat_model(openrouter_id).openrouter_id,
+        provider=OpenRouterProvider(api_key=settings.OPENROUTER_API_KEY),
+        # Usage accounting returns what OpenRouter actually billed, which is
+        # what the monthly ceiling is counted in.
+        settings=OpenRouterModelSettings(openrouter_usage={"include": True}),
+    )
+
+
+def compact_threshold(openrouter_id: str) -> int:
+    return min(
+        settings.COMPACT_AT_TOKENS,
+        chat_model(openrouter_id).context_window - settings.CONTEXT_RESERVE_TOKENS,
+    )

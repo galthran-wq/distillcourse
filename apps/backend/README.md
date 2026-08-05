@@ -1,7 +1,7 @@
 # apps/backend
 
-FastAPI service: the API, and from #10 onwards the pydantic-ai tutor harness as
-a module inside this same process. Forked from
+FastAPI service: the API and the pydantic-ai tutor harness, a module inside
+this same process. Forked from
 [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template)
 (`backend/`, commit `750d3d0`) and then rewritten to be async end to end
 (psycopg async driver, `AsyncSession`, async routes) with SQLAlchemy 2.0 typed
@@ -14,9 +14,19 @@ app/
   main.py            # FastAPI app: instrumentation, CORS, router mount
   api/
     main.py          # the router tree
-    deps.py          # SessionDep, CurrentSession, CurrentUser
+    deps.py          # SessionDep, SessionFactoryDep, CurrentSession, CurrentUser
     routes/health.py # GET /api/v1/health (also the compose healthcheck)
     routes/auth.py   # signup / login / logout / me / password
+    routes/chats.py  # chat CRUD + the Vercel AI data stream
+  harness/
+    agent.py         # the tutor agent, the model pool, the compaction threshold
+    prompts.py       # module concatenation + context blocks
+    prompts/         # the prompt modules themselves (see below)
+    deps.py          # HarnessDeps — what a tool receives
+    repository.py    # user-scoped reads and writes over chats and messages
+    usage.py         # the shape of messages.usage, written once, read by caps
+    limits.py        # the daily cap and the monthly cost ceiling
+    runner.py        # claim, persist, stream, compact
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
     db.py            # async engine + session factory
@@ -86,6 +96,39 @@ uv run alembic revision --autogenerate -m "<what changed>"
 uv run alembic upgrade head
 uv run alembic downgrade -1
 ```
+
+## The harness
+
+The tutor is a module, not a service. Isolation is by type: a tool never sees a
+user id, it sees a `HarnessRepository` that was constructed with one, so the
+only chats and messages it can reach are that user's.
+
+A run is owned by the server, not by the client. The chat is claimed
+atomically (`chats.active_run_id` with a deadline, so a worker that dies frees
+the chat), the user's message is written before the model is called, and the
+agent stream is drained by a task with its own session — a closed tab ends the
+response, not the run. Messages are stored twice: as native pydantic-ai JSON,
+which is what the next run replays, and as the Vercel AI projection the widget
+renders. A failed run marks its rows, which keeps them on screen and out of
+the model's context.
+
+The history a run is given is the one in the database. A Vercel AI client
+posts every message it holds on every turn; `POST /chats/{id}/stream` takes
+only the last one from the request, so a client with a stale or edited
+transcript cannot rewrite what the tutor remembers.
+
+Prompts are assembled per run from `harness/prompts/`: `base.md`, the medium
+(`web`, `telegram`), then the modules the run kind calls for, then context
+blocks. They are content, so `docs/pedagogy.md` governs them the way it
+governs lessons. Blocks carrying text from outside the platform are fenced
+with their provenance, and `base.md` is where the tutor is told that anything
+inside such a fence is data.
+
+Caps are enforcement, not telemetry: messages per user per day, and an
+instance-wide monthly ceiling computed from the cost recorded on every run.
+Set a spend limit on the OpenRouter key too — that one holds even if this code
+is wrong. The per-user web search cap belongs to the search tool that spends
+it and lands with it.
 
 ## Dormant mail
 
