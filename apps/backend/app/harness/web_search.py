@@ -12,7 +12,8 @@ TIMEOUT_SECONDS = 30.0
 
 class WebSearchUnavailable(Exception):
     """The web is not reachable right now — a missing key, a provider error, an
-    answer that came back empty. The tutor is expected to continue without it.
+    answer that came back empty or in a shape this client cannot read. The
+    tutor is expected to continue without it.
     """
 
 
@@ -60,6 +61,13 @@ async def ask(query: str) -> str:
             )
             response.raise_for_status()
             payload: dict[str, Any] = response.json()
+        return as_text(payload)
     except httpx.HTTPError as exc:
         raise WebSearchUnavailable(f"the web search provider failed: {exc}")
-    return as_text(payload)
+    # A 200 whose body is not the json this client expects: decoding it and
+    # walking it are as much of the provider's contract as the status code,
+    # and a raw KeyError here would abort the learner's whole turn.
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise WebSearchUnavailable(
+            f"the web search provider returned an unusable answer: {exc}"
+        )

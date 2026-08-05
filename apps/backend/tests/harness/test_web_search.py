@@ -1,7 +1,10 @@
+from typing import Any
+
+import httpx
 import pytest
 
 from app.core.config import settings
-from app.harness.web_search import WebSearchUnavailable, as_text, ask
+from app.harness.web_search import API_URL, WebSearchUnavailable, as_text, ask
 
 
 def payload(text: str, **extra: object) -> dict[str, object]:
@@ -34,6 +37,30 @@ def test_an_empty_answer_is_an_unavailable_search() -> None:
         as_text(payload("   "))
     with pytest.raises(WebSearchUnavailable):
         as_text({})
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"text": "<html>the gateway is down</html>"},
+        {"json": {"choices": [{"message": {}}]}},
+    ],
+)
+async def test_a_body_this_client_cannot_read_is_an_unavailable_search(
+    monkeypatch: pytest.MonkeyPatch, body: dict[str, Any]
+) -> None:
+    """Decoding the body and walking it are as much of the provider's contract
+    as its status code. Anything raised here that is not WebSearchUnavailable
+    escapes the tool and takes the learner's whole turn with it."""
+    monkeypatch.setattr(settings, "PERPLEXITY_API_KEY", "not-a-real-key")
+
+    async def post(*_args: Any, **_kwargs: Any) -> httpx.Response:
+        return httpx.Response(200, request=httpx.Request("POST", API_URL), **body)
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+
+    with pytest.raises(WebSearchUnavailable, match="unusable"):
+        await ask("what happened today")
 
 
 async def test_without_a_key_no_request_is_attempted(

@@ -10,9 +10,9 @@ telemetry (#8) owns and that does not exist yet; the tool lands with the table
 it reads.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_ai import RunContext, ToolFailed
 
 from app.content.search import search, section_of, sections, suggest
@@ -26,6 +26,11 @@ from app.harness.usage import WEB_SEARCH_CALLS
 
 Corpus = Literal["lesson", "research", "concept"]
 IncidentKind = Literal["error", "unclear", "other"]
+# `incidents.locator` is varchar(512). Validated as a tool argument, an
+# over-long locator comes back to the model as a retry it can correct;
+# unvalidated, it fails the insert and leaves the run's session in a failed
+# transaction, where storing the turn and releasing the chat both raise.
+IncidentLocator = Annotated[str, Field(max_length=512)]
 
 # An agent that asks for a hundred hits is asking for a context window full of
 # snippets it will not read.
@@ -158,7 +163,10 @@ async def get_course_structure(
 
 @tutor.tool
 async def report_content_incident(
-    ctx: RunContext[HarnessDeps], locator: str, kind: IncidentKind, summary: str
+    ctx: RunContext[HarnessDeps],
+    locator: IncidentLocator,
+    kind: IncidentKind,
+    summary: str,
 ) -> str:
     """File a problem in the material itself, for a human to triage.
 

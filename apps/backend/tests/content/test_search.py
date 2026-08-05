@@ -168,6 +168,18 @@ async def test_no_section_owns_an_anchor_that_is_not_in_the_lesson(
     assert await sections(session, "lesson:information-theory/no-such-lesson") == []
 
 
+async def test_a_locator_is_matched_literally_and_not_as_a_pattern(
+    session: AsyncSession, corpus_index: ContentIndex
+) -> None:
+    """The path is model-supplied. Unescaped, its `%` and `_` are LIKE
+    wildcards: one locator would read out every lesson of every course.
+    """
+    await ingest(session, corpus_index)
+
+    assert await sections(session, "lesson:%") == []
+    assert await sections(session, "lesson:information-theory/kl_divergence") == []
+
+
 async def test_a_mistyped_locator_still_suggests_the_lesson_it_meant(
     session: AsyncSession, corpus_index: ContentIndex
 ) -> None:

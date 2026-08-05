@@ -189,6 +189,43 @@ async def test_a_wrong_formula_is_filed_as_a_content_incident(
     assert (incident.user_id, incident.chat_id) == (repo.user_id, chat.id)
 
 
+async def test_a_locator_longer_than_the_column_is_a_retry_not_a_failed_run(
+    repo: HarnessRepository, chat: Chat, session: AsyncSession
+) -> None:
+    """`incidents.locator` is varchar(512), so an invented locator longer than
+    that has to be caught as tool-argument validation. The insert it would
+    otherwise fail leaves the session in a failed transaction, and the turn is
+    then stored nowhere while the chat stays claimed until its lease expires.
+    """
+
+    def tutor_turn(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        # Counted over the calls made, not the values returned: a rejected
+        # argument comes back as a retry prompt and never as a tool return.
+        tried = [
+            part
+            for message in messages
+            if isinstance(message, ModelResponse)
+            for part in message.parts
+            if isinstance(part, ToolCallPart)
+        ]
+        if not tried:
+            return call(
+                "report_content_incident",
+                locator=f"{KL}#{'x' * 512}",
+                kind="error",
+                summary="the formula is inverted",
+            )
+        return ModelResponse(parts=[TextPart(content="noted")])
+
+    with tutor.override(model=FunctionModel(tutor_turn)):
+        answer = await runner.run(repo, chat, "the formula in this section is wrong")
+
+    assert answer == "noted"
+    assert (await session.scalars(select(Incident))).first() is None
+    # The turn was stored, so the session the tool ran in is still usable.
+    assert await repo.rows(chat)
+
+
 def searching(searches: int) -> FunctionModel:
     """A tutor that runs `searches` web searches and then answers."""
 
@@ -282,7 +319,14 @@ async def test_a_tool_files_against_the_chat_its_deps_were_built_for(
 
     with tutor.override(model=FunctionModel(tutor_turn)):
         await runner.run(repo, mine, "this section is unclear")
+        await runner.run(other_repo, theirs, "this section is unclear")
 
-    incident = (await session.scalars(select(Incident))).one()
-    assert (incident.user_id, incident.chat_id) == (repo.user_id, mine.id)
-    assert theirs.id != mine.id
+    for owner, chat in ((repo, mine), (other_repo, theirs)):
+        filed = (
+            await session.scalars(
+                select(Incident).where(Incident.user_id == owner.user_id)
+            )
+        ).all()
+        assert [(incident.user_id, incident.chat_id) for incident in filed] == [
+            (owner.user_id, chat.id)
+        ]

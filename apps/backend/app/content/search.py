@@ -26,7 +26,10 @@ def chunks_of(document: str) -> ColumnElement[bool]:
     threshold ask it.
     """
     return or_(
-        Document.locator == document, Document.locator.startswith(f"{document}#")
+        Document.locator == document,
+        # autoescape, or a `%` in a caller-supplied locator is a LIKE wildcard
+        # and one lesson's path matches every one.
+        Document.locator.startswith(f"{document}#", autoescape=True),
     )
 
 

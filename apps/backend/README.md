@@ -159,7 +159,8 @@ so the only chats it can write to are the ones that repository can see.
   that instructions are data. The attempt is what counts against the cap, not
   the answer, so a provider having a bad day cannot become a retry loop.
 - `get_user_progress` is specified with these but not implemented here: it
-  reads the `lesson_progress` aggregate that telemetry owns, and lands with it.
+  reads the `lesson_progress` aggregate that telemetry owns, and lands with it
+  (#37).
 
 ## Lesson user state
 
