@@ -1,4 +1,5 @@
 import "server-only";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   STATUS_RANK,
@@ -10,8 +11,12 @@ import {
 
 // content/ lives at the repo ROOT (it is the human curation surface, shared
 // with the content factory), while this app lives in apps/frontend — hence the
-// climb out. Next runs with cwd = the app directory in dev, build and start.
-const CONTENT_ROOT = join(process.cwd(), "..", "..", "content");
+// climb out. cwd rather than the scripts' __dirname: the Next bundler moves
+// this module, so cwd is the only stable anchor, and Next runs with cwd = the
+// app directory in dev, build and start. CONTENT_ROOT overrides it for hosts
+// that build from somewhere else.
+const CONTENT_ROOT =
+  process.env.CONTENT_ROOT ?? join(process.cwd(), "..", "..", "content");
 
 /**
  * Visibility: production renders `published` lessons only. Dev — and any
@@ -39,6 +44,17 @@ export function isReadable(lesson: LoadedLesson): boolean {
 let coursesMemo: LoadedCourse[] | undefined;
 
 function readCourses(): LoadedCourse[] {
+  // Fail loudly on a wrong cwd. listCourseDirs answers "no courses/" with an
+  // empty list, which would let `next build` exit 0 having shipped a site with
+  // zero courses — and `npm run validate` cannot catch it, since it resolves
+  // content from __dirname instead.
+  if (!existsSync(join(CONTENT_ROOT, "courses"))) {
+    throw new Error(
+      `No courses/ directory under content root ${CONTENT_ROOT} ` +
+        `(resolved from cwd ${process.cwd()}). Build with cwd = apps/frontend, ` +
+        `or set CONTENT_ROOT to the content directory.`,
+    );
+  }
   return listCourseDirs(CONTENT_ROOT).map((dir) => loadCourse(dir));
 }
 

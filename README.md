@@ -105,6 +105,11 @@ npm run build      # production build
 
 Rendered previews (`figure`, `preview`) land in `apps/frontend/.preview/`.
 
+The frontend finds `content/` by climbing out of `apps/frontend`, so it must
+be built with that as the working directory (what the root `npm run build`
+does). A host that builds from somewhere else fails the build with an
+explicit message; point it at the tree with `CONTENT_ROOT=/abs/path/content`.
+
 Sourced images (photographs, scans, published plots) need `poppler-utils`
 and `imagemagick` for extraction and resizing; `npm run validate` itself
 stays dependency-free.

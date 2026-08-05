@@ -14,6 +14,7 @@ import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { figures } from "../components/figures";
 import { restoreInvocationDir } from "./invocation-dir";
+import { appRoot } from "./paths";
 
 restoreInvocationDir();
 
@@ -50,7 +51,6 @@ if (target !== undefined && target in figures) {
 const frame = frameArg !== undefined ? Number(frameArg) : undefined;
 const markup = renderToStaticMarkup(createElement(component, { frame }));
 
-const appRoot = resolve(__dirname, "..");
 const katexCss = join(appRoot, "node_modules/katex/dist/katex.min.css");
 const tokens = dark
   ? "--paper:#131312;--panel:#1d1d1b;--ink:#eaeae6;--line:#34342f;"

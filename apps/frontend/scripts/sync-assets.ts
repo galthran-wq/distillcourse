@@ -23,14 +23,12 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, join, relative } from "node:path";
 import { parse } from "yaml";
 import { isRasterFile } from "../lib/content/images";
+import { appRoot, contentRoot, repoRoot } from "./paths";
 
-// This app is apps/frontend; content/ lives at the repo root above it.
-const appRoot = resolve(__dirname, "..");
-const repoRoot = resolve(appRoot, "..", "..");
-const coursesRoot = join(repoRoot, "content", "courses");
+const coursesRoot = join(contentRoot, "courses");
 const publicRoot = join(appRoot, "public", "course-assets");
 
 function dirs(path: string): string[] {

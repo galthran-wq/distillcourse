@@ -15,7 +15,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { evaluate } from "@mdx-js/mdx";
@@ -31,10 +31,8 @@ import FigureSequence from "../components/mdx/FigureSequence";
 import { ImageCredits } from "../components/mdx/SourcedImage";
 import * as Blocks from "../components/mdx/Blocks";
 import { loadCredits } from "../lib/content/credits";
+import { appRoot, repoRoot } from "./paths";
 
-// This app is apps/frontend; content/ lives at the repo root above it.
-const appRoot = resolve(__dirname, "..");
-const repoRoot = resolve(appRoot, "..", "..");
 const [course, lesson] = process.argv.slice(2);
 const shoot = !process.argv.includes("--no-screenshot");
 
