@@ -19,7 +19,8 @@ export default function DemoHost({ name, caption }: Props) {
   const Demo = lazyDemos[name] ?? null;
 
   return (
-    <figure className="my-10">
+    // data-demo is what telemetry counts: which demo the reader touched.
+    <figure className="my-10" data-demo={name}>
       {Demo === null ? (
         <div className="rounded-md border border-dashed border-line px-5 py-8 text-center font-mono text-sm text-faint">
           demo “{name}” not built yet — /demo-builder will fill this in

@@ -14,8 +14,9 @@ MAX_BATCHES_PER_MINUTE = 60
 
 # `<section-anchor>/<kind><n>`: the anchor namespace is the index's
 # (app/content/locators.py), and the ordinal disambiguates two proofs in one
-# section.
-Target = Annotated[str, Field(max_length=120, pattern=r"^[a-z0-9/-]+$")]
+# section. Letters rather than ASCII, because rehype-slug keeps the alphabet
+# the heading was written in.
+Target = Annotated[str, Field(max_length=120, pattern=r"^[\w/-]+$")]
 
 OPENED = "lesson_opened"
 HEARTBEAT = "heartbeat"

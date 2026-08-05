@@ -10,6 +10,7 @@ import rehypeSlug from "rehype-slug";
 import rehypePrettyCode from "rehype-pretty-code";
 import type { MDXComponents } from "mdx/types";
 import DemoHost from "@/components/mdx/DemoHost";
+import LessonTelemetry from "@/components/LessonTelemetry";
 import LessonToc from "@/components/LessonToc";
 import Figure, { type FigureProps } from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
@@ -141,6 +142,9 @@ export default async function LessonPage({
 
   return (
     <div className="lesson-grid mx-auto w-full max-w-7xl px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_230px] lg:gap-14">
+      {/* The locator is the index's, so an event names the same place a
+          search hit or a tutor citation does. */}
+      <LessonTelemetry lesson={`lesson:${course.course.slug}/${lesson.slug}`} />
       <article className="min-w-0">
         <header className="border-b border-line py-10">
           <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
