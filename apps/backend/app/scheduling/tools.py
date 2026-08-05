@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic_ai import RunContext
 
+from app.core.clock import zone
 from app.harness.deps import HarnessDeps
 from app.scheduling import policy, repository
 
@@ -13,7 +14,7 @@ async def _their_clock(deps: HarnessDeps, moment: datetime) -> datetime:
     if moment.tzinfo is not None:
         return moment
     user = await deps.repo.user()
-    return moment.replace(tzinfo=policy.zone(user.timezone))
+    return moment.replace(tzinfo=zone(user.timezone))
 
 
 async def create_reminder(

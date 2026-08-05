@@ -7,6 +7,7 @@ import logfire
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models import Chat, Message, Schedule, User
 from app.scheduling import policy
 
@@ -15,8 +16,11 @@ CreatedBy = Literal["system", "user"]
 Outcome = Literal["answered", "ignored"]
 
 # How long a claimed row stays off limits to other workers. A process that
-# dies mid-run leaves nothing waiting longer than this.
-LEASE = timedelta(minutes=5)
+# dies mid-run leaves nothing waiting longer than this. It has to outlast the
+# run it holds inside it — the harness lets a run hold its chat for
+# RUN_CLAIM_TTL_SECONDS — or a second poller would sweep the lease of a run
+# still in flight and deliver the same message twice.
+LEASE = timedelta(seconds=settings.RUN_CLAIM_TTL_SECONDS) + timedelta(minutes=5)
 CLAIM_BATCH = 100
 WAITING = ("pending", "deferred")
 
@@ -50,7 +54,17 @@ async def claim_due(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
     so two pollers cannot pick up the same schedule; the transaction ends here
     rather than around the run, which would hold a lock for as long as a model
     takes to answer.
+
+    A muted learner's rows are not claimed at all rather than pushed to the end
+    of the mute: they keep the time they were meant for, so lifting a mute makes
+    everything it held back due again in the very next cycle.
     """
+    muted = (
+        select(User.id)
+        .where(User.id == Schedule.user_id, User.muted_until > now)
+        .correlate(Schedule)
+        .exists()
+    )
     rows = (
         await session.scalars(
             select(Schedule)
@@ -58,6 +72,7 @@ async def claim_due(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
                 Schedule.status.in_(WAITING),
                 Schedule.due_at <= now,
                 Schedule.lease_until.is_(None),
+                ~muted,
             )
             .order_by(Schedule.due_at)
             .limit(CLAIM_BATCH)
@@ -78,6 +93,15 @@ async def defer(
     for row in rows:
         row.status = "deferred"
         row.due_at = due_at
+        row.claimed_at = None
+        row.lease_until = None
+    await session.commit()
+
+
+async def drop(session: AsyncSession, rows: Sequence[Schedule]) -> None:
+    """Rows nothing will ever deliver. Unlike a defer, these do not come back."""
+    for row in rows:
+        row.status = "cancelled"
         row.claimed_at = None
         row.lease_until = None
     await session.commit()

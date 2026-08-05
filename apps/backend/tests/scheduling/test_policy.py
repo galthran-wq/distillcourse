@@ -71,11 +71,6 @@ def test_retries_back_off() -> None:
     assert policy.retry_at(start, 2) == start + timedelta(minutes=10)
 
 
-def test_an_unreadable_timezone_falls_back_to_utc() -> None:
-    assert policy.zone("Mars/Olympus") == ZoneInfo("UTC")
-    assert policy.zone("Europe/Moscow") == MOSCOW
-
-
 def test_one_message_carries_three_items_and_the_rest_wait() -> None:
     due = [schedule(topic=f"course-{index}") for index in range(5)]
 

@@ -19,6 +19,7 @@ from pydantic_ai.ui.vercel_ai.response_types import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.clock import zone
 from app.harness.agent import compact_threshold, model_for, tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import check_cost_ceiling, check_run_allowed
@@ -26,7 +27,6 @@ from app.harness.prompts import ContextBlock, Medium, RunKind, assemble
 from app.harness.repository import HarnessRepository, Role
 from app.harness.usage import usage_row
 from app.models import Chat
-from app.scheduling.policy import zone
 
 
 class RunBusy(Exception):

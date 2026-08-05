@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import logfire
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core import sessions
+from app.core import clock, sessions
 from app.core.db import session_factory
 from app.core.observability import configure
 from app.harness import runner
@@ -36,10 +36,7 @@ def _run_kind(rows: Sequence[Schedule]) -> RunKind:
 async def _fire(
     session: AsyncSession, user: User, rows: list[Schedule], now: datetime
 ) -> None:
-    tz = policy.zone(user.timezone)
-    if user.muted_until is not None and now < user.muted_until:
-        await repository.defer(session, rows, due_at=user.muted_until)
-        return
+    tz = clock.zone(user.timezone)
     if not policy.in_window(now, tz):
         await repository.defer(session, rows, due_at=policy.next_open(now, tz))
         return
@@ -57,15 +54,14 @@ async def _fire(
         return
     thread = await repository.thread(session, user.id)
     if thread is None:
-        # Nothing is delivered without a connected transport. The row is kept:
-        # a thread that comes back finds its reminders still waiting.
-        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, tz))
+        # Nothing is delivered without a connected transport, and nothing is
+        # rescheduled either: a row with nowhere to go would come back every
+        # morning forever. Rows are created once a learner has paired Telegram.
+        await repository.drop(session, rows)
         return
     now_items, later = policy.session_items(
         rows, avoid=await repository.ignored_topic(session, user.id)
     )
-    if later:
-        await repository.defer(session, later, due_at=policy.tomorrow_open(now, tz))
     try:
         await runner.run(
             HarnessRepository(session, user.id),
@@ -74,16 +70,23 @@ async def _fire(
             run_kind=_run_kind(now_items),
         )
     except runner.RunBusy:
-        await repository.defer(session, now_items, due_at=now + BUSY_RETRY)
+        await repository.defer(session, rows, due_at=now + BUSY_RETRY)
         return
     except LimitExceeded:
-        await repository.defer(session, now_items, due_at=policy.tomorrow_open(now, tz))
+        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, tz))
         return
     except Exception as exc:
-        # Whatever the model, the network or the database did is this row's
-        # problem, not the cycle's: back off and fail the row after three tries.
+        # Whatever the model, the network or the database did is the attempted
+        # rows' problem, not the cycle's: back off and fail them after three
+        # tries. The overflow was never attempted, so it stays plainly due.
         await repository.retry(session, now_items, now=now, error=str(exc))
+        if later:
+            await repository.defer(session, later, due_at=now)
         return
+    # Only now, with the message out: a run that never happened must not spend
+    # the overflow's day.
+    if later:
+        await repository.defer(session, later, due_at=policy.tomorrow_open(now, tz))
     await repository.open_slot(
         session, now_items, deadline=policy.slot_deadline(now, tz)
     )

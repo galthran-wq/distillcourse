@@ -34,6 +34,7 @@ app/
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
     db.py            # async engine + session factory
+    clock.py         # users.timezone -> ZoneInfo, for every run and the poller
     security.py      # password hashing (argon2, bcrypt kept) + length policy
     sessions.py      # session lifecycle: token, row, cookie, sliding expiry
     rate_limit.py    # fixed-window limiter for signup and login
@@ -192,10 +193,13 @@ and one table beats a Redis and a Celery for a handful of messages a day.
 
 A cycle claims what is due in one statement (`FOR UPDATE SKIP LOCKED`, then a
 lease) and commits before running anything, so a lock is never held for as long
-as a model takes to answer and two pollers cannot pick up the same row. Every
-transition clears the lease, which makes an expired lease exactly the set of
-rows a dead worker was holding: they go back to pending, one attempt poorer,
-and a row that fails three times is failed with a logfire error.
+as a model takes to answer and two pollers cannot pick up the same row. The
+lease outlasts the run it holds inside it (`RUN_CLAIM_TTL_SECONDS` plus a
+margin), or a second poller would reclaim a row whose run is still in flight
+and send the same message twice. Every transition clears the lease, which makes
+an expired lease exactly the set of rows a dead worker was holding: they go back
+to pending, one attempt poorer, and a row that fails three times is failed with
+a logfire error.
 
 What reaches the learner is decided per user, in `policy.py`:
 
@@ -212,12 +216,17 @@ What reaches the learner is decided per user, in `policy.py`:
   with a different `payload.topic`.
 - **Mute.** `users.muted_until` pauses everything the platform starts; the
   learner sets it in conversation (the tutor's mute tool), and answers to what
-  they write are unaffected.
+  they write are unaffected. A muted learner's rows are not claimed rather than
+  pushed past the mute, so they keep the time they were meant for and an
+  open-ended mute — a timestamp in the year 9999 — is undone by clearing one
+  column.
 
 Delivery goes into the learner's eternal Telegram thread through the ordinary
-harness `run()`, with the `proactive` or `review` prompt module. Nothing is
-delivered to a learner who has no thread — a reminder is not created for them
-in the first place. Whether they replied is read back from the thread, so the
+harness `run()`, with the `proactive` or `review` prompt module. Rows exist only
+for a learner who has paired Telegram: the reminder tool refuses to create one
+otherwise, and a row that reaches the poller with no thread behind it is
+cancelled rather than rescheduled — a row with nowhere to go would come back
+every morning forever. Whether they replied is read back from the thread, so the
 outcome (`answered` / `ignored`) is recorded whichever way a message arrived.
 
 The worker also owns the daily housekeeping sweep of rows nothing will read

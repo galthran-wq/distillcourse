@@ -65,14 +65,16 @@ async def test_a_due_review_is_delivered_and_waits_for_a_reply(
 async def test_nothing_is_delivered_without_a_connected_thread(
     session: AsyncSession, user: User
 ) -> None:
+    """A row with nowhere to go is dropped, not rescheduled: rescheduling it
+    would re-claim and re-write it every morning for as long as the user lives."""
     row = await due_review(session, user)
 
     with replying():
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
-    assert row.status == "deferred"
-    assert row.due_at == policy.tomorrow_open(NOON, UTC_ZONE)
+    assert row.status == "cancelled"
+    assert row.lease_until is None
 
 
 @pytest.mark.usefixtures("thread")
@@ -276,20 +278,111 @@ async def test_the_message_after_an_ignored_one_leads_with_another_topic(
     assert prompt.index("other 0") < prompt.index("same 0")
 
 
+async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
+    session: AsyncSession, user: User, thread: Chat
+) -> None:
+    """The sequence in one pass: a due review is delivered, the slot waits, the
+    learner never answers, it times out as ignored, and the message that goes
+    out next leads with a different topic."""
+    first = await due_review(
+        session, user, topic="information-theory", note="entropy is due"
+    )
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(first)
+    assert (first.status, first.outcome) == ("awaiting_reply", None)
+    assert "entropy is what you owe me" in await thread_messages(session, user, thread)
+
+    timeout = policy.slot_deadline(NOON, UTC_ZONE)
+    same = await due_review(
+        session,
+        user,
+        topic="information-theory",
+        note="mutual information is due",
+        at=timeout,
+    )
+    other = await due_review(
+        session,
+        user,
+        topic="classical-ml",
+        note="bias and variance are due",
+        at=timeout,
+    )
+
+    with replying():
+        await worker.cycle(session, timeout)
+
+    for row in (first, same, other):
+        await session.refresh(row)
+    prompt = await thread_messages(session, user, thread)
+    assert (first.status, first.outcome) == ("done", "ignored")
+    assert same.status == other.status == "awaiting_reply"
+    assert prompt.index("bias and variance") < prompt.index("mutual information")
+
+
+@pytest.mark.usefixtures("thread")
+async def test_a_failed_run_does_not_spend_the_overflows_day(
+    session: AsyncSession, user: User
+) -> None:
+    """No message went out, so what it could not carry is still due today."""
+
+    def refuse(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        raise RuntimeError("openrouter is down")
+
+    rows = [await due_review(session, user, note=f"item {index}") for index in range(4)]
+
+    with tutor.override(model=FunctionModel(refuse), tools=[]):
+        await worker.cycle(session, NOON)
+
+    for row in rows:
+        await session.refresh(row)
+    overflow = [row for row in rows if row.status == "deferred"]
+    assert [(row.due_at, row.attempts, row.lease_until) for row in overflow] == [
+        (NOON, 0, None)
+    ]
+
+
 async def test_a_muted_learner_is_left_alone(
     session: AsyncSession, user: User, thread: Chat
 ) -> None:
+    """A mute is not a reschedule: the row is not claimed at all, so it keeps
+    the time it was meant for."""
     row = await due_review(session, user)
+    due_at = row.due_at
     await repository.mute(session, user.id, until=NOON + timedelta(days=2))
-    await session.refresh(user)
 
     with replying():
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
-    assert row.status == "deferred"
-    assert row.due_at == user.muted_until
+    assert row.status == "pending"
+    assert row.due_at == due_at
+    assert row.claimed_at is None
     assert await HarnessRepository(session, user.id).rows(thread) == []
+
+
+@pytest.mark.usefixtures("thread")
+async def test_an_open_ended_mute_does_not_outlive_itself(
+    session: AsyncSession, user: User
+) -> None:
+    """`/mute` with no end date parks the user in the year 9999. What was due
+    while it held has to arrive once the learner asks for messages back."""
+    row = await due_review(session, user)
+    await repository.mute(session, user.id, until=policy.INDEFINITE)
+
+    with replying():
+        await worker.cycle(session, NOON)
+    await session.refresh(row)
+    assert row.status == "pending"
+
+    await repository.mute(session, user.id, until=None)
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(row)
+    assert row.status == "awaiting_reply"
 
 
 @pytest.mark.usefixtures("thread")

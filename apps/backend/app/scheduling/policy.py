@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from app.models import Schedule
 
@@ -19,15 +19,6 @@ RETRY_DELAY = timedelta(minutes=5)
 # A mute with no end date. Keeping it a distant moment rather than a second
 # column means one nullable timestamp answers "is this user muted".
 INDEFINITE = datetime(9999, 12, 31, tzinfo=UTC)
-
-
-def zone(name: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(name)
-    except ZoneInfoNotFoundError, ValueError:
-        # The column holds whatever a browser reported at signup; one
-        # unreadable row must not stop the poller for everyone else.
-        return ZoneInfo("UTC")
 
 
 def _open_at(day: date, tz: ZoneInfo) -> datetime:
@@ -95,6 +86,10 @@ def session_items(
     """
     ordered = sorted(
         due,
-        key=lambda row: (row.kind != "reminder", topic(row) == avoid, row.due_at),
+        key=lambda row: (
+            row.kind != "reminder",
+            avoid is not None and topic(row) == avoid,
+            row.due_at,
+        ),
     )
     return ordered[:SESSION_ITEMS], ordered[SESSION_ITEMS:]

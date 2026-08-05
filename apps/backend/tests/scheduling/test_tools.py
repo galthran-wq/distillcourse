@@ -194,7 +194,10 @@ async def test_muting_from_the_conversation_stops_the_next_message(
     await session.refresh(user)
     await session.refresh(review)
     assert user.muted_until == policy.INDEFINITE
-    assert review.status == "deferred"
+    # Held where it stands, not pushed out to the year 9999: the mute is undone
+    # by clearing one column, and this row is due again the moment it is.
+    assert review.status == "pending"
+    assert review.claimed_at is None
     assert len(await repo.rows(thread)) == before
 
 
