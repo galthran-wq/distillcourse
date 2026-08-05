@@ -5,34 +5,53 @@ from fastapi import HTTPException, Request, status
 WINDOW = timedelta(minutes=1)
 MAX_REQUESTS = 10
 
-# A fixed window over one dict, cleared whole when the window turns: no per-key
-# expiry bookkeeping, and memory bounded by the number of addresses seen in a
-# minute. Counters are per process, so with N uvicorn workers the effective
-# ceiling is N * MAX_REQUESTS — enough to keep credential stuffing off a box
-# that has no shared cache to count in.
-_window_start = datetime.now(UTC)
-_hits: dict[str, int] = {}
+
+class FixedWindow:
+    """A per-process fixed-window counter, keyed by whatever the caller counts.
+
+    One dict cleared whole when the window turns: no per-key expiry
+    bookkeeping, and memory bounded by the number of keys seen in a minute.
+    Counters are per process, so with N uvicorn workers the effective ceiling
+    is N * max_requests — enough to keep credential stuffing and a runaway
+    client off a box that has no shared cache to count in.
+    """
+
+    def __init__(self, max_requests: int) -> None:
+        self.max_requests = max_requests
+        self._window_start = datetime.now(UTC)
+        self._hits: dict[str, int] = {}
+        _limiters.append(self)
+
+    def check(self, key: str) -> None:
+        now = datetime.now(UTC)
+        if now - self._window_start >= WINDOW:
+            self._hits.clear()
+            self._window_start = now
+        self._hits[key] = self._hits.get(key, 0) + 1
+        if self._hits[key] > self.max_requests:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "too many requests, try again in a minute",
+            )
+
+    def clear(self) -> None:
+        self._hits.clear()
+        self._window_start = datetime.now(UTC)
+
+
+# Every limiter registers itself so the test suite can empty all the windows
+# between tests without knowing where each one lives.
+_limiters: list[FixedWindow] = []
+_signup_and_login = FixedWindow(MAX_REQUESTS)
 
 
 def rate_limit(request: Request) -> None:
-    global _window_start
-    now = datetime.now(UTC)
-    if now - _window_start >= WINDOW:
-        _hits.clear()
-        _window_start = now
-    address = _client_address(request)
-    _hits[address] = _hits.get(address, 0) + 1
-    if _hits[address] > MAX_REQUESTS:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            "too many requests, try again in a minute",
-        )
+    _signup_and_login.check(_client_address(request))
 
 
 def reset() -> None:
-    global _window_start
-    _hits.clear()
-    _window_start = datetime.now(UTC)
+    for limiter in _limiters:
+        limiter.clear()
 
 
 def _client_address(request: Request) -> str:
