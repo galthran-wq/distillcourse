@@ -66,7 +66,9 @@ async def start(
 async def test_a_run_persists_the_turn_its_usage_and_the_title(
     repo: HarnessRepository, chat: Chat
 ) -> None:
-    with tutor.override(model=TestModel(custom_output_text="expected surprise")):
+    with tutor.override(
+        model=TestModel(custom_output_text="expected surprise"), tools=[]
+    ):
         output = await runner.run(repo, chat, "what is entropy?")
 
     rows = await repo.rows(chat)
@@ -124,7 +126,7 @@ async def test_a_claimed_chat_refuses_a_second_run(
 ) -> None:
     await repo.claim_run(chat, uuid.uuid4())
 
-    with tutor.override(model=TestModel()):
+    with tutor.override(model=TestModel(), tools=[]):
         with pytest.raises(runner.RunBusy):
             await runner.run(repo, chat, "what is entropy?")
 
@@ -143,7 +145,7 @@ async def test_a_run_that_cannot_start_leaves_the_chat_free(
     )
     monkeypatch.setattr(runner, "summarize", explode)
 
-    with tutor.override(model=TestModel()):
+    with tutor.override(model=TestModel(), tools=[]):
         with pytest.raises(RuntimeError, match="openrouter is down"):
             await runner.run(repo, chat, "what is entropy?")
 
@@ -163,7 +165,9 @@ async def test_a_full_context_is_compacted_before_the_next_run(
         usage={"input_tokens": 900_000, "output_tokens": 0},
     )
 
-    with tutor.override(model=TestModel(custom_output_text="they study entropy")):
+    with tutor.override(
+        model=TestModel(custom_output_text="they study entropy"), tools=[]
+    ):
         await runner.run(repo, chat, "what is entropy?")
 
     rows = await repo.rows(chat)
@@ -204,7 +208,9 @@ async def test_the_conversation_the_client_holds_is_not_replayed(
         UIMessage(id="m0a", role="assistant", parts=[TextUIPart(text="a unit")]),
     ]
 
-    with tutor.override(model=TestModel(custom_output_text="expected surprise")):
+    with tutor.override(
+        model=TestModel(custom_output_text="expected surprise"), tools=[]
+    ):
         chunks = await start(session_factory, repo, chat, earlier=earlier)
         [_ async for _ in chunks]
 
@@ -229,7 +235,7 @@ async def test_a_failure_before_the_stream_is_told_to_the_client(
 
     monkeypatch.setattr(runner, "model_for", explode)
 
-    with tutor.override(model=TestModel()):
+    with tutor.override(model=TestModel(), tools=[]):
         chunks = [chunk async for chunk in await start(session_factory, repo, chat)]
 
     rows = await repo.rows(chat)
@@ -248,7 +254,9 @@ async def test_a_client_that_leaves_mid_stream_still_gets_its_run_stored(
     repo: HarnessRepository,
     chat: Chat,
 ) -> None:
-    with tutor.override(model=TestModel(custom_output_text="expected surprise")):
+    with tutor.override(
+        model=TestModel(custom_output_text="expected surprise"), tools=[]
+    ):
         chunks = await start(session_factory, repo, chat)
         await anext(chunks)
         await chunks.aclose()
@@ -272,7 +280,9 @@ async def test_a_fresh_summary_does_not_trigger_another_compaction(
         usage={"input_tokens": 900_000, "output_tokens": 0},
     )
 
-    with tutor.override(model=TestModel(custom_output_text="they study entropy")):
+    with tutor.override(
+        model=TestModel(custom_output_text="they study entropy"), tools=[]
+    ):
         await runner.run(repo, chat, "what is entropy?")
         await runner.run(repo, chat, "and cross entropy?")
 
@@ -288,7 +298,7 @@ async def test_a_system_run_does_not_spend_the_daily_allowance(
             chat, [ModelRequest(parts=[UserPromptPart(content="q")])], role="user"
         )
 
-    with tutor.override(model=TestModel(custom_output_text="due for review")):
+    with tutor.override(model=TestModel(custom_output_text="due for review"), tools=[]):
         assert await runner.run(repo, chat, "review time", run_kind="review")
         assert await runner.run(repo, chat, "what is entropy?")
         with pytest.raises(LimitExceeded):

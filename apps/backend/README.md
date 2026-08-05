@@ -25,9 +25,11 @@ app/
     prompts.py       # module concatenation + context blocks
     prompts/         # the prompt modules themselves (see below)
     deps.py          # HarnessDeps — what a tool receives
+    tools.py         # the tools themselves; importing it registers them
+    web_search.py    # the Perplexity call behind the web_search tool
     repository.py    # user-scoped reads and writes over chats and messages
     usage.py         # the shape of messages.usage, written once, read by caps
-    limits.py        # the daily cap and the monthly cost ceiling
+    limits.py        # the daily cap, the monthly ceiling, the web search cap
     runner.py        # claim, persist, stream, compact
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
@@ -39,7 +41,7 @@ app/
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
-  content/           # the indexed corpus: ingest CLI + tier-1 FTS search
+  content/           # the indexed corpus: ingest CLI, FTS search, course spine
   telemetry/         # reading events, the lesson aggregate, completion
   cli.py             # operator commands (reset-password, delete-user,
                      # rebuild-progress)
@@ -130,11 +132,34 @@ governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
 inside such a fence is data.
 
-Caps are enforcement, not telemetry: messages per user per day, and an
-instance-wide monthly ceiling computed from the cost recorded on every run.
-Set a spend limit on the OpenRouter key too — that one holds even if this code
-is wrong. The per-user web search cap belongs to the search tool that spends
-it and lands with it.
+Caps are enforcement, not telemetry: messages per user per day, an
+instance-wide monthly ceiling computed from the cost recorded on every run,
+and web searches per user per day. Set a spend limit on the OpenRouter key
+too — that one holds even if this code is wrong.
+
+## The tutor's tools
+
+`app/harness/tools.py`, registered on the agent by being imported. None of
+them takes a user id: a tool is handed the repository the run was built with,
+so the only chats it can write to are the ones that repository can see.
+
+- `search_content` / `fetch_content` — the corpus. A locator that resolves to
+  nothing comes back as `not_found` with the three closest locators, which is
+  what lets the tutor correct its own typo instead of telling the learner the
+  material does not exist. An anchor resolves to the section that contains it;
+  a locator without one reads the whole document.
+- `get_course_structure` — the spine of a course from the `course:` documents:
+  modules and lessons in reading order, prerequisites, concepts.
+- `report_content_incident` — a row in `incidents` when the tutor concludes the
+  material is at fault rather than the learner. Triage is manual (`psql`);
+  nothing else in the application reads that table.
+- `web_search` — one Perplexity call, capped per user per day and counted in
+  `messages.usage` beside the tokens. The answer reaches the model inside an
+  `<untrusted source="web_search">` fence, where `base.md` has already told it
+  that instructions are data. The attempt is what counts against the cap, not
+  the answer, so a provider having a bad day cannot become a retry loop.
+- `get_user_progress` is specified with these but not implemented here: it
+  reads the `lesson_progress` aggregate that telemetry owns, and lands with it.
 
 ## Lesson user state
 
@@ -154,9 +179,10 @@ queries them in psql (`docs/deployment.md`).
 ## The content index
 
 `documents` is the only route from the service to the courses: which files
-exist and where they live is unknown here. Rows arrive from the frontend's
-`npm run export-index`, which chunks lessons through the site's own MDX
-pipeline, and are written by
+exist and where they live is unknown here — the structure of a course is a
+row in it (`course:<slug>`, the spine in `metadata`) exactly as its prose is.
+Rows arrive from the frontend's `npm run export-index`, which chunks lessons
+through the site's own MDX pipeline, and are written by
 
 ```bash
 python -m app.content.ingest <index.json>     # `make reindex` from the root

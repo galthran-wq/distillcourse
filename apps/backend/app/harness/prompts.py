@@ -30,15 +30,18 @@ def _module(name: str) -> str:
     return (PROMPTS_DIR / name).read_text(encoding="utf-8").strip()
 
 
+def untrusted(source: str, body: str) -> str:
+    """Fence text that came from outside the platform, naming where it came
+    from. `base.md` is where the tutor is told that what is inside a fence is
+    data — so anything reaching the model from the open web goes through here,
+    whether it arrives as a context block or as a tool result."""
+    return f'<untrusted source="{source}">\n{body}\n</untrusted>'
+
+
 def _render(block: ContextBlock) -> str:
     if block.untrusted_source is None:
         return f"## {block.title}\n\n{block.body}"
-    return (
-        f"## {block.title}\n\n"
-        f'<untrusted source="{block.untrusted_source}">\n'
-        f"{block.body}\n"
-        "</untrusted>"
-    )
+    return f"## {block.title}\n\n{untrusted(block.untrusted_source, block.body)}"
 
 
 def assemble(

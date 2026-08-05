@@ -100,7 +100,9 @@ async def test_the_stream_answers_and_leaves_the_conversation_readable(
     repo = HarnessRepository(session, user.id)
     chat = await repo.create_chat(kind="web")
 
-    with tutor.override(model=TestModel(custom_output_text="expected surprise")):
+    with tutor.override(
+        model=TestModel(custom_output_text="expected surprise"), tools=[]
+    ):
         response = await signed_in.post(
             f"/api/v1/chats/{chat.id}/stream",
             json=submission(chat.id, "lesson:information-theory/entropy"),
@@ -149,7 +151,9 @@ async def test_compacting_replaces_the_history_with_a_summary(
     chat = await repo.create_chat(kind="web")
     await repo.add_messages(chat, [QUESTION], role="user")
 
-    with tutor.override(model=TestModel(custom_output_text="they study entropy")):
+    with tutor.override(
+        model=TestModel(custom_output_text="they study entropy"), tools=[]
+    ):
         response = await signed_in.post(f"/api/v1/chats/{chat.id}/compact")
 
     history = await repo.history(chat)
