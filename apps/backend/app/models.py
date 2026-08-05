@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.content.locators import LESSON_LENGTH
+from app.content.locators import LESSON_LENGTH, SLUG_LENGTH
 
 
 class Base(DeclarativeBase):
@@ -178,7 +178,7 @@ class Document(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     corpus: Mapped[str] = mapped_column(String(16), index=True)
-    course_slug: Mapped[str | None] = mapped_column(String(64), index=True)
+    course_slug: Mapped[str | None] = mapped_column(String(SLUG_LENGTH), index=True)
     locator: Mapped[str] = mapped_column(String(512), unique=True)
     title: Mapped[str] = mapped_column(Text)
     breadcrumb: Mapped[str] = mapped_column(Text)
@@ -191,43 +191,9 @@ class Document(Base):
     tsv: Mapped[str] = mapped_column(TSVECTOR, Computed(DOCUMENT_TSV, persisted=True))
 
 
-# Everything a user does to a lesson is keyed by "<course-slug>/<lesson-slug>":
-# the path half of the content index's `lesson:` locator, so user state and the
-# corpus name the same places without either owning the other's table.
-SLUG_MAX_LENGTH = 80
-LESSON_KEY_MAX_LENGTH = 2 * SLUG_MAX_LENGTH + 1
-
-
-class LessonProgress(Base):
-    """Reading aggregate per (user, lesson), derived from telemetry events.
-
-    Telemetry ingest owns the writes; the visit history is the only reader, and
-    it exposes the timestamps rather than the counters — a reader is shown
-    where they have been, never the measurements taken while they read.
-    """
-
-    __tablename__ = "lesson_progress"
-
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    lesson: Mapped[str] = mapped_column(String(LESSON_KEY_MAX_LENGTH), primary_key=True)
-    active_seconds: Mapped[int] = mapped_column(server_default="0")
-    max_scroll_pct: Mapped[int] = mapped_column(server_default="0")
-    proofs_opened: Mapped[int] = mapped_column(server_default="0")
-    solutions_opened: Mapped[int] = mapped_column(server_default="0")
-    demos_touched: Mapped[int] = mapped_column(server_default="0")
-    first_seen: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    last_seen: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
-
-
+# Rating and bookmark are keyed by the same `lesson:` locator `events` and
+# `lesson_progress` carry, so a reader's votes, their reading and the corpus
+# all name a lesson with one string.
 class LessonRating(Base):
     __tablename__ = "lesson_ratings"
     # The API rejects anything else already; the constraint is what keeps the
@@ -237,7 +203,7 @@ class LessonRating(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    lesson: Mapped[str] = mapped_column(String(LESSON_KEY_MAX_LENGTH), primary_key=True)
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
     value: Mapped[int] = mapped_column(SmallInteger)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -250,7 +216,7 @@ class Bookmark(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    lesson: Mapped[str] = mapped_column(String(LESSON_KEY_MAX_LENGTH), primary_key=True)
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

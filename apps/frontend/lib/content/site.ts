@@ -2,6 +2,7 @@ import "server-only";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadCourse, listCourseDirs, type LoadedCourse, type LoadedLesson } from "./load";
+import { lessonKey } from "./locator";
 import { isReadable } from "./visibility";
 
 // content/ lives at the repo ROOT (it is the human curation surface, shared
@@ -52,15 +53,15 @@ export interface LessonLink {
 }
 
 /**
- * Every readable lesson under the `<course>/<lesson>` key the API stores user
- * state against, so a profile row can be named and linked without the backend
+ * Every readable lesson under the `lesson:` locator the API stores user state
+ * against, so a profile row can be named and linked without the backend
  * knowing any of it.
  */
 export function getLessonLinks(): Record<string, LessonLink> {
   const links: Record<string, LessonLink> = {};
   for (const course of getCourses()) {
     for (const entry of course.lessons.filter(isReadable)) {
-      links[`${course.course.slug}/${entry.lesson.slug}`] = {
+      links[lessonKey(course.course.slug, entry.lesson.slug)] = {
         title: entry.lesson.title,
         course: course.course.title,
         href: `/courses/${course.course.slug}/lessons/${entry.lesson.slug}`,

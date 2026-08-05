@@ -138,12 +138,14 @@ it and lands with it.
 
 ## Lesson user state
 
-Three tables keyed by `(user_id, "<course-slug>/<lesson-slug>")`:
-`lesson_progress` (the reading aggregate telemetry writes and the profile's
-visit history reads), `lesson_ratings` (one changeable ±1 per lesson) and
-`bookmarks`. The service does not know which lessons exist — that is the
-content index's business — so the routes validate the shape of the two slugs
-and nothing more.
+Three tables keyed by `(user_id, "lesson:<course-slug>/<lesson-slug>")` — the
+content index's own locator, so a rating, a bookmark, a reading event and a
+search hit all name a lesson with one string: `lesson_progress` (the reading
+aggregate telemetry writes and the profile's visit history reads),
+`lesson_ratings` (one changeable ±1 per lesson) and `bookmarks`. The service
+does not know which lessons exist — that is the content index's business — so
+the routes validate the shape of the two slugs (`locators.SLUG_LENGTH`) and
+compose the locator themselves.
 
 Every route requires a session: an anonymous visitor reads the site and leaves
 no row anywhere. Ratings have no public counter and no dashboard; the curator

@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
+import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import {
   getLessonState,
@@ -37,23 +38,7 @@ export function LessonStateProvider({
   children: React.ReactNode;
 }) {
   const auth = useAuth();
-  const [state, setState] = useState<LessonState | null>(null);
-
-  useEffect(() => {
-    if (auth.status !== "signed-in") return;
-    let current = true;
-    getLessonState(lesson).then(
-      (loaded) => {
-        if (current) setState(loaded);
-      },
-      () => {
-        if (current) setState(null);
-      },
-    );
-    return () => {
-      current = false;
-    };
-  }, [auth.status, lesson]);
+  const [state, setState] = useSignedIn(getLessonState, lesson);
 
   // The button answers the click and the write follows; a failed write puts the
   // previous answer back rather than leaving the page and the database apart.

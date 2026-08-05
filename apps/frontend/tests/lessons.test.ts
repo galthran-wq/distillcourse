@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { lessonKey } from "@/lib/content/locator";
 import {
   getLessonState,
   getProfile,
@@ -26,7 +27,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const LESSON = "information-theory/entropy";
+// The index locator, which is the key the API stores state under; the URL
+// it travels on drops the corpus the route prefix already names.
+const LESSON = lessonKey("information-theory", "entropy");
 
 describe("the lesson state client", () => {
   it("reads the state of one lesson", async () => {

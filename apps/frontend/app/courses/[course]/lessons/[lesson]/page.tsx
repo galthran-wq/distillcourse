@@ -34,6 +34,7 @@ import {
   Task,
   Theorem,
 } from "@/components/mdx/Blocks";
+import { lessonKey } from "@/lib/content/locator";
 import { getCourses, getLessonView } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
 import { rehypeCollectToc, type TocEntry } from "@/lib/content/toc";
@@ -75,6 +76,9 @@ export default async function LessonPage({
   const { course, entry, moduleTitle, prev, next } = view;
   const lesson = entry.lesson;
   const number = String(entry.index + 1).padStart(2, "0");
+  // The one name this lesson has on the API — telemetry, rating and bookmark
+  // all send it, and the profile looks a row up by it.
+  const key = lessonKey(course.course.slug, lesson.slug);
 
   const imageCredits = loadCredits(entry.dir).entries;
 
@@ -149,14 +153,11 @@ export default async function LessonPage({
     <div className="lesson-grid mx-auto w-full max-w-7xl px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_230px] lg:gap-14">
       {/* The locator is the index's, so an event names the same place a
           search hit or a tutor citation does. */}
-      <LessonTelemetry lesson={`lesson:${course.course.slug}/${lesson.slug}`} />
+      <LessonTelemetry lesson={key} />
       <article className="min-w-0">
         {/* Keyed by the lesson: moving to the next one must not show the
             previous one's bookmark while the new state loads. */}
-        <LessonStateProvider
-          key={`${course.course.slug}/${lesson.slug}`}
-          lesson={`${course.course.slug}/${lesson.slug}`}
-        >
+        <LessonStateProvider key={key} lesson={key}>
           <header className="border-b border-line py-10">
             <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
               <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">

@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import type { LessonLink } from "@/lib/content/site";
-import { getProfile, type Profile } from "@/lib/lessons/api";
+import { getProfile } from "@/lib/lessons/api";
 
 function day(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -53,23 +53,7 @@ export default function ProfileLists({
   lessons: Record<string, LessonLink>;
 }) {
   const auth = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-
-  useEffect(() => {
-    if (auth.status !== "signed-in") return;
-    let current = true;
-    getProfile().then(
-      (loaded) => {
-        if (current) setProfile(loaded);
-      },
-      () => {
-        if (current) setProfile(null);
-      },
-    );
-    return () => {
-      current = false;
-    };
-  }, [auth.status]);
+  const [profile] = useSignedIn(getProfile);
 
   if (auth.status === "anonymous") {
     return (

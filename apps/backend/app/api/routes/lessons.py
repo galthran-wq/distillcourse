@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, Path, status
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep
+from app.content.locators import SLUG_LENGTH
 from app.lessons import state
-from app.models import SLUG_MAX_LENGTH
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
 
@@ -13,12 +13,14 @@ router = APIRouter(prefix="/lessons", tags=["lessons"])
 # ingested separately — so the shape of a slug is the whole check: enough to
 # keep junk out of the columns the curator reads.
 Slug = Annotated[
-    str, Path(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=SLUG_MAX_LENGTH)
+    str, Path(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=SLUG_LENGTH)
 ]
 
 
 def lesson_key(course: Slug, lesson: Slug) -> str:
-    return f"{course}/{lesson}"
+    # The index's locator: what telemetry already stores a reader's progress
+    # under, so the profile can join a rating, a bookmark and a visit.
+    return f"lesson:{course}/{lesson}"
 
 
 LessonKey = Annotated[str, Depends(lesson_key)]

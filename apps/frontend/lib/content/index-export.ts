@@ -10,6 +10,7 @@ import rehypeSlug from "rehype-slug";
 import { visit } from "unist-util-visit";
 import type { Root, RootContent, Element } from "hast";
 import type { LoadedCourse, LoadedLesson } from "./load";
+import { lessonKey } from "./locator";
 import { isMdxJsxNode, stringAttr, type MdxJsxNode } from "./mdx-jsx";
 import { isReadable } from "./visibility";
 
@@ -288,7 +289,7 @@ function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocume
   const chunks = chunk(root, entry.lesson.title);
   const moduleTitle =
     course.course.modules.find((m) => m.slug === entry.moduleSlug)?.title ?? "";
-  const path = `${course.course.slug}/${entry.lesson.slug}`;
+  const key = lessonKey(course.course.slug, entry.lesson.slug);
 
   const perChunk = chunks.map((c) => {
     const segments = segmentsOf(c.nodes);
@@ -306,7 +307,7 @@ function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocume
   return perChunk.map(({ chunk: c, text, words }, position) => ({
     corpus: "lesson" as const,
     course_slug: course.course.slug,
-    locator: `lesson:${path}${c.anchor !== undefined ? `#${c.anchor}` : ""}`,
+    locator: `${key}${c.anchor !== undefined ? `#${c.anchor}` : ""}`,
     title: c.title,
     breadcrumb: [
       course.course.title,

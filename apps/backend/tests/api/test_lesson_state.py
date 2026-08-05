@@ -12,6 +12,9 @@ from tests.utils.utils import signup
 
 LESSON = "/api/v1/lessons/information-theory/entropy"
 PROFILE = "/api/v1/profile"
+# What those routes store under: the content index's locator, which is also
+# what telemetry writes into lesson_progress.
+LESSON_KEY = "lesson:information-theory/entropy"
 
 
 @pytest.fixture
@@ -24,11 +27,19 @@ async def reader(client: AsyncClient) -> uuid.UUID:
 async def visited(
     session: AsyncSession, user_id: uuid.UUID, lesson: str, *, minutes_ago: int
 ) -> None:
+    """A row as telemetry ingest leaves it — that module owns every write here."""
+    seen = datetime.now(UTC) - timedelta(minutes=minutes_ago)
     session.add(
         LessonProgress(
             user_id=user_id,
             lesson=lesson,
-            last_seen=datetime.now(UTC) - timedelta(minutes=minutes_ago),
+            active_seconds=0,
+            max_scroll_pct=0,
+            proofs_opened=0,
+            solutions_opened=0,
+            demos_touched=0,
+            first_seen=seen,
+            last_seen=seen,
         )
     )
     await session.commit()
@@ -56,9 +67,7 @@ async def test_a_rating_is_stored_and_changed(
 
     # What the curator reads in psql: one row per (user, lesson), current vote.
     rows = (await session.scalars(select(LessonRating))).all()
-    assert [(row.lesson, row.value) for row in rows] == [
-        ("information-theory/entropy", -1)
-    ]
+    assert [(row.lesson, row.value) for row in rows] == [(LESSON_KEY, -1)]
     assert (await client.get(LESSON)).json()["rating"] == -1
 
 
@@ -88,7 +97,7 @@ async def test_a_bookmark_toggles_and_repeats_harmlessly(client: AsyncClient) ->
 
     bookmarked = (await client.get(PROFILE)).json()["bookmarks"]
     assert (await client.get(LESSON)).json()["bookmarked"] is True
-    assert [row["lesson"] for row in bookmarked] == ["information-theory/entropy"]
+    assert [row["lesson"] for row in bookmarked] == [LESSON_KEY]
 
     await client.delete(f"{LESSON}/bookmark")
     await client.delete(f"{LESSON}/bookmark")
@@ -101,20 +110,50 @@ async def test_history_is_the_most_recent_visits_newest_first(
     client: AsyncClient, session: AsyncSession, reader: uuid.UUID
 ) -> None:
     for index in range(HISTORY_LIMIT + 3):
-        await visited(session, reader, f"course/lesson-{index}", minutes_ago=index)
+        await visited(
+            session, reader, f"lesson:course/lesson-{index}", minutes_ago=index
+        )
 
     history = (await client.get(PROFILE)).json()["history"]
 
     assert len(history) == HISTORY_LIMIT
     assert [row["lesson"] for row in history] == [
-        f"course/lesson-{index}" for index in range(HISTORY_LIMIT)
+        f"lesson:course/lesson-{index}" for index in range(HISTORY_LIMIT)
     ]
+
+
+@pytest.mark.usefixtures("reader")
+async def test_a_lesson_that_was_read_appears_under_the_key_it_was_rated_by(
+    client: AsyncClient,
+) -> None:
+    # Telemetry writes the history rows and these routes write the ratings and
+    # bookmarks; the profile is only useful if the two name a lesson alike.
+    await client.put(f"{LESSON}/bookmark")
+    await client.post(
+        "/api/v1/telemetry/events",
+        json={
+            "lesson": LESSON_KEY,
+            "events": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "lesson_opened",
+                    "client_ts": datetime.now(UTC).isoformat(),
+                    "payload": {},
+                }
+            ],
+        },
+    )
+
+    profile = (await client.get(PROFILE)).json()
+
+    assert [row["lesson"] for row in profile["history"]] == [LESSON_KEY]
+    assert [row["lesson"] for row in profile["bookmarks"]] == [LESSON_KEY]
 
 
 async def test_history_carries_no_reading_measurements(
     client: AsyncClient, session: AsyncSession, reader: uuid.UUID
 ) -> None:
-    await visited(session, reader, "course/lesson", minutes_ago=1)
+    await visited(session, reader, "lesson:course/lesson", minutes_ago=1)
 
     entry = (await client.get(PROFILE)).json()["history"][0]
 
@@ -125,8 +164,10 @@ async def test_history_carries_no_reading_measurements(
 async def test_another_reader_state_is_invisible(
     client: AsyncClient, session: AsyncSession, other_user: User
 ) -> None:
-    await visited(session, other_user.id, "course/theirs", minutes_ago=1)
-    session.add(LessonRating(user_id=other_user.id, lesson="course/theirs", value=1))
+    await visited(session, other_user.id, "lesson:course/theirs", minutes_ago=1)
+    session.add(
+        LessonRating(user_id=other_user.id, lesson="lesson:course/theirs", value=1)
+    )
     await session.commit()
 
     profile = (await client.get(PROFILE)).json()
