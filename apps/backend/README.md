@@ -37,7 +37,9 @@ app/
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   content/           # the indexed corpus: ingest CLI + tier-1 FTS search
-  cli.py             # operator commands (reset-password, delete-user)
+  telemetry/         # reading events, the lesson aggregate, completion
+  cli.py             # operator commands (reset-password, delete-user,
+                     # rebuild-progress)
   alembic/           # migrations; explicit, hand-reviewed, always reversible
   mail/              # SMTP sender + templates — dormant, see below
 ```
@@ -153,6 +155,40 @@ corpus is hundreds of chunks and the consumer is an agent that reformulates
 its query, so recall matters more than the order of the top few. If that
 stops being good enough, the next step is a BM25 rerank of the top 50 in
 memory, and only then a vector tier.
+
+## Telemetry
+
+`events` is append-only and is the truth about reading; `lesson_progress` is a
+projection of it, upserted in the same transaction as the flush that changed
+it. Only signed-in readers are tracked — an anonymous visitor reaches
+`POST /telemetry/events` as a 401 and leaves no row.
+
+The browser mints each event's id, so a retried flush lands on rows that are
+already there. A batch is capped at 50 events and each payload is validated
+against its type and re-emitted from the model, so what the aggregate casts in
+SQL is always the declared shape; an event the server cannot read is dropped
+rather than answered with an error, because telemetry must not interrupt
+reading.
+
+The aggregate is a full recompute from the events of one (reader, lesson), not
+an increment: the projection cannot drift from the log, and
+
+```bash
+python -m app.cli rebuild-progress    # every aggregate, from the events
+```
+
+is that same function over every pair. Rebuild recomputes aggregates only —
+side effects are not replayed, so a completion a changed heuristic invents
+starts no review ladder.
+
+A lesson counts as complete at `max_scroll_pct >= 90` and `active_seconds`
+past a threshold of `document_word_count / 250 wpm / 2`, clamped to 3–20
+minutes and read from `documents` (5 minutes for a lesson the index has never
+seen). The completion instant is derived from running totals over the events
+rather than from `now()`, so deriving it twice gives the same answer. It is
+recorded as a `lesson_completed` event whose id is derived from (user,
+lesson): the insert itself is the exactly-once check, and that row is where
+spaced repetition subscribes.
 
 ## Dormant mail
 

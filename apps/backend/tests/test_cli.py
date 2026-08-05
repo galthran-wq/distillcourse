@@ -1,9 +1,12 @@
+import uuid
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import cli, crud
-from app.models import UserSession
+from app.models import Event, LessonProgress, UserSession
 from tests.utils.utils import random_email, random_password, user_session
 
 
@@ -35,6 +38,32 @@ async def test_delete_user_takes_the_sessions_with_it(session: AsyncSession) -> 
 
     assert await crud.get_user_by_email(session, email) is None
     assert (await session.scalars(select(UserSession))).all() == []
+
+
+async def test_rebuild_progress_recomputes_the_aggregate_from_the_events(
+    session: AsyncSession,
+) -> None:
+    lesson = "lesson:information-theory/entropy"
+    user = await crud.create_user(
+        session, email=random_email(), password=random_password(), timezone="UTC"
+    )
+    session.add(
+        Event(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            lesson=lesson,
+            type="heartbeat",
+            payload={"seconds": 10},
+            client_ts=datetime.now(UTC),
+        )
+    )
+    await session.commit()
+
+    await cli.rebuild_progress(session)
+
+    aggregate = await session.get(LessonProgress, (user.id, lesson))
+    assert aggregate is not None
+    assert aggregate.active_seconds == 10
 
 
 async def test_reset_password_reports_an_unknown_email(session: AsyncSession) -> None:
