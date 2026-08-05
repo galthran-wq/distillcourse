@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.ingest import ingest
 from app.content.schemas import ContentIndex
-from app.content.search import SearchHit, fetch, search
+from app.content.search import SearchHit, search, section_of, sections, suggest
 from tests.content.conftest import document, index
 
 # The queries a tutor actually issues, with the lesson that should answer each.
@@ -139,26 +139,44 @@ async def test_a_renamed_heading_leaves_no_dead_locator_behind(
     ]
 
 
-async def test_fetch_resolves_an_h3_anchor_to_its_containing_section(
+async def test_an_h3_anchor_resolves_to_its_containing_section(
     session: AsyncSession, corpus_index: ContentIndex
 ) -> None:
     await ingest(session, corpus_index)
 
-    section = await fetch(
-        session,
-        "lesson:information-theory/kl-divergence#one-inequality-many-corollaries",
-    )
+    lesson = "lesson:information-theory/kl-divergence"
+    chunks = await sections(session, lesson)
+    section = section_of(chunks, f"{lesson}#one-inequality-many-corollaries")
 
     assert section is not None
     assert section.locator == (
-        "lesson:information-theory/kl-divergence"
-        "#gibbs-inequality-the-overhead-is-never-negative"
+        f"{lesson}#gibbs-inequality-the-overhead-is-never-negative"
     )
+    # In reading order, and the whole lesson: the lead chunk carries no anchor.
+    assert chunks[0].locator == lesson
+    assert [chunk.position for chunk in chunks] == list(range(len(chunks)))
 
 
-async def test_fetch_returns_none_for_a_locator_no_document_owns(
+async def test_no_section_owns_an_anchor_that_is_not_in_the_lesson(
     session: AsyncSession, corpus_index: ContentIndex
 ) -> None:
     await ingest(session, corpus_index)
 
-    assert await fetch(session, "lesson:information-theory/kl-divergence#gone") is None
+    chunks = await sections(session, "lesson:information-theory/kl-divergence")
+
+    assert section_of(chunks, "lesson:information-theory/kl-divergence#gone") is None
+    assert await sections(session, "lesson:information-theory/no-such-lesson") == []
+
+
+async def test_a_mistyped_locator_still_suggests_the_lesson_it_meant(
+    session: AsyncSession, corpus_index: ContentIndex
+) -> None:
+    """One wrong word out of several must not veto the suggestion — that is the
+    whole case suggestions exist for."""
+    await ingest(session, corpus_index)
+
+    hits = await suggest(session, "lesson:information-theory/kl-divergance")
+
+    assert "lesson:information-theory/kl-divergence" in [
+        hit.locator.split("#")[0] for hit in hits
+    ]
