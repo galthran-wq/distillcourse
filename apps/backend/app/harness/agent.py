@@ -13,6 +13,7 @@ from app.scheduling.tools import (
     mute_proactive,
     unmute_proactive,
 )
+from app.telegram.tools import send_message
 
 tutor = Agent(
     name="tutor",
@@ -23,6 +24,7 @@ tutor = Agent(
         cancel_reminder,
         mute_proactive,
         unmute_proactive,
+        send_message,
     ],
 )
 

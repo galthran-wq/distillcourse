@@ -18,7 +18,8 @@ from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import Chat, Schedule, User
 from app.scheduling import policy, repository, worker
-from tests.scheduling.conftest import NOON, replying
+from tests.conftest import replying
+from tests.scheduling.conftest import NOON
 
 FRIDAY = NOON + timedelta(days=2)
 

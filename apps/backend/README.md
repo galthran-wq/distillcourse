@@ -20,6 +20,8 @@ app/
     routes/chats.py  # chat CRUD + the Vercel AI data stream
     routes/lessons.py # per-lesson user state: rating, bookmark
     routes/profile.py # visit history + bookmarks for the profile page
+    routes/settings.py # the learner's own settings, pairing included
+    routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
   harness/
     agent.py         # the tutor agent, the model pool, the compaction threshold
     prompts.py       # module concatenation + context blocks
@@ -44,6 +46,12 @@ app/
     repository.py    # schedules: claim, lease, defer, slot, outcome
     worker.py        # the poller process + the daily housekeeping sweep
     tools.py         # reminder and mute tools, run by the tutor
+  telegram/
+    api.py           # the Bot API client: sendMessage, setWebhook
+    repository.py    # links, pairing codes, update dedup
+    outbox.py        # sending: length split, HTML fallback, blocked bot
+    updates.py       # one incoming message, end to end; bot commands
+    tools.py         # send_message, run by the tutor
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
@@ -164,6 +172,11 @@ so the only chats it can write to are the ones that repository can see.
   `<untrusted source="web_search">` fence, where `base.md` has already told it
   that instructions are data. The attempt is what counts against the cap, not
   the answer, so a provider having a bad day cannot become a retry loop.
+- `send_message` — one message into the learner's Telegram thread, before the
+  answer is finished. It is the delivery once it is used: a run that sent
+  nothing has its final answer delivered for it, and one that sent something
+  does not get its answer sent on top. On the site the tool says there is
+  nothing to send: the answer is the delivery there.
 - `get_user_progress` is specified with these but not implemented here: it
   reads the `lesson_progress` aggregate that telemetry owns, and lands with it
   (#37).
@@ -203,8 +216,9 @@ a logfire error.
 
 What reaches the learner is decided per user, in `policy.py`:
 
-- **Quiet hours** 09:00–22:00 on `users.timezone`; outside them the row waits
-  for the next morning.
+- **Quiet hours** `users.quiet_start`–`users.quiet_end` (09:00–22:00 by
+  default) on `users.timezone`, both ends the learner's to move on the settings
+  page; outside them the row waits for the next morning.
 - **One open slot.** A delivered message sets `awaiting_reply`, and `due_at`
   then means the moment it counts as ignored — four *waking* hours later, so a
   message at 21:30 is not written off overnight. Everything else due waits for
@@ -230,7 +244,50 @@ every morning forever. Whether they replied is read back from the thread, so the
 outcome (`answered` / `ignored`) is recorded whichever way a message arrived.
 
 The worker also owns the daily housekeeping sweep of rows nothing will read
-again; today that is expired sessions.
+again: expired sessions, spent pairing codes and update ids older than a week.
+
+## Telegram
+
+The second medium, and the only one the platform can write to first. One
+learner, one Telegram account (`tg_links`, unique on both sides), one eternal
+thread (`chats.kind = 'telegram'`) — no chat switching, deliberately unlike the
+site.
+
+Pairing starts on the settings page: a one-time code (10 minutes, spent on
+first use) behind a `t.me/<bot>?start=<code>` link. The code is the credential,
+so a leak is bounded by that TTL and that single use; a Telegram account that
+already belongs to another learner is refused before the code is spent.
+Unpairing deletes the link and keeps the thread, so pairing again resumes the
+same conversation.
+
+`POST /api/tg/webhook` is outside the versioned API: it is registered with
+Telegram once and answers to Telegram alone, authenticated by the
+`X-Telegram-Bot-Api-Secret-Token` header (a header, not a query string, which
+would be written to every access log on the way). The route records the
+`update_id`, answers 200 immediately and does the work in the background:
+Telegram redelivers anything it does not get a prompt answer to, and the
+recorded id is what keeps a redelivery from starting a second run.
+
+Serialization is the thread's own claim, which is the only thing both processes
+can see: a proactive run finds the thread held by an incoming message and comes
+back later, and an incoming message waits for a proactive run to finish rather
+than talking over it. A wait that outlasts the run is answered with a line
+saying so — silence reads as a broken bot.
+
+Formatting is the tutor's job (`prompts/medium/telegram.md`): it writes
+Telegram HTML and keeps its own messages under the limit. The backend's two
+safety nets are for when it does not — a message Telegram will not parse is
+resent unformatted rather than dropped, and one over 4096 characters is split.
+
+`/clear`, `/compact`, `/mute` and `/unmute` are bot commands, handled by the
+backend rather than by the model: `/clear` writes the marker that cuts the
+history, `/compact` is the same summarisation the site does, and the two mutes
+set `users.muted_until`.
+
+A 403 from Telegram means the bot was blocked. The link goes to `broken`, and a
+broken link holds that learner's schedules exactly as a mute does — nothing is
+retried into a dead channel, and the site shows a banner. Any message from them
+proves the channel is back and reopens it.
 
 ## The content index
 

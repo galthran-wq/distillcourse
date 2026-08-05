@@ -16,6 +16,9 @@ from app.harness.prompts import RunKind
 from app.harness.repository import HarnessRepository
 from app.models import Schedule, User
 from app.scheduling import policy, repository
+from app.telegram import api, updates
+from app.telegram import repository as telegram
+from app.telegram.outbox import Outbox
 
 POLL = timedelta(seconds=30)
 HOUSEKEEPING = timedelta(days=1)
@@ -52,20 +55,22 @@ async def _fire(
     if spent >= policy.DAILY_INITIATIONS:
         await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
         return
-    thread = await repository.thread(session, user.id)
-    if thread is None:
+    link = await telegram.link_for_user(session, user.id)
+    if link is None:
         # Nothing is delivered without a connected transport, and nothing is
         # rescheduled either: a row with nowhere to go would come back every
         # morning forever. Rows are created once a learner has paired Telegram.
         await repository.drop(session, rows)
         return
+    thread = await updates.thread_of(session, user.id)
     now_items, later = policy.session_items(
         rows, avoid=await repository.ignored_topic(session, user.id)
     )
     try:
-        await runner.run(
+        await updates.converse(
             HarnessRepository(session, user.id),
             thread,
+            Outbox(session=session, link=link),
             _prompt(now_items),
             run_kind=_run_kind(now_items),
         )
@@ -73,6 +78,12 @@ async def _fire(
         await repository.defer(session, rows, due_at=now + BUSY_RETRY)
         return
     except LimitExceeded:
+        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
+        return
+    except api.BotBlocked:
+        # The channel is dead and the link is marked broken, which is what keeps
+        # the poller off this learner until an incoming message proves it is
+        # back. Nothing is retried into it in the meantime.
         await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
         return
     except Exception as exc:
@@ -106,10 +117,11 @@ async def cycle(session: AsyncSession, now: datetime) -> None:
         await _fire(session, users[user_id], rows, now)
 
 
-async def housekeep(session: AsyncSession) -> None:
+async def housekeep(session: AsyncSession, now: datetime) -> None:
     """Rows nothing will read again. This process owns the sweep because it is
     the one with a clock of its own."""
     await sessions.delete_expired(session)
+    await telegram.prune(session, now)
     await session.commit()
 
 
@@ -121,7 +133,7 @@ async def poll(factory: async_sessionmaker[AsyncSession]) -> None:
             async with factory() as session:
                 await cycle(session, now)
                 if now - swept >= HOUSEKEEPING:
-                    await housekeep(session)
+                    await housekeep(session, now)
                     swept = now
         except Exception:
             # The loop is the process. A cycle that fails is reported and the

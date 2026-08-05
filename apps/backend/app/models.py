@@ -3,6 +3,7 @@ from datetime import datetime, time
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Computed,
     DateTime,
@@ -278,6 +279,64 @@ class Document(Base):
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB)
     content_hash: Mapped[str] = mapped_column(String(64))
     tsv: Mapped[str] = mapped_column(TSVECTOR, Computed(DOCUMENT_TSV, persisted=True))
+
+
+class TgLink(Base):
+    """The learner's Telegram account, and the state of the channel to it.
+
+    One row per learner and one per Telegram chat: a phone that is already
+    somebody's cannot become a second learner's. `broken` means the bot was
+    blocked — the transport is down, and the poller leaves the learner alone
+    until an incoming message proves it is back.
+    """
+
+    __tablename__ = "tg_links"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    tg_chat_id: Mapped[int] = mapped_column(BigInteger, unique=True)
+    status: Mapped[str] = mapped_column(
+        String(8), default="active", server_default="active"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class TgPairingCode(Base):
+    """A one-time code behind a `t.me/<bot>?start=<code>` link.
+
+    Whoever holds the string can attach their Telegram account to the learner
+    it was issued for, so it is short-lived and spent on first use.
+    """
+
+    __tablename__ = "tg_pairing_codes"
+
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class TgUpdateSeen(Base):
+    """Update ids Telegram has already delivered.
+
+    Telegram redelivers an update it got no answer to, and answering takes as
+    long as a model run: without this table a slow reply is a second run over
+    the same message.
+    """
+
+    __tablename__ = "tg_updates_seen"
+
+    update_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 # Rating and bookmark are keyed by the same `lesson:` locator `events` and

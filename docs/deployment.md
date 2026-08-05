@@ -62,6 +62,28 @@ The export is the complete index, and ingest deletes every row of the corpora
 it mentions that the file no longer lists — that is how a renamed heading or a
 deleted lesson stops being a search result the tutor can quote.
 
+## The Telegram bot
+
+The channel the platform writes to on its own. Without the three `TELEGRAM_*`
+variables it simply does not exist: the settings page offers no pairing and
+nothing is ever sent.
+
+1. Create the bot with `@BotFather`, and put the token and the bot's `@name`
+   (without the `@`) in `.env`.
+2. Put any long random string in `TELEGRAM_WEBHOOK_SECRET` — Telegram echoes it
+   back in a header on every call, and that header is the only thing that says
+   a request is Telegram's.
+3. Register the URL once, after the stack is up and reachable over TLS:
+
+```bash
+docker compose exec backend python -m app.cli set-webhook \
+  https://<your host>/api/tg/webhook
+```
+
+Learners pair themselves from Settings on the site; the operator does nothing
+per account. `tg_links.status` is `broken` for anyone who blocked the bot —
+their schedules are paused until they write to it again.
+
 ## Accounts
 
 Signup requires `INVITE_CODE` from `.env`; hand that string to whoever should
