@@ -1,3 +1,5 @@
+import re
+from collections.abc import Sequence
 from typing import Any
 
 from pydantic import BaseModel
@@ -24,7 +26,10 @@ def chunks_of(document: str) -> ColumnElement[bool]:
     threshold ask it.
     """
     return or_(
-        Document.locator == document, Document.locator.startswith(f"{document}#")
+        Document.locator == document,
+        # autoescape, or a `%` in a caller-supplied locator is a LIKE wildcard
+        # and one lesson's path matches every one.
+        Document.locator.startswith(f"{document}#", autoescape=True),
     )
 
 
@@ -80,23 +85,58 @@ async def search(
     ]
 
 
-async def fetch(session: AsyncSession, locator: str) -> Document | None:
-    """Resolves a locator to the chunk that contains it.
+async def sections(session: AsyncSession, path: str) -> list[Document]:
+    """Every chunk of one document — a locator without its anchor — in reading
+    order. A consumer that has them all can answer both "this section" and
+    "the whole lesson" from a single query, and knows each chunk's neighbours.
+    """
+    return list(
+        (
+            await session.scalars(
+                select(Document).where(chunks_of(path)).order_by(Document.position)
+            )
+        ).all()
+    )
+
+
+def section_of(chunks: Sequence[Document], locator: str) -> Document | None:
+    """The chunk a locator names, out of the chunks of its document.
 
     An h3 anchor has no chunk of its own — it resolves to the h2 section it
     sits in, so a reference a reader followed on the page also resolves here.
     """
-    exact = (
-        await session.scalars(select(Document).where(Document.locator == locator))
-    ).first()
-    if exact is not None or "#" not in locator:
-        return exact
+    anchor = locator.partition("#")[2]
+    return next(
+        (
+            chunk
+            for chunk in chunks
+            if chunk.locator == locator or (anchor != "" and anchor in chunk.anchors)
+        ),
+        None,
+    )
 
-    document, anchor = locator.split("#", 1)
-    return (
-        await session.scalars(
-            select(Document)
-            .where(chunks_of(document), Document.anchors.bool_op("@>")([anchor]))
-            .order_by(Document.position)
-        )
-    ).first()
+
+async def suggest(
+    session: AsyncSession, locator: str, *, limit: int = 3
+) -> list[SearchHit]:
+    """The locators closest to one that resolved to nothing.
+
+    The words of the locator are OR-ed rather than searched as a phrase:
+    websearch_to_tsquery ANDs its terms, and the one word the caller got wrong
+    is exactly the one that must not veto the match. The corpus prefix is a
+    filter rather than a word — asking for a lesson and being offered the
+    concept entry of the same name is not the correction the caller needs.
+    """
+    corpus, _, path = locator.partition(":")
+    words = [
+        word
+        for word in re.split(r"[^a-z0-9]+", (path or locator).lower())
+        if len(word) > 1
+    ]
+    if not words:
+        return []
+    query = " OR ".join(words)
+    hits = await search(session, query, corpus=corpus, limit=limit) if path else []
+    # The prefix can be the part that is wrong, and no suggestion at all is the
+    # one answer that helps nobody.
+    return hits or await search(session, query, limit=limit)

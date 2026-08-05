@@ -155,6 +155,33 @@ class LessonProgress(Base):
     )
 
 
+class Incident(Base):
+    """A problem the tutor concluded is in the material, not in the learner.
+
+    Filed by `report_content_incident`; triage is manual (psql) and nothing in
+    the application reads this table.
+    """
+
+    __tablename__ = "incidents"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # The report is about the content, so it outlives the conversation that
+    # produced it: deleting a chat must not delete the evidence.
+    chat_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("chats.id", ondelete="SET NULL"), default=None
+    )
+    locator: Mapped[str] = mapped_column(String(512))
+    kind: Mapped[str] = mapped_column(String(16))
+    summary: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), server_default="open")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 # Title over body, and the config is spelled out: a generated column may only
 # call immutable functions, which to_tsvector is exactly when given one.
 # Migrations carry their own frozen copy (0004_documents.py); changing this

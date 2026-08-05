@@ -25,7 +25,7 @@ import { isReadable } from "./visibility";
 export const INDEX_SCHEMA_VERSION = 1;
 
 /** `<corpus>:<path>[#<anchor>]`; `pdf` is reserved for the PDF corpus. */
-export type Corpus = "lesson" | "research" | "concept";
+export type Corpus = "lesson" | "research" | "concept" | "course";
 
 export interface IndexDocument {
   corpus: Corpus;
@@ -377,8 +377,60 @@ function conceptDocuments(course: LoadedCourse): IndexDocument[] {
   }));
 }
 
+/**
+ * The course spine as one document: the modules and lessons in reading order,
+ * each lesson with what it needs and what it teaches. The backend knows the
+ * courses only through this index, so a structure it cannot read here is a
+ * structure the tutor does not have.
+ *
+ * Only readable lessons are listed, for the same reason they are the only ones
+ * indexed: the tutor must not point a learner at a lesson the site will not
+ * render.
+ */
+function courseDocument(course: LoadedCourse): IndexDocument {
+  const readable = course.lessons.filter(isReadable);
+  const modules = course.course.modules
+    .map((mod) => ({
+      slug: mod.slug,
+      title: mod.title,
+      lessons: readable
+        .filter((entry) => entry.moduleSlug === mod.slug)
+        .map(({ lesson }) => ({
+          slug: lesson.slug,
+          locator: `lesson:${course.course.slug}/${lesson.slug}`,
+          title: lesson.title,
+          type: lesson.type,
+          est_minutes: lesson.est_minutes,
+          prerequisites: lesson.prerequisites,
+          introduces: lesson.concepts.introduces,
+          reinforces: lesson.concepts.reinforces,
+        })),
+    }))
+    .filter((mod) => mod.lessons.length > 0);
+
+  // Searchable as well as readable: "which course covers channel capacity" is
+  // a question the titles answer and the lesson chunks do not.
+  const text = [
+    course.course.tagline,
+    ...modules.map((m) => [m.title, ...m.lessons.map((l) => l.title)].join(BREADCRUMB_SEP)),
+  ].join("\n\n");
+
+  return {
+    corpus: "course",
+    course_slug: course.course.slug,
+    locator: `course:${course.course.slug}`,
+    title: course.course.title,
+    breadcrumb: course.course.title,
+    text,
+    anchors: [],
+    position: 0,
+    metadata: { tagline: course.course.tagline, modules },
+  };
+}
+
 export function courseDocuments(course: LoadedCourse): IndexDocument[] {
   return [
+    courseDocument(course),
     ...course.lessons.filter(isReadable).flatMap((l) => lessonDocuments(course, l)),
     ...researchDocuments(course),
     ...conceptDocuments(course),

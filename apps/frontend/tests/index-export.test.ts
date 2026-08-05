@@ -74,6 +74,9 @@ function loadedLesson(
       slug,
       title,
       status,
+      type: "core",
+      est_minutes: 12,
+      prerequisites: index === 0 ? [] : ["main"],
       concepts: { introduces: ["entropy"], reinforces: ["surprisal"] },
     } as LoadedLesson["lesson"],
     moduleSlug: "basics",
@@ -90,7 +93,11 @@ function course(lessons: LoadedLesson[]): LoadedCourse {
     course: {
       slug: "demo-course",
       title: "Demo Course",
-      modules: [{ slug: "basics", title: "Basics" }],
+      tagline: "What a demo course is for",
+      modules: [
+        { slug: "basics", title: "Basics" },
+        { slug: "empty", title: "Nothing readable yet" },
+      ],
     } as LoadedCourse["course"],
     concepts: {
       concepts: [
@@ -228,6 +235,48 @@ describe("courseDocuments", () => {
     const preview = exportDocuments();
     expect(lessonChunks(preview, "later")).toEqual([]);
     expect(lessonChunks(preview, "other")).toHaveLength(1);
+  });
+
+  it("exports the course spine, listing only the lessons it indexes", () => {
+    vi.stubEnv("CONTENT_PREVIEW", "1");
+    const spine = exportDocuments().find((d) => d.corpus === "course");
+
+    expect(spine?.locator).toBe("course:demo-course");
+    expect(spine?.metadata).toEqual({
+      tagline: "What a demo course is for",
+      modules: [
+        {
+          slug: "basics",
+          title: "Basics",
+          lessons: [
+            {
+              slug: "main",
+              locator: "lesson:demo-course/main",
+              title: "The main lesson",
+              type: "core",
+              est_minutes: 12,
+              prerequisites: [],
+              introduces: ["entropy"],
+              reinforces: ["surprisal"],
+            },
+            {
+              slug: "other",
+              locator: "lesson:demo-course/other",
+              title: "The other lesson",
+              type: "core",
+              est_minutes: 12,
+              prerequisites: ["main"],
+              introduces: ["entropy"],
+              reinforces: ["surprisal"],
+            },
+          ],
+        },
+      ],
+    });
+    // The planned lesson is not in the spine, and a module with nothing
+    // readable in it is not a module the learner can be sent to.
+    expect(spine?.text).not.toContain("A planned lesson");
+    expect(spine?.text).toContain("What a demo course is for");
   });
 
   it("indexes research per file and concepts per entry, whatever the statuses", () => {

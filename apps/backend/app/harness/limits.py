@@ -1,9 +1,10 @@
+from pydantic_ai.usage import RunUsage
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.harness.repository import HarnessRepository
-from app.harness.usage import COST_USD
+from app.harness.usage import COST_USD, WEB_SEARCH_CALLS
 from app.models import Message
 
 
@@ -22,6 +23,16 @@ async def check_cost_ceiling(session: AsyncSession) -> None:
     if float(spent or 0.0) >= settings.MONTHLY_COST_CEILING_USD:
         raise LimitExceeded(
             f"monthly budget of ${settings.MONTHLY_COST_CEILING_USD:.2f} is spent"
+        )
+
+
+async def check_web_search_allowed(repo: HarnessRepository, usage: RunUsage) -> None:
+    # The run in flight has not stored its usage yet, so the searches it has
+    # already made are counted from the live usage rather than from the table.
+    spent = await repo.web_searches_today() + usage.details.get(WEB_SEARCH_CALLS, 0)
+    if spent >= settings.WEB_SEARCH_DAILY_CAP:
+        raise LimitExceeded(
+            f"daily web search cap reached ({settings.WEB_SEARCH_DAILY_CAP} per day)"
         )
 
 
