@@ -10,8 +10,8 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.harness.usage import INPUT_TOKENS, OUTPUT_TOKENS
-from app.models import Chat, Message
+from app.harness.usage import INPUT_TOKENS, OUTPUT_TOKENS, WEB_SEARCH_CALLS
+from app.models import Chat, Incident, Message
 
 Role = Literal["user", "agent", "system"]
 Marker = Literal["clear", "compact"]
@@ -192,3 +192,29 @@ class HarnessRepository:
             )
         )
         return int(total or 0)
+
+    async def web_searches_today(self) -> int:
+        total = await self.session.scalar(
+            select(func.sum(Message.usage[WEB_SEARCH_CALLS].as_integer()))
+            .select_from(Message)
+            .join(Chat, Chat.id == Message.chat_id)
+            .where(
+                Chat.user_id == self.user_id,
+                Message.created_at >= func.date_trunc("day", func.now()),
+            )
+        )
+        return int(total or 0)
+
+    async def file_incident(
+        self, chat: Chat, *, locator: str, kind: str, summary: str
+    ) -> Incident:
+        incident = Incident(
+            user_id=self.user_id,
+            chat_id=chat.id,
+            locator=locator,
+            kind=kind,
+            summary=summary,
+        )
+        self.session.add(incident)
+        await self.session.commit()
+        return incident

@@ -73,7 +73,13 @@ class Settings(BaseSettings):
     ]
     DEFAULT_CHAT_MODEL: str = "moonshotai/kimi-k3"
 
+    # The tutor's only route out to the open web. Unset, web_search reports
+    # itself unavailable and the agent answers from the corpus.
+    PERPLEXITY_API_KEY: str | None = None
+    PERPLEXITY_MODEL: str = "sonar"
+
     DAILY_MESSAGE_CAP: int = 100
+    WEB_SEARCH_DAILY_CAP: int = 20
     # The instance-wide ceiling is the software half of the budget; the other
     # half is a spend limit on the OpenRouter key itself.
     MONTHLY_COST_CEILING_USD: float = 50.0
