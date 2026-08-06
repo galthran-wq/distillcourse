@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.content.ingest import ingest
 from app.content.schemas import ContentIndex
 from app.models import ReviewState, Schedule, User
+from tests.conftest import Bot
 from tests.content.conftest import corpus_index  # noqa: F401  (a shared fixture)
 from tests.harness.conftest import call
 from tests.scheduling.conftest import NOON, thread  # noqa: F401  (a shared fixture)
@@ -60,6 +61,12 @@ async def reviews(session: AsyncSession, user: User) -> list[Schedule]:
             .order_by(Schedule.claimed_at.nullslast(), Schedule.due_at)
         )
     )
+
+
+def echoed(bot: Bot) -> str:
+    """What an echoing tutor sent back, reassembled. A prompt is longer than one
+    Telegram message, so the outbox cuts it up on its line breaks."""
+    return "\n".join(bot.texts)
 
 
 def instructions(messages: list[ModelMessage]) -> str:

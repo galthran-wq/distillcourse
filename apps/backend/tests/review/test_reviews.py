@@ -17,6 +17,7 @@ from tests.conftest import Bot, replying
 from tests.harness.conftest import echoing
 from tests.review.conftest import (
     LESSON,
+    echoed,
     grading,
     reviews,
 )
@@ -202,10 +203,45 @@ async def test_a_learner_who_writes_mid_review_is_handed_it_to_close(
     with tutor.override(model=echoing()):
         await deliver(client, message("actually, a different question"))
 
-    prompt = bot.texts[-1]
+    prompt = echoed(bot)
     assert subject.OPEN in prompt
     assert str(row.id) in prompt
     assert "report_review_outcome" in prompt
+
+
+async def test_the_run_that_answers_a_review_is_told_how_to_conduct_one(
+    client: AsyncClient, session: AsyncSession, user: User, bot: Bot
+) -> None:
+    """The poller's question is a `review` run and carries the review module.
+    Everything after it — the answer, the judging, the follow-ups, the grade —
+    arrives as a `chat` run, whose modules do not include it, so the block does.
+    """
+    await ladder_row(session, user)
+    await ask(session)
+
+    with tutor.override(model=echoing()):
+        await deliver(client, message("the average surprisal of the source"))
+
+    prompt = echoed(bot)
+    assert "At most two follow-ups on the same item" in prompt
+    assert "Judge every answer explicitly" in prompt
+
+
+@pytest.mark.usefixtures("indexed_course")
+async def test_the_subject_is_read_from_the_lesson_not_from_the_rotation_field(
+    session: AsyncSession, user: User, bot: Bot
+) -> None:
+    """`topic` is what the poller rotates away from after an ignored message. A
+    delivery without one still knows which course its lesson is in."""
+    await ladder_row(session, user, step=1)
+    row = (await review.materialize(session, NOON))[0]
+    row.payload = {key: value for key, value in row.payload.items() if key != "topic"}
+    await session.commit()
+
+    with tutor.override(model=echoing()):
+        await worker.cycle(session, NOON)
+
+    assert "Entropy: Expected surprisal of a distribution" in echoed(bot)
 
 
 @pytest.mark.usefixtures("indexed_course")
@@ -219,7 +255,7 @@ async def test_the_question_is_asked_about_the_concepts_the_lesson_teaches(
     with tutor.override(model=echoing()):
         await worker.cycle(session, NOON)
 
-    prompt = bot.texts[-1]
+    prompt = echoed(bot)
     assert "Entropy: Expected surprisal of a distribution" in prompt
     assert "confusable with Prefix code" in prompt
     assert ladder.question_format(1) in prompt
@@ -244,4 +280,4 @@ async def test_what_a_review_turned_up_is_carried_into_the_next_one(
     with tutor.override(model=echoing()):
         await deliver(client, message("anything else?", update_id=2))
 
-    assert kept[0].slug in bot.texts[-1]
+    assert kept[0].slug in echoed(bot)

@@ -334,14 +334,23 @@ confuses them with — and the format the rung calls for (free recall,
 discrimination, application, justification). `prompts/review.md` governs how
 it is conducted; `report_review_outcome` is how it ends, and its `notes`
 become a memory, so the next review of that lesson starts from the sore spot.
+Only the opening question is a `review` run — every turn after it is an
+incoming message, so a `chat` run, whose modules do not include review.md.
+The context block that carries the open review carries the module with it, or
+the dialogue those rules describe would govern only the message nobody has
+answered yet.
 
-Whether an item was graded is recorded in the delivery's payload, and the
-poller settles the rest: a session nobody answered is an `ignored` rung on
-every item, a session they did answer is a deferral on the items the tutor
-never reached — the rung does not move and nothing is held against them. A
-settlement is not a grade, so an answer that arrives after the slot timed out
-is still graded from the thread, and the delivery the ladder had already
-queued again is cancelled.
+Whether an item was graded is recorded in the delivery's payload, which is
+also what makes grading it twice a no-op: two runs can hold the same item when
+an answer arrives split across two messages, and one delivery moves the ladder
+once. The poller settles what was never graded: a session nobody answered is
+an `ignored` rung on every item, a session they did answer is a deferral on
+the items the tutor never reached — the rung does not move and nothing is held
+against them. A delivery that ran out of attempts is a deferral too; left
+unaccounted for it would be neither live nor settled, and the ladder behind it
+would be materialised again every cycle forever. A settlement is not a grade,
+so an answer that arrives after the slot timed out is still graded from the
+thread, and the delivery the ladder had already queued again is cancelled.
 
 ## Telegram
 

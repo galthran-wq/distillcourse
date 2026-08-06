@@ -13,9 +13,10 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.structure import ConceptEntry, CourseStructure, LessonEntry, structure
-from app.harness.prompts import ContextBlock
+from app.harness import prompts
 from app.models import Schedule
 from app.review import ladder
+from app.review import repository as review
 
 DUE = "The reviews due now"
 OPEN = "The review still open"
@@ -25,11 +26,20 @@ CONDUCT = (
     "judge it, and only then offer the next. Every item you get an answer on "
     "is reported with `report_review_outcome`, quoting its schedule id."
 )
-CLOSE = (
-    "The learner has written to you while a review of theirs was open. If what "
-    "they say answers it, grade it with `report_review_outcome` and carry on "
-    "with what they came for. If it does not, answer what they asked and leave "
-    "the review alone — it comes back another day."
+# The poller's message is a `review` run and carries the review module in its
+# system prompt. Every turn after it — the answer, the judging, the follow-ups,
+# the grading call — is an incoming message, and that is a `chat` run, whose
+# modules do not include it. So the block that hands a chat run the open review
+# hands it the rules for conducting one as well; without this the dialogue the
+# module describes is in force only for the question nobody has answered yet.
+CLOSE = "\n\n".join(
+    (
+        prompts.module("review.md"),
+        "The learner has written to you while a review of theirs was open. If "
+        "what they say answers it, grade it with `report_review_outcome` and "
+        "carry on with what they came for. If it does not, answer what they "
+        "asked and leave the review alone — it comes back another day.",
+    )
 )
 
 
@@ -96,21 +106,22 @@ def _lines(material: Material) -> Iterator[str]:
         yield f"  - confusable with {concept.name}: {concept.definition}"
 
 
-def _topic(row: Schedule) -> str:
-    return str(row.payload.get("topic", ""))
-
-
 async def _materials(session: AsyncSession, rows: Sequence[Schedule]) -> list[Material]:
-    """One pass over the spine of every course the due items belong to."""
+    """One pass over the spine of every course the due items belong to.
+
+    Keyed off the lesson locator the row carries rather than its `topic`, which
+    is the poller's rotation field and says nothing about where the material is.
+    """
+    courses = {row.id: review.course(row.payload["lesson"]) for row in rows}
     spines = {
-        course.course: course
-        for slug in sorted({_topic(row) for row in rows} - {""})
-        for course in await structure(session, slug)
+        spine.course: spine
+        for slug in sorted(set(courses.values()) - {""})
+        for spine in await structure(session, slug)
     }
     found = []
     for row in rows:
-        course = spines.get(_topic(row))
-        material = _material(course, row) if course is not None else None
+        spine = spines.get(courses[row.id])
+        material = _material(spine, row) if spine is not None else None
         # A lesson the index no longer carries still has a ladder and still
         # gets asked about; it just arrives without its concepts.
         found.append(
@@ -124,7 +135,7 @@ async def _materials(session: AsyncSession, rows: Sequence[Schedule]) -> list[Ma
 
 async def block(
     session: AsyncSession, rows: Sequence[Schedule], *, title: str, instruction: str
-) -> tuple[ContextBlock, ...]:
+) -> tuple[prompts.ContextBlock, ...]:
     # A review names the lesson it is of. A row that does not is something else
     # the poller is carrying — a reminder, or a review whose payload predates
     # the ladder — and there is no subject matter to assemble for it.
@@ -136,19 +147,21 @@ async def block(
         for material in await _materials(session, reviews)
         for line in _lines(material)
     ]
-    return (ContextBlock(title=title, body="\n".join([*body, "", instruction])),)
+    return (
+        prompts.ContextBlock(title=title, body="\n".join([*body, "", instruction])),
+    )
 
 
 async def due_block(
     session: AsyncSession, rows: Sequence[Schedule]
-) -> tuple[ContextBlock, ...]:
+) -> tuple[prompts.ContextBlock, ...]:
     """The material for the reviews the poller is delivering right now."""
     return await block(session, rows, title=DUE, instruction=CONDUCT)
 
 
 async def open_block(
     session: AsyncSession, rows: Sequence[Schedule]
-) -> tuple[ContextBlock, ...]:
+) -> tuple[prompts.ContextBlock, ...]:
     """The material for a review the learner has walked into mid-conversation.
 
     Without this a review hangs until it times out while the learner is right

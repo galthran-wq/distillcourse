@@ -46,6 +46,26 @@ async def test_the_last_rung_passed_ends_the_ladder(
     assert "finished" in answer
 
 
+@pytest.mark.usefixtures("link")
+async def test_one_delivery_moves_the_ladder_once(
+    session: AsyncSession, user: User, thread: Chat
+) -> None:
+    """Two runs can hold the same item: an answer split across two messages
+    hands the second one a context block assembled before the first graded it.
+    A second grade would skip a rung the learner never sat on."""
+    state = await ladder_row(session, user, step=1)
+    row = (await review.materialize(session, NOON))[0]
+
+    await reported(session, user, thread, schedule_id=str(row.id), outcome="passed")
+    again = await reported(
+        session, user, thread, schedule_id=str(row.id), outcome="passed"
+    )
+
+    await session.refresh(state)
+    assert state.step == 2
+    assert "already recorded as passed" in again
+
+
 async def test_a_review_of_someone_elses_cannot_be_graded(
     session: AsyncSession, user: User, other_user: User, thread: Chat
 ) -> None:

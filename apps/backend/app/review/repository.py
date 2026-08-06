@@ -10,27 +10,26 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, and_, func, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ReviewState, Schedule, TgLink
 from app.review import ladder
 from app.review.ladder import Outcome, Rung, Settlement
-from app.scheduling.repository import WAITING
+from app.scheduling import repository as scheduling
 
 # A delivery still on its way to the learner, or waiting for their answer.
 # While one exists the ladder is represented in the queue already.
-LIVE = (*WAITING, "awaiting_reply")
+LIVE = (*scheduling.WAITING, "awaiting_reply")
 # What `settle` and the outcome tool write into a delivered row's payload: the
 # only record of whether that delivery has been accounted for.
 OUTCOME = "outcome"
 GRADES = ("passed", "partial", "failed")
 
 
-def _course(lesson: str) -> str:
-    # `lesson:<course>/<slug>` — the course is the topic the poller rotates
-    # away from after an ignored message.
+def course(lesson: str) -> str:
+    """The course a lesson locator belongs to. `lesson:<course>/<slug>`."""
     return lesson.partition(":")[2].partition("/")[0]
 
 
@@ -177,7 +176,9 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
             payload={
                 "lesson": state.lesson,
                 "note": f"a review of {state.lesson} is due",
-                "topic": _course(state.lesson),
+                # The topic is what the poller rotates away from after an
+                # ignored message; for a review that is its course.
+                "topic": course(state.lesson),
                 "step": state.step,
             },
             status="pending",
@@ -214,7 +215,8 @@ async def settle(session: AsyncSession, now: datetime) -> None:
     A session the learner never answered is an `ignored` rung. A session they
     did answer, on the items the tutor did not report, is a deferral and
     nothing more: what they said counted, and the rest is asked another day
-    rather than held against them.
+    rather than held against them. So is a delivery that never reached them at
+    all — nothing was learned about the learner from our own outage either.
     """
     for row in await _reviews(
         session,
@@ -222,8 +224,14 @@ async def settle(session: AsyncSession, now: datetime) -> None:
         # predicate `ungraded` reads by, which lets a late answer overwrite a
         # settlement that is already written.
         ~Schedule.payload.has_key(OUTCOME),
-        Schedule.status == "done",
-        Schedule.outcome.is_not(None),
+        or_(
+            and_(Schedule.status == "done", Schedule.outcome.is_not(None)),
+            # A delivery out of attempts is as over as one that timed out, and
+            # nothing else accounts for it: leave it and the ladder stays due in
+            # the past, so `materialize` queues the same review every cycle,
+            # forever.
+            Schedule.status == "failed",
+        ),
     ):
         state = await state_of(session, row.user_id, row.payload["lesson"])
         settlement: Settlement = "ignored" if row.outcome == "ignored" else "deferred"
@@ -266,14 +274,10 @@ async def cancel_deliveries(
     and put back in the queue; that queued copy asks about a rung the learner
     is no longer on.
     """
-    rows = await session.scalars(
-        select(Schedule).where(
-            Schedule.user_id == user_id,
-            _of_a_ladder(),
-            _about(lesson),
-            Schedule.status.in_(WAITING),
-        )
+    rows = await _reviews(
+        session,
+        Schedule.user_id == user_id,
+        _about(lesson),
+        Schedule.status.in_(scheduling.WAITING),
     )
-    for row in rows:
-        row.status = "cancelled"
-    await session.commit()
+    await scheduling.drop(session, rows)

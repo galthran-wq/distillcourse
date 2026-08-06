@@ -158,9 +158,11 @@ async def _open_reviews(
 async def _answer(
     repo: HarnessRepository, chat: Chat, outbox: Outbox, text: str
 ) -> None:
-    blocks = await _open_reviews(repo, datetime.now(UTC))
     for attempt in range(RUN_ATTEMPTS):
         try:
+            # Read per attempt, not once: what is open changes while we wait,
+            # because what we are waiting for is the run that may have graded it.
+            blocks = await _open_reviews(repo, datetime.now(UTC))
             await thread.converse(repo, chat, outbox, text, blocks=blocks)
             return
         except runner.RunBusy:

@@ -1,8 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated
 
-from pydantic import Field
 from pydantic_ai import RunContext
 
 from app.harness.deps import HarnessDeps
@@ -16,7 +14,6 @@ from app.review.ladder import Outcome
 # the next review of it replaces what the last one found rather than adding a
 # second line to the profile about the same confusion.
 NOTE_PREFIX = "review-"
-Notes = Annotated[str, Field(max_length=memory.CONTENT_LENGTH)]
 
 
 def _memory(lesson: str, notes: str) -> memory.Recollection:
@@ -52,7 +49,7 @@ async def report_review_outcome(
     ctx: RunContext[HarnessDeps],
     schedule_id: uuid.UUID,
     outcome: Outcome,
-    notes: Notes | None = None,
+    notes: memory.Content | None = None,
 ) -> str:
     """Record how the learner did on one review, and when it should come back.
 
@@ -74,6 +71,13 @@ async def report_review_outcome(
     row = await repository.delivery(repo.session, repo.user_id, schedule_id)
     if row is None:
         return "no review of this learner's is on record under that id"
+    graded = row.payload.get(repository.OUTCOME)
+    if graded in repository.GRADES:
+        # One delivery moves the ladder once. Two runs can hold the same item —
+        # a learner's answer split across two messages gives the second run a
+        # context block assembled before the first one graded it — and a second
+        # move would skip a rung the learner never sat.
+        return f"that review is already recorded as {graded}"
     lesson: str = row.payload["lesson"]
     now = datetime.now(UTC)
     state = await repository.apply(repo.session, repo.user_id, lesson, outcome, now)

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import ReviewState, Schedule, TgLink, User
 from app.review import ladder
 from app.review import repository as review
+from app.scheduling import repository as scheduling
 from app.telemetry import progress
 from tests.review.conftest import LESSON, reviews
 from tests.review.conftest import ladder as ladder_row
@@ -201,6 +202,48 @@ async def test_a_session_is_settled_once(session: AsyncSession, user: User) -> N
 
     await session.refresh(state)
     assert state.next_due_at == NOON + ladder.STEPS[1]
+
+
+@pytest.mark.usefixtures("link")
+async def test_a_delivery_out_of_attempts_is_settled_rather_than_queued_forever(
+    session: AsyncSession, user: User
+) -> None:
+    """`failed` is neither live nor settled by the answered path, and the ladder
+    behind it stays due in the past: unaccounted for, every cycle makes the same
+    review again. Our outage says nothing about the learner, so it is a deferral.
+    """
+    state = await ladder_row(session, user, step=1)
+    row = (await review.materialize(session, NOON))[0]
+    row.claimed_at = NOON
+    row.status = "failed"
+    await session.commit()
+
+    await review.settle(session, NOON)
+    await review.materialize(session, NOON)
+
+    await session.refresh(state)
+    assert (state.step, state.last_outcome) == (1, "deferred")
+    assert state.next_due_at == NOON + ladder.DEFERRAL
+    assert [item.status for item in await reviews(session, user)] == ["failed"]
+
+
+@pytest.mark.usefixtures("link")
+async def test_a_cancelled_delivery_is_not_swept_back_into_the_queue(
+    session: AsyncSession, user: User
+) -> None:
+    """Cancelling clears the lease, as every other transition does. A row that
+    kept one is a row `sweep_leases` hands back as if its worker had died."""
+    await ladder_row(session, user)
+    await review.materialize(session, NOON)
+    row = (await scheduling.claim_due(session, NOON))[0]
+
+    await review.cancel_deliveries(session, user.id, LESSON)
+    await scheduling.sweep_leases(
+        session, NOON + scheduling.LEASE + timedelta(minutes=1)
+    )
+
+    await session.refresh(row)
+    assert (row.status, row.lease_until) == ("cancelled", None)
 
 
 @pytest.mark.usefixtures("link")
