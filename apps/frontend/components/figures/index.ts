@@ -18,6 +18,9 @@ import FftMemoryOrderLedger from "./digital-signal-processing/FftMemoryOrderLedg
 import DtmfFeatureTimingPipeline from "./digital-signal-processing/DtmfFeatureTimingPipeline";
 import DtmfCoordinateComparison from "./digital-signal-processing/DtmfCoordinateComparison";
 import DtmfCoordinateCostLatencyLedger from "./digital-signal-processing/DtmfCoordinateCostLatencyLedger";
+import WindowShapeSpectrumPair from "./digital-signal-processing/WindowShapeSpectrumPair";
+import WindowCalibrationLedger from "./digital-signal-processing/WindowCalibrationLedger";
+import WindowTradeoffMap from "./digital-signal-processing/WindowTradeoffMap";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -175,6 +178,9 @@ export const figures: Record<string, RegisteredFigure> = {
   DtmfFeatureTimingPipeline: { component: DtmfFeatureTimingPipeline },
   DtmfCoordinateComparison: { component: DtmfCoordinateComparison },
   DtmfCoordinateCostLatencyLedger: { component: DtmfCoordinateCostLatencyLedger },
+  WindowShapeSpectrumPair: { component: WindowShapeSpectrumPair },
+  WindowCalibrationLedger: { component: WindowCalibrationLedger },
+  WindowTradeoffMap: { component: WindowTradeoffMap },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },

@@ -66,4 +66,6 @@ export const demos: Record<
   FftBudgetLab: () => import("./digital-signal-processing/FftBudgetLab"),
   DtmfDecisionLab: () =>
     import("./digital-signal-processing/DtmfDecisionLab"),
+  WeakToneWindowLab: () =>
+    import("./digital-signal-processing/WeakToneWindowLab"),
 };

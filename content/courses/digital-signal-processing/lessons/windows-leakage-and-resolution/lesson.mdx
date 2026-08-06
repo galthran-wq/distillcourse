@@ -20,6 +20,8 @@ with no forward normalization. Padding changes the evaluation spacing from $2\pi
 
 ## Finite observation creates leakage before an FFT is chosen
 
+### An off-grid record cannot join its periodic copy
+
 The DFT grid states where a finite-record transform is sampled; the shape being sampled is already fixed by the observation. Take the complex sinusoid
 
 $$
@@ -28,7 +30,9 @@ $$
 
 Its phase advances by one and a half cycles across an eight-sample aperture. Repeating the stored block, as the DFT coordinate model does, places the last part of one copy beside the first part of the next. The two copies do not join as one continuous sinusoid because $1.5$ is not an integer bin coordinate. That boundary mismatch is present before an FFT algorithm or display length is selected.
 
-{/* fig PeriodicBoundaryRepair: four raw-SVG frames on identical axes; frame 1 shows the half-open N=8 complex sinusoid through its real projection with endpoint dots and label q=1.5; frame 2 adds adjacent periodized copies and a red boundary-jump guide; frame 3 overlays periodic Hann weights on the same eight samples; frame 4 shows tapered copies meeting at zero while the central samples retain weight. One delta per frame; amber signal, blue window, currentColor axes; exact labels n=0, N-1, N and w[0]=w[N]=0. */}
+<FigureSequence name="periodic-boundary-repair" alt="Four fixed-layout frames show an eight-sample cosine at original-bin coordinate 1.5, its discontinuous periodic extension, periodic Hann weights on samples zero through seven, and tapered copies whose analytic endpoints meet at zero." caption="The off-bin record does not join its periodic copy; a taper repairs the boundary only by changing the samples' weights." />
+
+### Every finite weight becomes a spectral kernel
 
 The rectangular observation is itself a weighting: it keeps each stored sample with weight one and assigns zero outside the record. Replacing it with a taper changes the weighting rather than removing finite observation.
 
@@ -120,18 +124,18 @@ The last formula names one particular four-term minimum Blackman–Harris window
 
 Normalize every spectral curve by $|W(1)|=\sum_n w[n]$ and measure frequency in *current-record bin units*, where one bin is $2\pi/N$ radians/sample. The **null-to-null main-lobe width** is the distance between the first exact nulls around zero. The **peak sidelobe level** is the largest magnitude outside that interval, expressed as $20\log_{10}(|W|/|W(1)|)$.
 
-Under the periodic definitions, dense direct-DTFT evaluation gives:
+Freeze the finite reference length at $N_{\mathrm{ref}}=128$. Under the periodic definitions, dense direct-DTFT evaluation gives:
 
-| window | null-to-null width (bins) | peak sidelobe (dB) | far falloff | coherent gain | scalloping loss (dB) | ENBW (bins) |
+| window | null-to-null width (bins) | peak sidelobe at $N_{\mathrm{ref}}$ (dB) | far falloff | coherent gain | scalloping loss at $N_{\mathrm{ref}}$ (dB) | ENBW (bins) |
 |:--|--:|--:|:--|--:|--:|--:|
 | rectangular | 2 | $-13.26$ | about 6 dB/octave | 1 | 3.92 | 1 |
 | Hann | 4 | $-31.47$ | about 18 dB/octave | 0.5 | 1.42 | 1.5 |
-| Hamming | 4 | about $-42.7$ | about 6 dB/octave | 0.54 | 1.75 | 1.363 |
+| Hamming | 4 | about $-42.62$ | about 6 dB/octave | 0.54 | 1.75 | 1.363 |
 | four-term Blackman–Harris | 8 | about $-92.0$ | not used as its ranking metric here | 0.35875 | 0.826 | 2.004 |
 
-The displayed values are reference values for these coefficient formulas, not universal properties of names exposed by a library. A 3 dB or 6 dB bandwidth is another legitimate measure, but it must not be called the null-to-null width. Harris's coherent two-line resolution argument uses the 6 dB width because two equal responses add at their crossover.
+The displayed sidelobe and scalloping values are finite-$N_{\mathrm{ref}}$ reference values for these coefficient formulas, not universal properties of names exposed by a library. Main-lobe width, coherent gain, and ENBW take the shown values for these periodic cosine sums at the nondegenerate lengths used here. A 3 dB or 6 dB bandwidth is another legitimate measure, but it must not be called the null-to-null width. Harris's coherent two-line resolution argument uses the 6 dB width because two equal responses add at their crossover.
 
-{/* fig WindowShapeSpectrumPair: component figure with four aligned rows, each pairing periodic w[n] at N=64 with normalized |W| on one common -110-to-0 dB axis; exact first-null guides at +/-1, +/-2, +/-2, +/-4 current-record bins; label peak sidelobe and far-falloff separately; formula labels in KaTeX; rectangle amber subject, other windows distinct line styles plus blue/green roles; mobile stacks each time/spectrum pair. */}
+<Figure name="WindowShapeSpectrumPair" alt="Four aligned rows pair periodic 64-sample rectangular, Hann, Hamming, and four-term Blackman-Harris time weights with dense normalized DTFT spectra on one minus 110 to zero decibel scale; first-null widths grow from two to eight bins while peak sidelobes and far falloff change separately." caption="Smoother endpoint behavior redistributes the same finite-record kernel: lower sidelobes are purchased with a wider main lobe." />
 
 ### Smoothness controls the far field, not every sidelobe
 
@@ -215,15 +219,13 @@ L_s=-20\log_{10}
 \right)\ \text{dB}.
 $$
 
-The minus sign makes attenuation a positive loss. Under the frozen periodic definitions, the rectangular value is about $3.92$ dB, Hann about $1.42$ dB, and four-term Blackman–Harris about $0.826$ dB. This metric concerns the sampled location of one isolated tone. It is not the sidelobe level and does not decide whether a neighbor is masked.
+The minus sign makes attenuation a positive loss. At the table's $N_{\mathrm{ref}}=128$, the rectangular value is about $3.92$ dB, Hann about $1.424$ dB, and four-term Blackman–Harris about $0.826$ dB. Finite length matters: the four-sample Hann above has exact ratio $(2+\sqrt2)/4$ and loss $1.375$ dB, not the $N=128$ reference value. This metric concerns the sampled location of one isolated tone. It is not the sidelobe level and does not decide whether a neighbor is masked.
 
-{/* fig WindowCalibrationLedger: component ledger with two vertical paths from the N=4 Hann vector [0,0.5,1,0.5]. Tone path sums weights coherently to Cw=2, divides by N to show biased 0.5, then divides by Cw to recover complex amplitude 1; half-bin inset shows |W(pi/N)|/|W(0)| and positive loss. Noise path, completed in the next section, squares weights to 1.5 and yields ENBW 1.5 bins. Use KaTeX and exact factor-of-two guard for real interior bins. */}
-
-<KeyFact>
-Coherent-gain correction removes window bias at the kernel peak; it does not remove the placement loss of an off-bin tone or interference contributed by another line.
-</KeyFact>
+<Figure name="WindowCalibrationLedger" alt="A two-path ledger starts from the periodic four-sample Hann vector zero, one half, one, one half: the tone path gives coherent sum two, normalized gain one half, corrected complex amplitude A, and a separate half-bin scalloping loss, while the noise path gives squared sum one and one half and ENBW one and one half bins; a guard notes the extra one-sided factor of two for real interior-bin cosines." caption="Tone amplitude follows the coherent sum of weights; white-noise power follows their squared sum, so coherent gain and ENBW correct different quantities." />
 
 ## Equivalent noise bandwidth uses squared weights
+
+### White noise adds through squared weights
 
 A deterministic tone adds through $\sum_nw[n]$, whereas independent zero-mean noise samples add in power through $\sum_nw^2[n]$. Dividing every spectrum by coherent gain therefore does not make the noise floors of different windows equal.
 
@@ -247,6 +249,8 @@ $$
 $$
 
 where the dimensionless bandwidth is measured in original DFT bins.
+
+### ENBW turns the squared sum into a calibrated bandwidth
 
 <Definition title="equivalent noise bandwidth">
 For a nonzero finite window, its equivalent noise bandwidth is
@@ -301,7 +305,7 @@ $$
 
 using unrounded values. The result is an all-tested-phase statement for a noiseless analytic two-tone study, not a probability of detection.
 
-{/* fig WeakToneMasking: raw SVG and key-image candidate at figures/weak-tone-masking.svg; fixed q axis 19 to 27 and -110-to-0 dB y axis; normalized strong-only rectangular N=128 trace plus full two-tone trace at worst phase 90 degrees; vertical markers q=20.5 and q=26, weak level -40 dB, bracket q=[25.5,26.5], local leakage -24.71 dB, worst margin -1.62 dB FAIL. Solid/dashed distinction in addition to amber/blue; alt text must state that the strong rectangular sidelobe covers the -40 dB line. */}
+<Figure src="./figures/weak-tone-masking.svg" alt="For a rectangular 128-sample record at the worst tested weak phase of 90 degrees, strong-only and full two-tone exact-DTFT traces cover the minus 40 decibel tone at original-bin coordinate 26; over the declared 25.5 to 26.5 neighborhood, local leakage is minus 24.71 decibels, the observed peak is minus 26.33 decibels, and the minus 1.62 decibel margin fails the 3 decibel rule." caption="The rectangular kernel is narrow, yet its local sidelobe leakage masks the weak neighbor and fails the all-tested-phase criterion." />
 
 Selected cells of the frozen audit show why no headline metric wins alone:
 
@@ -320,15 +324,11 @@ The $N=128$ rectangle falsifies **narrowest is best**: its two-bin main lobe doe
 Precommit before revealing the audit. First select the rectangular $N=128$ case and predict from main-lobe width alone; record its $-1.62$ dB minimum margin. Hold $N=128$ while comparing Hann, Hamming, and four-term Blackman–Harris, and explain the verdict from local leakage rather than peak sidelobe alone. Finally move the short Blackman–Harris case from $N=64$ to $N=128$ without moving either physical tone.
 </Task>
 
-{/* demo WeakToneWindowLab: unbuilt component handoff. Four presets named Rectangular trap, Hann clears, Short BH trap, and Longer Hamming; controls choose one of the four frozen periodic windows and acquired N in [64,128,256] before Audit all 16 phases reveals the deterministic minimum. Phase slider inspects 0:22.5:337.5 degrees but never changes the all-phase verdict. Plot exact-DTFT q coordinates, not FFT bins; metric cards show null width, peak sidelobe, Gc, positive scalloping loss, ENBW, local leakage, and >=3 dB PASS/FAIL. No padding control, probability language, randomness, network, or audio. */}
+<Demo name="WeakToneWindowLab" caption="Precommit to a periodic window and acquired record length, audit all 16 deterministic phases, then explain each pass or failure from local leakage and main-lobe width rather than from one headline metric." />
 
-{/* fig WindowTradeoffMap: component figure built only from a checked derived table, not OCR or eyeballed Harris Figure 12. Plot peak sidelobe against a separately declared worst-case processing-loss formula for rectangle, Hann, Hamming, Blackman, and four-term Blackman-Harris; direct labels plus shapes; annotate that coherent multitone addition, local separation, and main-lobe encroachment are omitted, so the map cannot name a universal winner. */}
+<Figure name="WindowTradeoffMap" alt="A shape-coded scatter plot places rectangular, periodic Hann, periodic Hamming, classic Blackman, and four-term Blackman-Harris windows by peak-sidelobe rejection and worst-case processing loss, with companion metric cards and a warning that local separation, main-lobe encroachment, and coherent multitone addition are omitted." caption="A two-metric map reveals tradeoffs but cannot name a universal winner for an undeclared signal geometry." />
 
 For two equal tones separated near one null-to-null main-lobe width, the rectangle may retain two peaks that Blackman–Harris merges. For a tone $40$ dB below a strong neighbor several bins away, the rectangle's sidelobes can dominate while a taper succeeds. Every selection therefore records the signal geometry, window convention, main-lobe measure, local leakage check, coherent calibration, and noise bandwidth.
-
-<KeyFact>
-A window is defensible only relative to a declared claim: the same four-term Blackman–Harris choice fails at $N=64$ and passes at $N=128$ because observation length moves the fixed physical neighbor relative to its broad main lobe.
-</KeyFact>
 
 Window choice is now measurable: the record kernel's main lobe and sidelobes set deterministic interference, while coherent gain, scalloping, and ENBW calibrate tone and noise claims. What remains unresolved is how to locate one isolated tone between displayed coordinates without mistaking a denser grid for longer observation. <Ref lesson="peak-estimation-and-zero-padding">Peak Estimation and Zero-Padding Limits</Ref> next separates window-dependent interpolation from physical resolution.
 
@@ -356,7 +356,7 @@ Refute the claim “Hann and Hamming differ only in spelling.” Use the periodi
 <Solution>
 Periodic Hann has coefficients $0.5-0.5\cos(2\pi n/N)$. Its continuous endpoint value and first derivative match zero at the support boundary, so the first unmatched derivative occurs later and the distant sidelobe envelope falls at about 18 dB per octave. Its peak sidelobe is about $-31.47$ dB.
 
-Periodic Hamming has coefficients $0.54-0.46\cos(2\pi n/N)$. Its boundary level is $0.08$, so extending the finite support by zero creates a value discontinuity and the far envelope eventually falls at about 6 dB per octave. Its coefficients cancel the first sidelobes more strongly, giving a peak near $-42.7$ dB.
+Periodic Hamming has coefficients $0.54-0.46\cos(2\pi n/N)$. Its boundary level is $0.08$, so extending the finite support by zero creates a value discontinuity and the far envelope eventually falls at about 6 dB per octave. Its coefficients cancel the first sidelobes more strongly, giving a peak near $-42.62$ dB at the table's $N_{\mathrm{ref}}=128$.
 
 The claim is false because the coefficient vectors, boundary clauses, peak sidelobes, and asymptotic tails differ. Hamming can be preferable when one nearby interferer lands in its suppressed early sidelobe region. Hann can be preferable when sufficiently distant leakage matters and its faster tail eventually falls below Hamming's. Neither statement ranks the windows without the interferer location.
 </Solution>
