@@ -245,6 +245,37 @@ class Schedule(Base):
     )
 
 
+class ReviewState(Base):
+    """Where a learner stands on the review ladder of one lesson.
+
+    The ladder is state of its own rather than something read back out of
+    `schedules`: a schedule row is one delivery, and deliveries are retried,
+    coalesced, cancelled and rebuilt. This row answers "which rung is this
+    learner on for this lesson" through all of that, and its primary key is
+    what makes a replayed completion start no second ladder.
+
+    `next_due_at` NULL is a finished ladder — the last rung was passed, and
+    nothing is scheduled again. The row stays: it is the history, and it is
+    what keeps the finished ladder from being started over.
+    """
+
+    __tablename__ = "review_state"
+    __table_args__ = (Index("ix_review_state_next_due_at", "next_due_at"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    step: Mapped[int] = mapped_column(SmallInteger)
+    last_outcome: Mapped[str | None] = mapped_column(String(16), default=None)
+    next_due_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 # Title over body, and the config is spelled out: a generated column may only
 # call immutable functions, which to_tsvector is exactly when given one.
 # Migrations carry their own frozen copy (0004_documents.py); changing this
