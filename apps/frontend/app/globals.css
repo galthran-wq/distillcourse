@@ -79,6 +79,13 @@ body {
   color: var(--ink);
   font-family: var(--font-plex-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Switching the theme rewrites every colour token at once. The page itself
+     is the largest of those areas, and cutting it from paper to ink is a flash
+     — so it crosses over instead. The chrome that carries `transition-colors`
+     crosses with it. */
+  transition:
+    background-color var(--motion-base),
+    color var(--motion-base);
 }
 
 /* A document wider than the viewport widens the mobile layout viewport, and
@@ -611,13 +618,64 @@ html {
   from { opacity: 0; transform: scale(0.94); }
   to { opacity: 1; transform: scale(1); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .lightbox-overlay,
-  .lightbox-overlay .lightbox-full,
-  .lightbox-overlay.is-closing,
-  .lightbox-overlay.is-closing .lightbox-full {
-    animation: none;
+/* ---------- tutor panel: the two shapes, and the way between them ----------
+   The panel's geometry is here rather than in its class list because it
+   travels: docked in its corner and expanded over the page are one element
+   resizing between two boxes, and a side can only be animated where both boxes
+   give it a length. `inset-0` against `right-6 bottom-20` leaves top and left
+   at `auto` at one end of the trip, and `auto` has nothing to interpolate — so
+   both boxes are stated as right/bottom/width/height. The base is the docked
+   box; the rules under it are the departures from it. */
+.chat-panel {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 5rem; /* clear of the launcher below it */
+  width: min(24rem, calc(100vw - 3rem));
+  height: min(32rem, calc(100vh - 8rem));
+  /* it grows out of the launcher in that corner, and shrinks back into it */
+  transform-origin: bottom right;
+  transition-property: opacity, transform, right, bottom, width, height;
+  transition-duration: var(--motion-base);
+  transition-timing-function: ease-out;
+}
+
+/* Nothing to scroll: the sign-in prompt is as tall as the sentence in it. */
+.chat-panel[data-shape="prompt"] {
+  height: auto;
+}
+
+/* Over the page, all but its margin; on a phone there is no margin to leave. */
+.chat-panel[data-shape="expanded"] {
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+}
+@media (min-width: 40rem) {
+  .chat-panel[data-shape="expanded"] {
+    /* Centred, and never wider than the reading column it holds. Anchored to
+       one side, centring is what that side's offset says it is. */
+    right: max(1rem, calc((100% - 56rem) / 2));
+    bottom: 1rem;
+    width: min(56rem, calc(100% - 2rem));
+    height: calc(100% - 2rem);
   }
+}
+
+@starting-style {
+  .chat-panel {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+/* Closed, and kept on screen by the widget for exactly as long as this takes.
+   It stops taking clicks the moment it starts leaving — it is already gone as
+   far as the reader is concerned. */
+.chat-panel.is-closing {
+  opacity: 0;
+  transform: scale(0.94);
+  pointer-events: none;
 }
 
 /* ---------- tutor replies (chat widget) ----------
@@ -700,5 +758,22 @@ html {
   }
   to {
     background: transparent;
+  }
+}
+
+/* ---------- reduced motion ----------
+   One rule for the whole site: a reader who asks for no motion gets none of
+   it, whatever a component decides for itself. Not zero — a hair — so that
+   animationend still fires for anything waiting on it. The exception is the
+   reference highlight, which is a colour fading rather than something moving,
+   and is the only mark of where a reference landed. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.anchor-flash),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

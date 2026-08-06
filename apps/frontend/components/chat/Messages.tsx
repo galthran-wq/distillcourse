@@ -69,11 +69,15 @@ export default function Messages({
             // transcript is only ever appended to, which makes position one.
             key={turn}
             aria-label={message.role === "user" ? "You" : "Tutor"}
-            className={
+            // A turn rises into place as it is added. The answer inside it is
+            // written a token at a time and does not animate: the element is
+            // there from the first token, and this only plays on the node
+            // React inserts.
+            className={`transition-[opacity,translate] duration-(--motion-base) starting:translate-y-1.5 starting:opacity-0 ${
               message.role === "user"
                 ? "ml-auto w-fit max-w-[85%] rounded-md bg-accent/10 px-3 py-2"
                 : ""
-            }
+            }`}
           >
             {message.parts.map((part, index) => {
               if (part.type === "text") {

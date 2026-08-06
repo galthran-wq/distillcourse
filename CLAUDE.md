@@ -66,6 +66,12 @@ Rules that override defaults:
   `LABEL_CLASS`, every dropdown `MENU_CLASS`/`MENU_ITEM_CLASS`, all from
   `ui/styles.ts`. Never hand-roll the look of one in a page or a demo; the
   focus ring is global (`@layer base`, so a utility can still override it).
+  Motion belongs to that layer too, and there is no animation library: an
+  entrance is an `@starting-style` transition (`starting:` utilities, or a rule
+  in `globals.css` where the element's geometry already lives there), nothing
+  runs longer than `--motion-base`, and one blanket `prefers-reduced-motion`
+  rule at the end of `globals.css` turns all of it off — a component never
+  repeats that rule for itself.
 - Code style is binding for ALL code in this repo:
   `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
   only, grep before writing (no duplicated functionality), domain-separated
