@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui";
+import { FIELD_CLASS, LABEL_CLASS } from "@/components/ui/styles";
 import { ApiError } from "@/lib/http";
 import {
   getSettings,
@@ -15,7 +16,6 @@ import {
 } from "@/lib/settings/api";
 import { setSettings, useSettings } from "@/lib/settings/store";
 
-const LABEL = "font-mono text-[11px] uppercase tracking-wider text-faint";
 const CHANNEL: Record<Settings["telegram"], string> = {
   none: "not connected",
   active: "connected",
@@ -27,9 +27,39 @@ type Write = (change: () => Promise<Settings | void>) => Promise<void>;
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-10 border-t border-line pt-6">
-      <h2 className={`mb-3 ${LABEL}`}>{title}</h2>
+      <h2 className={`mb-3 ${LABEL_CLASS}`}>{title}</h2>
       {children}
     </section>
+  );
+}
+
+/** The one setting that is simply on or off, so it is shown as on or off. */
+function Switch({
+  on,
+  label,
+  onToggle,
+}: {
+  on: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onToggle}
+      className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-(--motion-fast) ${
+        on ? "border-accent bg-accent" : "border-line bg-panel"
+      }`}
+    >
+      <span
+        className={`size-4 rounded-full transition-transform duration-(--motion-fast) ${
+          on ? "translate-x-[1.5rem] bg-paper" : "translate-x-[0.1875rem] bg-faint"
+        }`}
+      />
+    </button>
   );
 }
 
@@ -66,14 +96,14 @@ function QuietHours({ settings, write }: { settings: Settings; write: Write }) {
           ["Until", end, setEnd],
         ] as const
       ).map(([label, value, set]) => (
-        <label key={label} className="block text-sm">
+        <label key={label} className="block w-32 text-sm">
           <span className="text-soft">{label}</span>
           <input
             type="time"
             value={value}
             onChange={(event) => set(event.target.value)}
             onBlur={save}
-            className="mt-1 block rounded border border-line bg-transparent px-2 py-1"
+            className={`${FIELD_CLASS} mt-1`}
           />
         </label>
       ))}
@@ -125,11 +155,18 @@ export default function SettingsPanel() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button onClick={() => void write(async () => setPairing(await pairTelegram()))}>
+          {/* The page's one primary action, and only while there is nothing
+              connected: once there is, this is a second account, not a call. */}
+          <Button
+            variant={settings.telegram === "none" ? "solid" : "outline"}
+            onClick={() => void write(async () => setPairing(await pairTelegram()))}
+          >
             {settings.telegram === "none" ? "Connect Telegram" : "Connect another account"}
           </Button>
           {settings.telegram !== "none" && (
-            <Button onClick={() => void write(unpairTelegram)}>Disconnect</Button>
+            <Button variant="ghost" onClick={() => void write(unpairTelegram)}>
+              Disconnect
+            </Button>
           )}
         </div>
         {pairing !== null && (
@@ -174,12 +211,16 @@ export default function SettingsPanel() {
       </Section>
 
       <Section title="Messages the platform starts">
-        <p className="text-sm text-soft">
-          {muted ? "Paused. Answers to what you write are unaffected." : "On."}
-        </p>
-        <Button className="mt-3" onClick={() => void write(() => updateSettings({ muted: !muted }))}>
-          {muted ? "Resume" : "Pause"}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Switch
+            on={!muted}
+            label="Messages the platform starts"
+            onToggle={() => void write(() => updateSettings({ muted: !muted }))}
+          />
+          <span className="text-sm text-soft">
+            {muted ? "Paused. Answers to what you write are unaffected." : "On."}
+          </span>
+        </div>
       </Section>
     </>
   );

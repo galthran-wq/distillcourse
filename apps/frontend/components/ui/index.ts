@@ -1,8 +1,10 @@
 /**
- * Reusable UI primitives for demos and lesson widgets. All styling flows
- * from the theme tokens in globals.css — restyle here (or in the tokens),
- * never inline in individual demos. demo-builder MUST compose from these;
- * a missing primitive gets added here, not hand-rolled in a demo.
+ * The site's UI primitives — chrome and lesson widgets alike. All styling
+ * flows from the theme tokens in globals.css — restyle here (or in the
+ * tokens), never inline in a page or a demo. demo-builder MUST compose from
+ * these; a missing primitive gets added here, not hand-rolled in a demo.
+ * The looks that are only a look (field, label, button classes) live beside
+ * this in ./styles, which server components may call.
  */
 export { Panel } from "./Panel";
 export { Button } from "./Button";

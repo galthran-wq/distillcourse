@@ -1,7 +1,8 @@
 "use client";
 
 import type { FormEvent, KeyboardEvent } from "react";
-import { FIELD_CLASS } from "@/components/ui/field";
+import { Button } from "@/components/ui";
+import { FIELD_CLASS } from "@/components/ui/styles";
 import { dropQuote, useQuote } from "@/lib/chat/quote";
 import { setDraft, useDraft } from "@/lib/chat/stored";
 
@@ -34,14 +35,15 @@ export default function Composer({ disabled, onSubmit }: Props) {
       {quote !== null && (
         <div className="mb-2 flex items-start gap-2 border-l-2 border-accent pl-2">
           <p className="line-clamp-3 flex-1 text-[13px] text-soft">{quote.text}</p>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={dropQuote}
             aria-label="Drop the quoted passage"
-            className="px-1 text-soft hover:text-accent"
+            className="px-2"
           >
             ×
-          </button>
+          </Button>
         </div>
       )}
       <textarea
@@ -51,15 +53,11 @@ export default function Composer({ disabled, onSubmit }: Props) {
         rows={2}
         aria-label="Message the tutor"
         placeholder={disabled ? "the tutor is answering…" : "Ask about this section"}
-        className={`${FIELD_CLASS} mt-0 resize-none`}
+        className={`${FIELD_CLASS} resize-none`}
       />
-      <button
-        type="submit"
-        disabled={!ready}
-        className="mt-2 min-h-9 w-full rounded border border-line text-sm transition-colors hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink"
-      >
+      <Button type="submit" variant="solid" size="sm" disabled={!ready} className="mt-2 w-full">
         Send
-      </button>
+      </Button>
     </form>
   );
 }

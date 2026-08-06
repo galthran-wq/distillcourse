@@ -224,7 +224,7 @@ function Heatmap({
         <span
           ref={tip}
           role="tooltip"
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded border border-line bg-paper px-2 py-1 font-mono text-[10px] whitespace-nowrap text-soft"
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-sm border border-line bg-paper px-2 py-1 font-mono text-[10px] whitespace-nowrap text-soft"
           style={{
             // Held inside the frame: the last column's tooltip would otherwise
             // hang off the panel and widen the whole page on a phone.

@@ -22,6 +22,7 @@ import SelectionReference from "@/components/lessons/SelectionReference";
 import Figure, { type FigureProps } from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
 import { ImageCredits } from "@/components/mdx/SourcedImage";
+import { LABEL_CLASS } from "@/components/ui/styles";
 import { loadCredits } from "@/lib/content/credits";
 import {
   Aside,
@@ -169,7 +170,7 @@ export default async function LessonPage({
             previous one's bookmark while the new state loads. */}
         <LessonStateProvider key={key} lesson={key}>
           <header className="border-b border-line py-10">
-            <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
+            <p className={LABEL_CLASS}>
               <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
                 {course.course.title}
               </Link>{" "}
@@ -181,11 +182,11 @@ export default async function LessonPage({
                 {lesson.title}
               </span>
             </h1>
-            <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
               <span className="text-soft">{lesson.goal}</span>
               <span>~{lesson.est_minutes} min</span>
               <BookmarkToggle />
-            </p>
+            </div>
           </header>
 
           <div className="prose-lesson py-10">

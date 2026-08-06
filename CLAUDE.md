@@ -51,6 +51,13 @@ Rules that override defaults:
   own `isReadable`, and chunk anchors come from the site's own rehype-slug —
   if you change how lessons are rendered or which ones render, the export
   follows automatically; if you fork either, search starts lying.
+- The site's look is one layer, not per-page decisions: the tokens in
+  `apps/frontend/app/globals.css` (`@theme`: colors, `--radius-sm|md|full`,
+  `--shadow-card|popover`, `--motion-fast|base|slow`) and the primitives in
+  `apps/frontend/components/ui`. Every button is `ui/Button` — `solid` for the
+  one primary action a view has, `outline`, `ghost` — every text field carries
+  `FIELD_CLASS` and every mono micro-cap `LABEL_CLASS` from `ui/styles.ts`.
+  Never hand-roll one in a page or a demo; the focus ring is global.
 - Code style is binding for ALL code in this repo:
   `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
   only, grep before writing (no duplicated functionality), domain-separated

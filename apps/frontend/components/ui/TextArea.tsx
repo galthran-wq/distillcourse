@@ -1,6 +1,6 @@
 "use client";
 
-import { FIELD_CLASS } from "./field";
+import { FIELD_CLASS } from "./styles";
 
 interface Props {
   label: string;
@@ -20,7 +20,7 @@ export function TextArea({ label, value, onChange, rows = 3, ariaLabel }: Props)
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
         aria-label={ariaLabel ?? label}
-        className={`${FIELD_CLASS} resize-y font-mono`}
+        className={`${FIELD_CLASS} mt-1 resize-y font-mono`}
       />
     </label>
   );

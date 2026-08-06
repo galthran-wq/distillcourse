@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LABEL_CLASS } from "@/components/ui/styles";
 
 /**
  * Textbook environments. Numbering is done with CSS counters (see
@@ -88,7 +89,7 @@ export function References({
 }) {
   return (
     <section className="references mt-12 border-t border-line pt-5">
-      <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-faint">
+      <p className={`mb-2 ${LABEL_CLASS}`}>
         References
       </p>
       <div className="references-body">{children}</div>
@@ -120,7 +121,7 @@ export function Task({ children }: { children: ReactNode }) {
 export function Aside({ children }: { children: ReactNode }) {
   return (
     <details
-      className="aside my-8 rounded border border-dashed border-line px-5 py-3"
+      className="aside my-8 rounded-sm border border-dashed border-line px-5 py-3"
       data-toggle="aside"
     >
       <summary className="cursor-pointer font-mono text-[12px] text-faint">

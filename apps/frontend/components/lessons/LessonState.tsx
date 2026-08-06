@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { CONTROL_CLASS } from "@/components/ui/field";
+import { Button } from "@/components/ui";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import {
@@ -75,16 +75,25 @@ export function BookmarkToggle() {
   if (state === null) return null;
 
   return (
-    <button
-      type="button"
-      aria-pressed={state.bookmarked}
+    <Button
+      variant="ghost"
+      size="icon"
+      active={state.bookmarked}
       onClick={() => bookmark(!state.bookmarked)}
-      className={`${CONTROL_CLASS} ${
-        state.bookmarked ? "text-accent" : "text-faint hover:text-accent"
-      }`}
+      aria-label={state.bookmarked ? "Remove bookmark" : "Bookmark this lesson"}
     >
-      {state.bookmarked ? "bookmarked" : "bookmark"}
-    </button>
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden
+        className="size-4"
+        fill={state.bookmarked ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      >
+        <path d="M3.75 2.75h8.5v10.5L8 10.25l-4.25 3z" />
+      </svg>
+    </Button>
   );
 }
 
@@ -93,25 +102,20 @@ export function LessonRating() {
   if (state === null) return null;
 
   return (
-    <div className="mt-10 flex items-center gap-3 border-t border-line pt-6">
-      <span className="font-mono text-[11px] tracking-wide text-faint">
-        was this lesson useful?
-      </span>
-      {([1, -1] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={state.rating === value}
-          onClick={() => rate(value)}
-          className={`${CONTROL_CLASS} rounded border px-2 py-1 ${
-            state.rating === value
-              ? "border-accent text-accent"
-              : "border-line text-soft hover:border-faint"
-          }`}
-        >
-          {value === 1 ? "yes" : "no"}
-        </button>
-      ))}
+    <div className="mt-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-6">
+      <span className="text-sm text-soft">Was this lesson useful?</span>
+      <div className="flex items-center gap-2">
+        {([1, -1] as const).map((value) => (
+          <Button
+            key={value}
+            size="sm"
+            active={state.rating === value}
+            onClick={() => rate(value)}
+          >
+            {value === 1 ? "Yes" : "No"}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }

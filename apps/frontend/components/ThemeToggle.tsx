@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { Button } from "@/components/ui";
 
 type Theme = "light" | "dark";
 
@@ -36,13 +37,12 @@ export default function ThemeToggle() {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      size="icon"
       onClick={toggle}
       aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-base transition-colors hover:border-accent hover:text-accent"
     >
       {theme === null ? "◐" : theme === "dark" ? "☀" : "☾"}
-    </button>
+    </Button>
   );
 }

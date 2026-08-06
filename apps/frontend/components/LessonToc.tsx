@@ -1,6 +1,7 @@
 "use client";
 
 import { useLessonPosition } from "@/lib/lesson/position";
+import { LABEL_CLASS } from "@/components/ui/styles";
 import type { TocEntry } from "@/lib/content/toc";
 
 export default function LessonToc({ toc }: { toc: TocEntry[] }) {
@@ -10,7 +11,7 @@ export default function LessonToc({ toc }: { toc: TocEntry[] }) {
 
   return (
     <nav className="lesson-toc mt-10" aria-label="Contents">
-      <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-faint">
+      <p className={`mb-2 ${LABEL_CLASS}`}>
         Contents
       </p>
       {toc.map((h) => (

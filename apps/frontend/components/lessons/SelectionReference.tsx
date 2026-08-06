@@ -47,7 +47,7 @@ export default function SelectionReference({
         window.getSelection()?.removeAllRanges();
       }}
       style={{ ...buttonPosition(passage), height: BUTTON_HEIGHT }}
-      className="fixed z-40 flex -translate-x-1/2 items-center rounded border border-line bg-paper px-2 font-mono text-[11px] text-soft shadow-sm hover:border-accent hover:text-accent"
+      className="fixed z-40 flex -translate-x-1/2 items-center rounded-sm border border-line bg-paper px-2.5 text-[12px] text-soft shadow-card transition-colors duration-(--motion-fast) hover:border-accent hover:text-accent"
     >
       reference in chat
     </button>
