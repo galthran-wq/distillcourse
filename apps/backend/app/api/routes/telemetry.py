@@ -56,18 +56,8 @@ async def events(batch: EventBatch, user: CurrentUser, session: SessionDep) -> N
 FEED_ENTRIES = 30
 
 
-class Day(BaseModel):
-    date: date
-    count: int
-    minutes: int
-
-
 class Activity(BaseModel):
-    days: list[Day]
-    feed: list[passes.Entry]
-
-
-class DayActivity(BaseModel):
+    days: list[passes.Day]
     feed: list[passes.Entry]
 
 
@@ -75,35 +65,34 @@ class DayActivity(BaseModel):
 async def activity(user: CurrentUser, session: SessionDep) -> Activity:
     """The grid the profile draws and the feed under it, on the reader's calendar.
 
-    A square counts the lessons the day *earned* — five minutes each — while its
-    minutes and the feed under it are every lesson the day *touched*: the two
-    answer "was this a reading day" and "what was read", and only the first has
-    a bar to clear.
+    A square counts the lessons the day *earned* — five minutes each, capped at
+    the lesson's own completion bar — while its seconds and the feed under it
+    are every lesson the day *touched*: the two answer "was this a reading day"
+    and "what was read", and only the first has a bar to clear. Seconds rather
+    than minutes, because the browser is the one place both this and the feed
+    are put into words and there must be one rounding, not two.
+
+    A reader who moves timezone gets a grid cut two ways: `count` is dated in
+    the zone that was stored when the day was credited (`lesson_passes.day`,
+    written once and never revisited), while `seconds` and the feed are bucketed
+    in the zone they hold now. Deliberate — re-deriving passes on demand would
+    let a square that was earned stop existing — and it shows only on the days
+    around the move.
     """
-    read = await passes.entries(session, user)
-    minutes: dict[date, int] = {}
-    for entry in read:
-        minutes[entry.date] = minutes.get(entry.date, 0) + entry.seconds
-    counts = dict(await passes.activity(session, user))
     return Activity(
-        days=[
-            Day(
-                date=day,
-                count=counts.get(day, 0),
-                minutes=round(minutes.get(day, 0) / 60),
-            )
-            for day in sorted(counts.keys() | minutes.keys())
-        ],
-        feed=read[:FEED_ENTRIES],
+        days=await passes.activity(session, user),
+        feed=await passes.entries(session, user, limit=FEED_ENTRIES),
     )
 
 
 @router.get("/activity/{day}")
-async def activity_on(day: date, user: CurrentUser, session: SessionDep) -> DayActivity:
+async def activity_on(
+    day: date, user: CurrentUser, session: SessionDep
+) -> list[passes.Entry]:
     """What one square of the grid was made of, for the reader who clicked it.
 
     Derived from `events`, which housekeeping is free to prune: a square outlives
     the events behind it — a day that was read stays read — so an old one can
     answer with nothing, and that is the honest answer rather than a fault.
     """
-    return DayActivity(feed=await passes.entries(session, user, day))
+    return await passes.entries(session, user, day)

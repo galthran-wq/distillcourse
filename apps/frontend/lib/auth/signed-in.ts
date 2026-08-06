@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useAuth } from "@/lib/auth/store";
+import { answered } from "@/lib/load";
 
 /**
  * Loads something that exists only for a signed-in reader; `null` until it is
@@ -20,20 +21,7 @@ export function useSignedIn<T>(
 
   useEffect(() => {
     if (auth.status !== "signed-in") return;
-    // The answer to a request the reader has already navigated away from is
-    // not theirs to be shown.
-    let current = true;
-    load(key).then(
-      (loaded) => {
-        if (current) setValue(loaded);
-      },
-      () => {
-        if (current) setValue(null);
-      },
-    );
-    return () => {
-      current = false;
-    };
+    return answered(load(key), setValue);
   }, [auth.status, load, key]);
 
   return [value, setValue];

@@ -1,10 +1,14 @@
 import { call } from "@/lib/http";
 
-/** A day of the grid: the lessons it earned, and everything it was spent on. */
+/**
+ * A day of the grid: the lessons it earned, and everything it was spent on.
+ * Seconds rather than minutes, because the browser is the only place a duration
+ * is put into words and one rounding cannot disagree with itself.
+ */
 export interface ActivityDay {
   date: string;
   count: number;
-  minutes: number;
+  seconds: number;
 }
 
 /**
@@ -26,14 +30,10 @@ export interface Activity {
   feed: ActivityEntry[];
 }
 
-export interface DayActivity {
-  feed: ActivityEntry[];
-}
-
 export function getActivity(): Promise<Activity> {
   return call<Activity>("/telemetry/activity");
 }
 
-export function getActivityOn(date: string): Promise<DayActivity> {
-  return call<DayActivity>(`/telemetry/activity/${date}`);
+export function getActivityOn(date: string): Promise<ActivityEntry[]> {
+  return call<ActivityEntry[]>(`/telemetry/activity/${date}`);
 }

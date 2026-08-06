@@ -33,8 +33,9 @@ def _day_window(day: date, tz: ZoneInfo) -> tuple[ColumnElement[bool], ...]:
 
     combine() at both ends rather than a day of arithmetic: on the night the
     clocks change the local day is 23 or 25 hours long. Stated as instants, so
-    the query still reads `events` by its (user, lesson, server_ts) index rather
-    than by a timezone conversion of every row the reader ever produced.
+    the query reads `events` by an index on `server_ts` rather than by a
+    timezone conversion of every row the reader ever produced — which one
+    depends on whether the caller has a lesson to narrow it by.
     """
     return (
         Event.server_ts >= datetime.combine(day, time(), tz),
@@ -129,27 +130,72 @@ async def record(session: AsyncSession, user: User, lesson: str, at: datetime) -
     await credit(session, user.id, lesson, tz.key, *_day_window(day, tz))
 
 
-async def activity(session: AsyncSession, user: User) -> list[tuple[date, int]]:
-    """How many lessons this reader passed on each day of the grid.
+class Day(BaseModel):
+    """One square of the grid.
+
+    `count` is the lessons the day *earned* — `DAY_SECONDS` each — and `seconds`
+    is every second it was read for, bar or no bar. A day is in the answer for
+    either reason: five minutes on a lesson earns a count, one minute earns none
+    and is still a day the reader read on.
+    """
+
+    date: date
+    count: int
+    seconds: int
+
+
+async def _counts(
+    session: AsyncSession, user_id: uuid.UUID, since: date
+) -> dict[date, int]:
+    """How many lessons this reader passed on each day of the grid."""
+    rows = (
+        await session.execute(
+            select(LessonPass.day, func.count())
+            .where(LessonPass.user_id == user_id, LessonPass.day >= since)
+            .group_by(LessonPass.day)
+        )
+    ).tuples()
+    return dict(rows.all())
+
+
+async def _seconds(
+    session: AsyncSession, user_id: uuid.UUID, tz: ZoneInfo
+) -> dict[date, int]:
+    """How long each of this reader's days was read, over every lesson at once.
+
+    Rolled up in SQL rather than summed out of `entries()`: the grid asks about
+    a year of days, and materialising a model per lesson per day to add up 365
+    numbers is a year of objects for an answer that is one row per day.
+    """
+    bucket = _local_day(tz.key)
+    total = func.sum(progress.CREDITED_SECONDS)
+    rows = (
+        await session.execute(
+            select(bucket.label("day"), total.label("seconds"))
+            .where(
+                Event.user_id == user_id,
+                Event.server_ts >= datetime.combine(_grid_start(tz), time(), tz),
+            )
+            .group_by(bucket)
+            .having(total > 0)
+        )
+    ).tuples()
+    return dict(rows.all())
+
+
+async def activity(session: AsyncSession, user: User) -> list[Day]:
+    """Every day of the grid this reader touched, oldest first.
 
     Only the days they read on; a grid is mostly empty, and the caller draws
     the blanks anyway.
     """
-    return list(
-        (
-            await session.execute(
-                select(LessonPass.day, func.count())
-                .where(
-                    LessonPass.user_id == user.id,
-                    LessonPass.day >= _grid_start(zone(user.timezone)),
-                )
-                .group_by(LessonPass.day)
-                .order_by(LessonPass.day)
-            )
-        )
-        .tuples()
-        .all()
-    )
+    tz = zone(user.timezone)
+    counts = await _counts(session, user.id, _grid_start(tz))
+    seconds = await _seconds(session, user.id, tz)
+    return [
+        Day(date=day, count=counts.get(day, 0), seconds=seconds.get(day, 0))
+        for day in sorted(counts.keys() | seconds.keys())
+    ]
 
 
 class Entry(BaseModel):
@@ -168,7 +214,11 @@ class Entry(BaseModel):
 
 
 async def entries(
-    session: AsyncSession, user: User, day: date | None = None
+    session: AsyncSession,
+    user: User,
+    day: date | None = None,
+    *,
+    limit: int | None = None,
 ) -> list[Entry]:
     """What this reader read on each of their days, newest first.
 
@@ -176,7 +226,8 @@ async def entries(
     already two projections (the aggregate, the pass), and how those events fell
     across the clock is a question about the log itself. A lesson merely opened
     and left is not an entry — attention is `progress`'s definition of it and
-    nobody else's.
+    nobody else's, and the span is the reading rather than the tab: a lesson
+    opened at breakfast and read in the evening is an evening.
     """
     tz = zone(user.timezone)
     within = (
@@ -186,19 +237,22 @@ async def entries(
     )
     bucket = _local_day(tz.key)
     seconds = func.sum(progress.CREDITED_SECONDS)
-    last_at = func.max(Event.server_ts)
+    last_at = func.max(progress.CREDITED_AT)
     rows = await session.execute(
         select(
             bucket.label("date"),
             Event.lesson,
             seconds.label("seconds"),
-            func.min(Event.server_ts).label("first_at"),
+            func.min(progress.CREDITED_AT).label("first_at"),
             last_at.label("last_at"),
         )
         .where(Event.user_id == user.id, *within)
         .group_by(bucket, Event.lesson)
         .having(seconds > 0)
         .order_by(bucket.desc(), last_at.desc())
+        # `having` keeps only groups with a heartbeat in them, so the span above
+        # is never null and the newest `limit` lines are the newest reading.
+        .limit(limit)
     )
     return [
         Entry(

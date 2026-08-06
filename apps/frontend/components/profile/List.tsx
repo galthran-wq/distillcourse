@@ -1,4 +1,4 @@
-// The two shapes every list on the profile is built from.
+// The three shapes every list on the profile is built from.
 import Link from "next/link";
 import type { LessonLink } from "@/lib/content/site";
 
@@ -10,6 +10,41 @@ export function Section({ title, children }: { title: string; children: React.Re
       </h2>
       {children}
     </section>
+  );
+}
+
+export interface Listed {
+  lesson: string;
+  link?: LessonLink;
+  note: string;
+}
+
+/**
+ * A titled list of lessons, or one line saying there are none. Everything on
+ * the profile that is "these lessons, each with a note" — the feed under the
+ * activity grid is not: its lines are cut into days, each with a heading.
+ */
+export function LessonList({
+  title,
+  empty,
+  rows,
+}: {
+  title: string;
+  empty: string;
+  rows: Listed[];
+}) {
+  return (
+    <Section title={title}>
+      {rows.length === 0 ? (
+        <p className="text-sm text-faint">{empty}</p>
+      ) : (
+        <ul>
+          {rows.map((row) => (
+            <LessonRow key={row.lesson} {...row} />
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }
 

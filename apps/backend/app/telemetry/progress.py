@@ -41,6 +41,11 @@ COMPLETION_SCROLL_PCT = 90
 CREDITED_SECONDS = case(
     (Event.type == schemas.HEARTBEAT, Event.payload["seconds"].as_integer()), else_=0
 )
+# When an event that counts as reading happened, and nothing for one that does
+# not. min/max of this is the span a sitting was actually read over: a lesson
+# opened at breakfast and left in a tab does not stretch the evening's reading
+# back to it.
+CREDITED_AT = case((Event.type == schemas.HEARTBEAT, Event.server_ts))
 _PCT = case((Event.type == schemas.SCROLL, Event.payload["pct"].as_integer()), else_=0)
 _EVENT_ORDER = (Event.server_ts, Event.id)
 

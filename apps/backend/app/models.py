@@ -145,6 +145,10 @@ class Event(Base):
     __tablename__ = "events"
     __table_args__ = (
         Index("ix_events_user_lesson_ts", "user_id", "lesson", "server_ts"),
+        # Everything about one lesson reads the index above; the activity grid
+        # and its feed ask about a reader's days across every lesson at once,
+        # which that index cannot serve without scanning their whole history.
+        Index("ix_events_user_ts", "user_id", "server_ts"),
     )
 
     # Minted by the browser, which is what makes a retried flush a no-op

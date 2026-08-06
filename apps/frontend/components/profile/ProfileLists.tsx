@@ -7,7 +7,7 @@ import type { LessonLink } from "@/lib/content/site";
 import { day } from "@/lib/day";
 import { getProfile } from "@/lib/lessons/api";
 import Activity from "./Activity";
-import { LessonRow, Section } from "./List";
+import { LessonList } from "./List";
 
 export default function ProfileLists({
   lessons,
@@ -35,42 +35,27 @@ export default function ProfileLists({
         <>
           {/* Every lesson once, by when it was last opened — the feed above
               answers "which days", this answers "which lessons". */}
-          <Section title="recently read">
-            {profile.history.length === 0 ? (
-              <p className="text-sm text-faint">No lessons read yet.</p>
-            ) : (
-              <ul>
-                {profile.history.map((visit) => (
-                  <LessonRow
-                    key={visit.lesson}
-                    lesson={visit.lesson}
-                    link={lessons[visit.lesson]}
-                    note={
-                      visit.completed_at === null
-                        ? day(visit.last_seen)
-                        : `${day(visit.last_seen)} · completed`
-                    }
-                  />
-                ))}
-              </ul>
-            )}
-          </Section>
-          <Section title="bookmarks">
-            {profile.bookmarks.length === 0 ? (
-              <p className="text-sm text-faint">Nothing bookmarked.</p>
-            ) : (
-              <ul>
-                {profile.bookmarks.map((bookmark) => (
-                  <LessonRow
-                    key={bookmark.lesson}
-                    lesson={bookmark.lesson}
-                    link={lessons[bookmark.lesson]}
-                    note={day(bookmark.created_at)}
-                  />
-                ))}
-              </ul>
-            )}
-          </Section>
+          <LessonList
+            title="recently read"
+            empty="No lessons read yet."
+            rows={profile.history.map((visit) => ({
+              lesson: visit.lesson,
+              link: lessons[visit.lesson],
+              note:
+                visit.completed_at === null
+                  ? day(visit.last_seen)
+                  : `${day(visit.last_seen)} · completed`,
+            }))}
+          />
+          <LessonList
+            title="bookmarks"
+            empty="Nothing bookmarked."
+            rows={profile.bookmarks.map((bookmark) => ({
+              lesson: bookmark.lesson,
+              link: lessons[bookmark.lesson],
+              note: day(bookmark.created_at),
+            }))}
+          />
         </>
       )}
     </>

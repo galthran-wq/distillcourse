@@ -23,7 +23,7 @@ export interface Square {
   /** The day as the API names it, and how two days are compared. */
   key: string;
   count: number;
-  minutes: number;
+  seconds: number;
 }
 
 function two(value: number): string {
@@ -48,7 +48,7 @@ export function squares(days: ActivityDay[], today: Date): Square[] {
     at.setDate(start.getDate() + index);
     const on = key(at);
     const day = read.get(on);
-    return { date: at, key: on, count: day?.count ?? 0, minutes: day?.minutes ?? 0 };
+    return { date: at, key: on, count: day?.count ?? 0, seconds: day?.seconds ?? 0 };
   });
 }
 
@@ -87,13 +87,22 @@ function clock(at: string): string {
   return at.slice(11, 16);
 }
 
+/**
+ * Reading time as the panel says it, wherever it says it. The one rounding
+ * there is: the tooltip over a square and the lines beneath it are the same
+ * seconds cut two ways, and two roundings would let them disagree by a minute.
+ * Never "0 min" — a minute that was read is not nothing.
+ */
+export function spent(seconds: number): string {
+  return seconds < 60 ? "<1 min" : `${Math.round(seconds / 60)} min`;
+}
+
 /** What a feed row says about the day it covers: when, and for how long. */
 export function sitting(entry: ActivityEntry): string {
   const from = clock(entry.first_at);
   const to = clock(entry.last_at);
   const span = from === to ? from : `${from}–${to}`;
-  const spent = entry.seconds < 60 ? "<1 min" : `${Math.round(entry.seconds / 60)} min`;
-  return `${span} · ${spent}`;
+  return `${span} · ${spent(entry.seconds)}`;
 }
 
 /**
