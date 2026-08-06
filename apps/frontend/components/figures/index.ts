@@ -21,6 +21,9 @@ import DtmfCoordinateCostLatencyLedger from "./digital-signal-processing/DtmfCoo
 import WindowShapeSpectrumPair from "./digital-signal-processing/WindowShapeSpectrumPair";
 import WindowCalibrationLedger from "./digital-signal-processing/WindowCalibrationLedger";
 import WindowTradeoffMap from "./digital-signal-processing/WindowTradeoffMap";
+import PeakParabolaFit from "./digital-signal-processing/PeakParabolaFit";
+import PhaseFalseResolution from "./digital-signal-processing/PhaseFalseResolution";
+import LocalizationResolutionLedger from "./digital-signal-processing/LocalizationResolutionLedger";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -181,6 +184,9 @@ export const figures: Record<string, RegisteredFigure> = {
   WindowShapeSpectrumPair: { component: WindowShapeSpectrumPair },
   WindowCalibrationLedger: { component: WindowCalibrationLedger },
   WindowTradeoffMap: { component: WindowTradeoffMap },
+  PeakParabolaFit: { component: PeakParabolaFit },
+  PhaseFalseResolution: { component: PhaseFalseResolution },
+  LocalizationResolutionLedger: { component: LocalizationResolutionLedger },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },
