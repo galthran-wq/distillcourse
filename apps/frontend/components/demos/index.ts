@@ -11,6 +11,7 @@ export const demos: Record<
   () => Promise<{ default: ComponentType<object> }>
 > = {
   SurprisalSlider: () => import("./information-theory/SurprisalSlider"),
+  ArithmeticInterval: () => import("./information-theory/ArithmeticInterval"),
   EntropyExplorer: () => import("./information-theory/EntropyExplorer"),
   CodewordBudget: () => import("./information-theory/CodewordBudget"),
   BlockCodingGap: () => import("./information-theory/BlockCodingGap"),
@@ -28,4 +29,5 @@ export const demos: Record<
   TwoPartCode: () => import("./information-theory/TwoPartCode"),
   InformationPlane: () => import("./information-theory/InformationPlane"),
   InfoNCESaturation: () => import("./information-theory/InfoNCESaturation"),
+  LZ77Window: () => import("./information-theory/LZ77Window"),
 };

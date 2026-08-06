@@ -109,6 +109,9 @@ import LossVsGradient from "./information-theory/LossVsGradient";
 import AdaptiveCoderStep from "./information-theory/AdaptiveCoderStep";
 import UkSeparation from "./information-theory/UkSeparation";
 import SzilardFreeEnergy from "./information-theory/SzilardFreeEnergy";
+import DeflatePipeline from "./information-theory/DeflatePipeline";
+import FanoTwoExpansions from "./information-theory/FanoTwoExpansions";
+import FanoLeCamReduction from "./information-theory/FanoLeCamReduction";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -241,4 +244,7 @@ export const figures: Record<string, RegisteredFigure> = {
   AdaptiveCoderStep: { component: AdaptiveCoderStep, frames: 4 },
   UkSeparation: { component: UkSeparation },
   SzilardFreeEnergy: { component: SzilardFreeEnergy },
+  DeflatePipeline: { component: DeflatePipeline },
+  FanoTwoExpansions: { component: FanoTwoExpansions, frames: 4 },
+  FanoLeCamReduction: { component: FanoLeCamReduction },
 };
