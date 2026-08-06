@@ -47,8 +47,8 @@ describe("the lesson state client", () => {
     expect(init.method).toBe("DELETE");
   });
 
-  it("reads history and bookmarks in one request", async () => {
-    const fetch = stubFetch({ history: [], bookmarks: [] });
+  it("reads bookmarks from the profile", async () => {
+    const fetch = stubFetch({ bookmarks: [] });
 
     await getProfile();
 

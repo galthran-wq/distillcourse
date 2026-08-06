@@ -6,7 +6,6 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.lessons.state import HISTORY_LIMIT
 from app.models import LessonProgress, LessonRating, User
 from tests.utils.utils import signup
 
@@ -106,28 +105,12 @@ async def test_a_bookmark_toggles_and_repeats_harmlessly(client: AsyncClient) ->
     assert (await client.get(PROFILE)).json()["bookmarks"] == []
 
 
-async def test_history_is_the_most_recent_visits_newest_first(
-    client: AsyncClient, session: AsyncSession, reader: uuid.UUID
-) -> None:
-    for index in range(HISTORY_LIMIT + 3):
-        await visited(
-            session, reader, f"lesson:course/lesson-{index}", minutes_ago=index
-        )
-
-    history = (await client.get(PROFILE)).json()["history"]
-
-    assert len(history) == HISTORY_LIMIT
-    assert [row["lesson"] for row in history] == [
-        f"lesson:course/lesson-{index}" for index in range(HISTORY_LIMIT)
-    ]
-
-
 @pytest.mark.usefixtures("reader")
 async def test_a_lesson_that_was_read_appears_under_the_key_it_was_rated_by(
     client: AsyncClient,
 ) -> None:
-    # Telemetry writes the history rows and these routes write the ratings and
-    # bookmarks; the profile is only useful if the two name a lesson alike.
+    # Telemetry and these routes must name a lesson alike, or the profile
+    # and the activity feed drift apart.
     await client.put(f"{LESSON}/bookmark")
     await client.post(
         "/api/v1/telemetry/events",
@@ -146,18 +129,7 @@ async def test_a_lesson_that_was_read_appears_under_the_key_it_was_rated_by(
 
     profile = (await client.get(PROFILE)).json()
 
-    assert [row["lesson"] for row in profile["history"]] == [LESSON_KEY]
     assert [row["lesson"] for row in profile["bookmarks"]] == [LESSON_KEY]
-
-
-async def test_history_carries_no_reading_measurements(
-    client: AsyncClient, session: AsyncSession, reader: uuid.UUID
-) -> None:
-    await visited(session, reader, "lesson:course/lesson", minutes_ago=1)
-
-    entry = (await client.get(PROFILE)).json()["history"][0]
-
-    assert set(entry) == {"lesson", "last_seen", "completed_at"}
 
 
 @pytest.mark.usefixtures("reader")
@@ -172,7 +144,7 @@ async def test_another_reader_state_is_invisible(
 
     profile = (await client.get(PROFILE)).json()
 
-    assert profile == {"history": [], "bookmarks": []}
+    assert profile == {"bookmarks": []}
     assert (await client.get("/api/v1/lessons/course/theirs")).json() == {
         "rating": None,
         "bookmarked": False,

@@ -5,11 +5,10 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Bookmark, LessonProgress, LessonRating
+from app.models import Bookmark, LessonRating
 
 # The profile shows where the reader has been lately, not everywhere they have
 # ever been; a longer list is a different feature, not a bigger number here.
-HISTORY_LIMIT = 20
 
 
 async def rating(session: AsyncSession, user_id: uuid.UUID, lesson: str) -> int | None:
@@ -64,19 +63,6 @@ async def remove_bookmark(
         delete(Bookmark).where(Bookmark.user_id == user_id, Bookmark.lesson == lesson)
     )
     await session.commit()
-
-
-async def history(
-    session: AsyncSession, user_id: uuid.UUID
-) -> Sequence[LessonProgress]:
-    return (
-        await session.scalars(
-            select(LessonProgress)
-            .where(LessonProgress.user_id == user_id)
-            .order_by(LessonProgress.last_seen.desc())
-            .limit(HISTORY_LIMIT)
-        )
-    ).all()
 
 
 async def bookmarks(session: AsyncSession, user_id: uuid.UUID) -> Sequence[Bookmark]:

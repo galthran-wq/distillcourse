@@ -8,19 +8,12 @@ export interface LessonState {
   bookmarked: boolean;
 }
 
-export interface Visit {
-  lesson: string;
-  last_seen: string;
-  completed_at: string | null;
-}
-
 export interface Bookmarked {
   lesson: string;
   created_at: string;
 }
 
 export interface Profile {
-  history: Visit[];
   bookmarks: Bookmarked[];
 }
 

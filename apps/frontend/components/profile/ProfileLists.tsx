@@ -23,7 +23,7 @@ export default function ProfileLists({
         <Link href="/login" className="text-accent hover:underline">
           Sign in
         </Link>{" "}
-        to keep a reading history and bookmarks.
+        to keep bookmarks and your reading activity.
       </p>
     );
   }
@@ -32,31 +32,15 @@ export default function ProfileLists({
     <>
       <Activity lessons={lessons} />
       {profile !== null && (
-        <>
-          {/* Every lesson once, by when it was last opened — the feed above
-              answers "which days", this answers "which lessons". */}
-          <LessonList
-            title="recently read"
-            empty="No lessons read yet."
-            rows={profile.history.map((visit) => ({
-              lesson: visit.lesson,
-              link: lessons[visit.lesson],
-              note:
-                visit.completed_at === null
-                  ? day(visit.last_seen)
-                  : `${day(visit.last_seen)} · completed`,
-            }))}
-          />
-          <LessonList
-            title="bookmarks"
-            empty="Nothing bookmarked."
-            rows={profile.bookmarks.map((bookmark) => ({
-              lesson: bookmark.lesson,
-              link: lessons[bookmark.lesson],
-              note: day(bookmark.created_at),
-            }))}
-          />
-        </>
+        <LessonList
+          title="bookmarks"
+          empty="Nothing bookmarked."
+          rows={profile.bookmarks.map((bookmark) => ({
+            lesson: bookmark.lesson,
+            link: lessons[bookmark.lesson],
+            note: day(bookmark.created_at),
+          }))}
+        />
       )}
     </>
   );

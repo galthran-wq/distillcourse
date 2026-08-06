@@ -22,7 +22,7 @@ app/
     routes/auth.py   # signup / login / logout / me / password
     routes/chats.py  # chat CRUD + the Vercel AI data stream
     routes/lessons.py # per-lesson user state: rating, bookmark
-    routes/profile.py # visit history + bookmarks for the profile page
+    routes/profile.py # bookmarks for the profile page
     routes/telemetry.py # reading events in, the activity grid and its feed out
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
@@ -68,7 +68,7 @@ app/
     tools.py         # report_review_outcome, run by the tutor
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
-  lessons/state.py   # what a user did to a lesson: history, rating, bookmark
+  lessons/state.py   # what a user did to a lesson: rating, bookmark
   content/           # the indexed corpus: ingest CLI, FTS search, course spine
   telemetry/         # reading events, the lesson aggregate, completion, the
                      # reading days behind the activity grid and its feed
