@@ -16,7 +16,7 @@ from app.core.security import (
 )
 from app.models import User
 from app.telegram import api
-from app.telemetry import progress
+from app.telemetry import passes, progress
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ async def set_active(session: AsyncSession, email: str, active: bool) -> None:
 
 async def rebuild_progress(session: AsyncSession) -> None:
     logger.info("rebuilt %d lesson aggregates", await progress.rebuild(session))
+    logger.info("credited %d reading days", await passes.rebuild(session))
 
 
 async def set_webhook(url: str) -> None:

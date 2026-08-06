@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
@@ -8,31 +8,35 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Event, LessonProgress
+from app.models import Event, LessonProgress, User
 from app.review import repository as review
-from app.telemetry import progress, schemas
+from app.telemetry import passes, progress, schemas
 from app.telemetry.schemas import EventBatch, RawEvent
 
 
-async def record(session: AsyncSession, user_id: uuid.UUID, batch: EventBatch) -> None:
+async def record(session: AsyncSession, user: User, batch: EventBatch) -> None:
     """Stores a flush and re-derives what it changed, in one transaction."""
     if not batch.events:
         return
-    await progress.lock(session, user_id, batch.lesson)
-    rows = await _rows(session, user_id, batch)
+    await progress.lock(session, user.id, batch.lesson)
+    rows = await _rows(session, user.id, batch)
     if rows:
         await session.execute(
             insert(Event).values(rows).on_conflict_do_nothing(index_elements=["id"])
         )
-    completed_at = await progress.recompute(session, user_id, batch.lesson)
+    completed_at = await progress.recompute(session, user.id, batch.lesson)
     if completed_at is not None:
-        await _emit_completion(session, user_id, batch.lesson, completed_at)
+        await _emit_completion(session, user.id, batch.lesson, completed_at)
         # The subscription spaced repetition is built on. Unconditional rather
         # than guarded by the emit: the ladder's own key is what makes a second
         # completion of the same lesson a no-op, and a ladder that failed to
         # open once should be opened by the next flush that sees the
         # completion, not lost with the event that already exists.
-        await review.start(session, user_id, batch.lesson, completed_at)
+        await review.start(session, user.id, batch.lesson, completed_at)
+    # Independent of the completion above and deliberately silent: a lesson
+    # read again on a later day is another square on the profile, never another
+    # ladder and never another event.
+    await passes.record(session, user, batch.lesson, datetime.now(UTC))
     await session.commit()
 
 

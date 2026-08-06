@@ -60,6 +60,19 @@ def module_of(course: CourseStructure, lesson: LessonEntry) -> ModuleEntry | Non
     return next((module for module in course.modules if lesson in module.lessons), None)
 
 
+async def lesson_titles(session: AsyncSession) -> dict[str, str]:
+    """Every indexed lesson's title, under the locator user state is keyed by.
+
+    Read from the spine rather than from the lesson's own chunks: a lesson that
+    opens on an h2 has no anchorless chunk carrying its title.
+    """
+    return {
+        lesson.locator: lesson.title
+        for course in await structure(session)
+        for lesson in reading_order(course)
+    }
+
+
 def _concept(document: Document) -> ConceptEntry:
     return ConceptEntry(
         id=document.locator.rpartition("/")[2],

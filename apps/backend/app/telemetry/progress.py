@@ -5,7 +5,16 @@ from hashlib import sha256
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, Select, and_, case, distinct, func, select
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    and_,
+    case,
+    distinct,
+    func,
+    literal_column,
+    select,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -82,26 +91,59 @@ def _totals(user_id: uuid.UUID, lesson: str) -> Select[Any]:
     ).where(Event.user_id == user_id, Event.lesson == lesson)
 
 
-def _completed_at(user_id: uuid.UUID, lesson: str, threshold: int) -> Select[Any]:
-    """The instant the reader first satisfied the rule, from the events alone.
+def reached_bar(
+    user_id: uuid.UUID,
+    lesson: str,
+    threshold: int,
+    bucket: ColumnElement[Any],
+    *within: ColumnElement[bool],
+) -> Select[Any]:
+    """Per bucket of this reader's events on this lesson, the instant its
+    running totals first met the bar: `threshold` seconds of credited
+    attention, scrolled to `COMPLETION_SCROLL_PCT`.
 
-    Not `now()`: completion has to be the same instant however often it is
-    derived, or `rebuild-progress` would rewrite every completion date it
-    touches. Running totals over the event order give exactly that.
+    The bar is written once here because two things are derived from it —
+    completion, over the whole history, and a reading day, over one day of it
+    (app/telemetry/passes.py) — and "read this lesson" has to mean the same in
+    both.
+
+    The instant comes from the events and never from `now()`: it has to be the
+    same however often it is derived, or `rebuild-progress` would rewrite every
+    date it touches.
     """
     running = (
         select(
+            bucket.label("bucket"),
             Event.server_ts,
-            func.sum(_SECONDS).over(order_by=_EVENT_ORDER).label("active_seconds"),
-            func.max(_PCT).over(order_by=_EVENT_ORDER).label("max_scroll_pct"),
+            func.sum(_SECONDS)
+            .over(partition_by=bucket, order_by=_EVENT_ORDER)
+            .label("active_seconds"),
+            func.max(_PCT)
+            .over(partition_by=bucket, order_by=_EVENT_ORDER)
+            .label("max_scroll_pct"),
         )
-        .where(Event.user_id == user_id, Event.lesson == lesson)
+        .where(Event.user_id == user_id, Event.lesson == lesson, *within)
         .subquery()
     )
-    return select(func.min(running.c.server_ts)).where(
-        running.c.active_seconds >= threshold,
-        running.c.max_scroll_pct >= COMPLETION_SCROLL_PCT,
+    return (
+        select(running.c.bucket, func.min(running.c.server_ts).label("reached_at"))
+        .where(
+            running.c.active_seconds >= threshold,
+            running.c.max_scroll_pct >= COMPLETION_SCROLL_PCT,
+        )
+        .group_by(running.c.bucket)
     )
+
+
+def _completed_at(user_id: uuid.UUID, lesson: str, threshold: int) -> Select[Any]:
+    """When the reader first met the bar on this lesson.
+
+    One bucket, so the totals run over the whole history: someone who reads it
+    in five sittings has read it, which is what separates completion from the
+    reading day a single sitting has to earn on its own.
+    """
+    reached = reached_bar(user_id, lesson, threshold, literal_column("1")).subquery()
+    return select(reached.c.reached_at)
 
 
 async def threshold_seconds(session: AsyncSession, lesson: str) -> int:

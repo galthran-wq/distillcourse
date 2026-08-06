@@ -69,7 +69,8 @@ app/
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
   content/           # the indexed corpus: ingest CLI, FTS search, course spine
-  telemetry/         # reading events, the lesson aggregate, completion
+  telemetry/         # reading events, the lesson aggregate, completion,
+                     # the reading days behind the activity grid
   cli.py             # operator commands (reset-password, delete-user,
                      # deactivate-user, rebuild-progress)
   alembic/           # migrations; explicit, hand-reviewed, always reversible
@@ -515,6 +516,20 @@ are the client's to choose, so a derived one could be squatted to suppress the
 completion. What makes the emit exactly-once is the absence of the event,
 checked under the same advisory lock the flush holds. That row is where spaced
 repetition subscribes.
+
+A **reading day** is that same bar applied to one calendar day of the reader's
+own clock (`users.timezone`), and `lesson_passes` holds one row per
+`(reader, lesson, day)` whose events reach it on their own. Completion is
+cumulative and happens once; a pass repeats, which is what the activity grid on
+the profile counts — reading a lesson twice in one evening is one square,
+coming back to it next month is another. The same flush writes it,
+`ON CONFLICT DO NOTHING` over a day window stated in UTC so the query still
+reads `events` by its index, and a pass emits no event and opens no ladder:
+only completion does that. `rebuild-progress` re-derives passes as well, adding
+rows and removing none — `events` is pruned, and a day whose events are gone is
+still a day that was read. `GET /telemetry/activity` serves the grid (53 weeks
+of daily counts, dated on the reader's calendar) together with the
+recently-read list under it.
 
 ## Not here
 

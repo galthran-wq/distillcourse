@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Any
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     Computed,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -183,6 +184,29 @@ class LessonProgress(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+
+
+class LessonPass(Base):
+    """One day on which a reader met the reading bar on one lesson.
+
+    `lesson_progress` answers "has this lesson been read"; this answers "which
+    days did they read", which needs a row per day rather than one per lesson:
+    coming back to a lesson a month later is reading, and it is what the
+    activity grid on the profile counts.
+    """
+
+    __tablename__ = "lesson_passes"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    # The reader's own calendar date (users.timezone), not the server's: an
+    # evening in Sydney is one square, and not tomorrow's.
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    # When that day's events met the bar, derived from them rather than from
+    # now() — the same rule `lesson_progress.completed_at` is written by.
+    passed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Incident(Base):
