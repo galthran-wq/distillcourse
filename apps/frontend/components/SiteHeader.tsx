@@ -20,9 +20,12 @@ export default function SiteHeader() {
           distillcourse
         </Link>
         <nav className="min-w-0">
+          {/* aria-current is about the href, not the section: this item points
+              at "/", so it is the current page only on "/". The highlight is
+              the section's, and stays on through a course. */}
           <Link
             href="/"
-            aria-current={onCourses ? "page" : undefined}
+            aria-current={pathname === "/" ? "page" : undefined}
             className={`block rounded-sm px-2 py-1.5 text-[13px] transition-colors duration-(--motion-fast) ${
               onCourses
                 ? "bg-panel font-medium text-ink"

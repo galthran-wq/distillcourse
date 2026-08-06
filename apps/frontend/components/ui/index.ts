@@ -13,3 +13,4 @@ export { Slider } from "./Slider";
 export { Readout } from "./Readout";
 export { Input } from "./Input";
 export { TextArea } from "./TextArea";
+export { Switch } from "./Switch";

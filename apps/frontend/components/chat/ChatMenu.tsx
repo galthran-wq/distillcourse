@@ -2,7 +2,7 @@
 
 import { COMMANDS } from "@/lib/chat/commands";
 import type { ChatModel, ChatSummary } from "@/lib/chat/api";
-import { LABEL_CLASS } from "@/components/ui/styles";
+import { LABEL_CLASS, MENU_CLASS, MENU_ITEM_CLASS } from "@/components/ui/styles";
 
 interface Props {
   current: ChatSummary;
@@ -15,8 +15,8 @@ interface Props {
 }
 
 const HEADING = `px-2.5 pt-3 pb-1 ${LABEL_CLASS}`;
-const ITEM =
-  "block w-full truncate rounded-sm px-2.5 py-2 text-left text-sm transition-colors duration-(--motion-fast) hover:bg-line/60";
+// A chat title is arbitrary length and this panel is the one that lists them.
+const ITEM = `${MENU_ITEM_CLASS} truncate text-sm`;
 
 export default function ChatMenu({
   current,
@@ -28,7 +28,7 @@ export default function ChatMenu({
   onModel,
 }: Props) {
   return (
-    <div className="absolute right-0 top-full z-10 mt-1 max-h-96 w-64 overflow-y-auto rounded-md border border-line bg-panel p-1.5 shadow-popover">
+    <div className={`${MENU_CLASS} max-h-96 w-64 overflow-y-auto`}>
       <button type="button" className={`${ITEM} text-soft`} onClick={onNew}>
         /clear — {COMMANDS.clear}
       </button>

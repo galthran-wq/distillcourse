@@ -50,6 +50,7 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
       )}
       <Button
         variant={open ? "outline" : "solid"}
+        size="pill"
         onClick={togglePanel}
         aria-expanded={open}
         className="fixed bottom-6 right-6 z-40 shadow-card"

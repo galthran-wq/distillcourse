@@ -52,12 +52,20 @@ Rules that override defaults:
   if you change how lessons are rendered or which ones render, the export
   follows automatically; if you fork either, search starts lying.
 - The site's look is one layer, not per-page decisions: the tokens in
-  `apps/frontend/app/globals.css` (`@theme`: colors, `--radius-sm|md|full`,
-  `--shadow-card|popover`, `--motion-fast|base|slow`) and the primitives in
-  `apps/frontend/components/ui`. Every button is `ui/Button` — `solid` for the
-  one primary action a view has, `outline`, `ghost` — every text field carries
-  `FIELD_CLASS` and every mono micro-cap `LABEL_CLASS` from `ui/styles.ts`.
-  Never hand-roll one in a page or a demo; the focus ring is global.
+  `apps/frontend/app/globals.css` and the primitives in
+  `apps/frontend/components/ui`. `@theme inline` holds the colors, `--radius-*`
+  and `--shadow-card|popover` — consumed as Tailwind utilities
+  (`rounded-sm|md|full`, `shadow-card`), not dereferenceable as CSS variables.
+  Motion and elevation are plain `:root` variables, per theme: `--motion-fast`
+  and `--motion-base` used as `duration-(--motion-*)`, `--elevation-card`
+  and `--elevation-popover` reached through the `--shadow-*` utilities.
+  Anything that reads as a button is `ui/Button` — `solid` for the one primary
+  action a view has, `outline`, `ghost`; menu rows, the switch and the
+  selection chip are their own controls and say so. Every text field carries
+  `FIELD_CLASS` with a `FIELD_LABEL_CLASS` label, every mono micro-cap
+  `LABEL_CLASS`, every dropdown `MENU_CLASS`/`MENU_ITEM_CLASS`, all from
+  `ui/styles.ts`. Never hand-roll the look of one in a page or a demo; the
+  focus ring is global (`@layer base`, so a utility can still override it).
 - Code style is binding for ALL code in this repo:
   `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
   only, grep before writing (no duplicated functionality), domain-separated

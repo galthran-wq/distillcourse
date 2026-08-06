@@ -85,7 +85,6 @@ export default function ChatPanel({ session }: { session: Session }) {
           onClick={toggleMenu}
           aria-label="Chat menu"
           aria-expanded={menu}
-          className="px-2"
         >
           ⋯
         </Button>

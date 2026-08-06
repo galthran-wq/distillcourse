@@ -40,7 +40,6 @@ export default function Composer({ disabled, onSubmit }: Props) {
             size="sm"
             onClick={dropQuote}
             aria-label="Drop the quoted passage"
-            className="px-2"
           >
             ×
           </Button>

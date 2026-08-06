@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Panel } from "@/components/ui";
+import { Button, Panel } from "@/components/ui";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import type { LessonLink } from "@/lib/content/site";
 import { day } from "@/lib/day";
@@ -344,13 +344,14 @@ export default function Activity({ lessons }: { lessons: Record<string, LessonLi
       </Section>
       <Section title="activity feed">
         {selected !== null && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setSelected(null)}
-            className="mb-3 cursor-pointer font-mono text-[11px] text-faint hover:text-accent"
+            className="mb-3"
           >
-            ← back to recent
-          </button>
+            ← Back to recent
+          </Button>
         )}
         <Feed lessons={lessons} feed={feed} selected={selected} />
       </Section>

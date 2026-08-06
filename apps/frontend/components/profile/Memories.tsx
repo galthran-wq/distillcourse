@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui";
-import { FIELD_CLASS } from "@/components/ui/styles";
+import { FIELD_CLASS, FIELD_LABEL_CLASS } from "@/components/ui/styles";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import { day } from "@/lib/day";
@@ -65,20 +65,20 @@ export function MemoryRow({
         </span>
       </div>
       <label className="mt-3 block text-sm">
-        <span className="text-soft">What it is about</span>
+        <span className={FIELD_LABEL_CLASS}>What it is about</span>
         <input
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          className={`${FIELD_CLASS} mt-1`}
+          className={FIELD_CLASS}
         />
       </label>
       <label className="mt-3 block text-sm">
-        <span className="text-soft">What it remembers</span>
+        <span className={FIELD_LABEL_CLASS}>What it remembers</span>
         <textarea
           value={content}
           onChange={(event) => setContent(event.target.value)}
           rows={3}
-          className={`${FIELD_CLASS} mt-1 resize-y`}
+          className={`${FIELD_CLASS} resize-y`}
         />
       </label>
       <div className="mt-3 flex flex-wrap items-center gap-2">

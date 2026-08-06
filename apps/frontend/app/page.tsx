@@ -48,7 +48,13 @@ export default function Home() {
                     <span aria-hidden className="h-1 flex-1 rounded-full bg-line">
                       <span
                         className="block h-full rounded-full bg-accent"
-                        style={{ width: `${(readable / lessons.length) * 100}%` }}
+                        style={{
+                          // A course with no lessons yet is 0% written, not NaN.
+                          width:
+                            lessons.length === 0
+                              ? "0%"
+                              : `${(readable / lessons.length) * 100}%`,
+                        }}
                       />
                     </span>
                     <span className="shrink-0 font-mono text-[11px] text-faint">

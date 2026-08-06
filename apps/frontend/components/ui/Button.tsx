@@ -19,6 +19,10 @@ export function Button({
   ...props
 }: Props) {
   return (
+    // `className` can only add — Tailwind resolves two utilities for the same
+    // property by stylesheet order, not by which was written last, so a caller
+    // cannot override the padding or the radius the size sets. Anything that
+    // needs a different shape is a `size`, not a class.
     <button
       type={type}
       aria-pressed={active}

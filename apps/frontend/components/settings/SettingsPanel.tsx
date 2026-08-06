@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui";
-import { FIELD_CLASS, LABEL_CLASS } from "@/components/ui/styles";
+import { Button, Switch } from "@/components/ui";
+import { FIELD_CLASS, FIELD_LABEL_CLASS, LABEL_CLASS } from "@/components/ui/styles";
 import { ApiError } from "@/lib/http";
 import {
   getSettings,
@@ -30,36 +30,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className={`mb-3 ${LABEL_CLASS}`}>{title}</h2>
       {children}
     </section>
-  );
-}
-
-/** The one setting that is simply on or off, so it is shown as on or off. */
-function Switch({
-  on,
-  label,
-  onToggle,
-}: {
-  on: boolean;
-  label: string;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={onToggle}
-      className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-(--motion-fast) ${
-        on ? "border-accent bg-accent" : "border-line bg-panel"
-      }`}
-    >
-      <span
-        className={`size-4 rounded-full transition-transform duration-(--motion-fast) ${
-          on ? "translate-x-[1.5rem] bg-paper" : "translate-x-[0.1875rem] bg-faint"
-        }`}
-      />
-    </button>
   );
 }
 
@@ -97,13 +67,13 @@ function QuietHours({ settings, write }: { settings: Settings; write: Write }) {
         ] as const
       ).map(([label, value, set]) => (
         <label key={label} className="block w-32 text-sm">
-          <span className="text-soft">{label}</span>
+          <span className={FIELD_LABEL_CLASS}>{label}</span>
           <input
             type="time"
             value={value}
             onChange={(event) => set(event.target.value)}
             onBlur={save}
-            className={`${FIELD_CLASS} mt-1`}
+            className={FIELD_CLASS}
           />
         </label>
       ))}

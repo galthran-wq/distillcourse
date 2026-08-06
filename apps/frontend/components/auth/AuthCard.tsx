@@ -44,12 +44,14 @@ export default function AuthCard({ mode }: { mode: Mode }) {
     const text = (name: string) => String(form.get(name) ?? "");
     const problems = refuse(mode, text("email"), text("password"), text("invite_code"));
     setReported(problems);
+    // Cleared before the guard: the last server answer described a request this
+    // submit replaces, so it must not survive alongside the new field errors.
+    setError(null);
     if (Object.keys(problems).length > 0) return;
     // Scheduling runs on the user's own clock, so the browser's zone is part
     // of every credential exchange, not something captured once at signup.
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setPending(true);
-    setError(null);
     try {
       const user = isSignup
         ? await signup({
