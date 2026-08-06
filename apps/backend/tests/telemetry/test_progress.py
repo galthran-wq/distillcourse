@@ -5,6 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import cli
 from app.models import LessonProgress, User
 from app.telemetry import progress, schemas
 from tests.telemetry.conftest import (
@@ -86,9 +87,8 @@ async def test_rebuild_reproduces_the_aggregate_and_emits_nothing(
         )
     )
 
-    rebuilt = await progress.rebuild(session)
+    await cli.rebuild_progress(session)
 
-    assert rebuilt == 1
     assert snapshot(await aggregate(session, user)) == expected
     # The ladder a completion starts is not handed out retroactively.
     assert await stored_events(session, schemas.COMPLETED) == 1

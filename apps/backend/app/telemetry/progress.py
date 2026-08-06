@@ -5,12 +5,22 @@ from hashlib import sha256
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, Select, and_, case, distinct, func, select
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    Subquery,
+    and_,
+    case,
+    distinct,
+    func,
+    literal_column,
+    select,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content import search
-from app.models import Document, Event, LessonProgress
+from app.models import Document, Event, LessonProgress, User
 from app.telemetry import schemas
 
 WORDS_PER_MINUTE = 250
@@ -82,26 +92,76 @@ def _totals(user_id: uuid.UUID, lesson: str) -> Select[Any]:
     ).where(Event.user_id == user_id, Event.lesson == lesson)
 
 
-def _completed_at(user_id: uuid.UUID, lesson: str, threshold: int) -> Select[Any]:
-    """The instant the reader first satisfied the rule, from the events alone.
+def _running(
+    user_id: uuid.UUID,
+    lesson: str,
+    bucket: ColumnElement[Any],
+    *within: ColumnElement[bool],
+) -> Subquery:
+    """Every event of this reader on this lesson, each carrying the totals its
+    bucket had reached by then.
 
-    Not `now()`: completion has to be the same instant however often it is
-    derived, or `rebuild-progress` would rewrite every completion date it
-    touches. Running totals over the event order give exactly that.
+    The totals come from the events and never from `now()`: whatever is derived
+    from them has to be the same however often it is derived, or
+    `rebuild-progress` would rewrite every date it touches.
     """
-    running = (
+    return (
         select(
+            bucket.label("bucket"),
             Event.server_ts,
-            func.sum(_SECONDS).over(order_by=_EVENT_ORDER).label("active_seconds"),
-            func.max(_PCT).over(order_by=_EVENT_ORDER).label("max_scroll_pct"),
+            func.sum(_SECONDS)
+            .over(partition_by=bucket, order_by=_EVENT_ORDER)
+            .label("active_seconds"),
+            func.max(_PCT)
+            .over(partition_by=bucket, order_by=_EVENT_ORDER)
+            .label("max_scroll_pct"),
         )
-        .where(Event.user_id == user_id, Event.lesson == lesson)
+        .where(Event.user_id == user_id, Event.lesson == lesson, *within)
         .subquery()
     )
-    return select(func.min(running.c.server_ts)).where(
+
+
+def _first(running: Subquery, *met: ColumnElement[bool]) -> Select[Any]:
+    """Per bucket, the instant its running totals first satisfied `met`."""
+    return (
+        select(running.c.bucket, func.min(running.c.server_ts).label("reached_at"))
+        .where(*met)
+        .group_by(running.c.bucket)
+    )
+
+
+def reached_seconds(
+    user_id: uuid.UUID,
+    lesson: str,
+    seconds: int,
+    bucket: ColumnElement[Any],
+    *within: ColumnElement[bool],
+) -> Select[Any]:
+    """Per bucket, the instant credited attention first reached `seconds`.
+
+    Attention alone, with no scroll depth: this is what a reading day is earned
+    by (app/telemetry/passes.py), and a lesson read over a fortnight reaches
+    the bottom of the page on exactly one of those days.
+    """
+    running = _running(user_id, lesson, bucket, *within)
+    return _first(running, running.c.active_seconds >= seconds)
+
+
+def _completed_at(user_id: uuid.UUID, lesson: str, threshold: int) -> Select[Any]:
+    """When the reader first met the completion bar on this lesson: `threshold`
+    seconds of credited attention, scrolled to `COMPLETION_SCROLL_PCT`.
+
+    One bucket, so the totals run over the whole history: someone who reads it
+    in five sittings has read it, which is what separates completion from the
+    reading day a single sitting has to earn on its own.
+    """
+    running = _running(user_id, lesson, literal_column("1"))
+    reached = _first(
+        running,
         running.c.active_seconds >= threshold,
         running.c.max_scroll_pct >= COMPLETION_SCROLL_PCT,
-    )
+    ).subquery()
+    return select(reached.c.reached_at)
 
 
 async def threshold_seconds(session: AsyncSession, lesson: str) -> int:
@@ -230,21 +290,23 @@ async def of_reader(
     ]
 
 
-async def rebuild(session: AsyncSession) -> int:
-    """Recomputes every aggregate. Side effects are deliberately not replayed.
+async def pairs(session: AsyncSession) -> list[tuple[uuid.UUID, str, str]]:
+    """Every (reader, lesson) the event log names, with the reader's own zone.
 
-    A completion that was already derived keeps its `lesson_completed` event;
-    one that a changed heuristic creates here gets none, because the review
-    ladder it would start is not a thing to hand out retroactively.
+    Everything derived from the events is derived per pair, and `rebuild-progress`
+    (app/cli.py) walks this once for all of them. The zone rides along because
+    the other projection built from these events — the reading day
+    (app/telemetry/passes.py) — is dated on the reader's calendar, and one join
+    here beats a lookup per pair.
     """
-    pairs = (
-        await session.execute(select(Event.user_id, Event.lesson).distinct())
-    ).all()
-    for user_id, lesson in pairs:
-        # One transaction per pair, so a reader flushing mid-rebuild waits for
-        # their own pair and no longer than that: a rebuild that held one lock
-        # for the whole corpus would stall every reader on the site.
-        await lock(session, user_id, lesson)
-        await recompute(session, user_id, lesson)
-        await session.commit()
-    return len(pairs)
+    return list(
+        (
+            await session.execute(
+                select(Event.user_id, Event.lesson, User.timezone)
+                .join(User, User.id == Event.user_id)
+                .distinct()
+            )
+        )
+        .tuples()
+        .all()
+    )

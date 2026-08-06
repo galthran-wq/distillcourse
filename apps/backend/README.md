@@ -23,6 +23,7 @@ app/
     routes/chats.py  # chat CRUD + the Vercel AI data stream
     routes/lessons.py # per-lesson user state: rating, bookmark
     routes/profile.py # visit history + bookmarks for the profile page
+    routes/telemetry.py # reading events in, the activity grid out
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
     routes/memories.py # what the tutor remembers: list, edit, delete
@@ -69,7 +70,8 @@ app/
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
   content/           # the indexed corpus: ingest CLI, FTS search, course spine
-  telemetry/         # reading events, the lesson aggregate, completion
+  telemetry/         # reading events, the lesson aggregate, completion,
+                     # the reading days behind the activity grid
   cli.py             # operator commands (reset-password, delete-user,
                      # deactivate-user, rebuild-progress)
   alembic/           # migrations; explicit, hand-reviewed, always reversible
@@ -501,9 +503,10 @@ an increment: the projection cannot drift from the log, and
 python -m app.cli rebuild-progress    # every aggregate, from the events
 ```
 
-is that same function over every pair. Rebuild recomputes aggregates only —
-side effects are not replayed, so a completion a changed heuristic invents
-starts no review ladder.
+is that same function over every pair, under the same per-pair lock, crediting
+reading days in the same walk. Rebuild derives projections only — side effects
+are not replayed, so a completion a changed heuristic invents starts no review
+ladder.
 
 A lesson counts as complete at `max_scroll_pct >= 90` and `active_seconds`
 past a threshold of `document_word_count / 250 wpm / 2`, clamped to 3–20
@@ -515,6 +518,24 @@ are the client's to choose, so a derived one could be squatted to suppress the
 completion. What makes the emit exactly-once is the absence of the event,
 checked under the same advisory lock the flush holds. That row is where spaced
 repetition subscribes.
+
+A **reading day** is a lower bar over one calendar day of the reader's own
+clock (`users.timezone`): 60 seconds of credited attention, no scroll depth at
+all. `lesson_passes` holds one row per `(reader, lesson, day)` that clears it.
+Completion is the whole lesson and happens once; a pass is a day of reading and
+repeats, which is what the activity grid on the profile counts — reading a
+lesson twice in one evening is one square, coming back to it next month is
+another, and a long lesson read across a week is a square on each of those days
+though it completes on none of them. The same flush writes it, in a savepoint
+of its own so a square that cannot be written never fails the flush that
+carries the reading; the day window is stated in UTC around the database's own
+`now()`, so the query still reads `events` by its index and dates the day by
+the clock that stamped `server_ts`. A pass emits no event and opens no ladder:
+only completion does that. `rebuild-progress` re-derives passes in the same
+walk, adding rows and removing none — `events` is pruned, and a day whose
+events are gone is still a day that was read. `GET /telemetry/activity` serves
+the grid: 53 weeks of daily counts and nothing else, with the recently-read
+list beside it coming from `GET /profile` as it always has.
 
 ## Not here
 

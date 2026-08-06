@@ -86,6 +86,35 @@ def beats(heartbeats: int, *, depth: int) -> list[dict[str, Any]]:
     ]
 
 
+async def stamped_read(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    at: datetime,
+    *,
+    heartbeats: int = HEARTBEATS_TO_COMPLETE,
+    depth: int = 90,
+    lesson: str = LESSON,
+) -> None:
+    """A reading session the server clock saw at `at`, written straight in.
+
+    The route cannot produce one: `server_ts` is the database's own clock, and
+    which day a reading belongs to is a question about that clock.
+    """
+    session.add_all(
+        Event(
+            id=uuid.UUID(raw["id"]),
+            user_id=user_id,
+            lesson=lesson,
+            type=raw["type"],
+            payload=raw["payload"],
+            client_ts=at,
+            server_ts=at + timedelta(seconds=index),
+        )
+        for index, raw in enumerate(beats(heartbeats, depth=depth))
+    )
+    await session.commit()
+
+
 async def rewind(session: AsyncSession, seconds: int) -> None:
     """Makes the last flush look `seconds` old, which is what waiting does.
 

@@ -1,12 +1,14 @@
 from collections.abc import Callable, Coroutine
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.routing import APIRoute
+from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.rate_limit import FixedWindow, register
-from app.telemetry import ingest
+from app.telemetry import ingest, passes
 from app.telemetry.schemas import MAX_BATCH_BYTES, MAX_BATCHES_PER_MINUTE, EventBatch
 
 
@@ -45,4 +47,28 @@ _flushes = register(FixedWindow(MAX_BATCHES_PER_MINUTE))
 @router.post("/events", status_code=status.HTTP_204_NO_CONTENT)
 async def events(batch: EventBatch, user: CurrentUser, session: SessionDep) -> None:
     _flushes.check(str(user.id))
-    await ingest.record(session, user.id, batch)
+    await ingest.record(session, user, batch)
+
+
+class Day(BaseModel):
+    date: date
+    count: int
+
+
+class Activity(BaseModel):
+    days: list[Day]
+
+
+@router.get("/activity")
+async def activity(user: CurrentUser, session: SessionDep) -> Activity:
+    """The reading days the profile draws as a grid, on the reader's calendar.
+
+    Days only: what was read lately is the history `GET /profile` already
+    serves, and one answer to that question is enough.
+    """
+    return Activity(
+        days=[
+            Day(date=day, count=count)
+            for day, count in await passes.activity(session, user)
+        ]
+    )

@@ -16,7 +16,7 @@ from app.core.security import (
 )
 from app.models import User
 from app.telegram import api
-from app.telemetry import progress
+from app.telemetry import passes, progress
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -62,7 +62,30 @@ async def set_active(session: AsyncSession, email: str, active: bool) -> None:
 
 
 async def rebuild_progress(session: AsyncSession) -> None:
-    logger.info("rebuilt %d lesson aggregates", await progress.rebuild(session))
+    """Re-derives every aggregate and every reading day from the raw events.
+
+    One walk over the pairs, and one transaction per pair under that pair's
+    lock: a reader flushing mid-rebuild waits for their own pair and no longer
+    than that, where a rebuild holding one lock for the whole corpus would
+    stall every reader on the site.
+
+    Side effects are deliberately not replayed. A completion that was already
+    derived keeps its `lesson_completed` event; one that a changed heuristic
+    creates here gets none, because the review ladder it would start is not a
+    thing to hand out retroactively. Reading days are added and never removed:
+    `events` is pruned, and a day whose events are gone is still a day that was
+    read.
+    """
+    pairs = await progress.pairs(session)
+    days = 0
+    for user_id, lesson, timezone in pairs:
+        await progress.lock(session, user_id, lesson)
+        await progress.recompute(session, user_id, lesson)
+        days += await passes.credit(session, user_id, lesson, timezone)
+        await session.commit()
+    logger.info(
+        "rebuilt %d lesson aggregates, credited %d reading days", len(pairs), days
+    )
 
 
 async def set_webhook(url: str) -> None:

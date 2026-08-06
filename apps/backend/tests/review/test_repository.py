@@ -7,11 +7,11 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import cli
 from app.models import ReviewState, Schedule, TgLink, User
 from app.review import ladder
 from app.review import repository as review
 from app.scheduling import repository as scheduling
-from app.telemetry import progress
 from tests.review.conftest import LESSON, reviews
 from tests.review.conftest import ladder as ladder_row
 from tests.scheduling.conftest import NOON
@@ -59,7 +59,7 @@ async def test_rebuilding_progress_creates_no_second_ladder(
     assert state is not None
     climbed = (state.step, state.next_due_at)
 
-    await progress.rebuild(session)
+    await cli.rebuild_progress(session)
 
     await session.refresh(state)
     assert await ladders(session) == 1

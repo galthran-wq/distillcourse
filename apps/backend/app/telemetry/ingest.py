@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Any
@@ -6,34 +7,57 @@ from typing import Any
 from pydantic import ValidationError
 from sqlalchemy import exists, func, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Event, LessonProgress
+from app.models import Event, LessonProgress, User
 from app.review import repository as review
-from app.telemetry import progress, schemas
+from app.telemetry import passes, progress, schemas
 from app.telemetry.schemas import EventBatch, RawEvent
 
+logger = logging.getLogger(__name__)
 
-async def record(session: AsyncSession, user_id: uuid.UUID, batch: EventBatch) -> None:
+
+async def record(session: AsyncSession, user: User, batch: EventBatch) -> None:
     """Stores a flush and re-derives what it changed, in one transaction."""
     if not batch.events:
         return
-    await progress.lock(session, user_id, batch.lesson)
-    rows = await _rows(session, user_id, batch)
+    await progress.lock(session, user.id, batch.lesson)
+    rows = await _rows(session, user.id, batch)
     if rows:
         await session.execute(
             insert(Event).values(rows).on_conflict_do_nothing(index_elements=["id"])
         )
-    completed_at = await progress.recompute(session, user_id, batch.lesson)
+    completed_at = await progress.recompute(session, user.id, batch.lesson)
     if completed_at is not None:
-        await _emit_completion(session, user_id, batch.lesson, completed_at)
+        await _emit_completion(session, user.id, batch.lesson, completed_at)
         # The subscription spaced repetition is built on. Unconditional rather
         # than guarded by the emit: the ladder's own key is what makes a second
         # completion of the same lesson a no-op, and a ladder that failed to
         # open once should be opened by the next flush that sees the
         # completion, not lost with the event that already exists.
-        await review.start(session, user_id, batch.lesson, completed_at)
+        await review.start(session, user.id, batch.lesson, completed_at)
+    await _credit_reading_day(session, user, batch.lesson)
     await session.commit()
+
+
+async def _credit_reading_day(session: AsyncSession, user: User, lesson: str) -> None:
+    """The square the profile grid draws, in a savepoint of its own.
+
+    Independent of the completion above and deliberately silent: a lesson read
+    again on a later day is another square, never another ladder and never
+    another event. And never a failed flush either — the reading it describes
+    is already stored, and a square is not worth rolling that back for, nor
+    worth answering a browser that only wanted to report reading with a 500.
+    """
+    try:
+        async with session.begin_nested():
+            # Postgres's clock rather than this host's: it is the one that
+            # stamps `server_ts`, which is the column the day window selects on.
+            now = (await session.execute(select(func.now()))).scalar_one()
+            await passes.record(session, user, lesson, now)
+    except SQLAlchemyError:
+        logger.exception("could not credit a reading day for %s", lesson)
 
 
 async def _rows(
