@@ -9,7 +9,8 @@ export const meta = {
   ],
 }
 
-const { epic, slug, root, issues } = args
+// args may arrive JSON-encoded depending on the caller
+const { epic, slug, root, issues } = typeof args === 'string' ? JSON.parse(args) : args
 const branch = `epic/${slug}`
 const SKILL = `${root}/.claude/skills/feature-impl/SKILL.md`
 const REVIEW = `${root}/.claude/skills/impl-review/SKILL.md`
