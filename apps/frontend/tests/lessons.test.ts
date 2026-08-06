@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { lessonKey } from "@/lib/content/locator";
 import {
   getLessonState,
@@ -6,26 +6,7 @@ import {
   rateLesson,
   setBookmark,
 } from "@/lib/lessons/api";
-
-function stubFetch(body: unknown = null): ReturnType<typeof vi.fn> {
-  const fetch = vi.fn(
-    async () =>
-      new Response(body === null ? null : JSON.stringify(body), {
-        status: body === null ? 204 : 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-  );
-  vi.stubGlobal("fetch", fetch);
-  return fetch;
-}
-
-function requestOf(fetch: ReturnType<typeof vi.fn>): [string, RequestInit] {
-  return fetch.mock.calls[0] as unknown as [string, RequestInit];
-}
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+import { requestOf, stubFetch } from "./utils/fetch";
 
 // The index locator, which is the key the API stores state under; the URL
 // it travels on drops the corpus the route prefix already names.

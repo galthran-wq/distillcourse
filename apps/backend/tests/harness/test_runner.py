@@ -30,6 +30,7 @@ from app.harness.deps import HarnessDeps
 from app.harness.limits import LimitExceeded
 from app.harness.repository import HarnessRepository
 from app.models import Chat, Message
+from tests.harness.conftest import compacting
 
 
 def note(topic: str) -> str:
@@ -165,9 +166,7 @@ async def test_a_full_context_is_compacted_before_the_next_run(
         usage={"input_tokens": 900_000, "output_tokens": 0},
     )
 
-    with tutor.override(
-        model=TestModel(custom_output_text="they study entropy"), tools=[]
-    ):
+    with tutor.override(model=compacting("they study entropy"), tools=[]):
         await runner.run(repo, chat, "what is entropy?")
 
     rows = await repo.rows(chat)
@@ -280,9 +279,7 @@ async def test_a_fresh_summary_does_not_trigger_another_compaction(
         usage={"input_tokens": 900_000, "output_tokens": 0},
     )
 
-    with tutor.override(
-        model=TestModel(custom_output_text="they study entropy"), tools=[]
-    ):
+    with tutor.override(model=compacting("they study entropy"), tools=[]):
         await runner.run(repo, chat, "what is entropy?")
         await runner.run(repo, chat, "and cross entropy?")
 

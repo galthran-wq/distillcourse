@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { CONTROL_CLASS } from "@/components/ui/field";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import {
@@ -22,8 +23,6 @@ const Context = createContext<Held>({
   rate: () => {},
   bookmark: () => {},
 });
-
-const CONTROL = "font-mono text-[11px] tracking-wide transition-colors";
 
 /**
  * Holds one lesson's rating and bookmark for the two controls that show them —
@@ -80,7 +79,7 @@ export function BookmarkToggle() {
       type="button"
       aria-pressed={state.bookmarked}
       onClick={() => bookmark(!state.bookmarked)}
-      className={`${CONTROL} ${
+      className={`${CONTROL_CLASS} ${
         state.bookmarked ? "text-accent" : "text-faint hover:text-accent"
       }`}
     >
@@ -104,7 +103,7 @@ export function LessonRating() {
           type="button"
           aria-pressed={state.rating === value}
           onClick={() => rate(value)}
-          className={`${CONTROL} rounded border px-2 py-1 ${
+          className={`${CONTROL_CLASS} rounded border px-2 py-1 ${
             state.rating === value
               ? "border-accent text-accent"
               : "border-line text-soft hover:border-faint"

@@ -15,6 +15,7 @@ from app.telegram import api, outbox, repository, updates
 # Aliased because `thread` here is the fixture holding the Chat row.
 from app.telegram import thread as delivery
 from tests.conftest import Bot, replying
+from tests.harness.conftest import compacting
 from tests.telegram.conftest import deliver, message
 
 
@@ -180,7 +181,9 @@ async def test_compact_replaces_the_history_with_a_summary(
     with replying():
         await deliver(client, message("what is entropy?"))
 
-    with replying("they asked about entropy"):
+    # A compaction asks for structured output — the summary and the memory
+    # candidates — which is more than `replying` can answer.
+    with tutor.override(model=compacting("they asked about entropy")):
         await deliver(client, message("/compact", update_id=2))
 
     rows = await repo.live_rows(thread)

@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import User
+from tests.harness.conftest import compacting
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
 
@@ -151,9 +152,7 @@ async def test_compacting_replaces_the_history_with_a_summary(
     chat = await repo.create_chat(kind="web")
     await repo.add_messages(chat, [QUESTION], role="user")
 
-    with tutor.override(
-        model=TestModel(custom_output_text="they study entropy"), tools=[]
-    ):
+    with tutor.override(model=compacting("they study entropy"), tools=[]):
         response = await signed_in.post(f"/api/v1/chats/{chat.id}/compact")
 
     history = await repo.history(chat)
