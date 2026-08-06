@@ -34,9 +34,18 @@ MAX_THRESHOLD_SECONDS = 20 * 60
 UNINDEXED_THRESHOLD_SECONDS = 5 * 60
 COMPLETION_SCROLL_PCT = 90
 
-_SECONDS = case(
+# The one definition of credited attention there is: an event is worth the
+# seconds a heartbeat claims and nothing otherwise. Public because the reading
+# day and the activity feed (app/telemetry/passes.py) are the same sum over
+# other buckets, and a second definition of read time would be a second answer.
+CREDITED_SECONDS = case(
     (Event.type == schemas.HEARTBEAT, Event.payload["seconds"].as_integer()), else_=0
 )
+# When an event that counts as reading happened, and nothing for one that does
+# not. min/max of this is the span a sitting was actually read over: a lesson
+# opened at breakfast and left in a tab does not stretch the evening's reading
+# back to it.
+CREDITED_AT = case((Event.type == schemas.HEARTBEAT, Event.server_ts))
 _PCT = case((Event.type == schemas.SCROLL, Event.payload["pct"].as_integer()), else_=0)
 _EVENT_ORDER = (Event.server_ts, Event.id)
 
@@ -73,7 +82,7 @@ def _totals(user_id: uuid.UUID, lesson: str) -> Select[Any]:
     # function of the event set: two tabs reporting the same proof, or a replay
     # of an old batch, must not make it two proofs.
     return select(
-        func.coalesce(func.sum(_SECONDS), 0).label("active_seconds"),
+        func.coalesce(func.sum(CREDITED_SECONDS), 0).label("active_seconds"),
         func.coalesce(func.max(_PCT), 0).label("max_scroll_pct"),
         func.count(distinct(_toggle_target("proof"))).label("proofs_opened"),
         func.count(distinct(_toggle_target("solution"))).label("solutions_opened"),
@@ -109,7 +118,7 @@ def _running(
         select(
             bucket.label("bucket"),
             Event.server_ts,
-            func.sum(_SECONDS)
+            func.sum(CREDITED_SECONDS)
             .over(partition_by=bucket, order_by=_EVENT_ORDER)
             .label("active_seconds"),
             func.max(_PCT)

@@ -23,7 +23,7 @@ app/
     routes/chats.py  # chat CRUD + the Vercel AI data stream
     routes/lessons.py # per-lesson user state: rating, bookmark
     routes/profile.py # visit history + bookmarks for the profile page
-    routes/telemetry.py # reading events in, the activity grid out
+    routes/telemetry.py # reading events in, the activity grid and its feed out
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
     routes/memories.py # what the tutor remembers: list, edit, delete
@@ -70,8 +70,8 @@ app/
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
   content/           # the indexed corpus: ingest CLI, FTS search, course spine
-  telemetry/         # reading events, the lesson aggregate, completion,
-                     # the reading days behind the activity grid
+  telemetry/         # reading events, the lesson aggregate, completion, the
+                     # reading days behind the activity grid and its feed
   cli.py             # operator commands (reset-password, delete-user,
                      # deactivate-user, rebuild-progress)
   alembic/           # migrations; explicit, hand-reviewed, always reversible
@@ -520,8 +520,10 @@ checked under the same advisory lock the flush holds. That row is where spaced
 repetition subscribes.
 
 A **reading day** is a lower bar over one calendar day of the reader's own
-clock (`users.timezone`): 60 seconds of credited attention, no scroll depth at
-all. `lesson_passes` holds one row per `(reader, lesson, day)` that clears it.
+clock (`users.timezone`): five minutes of credited attention, no scroll depth
+at all, and capped at that lesson's own completion threshold — a lesson that
+can be *finished* in three minutes must not need five to earn its square.
+`lesson_passes` holds one row per `(reader, lesson, day)` that clears it.
 Completion is the whole lesson and happens once; a pass is a day of reading and
 repeats, which is what the activity grid on the profile counts — reading a
 lesson twice in one evening is one square, coming back to it next month is
@@ -533,9 +535,30 @@ carries the reading; the day window is stated in UTC around the database's own
 the clock that stamped `server_ts`. A pass emits no event and opens no ladder:
 only completion does that. `rebuild-progress` re-derives passes in the same
 walk, adding rows and removing none — `events` is pruned, and a day whose
-events are gone is still a day that was read. `GET /telemetry/activity` serves
-the grid: 53 weeks of daily counts and nothing else, with the recently-read
-list beside it coming from `GET /profile` as it always has.
+events are gone is still a day that was read.
+
+`GET /telemetry/activity` serves the profile's activity panel in one answer.
+`days` is the days of a 53-week grid the reader touched, each carrying both
+questions: `count`, the lessons that *earned* the day, straight from
+`lesson_passes`, and `seconds`, everything the day was *spent* on, rolled up
+from `events` in the reader's zone — a day under the bar has a count of zero
+and is still a day that was read. `feed` is the 30 newest lines beneath it, one
+per `(day, lesson)`, with the seconds and the span of the reader's own clock
+the reading happened over; a lesson merely opened and abandoned is not a line,
+and an abandoned tab does not stretch the span of the evening it was finally
+read in. Clicking a square asks `GET /telemetry/activity/{date}` for that day's
+lines alone. Durations go over the wire as seconds, never minutes: the browser
+is the one place a duration is put into words, and two roundings would let a
+tooltip and the line under it disagree by a minute. A reader who moves timezone
+gets a grid cut two ways — the pass keeps the zone it was written in, the
+seconds and the feed are bucketed in the zone held now — which the route states
+and is why nothing re-derives a pass on demand: a square that was earned must
+not stop existing.
+
+The **recently read** list beside the panel is a different question with a
+different source: `GET /profile` over `lesson_progress`, every lesson once by
+when it was last opened, as it always has been. The panel answers "which
+days"; that answers "which lessons".
 
 ## Not here
 
