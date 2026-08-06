@@ -59,7 +59,7 @@ export default function Figure({
     if (reg !== undefined) {
       const Comp = reg.component;
       body = (
-        <div className="mx-auto max-w-2xl" role="img" aria-label={alt}>
+        <div className="figure-scroll" role="img" aria-label={alt}>
           <Comp />
         </div>
       );

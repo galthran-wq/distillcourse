@@ -42,6 +42,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* A document wider than the viewport widens the mobile layout viewport, and
+   position:fixed UI (the tutor button) then resolves against the widened one
+   and lands past the screen edge where nothing can tap it. clip, not hidden:
+   hidden would make the root a scroll container and kill the sticky ToC. */
+html,
+body {
+  overflow-x: clip;
+}
+
 ::selection {
   background: color-mix(in srgb, var(--accent) 25%, transparent);
 }
@@ -108,6 +117,18 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.2em 0;
+  /* Math is never scaled down, so on a phone an equation is often wider than
+     the column and scrolls; unmarked, the cut edge reads as a broken render.
+     The edge is painted on the box (scroll) and covered at each end by a patch
+     that travels with the equation (local), so an edge shows only where there
+     is more to reveal. The patch has to match whatever paints behind the
+     equation: --math-surface is declared beside each background below and
+     inherits down from the nearest block that has one. */
+  background:
+    linear-gradient(to right, var(--math-surface, var(--paper)) 0.75rem, transparent 2rem) 0 0 / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--math-surface, var(--paper)) 0.75rem, transparent 2rem) 100% 0 / 2rem 100% no-repeat local,
+    linear-gradient(to right, var(--line), transparent) 0 0 / 0.75rem 100% no-repeat scroll,
+    linear-gradient(to left, var(--line), transparent) 100% 0 / 0.75rem 100% no-repeat scroll;
 }
 .prose-lesson .katex {
   font-size: 1.06em;
@@ -147,6 +168,7 @@ body {
 .env {
   margin: 1.6em 0;
   background: var(--panel);
+  --math-surface: var(--panel);
   border: 1px solid var(--line);
   border-left-width: 3px;
   border-radius: 4px;
@@ -197,6 +219,7 @@ body {
 .env-remark {
   counter-increment: remark;
   background: none;
+  --math-surface: inherit;
   border: none;
   border-left: 2px dashed var(--faint);
   border-radius: 0;
@@ -209,6 +232,7 @@ body {
 /* Proof nests INSIDE the theorem block — collapsible, no panel of its own. */
 .env-proof {
   background: none;
+  --math-surface: inherit;
   border: none;
   border-radius: 0;
   padding: 0;
@@ -275,6 +299,13 @@ body {
 }
 .references-body li {
   margin: 0.35em 0;
+}
+/* Citations and image credits carry bare URLs, which offer no break
+   opportunity and widen the whole document on a narrow phone. Set on the
+   section so it covers the image credits too, which render outside
+   .references-body. */
+.references {
+  overflow-wrap: anywhere;
 }
 
 /* ---------- right-hand table of contents ---------- */
@@ -346,6 +377,7 @@ html {
   border-left-width: 3px;
   border-radius: 4px;
   background: var(--panel);
+  --math-surface: var(--panel);
   padding: 0.8em 1.2em;
 }
 .callout-label {
@@ -376,6 +408,39 @@ html {
 }
 .course-intro p:last-child {
   margin-bottom: 0;
+}
+
+/* Component figures are drawn at a natural width and do not reflow, so below
+   lg they scroll in their box rather than widen the document. A scroll box
+   also clips its other axis and cannot scroll before its own content edge, so
+   it is padded past the bleed at the sides and below and the padding pulled
+   back out of the layout. It opens again at lg, where the gutter beside the
+   table of contents has room for a figure wider than the column. */
+.figure-scroll {
+  --figure-w: 42rem; /* the column component figures are composed for */
+  overflow-x: auto;
+  padding: 0 1.5rem 3rem;
+  /* centred while the column has slack, full-bleed once it has none */
+  margin: 0 max(-1.5rem, calc((100% - var(--figure-w) - 3rem) / 2)) -3rem;
+}
+/* A figure centres its own content, and content centred in a box too small for
+   it overflows both ends — the half past the left edge is then unreachable,
+   since scrolling stops at the content edge. Letting the figure keep its
+   minimum width leaves nothing to centre, so all of the overflow is on the
+   scrollable side. Figures that do fit are untouched. */
+.figure-scroll > * {
+  min-width: min-content;
+}
+@media (min-width: 64rem) {
+  .figure-scroll {
+    overflow-x: visible;
+    padding: 0;
+    margin: 0 auto;
+    max-width: var(--figure-w);
+  }
+  .figure-scroll > * {
+    min-width: 0;
+  }
 }
 
 /* inlined figure SVGs scale and inherit theme color */
@@ -426,6 +491,7 @@ html {
 .prose-lesson .callout-keyfact {
   border: 0;
   background: transparent;
+  --math-surface: inherit;
   padding: 0;
 }
 

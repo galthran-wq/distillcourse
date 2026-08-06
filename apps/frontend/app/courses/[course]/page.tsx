@@ -154,17 +154,20 @@ export default async function CoursePage({
                   </span>
                   <span className="text-soft">
                     {kr.text}{" "}
+                    {/* Only the arrow is tied to the title. A nowrap title is
+                        wider than a phone's column, and the li is a flex row,
+                        so it would widen the whole document instead. */}
                     {readable ? (
                       <Link
                         href={`/courses/${course.slug}/lessons/${kr.lesson}`}
-                        className="whitespace-nowrap font-mono text-[11px] text-accent hover:underline"
+                        className="font-mono text-[11px] text-accent hover:underline"
                       >
-                        → {target.lesson.title}
+                        →&nbsp;{target.lesson.title}
                       </Link>
                     ) : (
                       target !== undefined && (
-                        <span className="whitespace-nowrap font-mono text-[11px] text-faint">
-                          → {target.lesson.title} (planned)
+                        <span className="font-mono text-[11px] text-faint">
+                          →&nbsp;{target.lesson.title} (planned)
                         </span>
                       )
                     )}
@@ -218,7 +221,7 @@ export default async function CoursePage({
                         {lesson.goal}
                       </span>
                     </span>
-                    <span className="flex shrink-0 items-center gap-3 font-mono text-[11px] text-faint">
+                    <span className="flex items-center gap-3 font-mono text-[11px] text-faint">
                       {lesson.type === "extra" && (
                         <span className="rounded border border-dashed border-line px-1.5 py-0.5">
                           extra
