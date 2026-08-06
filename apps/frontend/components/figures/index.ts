@@ -1,5 +1,14 @@
 import type { ComponentType } from "react";
 import W2vOneStep from "./examples/W2vOneStep";
+import ConvolutionThreeViews from "./digital-signal-processing/ConvolutionThreeViews";
+import PoleModePairings from "./digital-signal-processing/PoleModePairings";
+import ResonatorStateLedger from "./digital-signal-processing/ResonatorStateLedger";
+import X8ValidationDiagnostics from "./digital-signal-processing/X8ValidationDiagnostics";
+import X8IdentificationPipeline from "./digital-signal-processing/X8IdentificationPipeline";
+import PhasorCoordinateLedger from "./digital-signal-processing/PhasorCoordinateLedger";
+import ComplexModeEigenfunction from "./digital-signal-processing/ComplexModeEigenfunction";
+import ConvolutionMultiplicationBridge from "./digital-signal-processing/ConvolutionMultiplicationBridge";
+import GroupDelayPackets from "./digital-signal-processing/GroupDelayPackets";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -139,6 +148,15 @@ export interface RegisteredFigure {
  */
 export const figures: Record<string, RegisteredFigure> = {
   W2vOneStep: { component: W2vOneStep },
+  ConvolutionThreeViews: { component: ConvolutionThreeViews },
+  PoleModePairings: { component: PoleModePairings },
+  ResonatorStateLedger: { component: ResonatorStateLedger },
+  X8ValidationDiagnostics: { component: X8ValidationDiagnostics },
+  X8IdentificationPipeline: { component: X8IdentificationPipeline },
+  PhasorCoordinateLedger: { component: PhasorCoordinateLedger },
+  ComplexModeEigenfunction: { component: ComplexModeEigenfunction },
+  ConvolutionMultiplicationBridge: { component: ConvolutionMultiplicationBridge },
+  GroupDelayPackets: { component: GroupDelayPackets },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },

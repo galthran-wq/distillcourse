@@ -1,0 +1,202 @@
+{
+  "lesson": "difference-equations-and-stability",
+  "component": "FeedbackStabilityLab",
+  "d1_objective": "The learner sees pole angle set oscillation frequency and pole radius stretch or reverse the impulse-response envelope, then extends a harmless-looking 100-sample prefix until an unstable mode visibly grows and refutes finite-record stability.",
+  "sources": {
+    "course_spec": "content/courses/digital-signal-processing/course.yaml:202",
+    "final_lesson_brief": "content/courses/digital-signal-processing/research/difference-equations-and-stability.md",
+    "lesson_status": "No lesson.mdx exists at preflight time; the lesson author must state the fixed request f*=0.180 cycles/sample and the guided tune-then-extend task beside the embed without changing this numerical contract.",
+    "design_contract": "content/courses/digital-signal-processing/research/_pipeline/design/pedagogy-proposal.json:D03-feedback-stability"
+  },
+  "targets": {
+    "component_file": "components/demos/digital-signal-processing/FeedbackStabilityLab.tsx",
+    "registry_file": "components/demos/index.ts",
+    "registry_entry": "FeedbackStabilityLab: () => import(\"./digital-signal-processing/FeedbackStabilityLab\"),",
+    "lesson_embed_owned_by_lesson_author": "<Demo name=\"FeedbackStabilityLab\" caption=\"Tune the pole pair to 0.180 cycles/sample under the radius and settling limits, then test the 100-sample stability claim by extending the trace.\" />",
+    "preflight_mutations": [
+      "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/difference-equations-and-stability/demo-preflight.json"
+    ]
+  },
+  "implementation_contract": {
+    "export": "default function FeedbackStabilityLab() with no required props",
+    "client_boundary": "Put \"use client\" before imports because this narrow island owns useState and native input handlers; keep constants and pure recurrence/metric/geometry helpers in the same module and pass no nonserializable props across the boundary.",
+    "lazy_loading": "Add the explicit registry import promise only. DemoHost already constructs React.lazy loaders once at module scope and owns Suspense, so do not add next/dynamic, a second Suspense boundary, or ssr:false.",
+    "styling": "Use existing Tailwind theme utilities plus currentColor for SVG axes/text and the house amber #e2903a / blue #4c8dd6 with dash/shape cues; add no CSS module, global CSS, inline stylesheet, or chart library.",
+    "dependencies": 0,
+    "network_or_async": false,
+    "component_loc_limit": 200
+  },
+  "model": {
+    "units_and_domain": "Normalized frequency f0 is in cycles/sample, 0.05 <= f0 <= 0.45; omega0=2*pi*f0 radians/sample. Radius is 0.900 <= r <= 1.020. The range excludes angles 0 and pi, so the conjugate resonator remains nondegenerate and every 1000-sample endpoint stays finite.",
+    "input_and_initial_state": "x[n]=delta[n]; y[-1]=y[-2]=0. Compute n=0 through N-1 with no resets inside a trace.",
+    "recurrence": "y[n] = x[n] + 2*r*cos(omega0)*y[n-1] - r^2*y[n-2].",
+    "state_update": "Start prev1=y[-1]=0 and prev2=y[-2]=0; for each n, current=(n===0?1:0)+a1*prev1+a2*prev2, append current, then prev2=prev1 and prev1=current.",
+    "transfer_function": "H(z)=1/(1-2*r*cos(omega0)z^-1+r^2 z^-2).",
+    "pole_to_coefficient_mapping": {
+      "poles": "p1,2 = r*exp(+/-j*omega0)",
+      "characteristic_polynomial": "(z-p1)(z-p2)=z^2-2*r*cos(omega0)z+r^2",
+      "recurrence_form": "y[n]=a1*y[n-1]+a2*y[n-2]+x[n]",
+      "a1": "2*r*cos(omega0)",
+      "a2": "-r^2",
+      "denominator_coefficients": "[1,-a1,-a2]=[1,-2*r*cos(omega0),r^2]",
+      "impulse_response_check": "h[n]=r^n*sin((n+1)omega0)/sin(omega0) for n>=0, consistent with h[0]=1 and the iterative recurrence. Use the recurrence for rendering to keep state and initial conditions explicit."
+    },
+    "stability": "For this causal rational system, BIBO stable iff both poles satisfy r<1. A finite prefix being numerically bounded is evidence about that prefix only, never proof of absolute summability.",
+    "settling": {
+      "definition": "The pole-mode envelope has fallen to at most 1% of its initial envelope.",
+      "formula": "For 0<r<1, n1pct=ceil(log(0.01)/log(r)); for r>=1, n1pct=Infinity and display 'never'.",
+      "pass": "n1pct < 200, strictly under 200 samples.",
+      "important_boundary": "r=0.980 gives 228 samples and fails; r=0.970 gives 152 and passes. The continuous boundary for n<200 is r<=exp(log(0.01)/199)=0.977124..., so the 0.001 slider grid's largest passing radius is 0.977."
+    },
+    "tuning_target": {
+      "requested_frequency": 0.18,
+      "units": "cycles/sample",
+      "angular_frequency": "0.36*pi radians/sample",
+      "frequency_error": "abs(f0-0.180)/0.180",
+      "frequency_pass": "frequency_error < 0.01 (below 1%, matching the final design target)",
+      "radius_pass": "r <= 0.98 + 1e-12",
+      "settling_pass": "n1pct < 200",
+      "overall_pass": "frequency_pass && radius_pass && settling_pass"
+    },
+    "finite_record_falsification": {
+      "claim": "A bounded 100-sample impulse response proves BIBO stability.",
+      "counterexample": "Set f0=0.180 and r=1.002. Its poles lie outside the unit circle, but max(abs(h[0..99])) is only 1.325583. Extend without resetting state to n=999: max(abs(h[0..999])) becomes 8.004908 and the geometric envelope keeps growing, so the 100-sample observation is falsified.",
+      "comparison_metrics": "Always calculate max100 from the first 100 samples and maxShown from the selected N. In the extended view show maxShown/max100 and state that r>=1 means no finite settling time and no BIBO stability, independently of visual scale.",
+      "honesty": "Call the short trace 'bounded over 100 displayed samples', never 'stable'; every finite numeric array is bounded. The recognizable falsification moment requires N=1000, r>=1, and maxShown>2*max100."
+    }
+  },
+  "data_and_state": {
+    "stored_state_only": [
+      "frequency f0 initialized to 0.150 cycles/sample",
+      "pole radius r initialized to 0.980",
+      "trace length N initialized to 100"
+    ],
+    "derived_only": [
+      "omega0, a1, a2, conjugate pole coordinates",
+      "1000-sample impulse response (slice to N for the chart)",
+      "frequency error, stability, n1pct, three target booleans, overall PASS",
+      "active system-preset index or null and active trace-length index",
+      "max100, maxShown, growth ratio, safe chart scale and SVG points"
+    ],
+    "no_effects": "No useEffect, timer, animation, transition, random seed, browser API, memoized external state, or reset between the first 100 and extended samples. All values derive synchronously during render."
+  },
+  "interaction": {
+    "initial_state": {
+      "preset": "Untuned start",
+      "f0": 0.15,
+      "r": 0.98,
+      "N": 100,
+      "visible_result": "A nonblank damped oscillation and inside-unit-circle pole pair appear immediately. Radius passes, but frequency error is 16.67% and 1% settling is 228 samples, so the view teaches that stable and r<=0.98 do not by themselves meet the transient specification."
+    },
+    "system_presets": [
+      {
+        "label": "Untuned start",
+        "f0": 0.15,
+        "r": 0.98,
+        "expected": "frequency FAIL; radius PASS; settling FAIL (228); overall FAIL"
+      },
+      {
+        "label": "On pitch, slow",
+        "f0": 0.18,
+        "r": 0.98,
+        "expected": "frequency PASS; radius PASS; settling FAIL (228); overall FAIL"
+      },
+      {
+        "label": "Meets all",
+        "f0": 0.18,
+        "r": 0.97,
+        "expected": "frequency PASS; radius PASS; settling PASS (152); overall PASS"
+      },
+      {
+        "label": "100-sample trap",
+        "f0": 0.18,
+        "r": 1.002,
+        "expected": "frequency PASS; radius FAIL; settling never; BIBO unstable; short prefix deceptively mild"
+      }
+    ],
+    "preset_behavior": "PresetGroup sets f0 and r; selecting 100-sample trap also returns N to 100 to stage the guided falsification. Compute activeIndex from live f0/r within 1e-9 and leave the trap active when only the view length changes; return null after either system slider moves off a preset.",
+    "controls": [
+      "PresetGroup for the four named system presets, inside a role=group labelled Resonator presets.",
+      "Slider 'resonant frequency f0', min 0.05, max 0.45, step 0.001, display in cycles/sample and ariaValueText also giving omega0/pi.",
+      "Slider 'pole radius r', min 0.900, max 1.020, step 0.001, display to three decimals and spoken as pole radius.",
+      "PresetGroup for 'First 100' and 'Extend to 1000', inside a role=group labelled Trace length; extending continues the same zero-state impulse computation rather than restarting at sample 100."
+    ],
+    "guided_task": [
+      "Tune f0 until frequency error is below 1%.",
+      "Reduce r until r<=0.98 and n1pct<200; the TargetList and PASS readout confirm all three gates.",
+      "Select 100-sample trap and inspect the mild 100-sample prefix.",
+      "Select Extend to 1000; the outside-unit-circle poles, rising envelope, max-amplitude ratio, and FALSIFIED readout reject the finite-record claim."
+    ],
+    "feedback": "At most 1000 two-state recurrence updates plus SVG point mapping run synchronously on each input, comfortably within D2's 200 ms budget and without network activity."
+  },
+  "readouts_and_visual": {
+    "kit_composition": "Panel outer container; two PresetGroups; two Sliders; one TargetList for requested frequency, radius, and settling gates; one Readout for coefficients, BIBO verdict, peak comparison, overall PASS, and the explicit FALSIFIED message. Add no UI primitive.",
+    "readout_fields": [
+      "requested/current f0 and relative frequency error",
+      "pole radius and inside/on/outside-unit-circle classification",
+      "a1 and a2 in y[n]=a1*y[n-1]+a2*y[n-2]+x[n]",
+      "1% settling in samples or 'never'",
+      "max |h| over first 100, max |h| over shown record, and their ratio",
+      "PASS/Not yet for tuning and FALSIFIED/not yet for the finite-record claim"
+    ],
+    "chart": "One dependency-free responsive SVG (viewBox about 0 0 480 350, className w-full select-none). The upper inset is a pole plane with labelled Re/Im axes, unit circle, conjugate poles, and textual r/f0. The lower panel is the actual impulse response h[n] with labelled n and h[n] axes, zero line, solid blue response, dashed amber +/-r^n/abs(sin(omega0)) envelopes, a shaded/labelled first-100 region and n=99 boundary when extended, and honest dynamically padded symmetric y ticks derived from finite maxShown. Use all 100 or 1000 points; no chart dependency or animation.",
+    "scale_edge_case": "Let peak=max(abs(shown)); choose scale=max(1e-9,1.1*peak). If a mapped coordinate is unexpectedly nonfinite, omit the point and force a failing readout, though declared ranges keep all samples finite. Never normalize each segment independently or hide growth by clipping.",
+    "non_color_cues": "Unit circle dashed versus pole dots; response solid versus envelope dashed; explicit inside/outside, PASS/Not yet, and FALSIFIED labels; first-100 region boundary and peak numbers make every conclusion available without color.",
+    "responsive_layout": "Stack by default, use sm:grid-cols-2 only for the two sliders, allow kit preset buttons to wrap, and keep the single SVG fluid with no fixed CSS width or horizontal scroll at 360px.",
+    "theme": "Use currentColor with opacity for axes, ticks, labels, and unit circle; theme classes text-ink/text-soft/text-faint/text-accent/border-line/bg-panel for DOM; verify amber/blue marks plus non-color cues on both light and dark backgrounds."
+  },
+  "accessibility": {
+    "keyboard": "PresetGroup uses native Button elements for Tab and Enter/Space; Slider uses native range inputs for Tab and arrow keys; no pointer-only gesture or custom key handler.",
+    "touch": "Existing Button min-h-11 and Slider h-11 provide at least 44px targets; wrapped preset rows and stacked mobile layout prevent crowding.",
+    "aria": "Label both preset groups with role=group; give precise Slider ariaLabel/ariaValueText including units; TargetList and Readout provide polite live text; give the SVG role=img and a concise dynamic aria-label naming f0, r, pole classification, N, max100, maxShown, and whether the claim is falsified.",
+    "motion": "No animation; slider changes replace static geometry immediately, respecting reduced-motion users without special handling."
+  },
+  "loc_plan": {
+    "limit": 200,
+    "planned": 190,
+    "budget": {
+      "imports_types_constants_presets": 27,
+      "recurrence_metrics_and_svg_helpers": 41,
+      "state_derived_values_handlers": 35,
+      "kit_controls_targets_readout": 42,
+      "responsive_svg": 45
+    },
+    "strategy": "Use compact module constants, one recurrence helper, mapped SVG marks, and a single component. Store only f0/r/N. Do not extract runtime files, add a test/chart/math library, use a reducer/effect, or create separate desktop/mobile SVGs."
+  },
+  "deterministic_checks": [
+    "At f0=0.180 and r=0.980, a1=0.8345274115, a2=-0.9604000000, poles have radius 0.98 and angle +/-0.36*pi, frequency error is 0, and n1pct=228; overall tuning fails only the settling gate.",
+    "At f0=0.180 and r=0.970, a1=0.8260118256, a2=-0.9409000000, n1pct=152, and all three tuning gates pass.",
+    "At the initial f0=0.150 and r=0.980, a1=1.1520590945, a2=-0.9604, frequency error=1/6=16.6667%, radius passes, and settling fails.",
+    "For f0=0.180 and r=0.970, recurrence samples h[0..4]=[1,0.8260118256,-0.2586044639,-0.9908048721,-0.5750956012].",
+    "For the 100-sample trap f0=0.180 and r=1.002, a1=0.8532617003, a2=-1.0040040000, max100=1.3255831552, max1000=8.0049081806, n1pct=Infinity, and the extended-view falsification condition is true.",
+    "Changing only N never changes f0, r, a1, a2, the poles, or the first 100 samples; trace1000.slice(0,100) equals trace100 sample-for-sample.",
+    "Strict thresholds: a frequency error exactly 1% fails, n1pct exactly 200 fails, r=0.980 passes the radius gate but not settling, and r=1.000 is not BIBO stable and displays settling 'never'.",
+    "All four slider corners at r in {0.900,1.020}, f0 in {0.050,0.450}, N=1000 produce finite coefficients, samples, extrema, and SVG coordinates; the worst declared corner remains around 1.145e9, far below Number.MAX_VALUE.",
+    "Preset activeIndex clears after a 0.001 slider move, the Meets all preset yields PASS, and the trap cannot yield tuning PASS even though its frequency matches."
+  ],
+  "numerical_edge_cases": [
+    "Use Number.isFinite before formatting settling, ratios, or SVG coordinates; display 'never' for n1pct and an em dash rather than NaN for an undefined ratio.",
+    "Never evaluate log(r) for r>=1; classify those radii before the settling formula. The declared r minimum avoids log(0).",
+    "Use a 1e-12 radius tolerance only for slider serialization at the <=0.98 gate; do not soften the strict r<1 BIBO test or the strict <1% and <200 task thresholds.",
+    "The angle range keeps abs(sin(omega0))>=sin(0.1*pi), preventing a singular analytic envelope. Rendering still uses the recurrence, not division by sin, for the response.",
+    "Calculate the full 1000-sample trace once per render and slice it, ensuring the extension is identical state continuation and avoiding inconsistent separately initialized traces.",
+    "Use max(1e-9,1.1*peak) for the symmetric y scale so an unexpectedly zero trace cannot divide by zero; x coordinates use N-1 and N is always 100 or 1000."
+  ],
+  "validation_and_preview": [
+    "Confirm the component is a default-exported client component, has no required props, imports only React state plus @/components/ui, and is at or below 200 physical lines.",
+    "Run a deterministic Node/TypeScript harness for every listed coefficient, trace, threshold, continuation, preset, and endpoint assertion before UI review.",
+    "Run npx tsc --noEmit.",
+    "Run npx eslint components/demos/digital-signal-processing/FeedbackStabilityLab.tsx components/demos/index.ts.",
+    "After lesson.mdx exists and embeds the demo, run npm run validate -- digital-signal-processing difference-equations-and-stability.",
+    "Run npm run preview -- digital-signal-processing difference-equations-and-stability for static light/dark layout; expect the preview script's nonhydrated demo placeholder, then use npm run dev for interaction.",
+    "In npm run dev, inspect the lesson route at desktop and 360px in light and dark themes; keyboard-select all presets and trace lengths, arrow both sliders through endpoints and thresholds, verify active preset clearing, reproduce the numeric checks, and confirm no clipping, horizontal scroll, color-only cue, delayed feedback, or hydration warning.",
+    "Guided manual acceptance: use On pitch, slow to observe the separate settling failure, use Meets all to obtain PASS, select 100-sample trap, record max100 near 1.326, extend to 1000, and obtain FALSIFIED with maxShown near 8.005 while the pole plot remains outside the unit circle."
+  ],
+  "checklist_expectation": {
+    "D1": "PASS: coupled pole geometry, recurrence coefficients, settling, and finite-to-extended growth change together and support both a target and a falsification impossible in one static view.",
+    "D2": "PASS: at most 1000 recurrence updates and SVG mappings are synchronous with no async or network.",
+    "D3": "PASS: the initial ringing state already exposes two failed constraints, and four named system presets anchor the narrative.",
+    "D4": "PASS: the learner can reach an unambiguous three-gate PASS, then a separate FALSIFIED moment by extending the trap without resetting it.",
+    "D5": "PASS by plan: one <=200-line default-exported client component, existing UI imports, zero dependencies, native keyboard/touch controls, and a fluid theme-safe SVG."
+  }
+}

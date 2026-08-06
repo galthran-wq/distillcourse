@@ -1,0 +1,348 @@
+A fitted recurrence is useful only when it predicts held-out flight measurements and its residuals expose the physics it omits.
+
+<Ref lesson="difference-equations-and-stability">Difference Equations and Stability</Ref> ended with an output-only record split into training and validation samples. A second-order recurrence reproduced its training values exactly but lost to a first-order model on held-out RMSE. That calculation established the seam: roots describe a stated recurrence, while untouched records test whether the recurrence predicts anything beyond the data that chose it.
+
+Here the evidence is no longer a small teaching sequence. We will audit nine measured longitudinal maneuvers from the Skywalker X8 UAV campaign: seven creator-designated training records choose one frozen elevator-to-pitch-rate recurrence, and two creator-designated validation records judge it. The route is data contract, boundary-safe fitting, root check, one-step and free-run validation, residual diagnosis, and a deliberately narrow physical conclusion.
+
+## Two flight artifacts motivate one careful boundary
+
+### MIT's perching glider is context, not our dataset
+
+MIT 6.003 presents real-flight lift and drag scatter against flat-plate curves for a perching glider. The visible disagreement is a memorable reason not to trust an ideal curve merely because it looks physical.
+
+<Figure src="./figures/aerodynamic-flight-data.png" alt="Two MIT perching-glider plots show measured lift and drag coefficient point clouds beside flat-plate theory curves, with visible model-data mismatch at large angles." caption="MIT's perching-glider point clouds visibly depart from flat-plate curves at large angles, motivating validation; this different vehicle supplies no numbers to the Skywalker X8 study." />
+
+The same lecture shows a recorded approach and perch. A trajectory that matters is exactly where a model should face flight it did not fit.
+
+<Figure src="./figures/perching-trajectory.png" alt="A monochrome multiple-exposure MIT record shows a perching glider moving across a motion-capture room toward a horizontal perch line." caption="MIT's recorded perching sequence motivates untouched flight evaluation; it is a different vehicle and campaign, not an X8 validation maneuver." />
+
+Those rasters stop at motivation. Every coefficient, error, and residual below comes instead from the CC0 **System identification campaign - Skywalker X8 UAV**, DataverseNO Version 1.0, DOI `10.18710/U4TLYV`. Nothing is pooled or compared numerically across the two vehicles.
+
+<Definition title="system identification">
+**System identification** estimates and validates a dynamical model from ordered input-output records under a declared preprocessing, model-selection, and evaluation protocol. Fitting chooses coefficients; validation tests the frozen choices on records that did not choose them.
+</Definition>
+
+That separation determines the next move: before writing any recurrence, we must fix the X8 records' indices, units, file boundaries, and creator-designated roles.
+
+## The record contract comes before the recurrence
+
+### Nine files are nine independent maneuvers
+
+The released CSVs are headerless. The Version 1.0 README assigns exactly 41 numeric columns and their units. This lesson uses only
+
+| position | README name | symbol | unit | role |
+|---:|:---|:---:|:---:|:---|
+| 1 | `t` | $t[n]$ | s | time |
+| 2 | `elevator` | $u[n]$ | rad | input |
+| 9 | `IMU_angvel_q` | $q[n]$ | rad/s | measured output |
+
+Each file starts again at row 1, $n=0$, $t=0$, and includes its last row. Its nominal rate is $40$ samples/s, so $T_s=0.025$ s. The deterministic integrity audit found 3,828 complete rows across the nine longitudinal files, exactly 41 finite fields per row, no missing values, and every within-file time increment equal to $0.025$ s within $10^{-9}$ s.
+
+The creator—not this lesson—designated the split. Training contains four 3211 elevator maneuvers and three elevator doublets. Validation contains `longitudinal_3211_5.csv` and `longitudinal_doublet_4.csv`. These are two separate maneuvers; this study creates neither a random row split nor a percentage-based tail split.
+
+<Figure src="./figures/time-ordered-holdout.svg" alt="Seven creator-designated X8 training-file blocks, each with its own state reset, feed a frozen model before two separate untouched validation-file blocks; random-row shuffling and cross-file lags are crossed out." caption="The creator-designated split is by whole maneuver: seven files may choose the model, while two separately reset files may only judge it." />
+
+<KeyFact>
+A maneuver boundary is a state boundary. Using the last $q$ or $u$ from one file as a delayed regressor or recursive seed for the next invents a transition the aircraft never made; that false row can move fitted coefficients, characteristic roots, and every downstream validation score.
+</KeyFact>
+
+### Integrity failures stop the analysis
+
+For each file, verify its pinned MD5 before parsing. Require 41 finite numeric fields in every row, $t[0]=0$, and $t[n]-t[n-1]=0.025$ s. If a check fails, report file and row and stop. Imputing, dropping, or “repairing” a row after seeing the signals changes the declared study.
+
+<Exercise>
+The README assigns teaching columns 1, 2, 9, 12, 15, 26, and 29. Map them to names and units. Then inspect this parser report:
+
+| CSV row | $t$ (s) | elevator | `IMU_angvel_q` | field count |
+|---:|---:|---:|---:|---:|
+| 1 | 0.000 | 0.012 | $-0.031$ | 41 |
+| 2 | 0.025 | 0.011 | $-0.028$ | 41 |
+| 3 | 0.050 | 0.010 | $-0.024$ | 40 |
+| 4 | 0.075 | 0.009 | $-0.021$ | 41 |
+
+Verify the sample interval and identify the first invalid row. What should the loader do?
+
+<Solution>
+The mapping is: 1 `t` (s), 2 `elevator` (rad), 9 `IMU_angvel_q` (rad/s), 12 `EstimatedState_theta` (rad), 15 `EstimatedState_q` (rad/s), 26 `EstimatedState_alpha` (rad), and 29 `IndicatedSpeed` (m/s). The displayed time differences are $0.025$ s, consistent with 40 samples/s.
+
+Row 3 is the first invalid row because it has 40 rather than 41 fields. The loader must stop and report that row; it must not interpolate, drop the row, or bridge row 2 to row 4. `EstimatedState_alpha` is an angle estimate, not a stall label.
+</Solution>
+</Exercise>
+
+## A frozen ARX recurrence asks whether elevator helps
+
+### Match output memory before adding input
+
+With channel meanings and state boundaries fixed, the comparison can now isolate one question: hold pitch-rate memory at order two, then ask whether recorded elevator adds predictive information.
+
+The baseline is an input-free second-order autoregression,
+
+$$
+\hat q_0[n]=c_0+a_{01}q[n-1]+a_{02}q[n-2].
+$$
+
+It asks how much pitch-rate prediction comes from pitch-rate memory alone. The candidate keeps that output order and adds one recorded elevator term:
+
+$$
+\hat q_1[n]
+=c+a_1q[n-1]+a_2q[n-2]+b_1u[n-1].
+$$
+
+This is ARX$(2,1,1)$: two output lags, one input term, and a one-sample input lag. Because $q$ is in rad/s and $u$ is in rad, $a_1$ and $a_2$ are dimensionless, $b_1$ has units $1/$s, and $c$ has units rad/s.
+
+The one-sample lag is a precommitted discrete modeling convention; it does not measure $0.025$ s of actuator latency. The source channels were manually synchronized, so an effective record-level lag can contain alignment error as well as physical response.
+
+### Construct lags inside each training file
+
+For a training file of length $L$, make design rows only for $n=2,\ldots,L-1$:
+
+$$
+X_1[n]=[q[n-1],q[n-2],u[n-1],1],
+\qquad y[n]=q[n].
+$$
+
+Build those rows separately in all seven files, then stack the completed matrices. Never concatenate raw sequences first. Unweighted float64 least squares on the resulting 2,936 training rows fixes all coefficients. There is no centering, scaling, detrending, smoothing, filtering, clipping, resampling, or maneuver-specific refit; the intercept absorbs one pooled offset.
+
+<Exercise>
+To isolate the boundary issue, fit the first-order special case $q[n]=a q[n-1]$ through the origin on two short independent training maneuvers:
+
+$$
+q_A=[1,0.5],\qquad q_B=[10,5].
+$$
+
+Find $a$ when lag state resets between files. Then concatenate the records, include the false transition $0.5\to10$, and refit. What changed?
+
+<Solution>
+With a reset, the only valid pairs are $(1,0.5)$ and $(10,5)$, so
+
+$$
+a=\frac{1(0.5)+10(5)}{1^2+10^2}=0.5.
+$$
+
+Concatenation invents the pair $(0.5,10)$. The fitted coefficient becomes
+
+$$
+a_{\rm bridged}
+=\frac{1(0.5)+0.5(10)+10(5)}{1^2+0.5^2+10^2}
+=\frac{55.5}{101.25}\approx0.5481.
+$$
+
+No aircraft transition produced that change; the parser did. In the real study, every lag matrix and every free-run state is reset at each maneuver boundary.
+</Solution>
+</Exercise>
+
+### Freeze coefficients before opening validation
+
+The training-only checkpoint gives
+
+$$
+\begin{aligned}
+a_1&=1.7421463, & a_2&=-0.8284751,\\
+b_1&=-0.3877093\ \mathrm{s}^{-1}, & c&=-0.0114088\ \mathrm{rad/s},
+\end{aligned}
+$$
+
+and the matched baseline gives
+
+$$
+a_{01}=1.8724058,\qquad
+a_{02}=-0.9386441,\qquad
+c_0=0.0001603\ \mathrm{rad/s}.
+$$
+
+The stacked training RMSE values are $0.04256$ rad/s for ARX and $0.04863$ rad/s for AR(2). That difference is not the result. It only freezes two candidates for validation.
+
+### The fitted homogeneous modes decay
+
+Set input and intercept to zero and substitute $q_h[n]=r^n$:
+
+$$
+r^2-a_1r-a_2=0.
+$$
+
+The ARX roots are
+
+$$
+r_{1,2}=0.8710731\pm j0.2640202,
+\qquad |r_1|=|r_2|=0.9102061<1.
+$$
+
+Thus the homogeneous modes of this fitted recurrence decay. That passes the precommitted model-stability check. It does not establish stability of the aircraft, its controller, its sensor chain, or the experiment.
+
+## Validation asks two different prediction questions
+
+### One step tests the local update rule
+
+For each validation file, one-step prediction uses measured $q[n-1]$ and $q[n-2]$ at every scored index. Its residual sign is
+
+$$
+e_1[n]=q[n]-\hat q_1[n].
+$$
+
+The first two rows are needed as lags, so scoring begins at $n=2$. The 3211 file has 416 raw rows and $M=414$ scored samples; the doublet has 462 raw rows and $M=460$.
+
+### Free run tests accumulated recurrence dynamics
+
+Free run uses the two measured seeds only once:
+
+$$
+\tilde q[0]=q[0],\qquad \tilde q[1]=q[1].
+$$
+
+Thereafter it feeds back its own predictions,
+
+$$
+\tilde q[n]
+=c+a_1\tilde q[n-1]+a_2\tilde q[n-2]+b_1u[n-1],
+$$
+
+while continuing to use the recorded elevator input. The AR(2) baseline follows the same seed and scoring rule but has no elevator term. A one-step model is repeatedly corrected by measurement; a free-run model must carry its own state. Their errors answer different questions and must remain separate.
+
+### Normalize within each maneuver, then average maneuvers equally
+
+For $M$ scored samples,
+
+$$
+\operatorname{RMSE}=\sqrt{\frac1M\sum e[n]^2},
+\qquad
+\operatorname{NRMSE}=\frac{\operatorname{RMSE}}
+{\sqrt{M^{-1}\sum(q[n]-\bar q)^2}}.
+$$
+
+NRMSE accounts for the different pitch-rate scale in each maneuver. The primary aggregate is the arithmetic mean of the two per-file values, giving the 3211 and doublet equal weight. It is not one concatenated trajectory.
+
+| maneuver / aggregate | mode | AR(2) RMSE | AR(2) NRMSE | ARX RMSE | ARX NRMSE |
+|:---|:---|---:|---:|---:|---:|
+| `longitudinal_3211_5` | one step | 0.04727 | 0.077 | 0.04260 | 0.069 |
+| `longitudinal_3211_5` | free run | 0.6170 | 0.999 | 0.2335 | 0.378 |
+| `longitudinal_doublet_4` | one step | 0.04966 | 0.095 | 0.04283 | 0.082 |
+| `longitudinal_doublet_4` | free run | 0.5227 | 1.005 | 0.2169 | 0.417 |
+| equal-maneuver macro | one step | 0.04847 | 0.086 | 0.04272 | 0.076 |
+| equal-maneuver macro | free run | 0.5699 | 1.002 | 0.2252 | 0.397 |
+
+RMSE is in rad/s; NRMSE is unitless. The precommitted rule promised no minimum improvement and no successful outcome. It required ARX to beat AR(2) in both metrics, both modes, and both validation files; both macro NRMSE effects had to be positive; and both ARX roots had to remain inside the unit circle. Every gate passed.
+
+Using full-precision macro NRMSE,
+
+$$
+100\left(1-\frac{0.0756403}{0.0859842}\right)=12.0\%
+$$
+
+for one step, and
+
+$$
+100\left(1-\frac{0.3974635}{1.0017412}\right)=60.3\%
+$$
+
+for free run. The supported primary claim is specific: recorded elevator supplies held-out predictive information beyond matched-order pitch-rate memory.
+
+<Figure name="X8ValidationDiagnostics" alt="Two validation-maneuver columns compare AR(2) and ARX one-step and free-run error traces and NRMSE, followed by ARX residual autocorrelation whose bars repeatedly cross per-file descriptive bands." caption="Elevator-aware ARX lowers error on both untouched X8 maneuvers, but autocorrelation beyond the descriptive bands leaves predictable structure in the residuals." />
+
+## Better prediction does not finish identification
+
+### Residual autocorrelation exposes remaining memory
+
+For each validation file separately, subtract the mean from the ARX one-step residuals: $r[i]=e_1[i]-\bar e_1$. Then compute
+
+$$
+\rho[k]=
+\frac{\sum_{i=k}^{M-1}r[i]r[i-k]}
+{\sum_{i=0}^{M-1}r[i]^2},
+\qquad k=1,\ldots,20.
+$$
+
+No pair crosses a file boundary. The approximate descriptive band is $\pm1.96/\sqrt M$: $\pm0.0963$ for the 3211 file and $\pm0.0914$ for the doublet. Lag 1 is $0.5589$ and $0.5349$, respectively, and multiple later lags also cross the bands. These twenty correlated comparisons are diagnostic flags, not a formal whiteness test. Still, the structure is too large to dismiss as an aggregate-score detail.
+
+<KeyFact>
+The frozen ARX model is **predictively better but structurally incomplete**. Lower validation error supports the value of elevator input; correlated residuals reject the stronger claim that this recurrence captures all predictable longitudinal dynamics.
+</KeyFact>
+
+### The idealization gap is measured and procedural
+
+The campaign documents strong northwesterly wind with a significant vertical component. An elevator-only recurrence omits that disturbance, along with throttle, airspeed, attitude, lateral coupling, saturation, and changing operating conditions.
+
+The STIM300 IMU was downsampled from 200 Hz, GPS and propulsion channels were upsampled from 10 Hz, command data originated at 40 Hz, and the sources were manually synchronized. Therefore the fixed input lag is an effective lag in the released record, not a measurement of actuator latency. The output is an IMU gyro measurement, so correlated sensor error can appear in both target $q[n]$ and its delayed regressors and bias ordinary least squares.
+
+Finally, 3211 and doublet excitations probe different input patterns. A residual difference between them may reflect maneuver shift, wind, timing, or omitted dynamics; it does not isolate one aerodynamic cause. Neither validation file is documented as perching or stall data, and `EstimatedState_alpha` is not a stall flag.
+
+<Figure name="X8IdentificationPipeline" alt="A five-stage Skywalker X8 pipeline carries the physical aircraft and strong-wind disturbance into synchronized 40 hertz elevator and pitch-rate records, training-only fitting, frozen AR and ARX predictors, and two separately reset validation maneuvers, with validation feedback blocked." caption="The X8 audit permits training files to freeze the recurrence, then sends two separately reset maneuvers forward to one-step and free-run checks; validation never flows back." />
+
+### Provenance makes the numerical claim reproducible
+
+The local projection preserves unmodified source files and MD5s, excludes GPS/location fields from derived artifacts, and records every computation. The frozen protocol hash begins `3750f7e4`, the script hash `631a8c65`, the validation-summary hash `a8f1c9ca`, and the derived artifact-set hash begins `7aee6d22`. These shortened forms identify the full hashes stored with the build; they are not replacements for verification.
+
+The first time-domain module now closes with a complete audit: sampled records define indices and units, a recurrence compresses memory, its roots test the fitted homogeneous modes, untouched maneuvers test prediction, and residuals expose what the low-order model still omits. **Complex Sinusoids and Phasors** next represents amplitude, decay, discrete frequency, and phase with complex exponentials; the final exercise makes that single forward handoff through the fitted conjugate roots.
+
+## Exercises
+
+<Exercise>
+A nested higher-order recurrence obtains lower training RMSE than the frozen ARX$(2,1,1)$. Refute the claim “therefore it is a better flight model.” State the minimum evidence needed to compare it fairly, and explain what happens if its order was proposed after inspecting either current validation file.
+
+<Solution>
+Nesting makes training error a one-way test: the larger model can set its extra coefficients to zero, so least-squares training RMSE cannot increase. Lower training error therefore proves only additional fitting freedom.
+
+A fair comparison must freeze preprocessing, effective lag, order, coefficients, root check, one-step/free-run rules, and residual diagnostics before opening untouched 3211 and doublet validation maneuvers. It must report both files separately, not hide opposite outcomes in an aggregate. If the higher order was proposed after seeing either current validation file, both files have influenced model selection and are no longer fresh tests for that revision. New untouched maneuvers are required.
+</Solution>
+</Exercise>
+
+<Exercise>
+Implement the nine-file integrity audit. Verify Version 1.0 file MD5s, row counts, 41 finite numeric fields, $t[0]=0$, every $0.025$ s increment, and absence of missing values. Report the expected row counts for the seven training and two validation files. What must happen on the first discrepancy?
+
+<Solution>
+In declared order, training row counts are
+
+$$
+[417,416,415,414,463,461,364]
+$$
+
+for `3211_1` through `3211_4`, then `doublet_1` through `doublet_3`. Validation counts are $416$ for `3211_5` and $462$ for `doublet_4`, totaling 3,828 rows. The released audit finds all MD5s correct, every row numeric with 41 finite fields, every file starting at zero, every increment $0.025$ s within $10^{-9}$ s, and no missing values.
+
+On the first discrepancy, stop and report file and row. Do not silently impute, exclude, reorder, resample, or bridge. Reproducibility requires preserving even a failed integrity result.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the frozen build and reproduce the AR(2) versus ARX$(2,1,1)$ validation table. Report both root magnitudes, both equal-maneuver macro NRMSE effects, the lag-1 ARX one-step residual autocorrelation and descriptive band for each maneuver, and the strongest supported conclusion. Then name three limits that the scores cannot remove.
+
+<Solution>
+The roots are $0.8710731\pm j0.2640202$, each with magnitude $0.9102061$. ARX is strictly better in RMSE and NRMSE for one step and free run on both files. Equal-maneuver macro NRMSE falls by $12.0\%$ one step and $60.3\%$ free run.
+
+For `3211_5`, lag-1 residual autocorrelation is $0.5589$ against a descriptive band of $\pm0.0963$. For `doublet_4`, it is $0.5349$ against $\pm0.0914$. Multiple later lags also cross. Thus recorded elevator is predictively useful beyond matched-order output memory, but the model is **predictively better but structurally incomplete**.
+
+Limits include strong wind with vertical component, manual synchronization and multirate resampling, correlated gyro error in target and regressors, omitted inputs/states, and maneuver shift. The scores do not establish aircraft or controller stability, identify actuator latency, or turn either validation maneuver into perching or stall evidence.
+</Solution>
+</Exercise>
+
+<Exercise>
+The fitted root pair is $0.871073\pm j0.264020$. Write a real homogeneous component with initial amplitude $A=0.20$ and phase $\phi=0$ in the form $A\rho^n\cos(\omega_0n+\phi)$. Find $\rho$, $\omega_0$ in rad/sample, cycles/sample, and the corresponding nominal hertz at 40 samples/s. This completes the module's single forward handoff to <Ref lesson="complex-sinusoids-and-phasors">Complex Sinusoids and Phasors</Ref>.
+
+<Solution>
+The radius is
+
+$$
+\rho=\sqrt{0.871073^2+0.264020^2}\approx0.910206,
+$$
+
+and the angle is
+
+$$
+\omega_0=\operatorname{atan2}(0.264020,0.871073)
+\approx0.29430\ \text{rad/sample}.
+$$
+
+Thus one real component is
+
+$$
+0.20(0.910206)^n\cos(0.29430n).
+$$
+
+Its discrete frequency is $0.29430/(2\pi)\approx0.04684$ cycles/sample, corresponding nominally to $40(0.04684)\approx1.87$ Hz. The next lesson packages this decay, rotation, and phase with complex exponentials.
+</Solution>
+</Exercise>
+
+<References>
+1. Bogdan Løw-Hansen and Richard Hann, 2024, *System identification campaign - Skywalker X8 UAV*, DataverseNO, Version 1.0, CC0-1.0 — README contract, creator-designated maneuver split, measured flight records, and synchronization/wind caveats. https://doi.org/10.18710/U4TLYV
+2. Dennis Freeman and MIT OpenCourseWare, *Signals and Systems, MIT 6.003*, Fall 2011, Session 10, slides 2–14 — contextual perching-glider artifacts from a different vehicle. https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/
+3. Sophocles J. Orfanidis, *Introduction to Signal Processing*, 2nd ed., §28.4.3 — autoregressive prediction, separate generalization records, and residual correlation. https://www.ece.rutgers.edu/~orfanidi/intro2sp/
+4. Petre Stoica and Randolph Moses, *Spectral Analysis of Signals*, §§1.1 and 1.5 — finite-record inference and model limitations. https://user.it.uu.se/~ps/SAS-new.pdf
+</References>

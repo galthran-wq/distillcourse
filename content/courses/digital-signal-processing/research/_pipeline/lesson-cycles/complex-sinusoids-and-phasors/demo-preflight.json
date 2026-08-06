@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "status": "ready",
+  "lesson": "complex-sinusoids-and-phasors",
+  "component": "QuadratureDetectorLab",
+  "planned_loc": 196,
+  "dependency_count": 0,
+  "d1_objective": "The learner sees a fixed-amplitude tone rotate through phase, watches its in-phase and quadrature projections trade value, finds the phase where a sine-only amplitude estimate vanishes, and then sees the I/Q magnitude and wrapped phase remain correct across the entire phase family.",
+  "sources": {
+    "agents": "AGENTS.md",
+    "demo_skill": ".claude/skills/demo-builder/SKILL.md",
+    "demo_checklist": ".claude/skills/demo-builder/checklists/demo-checklist.md",
+    "component_contract": "docs/components.md",
+    "pedagogy_contract": "docs/pedagogy.md, demo rules D1-D5",
+    "course_spec": "content/courses/digital-signal-processing/course.yaml, lesson complex-sinusoids-and-phasors",
+    "final_brief": "content/courses/digital-signal-processing/research/complex-sinusoids-and-phasors.md",
+    "design_contract": "content/courses/digital-signal-processing/research/_pipeline/design/pedagogy-proposal.json:D04-quadrature-detector",
+    "exercise_alignment": "content/courses/digital-signal-processing/research/_pipeline/design/exercise-fixes-modules-1-3.json:complex-sinusoids-and-phasors",
+    "existing_patterns": [
+      "components/ui/*",
+      "components/demos/index.ts",
+      "components/mdx/DemoHost.tsx",
+      "components/demos/digital-signal-processing/EchoKernelLab.tsx",
+      "components/demos/digital-signal-processing/FeedbackStabilityLab.tsx",
+      "components/demos/information-theory/SurprisalSlider.tsx",
+      "components/demos/information-theory/ChannelCodingThreshold.tsx"
+    ],
+    "next_16_2_11_docs": [
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md",
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/01-app/02-guides/lazy-loading.md",
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md",
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/01-app/01-getting-started/11-css.md"
+    ],
+    "lesson_status": "No lesson.mdx exists at preflight time; the lesson author must place the guided sine-null-then-I/Q task beside the embed without changing this numerical contract."
+  },
+  "targets": {
+    "component_file": "components/demos/digital-signal-processing/QuadratureDetectorLab.tsx",
+    "registry_file": "components/demos/index.ts",
+    "registry_entry": "QuadratureDetectorLab: () => import(\"./digital-signal-processing/QuadratureDetectorLab\"),",
+    "lesson_embed_owned_by_lesson_author": "<Demo name=\"QuadratureDetectorLab\" caption=\"Find a phase that nulls the sine-only detector, then switch to I/Q and verify amplitude and wrapped phase over the full phase sweep.\" />",
+    "preflight_mutations": [
+      "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/complex-sinusoids-and-phasors/demo-preflight.json"
+    ]
+  },
+  "implementation_contract": {
+    "export": "default function QuadratureDetectorLab() with no required props",
+    "client_boundary": "Put \"use client\" before imports because this narrow component owns useState and event handlers. Import only useState and the existing UI kit; keep all constants, projection math, seeded-phase logic, sweep checks, and SVG geometry in the same client module. No props cross the boundary.",
+    "lazy_loading": "Add only the explicit registry import promise. DemoHost already constructs React.lazy loaders once at module scope and owns Suspense; do not add next/dynamic, another lazy/Suspense layer, ssr:false, or a variable import path.",
+    "styling": "Use existing Tailwind utilities and app theme tokens. Use currentColor for SVG axes/text; house amber #e2903a for I/cosine and blue #4c8dd6 for Q/sine, with labels, line styles, and outlines as non-color cues. Add no CSS module, global CSS, inline stylesheet, or chart library.",
+    "dependencies": 0,
+    "network_or_async": false,
+    "component_loc_limit": 200,
+    "ui_changes_required": false
+  },
+  "signal_and_math": {
+    "record": "x[n]=A cos(omega0 n + phi), n=0,...,19, with A=1, omega0=0.3 pi rad/sample=0.15 cycles/sample. Twenty samples contain exactly three cycles.",
+    "units": "n is a dimensionless sample index; omega0 is radians/sample; phi is displayed in degrees and converted internally to radians.",
+    "references": "c[n]=cos(omega0 n), s[n]=sin(omega0 n).",
+    "projections": {
+      "I": "(2/N) sum from n=0 to N-1 of x[n] c[n] = A cos(phi)",
+      "Q": "-(2/N) sum from n=0 to N-1 of x[n] s[n] = A sin(phi)",
+      "sign_reason": "The negative sine correlation makes I+jQ=A exp(j phi) for x[n]=A cos(omega0 n+phi)."
+    },
+    "orthogonality_contract": "Because omega0=2 pi*3/20, sum cos^2=sum sin^2=N/2 and sum sin cos=0. Therefore the displayed equalities and I/Q recovery hold for every real phi in exact arithmetic; the result is not generalized to arbitrary finite windows or off-bin frequencies.",
+    "sine_only_estimator": {
+      "amplitude": "Ahat_sine=abs(Q)",
+      "phase": "unidentifiable from one scalar projection",
+      "nulls": "phi=0 degrees and +/-180 degrees modulo 360, where Q=0 although A=1"
+    },
+    "iq_estimator": {
+      "amplitude": "Ahat_IQ=hypot(I,Q)",
+      "phase_degrees": "phihat=atan2(Q,I)*180/pi, normalized to the canonical interval (-180,180], with -180 displayed as +180",
+      "phase_error": "abs(wrapDegrees(phihat-phi))",
+      "zero_magnitude_rule": "Phase is undefined when Ahat_IQ is zero. The declared benchmark A=1 avoids that degenerate case; the readout still names the rule."
+    },
+    "thresholds": {
+      "amplitude_error": "abs(Ahat_IQ-A)/A < 0.01, strictly below 1%",
+      "phase_error": "abs(wrapDegrees(phihat-phi)) < 2 degrees, strictly below 2 degrees",
+      "full_phase_pass": "Both strict inequalities hold on the deterministic -180 to +180 degree implementation sweep at 0.25-degree spacing, while the orthogonality identity supplies the all-real-phase mathematical guarantee.",
+      "sine_null_falsification": "Detector mode is sine-only, abs(Q)<1e-12, and sine-only relative amplitude error>0.99. The readout says FALSIFIED rather than treating the null as absence of a tone."
+    }
+  },
+  "state_and_interaction": {
+    "stored_state_only": [
+      "detector mode 'sine' | 'iq', initialized to 'sine'",
+      "phaseDeg, initialized to 37",
+      "unsigned 32-bit phase seed, initialized to 0x6d2b79f5"
+    ],
+    "derived_only": [
+      "20 samples, I, Q, sine-only and I/Q estimates, errors, null/pass booleans",
+      "active phase-preset index or null",
+      "phasor, projection, detector-bar, and sample-stem SVG geometry",
+      "module-level deterministic full-phase sweep maxima"
+    ],
+    "initial_state": {
+      "mode": "sine",
+      "phase_degrees": 37,
+      "visible_result": "Both projections are nonzero (I=0.798636, Q=0.601815). The sine-only amplitude estimate is 0.601815, so its relative error is 39.8185%, while the paired magnitude is 1 and paired phase is 37 degrees. The first screenshot already demonstrates phase sensitivity without starting at the final null."
+    },
+    "phase_presets": [
+      {
+        "label": "Oblique 37°",
+        "phase_degrees": 37,
+        "role": "alive-on-arrival partial projection"
+      },
+      {
+        "label": "Sine peak 90°",
+        "phase_degrees": 90,
+        "role": "one projection happens to recover amplitude but still cannot identify general phase"
+      },
+      {
+        "label": "Sine null 0°",
+        "phase_degrees": 0,
+        "role": "recognizable falsification: Q and Ahat_sine vanish while I/Q magnitude remains one"
+      },
+      {
+        "label": "Wrap edge 180°",
+        "phase_degrees": 180,
+        "role": "second null and wrapped-phase boundary check"
+      }
+    ],
+    "controls": [
+      "PresetGroup labelled Detector, with Sine only and I/Q pair.",
+      "PresetGroup labelled Phase cases, with the four named phase presets; activeIndex clears after a manual/random phase leaves a preset.",
+      "Button labelled New seeded phase. Advance seed=(imul(seed,1664525)+1013904223)>>>0, then set phaseDeg=round(seed/2^32*360-180). The deterministic initial sequence is -176, 58, -66, 176, 47, 103 degrees.",
+      "Slider labelled input phase phi, min -180, max 180, step 1, display degrees and expose the same value via aria-valuetext."
+    ],
+    "guided_task": [
+      "Start in Sine only and use presets, the slider, or seeded trials to observe that its amplitude estimate changes with phase.",
+      "Find Sine null 0 degrees; TargetList and Readout report Q approximately zero, 100% amplitude error, and FALSIFIED.",
+      "Switch to I/Q pair; the current estimate reports amplitude one and the correct wrapped phase.",
+      "Read the full-sweep maximum errors and obtain PASS only when both strict thresholds hold."
+    ],
+    "feedback_budget": "Each live update performs 20 sample/projection operations and simple SVG mapping. The 1,441-phase by 20-sample deterministic sweep is computed once at module initialization (28,820 samples), requires no memoization/effect, and remains far below 200 ms."
+  },
+  "readouts_and_visual": {
+    "kit_composition": "Panel outer container; two PresetGroups; one Button; one Slider; one TargetList; one Readout. Every control/live region comes from components/ui; no new primitive is needed.",
+    "target_list": [
+      "Find the sine-only null: live Q, Ahat_sine, and relative amplitude error; met only at the declared falsification condition.",
+      "I/Q passes every phase: dense-sweep maximum amplitude and phase errors; met only in I/Q mode when both strict limits pass."
+    ],
+    "readout_fields": [
+      "A=1, omega0=0.3 pi rad/sample=0.15 cycles/sample, N=20",
+      "I and Q to six decimals",
+      "active estimator amplitude and relative error",
+      "I/Q wrapped phase estimate and error, or 'phase unavailable' for sine only",
+      "PASS/Not yet and explicit FALSIFIED message at the one-projection null",
+      "full-sweep maximum amplitude and wrapped-phase error"
+    ],
+    "visual": "Dependency-free responsive DOM/SVG. Use a two-column grid at sm and one column at 360px: a unit-circle phasor panel with labelled I and Q drop projections, and a detector panel with side-by-side sine-only |Q| and I/Q hypot(I,Q) bars against a dashed true-A=1 line. Below, a full-width 20-sample stem plot of x[n] updates with phase. In sine-only mode the unmeasured I leg is dashed/muted and the sine bar has the active outline; in I/Q mode both legs and the paired bar are active. Never connect discrete sample dots.",
+    "non_color_cues": "I and Q are directly labelled; sine-only uses one projection and an active outline, I/Q uses a vector/bracket and a different active outline; true amplitude is dashed; PASS, FALSIFIED, numeric values, filled/hollow points, and solid/dashed strokes carry every conclusion without color.",
+    "theme": "Use currentColor and opacity for axes, labels, guides, inactive marks, and stems; amber/blue only as labelled semantic accents; var(--panel) for hollow marks. No hard-coded light background.",
+    "mobile": "Preset buttons wrap; controls stack; each upper SVG occupies full mobile width instead of shrinking a desktop two-panel canvas; waveform SVG remains fluid; labels are at least 12 user units and no element needs horizontal scroll at 360px."
+  },
+  "accessibility": {
+    "keyboard": "PresetGroup and Button render native buttons; Slider renders a native range input. Tab, Enter/Space, and arrow keys cover the full task; no pointer-only gesture.",
+    "touch": "Existing Button min-h-11 and Slider h-11 provide at least 44px targets; rows wrap and remain separated on narrow screens.",
+    "aria": "Wrap both preset groups in labelled role=group regions. Give Button and Slider explicit labels/units. TargetList and Readout announce live status politely. Each SVG has role=img and a dynamic aria-label naming phase, I, Q, active detector estimate, current error, and pass/falsification status.",
+    "motion": "No timer or animation; input replaces static geometry synchronously, so reduced-motion users lose nothing.",
+    "theme_and_contrast": "Verify both themes manually; no information relies only on amber versus blue."
+  },
+  "deterministic_checks": [
+    "For A=1, N=20, omega0=0.3*pi and phi=37 degrees: I=0.7986355100472933, Q=0.6018150231520483, Ahat_sine=0.6018150231520483 (39.8184976848% error), Ahat_IQ=1.0000000000000002, phihat=37 degrees.",
+    "At phi=90 degrees: I is within 8e-17 of zero, Q=0.9999999999999997, and the sine-only amplitude happens to pass; the interface must still state that one scalar cannot identify arbitrary phase.",
+    "At phi=0 degrees: I=1.0000000000000002, abs(Q)<2e-16, Ahat_sine approximately zero with 100% error, and Ahat_IQ=1 with phihat approximately 0; falsification is true.",
+    "At phi=180 degrees: I=-1.0000000000000002, abs(Q)<2e-16, canonical I/Q phase is +180 degrees, circular phase error is zero rather than 360 degrees, and the second sine-only null is recognized. An input endpoint of -180 degrees represents the same phase and is displayed as +180 degrees.",
+    "Across 1,441 phases from -180 to 180 in 0.25-degree increments, the actual 20-sample dot-product implementation has maximum relative amplitude error 8.881784197001252e-16 and maximum wrapped phase error 0 degrees; both strict gates pass by wide margin.",
+    "The algebraic orthogonality identities establish the same I/Q result for every real phase, while the dense sweep is an implementation regression check rather than evidence for off-bin/general-window cases.",
+    "Changing detector mode never changes phase, seed, samples, I, or Q. Changing phase never changes A, omega0, N, or the full-sweep maxima.",
+    "Strict boundaries: exactly 1% amplitude error fails and exactly 2 degrees phase error fails; use <, not <=. Phase is never reported as meaningful if the recovered magnitude is zero."
+  ],
+  "loc_plan": {
+    "limit": 200,
+    "planned": 196,
+    "budget": {
+      "imports_types_constants_presets": 24,
+      "projection_wrap_seed_and_sweep_helpers": 39,
+      "state_derived_values_and_handlers": 29,
+      "kit_controls_targets_and_readout": 52,
+      "responsive_svg_panels": 52
+    },
+    "strategy": "Use compact module constants, one projection helper reused by live state and the sweep, map fixed sample/tick arrays, and keep only three state values. Do not extract runtime files, duplicate desktop/mobile SVGs, add a reducer/effect, or add a math/chart/random library."
+  },
+  "validation_and_preview": [
+    "Confirm the file begins with use client, default-exports a no-required-props component, imports only useState and @/components/ui, and is no more than 200 physical lines.",
+    "Run a deterministic Node/TypeScript harness for every numeric, wrap, threshold, seed-sequence, and all-phase assertion above.",
+    "Run npx tsc --noEmit.",
+    "Run npx eslint components/demos/digital-signal-processing/QuadratureDetectorLab.tsx components/demos/index.ts.",
+    "After lesson.mdx embeds the demo, run npm run validate -- digital-signal-processing complex-sinusoids-and-phasors.",
+    "Use npm run preview for static light/dark lesson layout, expecting the nonhydrated placeholder, then npm run dev for the actual client interaction.",
+    "In development, inspect desktop and 360px in both themes; keyboard-select every detector/preset, arrow the phase slider through -180/0/180, use seeded trials, verify activeIndex clearing, reproduce null/PASS moments, and check for hydration warnings, clipping, horizontal scroll, stale live text, or color-only meaning."
+  ],
+  "checklist_expectation": {
+    "D1": "PASS: the continuous phase search exposes a real null and the invariant quadrature magnitude, supporting a target and falsification rather than mere motion.",
+    "D2": "PASS: synchronous fixed-size dot products and SVG updates, no async/network or delayed transition.",
+    "D3": "PASS: the 37-degree initial state is nondegenerate and already shows one-projection bias; four named phase presets anchor the task.",
+    "D4": "PASS: the learner can reach an explicit FALSIFIED null and then a separate strict all-phase PASS.",
+    "D5": "PASS by plan: one 196-line default-exported client component, existing UI kit only, zero dependencies, native keyboard/touch controls, and responsive theme-safe visuals.",
+    "honest_ranges": "PASS: fixed nonzero A and integer-period record avoid undefined phase and leakage; phase endpoints wrap safely and all calculations remain finite.",
+    "registration": "Planned explicit lazy registry entry; no next/dynamic or ssr:false."
+  },
+  "blockers": []
+}

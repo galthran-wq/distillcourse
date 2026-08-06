@@ -1,0 +1,924 @@
+{
+  "proposal_version": 1,
+  "course_title": "Digital Signal Processing",
+  "tagline": "From sampled data to filters, spectra, multirate systems, and deployable signal chains",
+  "audience": "Busy engineers and technically mature programmers who want a first serious DSP course or a coherent return to material previously learned in fragments.",
+  "design_thesis": "The course treats DSP as a sequence of representations that make an engineering decision possible. Samples and convolution establish exact time-domain behavior; complex exponentials, the DTFT, and the z-transform expose frequency response and stability; sampling and the DFT connect physical signals to finite computation; filter and multirate structures turn specifications into efficient systems; stochastic and short-time methods handle finite noisy data; audio and communications modules force the complete chain to survive real artifacts and implementation conventions.",
+  "course_prerequisites": [
+    {
+      "requirement": "Algebra and trigonometry, including geometric series, logarithms, radians, and manipulation of rational expressions.",
+      "honesty_note": "These operations are used without remediation in transform, FFT, and filter derivations."
+    },
+    {
+      "requirement": "Complex arithmetic and Euler's identity at the level of rectangular/polar conversion and conjugation.",
+      "honesty_note": "The course gives a visual re-anchoring in the first spectral lesson, but it is not a substitute for first exposure to complex numbers."
+    },
+    {
+      "requirement": "Single-variable calculus, including differentiation, integration, and the idea of convergence.",
+      "honesty_note": "Continuous-time sampling arguments and analog-to-digital filter mappings use calculus; contour integration and measure theory are not required."
+    },
+    {
+      "requirement": "Elementary probability: mean, variance, covariance, and independent random variables.",
+      "honesty_note": "The stochastic module reviews these objects for sequences but assumes the scalar ideas are familiar."
+    },
+    {
+      "requirement": "Ability to read and modify short Python/NumPy notebooks and interpret linear and logarithmic plots.",
+      "honesty_note": "Applications are computational studies, not programming tutorials. No prior DSP or signals-and-systems course is assumed."
+    }
+  ],
+  "not_required": [
+    "Prior Fourier-transform or z-transform coursework",
+    "Analog circuit design",
+    "Measure-theoretic probability",
+    "Optimization beyond linear algebra and the stated filter-design algorithms"
+  ],
+  "outcomes": [
+    {
+      "id": "O1",
+      "text": "Analyze discrete-time signals and LTI systems in the time domain using sequence operations, impulse responses, convolution, and system properties.",
+      "bloom": "Analyze"
+    },
+    {
+      "id": "O2",
+      "text": "Analyze LTI behavior with complex exponentials, the DTFT, frequency response, the z-transform, pole-zero geometry, causality, and stability.",
+      "bloom": "Analyze"
+    },
+    {
+      "id": "O3",
+      "text": "Evaluate sampling rate, analog bandwidth, reconstruction, quantization, and dither choices for an acquisition system.",
+      "bloom": "Evaluate"
+    },
+    {
+      "id": "O4",
+      "text": "Compute and interpret DFT/FFT spectra with correct indexing, scaling, symmetry, windowing, leakage, and resolution judgments.",
+      "bloom": "Evaluate"
+    },
+    {
+      "id": "O5",
+      "text": "Design FIR and IIR filters from amplitude, phase, delay, and implementation specifications and realize them in numerically appropriate structures.",
+      "bloom": "Create"
+    },
+    {
+      "id": "O6",
+      "text": "Design efficient decimators, interpolators, rational sample-rate converters, and analysis/synthesis filter banks using polyphase structures.",
+      "bloom": "Create"
+    },
+    {
+      "id": "O7",
+      "text": "Evaluate power-spectral estimates for random finite records by reasoning about stationarity, bias, variance, leakage, resolution, and model mismatch.",
+      "bloom": "Evaluate"
+    },
+    {
+      "id": "O8",
+      "text": "Construct and validate short-time audio processing systems using STFT, overlap processing, reconstruction constraints, and phase-aware modification.",
+      "bloom": "Create"
+    },
+    {
+      "id": "O9",
+      "text": "Construct a quadrature communications receiver that translates, selects, and detects a modulated channel while accounting for synchronization and interference.",
+      "bloom": "Create"
+    },
+    {
+      "id": "O10",
+      "text": "Validate a DSP design against a real or reproducible artifact, state which ideal assumptions it uses, and diagnose departures caused by finite records, noise, rate, precision, or implementation conventions.",
+      "bloom": "Evaluate"
+    }
+  ],
+  "ordered_argument_spine": [
+    {
+      "step": 1,
+      "claim": "A sampled signal is an indexed physical measurement, and elementary sequence operations are already useful when units, boundaries, and alignment remain explicit.",
+      "lessons": ["sampled-signals-and-units", "convolution-as-a-sliding-dot-product"]
+    },
+    {
+      "step": 2,
+      "claim": "Linearity and time invariance make one impulse response predict every input through convolution.",
+      "lessons": ["lti-systems-and-impulse-response", "application-sensor-fir-cleanup"]
+    },
+    {
+      "step": 3,
+      "claim": "Complex exponentials diagonalize LTI systems; the DTFT records their gains and phases, while the z-transform adds convergence, causality, and stability.",
+      "lessons": ["complex-exponentials-and-phasors", "discrete-time-fourier-transform", "frequency-response-and-delay", "z-transform-poles-and-stability", "application-dtmf-resonator"]
+    },
+    {
+      "step": 4,
+      "claim": "Sampling creates periodic spectral copies, so bandwidth and analog filtering—not later digital cleanup—decide whether the continuous signal remains identifiable.",
+      "lessons": ["sampling-as-spectral-replication", "aliasing-reconstruction-and-antialiasing", "quantization-dither-and-converter-budgets", "application-audio-acquisition-chain"]
+    },
+    {
+      "step": 5,
+      "claim": "The DFT is a finite sampling of a periodic spectrum, and FFT factorization makes it practical without changing what it means.",
+      "lessons": ["dft-definition-symmetry-and-scaling", "radix-2-fft-factorization"]
+    },
+    {
+      "step": 6,
+      "claim": "Finite observation changes the spectrum by convolution with a window, so reliable spectral claims require explicit leakage, resolution, amplitude, and noise-bandwidth budgets.",
+      "lessons": ["finite-records-and-window-metrics", "spectral-resolution-and-calibration", "application-weak-tone-analyzer"]
+    },
+    {
+      "step": 7,
+      "claim": "Filter design converts spectral requirements into coefficients, and realization converts algebraically equivalent transfer functions into systems with different delay, cost, and numerical risk.",
+      "lessons": ["fir-specifications-and-windowed-sinc", "equiripple-and-least-squares-fir", "fir-structures-and-fast-convolution", "iir-prototypes-and-bilinear-design", "iir-sections-and-numerical-robustness", "application-ecg-filter-chain"]
+    },
+    {
+      "step": 8,
+      "claim": "Rate changes are filtering problems; polyphase identities remove computations that cannot affect retained outputs, and filter banks organize the same machinery into channels.",
+      "lessons": ["sampling-rate-operations", "rational-rate-conversion", "polyphase-and-noble-identities", "perfect-reconstruction-filter-banks", "application-subband-audio-coder"]
+    },
+    {
+      "step": 9,
+      "claim": "A spectrum estimated from random finite data is an estimator rather than a transform value, and every improvement trades resolution, variance, assumptions, or robustness.",
+      "lessons": ["random-sequences-autocorrelation-and-psd", "periodogram-and-welch-estimation", "ar-spectral-models", "application-vibration-spectrum-monitor"]
+    },
+    {
+      "step": 10,
+      "claim": "Signals whose spectra change over time require local Fourier analysis and overlap reconstruction rather than one global spectrum.",
+      "lessons": ["short-time-fourier-transform", "fft-convolution-and-overlap-processing", "wola-reconstruction-and-spectral-modification", "application-speech-spectral-denoiser"]
+    },
+    {
+      "step": 11,
+      "claim": "Modulation is spectral translation; quadrature representation, filtering, and correlation turn that identity into a practical receiver.",
+      "lessons": ["analytic-signals-and-iq", "modulation-mixing-and-channel-selection", "matched-detection-and-synchronization", "application-software-am-receiver"]
+    }
+  ],
+  "polished_openers": {
+    "rationale": "The first two lessons require only arrays, units, multiplication, and addition. Each produces a complete visible result before any transform notation appears.",
+    "lessons": [
+      {
+        "slug": "sampled-signals-and-units",
+        "felt_win": "The learner can read, align, shift, reverse, scale, and summarize a short sensor record without confusing sample index with physical time.",
+        "signature_experience": "A synchronized strip chart and literal cell array update together as the learner applies delay, reversal, gain, and offset; the final task repairs an intentionally mislabeled plot.",
+        "polish_priority": "Use one eight-sample accelerometer record, no abstract signals until every operation has a physical interpretation, and complete solutions for all boundary conventions."
+      },
+      {
+        "slug": "convolution-as-a-sliding-dot-product",
+        "felt_win": "The learner manually computes and then verifies every output of a three-tap moving-average filter.",
+        "signature_experience": "A five-frame figure sequence changes only the kernel alignment; cell products, their sum, and the output sample share color bindings. A short notebook reproduces the hand result.",
+        "polish_priority": "Keep the first example causal and positive, then add one edge detector and one boundary near-miss so convolution is not mistaken for averaging."
+      }
+    ]
+  },
+  "core_vs_extra_policy": {
+    "core_path": "Forty-one core and synthesis lessons form a complete prerequisite graph and include every module application. Core lessons may contain optional starred proofs or derivations, but their main argument does not depend on them.",
+    "extra_path": "Four advanced lessons deepen design theory after the relevant core machinery is established. No core, synthesis, or later module lesson lists an extra lesson as a prerequisite.",
+    "extra_topics": [
+      "Minimum-phase, allpass, and Hilbert-transform structures",
+      "Paraunitary and wavelet filter banks",
+      "MUSIC and ESPRIT line-spectrum estimation",
+      "Sinusoidal models and the phase vocoder"
+    ]
+  },
+  "modules": [
+    {
+      "number": 1,
+      "slug": "time-domain-signals-and-lti-systems",
+      "title": "Time-Domain Signals and LTI Systems",
+      "argument_move": "Start with literal sample arrays, derive convolution from a small filtering computation, then state the LTI conditions that make convolution universal.",
+      "outcomes": ["O1", "O10"],
+      "lessons": [
+        {
+          "number": 1,
+          "slug": "sampled-signals-and-units",
+          "title": "Sampled Signals, Indices, and Units",
+          "type": "core",
+          "goal": "Analyze indexed signal records using physical units, alignment, delay, reversal, scaling, and offset.",
+          "bloom": "Analyze",
+          "est_minutes": 30,
+          "prerequisites": [],
+          "key_ideas": ["Sample index is not physical time", "Sequence operations require an explicit boundary convention", "Amplitude units survive algebra and constrain interpretation"]
+        },
+        {
+          "number": 2,
+          "slug": "convolution-as-a-sliding-dot-product",
+          "title": "Convolution as a Sliding Dot Product",
+          "type": "core",
+          "goal": "Compute finite discrete convolution and interpret each output as a weighted local measurement.",
+          "bloom": "Apply",
+          "est_minutes": 35,
+          "prerequisites": ["sampled-signals-and-units"],
+          "key_ideas": ["Flip, shift, multiply, and sum", "Output support and boundary handling", "Smoothing and differencing as two kernels"]
+        },
+        {
+          "number": 3,
+          "slug": "lti-systems-and-impulse-response",
+          "title": "LTI Systems and Impulse Response",
+          "type": "core",
+          "goal": "Determine whether a system is linear and time invariant and derive its convolution representation from impulse decomposition.",
+          "bloom": "Analyze",
+          "est_minutes": 40,
+          "prerequisites": ["convolution-as-a-sliding-dot-product"],
+          "key_ideas": ["Linearity and time invariance are separate tests", "Shifted impulses form a signal", "Impulse response determines an LTI system", "Causality and BIBO stability in the time domain"]
+        },
+        {
+          "number": 4,
+          "slug": "application-sensor-fir-cleanup",
+          "title": "Application: Sensor Smoothing and Event Detection",
+          "type": "synthesis",
+          "goal": "Construct and validate a causal FIR chain that smooths a noisy sensor record while preserving detectable step events.",
+          "bloom": "Create",
+          "est_minutes": 45,
+          "prerequisites": ["lti-systems-and-impulse-response"],
+          "key_ideas": ["Moving average versus first difference", "Delay and endpoint transients", "Noise reduction versus event smearing", "Impulse and step response checks"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-sensor-fir-cleanup",
+        "artifact": "A reproducible accelerometer or industrial sensor trace with additive noise and labeled step events.",
+        "deliverable": "A short FIR pipeline, hand-checked impulse response, plots before and after filtering, and quantitative false-alarm/delay measurements.",
+        "theory_used": ["Sequence alignment", "Convolution", "Linearity", "Time invariance", "Causality", "Impulse and step response"],
+        "departure_from_ideal": "The record is finite, startup state is unknown, measurement noise is not perfectly white, and smoothing delays and broadens the event being detected."
+      }
+    },
+    {
+      "number": 2,
+      "slug": "frequency-domain-lti-and-z-transform",
+      "title": "Frequency-Domain LTI Systems and the z-Transform",
+      "argument_move": "Use rotating exponentials as LTI eigenfunctions, collect their gains in the DTFT, and extend the same expression into the z-plane to decide realizability and stability.",
+      "outcomes": ["O2", "O10"],
+      "lessons": [
+        {
+          "number": 5,
+          "slug": "complex-exponentials-and-phasors",
+          "title": "Complex Exponentials and Phasors",
+          "type": "core",
+          "goal": "Represent discrete sinusoids as rotating complex exponentials and relate frequency, phase, conjugation, and periodicity.",
+          "bloom": "Apply",
+          "est_minutes": 35,
+          "prerequisites": ["lti-systems-and-impulse-response"],
+          "key_ideas": ["Euler representation", "Discrete frequency is periodic modulo 2π", "Real sinusoids require conjugate components", "Phase is initial angle"]
+        },
+        {
+          "number": 6,
+          "slug": "discrete-time-fourier-transform",
+          "title": "The Discrete-Time Fourier Transform",
+          "type": "core",
+          "goal": "Compute and interpret DTFTs using transform pairs, symmetry, shift, modulation, convolution, and Parseval relations.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["complex-exponentials-and-phasors", "convolution-as-a-sliding-dot-product"],
+          "key_ideas": ["Spectrum is a continuous periodic function of discrete frequency", "Time convolution becomes frequency multiplication", "Time shift changes phase", "Energy is conserved across representations"]
+        },
+        {
+          "number": 7,
+          "slug": "frequency-response-and-delay",
+          "title": "Frequency Response, Phase, and Group Delay",
+          "type": "core",
+          "goal": "Predict sinusoidal and narrowband LTI outputs from magnitude, phase, phase delay, and group delay.",
+          "bloom": "Analyze",
+          "est_minutes": 40,
+          "prerequisites": ["discrete-time-fourier-transform"],
+          "key_ideas": ["Complex exponentials are eigenfunctions", "Magnitude controls component gain", "Phase controls alignment and waveform shape", "Group delay tracks a narrowband envelope"]
+        },
+        {
+          "number": 8,
+          "slug": "z-transform-poles-and-stability",
+          "title": "z-Transform, Poles, Zeros, and Stability",
+          "type": "core",
+          "goal": "Analyze rational discrete-time systems using regions of convergence, pole-zero geometry, causality, and stability.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["frequency-response-and-delay"],
+          "key_ideas": ["A transform expression needs a region of convergence", "The unit circle yields the DTFT when it lies in the ROC", "Causal stable rational systems have poles inside the unit circle", "Pole-zero vectors determine frequency response"]
+        },
+        {
+          "number": 9,
+          "slug": "application-dtmf-resonator",
+          "title": "Application: DTMF Resonator Bank",
+          "type": "synthesis",
+          "goal": "Construct and evaluate a stable resonator bank that identifies DTMF tones under duration, noise, and frequency-offset constraints.",
+          "bloom": "Create",
+          "est_minutes": 45,
+          "prerequisites": ["z-transform-poles-and-stability"],
+          "key_ideas": ["Pole angle selects frequency", "Pole radius trades selectivity against settling time", "Parallel channels implement a detector bank", "Thresholds must reflect noise and finite tone duration"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-dtmf-resonator",
+        "artifact": "Recorded or synthesized telephone keypad tones with leading/trailing silence, noise, and modest oscillator error.",
+        "deliverable": "A stable detector bank, pole-zero and response plots, confusion results, and a justified radius/threshold choice.",
+        "theory_used": ["LTI eigenfunctions", "DTFT", "Frequency response", "z-transform", "Pole radius and angle", "Stability and transient response"],
+        "departure_from_ideal": "Real tones are finite, may be detuned, pass through an unknown channel, and do not reach steady-state resonator amplitude instantly."
+      }
+    },
+    {
+      "number": 3,
+      "slug": "sampling-and-data-conversion",
+      "title": "Sampling and Data Conversion",
+      "argument_move": "Derive sampling as multiplication by an impulse train, make aliasing irreversible spectral overlap, and add amplitude quantization to form an honest acquisition budget.",
+      "outcomes": ["O3", "O10"],
+      "lessons": [
+        {
+          "number": 10,
+          "slug": "sampling-as-spectral-replication",
+          "title": "Sampling as Spectral Replication",
+          "type": "core",
+          "goal": "Derive the spectrum of an impulse-sampled continuous-time signal and map continuous frequency to discrete frequency.",
+          "bloom": "Analyze",
+          "est_minutes": 40,
+          "prerequisites": ["discrete-time-fourier-transform"],
+          "key_ideas": ["Sampling is time multiplication", "Impulse-train multiplication replicates spectra", "Ω=ωT maps physical to discrete frequency", "Discrete spectra are periodic"]
+        },
+        {
+          "number": 11,
+          "slug": "aliasing-reconstruction-and-antialiasing",
+          "title": "Aliasing, Reconstruction, and Anti-Alias Filtering",
+          "type": "core",
+          "goal": "Evaluate whether a bandlimited signal can be reconstructed and specify the analog anti-alias filter required before sampling.",
+          "bloom": "Evaluate",
+          "est_minutes": 45,
+          "prerequisites": ["sampling-as-spectral-replication"],
+          "key_ideas": ["Spectral copies must not overlap", "Aliased components cannot be separated after sampling", "Ideal sinc reconstruction is a limiting model", "Transition bands force oversampling margin"]
+        },
+        {
+          "number": 12,
+          "slug": "quantization-dither-and-converter-budgets",
+          "title": "Quantization, Dither, and Converter Budgets",
+          "type": "core",
+          "goal": "Evaluate bit depth and dither choices from dynamic-range, overload, and error-model requirements.",
+          "bloom": "Evaluate",
+          "est_minutes": 40,
+          "prerequisites": ["aliasing-reconstruction-and-antialiasing"],
+          "key_ideas": ["Step size and overload are separate failure modes", "The white-noise model has conditions", "Dither trades distortion for noise", "Bit depth determines a finite amplitude budget"]
+        },
+        {
+          "number": 13,
+          "slug": "application-audio-acquisition-chain",
+          "title": "Application: Audio Acquisition Chain",
+          "type": "synthesis",
+          "goal": "Specify and test an audio acquisition chain from analog bandwidth through anti-alias filtering, sample rate, quantization, and dither.",
+          "bloom": "Create",
+          "est_minutes": 45,
+          "prerequisites": ["quantization-dither-and-converter-budgets"],
+          "key_ideas": ["20 kHz content versus 44.1/48 kHz sampling", "Analog transition-band budget", "16-bit dynamic range and headroom", "Dithered low-level signals"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-audio-acquisition-chain",
+        "artifact": "A speech/music excerpt containing near-Nyquist content and a low-level fade, passed through a simulated ADC front end.",
+        "deliverable": "An anti-alias specification, sample-rate and bit-depth justification, aliased/clean spectra, and a listening/measurement comparison with and without dither.",
+        "theory_used": ["Spectral replication", "Nyquist condition", "Reconstruction", "Analog anti-aliasing", "Quantization", "Dither"],
+        "departure_from_ideal": "The analog filter is finite order, converter noise is not exactly independent or uniform, clocks jitter, and audio bandwidth is a system choice rather than a universal constant."
+      }
+    },
+    {
+      "number": 4,
+      "slug": "dft-fft-and-finite-record-spectra",
+      "title": "DFT, FFT, and Finite-Record Spectra",
+      "argument_move": "Connect the finite DFT to the DTFT and periodic extension, factor its computation, then show how the observation window—not the FFT call—sets spectral evidence.",
+      "outcomes": ["O4", "O10"],
+      "lessons": [
+        {
+          "number": 14,
+          "slug": "dft-definition-symmetry-and-scaling",
+          "title": "DFT Definition, Symmetry, and Scaling",
+          "type": "core",
+          "goal": "Compute and interpret the DFT as frequency samples of a finite record's periodic extension using consistent indexing and normalization.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["discrete-time-fourier-transform"],
+          "key_ideas": ["DFT basis and matrix", "Periodic time and frequency indexing", "Conjugate symmetry for real data", "Forward/inverse scaling conventions", "Circular versus linear convolution"]
+        },
+        {
+          "number": 15,
+          "slug": "radix-2-fft-factorization",
+          "title": "Radix-2 FFT Factorization",
+          "type": "core",
+          "goal": "Derive and trace a radix-2 FFT, including butterflies, twiddle factors, operation count, and bit-reversed ordering.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["dft-definition-symmetry-and-scaling"],
+          "key_ideas": ["Even/odd decomposition", "N² versus N log₂N", "In-place butterflies", "Bit reversal", "Factorization changes cost, not the transform"]
+        },
+        {
+          "number": 16,
+          "slug": "finite-records-and-window-metrics",
+          "title": "Finite Records, Leakage, and Window Metrics",
+          "type": "core",
+          "goal": "Evaluate window choices using main-lobe width, sidelobe behavior, coherent gain, scalloping loss, and equivalent noise bandwidth.",
+          "bloom": "Evaluate",
+          "est_minutes": 45,
+          "prerequisites": ["dft-definition-symmetry-and-scaling"],
+          "key_ideas": ["Finite observation is time multiplication and spectral convolution", "Off-bin tones leak", "Endpoint smoothness controls far sidelobes", "Every taper trades resolution and leakage", "Window gain must be calibrated"]
+        },
+        {
+          "number": 17,
+          "slug": "spectral-resolution-and-calibration",
+          "title": "Spectral Resolution, Zero Padding, and Calibration",
+          "type": "core",
+          "goal": "Evaluate whether a finite-record spectrum supports claims about tone frequency, amplitude, separation, and noise level.",
+          "bloom": "Evaluate",
+          "est_minutes": 40,
+          "prerequisites": ["finite-records-and-window-metrics", "radix-2-fft-factorization"],
+          "key_ideas": ["Record duration sets physical resolution", "Zero padding interpolates without adding information", "One-sided spectra need explicit amplitude scaling", "ENBW converts bin power to noise density", "Phase and tone placement bias peaks"]
+        },
+        {
+          "number": 18,
+          "slug": "application-weak-tone-analyzer",
+          "title": "Application: Weak-Tone Spectrum Analyzer",
+          "type": "synthesis",
+          "goal": "Construct and validate an FFT analyzer that detects a weak sinusoid near a stronger off-bin interferer.",
+          "bloom": "Create",
+          "est_minutes": 50,
+          "prerequisites": ["spectral-resolution-and-calibration"],
+          "key_ideas": ["Window selection from a detection requirement", "Strong-tone bin offset", "Weak-tone dynamic range", "Calibrated amplitude and noise floor", "Record-length versus latency"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-weak-tone-analyzer",
+        "artifact": "A reproducible version of Harris's unequal-tone experiment: a weak line roughly 40 dB below a nearby strong line, with the strong tone shifted on and off the DFT grid.",
+        "deliverable": "A tested analyzer configuration, fixed-axis window comparison, detection decision, amplitude-error table, and latency/dynamic-range justification.",
+        "theory_used": ["DFT/FFT", "Finite-record convolution", "Window sidelobes", "Scalloping", "ENBW", "Zero padding", "Resolution"],
+        "departure_from_ideal": "Real analyzers face oscillator drift, nonstationary interference, ADC noise, and window-dependent threshold statistics rather than two eternal sinusoids."
+      }
+    },
+    {
+      "number": 5,
+      "slug": "fir-and-iir-filter-design",
+      "title": "FIR and IIR Filter Design and Realization",
+      "argument_move": "Translate frequency-domain tolerances into FIR and IIR coefficients, then treat implementation structure and finite precision as part of the design rather than an afterthought.",
+      "outcomes": ["O5", "O10"],
+      "lessons": [
+        {
+          "number": 19,
+          "slug": "fir-specifications-and-windowed-sinc",
+          "title": "FIR Specifications and Windowed-Sinc Design",
+          "type": "core",
+          "goal": "Design a causal linear-phase FIR filter from passband, stopband, transition-width, ripple, and delay specifications using a windowed ideal response.",
+          "bloom": "Create",
+          "est_minutes": 45,
+          "prerequisites": ["finite-records-and-window-metrics", "frequency-response-and-delay"],
+          "key_ideas": ["Ideal lowpass sinc is infinite and noncausal", "Truncation creates Gibbs behavior", "Window main lobe maps to transition width", "Symmetry produces linear phase", "Kaiser order and beta estimates"]
+        },
+        {
+          "number": 20,
+          "slug": "equiripple-and-least-squares-fir",
+          "title": "Equiripple and Least-Squares FIR Design",
+          "type": "core",
+          "goal": "Design a weighted equiripple or least-squares FIR filter from the error criterion implied by a specification.",
+          "bloom": "Evaluate",
+          "est_minutes": 45,
+          "prerequisites": ["fir-specifications-and-windowed-sinc"],
+          "key_ideas": ["Minimax versus integrated squared error", "Alternation and weighted ripple", "Order advantage over windowing", "Multiband specifications", "Verification on a dense grid"]
+        },
+        {
+          "number": 21,
+          "slug": "fir-structures-and-fast-convolution",
+          "title": "FIR Structures and Fast Convolution",
+          "type": "core",
+          "goal": "Select a direct, folded linear-phase, or FFT-block FIR realization from latency, throughput, memory, and coefficient constraints.",
+          "bloom": "Evaluate",
+          "est_minutes": 40,
+          "prerequisites": ["equiripple-and-least-squares-fir", "radix-2-fft-factorization"],
+          "key_ideas": ["Coefficient symmetry halves multiplies", "Direct and FFT convolution have different crossovers", "Overlap-add/save recover linear convolution", "Block size trades latency and throughput"]
+        },
+        {
+          "number": 22,
+          "slug": "iir-prototypes-and-bilinear-design",
+          "title": "IIR Prototypes and Bilinear Design",
+          "type": "core",
+          "goal": "Design a digital IIR filter by selecting an analog prototype, prewarping critical frequencies, and applying the bilinear transform.",
+          "bloom": "Create",
+          "est_minutes": 50,
+          "prerequisites": ["z-transform-poles-and-stability", "frequency-response-and-delay"],
+          "key_ideas": ["Butterworth, Chebyshev, and elliptic tradeoffs", "Bilinear stability mapping", "Frequency warping and prewarping", "Order versus phase nonlinearity"]
+        },
+        {
+          "number": 23,
+          "slug": "iir-sections-and-numerical-robustness",
+          "title": "IIR Sections and Numerical Robustness",
+          "type": "core",
+          "goal": "Evaluate scaled second-order-section realizations against quantization, overflow, roundoff, and limit-cycle risks.",
+          "bloom": "Evaluate",
+          "est_minutes": 45,
+          "prerequisites": ["iir-prototypes-and-bilinear-design"],
+          "key_ideas": ["Equivalent transfer functions are not numerically equivalent", "Pole-zero pairing and section order matter", "Internal scaling prevents overflow", "Coefficient quantization moves poles", "Fixed-point feedback can sustain limit cycles"]
+        },
+        {
+          "number": 24,
+          "slug": "minimum-phase-and-allpass",
+          "title": "Minimum-Phase, Allpass, and Hilbert Structures",
+          "type": "extra",
+          "goal": "Analyze magnitude-equivalent systems using minimum-phase factors, allpass sections, Hilbert transformers, and analytic-signal construction.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["fir-structures-and-fast-convolution", "iir-sections-and-numerical-robustness"],
+          "key_ideas": ["Reciprocal-conjugate zero choices", "Minimum phase minimizes delay concentration", "Allpass magnitude is constant", "Hilbert pairs create analytic signals"]
+        },
+        {
+          "number": 25,
+          "slug": "application-ecg-filter-chain",
+          "title": "Application: ECG Filter Chain",
+          "type": "synthesis",
+          "goal": "Design and compare FIR and IIR filters that remove baseline drift, mains interference, and high-frequency noise from an ECG while preserving waveform timing.",
+          "bloom": "Create",
+          "est_minutes": 55,
+          "prerequisites": ["fir-structures-and-fast-convolution", "iir-sections-and-numerical-robustness"],
+          "key_ideas": ["Highpass, notch, and lowpass specifications", "FIR delay versus IIR order", "Zero-phase offline filtering versus causal deployment", "Morphology and timing validation", "SOS robustness"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-ecg-filter-chain",
+        "artifact": "An openly available ECG segment with baseline drift, a narrow mains component, and broadband measurement noise, or a reproducible contamination of a clean trace.",
+        "deliverable": "Two specification-compliant FIR/IIR chains, response and pole-zero checks, waveform-distortion metrics, and a deployment recommendation for offline versus real-time use.",
+        "theory_used": ["FIR and IIR specifications", "Window/equiripple design", "Bilinear design", "Linear/group delay", "SOS realization", "Finite precision"],
+        "departure_from_ideal": "ECG morphology is nonstationary, interference frequency drifts, forward-reverse filtering is noncausal, and a mathematically sharp filter can distort clinically relevant timing."
+      }
+    },
+    {
+      "number": 6,
+      "slug": "multirate-processing-and-filter-banks",
+      "title": "Multirate Processing and Filter Banks",
+      "argument_move": "Show how downsampling and upsampling move spectral copies, design the filters that prevent overlap and imaging, then restructure them so arithmetic occurs at the lowest useful rate.",
+      "outcomes": ["O6", "O10"],
+      "lessons": [
+        {
+          "number": 26,
+          "slug": "sampling-rate-operations",
+          "title": "Downsampling, Upsampling, and Spectral Images",
+          "type": "core",
+          "goal": "Analyze decimation and interpolation in time and frequency and identify aliasing and imaging conditions.",
+          "bloom": "Analyze",
+          "est_minutes": 40,
+          "prerequisites": ["aliasing-reconstruction-and-antialiasing", "fir-specifications-and-windowed-sinc"],
+          "key_ideas": ["Decimation stretches and sums spectra", "Upsampling inserts zeros and creates images", "Anti-alias and anti-image filters", "Rate annotations are part of every block diagram"]
+        },
+        {
+          "number": 27,
+          "slug": "rational-rate-conversion",
+          "title": "Rational Sample-Rate Conversion",
+          "type": "core",
+          "goal": "Design an L/M sample-rate converter and distribute its transition and attenuation requirements across one or more stages.",
+          "bloom": "Create",
+          "est_minutes": 45,
+          "prerequisites": ["sampling-rate-operations"],
+          "key_ideas": ["Expand, filter, then decimate", "One filter suppresses images and aliases", "Coprime factors and multistage choices", "44.1 kHz to 48 kHz as 160/147"]
+        },
+        {
+          "number": 28,
+          "slug": "polyphase-and-noble-identities",
+          "title": "Polyphase Decomposition and Noble Identities",
+          "type": "core",
+          "goal": "Derive polyphase rate-converter structures that avoid operations on discarded samples and inserted zeros.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["rational-rate-conversion"],
+          "key_ideas": ["Polyphase decomposition partitions coefficients by residue class", "Noble identities move filters across rate changers", "Arithmetic belongs at the low rate", "Commutator implementation"]
+        },
+        {
+          "number": 29,
+          "slug": "perfect-reconstruction-filter-banks",
+          "title": "Perfect-Reconstruction Filter Banks",
+          "type": "core",
+          "goal": "Analyze a two-channel critically sampled analysis/synthesis bank and verify alias cancellation and delayed perfect reconstruction.",
+          "bloom": "Analyze",
+          "est_minutes": 50,
+          "prerequisites": ["polyphase-and-noble-identities"],
+          "key_ideas": ["Analysis, decimation, expansion, and synthesis", "Alias-transfer and distortion-transfer terms", "Polyphase matrix", "Perfect reconstruction up to gain and delay", "Subband coding exposes quantization sensitivity"]
+        },
+        {
+          "number": 30,
+          "slug": "paraunitary-and-wavelet-banks",
+          "title": "Paraunitary and Wavelet Filter Banks",
+          "type": "extra",
+          "goal": "Analyze paraunitary, cosine-modulated, and dyadic wavelet banks as structured perfect-reconstruction systems.",
+          "bloom": "Analyze",
+          "est_minutes": 50,
+          "prerequisites": ["perfect-reconstruction-filter-banks"],
+          "key_ideas": ["Paraunitary energy preservation", "Power complementarity", "Cosine modulation from one prototype", "Dyadic time-frequency tiling"]
+        },
+        {
+          "number": 31,
+          "slug": "application-subband-audio-coder",
+          "title": "Application: Subband Audio Coder",
+          "type": "synthesis",
+          "goal": "Construct and evaluate a critically sampled audio subband coder with unequal quantization and polyphase implementation.",
+          "bloom": "Create",
+          "est_minutes": 55,
+          "prerequisites": ["perfect-reconstruction-filter-banks"],
+          "key_ideas": ["Analysis/synthesis channels", "Critical sampling", "Bit allocation across subbands", "Reconstruction error from quantization", "Polyphase arithmetic savings"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-subband-audio-coder",
+        "artifact": "A short music or speech recording encoded by a two- or four-band analysis/synthesis bank with controlled subband quantization.",
+        "deliverable": "A reconstructing unquantized bank, rate/operation counts, two bit-allocation policies, objective error spectra, and listening comparisons.",
+        "theory_used": ["Rate-change spectra", "Anti-alias filters", "Polyphase decomposition", "Noble identities", "Perfect reconstruction", "Subband quantization"],
+        "departure_from_ideal": "Quantization breaks perfect reconstruction, real filters have delay and finite stopbands, and perceptual importance is not captured by equal mean-square error alone."
+      }
+    },
+    {
+      "number": 7,
+      "slug": "stochastic-spectral-analysis",
+      "title": "Stochastic Spectral Analysis",
+      "argument_move": "Replace the deterministic spectrum of one known sequence by statistical descriptions and estimators, then make every smooth-looking curve account for its bias, variance, and assumptions.",
+      "outcomes": ["O7", "O10"],
+      "lessons": [
+        {
+          "number": 32,
+          "slug": "random-sequences-autocorrelation-and-psd",
+          "title": "Random Sequences, Autocorrelation, and Power Spectral Density",
+          "type": "core",
+          "goal": "Derive and interpret autocorrelation and PSD for wide-sense stationary sequences and their LTI-filtered outputs.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["discrete-time-fourier-transform", "lti-systems-and-impulse-response"],
+          "key_ideas": ["Ensemble versus time averages", "Wide-sense stationarity", "PSD is the DTFT of autocorrelation", "White means uncorrelated across nonzero lags", "LTI output PSD is |H|² times input PSD"]
+        },
+        {
+          "number": 33,
+          "slug": "periodogram-and-welch-estimation",
+          "title": "Periodogram and Welch Spectral Estimation",
+          "type": "core",
+          "goal": "Design a nonparametric PSD estimate and evaluate its leakage, bias, variance, overlap, and resolution.",
+          "bloom": "Evaluate",
+          "est_minutes": 50,
+          "prerequisites": ["random-sequences-autocorrelation-and-psd", "spectral-resolution-and-calibration"],
+          "key_ideas": ["A periodogram is noisy even for long records", "Windowing smooths and biases the estimate", "Averaging reduces variance", "Overlap does not create independent records", "Welch trades segment length for stability"]
+        },
+        {
+          "number": 34,
+          "slug": "ar-spectral-models",
+          "title": "Autoregressive Spectral Models",
+          "type": "core",
+          "goal": "Evaluate an autoregressive spectral model using Yule-Walker equations, prediction error, and order checks.",
+          "bloom": "Evaluate",
+          "est_minutes": 50,
+          "prerequisites": ["periodogram-and-welch-estimation", "z-transform-poles-and-stability"],
+          "key_ideas": ["AR spectra are rational all-pole models", "Yule-Walker links covariance to prediction coefficients", "Model order changes resolution and variance", "Stable poles and residual whiteness are validation checks", "Model mismatch can invent peaks"]
+        },
+        {
+          "number": 35,
+          "slug": "subspace-line-spectra",
+          "title": "Subspace Line-Spectrum Estimation",
+          "type": "extra",
+          "goal": "Analyze MUSIC and ESPRIT frequency estimates using signal/noise subspaces, rank, model order, and array or time-series geometry.",
+          "bloom": "Analyze",
+          "est_minutes": 50,
+          "prerequisites": ["ar-spectral-models"],
+          "key_ideas": ["Covariance eigenstructure", "Signal and noise subspaces", "MUSIC pseudospectrum", "ESPRIT shift invariance", "Sensitivity to order and coherent sources"]
+        },
+        {
+          "number": 36,
+          "slug": "application-vibration-spectrum-monitor",
+          "title": "Application: Vibration Spectrum Monitor",
+          "type": "synthesis",
+          "goal": "Construct a vibration-monitoring spectrum estimate that separates rotating lines from broadband noise and reports uncertainty across repeated records.",
+          "bloom": "Create",
+          "est_minutes": 55,
+          "prerequisites": ["ar-spectral-models"],
+          "key_ideas": ["Stationarity segmentation", "Welch configuration", "Line versus colored background", "AR cross-check", "Confidence through repeatability and sensitivity analysis"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-vibration-spectrum-monitor",
+        "artifact": "A measured or reproducibly simulated rotating-machine vibration record with shaft harmonics, changing broadband noise, and finite observation intervals.",
+        "deliverable": "A Welch monitor, AR comparison, sensitivity sweep over segment length/window/model order, and a fault-line decision with uncertainty and false-peak diagnostics.",
+        "theory_used": ["Stationarity", "Autocorrelation and PSD", "Window ENBW", "Periodogram bias/variance", "Welch averaging", "AR modeling"],
+        "departure_from_ideal": "Machine speed drifts, vibration is cyclostationary, sensor mounting colors the spectrum, and neither Gaussian noise nor a low-order AR model is guaranteed."
+      }
+    },
+    {
+      "number": 8,
+      "slug": "short-time-audio-processing",
+      "title": "Short-Time Audio Processing",
+      "argument_move": "Localize Fourier analysis in time, preserve linear convolution and overlap reconstruction, then modify spectra without treating phase and transients as disposable.",
+      "outcomes": ["O8", "O10"],
+      "lessons": [
+        {
+          "number": 37,
+          "slug": "short-time-fourier-transform",
+          "title": "Short-Time Fourier Transform and Spectrograms",
+          "type": "core",
+          "goal": "Construct and interpret an STFT using window length, FFT length, hop size, and time-frequency resolution appropriate to a changing signal.",
+          "bloom": "Create",
+          "est_minutes": 45,
+          "prerequisites": ["spectral-resolution-and-calibration", "periodogram-and-welch-estimation"],
+          "key_ideas": ["A spectrogram is a sequence of local spectra", "Window length trades time against frequency localization", "FFT length interpolates frequency", "Hop controls time sampling", "Speech harmonics and formants need different resolutions"]
+        },
+        {
+          "number": 38,
+          "slug": "fft-convolution-and-overlap-processing",
+          "title": "FFT Convolution and Overlap Processing",
+          "type": "core",
+          "goal": "Construct overlap-add and overlap-save systems that perform long linear convolution with bounded latency and correct boundary handling.",
+          "bloom": "Create",
+          "est_minutes": 45,
+          "prerequisites": ["fir-structures-and-fast-convolution", "short-time-fourier-transform"],
+          "key_ideas": ["Circular convolution requires padding or overlap", "Overlap-add sums valid tails", "Overlap-save discards corrupted prefixes", "Block size determines cost and latency"]
+        },
+        {
+          "number": 39,
+          "slug": "wola-reconstruction-and-spectral-modification",
+          "title": "WOLA Reconstruction and Spectral Modification",
+          "type": "core",
+          "goal": "Design a weighted overlap-add analysis/modification/synthesis system and verify reconstruction, phase consistency, and transient behavior.",
+          "bloom": "Create",
+          "est_minutes": 50,
+          "prerequisites": ["fft-convolution-and-overlap-processing"],
+          "key_ideas": ["COLA and weighted overlap conditions", "STFT as a modulated filter bank", "Magnitude-only modification still needs phase", "Spectral changes can break alias cancellation", "Transient smearing is a model failure"]
+        },
+        {
+          "number": 40,
+          "slug": "sinusoidal-models-and-phase-vocoder",
+          "title": "Sinusoidal Models and the Phase Vocoder",
+          "type": "extra",
+          "goal": "Analyze sinusoidal tracking and phase-vocoder time scaling using instantaneous frequency, phase continuation, and transient-aware reconstruction.",
+          "bloom": "Analyze",
+          "est_minutes": 50,
+          "prerequisites": ["wola-reconstruction-and-spectral-modification"],
+          "key_ideas": ["Peak interpolation and track assignment", "Phase continuation estimates within-bin frequency", "Time scaling conflicts with inter-bin phase", "Tones, noise, and transients need different models"]
+        },
+        {
+          "number": 41,
+          "slug": "application-speech-spectral-denoiser",
+          "title": "Application: Speech Spectral Denoiser",
+          "type": "synthesis",
+          "goal": "Construct and evaluate a real-time STFT speech denoiser that estimates a noise floor, applies a bounded gain mask, and reconstructs without frame artifacts.",
+          "bloom": "Create",
+          "est_minutes": 55,
+          "prerequisites": ["wola-reconstruction-and-spectral-modification", "periodogram-and-welch-estimation"],
+          "key_ideas": ["Noise PSD estimation", "Gain flooring versus musical noise", "Perfect reconstruction before modification", "Window/hop latency", "Speech quality versus noise suppression"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-speech-spectral-denoiser",
+        "artifact": "A noisy speech recording containing a noise-only calibration interval, voiced/unvoiced segments, and at least one transient consonant.",
+        "deliverable": "A WOLA denoiser, reconstruction null test, time-frequency mask plots, SNR or segmental metrics, latency calculation, and listening comparison across two parameter settings.",
+        "theory_used": ["STFT", "Window and hop selection", "PSD estimation", "Overlap reconstruction", "Spectral gain", "Phase and transient behavior"],
+        "departure_from_ideal": "Noise is not perfectly stationary, speech and noise spectra overlap, isolated-bin attenuation creates musical noise, and a mathematically valid overlap condition does not guarantee perceptual transparency."
+      }
+    },
+    {
+      "number": 9,
+      "slug": "communications-signal-processing",
+      "title": "Communications Signal Processing",
+      "argument_move": "Represent real passbands by complex baseband, use multiplication for spectral translation, then combine channel filters, synchronization, and correlation into a receiver whose failures are measurable.",
+      "outcomes": ["O9", "O10"],
+      "lessons": [
+        {
+          "number": 42,
+          "slug": "analytic-signals-and-iq",
+          "title": "Analytic Signals and I/Q Representation",
+          "type": "core",
+          "goal": "Represent a real bandpass signal as complex baseband and relate analytic signals, Hilbert pairs, positive frequency, and I/Q imbalance.",
+          "bloom": "Analyze",
+          "est_minutes": 45,
+          "prerequisites": ["frequency-response-and-delay", "fir-specifications-and-windowed-sinc"],
+          "key_ideas": ["Analytic signals suppress negative frequency", "Complex envelopes separate carrier from modulation", "I and Q are orthogonal projections", "Gain and phase imbalance create image leakage"]
+        },
+        {
+          "number": 43,
+          "slug": "modulation-mixing-and-channel-selection",
+          "title": "Modulation, Mixing, and Channel Selection",
+          "type": "core",
+          "goal": "Design a sampled frequency-translation and channel-selection chain with correct image, alias, filter, and oscillator budgets.",
+          "bloom": "Create",
+          "est_minutes": 50,
+          "prerequisites": ["analytic-signals-and-iq", "sampling-rate-operations"],
+          "key_ideas": ["Multiplication translates spectra", "Real mixing creates two images", "Complex mixing selects one direction", "Channel filters and decimation form a digital downconverter", "Oscillator offset rotates baseband phase"]
+        },
+        {
+          "number": 44,
+          "slug": "matched-detection-and-synchronization",
+          "title": "Matched Detection and Synchronization",
+          "type": "core",
+          "goal": "Construct a matched-filter detector and evaluate timing and carrier-phase errors in additive noise.",
+          "bloom": "Create",
+          "est_minutes": 50,
+          "prerequisites": ["modulation-mixing-and-channel-selection", "random-sequences-autocorrelation-and-psd"],
+          "key_ideas": ["Correlation is convolution with a reversed conjugate template", "The matched filter maximizes sampled SNR for white noise", "Timing offset moves the correlation peak", "Carrier phase error attenuates coherent detection", "Colored noise calls for prewhitening"]
+        },
+        {
+          "number": 45,
+          "slug": "application-software-am-receiver",
+          "title": "Application: Software AM Receiver",
+          "type": "synthesis",
+          "goal": "Construct and validate a software AM receiver that tunes one channel from a sampled band, rejects adjacent interference, demodulates audio, and reports synchronization limits.",
+          "bloom": "Create",
+          "est_minutes": 60,
+          "prerequisites": ["matched-detection-and-synchronization", "polyphase-and-noble-identities"],
+          "key_ideas": ["Complex downconversion", "Lowpass channel selection", "Decimation and polyphase efficiency", "Envelope versus coherent detection", "Carrier offset and adjacent-channel rejection"]
+        }
+      ],
+      "module_final_application": {
+        "lesson": "application-software-am-receiver",
+        "artifact": "A recorded or reproducibly synthesized complex-IQ AM band containing a desired speech channel, an adjacent interferer, noise, carrier offset, and I/Q imbalance.",
+        "deliverable": "A tuned and decimated receiver, spectral plots at each stage, recovered audio, adjacent-channel and noise measurements, and comparison of envelope and coherent detection.",
+        "theory_used": ["Complex baseband", "Spectral translation", "FIR channel filtering", "Polyphase decimation", "Correlation", "Carrier synchronization", "Stochastic noise"],
+        "departure_from_ideal": "Oscillators are offset, channels are not perfectly bandlimited, front ends have I/Q imbalance, interference is time varying, and coherent detection requires phase information an envelope detector avoids at a power cost."
+      }
+    }
+  ],
+  "spiral_revisits": [
+    {
+      "concept": "Convolution",
+      "encounters": ["convolution-as-a-sliding-dot-product", "discrete-time-fourier-transform", "fir-structures-and-fast-convolution", "fft-convolution-and-overlap-processing", "matched-detection-and-synchronization"]
+    },
+    {
+      "concept": "Aliasing",
+      "encounters": ["sampling-as-spectral-replication", "aliasing-reconstruction-and-antialiasing", "sampling-rate-operations", "perfect-reconstruction-filter-banks", "wola-reconstruction-and-spectral-modification"]
+    },
+    {
+      "concept": "Finite observation",
+      "encounters": ["finite-records-and-window-metrics", "spectral-resolution-and-calibration", "periodogram-and-welch-estimation", "short-time-fourier-transform", "application-vibration-spectrum-monitor"]
+    },
+    {
+      "concept": "Poles, zeros, and stability",
+      "encounters": ["z-transform-poles-and-stability", "application-dtmf-resonator", "iir-prototypes-and-bilinear-design", "iir-sections-and-numerical-robustness", "ar-spectral-models"]
+    },
+    {
+      "concept": "Phase",
+      "encounters": ["complex-exponentials-and-phasors", "frequency-response-and-delay", "dft-definition-symmetry-and-scaling", "wola-reconstruction-and-spectral-modification", "analytic-signals-and-iq", "matched-detection-and-synchronization"]
+    },
+    {
+      "concept": "Efficiency versus ideal algebra",
+      "encounters": ["radix-2-fft-factorization", "fir-structures-and-fast-convolution", "iir-sections-and-numerical-robustness", "polyphase-and-noble-identities", "application-software-am-receiver"]
+    }
+  ],
+  "research_trace": [
+    {
+      "source": "Discrete-Time Signal Processing",
+      "role": "Rigorous backbone for sequences, LTI systems, DTFT/z-transform, DFT, structures, sampling, FIR/IIR design, and finite-word caveats.",
+      "modules": [1, 2, 3, 4, 5]
+    },
+    {
+      "source": "Understanding Digital Signal Processing",
+      "role": "Engineer-facing numerical examples, implementation conventions, FFT interpretation, FIR/IIR tradeoffs, quadrature, multirate structures, and practical failure modes.",
+      "modules": [1, 2, 4, 5, 6, 9]
+    },
+    {
+      "source": "Multirate Systems and Filter Banks",
+      "role": "Authoritative derivations of rate-change spectra, noble identities, polyphase systems, perfect reconstruction, paraunitary banks, and subband quantization.",
+      "modules": [6]
+    },
+    {
+      "source": "Introduction to Signal Processing",
+      "role": "Open computational backbone for convolution, transforms, filter design, converter experiments, smoothing, multirate systems, and implementation-oriented exercises.",
+      "modules": [1, 2, 3, 4, 5, 6, 7]
+    },
+    {
+      "source": "The Scientist and Engineer's Guide to Digital Signal Processing",
+      "role": "Low-floor opening sequence, physical intuition, array-first convolution, practical filters, numerical judgment, and application-led explanations.",
+      "modules": [1, 3, 4, 5]
+    },
+    {
+      "source": "Signals and Systems, MIT 6.003",
+      "role": "Representation-first dependency order, transform and sampling derivations, DTMF/ECG/audio-CD/radio applications, and prediction-before-solution problem design.",
+      "modules": [1, 2, 3, 5, 9]
+    },
+    {
+      "source": "The Fourier Transform and Its Applications, EE 261",
+      "role": "Mathematical bridge for Fourier projection, transform dualities, convolution, sampling, DFT indexing, FFT, and normalization discipline.",
+      "modules": [2, 3, 4]
+    },
+    {
+      "source": "Discrete-Time Signal Processing, MIT 6.341",
+      "role": "Graduate-level ordering, counterexamples, structure and numerical-equivalence distinctions, spectral-analysis misconceptions, multirate projects, and STFT/filter-bank unification.",
+      "modules": [4, 5, 6, 8]
+    },
+    {
+      "source": "Spectral Analysis of Signals",
+      "role": "Stochastic spectral definitions, periodogram/Welch bias-variance analysis, AR/Yule-Walker models, MUSIC/ESPRIT, model-order issues, and measured-data studies.",
+      "modules": [7]
+    },
+    {
+      "source": "Spectral Audio Signal Processing",
+      "role": "Window calibration, audio spectral resolution, Welch estimation, STFT/WOLA, filter-bank duality, phase-aware modification, and executable audio applications.",
+      "modules": [4, 5, 7, 8]
+    },
+    {
+      "source": "On the Use of Windows for Harmonic Analysis with the Discrete Fourier Transform",
+      "role": "Canonical finite-record conventions, leakage mechanisms, ENBW/scalloping/processing-loss metrics, and the unequal-tone detection experiment.",
+      "modules": [4, 7]
+    },
+    {
+      "source": "An Algorithm for the Machine Calculation of Complex Fourier Series",
+      "role": "Primary-source FFT factorization, operation-count argument, in-place butterflies, data ordering, and architecture-sensitive radix choice.",
+      "modules": [4]
+    },
+    {
+      "source": "Seeing Circles, Sines, and Signals: A Compact Primer on Digital Signal Processing",
+      "role": "Visual coordination of phasors, sample dots, basis products, complex coefficients, alias families, DFT bins, zero padding, and leakage; its informal claims require the boundary qualifications supplied by the rigorous sources.",
+      "modules": [1, 2, 3, 4]
+    }
+  ],
+  "coverage_audit": {
+    "time_domain_lti": ["convolution-as-a-sliding-dot-product", "lti-systems-and-impulse-response", "application-sensor-fir-cleanup"],
+    "sampling_aliasing": ["sampling-as-spectral-replication", "aliasing-reconstruction-and-antialiasing", "application-audio-acquisition-chain"],
+    "dtft_z": ["discrete-time-fourier-transform", "frequency-response-and-delay", "z-transform-poles-and-stability"],
+    "dft_fft_windowing": ["dft-definition-symmetry-and-scaling", "radix-2-fft-factorization", "finite-records-and-window-metrics", "spectral-resolution-and-calibration", "application-weak-tone-analyzer"],
+    "fir_iir_design_realization": ["fir-specifications-and-windowed-sinc", "equiripple-and-least-squares-fir", "fir-structures-and-fast-convolution", "iir-prototypes-and-bilinear-design", "iir-sections-and-numerical-robustness", "application-ecg-filter-chain"],
+    "multirate_filter_banks": ["sampling-rate-operations", "rational-rate-conversion", "polyphase-and-noble-identities", "perfect-reconstruction-filter-banks", "application-subband-audio-coder"],
+    "stochastic_spectra": ["random-sequences-autocorrelation-and-psd", "periodogram-and-welch-estimation", "ar-spectral-models", "application-vibration-spectrum-monitor"],
+    "audio_applications": ["application-audio-acquisition-chain", "application-subband-audio-coder", "short-time-fourier-transform", "application-speech-spectral-denoiser"],
+    "communications_applications": ["application-dtmf-resonator", "analytic-signals-and-iq", "modulation-mixing-and-channel-selection", "matched-detection-and-synchronization", "application-software-am-receiver"],
+    "implementation_honesty": ["quantization-dither-and-converter-budgets", "spectral-resolution-and-calibration", "iir-sections-and-numerical-robustness", "polyphase-and-noble-identities", "periodogram-and-welch-estimation", "wola-reconstruction-and-spectral-modification"]
+  },
+  "assessment_and_pacing": {
+    "lesson_pattern": "One substantive objective per 30–50 minute core lesson, with a concrete computation before the general form where it exposes the need; worked-example/problem pairs occur in the body, followed by mixed exercises and references.",
+    "retrieval": "From lesson 3 onward, each lesson opens with two to four prerequisite prompts; each module application mixes at least three earlier techniques without naming which one applies.",
+    "applications": "Each module ends with a runnable study or deployed-system analogue, a numerical acceptance criterion, and an explicit idealization audit.",
+    "busy_engineer_route": "Complete the 41 core/synthesis lessons in order. Each module can be taken as a two-week unit with one concept lesson and one worked block per sitting; all four extra lessons are optional and non-blocking.",
+    "proof_depth": "Core identities are derived far enough to support design decisions. Longer convergence proofs, paraunitary constructions, optimal-window theory, and subspace-estimator asymptotics remain starred or extra."
+  }
+}
