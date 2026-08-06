@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.harness import runner
-from app.harness.prompts import RunKind
+from app.harness.prompts import ContextBlock, RunKind
 from app.harness.repository import HarnessRepository
 from app.models import Chat
 from app.telegram.outbox import Outbox
@@ -37,6 +37,7 @@ async def converse(
     prompt: str,
     *,
     run_kind: RunKind = "chat",
+    blocks: tuple[ContextBlock, ...] = (),
 ) -> None:
     """Run the tutor over the thread and make sure the learner hears something.
 
@@ -45,7 +46,13 @@ async def converse(
     and then says nothing is indistinguishable from a broken one.
     """
     answer = await runner.run(
-        repo, chat, prompt, medium="telegram", run_kind=run_kind, outbox=outbox
+        repo,
+        chat,
+        prompt,
+        medium="telegram",
+        run_kind=run_kind,
+        blocks=blocks,
+        outbox=outbox,
     )
     if outbox.sent == 0 and answer.strip():
         await outbox.send(answer)

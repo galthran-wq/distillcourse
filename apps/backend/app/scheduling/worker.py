@@ -15,6 +15,8 @@ from app.harness.limits import LimitExceeded
 from app.harness.prompts import RunKind
 from app.harness.repository import HarnessRepository
 from app.models import Schedule, User
+from app.review import repository as review
+from app.review import subject
 from app.scheduling import policy, repository
 from app.telegram import api, thread
 from app.telegram import repository as telegram
@@ -73,6 +75,7 @@ async def _fire(
             Outbox(session=session, link=link),
             _prompt(now_items),
             run_kind=_run_kind(now_items),
+            blocks=await subject.due_block(session, now_items),
         )
     except runner.RunBusy:
         await repository.defer(session, rows, due_at=now + BUSY_RETRY)
@@ -108,6 +111,12 @@ async def cycle(session: AsyncSession, now: datetime) -> None:
     await repository.sweep_leases(session, now)
     await repository.close_answered(session)
     await repository.expire_slots(session, now)
+    # The ladders read the sessions that just closed and then put what they owe
+    # into the queue, in that order: a review settled as ignored is due again
+    # from now, and its next delivery is made in this same cycle rather than
+    # thirty seconds later.
+    await review.settle(session, now)
+    await review.materialize(session, now)
     batches: dict[uuid.UUID, list[Schedule]] = defaultdict(list)
     for row in await repository.claim_due(session, now):
         batches[row.user_id].append(row)

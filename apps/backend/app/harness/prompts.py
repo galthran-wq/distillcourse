@@ -28,7 +28,9 @@ class ContextBlock:
 
 
 @lru_cache
-def _module(name: str) -> str:
+def module(name: str) -> str:
+    """One prompt module's text. Public because a run whose kind does not carry
+    a module may still need it: a context block can hand it over instead."""
     return (PROMPTS_DIR / name).read_text(encoding="utf-8").strip()
 
 
@@ -50,4 +52,4 @@ def assemble(
     medium: Medium, run_kind: RunKind, blocks: tuple[ContextBlock, ...] = ()
 ) -> str:
     modules = ["base.md", f"medium/{medium}.md", *_MODULES[run_kind]]
-    return "\n\n".join([*(_module(name) for name in modules), *map(_render, blocks)])
+    return "\n\n".join([*(module(name) for name in modules), *map(_render, blocks)])

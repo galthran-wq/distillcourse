@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import logfire
@@ -12,8 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.harness import runner
 from app.harness.limits import LimitExceeded
+from app.harness.prompts import ContextBlock
 from app.harness.repository import HarnessRepository
 from app.models import Chat
+from app.review import repository as review
+from app.review import subject
 from app.scheduling import policy
 from app.scheduling import repository as scheduling
 from app.telegram import api, repository, thread
@@ -25,6 +28,10 @@ from app.telegram.outbox import Outbox
 # learner is told, because silence reads as a broken bot.
 RUN_WAIT_SECONDS = 5.0
 RUN_ATTEMPTS = 6
+# How long after a review was sent an answer to it is still read as one. The
+# slot times out in four waking hours; a learner who comes back the next
+# morning is answering, not changing the subject.
+LATE_ANSWER = timedelta(days=1)
 
 PAIR_FIRST = (
     "This chat is not connected to a distillcourse account. Sign in on the "
@@ -135,12 +142,28 @@ async def _pair(session: AsyncSession, update: Update, code: str) -> None:
     await api.send_message(update.tg_chat_id, PAIRED, html=False)
 
 
+async def _open_reviews(
+    repo: HarnessRepository, now: datetime
+) -> tuple[ContextBlock, ...]:
+    """Whatever review this message may be an answer to.
+
+    A learner who writes while a review of theirs is open must not leave it
+    hanging until it times out, and one who answers hours late is still
+    answering — so the run is handed both, with the ids it closes them by.
+    """
+    rows = await review.ungraded(repo.session, repo.user_id, now - LATE_ANSWER)
+    return await subject.open_block(repo.session, rows)
+
+
 async def _answer(
     repo: HarnessRepository, chat: Chat, outbox: Outbox, text: str
 ) -> None:
     for attempt in range(RUN_ATTEMPTS):
         try:
-            await thread.converse(repo, chat, outbox, text)
+            # Read per attempt, not once: what is open changes while we wait,
+            # because what we are waiting for is the run that may have graded it.
+            blocks = await _open_reviews(repo, datetime.now(UTC))
+            await thread.converse(repo, chat, outbox, text, blocks=blocks)
             return
         except runner.RunBusy:
             if attempt + 1 == RUN_ATTEMPTS:

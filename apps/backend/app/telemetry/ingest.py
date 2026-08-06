@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Event, LessonProgress
+from app.review import repository as review
 from app.telemetry import progress, schemas
 from app.telemetry.schemas import EventBatch, RawEvent
 
@@ -26,6 +27,12 @@ async def record(session: AsyncSession, user_id: uuid.UUID, batch: EventBatch) -
     completed_at = await progress.recompute(session, user_id, batch.lesson)
     if completed_at is not None:
         await _emit_completion(session, user_id, batch.lesson, completed_at)
+        # The subscription spaced repetition is built on. Unconditional rather
+        # than guarded by the emit: the ladder's own key is what makes a second
+        # completion of the same lesson a no-op, and a ladder that failed to
+        # open once should be opened by the next flush that sees the
+        # completion, not lost with the event that already exists.
+        await review.start(session, user_id, batch.lesson, completed_at)
     await session.commit()
 
 
