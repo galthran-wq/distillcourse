@@ -1,10 +1,11 @@
 /**
- * The geometry of the activity grid: a year of full weeks, one column each,
- * Monday at the top. Kept out of the component because it is arithmetic on
- * dates — the part worth testing.
+ * The arithmetic behind the activity panel: the geometry of the grid — a year
+ * of full weeks, one column each, Monday at the top — and the shaping of the
+ * feed under it. Kept out of the component because it is the part worth
+ * testing.
  */
 
-import type { ActivityDay } from "@/lib/telemetry/api";
+import type { ActivityDay, ActivityEntry } from "@/lib/telemetry/api";
 
 /**
  * Mirrors ACTIVITY_WEEKS in apps/backend/app/telemetry/passes.py, which bounds
@@ -22,6 +23,7 @@ export interface Square {
   /** The day as the API names it, and how two days are compared. */
   key: string;
   count: number;
+  minutes: number;
 }
 
 function two(value: number): string {
@@ -37,15 +39,16 @@ export function key(at: Date): string {
 }
 
 export function squares(days: ActivityDay[], today: Date): Square[] {
-  const counts = new Map(days.map((day) => [day.date, day.count]));
+  const read = new Map(days.map((day) => [day.date, day]));
   // Midday, so adding days never lands on the hour a clock change skips.
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
   start.setDate(start.getDate() - ((today.getDay() + 6) % 7) - DAYS * (WEEKS - 1));
   return Array.from({ length: WEEKS * DAYS }, (_, index) => {
     const at = new Date(start);
     at.setDate(start.getDate() + index);
-    const day = key(at);
-    return { date: at, key: day, count: counts.get(day) ?? 0 };
+    const on = key(at);
+    const day = read.get(on);
+    return { date: at, key: on, count: day?.count ?? 0, minutes: day?.minutes ?? 0 };
   });
 }
 
@@ -72,4 +75,37 @@ export function month(cells: Square[], week: number): string | null {
   // month that is nearly over says less than a blank.
   if (week === 0 && cells[DAYS].date.getMonth() !== at.getMonth()) return null;
   return at.toLocaleDateString(undefined, { month: "short" });
+}
+
+/**
+ * The reader's own wall clock, taken from the offset the API already stated the
+ * instant in. `new Date` would name that instant in the browser's zone instead,
+ * which is a different hour — and sometimes a different day than the one the
+ * entry is filed under.
+ */
+function clock(at: string): string {
+  return at.slice(11, 16);
+}
+
+/** What a feed row says about the day it covers: when, and for how long. */
+export function sitting(entry: ActivityEntry): string {
+  const from = clock(entry.first_at);
+  const to = clock(entry.last_at);
+  const span = from === to ? from : `${from}–${to}`;
+  const spent = entry.seconds < 60 ? "<1 min" : `${Math.round(entry.seconds / 60)} min`;
+  return `${span} · ${spent}`;
+}
+
+/**
+ * The feed cut into its days, newest first — which is the order the API
+ * answers in, so this only finds the seams.
+ */
+export function group(feed: ActivityEntry[]): [string, ActivityEntry[]][] {
+  const days: [string, ActivityEntry[]][] = [];
+  for (const entry of feed) {
+    const open = days.at(-1);
+    if (open?.[0] === entry.date) open[1].push(entry);
+    else days.push([entry.date, [entry]]);
+  }
+  return days;
 }

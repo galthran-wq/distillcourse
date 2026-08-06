@@ -30,24 +30,48 @@ export default function ProfileLists({
 
   return (
     <>
-      <Activity lessons={lessons} history={profile?.history ?? null} />
+      <Activity lessons={lessons} />
       {profile !== null && (
-        <Section title="bookmarks">
-          {profile.bookmarks.length === 0 ? (
-            <p className="text-sm text-faint">Nothing bookmarked.</p>
-          ) : (
-            <ul>
-              {profile.bookmarks.map((bookmark) => (
-                <LessonRow
-                  key={bookmark.lesson}
-                  lesson={bookmark.lesson}
-                  link={lessons[bookmark.lesson]}
-                  note={day(bookmark.created_at)}
-                />
-              ))}
-            </ul>
-          )}
-        </Section>
+        <>
+          {/* Every lesson once, by when it was last opened — the feed above
+              answers "which days", this answers "which lessons". */}
+          <Section title="recently read">
+            {profile.history.length === 0 ? (
+              <p className="text-sm text-faint">No lessons read yet.</p>
+            ) : (
+              <ul>
+                {profile.history.map((visit) => (
+                  <LessonRow
+                    key={visit.lesson}
+                    lesson={visit.lesson}
+                    link={lessons[visit.lesson]}
+                    note={
+                      visit.completed_at === null
+                        ? day(visit.last_seen)
+                        : `${day(visit.last_seen)} · completed`
+                    }
+                  />
+                ))}
+              </ul>
+            )}
+          </Section>
+          <Section title="bookmarks">
+            {profile.bookmarks.length === 0 ? (
+              <p className="text-sm text-faint">Nothing bookmarked.</p>
+            ) : (
+              <ul>
+                {profile.bookmarks.map((bookmark) => (
+                  <LessonRow
+                    key={bookmark.lesson}
+                    lesson={bookmark.lesson}
+                    link={lessons[bookmark.lesson]}
+                    note={day(bookmark.created_at)}
+                  />
+                ))}
+              </ul>
+            )}
+          </Section>
+        </>
       )}
     </>
   );
