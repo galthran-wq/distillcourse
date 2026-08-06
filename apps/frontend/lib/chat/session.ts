@@ -14,7 +14,7 @@ import { API } from "@/lib/api-base";
 import { errorDetail } from "@/lib/http";
 import { currentLocator } from "@/lib/lesson/position";
 import { takeQuote } from "@/lib/chat/quote";
-import { stored } from "@/lib/chat/stored";
+import { rememberChat, storedChatId } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
 export interface Session {
@@ -49,7 +49,7 @@ async function open(summary: ChatSummary): Promise<Session> {
     }),
   };
   session.set(next);
-  stored.set({ chatId: summary.id });
+  rememberChat(summary.id);
   return next;
 }
 
@@ -65,7 +65,7 @@ export function resumeSession(): Promise<Session> {
     const chats = await webChats();
     // The stored one can be gone — deleted, or belonging to whoever was
     // signed in on this browser before — and then the most recent stands in.
-    const last = chats.find((chat) => chat.id === stored.get().chatId);
+    const last = chats.find((chat) => chat.id === storedChatId());
     return open(last ?? chats[0] ?? (await createChat()));
   })().finally(() => {
     opening = null;

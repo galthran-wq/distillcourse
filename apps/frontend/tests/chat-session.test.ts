@@ -1,15 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { User } from "@/lib/auth/api";
 import type { ChatSummary } from "@/lib/chat/api";
 import type { StoredChat } from "@/lib/chat/stored";
-
-const READER: User = {
-  id: "u1",
-  email: "reader@example.com",
-  full_name: null,
-  timezone: "UTC",
-};
 
 const WEB: ChatSummary = {
   id: "c1",
@@ -100,7 +92,7 @@ async function session() {
 }
 
 /** What a previous visit left in storage, read as the modules are built. */
-function remembered(state: Partial<StoredChat> | Record<string, unknown>): void {
+function remembered(state: Partial<StoredChat>): void {
   window.localStorage.setItem("distillcourse.chat", JSON.stringify(state));
 }
 
@@ -155,6 +147,25 @@ describe("the chat session", () => {
 
     expect(open.summary.id).toBe("c1");
     expect(sent("POST", "/api/v1/chats")).toHaveLength(0);
+  });
+
+  it("records the chat it switched to, so the next load comes back to it", async () => {
+    served({
+      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+      "GET /api/v1/chats/c2/messages": json([]),
+    });
+    const { resumeSession, selectSession } = await session();
+    await resumeSession();
+
+    await selectSession(FRESH);
+
+    expect(JSON.parse(window.localStorage.getItem("distillcourse.chat") ?? "null")).toEqual({
+      open: false,
+      chatId: "c2",
+      draft: "",
+      owner: "",
+    });
   });
 
   it("starts one chat, not two, when the widget asks twice before the first answer", async () => {
@@ -363,99 +374,6 @@ describe("the chat session", () => {
 
     expect(await resumeSession()).not.toBe(mine);
     expect(sent("GET", "/api/v1/chats")).toHaveLength(2);
-  });
-});
-
-describe("what the widget remembers", () => {
-  it("has the panel, the chat and the draft back after a reload", async () => {
-    served({
-      "GET /api/v1/chats": json([WEB]),
-      "GET /api/v1/chats/c1/messages": json([]),
-    });
-    const { resumeSession } = await session();
-    const { togglePanel } = await import("@/lib/chat/panel");
-    await resumeSession();
-    togglePanel();
-    (await import("@/lib/chat/stored")).stored.set({ draft: "why is this true?" });
-
-    // The reload: the same storage, every module built again out of it.
-    vi.resetModules();
-    const { stored } = await import("@/lib/chat/stored");
-
-    expect(stored.get()).toEqual({
-      open: true,
-      chatId: "c1",
-      draft: "why is this true?",
-      owner: "",
-    });
-  });
-
-  it("keeps the draft when the load settles who is signed in", async () => {
-    remembered({ open: true, chatId: "c1", draft: "half a question", owner: "u1" });
-    const { stored } = await import("@/lib/chat/stored");
-    const { setUser } = await import("@/lib/auth/store");
-
-    // Every load ends in this call, and it is the first thing here to name a
-    // reader — so it must not read as one reader replacing another.
-    setUser(READER);
-
-    expect(stored.get()).toEqual({
-      open: true,
-      chatId: "c1",
-      draft: "half a question",
-      owner: "u1",
-    });
-  });
-
-  it("drops the draft, but not the panel, when the reader signs out", async () => {
-    remembered({ open: true, chatId: "c1", draft: "half a question", owner: "u1" });
-    const { stored } = await import("@/lib/chat/stored");
-    const { setUser } = await import("@/lib/auth/store");
-    setUser(READER);
-
-    setUser(null);
-
-    // Whoever signs in next on this browser gets an empty composer; where the
-    // panel sits is not theirs to inherit or lose.
-    expect(stored.get()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
-  });
-
-  it("drops the previous reader's draft on a load that opens anonymous", async () => {
-    remembered({ open: true, chatId: "c1", draft: "half a question", owner: "u1" });
-    const { stored } = await import("@/lib/chat/stored");
-    const { setUser } = await import("@/lib/auth/store");
-
-    // They signed out during some earlier visit, so this page load never saw
-    // them: only the entry knows the draft in it is not the current reader's.
-    setUser(null);
-
-    expect(stored.get()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
-  });
-
-  it("falls back to the declared defaults when the entry is corrupt", async () => {
-    remembered({ open: "yes", chatId: "c1", draft: 123, gone: "old field" });
-
-    const { stored } = await import("@/lib/chat/stored");
-
-    // Field by field: the widget is mounted on every page, so the one good
-    // field is worth keeping and the wrong-typed ones must not reach it.
-    expect(stored.get()).toEqual({ open: false, chatId: "c1", draft: "", owner: "" });
-  });
-
-  it("does not write back over what another tab changed", async () => {
-    const here = (await import("@/lib/chat/stored")).stored;
-    vi.resetModules();
-    const other = (await import("@/lib/chat/stored")).stored;
-
-    other.set({ draft: "asked in the other tab" });
-    here.set({ open: true });
-
-    expect(here.get()).toEqual({
-      open: true,
-      chatId: "",
-      draft: "asked in the other tab",
-      owner: "",
-    });
   });
 });
 

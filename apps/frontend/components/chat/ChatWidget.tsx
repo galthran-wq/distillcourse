@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import { useAuth } from "@/lib/auth/store";
-import { togglePanel, usePanel } from "@/lib/chat/panel";
 import { resumeSession, useSession } from "@/lib/chat/session";
+import { togglePanel, usePanel } from "@/lib/chat/stored";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
 
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {

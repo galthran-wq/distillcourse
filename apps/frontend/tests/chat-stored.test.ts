@@ -1,0 +1,100 @@
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { User } from "@/lib/auth/api";
+import type { StoredChat } from "@/lib/chat/stored";
+
+const READER: User = {
+  id: "u1",
+  email: "reader@example.com",
+  full_name: null,
+  timezone: "UTC",
+};
+
+const LEFT_BY_U1: StoredChat = {
+  open: true,
+  chatId: "c1",
+  draft: "half a question",
+  owner: "u1",
+};
+
+/** What a previous visit left in storage, read as the modules are built. */
+function remembered(state: Partial<StoredChat>): void {
+  window.localStorage.setItem("distillcourse.chat", JSON.stringify(state));
+}
+
+/** The entry itself — what the next load is built out of. */
+function entry(): unknown {
+  return JSON.parse(window.localStorage.getItem("distillcourse.chat") ?? "null");
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+  vi.resetModules();
+});
+
+describe("what the widget remembers", () => {
+  it("has the panel, the chat and the draft back after a reload", async () => {
+    const { openPanel, rememberChat, setDraft } = await import("@/lib/chat/stored");
+    openPanel();
+    rememberChat("c1");
+    setDraft("why is this true?");
+
+    // The reload: the same storage, every module built again out of it.
+    vi.resetModules();
+    const { storedChatId } = await import("@/lib/chat/stored");
+
+    expect(entry()).toEqual({
+      open: true,
+      chatId: "c1",
+      draft: "why is this true?",
+      owner: "",
+    });
+    expect(storedChatId()).toBe("c1");
+  });
+
+  it("keeps the draft when the load settles who is signed in", async () => {
+    remembered(LEFT_BY_U1);
+    const { setUser } = await import("@/lib/auth/store");
+
+    // Every load ends in this call, and it is the first thing here to name a
+    // reader — so it must not read as one reader replacing another.
+    setUser(READER);
+
+    expect(entry()).toEqual(LEFT_BY_U1);
+  });
+
+  it("drops the draft, but not the panel, when the reader signs out", async () => {
+    remembered(LEFT_BY_U1);
+    const { setUser } = await import("@/lib/auth/store");
+    setUser(READER);
+
+    setUser(null);
+
+    // Whoever signs in next on this browser gets an empty composer; where the
+    // panel sits is not theirs to inherit or lose.
+    expect(entry()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
+  });
+
+  it("drops the previous reader's draft on a load that opens anonymous", async () => {
+    remembered(LEFT_BY_U1);
+    const { setUser } = await import("@/lib/auth/store");
+
+    // They signed out during some earlier visit, so this page load never saw
+    // them: only the entry knows the draft in it is not the current reader's.
+    setUser(null);
+
+    expect(entry()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
+  });
+
+  it("keeps the draft when the load could not ask who is signed in", async () => {
+    remembered(LEFT_BY_U1);
+    const { setUser } = await import("@/lib/auth/store");
+
+    // What the bootstrap does with anything but a 401: the reader is shown the
+    // anonymous panel, but a request that never arrived has not signed anyone
+    // out, and it must not take the draft with it.
+    setUser(null, false);
+
+    expect(entry()).toEqual(LEFT_BY_U1);
+  });
+});

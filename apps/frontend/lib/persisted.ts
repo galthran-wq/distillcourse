@@ -18,7 +18,8 @@ function load<T extends object>(key: string, initial: T): Partial<T> {
     // hand, so a field is taken only if it is still the type its default is —
     // the readers call it as that type, and these stores are mounted on every
     // page, where one wrong field would break the whole site until the reader
-    // cleared their own storage.
+    // cleared their own storage. `typeof` settles that because a field can only
+    // be a string, a number or a boolean; absence is "" or 0, never null.
     return Object.fromEntries(
       Object.entries(parsed).filter(
         ([field, value]) => typeof value === typeof initial[field as keyof T],
@@ -33,8 +34,6 @@ function load<T extends object>(key: string, initial: T): Partial<T> {
 
 /**
  * A record of state that outlives the tab, held in one localStorage entry.
- * Every field must be exactly one JSON type, since that type is all a corrupt
- * entry is checked against; write "" or 0 for absence rather than null.
  *
  * Fields are read one at a time, so a keystroke in one does not re-render the
  * readers of another. The server snapshot stays the declared initial value for
@@ -43,7 +42,7 @@ function load<T extends object>(key: string, initial: T): Partial<T> {
  * reads the live value again immediately after hydration, which is where the
  * stored one arrives.
  */
-export function createPersistedStore<T extends object>(
+export function createPersistedStore<T extends Record<string, string | number | boolean>>(
   key: string,
   initial: T,
 ): PersistedStore<T> {
@@ -52,16 +51,20 @@ export function createPersistedStore<T extends object>(
   return {
     get: store.get,
     set(patch: Partial<T>): void {
-      // Merged onto the entry, not onto this tab's copy of it: every write goes
-      // through storage, so what another tab has changed since this tab loaded
-      // is already there, and merging the other way would write it back out.
-      const next = { ...store.get(), ...load(key, initial), ...patch };
+      // What is written out is merged onto the entry, not onto this tab's copy
+      // of it: every write goes through storage, so what another tab changed
+      // since this tab loaded is already there, and merging the other way would
+      // write it back out. What this tab holds takes the patch alone — the
+      // other tab's composer text is not this composer's to display.
       try {
-        window.localStorage.setItem(key, JSON.stringify(next));
+        window.localStorage.setItem(
+          key,
+          JSON.stringify({ ...store.get(), ...load(key, initial), ...patch }),
+        );
       } catch {
         // Refused or full: this tab still has to see its own change.
       }
-      store.set(next);
+      store.set({ ...store.get(), ...patch });
     },
     use: <K extends keyof T>(field: K): T[K] =>
       useSyncExternalStore(

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { openPanel } from "@/lib/chat/panel";
 import { setQuote } from "@/lib/chat/quote";
+import { openPanel } from "@/lib/chat/stored";
 import {
   BUTTON_HEIGHT,
   buttonPosition,

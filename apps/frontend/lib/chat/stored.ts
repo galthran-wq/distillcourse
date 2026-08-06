@@ -2,7 +2,7 @@
 
 import { createPersistedStore } from "@/lib/persisted";
 
-export interface StoredChat {
+export type StoredChat = {
   open: boolean;
   /** The chat the reader had open, "" for none. It may since have been deleted. */
   chatId: string;
@@ -10,26 +10,57 @@ export interface StoredChat {
   draft: string;
   /** Whose chat id and draft these are; "" while nobody is signed in. */
   owner: string;
-}
+};
 
 // What the widget needs to come back the way the reader left it, in one entry
-// so that the four are written and read as one state.
-export const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
+// so that the four are written and read as one state. Private, like every other
+// store here: what the entry is called and how it is shaped stops at this file.
+const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
   open: false,
   chatId: "",
   draft: "",
   owner: "",
 });
 
+// The panel is opened from the lesson as well as from the widget — quoting a
+// passage is asking about it — and the two trees have no common ancestor. It is
+// stored because a reload is not a decision to close it.
+
+export function openPanel(): void {
+  stored.set({ open: true });
+}
+
+export function togglePanel(): void {
+  stored.set({ open: !stored.get().open });
+}
+
+export function usePanel(): boolean {
+  return stored.use("open");
+}
+
+/** The message being written, kept here so a reload does not lose it. */
+export function useDraft(): string {
+  return stored.use("draft");
+}
+
+export function setDraft(draft: string): void {
+  stored.set({ draft });
+}
+
+export function storedChatId(): string {
+  return stored.get().chatId;
+}
+
+export function rememberChat(chatId: string): void {
+  stored.set({ chatId });
+}
+
 /**
- * Hand the stored chat to whoever is signed in now, dropping what the reader
- * before them left: an unsent draft is rendered straight into the composer, so
- * a shared browser has to forget it. Where the panel sits stays — that belongs
- * to the browser, not to them.
- *
- * The owner is settled against the entry rather than against who this tab saw
- * sign out, because the load that has to notice is the one that finds someone
- * else's draft already in storage, and it never saw them at all.
+ * Hand the stored chat to whoever is signed in now, dropping the draft the
+ * reader before them left: it renders straight into the composer, so a shared
+ * browser has to forget it, and only the entry knows whose it is — the load
+ * that would leak it never saw them sign out. Where the panel sits belongs to
+ * the browser rather than to them, and stays.
  */
 export function claimStored(owner: string): void {
   if (stored.get().owner === owner) return;
