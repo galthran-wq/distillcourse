@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ViewTransition } from "react";
 import { evaluate } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
@@ -169,25 +170,35 @@ export default async function LessonPage({
         {/* Keyed by the lesson: moving to the next one must not show the
             previous one's bookmark while the new state loads. */}
         <LessonStateProvider key={key} lesson={key}>
-          <header className="border-b border-line py-10">
-            <p className={LABEL_CLASS}>
-              <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
-                {course.course.title}
-              </Link>{" "}
-              · {moduleTitle}
-            </p>
-            <h1 className="mt-3 flex items-baseline gap-3">
-              <span className="font-mono text-sm text-faint">{number}</span>
-              <span className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-                {lesson.title}
-              </span>
-            </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
-              <span className="text-soft">{lesson.goal}</span>
-              <span>~{lesson.est_minutes} min</span>
-              <BookmarkToggle />
-            </div>
-          </header>
+          {/* The turn from one lesson to the next is drawn in the stylesheet,
+              off the transition type the previous/next link sets. This is what
+              asks React for a view transition at all: the router starts one by
+              itself only in a production build, and an animation that plays
+              nowhere it can be worked on is one nobody can fix. It goes around
+              the title because that is the line naming the lesson — where
+              React does honour the name, the title keeps a snapshot of its own
+              and holds still while the page turns under it. */}
+          <ViewTransition name="lesson-title">
+            <header className="border-b border-line py-10">
+              <p className={LABEL_CLASS}>
+                <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
+                  {course.course.title}
+                </Link>{" "}
+                · {moduleTitle}
+              </p>
+              <h1 className="mt-3 flex items-baseline gap-3">
+                <span className="font-mono text-sm text-faint">{number}</span>
+                <span className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+                  {lesson.title}
+                </span>
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
+                <span className="text-soft">{lesson.goal}</span>
+                <span>~{lesson.est_minutes} min</span>
+                <BookmarkToggle />
+              </div>
+            </header>
+          </ViewTransition>
 
           <div className="prose-lesson py-10">
             <MDXContent components={components} />
@@ -199,6 +210,7 @@ export default async function LessonPage({
             {prev !== undefined ? (
               <Link
                 href={`/courses/${course.course.slug}/lessons/${prev.lesson.slug}`}
+                transitionTypes={["nav-back"]}
                 className="group max-w-[45%]"
               >
                 <span className="font-mono text-[11px] tracking-wide text-faint">← previous</span>
@@ -212,6 +224,7 @@ export default async function LessonPage({
             {next !== undefined ? (
               <Link
                 href={`/courses/${course.course.slug}/lessons/${next.lesson.slug}`}
+                transitionTypes={["nav-forward"]}
                 className="group max-w-[45%] text-right"
               >
                 <span className="font-mono text-[11px] tracking-wide text-faint">next →</span>

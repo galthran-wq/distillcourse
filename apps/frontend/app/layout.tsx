@@ -36,6 +36,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // The site scrolls smoothly because the table of contents needs it to.
+      // Next 16 no longer suspends that for a route change unless it is told
+      // the page has it, and a route change that smooth-scrolls to the top
+      // drags the new page up through the transition to it.
+      data-scroll-behavior="smooth"
       className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">

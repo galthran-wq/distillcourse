@@ -71,7 +71,10 @@ Rules that override defaults:
   in `globals.css` where the element's geometry already lives there), nothing
   runs longer than `--motion-base`, and one blanket `prefers-reduced-motion`
   rule at the end of `globals.css` turns all of it off — a component never
-  repeats that rule for itself.
+  repeats that rule for itself. The one route transition, the page turn
+  between two lessons, is the same layer: `experimental.viewTransition` plus
+  `::view-transition-*` rules keyed on the type a `<Link transitionTypes>`
+  sets.
 - Code style is binding for ALL code in this repo:
   `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
   only, grep before writing (no duplicated functionality), domain-separated
