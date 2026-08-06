@@ -171,14 +171,27 @@ export default async function LessonPage({
             previous one's bookmark while the new state loads. */}
         <LessonStateProvider key={key} lesson={key}>
           {/* The turn from one lesson to the next is drawn in the stylesheet,
-              off the transition type the previous/next link sets. This is what
-              asks React for a view transition at all: the router starts one by
-              itself only in a production build, and an animation that plays
-              nowhere it can be worked on is one nobody can fix. It goes around
-              the title because that is the line naming the lesson — where
-              React does honour the name, the title keeps a snapshot of its own
-              and holds still while the page turns under it. */}
-          <ViewTransition name="lesson-title">
+              off the transition type the previous/next link sets. This
+              boundary is what asks for a view transition at all: React starts
+              one only where a <ViewTransition> is in the committed tree, in a
+              development and a production build alike, so a navigation between
+              two pages that hold none — /settings to /profile — simply cuts.
+              It goes around the title because that is the line naming the
+              lesson: the title takes a snapshot of its own and holds still
+              (stylesheet: `::view-transition-group(lesson-title)`) while the
+              page turns under it.
+
+              Only the lesson-to-lesson pair is worth that snapshot, which is
+              what `share` names; entering or leaving the lessons there is no
+              other title for it to hold still against, and a box pinned to 0s
+              against the page's own cross-fade is a header that pops. */}
+          <ViewTransition
+            name="lesson-title"
+            share="auto"
+            enter="none"
+            exit="none"
+            default="none"
+          >
             <header className="border-b border-line py-10">
               <p className={LABEL_CLASS}>
                 <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">

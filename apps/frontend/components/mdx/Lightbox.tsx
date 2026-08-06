@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MOTION_FAST_MS } from "@/components/ui/styles";
+import { useExitDelay } from "@/lib/ui/exit";
 
 interface Props {
   src: string;
@@ -17,31 +19,23 @@ interface Props {
  * both roles, which is why the pipeline stores sourced images at high
  * resolution (docs/figures.md §Sourced images).
  *
- * Open/close is animated (backdrop fade + image zoom, ~200ms); the closing
- * state keeps the dialog mounted until its exit animation ends.
+ * Open/close is animated (backdrop fade + image zoom); the overlay stays
+ * mounted for the length of its exit, the way the tutor panel does.
  */
 export default function Lightbox({ src, alt, width, height, className }: Props) {
-  const [state, setState] = useState<"closed" | "open" | "closing">("closed");
+  const [open, setOpen] = useState(false);
+  const onScreen = useExitDelay(open, MOTION_FAST_MS);
 
   useEffect(() => {
-    if (state === "closed") return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setState("closing");
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [state]);
-
-  // Unmount on a timer, never on animationend: the event does not fire when
-  // the exit animation is suppressed (prefers-reduced-motion) or fails to
-  // restart, and a missed event would leave the overlay eating every click.
-  useEffect(() => {
-    if (state !== "closing") return;
-    const t = setTimeout(() => setState("closed"), 160);
-    return () => clearTimeout(t);
-  }, [state]);
+  }, [open]);
 
   return (
     <>
@@ -59,19 +53,19 @@ export default function Lightbox({ src, alt, width, height, className }: Props) 
           // expanding must not navigate.
           e.preventDefault();
           e.stopPropagation();
-          setState("open");
+          setOpen(true);
         }}
       />
-      {state !== "closed" && (
+      {onScreen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label={alt}
-          className={`lightbox-overlay${state === "closing" ? " is-closing" : ""}`}
+          className={`lightbox-overlay${open ? "" : " is-closing"}`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setState("closing");
+            setOpen(false);
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -5,13 +5,12 @@ import { useEffect, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import { ChatIcon } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
+import { MOTION_BASE_MS } from "@/components/ui/styles";
 import { useAuth } from "@/lib/auth/store";
 import { resumeSession, useSession } from "@/lib/chat/session";
 import { collapsePanel, togglePanel, usePanel } from "@/lib/chat/stored";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
-
-// How long the panel takes to leave: `--motion-base`, which a timer cannot read.
-const EXIT_MS = 200;
+import { useExitDelay } from "@/lib/ui/exit";
 
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
@@ -19,22 +18,12 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const panel = usePanel();
   const [unreachable, setUnreachable] = useState(false);
   const open = panel !== "closed";
-  // A closed panel is an unmounted one, and an unmounted panel has nothing left
-  // to animate — so it stays on screen for the length of its exit. Opening is
-  // adjusted here rather than in an effect: the panel has to be in the paint
-  // that opens it, and a paint later is a frame of nothing.
-  const [onScreen, setOnScreen] = useState(open);
-  if (open && !onScreen) setOnScreen(true);
+  // `.chat-panel` shrinks back into its launcher over one `--motion-base`.
+  const onScreen = useExitDelay(open, MOTION_BASE_MS);
   // Only an open conversation is worth the screen. It is also the only state
   // that carries the panel's own chrome, and the launcher is hidden under the
   // overlay — a sign-in prompt spread over the page would have no way out.
   const expanded = panel === "expanded" && session !== null;
-
-  useEffect(() => {
-    if (open || !onScreen) return;
-    const timer = setTimeout(() => setOnScreen(false), EXIT_MS);
-    return () => clearTimeout(timer);
-  }, [open, onScreen]);
 
   useEffect(() => {
     if (!open || auth.status !== "signed-in" || session !== null) return;
@@ -79,10 +68,12 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
           // sits beside the page and is just a region of it.
           role={expanded ? "dialog" : undefined}
           aria-modal={expanded || undefined}
-          // Which box `.chat-panel` puts it in. Full height only once there is
-          // a conversation to scroll.
+          // Which box `.chat-panel` puts it in. Full height only for a reader
+          // who has a conversation to scroll: the sign-in prompt and the line
+          // of status while auth is still loading are as tall as their text,
+          // and a 24rem by 32rem box holding one line is an empty box.
           data-shape={
-            expanded ? "expanded" : auth.status === "anonymous" ? "prompt" : "docked"
+            expanded ? "expanded" : auth.status === "signed-in" ? "docked" : "prompt"
           }
           className={`chat-panel flex flex-col rounded-md border border-line bg-paper shadow-popover ${
             expanded ? "z-50 max-sm:rounded-none" : "z-40"

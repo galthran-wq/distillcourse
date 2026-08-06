@@ -3,6 +3,15 @@
 // purpose: server components call `buttonClass` too, and an export of a client
 // module is an opaque reference on the server, not a function.
 
+/**
+ * `--motion-base` and `--motion-fast` in milliseconds. A timer cannot read a
+ * CSS variable, and something leaving the page has to stay mounted for exactly
+ * as long as its animation lasts — see `useExitDelay`. These two numbers are
+ * the tokens in globals.css and have to be retuned with them.
+ */
+export const MOTION_BASE_MS = 200;
+export const MOTION_FAST_MS = 150;
+
 /** Every text field: input, textarea, and the native time picker. */
 export const FIELD_CLASS =
   "block w-full rounded-sm border border-line bg-panel px-3 py-2 text-sm text-ink transition-colors duration-(--motion-fast) placeholder:text-faint hover:border-faint focus:border-accent aria-invalid:border-accent";

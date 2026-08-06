@@ -71,10 +71,15 @@ Rules that override defaults:
   in `globals.css` where the element's geometry already lives there), nothing
   runs longer than `--motion-base`, and one blanket `prefers-reduced-motion`
   rule at the end of `globals.css` turns all of it off — a component never
-  repeats that rule for itself. The one route transition, the page turn
-  between two lessons, is the same layer: `experimental.viewTransition` plus
-  `::view-transition-*` rules keyed on the type a `<Link transitionTypes>`
-  sets.
+  repeats that rule for itself. An exit needs the element to stay mounted
+  while it plays: that is `useExitDelay` in `lib/ui/exit.ts`, fed
+  `MOTION_BASE_MS`/`MOTION_FAST_MS` from `ui/styles.ts` — the millisecond
+  copies of the two tokens, retuned with them. Never a second timer. The one
+  route transition, the page turn between two lessons, is the same layer:
+  `experimental.viewTransition`, a `<ViewTransition>` around the lesson header
+  — React runs a transition only for a commit that holds one, so this is what
+  makes the turn happen at all — and `::view-transition-*` rules keyed on the
+  type a `<Link transitionTypes>` sets.
 - Code style is binding for ALL code in this repo:
   `.claude/skills/impl-review/style.md` — simplicity above all, WHY-comments
   only, grep before writing (no duplicated functionality), domain-separated
