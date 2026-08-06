@@ -57,6 +57,11 @@ app/
   memory/
     repository.py    # the learner profile: index, read, upsert, delete
     tools.py         # read_memory / save_memory / delete_memory
+  review/
+    ladder.py        # the intervals and what an outcome does to them
+    repository.py    # review_state, and the deliveries it materialises
+    subject.py       # what a review is about: the lesson's concepts
+    tools.py         # report_review_outcome, run by the tutor
   models.py          # SQLAlchemy 2.0 declarative tables
   crud.py            # user reads/writes
   lessons/state.py   # what a user did to a lesson: history, rating, bookmark
@@ -183,6 +188,8 @@ so the only chats it can write to are the ones that repository can see.
   does not get its answer sent on top. On the site the tool says there is
   nothing to send: the answer is the delivery there.
 - `read_memory` / `save_memory` / `delete_memory` — the learner profile below.
+- `report_review_outcome` — how one review went, which is what schedules the
+  next one. See spaced repetition below.
 - `get_user_progress` is specified with these but not implemented here: it
   reads the `lesson_progress` aggregate that telemetry owns, and lands with it
   (#37).
@@ -289,6 +296,52 @@ outcome (`answered` / `ignored`) is recorded whichever way a message arrived.
 
 The worker also owns the daily housekeeping sweep of rows nothing will read
 again: expired sessions, spent pairing codes and update ids older than a week.
+
+## Spaced repetition
+
+`review_state` is where a learner stands on the ladder of one lesson:
+`(user_id, lesson)`, the rung, the last outcome and when the next review is
+due. It is state of its own rather than something read back out of
+`schedules`, because a schedule row is one delivery and deliveries get
+retried, coalesced, cancelled and rebuilt. The ladder survives all of that,
+answers "which rung is this learner on for this lesson", and — being keyed by
+`(user, lesson)` — makes a replayed completion start no second ladder. That is
+what `rebuild-progress` leans on.
+
+A ladder opens when telemetry derives `lesson_completed`, on the completion
+instant rather than on the flush that noticed it. The intervals are 1, 3, 7
+and 21 days, and an outcome moves the rung: **success stretches, failure
+compresses** — `passed` climbs, `partial` repeats the interval that was not
+quite enough, `failed` drops back to the one that was. `ignored` moves nothing
+(silence is not evidence about what they know) but re-arms the same interval
+from now, so a learner who was away does not come back to a queue. `passed` on
+the last rung finishes the ladder: `next_due_at` goes NULL, nothing is
+scheduled again, and the row stays as history. A later stumble does not
+resurrect it.
+
+Deliveries are materialised from the ladder each poller cycle: a due row with
+no live delivery and a working Telegram link becomes a `schedules` row, which
+from there is ordinary proactive work (#15) — quiet hours, one open slot,
+three initiations a day, coalescing, topic rotation. Nothing is materialised
+for a learner who has not paired: a row with nowhere to go would be cancelled
+on sight and made again every cycle, and pairing later needs no repair because
+the ladder stood the whole time.
+
+The review itself is a dialogue, not a quiz. The run is given the lesson's
+concepts from the index — what it introduces and reinforces, plus the
+concepts introduced in the lessons either side, which are the ones a learner
+confuses them with — and the format the rung calls for (free recall,
+discrimination, application, justification). `prompts/review.md` governs how
+it is conducted; `report_review_outcome` is how it ends, and its `notes`
+become a memory, so the next review of that lesson starts from the sore spot.
+
+Whether an item was graded is recorded in the delivery's payload, and the
+poller settles the rest: a session nobody answered is an `ignored` rung on
+every item, a session they did answer is a deferral on the items the tutor
+never reached — the rung does not move and nothing is held against them. A
+settlement is not a grade, so an answer that arrives after the slot timed out
+is still graded from the thread, and the delivery the ladder had already
+queued again is cancelled.
 
 ## Telegram
 
