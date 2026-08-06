@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.core import sessions
+from app.core.config import settings
 from app.core.db import engine, session_factory
 from app.core.security import (
     MAX_PASSWORD_LENGTH,
@@ -14,6 +15,7 @@ from app.core.security import (
     get_password_hash,
 )
 from app.models import User
+from app.telegram import api
 from app.telemetry import progress
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -48,6 +50,14 @@ async def rebuild_progress(session: AsyncSession) -> None:
     logger.info("rebuilt %d lesson aggregates", await progress.rebuild(session))
 
 
+async def set_webhook(url: str) -> None:
+    """Tell Telegram where to post. The full URL, ending in /api/tg/webhook."""
+    if settings.TELEGRAM_WEBHOOK_SECRET is None:
+        raise SystemExit("TELEGRAM_WEBHOOK_SECRET is unset")
+    await api.set_webhook(url, settings.TELEGRAM_WEBHOOK_SECRET)
+    logger.info("telegram will post updates to %s", url)
+
+
 def _prompt_new_password() -> str:
     password = getpass.getpass("new password: ")
     if not MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH:
@@ -67,6 +77,8 @@ async def _run(arguments: argparse.Namespace) -> None:
             await delete_user(session, arguments.email)
         elif arguments.command == "rebuild-progress":
             await rebuild_progress(session)
+        elif arguments.command == "set-webhook":
+            await set_webhook(arguments.url)
         else:
             raise SystemExit(f"unknown command: {arguments.command}")
     await engine.dispose()
@@ -78,6 +90,7 @@ def main() -> None:
     for name in ("reset-password", "delete-user"):
         subcommands.add_parser(name).add_argument("email")
     subcommands.add_parser("rebuild-progress")
+    subcommands.add_parser("set-webhook").add_argument("url")
     asyncio.run(_run(parser.parse_args()))
 
 

@@ -27,6 +27,7 @@ from app.harness.prompts import ContextBlock, Medium, RunKind, assemble
 from app.harness.repository import HarnessRepository, Role
 from app.harness.usage import usage_row
 from app.models import Chat
+from app.telegram.outbox import Outbox
 
 
 class RunBusy(Exception):
@@ -189,6 +190,7 @@ async def run(
     medium: Medium = "telegram",
     run_kind: RunKind = "chat",
     blocks: tuple[ContextBlock, ...] = (),
+    outbox: Outbox | None = None,
 ) -> str:
     """Non-streaming run, for Telegram and for scheduled work."""
     # A run the learner asked for spends their daily allowance; one the
@@ -202,7 +204,7 @@ async def run(
     run_id = uuid.uuid4()
     user_message = ModelRequest(parts=[UserPromptPart(content=prompt)])
     history = await _open_run(repo, chat, run_id, [user_message], medium, role)
-    deps = HarnessDeps(repo=repo, chat=chat)
+    deps = HarnessDeps(repo=repo, chat=chat, outbox=outbox)
     try:
         result = await tutor.run(
             message_history=[*history, user_message],

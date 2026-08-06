@@ -8,7 +8,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import Chat, Message, Schedule, User
+from app.models import Chat, Message, Schedule, TgLink, User
 from app.scheduling import policy
 
 ScheduleKind = Literal["review", "reminder"]
@@ -57,11 +57,19 @@ async def claim_due(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
 
     A muted learner's rows are not claimed at all rather than pushed to the end
     of the mute: they keep the time they were meant for, so lifting a mute makes
-    everything it held back due again in the very next cycle.
+    everything it held back due again in the very next cycle. A learner whose
+    channel is down is held the same way — there is nothing to retry into a
+    blocked bot, and repairing the link releases everything at once.
     """
     muted = (
         select(User.id)
         .where(User.id == Schedule.user_id, User.muted_until > now)
+        .correlate(Schedule)
+        .exists()
+    )
+    unreachable = (
+        select(TgLink.user_id)
+        .where(TgLink.user_id == Schedule.user_id, TgLink.status != "active")
         .correlate(Schedule)
         .exists()
     )
@@ -73,6 +81,7 @@ async def claim_due(session: AsyncSession, now: datetime) -> Sequence[Schedule]:
                 Schedule.due_at <= now,
                 Schedule.lease_until.is_(None),
                 ~muted,
+                ~unreachable,
             )
             .order_by(Schedule.due_at)
             .limit(CLAIM_BATCH)
@@ -231,17 +240,6 @@ async def ignored_topic(session: AsyncSession, user_id: uuid.UUID) -> str | None
     if row is None or row.outcome != "ignored":
         return None
     return policy.topic(row)
-
-
-async def thread(session: AsyncSession, user_id: uuid.UUID) -> Chat | None:
-    """The eternal Telegram thread — the only place a proactive message goes."""
-    chat: Chat | None = await session.scalar(
-        select(Chat)
-        .where(Chat.user_id == user_id, Chat.kind == "telegram")
-        .order_by(Chat.created_at)
-        .limit(1)
-    )
-    return chat
 
 
 async def users_by_id(

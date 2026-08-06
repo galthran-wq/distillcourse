@@ -1,8 +1,9 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Computed,
     DateTime,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
@@ -26,6 +28,11 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = "users"
+    # The window is read as `opens <= t < closes`, which says nothing at all
+    # when the two are the wrong way round.
+    __table_args__ = (
+        CheckConstraint("quiet_start < quiet_end", name="ck_users_quiet_hours"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     # citext: "Ann@x.com" and "ann@x.com" are one account and one login.
@@ -35,6 +42,18 @@ class User(Base):
     # Re-read from the browser at every login: a user who relocates must not
     # keep getting proactive messages on their old clock.
     timezone: Mapped[str] = mapped_column(Text, server_default="UTC")
+    # The waking window the platform may write in, on the clock above. Stored
+    # per learner because it is theirs to set (the settings page), and read by
+    # every decision the poller makes about when.
+    # The default is stated on both sides: the column answers for rows that
+    # already exist, the mapper for a row this process inserts, which must not
+    # have to read the value back before the poller can use it.
+    quiet_start: Mapped[time] = mapped_column(
+        Time, default=time(9), server_default="09:00"
+    )
+    quiet_end: Mapped[time] = mapped_column(
+        Time, default=time(22), server_default="22:00"
+    )
     # NULL is "not muted": until this moment the platform answers but never
     # opens the conversation itself.
     muted_until: Mapped[datetime | None] = mapped_column(
@@ -260,6 +279,64 @@ class Document(Base):
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB)
     content_hash: Mapped[str] = mapped_column(String(64))
     tsv: Mapped[str] = mapped_column(TSVECTOR, Computed(DOCUMENT_TSV, persisted=True))
+
+
+class TgLink(Base):
+    """The learner's Telegram account, and the state of the channel to it.
+
+    One row per learner and one per Telegram chat: a phone that is already
+    somebody's cannot become a second learner's. `broken` means the bot was
+    blocked — the transport is down, and the poller leaves the learner alone
+    until an incoming message proves it is back.
+    """
+
+    __tablename__ = "tg_links"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    tg_chat_id: Mapped[int] = mapped_column(BigInteger, unique=True)
+    status: Mapped[str] = mapped_column(
+        String(8), default="active", server_default="active"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class TgPairingCode(Base):
+    """A one-time code behind a `t.me/<bot>?start=<code>` link.
+
+    Whoever holds the string can attach their Telegram account to the learner
+    it was issued for, so it is short-lived and spent on first use.
+    """
+
+    __tablename__ = "tg_pairing_codes"
+
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class TgUpdateSeen(Base):
+    """Update ids Telegram has already delivered.
+
+    Telegram redelivers an update it got no answer to, and answering takes as
+    long as a model run: without this table a slow reply is a second run over
+    the same message.
+    """
+
+    __tablename__ = "tg_updates_seen"
+
+    update_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 # Rating and bookmark are keyed by the same `lesson:` locator `events` and

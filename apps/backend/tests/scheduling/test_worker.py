@@ -1,24 +1,36 @@
 import asyncio
 import json
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core import sessions
 from app.core.config import settings
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
-from app.models import Chat, Message, Schedule, User, UserSession
+from app.models import (
+    Chat,
+    Message,
+    Schedule,
+    TgLink,
+    TgPairingCode,
+    TgUpdateSeen,
+    User,
+    UserSession,
+)
 from app.scheduling import policy, repository, worker
-from tests.scheduling.conftest import NOON, replying
+from app.telegram import api
+from app.telegram import repository as telegram
+from tests.conftest import Bot, replying
+from tests.scheduling.conftest import NOON
 
-UTC_ZONE = ZoneInfo("UTC")
+WAKING = policy.Hours(ZoneInfo("UTC"), time(9), time(22))
 
 
 async def due_review(
@@ -57,7 +69,7 @@ async def test_a_due_review_is_delivered_and_waits_for_a_reply(
 
     await session.refresh(row)
     assert row.status == "awaiting_reply"
-    assert row.due_at == policy.slot_deadline(NOON, UTC_ZONE)
+    assert row.due_at == policy.slot_deadline(NOON, WAKING)
     assert row.claimed_at == NOON
     assert "entropy is what you owe me" in await thread_messages(session, user, thread)
 
@@ -145,7 +157,7 @@ async def test_quiet_hours_hold_the_message_until_morning(
 
     await session.refresh(row)
     assert row.status == "deferred"
-    assert row.due_at == policy.next_open(night, UTC_ZONE)
+    assert row.due_at == policy.next_open(night, WAKING)
     assert await HarnessRepository(session, user.id).rows(thread) == []
 
 
@@ -166,7 +178,7 @@ async def test_the_daily_budget_holds_the_fourth_message(
 
     await session.refresh(row)
     assert row.status == "deferred"
-    assert row.due_at == policy.tomorrow_open(NOON, UTC_ZONE)
+    assert row.due_at == policy.tomorrow_open(NOON, WAKING)
 
 
 async def test_three_items_travel_together_and_the_rest_wait(
@@ -183,7 +195,7 @@ async def test_three_items_travel_together_and_the_rest_wait(
     postponed = [row for row in rows if row.status == "deferred"]
     prompt = await thread_messages(session, user, thread)
     assert len(delivered) == policy.SESSION_ITEMS
-    assert [row.due_at for row in postponed] == [policy.tomorrow_open(NOON, UTC_ZONE)]
+    assert [row.due_at for row in postponed] == [policy.tomorrow_open(NOON, WAKING)]
     # One message carrying all three, not three messages.
     assert prompt.count("What is due now") == 1
     assert repository.CLAIM_BATCH > len(rows)
@@ -295,7 +307,7 @@ async def test_a_message_runs_the_whole_loop_from_delivery_to_rotation(
     assert (first.status, first.outcome) == ("awaiting_reply", None)
     assert "entropy is what you owe me" in await thread_messages(session, user, thread)
 
-    timeout = policy.slot_deadline(NOON, UTC_ZONE)
+    timeout = policy.slot_deadline(NOON, WAKING)
     same = await due_review(
         session,
         user,
@@ -400,6 +412,60 @@ async def test_an_expired_mute_lets_the_platform_write_again(
     assert row.status == "awaiting_reply"
 
 
+@pytest.mark.usefixtures("thread")
+async def test_a_blocked_bot_pauses_everything_for_that_learner(
+    session: AsyncSession, user: User, link: TgLink, bot: Bot
+) -> None:
+    """No retries into a dead channel: the send fails, the link is marked
+    broken, and nothing of that learner's is claimed until it is repaired."""
+    row = await due_review(session, user)
+    bot.refuse = api.BotBlocked("bot was blocked by the user")
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(row)
+    await session.refresh(link)
+    assert link.status == "broken"
+    # Held, not pushed to tomorrow: the row keeps the time it was meant for.
+    assert (row.status, row.due_at) == ("deferred", NOON)
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(row)
+    assert (row.status, row.claimed_at) == ("deferred", None)
+    assert bot.sent == []
+
+    # Repairing the link releases what it held, in the very next cycle.
+    link.status = "active"
+    await session.commit()
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(row)
+    assert row.status == "awaiting_reply"
+    assert bot.sent != []
+
+
+async def test_housekeeping_removes_the_pairing_codes_and_update_ids_nothing_reads(
+    session: AsyncSession, user: User
+) -> None:
+    now = datetime.now(UTC)
+    await telegram.issue_code(session, user.id, now=now - 2 * telegram.CODE_TTL)
+    await telegram.first_sighting(session, 1)
+    await session.execute(
+        update(TgUpdateSeen).values(
+            received_at=now - telegram.UPDATE_RETENTION - timedelta(days=1)
+        )
+    )
+
+    await worker.housekeep(session, now)
+
+    assert await session.scalar(select(TgPairingCode)) is None
+    assert await session.scalar(select(TgUpdateSeen)) is None
+
+
 async def test_housekeeping_removes_the_sessions_nothing_will_read(
     session: AsyncSession, user: User
 ) -> None:
@@ -415,7 +481,7 @@ async def test_housekeeping_removes_the_sessions_nothing_will_read(
     )
     await session.commit()
 
-    await worker.housekeep(session)
+    await worker.housekeep(session, NOON)
 
     assert await session.scalar(select(UserSession).limit(1)) is None
 
@@ -459,7 +525,7 @@ async def test_a_spent_budget_holds_the_message_rather_than_failing_it(
     await session.refresh(row)
     assert row.status == "deferred"
     assert row.attempts == 0
-    assert row.due_at == policy.tomorrow_open(NOON, UTC_ZONE)
+    assert row.due_at == policy.tomorrow_open(NOON, WAKING)
 
 
 async def test_a_failed_cycle_does_not_stop_the_poller(
@@ -476,7 +542,13 @@ async def test_a_failed_cycle_does_not_stop_the_poller(
     monkeypatch.setattr(worker, "cycle", one_bad_cycle)
     monkeypatch.setattr(worker, "POLL", timedelta(seconds=0.01))
     poller = asyncio.create_task(worker.poll(session_factory))
-    await asyncio.sleep(0.05)
-    poller.cancel()
+    try:
+        # Waited for rather than slept through: what the failed cycle costs
+        # before the next one (logging it, mostly) is not this test's subject.
+        async with asyncio.timeout(2):
+            while len(cycles) < 2:
+                await asyncio.sleep(0.01)
+    finally:
+        poller.cancel()
 
     assert len(cycles) > 1

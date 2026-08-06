@@ -1,15 +1,15 @@
 import secrets
 import uuid
 from typing import Annotated
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
 
 from app import crud
 from app.api.deps import CurrentSession, CurrentUser, SessionDep
 from app.core import sessions
+from app.core.clock import TimezoneName
 from app.core.config import settings
 from app.core.rate_limit import rate_limit
 from app.core.security import (
@@ -22,19 +22,6 @@ from app.core.security import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _known_timezone(value: str) -> str:
-    try:
-        ZoneInfo(value)
-    except (ZoneInfoNotFoundError, ValueError) as exc:
-        raise ValueError(f"unknown timezone: {value}") from exc
-    return value
-
-
-# Scheduling (quiet hours, proactive reviews) reads this straight from the row,
-# so anything that is not an IANA zone has to be rejected at the door. The
-# length bound runs first because ZoneInfo turns the name into a filesystem
-# path, and an over-long one raises OSError, which no validator here catches.
-TimezoneName = Annotated[str, Field(max_length=64), AfterValidator(_known_timezone)]
 Password = Annotated[
     str, Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
 ]

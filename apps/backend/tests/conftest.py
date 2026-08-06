@@ -1,4 +1,6 @@
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -6,6 +8,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from pydantic_ai.models.test import TestModel
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker
 
 from app import crud
@@ -13,10 +16,62 @@ from app.api.deps import get_current_user, get_session, get_session_factory
 from app.core import rate_limit
 from app.core.config import settings
 from app.core.db import engine
+from app.harness.agent import tutor
 from app.main import app
-from app.models import User
+from app.models import TgLink, User
+from app.telegram import api
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
+# The learner's Telegram account, as Telegram numbers it.
+TG_CHAT_ID = 4242
+
+
+@contextmanager
+def replying(text: str = "entropy is what you owe me") -> Iterator[None]:
+    # No tools: what a run does with the tool catalogue is the subject of the
+    # tool tests, and TestModel would otherwise call all of them.
+    with tutor.override(model=TestModel(custom_output_text=text), tools=[]):
+        yield
+
+
+@dataclass(frozen=True)
+class Sent:
+    tg_chat_id: int
+    text: str
+    html: bool
+
+
+@dataclass
+class Bot:
+    """Telegram, recorded instead of called.
+
+    Shared by the telegram tests and the scheduler's, which delivers over the
+    same wire. `refuse` fails the next send and is then forgotten, which is
+    what a fallback has to survive.
+    """
+
+    sent: list[Sent] = field(default_factory=list)
+    refuse: Exception | None = None
+
+    async def send_message(
+        self, tg_chat_id: int, text: str, *, html: bool = True
+    ) -> None:
+        if self.refuse is not None:
+            failure, self.refuse = self.refuse, None
+            raise failure
+        self.sent.append(Sent(tg_chat_id, text, html))
+
+    @property
+    def texts(self) -> list[str]:
+        return [item.text for item in self.sent]
+
+
+@pytest.fixture(autouse=True)
+def bot(monkeypatch: pytest.MonkeyPatch) -> Bot:
+    """Nothing in the suite reaches api.telegram.org."""
+    stub = Bot()
+    monkeypatch.setattr(api, "send_message", stub.send_message)
+    return stub
 
 
 @pytest.fixture(autouse=True)
@@ -87,6 +142,15 @@ async def other_user(session: AsyncSession) -> User:
     return await crud.create_user(
         session, email="stranger@test", password="secret", timezone="UTC"
     )
+
+
+@pytest.fixture
+async def link(session: AsyncSession, user: User) -> TgLink:
+    """The learner has Telegram connected."""
+    row = TgLink(user_id=user.id, tg_chat_id=TG_CHAT_ID)
+    session.add(row)
+    await session.commit()
+    return row
 
 
 @pytest.fixture

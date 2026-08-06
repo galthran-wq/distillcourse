@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     PERPLEXITY_API_KEY: str | None = None
     PERPLEXITY_MODEL: str = "sonar"
 
+    # The Telegram bot: the token BotFather issued, the @name the pairing deep
+    # link is built from, and the secret Telegram echoes back on every webhook
+    # call. Unset, the channel simply does not exist: the webhook refuses
+    # everything and the settings page offers no pairing.
+    TELEGRAM_BOT_TOKEN: str | None = None
+    TELEGRAM_BOT_USERNAME: str | None = None
+    TELEGRAM_WEBHOOK_SECRET: str | None = None
+
     DAILY_MESSAGE_CAP: int = 100
     WEB_SEARCH_DAILY_CAP: int = 20
     # The instance-wide ceiling is the software half of the budget; the other
