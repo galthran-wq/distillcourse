@@ -2,10 +2,11 @@
 """Deterministic DTMF test corpus per ITU-T Q.23/Q.24 (pure stdlib).
 
 Q.23: low group 697/770/852/941 Hz, high group 1209/1336/1477/1633 Hz;
-sending frequency tolerance +/-1.8%. Q.24 (AT&T annex values used widely):
-receivers must operate at <=1.5% frequency offset and must not operate at
->=3.5%; accept twist (high-vs-low level difference) within roughly
--8..+4 dB; accept tones >=40 ms and reject <23 ms.
+sending frequency tolerance +/-1.8%. The selected Q.24 Annex A AT&T example
+profile specifies operation at <=1.5% frequency offset, non-operation at
+>=3.5%, high-minus-low twist from -8 through +4 dB, operation for tones
+>=40 ms, and non-operation for tones <=23 ms. Durations between 23 and
+40 ms are intentionally not assigned a mandatory outcome by this corpus.
 
 Everything is synthesized at 8000 Hz, 16-bit mono WAV, with a fixed LCG
 noise seed, so the corpus is exactly reproducible. Run: python3 generate.py
@@ -42,6 +43,7 @@ def silence(ms):
     return [0.0] * int(FS * ms / 1000)
 
 def add_noise(x, snr_db, seed=0x6D2B79F5):
+    """Add noise using power over every sample, including pauses."""
     p = sum(v * v for v in x) / len(x)
     target = p / 10 ** (snr_db / 10)
     g = lcg(seed)
@@ -50,8 +52,28 @@ def add_noise(x, snr_db, seed=0x6D2B79F5):
     s = math.sqrt(target / pn)
     return [v + s * w for v, w in zip(x, noise)]
 
+def active_tone_indices(key_count, delay=0):
+    """Indices for 100 ms tone-on spans in a 100 ms tone/100 ms pause sequence."""
+    tone_samples = FS // 10
+    stride = 2 * tone_samples
+    return [delay + key * stride + n
+            for key in range(key_count)
+            for n in range(tone_samples)]
+
+def add_noise_active_tone_snr(x, snr_db, indices, seed=0x6D2B79F5):
+    """Add full-length noise scaled only on the declared active-tone mask."""
+    if not indices or indices[0] < 0 or indices[-1] >= len(x):
+        raise ValueError("active-tone indices must be nonempty and inside x")
+    signal_power = sum(x[i] * x[i] for i in indices) / len(indices)
+    target_noise_power = signal_power / 10 ** (snr_db / 10)
+    g = lcg(seed)
+    noise = [next(g) for _ in x]
+    mask_noise_power = sum(noise[i] * noise[i] for i in indices) / len(indices)
+    scale = math.sqrt(target_noise_power / mask_noise_power)
+    return [v + scale * w for v, w in zip(x, noise)]
+
 def phone_channel():
-    """101-tap Hamming windowed-sinc bandpass, 300-3400 Hz: the Q.24 voice band."""
+    """Course-defined 101-tap Hamming windowed-sinc, 300-3400 Hz bandpass."""
     taps, fc1, fc2 = 101, 300 / FS, 3400 / FS
     mid = taps // 2
     h = []
@@ -98,7 +120,8 @@ def main():
         "offset+3.5pct-must-reject": dict(off_pct=3.5),
         "twist+4dB-limit": dict(twist_db=4.0),
         "twist-8dB-limit": dict(twist_db=-8.0),
-        "short-25ms-must-reject": dict(ms=25),
+        "short-20ms-must-reject": dict(ms=20),
+        "short-25ms-indeterminate": dict(ms=25),
         "short-45ms-must-operate": dict(ms=45),
     }
     for name, kw in cases.items():
@@ -107,9 +130,19 @@ def main():
     # 4. Noise variants of the full sequence (deterministic seed).
     for snr in (30, 15):
         write_wav(f"clips/all-keys-snr{snr}dB.wav", add_noise(seq, snr))
-    # 5. Phone-band channel versions: clean and 15 dB SNR after the channel.
-    write_wav("clips/all-keys-channel.wav", conv(seq, ch))
-    write_wav("clips/all-keys-channel-snr15dB.wav", add_noise(conv(seq, ch), 15))
+    # 5. Explicit 10 dB ACTIVE-TONE SNR. Power is measured only over each
+    #    100 ms tone-on interval, never over the 100 ms pauses.
+    tone_mask = active_tone_indices(len(KEYS))
+    write_wav("clips/all-keys-active-snr10dB.wav",
+              add_noise_active_tone_snr(seq, 10, tone_mask))
+    # 6. Course phone-band channel variants. The channel-aligned mask starts
+    #    at its exact 50-sample linear-phase group delay.
+    channel_seq = conv(seq, ch)
+    write_wav("clips/all-keys-channel.wav", channel_seq)
+    write_wav("clips/all-keys-channel-snr15dB.wav", add_noise(channel_seq, 15))
+    channel_tone_mask = active_tone_indices(len(KEYS), delay=len(ch) // 2)
+    write_wav("clips/all-keys-channel-active-snr10dB.wav",
+              add_noise_active_tone_snr(channel_seq, 10, channel_tone_mask))
 
 if __name__ == "__main__":
     main()

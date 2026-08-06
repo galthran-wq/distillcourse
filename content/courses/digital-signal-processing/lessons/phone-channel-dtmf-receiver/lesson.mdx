@@ -1,0 +1,370 @@
+A DTMF receiver must turn finite Fourier evidence into a key-or-reject decision while keeping spectral features, temporal qualification, latency, and cost on declared coordinates.
+
+<Ref lesson="fft-factorization-and-layout">FFT Factorization and Machine Layout</Ref> established that a full transform and selected sums are interchangeable only at the same declared coordinates, then handed their finite evidence to this application. <Ref lesson="sampling-aliasing-and-reconstruction">Sampling, Aliasing, and Reconstruction</Ref> fixed the hertz-to-radians/sample map and the rule that a digital detector cannot undo analog spectral overlap. The remaining task is to turn eight finite frequency measurements into an auditable stateful contract that emits a key only after every spectral and temporal gate passes; every failed or ambiguous gate emits `REJECT`.
+
+The construction proceeds from the row-column code to feature coordinates, temporal state, the complete gate conjunction, and a held-out audit that preserves failed targets beside passed ones.
+
+## A pair becomes a candidate only through two frequency groups
+
+The inherited transforms return coefficients, but a DTMF decision begins with a stricter combinatorial condition than selecting two large values.
+
+### Four inherited facts bound the detector
+
+<Task>
+Work closed-book. Answer exactly four retrieval prompts.
+
+1. At $f_s=8$ kHz, map 770 Hz and 1336 Hz to radians/sample and state whether either nominal tone aliases across $\pi$.
+2. Write the course's raw forward $N$-point DFT and state the conjugate-symmetry relation for a real record.
+3. State the condition under which a physical-frequency sum $C_N(f)$ is the same coordinate as one ordinary DFT bin $X_N[k]$, then state what changes when 205 acquired samples are padded to length 256.
+4. Distinguish analog aliasing from finite-record leakage by naming when each is created and one change that can affect it.
+
+Proceed when prompt 3 and at least two of the other prompts are correct.
+</Task>
+
+<Aside title="Retrieval answers">
+The two discrete frequencies are
+
+$$
+\omega_{770}=2\pi\frac{770}{8000}=0.1925\pi,
+\qquad
+\omega_{1336}=2\pi\frac{1336}{8000}=0.334\pi
+$$
+
+radians/sample. Both lie strictly below $\pi$, so neither nominal tone aliases at the declared sampling rate.
+
+The raw forward transform is
+
+$$
+X_N[k]=\sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/N},
+\qquad k=0,\ldots,N-1.
+$$
+
+For real $x[n]$, $X_N[(N-k)\bmod N]=X_N[k]^*$. A selected sum equals an ordinary bin under the same record and scale only when $f/f_s$ and $k/N$ are equal modulo one. Padding 205 samples with 51 zeros changes the sampled grid to $kf_s/256$ but adds no observation time and does not narrow the 205-sample record-window response.
+
+Analog aliasing is created at acquisition when continuous-frequency replicas overlap; changing the analog anti-alias filter or sampling rate can prevent it. Leakage is created by finite observation and its window; changing the record or window changes leakage, while relabeling bins does not.
+</Aside>
+
+### One row and one column define a candidate
+
+The DTMF code uses low-group frequencies 697, 770, 852, and 941 Hz and high-group frequencies 1209, 1336, 1477, and 1633 Hz. One member of each group defines a keypad intersection. For key `5`, the candidate pair is 770 Hz plus 1336 Hz. A lone 770 Hz component has no high-group member, while 770 Hz plus 852 Hz contains two low-group members; neither input has a valid keypad intersection.
+
+<Figure src="./figures/dtmf-key-decision-grid.svg" alt="A four-by-four DTMF grid pairs low rows 697, 770, 852, and 941 hertz with high columns 1209, 1336, 1477, and 1633 hertz; row 770 and column 1336 intersect at key 5, while missing, duplicate, or failed gates lead to REJECT." caption="A key exists only at one qualified row-column intersection; every incomplete or conflicting pattern returns REJECT." />
+
+The common rule “take the two largest bins” fails before any threshold is chosen. In the committed clean key-5 record, the two largest values over all 205 DFT bins occur at $k=34$ and $k=171$. They are the positive- and negative-frequency partners of the same real high-group tone, not one row plus one column.
+
+Restricting the search to positive frequencies does not repair the rule. For a lone 770 Hz cosine in a 205-sample rectangular record, the two largest positive-bin magnitudes occur at $k=20$ and $k=19$. Both arise from the same off-grid low-group tone and its leakage. The replacement rule searches the two groups separately, requires one qualified member in each, applies the remaining gates, and retains `REJECT` as an ordinary output.
+
+The group rule identifies which physical frequencies matter. An auditable receiver must next identify the mathematical coordinates at which those frequencies are measured.
+
+## Feature coordinates must be named before thresholds or cost
+
+A correct row-column rule still fails audit if an exact physical frequency is silently replaced by a nearby bin from a different transform length.
+
+### Exact physical frequencies need their own coordinates
+
+<Example title="key 5 on exact and N=205 coordinates">
+Let $f_s=8000$ Hz and $N=205$. The record spans $205/8000=25.625$ ms and its DFT-bin spacing is
+
+$$
+\Delta f=\frac{f_s}{N}=39.024390\ \text{Hz}.
+$$
+
+For each nominal tone, compute $k=\operatorname{round}(fN/f_s)$ and $f_k=kf_s/N$:
+
+| nominal $f$ | nearest $k$ | $f_k$ | $f_k-f$ | $100(f_k-f)/f$ |
+|---:|---:|---:|---:|---:|
+| 770 Hz | 20 | 780.487805 Hz | +10.487805 Hz | +1.362053% |
+| 1336 Hz | 34 | 1326.829268 Hz | −9.170732 Hz | −0.686432% |
+
+Both bin centers lie inside the named AT&T column of Q.24 Annex A's ±1.5% operate interval. That geometric inclusion does not make either bin an exact nominal coordinate and does not prove operation for every tone at the interval boundary.
+
+The two evaluations use different kernels:
+
+$$
+C_{205}(770)=\sum_{n=0}^{204}x[n]e^{-j2\pi(770)n/8000},
+\qquad
+X_{205}[20]=\sum_{n=0}^{204}x[n]e^{-j2\pi(20)n/205}.
+$$
+
+Their exponent coordinates differ because $770/8000\ne20/205$. The same distinction holds between $C_{205}(1336)$ and $X_{205}[34]$.
+</Example>
+
+<Figure name="DtmfCoordinateComparison" alt="For key 5, exact correlations evaluate 770 and 1336 hertz; the nearest 205-point bins are 780.4878 and 1326.8293 hertz, while appending 51 zeros gives nearest 256-point bins at 781.25 and 1343.75 hertz." caption="Zero padding samples a different frequency grid; neither nearest-bin pair is the exact-nominal correlation pair." />
+
+<Definition title="selected-frequency finite-record projection">
+For an $N$-sample record acquired at $f_s$, the unscaled negative-sign projection at physical frequency $f$ is
+
+$$
+C_N(f)=\sum_{n=0}^{N-1}x[n]e^{-j2\pi fn/f_s}.
+$$
+
+It equals $X_N[k]$ as a coordinate identity only when $f/f_s\equiv k/N\pmod 1$ under the same record and scale.
+</Definition>
+
+The canonical case is $C_{205}(770)$, which evaluates the exact nominal low component of key 5. A structurally different valid case appends 51 zeros and writes the selected padded-grid value as $C_{205}(kf_s/256)$; the zero samples need not appear in the sum. At the boundary $N=1$, the projection is $x[0]$ for every $f$. Calling $C_{205}(770)$ by the name $X_{205}[20]$ is a near-miss because it violates the exponent-coordinate clause. At 8 kHz, $f=20f_s/205=780.487805$ Hz is an exact $N=205$ bin coordinate.
+
+<Exercise>
+For key `8`, whose nominal frequencies are 852 Hz and 1336 Hz, use $f_s=8000$ Hz and $N=205$ to produce the same nearest-bin table as the example. Then decide whether an ordinary $N=256$ padded FFT coefficient can be declared identical to either exact-nominal projection.
+
+A genuine attempt writes $k=\operatorname{round}(fN/f_s)$ for both tones and the coordinate-identity condition before opening the solution. First hint: an ordinary 256-point bin is an integer multiple of 31.25 Hz.
+
+<Solution>
+For 852 Hz,
+
+$$
+k=\operatorname{round}(852\cdot205/8000)=22,
+$$
+
+so $f_k=22(8000/205)=858.536585$ Hz. The signed error is $+6.536585$ Hz, or
+
+$$
+100\frac{6.536585}{852}=+0.767205\%.
+$$
+
+For 1336 Hz, $k=34$, $f_k=1326.829268$ Hz, and the error is $-9.170732$ Hz or $-0.686432\%$. Both nearest $N=205$ centers lie inside the named ±1.5% operate interval, with the same limited inference as in the example.
+
+At $N=256$, ordinary bins lie at $31.25k$ Hz. Neither $852/31.25=27.264$ nor $1336/31.25=42.752$ is an integer. Therefore neither exact-nominal projection is an ordinary padded FFT bin. A chirp-z transform, interpolation rule, or direct physical-frequency projection could target those frequencies, but it would be an additional declared computation. The transferable step is to compare exponent coordinates before comparing coefficient values or arithmetic.
+</Solution>
+</Exercise>
+
+### Coordinate identity precedes a fair cost ledger
+
+Coordinate choice also controls a fair cost ledger. Eight exact $N=205$ direct projections use 1640 complex-product slots and 1632 complex additions. Eight real-input Goertzel evaluations at those same physical frequencies use 1656 real multiplications and 3288 real additions under the declared Lyons ledger. These heterogeneous units do not form one total.
+
+For padded-grid coordinates, eight selected sums can omit the 51 known zeros and retain 1640 complex-product slots plus 1632 additions; a literal 256-iteration implementation records 2048 and 2040 instead. A full radix-2 256-point FFT records 1024 twiddle slots and 2048 complex additions. Runtime still depends on implementation, batching, memory traffic, and hardware.
+
+<KeyFact>
+Coefficient equality requires the same exponent coordinate; proximity, padding, or membership in a tolerance interval does not supply that identity.
+</KeyFact>
+
+Named feature coordinates describe one finite frame. The receiver's duration decision requires a longer temporal contract.
+
+## A feature frame cannot certify the duration gate
+
+The $N=205$ frame supplies spectral evidence after 25.625 ms, but the named operation boundary cannot be satisfied before at least 320 received samples have been considered by the duration rule.
+
+### The named profile contains an intentional gray region
+
+The selected laboratory profile is the AT&T column of ITU-T Q.24 Annex A. Its duration categories are non-operation through 23 ms, an unspecified open interval from 23 to 40 ms, and operation from 40 ms when every other gate also passes. Those values are one named national/application example in Q.24, not a universal receiver table.
+
+<Figure src="./figures/dtmf-duration-profile.svg" alt="An AT&T Q.24 Annex A duration band marks at most 23 milliseconds as non-operation, strictly between 23 and 40 milliseconds as an unspecified gray region, and at least 40 milliseconds as the operation-duration region; fixtures at 20, 25, and 45 milliseconds fall into those three regions." caption="The named profile leaves 23-40 ms unspecified; the 25 ms fixture is not conformance ground truth." />
+
+<Example title="three repaired duration fixtures">
+At 8 kHz, duration $T$ seconds contains $N_T=f_sT$ active samples.
+
+- The 20 ms fixture contains $8000(0.020)=160$ active samples. It lies within the named AT&T profile's ≤23 ms non-operation side and must return `REJECT`.
+- The 25 ms fixture contains $8000(0.025)=200$ active samples. It lies in the named profile's 23–40 ms gray region, so it has no mandatory conformance label and is excluded from conformance accuracy.
+- The 45 ms fixture contains $8000(0.045)=360$ active samples. It reaches the named profile's ≥40 ms operation-duration side, but frequency, group structure, energy/dominance, twist, pause, and interruption still remain to be checked.
+
+The $N=205$ feature frame lies between the second and third fixtures at 25.625 ms. It cannot by itself certify the 320-sample operation-duration boundary.
+</Example>
+
+<Figure name="DtmfFeatureTimingPipeline" alt="A synthetic key-5 signal passes through the 101-tap course FIR, a 205-sample rectangular feature frame produces eight declared spectral coordinates, and a separate temporal state accumulates at least 320 received samples before frequency, dominance, twist, pause, and interruption gates can return KEY or REJECT." caption="Spectral evidence may arrive before temporal qualification; one 205-sample frame cannot by itself satisfy a 320-sample duration gate." />
+
+<Exercise>
+Under the same named AT&T profile, classify bursts of 23, 31, and 40 ms at 8 kHz. State the earliest received evidence span for the duration gate, then place the course FIR's 50-sample delay on a separate source-origin ledger.
+
+A genuine attempt writes the three duration regions before calculating samples. First hint: the two inclusive boundaries are 23 ms on the non-operation side and 40 ms on the operation side.
+
+<Solution>
+The 23 ms burst contains $8000(0.023)=184$ samples and lies on the named profile's mandatory non-operation side. The 31 ms burst contains 248 samples and lies in the unspecified gray region. The 40 ms burst contains 320 samples and reaches the operation-duration side, assuming every other gate passes.
+
+The declared duration rule therefore needs a 320-sample, 40 ms received-signal span. The symmetric 101-tap course FIR has group delay
+
+$$
+\frac{101-1}{2}=50\ \text{samples}=6.25\ \text{ms}.
+$$
+
+That delay belongs between source onset and received-signal onset. It is not added to a latency already defined from received onset, and frame/block alignment remains a separate implementation term. The transferable move is to attach every latency value to its origin and decision boundary.
+</Solution>
+</Exercise>
+
+### The executable receiver carries state across five-millisecond blocks
+
+The frozen executable study uses a different feature schedule from the lesson's $N=205$ cost comparison: its exact-nominal spectral record is 160 samples, or 20 ms, and its temporal state advances in 40-sample, 5 ms blocks. A qualifying candidate spans at least 40 ms, contains at least 30 ms above the block-energy threshold, and permits at most 10 ms of consecutive interruption. This design separation prevents a short spectral record from being mislabeled as the temporal proof.
+
+<KeyFact>
+A 205-sample frame can supply features, but it cannot certify a 320-sample duration condition; received-onset latency and the FIR's source-path delay belong to separate ledgers.
+</KeyFact>
+
+Duration is one gate among several. Emitting a key requires the entire set to agree at one decision time.
+
+## A key is the conjunction of declared gates
+
+Temporal qualification prevents short registrations, but it cannot repair a missing group, an out-of-profile frequency, failed dominance, or unacceptable twist.
+
+### Standards boundaries and local gates serve different roles
+
+The standards values and the local receiver thresholds serve different roles. ITU-T Q.23 specifies the sender frequencies and a ±1.8% sender tolerance. The named AT&T column of Q.24 Annex A supplies this lesson's laboratory receiver profile: operate-frequency offsets through ±1.5%, non-operation offsets from ±3.5%, accepted high-minus-low twist from −8 through +4 dB, operation duration from 40 ms, non-operation through 23 ms, pause of at least 40 ms, and interruption through 10 ms. It leaves the frequency and duration transition regions locally specified.
+
+The frozen synthetic study selected its own implementation thresholds from 640 training trials before held-out scoring:
+
+| local gate | frozen study value | role |
+|:--|:--|:--|
+| block energy | 0.028 | locate active 5 ms blocks |
+| group energy | at least 0.035 | reject an absent or weak group |
+| winner dominance | at least 3 dB | reject an insufficiently isolated group winner |
+| measured twist | −10 through +5 dB | allow estimator error around the named profile's −8 through +4 dB operate interval |
+| estimated detuning | at most 2% absolute | local measured-frequency threshold, distinct from the named ±1.5% operate and ±3.5% non-operate boundaries |
+
+These are training-selected design values, not numbers copied from Q.24. They must not be retuned on the held-out trial cards.
+
+### The decision contract makes rejection first-class
+
+<Definition title="DTMF key-or-reject decision contract">
+Emit the key at row $r$ and column $c$ only when exactly one low-group member $r$ and exactly one high-group member $c$ are accepted and every declared frequency, energy/dominance, twist, duration, pause, and interruption gate passes. Emit `REJECT` after any failed or ambiguous gate. For a duration strictly between 23 and 40 ms under the named AT&T profile, report the local receiver output separately from the null conformance label.
+</Definition>
+
+A nominal 45 ms pair at 770 and 1336 Hz is a key-5 candidate, but not a key until every gate passes. The same structure maps the service-key pair 941 and 1209 Hz to `*`. A 20 ms otherwise valid pair fails duration. A 25 ms pair may receive a local key or `REJECT`, but its profile conformance label remains absent. A lone 770 Hz tone and an input containing two low-group tones violate the exactly-one-per-group condition even when local magnitude ranks look decisive.
+
+<Task>
+Use the contract lab in three stages. First select **Two lows**, observe the immutable frozen false accept `B`, and enable exactly-one-per-group until the teaching-contract row returns `REJECT`. Then use **Detuned pair** and **Low twist**, enabling only the matching fixed gate before enabling all spectral gates. Finally use **Timing audit** to preserve all four outcomes: Hard 50 ms emits `7` but fails the ≤40 ms latency target; Short 22 ms rejects; Gray 26 ms is unscored; Pause 38 ms requires the independent pause gate to reach the declared `REJECT` contract.
+</Task>
+
+<Demo name="DtmfDecisionLab" caption="Enable the independent gates until each frozen trial reaches its declared key-or-reject contract; compare the unchanged frozen-study output with the teaching-contract output, and keep gray cases unscored." />
+
+The frozen gate contract supports held-out evaluation. Each predeclared target retains its own denominator and verdict.
+
+## Held-out evidence preserves both passes and failures
+
+The frozen gate contract makes target-by-target evaluation possible; an honest audit reports the successful clean and hard-set accuracies beside the failed all-negative and 40 ms latency requirements.
+
+### Target-specific denominators keep failures visible
+
+The deterministic study has status `complete_targets_partially_met`. Its 17 labels are the 16 keypad symbols plus `REJECT`. Threshold selection used only the 640-trial training split. The held-out splits use distinct deterministic seeds, and changing all non-training seeds leaves both the training records and selected thresholds unchanged.
+
+| held-out condition | result | target | verdict |
+|:--|:--|:--|:--|
+| clean keys, 32 per key | 512/512 = 100% | at least 99% | **PASS** |
+| 10 dB active-tone SNR, 64 per key, independent low/high offsets inside ±1.5% | 1023/1024 = 99.90234375% | at least 95% | **PASS** |
+| ten mandatory-negative categories, 64 trials each | 637/640 = 99.53125% rejected | all 640 rejected | **FAIL** |
+| accepted hard-set received-onset latency | median 45 ms, p95 45 ms, maximum 50 ms | maximum at most 40 ms | **FAIL** |
+
+The hard split's only classification error is a false reject of `*` at the twist gate. The three negative false accepts are `negative-two_low-013 → B`, `negative-twist_low-063 → 5`, and `negative-insufficient_pause_lt_40ms-013 → 2`; the last input has a 38 ms pause. These failures remain adjacent to the two passing accuracies because `all_declared_targets_met=false`.
+
+<Figure name="DtmfCoordinateCostLatencyLedger" alt="A ledger compares exact 205-sample correlation and Goertzel costs with a 256-point FFT-grid cost, separates 40 milliseconds from received onset from the FIR's 6.25-millisecond source delay, and audits a separate 160-sample receiver study: clean and 10-decibel accuracy pass, while negative-control rejection and a 50-millisecond hard-set maximum latency fail their targets." caption="A fair comparison fixes coordinates, units, and latency origin; the frozen study passes two targets and exposes two failures." />
+
+### Synthetic evidence does not establish field conformance
+
+The combined held-out confusion matrix contains 2172 correct labels among 2176 trials, but that pooled 99.81617647% depends on the frozen mixture of clean keys, impaired keys, and negatives. It is not a substitute for the four condition-specific verdicts. All 128 gray-duration trials at 24–39 ms and all training trials are excluded from this conformance denominator.
+
+The study is reproducible evidence about a deterministic synthetic receiver. It uses generated PCM, optional convolution with the course's symmetric 101-tap 300–3400 Hz FIR, and exactly defined Gaussian noise. It contains no deployed telephone receiver, acoustic recording, reverberation, clipping, speech, dial tone, echo, calibrated dBm level, or population sample. High accuracy on its frozen grid is therefore neither statistical confidence nor standards conformance.
+
+<Aside title="Reproduction boundary">
+The recorded receiver script SHA-256 is `0283c18203088710d2c725e51406dfe7adf7d73eaaf623e61f092655f3082349`; its result SHA-256 is `80017325d559f87e209fbf4e431eed1581f1fb69b2cd89740e241653162673ba`. A fresh Python 3.12.3 run matches the result byte-for-byte. This establishes deterministic execution, not external preregistration or real-world generalization.
+</Aside>
+
+### Rectangular leakage remains an unresolved failure
+
+The remaining visible failure is spectral rather than statistical. For a length-205 rectangular complex record, a unit line at bin coordinate 20.5 contributes normalized magnitude
+
+$$
+\left|\frac{\sin(\pi d)}{205\sin(\pi d/205)}\right|=0.212225
+$$
+
+at a point $d=1.5$ bins away. That is −13.4641 dB, which is 26.5359 dB above a neighboring line of amplitude 0.01, or −40 dB. Zero padding samples this same finite-record response more densely and cannot remove the masking.
+
+<KeyFact>
+The frozen study has two passes and two failures: clean and 10 dB ±1.5% accuracy pass, while all-negative rejection and maximum accepted hard-set latency fail; no pooled score can erase either failure.
+</KeyFact>
+
+The receiver contract is now auditable: spectral coordinates, named-profile gates, temporal state, latency origins, and arithmetic units are separated, and the held-out study preserves both passed and failed targets. **Windows, Leakage, and Resolution** next measures how the rectangular record's main lobe and sidelobes hide the weak neighboring line and how a changed window trades that leakage against resolution and calibration.
+
+## Exercises
+
+<Exercise>
+An implementation requirement asks for the eight exact-nominal projections $C_{205}(f_i)$ from one 205-sample record at 8 kHz. Three teams propose (A) reading the nearest bins of one 205-point FFT, (B) appending 51 zeros and reading the nearest bins of one 256-point FFT, or (C) evaluating direct projections or real-input Goertzel recurrences at the eight physical nominal frequencies. Select every proposal that meets the requirement without interpolation, diagnose the coordinate error in each rejected proposal, and specify a coefficient-equality test. Then state how the comparison changes if the requirement is replaced by eight declared $N=256$ grid coordinates.
+
+<Solution>
+Only proposal C meets the exact-nominal requirement without an additional interpolation or transform step. It targets
+
+$$
+C_{205}(f_i)=\sum_{n=0}^{204}x[n]e^{-j2\pi f_i n/8000}
+$$
+
+at each requested physical frequency $f_i$. A direct sum and a Goertzel recurrence may therefore be compared as implementations of the same coordinates when sign, raw scale, input record, and numerical tolerance are fixed.
+
+Proposal A instead returns ordinary coordinates $X_{205}[k_i]$ at integer multiples of $8000/205$ Hz. Proposal B returns $X_{256}[k_i]$, equivalently selected sums over the same 205 nonzero samples at integer multiples of $8000/256$ Hz. Padding changes the grid but does not make either nearest-bin family identical to the nominal physical frequencies. Proximity to a nominal value or membership in an operate interval is not coefficient identity.
+
+The equality test freezes one input record, the negative exponent, raw forward scale, and the eight exact frequencies, then compares the eight complex values from C's two implementations under a declared numerical tolerance. Comparing magnitudes alone would miss phase or sign errors.
+
+If the requirement changes to eight declared $N=256$ grid coordinates, a selected direct-sum path and the full 256-point FFT can be compared at the same eight indices after the 51 zeros, ordering, and scale are declared. The exact-nominal C implementation must be retargeted to those grid frequencies before it belongs in that equality test. The method follows the requested coordinates; the algorithm name does not define them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Under the named AT&T Q.24 Annex A profile, classify the duration gate for a tone through 23 ms, a 25 ms tone, and a tone from 40 ms. Then classify an input with zero amplitude in one frequency group and split the local outcome for offsets in the open gap between the named 1.5% operate and 3.5% non-operate boundaries.
+
+<Solution>
+A tone no longer than 23 ms lies on the mandatory non-operation side and returns `REJECT`. A 25 ms tone lies in the 23–40 ms gray region; its local receiver may return a key or `REJECT`, but it has no mandatory conformance label. A tone of at least 40 ms reaches only the operation-duration side, so every other gate still has to pass.
+
+Zero amplitude in one group violates exactly-one-per-group and group energy, so the overall output is `REJECT` regardless of the surviving tone's magnitude. The frequency transition gap has no mandatory profile label. Under this receiver's declared local detuning gate, offsets in $(1.5\%,2.0\%]$ may still pass the detuning check, while offsets in $(2.0\%,3.5\%)$ fail it and return `REJECT`. Passing the local detuning gate supplies no profile operate guarantee, and neither case may be forced to its nearest key when another gate fails.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute “the largest two FFT bins always name the key” twice: first when all bins of a real record are eligible, then when only positive-frequency bins of a lone 770 Hz, $N=205$ rectangular record are eligible. Name the failed inference and give the replacement decision rule.
+
+<Solution>
+For a real record, conjugate symmetry gives $X[N-k]=X[k]^*$. The positive- and negative-frequency coefficients of one strong real sinusoid therefore have equal magnitude and may be the two largest values. In the clean key-5 record, $k=34$ and $k=171=205-34$ are such a pair for the high tone, so the two winners do not represent one low and one high component.
+
+For a lone 770 Hz cosine, 770 Hz is off the $N=205$ grid. The largest positive-frequency bins are $k=20$ and $k=19$, both supplied by the one low-group tone's rectangular-window response. Restricting the ranking to positive frequencies therefore still returns two values without a high-group component.
+
+The failed inference is that two ranked coordinates imply two distinct transmitted group members. The replacement searches low and high groups separately, requires exactly one qualified member in each, applies frequency, energy/dominance, twist, duration, pause, and interruption gates, and returns `REJECT` after any failure.
+</Solution>
+</Exercise>
+
+<Exercise>
+Audit the frozen receiver study without retuning any threshold. Reconstruct the clean, 10 dB ±1.5%, mandatory-negative, and accepted-hard-latency target verdicts. State why the clean split's 40 ms maximum cannot replace the hard split's maximum, and state how gray-duration trials enter the calculation.
+
+<Solution>
+The clean split has 512 correct labels among 512 trials, or 100%, and passes its at-least-99% target. The held-out hard split has 1023 correct labels among 1024 trials at 10 dB active-tone SNR with independently drawn low/high offsets inside ±1.5%, or 99.90234375%, and passes its at-least-95% target.
+
+The negative split rejects 637 of 640 trials, or 99.53125%. Because the target requires all 640 rejects, the three false accepts make this a failure. The false accepts are a two-low input emitted as `B`, a low-twist input emitted as `5`, and a 38 ms-pause input emitted as `2`.
+
+Among the 1023 accepted hard trials, latency from received-signal onset has median and p95 45 ms and maximum 50 ms. The maximum exceeds the 40 ms target, so latency fails. The clean maximum of 40 ms belongs to another split with no noise, offsets, twist variation, or channel; substituting it would change the tested condition.
+
+All 128 trials with durations 24–39 ms have null conformance labels and are excluded, as are all training trials. The correct overall statement is `complete_targets_partially_met` and `all_declared_targets_met=false`. The result remains a deterministic synthetic audit, not standards-conformance or field evidence.
+</Solution>
+</Exercise>
+
+<Exercise>
+Specify one apples-to-apples implementation comparison for eight requested coordinates. Choose either eight selected $N=256$ grid sums versus a full $N=256$ FFT at the same bins, or eight exact-nominal direct projections versus real-input Goertzel evaluations at the same physical frequencies. State coordinates, sign, scale, arithmetic units, buffering, and the equality check before choosing a likely implementation.
+
+<Solution>
+One valid grid comparison fixes eight indices $k_i$ and the negative-sign raw coefficients
+
+$$
+X_{256}[k_i]=\sum_{n=0}^{204}x[n]e^{-j2\pi k_i n/256},
+$$
+
+where 51 appended values are known zeros. The selected path can omit those zeros and uses 1640 complex-product slots plus 1632 complex additions. A literal 256-iteration loop instead records 2048 and 2040. The full radix-2 FFT uses a 256-value buffer, 1024 twiddle slots, and 2048 complex additions, then restores natural order and reads the same $k_i$. A seeded check compares the same eight complex values under one scale and requires a declared numerical tolerance.
+
+One valid exact-frequency comparison fixes the eight physical DTMF frequencies and evaluates $C_{205}(f)$ by both methods. Direct evaluation uses 1640 complex-product slots and 1632 complex additions. The declared real-input Goertzel ledger uses 1656 real multiplications and 3288 real additions. Its resonant frequency must be the same possibly noninteger physical coordinate, not a rounded DFT bin.
+
+Either branch is valid. The arithmetic units remain separate, buffering and ordering are reported, and timing on the target machine decides the runtime winner. An ordinary FFT-grid coefficient cannot be declared identical to an exact-nominal result unless the exponent coordinates coincide.
+</Solution>
+</Exercise>
+
+<Exercise>
+An engineer cannot see a weak line beside a strong off-grid line in a 205-sample rectangular record. Three proposed repairs are: (A) zero-pad the record to 2048 points, (B) acquire 410 samples at the same rate, or (C) keep 205 samples but change the window and compare uncalibrated peak heights. Diagnose what each proposal changes and what it leaves unchanged. Then design a reproducible comparison that can distinguish denser spectral sampling, longer-observation resolution, and a window's leakage tradeoff without assuming that the tallest displayed peak is the best result.
+
+<Solution>
+Proposal A samples the same 205-sample rectangular-record transform on a denser display grid. It may locate the shape between the old bins more finely, but it does not change the acquired duration, rectangular kernel, main-lobe width, or sidelobe leakage. A newly visible sample is not newly acquired resolving power.
+
+Proposal B doubles the acquired duration while keeping the sampling rate fixed. Its ordinary grid spacing halves, and a fixed physical tone separation occupies twice as many bins of the longer record. The finite-record kernel changes because the observation changed; this proposal can change physical resolving power and leakage geometry, at the cost of doubled acquisition time and a changed latency/buffering contract.
+
+Proposal C changes the kernel without adding observation time. A different window may lower sidelobes near the weak line, but it also changes main-lobe width, coherent gain, scalloping, and noise bandwidth. Comparing raw peak heights would confound attenuation by the window with detection performance, so the values must be calibrated to the same amplitude convention.
+
+A reproducible comparison freezes the sampling rate, physical tone frequencies, amplitudes, relative-phase cases, noise rule, estimator coordinates, and amplitude calibration. It varies padding length, acquired duration, and window family separately. For each run it reports grid spacing, observation time, main-lobe width, peak sidelobe level, coherent gain, scalloping loss, equivalent noise bandwidth, and whether the weak line remains stable under relative-phase changes. Those measurements separate display density from physical evidence and make the window choice a declared tradeoff. <Ref lesson="windows-leakage-and-resolution">Windows, Leakage, and Resolution</Ref> derives the window metrics needed to execute that comparison.
+</Solution>
+</Exercise>
+
+<References>
+1. ITU-T Recommendation Q.23 (11/1988), *Technical Features of Push-Button Telephone Sets*, printed p. 2, clauses 5–7 — the two four-frequency groups, 16-signal allocation, ±1.8% sender tolerance, and distortion-product limit. [Official recommendation record](https://www.itu.int/rec/T-REC-Q.23)
+2. ITU-T Recommendation Q.24 (11/1988), *Multifrequency Push-Button Signal Reception*, printed pp. 1–3, clauses 2.1–2.5 and Annex A, Table A-1 with footnote b — exactly-one-per-group reception, parameter categories, and the named AT&T laboratory-profile values used here. [Official recommendation record](https://www.itu.int/rec/T-REC-Q.24-198811-I)
+3. Sophocles J. Orfanidis, *Introduction to Signal Processing*, 2nd ed., §9.2 Example 9.2.1 and §9.3, printed pp. 374–375; §16.1.1 Example 16.1.1, printed pp. 768–770 — selective finite-frequency evaluation, leakage, the DTMF mapping, and filter-bank/DFT receivers. [Author's book page](https://www.ece.rutgers.edu/~orfanidi/intro2sp/)
+4. Richard G. Lyons, *Understanding Digital Signal Processing*, 3rd ed., §13.17, especially printed pp. 644–647 and §13.17.3 — real-input Goertzel arithmetic, integer-bin equivalence, noninteger resonant frequencies, and the FFT comparison rule.
+5. Dennis Freeman, *Signals and Systems, MIT 6.003*, Fall 2011, Problem Set 6 Engineering Problem 6 and solution, pp. 9–11 — sampled DTMF resonators and the selectivity-versus-settling tradeoff. [MIT OpenCourseWare](https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/)
+6. Course artifact, `research/data/dtmf-v1/receiver_study.py` and `_pipeline/lesson-cycles/phone-channel-dtmf-receiver/receiver-study.json` — frozen thresholds, deterministic split seeds, confusion normalization, target-specific held-out results, and received-onset latency.
+</References>

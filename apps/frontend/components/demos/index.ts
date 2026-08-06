@@ -64,4 +64,6 @@ export const demos: Record<
   PaddingVsDataLab: () =>
     import("./digital-signal-processing/PaddingVsDataLab"),
   FftBudgetLab: () => import("./digital-signal-processing/FftBudgetLab"),
+  DtmfDecisionLab: () =>
+    import("./digital-signal-processing/DtmfDecisionLab"),
 };

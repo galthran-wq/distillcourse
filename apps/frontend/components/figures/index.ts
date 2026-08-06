@@ -15,6 +15,9 @@ import PaddingDurationResolution from "./digital-signal-processing/PaddingDurati
 import FftButterflyLedger from "./digital-signal-processing/FftButterflyLedger";
 import FftCostGrowth from "./digital-signal-processing/FftCostGrowth";
 import FftMemoryOrderLedger from "./digital-signal-processing/FftMemoryOrderLedger";
+import DtmfFeatureTimingPipeline from "./digital-signal-processing/DtmfFeatureTimingPipeline";
+import DtmfCoordinateComparison from "./digital-signal-processing/DtmfCoordinateComparison";
+import DtmfCoordinateCostLatencyLedger from "./digital-signal-processing/DtmfCoordinateCostLatencyLedger";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -169,6 +172,9 @@ export const figures: Record<string, RegisteredFigure> = {
   FftButterflyLedger: { component: FftButterflyLedger },
   FftCostGrowth: { component: FftCostGrowth },
   FftMemoryOrderLedger: { component: FftMemoryOrderLedger },
+  DtmfFeatureTimingPipeline: { component: DtmfFeatureTimingPipeline },
+  DtmfCoordinateComparison: { component: DtmfCoordinateComparison },
+  DtmfCoordinateCostLatencyLedger: { component: DtmfCoordinateCostLatencyLedger },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },
