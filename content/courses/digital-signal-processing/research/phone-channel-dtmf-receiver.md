@@ -67,4 +67,4 @@ est_minutes: 40
 - **Falsification:** Refute 'more zero padding always fixes two-tone decisions' by holding record duration fixed while changing only FFT length.
 - **Idealization gap:** Orthogonal bin-centered sinusoids become off-bin, unequal, noisy, reverberant, and time-limited in a real acoustic/telephone path.
 - **Deliverable:** Receiver code, threshold table, confusion matrix, failure example, and arithmetic/latency budget.
-- **Data/rights gate:** The browser may record the learner's own tones locally; provide a small redistributable channel corpus for reproducibility.
+- **Data/rights gate:** SOURCED — `research/data/dtmf-v1/` holds a deterministic Q.23/Q.24 corpus (clean keys, offset/twist/duration stress cases with declared expected outcomes, seeded noise, 300–3400 Hz channel and its impulse response) regenerable via `generate.py`. The browser may additionally record the learner's own tones locally.

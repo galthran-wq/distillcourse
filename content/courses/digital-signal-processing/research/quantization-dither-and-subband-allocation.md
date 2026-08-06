@@ -22,10 +22,56 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Step size and overload are separate failures.
-2. $q^2/12$ is a conditional noise model.
-3. Dither trades deterministic distortion for noise.
-4. Direct and polyphase schedules preserve the same subband statistics; unequal bits exploit unequal signal importance.
+1. **The flaw first.** The course has used "quantization noise" informally
+   since module 1's converter chain; this lesson makes the model earn its
+   keep and shows exactly where it lies. A quantizer is a deterministic
+   nonlinearity; calling its error "noise" is a hypothesis with conditions,
+   not a fact.
+2. **Two failures with opposite cures**: granular error (bounded by $q/2$,
+   shrinks with more bits) and overload (unbounded, shrinks with more RANGE).
+   For a fixed word length, range and step trade directly; the loading
+   decision — how many $\sigma$ of headroom — is a design choice with a
+   measurable optimum, and the warm-up's saturating sample is the smallest
+   demonstration.
+3. **$q^2/12$ and its conditions**: derive the uniform-error variance, then
+   the full-scale-sine consequence $\mathrm{SNR}\approx6.02b+1.76$ dB — and
+   immediately exhibit the conditions failing: the 3-bit speech error is
+   speech-shaped (captured artifact), and a low-level tone locks to the grid
+   producing harmonic spurs, not a floor. The model is *conditional on the
+   signal exercising many levels*.
+4. **Dither converts distortion into noise, at a price**: the first-exposure
+   block from `finite-word-realizations` is inherited (C5) and now
+   quantified — triangular-PDF dither at the right level whitens the error
+   and decouples it from the input; the SNR cost is explicit, and
+   "correlation went down" is never accepted without the noise ledger.
+5. **Subbands make bits a portfolio**: with per-band variances
+   $\sigma_k^2$, the equal-noise allocation is
+   $b_k=\bar b+\tfrac12\log_2(\sigma_k^2/\mathrm{GM})$; for the exercise's
+   variances $[16,4,1,1]$: GM $=(16\cdot4)^{1/4}\cdot1^{1/2}=2.83$, ideal
+   real-valued bits $[5.25,4.25,3.25,3.25]$, integers by water-filling.
+   Coding gain = AM/GM of variances $=5.5/2.83\approx1.94\to2.9$ dB over
+   flat allocation at the same average rate — a computed, checkable number
+   (Vaidyanathan App. C).
+6. **Schedules do not change statistics**: direct and polyphase analysis
+   produce identical retained coefficients, hence identical variances and
+   allocations — efficiency and coding decisions are orthogonal, which is
+   the module's running theme applied to bits (derivation exercise 5).
+7. **Side information is part of the rate**: transmitted allocations,
+   scale factors, and headers all spend the same budget the subband bits do;
+   the transient-variance-swap case in the strategy exercise makes the
+   accounting bite before the link application charges it end to end.
+
+## Misconception to refute (L13)
+
+- "Quantization error is white noise, independent of the signal, at
+  $q^2/12$ — always." Prevalent because the model works so well at high
+  resolution that it gets remembered without its hypotheses. Refutation: the
+  captured 3-bit speech error is audibly and visibly speech-correlated, and
+  a 0.75-LSB sine quantizes to a deterministic distorted square-ish wave
+  whose "noise" is odd harmonic spurs. Replacement model: error =
+  deterministic function of input; the white model is an approximation valid
+  when the signal is large and busy relative to $q$ — and dither is the tool
+  that buys the model's validity at low levels, at a stated SNR cost.
 
 ## Pitfalls / subtleties to flag
 

@@ -22,10 +22,56 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Analytic signals suppress negative-frequency content.
-2. I and Q are orthogonal projections.
-3. Complex mixing translates one spectral direction.
-4. Gain and phase imbalance create image leakage.
+1. **The flaw first.** A real mixer cannot choose a direction: multiplying by
+   $\cos(\omega_cn)$ lands energy at BOTH $\omega\pm\omega_c$ because a real
+   signal's spectrum carries conjugate sidebands (the phasors lesson's
+   conjugate-pair result, now cashed as a communication obstacle — C5
+   revisit). Everything in this lesson is machinery for keeping only one
+   rotation direction.
+2. **The analytic signal is one-sided by construction**:
+   $z[n]=x[n]+j\hat x[n]$ with $\hat x$ the Hilbert transform
+   ($H(e^{j\omega})=-j\,\mathrm{sgn}\,\omega$) cancels the negative-frequency
+   half exactly; derive the cancellation on one conjugate pair, then state it
+   spectrally. Envelope and instantaneous phase fall out as $|z|$ and
+   $\arg z$.
+3. **Realizable Hilbert = type III/IV FIR + matched delay**: the ideal
+   response forces zeros at DC (and $\pi$ for type III), so practical
+   analytic construction is bandpass-valid only, and the real path must carry
+   the transformer's $(N-1)/2$-sample delay or the cancellation leaks even
+   with a perfect magnitude response — the documented silent failure.
+4. **Complex mixing is one-directional translation**: $z[n]e^{j\omega_0n}$
+   moves the one-sided spectrum by exactly $+\omega_0$, no image; the worked
+   Lyons case ($\cos\to e^{j0.2\pi n}$, mix by $e^{j0.3\pi n}$) against the
+   real-mixer double image is the lesson's central contrast. I/Q transport is
+   then just the two real coordinates of one complex stream (the phasors
+   lesson's I/Q made load-bearing).
+5. **Imbalance arithmetic the reader can run**: gain error $1+\epsilon$ and
+   phase error $\phi$ leak an image at relative power $\approx(\epsilon^2+\phi^2)/4$,
+   so image rejection $\approx10\log_{10}\!\big(4/(\epsilon^2+\phi^2)\big)$ —
+   1% gain plus 1° phase gives only ~40 dB. Derive the first-order formula
+   (the derivation exercise) and check it against the exact
+   $(1+2g\cos\phi+g^2)/(1-2g\cos\phi+g^2)$ form; the demo's 40 dB pass
+   threshold is this arithmetic made interactive.
+6. **Coherence costs**: a coherent AM receiver recovers $\cos\phi$ of the
+   signal and dies at $\phi=\pi/2$; carrier frequency offset rotates the
+   constellation at $\Delta\omega$ per sample. Both are one-line
+   computations that the QPSK figure sequence visualizes.
+7. **Where this sits in systems**: image-reject receivers, SSB, and the
+   final link's QPSK stage all reduce to "make the negative-frequency copy
+   small, then budget how small" — the lesson ends by naming image rejection
+   as a budget line the streaming-link application will spend.
+
+## Misconception to refute (L13)
+
+- "Negative frequencies are a mathematical fiction, so ignoring them is
+  harmless." Prevalent because real-signal spectra are always drawn
+  one-sided in casual practice. Refutation: mix a real 0.2π-cycle tone with
+  a real carrier and the "fictional" side materializes as a second, fully
+  physical component at the difference frequency — the image that corrupts
+  the band. Replacement model: a real signal is a conjugate pair of
+  rotations (phasors lesson); one-sided spectra are legitimate only after
+  the analytic construction has actively cancelled the other side, and the
+  cancellation quality is measurable in dB.
 
 ## Pitfalls / subtleties to flag
 

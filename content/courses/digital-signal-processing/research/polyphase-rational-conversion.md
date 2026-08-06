@@ -22,10 +22,50 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Expansion, filtering, and decimation implement $L/M$.
-2. Polyphase components partition coefficients by residue.
-3. Noble identities move filters across rate changers.
-4. 44.1 kHz to 48 kHz uses $160/147$.
+1. **The flaw first.** The correct $L/M$ diagram from the previous lesson
+   runs its filter at the intermediate rate $Lf_s$ — for 44.1→48 kHz that is
+   $44100\times160=7.056$ MHz of conceptual sample rate, on a stream that is
+   mostly inserted zeros and future discards. The mathematics is right; the
+   schedule is absurd. Polyphase is the theorem that none of that work was
+   necessary.
+2. **Type-1 decomposition as coefficient dealing**:
+   $H(z)=\sum_{k=0}^{M-1}z^{-k}E_k(z^M)$ — the prototype's taps dealt into
+   residue classes. Derive it as pure regrouping (no approximation), then
+   show the branch view: each output sample needs exactly one branch's dot
+   product.
+3. **Noble identities, stated and proved**: $\downarrow M$ then $H(z)$ equals
+   $H(z^M)$ then $\downarrow M$ (and the dual for $\uparrow L$). These two
+   moves — deal, then commute across the rate changer — ARE the polyphase
+   method; everything else is bookkeeping.
+4. **The savings is exactly the rate ratio**: an $N$-tap prototype at the
+   high rate costs $N$ multiplies per high-rate sample; after polyphase every
+   retained output costs $N/L$ (interpolation) or the branch work runs at the
+   *low* side of the converter. For $147/160$ the schedule computes ~$N/160$
+   of the naive per-output work — the "at most 35%" target in the demo spec
+   is conservative bookkeeping on top of this.
+5. **The commutator/schedule picture**: which phase fires for output $m$ is
+   $\,(mM)\bmod L$-arithmetic — a literal index timeline (figure 3), which is
+   also where implementation reality (phase accumulators, FIFO occupancy,
+   $\pm$ppm clock drift in the strategy exercise) attaches.
+6. **Fractional-delay framing as the forward-looking alternative**: a Farrow
+   or table-interpolated fractional delay handles *drifting* ratios where a
+   fixed 147/160 schedule assumes locked clocks — one named aside, since the
+   streaming-link application meets $\pm50$ ppm drift.
+7. **Verification discipline**: the polyphase schedule must match the
+   expand-filter-decimate reference below $10^{-10}$ before any cost claim is
+   admitted; equality first, efficiency second.
+
+## Misconception to refute (L13)
+
+- "Interpolation by $L$ requires running every tap over the zero-stuffed
+  stream, so high-quality resampling is inherently expensive." Prevalent
+  because the textbook diagram literally draws the zero-stuffed stream into
+  the filter. Refutation: the dealt phases $[1,4]$, $[2,5]$, $[3,6]$ of the
+  warm-up compute the identical outputs with no zero ever multiplied — and
+  the count is checkable by hand. Replacement model: the diagram defines the
+  *map*; the noble identities license a schedule that touches only surviving
+  products, and the 7.056 MHz intermediate rate is a coordinate system, not
+  a clock that must exist.
 
 ## Pitfalls / subtleties to flag
 

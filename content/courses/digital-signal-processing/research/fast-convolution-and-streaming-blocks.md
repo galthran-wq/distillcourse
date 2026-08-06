@@ -22,10 +22,54 @@ est_minutes: 38
 
 ## Key points the lesson must cover
 
-1. Circular wrap is eliminated by padding and overlap.
-2. OLA sums tails while OLS discards corrupted prefixes.
-3. Block length trades latency against throughput.
-4. The direct/FFT crossover is hardware-dependent.
+1. **The flaw first.** DFT multiplication computes *circular* convolution
+   (established in `dft-bins-symmetry-and-scaling`), and a stream is not
+   circular. The whole lesson is the bookkeeping that makes transform
+   multiplication produce exact linear convolution on an unbounded input with
+   a bounded buffer.
+2. **The padding identity, stated exactly**: an $N$-point circular convolution
+   of sequences with support $L_x$ and $M$ equals their linear convolution iff
+   $N\ge L_x+M-1$. This is an equality condition, not an approximation
+   tolerance — the claim-to-refute exercise turns on it.
+3. **OLA vs OLS is a question of who owns the seam**: OLA zero-pads each
+   input block and *adds* overlapping output tails (the tail is valid, shared
+   work); OLS overlaps *inputs*, computes an $N$-point circular convolution,
+   and *discards* the first $M-1$ corrupted outputs. Same arithmetic totals;
+   different state, memory, and packet semantics — which is why the strategy
+   exercise keys on stream ownership.
+4. **Cost algebra with one declared counting convention**: with block output
+   length $L=N-M+1$, each block costs two length-$N$ transforms plus $N$
+   spectral multiplies; per output sample that is roughly
+   $(2N\log_2N+N)/L$ multiply-equivalents against $M$ for direct filtering.
+   Worked: $M=1024$, $N=4096$, $L=3073$ → about $(2\cdot4096\cdot12+4096)/3073
+   \approx33$ per sample versus $1024$ direct — a ~30× reduction, and the
+   filter's spectrum is computed once. State the convention (real-FFT
+   optimizations change constants, never the $N\log N$ shape).
+5. **Latency is structural, not computational**: a block cannot be transformed
+   until it is full, so blocking adds up to $L$ samples of gathering delay
+   plus compute; at 48 kHz, $L=3073$ is 64 ms before the filter's own group
+   delay. Small blocks cut latency and raise per-sample cost — the tradeoff
+   is the demo-adjacent computation, and the partitioned-convolution escape
+   (split the kernel, convolve early parts with small blocks) is one named
+   aside pointing at real-time reverb practice (J. O. Smith ch. 8).
+6. **The crossover is empirical**: the $M$ at which FFT filtering beats direct
+   depends on hardware constants; the lesson's benchmark figure computes it
+   rather than quoting folklore, and states that changing (time-varying)
+   filters re-toll the transform of $h$.
+7. **Numerical honesty**: FFT filtering is exact in exact arithmetic; in
+   floats the seam test against direct convolution (error $<10^{-10}$) is the
+   acceptance criterion every exercise reuses, and normalization placement
+   ($1/N$ in exactly one place) is part of the declared contract.
+
+## Misconception to refute (L13)
+
+- "Circular convolution approximates linear convolution, and more points make
+  it closer." Prevalent because plots of underpadded results look almost
+  right. Refutation: the error is structural wrap of exactly the tail
+  samples, not noise — at $N=L_x+M-2$ one sample is wrong by the full tail
+  value regardless of $N$'s size, and at $N\ge L_x+M-1$ the result is exactly
+  linear. Replacement model: an equality condition with a hard boundary.
+  Discriminating example: the warm-up's 4-point vs 8-point comparison.
 
 ## Pitfalls / subtleties to flag
 

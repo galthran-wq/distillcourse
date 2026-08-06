@@ -22,10 +22,57 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Critical sampling removes redundancy.
-2. Analysis and synthesis jointly determine alias transfer.
-3. Perfect reconstruction permits gain and delay.
-4. Subband quantization breaks exact cancellation.
+1. **The flaw first.** Downsampling each channel of a two-channel split by 2
+   is critical sampling: exactly as many subband samples as input samples, no
+   redundancy — and each decimator aliases its own channel. The previous
+   lessons' answer (filter harder) cannot work here: with finite filters the
+   channels overlap, so alias energy *will* enter. The bank's escape is
+   structural: make the synthesis side cancel what analysis let through.
+2. **The two-channel algebra, carried in full**:
+   $\hat X(z)=\tfrac12[H_0F_0+H_1F_1](z)\,X(z)+\tfrac12[H_0(-z)F_0(z)+H_1(-z)F_1(z)]\,X(-z)$.
+   The $X(-z)$ coefficient is the alias transfer; choosing
+   $F_0(z)=H_1(-z)$, $F_1(z)=-H_0(-z)$ kills it for ANY analysis pair —
+   cancellation is a designed identity, not a filtering achievement. What
+   remains is the distortion transfer $T(z)$, and PR means $T(z)=cz^{-d}$:
+   gain and delay are permitted, shape change is not.
+3. **The QMF lineage as a short argued history**: $H_1(z)=H_0(-z)$ makes
+   $T(z)=\tfrac12[H_0^2(z)-H_0^2(-z)]$ — and the only 2-tap FIR solving PR
+   exactly is Haar, which is why longer "QMF" designs (Johnston) accept
+   near-PR, and why the conjugate-quadrature construction
+   $H_1(z)=-z^{-(N-1)}H_0(-z^{-1})$ (Smith–Barnwell) recovers exact PR with
+   good filters. Each step answers the previous step's failure (flaw-first
+   progression).
+4. **The polyphase statement subsumes all of it**: with analysis polyphase
+   matrix $E(z)$ and synthesis $R(z)$, PR ⇔ $R(z)E(z)=cz^{-d}I$. One matrix
+   identity replaces case analysis, scales to $M$ channels, and is the form
+   the wavelet lesson factorizes.
+5. **Paraunitary specialization**: $\tilde E(z)E(z)=I$ gives PR with energy
+   preservation (Parseval across the bank) and synthesis = time-reversed
+   conjugate analysis — the orthonormal case the strategy exercise weighs
+   against linear-phase biorthogonal banks.
+6. **Fragility is the price of critical sampling**: the cancellation is an
+   exact algebraic identity between coupled filters, so quantizing ONE
+   synthesis coefficient revives the alias term (the gem's tens-of-dB jump)
+   even while every magnitude plot still looks fine; oversampled banks buy
+   robustness with redundancy. This seeds both the wavelet lesson's
+   structure-preserving factorizations and the final link's oversampled
+   subband choice.
+7. **What quantization does inside the bank** (bridge to the next core
+   lesson): subband quantization error passes through synthesis filters the
+   designer chose — noise shaping by structure — so recombination error is
+   measurable and attributable even without a PR proof.
+
+## Misconception to refute (L13)
+
+- "If each filter in the bank is a good filter, the bank reconstructs well."
+  Prevalent because single-filter quality has been the whole course until
+  now. Refutation: the claim-to-refute exercise's bank — plausible magnitude
+  plots, alias residual large — against Haar's mediocre 2-tap "filters"
+  achieving mathematically perfect reconstruction. Replacement model:
+  reconstruction quality lives in the *joint* identity $R(z)E(z)=cz^{-d}I$,
+  which relates filters across the bank; individual responses only decide
+  how much work the cancellation must do (and how fragile it is under
+  coefficient error).
 
 ## Pitfalls / subtleties to flag
 

@@ -22,10 +22,46 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Reciprocal-conjugate zero choices preserve magnitude.
-2. Minimum phase concentrates energy earliest.
-3. Allpass sections change phase at unit magnitude.
-4. Hilbert transformers create quadrature pairs.
+1. **The flaw first.** The DTFT lesson proved equal magnitudes do not imply
+   equal waveforms; this lesson counts and organizes the freedom. An FIR with
+   $k$ zeros off the unit circle has $2^k$ magnitude-equivalent causal
+   versions (reflect each zero through the circle or not); the question is
+   which one to want, and why.
+2. **Reflection preserves magnitude up to a constant**: replacing a zero
+   $z_0$ by $1/z_0^*$ multiplies $|H(e^{j\omega})|$ by the constant $|z_0|$ —
+   derive it from $|e^{j\omega}-z_0| = |z_0|\,|e^{j\omega}-1/z_0^*|$ on the
+   unit circle. This is the derivation-not-shown exercise's core.
+3. **Minimum phase is four equivalent superlatives**: all zeros (and poles)
+   inside the circle ⇔ minimum group delay among magnitude-equivalent causal
+   systems ⇔ maximal partial-energy accumulation at every prefix length ⇔
+   stable causal inverse exists. The partial-energy race (worked case) makes
+   one of these felt; state the equivalence as the organizing theorem.
+4. **Every causal rational system factors as $H=H_{\min}\cdot H_{ap}$**: the
+   allpass factor carries the reflected zeros' excess phase at exactly unit
+   magnitude, and a causal stable allpass has nonnegative group delay at
+   every frequency — which is *why* the minimum-phase factor is delay-minimal.
+5. **The equalization consequence**: inverting a measured channel can cancel
+   only $H_{\min}$; the allpass residue is unremovable by any stable causal
+   filter, and a unit-circle zero blocks even that (boundary probe). This is
+   the practical payoff for audio/channel equalization.
+6. **Magnitude determines a minimum-phase system completely**: the
+   cepstrum/Hilbert construction builds $H_{\min}$ from $|H|$ alone (J. O.
+   Smith; Vaidyanathan App. D), which is what the strategy-choice exercise
+   exercises at scale, root-free.
+7. **Hilbert transformers create quadrature pairs** — the type III/IV FIR
+   with its forced DC/Nyquist zeros — kept here as the constructive bridge
+   the analytic-signals lesson will inherit.
+
+## Misconception to refute (L13)
+
+- "Minimum phase means small (nearly zero) phase." Prevalent from the name.
+  Refutation: a minimum-phase system with sharp magnitude variation has
+  large phase — the magnitude-phase Hilbert relation forces it; what is
+  minimal is the phase *lag relative to every magnitude-equivalent causal
+  alternative*, i.e. the allpass excess is zero. Discriminating example:
+  compare the min-phase version of the worked FIR against a pure delay of
+  equal length — the delay has unit magnitude and larger group delay at
+  every frequency, yet "flatter-looking" phase slope.
 
 ## Pitfalls / subtleties to flag
 

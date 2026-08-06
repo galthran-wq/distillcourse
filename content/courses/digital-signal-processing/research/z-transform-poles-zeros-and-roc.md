@@ -25,21 +25,64 @@ est_minutes: 40
 - Ledger family `z-transform`: pair every $X(z)$ with its ROC, write poles as $p_i$ and zeros as $z_i$, and do not silently assume causality. Example: $1/(1-0.5z^{-1})$ with $|z|>0.5$ is the right-sided sequence.
 ## Key points the lesson must cover
 
-1. A rational expression without its ROC is incomplete.
-2. The DTFT exists when the unit circle lies in the ROC.
-3. Causal stable rational systems have poles inside the unit circle.
-4. Pole-zero vectors predict magnitude and phase.
+1. **The flaw first.** The DTFT could not represent the growing mode the course
+   already met: $h[n]=1.2^nu[n]$ from **Difference Equations and Stability** has
+   no convergent DTFT series, yet its recurrence is one line. The z-transform
+   weights samples by $r^{-n}$ so that a large enough contour radius restores
+   convergence — the transform exists on a *region*, and the region is data.
+2. **ROC families follow support.** Right-sided sequences converge outside the
+   outermost pole; left-sided inside the innermost; two-sided on an annulus;
+   finite-length everywhere except possibly $0$ and $\infty$. Derive each from
+   the geometric series, then state the master fact: a rational expression
+   without its ROC is not a sequence.
+3. **The DTFT is the unit-circle restriction**, defined exactly when the ROC
+   contains $|z|=1$. This closes the loop with the drafted transform lessons:
+   $1.2^nu[n]$ has ROC $|z|>1.2$, which is why no frequency response existed.
+4. **Inversion by partial fractions**, including one repeated-pole case
+   ($nr^nu[n]$ terms), worked completely — this is the tool every later design
+   lesson assumes.
+5. **Causal + stable ⇔ all poles strictly inside the unit circle with an
+   outward ROC.** Both directions argued, and the converse trap named: the same
+   poles with an interior ROC give an anticausal stable or causal unstable
+   reading (see misconception below).
+6. **Pole-zero vector geometry**: $|H(e^{j\omega})|$ is the product of
+   distances to zeros over distances to poles, phase the sum of angles. Reread
+   the module-1 resonator with $\rho=0.97$, $\omega_0=0.36\pi$: its transfer
+   function $1/(1-2\rho\cos\omega_0z^{-1}+\rho^2z^{-2})$ has the conjugate pole
+   pair the recurrence lesson found by trial mode — same numbers, new geometry
+   (spiral revisit, C5).
+7. **Hidden-mode caution as the bridge to implementation**: an exactly
+   cancelled pole-zero pair leaves the input-output response clean while the
+   realization can hold an internal growing state; finite precision un-cancels
+   it. This is the seam to `finite-word-realizations`.
+
+## Misconception to refute (L13)
+
+- "Poles inside the unit circle means stable." Prevalent because it is the
+  correct *causal* specialization stated without its hypothesis. Refutation:
+  $1/(1-0.5z^{-1})$ with ROC $|z|<0.5$ has its pole inside the circle and is
+  the *unbounded anticausal* sequence $-(0.5)^nu[-n-1]$... whose absolute sum
+  diverges. The replacement model: stability is a property of (expression,
+  ROC) pairs — the ROC must contain the unit circle; causal systems then force
+  poles inside. Discriminating example: the two inversions of the warm-up
+  exercise.
 
 ## Pitfalls / subtleties to flag
 
 - Pole-zero cancellation, finite precision, hidden unstable modes, and omitted ROC make symbolic transfer functions misleading.
 - A rational formula without its ROC does not identify a sequence, causality, or stability; the same poles and algebraic expression can describe incompatible left- and right-sided signals.
+- A pole ON the unit circle admits no stable reading under either ROC; the accumulator $1/(1-z^{-1})$ is the canonical marginal case and connects back to the divergent step response of the stability lesson.
+- $z$ and $z^{-1}$ polynomial conventions flip which "roots" are poles; imported coefficient arrays (`[b, a]` order, leading-coefficient normalization) must be declared before any pole plot is trusted.
+- Zeros may lie anywhere, including outside the unit circle, without harming stability — readers routinely transfer the pole restriction to zeros; the FIR case ($h=[1,-2]$, zero at $z=2$, perfectly stable) breaks that transfer and seeds `minimum-phase-and-allpass-structures`.
 - Declare sign, scale, index, endpoint, and unit conventions before importing formulas or plots.
 
 ## Concrete gems / worked examples
 
 - The same rational formula represents different sequences under different ROCs; only one may be causal and stable.
 - Worked case grounded in Oppenheim–Schafer ch. 3: $X(z)=1/(1-0.5z^{-1})$ with ROC $|z|>0.5$ yields $(0.5)^n u[n]$, while ROC $|z|<0.5$ yields the left-sided sequence; only the first is causal and includes the unit circle for a stable DTFT.
+- The module-1 resonator reread: $h[n]=\rho^n\frac{\sin((n+1)\omega_0)}{\sin\omega_0}u[n]$ transforms to $1/(1-2\rho\cos\omega_0\,z^{-1}+\rho^2z^{-2})$, ROC $|z|>\rho$. With $\rho=0.97$, $\omega_0=0.36\pi$ these are exactly the FeedbackStabilityLab coefficients $a_1=0.8260$, $a_2=-0.9409$; the pole radius the reader tuned by slider is now a dot on the z-plane, and the settling gate $N_{1\%}=\lceil\ln 0.01/\ln\rho\rceil$ is readable from that radius alone.
+- Peaking geometry with numbers: for the same resonator, the distance from $e^{j0.36\pi}$ to the near pole is $1-\rho=0.03$, so the magnitude response peaks by roughly $1/0.03\approx33$ relative to the far-pole and zero factors — the vector picture predicts the resonance height before any dense evaluation.
+- The mask hand-off: an FIR is all zeros (poles only at $z=0$), so its response is built entirely from zero placements; sketching the ten circle zeros of an 11-tap averager (the eleventh root at $z=1$ is cancelled) explains its comb of nulls at $2\pi k/11$, $k=1,\ldots,10$... a two-minute computation that makes the FIR lesson's zero plots familiar on arrival.
 
 ## FIGURE PLAN
 

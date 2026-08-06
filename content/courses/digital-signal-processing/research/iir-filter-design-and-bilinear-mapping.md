@@ -22,14 +22,63 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Analog prototypes trade flatness and ripple.
-2. The bilinear transform preserves stability.
-3. Prewarping corrects selected frequency edges.
-4. High-Q poles increase sensitivity and settling time.
+1. **The flaw first.** The FIR lesson's mask arithmetic gets expensive when
+   the transition is sharp: the same 60 dB mask that costs ~89 FIR taps at a
+   2 kHz transition costs hundreds when the transition narrows. Feedback meets
+   sharp magnitude cheaply — the lesson's question is what the recursion
+   charges in phase, sensitivity, and transients.
+2. **Prototype families are named tradeoffs**: Butterworth (maximally flat,
+   slow rolloff), Chebyshev I (passband ripple buys rolloff), Chebyshev II
+   (stopband ripple, flat passband), elliptic (ripple both sides, minimum
+   order). Keep the Orfanidis shared-mask order comparison (35/10/10/5) as the
+   headline, and add a fully derived Butterworth order: for $f_s=48$ kHz,
+   1 dB at 6 kHz, 60 dB at 8 kHz, prewarped edges give
+   $\Omega_p=96000\tan(\pi\cdot6/48)=96000\tan(22.5^\circ)\approx39.8$ krad/s,
+   $\Omega_s=96000\tan(30^\circ)\approx55.4$ krad/s, ratio $1.394$, and
+   $n\ge\log_{10}\!\big[(10^{6}-1)/(10^{0.1}-1)\big]/\big(2\log_{10}1.394\big)
+   \approx22.9$ → order 23 Butterworth where an elliptic meets the same mask
+   near order 6 — the family choice is an order-of-magnitude decision.
+3. **Impulse invariance vs bilinear, argued not listed**: sampling an analog
+   impulse response aliases its tail (usable only for strictly bandlimited
+   prototypes); the bilinear transform is an algebraic map with no aliasing
+   whose price is frequency warping $\omega=2\arctan(\Omega T/2)$. State why
+   the left half-plane maps exactly onto the open unit disk — stability
+   preservation is a theorem, not a habit.
+4. **Prewarping is exact only where you spend it**: chosen edges land
+   exactly; everything between warps. The worked ledger
+   ($\Omega_p=2f_s\tan(\omega_p/2)$, map, invert, land) is the lesson's
+   central computation.
+5. **Phase is the bill**: IIR phase is nonlinear by construction; group delay
+   peaks near the band edge and grows with pole Q. An elliptic that saves 4×
+   the order can cost a band-edge group-delay peak an order of magnitude above
+   its passband average — compute it on the worked design rather than assert
+   it.
+6. **High-Q poles are fragile poles**: sensitivity and settling both scale
+   with $1/(1-\rho)$; the settling gate from module 1
+   ($N_{1\%}=\lceil\ln0.01/\ln\rho\rceil$) reappears here as a design output
+   (spiral revisit). A pole at $\rho=0.995$ needs ~919 samples to settle to
+   1% — sharp filters ring long before they quantize badly.
+7. **Realization preview, one sentence**: the transfer function chosen here
+   is not yet an implementation; direct-form vs SOS divergence is the next
+   lesson's subject, so this lesson reports only the maximum pole radius as
+   the fragility indicator.
+
+## Misconception to refute (L13)
+
+- "Lower order means cheaper." Prevalent because multiply counts are the
+  visible cost. Refutation: charge the order-6 elliptic its full bill on the
+  worked mask — band-edge group-delay spread, 1% settling time from its
+  maximum pole radius, and the coefficient word length the high-Q sections
+  will demand next lesson — against the order-23 Butterworth's (or a linear-
+  phase FIR's) flat delay and benign sensitivity. Replacement model: order
+  counts multiplies; delay spread, settling, and precision are the rest of
+  the price, and either candidate can win once all four are on the table.
 
 ## Pitfalls / subtleties to flag
 
 - Bilinear warping, nonlinear group delay, high-Q coefficient sensitivity, state growth, and startup transients matter more than ideal order.
+- Offline forward-backward filtering (filtfilt) squares the magnitude and cancels phase — a legitimate escape from IIR phase cost, but only for finished records; presenting it as a general fix hides its acausality and its doubled attenuation. Name it once, with both caveats.
+- The bilinear map compresses the entire infinite analog axis onto $(-\pi,\pi)$; comparing an analog prototype's rolloff "in Hz" with the digital response without the $\tan$ map misreads every frequency except the prewarped edges.
 - Analog prototype families trade passband flatness, ripple, stopband ripple, order, and delay differently; the lowest-order magnitude match may have unacceptable group-delay variation.
 - Declare sign, scale, index, endpoint, and unit conventions before importing formulas or plots.
 

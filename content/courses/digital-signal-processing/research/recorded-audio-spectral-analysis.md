@@ -69,4 +69,4 @@ est_minutes: 40
 - **Falsification:** Reject 'the plot with the most FFT bins has the best physical resolution' using fixed-data padding and longer-data comparisons.
 - **Idealization gap:** Stationary sinusoids, white noise, exact bin centering, and perfect COLA are approximations; attacks, vibrato, formant motion, colored noise, and finite frames break them.
 - **Deliverable:** Parameter ledger, matched spectrum panels, variability statistics, reconstruction check, and listening files.
-- **Data/rights gate:** Published plots require rights review. If not cleared, use the same protocol on CC-licensed recordings; never redraw measured curves.
+- **Data/rights gate:** SOURCED (license review deferred) — `research/data/audio-clips-v1/` holds a sustained oboe C4 (Iowa MIS, 44.1 kHz) and clean speech (CMU Arctic, 16 kHz); run the lesson's protocol on these. Published JOS plots remain rights-gated context; never redraw measured curves. See provenance.json for the pre-publication license checklist.

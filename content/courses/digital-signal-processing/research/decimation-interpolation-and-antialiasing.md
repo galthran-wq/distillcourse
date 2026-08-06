@@ -25,10 +25,54 @@ est_minutes: 40
 - Ledger family `multirate-polyphase`: write a sample rate on every edge, use $\downarrow M$ and $\uparrow L$, and state the ratio as output/input. Example: 48 kHz to 44.1 kHz reduces to $L/M=147/160$.
 ## Key points the lesson must cover
 
-1. Downsampling stretches and sums spectra.
-2. Upsampling inserts zeros and creates images.
-3. Anti-alias filtering precedes decimation.
-4. Anti-image filtering completes interpolation.
+1. **The flaw first.** "Keep every $M$th sample" sounds like deletion;
+   spectrally it is *resampling an already-sampled signal*, and the sampling
+   lesson's replica argument applies again with $f_s/M$ spacing. The
+   discarded degrees of freedom fold back unless a filter removed them first
+   — the module-2 irreversibility result, now inside the digital domain
+   (spiral revisit of `sampling-aliasing-and-reconstruction`).
+2. **The decimation identity, derived**: $Y(e^{j\omega})=\frac1M\sum_{k=0}^{M-1}
+   X\big(e^{j(\omega-2\pi k)/M}\big)$ — the spectrum stretches by $M$ AND sums
+   $M$ shifted copies. The derivation via the impulse-train picker sequence
+   is the lesson's central computation; the $1/M$ scale and the $k\ne0$ alias
+   terms both matter later.
+3. **The interpolation identity is cleaner but not free**:
+   $\uparrow L$ gives $Y(e^{j\omega})=X(e^{j\omega L})$ — compression of the
+   axis creates $L-1$ spectral images, and the anti-image lowpass must both
+   remove them and supply gain $L$ to preserve amplitude (a routinely
+   forgotten factor that makes interpolated audio quiet by exactly
+   $20\log_{10}L$ dB).
+4. **Filter placement is forced, not stylistic**: anti-alias *before*
+   $\downarrow M$, anti-image *after* $\uparrow L$; for a rational $L/M$
+   change the two merge into one lowpass at $\min(\pi/L,\pi/M)$ running at
+   the high intermediate rate — the inefficiency the polyphase lesson will
+   remove.
+5. **Multistage decomposition is the first big win**: splitting $M=8$ into
+   $2\cdot2\cdot2$ lets early stages use wide transitions (cheap taps at high
+   rates) and the final stage a sharp transition at low rate; the strategy
+   exercise makes the reader produce the per-stage masks and count multiplies
+   per output for both plans.
+6. **The CD chain as deployed evidence**: oversample at $4\times44.1=176.4$
+   kHz so the analog reconstruction filter gets a ~20 kHz-wide transition
+   instead of a ~2 kHz cliff, do the sharp filtering digitally, then decimate
+   — the canonical case of moving filter difficulty across a rate change
+   (MIT 6.003 Session 25).
+7. **Bandpass caution inherited forward**: the folding decision depends on
+   occupied band edges, not center frequencies — the drafted sampling
+   lesson's bandpass exercise reappears here with $M$ in place of $f_s$
+   (E3 mixed review hook).
+
+## Misconception to refute (L13)
+
+- "Downsampling just removes samples, so if the plot still looks smooth
+  nothing was lost." Prevalent because time-domain thinning looks harmless
+  and often is (when the signal was oversampled). Refutation: the warm-up's
+  $0.7\pi$ tone lands at $-0.6\pi$ after $\downarrow2$ — a *different*
+  frequency now indistinguishable from a legitimate one, and the alias-sum
+  term that produced it is invisible in any time-domain thinning picture.
+  Replacement model: decimation = anti-alias filter + sampler; the
+  smooth-looking plot is the module-2 300/700 Hz collision again, one domain
+  deeper.
 
 ## Pitfalls / subtleties to flag
 

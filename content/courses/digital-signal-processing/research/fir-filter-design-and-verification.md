@@ -26,10 +26,56 @@ est_minutes: 40
 - Ledger family `filter-specifications`: declare $\omega_p,\omega_s,\delta_p,\delta_s,A_s$ as inequalities before selecting a method. Example: $\delta_p=0.01$ is a linear bound, whereas $A_s=60$ dB must be converted before direct comparison.
 ## Key points the lesson must cover
 
-1. Ideal sinc responses are infinite and noncausal.
-2. Window families map transition width to sidelobes.
-3. Symmetry yields exact linear phase.
-4. Equiripple and least-squares optimize different errors.
+1. **The flaw first.** The ideal lowpass the z-transform lesson inverted is an
+   infinite two-sided sinc: exact in principle, undeployable as written. Every
+   FIR method is a controlled answer to "what do we give up to make it finite
+   and causal" — and the currency is a specification, not a vibe.
+2. **Specification language before any method**: passband/stopband edges
+   $\omega_p,\omega_s$, linear ripples $\delta_p,\delta_s$, and the conversion
+   $A_s=-20\log_{10}\delta_s$ — a $60$ dB stopband is $\delta_s=10^{-3}$.
+   Requirements are inequalities on a dense grid, never equalities at a few
+   samples.
+3. **The window method is the windows lesson reapplied**: truncation is
+   multiplication in time, so the realized response is the ideal response
+   convolved with the window transform (spiral revisit of
+   `windows-leakage-and-resolution` — same convolution, new target). Gibbs
+   follows: the rectangular truncation's ~9% overshoot and ~21 dB stopband do
+   not improve with more taps; taps buy transition width, not ripple height.
+   Canonical window-design stopbands: rectangular ~21 dB, Hann ~44 dB,
+   Hamming ~53 dB, Blackman ~74 dB (verify exact values against
+   Oppenheim–Schafer's window-design table before quoting).
+4. **Kaiser makes the tradeoff a formula**: $\beta$ from the attenuation, tap
+   estimate $N\approx(A_s-7.95)/(2.285\,\Delta\omega)$. Worked: 60 dB over a
+   2 kHz transition at $f_s=48$ kHz gives $\Delta\omega=2\pi\cdot2/48=0.262$
+   rad, $N\approx(60-7.95)/(2.285\cdot0.262)\approx87$ — call it 89 taps for
+   odd symmetry. The reader should be able to produce this estimate unaided.
+5. **Symmetry buys exact linear phase and costs delay**: the four
+   linear-phase types with their forced zeros (type II forces $H=0$ at $\pi$ —
+   no highpass; types III/IV force a zero at DC — differentiators and Hilbert
+   transformers live there). Delay is $(N-1)/2$ samples: the 89-tap design
+   above delays 44 samples $\approx0.92$ ms — the number the ECG application
+   later charges against wearable latency.
+6. **Equiripple as constrained optimality**: the alternation picture — the
+   best weighted-Chebyshev design equalizes its error extrema, and the exchange
+   algorithm hunts them on a dense grid. Equiripple beats windowed designs on
+   tap count at the same mask because window designs waste attenuation where
+   the mask does not require it; least squares instead minimizes energy and
+   concedes edge peaks.
+7. **Verification is part of design (the lesson title's second half)**:
+   evaluate on a grid much denser than the design grid, check between-extrema
+   behavior, and confirm coefficient symmetry survived rounding. A design that
+   passes on its own grid and fails between samples is the documented failure
+   mode of naive frequency sampling.
+
+## Misconception to refute (L13)
+
+- "Increase the filter length and the ripple goes away." Prevalent because it
+  is true of transition width and false of Gibbs ripple height — truncation
+  ripple converges in $L^2$, not uniformly. Refutation: rectangular designs at
+  $N=31$, $101$, $301$ all peak near the same ~9% overshoot; only the window
+  shape (or an equiripple formulation) moves the peak. Replacement model:
+  taps buy transition width; the window's sidelobe envelope buys ripple.
+  Discriminating example is the claim-to-refute exercise below.
 
 ## Pitfalls / subtleties to flag
 
@@ -41,6 +87,9 @@ est_minutes: 40
 
 - Increasing rectangular-window length narrows Gibbs ripples without reducing their peak, while a Kaiser design trades explicit width for attenuation.
 - Worked case grounded in MIT 6.341 Lecture 2 pp. 5–6 and Lecture 9 pp. 4–6: make a 51-tap real FIR symmetric about sample 25, verify group delay 25 samples wherever magnitude is nonzero, then use the exchange algorithm’s dense verification grid to catch an inter-grid ripple violation.
+- The Kaiser estimate as a planning tool: 60 dB / 2 kHz transition / 48 kHz sample rate → ~89 taps and 0.92 ms delay; halving the transition width doubles the taps and the delay. Three numbers a designer can produce on paper before touching a tool.
+- Zero-plot literacy: a linear-phase FIR's zeros come in reciprocal-conjugate quadruples ($z_0$, $z_0^*$, $1/z_0$, $1/z_0^*$); stopband zeros sit ON the unit circle where the response must vanish, transition/passband shaping zeros sit off it. One annotated zero plot of the worked design makes equiripple structure visible.
+- Type-II trap in one line: an even-length symmetric FIR has a forced zero at $z=-1$, so an even-length highpass "design" fails before it starts — the symmetry-type table is a feasibility check, not trivia.
 
 ## FIGURE PLAN
 

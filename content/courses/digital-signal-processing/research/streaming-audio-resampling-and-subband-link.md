@@ -22,10 +22,57 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Rate and latency ledgers must close end to end.
-2. Polyphase work counts exclude discarded products.
-3. Subband quantization makes analysis/synthesis recombination error measurable even without a perfect-reconstruction proof.
-4. Carrier and clock errors accumulate with filter delay.
+1. **The closing move of the course**: every module contributed a component
+   that passed its own acceptance test; the link asks whether the composed
+   system passes ANY end-to-end test, and the honest answer is "only if the
+   budgets were summed, not assumed." The lesson's method is the ledger, and
+   the ledger is the deliverable.
+2. **Rate arithmetic runs the show**: 96 kb/s payload over 44.1 kHz mono is
+   ~2.18 bits per source sample — so the subband allocator must reach a
+   fractional average via unequal integer bits plus paid-for side
+   information (the quantization lesson's portfolio, now under a hard
+   budget); QPSK at 2 bits/symbol turns the 108.8 kb/s wire rate into a
+   54.4 kBd symbol stream. Every one of these numbers is derivable from the
+   warm-up's ledger.
+3. **Latency decomposes into named, chargeable parts**: converter filter
+   group delay (at the LOW rate side after polyphase), OLS block gathering
+   ($N-M+1$ samples), packetization (10 or 20 ms), and jitter buffer — the
+   strategy exercise's two configurations differ block by block, and the
+   42 ms warm-up total is the model computation.
+4. **Polyphase work counts exclude discarded products** — the module's
+   efficiency theorem restated as an auditable ledger row, with the
+   $10^{-10}$ direct-agreement check as the admission ticket (inherited
+   verbatim from `polyphase-rational-conversion`).
+5. **Oversampled subbands are a deliberate retreat from criticality**: the
+   link chooses measurable recombination error plus robustness over a
+   fragile PR proof — the PR/wavelet branch explains what was traded, but
+   the core path must state the decision and measure the floating-point
+   recombination baseline BEFORE quantization so later error is attributable
+   (its own ledger row, not a mystery).
+6. **Impairments compound through delay**: carrier phase error rotates all
+   symbols ($\cos\phi$ recovery from the analytic lesson), clock drift
+   (±50 ppm) walks the resampler's phase accumulator into FIFO slip unless
+   bounded, and both interact with block latency — the first-failed-threshold
+   diagnosis is the lesson's capstone skill: find WHICH budget broke, in
+   which stage, before touching any knob.
+7. **An audible failure/repair pair is mandatory evidence**: numbers close
+   the ledger; the ear validates that the ledger measured the right things
+   (bundled clip: `prometheus-excerpt-44k1.wav`; see data gate).
+
+## Misconception to refute (L13)
+
+- "Every component met its spec, so the system meets its spec." Prevalent
+  because it is how component datasheets invite you to think, and because it
+  worked for single-stage designs all course. Refutation: compose stages
+  that individually pass — converter agreement $10^{-10}$, subband
+  recombination $-80$ dB, EVM under 5%, blocks seam-clean — and watch the
+  end-to-end budget fail anyway: latencies ADD past 100 ms, quantized
+  coefficients revive alias terms the floating-point test never saw, and
+  carrier error multiplies EVM into the quantization margin. Replacement
+  model: budgets compose by summation and interaction, so the system spec is
+  a ledger with a row per stage and a column per resource — and the
+  falsification exercise makes the reader repair the FIRST violated cell,
+  not the loudest symptom.
 
 ## Pitfalls / subtleties to flag
 
@@ -68,4 +115,4 @@ est_minutes: 40
 - **Falsification:** Test 'meeting every component threshold guarantees the end-to-end target' by combining coefficient quantization, carrier error, and block latency, then identify and repair the first exceeded budget.
 - **Idealization gap:** Infinite filters, exact rational clocks, independent white quantization noise, perfectly matched analysis/synthesis coefficients, synchronized carriers, and zero packet delay do not survive finite buffers and fixed-point transport.
 - **Deliverable:** Runnable link, rate/latency/operation ledger, spectra and constellation, reconstruction metrics, and one audible failure/repair pair.
-- **Data/rights gate:** Use learner-owned or CC-licensed audio; the published quantization plots are optional evidence pending publisher review.
+- **Data/rights gate:** SOURCED (license review deferred) — `research/data/audio-clips-v1/derived/prometheus-excerpt-44k1.wav` (12 s music, native 44.1 kHz) plus a declared 48 kHz resample; the 44.1↔48 converter study should treat the ffmpeg resample as reference only. Speech alternative: arctic_a0001. See provenance.json.

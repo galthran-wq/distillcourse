@@ -22,10 +22,54 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Paraunitary banks preserve energy.
-2. Cosine modulation generates channels from one prototype.
-3. Dyadic banks trade time and frequency resolution by scale.
-4. Critical sampling remains sensitive to coefficient error.
+1. **The flaw first.** The previous lesson's PR identity is easy to satisfy
+   badly (Haar) and fragile to satisfy well (long coupled filters). Structure
+   is the answer twice over: paraunitary factorizations build PR into the
+   parameterization so no cancellation can be lost, and modulation/tree
+   structures generate many channels from one designed prototype.
+2. **Paraunitary means energy accounting**: $\tilde E(z)E(z)=I$ makes the
+   analysis stage an energy-preserving (lossless) transform for every input —
+   derive $\sum|x|^2=\sum|y|^2$ from the identity, and note the FIR
+   factorization result (Vaidyanathan ch. 6): every FIR paraunitary matrix is
+   a product of rotations and delays, so quantizing the ROTATION ANGLES
+   preserves paraunitariness exactly — the structural cure for the previous
+   lesson's coefficient fragility.
+3. **Daubechies-4 as the concrete orthonormal pair**:
+   $h=\frac1{4\sqrt2}[1{+}\sqrt3,\,3{+}\sqrt3,\,3{-}\sqrt3,\,1{-}\sqrt3]$ —
+   verify by hand that $\sum h[n]=\sqrt2$, $\sum h[n]^2=1$, and the shift-2
+   orthogonality $h_0h_2+h_1h_3=0$; two vanishing moments annihilate linear
+   ramps where Haar leaves residue. A four-number example carries the whole
+   orthonormal-wavelet apparatus.
+4. **The dyadic tree is recursion on the lowpass branch only**: octave bands,
+   constant-Q tiling, and the coefficient count staying exactly $N$ at every
+   depth (critical sampling preserved through the tree). The worked
+   `[3,1,0,4]` two-level example already in this brief is the anchor;
+   energy 26 at every level is the paraunitary ledger made visible.
+5. **Finite trees vs infinite bases**: iterating a PR pair infinitely need
+   not converge to a legitimate scaling function — the $z\mapsto z^3$
+   counterexample fails the scaling-function condition while remaining
+   perfectly paraunitary at every finite level. This is the lesson's
+   boundary between filter-bank truth and wavelet truth.
+6. **Cosine modulation as the economy of scale**: $M$ channels from one
+   prototype via cosine modulation, implemented as prototype polyphase + fast
+   DCT — the structure inside MP3-era audio coders (J. O. Smith ch. 11
+   context), and the reason modulated banks dominate when $M$ is large.
+7. **Tiling as measurement choice**: uniform STFT tiles vs constant-Q dyadic
+   tiles answer different questions about the same signal — the
+   tone-plus-click strategy exercise makes the reader measure the difference
+   rather than admire it.
+
+## Misconception to refute (L13)
+
+- "Any PR (even paraunitary) two-channel pair, iterated, gives an orthonormal
+  wavelet basis." Prevalent because finite-level trees DO inherit PR from the
+  pair, so the infinite claim looks like a free limit. Refutation: the
+  $z\mapsto z^3$ pair is paraunitary, passes every finite-level
+  reconstruction test, and fails the scaling-function Nyquist condition —
+  its iterated lowpass does not converge to a usable $\phi$. Replacement
+  model: finite-level PR is a filter-bank property; a wavelet basis
+  additionally needs the infinite-product/scaling conditions (Vaidyanathan
+  §11.5), which Haar and Daubechies satisfy and the counterexample does not.
 
 ## Pitfalls / subtleties to flag
 

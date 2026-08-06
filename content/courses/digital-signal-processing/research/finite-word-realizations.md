@@ -33,11 +33,55 @@ est_minutes: 40
 
 ## Key points the lesson must cover
 
-1. Second-order sections localize sensitivity.
-2. Scaling protects internal states.
-3. Coefficient rounding moves poles and zeros.
-4. Feedback can sustain zero-input limit cycles.
-5. Seeded dither trades coherent grid-locked error for measurable broadband noise; it does not repair overload or unstable quantized poles.
+1. **The flaw first.** Two realizations of the *same* rational transfer
+   function — expanded direct form and SOS cascade — produce different
+   outputs, different noise floors, and sometimes different stability once
+   coefficients and states live on a finite grid. Algebraic equivalence is a
+   real-arithmetic theorem; the lesson tests what survives its failure.
+2. **Why direct forms fail first**: a high-order polynomial's roots are
+   ill-conditioned functions of its coefficients — the sensitivity of pole
+   $p_i$ to coefficient $a_k$ carries a $\prod_{j\ne i}(p_i-p_j)^{-1}$ factor
+   (Oppenheim–Schafer §6.8), so clustered narrowband poles amplify rounding
+   catastrophically. SOS factoring keeps each conjugate pair in its own
+   quadratic, where rounding moves only that pair. Derive the sensitivity
+   factor; do not just assert the folklore.
+3. **Quantization noise as an injected-source model**: each rounding point
+   injects a bounded error ($|e|\le q/2$; variance $q^2/12$ under the
+   conditional model the quantization lesson will formalize), and each source
+   reaches the output through its own transfer function. Roundoff-noise gain
+   is therefore a *structure* property: pairing and ordering of sections
+   change the output noise floor at identical coefficients.
+4. **Scaling is the overflow contract**: $\ell_\infty$/$\ell_1$/$\ell_2$
+   norms give guaranteed / worst-case / energy scalings; scaling down buys
+   overflow margin and pays in SNR, which is why ordering (spread the gain,
+   put high-Q sections where their peaking is absorbed) is a real decision
+   and not a convention.
+5. **Coefficient rounding moves poles and zeros** — the quantized-pole cloud
+   figure — with the acceptance rule that every quantized pole radius stays
+   strictly below 1 and the dense response error stays within its mask.
+6. **Zero-input limit cycles are the signature nonlinearity**: rounding in
+   the feedback loop creates fixed points and oscillations the linear model
+   forbids (the §6.9.1 trapped-state worked case); saturation vs wraparound
+   arithmetic changes which large-signal oscillations can persist.
+7. **Seeded dither trades coherent grid-locked error for measurable broadband
+   noise; it does not repair overload or unstable quantized poles** — keep the
+   first-exposure block below as the authoritative treatment.
+8. **The acceptance-ledger habit**: quantized pole radii, dense-grid response
+   error, maximum state magnitude, overflow count, limit-cycle test — the
+   five-row report the strategy-choice exercise demands and the ECG
+   application reuses verbatim (C5 spiral into the module close).
+
+## Misconception to refute (L13)
+
+- "The poles are stable in floating point, so the fixed-point filter is
+  stable." Prevalent because stability was just proved as a pole-location
+  theorem. Refutation: quantizing the direct-form coefficients of a
+  clustered-pole design moves a pole outside the unit circle at a word length
+  where the SOS form of the *same* transfer function stays inside; and even
+  with stable quantized poles, the §6.9.1 rounding loop sustains a nonzero
+  zero-input output forever. Replacement model: stability of an
+  implementation is a property of the realization + word format + rounding
+  rule, checked by the acceptance ledger, not read off the ideal pole plot.
 
 ## Pitfalls / subtleties to flag
 
