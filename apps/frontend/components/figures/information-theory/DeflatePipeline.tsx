@@ -299,7 +299,7 @@ export default function DeflatePipeline() {
           <tspan fill={ACCENT}>8,776 matches at 18.9 bits</tspan>
           <tspan fillOpacity="0.4">{"  ·  "}</tspan>
           <tspan fill={SUPPORT}>644 bits of table</tspan>
-          <tspan fontWeight="600">{" = 25,586 bytes"}</tspan>
+          <tspan fontWeight="600">{" = 25,568 bytes"}</tspan>
         </text>
       </svg>
     </div>

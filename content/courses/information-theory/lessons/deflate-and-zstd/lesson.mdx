@@ -49,7 +49,7 @@ by block, with the code tables shipped in front of the data they describe.
    "huffman-by-hand + kraft-inequality", and under the whole right half
    "this lesson: how they share one bitstream". A tally line at the bottom,
    from the measured 112 KB block: "5,374 literals at 7.1 bits · 8,776
-   matches at 18.9 bits · 644 bits of table = 25,586 bytes". Colors: amber
+   matches at 18.9 bits · 644 bits of table = 25,568 bytes". Colors: amber
    = the matcher and its two streams, blue = the entropy stage, currentColor
    everything else. One idea: the format is the module's parts in series. */}
 <Figure
@@ -61,31 +61,34 @@ by block, with the code tables shipped in front of the data they describe.
 ### Three containers, one format
 
 A raw DEFLATE stream has no header, no length, and no checksum, so it never
-travels alone. Three wrappers carry it, and confusing them is the commonest
-source of confusion about what "gzip" names. The `gzip` file format
+travels alone. Three wrappers carry it, and the name `gzip` belongs to only
+one of them. The `gzip` file format
 ([RFC 1952](https://www.rfc-editor.org/rfc/rfc1952)) adds an 18-byte frame: a
 10-byte header holding a magic number, the method, flags and a timestamp, and
 an 8-byte trailer holding a CRC-32 of the original data and its length. The
 zlib format ([RFC 1950](https://www.rfc-editor.org/rfc/rfc1950)) adds 6 bytes
-instead: two header bytes whose upper nibble encodes the base-2 logarithm of
-the window size minus eight, and a 4-byte Adler-32 trailer. PNG image data is
+instead: a 2-byte header and a 4-byte Adler-32 trailer. PNG image data is
 zlib-wrapped DEFLATE, and HTTP `Content-Encoding: gzip` is the RFC 1952
 wrapper. All three carry byte-identical DEFLATE inside.
 
 **The measurement that anchors the rest of this lesson.** Take the 112,425
 bytes of RFC 8878's own text and run `gzip -9`. The output is 25,586 bytes:
-18 bytes of gzip frame and one DEFLATE block. Inside that block the matcher
+18 bytes of gzip frame and one 25,568-byte DEFLATE block. Inside it the matcher
 emitted 5,374 literals and 8,776 matches; each literal cost 7.13 bits on
 average and each match 18.87 bits, while a match retired 12.2 input bytes.
 The two code tables that make those numbers decodable cost 644 bits, which is
 80 bytes, or 0.3% of the output.
 
 <KeyFact>
-A match costs 18.9 bits and replaces 97.6 bits of input, so the entropy stage
-is not decoration on top of LZ77: it is where two thirds of the compression
-happens. A DEFLATE encoder that emitted the same parse with fixed-width
-fields, as <Ref lesson="dictionary-coding"/> priced it, would spend 31 bits
-per match instead.
+A match costs 18.9 bits and retires 97.6 bits of input. Price that same parse
+in fixed-width fields — one flag bit, then either an 8-bit literal or the
+15-bit distance and 8-bit length of <Ref lesson="dictionary-coding"/>, whose
+31-bit triple is those two fields plus a bundled trailing literal — and it
+occupies 32,374 bytes. The Huffman stage brings it to 25,568: the entropy
+stage cuts the LZ77 representation to **four fifths** of its fixed-field size,
+which is 8% of the 87 KB the file lost in total. The parse accounts for the
+other 92%, which is why the entire difference between `gzip -1` and `gzip -9`
+later in this lesson is a difference of parses inside an unchanged format.
 </KeyFact>
 
 ## Canonical codes: the Kraft inequality used as a wire format
@@ -150,9 +153,9 @@ the Kraft inequality, these conditions determine every codeword.
 
 ### The boundary: four cases and one theorem
 
-The construction is defined for any list of positive integers, so what marks
-the boundary between the lists it serves and the lists it silently breaks on
-is worth fixing with instances before the general statement.
+The construction is defined for any list of positive integers, but it returns
+a usable code for only some of them. Four length lists mark where the boundary
+runs.
 
 - **Canonical.** The RFC's `ABCDEFGH` with lengths $(3,3,3,3,3,2,4,4)$, which
   the sequence above builds. Its Kraft sum is
@@ -301,9 +304,9 @@ as `0001`. Distance 1000 falls in 769 to 1024, which is code 19 with 8 extra
 bits; the residue is $1000 - 769 = 231$, sent as `11100111`.
 
 The whole match is four elements: the Huffman codeword for 279, four raw bits,
-the Huffman codeword for 19, eight raw bits. In the measured 112 KB block the
-two codewords cost about 6 and 5 bits, so the match costs roughly 23 bits and
-retires 800.
+the Huffman codeword for 19, eight raw bits. In the measured 112 KB block those
+two codewords are 7 and 5 bits long, so the match costs 24 bits and retires
+800.
 </Example>
 
 <Figure
@@ -394,29 +397,34 @@ taste but of arithmetic, and it can be measured.
 
 ### The crossover sits at 236 bytes
 
-Compressing prefixes of a text file with `gzip -9` and costing the same LZ77
-parse three ways gives the crossover exactly. At a 64-byte block the dynamic
-header is 253 bits and the fitted code saves only 176 bits over the fixed
-tables, so fixed wins; at 236 bytes the header is 376 bits and the saving is
-382, and the encoder switches. From there the gap only widens: at 112 KB the
-header has grown to 644 bits while the saving has reached 29,919.
+Compressing prefixes of RFC 8878's text with `gzip -9` and costing the same
+LZ77 parse three ways locates the crossover exactly. At a 64-byte block the
+fitted code saves 173 bits of data over the fixed tables while its own
+description would cost about 260, so `gzip` emits a fixed block. At 236 bytes
+the header is 376 bits and the saving 379, and `gzip` switches to dynamic on
+that byte and stays there for every longer prefix. From there the gap only
+widens: at 112 KB the header has grown to 644 bits while the saving has
+reached 30,560.
 
 <KeyFact>
-The dynamic header is almost constant. Over a range of block sizes spanning a
-factor of 1,700 it moved from 253 bits to 644, while the data it describes
-grew by the same factor of 1,700. That asymmetry, not any property of Huffman
-coding, is what makes per-block statistics affordable and what makes short
-blocks expensive.
+The dynamic header barely grows. From a 64-byte block to a 112,425-byte one
+the input grew by a factor of 1,800 and the coded data by a factor of 990,
+while the tables describing that data went from about 260 bits to 644 — a
+factor of 2.5. That asymmetry, not any property of Huffman coding, is what
+makes per-block statistics affordable and short blocks expensive.
 </KeyFact>
 
 Where the statistics change, the encoder starts a new block. Concatenating
 60,000 bytes of English with 60,000 uniformly random bytes and running
 `gzip -9` produces three blocks: one dynamic block covering 63,675 bytes, then
-two stored blocks covering the rest. The encoder rode 3,675 bytes into the
-random region before giving up, then abandoned compression entirely. On a
-1.33 MB corpus of ordinary prose the same encoder emits nine blocks, all
-dynamic, each covering about 170 KB, with headers between 596 and 875 bits.
-Nothing in RFC 1951 requires or forbids any of those choices.
+two stored blocks covering the rest. The dynamic block runs 3,675 bytes past
+the seam and then ends after exactly 12,288 literals-and-matches. Moving the
+seam moves the boundary, but every early boundary measured here lands on a
+multiple of 4,096 symbols, which is the interval at which `gzip` reconsiders
+whether the block is still worth compressing. On a 1.33 MB corpus of ordinary
+prose the same encoder emits nine blocks, all dynamic, each covering about
+170 KB, with headers between 596 and 875 bits. Nothing in RFC 1951 requires or
+forbids any of those choices.
 
 ## Everything before the data is the model
 
@@ -428,8 +436,8 @@ sequences coded with that code, and only then the data.
 
 <Figure
   src="./figures/block-layout.svg"
-  alt="The fields of one dynamic DEFLATE block in order: BFINAL, BTYPE, HLIT, HDIST, HCLEN, the code-length code, the run-length coded code lengths, then the compressed data, with the model measured at 644 bits against 25,486 bytes of data"
-  caption="A 112 KB block of text: 80 bytes of model in front of 25,486 bytes of data."
+  alt="The fields of one dynamic DEFLATE block in order: BFINAL, BTYPE, HLIT, HDIST, HCLEN, the code-length code, the run-length coded code lengths, then the compressed data, with the model measured at 644 bits against 25,487 bytes of data"
+  caption="A 112 KB block of text: 80 bytes of model in front of 25,487 bytes of data."
 />
 
 `HLIT`, `HDIST` and `HCLEN` are 5, 5 and 4 bits, and they hold the number of
@@ -483,6 +491,8 @@ most-significant bit of the code first.
   caption="Both fill the byte from bit 0 upward; they differ in which end of the element goes in first, so a codeword appears reversed and a field does not."
 />
 
+### Each convention is the natural one on its own side
+
 Nothing in the theory predicts the asymmetry, and nothing forbids it. It comes
 from the two decoders. A fixed-width field is a little-endian integer, and
 accumulating it as `value |= bit << k` is what a machine does naturally.
@@ -490,6 +500,8 @@ A prefix code must be walked from the root, and the root bit is the code's
 first bit, so the decoder accumulates it as `code = (code << 1) | bit`. Each
 convention is the natural one on its own side; DEFLATE simply uses both, in
 the same byte, without a marker.
+
+### The signature of getting it wrong
 
 This is the single most common defect in from-scratch implementations, and it
 has a characteristic signature: `BFINAL`, `BTYPE`, `HLIT`, `HDIST` and `HCLEN`
@@ -504,6 +516,8 @@ counting argument shows that no lossless compression algorithm can compress
 every possible input data set", and then commits to a number: the worst-case
 expansion is 5 bytes per 32 KB block, a size increase of 0.015% for large
 data sets. The stored block is what converts the concession into a guarantee.
+
+### Five bytes, accounted field by field
 
 Those 5 bytes are the stored-block header, and they are exactly accounted:
 3 bits of `BFINAL` and `BTYPE`, up to 5 bits of padding to reach a byte
@@ -537,8 +551,7 @@ come out larger than the input it replaces.
 published in 2021 and designed twenty-five years after DEFLATE with the same
 pipeline and four substantive changes. On the same 112,425-byte text,
 `zstd -19` produces 23,215 bytes against `gzip -9`'s 25,586, a 9% improvement
-that comes from all four together. Each is worth tracing to the assumption it
-relaxes.
+that comes from all four together.
 
 ### The window stops being a constant
 
@@ -711,12 +724,17 @@ stored-block header is the counting bound written as a specification clause.
 Zstandard changes four things, and each one steps outside a stated assumption
 rather than improving on a theorem.
 
-What is not established is what happens when the model feeding the entropy
-coder is not a frequency table at all. The next module takes that up:
-<Ref lesson="kl-divergence"/> prices the cost of coding with the wrong
-distribution, and <Ref lesson="compression-is-prediction"/> shows that a
-trained predictor plus an arithmetic coder is a compressor whose measured
-output size is the model's loss.
+Every quantity in this module has been a property of one stream: its entropy,
+its codeword lengths, its parse. What is not established is what one stream
+says about another. The next module takes that up, beginning with
+<Ref lesson="mutual-information"/>, which measures how much observing one
+variable cuts the uncertainty in a second — the quantity a compression oracle
+leaks, and the quantity <Ref lesson="channel-capacity"/> later maximises to
+price a noisy channel. Two modules on, <Ref lesson="kl-divergence"/> returns to
+the entropy coder and prices what it costs to code with the wrong
+distribution, and <Ref lesson="compression-is-prediction"/> turns that price
+into a claim about trained models: a compressor's output size is its model's
+loss.
 
 ## Exercises
 
@@ -921,34 +939,49 @@ cannot express a 2-bit-per-symbol source at all; stored is worse still by the
 $400 + 2n < 8n$, that is $n > 400/6 \approx 67$ symbols. From 67 bytes on,
 the fitted code has already repaid its own description.
 
-**(c) Why English crosses so much later.** Two reasons, and both are about the
-size of the saving rather than the size of the header.
+**(c) Why English crosses at 236 and not at 67.** Both reasons live in the
+denominator, and one of them is a trap in how the saving gets quoted.
 
-First, the assumed gap is unrealistically wide. This exercise gives the fitted
-code 2.0 bits per symbol against the fixed table's 8.0, a saving of 6 bits per
-symbol. On English text the fitted code reaches about 4.61 bits per input byte
-at a 256-byte block while the fixed table reaches 4.71, a saving of 0.1 bits.
-At that rate a 376-bit header needs roughly 3,700 bits of data to repay
-itself, which is about the block size where the switch is observed.
+First, the assumed gap is far too wide. This exercise gives the fitted code
+2.0 bits per symbol against the fixed table's 8.0, a saving of 6 bits per
+symbol. On English text at a 256-byte block the two codings land at 4.61 and
+4.71 *total* bits per input byte — but that 0.10 is the margin left over
+*after* the header has been paid, not the saving that pays for it. Gross, the
+fitted code saves 409 bits of data over the fixed tables on those 256 bytes,
+which is 1.60 bits per input byte, and the 385-bit header eats all but 0.10 of
+it. Putting the gross figure into part (b)'s formula gives
+$376 / 1.61 \approx 234$ bytes against the 236 measured in the body: a factor
+of 3.5 above this exercise's 67, and the whole factor is the denominator.
 
-Second, the header is not constant at small $n$. A 64-byte block's header
-measured 253 bits, not 400, because fewer symbols occur and the zero runs
-collapse further. Both effects move the crossover, and they move it in
-opposite directions.
+Second, the header is not constant at small $n$. Costing a 64-byte block as
+dynamic gives about 260 bits, not 400, because fewer symbols occur and the
+zero runs collapse further. That pulls the crossover down while the smaller
+per-byte saving pushes it up, and on English the second effect wins.
 
-**The transferable move:** a header pays for itself at a block size of about
-(header bits) / (bits saved per symbol), and the denominator is what varies
-between sources, not the numerator.
+**The transferable move:** a header repays itself at a block size of about
+(header bits) / (**gross** bits saved per symbol). Quoting the saving net of
+the header, as the 4.61-against-4.71 comparison does, makes the crossover look
+almost free when it is nothing of the kind.
 </Solution>
 </Exercise>
 
 <Exercise>
-Research-shaped. Take a text file of at least 1 MB. Compress it with
-`gzip -1`, `gzip -9` and `zstd -19`, recording sizes and elapsed times. Then
-write or obtain a tool that walks the DEFLATE bitstream and reports, for the
-`gzip -9` output, how many blocks were emitted, of which types, and how many
-bits each block spent on its header. State what the level knob is actually
-changing, given that all three gzip outputs are the same format.
+Research-shaped, in two parts. Take a text file of at least 1 MB, compress it
+with `gzip -1`, `gzip -9` and `zstd -19` recording sizes and elapsed times,
+and write or obtain a tool that walks the DEFLATE bitstream.
+
+**(a) What ends a block?** For the `gzip -9` output, report the number of
+literals plus matches in every block, not just the bytes each block covers.
+Then build two inputs whose statistics change partway through — 60 KB of
+prose followed by 60 KB of uniform random bytes, and the same two halves in
+the opposite order — and report the boundaries and block types for each.
+State the rule your measurements support, and say which part of it is in
+RFC 1951.
+
+**(b) Test the crossover model on your own file.** Find the smallest prefix of
+it for which `gzip -9` emits a dynamic rather than a fixed block. Cost that
+prefix's parse both ways, and check the prediction (header bits) divided by
+(gross bits saved per input byte) against the prefix length you observed.
 
 <Solution>
 **Measured on a 1,333,811-byte corpus of English prose**, with `gzip 1.12`
@@ -961,13 +994,6 @@ and `zstd 1.5.5`, times averaged over five runs:
 | `gzip -9` | 463,907 | 2.78 | 0.098 s |
 | `zstd -19` | 373,742 | 2.24 | 0.536 s |
 
-**Block census for `gzip -9`.** Nine blocks, all dynamic, covering 14,789
-bytes then seven blocks of roughly 170,000 bytes each then a final 105,171.
-Headers ran from 596 to 875 bits, so the entire cost of transmitting nine
-separate models was about 920 bytes, 0.2% of the output. The first block is
-short because the encoder flushes when its internal buffer fills rather than
-on any statistical criterion.
-
 **What a walker has to do.** Read 1 bit of `BFINAL` and 2 of `BTYPE`; for
 `BTYPE = 0` align and read `LEN`; for `BTYPE = 2` read `HLIT`, `HDIST`,
 `HCLEN`, then the code-length code, then decode the two length sequences, then
@@ -975,14 +1001,36 @@ decode symbols until 256. Remember that Huffman codewords are packed
 most-significant bit first while every other field is least-significant bit
 first.
 
-**What the level changes.** Not the format. Every level emits the same block
-types with the same three alphabets, and any conforming decoder reads all of
-them. What changes is how hard the matcher looks: `-1` truncates its hash
-chains aggressively and takes the first adequate match, `-9` walks longer
-chains and applies lazy matching. On a 112 KB text the two parses were 13,030
-matches averaging 8.3 bytes against 8,776 averaging 12.2, and the whole
-6,162-byte size difference came from that. RFC 1951 §4 describes both
-strategies and states explicitly that neither is part of the format.
+**(a) The count is in symbols, not bytes.** On a file whose statistics do not
+change, every non-final block held exactly 32,767 literals-and-matches. On
+854,903 bytes of a typeset textbook the first two blocks reached that count
+after 278,634 and 351,765 input bytes and the last took the remaining 224,504.
+`gzip` closes a block when its symbol buffer fills, and how many bytes that
+buffer covers depends on how much each symbol retires, which is why the byte
+size of a block varies by a quarter across one homogeneous file.
+
+The heterogeneous inputs add the second half of the rule. Prose then random
+gives one dynamic block over 63,675 bytes — 12,288 symbols, well short of the
+buffer — then two stored blocks of about 32 KB. Random then prose gives a
+stored block of 32,781 bytes, then a full 32,767-symbol dynamic block, then
+the remainder. Moving the seam moves the first boundary, but every early
+boundary lands on a multiple of 4,096 symbols, so the encoder is re-deciding
+at a fixed symbol interval rather than at the seam itself. None of this is in
+RFC 1951: the buffer size, the checkpoint interval and the decision rule are
+all encoder-side, and §4 says so.
+
+**(b) The model predicts the crossover to within a byte or two.** On RFC 8878's
+text `gzip -9` emits fixed blocks up to 235 bytes and dynamic from 236 on. At
+236 the dynamic header is 376 bits and the fitted code saves 379 bits of data
+over the fixed tables, or 1.61 bits per input byte, so the model predicts
+$376/1.61 \approx 234$. Two other files, same procedure: RFC 1951's own text
+crosses at 228, where the header is 337 bits against a gross saving of 1.49
+bits per byte, predicting 227; a typeset textbook, whose long runs of spaces
+the fixed table codes badly, crosses at 69, with a 244-bit header against 3.58
+bits per byte, predicting 68. The crossover moves by a factor of 3.4 across
+those three files and the header moves by less than 1.6, so the denominator is
+doing all the work — the same conclusion the mixed-review exercise above
+reaches by setting a 6-bit-per-symbol saving against English's 1.6.
 
 **What counts as agreement.** Your absolute sizes will differ with the text,
 but the ratios should not: `-9` should land within a few percent of `-6`,
@@ -1041,7 +1089,7 @@ surprisal lowers the file size by the same amount.
 1. L. P. Deutsch, "DEFLATE Compressed Data Format Specification version 1.3," RFC 1951, IETF, May 1996 — §1.1 the counting-argument concession and the 5-bytes-per-32-KB worst case; §2 the two-stage overview and the 32 KB / 258-byte limits; §3.1.1 the three bit-packing rules; §3.2.2 the two canonical rules, the three-step construction and the `ABCDEFGH` example with lengths (3,3,3,3,3,2,4,4); §3.2.3 the master decode loop; §3.2.4 the stored block; §3.2.5 the merged 286-symbol alphabet and the two extra-bit tables; §3.2.6 the fixed code lengths; §3.2.7 HLIT/HDIST/HCLEN, the 16/17/18 repeat codes and the scrambled permutation; §4 hash chains and lazy matching, declared not part of the format. https://www.rfc-editor.org/rfc/rfc1951
 2. Y. Collet, M. Kucherawy, Ed., "Zstandard Compression and the application/zstd Media Type," RFC 8878, IETF, February 2021 — §3.1.1.1.2 the window-size formula and its 1 KB to 3.75 TB range; §3.1.1.2 the three block types, the 3-byte block header and the 128 KB block cap, with the recommendation to send a `Raw_Block` when compression would expand; §3.1.1.3 the literals and sequences sections; §3.1.1.3.2.1.1 the offset formula and the repeat codes; §3.1.1.5 and Table 18 the three-slot cache trace used above; §4.1.1 the FSE table description and the state-spreading stride; §4.2.1 Huffman by weights with the inferred last weight and its six-symbol example; §5 the dictionary format; §8 the compression-side-channel rule and the CRIME citation. https://www.rfc-editor.org/rfc/rfc8878
 3. P. Deutsch, "GZIP file format specification version 4.3," RFC 1952, IETF, May 1996 — §2.2–2.3 the 10-byte member header and the 8-byte CRC-32 and ISIZE trailer that make up the 18 bytes measured here. https://www.rfc-editor.org/rfc/rfc1952
-4. P. Deutsch, J-L. Gailly, "ZLIB Compressed Data Format Specification version 3.3," RFC 1950, IETF, May 1996 — §2.2 the 2-byte CMF/FLG header, with CINFO the base-2 logarithm of the window size minus eight, and the 4-byte Adler-32 trailer; this is the wrapper PNG image data carries. https://www.rfc-editor.org/rfc/rfc1950
+4. P. Deutsch, J-L. Gailly, "ZLIB Compressed Data Format Specification version 3.3," RFC 1950, IETF, May 1996 — §2.2 the 2-byte CMF/FLG header and the 4-byte Adler-32 trailer that make up the 6-byte wrapper PNG image data carries. https://www.rfc-editor.org/rfc/rfc1950
 5. E. S. Schwartz, B. Kallick, "Generating a canonical prefix encoding," *Communications of the ACM*, 7(3), March 1964, pp. 166–169 — the canonical construction thirty-two years before RFC 1951 adopted it, and the reference RFC 1951 §5 cites for it.
 6. D. Hirschberg, D. Lelewer, "Efficient decoding of prefix codes," *Communications of the ACM*, 33(4), April 1990, pp. 449–459 — the table-driven decoding that canonical ordering makes possible, and the second reference RFC 1951 §5 gives for its code construction.
 7. L. L. Larmore, D. S. Hirschberg, "A fast algorithm for optimal length-limited Huffman codes," *Journal of the ACM*, 37(3), July 1990, pp. 464–473 — the package-merge algorithm, which solves the problem RFC 1951 §3.2.1 raises and does not answer: how to build an optimal code when no codeword may exceed 15 bits. https://doi.org/10.1145/79147.79150
@@ -1049,8 +1097,11 @@ surprisal lowers the file size by the same amount.
 9. D. A. Huffman, "A Method for the Construction of Minimum-Redundancy Codes," *Proceedings of the I.R.E.*, 40(9), 1952, pp. 1098–1101 — the optimality result whose three assumptions this lesson tests against a shipped format; cited by RFC 1951 §5 as reference [1].
 
 Measurements reported in this lesson were made with `gzip 1.12` and
-`zstd 1.5.5`. Unless stated otherwise the input is the 112,425-byte plain-text
+`zstd 1.5.5`. Unless stated otherwise the input is the 112,425-byte plain text
 of RFC 8878; the block census and timings use a 1,333,811-byte corpus of
-English prose, and the dictionary experiment uses 1,200 synthetic JSON records
+English prose; the block-boundary experiments concatenate prefixes of that RFC
+text with uniformly random bytes; the second and third crossover measurements
+use the 36,944-byte plain text of RFC 1951 and an 854,903-byte typeset
+textbook; and the dictionary experiment uses 1,200 synthetic JSON records
 averaging 178 bytes.
 </References>
