@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "status": "ready_with_frozen_numeric_contract",
+  "lesson": "dft-bins-symmetry-and-scaling",
+  "component": "PaddingVsDataLab",
+  "course_spec": "Use zero padding to reduce one-tone peak-location error below 0.1 original bins, then try and fail to resolve a two-tone pair hidden by the unchanged record. Two stable maxima under a phase perturbation are the resolution threshold.",
+  "course_spec_assessment": "The interaction is D1-worthy but the one-line spec is not implementation-deterministic by itself: it omits f_s, N, tone parameters, padding choices, phase perturbation, peak finder, stability tolerance, plot band, and initial state. This preflight freezes those values without editing course.yaml.",
+  "d1_buildable": true,
+  "d1_sentence": "The learner holds the acquired record fixed and increases zero padding to watch the spectral sample grid densify and the one-tone peak estimate improve while a close pair remains phase-unstable, then increases actual record length and sees two stable peaks appear on the same 1 Hz grid.",
+  "blocker_count": 0,
+  "planned_loc": 198,
+  "dependency_count": 0,
+  "targets": {
+    "component_file": "components/demos/digital-signal-processing/PaddingVsDataLab.tsx",
+    "registry_file": "components/demos/index.ts",
+    "registry_entry": "PaddingVsDataLab: () => import(\"./digital-signal-processing/PaddingVsDataLab\"),",
+    "lesson_embed": "<Demo name=\"PaddingVsDataLab\" caption=\"Use padding to refine one peak estimate, then hold the 1 hertz display grid fixed and determine how much acquired duration makes two phase-stable peaks appear.\" />"
+  },
+  "implementation_contract": {
+    "export": "default function PaddingVsDataLab() with no required props",
+    "client_boundary": "Put use client before imports. Store only scenario, acquired length N, padding-factor index, and live pair phase; derive spectra, peaks, targets, and preset indices synchronously without effects or browser APIs.",
+    "kit": "Panel outer container; PresetGroup for four named scenarios and phase anchors; Slider for N and padding factor; TargetList for the two tasks; Readout for live metrics. No UI primitive changes are required.",
+    "styling": "Tailwind theme classes and currentColor for custom SVG; house amber #e2903a and blue #4c8dd6 with solid/dashed cues. No chart package, CSS file, fixed light background, network, or dependency.",
+    "performance": "Evaluate only the displayed 140-210 Hz band. Worst case is three direct spectra over about 281 bins times 256 samples, below 220000 complex accumulations per input and comfortably below 200 ms. An FFT implementation is unnecessary."
+  },
+  "signal_and_math": {
+    "sample_rate_hz": 1024,
+    "sample_indices": "n=0,...,N-1; the record is half-open and uses a rectangular window",
+    "single_tone": "x_1[n]=cos(2pi*173 n/1024)",
+    "pair": "x_2[n]=cos(2pi*170 n/1024)+0.8cos(2pi*180 n/1024+phi)",
+    "record_lengths": [64, 128, 192, 256],
+    "padding_factors": [1, 2, 4, 8, 16],
+    "transform_length": "L=Q N for selected padding factor Q; use the N measured samples and append exactly L-N zeros",
+    "dft": "X_L[k]=sum_{n=0}^{N-1}x[n]e^{-j2pi kn/L}; display one-sided amplitude 2|X_L[k]|/N in 140<=f_k<=210 Hz, where f_k=k f_s/L",
+    "single_peak_estimator": "Choose the largest displayed magnitude in 140-210 Hz; ties choose the lower-frequency bin. Report e_bin=|f_hat-173|/(f_s/N) in original unpadded-bin units.",
+    "single_target": "PASS when e_bin<0.1 with N=64; padding factor Q=4 is the first allowed factor that passes.",
+    "phase_perturbation_deg": [0, 90],
+    "pair_peak_finder": "Within 150-200 Hz, a candidate is a strict local maximum on the L-point grid and has magnitude at least 20% of that spectrum's maximum in 140-210 Hz.",
+    "pair_resolution_rule": "For both phi=0 and phi=90 degrees, there must be two distinct candidates with one within 0.5 Hz of 170 Hz and the other within 0.5 Hz of 180 Hz. A lower sampled magnitude must occur between their peak indices. PASS uses strict peak detection and inclusive 0.5 Hz location tolerance.",
+    "pair_control": "Compare N=64,Q=16 with N=256,Q=4. Both have L=1024 and Delta f=1 Hz, so the resolution change comes from acquired duration, not from a denser plotted grid.",
+    "resolution_interpretation": "This is a deterministic criterion for the supplied rectangular-window pair, not a universal theorem that every two tones separated by 10 Hz resolve at N=256."
+  },
+  "state_and_interaction": {
+    "stored_state": [
+      "scenario: single or pair",
+      "N: one of 64,128,192,256",
+      "paddingIndex: one of 0,...,4 mapping to Q=1,2,4,8,16",
+      "pairPhaseDeg: 0 through 90 in 1-degree steps for the live trace"
+    ],
+    "initial_state": "Padded pair: pair mode, N=64, Q=16, phi=0 degrees. The 1 Hz grid already looks dense but shows only one qualifying central maximum, making the interpolation-versus-resolution failure visible before interaction.",
+    "scenario_presets": [
+      {
+        "label": "Coarse tone",
+        "state": "single, N=64, Q=1, phi=0",
+        "observable": "f_hat=176 Hz and e_bin=3/16=0.1875, so the 0.1-bin target fails"
+      },
+      {
+        "label": "Padded tone",
+        "state": "single, N=64, Q=4, phi=0",
+        "observable": "f_hat=172 Hz and e_bin=1/16=0.0625, the first allowed padding-factor pass"
+      },
+      {
+        "label": "Padded pair",
+        "state": "pair, N=64, Q=16, phi=0",
+        "observable": "L=1024 and Delta f=1 Hz, but the two true tones do not produce qualifying stable maxima under the 90-degree perturbation"
+      },
+      {
+        "label": "Long pair",
+        "state": "pair, N=256, Q=4, phi=0",
+        "observable": "L=1024 and Delta f=1 Hz remain unchanged; the 0- and 90-degree tests both produce maxima within 0.5 Hz of 170 and 180 Hz"
+      }
+    ],
+    "controls": [
+      "Named scenario PresetGroup; active index clears when any live value differs from the preset.",
+      "Acquired samples Slider shown as N=64/128/192/256 with min=0,max=3,step=1 mapped to the declared lengths.",
+      "Padding Slider shown as Q=1/2/4/8/16 with min=0,max=4,step=1; its label also reports L=QN and Delta f=f_s/L.",
+      "Pair phase Slider 0-90 degrees, step 1, disabled or visually de-emphasized in single mode; phase presets 0 degrees and 90 degrees remain keyboard reachable."
+    ],
+    "guided_task": [
+      "Select Coarse tone and increase only Q until the peak-location error is strictly below 0.1 original bins; TargetList recognizes Q=4 as the first pass.",
+      "Select Padded pair, compare live phi=0 and 90 degrees, and confirm the stable-two-peak target fails even though Delta f=1 Hz.",
+      "Select Long pair. Confirm Delta f is still 1 Hz while acquired duration increases from 62.5 ms to 250 ms and the two-phase resolution target passes."
+    ]
+  },
+  "readouts_and_visual": {
+    "targets": [
+      "Peak interpolation: N=64 and e_bin<0.1; show current e_bin, f_hat, and first passing Q=4.",
+      "Stable pair: both phase tests have distinct qualifying maxima within 0.5 Hz of 170 and 180 Hz; show PASS/FAIL and both phase-specific peak locations."
+    ],
+    "readout_fields": [
+      "mode, N, Q, L, acquired duration N/f_s in ms",
+      "original spacing f_s/N and displayed spacing f_s/L in Hz",
+      "single f_hat and e_bin, or live pair maxima and phase",
+      "phase-0 and phase-90 qualifying peak coordinates",
+      "record-limited individual-tone main-lobe width 2f_s/N",
+      "explicit text: zero padding adds coordinates, not acquired information"
+    ],
+    "spectrum_chart": "Responsive SVG over the fixed 140-210 Hz band. Draw the continuous-looking dense reference response as a muted path only when Q permits it, current DFT samples as stems/dots, amber 170/173 Hz and blue 180 Hz truth guides, and direct peak labels. In pair mode overlay the alternate 0/90-degree response as dashed only when the stability target is being evaluated; never rely on hue alone.",
+    "mobile": "Controls and readouts stack at 360 px; the spectrum keeps 140,170,173,180,210 Hz anchors as relevant, uses a mobile-safe viewBox, and has no horizontal scroll.",
+    "accessibility": "Native kit buttons and sliders, 44 px targets, aria-valuetext for N/Q/phase, polite Readout and TargetList updates, SVG role=img with a dynamic label naming N, L, grid, peak result, and resolution status. No motion or timer."
+  },
+  "deterministic_checks": [
+    "Single tone, N=64,Q=1,L=64: f_hat=176 Hz, original bin width 16 Hz, e_bin=0.1875, FAIL.",
+    "Single tone, N=64,Q=2,L=128: f_hat=176 Hz, e_bin=0.1875, FAIL.",
+    "Single tone, N=64,Q=4,L=256: f_hat=172 Hz, e_bin=0.0625, PASS and first allowed Q pass.",
+    "Single tone, N=64,Q=16,L=1024: f_hat=173 Hz, e_bin=0 exactly.",
+    "Pair, N=64,Q=16,L=1024: phi=0 has one qualifying peak at 171 Hz; phi=90 has qualifying peaks at 166 and 187 Hz, so the stable-location rule fails.",
+    "Pair, N=128,Q=16,L=2048: phi=0 has near-tone peaks at 169.5 and 180.5 Hz, but phi=90 has only one qualifying central peak near 171 Hz, so the two-phase rule fails.",
+    "Pair, N=256,Q=4,L=1024: phi=0 has true-tone peaks at 170 and 180 Hz; phi=90 has true-tone peaks at 170 and 180 Hz on the 1 Hz grid, so PASS.",
+    "Pair control presets both use L=1024 and Delta f=1 Hz; durations are 62.5 and 250 ms and individual-tone main-lobe widths are 32 and 8 Hz.",
+    "All slider endpoints produce finite DFT values and coordinates; no log scale or log(0) floor is required."
+  ],
+  "scope_guards": [
+    "Do not claim zero padding reconstructs unobserved samples, narrows the N-sample window response, or improves theorem-level resolving power.",
+    "Do not call every local maximum a physical sinusoid; the pass rule is explicitly tied to known constructed truth and phase stability.",
+    "Do not generalize the 10 Hz pair threshold beyond this rectangular window, amplitude ratio, sample rate, and two tested phases.",
+    "Do not introduce FFT complexity or library APIs; the next lesson owns factorization and machine layout."
+  ],
+  "validation_plan": [
+    "Run a deterministic TypeScript harness for every numeric check and strict/inclusive threshold above.",
+    "Confirm use client is first, default export has no required props, imports are React plus components/ui only, and the component remains at or below about 200 physical lines.",
+    "Run npx tsc --noEmit and scoped eslint on PaddingVsDataLab.tsx plus the demo registry.",
+    "After the lesson exists, run npm run validate -- digital-signal-processing dft-bins-symmetry-and-scaling.",
+    "Inspect light/dark desktop and 360 px; keyboard-run every preset, N/Q endpoint, and phase endpoint; verify preset clearing and live target announcements."
+  ],
+  "checklist_expectation": {
+    "D1": "PASS: the learner hits one interpolation target, then falsifies padding-as-resolution and crosses a duration threshold while holding display-grid spacing fixed.",
+    "D2": "PASS by plan: fixed-band direct evaluation stays below 220000 accumulations per event with no network or async work.",
+    "D3": "PASS by plan: the initial densely padded pair visibly fails, and four named presets anchor the narrative.",
+    "D4": "PASS by plan: three ordered tasks have exact observable outcomes and remain open to N/Q/phase exploration afterward.",
+    "D5": "PASS by plan: one client component, existing UI kit, no dependency, keyboard/touch controls, responsive SVG, and an approximately 198-line budget."
+  }
+}

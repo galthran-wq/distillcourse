@@ -1,0 +1,336 @@
+{
+  "status": "complete_with_spec_issues",
+  "lesson": "dft-bins-symmetry-and-scaling",
+  "brief_path": "content/courses/digital-signal-processing/research/dft-bins-symmetry-and-scaling.md",
+  "prerequisite_path": "content/courses/digital-signal-processing/lessons/dtft-and-frequency-response/lesson.mdx",
+  "checks_count": 21,
+  "source_count": 4,
+  "issues_found": 7,
+  "blockers": [],
+  "writer_scope": {
+    "must_establish": [
+      "An N-point DFT is a complete coordinate transform for one declared N-sample record, not a detector that returns only physically present sinusoids.",
+      "Under the house convention, the DFT is the finite-record DTFT sampled at omega_k=2 pi k/N.",
+      "A bin has normalized angular frequency before it has hertz; hertz requires both f_s and N.",
+      "Real records give conjugate-symmetric coefficients, with DC and, only for even N, Nyquist as self-conjugate real singletons.",
+      "Raw two-sided coefficients, one-sided peak amplitudes, unitary coefficients, and packed storage are different objects and need separate ledgers.",
+      "Pointwise multiplication of two N-point DFTs followed by the declared IDFT gives N-point circular convolution; zero padding to N >= L_x+L_h-1 embeds linear convolution exactly.",
+      "Zero padding samples the same finite-record DTFT more densely; genuinely longer data can improve discrimination, while appended zeros cannot add resolving information."
+    ],
+    "must_not_expand": [
+      "Do not teach FFT factorization beyond the final even/odd handoff.",
+      "Do not turn the lesson into peak estimation, window selection, or streaming FFT convolution; those have later lessons.",
+      "Do not infer periodic physical data from a finite record. Periodicity belongs to the DFT representation/circular indexing unless the acquisition model separately asserts it."
+    ],
+    "recommended_body_sequence": [
+      "Freeze indices, sign, scale, endpoint, and unit conventions before the first calculation.",
+      "Relate the declared DFT to DTFT samples and correlations against orthogonal basis rows.",
+      "Compute one complete short transform and map bins to normalized and physical frequency.",
+      "Derive real-input symmetry and treat DC/even-N Nyquist boundaries.",
+      "Give a two-sided/one-sided/scaling/storage ledger with reconstruction and amplitude use cases.",
+      "Derive circular convolution and the exact zero-padding condition.",
+      "Use the padding-versus-data comparison, then close with the even/odd FFT split."
+    ]
+  },
+  "frozen_conventions": {
+    "record": "x[n] is declared only for integer n=0,...,N-1 unless an extension is explicitly supplied.",
+    "forward": "X[k] = sum_{n=0}^{N-1} x[n] exp(-j 2 pi k n/N), k=0,...,N-1.",
+    "inverse": "x[n] = (1/N) sum_{k=0}^{N-1} X[k] exp(+j 2 pi k n/N), n=0,...,N-1.",
+    "root": "W_N = exp(-j 2 pi/N), so X[k]=sum_n x[n] W_N^{kn}.",
+    "dtft_sampling": "For the zero-extended finite record X_r(e^{j omega})=sum_{n=0}^{N-1}x[n]exp(-j omega n), X[k]=X_r(e^{j omega}) at omega=2 pi k/N.",
+    "unshifted_frequency": "omega_k=2 pi k/N rad/sample and f_k=k f_s/N Hz for k=0,...,N-1; bins above Nyquist are equivalent negative-frequency representatives, not additional frequencies above f_s/2.",
+    "signed_frequency": "Use the half-open interval [-pi,pi): kappa(k)=k for k<N/2 and kappa(k)=k-N for k>=N/2; omega_tilde=2 pi kappa/N and f_tilde=kappa f_s/N. Thus an even-N Nyquist bin is labeled -pi or -f_s/2 in this signed ledger. If a figure instead labels it +f_s/2, state that endpoint choice and do not show both.",
+    "record_time": "Sample locations 0 through (N-1)T_s span (N-1)T_s, while the periodized N-sample block and bin spacing use period N T_s; do not call both quantities 'record duration' without qualification.",
+    "phase": "Use principal phase in (-pi,pi] with -pi represented as +pi, inherited from the concept ledger. Phase is undefined when X[k]=0.",
+    "circular_convolution": "(x circular_N h)[n]=sum_{m=0}^{N-1}x[m]h[(n-m) mod N]. Under the house DFT pair, DFT{x circular_N h}=X[k]H[k].",
+    "parseval": "sum_{n=0}^{N-1}|x[n]|^2=(1/N)sum_{k=0}^{N-1}|X[k]|^2.",
+    "one_sided_peak_amplitude": "For real x under the raw forward DFT, A[0]=|X[0]|/N; if N is even, A[N/2]=|X[N/2]|/N; every other retained positive-frequency bin uses A[k]=2|X[k]|/N. Odd N has no Nyquist singleton.",
+    "unitary_alternative": "If both directions use 1/sqrt(N), label the coefficients X_u=X/sqrt(N); then sum|x|^2=sum|X_u|^2. Do not mix this with the house pair inside an example."
+  },
+  "checked_claims_formulas_examples": [
+    {
+      "id": "basis_orthogonality_and_inverse",
+      "claim": "sum_{n=0}^{N-1} exp(j2 pi (k-l)n/N)=N when k=l mod N and 0 otherwise; hence the inverse kernel is the conjugate forward kernel scaled by 1/N.",
+      "result": "verified"
+    },
+    {
+      "id": "correlation_interpretation",
+      "claim": "With v_k[n]=exp(j2 pi kn/N), X[k]=<x,v_k>=sum_n x[n]conj(v_k[n]); it is a complex coordinate/correlation, not a yes/no physical-tone test.",
+      "result": "verified"
+    },
+    {
+      "id": "dft_as_dtft_samples",
+      "claim": "Substitution of omega=2 pi k/N into the finite-record DTFT yields the declared DFT exactly.",
+      "qualification": "This is the DTFT of the declared finite record. Zero padding changes the sampling grid but not that finite sum.",
+      "result": "verified"
+    },
+    {
+      "id": "real_conjugate_symmetry",
+      "derivation": "For real x[n], X[(N-k) mod N]=sum_n x[n]exp(+j2 pi kn/N)=conj(X[k]).",
+      "boundaries": "X[0] is real. For even N, X[N/2] is also real. For odd N there is no Nyquist bin.",
+      "result": "verified"
+    },
+    {
+      "id": "independent_real_input_bins",
+      "claim": "Even N retains k=0,...,N/2 (N/2+1 complex slots with real singleton endpoints); odd N retains k=0,...,(N-1)/2 ((N+1)/2 slots, only DC a singleton).",
+      "result": "verified"
+    },
+    {
+      "id": "eight_point_alternating_audit",
+      "input": "x[n]=(-1)^n, n=0,...,7",
+      "raw_dft": "X[4]=8 and X[k]=0 for k!=4.",
+      "inverse": "The 1/8 IDFT reconstructs x[n].",
+      "unitary": "X_u[4]=sqrt(8).",
+      "energy": "sum_n|x[n]|^2=8=(1/8)|8|^2=|sqrt(8)|^2.",
+      "result": "verified numerically and algebraically"
+    },
+    {
+      "id": "planned_four_point_warmup",
+      "input": "x=[1,0,-1,0], f_s=8 kHz, N=4",
+      "raw_dft": "X=[0,2,0,2].",
+      "unshifted_bins_hz": "[0,2,4,6] kHz.",
+      "signed_bins_hz": "[0,2,-4,-2] kHz under the frozen half-open convention.",
+      "interpretation": "The nonzero pair is at +/-2 kHz; bin 2 is the -4 kHz Nyquist singleton but is zero here.",
+      "result": "verified"
+    },
+    {
+      "id": "planned_one_khz_strategy_case",
+      "input": "x[n]=cos(2 pi n/8), f_s=8 kHz, N=8",
+      "raw_dft": "X[1]=X[7]=4; all other bins are zero.",
+      "two_sided_use": "Retain complex X[0..7] for the ordinary IDFT or coefficient multiplication; the two 0.5-amplitude complex exponentials sum to the real cosine.",
+      "one_sided_use": "The one-sided peak-amplitude ledger reports A[1]=2|4|/8=1. It is a reporting transform, not input to the ordinary length-8 IDFT.",
+      "phase_note": "A packed one-sided complex rFFT can reconstruct real input when its layout and original N are known; an amplitude-only one-sided display cannot reconstruct phase.",
+      "result": "verified"
+    },
+    {
+      "id": "boundary_probe",
+      "cases": [
+        "N=1: X[0]=x[0]; DC is the only singleton and must not be doubled.",
+        "x[n]=C: X[0]=NC and all other bins vanish.",
+        "Even N, x[n]=A(-1)^n: X[N/2]=NA only; the Nyquist singleton must not be doubled.",
+        "Odd N: no sample sequence exp(j pi n) is periodic with odd period N, so a truncated alternating record is not a Nyquist-bin singleton and generally leaks."
+      ],
+      "result": "verified"
+    },
+    {
+      "id": "off_bin_leakage_counterexample",
+      "input": "N=8, x[n]=cos(2 pi(1.5)n/8)",
+      "raw_dft_rounded": "[(1,0),(1,2.179580),(1,-2.613126),(1,-0.648847),(1,0),(1,0.648847),(1,2.613126),(1,-2.179580)].",
+      "conclusion": "A record containing one sinusoid can have nonzero values in every DFT bin; bins are coordinates/samples of the windowed record spectrum, not a list restricted to generating sinusoids.",
+      "result": "verified numerically"
+    },
+    {
+      "id": "raw_real_sinusoid_scaling",
+      "claim": "A bin-centered real cosine of peak amplitude A away from DC/Nyquist gives conjugate magnitudes AN/2; a complex exponential of amplitude A gives one magnitude AN; a constant D gives X[0]=DN.",
+      "result": "verified"
+    },
+    {
+      "id": "one_sided_no_double_count",
+      "claim": "Doubling only paired interior magnitudes preserves peak-amplitude reporting. DC and the even-N Nyquist bin each represent their own conjugate and are never doubled.",
+      "qualification": "Power/PSD and RMS spectra require different square/frequency-width scaling and are outside this lesson unless explicitly derived.",
+      "result": "verified"
+    },
+    {
+      "id": "parseval_derivation",
+      "derivation": "Insert the 1/N inverse into sum_n x[n]conj(x[n]); root orthogonality removes k!=l cross terms, leaving (1/N)sum_k|X[k]|^2.",
+      "short_check": "For x=[1,0,-1,0], time energy is 2 and spectral energy is (1/4)(|2|^2+|2|^2)=2.",
+      "result": "verified"
+    },
+    {
+      "id": "circular_convolution_theorem",
+      "derivation": "Expand DFT{x circular_N h}, substitute r=(n-m) mod N, and separate the finite periodic sums to obtain X[k]H[k].",
+      "result": "verified"
+    },
+    {
+      "id": "linear_vs_circular_numeric",
+      "inputs": "x=[1,2,3], h=[1,1]",
+      "linear": "[1,3,5,3]",
+      "three_point_circular": "[4,3,5], because the linear tail 3 wraps onto index 0.",
+      "four_point_padded": "[1,3,5,3], exact because N=4=L_x+L_h-1.",
+      "result": "verified"
+    },
+    {
+      "id": "padding_condition",
+      "claim": "For arrays of declared lengths L_x and L_h beginning at zero, the allocated linear-convolution length is L_x+L_h-1. Padding both to any N at least that large prevents modulo-N overlap.",
+      "qualification": "Actual mathematical support can be shorter if endpoints vanish or cancel, but the array-length guarantee remains the safe implementation rule.",
+      "result": "verified"
+    },
+    {
+      "id": "zero_padding_interpolation",
+      "claim": "Appending M-N zeros and taking an M-point DFT evaluates the same N-term finite-record DTFT at omega=2 pi k/M. It can reduce grid-quantized peak-location error but does not narrow the record's main lobe or create a second resolvable component.",
+      "result": "verified"
+    },
+    {
+      "id": "fft_forward_split",
+      "claim": "For even N, E[k]=DFT_{N/2}{x[2r]}, O[k]=DFT_{N/2}{x[2r+1]}, X[k]=E[k]+W_N^k O[k], and X[k+N/2]=E[k]-W_N^k O[k] for k=0,...,N/2-1.",
+      "n8_delivery": "The eight-sample exercise must expose two reused four-point sums and end with a Ref to fft-factorization-and-layout; cost claims beyond this split belong to that lesson.",
+      "result": "verified"
+    },
+    {
+      "id": "normalization_family_guard",
+      "claim": "For forward scale alpha and inverse scale beta with alpha beta N=1, Parseval is sum|x|^2=(1/(N|alpha|^2))sum|X_alpha|^2 and DFT_alpha{x circular h}=X_alpha H_alpha/alpha.",
+      "lesson_use": "Keep alpha=1, beta=1/N in the main line; use this identity only to explain why formulas change across conventions.",
+      "result": "verified"
+    },
+    {
+      "id": "prerequisite_continuity",
+      "inherited": [
+        "DTFT sign is negative in analysis and omega is radians/sample modulo 2 pi.",
+        "A finite record does not itself declare zero or periodic extension.",
+        "For real sequences the DTFT is conjugate symmetric; phase is undefined at zeros; 0 and pi modulo 2 pi are self-conjugate frequencies."
+      ],
+      "handoff": "The prerequisite explicitly reserves circular convolution for this DFT lesson, so the distinction is continuous and nonduplicative.",
+      "result": "verified"
+    },
+    {
+      "id": "source_pointer_audit",
+      "result": "verified against the exact local shards and read sidecars; corrected routes are recorded under sources and issues"
+    }
+  ],
+  "representation_ledger": [
+    {
+      "name": "house full complex DFT",
+      "shape": "N complex coefficients, unshifted k=0,...,N-1",
+      "scale": "forward 1, inverse 1/N",
+      "safe_use": "ordinary inverse, phase, circular convolution, exact algebra"
+    },
+    {
+      "name": "shifted display",
+      "shape": "same N coefficients reordered onto [-pi,pi)",
+      "scale": "unchanged",
+      "safe_use": "signed-frequency plots; reordering is not a new transform"
+    },
+    {
+      "name": "real-input independent complex half",
+      "shape": "floor(N/2)+1 complex coefficients",
+      "scale": "raw coefficients unchanged",
+      "safe_use": "real-input reconstruction only with an inverse that restores the conjugate half and knows N; N matters especially for odd lengths"
+    },
+    {
+      "name": "one-sided peak-amplitude display",
+      "shape": "floor(N/2)+1 nonnegative magnitudes",
+      "scale": "divide raw magnitude by N and double paired interior bins only",
+      "safe_use": "reporting bin-centered real sinusoid peak amplitudes; not phase reconstruction or the ordinary IDFT"
+    },
+    {
+      "name": "implementation-specific packed real array",
+      "shape": "API dependent; may be complex half-spectrum or real interleaving/in-place packing",
+      "scale": "API dependent",
+      "safe_use": "only after library documentation fixes ordering, endpoint packing, length, and normalization"
+    }
+  ],
+  "demo_acceptance_preflight": {
+    "component": "PaddingVsDataLab",
+    "conceptual_pass_conditions": [
+      "The unpadded and zero-padded curves use exactly the same nonzero samples and differ only in the evaluation grid.",
+      "Peak-location error is reported in original-bin units Delta f_0=f_s/N_data, not padded-bin units.",
+      "The genuinely longer-data case adds measured samples over a longer observation; it does not reuse appended zeros.",
+      "The two-tone decision is evaluated under at least one declared relative-phase perturbation and requires two local maxima associated with the two true tones."
+    ],
+    "cannot_verify_from_current_spec": [
+      "single-tone frequency/phase/amplitude, f_s, N_data, padding range, and peak estimator",
+      "two-tone frequencies, separation, amplitudes, starting phase, and longer-record length",
+      "the size/set of phase perturbations, local-maximum definition, minimum prominence/separation, and tolerance for association with true tones"
+    ],
+    "result": "core concept is evidenced; numeric acceptance is under-specified and must be frozen before implementation or a reproducible worked claim"
+  },
+  "sources": [
+    {
+      "id": "oppenheim-schafer",
+      "title": "Discrete-Time Signal Processing, Second Edition",
+      "precise_locations": [
+        "Chapter 8 §8.4, printed pp. 555-558 / physical PDF pp. 580-583: DFT samples of the DTFT and periodization/time aliasing",
+        "Chapter 8 §8.5, printed pp. 559-564 / physical PDF pp. 584-589: DFT analysis/synthesis definitions",
+        "Chapter 8 §§8.6.4-8.6.5, printed pp. 568-575 / physical PDF pp. 593-600: real symmetry and circular convolution",
+        "Chapter 8 §8.7, beginning printed p. 576 / physical PDF p. 601: linear convolution by DFT and N >= L+P-1",
+        "Problem 8.57, printed p. 621 / physical PDF p. 646: DFT Parseval identity",
+        "Chapter 10 §§10.1-10.2, beginning printed pp. 693-696 / physical PDF pp. 718-721: physical-frequency labels and zero-padding interpretation"
+      ],
+      "local_cache": "content/courses/digital-signal-processing/research/texts/oppenheim-s3.txt",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/oppenheim-s3.json"
+    },
+    {
+      "id": "lyons",
+      "title": "Understanding Digital Signal Processing, Third Edition",
+      "precise_locations": [
+        "Chapter 3 §§3.1-3.2, physical PDF pp. 75-87: correlation view, bin spacing, and real-input symmetry",
+        "Chapter 3 §§3.4-3.5, physical PDF pp. 88-89: magnitude scaling and physical frequency axis",
+        "Chapter 3 §3.7, physical PDF pp. 91-92: inverse DFT",
+        "Chapter 3 §3.8, physical PDF pp. 92-99: off-bin leakage",
+        "Chapter 3 §3.11, physical PDF pp. 107-110: zero padding versus resolution",
+        "Chapter 3 §3.14, physical PDF pp. 125-128: DFT samples of the finite-record DTFT"
+      ],
+      "local_cache": "content/courses/digital-signal-processing/research/texts/lyons-s1.txt",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/lyons-s1.json"
+    },
+    {
+      "id": "mit-6003",
+      "title": "MIT 6.003 Signals and Systems, Fall 2011",
+      "precise_locations": [
+        "Session 17 slides 45-53: N roots, orthogonality, DT Fourier-series analysis/synthesis, and inverse matrices",
+        "Session 18 slides 16-20: review of the transform matrices and scaling",
+        "Session 18 slides 19-32: even/odd decomposition and FFT handoff"
+      ],
+      "normalization_translation": "MIT's DTFS coefficients use 1/N in analysis and no factor in synthesis. The house raw DFT is X[k]=N a_k, so copy the structure, not MIT's coefficient scale.",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/mit6003-s3.txt",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/mit6003-s3.json"
+    },
+    {
+      "id": "schaedler",
+      "title": "Seeing Circles, Sines, and Signals: A Compact Primer on Digital Signal Processing",
+      "precise_locations": [
+        "Lesson 15: glyph-level DFT notation",
+        "Lessons 21-23: quadrature correlations, eight-point walkthrough, DC/Nyquist, and real conjugate symmetry",
+        "Lesson 24: k f_s/N bin labels and longer-record resolution",
+        "Lesson 25: zero padding as denser interpolation without new resolving information",
+        "Lesson 28: full output, real packed layouts, omitted conjugate half, and implementation-dependent normalization"
+      ],
+      "source_caution": "Lesson 23 casually calls raw DC an average although it is a sum under its displayed unscaled DFT. Lesson 28's N/2 round-trip wording is not a valid universal inverse normalization rule; use the verified house ledger instead.",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/schaedler.txt",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/schaedler-s1.json"
+    }
+  ],
+  "reference_entries_for_lesson": [
+    "Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, Discrete-Time Signal Processing, 2nd ed., §§8.4-8.7, Problem 8.57, and §§10.1-10.2 — DFT/DTFT sampling, inversion, symmetry, circular convolution, Parseval, physical frequency, and zero padding.",
+    "Richard G. Lyons, Understanding Digital Signal Processing, 3rd ed., §§3.1-3.2, 3.4-3.5, 3.7-3.8, 3.11, and 3.14 — bin interpretation, real symmetry, scaling, leakage, zero padding, and DTFT samples.",
+    "MIT OpenCourseWare, 6.003 Signals and Systems, Fall 2011, Sessions 17-18 — finite DT Fourier-series bases, orthogonality, matrix inversion, and even/odd factorization; translate its coefficient normalization explicitly.",
+    "Jack Schaedler, Seeing Circles, Sines, and Signals, Lessons 15, 21-25, and 28 — visual DFT notation, quadrature correlations, bin structure, record length, zero padding, and software-layout cautions; do not adopt its heuristic scaling sentence."
+  ],
+  "issues": [
+    {
+      "id": "demo_numeric_contract_missing",
+      "severity": "blocking_for_demo_acceptance_only",
+      "detail": "The course spec supplies outcome phrases but no reproducible signals, record lengths, padding sweep, peak rule, or phase-perturbation set. A writer may explain the result, but component implementation and numeric pass/fail evidence require those values to be frozen."
+    },
+    {
+      "id": "schaedler_source_route_incomplete",
+      "severity": "citation",
+      "detail": "The brief's source list names Schaedler Lessons 15 and 21-23, while its own library-layout figure depends on Lesson 28 and the padding/data distinction depends on Lessons 24-25. Add Lessons 24-25 and 28 to the lesson reference route."
+    },
+    {
+      "id": "schaedler_scaling_claim_unsafe",
+      "severity": "substantive",
+      "detail": "Lesson 28 says to divide by N/2 somewhere in an FFT/IFFT round trip. N/2 explains the raw magnitude of a bin-centered real sinusoid pair, not universal inversion. The declared raw-forward/1/N-inverse pair needs overall round-trip factor 1/N; the lesson must correct rather than repeat the source."
+    },
+    {
+      "id": "mit_normalization_mismatch",
+      "severity": "notation",
+      "detail": "MIT Sessions 17-18 present DTFS analysis with 1/N and synthesis without a factor. The course convention reverses that placement. State X[k]=N a_k before borrowing MIT's matrices or examples."
+    },
+    {
+      "id": "signed_nyquist_endpoint_unfrozen_in_brief",
+      "severity": "notation",
+      "detail": "The brief asks for frequency ordering but does not select whether the even-N Nyquist endpoint appears at +f_s/2 or -f_s/2. This preflight freezes a half-open [-f_s/2,f_s/2) ledger; any opposite figure convention must be stated and must not duplicate the singleton."
+    },
+    {
+      "id": "positive_only_terminology_ambiguous",
+      "severity": "substantive",
+      "detail": "A one-sided complex real-FFT output can retain reconstructive phase, while a one-sided amplitude display discards phase and applies a factor-of-two rule. Do not call both 'positive-only spectrum'; label storage and amplitude reporting separately."
+    },
+    {
+      "id": "oppenheim_pointer_overbroad_and_missing_ch10",
+      "severity": "citation",
+      "detail": "The brief cites Chapter 8 §§8.1-8.7 for the whole lesson. The exact core route is §§8.4-8.7 plus Problem 8.57; physical hertz and zero-padding interpretation require §§10.1-10.2, which should be added to the lesson reference."
+    }
+  ]
+}

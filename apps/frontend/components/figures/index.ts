@@ -9,6 +9,9 @@ import PhasorCoordinateLedger from "./digital-signal-processing/PhasorCoordinate
 import ComplexModeEigenfunction from "./digital-signal-processing/ComplexModeEigenfunction";
 import ConvolutionMultiplicationBridge from "./digital-signal-processing/ConvolutionMultiplicationBridge";
 import GroupDelayPackets from "./digital-signal-processing/GroupDelayPackets";
+import DftBasisCorrelations from "./digital-signal-processing/DftBasisCorrelations";
+import RealDftConventionLedger from "./digital-signal-processing/RealDftConventionLedger";
+import PaddingDurationResolution from "./digital-signal-processing/PaddingDurationResolution";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -157,6 +160,9 @@ export const figures: Record<string, RegisteredFigure> = {
   ComplexModeEigenfunction: { component: ComplexModeEigenfunction },
   ConvolutionMultiplicationBridge: { component: ConvolutionMultiplicationBridge },
   GroupDelayPackets: { component: GroupDelayPackets },
+  DftBasisCorrelations: { component: DftBasisCorrelations },
+  RealDftConventionLedger: { component: RealDftConventionLedger },
+  PaddingDurationResolution: { component: PaddingDurationResolution },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },

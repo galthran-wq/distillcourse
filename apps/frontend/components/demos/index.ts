@@ -61,4 +61,6 @@ export const demos: Record<
     import("./digital-signal-processing/FeedbackStabilityLab"),
   QuadratureDetectorLab: () =>
     import("./digital-signal-processing/QuadratureDetectorLab"),
+  PaddingVsDataLab: () =>
+    import("./digital-signal-processing/PaddingVsDataLab"),
 };
