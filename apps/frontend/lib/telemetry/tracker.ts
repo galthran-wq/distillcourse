@@ -38,6 +38,17 @@ export interface EventBatch {
   events: ReadingEvent[];
 }
 
+// crypto.randomUUID exists only in secure contexts; a deploy reached over
+// plain http (an IP-and-port preview) must not crash the tree for it.
+export function uuid(): string {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export type Transport = (batch: EventBatch) => void;
 
 export class ReadingTracker {
@@ -122,7 +133,7 @@ export class ReadingTracker {
 
   private push(type: EventType, payload: Record<string, unknown>): void {
     this.buffer.push({
-      id: crypto.randomUUID(),
+      id: uuid(),
       type,
       client_ts: new Date(this.now()).toISOString(),
       payload,
