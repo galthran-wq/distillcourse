@@ -22,7 +22,7 @@ export default function FrameStepperNodes({ frames, alt, caption }: Props) {
   return (
     <figure className="my-10">
       <div
-        className="figure-scroll mx-auto max-w-2xl"
+        className="figure-scroll"
         role="img"
         aria-label={`${alt} — step ${i + 1} of ${frames.length}`}
       >
