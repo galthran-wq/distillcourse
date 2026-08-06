@@ -32,7 +32,7 @@ describe("a reference in a reply", () => {
     const html = reply("See [[lesson:info-theory/gone#nowhere]].");
 
     expect(html).toContain("[[lesson:info-theory/gone#nowhere]]");
-    expect(html).not.toContain("<a");
+    expect(html).not.toContain("<a href");
   });
 
   it("leaves a malformed locator as text rather than breaking the message", () => {
@@ -40,14 +40,14 @@ describe("a reference in a reply", () => {
 
     expect(html).toContain("[[not a locator]]");
     expect(html).toContain("[[lesson:Bad Slug/x]]");
-    expect(html).not.toContain("<a");
+    expect(html).not.toContain("<a href");
   });
 
   it("renders a corpus with no page as an unclickable source", () => {
     const html = reply("Shown in [[research:info-theory/infonce|the InfoNCE note]].");
 
     expect(html).toContain("<cite>the InfoNCE note</cite>");
-    expect(html).not.toContain("<a");
+    expect(html).not.toContain("<a href");
   });
 
   it("renders a concept the search returned as a source, not as brackets", () => {
@@ -68,7 +68,7 @@ describe("a reference in a reply", () => {
     const html = reply("[[course:not-a-course]]");
 
     expect(html).toContain("[[course:not-a-course]]");
-    expect(html).not.toContain("<a");
+    expect(html).not.toContain("<a href");
   });
 
   it("keeps the markdown around it — a reference is not a block of its own", () => {

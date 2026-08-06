@@ -3,32 +3,63 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
+import { ChatIcon } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
 import { useAuth } from "@/lib/auth/store";
 import { resumeSession, useSession } from "@/lib/chat/session";
-import { togglePanel, usePanel } from "@/lib/chat/stored";
+import { collapsePanel, togglePanel, usePanel } from "@/lib/chat/stored";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
+
+// Over the page, all but its margin; on a phone there is no margin to leave.
+const EXPANDED = "fixed inset-0 z-50 mx-auto sm:inset-4 sm:max-w-4xl sm:rounded-md";
+// Beside the page, clear of the launcher below it.
+const DOCKED = "fixed right-6 bottom-20 z-40 w-[min(24rem,calc(100vw-3rem))] rounded-md";
 
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
   const session = useSession();
-  const open = usePanel();
+  const panel = usePanel();
   const [unreachable, setUnreachable] = useState(false);
+  const open = panel !== "closed";
+  // Only an open conversation is worth the screen. It is also the only state
+  // that carries the panel's own chrome, and the launcher is hidden under the
+  // overlay — a sign-in prompt spread over the page would have no way out.
+  const expanded = panel === "expanded" && session !== null;
 
   useEffect(() => {
     if (!open || auth.status !== "signed-in" || session !== null) return;
     resumeSession().catch(() => setUnreachable(true));
   }, [open, auth.status, session]);
 
+  // What Escape does to anything covering the page. It returns the panel to its
+  // corner rather than closing it: the conversation was not what was dismissed.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") collapsePanel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
+
   return (
     <LessonsProvider value={lessons}>
+      {expanded && (
+        <button
+          type="button"
+          aria-label="Collapse the tutor"
+          onClick={collapsePanel}
+          className="fixed inset-0 z-40 bg-ink/25"
+        />
+      )}
       {open && (
         <section
           aria-label="Tutor"
-          // Full height only once there is a conversation to scroll; a prompt
-          // to sign in is two lines and should be two lines tall.
-          className={`fixed bottom-20 right-6 z-40 flex w-[min(24rem,calc(100vw-3rem))] flex-col rounded-md border border-line bg-paper shadow-popover ${
-            auth.status === "signed-in" ? "h-[min(32rem,calc(100vh-8rem))]" : ""
+          // Full height only once there is a conversation to scroll.
+          className={`flex flex-col border border-line bg-paper shadow-popover ${
+            expanded
+              ? EXPANDED
+              : `${DOCKED} ${auth.status === "signed-in" ? "h-[min(32rem,calc(100vh-8rem))]" : ""}`
           }`}
         >
           {auth.status === "anonymous" ? (
@@ -40,7 +71,7 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
               to ask it something.
             </p>
           ) : session !== null ? (
-            <ChatPanel session={session} />
+            <ChatPanel session={session} expanded={expanded} />
           ) : (
             <p className="p-4 text-sm text-faint">
               {unreachable ? "the tutor is unreachable" : "opening…"}
@@ -48,15 +79,18 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
           )}
         </section>
       )}
-      <Button
-        variant={open ? "outline" : "solid"}
-        size="pill"
-        onClick={togglePanel}
-        aria-expanded={open}
-        className="fixed bottom-6 right-6 z-40 shadow-card"
-      >
-        {open ? "Close" : "Tutor"}
-      </Button>
+      {!expanded && (
+        <Button
+          variant={open ? "outline" : "solid"}
+          size="pill"
+          onClick={togglePanel}
+          aria-expanded={open}
+          className="fixed right-6 bottom-6 z-40 shadow-card"
+        >
+          <ChatIcon />
+          Tutor
+        </Button>
+      )}
     </LessonsProvider>
   );
 }

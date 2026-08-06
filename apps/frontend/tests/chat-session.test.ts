@@ -161,7 +161,7 @@ describe("the chat session", () => {
     await selectSession(FRESH);
 
     expect(JSON.parse(window.localStorage.getItem("distillcourse.chat") ?? "null")).toEqual({
-      open: false,
+      panel: "closed",
       chatId: "c2",
       draft: "",
       owner: "",

@@ -2,9 +2,17 @@
 
 import { useChat } from "@ai-sdk/react";
 import { useEffect, useState } from "react";
+import ChatList from "@/components/chat/ChatList";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
 import Messages from "@/components/chat/Messages";
+import {
+  CloseIcon,
+  CollapseIcon,
+  ExpandIcon,
+  MoreIcon,
+  PlusIcon,
+} from "@/components/chat/icons";
 import { Button } from "@/components/ui";
 import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
@@ -18,24 +26,43 @@ import {
   streamFailure,
   type Session,
 } from "@/lib/chat/session";
+import { closePanel, toggleExpanded } from "@/lib/chat/stored";
 import { ApiError } from "@/lib/http";
 
-export default function ChatPanel({ session }: { session: Session }) {
+interface Props {
+  session: Session;
+  expanded: boolean;
+}
+
+/** What went wrong, in the reader's terms — or that nothing answered at all. */
+function failure(error: unknown): string {
+  return error instanceof ApiError ? error.message : "the server is unreachable";
+}
+
+export default function ChatPanel({ session, expanded }: Props) {
   const { messages, sendMessage, status, error } = useChat({ chat: session.chat });
   const [models, setModels] = useState<ChatModel[]>([]);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  function report(error: unknown): void {
+    setNotice(failure(error));
+  }
+
   useEffect(() => {
-    listModels().then(setModels, () => setNotice("the server is unreachable"));
+    listModels().then(setModels, (error: unknown) => setNotice(failure(error)));
   }, []);
 
-  function report(failure: unknown): void {
-    setNotice(
-      failure instanceof ApiError ? failure.message : "the server is unreachable",
-    );
-  }
+  // Refetched on every open rather than accumulated: titles are written
+  // server-side from the first message, and other tabs add chats this one has
+  // never seen. The rail shows them without being asked, so it also follows the
+  // session — a new chat, a switch and the title arriving are all its summary
+  // changing.
+  useEffect(() => {
+    if (!expanded && !menu) return;
+    webChats().then(setChats, (error: unknown) => setNotice(failure(error)));
+  }, [expanded, menu, session.summary]);
 
   // The backend names a chat after its first message, so the header can only
   // learn the name once an answer is in. `useChat`'s onFinish is no use here:
@@ -51,14 +78,6 @@ export default function ChatPanel({ session }: { session: Session }) {
     work.then(() => setNotice(done), report);
   }
 
-  function toggleMenu(): void {
-    setMenu(!menu);
-    if (menu) return;
-    // Refetched on every open: titles are written server-side from the first
-    // message, and other tabs add chats this one has never seen.
-    webChats().then(setChats, report);
-  }
-
   function submit(text: string): void {
     const command = parseCommand(text);
     if (command === "clear") return run(clearSession());
@@ -67,32 +86,45 @@ export default function ChatPanel({ session }: { session: Session }) {
     void sendMessage({ text });
   }
 
-  const model =
-    models.find((entry) => entry.openrouter_id === session.summary.model)?.display_name ??
-    session.summary.model;
   const line = error === undefined ? notice : streamFailure(error);
 
   return (
     <>
-      <header className="relative flex items-center gap-3 border-b border-line px-4 py-2">
-        <p className="min-w-0 flex-1 truncate text-sm">
+      <header className="relative flex items-center gap-0.5 border-b border-line px-2 py-1.5">
+        <p className="min-w-0 flex-1 truncate px-2 text-sm">
           {session.summary.title ?? "New chat"}
         </p>
-        <span className="font-mono text-[11px] text-faint">{model}</span>
         <Button
           variant="ghost"
-          size="sm"
-          onClick={toggleMenu}
+          size="icon"
+          onClick={() => setMenu(!menu)}
           aria-label="Chat menu"
           aria-expanded={menu}
         >
-          ⋯
+          <MoreIcon />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleExpanded}
+          aria-label={expanded ? "Collapse the tutor" : "Expand the tutor"}
+        >
+          {expanded ? <CollapseIcon /> : <ExpandIcon />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={closePanel}
+          aria-label="Close the tutor"
+        >
+          <CloseIcon />
         </Button>
         {menu && (
           <ChatMenu
             current={session.summary}
             chats={chats}
             models={models}
+            expanded={expanded}
             onNew={() => run(clearSession())}
             onCompact={() => run(compactSession(), "history compacted")}
             onSelect={(chat) => run(selectSession(chat))}
@@ -101,14 +133,39 @@ export default function ChatPanel({ session }: { session: Session }) {
         )}
       </header>
 
-      <Messages messages={messages} status={status} />
+      <div className="flex min-h-0 flex-1">
+        {expanded && (
+          <nav
+            aria-label="Chats"
+            className="hidden w-56 shrink-0 flex-col overflow-y-auto border-r border-line p-1.5 lg:flex"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => run(clearSession())}
+              className="mb-1 justify-start"
+            >
+              <PlusIcon className="size-3.5" />
+              New chat
+            </Button>
+            <ChatList
+              chats={chats}
+              current={session.summary.id}
+              onSelect={(chat) => run(selectSession(chat))}
+            />
+          </nav>
+        )}
 
-      {line !== null && (
-        <p role="status" className="px-4 pb-1 text-[13px] text-accent">
-          {line}
-        </p>
-      )}
-      <Composer disabled={busy(status)} onSubmit={submit} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Messages messages={messages} status={status} />
+          {line !== null && (
+            <p role="status" className="px-4 pb-1 text-[13px] text-accent">
+              {line}
+            </p>
+          )}
+          <Composer disabled={busy(status)} onSubmit={submit} />
+        </div>
+      </div>
     </>
   );
 }
