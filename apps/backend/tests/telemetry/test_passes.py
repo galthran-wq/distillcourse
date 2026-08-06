@@ -25,9 +25,13 @@ pytestmark = pytest.mark.usefixtures("indexed_lesson")
 # Well clear of midnight in every zone these tests use, so a reading session
 # never straddles two days by accident.
 EVENING = datetime(2026, 8, 4, 9, 0, tzinfo=UTC)
-# Six heartbeats meet the day's minute, and `stamped_read` stamps the events a
-# second apart: the sixth of them is the instant the day was earned.
-BEATS_TO_PASS = passes.DAY_SECONDS // HEARTBEAT_SECONDS
+# The test lesson's completion threshold (three minutes) is below DAY_SECONDS,
+# so it caps the day bar; `stamped_read` stamps the events a second apart, and
+# the last needed one is the instant the day was earned.
+BEATS_TO_PASS = (
+    min(passes.DAY_SECONDS, HEARTBEATS_TO_COMPLETE * HEARTBEAT_SECONDS)
+    // HEARTBEAT_SECONDS
+)
 PASSED_AT = EVENING + timedelta(seconds=BEATS_TO_PASS - 1)
 
 

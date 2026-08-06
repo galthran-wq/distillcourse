@@ -13,11 +13,12 @@ from app.telemetry import progress
 # apps/frontend/lib/telemetry/activity.ts, which is what actually decides how
 # many squares there are; this only bounds the query behind them.
 ACTIVITY_WEEKS = 53
-# What earns a day its square: a minute of credited attention on the lesson.
-# Deliberately far below the completion bar in `progress` — a lesson is read
-# over several days, and a day that got through one section of it is still a
-# day the reader read. Completion stays what it was: the whole lesson, once.
-DAY_SECONDS = 60
+# What earns a day its square: five minutes of credited attention on the
+# lesson — a real reading session, not a glance. Still well below the
+# completion bar in `progress`: a lesson is read over several days, and a day
+# that got through one section of it is a day the reader read. Completion
+# stays what it was: the whole lesson, once.
+DAY_SECONDS = 300
 
 
 def _local_day(timezone: str) -> ColumnElement[date]:
@@ -32,16 +33,21 @@ async def credit(
     timezone: str,
     *within: ColumnElement[bool],
 ) -> int:
-    """Writes a row for every local day that gave this lesson `DAY_SECONDS`.
+    """Writes a row for every local day that gave this lesson its day bar.
+
+    The bar is `DAY_SECONDS`, capped at the lesson's own completion threshold:
+    a short lesson that can be *completed* in three minutes must not need five
+    to earn its square.
 
     A day already credited is left exactly as it is: the second flush of an
     evening must not move the instant the bar was met, and the first pass of a
     lesson is not undone by reading it again.
     """
+    bar = min(DAY_SECONDS, await progress.threshold_seconds(session, lesson))
     days = (
         await session.execute(
             progress.reached_seconds(
-                user_id, lesson, DAY_SECONDS, _local_day(zone(timezone).key), *within
+                user_id, lesson, bar, _local_day(zone(timezone).key), *within
             )
         )
     ).all()
