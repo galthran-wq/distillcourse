@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ViewTransition } from "react";
 import { evaluate } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
@@ -169,25 +170,48 @@ export default async function LessonPage({
         {/* Keyed by the lesson: moving to the next one must not show the
             previous one's bookmark while the new state loads. */}
         <LessonStateProvider key={key} lesson={key}>
-          <header className="border-b border-line py-10">
-            <p className={LABEL_CLASS}>
-              <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
-                {course.course.title}
-              </Link>{" "}
-              · {moduleTitle}
-            </p>
-            <h1 className="mt-3 flex items-baseline gap-3">
-              <span className="font-mono text-sm text-faint">{number}</span>
-              <span className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-                {lesson.title}
-              </span>
-            </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
-              <span className="text-soft">{lesson.goal}</span>
-              <span>~{lesson.est_minutes} min</span>
-              <BookmarkToggle />
-            </div>
-          </header>
+          {/* The turn from one lesson to the next is drawn in the stylesheet,
+              off the transition type the previous/next link sets. This
+              boundary is what asks for a view transition at all: React starts
+              one only where a <ViewTransition> is in the committed tree, in a
+              development and a production build alike, so a navigation between
+              two pages that hold none — /settings to /profile — simply cuts.
+              It goes around the title because that is the line naming the
+              lesson: the title takes a snapshot of its own and holds still
+              (stylesheet: `::view-transition-group(lesson-title)`) while the
+              page turns under it.
+
+              Only the lesson-to-lesson pair is worth that snapshot, which is
+              what `share` names; entering or leaving the lessons there is no
+              other title for it to hold still against, and a box pinned to 0s
+              against the page's own cross-fade is a header that pops. */}
+          <ViewTransition
+            name="lesson-title"
+            share="auto"
+            enter="none"
+            exit="none"
+            default="none"
+          >
+            <header className="border-b border-line py-10">
+              <p className={LABEL_CLASS}>
+                <Link href={`/courses/${course.course.slug}`} className="hover:text-accent">
+                  {course.course.title}
+                </Link>{" "}
+                · {moduleTitle}
+              </p>
+              <h1 className="mt-3 flex items-baseline gap-3">
+                <span className="font-mono text-sm text-faint">{number}</span>
+                <span className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+                  {lesson.title}
+                </span>
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
+                <span className="text-soft">{lesson.goal}</span>
+                <span>~{lesson.est_minutes} min</span>
+                <BookmarkToggle />
+              </div>
+            </header>
+          </ViewTransition>
 
           <div className="prose-lesson py-10">
             <MDXContent components={components} />
@@ -199,6 +223,7 @@ export default async function LessonPage({
             {prev !== undefined ? (
               <Link
                 href={`/courses/${course.course.slug}/lessons/${prev.lesson.slug}`}
+                transitionTypes={["nav-back"]}
                 className="group max-w-[45%]"
               >
                 <span className="font-mono text-[11px] tracking-wide text-faint">← previous</span>
@@ -212,6 +237,7 @@ export default async function LessonPage({
             {next !== undefined ? (
               <Link
                 href={`/courses/${course.course.slug}/lessons/${next.lesson.slug}`}
+                transitionTypes={["nav-forward"]}
                 className="group max-w-[45%] text-right"
               >
                 <span className="font-mono text-[11px] tracking-wide text-faint">next →</span>

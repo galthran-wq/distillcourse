@@ -5,15 +5,12 @@ import { useEffect, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import { ChatIcon } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
+import { MOTION_BASE_MS } from "@/components/ui/styles";
 import { useAuth } from "@/lib/auth/store";
 import { resumeSession, useSession } from "@/lib/chat/session";
 import { collapsePanel, togglePanel, usePanel } from "@/lib/chat/stored";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
-
-// Over the page, all but its margin; on a phone there is no margin to leave.
-const EXPANDED = "fixed inset-0 z-50 mx-auto sm:inset-4 sm:max-w-4xl sm:rounded-md";
-// Beside the page, clear of the launcher below it.
-const DOCKED = "fixed right-6 bottom-20 z-40 w-[min(24rem,calc(100vw-3rem))] rounded-md";
+import { useExitDelay } from "@/lib/ui/exit";
 
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
@@ -21,6 +18,8 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const panel = usePanel();
   const [unreachable, setUnreachable] = useState(false);
   const open = panel !== "closed";
+  // `.chat-panel` shrinks back into its launcher over one `--motion-base`.
+  const onScreen = useExitDelay(open, MOTION_BASE_MS);
   // Only an open conversation is worth the screen. It is also the only state
   // that carries the panel's own chrome, and the launcher is hidden under the
   // overlay — a sign-in prompt spread over the page would have no way out.
@@ -56,21 +55,29 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
         // reached and named, and a full-viewport button carrying the same name
         // would be a second one in the tab order with nothing to show for it.
         // Escape does what clicking here does, for everyone who cannot.
-        <div aria-hidden onClick={collapsePanel} className="fixed inset-0 z-40 bg-scrim" />
+        <div
+          aria-hidden
+          onClick={collapsePanel}
+          className="fixed inset-0 z-40 bg-scrim transition-opacity duration-(--motion-base) starting:opacity-0"
+        />
       )}
-      {open && (
+      {onScreen && (
         <section
           aria-label="Tutor"
           // Expanded it covers the page, which is what a dialog is; docked it
           // sits beside the page and is just a region of it.
           role={expanded ? "dialog" : undefined}
           aria-modal={expanded || undefined}
-          // Full height only once there is a conversation to scroll.
-          className={`flex flex-col border border-line bg-paper shadow-popover ${
-            expanded
-              ? EXPANDED
-              : `${DOCKED} ${auth.status === "signed-in" ? "h-[min(32rem,calc(100vh-8rem))]" : ""}`
-          }`}
+          // Which box `.chat-panel` puts it in. Full height only for a reader
+          // who has a conversation to scroll: the sign-in prompt and the line
+          // of status while auth is still loading are as tall as their text,
+          // and a 24rem by 32rem box holding one line is an empty box.
+          data-shape={
+            expanded ? "expanded" : auth.status === "signed-in" ? "docked" : "prompt"
+          }
+          className={`chat-panel flex flex-col rounded-md border border-line bg-paper shadow-popover ${
+            expanded ? "z-50 max-sm:rounded-none" : "z-40"
+          } ${open ? "" : "is-closing"}`}
         >
           {auth.status === "anonymous" ? (
             <p className="p-4 text-sm text-soft">

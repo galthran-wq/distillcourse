@@ -28,7 +28,7 @@ export default function Home() {
               <li key={course.slug}>
                 <Link
                   href={`/courses/${course.slug}`}
-                  className="group flex flex-col gap-2 rounded-md border border-line bg-paper px-5 py-4 transition-[color,border-color,box-shadow] duration-(--motion-base) hover:border-faint hover:shadow-card"
+                  className="group flex flex-col gap-2 rounded-md border border-line bg-paper px-5 py-4 transition-[color,border-color,box-shadow,translate] duration-(--motion-base) hover:-translate-y-0.5 hover:border-faint hover:shadow-card"
                 >
                   <span className="flex items-baseline justify-between gap-4">
                     <span className="text-lg font-semibold tracking-tight group-hover:text-accent">

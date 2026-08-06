@@ -4,6 +4,10 @@ import createMDX from "@next/mdx";
 const nextConfig: NextConfig = {
   pageExtensions: ["md", "mdx", "ts", "tsx"],
   output: "standalone",
+  // Route changes become view transitions: the page turn between two lessons
+  // is drawn from them in globals.css. Experimental, and nothing depends on
+  // it — a browser without the View Transitions API cuts, as the site did.
+  experimental: { viewTransition: true },
   // Pin the project root to this directory. Without it, Turbopack infers the
   // root from lockfile locations and picks the MAIN checkout when running
   // from a git worktree (two package-lock.json files) — client chunks then

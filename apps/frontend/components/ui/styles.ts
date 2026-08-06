@@ -3,6 +3,15 @@
 // purpose: server components call `buttonClass` too, and an export of a client
 // module is an opaque reference on the server, not a function.
 
+/**
+ * `--motion-base` and `--motion-fast` in milliseconds. A timer cannot read a
+ * CSS variable, and something leaving the page has to stay mounted for exactly
+ * as long as its animation lasts — see `useExitDelay`. These two numbers are
+ * the tokens in globals.css and have to be retuned with them.
+ */
+export const MOTION_BASE_MS = 200;
+export const MOTION_FAST_MS = 150;
+
 /** Every text field: input, textarea, and the native time picker. */
 export const FIELD_CLASS =
   "block w-full rounded-sm border border-line bg-panel px-3 py-2 text-sm text-ink transition-colors duration-(--motion-fast) placeholder:text-faint hover:border-faint focus:border-accent aria-invalid:border-accent";
@@ -18,10 +27,12 @@ export const LABEL_CLASS = "font-mono text-[11px] uppercase tracking-wider text-
 
 /**
  * A panel hung under its trigger — the account menu, the chat menu. The caller
- * adds its own width and, where the list can run long, its own scrolling.
+ * adds its own width and, where the list can run long, its own scrolling. It
+ * opens out of the corner it hangs from; closing it is instant, since a menu
+ * that lingers is a menu still in the way of what was chosen.
  */
 export const MENU_CLASS =
-  "absolute right-0 top-full z-50 mt-1.5 rounded-md border border-line bg-panel p-1.5 shadow-popover";
+  "absolute right-0 top-full z-50 mt-1.5 origin-top-right rounded-md border border-line bg-panel p-1.5 shadow-popover transition-[opacity,scale] duration-(--motion-fast) starting:scale-95 starting:opacity-0";
 
 /** One row of such a panel, whether that row is a link or a button. */
 export const MENU_ITEM_CLASS =
@@ -34,8 +45,10 @@ export type ButtonVariant = "solid" | "outline" | "ghost";
  */
 export type ButtonSize = "sm" | "md" | "pill" | "icon";
 
+// The press is a scale rather than a colour: it reads the same on all three
+// variants, including the ghost one that has no surface to darken.
 const BASE =
-  "inline-flex items-center justify-center gap-2 border font-medium transition-[color,background-color,border-color,box-shadow] duration-(--motion-fast) disabled:pointer-events-none disabled:opacity-45";
+  "inline-flex items-center justify-center gap-2 border font-medium transition-[color,background-color,border-color,box-shadow,scale] duration-(--motion-fast) active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45";
 
 // The radius lives with the size rather than in BASE because the size decides
 // the shape: a control in a row takes the control radius, one that floats or
