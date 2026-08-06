@@ -32,8 +32,9 @@ frequencies per symbol; the next two paragraphs confirm the others.
 
 The coder is neutral and the model is not, so all the compression lives in
 the model. That leaves the practical question of where a model comes from
-when a file is handed over with no annotation. Two answers were available
-before 1977 and both are bad.
+when a file is handed over with no annotation. Three answers are available
+without any of Ziv and Lempel's machinery, and none of them reaches the
+structure that makes a file of English compressible.
 
 **Ship a measured table.** Count the symbols, transmit the counts, then
 code. The counts are overhead: 256 byte frequencies at 16 bits each is 512
@@ -48,6 +49,18 @@ previous $r$ letters, and over a 27-symbol alphabet that is $27^r$ contexts:
 $19{,}683$ at $r = 3$ and $531{,}441$ at $r = 4$. The number of samples
 needed to estimate a distribution over $r$-blocks grows the same way, so the
 learn-then-compress route slows down exactly where the information is.
+
+**Count while coding.** The third answer is the adaptive model already built
+in <Ref lesson="arithmetic-coding"/>: the coder consults the model through a
+single interface, one cumulative frequency table per symbol, so the model
+may update itself from the symbols already sent and the decoder, holding
+those same symbols, updates identically. Nothing is transmitted and
+no sample of the source is needed in advance, which disposes of the header
+entirely. It does not dispose of the context problem. An adaptive counter of
+single characters still charges about $4.03$ bits per letter, and an
+adaptive counter over $r$-letter contexts still has $27^r$ cells to fill
+from the one file it is given, so the sample-size explosion above survives
+the switch from measuring to adapting.
 
 From that diagnosis one would expect the fix to be a better estimator —
 smoothing, priors, mixing over orders. Ziv and Lempel's answer estimates no
@@ -169,35 +182,52 @@ feature of the format; it is the degenerate case of a match.
 
 ### The codeword budget: why short matches are rejected
 
-A pair is only worth emitting if it is shorter than the symbols it replaces,
-and that comparison is arithmetic on field widths. Take the parameters of
-[DEFLATE](https://www.rfc-editor.org/rfc/rfc1951), the 1996 format that
-`gzip`, PNG and `.zip` files all carry: a window of 32 KB and a match capped
-at 258 bytes. A distance in $1 \ldots 32768$ needs
-$\log_2 32768 = 15$ bits, a length in $3 \ldots 258$ needs $8$ bits, and a
-literal byte needs $8$.
+A pair is only worth emitting if it is shorter than the symbols it replaces.
+In the 1977 scheme that comparison is plain arithmetic on field widths,
+because every codeword has the same shape: a distance, a length, and one
+trailing literal, each at a width fixed in advance. Price that triple at the
+scale a modern format works at: a window of 32 KB and a match capped at 258
+bytes, which are the limits
+[DEFLATE](https://www.rfc-editor.org/rfc/rfc1951) sets. A distance in
+$1 \ldots 32768$ needs $\log_2 32768 = 15$ bits, a length in
+$3 \ldots 258$ needs $8$ bits, and a literal byte needs $8$: thirty-one bits
+a phrase, whatever the phrase covers.
 
 <Figure
   src="./figures/triple-budget.svg"
   alt="Three labelled bit fields — distance 15 bits, length 8 bits, literal 8 bits — totalling 31 bits, drawn above a bar of four 8-bit literal bytes totalling 32 bits"
-  caption="Thirty-one bits of triple against thirty-two bits of literals: DEFLATE's whole minimum-match-length rule is this one-bit margin."
+  caption="Thirty-one bits of fixed-width triple against thirty-two bits of literals: at these field widths a match of three is the shortest one that pays."
 />
 
 The triple carries its trailing literal, so a match of length $\ell$ retires
 $\ell + 1$ bytes. At $\ell = 2$ that is $24$ bits of input against the
 triple's $31$: a loss. At $\ell = 3$ it is $32$ against $31$: a win, by a
-single bit. A match of **two symbols or fewer** can never pay for its own
-pointer, which is where DEFLATE puts its minimum match length.
+single bit. Under fixed-width fields a match of **two symbols or fewer** can
+never pay for its own pointer, which is the accounting the demo below
+charges and the reason every sliding-window format sets some floor on match
+length.
 
-The original scheme fixed all three fields at once. With buffer length $n$
-and maximum phrase length $L_s$, every codeword occupies
+<Remark>
+DEFLATE's floor is 3, and it is a fact about the format rather than about
+this margin: the shortest length its length codes can name is 3 (RFC 1951
+§3.2.5). Its own arithmetic is different, because it fixes no field width.
+A match carries no trailing literal, and lengths and distances are Huffman
+symbols with extra bits, so under the format's fixed tables a length-3 match
+at a distance of at most 4 costs $7 + 5 = 12$ bits against the $24$ that
+three literal bytes of text cost: a factor of two, not one bit in thirty-two.
+The rule survives the change of coding; the margin that motivates it does not.
+<Ref lesson="deflate-and-zstd"/> prices the real code lengths.
+</Remark>
+
+The 1977 paper writes the fixed-width budget in general form. With buffer
+length $n$ and maximum phrase length $L_s$, every codeword occupies
 
 $$
 L_c = 1 + \lceil \log (n - L_s) \rceil + \lceil \log L_s \rceil
 $$
 
-symbols of the source alphabet — a pointer, a length, and one trailing
-literal, with no flag bit needed because every codeword has the same shape.
+symbols of the source alphabet — the pointer, the length, and the one
+trailing literal, with no flag bit needed anywhere in the stream.
 The paper's worked illustration takes a ternary alphabet, $L_s = 9$ and
 $n = 18$, giving $L_c = 1 + 2 + 2 = 5$ ternary digits per phrase. Since no
 phrase exceeds $L_s$ symbols and the analysis shows the parse produces at
@@ -552,19 +582,24 @@ inference.
 
 <Figure
   src="./figures/coders-on-one-file.svg"
-  alt="Horizontal bars for four coders on the same 20,942-byte text file: a Laplace-model arithmetic coder at 61%, gzip at 39%, bzip2 at 36%, ppmz at 32%, with a dashed line at 12.5% marking one bit per character"
+  alt="Horizontal bars for four coders on the same 20,942-byte text file: a Laplace-model arithmetic coder at 62%, gzip at 39%, bzip2 at 36%, ppmz at 32%, with a dashed line at 12.5% marking one bit per character"
   caption="No coder in the table comes within a factor of two of the entropy rate, and gzip is not even the best of them."
 />
 
-**The convergence is logarithmic, not fast.** The LZ78 rate approaches its
-limit at the speed of $c(n)\log_2 c(n)/n$, whose correction terms fall like
-$1/\log_2 n$. At $n = 20{,}942$ bytes, $\log_2 n$ is about $14$, and a
-correction of order $1/14$ of the rate is not the whole story: the phrase
-dictionary at that length still holds far fewer phrases than the source's
-typical strings require. MacKay states the boundary directly — the timescale
-on which universal performance is reached "may, for many sources, be
-unfeasibly long, because the number of typical substrings that need
-memorizing may be enormous".
+**The convergence is logarithmic, and still not the main term.** The
+redundancy of a Lempel-Ziv code, meaning the amount by which its expected
+rate exceeds $H$, is known for both families: order $1/\log_2 n$ for LZ78
+and its variants, order $\log_2\log_2 n / \log_2 n$ for the sliding-window
+schemes `gzip` belongs to, with $n$ the length of the input. At
+$n = 20{,}942$ that second ratio is $3.8/14.4 = 0.27$, so the error term the
+theory admits is a quarter-sized effect at this length, against a measured
+gap of a factor of three. What accounts for the rest is the hypothesis
+behind the theorem rather than its speed: a pointer is priced at the
+recurrence time of the block it names, and after 20 KB most of the blocks
+English typically produces have not recurred once. MacKay states the
+boundary directly — the timescale on which universal performance is reached
+"may, for many sources, be unfeasibly long, because the number of typical
+substrings that need memorizing may be enormous".
 
 **The window sees repetitions, not statistics.** LZ77 profits from a
 repeated substring and from nothing else. English text is redundant mostly
@@ -573,13 +608,14 @@ certainly `u`, which a context model prices at a hundredth of a bit instead
 of the $5.2$ bits that letter frequencies charge, and which is worth nothing
 at all to a matcher unless the surrounding string has occurred before.
 
-**A source with statistics and no repeats defeats it outright.** Take
-$10^6$ independent bits, 99% zeros. An ideal coder spends $H_2(0.01)$ bits
-per character, about 10,100 bytes; a simple adaptive arithmetic coder reaches
-14,143; `gzip` reaches 20,646, twice the ideal and the worst result in
-MacKay's comparison. Universality is a statement about the limit, and at any
-finite length a coder that models the source directly can beat a coder that
-only matches strings.
+**A source with statistics and no repeats defeats it outright.** Take a file
+of $10^6$ characters, each one `0` with probability $0.99$ and `1` with
+probability $0.01$, drawn independently. An ideal coder spends $H_2(0.01)$
+bits per character, about 10,100 bytes; the Laplace-model arithmetic coder
+reaches 14,143; `gzip` reaches 20,646, twice the ideal and the worst result
+in MacKay's comparison. Universality is a statement about the limit, and at
+any finite length a coder that models the source directly can beat a coder
+that only matches strings.
 
 <Figure
   float="right"
@@ -725,12 +761,15 @@ On MacKay's 20,942-byte chapter source the published figure is 8,177 bytes,
 or $3.12$ bits per character. Both are two to three times the entropy rate,
 and the direction of the gap is always the same.
 
-**Reason one: the convergence is logarithmic.** The LZ78 rate is
-$c(n)\log_2 c(n)/n$ and its correction terms fall like $1/\log_2 n$. At
-$n = 10^5$, $\log_2 n \approx 17$, so the asymptotic regime has barely
-started; the number of distinct substrings a source of entropy rate $1$
-produces at length $100$ is about $2^{100}$, and a dictionary built from
-$10^5$ symbols holds a vanishing fraction of them.
+**Reason one: the asymptotics have barely started.** The redundancy of a
+sliding-window code falls like $\log_2\log_2 n / \log_2 n$, which at
+$n = 10^5$ is $0.24$, a quarter-sized correction against a measured gap of a
+factor of two and a half. The larger part is the hypothesis under which the
+theorem prices a pointer: that the block being coded has occurred before,
+within reach. A source of entropy rate $1$ bit per character produces about
+$2^{100}$ distinct 100-character strings, so at $10^5$ characters almost
+every long block in the file is being seen for the first time and can only
+be sent as literals.
 
 **Reason two: the window addresses repeats, not statistics.** The one bit
 per letter measured by the guessing game comes from a human predictor using
@@ -929,6 +968,7 @@ $2^{-k+1}$ fraction reappears.
 7. P. Deutsch, "GZIP file format specification version 4.3," RFC 1952, IETF, 1996 — §2.2 and §2.3 fix the 10-byte member header and the 8-byte trailer (CRC-32 and ISIZE) that make up the 18 bytes of framing measured above. https://www.rfc-editor.org/rfc/rfc1952
 8. A. D. Wyner, J. Ziv, "The Sliding Window Lempel-Ziv Algorithm Is Asymptotically Optimal," *Proceedings of the IEEE*, 82(6), June 1994, pp. 872–877 — the finite-window result asserted above, which the idealised infinite-past theorem of this lesson does not cover.
 9. T. A. Welch, "A Technique for High-Performance Data Compression," *IEEE Computer*, 17(6), 1984, pp. 8–19 — the LZ78 variant that preloads the dictionary with the alphabet and emits indices only, used by `compress` and GIF.
+10. S. R. Kosaraju, G. Manzini, "Compression of Low Entropy Strings with Lempel–Ziv Algorithms," *SIAM Journal on Computing*, 29(3), 2000, pp. 893–911 — §1 collects the redundancy rates quoted above: $O(1/\log n)$ for LZ78 and many of its variants, $O(\log\log n/\log n)$ for two variants of LZ77 (the underlying analyses are Louchard &amp; Szpankowski 1997 and Savari 1997, 1998). The body of the paper drops the ergodic-source assumption and bounds both schemes against the empirical entropy of each individual string instead. https://epubs.siam.org/doi/10.1137/S0097539797331105
 
 Measurements reported in this lesson were made with `gzip 1.12` and
 `zstd 1.5.5` on the files described in place; the published figures are
