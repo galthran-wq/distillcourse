@@ -1,6 +1,6 @@
 "use client";
 
-import { FIELD_CLASS } from "./field";
+import { FIELD_CLASS, FIELD_LABEL_CLASS } from "./styles";
 
 interface Props {
   label: string;
@@ -14,7 +14,7 @@ interface Props {
 export function TextArea({ label, value, onChange, rows = 3, ariaLabel }: Props) {
   return (
     <label className="block text-sm">
-      <span>{label}</span>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

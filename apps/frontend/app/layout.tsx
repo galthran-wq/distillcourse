@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
-import ThemeToggle from "@/components/ThemeToggle";
+import SiteHeader from "@/components/SiteHeader";
 import ChatWidget from "@/components/chat/ChatWidget";
-import UserMenu from "@/components/auth/UserMenu";
 import TelegramBanner from "@/components/settings/TelegramBanner";
 import { getLessonLinks } from "@/lib/content/site";
 import "./globals.css";
@@ -49,20 +47,10 @@ export default function RootLayout({
           }}
         />
         <TelegramBanner />
-        <header className="border-b border-line">
-          <div className="mx-auto flex h-13 w-full max-w-7xl items-center justify-between px-6">
-            <Link href="/" className="text-[15px] font-semibold tracking-tight hover:text-accent">
-              distillcourse
-            </Link>
-            <div className="flex items-center gap-4">
-              <UserMenu />
-              <ThemeToggle />
-            </div>
-          </div>
-        </header>
+        <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-line">
-          <div className="mx-auto w-full max-w-7xl px-6 py-4 font-mono text-[11px] text-faint">
+          <div className="mx-auto w-full max-w-7xl px-4 py-4 font-mono text-[11px] text-faint sm:px-6">
             distillcourse
           </div>
         </footer>

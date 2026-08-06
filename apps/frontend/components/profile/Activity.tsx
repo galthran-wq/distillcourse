@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Panel } from "@/components/ui";
+import { Button, Panel } from "@/components/ui";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import type { LessonLink } from "@/lib/content/site";
 import { day } from "@/lib/day";
@@ -224,7 +224,7 @@ function Heatmap({
         <span
           ref={tip}
           role="tooltip"
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded border border-line bg-paper px-2 py-1 font-mono text-[10px] whitespace-nowrap text-soft"
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-sm border border-line bg-paper px-2 py-1 font-mono text-[10px] whitespace-nowrap text-soft"
           style={{
             // Held inside the frame: the last column's tooltip would otherwise
             // hang off the panel and widen the whole page on a phone.
@@ -344,13 +344,14 @@ export default function Activity({ lessons }: { lessons: Record<string, LessonLi
       </Section>
       <Section title="activity feed">
         {selected !== null && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setSelected(null)}
-            className="mb-3 cursor-pointer font-mono text-[11px] text-faint hover:text-accent"
+            className="mb-3"
           >
-            ← back to recent
-          </button>
+            ← Back to recent
+          </Button>
         )}
         <Feed lessons={lessons} feed={feed} selected={selected} />
       </Section>

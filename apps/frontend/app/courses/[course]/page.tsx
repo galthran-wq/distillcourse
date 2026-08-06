@@ -14,6 +14,7 @@ import FigureSequence from "@/components/mdx/FigureSequence";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl } from "@/lib/content/images";
 import Lightbox from "@/components/mdx/Lightbox";
+import { LABEL_CLASS } from "@/components/ui/styles";
 
 interface Params {
   course: string;
@@ -35,11 +36,7 @@ export async function generateMetadata({
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-3 font-mono text-[11px] uppercase tracking-wider text-faint">
-      {children}
-    </p>
-  );
+  return <p className={`mb-3 ${LABEL_CLASS}`}>{children}</p>;
 }
 
 export default async function CoursePage({
@@ -206,7 +203,7 @@ export default async function CoursePage({
                       <Lightbox
                         src={thumb}
                         alt={`${lesson.title} — key image`}
-                        className={`h-14 w-20 shrink-0 rounded border border-line object-cover ${readable ? "" : "opacity-50"} ${(lesson.key_image ?? "").endsWith(".svg") ? "bg-white object-contain p-1" : ""}`}
+                        className={`h-14 w-20 shrink-0 rounded-sm border border-line object-cover ${readable ? "" : "opacity-50"} ${(lesson.key_image ?? "").endsWith(".svg") ? "bg-white object-contain p-1" : ""}`}
                       />
                     )}
                     <span className="min-w-0 flex-1">
@@ -223,14 +220,14 @@ export default async function CoursePage({
                     </span>
                     <span className="flex items-center gap-3 font-mono text-[11px] text-faint">
                       {lesson.type === "extra" && (
-                        <span className="rounded border border-dashed border-line px-1.5 py-0.5">
+                        <span className="rounded-sm border border-dashed border-line px-1.5 py-0.5">
                           extra
                         </span>
                       )}
                       {readable ? (
                         <>
                           {previewMode() && lesson.status !== "published" && (
-                            <span className="rounded border border-line px-1.5 py-0.5">
+                            <span className="rounded-sm border border-line px-1.5 py-0.5">
                               {lesson.status}
                             </span>
                           )}

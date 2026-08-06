@@ -7,6 +7,7 @@ import {
   slugsFromLessonDir,
 } from "@/lib/content/images";
 import type { ImageCredit } from "@/lib/content/schema";
+import { LABEL_CLASS } from "@/components/ui/styles";
 import Lightbox from "./Lightbox";
 
 /**
@@ -80,7 +81,7 @@ export function ImageCredits({ credits }: { credits: ImageCredit[] }) {
   const link = "underline decoration-line underline-offset-2 hover:decoration-accent";
   return (
     <div className="mt-6">
-      <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-faint">
+      <p className={`mb-2 ${LABEL_CLASS}`}>
         Image credits
       </p>
       <ul className="list-none space-y-1.5 pl-0 text-[0.85rem] leading-relaxed text-soft">

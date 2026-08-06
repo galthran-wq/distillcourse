@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CONTROL_CLASS, FIELD_CLASS } from "@/components/ui/field";
+import { Button } from "@/components/ui";
+import { FIELD_CLASS, FIELD_LABEL_CLASS } from "@/components/ui/styles";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import { day } from "@/lib/day";
@@ -64,7 +65,7 @@ export function MemoryRow({
         </span>
       </div>
       <label className="mt-3 block text-sm">
-        <span className="text-soft">What it is about</span>
+        <span className={FIELD_LABEL_CLASS}>What it is about</span>
         <input
           value={description}
           onChange={(event) => setDescription(event.target.value)}
@@ -72,7 +73,7 @@ export function MemoryRow({
         />
       </label>
       <label className="mt-3 block text-sm">
-        <span className="text-soft">What it remembers</span>
+        <span className={FIELD_LABEL_CLASS}>What it remembers</span>
         <textarea
           value={content}
           onChange={(event) => setContent(event.target.value)}
@@ -80,24 +81,15 @@ export function MemoryRow({
           className={`${FIELD_CLASS} resize-y`}
         />
       </label>
-      <div className="mt-3 flex items-center gap-4">
-        <button
-          type="button"
-          onClick={save}
-          disabled={!edited}
-          className={`${CONTROL_CLASS} text-faint hover:text-accent disabled:opacity-40 disabled:hover:text-faint`}
-        >
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={save} disabled={!edited}>
           save
-        </button>
-        <button
-          type="button"
-          onClick={forget}
-          className={`${CONTROL_CLASS} text-faint hover:text-accent`}
-        >
+        </Button>
+        <Button size="sm" variant="ghost" onClick={forget}>
           forget this
-        </button>
+        </Button>
         {failure !== null && (
-          <span role="alert" className={`${CONTROL_CLASS} text-accent`}>
+          <span role="alert" className="ml-1 text-[13px] text-accent">
             {failure}
           </span>
         )}

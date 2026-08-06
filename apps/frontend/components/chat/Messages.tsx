@@ -10,8 +10,7 @@ import {
 } from "ai";
 import { useEffect, useRef } from "react";
 import Markdown from "@/components/chat/Markdown";
-
-const LABEL = "font-mono text-[11px] uppercase tracking-wider text-faint";
+import { LABEL_CLASS } from "@/components/ui/styles";
 
 // The tool's own name, which is what the harness reports; the widget adds no
 // vocabulary of its own so a tool shipped later needs no change here.
@@ -45,14 +44,14 @@ export default function Messages({
       )}
       {messages.map((message) => (
         <div key={message.id} className="mb-5">
-          <p className={LABEL}>{message.role === "user" ? "you" : "tutor"}</p>
+          <p className={LABEL_CLASS}>{message.role === "user" ? "you" : "tutor"}</p>
           {message.parts.map((part, index) => {
             if (part.type === "text") {
               return <Markdown key={index} text={part.text} />;
             }
             if (isToolUIPart(part)) {
               return (
-                <p key={index} className={`${LABEL} mt-1`}>
+                <p key={index} className={`${LABEL_CLASS} mt-1`}>
                   {toolStatus(part)}
                 </p>
               );
@@ -61,7 +60,7 @@ export default function Messages({
           })}
         </div>
       ))}
-      {status === "submitted" && <p className={LABEL}>thinking…</p>}
+      {status === "submitted" && <p className={LABEL_CLASS}>thinking…</p>}
       <div ref={bottom} />
     </div>
   );

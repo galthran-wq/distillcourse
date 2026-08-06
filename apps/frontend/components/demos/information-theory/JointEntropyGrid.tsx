@@ -108,9 +108,9 @@ export default function JointEntropyGrid() {
       </Readout>
 
       {/* H(rain) split on a 1-bit scale: difference (accent) + leftover */}
-      <div className="mt-1 flex h-2 w-full rounded bg-line">
-        <div className="h-2 rounded-l bg-accent" style={{ width: `${drop * 100}%` }} />
-        <div className="h-2 rounded-r bg-faint" style={{ width: `${HYgX * 100}%` }} />
+      <div className="mt-1 flex h-2 w-full rounded-sm bg-line">
+        <div className="h-2 rounded-l-sm bg-accent" style={{ width: `${drop * 100}%` }} />
+        <div className="h-2 rounded-r-sm bg-faint" style={{ width: `${HYgX * 100}%` }} />
       </div>
       <div className="flex justify-between text-xs opacity-70">
         <span>difference + leftover H(rain&thinsp;|&thinsp;sky) = H(rain)</span>

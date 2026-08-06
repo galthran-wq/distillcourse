@@ -1,11 +1,12 @@
 // The three shapes every list on the profile is built from.
 import Link from "next/link";
+import { LABEL_CLASS } from "@/components/ui/styles";
 import type { LessonLink } from "@/lib/content/site";
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-10">
-      <h2 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-faint">
+      <h2 className={`mb-2 ${LABEL_CLASS}`}>
         {title}
       </h2>
       {children}

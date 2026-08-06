@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
 import Messages from "@/components/chat/Messages";
+import { Button } from "@/components/ui";
 import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
 import {
@@ -78,15 +79,15 @@ export default function ChatPanel({ session }: { session: Session }) {
           {session.summary.title ?? "New chat"}
         </p>
         <span className="font-mono text-[11px] text-faint">{model}</span>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={toggleMenu}
           aria-label="Chat menu"
           aria-expanded={menu}
-          className="px-1 text-soft hover:text-accent"
         >
           ⋯
-        </button>
+        </Button>
         {menu && (
           <ChatMenu
             current={session.summary}

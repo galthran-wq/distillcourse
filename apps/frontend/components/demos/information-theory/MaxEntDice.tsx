@@ -105,9 +105,9 @@ export default function MaxEntDice() {
       </Readout>
 
       {/* entropy gauge: how much the constraint costs against log2 6 */}
-      <div className="mt-1 h-2 w-full rounded bg-line">
+      <div className="mt-1 h-2 w-full rounded-sm bg-line">
         <div
-          className="h-2 rounded bg-accent"
+          className="h-2 rounded-sm bg-accent"
           style={{ width: `${(H / H_MAX) * 100}%` }}
         />
       </div>

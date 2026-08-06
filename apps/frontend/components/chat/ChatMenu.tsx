@@ -2,6 +2,7 @@
 
 import { COMMANDS } from "@/lib/chat/commands";
 import type { ChatModel, ChatSummary } from "@/lib/chat/api";
+import { LABEL_CLASS, MENU_CLASS, MENU_ITEM_CLASS } from "@/components/ui/styles";
 
 interface Props {
   current: ChatSummary;
@@ -13,8 +14,9 @@ interface Props {
   onModel: (model: string) => void;
 }
 
-const HEADING = "px-3 pt-3 pb-1 font-mono text-[11px] uppercase tracking-wider text-faint";
-const ITEM = "block w-full truncate px-3 py-1.5 text-left text-sm hover:text-accent";
+const HEADING = `px-2.5 pt-3 pb-1 ${LABEL_CLASS}`;
+// A chat title is arbitrary length and this panel is the one that lists them.
+const ITEM = `${MENU_ITEM_CLASS} truncate text-sm`;
 
 export default function ChatMenu({
   current,
@@ -26,11 +28,11 @@ export default function ChatMenu({
   onModel,
 }: Props) {
   return (
-    <div className="absolute right-0 top-full z-10 max-h-96 w-64 overflow-y-auto rounded-b-md border border-line bg-panel shadow-lg">
-      <button type="button" className={`${ITEM} mt-2`} onClick={onNew}>
+    <div className={`${MENU_CLASS} max-h-96 w-64 overflow-y-auto`}>
+      <button type="button" className={`${ITEM} text-soft`} onClick={onNew}>
         /clear — {COMMANDS.clear}
       </button>
-      <button type="button" className={ITEM} onClick={onCompact}>
+      <button type="button" className={`${ITEM} text-soft`} onClick={onCompact}>
         /compact — {COMMANDS.compact}
       </button>
 
@@ -39,7 +41,7 @@ export default function ChatMenu({
         <button
           key={model.openrouter_id}
           type="button"
-          className={`${ITEM} ${model.openrouter_id === current.model ? "text-accent" : ""}`}
+          className={`${ITEM} ${model.openrouter_id === current.model ? "text-accent" : "text-soft"}`}
           onClick={() => onModel(model.openrouter_id)}
         >
           {model.display_name}
@@ -51,7 +53,7 @@ export default function ChatMenu({
         <button
           key={chat.id}
           type="button"
-          className={`${ITEM} ${chat.id === current.id ? "text-accent" : ""}`}
+          className={`${ITEM} ${chat.id === current.id ? "text-accent" : "text-soft"}`}
           onClick={() => onSelect(chat)}
         >
           {chat.title ?? "New chat"}

@@ -101,9 +101,9 @@ export default function EntropyExplorer() {
       </Readout>
 
       {/* 0-to-2-bit gauge: the ceiling makes "try to beat 2 bits" visible */}
-      <div className="mt-1 h-2 w-full rounded bg-line">
+      <div className="mt-1 h-2 w-full rounded-sm bg-line">
         <div
-          className="h-2 rounded bg-accent"
+          className="h-2 rounded-sm bg-accent"
           style={{ width: `${(Math.min(H, H_MAX) / H_MAX) * 100}%` }}
         />
       </div>

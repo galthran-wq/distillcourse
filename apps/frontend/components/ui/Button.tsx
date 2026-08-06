@@ -1,22 +1,32 @@
 "use client";
 
 import type { ButtonHTMLAttributes } from "react";
+import { buttonClass, type ButtonSize, type ButtonVariant } from "./styles";
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Pressed/selected state (also sets aria-pressed). */
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Toggle state (also sets aria-pressed). Leave unset on plain buttons. */
   active?: boolean;
 }
 
-export function Button({ active = false, className = "", ...props }: Props) {
+export function Button({
+  variant = "outline",
+  size = "md",
+  active,
+  type = "button",
+  className = "",
+  ...props
+}: Props) {
   return (
+    // `className` can only add — Tailwind resolves two utilities for the same
+    // property by stylesheet order, not by which was written last, so a caller
+    // cannot override the padding or the radius the size sets. Anything that
+    // needs a different shape is a `size`, not a class.
     <button
-      type="button"
+      type={type}
       aria-pressed={active}
-      className={`min-h-11 rounded border px-3 text-sm transition-colors ${
-        active
-          ? "border-accent bg-accent/10"
-          : "border-line hover:border-faint"
-      } ${className}`}
+      className={`${buttonClass(variant, size, active)} ${className}`}
       {...props}
     />
   );
