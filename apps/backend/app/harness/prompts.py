@@ -3,6 +3,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from app.core.config import settings
+
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 # How much of a selection travels with the question. A reader who selects a
@@ -35,8 +37,12 @@ class ContextBlock:
 @lru_cache
 def module(name: str) -> str:
     """One prompt module's text. Public because a run whose kind does not carry
-    a module may still need it: a context block can hand it over instead."""
-    return (PROMPTS_DIR / name).read_text(encoding="utf-8").strip()
+    a module may still need it: a context block can hand it over instead.
+
+    `{{site}}` becomes the public origin, so a module can spell out absolute
+    links without hard-coding a domain the deployment already configures."""
+    text = (PROMPTS_DIR / name).read_text(encoding="utf-8").strip()
+    return text.replace("{{site}}", settings.FRONTEND_HOST)
 
 
 def untrusted(source: str, body: str) -> str:

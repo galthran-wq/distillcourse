@@ -53,6 +53,12 @@ async def _call(method: str, payload: dict[str, Any]) -> dict[str, Any]:
     raise TelegramError(f"{method} failed: {description}")
 
 
+async def send_chat_action(tg_chat_id: int) -> None:
+    """The "typing…" bar. Telegram shows it for ~5 seconds or until a message
+    lands, so a long run refreshes it in a loop."""
+    await _call("sendChatAction", {"chat_id": tg_chat_id, "action": "typing"})
+
+
 async def send_message(tg_chat_id: int, text: str, *, html: bool = True) -> None:
     payload: dict[str, Any] = {"chat_id": tg_chat_id, "text": text}
     if html:

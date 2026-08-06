@@ -155,6 +155,20 @@ async def _open_reviews(
     return await subject.open_block(repo.session, rows)
 
 
+# A refresh under Telegram's ~5s display, so the bar never flickers off
+# mid-run.
+TYPING_REFRESH_SECONDS = 4.5
+
+
+async def _typing(tg_chat_id: int) -> None:
+    """Keeps the "typing…" bar up until cancelled. Failures are swallowed:
+    the indicator is a nicety, the answer is what matters."""
+    while True:
+        with suppress(api.TelegramError):
+            await api.send_chat_action(tg_chat_id)
+        await asyncio.sleep(TYPING_REFRESH_SECONDS)
+
+
 async def _answer(
     repo: HarnessRepository, chat: Chat, outbox: Outbox, text: str
 ) -> None:
@@ -193,6 +207,7 @@ async def handle(
         chat = await thread.of(session, link.user_id)
         outbox = Outbox(session=session, link=link)
         handler = _COMMANDS.get(command)
+        typing = asyncio.create_task(_typing(update.tg_chat_id))
         try:
             try:
                 if handler is None:
@@ -219,3 +234,5 @@ async def handle(
             logfire.exception("telegram update failed")
             with suppress(Exception):
                 await outbox.send(FAILED)
+        finally:
+            typing.cancel()
