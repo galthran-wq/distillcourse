@@ -78,7 +78,10 @@ export default function AuthCard({ mode }: { mode: Mode }) {
 
   return (
     <div className="mx-auto w-full max-w-sm px-6 py-16">
-      <div className="rounded-md border border-line bg-panel p-6 shadow-card sm:p-8">
+      {/* The card is the panel surface here, so the fields on it take the
+          page's fill instead — a field on panel over panel is a border and
+          nothing else. */}
+      <div className="rounded-md border border-line bg-panel p-6 shadow-card sm:p-8 [--field:var(--paper)]">
         <h1 className="text-xl font-semibold tracking-tight">
           {isSignup ? "Create an account" : "Sign in"}
         </h1>

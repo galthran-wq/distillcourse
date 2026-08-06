@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { buttonClass, MENU_CLASS, MENU_ITEM_CLASS } from "@/components/ui/styles";
 import { logout } from "@/lib/auth/api";
 import { setUser, useAuth } from "@/lib/auth/store";
+import { useDismiss } from "@/lib/ui/dismiss";
 
 // The header must not jump sideways when the answer to "who is this" arrives,
 // and the three answers are three different widths — so all three sit in one
@@ -20,21 +21,7 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const away = (event: PointerEvent): void => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", away);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
+  useDismiss(open, root, setOpen);
 
   if (auth.status === "loading") return <span className={SLOT} />;
 

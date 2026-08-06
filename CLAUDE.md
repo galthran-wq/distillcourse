@@ -58,7 +58,12 @@ Rules that override defaults:
   (`rounded-sm|md|full`, `shadow-card`), not dereferenceable as CSS variables.
   Motion and elevation are plain `:root` variables, per theme: `--motion-fast`
   and `--motion-base` used as `duration-(--motion-*)`, `--elevation-card`
-  and `--elevation-popover` reached through the `--shadow-*` utilities.
+  and `--elevation-popover` reached through the `--shadow-*` utilities, and
+  `--field`, the fill in `FIELD_CLASS` — a surface that is itself panel-filled
+  overrides it (`[--field:var(--paper)]`) so a field is always one step off
+  what it sits on. The prose blocks in `globals.css` (`.env`, `.callout`,
+  `pre`) are surfaces too and write the surface radius out as `0.5rem`: they
+  style markdown, not a class list.
   Anything that reads as a button is `ui/Button` — `solid` for the one primary
   action a view has, `outline`, `ghost`; menu rows, the switch and the
   selection chip are their own controls and say so. Every text field carries
@@ -74,7 +79,10 @@ Rules that override defaults:
   repeats that rule for itself. An exit needs the element to stay mounted
   while it plays: that is `useExitDelay` in `lib/ui/exit.ts`, fed
   `MOTION_BASE_MS`/`MOTION_FAST_MS` from `ui/styles.ts` — the millisecond
-  copies of the two tokens, retuned with them. Never a second timer. The one
+  copies of the two tokens, retuned with them. Never a second timer. A menu
+  goes away the same way everywhere — a press outside it or Escape, which it
+  spends rather than passing to the layer under it: `useDismiss` in
+  `lib/ui/dismiss.ts`, never a second pair of those listeners. The one
   route transition, the page turn between two lessons, is the same layer:
   `experimental.viewTransition`, a `<ViewTransition>` around the lesson header
   — React runs a transition only for a commit that holds one, so this is what

@@ -47,7 +47,9 @@ export default function SelectionReference({
         window.getSelection()?.removeAllRanges();
       }}
       style={{ ...buttonPosition(passage), height: BUTTON_HEIGHT }}
-      className="fixed z-40 flex -translate-x-1/2 items-center rounded-sm border border-line bg-paper px-2.5 text-[12px] text-soft shadow-card transition-colors duration-(--motion-fast) hover:border-accent hover:text-accent"
+      // Its own control — a chip that appears at the selection — but it hovers
+      // the way every outlined control on the site hovers.
+      className="fixed z-40 flex -translate-x-1/2 items-center rounded-sm border border-line bg-paper px-2.5 text-[12px] text-soft shadow-card transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink"
     >
       reference in chat
     </button>

@@ -29,7 +29,10 @@ export default function ChatList({ chats, current, className = ROW, onSelect }: 
           className={`${className} ${chat.id === current ? "text-accent" : "text-soft"}`}
           onClick={() => onSelect(chat)}
         >
-          {chat.title ?? "New chat"}
+          {/* A chat is named after its first answer, so the one being had has
+              no name yet. "New chat" is what the button above this list does —
+              the row for a chat already open is not that. */}
+          {chat.title ?? (chat.id === current ? "Current chat" : "New chat")}
         </button>
       ))}
     </>

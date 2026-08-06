@@ -18,7 +18,7 @@ interface Props {
 }
 
 const HEADING = `px-2.5 pt-3 pb-1 ${LABEL_CLASS}`;
-const ITEM = `${MENU_ITEM_CLASS} truncate text-sm`;
+const ITEM = `${MENU_ITEM_CLASS} truncate`;
 
 export default function ChatMenu({
   current,

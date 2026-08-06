@@ -12,9 +12,13 @@
 export const MOTION_BASE_MS = 200;
 export const MOTION_FAST_MS = 150;
 
-/** Every text field: input, textarea, and the native time picker. */
+/**
+ * Every text field: input, textarea, and the native time picker. The fill is
+ * `--field` rather than a colour, so a surface that is itself panel-filled can
+ * flip it and keep the field a step off what it sits on — see globals.css.
+ */
 export const FIELD_CLASS =
-  "block w-full rounded-sm border border-line bg-panel px-3 py-2 text-sm text-ink transition-colors duration-(--motion-fast) placeholder:text-faint hover:border-faint focus:border-accent aria-invalid:border-accent";
+  "block w-full rounded-sm border border-line bg-(--field) px-3 py-2 text-sm text-ink transition-colors duration-(--motion-fast) placeholder:text-faint hover:border-faint focus:border-accent aria-invalid:border-accent";
 
 /**
  * The text above a field. It carries the gap down to the field, so FIELD_CLASS

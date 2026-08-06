@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ChatList from "@/components/chat/ChatList";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
@@ -28,6 +28,7 @@ import {
 } from "@/lib/chat/session";
 import { closePanel, toggleExpanded } from "@/lib/chat/stored";
 import { ApiError } from "@/lib/http";
+import { useDismiss } from "@/lib/ui/dismiss";
 
 interface Props {
   session: Session;
@@ -45,6 +46,9 @@ export default function ChatPanel({ session, expanded }: Props) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const header = useRef<HTMLElement>(null);
+
+  useDismiss(menu, header, setMenu);
 
   function report(error: unknown): void {
     setNotice(failure(error));
@@ -90,7 +94,10 @@ export default function ChatPanel({ session, expanded }: Props) {
 
   return (
     <>
-      <header className="relative flex items-center gap-0.5 border-b border-line px-2 py-1.5">
+      <header
+        ref={header}
+        className="relative flex items-center gap-0.5 border-b border-line px-2 py-1.5"
+      >
         <p className="min-w-0 flex-1 truncate px-2 text-sm">
           {session.summary.title ?? "New chat"}
         </p>
@@ -106,7 +113,13 @@ export default function ChatPanel({ session, expanded }: Props) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={toggleExpanded}
+          // The menu hangs off this header, and the header is about to move and
+          // change width under it — the press is inside it, so nothing else
+          // takes the menu away.
+          onClick={() => {
+            setMenu(false);
+            toggleExpanded();
+          }}
           aria-label={expanded ? "Collapse the tutor" : "Expand the tutor"}
         >
           {expanded ? <CollapseIcon /> : <ExpandIcon />}
@@ -163,7 +176,7 @@ export default function ChatPanel({ session, expanded }: Props) {
               {line}
             </p>
           )}
-          <Composer disabled={busy(status)} expanded={expanded} onSubmit={submit} />
+          <Composer disabled={busy(status)} onSubmit={submit} />
         </div>
       </div>
     </>
