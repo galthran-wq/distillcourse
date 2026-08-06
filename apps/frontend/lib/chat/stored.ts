@@ -17,3 +17,13 @@ export const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
   chatId: null,
   draft: "",
 });
+
+/**
+ * Drop what belongs to the reader who was signed in, keeping the panel where
+ * they left it. The chat id survives being stale on its own — it is looked up
+ * in the reader's own chats and ignored when absent — but an unsent draft is
+ * rendered straight into the composer, so a shared browser has to forget it.
+ */
+export function forgetReader(): void {
+  stored.set({ chatId: null, draft: "" });
+}

@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { User } from "@/lib/auth/api";
 import type { ChatSummary } from "@/lib/chat/api";
 import type { StoredChat } from "@/lib/chat/stored";
+
+const READER: User = {
+  id: "u1",
+  email: "reader@example.com",
+  full_name: null,
+  timezone: "UTC",
+};
 
 const WEB: ChatSummary = {
   id: "c1",
@@ -379,6 +387,31 @@ describe("what the widget remembers", () => {
       chatId: "c1",
       draft: "why is this true?",
     });
+  });
+
+  it("keeps the draft when the load settles who is signed in", async () => {
+    remembered({ open: true, chatId: "c1", draft: "half a question" });
+    const { stored } = await import("@/lib/chat/stored");
+    const { setUser } = await import("@/lib/auth/store");
+
+    // Every load ends in this call, and it is the first thing here to name a
+    // reader — so it must not read as one reader replacing another.
+    setUser(READER);
+
+    expect(stored.get()).toEqual({ open: true, chatId: "c1", draft: "half a question" });
+  });
+
+  it("drops the draft, but not the panel, when the reader signs out", async () => {
+    remembered({ open: true, chatId: "c1", draft: "half a question" });
+    const { stored } = await import("@/lib/chat/stored");
+    const { setUser } = await import("@/lib/auth/store");
+    setUser(READER);
+
+    setUser(null);
+
+    // Whoever signs in next on this browser gets an empty composer; where the
+    // panel sits is not theirs to inherit or lose.
+    expect(stored.get()).toEqual({ open: true, chatId: null, draft: "" });
   });
 });
 
