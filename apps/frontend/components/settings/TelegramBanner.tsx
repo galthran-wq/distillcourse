@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useSignedIn } from "@/lib/auth/signed-in";
-import { getSettings } from "@/lib/settings/api";
+import { useSettings } from "@/lib/settings/store";
 
 /**
  * The one thing about the channel a reader has to learn without going looking:
  * the bot is blocked, so nothing the platform sends is arriving.
  */
 export default function TelegramBanner() {
-  const [settings] = useSignedIn(getSettings);
+  const settings = useSettings();
   if (settings?.telegram !== "broken") return null;
 
   return (

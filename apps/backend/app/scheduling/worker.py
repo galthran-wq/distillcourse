@@ -16,7 +16,7 @@ from app.harness.prompts import RunKind
 from app.harness.repository import HarnessRepository
 from app.models import Schedule, User
 from app.scheduling import policy, repository
-from app.telegram import api, updates
+from app.telegram import api, thread
 from app.telegram import repository as telegram
 from app.telegram.outbox import Outbox
 
@@ -62,14 +62,14 @@ async def _fire(
         # morning forever. Rows are created once a learner has paired Telegram.
         await repository.drop(session, rows)
         return
-    thread = await updates.thread_of(session, user.id)
+    chat = await thread.of(session, user.id)
     now_items, later = policy.session_items(
         rows, avoid=await repository.ignored_topic(session, user.id)
     )
     try:
-        await updates.converse(
+        await thread.converse(
             HarnessRepository(session, user.id),
-            thread,
+            chat,
             Outbox(session=session, link=link),
             _prompt(now_items),
             run_kind=_run_kind(now_items),
@@ -83,8 +83,9 @@ async def _fire(
     except api.BotBlocked:
         # The channel is dead and the link is marked broken, which is what keeps
         # the poller off this learner until an incoming message proves it is
-        # back. Nothing is retried into it in the meantime.
-        await repository.defer(session, rows, due_at=policy.tomorrow_open(now, hours))
+        # back. The rows keep the time they were meant for, so repairing the
+        # link releases them all at once rather than a morning later.
+        await repository.defer(session, rows, due_at=now)
         return
     except Exception as exc:
         # Whatever the model, the network or the database did is the attempted

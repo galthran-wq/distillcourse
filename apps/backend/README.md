@@ -50,6 +50,7 @@ app/
     api.py           # the Bot API client: sendMessage, setWebhook
     repository.py    # links, pairing codes, update dedup
     outbox.py        # sending: length split, HTML fallback, blocked bot
+    thread.py        # the one thread and the run that speaks into it
     updates.py       # one incoming message, end to end; bot commands
     tools.py         # send_message, run by the tutor
   models.py          # SQLAlchemy 2.0 declarative tables

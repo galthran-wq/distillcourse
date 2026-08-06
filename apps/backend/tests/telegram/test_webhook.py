@@ -102,7 +102,10 @@ async def test_an_expired_code_is_answered_with_the_reason(
 async def test_an_update_carrying_no_text_is_acknowledged_and_ignored(
     client: AsyncClient, session: AsyncSession, bot: Bot
 ) -> None:
-    sticker = {"update_id": 3, "message": {"chat": {"id": TG_CHAT_ID}}}
+    sticker = {
+        "update_id": 3,
+        "message": {"chat": {"id": TG_CHAT_ID, "type": "private"}},
+    }
 
     response = await deliver(client, sticker)
 
@@ -110,3 +113,19 @@ async def test_an_update_carrying_no_text_is_acknowledged_and_ignored(
     assert bot.sent == []
     # Nothing was acted on, so nothing is remembered either.
     assert await repository.first_sighting(session, 3) is True
+
+
+async def test_a_group_chat_cannot_redeem_a_pairing_code(
+    client: AsyncClient, session: AsyncSession, user: User, bot: Bot
+) -> None:
+    """A code spent in a group would put the learner's own thread — reviews,
+    reminders, everything they ever asked — in front of that whole room."""
+    code = await repository.issue_code(session, user.id, now=datetime.now(UTC))
+
+    response = await deliver(
+        client, message(f"/start {code.code}", chat_type="supergroup")
+    )
+
+    assert response.status_code == 200
+    assert bot.sent == []
+    assert await repository.link_for_user(session, user.id) is None

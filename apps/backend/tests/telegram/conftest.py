@@ -20,11 +20,15 @@ def configured_bot(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def message(
-    text: str, *, update_id: int = 1, tg_chat_id: int = TG_CHAT_ID
+    text: str,
+    *,
+    update_id: int = 1,
+    tg_chat_id: int = TG_CHAT_ID,
+    chat_type: str = "private",
 ) -> dict[str, Any]:
     return {
         "update_id": update_id,
-        "message": {"chat": {"id": tg_chat_id}, "text": text},
+        "message": {"chat": {"id": tg_chat_id, "type": chat_type}, "text": text},
     }
 
 

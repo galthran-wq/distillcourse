@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui";
-import { useSignedIn } from "@/lib/auth/signed-in";
 import { ApiError } from "@/lib/http";
 import {
   getSettings,
@@ -14,6 +13,7 @@ import {
   type Pairing,
   type Settings,
 } from "@/lib/settings/api";
+import { setSettings, useSettings } from "@/lib/settings/store";
 
 const LABEL = "font-mono text-[11px] uppercase tracking-wider text-faint";
 const CHANNEL: Record<Settings["telegram"], string> = {
@@ -21,6 +21,8 @@ const CHANNEL: Record<Settings["telegram"], string> = {
   active: "connected",
   broken: "connected, but the bot is blocked",
 };
+
+type Write = (change: () => Promise<Settings | void>) => Promise<void>;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -31,8 +33,56 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function QuietHours({ settings, write }: { settings: Settings; write: Write }) {
+  // The fields are the reader's until they leave one. Writing on every change
+  // sends 23:00 while they are still typing 23:30, and the server refuses a
+  // window that closes before it opens — so a value the reader is halfway
+  // through is both sent and reset under them.
+  const [start, setStart] = useState(toClock(settings.quiet_start));
+  const [end, setEnd] = useState(toClock(settings.quiet_end));
+
+  function save(): void {
+    if (!start || !end) {
+      // A cleared field is not a window; the one on the server stands.
+      setStart(toClock(settings.quiet_start));
+      setEnd(toClock(settings.quiet_end));
+      return;
+    }
+    if (toApi(start) === settings.quiet_start && toApi(end) === settings.quiet_end) {
+      return;
+    }
+    // Both ends in one write, so moving the window later is a change the
+    // server can accept rather than two it has to refuse.
+    void write(() =>
+      updateSettings({ quiet_start: toApi(start), quiet_end: toApi(end) }),
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-4">
+      {(
+        [
+          ["From", start, setStart],
+          ["Until", end, setEnd],
+        ] as const
+      ).map(([label, value, set]) => (
+        <label key={label} className="block text-sm">
+          <span className="text-soft">{label}</span>
+          <input
+            type="time"
+            value={value}
+            onChange={(event) => set(event.target.value)}
+            onBlur={save}
+            className="mt-1 block rounded border border-line bg-transparent px-2 py-1"
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export default function SettingsPanel() {
-  const [settings, setSettings] = useSignedIn(getSettings);
+  const settings = useSettings();
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +103,10 @@ export default function SettingsPanel() {
     }
   }
 
-  const muted = settings.muted_until !== null;
+  // A mute the tutor set has an end date, and the column keeps that time after
+  // it has passed: the moment, not the column, says whether this is paused.
+  const muted =
+    settings.muted_until !== null && new Date(settings.muted_until) > new Date();
 
   return (
     <>
@@ -93,21 +146,7 @@ export default function SettingsPanel() {
       </Section>
 
       <Section title="When the platform may write">
-        <div className="flex flex-wrap items-end gap-4">
-          {(["quiet_start", "quiet_end"] as const).map((end) => (
-            <label key={end} className="block text-sm">
-              <span className="text-soft">{end === "quiet_start" ? "From" : "Until"}</span>
-              <input
-                type="time"
-                value={toClock(settings[end])}
-                onChange={(event) =>
-                  void write(() => updateSettings({ [end]: toApi(event.target.value) }))
-                }
-                className="mt-1 block rounded border border-line bg-transparent px-2 py-1"
-              />
-            </label>
-          ))}
-        </div>
+        <QuietHours settings={settings} write={write} />
         <p className="mt-3 text-sm text-faint">
           On your own clock. Outside these hours a message waits for the next morning.
         </p>

@@ -23,7 +23,9 @@ def split(text: str) -> list[str]:
         parts.append(rest[:cut].strip())
         rest = rest[cut:].lstrip("\n")
     parts.append(rest)
-    return [part for part in parts if part]
+    # Telegram refuses a message with no text in it, and a part that is only
+    # whitespace is one; there is nothing in it to lose by dropping it.
+    return [part for part in parts if part.strip()]
 
 
 @dataclass
@@ -51,4 +53,6 @@ class Outbox:
             except api.BotBlocked:
                 await repository.set_status(self.session, self.link, "broken")
                 raise
-        self.sent += 1
+            # Per message actually out, not per call: a call that had nothing
+            # to send must not count as the learner having heard something.
+            self.sent += 1

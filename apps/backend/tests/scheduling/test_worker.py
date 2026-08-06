@@ -427,16 +427,25 @@ async def test_a_blocked_bot_pauses_everything_for_that_learner(
     await session.refresh(row)
     await session.refresh(link)
     assert link.status == "broken"
-    assert row.status == "deferred"
+    # Held, not pushed to tomorrow: the row keeps the time it was meant for.
+    assert (row.status, row.due_at) == ("deferred", NOON)
 
-    row.due_at = NOON
-    await session.commit()
     with replying():
         await worker.cycle(session, NOON)
 
     await session.refresh(row)
     assert (row.status, row.claimed_at) == ("deferred", None)
     assert bot.sent == []
+
+    # Repairing the link releases what it held, in the very next cycle.
+    link.status = "active"
+    await session.commit()
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(row)
+    assert row.status == "awaiting_reply"
+    assert bot.sent != []
 
 
 async def test_housekeeping_removes_the_pairing_codes_and_update_ids_nothing_reads(
@@ -533,7 +542,13 @@ async def test_a_failed_cycle_does_not_stop_the_poller(
     monkeypatch.setattr(worker, "cycle", one_bad_cycle)
     monkeypatch.setattr(worker, "POLL", timedelta(seconds=0.01))
     poller = asyncio.create_task(worker.poll(session_factory))
-    await asyncio.sleep(0.05)
-    poller.cancel()
+    try:
+        # Waited for rather than slept through: what the failed cycle costs
+        # before the next one (logging it, mostly) is not this test's subject.
+        async with asyncio.timeout(2):
+            while len(cycles) < 2:
+                await asyncio.sleep(0.01)
+    finally:
+        poller.cancel()
 
     assert len(cycles) > 1

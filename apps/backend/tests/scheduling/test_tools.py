@@ -112,7 +112,7 @@ async def test_the_prompt_tells_the_agent_what_time_it_is_for_the_learner(
     assert "Their timezone is `Europe/Moscow`" in prompt
 
 
-async def test_a_reminder_needs_a_thread_to_arrive_in(
+async def test_a_reminder_needs_a_channel_to_arrive_over(
     session: AsyncSession, user: User
 ) -> None:
     repo = HarnessRepository(session, user.id)
@@ -125,7 +125,7 @@ async def test_a_reminder_needs_a_thread_to_arrive_in(
     ):
         answer = await runner.run(repo, web, "remind me on Friday", medium="web")
 
-    assert "no Telegram thread connected" in answer
+    assert "no Telegram connected" in answer
     assert (await session.scalars(select(Schedule))).all() == []
 
 

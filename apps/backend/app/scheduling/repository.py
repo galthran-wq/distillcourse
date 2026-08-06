@@ -242,17 +242,6 @@ async def ignored_topic(session: AsyncSession, user_id: uuid.UUID) -> str | None
     return policy.topic(row)
 
 
-async def thread(session: AsyncSession, user_id: uuid.UUID) -> Chat | None:
-    """The eternal Telegram thread — the only place a proactive message goes."""
-    chat: Chat | None = await session.scalar(
-        select(Chat)
-        .where(Chat.user_id == user_id, Chat.kind == "telegram")
-        .order_by(Chat.created_at)
-        .limit(1)
-    )
-    return chat
-
-
 async def users_by_id(
     session: AsyncSession, ids: Collection[uuid.UUID]
 ) -> dict[uuid.UUID, User]:

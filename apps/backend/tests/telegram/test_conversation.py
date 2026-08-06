@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from httpx import AsyncClient
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
@@ -9,6 +11,9 @@ from app.harness.repository import HarnessRepository
 from app.models import Chat, TgLink, User
 from app.scheduling import policy
 from app.telegram import api, outbox, repository, updates
+
+# Aliased because `thread` here is the fixture holding the Chat row.
+from app.telegram import thread as delivery
 from tests.conftest import Bot, replying
 from tests.telegram.conftest import deliver, message
 
@@ -53,6 +58,35 @@ async def test_a_run_that_sent_its_own_messages_is_not_delivered_twice(
         await deliver(client, message("explain typical sets"))
 
     assert bot.texts == ["first half", "second half"]
+
+
+@pytest.mark.usefixtures("link")
+async def test_a_run_whose_tool_sent_nothing_still_answers(
+    client: AsyncClient, bot: Bot
+) -> None:
+    """A tool call with no text in it is not a delivery: counted as one, it
+    suppresses the final answer and the learner reads silence."""
+    with tutor.override(model=sending("   ", then="the surprisal is -log p")):
+        await deliver(client, message("what is surprisal?"))
+
+    assert bot.texts == ["the surprisal is -log p"]
+
+
+@pytest.mark.usefixtures("link")
+async def test_a_run_that_fails_outright_says_so(
+    monkeypatch: pytest.MonkeyPatch, client: AsyncClient, bot: Bot
+) -> None:
+    """Handling an update is the top of a background task, and the update id is
+    already recorded, so an escaping exception is permanent silence."""
+
+    async def explode(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("the provider fell over")
+
+    monkeypatch.setattr(delivery, "converse", explode)
+
+    await deliver(client, message("what is entropy?"))
+
+    assert bot.texts == [updates.FAILED]
 
 
 @pytest.mark.usefixtures("link")
@@ -125,6 +159,18 @@ async def test_clear_cuts_the_history_the_next_run_is_given(
 
     assert await repo.live_rows(thread) == []
     assert "Cleared" in bot.texts[-1]
+
+
+async def test_clear_waits_for_the_run_holding_the_thread(
+    client: AsyncClient, session: AsyncSession, thread: Chat, bot: Bot
+) -> None:
+    """The claim is the thread's queue, and `/clear` is in it: a marker written
+    beside a run in flight is overtaken by that run's own output."""
+    await HarnessRepository(session, thread.user_id).claim_run(thread, uuid.uuid4())
+
+    await deliver(client, message("/clear"))
+
+    assert bot.texts == [updates.BUSY]
 
 
 async def test_compact_replaces_the_history_with_a_summary(

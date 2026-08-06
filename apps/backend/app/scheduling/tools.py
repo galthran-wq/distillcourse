@@ -6,6 +6,7 @@ from pydantic_ai import RunContext
 from app.core.clock import zone
 from app.harness.deps import HarnessDeps
 from app.scheduling import policy, repository
+from app.telegram import repository as telegram
 
 
 async def _their_clock(deps: HarnessDeps, moment: datetime) -> datetime:
@@ -27,10 +28,12 @@ async def create_reminder(
         note: what to remind them of, in one line, in their own words.
     """
     repo = ctx.deps.repo
-    if await repository.thread(repo.session, repo.user_id) is None:
+    # The link, not the thread: the channel is what a reminder has to arrive
+    # over, and the poller drops rows a learner has no link for.
+    if await telegram.link_for_user(repo.session, repo.user_id) is None:
         return (
-            "no reminder was set: the learner has no Telegram thread connected, "
-            "and that is where the platform sends messages of its own"
+            "no reminder was set: the learner has no Telegram connected, and "
+            "that is where the platform sends messages of its own"
         )
     row = await repository.create(
         repo.session,
