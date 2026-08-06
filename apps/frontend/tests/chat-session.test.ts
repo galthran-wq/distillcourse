@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatSummary } from "@/lib/chat/api";
+import type { StoredChat } from "@/lib/chat/stored";
 
 const WEB: ChatSummary = {
   id: "c1",
@@ -89,8 +91,14 @@ async function session() {
   return { ...store, ...position };
 }
 
+/** What a previous visit left in storage, read as the modules are built. */
+function remembered(state: Partial<StoredChat>): void {
+  window.localStorage.setItem("distillcourse.chat", JSON.stringify(state));
+}
+
 beforeEach(() => {
   calls.length = 0;
+  window.localStorage.clear();
   vi.resetModules();
 });
 
@@ -104,6 +112,33 @@ describe("the chat session", () => {
     // into the reader's Telegram thread, and this is where that shows.
     served({
       "GET /api/v1/chats": json([TELEGRAM, WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+    });
+    const { resumeSession } = await session();
+
+    const open = await resumeSession();
+
+    expect(open.summary.id).toBe("c1");
+    expect(sent("POST", "/api/v1/chats")).toHaveLength(0);
+  });
+
+  it("resumes the chat the reader had open, not the most recent one", async () => {
+    remembered({ chatId: "c1" });
+    served({
+      "GET /api/v1/chats": json([FRESH, WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+    });
+    const { resumeSession } = await session();
+
+    const open = await resumeSession();
+
+    expect(open.summary.id).toBe("c1");
+  });
+
+  it("falls back to the most recent chat when the stored one is gone", async () => {
+    remembered({ chatId: "deleted-since" });
+    served({
+      "GET /api/v1/chats": json([WEB]),
       "GET /api/v1/chats/c1/messages": json([]),
     });
     const { resumeSession } = await session();
@@ -320,6 +355,30 @@ describe("the chat session", () => {
 
     expect(await resumeSession()).not.toBe(mine);
     expect(sent("GET", "/api/v1/chats")).toHaveLength(2);
+  });
+});
+
+describe("what the widget remembers", () => {
+  it("has the panel, the chat and the draft back after a reload", async () => {
+    served({
+      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+    });
+    const { resumeSession } = await session();
+    const { togglePanel } = await import("@/lib/chat/panel");
+    await resumeSession();
+    togglePanel();
+    (await import("@/lib/chat/stored")).stored.set({ draft: "why is this true?" });
+
+    // The reload: the same storage, every module built again out of it.
+    vi.resetModules();
+    const { stored } = await import("@/lib/chat/stored");
+
+    expect(stored.get()).toEqual({
+      open: true,
+      chatId: "c1",
+      draft: "why is this true?",
+    });
   });
 });
 
