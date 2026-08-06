@@ -10,10 +10,17 @@ import { setDraft, useDraft } from "@/lib/chat/stored";
 interface Props {
   /** A run is in flight: the chat takes one at a time. */
   disabled: boolean;
+  /**
+   * Not drawn here — the field is the same field either way. It is what the
+   * field's width changes with, and the number of rows a draft needs is a
+   * function of that width, so the measurement below has to be redone when it
+   * changes.
+   */
+  expanded: boolean;
   onSubmit: (text: string) => void;
 }
 
-export default function Composer({ disabled, onSubmit }: Props) {
+export default function Composer({ disabled, expanded, onSubmit }: Props) {
   // Outside the component, so that an unsent message survives a reload.
   const text = useDraft();
   const quote = useQuote();
@@ -22,13 +29,16 @@ export default function Composer({ disabled, onSubmit }: Props) {
 
   // One row until the message needs more, up to the cap the class sets — and
   // the field's own scrollHeight is the only measure of what it needs, which
-  // is only the truth once the height it was given is released.
+  // is only the truth once the height it was given is released. scrollHeight
+  // is the content box plus its padding, and the height set here is a
+  // border-box height, so the border has to be added back or the field is
+  // permanently two pixels short of its own text.
   useLayoutEffect(() => {
     const box = field.current;
     if (box === null) return;
     box.style.height = "auto";
-    box.style.height = `${box.scrollHeight}px`;
-  }, [text]);
+    box.style.height = `${box.scrollHeight + box.offsetHeight - box.clientHeight}px`;
+  }, [text, expanded]);
 
   function submit(event: FormEvent): void {
     event.preventDefault();

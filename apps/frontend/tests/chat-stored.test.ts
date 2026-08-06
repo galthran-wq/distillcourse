@@ -64,7 +64,20 @@ describe("what the widget remembers", () => {
     expect(entry()).toMatchObject({ panel: "expanded" });
   });
 
-  it("reads an entry left by an older version as a shut panel", async () => {
+  it("reads an entry left by the version before this one as a shut panel", async () => {
+    // What that version wrote: an `open` boolean, and no `panel` at all.
+    remembered({ open: true, chatId: "c1", draft: "", owner: "" } as Partial<StoredChat>);
+    const { storedChatId, togglePanel } = await import("@/lib/chat/stored");
+
+    togglePanel();
+
+    // It opens rather than closing, the field it never knew is dropped, and
+    // the fields it shares with this version survive.
+    expect(entry()).toEqual({ panel: "docked", chatId: "c1", draft: "", owner: "" });
+    expect(storedChatId()).toBe("c1");
+  });
+
+  it("reads a panel state it does not know as a shut panel", async () => {
     remembered({ panel: "half-open" });
     const { togglePanel } = await import("@/lib/chat/stored");
 

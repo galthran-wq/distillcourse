@@ -1,13 +1,22 @@
 // The widget's glyphs, drawn the way the lesson bookmark is — a 16-unit box,
 // currentColor, no fill — so a Button's variant colours them and no icon
-// package is added for six shapes.
+// package is added for a handful of shapes.
 import type { PropsWithChildren } from "react";
 
 interface IconProps {
   className?: string;
 }
 
-function Glyph({ className = "size-4", children }: PropsWithChildren<IconProps>) {
+interface GlyphProps extends IconProps {
+  /** A shape made of dots needs more weight than one made of lines. */
+  strokeWidth?: string;
+}
+
+function Glyph({
+  className = "size-4",
+  strokeWidth = "1.5",
+  children,
+}: PropsWithChildren<GlyphProps>) {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -15,7 +24,7 @@ function Glyph({ className = "size-4", children }: PropsWithChildren<IconProps>)
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -81,18 +90,10 @@ export function CheckIcon(props: IconProps) {
 }
 
 /** Three dots. Drawn as zero-length round strokes, so it needs no fill. */
-export function MoreIcon({ className = "size-4" }: IconProps) {
+export function MoreIcon(props: IconProps) {
   return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    >
+    <Glyph {...props} strokeWidth="2">
       <path d="M3.5 8h.01M8 8h.01M12.5 8h.01" />
-    </svg>
+    </Glyph>
   );
 }

@@ -33,28 +33,38 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
 
   // What Escape does to anything covering the page. It returns the panel to its
   // corner rather than closing it: the conversation was not what was dismissed.
+  // The page under the overlay is frozen while it is there, the way the image
+  // lightbox freezes it — a scrim that scrolls what it covers is a backdrop the
+  // reader can still work through.
   useEffect(() => {
     if (!expanded) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === "Escape") collapsePanel();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
   }, [expanded]);
 
   return (
     <LessonsProvider value={lessons}>
       {expanded && (
-        <button
-          type="button"
-          aria-label="Collapse the tutor"
-          onClick={collapsePanel}
-          className="fixed inset-0 z-40 bg-ink/25"
-        />
+        // Not a control: the header's collapse button is the one that can be
+        // reached and named, and a full-viewport button carrying the same name
+        // would be a second one in the tab order with nothing to show for it.
+        // Escape does what clicking here does, for everyone who cannot.
+        <div aria-hidden onClick={collapsePanel} className="fixed inset-0 z-40 bg-scrim" />
       )}
       {open && (
         <section
           aria-label="Tutor"
+          // Expanded it covers the page, which is what a dialog is; docked it
+          // sits beside the page and is just a region of it.
+          role={expanded ? "dialog" : undefined}
+          aria-modal={expanded || undefined}
           // Full height only once there is a conversation to scroll.
           className={`flex flex-col border border-line bg-paper shadow-popover ${
             expanded

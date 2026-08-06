@@ -11,13 +11,29 @@ const AT_END = 32;
 
 export default function Messages({
   messages,
+  chatId,
   status,
 }: {
   messages: UIMessage[];
+  /** Which conversation this is. The component is not remounted between two. */
+  chatId: string;
   status: ChatStatus;
 }) {
   const view = useRef<HTMLDivElement>(null);
   const following = useRef(true);
+
+  // Reading something further up is the only thing that unpins the transcript,
+  // and neither of the two below is that — so both put it back. Nothing else
+  // would: the panel keeps this component mounted across a chat switch, a
+  // /clear and every message after them, so the ref outlives them all.
+  // Declared above the scroll, which is the order the effects run in.
+  useEffect(() => {
+    following.current = true;
+  }, [chatId]);
+
+  useEffect(() => {
+    if (messages.at(-1)?.role === "user") following.current = true;
+  }, [messages]);
 
   useEffect(() => {
     const box = view.current;
@@ -32,12 +48,10 @@ export default function Messages({
   }
 
   return (
-    <div
-      ref={view}
-      onScroll={onScroll}
-      role="log"
-      className="flex-1 overflow-y-auto px-4 py-3"
-    >
+    // No live region: an answer arrives a token at a time, and a transcript
+    // that announces itself on every one of them reads the whole conversation
+    // out again per token. Each turn says who spoke, which is what is needed.
+    <div ref={view} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 py-3">
       {/* Expanded, the panel is far wider than a column of prose should be. */}
       <div className="mx-auto max-w-2xl space-y-4">
         {messages.length === 0 && (

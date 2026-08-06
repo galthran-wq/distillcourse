@@ -54,7 +54,12 @@ export default function ChatMenu({
       {/* Only where the rail is not: it appears at the same width the rail does. */}
       <div className={expanded ? "lg:hidden" : ""}>
         <p className={HEADING}>Chats</p>
-        <ChatList chats={chats} current={current.id} onSelect={onSelect} />
+        <ChatList
+          chats={chats}
+          current={current.id}
+          className={ITEM}
+          onSelect={onSelect}
+        />
       </div>
     </div>
   );

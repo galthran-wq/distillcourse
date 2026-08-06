@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { UIMessage } from "ai";
-import Messages from "@/components/chat/Messages";
-import { LessonsProvider } from "@/lib/content/links";
-import { LESSONS, rendered, turn } from "./chat-fixture";
+import { rendered, shown, turn } from "./chat-fixture";
 
 function reply(...parts: UIMessage["parts"]): string {
   return rendered([
@@ -56,8 +53,7 @@ describe("a rendered reply", () => {
       input: { query: "entropy" },
     });
 
-    expect(html).toContain("search lessons");
-    expect(html).toContain("…");
+    expect(html).toContain("search lessons…");
   });
 
   it("shows a tool that has answered, with what it was asked", () => {
@@ -73,7 +69,8 @@ describe("a rendered reply", () => {
     expect(html).toContain("<details");
     expect(html).toContain("search lessons");
     expect(html).toContain("&quot;entropy&quot;");
-    expect(html).not.toContain("…");
+    // Named without the ellipsis that says it is still going.
+    expect(html).not.toContain("search lessons…");
   });
 
   it("says a tool failed", () => {
@@ -89,28 +86,18 @@ describe("a rendered reply", () => {
   });
 });
 
-let root: Root;
-let host: HTMLElement;
-
-function show(messages: UIMessage[]): void {
-  act(() =>
-    root.render(
-      <LessonsProvider value={LESSONS}>
-        <Messages messages={messages} status="ready" />
-      </LessonsProvider>,
-    ),
-  );
-}
+const { host, show } = shown();
 
 /** Who spoke, in the order the transcript puts them on screen. */
 function speakers(): (string | null)[] {
-  return [...host.querySelectorAll("article")].map((node) =>
+  return [...host().querySelectorAll("article")].map((node) =>
     node.getAttribute("aria-label"),
   );
 }
 
+/** The scroll box: the transcript's own element, which is all it renders. */
 function box(): HTMLElement {
-  return host.querySelector("[role=log]") as HTMLElement;
+  return host().firstElementChild as HTMLElement;
 }
 
 /** jsdom lays nothing out, so the scroll box's geometry is stated here. */
@@ -134,17 +121,6 @@ function scrollTo(position: number): void {
   act(() => node.dispatchEvent(new Event("scroll", { bubbles: true })));
 }
 
-beforeEach(() => {
-  host = document.createElement("div");
-  document.body.append(host);
-  root = createRoot(host);
-});
-
-afterEach(() => {
-  act(() => root.unmount());
-  host.remove();
-});
-
 describe("the transcript", () => {
   // What the backend really sends: every stored question of every chat comes
   // back under this one id, so order is all the transcript has to go on.
@@ -166,7 +142,7 @@ describe("the transcript", () => {
   }
 
   function said(text: string): number {
-    return host.textContent?.indexOf(text) ?? -1;
+    return host().textContent?.indexOf(text) ?? -1;
   }
 
   it("puts the next turn under the ones before it", () => {
@@ -182,10 +158,10 @@ describe("the transcript", () => {
     show(conversation("a", 2));
     // A whole other conversation replaces this one, and its questions carry
     // the same ids: nothing here may be matched up with what it replaced.
-    show(conversation("b", 2));
+    show(conversation("b", 2), "b");
 
     expect(speakers()).toEqual(["You", "Tutor", "You", "Tutor"]);
-    expect(host.textContent).not.toContain("a ask");
+    expect(host().textContent).not.toContain("a ask");
     expect(said("b ask 0")).toBeLessThan(said("b answer 0"));
     expect(said("b answer 0")).toBeLessThan(said("b ask 1"));
   });
@@ -208,5 +184,28 @@ describe("the transcript", () => {
     show(conversation("a", 2));
 
     expect(view.at()).toBe(120);
+  });
+
+  // Having scrolled up is the reader reading something. Opening another chat
+  // and writing the next message are not, and the panel keeps the transcript
+  // mounted through both — so nothing but this puts it back at the end.
+  it("goes back to the end when the reader opens another chat", () => {
+    show(conversation("a", 4));
+    const view = scrollable(1000, 400);
+    scrollTo(120);
+
+    show(conversation("b", 2), "b");
+
+    expect(view.at()).toBe(1000);
+  });
+
+  it("goes back to the end when the reader asks the next question", () => {
+    show(conversation("a", 1));
+    const view = scrollable(1000, 400);
+    scrollTo(120);
+
+    show([...conversation("a", 1), turn("user", { type: "text", text: "and this?" })]);
+
+    expect(view.at()).toBe(1000);
   });
 });

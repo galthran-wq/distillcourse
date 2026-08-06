@@ -51,7 +51,7 @@ export default function ChatPanel({ session, expanded }: Props) {
   }
 
   useEffect(() => {
-    listModels().then(setModels, (error: unknown) => setNotice(failure(error)));
+    listModels().then(setModels, report);
   }, []);
 
   // Refetched on every open rather than accumulated: titles are written
@@ -61,7 +61,7 @@ export default function ChatPanel({ session, expanded }: Props) {
   // changing.
   useEffect(() => {
     if (!expanded && !menu) return;
-    webChats().then(setChats, (error: unknown) => setNotice(failure(error)));
+    webChats().then(setChats, report);
   }, [expanded, menu, session.summary]);
 
   // The backend names a chat after its first message, so the header can only
@@ -157,13 +157,13 @@ export default function ChatPanel({ session, expanded }: Props) {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <Messages messages={messages} status={status} />
+          <Messages messages={messages} chatId={session.summary.id} status={status} />
           {line !== null && (
             <p role="status" className="px-4 pb-1 text-[13px] text-accent">
               {line}
             </p>
           )}
-          <Composer disabled={busy(status)} onSubmit={submit} />
+          <Composer disabled={busy(status)} expanded={expanded} onSubmit={submit} />
         </div>
       </div>
     </>
