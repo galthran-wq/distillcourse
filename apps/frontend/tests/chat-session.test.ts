@@ -100,7 +100,7 @@ async function session() {
 }
 
 /** What a previous visit left in storage, read as the modules are built. */
-function remembered(state: Partial<StoredChat>): void {
+function remembered(state: Partial<StoredChat> | Record<string, unknown>): void {
   window.localStorage.setItem("distillcourse.chat", JSON.stringify(state));
 }
 
@@ -386,11 +386,12 @@ describe("what the widget remembers", () => {
       open: true,
       chatId: "c1",
       draft: "why is this true?",
+      owner: "",
     });
   });
 
   it("keeps the draft when the load settles who is signed in", async () => {
-    remembered({ open: true, chatId: "c1", draft: "half a question" });
+    remembered({ open: true, chatId: "c1", draft: "half a question", owner: "u1" });
     const { stored } = await import("@/lib/chat/stored");
     const { setUser } = await import("@/lib/auth/store");
 
@@ -398,11 +399,16 @@ describe("what the widget remembers", () => {
     // reader — so it must not read as one reader replacing another.
     setUser(READER);
 
-    expect(stored.get()).toEqual({ open: true, chatId: "c1", draft: "half a question" });
+    expect(stored.get()).toEqual({
+      open: true,
+      chatId: "c1",
+      draft: "half a question",
+      owner: "u1",
+    });
   });
 
   it("drops the draft, but not the panel, when the reader signs out", async () => {
-    remembered({ open: true, chatId: "c1", draft: "half a question" });
+    remembered({ open: true, chatId: "c1", draft: "half a question", owner: "u1" });
     const { stored } = await import("@/lib/chat/stored");
     const { setUser } = await import("@/lib/auth/store");
     setUser(READER);
@@ -411,7 +417,45 @@ describe("what the widget remembers", () => {
 
     // Whoever signs in next on this browser gets an empty composer; where the
     // panel sits is not theirs to inherit or lose.
-    expect(stored.get()).toEqual({ open: true, chatId: null, draft: "" });
+    expect(stored.get()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
+  });
+
+  it("drops the previous reader's draft on a load that opens anonymous", async () => {
+    remembered({ open: true, chatId: "c1", draft: "half a question", owner: "u1" });
+    const { stored } = await import("@/lib/chat/stored");
+    const { setUser } = await import("@/lib/auth/store");
+
+    // They signed out during some earlier visit, so this page load never saw
+    // them: only the entry knows the draft in it is not the current reader's.
+    setUser(null);
+
+    expect(stored.get()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
+  });
+
+  it("falls back to the declared defaults when the entry is corrupt", async () => {
+    remembered({ open: "yes", chatId: "c1", draft: 123, gone: "old field" });
+
+    const { stored } = await import("@/lib/chat/stored");
+
+    // Field by field: the widget is mounted on every page, so the one good
+    // field is worth keeping and the wrong-typed ones must not reach it.
+    expect(stored.get()).toEqual({ open: false, chatId: "c1", draft: "", owner: "" });
+  });
+
+  it("does not write back over what another tab changed", async () => {
+    const here = (await import("@/lib/chat/stored")).stored;
+    vi.resetModules();
+    const other = (await import("@/lib/chat/stored")).stored;
+
+    other.set({ draft: "asked in the other tab" });
+    here.set({ open: true });
+
+    expect(here.get()).toEqual({
+      open: true,
+      chatId: "",
+      draft: "asked in the other tab",
+      owner: "",
+    });
   });
 });
 

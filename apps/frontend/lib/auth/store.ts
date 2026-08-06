@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { me, type User } from "@/lib/auth/api";
 import { resetSession } from "@/lib/chat/session";
-import { forgetReader } from "@/lib/chat/stored";
+import { claimStored } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
 export type AuthState =
@@ -25,13 +25,11 @@ export function setUser(user: User | null): void {
   // Everything held for the reader outside React belongs to this identity:
   // whoever signs in next on this tab must not inherit the previous one's
   // conversation with the tutor.
-  if (user?.id !== previous?.id) {
-    resetSession();
-    // Only once someone was actually signed in here — this also runs on the
-    // first answer about who that is, which arrives on every load, and there
-    // the stored chat is precisely what the reload is meant to bring back.
-    if (previous !== null) forgetReader();
-  }
+  if (user?.id !== previous?.id) resetSession();
+  // Unconditionally, and never mind `previous`: this call also arrives on every
+  // load, where nobody was signed in yet and the entry itself is the only thing
+  // that knows who left the draft in it.
+  claimStored(user?.id ?? "");
   auth.set(user ? { status: "signed-in", user } : ANONYMOUS);
 }
 
