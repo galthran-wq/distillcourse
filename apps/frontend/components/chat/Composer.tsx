@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { FIELD_CLASS } from "@/components/ui/field";
 import { dropQuote, useQuote } from "@/lib/chat/quote";
+import { setDraft, useDraft } from "@/lib/chat/stored";
 
 interface Props {
   /** A run is in flight: the chat takes one at a time. */
@@ -11,14 +12,15 @@ interface Props {
 }
 
 export default function Composer({ disabled, onSubmit }: Props) {
-  const [text, setText] = useState("");
+  // Outside the component, so that an unsent message survives a reload.
+  const text = useDraft();
   const quote = useQuote();
   const ready = !disabled && text.trim() !== "";
 
   function submit(event: FormEvent): void {
     event.preventDefault();
     if (!ready) return;
-    setText("");
+    setDraft("");
     onSubmit(text.trim());
   }
 
@@ -44,7 +46,7 @@ export default function Composer({ disabled, onSubmit }: Props) {
       )}
       <textarea
         value={text}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => setDraft(event.target.value)}
         onKeyDown={onKeyDown}
         rows={2}
         aria-label="Message the tutor"

@@ -14,6 +14,7 @@ import { API } from "@/lib/api-base";
 import { errorDetail } from "@/lib/http";
 import { currentLocator } from "@/lib/lesson/position";
 import { takeQuote } from "@/lib/chat/quote";
+import { rememberChat, storedChatId } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
 export interface Session {
@@ -48,12 +49,13 @@ async function open(summary: ChatSummary): Promise<Session> {
     }),
   };
   session.set(next);
+  rememberChat(summary.id);
   return next;
 }
 
 let opening: Promise<Session> | null = null;
 
-/** Reopen the last web chat, or start the reader's first one. */
+/** Reopen the chat the reader last had open, or start their first one. */
 export function resumeSession(): Promise<Session> {
   const current = session.get();
   if (current !== null) return Promise.resolve(current);
@@ -61,7 +63,10 @@ export function resumeSession(): Promise<Session> {
   // second chat before the first request came back.
   opening ??= (async () => {
     const chats = await webChats();
-    return open(chats[0] ?? (await createChat()));
+    // The stored one can be gone — deleted, or belonging to whoever was
+    // signed in on this browser before — and then the most recent stands in.
+    const last = chats.find((chat) => chat.id === storedChatId());
+    return open(last ?? chats[0] ?? (await createChat()));
   })().finally(() => {
     opening = null;
   });
