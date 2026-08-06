@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import { useAuth } from "@/lib/auth/store";
+import { togglePanel, usePanel } from "@/lib/chat/panel";
 import { resumeSession, useSession } from "@/lib/chat/session";
+import { LessonsProvider, type Lessons } from "@/lib/content/links";
 
-export default function ChatWidget() {
+export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
   const session = useSession();
-  const [open, setOpen] = useState(false);
+  const open = usePanel();
   const [unreachable, setUnreachable] = useState(false);
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export default function ChatWidget() {
   }, [open, auth.status, session]);
 
   return (
-    <>
+    <LessonsProvider value={lessons}>
       {open && (
         <section
           aria-label="Tutor"
@@ -47,12 +49,12 @@ export default function ChatWidget() {
       )}
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={togglePanel}
         aria-expanded={open}
         className="fixed bottom-6 right-6 z-40 min-h-11 rounded-full border border-line bg-paper px-4 text-sm shadow-sm transition-colors hover:border-accent hover:text-accent"
       >
         {open ? "Close" : "Tutor"}
       </button>
-    </>
+    </LessonsProvider>
   );
 }

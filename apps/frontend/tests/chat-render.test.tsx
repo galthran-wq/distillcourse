@@ -1,14 +1,12 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { UIMessage } from "ai";
-import Messages from "@/components/chat/Messages";
+import { rendered, turn } from "./chat-fixture";
 
 function reply(...parts: UIMessage["parts"]): string {
-  const messages: UIMessage[] = [
-    { id: "m1", role: "user", parts: [{ type: "text", text: "why is this true?" }] },
-    { id: "m2", role: "assistant", parts },
-  ];
-  return renderToStaticMarkup(<Messages messages={messages} status="ready" />);
+  return rendered([
+    turn("user", { type: "text", text: "why is this true?" }),
+    turn("assistant", ...parts),
+  ]);
 }
 
 describe("a rendered reply", () => {
@@ -33,12 +31,6 @@ describe("a rendered reply", () => {
 
     expect(html).toContain("<li>first</li>");
     expect(html).toContain("<code>code</code>");
-  });
-
-  it("leaves a reference locator as plain text rather than breaking the message", () => {
-    const html = reply({ type: "text", text: "See [[lesson:info-theory/entropy#a]]." });
-
-    expect(html).toContain("[[lesson:info-theory/entropy#a]]");
   });
 
   it("names each turn", () => {

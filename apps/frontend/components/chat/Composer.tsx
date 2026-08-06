@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { FIELD_CLASS } from "@/components/ui/field";
+import { dropQuote, useQuote } from "@/lib/chat/quote";
 
 interface Props {
   /** A run is in flight: the chat takes one at a time. */
@@ -11,6 +12,7 @@ interface Props {
 
 export default function Composer({ disabled, onSubmit }: Props) {
   const [text, setText] = useState("");
+  const quote = useQuote();
   const ready = !disabled && text.trim() !== "";
 
   function submit(event: FormEvent): void {
@@ -27,6 +29,19 @@ export default function Composer({ disabled, onSubmit }: Props) {
 
   return (
     <form onSubmit={submit} className="border-t border-line p-3">
+      {quote !== null && (
+        <div className="mb-2 flex items-start gap-2 border-l-2 border-accent pl-2">
+          <p className="line-clamp-3 flex-1 text-[13px] text-soft">{quote.text}</p>
+          <button
+            type="button"
+            onClick={dropQuote}
+            aria-label="Drop the quoted passage"
+            className="px-1 text-soft hover:text-accent"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}

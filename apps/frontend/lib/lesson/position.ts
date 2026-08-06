@@ -1,6 +1,6 @@
 "use client";
 
-import { lessonKey } from "@/lib/content/locator";
+import { sectionKey } from "@/lib/content/locator";
 import { createStore } from "@/lib/store";
 
 export interface LessonPosition {
@@ -31,8 +31,7 @@ export function clearPosition(course: string, lesson: string): void {
 export function currentLocator(): string | null {
   const current = position.get();
   if (current === null) return null;
-  const anchor = current.anchor === null ? "" : `#${current.anchor}`;
-  return `${lessonKey(current.course, current.lesson)}${anchor}`;
+  return sectionKey(current.course, current.lesson, current.anchor);
 }
 
 export function useLessonPosition(): LessonPosition | null {
