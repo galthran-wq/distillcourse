@@ -181,6 +181,22 @@ function lintLessonMdx(
         message: `<Demo name="${name}"> but course.yaml declares ${lesson.demo ? `"${lesson.demo.component}"` : "no demo"}`,
       });
     }
+    // demo-embedded-unregistered: an embedded demo renders a hole at any
+    // status, so the registry check cannot wait for reviewed (which only
+    // gates course.yaml-declared demos of planned lessons).
+    if (name !== undefined && options.repoRoot !== undefined) {
+      const registry = join(options.repoRoot, "components", "demos", "index.ts");
+      const registered =
+        existsSync(registry) && readFileSync(registry, "utf8").includes(name);
+      if (!registered) {
+        diags.push({
+          level: "error",
+          rule: "demo-embedded-unregistered",
+          file,
+          message: `<Demo name="${name}"> is embedded in lesson.mdx but not registered in components/demos/index.ts`,
+        });
+      }
+    }
   }
 
   // ref-target: <Ref lesson="..."> must point at a lesson in this course.

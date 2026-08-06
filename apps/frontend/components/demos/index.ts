@@ -54,6 +54,8 @@ export const demos: Record<
     import("./algorithms-and-data-structures/QuickselectPivotChooser"),
   GreedyVsOptimalCounterexample: () =>
     import("./algorithms-and-data-structures/GreedyVsOptimalCounterexample"),
+  AliasThresholdLab: () =>
+    import("./digital-signal-processing/AliasThresholdLab"),
   EchoKernelLab: () => import("./digital-signal-processing/EchoKernelLab"),
   FeedbackStabilityLab: () =>
     import("./digital-signal-processing/FeedbackStabilityLab"),
