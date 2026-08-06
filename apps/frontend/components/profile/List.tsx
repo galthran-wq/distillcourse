@@ -1,7 +1,6 @@
+// The two shapes every list on the profile is built from.
 import Link from "next/link";
 import type { LessonLink } from "@/lib/content/site";
-
-/** The two shapes every list on the profile is built from. */
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

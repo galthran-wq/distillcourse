@@ -4,7 +4,7 @@
 // A `Date` as well as a timestamp, because a square of the activity grid is a
 // calendar day the browser built rather than an instant the API sent.
 export function day(at: string | Date): string {
-  return (typeof at === "string" ? new Date(at) : at).toLocaleDateString(undefined, {
+  return new Date(at).toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
     year: "numeric",

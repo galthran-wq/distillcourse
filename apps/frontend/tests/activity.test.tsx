@@ -4,8 +4,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Activity from "@/components/profile/Activity";
 import type { LessonLink } from "@/lib/content/site";
+import type { Visit } from "@/lib/lessons/api";
 import { DAYS, WEEKS, key, month, squares, tone } from "@/lib/telemetry/activity";
-import { getActivity, type Activity as Reading } from "@/lib/telemetry/api";
+import { getActivity, type ActivityDay } from "@/lib/telemetry/api";
 
 vi.mock("@/lib/telemetry/api", () => ({ getActivity: vi.fn() }));
 vi.mock("@/lib/auth/store", () => ({
@@ -69,10 +70,10 @@ describe("the grid a year of reading is drawn on", () => {
 let root: Root;
 let host: HTMLElement;
 
-function render(activity: Reading): Promise<void> {
-  vi.mocked(getActivity).mockResolvedValue(activity);
+function render(days: ActivityDay[], history: Visit[] | null = []): Promise<void> {
+  vi.mocked(getActivity).mockResolvedValue({ days });
   return act(async () => {
-    root.render(<Activity lessons={LINKS} />);
+    root.render(<Activity lessons={LINKS} history={history} />);
   });
 }
 
@@ -81,9 +82,20 @@ function drawn(): HTMLElement[] {
   return [...host.querySelectorAll<HTMLElement>("[title]")];
 }
 
+/** Tomorrow as the API dates a day, which is a day the browser has not reached. */
+function tomorrow(): string {
+  const at = new Date();
+  at.setDate(at.getDate() + 1);
+  return key(at);
+}
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
     true;
+  // The panel draws itself against "now", so the suite pins one: a Thursday,
+  // where tomorrow is still a square of the week the grid ends on.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 7, 6, 12));
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -92,15 +104,13 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  vi.useRealTimers();
   vi.mocked(getActivity).mockReset();
 });
 
 describe("the activity panel", () => {
   it("draws every day up to today, and says what a square is worth", async () => {
-    await render({
-      days: [{ date: key(new Date()), count: 3 }],
-      recent: [{ lesson: LESSON, title: null, last_seen: "2026-08-06T09:00:00Z" }],
-    });
+    await render([{ date: key(new Date()), count: 3 }]);
 
     const grid = drawn();
     // A year of squares, less the days of this week that have not happened.
@@ -111,28 +121,62 @@ describe("the activity panel", () => {
     expect(grid[0].title).toMatch(/^0 lessons — /);
   });
 
+  it("keeps a square the browser calls tomorrow when something was read on it", async () => {
+    // The counts are dated in the zone stored against the account; a reader
+    // east of the browser's own can have a square dated past its today.
+    await render([{ date: tomorrow(), count: 1 }]);
+
+    expect(drawn().at(-1)?.title).toMatch(/^1 lesson — /);
+  });
+
   it("lists what was read lately, linked where the site still has it", async () => {
-    await render({
-      days: [],
-      recent: [
-        { lesson: LESSON, title: "ignored", last_seen: "2026-08-06T09:00:00Z" },
-        { lesson: "lesson:gone/away", title: "A retired lesson", last_seen: "2026-08-01T09:00:00Z" },
+    await render(
+      [],
+      [
+        { lesson: LESSON, last_seen: "2026-08-06T09:00:00Z", completed_at: null },
+        {
+          lesson: "lesson:gone/away",
+          last_seen: "2026-08-01T09:00:00Z",
+          completed_at: "2026-08-01T09:30:00Z",
+        },
       ],
-    });
+    );
 
     const rows = [...host.querySelectorAll("li")].map((row) => row.textContent);
-    // The site's own build names a lesson it still has; the index's title is
-    // what is left when it does not.
+    // The site's own build names a lesson it still has; the locator is what is
+    // left when it does not.
     expect(host.querySelector("a")?.getAttribute("href")).toBe(LINKS[LESSON].href);
     expect(rows[0]).toContain("What entropy measures");
-    expect(rows[1]).toContain("A retired lesson");
+    expect(rows[0]).not.toContain("completed");
+    expect(rows[1]).toContain("lesson:gone/away");
+    // A lesson read through says so, which is the only thing the note adds.
+    expect(rows[1]).toContain("· completed");
   });
 
   it("shows a brand-new reader an empty grid and no feed", async () => {
-    await render({ days: [], recent: [] });
+    await render([], []);
 
     expect(drawn().length).toBeGreaterThan(0);
     expect(host.querySelectorAll("li")).toHaveLength(0);
     expect(host.textContent).toContain("No lessons read yet.");
+  });
+
+  it("holds the recently-read list back until the profile has answered", async () => {
+    await render([], null);
+
+    expect(drawn().length).toBeGreaterThan(0);
+    expect(host.textContent).not.toContain("No lessons read yet.");
+  });
+
+  it("draws nothing at all when the grid cannot be loaded", async () => {
+    vi.mocked(getActivity).mockRejectedValue(new Error("502"));
+
+    await act(async () => {
+      root.render(<Activity lessons={LINKS} history={[]} />);
+    });
+
+    // A year of blank squares would be a lie about a reader who may have read
+    // every day of it.
+    expect(host.textContent).toBe("");
   });
 });

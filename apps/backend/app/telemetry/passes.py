@@ -1,8 +1,7 @@
 import uuid
-from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import ColumnElement, Date, Row, func, select
+from sqlalchemy import ColumnElement, Date, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,8 +9,15 @@ from app.core.clock import zone
 from app.models import Event, LessonPass, User
 from app.telemetry import progress
 
-# The grid the profile draws: a year of full weeks, ending with the current one.
+# The grid the profile draws: a year of full weeks. Mirrors WEEKS in
+# apps/frontend/lib/telemetry/activity.ts, which is what actually decides how
+# many squares there are; this only bounds the query behind them.
 ACTIVITY_WEEKS = 53
+# What earns a day its square: a minute of credited attention on the lesson.
+# Deliberately far below the completion bar in `progress` — a lesson is read
+# over several days, and a day that got through one section of it is still a
+# day the reader read. Completion stays what it was: the whole lesson, once.
+DAY_SECONDS = 60
 
 
 def _local_day(timezone: str) -> ColumnElement[date]:
@@ -19,24 +25,23 @@ def _local_day(timezone: str) -> ColumnElement[date]:
     return func.timezone(timezone, Event.server_ts).cast(Date)
 
 
-async def _credit(
+async def credit(
     session: AsyncSession,
     user_id: uuid.UUID,
     lesson: str,
     timezone: str,
     *within: ColumnElement[bool],
 ) -> int:
-    """Writes a row for every local day whose events met the reading bar.
+    """Writes a row for every local day that gave this lesson `DAY_SECONDS`.
 
     A day already credited is left exactly as it is: the second flush of an
     evening must not move the instant the bar was met, and the first pass of a
     lesson is not undone by reading it again.
     """
-    threshold = await progress.threshold_seconds(session, lesson)
     days = (
         await session.execute(
-            progress.reached_bar(
-                user_id, lesson, threshold, _local_day(timezone), *within
+            progress.reached_seconds(
+                user_id, lesson, DAY_SECONDS, _local_day(zone(timezone).key), *within
             )
         )
     ).all()
@@ -64,13 +69,31 @@ async def _credit(
 async def record(session: AsyncSession, user: User, lesson: str, at: datetime) -> None:
     """Credits the reader with this lesson for the day `at` falls on.
 
+    `at` has to be the database's clock, because `events.server_ts` is stamped
+    by it and the window below is applied to that column: an application host
+    a few minutes off would select the wrong end of the day.
+
     Only that day, and the window is stated in UTC so the query still reads
     `events` by its (user, lesson, server_ts) index rather than by a timezone
     conversion of every row the reader ever produced.
     """
     tz = zone(user.timezone)
     day = at.astimezone(tz).date()
-    await _credit(
+    credited = await session.scalar(
+        select(
+            exists().where(
+                LessonPass.user_id == user.id,
+                LessonPass.lesson == lesson,
+                LessonPass.day == day,
+            )
+        )
+    )
+    # Every heartbeat flush of the evening arrives here, and once the day is
+    # credited nothing later in it can change the row: the aggregate below is
+    # then pure cost.
+    if credited:
+        return
+    await credit(
         session,
         user.id,
         lesson,
@@ -82,44 +105,26 @@ async def record(session: AsyncSession, user: User, lesson: str, at: datetime) -
     )
 
 
-async def rebuild(session: AsyncSession) -> int:
-    """Re-derives every reading day from the raw events, with no side effects.
-
-    Rows are added and never removed: `events` is pruned, and a day whose
-    events are gone is still a day the reader read.
-    """
-    readers = (
-        await session.execute(
-            select(Event.user_id, Event.lesson, User.timezone)
-            .join(User, User.id == Event.user_id)
-            .distinct()
-        )
-    ).all()
-    written = 0
-    for user_id, lesson, timezone in readers:
-        written += await _credit(session, user_id, lesson, zone(timezone).key)
-        # One transaction per reader and lesson, so a rebuild over the whole
-        # corpus never holds a long one.
-        await session.commit()
-    return written
-
-
-async def activity(
-    session: AsyncSession, user: User
-) -> Sequence[Row[tuple[date, int]]]:
+async def activity(session: AsyncSession, user: User) -> list[tuple[date, int]]:
     """How many lessons this reader passed on each day of the grid.
 
     Only the days they read on; a grid is mostly empty, and the caller draws
     the blanks anyway.
     """
     today = datetime.now(zone(user.timezone)).date()
-    # Back to the Monday that opens the grid, so every column is a full week.
-    since = today - timedelta(days=today.weekday() + 7 * (ACTIVITY_WEEKS - 1))
-    return (
-        await session.execute(
-            select(LessonPass.day, func.count())
-            .where(LessonPass.user_id == user.id, LessonPass.day >= since)
-            .group_by(LessonPass.day)
-            .order_by(LessonPass.day)
+    # Back to the Monday that opens the grid, and a week further: the browser
+    # decides which squares exist, and its calendar can be a day off the zone
+    # stored here — so this bound has to be looser than the grid, never tighter.
+    since = today - timedelta(days=today.weekday() + 7 * ACTIVITY_WEEKS)
+    return list(
+        (
+            await session.execute(
+                select(LessonPass.day, func.count())
+                .where(LessonPass.user_id == user.id, LessonPass.day >= since)
+                .group_by(LessonPass.day)
+                .order_by(LessonPass.day)
+            )
         )
-    ).all()
+        .tuples()
+        .all()
+    )

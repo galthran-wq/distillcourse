@@ -6,6 +6,12 @@
 
 import type { ActivityDay } from "@/lib/telemetry/api";
 
+/**
+ * Mirrors ACTIVITY_WEEKS in apps/backend/app/telemetry/passes.py, which bounds
+ * the query. This is the side that decides how many squares there are: the
+ * grid is drawn on the browser's calendar, and the backend windows on the zone
+ * stored against the account, so it deliberately returns a week more than this.
+ */
 export const WEEKS = 53;
 export const DAYS = 7;
 /** Steps of the intensity scale, counting the blank one. */
@@ -61,8 +67,9 @@ export function month(cells: Square[], week: number): string | null {
   const at = cells[week * DAYS].date;
   const previous = cells[(week - 1) * DAYS]?.date;
   if (previous !== undefined && previous.getMonth() === at.getMonth()) return null;
-  // The first column is labelled only where its label would stand alone: the
-  // grid opens mid-month, and the next column may well name the same month.
+  // The first column carries its month only when the column beside it is still
+  // in that month: the grid opens mid-month, and a label over one column of a
+  // month that is nearly over says less than a blank.
   if (week === 0 && cells[DAYS].date.getMonth() !== at.getMonth()) return null;
   return at.toLocaleDateString(undefined, { month: "short" });
 }

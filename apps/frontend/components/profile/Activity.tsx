@@ -5,6 +5,7 @@ import { Panel } from "@/components/ui";
 import { useSignedIn } from "@/lib/auth/signed-in";
 import type { LessonLink } from "@/lib/content/site";
 import { day } from "@/lib/day";
+import type { Visit } from "@/lib/lessons/api";
 import {
   DAYS,
   STEPS,
@@ -82,8 +83,11 @@ function Heatmap({ days }: { days: ActivityDay[] }) {
         >
           {cells.map((square) =>
             // A day that has not happened yet is left out of the grid, not
-            // drawn as a day with nothing read on it.
-            square.key > today ? (
+            // drawn as a day with nothing read on it. Only an empty one: this
+            // browser's calendar and the zone the counts are dated in can
+            // disagree by a day, and a square with reading in it is never a
+            // day that has not happened.
+            square.count === 0 && square.key > today ? (
               <span key={square.key} />
             ) : (
               <span
@@ -115,30 +119,46 @@ function Legend() {
 /**
  * The reader's year of reading, and what they read last. One panel, because
  * the two answer the same question at two zoom levels.
+ *
+ * The history is the profile's own — it arrives as a prop rather than from a
+ * second request, and it is `null` until the profile has loaded.
  */
-export default function Activity({ lessons }: { lessons: Record<string, LessonLink> }) {
+export default function Activity({
+  lessons,
+  history,
+}: {
+  lessons: Record<string, LessonLink>;
+  history: Visit[] | null;
+}) {
   const [activity] = useSignedIn(getActivity);
+
+  // Nothing drawn until there is something to draw: an empty grid is what a
+  // reader who has read nothing looks like, and a request that failed or has
+  // not answered yet is not that.
+  if (activity === null) return null;
 
   return (
     <Section title="activity">
       <Panel>
-        {/* Nothing loaded yet, or the request failed: the grid is drawn empty
-            either way, so nobody is shown a broken panel. */}
-        <Heatmap days={activity?.days ?? []} />
+        <Heatmap days={activity.days} />
         <Legend />
-        {activity !== null &&
-          (activity.recent.length === 0 ? (
+        {history !== null &&
+          (history.length === 0 ? (
             <p className="mt-4 border-t border-line pt-4 text-sm text-faint">
               No lessons read yet.
             </p>
           ) : (
             <ul className="mt-4 border-t border-line pt-1">
-              {activity.recent.map((item) => (
+              {history.map((visit) => (
                 <LessonRow
-                  key={item.lesson}
-                  lesson={item.title ?? item.lesson}
-                  link={lessons[item.lesson]}
-                  note={day(item.last_seen)}
+                  key={visit.lesson}
+                  lesson={visit.lesson}
+                  link={lessons[visit.lesson]}
+                  note={
+                    visit.completed_at === null
+                      ? day(visit.last_seen)
+                      : `${day(visit.last_seen)} · completed`
+                  }
                 />
               ))}
             </ul>

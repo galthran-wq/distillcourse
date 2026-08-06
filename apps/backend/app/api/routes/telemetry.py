@@ -1,5 +1,5 @@
 from collections.abc import Callable, Coroutine
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
@@ -7,9 +7,7 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep
-from app.content import structure
 from app.core.rate_limit import FixedWindow, register
-from app.lessons import state
 from app.telemetry import ingest, passes
 from app.telemetry.schemas import MAX_BATCH_BYTES, MAX_BATCHES_PER_MINUTE, EventBatch
 
@@ -57,36 +55,20 @@ class Day(BaseModel):
     count: int
 
 
-class Recent(BaseModel):
-    lesson: str
-    # Absent for a lesson the index has never seen; the site names it from its
-    # own build, and this is only what the service can add.
-    title: str | None
-    last_seen: datetime
-
-
 class Activity(BaseModel):
     days: list[Day]
-    recent: list[Recent]
 
 
 @router.get("/activity")
 async def activity(user: CurrentUser, session: SessionDep) -> Activity:
-    """The reading days the profile draws as a grid, and what was read lately.
+    """The reading days the profile draws as a grid, on the reader's calendar.
 
-    Both are on the reader's calendar, and the recent list is the same history
-    the profile has always shown.
+    Days only: what was read lately is the history `GET /profile` already
+    serves, and one answer to that question is enough.
     """
-    titles = await structure.lesson_titles(session)
     return Activity(
         days=[
             Day(date=day, count=count)
             for day, count in await passes.activity(session, user)
-        ],
-        recent=[
-            Recent(
-                lesson=row.lesson, title=titles.get(row.lesson), last_seen=row.last_seen
-            )
-            for row in await state.history(session, user.id)
-        ],
+        ]
     )

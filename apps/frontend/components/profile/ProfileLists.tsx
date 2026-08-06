@@ -30,7 +30,7 @@ export default function ProfileLists({
 
   return (
     <>
-      <Activity lessons={lessons} />
+      <Activity lessons={lessons} history={profile?.history ?? null} />
       {profile !== null && (
         <Section title="bookmarks">
           {profile.bookmarks.length === 0 ? (
