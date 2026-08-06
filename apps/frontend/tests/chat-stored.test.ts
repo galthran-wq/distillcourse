@@ -11,7 +11,7 @@ const READER: User = {
 };
 
 const LEFT_BY_U1: StoredChat = {
-  open: true,
+  panel: "docked",
   chatId: "c1",
   draft: "half a question",
   owner: "u1",
@@ -44,12 +44,46 @@ describe("what the widget remembers", () => {
     const { storedChatId } = await import("@/lib/chat/stored");
 
     expect(entry()).toEqual({
-      open: true,
+      panel: "docked",
       chatId: "c1",
       draft: "why is this true?",
       owner: "",
     });
     expect(storedChatId()).toBe("c1");
+  });
+
+  it("comes back over the page when that is where it was left", async () => {
+    const { toggleExpanded } = await import("@/lib/chat/stored");
+    toggleExpanded();
+
+    vi.resetModules();
+    const { openPanel } = await import("@/lib/chat/stored");
+    openPanel();
+
+    // Reopening from a lesson must not push it back into the corner.
+    expect(entry()).toMatchObject({ panel: "expanded" });
+  });
+
+  it("reads an entry left by the version before this one as a shut panel", async () => {
+    // What that version wrote: an `open` boolean, and no `panel` at all.
+    remembered({ open: true, chatId: "c1", draft: "", owner: "" } as Partial<StoredChat>);
+    const { storedChatId, togglePanel } = await import("@/lib/chat/stored");
+
+    togglePanel();
+
+    // It opens rather than closing, the field it never knew is dropped, and
+    // the fields it shares with this version survive.
+    expect(entry()).toEqual({ panel: "docked", chatId: "c1", draft: "", owner: "" });
+    expect(storedChatId()).toBe("c1");
+  });
+
+  it("reads a panel state it does not know as a shut panel", async () => {
+    remembered({ panel: "half-open" });
+    const { togglePanel } = await import("@/lib/chat/stored");
+
+    togglePanel();
+
+    expect(entry()).toMatchObject({ panel: "docked" });
   });
 
   it("keeps the draft when the load settles who is signed in", async () => {
@@ -72,7 +106,7 @@ describe("what the widget remembers", () => {
 
     // Whoever signs in next on this browser gets an empty composer; where the
     // panel sits is not theirs to inherit or lose.
-    expect(entry()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
+    expect(entry()).toEqual({ panel: "docked", chatId: "", draft: "", owner: "" });
   });
 
   it("drops the previous reader's draft on a load that opens anonymous", async () => {
@@ -83,7 +117,7 @@ describe("what the widget remembers", () => {
     // them: only the entry knows the draft in it is not the current reader's.
     setUser(null);
 
-    expect(entry()).toEqual({ open: true, chatId: "", draft: "", owner: "" });
+    expect(entry()).toEqual({ panel: "docked", chatId: "", draft: "", owner: "" });
   });
 
   it("keeps the draft when the load could not ask who is signed in", async () => {

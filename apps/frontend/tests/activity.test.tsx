@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Activity from "@/components/profile/Activity";
 import type { LessonLink } from "@/lib/content/site";
@@ -21,6 +20,7 @@ import {
   type ActivityDay,
   type ActivityEntry,
 } from "@/lib/telemetry/api";
+import { mounted } from "./utils/dom";
 
 vi.mock("@/lib/telemetry/api", () => ({
   getActivity: vi.fn(),
@@ -135,23 +135,22 @@ describe("a line of the feed", () => {
   });
 });
 
-let root: Root;
-let host: HTMLElement;
+const { host, render: put } = mounted();
 
 function render(days: ActivityDay[], feed: ActivityEntry[] = []): Promise<void> {
   vi.mocked(getActivity).mockResolvedValue({ days, feed });
   return act(async () => {
-    root.render(<Activity lessons={LINKS} />);
+    put(<Activity lessons={LINKS} />);
   });
 }
 
 /** Every square the grid drew; the back button is not one of them. */
 function drawn(): HTMLElement[] {
-  return [...host.querySelectorAll<HTMLElement>("[data-square]")];
+  return [...host().querySelectorAll<HTMLElement>("[data-square]")];
 }
 
 function square(day: string): HTMLElement {
-  const found = host.querySelector<HTMLElement>(`[data-square="${day}"]`);
+  const found = host().querySelector<HTMLElement>(`[data-square="${day}"]`);
   if (found === null) throw new Error(`no square for ${day}`);
   return found;
 }
@@ -164,19 +163,13 @@ function tomorrow(): string {
 }
 
 beforeEach(() => {
-  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   // The panel draws itself against "now", so the suite pins one: a Thursday,
   // where tomorrow is still a square of the week the grid ends on.
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 7, 6, 12));
-  host = document.createElement("div");
-  document.body.append(host);
-  root = createRoot(host);
 });
 
 afterEach(() => {
-  act(() => root.unmount());
-  host.remove();
   vi.useRealTimers();
   vi.mocked(getActivity).mockReset();
   vi.mocked(getActivityOn).mockReset();
@@ -230,7 +223,7 @@ describe("the activity grid", () => {
     await act(async () => {
       square("2026-08-06").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
     });
-    const tooltip = host.querySelector<HTMLElement>("[role=tooltip]");
+    const tooltip = host().querySelector<HTMLElement>("[role=tooltip]");
     expect(tooltip?.textContent).toBe(
       `${day(new Date(2026, 7, 6))} · 2 lessons · 47 min`,
     );
@@ -241,7 +234,7 @@ describe("the activity grid", () => {
     await act(async () => {
       square("2026-08-06").dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
     });
-    expect(host.querySelector("[role=tooltip]")).toBeNull();
+    expect(host().querySelector("[role=tooltip]")).toBeNull();
   });
 
   it("says the same minute in the tooltip as in the line under it", async () => {
@@ -256,8 +249,8 @@ describe("the activity grid", () => {
       square("2026-08-06").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
     });
 
-    const said = host.querySelector("[role=tooltip]")?.textContent ?? "";
-    const line = host.querySelector("li")?.textContent ?? "";
+    const said = host().querySelector("[role=tooltip]")?.textContent ?? "";
+    const line = host().querySelector("li")?.textContent ?? "";
     expect(said).toContain("3 min");
     expect(line).toContain("3 min");
   });
@@ -274,7 +267,7 @@ describe("the activity grid", () => {
 
     // Reaching a square shows what it is worth, exactly as hovering it does.
     await act(async () => stops[0].focus());
-    expect(host.querySelector("[role=tooltip]")?.textContent).toContain("9 min");
+    expect(host().querySelector("[role=tooltip]")?.textContent).toContain("9 min");
 
     // A week back, then a day up: the Wednesday of the week before.
     await act(async () => {
@@ -316,8 +309,8 @@ describe("the activity feed", () => {
       ],
     );
 
-    expect(host.querySelector("a")?.getAttribute("href")).toBe(LINKS[LESSON].href);
-    const rows = [...host.querySelectorAll("li")].map((row) => row.textContent);
+    expect(host().querySelector("a")?.getAttribute("href")).toBe(LINKS[LESSON].href);
+    const rows = [...host().querySelectorAll("li")].map((row) => row.textContent);
     expect(rows[0]).toContain("What entropy measures");
     expect(rows[0]).toContain("09:12–10:04 · 47 min");
     // The site's own build names a lesson it still has; the locator is what is
@@ -325,7 +318,7 @@ describe("the activity feed", () => {
     expect(rows[1]).toContain("lesson:gone/away");
     // A heading per day, newest first, naming the day on the reader's calendar
     // rather than the UTC midnight the date string would otherwise be read as.
-    expect([...host.querySelectorAll("h3")].map((head) => head.textContent)).toEqual([
+    expect([...host().querySelectorAll("h3")].map((head) => head.textContent)).toEqual([
       day(new Date(2026, 7, 6)),
       day(new Date(2026, 7, 4)),
     ]);
@@ -339,13 +332,13 @@ describe("the activity feed", () => {
 
     expect(vi.mocked(getActivityOn)).toHaveBeenCalledWith("2026-08-04");
     expect(square("2026-08-04").getAttribute("aria-pressed")).toBe("true");
-    expect(host.textContent).toContain("10 min");
-    expect(host.textContent).not.toContain("47 min");
+    expect(host().textContent).toContain("10 min");
+    expect(host().textContent).not.toContain("47 min");
 
     await act(async () => square("2026-08-04").click());
 
     expect(square("2026-08-04").getAttribute("aria-pressed")).toBe("false");
-    expect(host.textContent).toContain("47 min");
+    expect(host().textContent).toContain("47 min");
   });
 
   it("lets Escape put the recent feed back", async () => {
@@ -353,13 +346,13 @@ describe("the activity feed", () => {
     await render([{ date: "2026-08-04", count: 1, seconds: 600 }], [entry("2026-08-06")]);
 
     await act(async () => square("2026-08-04").click());
-    expect(host.textContent).toContain("Nothing read on this day.");
+    expect(host().textContent).toContain("Nothing read on this day.");
 
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     });
 
-    expect(host.textContent).toContain("47 min");
+    expect(host().textContent).toContain("47 min");
   });
 
   it("says nothing at all until the day it was asked for answers", async () => {
@@ -368,9 +361,9 @@ describe("the activity feed", () => {
 
     await act(async () => square("2026-08-04").click());
 
-    expect(host.querySelectorAll("li")).toHaveLength(0);
-    expect(host.textContent).not.toContain("Nothing read on this day.");
-    expect(host.textContent).not.toContain("Couldn't load this day.");
+    expect(host().querySelectorAll("li")).toHaveLength(0);
+    expect(host().textContent).not.toContain("Nothing read on this day.");
+    expect(host().textContent).not.toContain("Couldn't load this day.");
   });
 
   it("says so when the day it was asked for cannot be loaded", async () => {
@@ -380,27 +373,27 @@ describe("the activity feed", () => {
     await act(async () => square("2026-08-04").click());
 
     // A back button over nothing is what a request still in flight looks like.
-    expect(host.textContent).toContain("Couldn't load this day.");
-    expect(host.querySelectorAll("li")).toHaveLength(0);
+    expect(host().textContent).toContain("Couldn't load this day.");
+    expect(host().querySelectorAll("li")).toHaveLength(0);
   });
 
   it("shows a brand-new reader an empty grid and an empty feed", async () => {
     await render([], []);
 
     expect(drawn().length).toBeGreaterThan(0);
-    expect(host.querySelectorAll("li")).toHaveLength(0);
-    expect(host.textContent).toContain("No lessons read yet.");
+    expect(host().querySelectorAll("li")).toHaveLength(0);
+    expect(host().textContent).toContain("No lessons read yet.");
   });
 
   it("draws nothing at all when the grid cannot be loaded", async () => {
     vi.mocked(getActivity).mockRejectedValue(new Error("502"));
 
     await act(async () => {
-      root.render(<Activity lessons={LINKS} />);
+      put(<Activity lessons={LINKS} />);
     });
 
     // A year of blank squares would be a lie about a reader who may have read
     // every day of it.
-    expect(host.textContent).toBe("");
+    expect(host().textContent).toBe("");
   });
 });

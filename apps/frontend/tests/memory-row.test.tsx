@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRow } from "@/components/profile/Memories";
 import { editMemory, forgetMemory, type Memory } from "@/lib/memories/api";
+import { mounted } from "./utils/dom";
 
 vi.mock("@/lib/memories/api", () => ({
   editMemory: vi.fn(),
@@ -18,14 +18,14 @@ const REMEMBERED: Memory = {
   updated_at: "2026-08-05T10:00:00Z",
 };
 
-let root: Root;
-let host: HTMLElement;
+// A row of a list, so the host it is mounted in is one.
+const { host, render: put } = mounted("ul");
 let edited: Memory[];
 let forgotten: number;
 
 function render(memory: Memory = REMEMBERED): void {
   act(() =>
-    root.render(
+    put(
       <MemoryRow
         memory={memory}
         onEdited={(row) => edited.push(row)}
@@ -36,7 +36,7 @@ function render(memory: Memory = REMEMBERED): void {
 }
 
 function control(label: string): HTMLButtonElement {
-  const button = [...host.querySelectorAll("button")].find(
+  const button = [...host().querySelectorAll("button")].find(
     (candidate) => candidate.textContent === label,
   );
   if (button === undefined) throw new Error(`no "${label}" button`);
@@ -63,20 +63,11 @@ async function click(button: HTMLButtonElement): Promise<void> {
 }
 
 beforeEach(() => {
-  // React only treats `act` as a real boundary when this is set; without it
-  // the updates a click schedules are not flushed by the time it returns.
-  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
-  host = document.createElement("ul");
-  document.body.append(host);
-  root = createRoot(host);
   edited = [];
   forgotten = 0;
 });
 
 afterEach(() => {
-  act(() => root.unmount());
-  host.remove();
   vi.mocked(editMemory).mockReset();
   vi.mocked(forgetMemory).mockReset();
 });
@@ -86,7 +77,7 @@ describe("a memory on the learner's page", () => {
     render();
     expect(control("save").disabled).toBe(true);
 
-    type(host.querySelector("input")!, "the interview is in October");
+    type(host().querySelector("input")!, "the interview is in October");
 
     expect(control("save").disabled).toBe(false);
   });
@@ -94,8 +85,8 @@ describe("a memory on the learner's page", () => {
   it("hands the list the row it just wrote, dated now", async () => {
     vi.mocked(editMemory).mockResolvedValue();
     render();
-    type(host.querySelector("input")!, "the interview is in October");
-    type(host.querySelector("textarea")!, "Not six weeks; October.");
+    type(host().querySelector("input")!, "the interview is in October");
+    type(host().querySelector("textarea")!, "Not six weeks; October.");
 
     await click(control("save"));
 
@@ -120,12 +111,12 @@ describe("a memory on the learner's page", () => {
   it("keeps the list unchanged and says so when the write fails", async () => {
     vi.mocked(editMemory).mockRejectedValue(new Error("500"));
     render();
-    type(host.querySelector("input")!, "the interview is in October");
+    type(host().querySelector("input")!, "the interview is in October");
 
     await click(control("save"));
 
     expect(edited).toEqual([]);
-    expect(host.querySelector("[role=alert]")?.textContent).toBe("could not save that");
+    expect(host().querySelector("[role=alert]")?.textContent).toBe("could not save that");
   });
 
   it("drops the row from the list once the delete has gone through", async () => {

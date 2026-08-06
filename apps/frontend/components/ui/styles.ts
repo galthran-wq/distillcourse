@@ -13,7 +13,7 @@ export const FIELD_CLASS =
  */
 export const FIELD_LABEL_CLASS = "mb-1 block text-soft";
 
-/** Mono micro-caps: section headings, group labels, the name of a chat turn. */
+/** Mono micro-caps: section headings, group labels. */
 export const LABEL_CLASS = "font-mono text-[11px] uppercase tracking-wider text-faint";
 
 /**

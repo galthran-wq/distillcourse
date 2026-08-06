@@ -2,8 +2,12 @@
 
 import { createPersistedStore } from "@/lib/persisted";
 
+/** Shut, in its corner beside the page, or spread over it. */
+export type PanelState = "closed" | "docked" | "expanded";
+
 export type StoredChat = {
-  open: boolean;
+  /** A `PanelState`; the store can only hold it as a string. */
+  panel: string;
   /** The chat the reader had open, "" for none. It may since have been deleted. */
   chatId: string;
   /** The message they were in the middle of writing. */
@@ -16,7 +20,7 @@ export type StoredChat = {
 // so that the four are written and read as one state. Private, like every other
 // store here: what the entry is called and how it is shaped stops at this file.
 const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
-  open: false,
+  panel: "closed",
   chatId: "",
   draft: "",
   owner: "",
@@ -26,16 +30,37 @@ const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
 // passage is asking about it — and the two trees have no common ancestor. It is
 // stored because a reload is not a decision to close it.
 
+// The store guarantees only that the field is a string: an older version of
+// this code, or a hand-edited entry, can leave anything in it.
+function asState(panel: string): PanelState {
+  return panel === "docked" || panel === "expanded" ? panel : "closed";
+}
+
+export function usePanel(): PanelState {
+  return asState(stored.use("panel"));
+}
+
+/** Asking about a passage opens the panel wherever the reader last had it. */
 export function openPanel(): void {
-  stored.set({ open: true });
+  if (asState(stored.get().panel) === "closed") stored.set({ panel: "docked" });
 }
 
 export function togglePanel(): void {
-  stored.set({ open: !stored.get().open });
+  stored.set({ panel: asState(stored.get().panel) === "closed" ? "docked" : "closed" });
 }
 
-export function usePanel(): boolean {
-  return stored.use("open");
+export function closePanel(): void {
+  stored.set({ panel: "closed" });
+}
+
+export function toggleExpanded(): void {
+  stored.set({
+    panel: asState(stored.get().panel) === "expanded" ? "docked" : "expanded",
+  });
+}
+
+export function collapsePanel(): void {
+  stored.set({ panel: "docked" });
 }
 
 /** The message being written, kept here so a reload does not lose it. */

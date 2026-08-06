@@ -1,5 +1,6 @@
 "use client";
 
+import ChatList from "@/components/chat/ChatList";
 import { COMMANDS } from "@/lib/chat/commands";
 import type { ChatModel, ChatSummary } from "@/lib/chat/api";
 import { LABEL_CLASS, MENU_CLASS, MENU_ITEM_CLASS } from "@/components/ui/styles";
@@ -8,6 +9,8 @@ interface Props {
   current: ChatSummary;
   chats: ChatSummary[];
   models: ChatModel[];
+  /** The panel is over the page, where the rail lists the chats beside it. */
+  expanded: boolean;
   onNew: () => void;
   onCompact: () => void;
   onSelect: (chat: ChatSummary) => void;
@@ -15,13 +18,13 @@ interface Props {
 }
 
 const HEADING = `px-2.5 pt-3 pb-1 ${LABEL_CLASS}`;
-// A chat title is arbitrary length and this panel is the one that lists them.
 const ITEM = `${MENU_ITEM_CLASS} truncate text-sm`;
 
 export default function ChatMenu({
   current,
   chats,
   models,
+  expanded,
   onNew,
   onCompact,
   onSelect,
@@ -48,17 +51,16 @@ export default function ChatMenu({
         </button>
       ))}
 
-      <p className={HEADING}>Chats</p>
-      {chats.map((chat) => (
-        <button
-          key={chat.id}
-          type="button"
-          className={`${ITEM} ${chat.id === current.id ? "text-accent" : "text-soft"}`}
-          onClick={() => onSelect(chat)}
-        >
-          {chat.title ?? "New chat"}
-        </button>
-      ))}
+      {/* Only where the rail is not: it appears at the same width the rail does. */}
+      <div className={expanded ? "lg:hidden" : ""}>
+        <p className={HEADING}>Chats</p>
+        <ChatList
+          chats={chats}
+          current={current.id}
+          className={ITEM}
+          onSelect={onSelect}
+        />
+      </div>
     </div>
   );
 }
