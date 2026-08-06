@@ -12,6 +12,9 @@ import GroupDelayPackets from "./digital-signal-processing/GroupDelayPackets";
 import DftBasisCorrelations from "./digital-signal-processing/DftBasisCorrelations";
 import RealDftConventionLedger from "./digital-signal-processing/RealDftConventionLedger";
 import PaddingDurationResolution from "./digital-signal-processing/PaddingDurationResolution";
+import FftButterflyLedger from "./digital-signal-processing/FftButterflyLedger";
+import FftCostGrowth from "./digital-signal-processing/FftCostGrowth";
+import FftMemoryOrderLedger from "./digital-signal-processing/FftMemoryOrderLedger";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -163,6 +166,9 @@ export const figures: Record<string, RegisteredFigure> = {
   DftBasisCorrelations: { component: DftBasisCorrelations },
   RealDftConventionLedger: { component: RealDftConventionLedger },
   PaddingDurationResolution: { component: PaddingDurationResolution },
+  FftButterflyLedger: { component: FftButterflyLedger },
+  FftCostGrowth: { component: FftCostGrowth },
+  FftMemoryOrderLedger: { component: FftMemoryOrderLedger },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },

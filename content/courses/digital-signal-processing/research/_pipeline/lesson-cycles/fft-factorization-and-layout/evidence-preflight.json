@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "status": "complete_with_demo_spec_issues",
+  "lesson": "fft-factorization-and-layout",
+  "brief_path": "content/courses/digital-signal-processing/research/fft-factorization-and-layout.md",
+  "prerequisite_path": "content/courses/digital-signal-processing/lessons/dft-bins-symmetry-and-scaling/lesson.mdx",
+  "checks_count": 19,
+  "source_count": 4,
+  "issues_found": 6,
+  "blockers": [],
+  "writer_scope": {
+    "must_establish": [
+      "An FFT is an exact factorized evaluation of the already-declared DFT; it does not change the coefficient values, sign, scale, or circular boundary contract.",
+      "The radix-2 decimation-in-time recurrence reuses two N/2-point transforms to produce both X[k] and X[k+N/2].",
+      "A simplified radix-2 butterfly uses one twiddle multiplication and two complex additions; N/2 butterflies across log2 N stages give a declared arithmetic count.",
+      "In-place overwrite, input/output permutation, twiddle access, and normalization are interface contracts rather than incidental implementation details.",
+      "Cooley-Tukey factorization applies to composite lengths beyond powers of two; a mixed-radix plan for N=960 directly refutes power-of-two-only reasoning.",
+      "Asymptotic arithmetic savings do not by themselves guarantee lower elapsed time; layout traffic, constants, transform length, and the requested subset of outputs remain relevant."
+    ],
+    "must_not_expand": [
+      "Do not re-teach DFT interpretation, real symmetry, circular convolution, or zero padding; inherit their exact conventions from the prerequisite with a Ref and short recap.",
+      "Do not present radix 2 as the definition of FFT or claim prime lengths have no fast algorithms; only the specific Cooley-Tukey factorization stops when no nontrivial factor remains.",
+      "Do not turn the main line into a finite-word roundoff chapter. Scaling must be explicit here, while detailed quantization/noise analysis belongs to finite-word-realizations.",
+      "Do not state a cache or runtime crossover as universal. A measured crossover requires a declared implementation, machine, timer protocol, transform batch, and warmup.",
+      "Do not enter DTMF detector design; the final handoff only establishes that the next lesson may compute selected row and column frequency evidence."
+    ],
+    "recommended_body_sequence": [
+      "Begin from the prerequisite's N=8 even/odd split and its frozen unscaled-forward DFT convention.",
+      "Compute the N=8 factorization stage by stage before naming the general radix-2 FFT.",
+      "Bind the butterfly equations to one flow graph and a separate arithmetic ledger.",
+      "Trace bit-reversed input through an in-place DIT schedule, then contrast the valid normal-input/bit-reversed-output arrangement and DIF ordering.",
+      "Generalize from powers of two to N=product r_i with the Cooley-Tukey mixed-radix count, keeping its historical multiply-add unit separate from the modern butterfly count.",
+      "Use N=960 to falsify the power-of-two restriction, expose the runtime-versus-operation distinction, and close on selected-frequency computation for the DTMF receiver."
+    ]
+  },
+  "frozen_inherited_conventions": {
+    "record": "x[n] is the declared N-sample array for n=0,...,N-1.",
+    "forward": "X[k]=sum_{n=0}^{N-1} x[n] exp(-j 2 pi k n/N)=sum_n x[n] W_N^(kn), k=0,...,N-1.",
+    "inverse": "x[n]=(1/N) sum_{k=0}^{N-1} X[k] exp(+j 2 pi k n/N).",
+    "root": "W_N=exp(-j 2 pi/N), so W_N^(N/2)=-1 for even N and W_N^2=W_(N/2).",
+    "scale": "The forward transform is unscaled and the inverse carries 1/N. A factorized forward implementation must return the same raw X[k].",
+    "order": "Natural order means array index k=0,...,N-1. Bit-reversed or mixed-digit-reversed storage is a permutation of those coefficients, not a new frequency convention.",
+    "numeric_comparison": "Unless a task states otherwise, compare complex arrays in natural order with relative L2 error ||Y-X||_2/max(||X||_2,Number.EPSILON)."
+  },
+  "notation_ledger": [
+    {
+      "symbol": "N",
+      "meaning": "DFT length and number of complex input/output entries",
+      "constraint": "radix-2 derivations use N=2^m; mixed-radix derivations use N=product_i r_i"
+    },
+    {
+      "symbol": "m",
+      "meaning": "number of radix-2 stages when N=2^m",
+      "warning": "This is a new local role; do not silently reuse the prerequisite's convolution dummy m."
+    },
+    {
+      "symbol": "E[k], O[k]",
+      "meaning": "N/2-point DFTs of x[2r] and x[2r+1]",
+      "period": "N/2 in k"
+    },
+    {
+      "symbol": "r_i",
+      "meaning": "ordered mixed-radix factors whose product is N",
+      "warning": "Factor order may leave arithmetic count unchanged while changing stage layout and permutation."
+    },
+    {
+      "symbol": "P",
+      "meaning": "an explicitly declared input or output permutation",
+      "warning": "For mixed radices, digit reversal must name both the digit order and the associated radix bases; it is not ordinary binary bit reversal."
+    }
+  ],
+  "checked_claims_formulas_examples": [
+    {
+      "id": "fft_preserves_dft",
+      "claim": "Factorization changes the evaluation schedule, not the transform: with the inherited root, sign, scale, and order restored, the result equals the direct DFT coefficient by coefficient.",
+      "result": "verified algebraically and numerically"
+    },
+    {
+      "id": "direct_dft_cost",
+      "claim": "Direct evaluation of every output uses N^2 complex products and N(N-1) complex additions; both are order N^2.",
+      "qualification": "Counts can exclude trivial products or fuse operations, so every comparison must declare its unit.",
+      "result": "verified"
+    },
+    {
+      "id": "radix2_dit_split",
+      "claim": "For even N, E[k]=DFT_(N/2){x[2r]}, O[k]=DFT_(N/2){x[2r+1]}, X[k]=E[k]+W_N^k O[k], and X[k+N/2]=E[k]-W_N^k O[k] for k=0,...,N/2-1.",
+      "result": "verified; this exactly continues the prerequisite's final exercise"
+    },
+    {
+      "id": "simplified_butterfly",
+      "claim": "For inputs a and b with twiddle W, t=Wb, y_0=a+t, and y_1=a-t require one complex multiplication and two complex additions when multiplication by W is counted even if W is trivial.",
+      "result": "verified"
+    },
+    {
+      "id": "radix2_stage_and_total_counts",
+      "claim": "A radix-2 transform has log2 N stages and N/2 butterflies per stage, hence (N/2)log2 N twiddle-multiplication slots and Nlog2 N complex additions.",
+      "qualification": "The multiplication count is an upper structural count; W=1, -1, and +/-j can be implemented more cheaply.",
+      "result": "verified against Oppenheim-Schafer section 9.3 and MIT 6.341 Lecture 19"
+    },
+    {
+      "id": "n8_cost_ledger",
+      "direct": "64 complex products and 56 complex additions.",
+      "radix2": "3 stages x 4 butterflies = 12 twiddle-multiplication slots and 24 complex additions.",
+      "warning": "Do not call 12 the total FFT operation count or compare it with Cooley-Tukey's historical multiply-add T without translating units.",
+      "result": "verified"
+    },
+    {
+      "id": "n8_bit_reversal",
+      "natural_indices": [0, 1, 2, 3, 4, 5, 6, 7],
+      "three_bit_reversed_indices": [0, 4, 2, 6, 1, 5, 3, 7],
+      "result": "verified"
+    },
+    {
+      "id": "n8_worked_vector",
+      "input": [1, 2, 3, 4, 0, 0, 0, 0],
+      "raw_dft": [
+        "10",
+        "-0.414213562373-7.242640687119j",
+        "-2+2j",
+        "2.414213562373-1.242640687119j",
+        "-2",
+        "2.414213562373+1.242640687119j",
+        "-2-2j",
+        "-0.414213562373+7.242640687119j"
+      ],
+      "iterative_dit_relative_l2_error": 3.3871446926539036e-16,
+      "count": "12 twiddle slots and 24 complex additions",
+      "result": "verified by an independent direct DFT and bit-reversed-input radix-2 DIT harness"
+    },
+    {
+      "id": "permutation_failure_is_observable",
+      "test": "Compare the N=8 worked vector in natural order after intentionally leaving output in three-bit-reversed order.",
+      "relative_l2_error": 0.7907245477594314,
+      "result": "verified; a missing permutation is far above either 1e-12 or 1e-10"
+    },
+    {
+      "id": "scale_failure_is_observable",
+      "test": "Compare the N=8 raw DFT with a forward result divided by 8, as would occur if 1/2 were inserted at each of three stages without compensation.",
+      "relative_l2_error": 0.875,
+      "result": "verified; per-stage fixed-point scaling produces X/N and must be surfaced or compensated"
+    },
+    {
+      "id": "in_place_and_ordering_contract",
+      "claim": "A common iterative radix-2 DIT schedule is in place with bit-reversed input and natural output; a rearranged DIT graph can take natural input and produce bit-reversed output. A common DIF schedule takes natural input and produces bit-reversed output.",
+      "qualification": "In-place does not by itself determine which endpoint is permuted; the selected flow graph does.",
+      "result": "verified"
+    },
+    {
+      "id": "mixed_radix_factorization",
+      "claim": "Under Cooley and Tukey's operation definition, if N=product_i r_i, recursive factorization costs T=N sum_i r_i complex multiply-add operations; for equal radix r, T=rN log_r N.",
+      "qualification": "This historical count is a separate ledger from the simplified-butterfly multiplication/addition count.",
+      "result": "verified from equations 8-13"
+    },
+    {
+      "id": "radix_choice",
+      "claim": "The historical table gives r/log2 r=1.88 for radix 3 and 2.00 for radices 2 and 4; radix 3 is therefore about 6 percent cheaper in that formal ledger, while binary addressing and multiplication economy can favor 2 or 4.",
+      "calculation": "2.00/1.88-1 = 0.06383, about 6 percent.",
+      "result": "verified"
+    },
+    {
+      "id": "n960_mixed_radix_budget",
+      "factorization": "960=4*4*4*3*5=2^6*3*5",
+      "factor_sum": 20,
+      "cooley_tukey_cost": 19200,
+      "direct_cost": 921600,
+      "cost_ratio_direct_over_factored": 48,
+      "eightfold_pass_boundary": 115200,
+      "result": "verified: 19,200 <= 115,200 and 960 is not a power of two"
+    },
+    {
+      "id": "mixed_radix_numerical_check",
+      "implementation": "Independent recursive Cooley-Tukey evaluator using n=r*m+s and natural-order output k=k_prime+(N/r)q.",
+      "checks": [
+        "N=30, radices [2,3,5], deterministic complex input: relative L2 error 4.273990550258173e-15 against a full direct DFT.",
+        "N=960, radices [4,4,4,3,5], deterministic complex input: relative L2 error 1.5463156601063502e-14 against 16 independently evaluated direct bins."
+      ],
+      "result": "verified below the course demo's 1e-10 target"
+    },
+    {
+      "id": "prime_and_degenerate_boundaries",
+      "cases": [
+        "N=1 is the identity transform with zero factorization stages.",
+        "Repeated factors are valid; splitting a factor usually lowers N sum r_i, while replacing 4 by 2 and 2 leaves that historical sum unchanged.",
+        "A prime N has no nontrivial Cooley-Tukey factorization, but this does not prove that no fast prime-length algorithm exists."
+      ],
+      "result": "verified"
+    },
+    {
+      "id": "normalization_contract",
+      "claim": "The unscaled forward FFT must equal the prerequisite's raw X. The inverse uses the opposite exponent and total factor 1/N, whether that factor is applied once or distributed across stages.",
+      "qualification": "MIT 6.003 places 1/N in its DTFS analysis coefficients; translate a_k to X[k]=N a_k rather than importing its scale.",
+      "result": "verified"
+    },
+    {
+      "id": "asymptotic_runtime_guard",
+      "claim": "N log N arithmetic explains growth but does not guarantee a wall-clock win for every N or output request. Arithmetic constants, permutation traffic, coefficient access, storage geometry, and computing only a few bins can change the choice.",
+      "evidence": "Oppenheim-Schafer chapter 9 introduction and sections 9.2/9.5 separate arithmetic from technology, storage, access, and requested outputs; Cooley-Tukey's IBM 7094 timing table shows equal point counts with different layouts taking different times.",
+      "result": "verified with the requirement that any modern crossover remain measured and machine-specific"
+    },
+    {
+      "id": "source_pointer_audit",
+      "result": "verified against the exact local text shards, provenance sidecars, and read sidecars; source convention translations and precise routes are recorded below"
+    }
+  ],
+  "cost_ledgers": [
+    {
+      "name": "direct complex arithmetic",
+      "unit": "complex products and complex additions counted separately",
+      "formula": "N^2 products; N(N-1) additions"
+    },
+    {
+      "name": "simplified radix-2 butterfly",
+      "unit": "twiddle-multiplication slots and complex additions counted separately",
+      "formula": "(N/2)log2 N twiddle slots; Nlog2 N additions",
+      "caveat": "trivial twiddles can reduce actual multiplication work"
+    },
+    {
+      "name": "Cooley-Tukey 1965 mixed-radix",
+      "unit": "one complex multiplication followed by one complex addition",
+      "formula": "direct N^2; factored N sum_i r_i",
+      "caveat": "not numerically interchangeable with the separate modern butterfly ledger"
+    }
+  ],
+  "demo_acceptance_preflight": {
+    "component": "FftBudgetLab",
+    "conceptual_pass_conditions": [
+      "The selected stage radices multiply exactly to N=960 and include a non-power-of-two factor.",
+      "The budget uses one declared cost ledger and passes only when factored cost is no more than one eighth of the direct cost.",
+      "The numerical check uses the inherited negative-sign, unscaled-forward DFT and compares natural-order complex outputs with the declared relative L2 norm.",
+      "Removing or applying the wrong permutation must fail the comparison rather than merely relabel a chart.",
+      "Moving or omitting the total scale must fail the raw-forward comparison; a distributed inverse scale may pass only after its net factor is declared.",
+      "At least one direct-validation length contains radix-2, radix-3, and radix-5 stages, so the numerical check tests the mixed-radix claim rather than radix 2 alone."
+    ],
+    "verified_reference_pass": {
+      "budget_plan": "[4,4,4,3,5] for N=960",
+      "budget_cost": 19200,
+      "direct_cost": 921600,
+      "speedup_in_declared_historical_ledger": 48,
+      "numeric_cross_check": "A recursive mixed-radix implementation passes at N=30 with radices [2,3,5] at relative error 4.273990550258173e-15; a partial direct-bin audit of N=960 passes at 1.5463156601063502e-14."
+    },
+    "cannot_verify_from_current_spec": [
+      "The allowed radix controls, stage-count limit, factor order, initial plan, named presets, and exact learner actions are not declared.",
+      "Complex multiply-add is not defined: the spec does not say whether to use Cooley-Tukey's N sum r_i unit, separate butterfly products/additions, fused hardware operations, or a weighted total.",
+      "The phrase 'at least eight times fewer' needs the exact inequality factored_cost <= direct_cost/8 and a rule for equality.",
+      "The small direct-DFT validation length, deterministic real/complex input, seed or closed-form samples, reference implementation, and error denominator are absent.",
+      "An N=8 validation would test only radix 2 and cannot validate the radix-3/radix-5 stages needed for the N=960 power-of-two falsification; use at least N=30 or separately audit the 960-point implementation.",
+      "The mixed-radix index decomposition, stage order, digit-reversal mapping, natural-order restoration point, and intentional missing-permutation failure state are absent.",
+      "The forward/inverse direction, where the 1/N scale is applied, and the intentional missing-scale failure state are absent.",
+      "The pass/fail readouts, stable target moment, performance bound, chart quantities, mobile behavior, and accessibility labels are not specified."
+    ],
+    "result": "The concept and at least one valid numeric solution are evidenced, but the demo is not implementation-deterministic until the cost, validation, permutation, scaling, state, and interaction contracts are frozen."
+  },
+  "sources": [
+    {
+      "id": "cooley-tukey-1965",
+      "title": "James W. Cooley and John W. Tukey, An Algorithm for the Machine Calculation of Complex Fourier Series",
+      "precise_locations": [
+        "Journal p. 297 / PDF p. 1, equations 1-2: transform definition and direct N^2 multiply-add baseline.",
+        "Journal pp. 297-298 / PDF pp. 1-2, equations 3-8: two-factor decomposition and T=N(r1+r2).",
+        "Journal p. 298 / PDF p. 2, equations 9-13: recursive N=product r_i count and equal-radix rN log_r N form.",
+        "Journal p. 299 / PDF p. 3: radix-efficiency table, 6 percent radix-3 comparison, and binary-machine qualification.",
+        "Journal pp. 299-300 / PDF pp. 3-4, equations 14-22: binary stages, in-place pair updates, parallelism, radix-4 grouping, and bit-reversed final order."
+      ],
+      "convention_translation": "The paper defines W=exp(+2 pi i/N), opposite the house forward root. Its algebra and counts transfer after conjugating the root; do not copy its sign silently.",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/cooley-tukey.txt",
+      "cache_sidecar": "content/courses/digital-signal-processing/research/texts/cooley-tukey.txt.meta.yaml",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/cooley-tukey-s1.json"
+    },
+    {
+      "id": "oppenheim-schafer",
+      "title": "Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, Discrete-Time Signal Processing, Second Edition",
+      "precise_locations": [
+        "Chapter 9 introduction and section 9.1, printed pp. 629-633 / physical PDF pp. 654-658: complexity measures, DFT convention, direct counts, and FFT scope.",
+        "Section 9.3, printed pp. 635-646 / physical PDF pp. 660-671: radix-2 DIT recurrence, butterflies, counts, in-place storage, bit reversal, and alternative orderings.",
+        "Section 9.4, printed pp. 646-652 / physical PDF pp. 671-677: DIF recurrence, transpose relationship, counts, and input/output ordering.",
+        "Section 9.5, printed pp. 652-655 / physical PDF pp. 677-680: indexing, storage/access tradeoffs, coefficient tables/recurrences, and general composite lengths.",
+        "Section 9.7, printed pp. 661-669 / physical PDF pp. 686-694: fixed-point per-stage scaling, overflow, and normalization consequences."
+      ],
+      "quality_note": "The local shard is OCR from an image-only scan; page markers and prose are reliable, while exact symbols were cross-checked against the born-digital MIT 6.341 notes and the inherited course convention.",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/oppenheim-s3.txt",
+      "cache_sidecar": "content/courses/digital-signal-processing/research/texts/oppenheim-s3.txt.meta.yaml",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/oppenheim-s3.json"
+    },
+    {
+      "id": "mit-6003",
+      "title": "Dennis Freeman, Signals and Systems, MIT 6.003, Fall 2011",
+      "precise_locations": [
+        "Session 18 slides 17-20: DTFS matrix convention, 1/N analysis scale, and N^2 multiplication growth.",
+        "Session 18 slides 20-31: N=8 even/odd decomposition, reuse, and the 64 to 40 intermediate multiplication illustration.",
+        "Session 18 slide 32: recurrence M(N)=2M(N/2)+N and M(N)=N log2 N under the slides' unsimplified multiplication count."
+      ],
+      "convention_translation": "MIT's DTFS analysis coefficient is a_k=X[k]/N under the house raw DFT. The structural recurrence transfers, but the coefficient scale and the slides' unsimplified multiplication tally must be translated.",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/mit6003-s3.txt",
+      "cache_sidecar": "content/courses/digital-signal-processing/research/texts/mit6003-s3.txt.meta.yaml",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/mit6003-s3.json"
+    },
+    {
+      "id": "mit-6341",
+      "title": "Alan V. Oppenheim, Discrete-Time Signal Processing, MIT 6.341, Fall 2005",
+      "precise_locations": [
+        "Lecture 19 p. 1: house-compatible unscaled forward DFT, 1/N inverse, direct N^2 products and N(N-1) additions.",
+        "Lecture 19 p. 2: composite-factor cost N sum p_i, N=1024 order-of-magnitude comparison, and radix-2 DIF recurrence.",
+        "Lecture 19 pp. 2-3: recursive DIF butterflies, (N/2)log2 N multiplications, Nlog2 N additions, and bit-reversed output.",
+        "Lecture 19 pp. 3-4: DIT recurrence, simplified butterfly, bit-reversed input versus output arrangements, transpose relationship, and in-place/storage tradeoff."
+      ],
+      "local_cache": "content/courses/digital-signal-processing/research/texts/mit6341-s3.txt",
+      "cache_sidecar": "content/courses/digital-signal-processing/research/texts/mit6341-s3.txt.meta.yaml",
+      "read_sidecar": "content/courses/digital-signal-processing/research/_pipeline/reads/mit6341-s3.json"
+    }
+  ],
+  "issues": [
+    {
+      "id": "cost_unit_ambiguity",
+      "severity": "blocking_for_demo_numeric_contract",
+      "detail": "The demo says complex multiply-adds but does not define the unit. Cooley-Tukey's T=N sum r_i counts a multiplication followed by an addition per short-transform term; the modern simplified radix-2 ledger counts twiddle products and additions separately. Mixing them changes every displayed ratio."
+    },
+    {
+      "id": "n8_count_needs_qualification",
+      "severity": "substantive_for_lesson",
+      "detail": "The brief's 64 direct products versus 12 butterfly twiddle products is valid only as a product-slot comparison. The 12 include trivial twiddles and omit 24 complex additions; it must not be presented as total FFT work or as the Cooley-Tukey historical operation count."
+    },
+    {
+      "id": "demo_validation_case_under_specified",
+      "severity": "blocking_for_demo_numeric_contract",
+      "detail": "The small direct-DFT comparison has no length, input, direction, precision, norm, or zero-denominator rule. An N=8 check cannot exercise radix 3 or 5; N=30 with factors [2,3,5], or a declared direct audit of N=960, is needed to validate the mixed-radix claim."
+    },
+    {
+      "id": "mixed_radix_permutation_under_specified",
+      "severity": "blocking_for_demo_numeric_contract",
+      "detail": "The spec requires missing permutations to fail but does not define the mixed-radix digit representation, factor order, input/output permutation, natural-order restoration point, or the deliberately wrong state. Binary bit reversal is insufficient for the 2/3/5 factorization."
+    },
+    {
+      "id": "scaling_failure_under_specified",
+      "severity": "blocking_for_demo_numeric_contract",
+      "detail": "The inherited raw forward scale is one and the inverse total scale is 1/N, but the spec does not say which transform is tested, whether scale is applied once or per stage, or what control intentionally omits it. These choices must be frozen before a reproducible PASS/FAIL can exist."
+    },
+    {
+      "id": "demo_interaction_under_specified",
+      "severity": "blocking_for_demo_build_but_not_lesson_authoring",
+      "detail": "Allowed radices, plan editing rules, initial state, 2-4 named presets, target readouts, equality behavior at the 8x boundary, performance limits, mobile visual, and accessible labels are absent. The present spec establishes the concept but not a deterministic teaching instrument."
+    }
+  ]
+}
