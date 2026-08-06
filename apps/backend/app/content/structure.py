@@ -49,6 +49,17 @@ class CourseStructure(BaseModel):
     concepts: list[ConceptEntry]
 
 
+def reading_order(course: CourseStructure) -> list[LessonEntry]:
+    """Every lesson of a course, in the order it is read. The spine is stored
+    as modules, and most questions about it — which lesson is this, what comes
+    next to it — are about that flat order."""
+    return [lesson for module in course.modules for lesson in module.lessons]
+
+
+def module_of(course: CourseStructure, lesson: LessonEntry) -> ModuleEntry | None:
+    return next((module for module in course.modules if lesson in module.lessons), None)
+
+
 def _concept(document: Document) -> ConceptEntry:
     return ConceptEntry(
         id=document.locator.rpartition("/")[2],

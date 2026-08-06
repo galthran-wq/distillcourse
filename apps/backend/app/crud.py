@@ -41,9 +41,4 @@ async def authenticate(
     if user is None:
         verify_password(password, DUMMY_HASH)
         return None
-    verified, upgraded_hash = verify_password(password, user.hashed_password)
-    if not verified:
-        return None
-    if upgraded_hash:
-        user.hashed_password = upgraded_hash
-    return user
+    return user if verify_password(password, user.hashed_password) else None

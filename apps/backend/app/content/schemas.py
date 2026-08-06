@@ -2,12 +2,17 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.content.locators import SLUG_LENGTH
+
 
 class IndexDocument(BaseModel):
     """One chunk of content as exported by the frontend."""
 
     corpus: Annotated[str, Field(max_length=16)]
-    course_slug: Annotated[str | None, Field(max_length=64)] = None
+    # One bound for a slug across the service: the grammar, the column that
+    # stores it and this schema. Narrower here and the ingest of a long but
+    # legal slug fails validation; wider and it fails on the INSERT.
+    course_slug: Annotated[str | None, Field(max_length=SLUG_LENGTH)] = None
     locator: Annotated[str, Field(max_length=512)]
     title: str
     breadcrumb: str

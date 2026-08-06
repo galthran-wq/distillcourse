@@ -87,6 +87,10 @@ async def report_review_outcome(
     # A review the platform had given up on and queued again is asking about a
     # rung the learner has just moved off.
     await repository.cancel_deliveries(repo.session, repo.user_id, lesson)
+    # One transaction for the three of them: a ladder moved without its
+    # delivery marked is settled a second time by the next poller cycle, which
+    # rewrites the interval this call just set.
+    await repo.session.commit()
     kept = "" if notes is None else await _remember(ctx, lesson, notes)
     if state.next_due_at is None:
         return f"recorded as {outcome}; the ladder for {lesson} is finished.{kept}"

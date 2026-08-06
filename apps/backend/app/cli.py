@@ -46,6 +46,21 @@ async def delete_user(session: AsyncSession, email: str) -> None:
     logger.info("deleted %s", email)
 
 
+async def set_active(session: AsyncSession, email: str, active: bool) -> None:
+    """Close an account without deleting what it wrote, or open it again.
+
+    `users.is_active` is what the login and the per-request session check read;
+    this is what writes it, so an account can be stopped without taking its
+    telemetry, its chats and its ladders down with it.
+    """
+    user = await _require_user(session, email)
+    user.is_active = active
+    if not active:
+        await sessions.revoke_user(session, user.id)
+    await session.commit()
+    logger.info("%s is now %s", email, "active" if active else "deactivated")
+
+
 async def rebuild_progress(session: AsyncSession) -> None:
     logger.info("rebuilt %d lesson aggregates", await progress.rebuild(session))
 
@@ -75,6 +90,10 @@ async def _run(arguments: argparse.Namespace) -> None:
             await reset_password(session, arguments.email, _prompt_new_password())
         elif arguments.command == "delete-user":
             await delete_user(session, arguments.email)
+        elif arguments.command == "deactivate-user":
+            await set_active(session, arguments.email, False)
+        elif arguments.command == "activate-user":
+            await set_active(session, arguments.email, True)
         elif arguments.command == "rebuild-progress":
             await rebuild_progress(session)
         elif arguments.command == "set-webhook":
@@ -87,7 +106,7 @@ async def _run(arguments: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     subcommands = parser.add_subparsers(dest="command", required=True)
-    for name in ("reset-password", "delete-user"):
+    for name in ("reset-password", "delete-user", "deactivate-user", "activate-user"):
         subcommands.add_parser(name).add_argument("email")
     subcommands.add_parser("rebuild-progress")
     subcommands.add_parser("set-webhook").add_argument("url")

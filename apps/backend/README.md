@@ -5,7 +5,10 @@ this same process. Forked from
 [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template)
 (`backend/`, commit `750d3d0`) and then rewritten to be async end to end
 (psycopg async driver, `AsyncSession`, async routes) with SQLAlchemy 2.0 typed
-models instead of SQLModel.
+models instead of SQLModel. The fork and the surgery on it were meant to land
+as separate commits so the diff against the template could be read; the PR was
+squash-merged and that separation is gone, so the pinned commit above is what
+a diff has to be reconstructed from.
 
 ## Layout
 
@@ -68,9 +71,8 @@ app/
   content/           # the indexed corpus: ingest CLI, FTS search, course spine
   telemetry/         # reading events, the lesson aggregate, completion
   cli.py             # operator commands (reset-password, delete-user,
-                     # rebuild-progress)
+                     # deactivate-user, rebuild-progress)
   alembic/           # migrations; explicit, hand-reviewed, always reversible
-  mail/              # SMTP sender + templates — dormant, see below
 ```
 
 ## Auth
@@ -95,6 +97,9 @@ send an `Authorization` header — authenticates over the same cookie for free.
 uv run python -m app.cli reset-password someone@example.com   # prompts, then
                                                               # revokes their sessions
 uv run python -m app.cli delete-user someone@example.com      # sessions cascade
+uv run python -m app.cli deactivate-user someone@example.com  # closes the account,
+                                                              # keeps what it wrote
+uv run python -m app.cli activate-user someone@example.com    # opens it again
 ```
 
 ## Running
@@ -149,12 +154,29 @@ posts every message it holds on every turn; `POST /chats/{id}/stream` takes
 only the last one from the request, so a client with a stale or edited
 transcript cannot rewrite what the tutor remembers.
 
+Context is rebuilt per run in `harness/context.py`: the learner's clock, the
+index of what the tutor remembers, one line about what they have read, and —
+when the widget sent a position — where that lesson sits in the course spine
+and the full text of the section on their screen. The section is prefetched
+rather than left to `fetch_content`, because the question the widget exists for
+is "why is this true?" about something on screen with nothing selected: a model
+that answers that without reading the section answers blind.
+
 Prompts are assembled per run from `harness/prompts/`: `base.md`, the medium
-(`web`, `telegram`), then the modules the run kind calls for, then context
+(`web`, `telegram`), then the modules the run kind calls for, then those context
 blocks. They are content, so `docs/pedagogy.md` governs them the way it
 governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
 inside such a fence is data.
+
+Every tool is a barrier (`sequential=True`): the tool calls of one model
+response run as concurrent tasks, and all of them drive the run's single
+`AsyncSession`, which two coroutines cannot use at once.
+
+The model is the chat's for a dialogue the learner is having and the configured
+default for anything the platform starts by itself — reviews, proactive
+messages, compactions — which is why the web API refuses to run in, compact or
+re-model the Telegram thread.
 
 Caps are enforcement, not telemetry: messages per user per day, an
 instance-wide monthly ceiling computed from the cost recorded on every run,
@@ -190,9 +212,12 @@ so the only chats it can write to are the ones that repository can see.
 - `read_memory` / `save_memory` / `delete_memory` — the learner profile below.
 - `report_review_outcome` — how one review went, which is what schedules the
   next one. See spaced repetition below.
-- `get_user_progress` is specified with these but not implemented here: it
-  reads the `lesson_progress` aggregate that telemetry owns, and lands with it
-  (#37).
+- `get_user_progress` — the reading history: per lesson, how long they spent,
+  how far they scrolled, when it counted as finished, and how many of its
+  solutions they opened against how many it ships (`solutions_total`, from the
+  index). It is what "no point hiding a solution that is already open" is
+  decided from, and what an answer about what they have covered is grounded in.
+  A lesson never opened has no entry.
 
 ## Memory
 
@@ -269,7 +294,11 @@ What reaches the learner is decided per user, in `policy.py`:
 
 - **Quiet hours** `users.quiet_start`–`users.quiet_end` (09:00–22:00 by
   default) on `users.timezone`, both ends the learner's to move on the settings
-  page; outside them the row waits for the next morning.
+  page; outside them the row waits for the next morning. The window is
+  same-day: it must open before it closes, so a night-shift window like
+  18:00–02:00 cannot be expressed. Everything that counts waking hours (the
+  slot timeout, the daily budget) reads it as one interval within a date, and
+  wrapping it is a change to all of that, not to the constraint alone.
 - **One open slot.** A delivered message sets `awaiting_reply`, and `due_at`
   then means the moment it counts as ignored — four *waking* hours later, so a
   message at 21:30 is not written off overnight. Everything else due waits for
@@ -277,6 +306,13 @@ What reaches the learner is decided per user, in `policy.py`:
 - **Three initiations a day**, counted as messages rather than items: what is
   due for one learner is coalesced into a single message of at most three
   items, and the rest wait for tomorrow.
+- **Reminders are not initiations.** The slot and the budget govern what the
+  platform says on its own account; a reminder is the learner's appointment,
+  set for a time they named, so it goes out at that time regardless of an open
+  slot or a spent budget (quiet hours and mute still hold). Nothing is waiting
+  for an answer to it, so it is `done` on delivery rather than holding the slot
+  — though it does count as a message sent, against the day's budget for the
+  reviews behind it.
 - **Rotation.** After a message the learner let time out, the next one leads
   with a different `payload.topic`.
 - **Mute.** `users.muted_until` pauses everything the platform starts; the
@@ -289,10 +325,17 @@ What reaches the learner is decided per user, in `policy.py`:
 Delivery goes into the learner's eternal Telegram thread through the ordinary
 harness `run()`, with the `proactive` or `review` prompt module. Rows exist only
 for a learner who has paired Telegram: the reminder tool refuses to create one
-otherwise, and a row that reaches the poller with no thread behind it is
-cancelled rather than rescheduled — a row with nowhere to go would come back
-every morning forever. Whether they replied is read back from the thread, so the
+otherwise, and a review that reaches the poller with no thread behind it is
+cancelled rather than rescheduled — its ladder materialises it again the moment
+a link exists. A reminder is held instead: it has no such backing state, and
+unpairing to move to another phone must not silently cancel what the learner
+asked for by name. Whether they replied is read back from the thread, so the
 outcome (`answered` / `ignored`) is recorded whichever way a message arrived.
+
+One replica, deliberately: `compose.yml` runs a single `scheduler`, and the
+lease is sized for one run rather than for a whole batch of users, so a second
+poller could sweep the lease of a row the first is still delivering and send it
+twice. Scale it and that assumption has to be revisited first.
 
 The worker also owns the daily housekeeping sweep of rows nothing will read
 again: expired sessions, spent pairing codes and update ids older than a week.
@@ -372,7 +415,16 @@ Telegram once and answers to Telegram alone, authenticated by the
 would be written to every access log on the way). The route records the
 `update_id`, answers 200 immediately and does the work in the background:
 Telegram redelivers anything it does not get a prompt answer to, and the
-recorded id is what keeps a redelivery from starting a second run.
+recorded id is what keeps a redelivery from starting a second run. The price of
+that ordering is one message lost per crash between the 200 and the run — the
+id is already recorded, so Telegram will not send it again. Accepted: the
+alternative (answering after the run) turns every slow answer into duplicate
+deliveries, which is the failure the learner would actually notice.
+
+The eternal thread is created by the backend and by nothing else
+(`telegram/thread.py`). The web API opens web chats only and refuses to stream
+into, compact or re-model a telegram chat, because the poller reads any message
+in that thread as the learner's answer to the review it is waiting on.
 
 Serialization is the thread's own claim, which is the only thing both processes
 can see: a proactive run finds the thread held by an incoming message and comes
@@ -464,10 +516,12 @@ completion. What makes the emit exactly-once is the absence of the event,
 checked under the same advisory lock the flush holds. That row is where spaced
 repetition subscribes.
 
-## Dormant mail
+## Not here
 
-`app/mail/` is wired to nothing. It is kept because the platform will send mail
-(account and review notifications) and re-deriving the SMTP plumbing and the
-MJML-built templates is pure waste; `emails` and `jinja2` stay in the
-dependency set for the same reason. Nothing imports it today, and that is
-deliberate rather than an oversight.
+- **Mail.** No SMTP plumbing, no templates, no `EMAILS_*` settings: nothing
+  sends mail, and the fork's dormant module (with `emails` and `jinja2`) was
+  deleted rather than carried. Account and review notifications are #25, and
+  the template it came from is one `git log` away when that is scheduled.
+- **A generated API client.** The site's clients are hand-written
+  (`apps/frontend/lib/*/api.ts` over `lib/http.ts`); the OpenAPI generator is
+  gone, and `/api/v1/openapi.json` is served for reading, not for codegen.

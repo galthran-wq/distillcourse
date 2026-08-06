@@ -135,7 +135,9 @@ async def test_a_reminder_reaches_the_learner_at_its_time(
 
     row = await only_schedule(session)
     stored = str([message.pydantic_ai for message in await repo.rows(thread)])
-    assert row.status == "awaiting_reply"
+    # Delivered, not awaiting an answer: a reminder asked for nothing, so it
+    # does not hold the proactive slot the reviews queue behind.
+    assert row.status == "done"
     assert "you were going to redo exercise 3" in stored
 
 

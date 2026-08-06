@@ -17,26 +17,30 @@ from app.scheduling.tools import (
 )
 from app.telegram.tools import send_message
 
+# Barriers, every one of them: the tool calls of one model response run as
+# concurrent tasks, and every tool the tutor has drives the run's single
+# AsyncSession, which is not safe to use from two coroutines at once — the
+# second one to touch it raises "another operation is in progress" and takes
+# the whole run down with it. Two `search_content` calls in one response is the
+# most ordinary thing a tutor does, so the overlap is not a corner case. Tools
+# registered by `app/harness/tools.py` say the same thing at their decorator.
+_BARRIERS = (
+    create_reminder,
+    list_reminders,
+    cancel_reminder,
+    mute_proactive,
+    unmute_proactive,
+    send_message,
+    read_memory,
+    save_memory,
+    delete_memory,
+    report_review_outcome,
+)
+
 tutor = Agent(
     name="tutor",
     deps_type=HarnessDeps,
-    tools=[
-        create_reminder,
-        list_reminders,
-        cancel_reminder,
-        mute_proactive,
-        unmute_proactive,
-        send_message,
-        # Barriers: the tool calls of one model response run as concurrent
-        # tasks, and these drive the run's single AsyncSession, which is not
-        # safe to use from two coroutines at once. A response that both reads a
-        # memory and saves one is ordinary, so the overlap is not a corner
-        # case — and a review closes three items in one turn.
-        Tool(read_memory, sequential=True),
-        Tool(save_memory, sequential=True),
-        Tool(delete_memory, sequential=True),
-        Tool(report_review_outcome, sequential=True),
-    ],
+    tools=[Tool(function, sequential=True) for function in _BARRIERS],
 )
 
 

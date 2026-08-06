@@ -110,17 +110,18 @@ Rendered previews (`figure`, `preview`) land in `apps/frontend/.preview/`.
 
 The backend needs `uv` and a Postgres; `docker compose up -d db` gives one,
 plus the `_test` database its suite insists on. `apps/backend/README.md` covers
-the service, migrations and the dormant mail module.
+the service and its migrations.
 
 ```bash
 docker compose up -d db          # postgres 17 + the test database
 ./apps/backend/scripts/lint.sh   # ruff + mypy strict
 ./apps/backend/scripts/test.sh   # pytest, on a database built by the migrations
-npm run generate-client          # backend OpenAPI -> apps/frontend/lib/api
 ```
 
-`lib/api/` and the spec it comes from are generated, not committed: run
-`npm run generate-client` after a clone and after any API change.
+The site calls the API through hand-written clients (`apps/frontend/lib/*/api.ts`
+over `lib/http.ts`), which is all a handful of endpoints needs — there is no
+generated client to regenerate after an API change; the interfaces are edited
+where they are used.
 
 ## Running the whole thing
 

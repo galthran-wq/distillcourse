@@ -12,11 +12,17 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.content.structure import ConceptEntry, CourseStructure, LessonEntry, structure
+from app.content.locators import course_of
+from app.content.structure import (
+    ConceptEntry,
+    CourseStructure,
+    LessonEntry,
+    reading_order,
+    structure,
+)
 from app.harness import prompts
 from app.models import Schedule
 from app.review import ladder
-from app.review import repository as review
 
 DUE = "The reviews due now"
 OPEN = "The review still open"
@@ -53,10 +59,6 @@ class Material:
     confusable: list[ConceptEntry]
 
 
-def _reading_order(course: CourseStructure) -> list[LessonEntry]:
-    return [lesson for module in course.modules for lesson in module.lessons]
-
-
 def _neighbours(order: Sequence[LessonEntry], position: int) -> set[str]:
     """The lessons either side of this one. Concepts introduced next door are
     the ones a learner mixes up with these — they were met days apart, in the
@@ -66,7 +68,7 @@ def _neighbours(order: Sequence[LessonEntry], position: int) -> set[str]:
 
 
 def _material(course: CourseStructure, row: Schedule) -> Material | None:
-    order = _reading_order(course)
+    order = reading_order(course)
     position = next(
         (
             index
@@ -112,7 +114,7 @@ async def _materials(session: AsyncSession, rows: Sequence[Schedule]) -> list[Ma
     Keyed off the lesson locator the row carries rather than its `topic`, which
     is the poller's rotation field and says nothing about where the material is.
     """
-    courses = {row.id: review.course(row.payload["lesson"]) for row in rows}
+    courses = {row.id: course_of(row.payload["lesson"]) for row in rows}
     spines = {
         spine.course: spine
         for slug in sorted(set(courses.values()) - {""})

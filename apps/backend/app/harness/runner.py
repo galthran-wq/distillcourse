@@ -1,8 +1,10 @@
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator, Sequence
-from datetime import datetime
+from collections.abc import AsyncGenerator, Coroutine, Sequence
+from functools import partial
+from typing import Any
 
+import logfire
 from pydantic import BaseModel
 from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai.agent import AgentRunResult
@@ -13,6 +15,7 @@ from pydantic_ai.messages import (
     TextPart,
     UserPromptPart,
 )
+from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.response_types import (
     BaseChunk,
@@ -22,8 +25,8 @@ from pydantic_ai.ui.vercel_ai.response_types import (
 from pydantic_ai.usage import RunUsage
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.clock import zone
 from app.core.config import settings
+from app.harness import context
 from app.harness.agent import compact_threshold, model_for, tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import (
@@ -37,7 +40,7 @@ from app.harness.repository import HarnessRepository, Role
 from app.harness.usage import usage_row
 from app.memory import repository as memory
 from app.memory.repository import Recollection
-from app.models import Chat, Memory
+from app.models import Chat
 from app.telegram.outbox import Outbox
 
 
@@ -50,6 +53,14 @@ class RunBusy(Exception):
 _drains: set[asyncio.Task[None]] = set()
 
 
+def _finished(task: asyncio.Task[None]) -> None:
+    """A drain that died has nobody to raise to: the request it started under
+    returned long ago, so the traceback is only ever seen if it is logged."""
+    _drains.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        logfire.error("the drain of a chat run died", _exc_info=task.exception())
+
+
 def _prompt_text(messages: Sequence[ModelMessage]) -> str:
     for message in messages:
         for part in message.parts:
@@ -58,68 +69,27 @@ def _prompt_text(messages: Sequence[ModelMessage]) -> str:
     return ""
 
 
-def _blocks(current_locator: str | None) -> tuple[ContextBlock, ...]:
-    if current_locator is None:
-        return ()
-    return (
-        ContextBlock(
-            title="Where the learner is",
-            body=f"They are reading `{current_locator}`.",
-        ),
-    )
+def _prefix(messages: Sequence[ModelMessage], block: str) -> None:
+    """Put a block above the learner's question, in place.
 
-
-def _index_line(row: Memory) -> str:
-    # A row the learner rewrote on their own page says so. Saving under that
-    # slug replaces their wording with the tutor's, and the index is the only
-    # place a run could learn which lines it was corrected on.
-    if row.source == "user":
-        return f"- `{row.slug}` (the learner corrected this): {row.description}"
-    return f"- `{row.slug}`: {row.description}"
-
-
-async def _memory_index(repo: HarnessRepository) -> tuple[ContextBlock, ...]:
-    """What the tutor remembers about the learner, as slugs and descriptions.
-
-    The bodies stay out: a memory is a paragraph, and the whole design is that
-    the model fetches the few its descriptions say bear on the question.
+    The message is prefixed before it is stored, so what the run was given and
+    what the panel replays after a reload are the same string — and so the
+    fence around quoted material is written here, by the server, rather than by
+    a client that could leave it off.
     """
-    rows = await memory.index(repo.session, repo.user_id)
-    if not rows:
-        return ()
-    lines = [_index_line(row) for row in rows]
-    if len(rows) > settings.MEMORY_INDEX_SOFT_CAP:
-        lines.append(
-            f"\nThis is more than the {settings.MEMORY_INDEX_SOFT_CAP} lines this "
-            "profile is meant to be: merge the memories that overlap and delete "
-            "the ones that no longer hold, rather than adding another."
-        )
-    return (
-        ContextBlock(
-            title="What you remember about the learner",
-            body="\n".join(lines),
-        ),
-    )
+    for message in messages:
+        for part in message.parts:
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                part.content = f"{block}\n\n{part.content}"
+                return
 
 
-async def _context(
-    repo: HarnessRepository, blocks: tuple[ContextBlock, ...]
-) -> tuple[ContextBlock, ...]:
-    """Every run carries the learner's clock: a reminder they ask for is set
-    from the model's reading of "Friday", and the model has no clock at all.
-    The memory index rides on every run for the same reason — it is a profile
-    of the learner, not of the chat it was written in.
-    """
-    user = await repo.user()
-    now = datetime.now(zone(user.timezone))
-    return (
-        ContextBlock(
-            title="The learner's clock",
-            body=f"Their timezone is `{user.timezone}`; it is {now:%A %Y-%m-%d %H:%M} there.",
-        ),
-        *await _memory_index(repo),
-        *blocks,
-    )
+def _model(chat: Chat, run_kind: RunKind) -> OpenRouterModel:
+    """Which model answers. The learner's choice is theirs for the dialogue
+    they are having; a run the platform starts by itself — a review, a
+    proactive message, a compaction — is the instance's own spending and goes
+    to the default, whatever the chat was last switched to (#10)."""
+    return model_for(chat.model if run_kind == "chat" else settings.DEFAULT_CHAT_MODEL)
 
 
 class Compaction(BaseModel):
@@ -147,11 +117,11 @@ async def _compacted(
     underscore would otherwise spend the retries and take the learner's turn
     down with it.
     """
-    model = model_for(chat.model)
+    model = _model(chat, "compact")
     deps = HarnessDeps(repo=repo, chat=chat)
     # The index comes along so a candidate can reuse a slug: that is what
     # makes this pass consolidate the profile instead of growing it.
-    instructions = assemble(medium, "compact", await _memory_index(repo))
+    instructions = assemble(medium, "compact", await context.memory_index(repo))
     try:
         both = await tutor.run(
             message_history=history,
@@ -284,6 +254,61 @@ async def _close_run(
         await repo.fail_run(chat, run_id, failure)
 
 
+async def _guarded(
+    work: Coroutine[Any, Any, None], failure: str, run_id: uuid.UUID
+) -> None:
+    """Cleanup that must not raise.
+
+    All of it runs after the run is over, on a session that may be in a failed
+    transaction and against a database that may be briefly down. An exception
+    from any one step would leave the rest undone — the chat claimed for its
+    full TTL, the client's stream never terminated — so each step is reported
+    and the next one still runs.
+    """
+    try:
+        await work
+    except Exception:
+        logfire.exception(failure, run_id=str(run_id))
+
+
+async def _close_safely(
+    repo: HarnessRepository,
+    chat: Chat,
+    run_id: uuid.UUID,
+    *,
+    result: AgentRunResult[str] | None,
+    partial_text: str,
+    failure: str | None,
+) -> None:
+    """Store the turn whatever state the run left behind.
+
+    A run that died inside a tool leaves its session in a failed transaction,
+    where every further statement raises until it is rolled back — including the
+    ones that store what the learner already saw. The rollback comes only after
+    a first attempt has failed: on the ordinary path there is nothing to roll
+    back, and what the run's tools committed must not be undone.
+    """
+    store = partial(
+        _close_run,
+        repo,
+        chat,
+        run_id,
+        result=result,
+        partial_text=partial_text,
+        failure=failure,
+    )
+    try:
+        await store()
+        return
+    except Exception:
+        logfire.exception(
+            "storing the turn of run {run_id} failed; retrying on a clean session",
+            run_id=str(run_id),
+        )
+    await _guarded(repo.session.rollback(), "rolling back run {run_id} failed", run_id)
+    await _guarded(store(), "storing the turn of run {run_id} failed", run_id)
+
+
 async def run(
     repo: HarnessRepository,
     chat: Chat,
@@ -310,21 +335,28 @@ async def run(
     try:
         result = await tutor.run(
             message_history=[*history, user_message],
-            model=model_for(chat.model),
+            model=_model(chat, run_kind),
             deps=deps,
-            instructions=assemble(medium, run_kind, await _context(repo, blocks)),
+            instructions=assemble(
+                medium, run_kind, await context.blocks(repo, extra=blocks)
+            ),
             run_id=str(run_id),
         )
         await _close_run(
             repo, chat, run_id, result=result, partial_text="", failure=None
         )
     except Exception as exc:
-        await _close_run(
+        await _close_safely(
             repo, chat, run_id, result=None, partial_text="", failure=str(exc)
         )
         raise
     finally:
-        await repo.release_run(chat, run_id)
+        # Never the reason a caller sees a different exception: the claim is
+        # released by its deadline anyway, and the run's own failure is the one
+        # worth reporting.
+        await _guarded(
+            repo.release_run(chat, run_id), "releasing run {run_id} failed", run_id
+        )
     return result.output
 
 
@@ -339,56 +371,66 @@ async def _drain(
     current_locator: str | None,
     queue: asyncio.Queue[BaseChunk | None],
 ) -> None:
-    async with session_factory() as session:
-        repo = HarnessRepository(session, user_id)
-        chat = await repo.get_chat(chat_id)
-        if chat is None:
-            queue.put_nowait(None)
-            return
-        deps = HarnessDeps(repo=repo, chat=chat, current_locator=current_locator)
-        result: AgentRunResult[str] | None = None
-        text: list[str] = []
-        failure: str | None = None
+    try:
+        async with session_factory() as session:
+            repo = HarnessRepository(session, user_id)
+            chat = await repo.get_chat(chat_id)
+            if chat is None:
+                return
+            deps = HarnessDeps(repo=repo, chat=chat, current_locator=current_locator)
+            result: AgentRunResult[str] | None = None
+            text: list[str] = []
+            failure: str | None = None
 
-        def capture(completed: AgentRunResult[str]) -> None:
-            nonlocal result
-            result = completed
+            def capture(completed: AgentRunResult[str]) -> None:
+                nonlocal result
+                result = completed
 
-        try:
-            instructions = assemble(
-                "web", "chat", await _context(repo, _blocks(current_locator))
-            )
-            async for chunk in adapter.run_stream(
-                message_history=history,
-                deps=deps,
-                model=model_for(chat.model),
-                instructions=instructions,
-                run_id=str(run_id),
-                on_complete=capture,
-            ):
-                queue.put_nowait(chunk)
-                if isinstance(chunk, TextDeltaChunk):
-                    text.append(chunk.delta)
-                elif isinstance(chunk, ErrorChunk):
-                    failure = chunk.error_text
-        except Exception as exc:
-            # The adapter turns a failure inside the stream into an ErrorChunk;
-            # one raised before the stream exists — building the model, reading
-            # the prompt modules — has to reach the client from here.
-            failure = str(exc)
-            queue.put_nowait(ErrorChunk(error_text=failure))
-        finally:
-            await _close_run(
-                repo,
-                chat,
-                run_id,
-                result=result,
-                partial_text="".join(text),
-                failure=failure,
-            )
-            await repo.release_run(chat, run_id)
-            # Only now: when the stream ends, everything it produced is stored.
-            queue.put_nowait(None)
+            try:
+                instructions = assemble(
+                    "web",
+                    "chat",
+                    await context.blocks(repo, current_locator=current_locator),
+                )
+                async for chunk in adapter.run_stream(
+                    message_history=history,
+                    deps=deps,
+                    model=_model(chat, "chat"),
+                    instructions=instructions,
+                    run_id=str(run_id),
+                    on_complete=capture,
+                ):
+                    queue.put_nowait(chunk)
+                    if isinstance(chunk, TextDeltaChunk):
+                        text.append(chunk.delta)
+                    elif isinstance(chunk, ErrorChunk):
+                        failure = chunk.error_text
+            except Exception as exc:
+                # The adapter turns a failure inside the stream into an
+                # ErrorChunk; one raised before the stream exists — building the
+                # model, reading the prompt modules — has to reach the client
+                # from here.
+                failure = str(exc)
+                queue.put_nowait(ErrorChunk(error_text=failure))
+            finally:
+                await _close_safely(
+                    repo,
+                    chat,
+                    run_id,
+                    result=result,
+                    partial_text="".join(text),
+                    failure=failure,
+                )
+                await _guarded(
+                    repo.release_run(chat, run_id),
+                    "releasing run {run_id} failed",
+                    run_id,
+                )
+    finally:
+        # Outside everything: the client is reading this queue, and a stream
+        # that is never terminated hangs the browser for as long as it waits.
+        # By here the run is over and what it produced has been stored.
+        queue.put_nowait(None)
 
 
 async def _relay(queue: asyncio.Queue[BaseChunk | None]) -> AsyncGenerator[BaseChunk]:
@@ -403,6 +445,7 @@ async def start_stream(
     chat: Chat,
     adapter: VercelAIAdapter[HarnessDeps, str],
     current_locator: str | None = None,
+    quote: str | None = None,
 ) -> AsyncGenerator[BaseChunk]:
     """Start the run and hand back the client's view of it.
 
@@ -417,6 +460,8 @@ async def start_stream(
     # message just submitted is taken from the request.
     adapter.run_input.messages = adapter.run_input.messages[-1:]
     user_messages = adapter.sanitize_messages(adapter.messages)
+    if quote is not None:
+        _prefix(user_messages, quote)
     history = await _open_run(repo, chat, run_id, user_messages, "web", "user")
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
     task = asyncio.create_task(
@@ -432,5 +477,5 @@ async def start_stream(
         )
     )
     _drains.add(task)
-    task.add_done_callback(_drains.discard)
+    task.add_done_callback(_finished)
     return _relay(queue)

@@ -1,6 +1,23 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { attachQuote, dropQuote, setQuote } from "@/lib/chat/quote";
+import { dropQuote, setQuote, takeQuote, unfenced } from "@/lib/chat/quote";
 import { rendered, turn } from "./chat-fixture";
+
+const PASSAGE = {
+  text: "The entropy is the average surprisal.",
+  locator: "lesson:info-theory/entropy#the-average",
+};
+
+// The message as the backend stored it: the passage above the question, inside
+// the provenance fence it writes (app/harness/prompts.learner_quote).
+const STORED = [
+  '<untrusted source="learner-quote">',
+  `> ${PASSAGE.text}`,
+  ">",
+  `> — [[${PASSAGE.locator}]]`,
+  "</untrusted>",
+  "",
+  "why the average?",
+].join("\n");
 
 afterEach(() => {
   dropQuote();
@@ -11,46 +28,43 @@ function asked(text: string): string {
 }
 
 describe("a passage referenced from the lesson", () => {
-  it("goes to the tutor above the question, with the section it came from", () => {
-    setQuote({
-      text: "The entropy is the average surprisal.",
-      locator: "lesson:info-theory/entropy#the-average",
-    });
+  it("travels with the next message, as data for the backend to fence", () => {
+    setQuote(PASSAGE);
 
-    expect(attachQuote("why the average?")).toBe(
-      "> The entropy is the average surprisal.\n>\n> — [[lesson:info-theory/entropy#the-average]]\n\nwhy the average?",
-    );
+    expect(takeQuote()).toEqual(PASSAGE);
   });
 
-  it("is attached once, not to every message after it", () => {
-    setQuote({ text: "quoted", locator: "lesson:info-theory/entropy" });
-    attachQuote("first");
+  it("is spent by one message, not attached to every one after it", () => {
+    setQuote(PASSAGE);
+    takeQuote();
 
-    expect(attachQuote("second")).toBe("second");
-  });
-
-  it("leaves the message alone when nothing is selected", () => {
-    expect(attachQuote("plain question")).toBe("plain question");
+    expect(takeQuote()).toBeNull();
   });
 
   it("is dropped when the reader clears it", () => {
-    setQuote({ text: "quoted", locator: "lesson:info-theory/entropy" });
+    setQuote(PASSAGE);
     dropQuote();
 
-    expect(attachQuote("plain question")).toBe("plain question");
+    expect(takeQuote()).toBeNull();
   });
 
   it("reads back as a quote with a link to the passage", () => {
-    setQuote({
-      text: "The entropy is the average surprisal.",
-      locator: "lesson:info-theory/entropy#the-average",
-    });
-
-    const html = asked(attachQuote("why the average?"));
+    const html = asked(STORED);
 
     expect(html).toContain("<blockquote>");
-    expect(html).toContain("The entropy is the average surprisal.");
+    expect(html).toContain(PASSAGE.text);
     expect(html).toContain('href="/courses/info-theory/lessons/entropy#the-average"');
     expect(html).toContain("why the average?");
+    // The fence is provenance for the model, not something the reader reads.
+    expect(html).not.toContain("untrusted");
+  });
+
+  it("leaves a message that carries no quote alone", () => {
+    expect(unfenced("plain question")).toBe("plain question");
+    // A fence the tutor wrote about something else is not a quote block, so it
+    // is not unwrapped: only the one the composer's selection produces is.
+    expect(unfenced('<untrusted source="web_search">\nhits\n</untrusted>')).toContain(
+      "untrusted",
+    );
   });
 });

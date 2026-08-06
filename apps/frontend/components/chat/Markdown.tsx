@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { unfenced } from "@/lib/chat/quote";
 import { remarkReferences } from "@/lib/chat/references";
 import { useLessons } from "@/lib/content/links";
 import { reveal } from "@/lib/lesson/anchor";
@@ -43,7 +44,7 @@ export default function Markdown({ text }: { text: string }) {
         rehypePlugins={REHYPE}
         components={COMPONENTS}
       >
-        {text}
+        {unfenced(text)}
       </ReactMarkdown>
     </div>
   );

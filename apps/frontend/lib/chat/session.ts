@@ -13,6 +13,7 @@ import {
 import { API } from "@/lib/api-base";
 import { errorDetail } from "@/lib/http";
 import { currentLocator } from "@/lib/lesson/position";
+import { takeQuote } from "@/lib/chat/quote";
 import { createStore } from "@/lib/store";
 
 export interface Session {
@@ -40,8 +41,9 @@ async function open(summary: ChatSummary): Promise<Session> {
         credentials: "same-origin",
         // Resolved per request rather than per chat: the tutor is asked about
         // the section on screen when send is pressed. Off a lesson page it is
-        // null, which is what the harness expects to hear.
-        body: () => ({ currentLocator: currentLocator() }),
+        // null, which is what the harness expects to hear. The quote goes the
+        // same way, and is spent by the message that carries it.
+        body: () => ({ currentLocator: currentLocator(), quote: takeQuote() }),
       }),
     }),
   };

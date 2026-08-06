@@ -35,3 +35,12 @@ LESSON_SECTION = re.compile(rf"{LESSON.pattern}(#{ANCHOR})?")
 # as a DataError on the longest ones: len("lesson:") + the two bounded segments
 # and their separator.
 LESSON_LENGTH = len("lesson:") + 2 * SLUG_LENGTH + 1
+
+
+def course_of(locator: str) -> str:
+    """The course a locator belongs to. `<corpus>:<course>[/<rest>]`.
+
+    Every corpus is filed under a course, so this answers for a lesson, a
+    research brief, a concept and the course row itself alike.
+    """
+    return locator.partition(":")[2].partition("/")[0]

@@ -31,7 +31,11 @@ def upgrade() -> None:
         "documents",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("corpus", sa.String(length=16), nullable=False),
-        sa.Column("course_slug", sa.String(length=64), nullable=True),
+        # SLUG_LENGTH in app.content.locators, spelled out here because a
+        # migration is a snapshot: the model, the locator grammar and the
+        # route validators are all that one number, and a column narrower
+        # than it fails an ingest rather than a validation.
+        sa.Column("course_slug", sa.String(length=80), nullable=True),
         sa.Column("locator", sa.String(length=512), nullable=False),
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("breadcrumb", sa.Text(), nullable=False),

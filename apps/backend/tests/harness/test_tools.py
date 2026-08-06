@@ -1,3 +1,6 @@
+import uuid
+from datetime import UTC, datetime
+
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -12,11 +15,35 @@ from app.harness import runner, web_search
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.harness.usage import WEB_SEARCH_CALLS
-from app.models import Chat, Incident
+from app.models import Chat, Incident, LessonProgress
 from tests.content.conftest import corpus_index  # noqa: F401  (a shared fixture)
 from tests.harness.conftest import call, returns
 
 KL = "lesson:information-theory/kl-divergence"
+# A lesson of the fixture corpus with exercises: its chunks carry the count of
+# solutions it ships, which is what `solutions_opened` is read against.
+SURPRISE = "lesson:information-theory/what-is-surprise"
+
+
+async def progress_row(
+    session: AsyncSession, user_id: uuid.UUID, lesson: str, *, solutions_opened: int = 0
+) -> None:
+    now = datetime.now(UTC)
+    session.add(
+        LessonProgress(
+            user_id=user_id,
+            lesson=lesson,
+            active_seconds=900,
+            max_scroll_pct=100,
+            proofs_opened=0,
+            solutions_opened=solutions_opened,
+            demos_touched=0,
+            first_seen=now,
+            last_seen=now,
+            completed_at=now,
+        )
+    )
+    await session.commit()
 
 
 async def test_a_question_is_answered_from_the_index_with_a_locator_that_resolves(
@@ -302,3 +329,50 @@ async def test_a_tool_files_against_the_chat_its_deps_were_built_for(
         assert [(incident.user_id, incident.chat_id) for incident in filed] == [
             (owner.user_id, chat.id)
         ]
+
+
+async def test_progress_says_what_they_read_and_how_much_of_it_they_have_open(
+    repo: HarnessRepository,
+    other_repo: HarnessRepository,
+    chat: Chat,
+    session: AsyncSession,
+    corpus_index: ContentIndex,  # noqa: F811
+) -> None:
+    """The reading history behind #10's solutions policy: the tutor can see
+    what they finished and how many of a lesson's solutions they already
+    opened, which is what "no point hiding what is open" is decided from."""
+    await ingest(session, corpus_index)
+    await progress_row(session, repo.user_id, SURPRISE, solutions_opened=2)
+    await progress_row(session, other_repo.user_id, KL, solutions_opened=7)
+
+    def tutor_turn(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        if not returns(messages, "get_user_progress"):
+            return call("get_user_progress", course="information-theory")
+        return ModelResponse(parts=[TextPart(content="read")])
+
+    with tutor.override(model=FunctionModel(tutor_turn)):
+        await runner.run(repo, chat, "which lessons have I finished?")
+
+    [reading] = returns(await repo.history(chat), "get_user_progress")[0]
+    assert reading["lesson"] == SURPRISE
+    assert reading["completed_at"] is not None
+    assert reading["solutions_opened"] == 2
+    # From the index, not from the events: it is what makes the count above
+    # mean anything.
+    assert reading["solutions_total"] == 7
+
+
+async def test_progress_is_scoped_to_the_course_that_was_asked_for(
+    repo: HarnessRepository, chat: Chat, session: AsyncSession
+) -> None:
+    await progress_row(session, repo.user_id, SURPRISE)
+
+    def tutor_turn(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        if not returns(messages, "get_user_progress"):
+            return call("get_user_progress", course="classical-ml")
+        return ModelResponse(parts=[TextPart(content="read")])
+
+    with tutor.override(model=FunctionModel(tutor_turn)):
+        await runner.run(repo, chat, "how far am I through the ML course?")
+
+    assert returns(await repo.history(chat), "get_user_progress")[0] == []

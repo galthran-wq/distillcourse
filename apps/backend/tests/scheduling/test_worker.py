@@ -54,6 +54,19 @@ async def due_review(
     )
 
 
+async def due_reminder(
+    session: AsyncSession, user: User, *, note: str = "redo exercise 3"
+) -> Schedule:
+    return await repository.create(
+        session,
+        user_id=user.id,
+        kind="reminder",
+        due_at=NOON - timedelta(minutes=1),
+        payload={"note": note},
+        created_by="user",
+    )
+
+
 async def thread_messages(session: AsyncSession, user: User, chat: Chat) -> str:
     rows = await HarnessRepository(session, user.id).rows(chat)
     return json.dumps([row.pydantic_ai for row in rows])
@@ -218,6 +231,75 @@ async def test_one_message_waits_for_a_reply_at_a_time(
     assert row.status == "deferred"
     assert row.due_at == open_slot.due_at
     assert await HarnessRepository(session, user.id).rows(thread) == []
+
+
+async def test_a_reminder_does_not_wait_for_the_open_slot(
+    session: AsyncSession, user: User, thread: Chat
+) -> None:
+    """The learner named a time. An unanswered review of ours must not push
+    their own appointment four waking hours down the day."""
+    open_slot = await due_review(session, user)
+    open_slot.status = "awaiting_reply"
+    open_slot.claimed_at = NOON - timedelta(hours=1)
+    open_slot.due_at = NOON + timedelta(hours=3)
+    reminder = await due_reminder(session, user)
+    await session.commit()
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(reminder)
+    # Delivered and finished: nothing is waiting for an answer to a reminder,
+    # so it does not take the slot the review is still holding either.
+    assert reminder.status == "done"
+    assert "redo exercise 3" in await thread_messages(session, user, thread)
+
+
+@pytest.mark.usefixtures("thread")
+async def test_a_reminder_is_delivered_after_the_days_budget_is_spent(
+    session: AsyncSession, user: User
+) -> None:
+    for hour in range(policy.DAILY_INITIATIONS):
+        spent = await due_review(session, user)
+        spent.status = "done"
+        spent.outcome = "answered"
+        spent.claimed_at = NOON - timedelta(hours=hour + 1)
+    reminder = await due_reminder(session, user)
+    held = await due_review(session, user)
+    await session.commit()
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(reminder)
+    await session.refresh(held)
+    assert reminder.status == "done"
+    # The budget still governs what the platform says on its own account.
+    assert (held.status, held.due_at) == (
+        "deferred",
+        policy.tomorrow_open(NOON, WAKING),
+    )
+
+
+async def test_a_reminder_waits_for_a_transport_instead_of_being_cancelled(
+    session: AsyncSession, user: User
+) -> None:
+    """Unpairing to move to another phone must not silently cancel what the
+    learner asked for by name; a review is dropped because its ladder puts it
+    back the moment a link exists, and a reminder has no such backing state."""
+    reminder = await due_reminder(session, user)
+    review = await due_review(session, user)
+
+    with replying():
+        await worker.cycle(session, NOON)
+
+    await session.refresh(reminder)
+    await session.refresh(review)
+    assert review.status == "cancelled"
+    assert (reminder.status, reminder.due_at) == (
+        "deferred",
+        policy.tomorrow_open(NOON, WAKING),
+    )
 
 
 async def test_a_reply_closes_the_slot(

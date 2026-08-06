@@ -9,7 +9,7 @@ content — it is the constitution for all content generation.
 Monorepo: `content/` and `docs/` at the root, the Next site in
 `apps/frontend/`, the FastAPI backend in `apps/backend/`, deployment in
 `compose.yml` + `ops/` + `Makefile`. The root `package.json` proxies
-`npm run dev|build|test|validate|figure|preview|image|generate-client|export-index`
+`npm run dev|build|test|validate|figure|preview|image|export-index`
 into the frontend — run them from the repo root, with paths written from the
 repo root.
 

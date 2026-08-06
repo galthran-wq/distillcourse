@@ -28,8 +28,12 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = "users"
-    # The window is read as `opens <= t < closes`, which says nothing at all
-    # when the two are the wrong way round.
+    # The waking window is same-day: `opens <= t < closes`, so it must open
+    # before it closes and 18:00–02:00 cannot be expressed. Everything that
+    # counts waking hours reads it as one interval inside a date — the slot
+    # timeout that carries over the night, the budget that resets at local
+    # midnight — and wrapping the window is a change to all of that rather than
+    # to this constraint. The settings page says so where a learner sets it.
     __table_args__ = (
         CheckConstraint("quiet_start < quiet_end", name="ck_users_quiet_hours"),
     )
@@ -59,8 +63,10 @@ class User(Base):
     muted_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # Set False by `python -m app.cli deactivate-user`: the session check and
+    # the login check both read it, so an account can be closed without deleting
+    # what it wrote.
     is_active: Mapped[bool] = mapped_column(default=True)
-    is_superuser: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -4,6 +4,12 @@
 attempt at delivering it. Keeping the two apart is what makes the delivery
 layer disposable: a bug that loses, duplicates or cancels schedule rows is
 repaired by the next poller cycle, because the ladder is still standing.
+
+Transactions: the ladder moves — `start`, `apply`, `mark`, `cancel_deliveries`
+— flush and leave the commit to the caller, because recording one outcome is
+three of them and a crash between two would leave the ladder moved and the
+delivery ungraded, which the next `settle` would then settle a second time.
+`settle` and `materialize` are cycle steps and commit their own batch.
 """
 
 import uuid
@@ -14,6 +20,7 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.content.locators import course_of
 from app.models import ReviewState, Schedule, TgLink
 from app.review import ladder
 from app.review.ladder import Outcome, Rung, Settlement
@@ -26,11 +33,6 @@ LIVE = (*scheduling.WAITING, "awaiting_reply")
 # only record of whether that delivery has been accounted for.
 OUTCOME = "outcome"
 GRADES = ("passed", "partial", "failed")
-
-
-def course(lesson: str) -> str:
-    """The course a lesson locator belongs to. `lesson:<course>/<slug>`."""
-    return lesson.partition(":")[2].partition("/")[0]
 
 
 def _about(lesson: object) -> ColumnElement[bool]:
@@ -104,7 +106,7 @@ async def _move(
     state.next_due_at = to.next_due_at
     state.last_outcome = outcome
     state.updated_at = now
-    await session.commit()
+    await session.flush()
 
 
 async def apply(
@@ -178,7 +180,7 @@ async def materialize(session: AsyncSession, now: datetime) -> Sequence[Schedule
                 "note": f"a review of {state.lesson} is due",
                 # The topic is what the poller rotates away from after an
                 # ignored message; for a review that is its course.
-                "topic": course(state.lesson),
+                "topic": course_of(state.lesson),
                 "step": state.step,
             },
             status="pending",
@@ -196,7 +198,7 @@ async def mark(session: AsyncSession, row: Schedule, outcome: str) -> None:
     # Reassigned rather than mutated: SQLAlchemy compares a JSONB attribute by
     # identity, and a dict changed in place is not seen as changed at all.
     row.payload = {**row.payload, OUTCOME: outcome}
-    await session.commit()
+    await session.flush()
 
 
 async def _reviews(
@@ -243,6 +245,7 @@ async def settle(session: AsyncSession, now: datetime) -> None:
             )
             await _move(session, state, to, outcome=settlement, now=now)
         await mark(session, row, settlement)
+    await session.commit()
 
 
 async def ungraded(

@@ -7,7 +7,6 @@ import Composer from "@/components/chat/Composer";
 import Messages from "@/components/chat/Messages";
 import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
-import { attachQuote } from "@/lib/chat/quote";
 import {
   busy,
   changeModel,
@@ -64,7 +63,7 @@ export default function ChatPanel({ session }: { session: Session }) {
     if (command === "clear") return run(clearSession());
     if (command === "compact") return run(compactSession(), "history compacted");
     setNotice(null);
-    void sendMessage({ text: attachQuote(text) });
+    void sendMessage({ text });
   }
 
   const model =

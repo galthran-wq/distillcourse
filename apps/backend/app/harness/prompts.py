@@ -5,6 +5,11 @@ from typing import Literal
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
+# How much of a selection travels with the question. A reader who selects a
+# whole lesson is not quoting it; past this the tutor has the locator.
+QUOTE_LENGTH = 2000
+QUOTE_SOURCE = "learner-quote"
+
 Medium = Literal["web", "telegram"]
 RunKind = Literal["chat", "review", "proactive", "compact"]
 
@@ -40,6 +45,22 @@ def untrusted(source: str, body: str) -> str:
     data — so anything reaching the model from the open web goes through here,
     whether it arrives as a context block or as a tool result."""
     return f'<untrusted source="{source}">\n{body}\n</untrusted>'
+
+
+def learner_quote(text: str, locator: str) -> str:
+    """A passage the reader selected on the page, as it enters their message.
+
+    Fenced like any other quoted material: the selection is lesson prose, or
+    something they pasted into the page, and an instruction found in it is
+    still data. The tags are escaped out of the text itself — an unescaped
+    `</untrusted>` in the selection would close the fence and put the rest of
+    it back in the learner's own voice.
+    """
+    quoted = "\n".join(f"> {line}" for line in text[:QUOTE_LENGTH].splitlines())
+    fenced = quoted.replace("<untrusted", "&lt;untrusted").replace(
+        "</untrusted", "&lt;/untrusted"
+    )
+    return untrusted(QUOTE_SOURCE, f"{fenced}\n>\n> — [[{locator}]]")
 
 
 def _render(block: ContextBlock) -> str:

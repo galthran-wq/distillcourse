@@ -108,12 +108,17 @@ async def defer(
 
 
 async def drop(session: AsyncSession, rows: Sequence[Schedule]) -> None:
-    """Rows nothing will ever deliver. Unlike a defer, these do not come back."""
+    """Rows nothing will ever deliver. Unlike a defer, these do not come back.
+
+    The one function here that leaves the commit to its caller: dropping what
+    is queued for a lesson is the last step of recording a review outcome
+    (`app/review/tools.py`), and that whole path is one transaction.
+    """
     for row in rows:
         row.status = "cancelled"
         row.claimed_at = None
         row.lease_until = None
-    await session.commit()
+    await session.flush()
 
 
 async def retry(
@@ -144,6 +149,19 @@ async def open_slot(
     for row in rows:
         row.status = "awaiting_reply"
         row.due_at = deadline
+        row.lease_until = None
+    await session.commit()
+
+
+async def deliver(session: AsyncSession, rows: Sequence[Schedule]) -> None:
+    """Rows that are finished the moment they are sent.
+
+    A reminder is one: it asked for nothing, so there is no reply to wait for
+    and no outcome to record. It still counts as a message the platform sent,
+    which is what `initiations_today` reads it as.
+    """
+    for row in rows:
+        row.status = "done"
         row.lease_until = None
     await session.commit()
 

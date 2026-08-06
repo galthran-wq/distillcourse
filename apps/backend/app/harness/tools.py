@@ -5,9 +5,8 @@ Importing this module is what registers them on the agent (see
 `HarnessRepository` that already knows whose data it may touch: there is no
 user id in any signature to get wrong.
 
-`get_user_progress` is not here. It reads the `lesson_progress` aggregate that
-telemetry (#8) owns and that does not exist yet; the tool lands with the table
-it reads.
+Every one of them is a barrier (`sequential=True`) for the reason
+`app/harness/agent.py` states: they all drive the run's single AsyncSession.
 """
 
 from typing import Annotated, Literal
@@ -22,6 +21,7 @@ from app.harness.agent import tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import LimitExceeded, spend_web_search
 from app.harness.prompts import untrusted
+from app.telemetry import progress
 
 Corpus = Literal["lesson", "research", "concept"]
 IncidentKind = Literal["error", "unclear", "other"]
@@ -63,7 +63,7 @@ class NotFound(BaseModel):
     did_you_mean: list[str]
 
 
-@tutor.tool
+@tutor.tool(sequential=True)
 async def search_content(
     ctx: RunContext[HarnessDeps],
     query: str,
@@ -101,7 +101,7 @@ async def search_content(
     ]
 
 
-@tutor.tool
+@tutor.tool(sequential=True)
 async def fetch_content(
     ctx: RunContext[HarnessDeps], locator: str
 ) -> Passage | NotFound:
@@ -147,7 +147,7 @@ async def _suggestions(ctx: RunContext[HarnessDeps], locator: str) -> list[str]:
     return [hit.locator for hit in hits]
 
 
-@tutor.tool
+@tutor.tool(sequential=True)
 async def get_course_structure(
     ctx: RunContext[HarnessDeps], course: str | None = None
 ) -> list[CourseStructure]:
@@ -160,7 +160,26 @@ async def get_course_structure(
     return await structure(ctx.deps.repo.session, course)
 
 
-@tutor.tool
+@tutor.tool(sequential=True)
+async def get_user_progress(
+    ctx: RunContext[HarnessDeps], course: str | None = None
+) -> list[progress.Reading]:
+    """What the learner has read, lesson by lesson, most recent first.
+
+    `active_seconds` and `max_scroll_pct` are how long they spent and how far
+    down they got; `completed_at` is set once the lesson counts as read.
+    `solutions_opened` against `solutions_total` says how much of the exercise
+    material they have already seen — there is no point walking them through a
+    solution they have open. A lesson they never opened has no entry.
+
+    Args:
+        course: restrict to one course slug; every course by default.
+    """
+    repo = ctx.deps.repo
+    return await progress.of_reader(repo.session, repo.user_id, course=course)
+
+
+@tutor.tool(sequential=True)
 async def report_content_incident(
     ctx: RunContext[HarnessDeps],
     locator: IncidentLocator,
@@ -185,7 +204,7 @@ async def report_content_incident(
     return f"filed against {locator}"
 
 
-@tutor.tool
+@tutor.tool(sequential=True)
 async def web_search(ctx: RunContext[HarnessDeps], query: str) -> str:
     """Search the open web, for what the courses do not cover.
 

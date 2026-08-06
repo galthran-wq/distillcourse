@@ -1,9 +1,7 @@
-from pwdlib.hashers.bcrypt import BcryptHasher
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.core.security import verify_password
-from app.models import User
 from tests.utils.utils import random_email, random_password
 
 
@@ -17,9 +15,9 @@ async def test_create_user_stores_a_hash_not_the_password(
     )
 
     assert user.hashed_password != password
-    assert verify_password(password, user.hashed_password)[0]
+    assert verify_password(password, user.hashed_password)
+    assert user.hashed_password.startswith("$argon2")
     assert user.is_active is True
-    assert user.is_superuser is False
 
 
 async def test_get_user_by_email_finds_the_created_user(session: AsyncSession) -> None:
@@ -63,16 +61,3 @@ async def test_authenticate_rejects_an_unknown_email(session: AsyncSession) -> N
         )
         is None
     )
-
-
-async def test_authenticate_upgrades_a_bcrypt_hash_to_argon2(
-    session: AsyncSession,
-) -> None:
-    email, password = random_email(), random_password()
-    session.add(User(email=email, hashed_password=BcryptHasher().hash(password)))
-    await session.commit()
-
-    user = await crud.authenticate(session, email=email, password=password)
-
-    assert user is not None
-    assert user.hashed_password.startswith("$argon2")

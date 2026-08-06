@@ -5,7 +5,6 @@ from pydantic import (
     AnyUrl,
     BaseModel,
     BeforeValidator,
-    EmailStr,
     PostgresDsn,
     computed_field,
     model_validator,
@@ -101,15 +100,6 @@ class Settings(BaseSettings):
     # Headroom for the next turn's system prompt, tools and reply.
     CONTEXT_RESERVE_TOKENS: int = 32_000
 
-    SMTP_TLS: bool = True
-    SMTP_SSL: bool = False
-    SMTP_PORT: int = 587
-    SMTP_HOST: str | None = None
-    SMTP_USER: str | None = None
-    SMTP_PASSWORD: str | None = None
-    EMAILS_FROM_EMAIL: EmailStr | None = None
-    EMAILS_FROM_NAME: str | None = None
-
     @computed_field  # type: ignore[prop-decorator]
     @property
     def all_cors_origins(self) -> list[str]:
@@ -135,9 +125,7 @@ class Settings(BaseSettings):
         return {model.openrouter_id: model for model in self.CHAT_MODELS}
 
     @model_validator(mode="after")
-    def _apply_defaults_and_guard_deployments(self) -> Self:
-        if not self.EMAILS_FROM_NAME:
-            self.EMAILS_FROM_NAME = self.PROJECT_NAME
+    def _guard_deployments(self) -> Self:
         if self.DEFAULT_CHAT_MODEL not in self.chat_model_pool:
             raise ValueError(
                 f"DEFAULT_CHAT_MODEL={self.DEFAULT_CHAT_MODEL} is not in CHAT_MODELS"

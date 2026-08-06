@@ -149,6 +149,7 @@ export default function SettingsPanel() {
         <QuietHours settings={settings} write={write} />
         <p className="mt-3 text-sm text-faint">
           On your own clock. Outside these hours a message waits for the next morning.
+          The window has to open before it closes, so it cannot run past midnight.
         </p>
       </Section>
 

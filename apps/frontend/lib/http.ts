@@ -9,12 +9,12 @@ export class ApiError extends Error {
   }
 }
 
-// Hand-written rather than taken from the generated client in lib/api: that
-// client needs uv and the backend source to exist, which the frontend image
-// build (apps/frontend/Dockerfile) has neither of, and the handful of calls the
-// site makes is this. Generated types stay for code that runs outside the image
-// build. The session cookie is httpOnly and first-party, so no code here ever
-// touches it.
+// The whole API client: every feature declares the shapes it reads in its own
+// lib/*/api.ts over this. Hand-written rather than generated from the backend's
+// OpenAPI spec, because a generator needs uv and the backend source, which the
+// frontend image build (apps/frontend/Dockerfile) has neither of, and the
+// handful of calls the site makes is this. The session cookie is httpOnly and
+// first-party, so no code here ever touches it.
 export async function call<T>(
   path: string,
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",

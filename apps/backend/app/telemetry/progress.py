@@ -1,8 +1,10 @@
 import uuid
+from collections.abc import Collection
 from datetime import datetime
 from hashlib import sha256
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Select, and_, case, distinct, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -153,6 +155,79 @@ async def recompute(
             },
         ).returning(LessonProgress.completed_at)
     )
+
+
+class Reading(BaseModel):
+    """What one reader's events add up to on one lesson, as a consumer outside
+    telemetry reads it.
+
+    `solutions_total` comes from the index rather than from the events: it is a
+    property of the lesson, and it is what makes `solutions_opened` mean
+    anything. It is absent for a lesson the index has never seen.
+    """
+
+    lesson: str
+    completed_at: datetime | None
+    active_seconds: int
+    max_scroll_pct: int
+    solutions_opened: int
+    solutions_total: int | None
+    last_seen: datetime
+
+
+def _solutions_total(lessons: Collection[str]) -> Select[Any]:
+    """How many solutions each of these lessons ships.
+
+    Every chunk of a lesson carries the whole lesson's count, so grouping the
+    chunks by the document they belong to answers for the lesson — including
+    one that opens on an h2 and therefore has no anchorless chunk.
+    """
+    document = func.split_part(Document.locator, "#", 1)
+    return (
+        select(document, func.max(Document.meta["solutions_total"].as_integer()))
+        .where(document.in_(lessons))
+        .group_by(document)
+    )
+
+
+async def of_reader(
+    session: AsyncSession, user_id: uuid.UUID, *, course: str | None = None
+) -> list[Reading]:
+    """What this reader has read, most recently seen first.
+
+    A lesson they never opened has no row and is simply absent — "not started"
+    and "started and abandoned" are different answers, and only the events can
+    tell them apart.
+    """
+    statement = select(LessonProgress).where(LessonProgress.user_id == user_id)
+    if course is not None:
+        statement = statement.where(
+            # autoescape: a `%` in a caller-supplied slug is a LIKE wildcard,
+            # and one course's prefix would match every course.
+            LessonProgress.lesson.startswith(f"lesson:{course}/", autoescape=True)
+        )
+    rows = (
+        await session.scalars(statement.order_by(LessonProgress.last_seen.desc()))
+    ).all()
+    if not rows:
+        return []
+    totals: dict[str, int | None] = {}
+    for lesson, total in (
+        await session.execute(_solutions_total([row.lesson for row in rows]))
+    ).all():
+        totals[lesson] = total
+    return [
+        Reading(
+            lesson=row.lesson,
+            completed_at=row.completed_at,
+            active_seconds=row.active_seconds,
+            max_scroll_pct=row.max_scroll_pct,
+            solutions_opened=row.solutions_opened,
+            solutions_total=totals.get(row.lesson),
+            last_seen=row.last_seen,
+        )
+        for row in rows
+    ]
 
 
 async def rebuild(session: AsyncSession) -> int:

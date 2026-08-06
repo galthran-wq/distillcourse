@@ -27,15 +27,28 @@ export function useQuote(): Quote | null {
 }
 
 /**
- * Put the pending selection above the question, attributed to the section it
- * came from. The quote travels inside the message text rather than as a part
- * of its own because what the model is given and what the panel re-renders
- * after a reload are the same string: the stored message is the one the run
- * saw, and the Vercel adapter drops user parts that are not text.
+ * The selection this message carries, if any, and it carries it once.
+ *
+ * Sent as a field of the request beside the reader's position rather than
+ * pasted into the message here: the backend puts it above the question inside
+ * an `<untrusted>` fence (`app/harness/prompts.learner_quote`), which is the
+ * one mitigation the design names for quoted content and is worth nothing if
+ * the client writes it — a selection containing the closing tag would end the
+ * fence and put the rest of itself back in the learner's voice.
  */
-export function attachQuote(text: string): string {
+export function takeQuote(): Quote | null {
   const quote = pending.get();
-  if (quote === null) return text;
   pending.set(null);
-  return `> ${quote.text}\n>\n> — [[${quote.locator}]]\n\n${text}`;
+  return quote;
+}
+
+const FENCE = /^<untrusted source="learner-quote">\n([\s\S]*?)\n<\/untrusted>\n\n/;
+
+/**
+ * A stored message as the panel shows it: the fence the backend wrote around
+ * the quoted passage is provenance for the model, not something to read, and
+ * what is inside it is already a markdown blockquote.
+ */
+export function unfenced(text: string): string {
+  return text.replace(FENCE, "$1\n\n");
 }

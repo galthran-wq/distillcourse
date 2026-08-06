@@ -26,6 +26,28 @@ async def test_reset_password_replaces_the_password_and_revokes_sessions(
     assert (await session.scalars(select(UserSession))).all() == []
 
 
+async def test_a_deactivated_account_cannot_sign_in_and_keeps_what_it_wrote(
+    session: AsyncSession,
+) -> None:
+    email = random_email()
+    user = await crud.create_user(
+        session, email=email, password="a-known-password", timezone="UTC"
+    )
+    session.add(user_session(user))
+    await session.commit()
+
+    await cli.set_active(session, email, False)
+
+    assert user.is_active is False
+    # The live cookie goes with it: deactivating an account whose browser stays
+    # signed in would be no deactivation at all.
+    assert (await session.scalars(select(UserSession))).all() == []
+    assert await crud.get_user_by_email(session, email) is not None
+
+    await cli.set_active(session, email, True)
+    assert user.is_active is True
+
+
 async def test_delete_user_takes_the_sessions_with_it(session: AsyncSession) -> None:
     email = random_email()
     user = await crud.create_user(

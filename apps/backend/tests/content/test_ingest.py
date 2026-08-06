@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.ingest import ingest
+from app.content.locators import SLUG_LENGTH
 from app.content.schemas import ContentIndex
 from app.models import Document
 from tests.content.conftest import document, index
@@ -156,3 +157,16 @@ async def test_ingest_preserves_the_fields_consumers_read(
     assert stored.meta["document_word_count"] == 2544
     # The generated column is what search reads; it must exist without a write.
     assert await session.scalar(select(func.length(Document.tsv))) is not None
+
+
+async def test_the_longest_legal_course_slug_survives_the_column(
+    session: AsyncSession,
+) -> None:
+    """One bound for a slug across the service. A slug the locator grammar and
+    the routes accept but the column cannot hold would pass every validation
+    and then abort the whole reindex on the INSERT."""
+    slug = "a" * SLUG_LENGTH
+
+    await ingest(session, index(document(f"lesson:{slug}/entropy", course_slug=slug)))
+
+    assert await session.scalar(select(Document.course_slug)) == slug

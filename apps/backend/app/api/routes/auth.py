@@ -129,8 +129,7 @@ async def me(user: CurrentUser) -> UserPublic:
 async def change_password(
     body: PasswordChange, current: CurrentSession, session: SessionDep
 ) -> None:
-    verified, _ = verify_password(body.current_password, current.user.hashed_password)
-    if not verified:
+    if not verify_password(body.current_password, current.user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "incorrect password")
     current.user.hashed_password = get_password_hash(body.new_password)
     await sessions.revoke_user(session, current.user_id, keep=current.token_hash)
