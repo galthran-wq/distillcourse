@@ -54,12 +54,19 @@ function transcript(
   );
 }
 
-/** That conversation as markup: what a test about what a message renders as. */
+/**
+ * That conversation as markup: what a test about what a message renders as.
+ * The extras are named rather than positional — some tests want one, some
+ * another, and no order would spare the rest from restating a default to
+ * reach past it.
+ */
 export function rendered(
   messages: UIMessage[],
-  status: ChatStatus = "ready",
-  lessons: Lessons = LESSONS,
-  sections: LessonSections = SECTIONS,
+  {
+    lessons = LESSONS,
+    sections = SECTIONS,
+    status = "ready",
+  }: { lessons?: Lessons; sections?: LessonSections; status?: ChatStatus } = {},
 ): string {
   return renderToStaticMarkup(transcript(messages, lessons, sections, CHAT, status));
 }
@@ -70,12 +77,12 @@ export function rendered(
  */
 export function shown(): {
   host: () => HTMLElement;
-  show: (messages: UIMessage[], status?: ChatStatus, chatId?: string) => void;
+  show: (messages: UIMessage[], chatId?: string, status?: ChatStatus) => void;
 } {
   const dom = mounted();
   return {
     host: dom.host,
-    show: (messages, status = "ready", chatId = CHAT) =>
+    show: (messages, chatId = CHAT, status = "ready") =>
       act(() => dom.render(transcript(messages, LESSONS, SECTIONS, chatId, status))),
   };
 }

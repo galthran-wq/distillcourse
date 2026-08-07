@@ -24,15 +24,13 @@ export default function ToolChip({ part }: { part: Part }) {
     >
       {done ? (
         <CheckIcon className="size-3 shrink-0" />
-      ) : failed ? (
-        <span className="size-1.5 shrink-0 rounded-full bg-accent" />
       ) : (
-        // The transcript's waiting dots, with one dot: a tool that has not come
-        // back and a tutor that has not started are the same wait, so they are
-        // paced by the same rule rather than by two.
-        <span className="tutor-dots flex shrink-0">
-          <span className="size-1.5 rounded-full bg-faint" />
-        </span>
+        // Still out: the transcript's waiting dot, with one of them. A tool
+        // that has not come back and a tutor that has not started are the same
+        // wait, so they are paced by the same rule rather than by two.
+        <span
+          className={`size-1.5 shrink-0 rounded-full ${failed ? "bg-accent" : "tutor-dot bg-faint"}`}
+        />
       )}
       <span className="truncate">
         {name}

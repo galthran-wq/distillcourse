@@ -62,9 +62,9 @@ function Waiting({ status }: { status: ChatStatus }) {
         <>
           <span className="sr-only">the tutor is answering…</span>
           <span aria-hidden className="tutor-dots flex gap-1.5">
-            <span className="size-1.5 rounded-full bg-faint" />
-            <span className="size-1.5 rounded-full bg-faint" />
-            <span className="size-1.5 rounded-full bg-faint" />
+            <span className="tutor-dot size-1.5 rounded-full bg-faint" />
+            <span className="tutor-dot size-1.5 rounded-full bg-faint" />
+            <span className="tutor-dot size-1.5 rounded-full bg-faint" />
           </span>
         </>
       )}
