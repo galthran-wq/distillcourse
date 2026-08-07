@@ -101,10 +101,13 @@ export const MENU_ROW_CLASS = `flex ${MENU_ROW}`;
  * an action — the passage a selection offers to the tutor, and the same
  * passage again beside the message it was sent with. Not a Button, and it
  * says so here rather than in each place one is drawn. Geometry is the
- * caller's: one floats at the selection, the others sit in a row.
+ * caller's: one floats at the selection, the others sit in a row. The display
+ * is the caller's too, for the reason `MENU_ROW` gives — a chip inside a
+ * sentence is `inline-flex` and one in a row is `flex`, and two display
+ * utilities in the same class list resolve by stylesheet order.
  */
 export const CHIP_CLASS =
-  "flex items-center rounded-sm border border-line bg-paper text-[12px] text-soft transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink";
+  "items-center rounded-sm border border-line bg-paper text-[12px] text-soft transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink";
 
 export type ButtonVariant = "solid" | "outline" | "ghost";
 /**

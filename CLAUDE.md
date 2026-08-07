@@ -89,9 +89,11 @@ Rules that override defaults:
   entrance is an `@starting-style` transition (`starting:` utilities, or a rule
   in `globals.css` where the element's geometry already lives there), nothing
   runs longer than `--motion-base`, except an idle loop, which is a multiple
-  of it, and one blanket `prefers-reduced-motion`
-  rule at the end of `globals.css` turns all of it off — a component never
-  repeats that rule for itself. An exit needs the element to stay mounted
+  of it, and `.anchor-flash` — the 2s one-shot marking the heading a reference
+  sent the reader to, which is a message rather than a movement and is the one
+  selector the blanket `prefers-reduced-motion` rule at the end of
+  `globals.css` carves out. That rule turns off everything else, and a
+  component never repeats it for itself. An exit needs the element to stay mounted
   while it plays: that is `useExitDelay` in `lib/ui/exit.ts`, fed
   `MOTION_BASE_MS`/`MOTION_FAST_MS` from `ui/styles.ts` — the millisecond
   copies of the two tokens, retuned with them. Never a second timer. A menu

@@ -15,7 +15,7 @@ import { useDismiss } from "@/lib/ui/dismiss";
  * (`components/chat/Mentions`), which sit directly above them in the composer
  * and would read as a second kind of chip if either restyled on its own.
  */
-export const ROW_CHIP_CLASS = `${CHIP_CLASS} min-w-0 gap-1.5 py-1 pr-1.5 pl-2 text-left`;
+export const ROW_CHIP_CLASS = `${CHIP_CLASS} flex min-w-0 gap-1.5 py-1 pr-1.5 pl-2 text-left`;
 
 /**
  * A cap rather than a size, and it belongs to whatever the row holds: a short

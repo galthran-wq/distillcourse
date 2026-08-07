@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { anchorUnder, clearPosition, setPosition } from "@/lib/lesson/position";
+import { oncePerFrame } from "@/lib/ui/frame";
 
 interface Props {
   course: string;
@@ -47,19 +48,10 @@ export default function LessonPosition({ course, lesson, headings }: Props) {
       });
     };
 
-    // One measurement per frame however many sources ask for it: each run reads
-    // layout for every heading and then writes a store that re-renders the ToC
-    // and the chat widget, and a gesture that scrolls and reflows at once fires
-    // all three. Reading layout straight from the observer is also what earns
-    // the "ResizeObserver loop completed with undelivered notifications" error.
-    let queued = 0;
-    const schedule = (): void => {
-      if (queued !== 0) return;
-      queued = requestAnimationFrame(() => {
-        queued = 0;
-        measure();
-      });
-    };
+    // Each run reads layout for every heading and then writes a store that
+    // re-renders the ToC and the chat widget: once a frame is as often as that
+    // is worth doing.
+    const { schedule, cancel } = oncePerFrame(measure);
 
     measure();
     window.addEventListener("scroll", schedule, { passive: true });
@@ -72,7 +64,7 @@ export default function LessonPosition({ course, lesson, headings }: Props) {
     observer.observe(document.body);
 
     return () => {
-      cancelAnimationFrame(queued);
+      cancel();
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
       observer.disconnect();

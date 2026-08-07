@@ -25,7 +25,7 @@ export function selectionSpans(selection: Selection | null): selection is Select
 }
 
 /** …and what it spans is not whitespace alone. */
-export function selectionHasText(selection: Selection | null): selection is Selection {
+function selectionHasText(selection: Selection | null): selection is Selection {
   return selectionSpans(selection) && selection.toString().trim() !== "";
 }
 

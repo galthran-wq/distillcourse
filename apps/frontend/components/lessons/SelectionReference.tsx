@@ -63,7 +63,7 @@ export default function SelectionReference({
       style={{ ...buttonPosition(passage), height: BUTTON_HEIGHT }}
       // A chip, floating at the selection rather than sitting in a row — so it
       // brings its own placement and the shadow that lifts it off the prose.
-      className={`${CHIP_CLASS} fixed z-40 -translate-x-1/2 px-2.5 shadow-card`}
+      className={`${CHIP_CLASS} fixed z-40 flex -translate-x-1/2 px-2.5 shadow-card`}
     >
       reference in chat
     </button>

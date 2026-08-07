@@ -11,6 +11,7 @@ import {
   type PanelBox,
 } from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
+import { oncePerFrame } from "@/lib/ui/frame";
 
 /** What the reader has hold of: the panel itself, or an edge of it. */
 export type Grip = "move" | "left" | "top" | "corner";
@@ -127,16 +128,12 @@ export function usePanelFit(box: PanelBox): PanelBox {
     const measure = (): void => setView(movable() ? viewport() : null);
     // Dragging a window edge fires resize faster than the screen is drawn, and
     // every one of them would re-render the transcript under the panel.
-    let frame = 0;
-    const onResize = (): void => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
-    };
+    const { schedule, cancel } = oncePerFrame(measure);
     measure();
-    window.addEventListener("resize", onResize);
+    window.addEventListener("resize", schedule);
     return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("resize", onResize);
+      cancel();
+      window.removeEventListener("resize", schedule);
     };
   }, []);
 
