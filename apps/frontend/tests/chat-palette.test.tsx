@@ -5,16 +5,11 @@ import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
 import type { ChatListing, ChatModel, ChatSummary } from "@/lib/chat/api";
 import { setDraft } from "@/lib/chat/stored";
-import { mounted, type } from "./utils/dom";
+import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
-// jsdom has no ResizeObserver, and the field watches its own width to know how
-// many rows the draft wraps into. Nothing here changes that width.
-class NoResize implements ResizeObserver {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-}
-globalThis.ResizeObserver = NoResize;
+stubResizeObserver();
+// The palette carries the row the arrows walked to into view with them.
+stubScrollIntoView();
 
 const { host, render } = mounted();
 

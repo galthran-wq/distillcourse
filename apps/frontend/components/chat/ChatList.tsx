@@ -1,6 +1,9 @@
 "use client";
 
 import type { ChatListing } from "@/lib/chat/api";
+import { plain } from "@/lib/chat/references";
+import { useLessons } from "@/lib/content/links";
+import { useSections } from "@/lib/content/sections";
 import { ago } from "@/lib/day";
 import { MENU_ROW_CLASS } from "@/components/ui/styles";
 
@@ -34,6 +37,9 @@ export default function ChatList({
   dated = false,
   onSelect,
 }: Props) {
+  const lessons = useLessons();
+  const sections = useSections();
+
   return (
     <>
       {chats.map((chat) => (
@@ -45,9 +51,15 @@ export default function ChatList({
         >
           {/* A chat is named after its first answer, so the one being had has
               no name yet. "New chat" is what the button above this list does —
-              the row for a chat already open is not that. */}
+              the row for a chat already open is not that. A name made out of a
+              question written with `@` carries that question's locators, and a
+              name is where they read as what they point at. */}
           <span className="min-w-0 flex-1 truncate">
-            {chat.title ?? (chat.id === current ? "Current chat" : "New chat")}
+            {chat.title === null
+              ? chat.id === current
+                ? "Current chat"
+                : "New chat"
+              : plain(chat.title, lessons, sections)}
           </span>
           {dated && chat.last_message_at !== null && (
             <span className="shrink-0 text-[11px] text-faint">

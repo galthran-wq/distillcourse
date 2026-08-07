@@ -18,6 +18,7 @@ import { listModels, webChats, type ChatListing, type ChatModel } from "@/lib/ch
 import { parseCommand } from "@/lib/chat/commands";
 import { startPanelDrag } from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
+import { plain } from "@/lib/chat/references";
 import {
   adoptSummary,
   busy,
@@ -29,6 +30,8 @@ import {
   type Session,
 } from "@/lib/chat/session";
 import { closePanel, toggleExpanded } from "@/lib/chat/stored";
+import { useLessons } from "@/lib/content/links";
+import { useSections } from "@/lib/content/sections";
 import { ApiError } from "@/lib/http";
 import { useDismiss } from "@/lib/ui/dismiss";
 
@@ -52,6 +55,8 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const header = useRef<HTMLElement>(null);
   const title = useRef<HTMLParagraphElement>(null);
+  const lessons = useLessons();
+  const sections = useSections();
 
   useDismiss(menu, header, setMenu);
 
@@ -136,7 +141,12 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
         }`}
       >
         <p ref={title} className="min-w-0 flex-1 truncate px-2 text-sm">
-          {session.summary.title ?? "New chat"}
+          {/* The title is the question that started the chat, locators and
+              all — read here as the places they name, the way the message
+              itself reads them two lines below. */}
+          {session.summary.title === null
+            ? "New chat"
+            : plain(session.summary.title, lessons, sections)}
         </p>
         <Button
           variant="ghost"

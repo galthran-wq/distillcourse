@@ -1,35 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { evaluate } from "@mdx-js/mdx";
-import * as runtime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement, type ReactNode } from "react";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeSlug from "rehype-slug";
-import rehypePrettyCode from "rehype-pretty-code";
-import { rehypeCollectToc, type TocEntry } from "@/lib/content/toc";
+import { compileLesson } from "@/lib/content/render";
+import type { TocEntry } from "@/lib/content/toc";
 
 /**
- * Runs MDX through the same pipeline the lesson page uses (rehype-slug, then
- * the ToC collector) and returns both the collected entries and the ids that
- * actually ended up on h2/h3/h4 elements in the rendered HTML.
+ * Compiles MDX with the pipeline the lesson page is compiled with — the real
+ * one, called rather than restated, so that reordering it here is not
+ * something a test can be green about — and returns both the collected entries
+ * and the ids that actually ended up on h2/h3/h4 elements in the rendered HTML.
  */
 async function run(mdx: string): Promise<{ toc: TocEntry[]; html: string }> {
-  const toc: TocEntry[] = [];
-  const { default: MDXContent } = await evaluate(mdx, {
-    ...runtime,
-    remarkPlugins: [remarkGfm, remarkMath],
-    rehypePlugins: [
-      rehypeSlug,
-      [rehypeCollectToc, { out: toc }],
-      rehypeKatex,
-      [rehypePrettyCode, { theme: "github-dark-default" }],
-    ],
-  } as Parameters<typeof evaluate>[1]);
-
+  const { Content, toc } = await compileLesson(mdx);
   const html = renderToStaticMarkup(
-    createElement(MDXContent, {
+    createElement(Content, {
       components: {
         Aside: ({ children }: { children?: ReactNode }) =>
           createElement("aside", null, children),

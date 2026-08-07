@@ -3,7 +3,24 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatList from "@/components/chat/ChatList";
 import type { ChatListing } from "@/lib/chat/api";
+import { LessonsProvider, type Lessons } from "@/lib/content/links";
+import { SectionsProvider } from "@/lib/content/sections";
+import type { LessonSections } from "@/lib/content/site";
 import { mounted } from "./utils/dom";
+
+const LESSONS: Lessons = {
+  "lesson:us-history/indigenous-america": {
+    title: "Indigenous America",
+    course: "US history",
+    href: "/courses/us-history/lessons/indigenous-america",
+  },
+};
+
+const SECTIONS: LessonSections = {
+  "lesson:us-history/indigenous-america": [
+    { depth: 2, id: "cahokia", text: "Cahokia and the Mississippians" },
+  ],
+};
 
 const NOW = new Date("2026-08-07T12:00:00Z");
 
@@ -22,8 +39,19 @@ const { host, render } = mounted("nav");
 
 function shown(chats: ChatListing[], dated = true): void {
   act(() =>
-    render(<ChatList chats={chats} current="c1" dated={dated} onSelect={() => {}} />),
+    render(
+      <SectionsProvider value={SECTIONS}>
+        <LessonsProvider value={LESSONS}>
+          <ChatList chats={chats} current="c1" dated={dated} onSelect={() => {}} />
+        </LessonsProvider>
+      </SectionsProvider>,
+    ),
   );
+}
+
+/** One chat, under the title the backend gave it. */
+function named(title: string): void {
+  shown([{ ...chat("c2", null), title }], false);
 }
 
 /** What each row says, as the two things a row is made of. */
@@ -89,5 +117,30 @@ describe("the chat rail", () => {
     shown([chat("c2", "2026-08-07T10:00:00Z")], false);
 
     expect(rows()).toEqual([["chat c2", undefined]]);
+  });
+});
+
+/**
+ * A chat is titled with the question that started it, and a question written
+ * with `@` was sent carrying `[[locator]]` — so the rail is one of the two
+ * places (the panel's header is the other) that would otherwise show brackets.
+ */
+describe("a chat named after a question that points somewhere", () => {
+  it("reads a locator in its name as the place that locator names", () => {
+    named("[[lesson:us-history/indigenous-america#cahokia]] what was traded?");
+
+    expect(rows()[0][0]).toBe("Cahokia and the Mississippians what was traded?");
+  });
+
+  it("uses the label where the locator was written with one", () => {
+    named("about [[lesson:us-history/indigenous-america|the first lesson]]");
+
+    expect(rows()[0][0]).toBe("about the first lesson");
+  });
+
+  it("leaves a locator the site does not render as the text it is", () => {
+    named("[[lesson:us-history/withdrawn]] and then?");
+
+    expect(rows()[0][0]).toBe("[[lesson:us-history/withdrawn]] and then?");
   });
 });
