@@ -5,15 +5,22 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
+import CommandPalette, {
+  PALETTE_ID,
+  commandRowId,
+} from "@/components/chat/CommandPalette";
 import { SendIcon } from "@/components/chat/icons";
 import { PendingQuote, QuoteRow } from "@/components/chat/Quotes";
 import { Button } from "@/components/ui";
 import { FIELD_BOX_CLASS, FIELD_BOX_INPUT_CLASS } from "@/components/ui/styles";
+import { matchCommands, type Command } from "@/lib/chat/commands";
 import { useQuotes, type Quote } from "@/lib/chat/quote";
 import { setDraft, useDraft } from "@/lib/chat/stored";
+import { useDismiss } from "@/lib/ui/dismiss";
 
 interface Props {
   /** A run is in flight: the chat takes one at a time. */
@@ -27,7 +34,22 @@ export default function Composer({ disabled, onSubmit }: Props) {
   const text = useDraft();
   const quotes = useQuotes();
   const field = useRef<HTMLTextAreaElement>(null);
+  const column = useRef<HTMLDivElement>(null);
   const ready = !disabled && text.trim() !== "";
+
+  // What the palette lists is the draft read as a command, not a state of its
+  // own. Whether it is up at all is one, and typing is what puts it there: the
+  // draft outlives the tab, and a line the reader comes back to a day later
+  // was not typed just now and opens nothing. It goes away like any other menu
+  // here — Escape or a press away from it — and sending is the third way.
+  const [offered, setOffered] = useState(false);
+  const [chosen, setChosen] = useState(0);
+  const commands = matchCommands(text);
+  const open = offered && commands.length > 0 && !disabled;
+  // The list shortens as the reader types; the highlight cannot outrun it.
+  const active = Math.min(chosen, commands.length - 1);
+
+  useDismiss(open, column, setOffered);
 
   // One row until the message needs more, up to the cap the class sets — and
   // the field's own scrollHeight is the only measure of what it needs, which
@@ -63,22 +85,60 @@ export default function Composer({ disabled, onSubmit }: Props) {
     return () => observer.disconnect();
   }, [fit]);
 
+  function send(message: string): void {
+    setDraft("");
+    setOffered(false);
+    onSubmit(message, quotes);
+  }
+
+  // The one place a message leaves the composer, so the open palette is
+  // answered for here rather than at each of the two ways in: a slash on its
+  // own is nothing the tutor could answer, and the send button sits under the
+  // list as much as the Enter key does.
   function submit(event: FormEvent): void {
     event.preventDefault();
+    if (open) return pick(commands[active]);
     if (!ready) return;
-    setDraft("");
-    onSubmit(text.trim(), quotes);
+    send(text.trim());
+  }
+
+  // Chosen from the palette rather than typed out: the same message either
+  // way, so the widget goes on parsing one command out of one line of text.
+  function pick(command: Command): void {
+    send(`/${command}`);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    // Enter sends, shift+Enter breaks the line — a chat input, not a form field.
+    // The arrows walk the list while it is up, and the caret stays where it
+    // is. Escape is not handled here: `useDismiss` above takes it, the way it
+    // does for every other menu on this site.
+    if (open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      return setChosen((active + step + commands.length) % commands.length);
+    }
+    // Enter sends, shift+Enter breaks the line — a chat input, not a form
+    // field. What it sends with the palette up is `submit`'s to say.
     if (event.key === "Enter" && !event.shiftKey) submit(event);
+  }
+
+  function type(draft: string): void {
+    setDraft(draft);
+    // Typing is what opens the palette, and what takes a dismissal back.
+    setOffered(true);
+    // A different list, so the highlight starts at the top of it again.
+    setChosen(0);
   }
 
   return (
     <form onSubmit={submit} className="border-t border-line p-3">
-      {/* The column the transcript above it is set in. */}
-      <div className="mx-auto max-w-2xl">
+      {/* The column the transcript above it is set in, and what the palette
+          opens against: over the whole composer, the attached passages
+          included, since it is about the line being written rather than them.
+          It is the palette's extent too — a press anywhere in here is aimed at
+          the message being written and leaves the list up. */}
+      <div ref={column} className="relative mx-auto max-w-2xl">
+        {open && <CommandPalette commands={commands} active={active} onPick={pick} />}
         {quotes.length > 0 && (
           <QuoteRow>
             {quotes.map((quote) => (
@@ -95,10 +155,18 @@ export default function Composer({ disabled, onSubmit }: Props) {
           <textarea
             ref={field}
             value={text}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => type(event.target.value)}
             onKeyDown={onKeyDown}
             rows={1}
             aria-label="Message the tutor"
+            // The field stands in for the palette hanging over it: it keeps the
+            // focus, so it is what says the list is open and which row of it
+            // Enter would run. Only while it is — the rest of the time this is
+            // a message field and has nothing to say about a list.
+            role={open ? "combobox" : undefined}
+            aria-expanded={open || undefined}
+            aria-controls={open ? PALETTE_ID : undefined}
+            aria-activedescendant={open ? commandRowId(commands[active]) : undefined}
             placeholder={disabled ? "the tutor is answering…" : "Ask about this section"}
             // Geometry only: the fill, the line and the ring are the box's.
             // The height matches the send button beside it, so one line of

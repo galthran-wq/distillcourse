@@ -3,7 +3,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRow } from "@/components/profile/Memories";
 import { editMemory, forgetMemory, type Memory } from "@/lib/memories/api";
-import { mounted } from "./utils/dom";
+import { mounted, type } from "./utils/dom";
 
 vi.mock("@/lib/memories/api", () => ({
   editMemory: vi.fn(),
@@ -41,19 +41,6 @@ function control(label: string): HTMLButtonElement {
   );
   if (button === undefined) throw new Error(`no "${label}" button`);
   return button;
-}
-
-// React dedupes a change event against the value it last saw, and that tracker
-// lives on the element's own `value` setter — so a test that assigns to it is
-// the one case React ignores. Writing through the prototype is what a keystroke
-// does.
-function type(field: HTMLInputElement | HTMLTextAreaElement, value: string): void {
-  const prototype =
-    field instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(field, value);
-  act(() => field.dispatchEvent(new Event("input", { bubbles: true })));
 }
 
 async function click(button: HTMLButtonElement): Promise<void> {
