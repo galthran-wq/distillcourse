@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import SelectionReference from "@/components/lessons/SelectionReference";
 import {
   BUTTON_HEIGHT,
@@ -170,5 +170,21 @@ describe("the affordance the passage is offered through", () => {
     });
 
     expect(offer()).not.toBeNull();
+  });
+
+  it("does not read the selected text to decide whether it is still there", () => {
+    show("first");
+    const read = vi.spyOn(Selection.prototype, "toString");
+
+    // A drag fires this on every frame of the gesture, and what it has covered
+    // by then can be a chapter: whether anything is still selected is a
+    // question about the range, not about the text under it.
+    act(() => {
+      select("second");
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
   });
 });

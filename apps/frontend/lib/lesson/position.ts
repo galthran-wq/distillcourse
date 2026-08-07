@@ -46,6 +46,9 @@ export interface HeadingTop {
 
 // Where in the viewport a reader is taken to be reading.
 const READING_LINE = 0.25;
+// How close to the bottom of the document counts as the bottom of it: browsers
+// report fractional scroll offsets, so an exact zero never arrives.
+const FOOT = 2;
 
 /**
  * Which heading the reader is under, measured from the page: the last one at
@@ -62,10 +65,12 @@ export function anchorUnder(
   height: number,
   below: number,
 ): string | null {
-  // Over the last screenful the line slides down to the foot of the viewport:
-  // there is no scrolling left to bring the closing section up to a quarter
-  // down, and it is on screen and being read all the same.
-  const line = Math.max(height * READING_LINE, height - below);
+  // At the foot of the page, and only there, the line drops to the bottom of
+  // the viewport: no scrolling is left to bring the closing section up to a
+  // quarter down, and it is on screen and being read all the same. Sliding it
+  // over the whole last screenful instead would report that section while the
+  // reader is still a section above it.
+  const line = below <= FOOT ? height : height * READING_LINE;
   let current: string | null = headings[0]?.id ?? null;
   for (const heading of headings) {
     if (heading.top > line) break;

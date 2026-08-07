@@ -30,10 +30,14 @@ export default function LessonPosition({ course, lesson, headings }: Props) {
     });
 
     const measure = (): void => {
-      const tops = found.map(({ id, heading }) => ({
-        id,
-        top: heading.getBoundingClientRect().top,
-      }));
+      const tops = found.flatMap(({ id, heading }) =>
+        // A heading inside a closed `details` — a proof, a solution, an aside —
+        // has no box at all, and the browser reports its top as 0, which would
+        // otherwise outrank every heading actually on screen.
+        heading.getClientRects().length === 0
+          ? []
+          : [{ id, top: heading.getBoundingClientRect().top }],
+      );
       const below =
         document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
       setPosition({
@@ -43,19 +47,34 @@ export default function LessonPosition({ course, lesson, headings }: Props) {
       });
     };
 
+    // One measurement per frame however many sources ask for it: each run reads
+    // layout for every heading and then writes a store that re-renders the ToC
+    // and the chat widget, and a gesture that scrolls and reflows at once fires
+    // all three. Reading layout straight from the observer is also what earns
+    // the "ResizeObserver loop completed with undelivered notifications" error.
+    let queued = 0;
+    const schedule = (): void => {
+      if (queued !== 0) return;
+      queued = requestAnimationFrame(() => {
+        queued = 0;
+        measure();
+      });
+    };
+
     measure();
-    window.addEventListener("scroll", measure, { passive: true });
-    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
     // Not every move of a heading is a scroll or a resize: an image settling,
     // a figure hydrating or a details block opening shifts the page under a
     // reader who has not touched it, and leaves the store naming a section
     // they are no longer in.
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(schedule);
     observer.observe(document.body);
 
     return () => {
-      window.removeEventListener("scroll", measure);
-      window.removeEventListener("resize", measure);
+      cancelAnimationFrame(queued);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
       observer.disconnect();
       clearPosition(course, lesson);
     };
