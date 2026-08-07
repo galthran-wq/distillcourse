@@ -14,6 +14,17 @@ export interface Passage {
   left: number;
 }
 
+/** Nothing is selected: no range, a bare caret, or whitespace alone. */
+export function selectionEmpty(): boolean {
+  const selection = window.getSelection();
+  return (
+    selection === null ||
+    selection.rangeCount === 0 ||
+    selection.isCollapsed ||
+    selection.toString().trim() === ""
+  );
+}
+
 /**
  * What the reader has selected in the lesson they are on, or nothing. The text
  * is one line: it is quoted into a chat message, where a blank line would end
@@ -21,11 +32,8 @@ export interface Passage {
  */
 export function selectedPassage(course: string, lesson: string): Passage | null {
   const selection = window.getSelection();
-  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) {
-    return null;
-  }
+  if (selection === null || selectionEmpty()) return null;
   const text = selection.toString().replace(/\s+/g, " ").trim();
-  if (text === "") return null;
 
   const range = selection.getRangeAt(0);
   const start = range.startContainer;

@@ -8,6 +8,7 @@ import {
   BUTTON_HEIGHT,
   buttonPosition,
   selectedPassage,
+  selectionEmpty,
   type Passage,
 } from "@/lib/lesson/selection";
 
@@ -23,11 +24,21 @@ export default function SelectionReference({
 
   useEffect(() => {
     const update = (): void => setPassage(selectedPassage(course, lesson));
+    // Offering a passage waits for the gesture to end — half a drag is not
+    // what the reader means to quote — but withdrawing the offer cannot wait
+    // for anything. A press that lands elsewhere collapses the selection, and
+    // whether it does so before or after the pointerup read above is the
+    // browser's business; the collapse itself only ever fires this.
+    const withdraw = (): void => {
+      if (selectionEmpty()) setPassage(null);
+    };
     document.addEventListener("pointerup", update);
     document.addEventListener("keyup", update);
+    document.addEventListener("selectionchange", withdraw);
     return () => {
       document.removeEventListener("pointerup", update);
       document.removeEventListener("keyup", update);
+      document.removeEventListener("selectionchange", withdraw);
     };
   }, [course, lesson]);
 
