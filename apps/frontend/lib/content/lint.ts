@@ -184,8 +184,8 @@ function lintLessonMdx(
     // demo-embedded-unregistered: an embedded demo renders a hole at any
     // status, so the registry check cannot wait for reviewed (which only
     // gates course.yaml-declared demos of planned lessons).
-    if (name !== undefined && options.repoRoot !== undefined) {
-      const registry = join(options.repoRoot, "components", "demos", "index.ts");
+    if (name !== undefined && options.appRoot !== undefined) {
+      const registry = join(options.appRoot, "components", "demos", "index.ts");
       const registered =
         existsSync(registry) && readFileSync(registry, "utf8").includes(name);
       if (!registered) {
