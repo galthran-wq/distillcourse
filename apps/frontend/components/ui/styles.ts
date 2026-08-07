@@ -1,0 +1,107 @@
+// The class lists the site's chrome shares, so restyling one is a single edit
+// rather than a hunt through the widgets that use it. No "use client" here on
+// purpose: server components call `buttonClass` too, and an export of a client
+// module is an opaque reference on the server, not a function.
+
+/**
+ * `--motion-base` and `--motion-fast` in milliseconds. A timer cannot read a
+ * CSS variable, and something leaving the page has to stay mounted for exactly
+ * as long as its animation lasts — see `useExitDelay`. These two numbers are
+ * the tokens in globals.css and have to be retuned with them.
+ */
+export const MOTION_BASE_MS = 200;
+export const MOTION_FAST_MS = 150;
+
+/**
+ * Every text field: input, textarea, and the native time picker. The fill is
+ * `--field` rather than a colour, so a surface that is itself panel-filled can
+ * flip it and keep the field a step off what it sits on — see globals.css.
+ */
+export const FIELD_CLASS =
+  "block w-full rounded-sm border border-line bg-(--field) px-3 py-2 text-sm text-ink transition-colors duration-(--motion-fast) placeholder:text-faint hover:border-faint focus:border-accent aria-invalid:border-accent";
+
+/**
+ * The text above a field. It carries the gap down to the field, so FIELD_CLASS
+ * is pure look and no consumer has to re-add spacing around it.
+ */
+export const FIELD_LABEL_CLASS = "mb-1 block text-soft";
+
+/** Mono micro-caps: section headings, group labels. */
+export const LABEL_CLASS = "font-mono text-[11px] uppercase tracking-wider text-faint";
+
+/**
+ * The surface anything that opens over the page is drawn on — a menu, the
+ * preview of a referenced passage. It opens out of the corner it hangs from,
+ * which is the caller's to name along with where it hangs; closing it is
+ * instant, since something that lingers is still in the way of what was
+ * chosen.
+ */
+export const POPOVER_CLASS =
+  "absolute z-50 rounded-md border border-line bg-panel shadow-popover transition-[opacity,scale] duration-(--motion-fast) starting:scale-95 starting:opacity-0";
+
+/**
+ * A panel hung under its trigger — the account menu, the chat menu. The caller
+ * adds its own width and, where the list can run long, its own scrolling.
+ */
+export const MENU_CLASS = `${POPOVER_CLASS} right-0 top-full mt-1.5 origin-top-right p-1.5`;
+
+/** One row of such a panel, whether that row is a link or a button. */
+export const MENU_ITEM_CLASS =
+  "block w-full rounded-sm px-2.5 py-2 text-left text-[13px] transition-colors duration-(--motion-fast) hover:bg-line/60";
+
+/**
+ * A chip: a small outlined control that names a thing rather than performing
+ * an action — the passage a selection offers to the tutor, and the same
+ * passage again beside the message it was sent with. Not a Button, and it
+ * says so here rather than in each place one is drawn. Geometry is the
+ * caller's: one floats at the selection, the others sit in a row.
+ */
+export const CHIP_CLASS =
+  "flex items-center rounded-sm border border-line bg-paper text-[12px] text-soft transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink";
+
+export type ButtonVariant = "solid" | "outline" | "ghost";
+/**
+ * `pill` is a labelled control that floats over the page rather than sitting in
+ * a row of others; `icon` is the circle an icon-only control gets.
+ */
+export type ButtonSize = "sm" | "md" | "pill" | "icon";
+
+// The press is a scale rather than a colour: it reads the same on all three
+// variants, including the ghost one that has no surface to darken.
+const BASE =
+  "inline-flex items-center justify-center gap-2 border font-medium transition-[color,background-color,border-color,box-shadow,scale] duration-(--motion-fast) active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45";
+
+// The radius lives with the size rather than in BASE because the size decides
+// the shape: a control in a row takes the control radius, one that floats or
+// carries no label is round.
+const SIZE: Record<ButtonSize, string> = {
+  sm: "min-h-9 rounded-sm px-2.5 text-[13px]",
+  md: "min-h-11 rounded-sm px-3.5 text-sm",
+  pill: "min-h-11 rounded-full px-5 text-sm",
+  icon: "size-10 shrink-0 rounded-full p-0 text-base",
+};
+
+const VARIANT: Record<ButtonVariant, string> = {
+  solid: "border-accent bg-accent text-paper hover:bg-accent/90 active:bg-accent/80",
+  outline: "border-line bg-paper text-ink hover:border-faint hover:bg-panel",
+  ghost: "border-transparent text-soft hover:bg-panel hover:text-ink",
+};
+
+// Toggled on: the accent states the choice, so it replaces the variant rather
+// than layering over it — two border-color utilities in one class list resolve
+// by stylesheet order, not by the order they are written.
+const PRESSED = "border-accent bg-accent/10 text-accent";
+
+/**
+ * The button look. `ui/Button` is what a button uses; this is here for the few
+ * links that have to look like one, which cannot be a `<button>`. Variant and
+ * size are required: a default here would be a second opinion about what a
+ * plain button looks like, next to `ui/Button`'s.
+ */
+export function buttonClass(
+  variant: ButtonVariant,
+  size: ButtonSize,
+  pressed = false,
+): string {
+  return `${BASE} ${SIZE[size]} ${pressed ? PRESSED : VARIANT[variant]}`;
+}

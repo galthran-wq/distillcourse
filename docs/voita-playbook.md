@@ -182,7 +182,7 @@ render-and-look loop (`npm run figure`, see docs/figures.md), not raw SVG.
 ## Where this is already implemented
 
 - Component figures with the visual verification loop: done
-  (`components/figures/`, gold example `examples/W2vOneStep.tsx`,
+  (`apps/frontend/components/figures/`, gold example `examples/W2vOneStep.tsx`,
   /figure-artist skill).
 - Density and structure norms: encoded in pedagogy L2 and L6.
 - Not yet built, candidates: a dedicated one-liner "key idea" box

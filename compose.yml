@@ -1,0 +1,140 @@
+name: distillcourse
+
+services:
+  db:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-distillcourse}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./ops/postgres/create-test-database.sh:/docker-entrypoint-initdb.d/create-test-database.sh:ro
+    # Loopback only: the port exists for host-run migrations and the test
+    # suite, never for the network.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-distillcourse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backup:
+    image: prodrigestivill/postgres-backup-local:17
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-distillcourse}
+      # A real recovery pipes the dump into the live database, so it has to drop
+      # what is already there. -Z1 is the image's own default compression,
+      # restated because setting this variable replaces it wholesale.
+      POSTGRES_EXTRA_OPTS: "-Z1 --clean --if-exists"
+      # Daily dumps only: the recovery point objective is 24h, a deliberate
+      # choice for a course platform whose content of record lives in git.
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 0
+    volumes:
+      - ./backups:/backups
+
+  # Same image as backend, so `docker compose build` builds it once.
+  migrate:
+    image: distillcourse-backend
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: &backend-env
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      FRONTEND_HOST: ${FRONTEND_HOST:-http://localhost:3000}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-}
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN:-}
+      INVITE_CODE: ${INVITE_CODE:-local-invite}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      MONTHLY_COST_CEILING_USD: ${MONTHLY_COST_CEILING_USD:-50}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+      WEB_SEARCH_DAILY_CAP: ${WEB_SEARCH_DAILY_CAP:-20}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-distillcourse}
+    command: ["bash", "scripts/prestart.sh"]
+
+  backend:
+    image: distillcourse-backend
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *backend-env
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # The proactive half of the backend: the same image running a poller instead
+  # of the API. Separate so a restart of one is not a restart of the other.
+  scheduler:
+    image: distillcourse-backend
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *backend-env
+    command: ["python", "-m", "app.scheduling.worker"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        CONTENT_PREVIEW: ${CONTENT_PREVIEW:-1}
+    restart: always
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on:
+      - backend
+      - frontend
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

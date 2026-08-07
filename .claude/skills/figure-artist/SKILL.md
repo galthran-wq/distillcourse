@@ -3,7 +3,7 @@ name: figure-artist
 description: Produce or revise ONE figure for a lesson — drawn in house style (component figure with HTML+KaTeX+SVG, or a simple raw SVG), or a real sourced image (photograph, scan, published data plot) placed and credited. Verified through the render-and-look loop. Use when a lesson needs a figure built, a source figure recreated, or an existing figure fixed.
 argument-hint: "<FigureName | figure description | image file-stem> [reference image path]"
 disable-model-invocation: false
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(npm run figure:*), Bash(npm run image:*), Bash(npm run preview:*), Bash(npm run validate:*), Bash(npx tsc:*), Bash(npx eslint:*), Bash(rsvg-convert:*), Bash(curl:*), Bash(pdftoppm:*), Bash(pdfimages:*), Bash(convert:*), Bash(identify:*)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(npm run figure:*), Bash(npm run image:*), Bash(npm run preview:*), Bash(npm run validate:*), Bash(npm run typecheck:*), Bash(npm run lint:*), Bash(rsvg-convert:*), Bash(curl:*), Bash(pdftoppm:*), Bash(pdfimages:*), Bash(convert:*), Bash(identify:*)
 ---
 
 # Figure Artist
@@ -14,17 +14,17 @@ ship a figure you haven't looked at.
 The style contract: @docs/figures.md. The composition rules (12 load-bearing
 rules from the reference-corpus dissection): @docs/voita-playbook.md §Figure
 composition rules. Gold example:
-`components/figures/examples/W2vOneStep.tsx`.
+`apps/frontend/components/figures/examples/W2vOneStep.tsx`.
 
 ## Choose the tier
 
 - **Component figure** (default for anything with formulas, sentences,
   labeled pipelines, comparisons): a pure hook-free React component in
-  `components/figures/<course>/<Name>.tsx` — HTML/flex for text layout,
+  `apps/frontend/components/figures/<course>/<Name>.tsx` — HTML/flex for text layout,
   `<M tex=…/>` (KaTeX) for ALL math, inline SVG only for pure graphics
   (arrows, boxes, curves, grids). Inline styles + `palette.ts` constants
   ONLY — no Tailwind (the verifier renders standalone). Register it in
-  `components/figures/index.ts`. Embed via `<Figure name="<Name>" …/>`.
+  `apps/frontend/components/figures/index.ts`. Embed via `<Figure name="<Name>" …/>`.
 - **Raw SVG** (simple plots/diagrams with few short labels): author
   `figures/<name>.svg` in the lesson dir per docs/figures.md; embed via
   `<Figure src="./figures/<name>.svg" …/>`.
@@ -53,16 +53,16 @@ unusable, say so and draw it instead.
 3. **Author** the component/SVG.
 4. **THE LOOP — mandatory:** render and look, fix, repeat:
    - component: `npm run figure -- <Name> [frame]`, then Read the PNG in
-     `.preview/`; also check `--dark` once near the end. Not yet registered
+     `apps/frontend/.preview/`; also check `--dark` once near the end. Not yet registered
      (e.g. parallel builds where index.ts is off-limits)? Render by path:
-     `npm run figure -- components/figures/<course>/<Name>.tsx [frame]`.
+     `npm run figure -- apps/frontend/components/figures/<course>/<Name>.tsx [frame]`.
    - raw SVG: `rsvg-convert -w 1200 -b white <file> -o /tmp/…png`, Read it.
    List the defects you SEE (clipped labels, collisions, broken TeX shown
    as red source, spacing, misaligned arrows) and fix them. Repeat until a
    pass finds zero defects. Never conclude from the code that it "should"
    look right.
-5. **Check:** `npx tsc --noEmit` (component tier) and, if you touched the
-   registry, `npx eslint components/figures`.
+5. **Check:** `npm run typecheck` (component tier) and, if you touched the
+   registry, `npm run lint`.
 6. **Report:** final preview path, the defects each iteration caught, and
    the one-line statement of what the figure shows.
 
@@ -111,11 +111,11 @@ capture.
      subject, nothing clipped, labels legible at the placement width, no
      watermark/placeholder, both themes.
    - Then in the page: `npm run preview -- <course> <lesson>` renders the
-     chapter to `.preview/<lesson>-{light,dark}.png` plus a figures-only
+     chapter to `apps/frontend/.preview/<lesson>-{light,dark}.png` plus a figures-only
      pair. Read them. Text wrap, the credit list and the frame counter are
      only real there.
 5. **Credit it.** Add the entry to `figures/credits.yaml` (schema:
-   `lib/content/schema.ts`, guide: `docs/content-model.md`) — title, credit,
+   `apps/frontend/lib/content/schema.ts`, guide: `docs/content-model.md`) — title, credit,
    source_url, licence exactly as the source states it, retrieved date,
    `located`, `modifications`, and `background: light` for white-background
    line art. One `*` pattern entry covers a whole sequence. The provenance

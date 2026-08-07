@@ -2,7 +2,7 @@
 
 /**
  * Reference demo implementation — the idiom every demo follows:
- * compose controls/containers from components/ui (Panel, PresetGroup,
+ * compose controls/containers from `@/components/ui` (Panel, PresetGroup,
  * Slider, Readout), custom visuals as plain SVG with currentColor text,
  * synchronous updates, meaningful initial state.
  * (This example: probability vs. surprisal.)
