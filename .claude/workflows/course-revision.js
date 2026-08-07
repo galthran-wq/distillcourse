@@ -97,7 +97,7 @@ const done = await pipeline(
     ),
   async (_prev, lesson) => {
     const figs = await agent(
-      `${at}Figure scan for lesson ${slug}/${lesson.slug}: read content/courses/${slug}/lessons/${lesson.slug}/lesson.mdx and the FIGURE PLAN in content/courses/${slug}/research/${lesson.slug}.md, and return everything still to build.\n\nTwo kinds. kind="component": <Figure name="..."> / <FigureSequence name="..."> references whose PascalCase name is NOT registered in components/figures/index.ts (kebab-case names are plain SVG files already on disk — ignore those); the spec comes FIRST from the writer's {/* fig <Name>: ... */} comment — copy it verbatim — enriched from the FIGURE PLAN and surrounding prose. kind="sourced": every {/* img <file-stem>: ... */} handoff comment in the MDX and every \`source:\` entry in the FIGURE PLAN whose image file is not yet in the lesson's figures/ dir; the spec must carry what the reader must see, the research/images.yaml candidate id WITH its capture path under content/courses/${slug}/research/images/ when the pool has one — and when it does not, say "no pool candidate" plus whatever source pointer the handoff names, so the builder knows to hunt.`,
+      `${at}Figure scan for lesson ${slug}/${lesson.slug}: read content/courses/${slug}/lessons/${lesson.slug}/lesson.mdx and the FIGURE PLAN in content/courses/${slug}/research/${lesson.slug}.md, and return everything still to build.\n\nTwo kinds. kind="component": <Figure name="..."> / <FigureSequence name="..."> references whose PascalCase name is NOT registered in apps/frontend/components/figures/index.ts (kebab-case names are plain SVG files already on disk — ignore those); the spec comes FIRST from the writer's {/* fig <Name>: ... */} comment — copy it verbatim — enriched from the FIGURE PLAN and surrounding prose. kind="sourced": every {/* img <file-stem>: ... */} handoff comment in the MDX and every \`source:\` entry in the FIGURE PLAN whose image file is not yet in the lesson's figures/ dir; the spec must carry what the reader must see, the research/images.yaml candidate id WITH its capture path under content/courses/${slug}/research/images/ when the pool has one — and when it does not, say "no pool candidate" plus whatever source pointer the handoff names, so the builder knows to hunt.`,
       { label: `figure-scan: ${lesson.slug}`, phase: 'Revise', model: 'sonnet', schema: FIGLIST_SCHEMA },
     )
     if (figs && figs.missing.length > 0) {
@@ -116,8 +116,8 @@ const done = await pipeline(
                 : [
                     `${at}Build ONE component figure: ${f.name} (${f.isSequence ? 'multi-frame, used via <FigureSequence>' : 'single <Figure>'}) for lesson ${slug}/${lesson.slug}.`,
                     `Build spec: ${f.spec}`,
-                    `Read .claude/skills/figure-artist/SKILL.md and follow it exactly (component tier). The render-and-look loop is mandatory — the figure is not yet registered, so render by file path: \`npm run figure -- components/figures/${slug}/${f.name}.tsx [frame]\` — and LOOK at the PNG every iteration, listing visible defects before declaring it done.`,
-                    `PARALLEL-SAFETY HARD LIMIT: other figure builders run concurrently — do NOT edit components/figures/index.ts or any file outside components/figures/${slug}/${f.name}.tsx. Final message: the figure's one-line description and, for sequences, the frame count N.`,
+                    `Read .claude/skills/figure-artist/SKILL.md and follow it exactly (component tier). The render-and-look loop is mandatory — the figure is not yet registered, so render by file path: \`npm run figure -- apps/frontend/components/figures/${slug}/${f.name}.tsx [frame]\` — and LOOK at the PNG every iteration, listing visible defects before declaring it done.`,
+                    `PARALLEL-SAFETY HARD LIMIT: other figure builders run concurrently — do NOT edit apps/frontend/components/figures/index.ts or any file outside apps/frontend/components/figures/${slug}/${f.name}.tsx. Final message: the figure's one-line description and, for sequences, the frame count N.`,
                   ].join('\n\n'),
               { label: `${f.kind === 'sourced' ? 'image' : 'figure'}: ${f.name}`, phase: 'Revise', model: 'opus' },
             ),
@@ -127,9 +127,9 @@ const done = await pipeline(
       await agent(
         [
           `${at}Land the figures built for lesson ${slug}/${lesson.slug}. Built: ${JSON.stringify(figs.missing.map((f) => ({ name: f.name, kind: f.kind, isSequence: f.isSequence })))}. Builder reports: ${JSON.stringify(built)}.`,
-          `Component figures: add an import and a registry entry per figure in components/figures/index.ts (frames: N for sequences), then verify each renders by registry name (\`npm run figure -- <Name>\`).`,
+          `Component figures: add an import and a registry entry per figure in apps/frontend/components/figures/index.ts (frames: N for sequences), then verify each renders by registry name (\`npm run figure -- <Name>\`).`,
           `Sourced images: append each builder's credits entry to content/courses/${slug}/lessons/${lesson.slug}/figures/credits.yaml (create it with \`schema_version: 1\` and \`images:\` if absent), replace the matching {/* img <file-stem>: ... */} comment in lesson.mdx with the builder's snippet, and append hunted-capture entries to content/courses/${slug}/research/images.yaml.`,
-          `CONCURRENCY: another lesson's lander may be editing components/figures/index.ts and research/images.yaml at the same time. Re-read each shared file immediately before you edit it, APPEND your entries only, and never rewrite a shared file wholesale or delete an entry you did not add.`,
+          `CONCURRENCY: another lesson's lander may be editing apps/frontend/components/figures/index.ts and research/images.yaml at the same time. Re-read each shared file immediately before you edit it, APPEND your entries only, and never rewrite a shared file wholesale or delete an entry you did not add.`,
           `Finish with \`npm run validate ${slug} ${lesson.slug}\` and \`npm run preview -- ${slug} ${lesson.slug}\`; Read the figures-only PNGs in both themes. If a figure failed to build, render or land, say so explicitly.`,
         ].join('\n\n'),
         { label: `figure-land: ${lesson.slug}`, phase: 'Revise', model: 'sonnet' },
