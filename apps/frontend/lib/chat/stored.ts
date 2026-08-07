@@ -11,8 +11,9 @@ export type StoredChat = {
   /**
    * The box the reader dragged the docked panel to, in CSS pixels — the two
    * offsets from the corner it is anchored in, and its size. The defaults are
-   * `.chat-panel`'s own, written out in `globals.css`; the rules the reader
-   * may drag them within are `lib/chat/panel-box`'s.
+   * the constants below, which `.chat-panel` in `globals.css` states again in
+   * its own units; the rules the reader may drag them within are
+   * `lib/chat/panel-box`'s.
    */
   right: number;
   bottom: number;
@@ -31,15 +32,39 @@ export type StoredChat = {
 /** Where the docked panel sits and how big it is, in CSS pixels. */
 export type PanelBox = Pick<StoredChat, "right" | "bottom" | "width" | "height">;
 
+// The box the panel opens in, and so also the smallest it can be dragged to and
+// the closest to each edge it can be dragged. They live here, where the
+// defaults below are built out of them, because `lib/chat/panel-box` — which
+// enforces them — already imports this file and the other direction would be a
+// cycle. The fourth copy of these numbers is `.chat-panel` in `globals.css`,
+// which has to state them in its own units; the comment there says which.
+
+/**
+ * How close to the edge of the window the panel may be dragged, and so also how
+ * far it may grow: the page keeps this much of itself either way.
+ */
+export const PANEL_MARGIN = 24;
+
+/**
+ * What the panel leaves below itself: the launcher that opens it is fixed in
+ * that corner and stays there while it is open, so a box that reached the
+ * bottom margin would be a box with a button sitting on it.
+ */
+export const LAUNCHER_CLEARANCE = 80;
+
+/** The panel never goes below the box it opens at. */
+export const MIN_WIDTH = 384;
+export const MIN_HEIGHT = 512;
+
 // What the widget needs to come back the way the reader left it, in one entry
 // so that all of it is written and read as one state. Private, like every other
 // store here: what the entry is called and how it is shaped stops at this file.
 const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
   panel: "closed",
-  right: 24,
-  bottom: 80,
-  width: 384,
-  height: 512,
+  right: PANEL_MARGIN,
+  bottom: LAUNCHER_CLEARANCE,
+  width: MIN_WIDTH,
+  height: MIN_HEIGHT,
   chatId: "",
   draft: "",
   quotes: "",

@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, type CSSProperties, type PointerEvent as Press } from "react";
-import { panelBox, setPanelBox, type PanelBox } from "@/lib/chat/stored";
+import { useEffect, useState, type CSSProperties, type PointerEvent as Press } from "react";
+import {
+  LAUNCHER_CLEARANCE,
+  MIN_HEIGHT,
+  MIN_WIDTH,
+  PANEL_MARGIN,
+  panelBox,
+  setPanelBox,
+  type PanelBox,
+} from "@/lib/chat/stored";
 import { createStore } from "@/lib/store";
 
 /** What the reader has hold of: the panel itself, or an edge of it. */
 export type Grip = "move" | "left" | "top" | "corner";
 
-/** The panel never goes below the box it opens at. */
-export const MIN_WIDTH = 384;
-export const MIN_HEIGHT = 512;
-
-/**
- * How close to the edge of the window the panel may be dragged, and so also how
- * far it may grow: the page keeps this much of itself either way.
- */
-export const PANEL_MARGIN = 24;
+// The lengths the box is held to are the store's, which is where the defaults
+// are built out of them; they are passed on here because this is the module
+// that enforces them, and the tests read them from here.
+export { LAUNCHER_CLEARANCE, MIN_HEIGHT, MIN_WIDTH, PANEL_MARGIN };
 
 /**
  * The breakpoint the docked rule in `globals.css` is keyed on, mirrored here
@@ -25,7 +28,7 @@ export const PANEL_MARGIN = 24;
  */
 const DESKTOP = "(min-width: 40rem)";
 
-export interface Viewport {
+interface Viewport {
   width: number;
   height: number;
 }
@@ -38,9 +41,14 @@ function movable(): boolean {
   return window.matchMedia(DESKTOP).matches;
 }
 
-/** A whole number of pixels within bounds; a squeeze is settled by the minimum. */
-function px(value: number, min: number, max: number): number {
-  return Math.round(Math.max(min, Math.min(value, max)));
+/**
+ * A whole number of pixels between a floor and a ceiling. A window with no room
+ * for the floor is settled by the ceiling rather than the other way about: a
+ * minimum honoured past the edge of the window is a panel whose own header —
+ * the handle it is dragged by, the button that closes it — is off screen.
+ */
+function px(value: number, floor: number, ceiling: number): number {
+  return Math.round(Math.max(Math.min(floor, ceiling), Math.min(value, ceiling)));
 }
 
 /**
@@ -50,7 +58,8 @@ function px(value: number, min: number, max: number): number {
  * corner the panel is anchored in — so a resize moves nothing, it only changes
  * the width and the height, and each is bounded by the room left between that
  * anchor and the margin. A move changes neither: it is the anchor that travels,
- * as far as the same margin on any side.
+ * as far as the same margin on any side, except downwards, where it is the
+ * launcher's clearance that stops it.
  */
 export function draggedBox(
   from: PanelBox,
@@ -63,7 +72,11 @@ export function draggedBox(
     return {
       ...from,
       right: px(from.right - dx, PANEL_MARGIN, view.width - from.width - PANEL_MARGIN),
-      bottom: px(from.bottom - dy, PANEL_MARGIN, view.height - from.height - PANEL_MARGIN),
+      bottom: px(
+        from.bottom - dy,
+        LAUNCHER_CLEARANCE,
+        view.height - from.height - PANEL_MARGIN,
+      ),
     };
   return {
     ...from,
@@ -82,31 +95,52 @@ export function draggedBox(
  * The same box in a window it may no longer fit — one smaller than the one it
  * was dragged out in, or one being resized under it. The size gives way first,
  * then the corner it hangs from, so that what is left is inside the margin on
- * every side.
+ * every side and clear of the launcher below.
  */
 export function fittedBox(box: PanelBox, view: Viewport): PanelBox {
   const width = px(box.width, MIN_WIDTH, view.width - 2 * PANEL_MARGIN);
-  const height = px(box.height, MIN_HEIGHT, view.height - 2 * PANEL_MARGIN);
+  const height = px(box.height, MIN_HEIGHT, view.height - PANEL_MARGIN - LAUNCHER_CLEARANCE);
   return {
     right: px(box.right, PANEL_MARGIN, view.width - width - PANEL_MARGIN),
-    bottom: px(box.bottom, PANEL_MARGIN, view.height - height - PANEL_MARGIN),
+    bottom: px(box.bottom, LAUNCHER_CLEARANCE, view.height - height - PANEL_MARGIN),
     width,
     height,
   };
 }
 
-/** Brings the stored box back inside the window it is about to be drawn in. */
-export function fitPanelBox(): void {
-  if (movable()) setPanelBox(fittedBox(panelBox(), viewport()));
-}
+/**
+ * The stored box as this window can draw it, refitted as that window changes.
+ *
+ * The fit is never written back. It is this window's answer rather than a
+ * decision the reader made, and storing it would spend the box they dragged out
+ * on a wide screen the first time the page is opened on a small one — and spend
+ * it for good, since nothing puts it back. The window is state rather than
+ * something measured during a render: the server has no window, and the first
+ * client render has to reproduce what the server wrote. `null` is that render,
+ * and also every window under the breakpoint, where the stylesheet keeps the
+ * panel in its own corner and there is nothing to fit.
+ */
+export function usePanelFit(box: PanelBox): PanelBox {
+  const [view, setView] = useState<Viewport | null>(null);
 
-/** The same, for as long as the widget is mounted: a window can be resized. */
-export function usePanelFit(): void {
   useEffect(() => {
-    fitPanelBox();
-    window.addEventListener("resize", fitPanelBox);
-    return () => window.removeEventListener("resize", fitPanelBox);
+    const measure = (): void => setView(movable() ? viewport() : null);
+    // Dragging a window edge fires resize faster than the screen is drawn, and
+    // every one of them would re-render the transcript under the panel.
+    let frame = 0;
+    const onResize = (): void => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", onResize);
+    };
   }, []);
+
+  return view === null ? box : fittedBox(box, view);
 }
 
 // A drag is on the panel as a class as well as a box, because `globals.css`
@@ -118,17 +152,23 @@ export function usePanelDragging(): boolean {
   return dragging.use();
 }
 
-/** The custom properties the docked rule in `globals.css` places the panel by. */
-function vars(box: PanelBox): [string, string][] {
-  return Object.entries(box).map(([edge, size]) => [`--panel-${edge}`, `${size}px`]);
-}
-
+/**
+ * The custom properties the docked rule in `globals.css` places the panel by,
+ * spelled out: a field added to `PanelBox` is not a property any stylesheet
+ * reads. React takes custom properties off the style object all the same, which
+ * is what the cast says.
+ */
 export function panelVars(box: PanelBox): CSSProperties {
-  return Object.fromEntries(vars(box)) as CSSProperties;
+  return {
+    "--panel-right": `${box.right}px`,
+    "--panel-bottom": `${box.bottom}px`,
+    "--panel-width": `${box.width}px`,
+    "--panel-height": `${box.height}px`,
+  } as CSSProperties;
 }
 
 /**
- * Moves or resizes the docked panel for as long as the pointer that pressed
+ * Moves or resizes the docked `panel` for as long as the pointer that pressed
  * `grip` is down.
  *
  * While it runs the box goes straight to the panel's own custom properties and
@@ -138,23 +178,33 @@ export function panelVars(box: PanelBox): CSSProperties {
  * Nothing it wrote is overwritten in the meantime, since the props React holds
  * for the panel have not changed.
  */
-export function startPanelDrag(press: Press<HTMLElement>, grip: Grip): void {
-  const handle = press.currentTarget;
-  const panel = handle.closest<HTMLElement>(".chat-panel");
+export function startPanelDrag(
+  press: Press<HTMLElement>,
+  panel: HTMLElement | null,
+  grip: Grip,
+): void {
+  // Only the main button drags. A right-click opens the context menu over a
+  // captured pointer that is then never released, which would leave the panel
+  // held down with nothing to let go of it.
+  if (press.button !== 0 || !press.isPrimary) return;
   if (panel === null || !movable()) return;
+  const handle = press.currentTarget;
   // The press is the start of a drag, not of a selection of the header's text.
   press.preventDefault();
   handle.setPointerCapture(press.pointerId);
 
-  const from = panelBox();
   const view = viewport();
+  // What is on screen, which is not what is stored if this window is smaller
+  // than the one the box was dragged out in.
+  const from = fittedBox(panelBox(), view);
   const startX = press.clientX;
   const startY = press.clientY;
   let box = from;
 
   const drag = (at: PointerEvent): void => {
     box = draggedBox(from, grip, at.clientX - startX, at.clientY - startY, view);
-    for (const [name, value] of vars(box)) panel.style.setProperty(name, value);
+    for (const [name, value] of Object.entries(panelVars(box)))
+      panel.style.setProperty(name, String(value));
   };
   const drop = (): void => {
     handle.removeEventListener("pointermove", drag);

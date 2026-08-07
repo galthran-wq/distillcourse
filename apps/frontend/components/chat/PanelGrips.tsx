@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import { startPanelDrag } from "@/lib/chat/panel-box";
 
 /**
@@ -15,24 +16,24 @@ const GRIP = "absolute z-10 touch-none max-sm:hidden";
  * between them. The other two are the corner it hangs from, so these are the
  * ones that resize it without moving it. The header does the moving.
  */
-export default function PanelGrips() {
+export default function PanelGrips({ panel }: { panel: RefObject<HTMLElement | null> }) {
   return (
     <>
       <div
         aria-hidden
         className={`${GRIP} inset-y-0 -left-1 w-2 cursor-ew-resize`}
-        onPointerDown={(press) => startPanelDrag(press, "left")}
+        onPointerDown={(press) => startPanelDrag(press, panel.current, "left")}
       />
       <div
         aria-hidden
         className={`${GRIP} inset-x-0 -top-1 h-2 cursor-ns-resize`}
-        onPointerDown={(press) => startPanelDrag(press, "top")}
+        onPointerDown={(press) => startPanelDrag(press, panel.current, "top")}
       />
       {/* Last, so that the corner takes the presses the two strips cross on. */}
       <div
         aria-hidden
         className={`${GRIP} -top-1 -left-1 size-4 cursor-nwse-resize`}
-        onPointerDown={(press) => startPanelDrag(press, "corner")}
+        onPointerDown={(press) => startPanelDrag(press, panel.current, "corner")}
       />
     </>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import PanelGrips from "@/components/chat/PanelGrips";
 import { ChatIcon } from "@/components/chat/icons";
@@ -18,8 +18,15 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
   const session = useSession();
   const panel = usePanel();
-  const box = usePanelBox();
+  // A window can be smaller than the one the box was dragged out in, and can
+  // change size under an open panel. What that leaves is drawn rather than
+  // stored: the box stays the reader's.
+  const box = usePanelFit(usePanelBox());
   const dragging = usePanelDragging();
+  // What a drag moves. The lengths go straight onto this element while the
+  // pointer is down, so it is handed to the header and the grips rather than
+  // looked up from them.
+  const section = useRef<HTMLElement>(null);
   const [unreachable, setUnreachable] = useState(false);
   const open = panel !== "closed";
   // `.chat-panel` shrinks back into its launcher over one `--motion-base`.
@@ -32,10 +39,6 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   // prompt and the line of status while auth is still loading are as tall as
   // their text, and a 24rem by 32rem box holding one line is an empty box.
   const shape = expanded ? "expanded" : auth.status === "signed-in" ? "docked" : "prompt";
-
-  // A window can be smaller than the one the box was dragged out in, and can
-  // change size under an open panel.
-  usePanelFit();
 
   useEffect(() => {
     if (!open || auth.status !== "signed-in" || session !== null) return;
@@ -75,6 +78,7 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
       )}
       {onScreen && (
         <section
+          ref={section}
           aria-label="Tutor"
           // Expanded it covers the page, which is what a dialog is; docked it
           // sits beside the page and is just a region of it.
@@ -88,7 +92,7 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
             expanded ? "z-50 max-sm:rounded-none" : "z-40"
           } ${open ? "" : "is-closing"} ${dragging ? "is-dragging" : ""}`}
         >
-          {shape === "docked" && <PanelGrips />}
+          {shape === "docked" && <PanelGrips panel={section} />}
           {auth.status === "anonymous" ? (
             <p className="p-4 text-sm text-soft">
               The tutor answers about the lesson you are reading.{" "}
@@ -98,7 +102,7 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
               to ask it something.
             </p>
           ) : session !== null ? (
-            <ChatPanel session={session} expanded={expanded} />
+            <ChatPanel session={session} panel={section} expanded={expanded} />
           ) : (
             <p className="p-4 text-sm text-faint">
               {unreachable ? "the tutor is unreachable" : "opening…"}
