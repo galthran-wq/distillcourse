@@ -1,0 +1,787 @@
+A binary search tree degrades to O(n) operations whenever insertions arrive
+in sorted order; a balanced search tree prevents that by restoring a height
+invariant after every insertion or deletion using a constant number of local
+rotations. <Ref lesson="binary-search-trees">The previous lesson</Ref>
+established that every BST operation costs $O(h)$ and that the arrival order,
+not the key set, picks $h$ anywhere between $\lceil\lg(n+1)\rceil - 1$ and
+$n - 1$, with the routine orders (ascending IDs, timestamps) picking the
+worst. This lesson takes that choice away. It builds the machinery in full on
+the AVL tree, the simplest balancing scheme, and then presents the red-black
+tree, the one every mainstream library ships, through the correspondence
+that explains its rules. What remains open afterward is cost, not
+correctness: the heap of the next lesson keeps far less order for a smaller
+constant factor.
+
+The route: the rotation and the one thing it preserves; the AVL invariant
+and the two-line proof that it forces $h = O(\log n)$; the insertion fixup,
+one rebalance of at most two rotations; red-black trees as 2-3 trees in
+binary costume; and the module scoreboard updated.
+
+## Rotation: three pointer writes that reorder nothing
+
+The flaw was never the BST invariant, which licenses one-comparison discards
+in a tree of any shape; the flaw is that nothing constrains the shape. A fix
+therefore needs two parts: a **shape invariant** strong enough to force
+$h = O(\log n)$, and a **repair operation** cheap enough to run at every
+update. The repair operation is under a hard constraint of its own. The
+in-order sequence of the tree *is* the stored sorted order
+(<Ref lesson="binary-search-trees" id="order-restored-the-in-order-walk-is-sorted">the
+in-order theorem</Ref>), so a legal repair may change depths but never the
+left-to-right order of the keys.
+
+Exactly one such operation exists on a local scale, and it is the *rotation*.
+Take an edge between a node $y$ and its left child $x$. A **right rotation**
+at $y$ pivots the edge: $x$ comes up, $y$ goes down to $x$'s right, and $x$'s
+old right subtree $B$ switches parents to hang off $y$'s left. Reading the
+figure left to right, the same rotation run backward is a **left rotation**
+at $x$.
+
+<Figure
+  src="./figures/rotation.svg"
+  alt="Before and after of a rotation: y with left child x and subtrees A, B, C becomes x with right child y; B changes parent; the in-order strip A x B y C is identical under both"
+  caption="A rotation pivots one edge. Subtrees A, B, C keep their in-order positions: the sequence A · x · B · y · C reads the same on both sides."
+/>
+
+Three pointer writes implement it: $x.\mathit{right} \gets y$,
+$y.\mathit{left} \gets B$, and the parent's child pointer $\gets x$. Cost
+$O(1)$, independent of the sizes of $A$, $B$, $C$. Correctness is the
+figure's bottom strip: both trees read $A, x, B, y, C$ in order, and every
+subtree keeps keys in its legal range ($B$'s keys lie between $x$ and $y$,
+so $B$ may hang right of $x$ or left of $y$ equally well). The BST invariant
+survives, so search, insert, and delete work identically on the rotated
+tree.
+
+<Example title="right rotation at the root of the running tree">
+The previous lesson's running tree holds ten keys with 41 at the root, 20
+heading the left subtree, and 65 heading the right. Rotate right at 41: here
+$y = 41$, $x = 20$, $A = \{11\}$, $B = \{26, 29, 32\}$ (rooted at 29), and
+$C$ is 41's entire right subtree $\{50, 65, 72, 91\}$.
+
+The writes: $20.\mathit{right} \gets 41$, $41.\mathit{left} \gets 29$, and
+the root pointer $\gets 20$. In-order output before and after:
+$11, 20, 26, 29, 32, 41, 50, 65, 72, 91$. Unchanged, as the strip demands.
+
+The height is not preserved: 72, at depth 3 under the old root, sits at
+depth 4 under the new one, so the rotation moved the tree *away* from
+balance, height 3 to height 4.
+</Example>
+
+The example's last line is the point to keep. A rotation is direction-blind:
+it shortens one side by exactly the amount it lengthens the other. It is a
+steering wheel, not a stabilizer, and the invariant of the next section is
+what decides where and which way to turn it.
+
+<Exercise>
+On the original running tree, perform a right rotation at 65 (left child
+50). List the pointer writes, name the subtrees $A$, $B$, $C$, give the
+in-order output, and give the height of the whole tree before and after.
+
+<Solution>
+Here $y = 65$, $x = 50$, $A$ and $B$ are both empty (50 has no children),
+and $C = \{72, 91\}$ rooted at 91. Writes: $50.\mathit{right} \gets 65$,
+$65.\mathit{left} \gets \text{nil}$ (the $B$ write, vacuous since
+$B = \varnothing$), $41.\mathit{right} \gets 50$.
+
+The right subtree becomes the chain $50 \to 65 \to 91$ with 72 below 91:
+in-order $11, 20, 26, 29, 32, 41, 50, 65, 72, 91$, unchanged. The right
+subtree's height grows from 2 to 3, so the tree's height grows from 3 to 4.
+The transferable point: rotating an already-shallow side downhill digs it
+deeper. The empty $B$ is the boundary case of the schema, and nothing in the
+three writes needs adjusting for it.
+</Solution>
+</Exercise>
+
+<Aside>
+Rotations are not just order-preserving; they are universal. Any BST can be
+transformed into any other BST on the same keys by $O(n)$ rotations: rotate
+the first tree into the all-right chain (each right rotation at the deepest
+available spot pushes one node down; at most $n - 1$ of them are needed),
+then run the second tree's chain-making sequence backward.
+</Aside>
+
+<KeyFact>
+Rotation's monopoly cuts both ways: no other operation restructures a BST
+locally while preserving the in-order sequence, and none is needed, since
+$O(n)$ rotations reach every legal shape (the construction in the Aside
+above). A balancing scheme never has to ask whether a good shape exists,
+only how to steer toward it cheaply, and the steering rule is the entire
+difference between the schemes of this lesson.
+</KeyFact>
+
+## The invariant: sibling subtrees within one level of each other
+
+With the repair operation fixed, the design question is what the invariant
+should demand. The natural target is the floor itself: keep the tree at
+minimum height, every level full but the last. That demand turns out to
+forbid cheap repair. A complete tree's shape is a function of $n$ alone, so
+the BST condition dictates exactly which key occupies which node: the
+$k$-th node in in-order position must hold the $k$-th smallest key. Perfect
+balance is the sorted array wearing pointers, and it inherits the array's
+insertion bill: adding the key 8 to the complete tree on $0, \dots, 7$
+forces six of the eight existing nodes to change keys, and in general one
+insertion relabels $\Theta(n)$ nodes. An invariant that can be repaired by
+a few rotations near the changed leaf has to buy that locality with slack.
+
+The classical slack is one level, proposed by the Soviet mathematicians
+Adelson-Velsky and Landis in 1962 as the first balancing scheme.
+
+<Definition title="balance factor; AVL tree">
+For a node $x$ in a binary tree, the **balance factor** is
+$$
+\mathrm{bf}(x) = \mathrm{height}(x.\mathit{right}) - \mathrm{height}(x.\mathit{left}),
+$$
+with the height of an empty subtree taken as $-1$ (so a leaf has
+$\mathrm{bf} = 0$). An **AVL tree** is a BST in which every node satisfies
+$\mathrm{bf}(x) \in \{-1, 0, +1\}$.
+</Definition>
+
+Four instances fix the boundary. A perfect tree has $\mathrm{bf} = 0$
+everywhere: the invariant includes the floor. A two-node tree has
+$\mathrm{bf} = \pm 1$ at its root: single children are legal. The
+maximally tilted trees of the figure below lean at every node and are still
+AVL: the invariant is a local condition, and local tilts compound. The
+near-miss is the three-node chain: its top node has one subtree of height 1
+beside an empty subtree of height $-1$, $\mathrm{bf} = \pm 2$, violating
+exactly the one clause there is.
+
+### The height bound: minimum-size trees
+
+Whether local slack still forces logarithmic height is a counting question:
+how *few* nodes can an AVL tree of height $h$ have? Let $N(h)$ be that
+minimum. The stingiest height-$h$ tree has a root, one subtree of height
+$h-1$ (forced, to reach height $h$), and the other as small as the invariant
+tolerates, height $h-2$:
+
+$$
+N(0) = 1, \qquad N(1) = 2, \qquad N(h) = 1 + N(h-1) + N(h-2).
+$$
+
+<Figure
+  src="./figures/min-avl.svg"
+  alt="The smallest AVL trees of heights 1 through 4, with 2, 4, 7, and 12 nodes; the height-4 tree is shown as a root joining the height-3 tree (7 nodes) and the height-2 tree (4 nodes)"
+  caption="Minimum-size AVL trees: N(h) = 1 + N(h−1) + N(h−2), giving 2, 4, 7, 12, … nodes. Task: build N(5) from the last two counts before reading on; it should come to 20."
+/>
+
+<Theorem title="AVL height bound (MIT 6.006, Lecture 7)">
+An AVL tree with $n$ nodes has height $h \le 2\lg n$.
+
+<Proof>
+$N(h) = 1 + N(h-1) + N(h-2) \ge 2\,N(h-2)$, and $N(0) = 1 = 2^0$,
+$N(1) = 2 \ge 2^{1/2}$, so by induction $N(h) \ge 2^{h/2}$. A tree of
+height $h$ therefore has $n \ge N(h) \ge 2^{h/2}$ nodes; taking $\lg$ of
+both sides gives $h \le 2 \lg n$.
+</Proof>
+</Theorem>
+
+The halving in the exponent is the whole proof: allowing a tilt of one
+level means the tree can thin out at worst every *other* level, so height
+at most doubles against the perfect tree. The constant 2 is not tight. The
+recurrence for $N(h) + 1$ is the Fibonacci recurrence, and following it
+through (the Fibonacci exercise at the end of the lesson) sharpens the
+bound to
+$h \le \log_\varphi n \approx 1.44 \lg n$, where
+$\varphi = (1+\sqrt 5)/2$ is the golden ratio. At $n = 10^6$: the floor is
+19, the AVL ceiling is 28, and the plain BST ceiling is 999,999.
+
+<KeyFact>
+One level of local slack costs at most 44% of height globally: an AVL tree
+on $n$ keys has height at most $\approx 1.44 \lg n$, against the
+unmaintainable perfect $\lceil\lg(n+1)\rceil - 1$. Every $O(\log n)$
+guarantee in this lesson is this inequality plus the $O(h)$ costs of the
+previous lesson.
+</KeyFact>
+
+## Insert fixup: walk back up, rebalance once
+
+The invariant is worthless unless every insert and delete restores it, and
+restoring it needs the balance factors to be readable. Recomputing a height
+from scratch costs $\Theta(n)$, so each node instead *stores* its height,
+an extra integer maintained like any other field: a node's height is one
+plus the max of its children's stored heights, an $O(1)$ update, and only
+the changed node's ancestors (plus the two or three nodes relinked by a
+rotation) ever need updating. This store-a-subtree-summary trick is called
+*augmentation*, and it returns in the priority-queue and order-statistics
+material later in the course.
+
+An insertion hangs a new leaf exactly as in
+<Ref lesson="binary-search-trees">the previous lesson</Ref>, then walks the
+root-ward path updating stored heights. Each ancestor's height changes by
+at most 1, so no balance factor can pass $\pm 2$; the fixup finds the
+*lowest* ancestor with $|\mathrm{bf}| = 2$ and repairs there. Take
+$\mathrm{bf}(z) = +2$ (right-heavy; the $-2$ cases are mirror images), and
+let $y = z.\mathit{right}$:
+
+- **Outside case** ($\mathrm{bf}(y) \ge 0$: the extra weight is on the
+  outer, right-right line): one left rotation at $z$.
+- **Inside case** ($\mathrm{bf}(y) = -1$: the weight hangs in the bend
+  between $z$ and $y$): a single rotation fails, and a right rotation at
+  $y$ followed by a left rotation at $z$ succeeds.
+
+These are the four textbook cases RR, RL and their mirrors LL, LR: two
+genuine shapes, each with a reflection.
+
+<Figure
+  src="./figures/double-rotation.svg"
+  alt="Top row: the inside case 3-1-2, where a single right rotation at 3 produces 1-3-2, still unbalanced. Bottom row: rotating left at 1 straightens the bend into 3-2-1, and a right rotation at 3 then balances to 2 over 1 and 3"
+  caption="The inside case defeats a single rotation: the bend key 2 just flips sides. Straighten the bend first (left at 1), then rotate at the violated node."
+/>
+
+The top row of the figure shows the failure mechanism: the single rotation moves
+the imbalance from $-2$ at node 3 to $+2$ at node 1 because the middle key
+2 is *inside* the pivoting edge, and the pivot merely hands it to the other
+side. The first rotation of the double exists to move the middle key onto
+the outside line, where the second rotation can do its work.
+
+<Theorem title="one rebalance per insertion">
+After an insertion into an AVL tree, one rebalance (a single or double
+rotation, so at most two rotations) at the lowest violated node restores
+the invariant at every node of the tree.
+
+<Proof>
+Let $z$ be the lowest violated node and $H$ the height of $z$'s subtree
+before the insertion. The insertion raised that subtree to $H + 1$; that is
+the only way $z$'s balance factor moved. Checking the two cases: in the
+outside case the rotation makes both former endpoints balanced and returns
+the subtree to height $H$; in the inside case the two rotations lift the
+bend node to the top with balance factor 0 and likewise return height $H$
+(the case arithmetic is three lines per case; MIT 6.006 Lecture 7 writes
+the heights out in full). Since the subtree now has its pre-insertion
+height, every ancestor sees exactly the height it saw before the insert,
+so every stored height and balance factor above $z$ returns to its old,
+legal value, including any ancestor the insertion had pushed to $\pm 2$.
+</Proof>
+</Theorem>
+
+Deletion is the same walk with a weaker ending. A rebalance after a
+deletion can *shrink* the subtree below its pre-deletion height, which can
+newly violate the parent, which rebalances and can shrink again: the repair
+can cascade the whole way up, $O(\log n)$ rotations rather than at most
+two (the deletion exercise at the end of the lesson builds a cascade). Keep the two quantities separate: for
+both operations the fixup *walk* is $O(\log n)$; the *rotation count* is
+what differs, $\le 2$ for insert, up to $O(\log n)$ for delete. Either
+way, every dictionary operation on an AVL tree is $O(\log n)$ worst case.
+
+### The anti-degeneracy run: sorted insertion, watched
+
+The previous lesson's disaster was inserting $1, 2, \ldots$ in order.
+Under the fixup, the same order now costs three rotations in six inserts
+and never lets the height pass 2.
+
+<FigureSequence
+  name="avl-ascending"
+  alt="Seven frames: keys 1 through 6 inserted in ascending order into an AVL tree; violations with balance factor +2 appear at nodes 1, 3, and the root 2, and a left rotation repairs each; the final tree is rooted at 4 with height 2"
+  caption="Sorted insertion under the AVL fixup: three violations, three left rotations, final height 2. Every key keeps one horizontal position throughout: rotations move nothing left or right."
+/>
+
+<Task>
+Step through the frames and, before each rotation frame, predict which node
+the rotation lifts. Check frame 4 with care: nodes 3 and 2 are both at
+$+2$, the fixup fires at the lowest (node 3), and the theorem's promise
+that the root repairs itself shows up in frame 5 as node 2 dropping to
+$+1$ untouched.
+</Task>
+
+The run generalizes: under sorted insertion every violation is an outside
+case, the tree behaves like a machine that folds the growing chain back on
+itself, and after $n$ inserts the height is $\lfloor \lg n \rfloor$, the
+floor. The $10^6$-record index that cost $5 \times 10^{11}$ comparisons to
+build in the previous lesson's closing exercise costs under
+$4 \times 10^7$ here, and its searches drop from a million comparisons to
+about twenty.
+
+<Demo
+  name="RotationBalancer"
+  caption="A height-tracked BST with the AVL fixup switchable on and off; violated nodes and the repairing rotation are highlighted as they happen."
+/>
+
+<Task>
+Insert 1 through 6 in order with rotations off: the height readout climbs
+to 5, one level per key after the first. Re-run with rotations on and match
+what you see against the figure above: rotations fire after the 3rd, 5th,
+and 6th inserts, and the height readout never passes 2. Then find a
+six-key insertion order that triggers a double rotation; the run above
+never does, since sorted input produces only outside cases.
+</Task>
+
+<Exercise>
+Insert $10, 20, 30, 40, 50, 25$ into an empty AVL tree, in that order. For
+each insert, give the balance factors that change, name the case fired (if
+any), and draw or describe the resulting tree. One insert requires a
+double rotation; identify it before tracing.
+
+<Solution>
+The candidate for the double rotation is 25: it is the only key that
+arrives *between* its two nearest ancestors, so it is the only one that can
+create an inside bend.
+
+**10**: root. **20**: right child; $\mathrm{bf}(10) = +1$. **30**:
+$\mathrm{bf}(10) = +2$, right child 20 has $\mathrm{bf} = +1$: outside
+case, left rotation at 10. Tree: 20 over $(10, 30)$. **40**: right child
+of 30; $\mathrm{bf}(30) = +1$, $\mathrm{bf}(20) = +1$. **50**:
+$\mathrm{bf}(30) = +2$, outside again, left rotation at 30. Tree: 20 over
+$(10, 40)$, 40 over $(30, 50)$; $\mathrm{bf}(20) = +1$. **25**: walks
+$20 \to 40 \to 30$, attaches as 30's left child. Now
+$\mathrm{bf}(30) = -1$, $\mathrm{bf}(40) = -1$, and $\mathrm{bf}(20) = +2$
+with right child 40 at $\mathrm{bf} = -1$: **inside case**. Right rotation
+at 40 lifts 30: subtree 30 over $(25, 40(\,\cdot\,, 50))$; left rotation
+at 20 lifts 30 to the root.
+
+Final tree: 30 at the root, left child 20 over $(10, 25)$, right child 40
+with right child 50. Balance factors: 30: 0; 20: 0; 40: $+1$; leaves 0.
+Height 2, the floor for six keys. Two single rotations and one double:
+four rotations across six inserts, each insert's fixup stopping at one
+rebalance, as the theorem requires.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Insertion and deletion both walk an $O(\log n)$ fixup path, but their
+rotation counts differ: an insertion is fully repaired by one rebalance of
+at most two rotations, while a deletion's repairs can cascade to the root.
+The red-black tree below caps deletion at three rotations, and that cap is
+its claim to the standard libraries.
+</KeyFact>
+
+## Red-black trees: a 2-3 tree in binary costume
+
+The AVL tree settles the module's question, so the reason a second scheme
+exists is engineering, not necessity. The red-black tree gives a slightly
+weaker height bound in exchange for constant structural work on *every*
+update, deletions included. Stated as rules it looks arbitrary; derived
+from the 2-3 tree it is close to inevitable, so the 2-3 tree comes first.
+
+### 2-3 trees: grow at the root, not at the leaves
+
+A *2-3 tree* relaxes node width instead of balance: a node holds either
+one key with two children (a *2-node*) or two keys with three children (a
+*3-node*, whose middle child holds the keys between its two), and **every
+leaf sits at the same depth**. Search generalizes the BST walk: compare
+against the one or two keys in the node, follow the one interval that can
+contain the target.
+
+Insertion is where the design pays. The new key always joins a *leaf*
+node: if the leaf was a 2-node it becomes a 3-node and the shape is
+untouched; if it was a 3-node, the node briefly holds three keys, and it
+**splits**: the middle key moves up into the parent and the outer two
+become 2-nodes. The parent absorbs the promoted key the same way, possibly
+splitting too, and if the split cascades to the root, the root's middle
+key becomes a new root.
+
+<FigureSequence
+  name="two-three-split"
+  alt="Five frames: N is inserted into a 2-3 tree whose middle leaf and root are both 3-nodes; the leaf overflows and splits, N promotes into the root, the root overflows and splits, and N becomes a new root with every leaf dropping one level together"
+  caption="The split cascade in full: an overflowing node sends its middle key up, and when the cascade reaches the root the tree gains its new level at the top."
+/>
+
+<Task>
+Advance the frames, predicting before each one which node overflows next.
+Watch the leaf level throughout: no leaf ever gains a child, and the only
+depth change is in the last frame, where every leaf drops one level at
+once because a new root appeared above all of them.
+</Task>
+
+From the chain disaster one would expect growth at
+the bottom to be the danger; a 2-3 tree makes bottom growth structurally
+impossible. Leaves never gain children: the tree grows only when the root
+splits, adding one level *at the top* with every leaf dropping together,
+which is why all leaves stay level forever. Height therefore sits between
+$\log_3 n \approx 0.63 \lg n$ (all 3-nodes) and $\lg n$ (all 2-nodes):
+guaranteed logarithmic, for every insertion order. Widening nodes further,
+to as many keys as fit a disk page, gives the B-tree that file systems
+and databases are built on; the second course takes it up.
+
+The catch is the code. Two node types, three-way comparisons, and the
+split cases make direct implementations long and slow with no
+compensating asymptotic gain, so the direct form is rarely shipped. What
+is shipped is an encoding.
+
+### Red links are glued 3-nodes
+
+Encode each 3-node as two ordinary binary nodes joined by a *red* link,
+the smaller key hanging as the larger's left child; every real 2-3 edge is
+a *black* link. One color bit per node (the color of its parent link)
+records which is which. The result is a plain BST, searchable by the
+previous lesson's unmodified `Tree-Search`, whose black links form a
+perfectly balanced 2-3 skeleton.
+
+<Figure
+  src="./figures/rb-23.svg"
+  alt="A red-black BST with red links drawn horizontally (E glued to J, A to C, S to X), and below it the same keys as a 2-3 tree after hoisting each red node into its parent; every 2-3 leaf sits at depth 2"
+  caption="One structure, two drawings. Hoisting each red node into its parent turns the red-black BST into a 2-3 tree; the amber keys are the glued (red) halves of 3-nodes."
+/>
+
+Read the standard rules off the encoding. A red-black tree is a BST in
+which:
+
+1. every node is red or black;
+2. the root is black (it is a real node of the encoded tree, not glue);
+3. every nil is black;
+4. a red node has only black children (a red node is glue, so it must
+   hang directly off the black core of its cluster; a red child of a red
+   node would chain glue onto glue and fuse unboundedly many binary nodes
+   into a single node);
+5. every root-to-nil path has the same number of black nodes (black links
+   are the encoded tree's real edges, and its leaves all sit at the same
+   depth).
+
+These five properties do not quite say "this BST is a diagram of a 2-3
+tree". Property 4 caps a glued cluster at one black node with at most two
+red children, and that is up to *three* keys with four subtrees, a
+*4-node*. Properties 4 and 5 therefore encode the **2-3-4 tree**, the
+sibling structure whose nodes hold one, two, or three keys; it balances
+by the same split-and-promote mechanism, and it is the variant CLRS
+maintains directly, with red links hanging on either side. Pinning the
+encoding to the 2-3 tree of the figure takes one more rule, Sedgewick's
+**left-leaning convention**:
+
+6. red links lean left, and no node has two red children.
+
+Forbidding two red children outlaws the 4-node cluster, and forcing the
+glue leftward makes each 2-3 tree's encoding unique. The height bound is
+indifferent to the choice: properties 4 and 5 alone force it, in either
+convention.
+
+<Theorem title="red-black height bound (CLRS Lemma 13.1)">
+A red-black tree with $n$ internal nodes has height at most
+$2\lg(n+1)$.
+
+<Proof>
+Write $\mathrm{bh}(x)$ for the *black-height* of $x$: the number of black
+nodes on any path from $x$ (exclusive) down to a nil, well defined by
+property 5. Induction on height shows the subtree at $x$ has at least
+$2^{\mathrm{bh}(x)} - 1$ internal nodes: a nil has $\mathrm{bh} = 0$ and
+$2^0 - 1 = 0$ nodes, and an internal $x$ has two children of black-height
+at least $\mathrm{bh}(x) - 1$, giving
+$n(x) \ge 2\,(2^{\mathrm{bh}(x)-1} - 1) + 1 = 2^{\mathrm{bh}(x)} - 1$.
+By property 4 at least half the nodes on any root-to-nil path are black,
+so $\mathrm{bh}(\mathrm{root}) \ge h/2$, hence
+$n \ge 2^{h/2} - 1$ and $h \le 2\lg(n+1)$.
+</Proof>
+</Theorem>
+
+The factor 2 has the same meaning as the correspondence: a path alternates
+red and black at worst, so no path is more than twice as long as the
+all-black paths, which have length $\le \lg(n+1)$. It is the AVL argument
+with "thin out every other level" replaced by "go red every other link".
+
+### Constant rotations: why libraries default to red-black
+
+Insertion and deletion maintain the rules by simulating the 2-3 (in CLRS's
+variant, 2-3-4) operations on the encoding. Adding a key to a 2-node or
+splitting a 3-node becomes a **color flip** (repaint the links around one
+node) plus at most a couple of rotations to point the red links the right
+way. The consequences:
+
+- an insertion performs at most **2 rotations**;
+- a deletion performs at most **3 rotations**;
+- a split cascade can recolor $O(\log n)$ nodes, but recoloring is a bit
+  write, and averaged over any operation sequence the recoloring work is
+  $O(1)$ per update (the split-counting exercise at the end of the lesson
+  proves the 2-3 version of this by the aggregate method).
+
+That deletion line is the differentiator: the AVL delete can rotate at
+every level, the red-black delete restructures a bounded neighborhood and
+otherwise only recolors. The price is the height constant, 2 versus
+AVL's 1.44, so reads pay slightly more so that writes pay a bounded
+amount. Measured on realistic loads the price is smaller than the bound
+suggests: Sedgewick reports typical search paths of about
+$1.0 \lg n$. This trade is why the red-black tree backs `std::map` and
+`std::set` in C++, `TreeMap` and `TreeSet` in Java, and the
+[Linux kernel's rbtree](https://docs.kernel.org/core-api/rbtree.html)
+(which schedules processes with it in the Completely Fair Scheduler);
+AVL trees appear where reads dominate updates.
+
+The scheme and the name date to 1978, when
+[Guibas and Sedgewick](https://doi.org/10.1109/SFCS.1978.3) published
+"A Dichromatic Framework for Balanced Trees", showing that the known
+balancing schemes could all be expressed as BSTs with one extra bit per
+node, drawn as two link colors.
+
+### A height bound as a contract
+
+The bound has been tested in court, and the case closes an account this
+module left open. A telephone company contracted a database provider for a
+real-time customer database, built on red-black search and insert with
+<Ref lesson="binary-search-trees">Hibbard deletion</Ref>, the
+successor-splicing scheme of the previous lesson, which performs no
+red-black fixup at all. The implementers capped tree height at 80,
+comfortable if the theorem holds, since $2\lg n \le 80$ covers
+$2^{40} \approx 10^{12}$ keys, and wired the cap to an error-recovery
+process. Unrepaired deletions let the height creep past 80; the recovery
+process triggered; the phone service suffered an extended outage; the
+telephone company sued. The expert-witness testimony was the theorem read
+into the legal record: "if implemented properly, the height of a red-black
+BST with $n$ keys is at most $2 \lg n$." The height bound is not a
+performance nicety; it is the load-bearing clause of the structure's
+contract, and it binds only if *every* mutating operation restores the
+invariant, deletion included.
+
+<KeyFact>
+A red-black tree is a 2-3-4 tree drawn as a BST, and under the
+left-leaning convention exactly a 2-3 tree: red links glue multiway
+nodes, black-path equality is their level leaves. It holds
+$h \le 2\lg(n+1)$ with at most 2 rotations per insert and 3 per delete,
+the bounded-write guarantee that makes it the default ordered container
+in C++, Java, and the Linux kernel.
+</KeyFact>
+
+## The scoreboard: every ordered operation, O(log n), guaranteed
+
+The module set out to restore what hashing destroyed without giving up
+updates, and the goal is now met with worst-case guarantees.
+
+<Figure
+  src="./figures/height-bars.svg"
+  alt="Bar chart of worst-case heights at one million keys: perfect balance 19, AVL at most 28, red-black at most 39, and a plain BST on sorted input at 999,999, drawn with a break because it is 25,000 times the red-black bar"
+  caption="One million keys: both balanced ceilings sit within a factor 2 of the unmaintainable floor; the unbalanced worst case is not on the same scale."
+/>
+
+| operation | hash table | balanced BST |
+| --- | --- | --- |
+| search / insert / delete | $O(1)$ expected | $O(\log n)$ worst case |
+| minimum, successor | $\Theta(m + n)$ scan | $O(\log n)$ worst case |
+| range report, $r$ results | $\Theta(m + n)$ scan | $O(\log n + r)$ worst case |
+| guarantee holds… | for random-looking keys (<Ref lesson="hash-tables">HashDoS</Ref> breaks it) | for **every** input and arrival order |
+
+The columns are not rivals so much as answers to different questions: if
+no query ever mentions order, hashing's expected $O(1)$ is unbeatable;
+the moment minimum, successor, or a range enters the workload, the
+balanced BST is the structure that serves it without a full scan, at
+logarithmic cost per operation with no assumptions about keys, arrival
+order, or deletions.
+
+What is established: a rotation restructures in $O(1)$ while provably
+preserving the in-order sequence; the AVL invariant (sibling heights
+within 1) forces $h \le 1.44 \lg n$ and is restored after an insertion by
+one rebalance of at most two rotations; the red-black rules are the 2-3
+tree's perfect leaf-balance transcribed onto a binary tree, force
+$h \le 2\lg(n+1)$, and are maintained with a constant number of rotations
+per update, which is why libraries default to them. The module's next
+structure answers a cheaper question: a priority queue never asks for
+search, successor, or range, only "hand me the minimum", and
+<Ref lesson="binary-heaps-and-priority-queues">the binary heap</Ref>
+serves exactly that with no pointers, no rotations, and a weaker
+invariant on a complete tree packed into an array. The closing exercise
+walks to its doorstep.
+
+## Exercises
+
+<Exercise>
+The 2-3 tree $T$ has root $(G\ P)$ with three children: the leaf
+$(A\ C)$, the leaf $(K)$, and the leaf $(S\ U)$. (a) Draw the left-leaning
+red-black BST that encodes $T$. (b) Verify the five red-black properties
+and the left-leaning rule on your drawing. (c) Give the height of $T$, the height of the encoding,
+and check the encoding against the $2\lg(n+1)$ bound.
+
+<Solution>
+(a) Encode each 3-node as (larger key, black) with the smaller key as its
+red left child. Root: $P$ black with red left child $G$. $G$'s children
+are the encodings of the subtrees left of $G$ and between $G$ and $P$:
+left, $C$ black with red left child $A$; right, $K$ black. $P$'s right
+child covers keys above $P$: $U$ black with red left child $S$.
+
+(b) Property 1: every node colored. Property 2: the root $P$ is black.
+Property 3: nils black by convention. Property 4: the red nodes $G$, $A$,
+$S$ each have only black (or nil) children; no red-red edge. Property 5:
+count black nodes below the root on each path: through $A$:
+$C, \text{nil}$: 2 ($G$ and $A$ are red); through $K$: $K, \text{nil}$:
+2; through $S$: $U, \text{nil}$: 2. Equal on every path. Left-leaning
+rule: every red node ($G$, $A$, $S$) hangs as a left child, and no node
+has two red children.
+
+(c) $T$ has height 1 (root to leaves). The encoding has height 3 (path
+$P \to G \to C \to A$): each level of the 2-3 tree can cost up to two
+binary levels, one black link plus one red. With $n = 7$ keys the bound
+is $2\lg 8 = 6 \ge 3$. The transferable check: black links alone
+reproduce the 2-3 edges, so the black count 2 in (b) is the 2-3 height
+plus one nil step.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "AVL and red-black trees both force height $O(\log n)$, so every
+red-black tree satisfies the AVL invariant, just with different
+bookkeeping." Exhibit a legal red-black tree (the five-property CLRS
+convention, no rule 6, so red links may hang on either side) that is not
+an AVL tree, verify both claims about it, and
+name what each invariant actually bounds.
+
+<Solution>
+Take: root 10 black; left child 5 black (a leaf); right child 20 **red**
+with black children 15 and 30; and 35 red as 30's right child.
+
+Red-black legality: root black; the red nodes 20 and 35 have only black
+or nil children; black counts below the root: through 5: $5, \text{nil}$
+= 2; through 15: $15, \text{nil}$ = 2 (20 is red); through 35:
+$30, \text{nil}$ = 2; through 30's left nil: $30, \text{nil}$ = 2. All
+paths agree, so property 5 holds.
+
+AVL check at the root: left subtree (node 5) has height 0, right subtree
+($20 \to 30 \to 35$) has height 2, so $\mathrm{bf}(10) = +2$. Not an AVL
+tree.
+
+The step that fails in the claim is the substitution of one bound for
+the other. Property 5 equalizes only the *black* count per path, and
+property 4 then caps a path at twice its black count: red-black bounds
+the **ratio of path lengths** (longest over shortest $\le 2$). The AVL
+invariant bounds the **difference of sibling subtree heights** at every
+node. Both imply $h = O(\log n)$, with constants 2 and 1.44, but neither
+implies the other; the tree above has a legal 2:1 path ratio that the
+AVL difference condition forbids.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson used $N(h) \ge 2^{h/2}$ and cited $1.44 \lg n$ as the true
+constant. Derive it: (a) show $N(h) = F(h+3) - 1$, where $F(1) = F(2) =
+1, F(k) = F(k-1) + F(k-2)$ are the Fibonacci numbers; (b) show
+$F(k) \ge \varphi^{\,k-2}$ for $k \ge 2$, where
+$\varphi = (1 + \sqrt 5)/2$; (c) conclude
+$h \le \log_\varphi(n + 1) - 1 \approx 1.44\lg(n+1)$, and evaluate the
+bound at $n = 10^6$ against the lesson's figure of 28.
+
+<Solution>
+(a) Set $M(h) = N(h) + 1$. The recurrence $N(h) = 1 + N(h-1) + N(h-2)$
+becomes $M(h) = M(h-1) + M(h-2)$, exactly Fibonacci's. Bases:
+$M(0) = 2 = F(3)$ and $M(1) = 3 = F(4)$, so by induction
+$M(h) = F(h+3)$, i.e. $N(h) = F(h+3) - 1$. Check against the figure:
+$F(4)-1, \ldots, F(7)-1 = 2, 4, 7, 12$.
+
+(b) Induction using $\varphi^2 = \varphi + 1$. Bases:
+$F(2) = 1 = \varphi^0$ and $F(3) = 2 \ge \varphi$. Step:
+$F(k) = F(k-1) + F(k-2) \ge \varphi^{k-3} + \varphi^{k-4} =
+\varphi^{k-4}(\varphi + 1) = \varphi^{k-4}\varphi^2 = \varphi^{k-2}$.
+
+(c) A height-$h$ AVL tree has
+$n \ge N(h) = F(h+3) - 1 \ge \varphi^{h+1} - 1$, so
+$\varphi^{h+1} \le n + 1$ and
+$h \le \log_\varphi(n+1) - 1$. Since
+$\log_\varphi x = \lg x / \lg \varphi$ and $\lg \varphi \approx 0.694$,
+the constant is $1/0.694 \approx 1.44$. At $n = 10^6$:
+$\log_\varphi(10^6) = 6 \ln 10 / \ln \varphi \approx 13.816 / 0.481
+\approx 28.7$, so $h \le 27.7$, i.e. height at most 27, matching (and
+slightly beating) the figure's rounded 28.
+</Solution>
+</Exercise>
+
+<Exercise>
+Deletion's rotations cascade where insertion's stop. Build the
+minimum-size AVL tree of height 4 on the keys $1, \ldots, 12$ (left
+subtree always the deeper one), delete the key 12, and run the fixup:
+identify every node that becomes violated, the rotation that repairs it,
+and the total rotation count. Then state the general pattern this example
+illustrates.
+
+<Solution>
+Construction ($T_h$ = min tree of height $h$, root's left subtree
+$T_{h-1}$, right $T_{h-2}$, keys assigned by in-order rank): root 8; left
+subtree on $1..7$: root 5 with left $T_2$ (3 over $(2, 4)$, 2 with left
+child 1) and right $T_1$ (7 with left child 6); right subtree on
+$9..12$: root 11 with left $T_1$ (10 with left child 9) and right leaf
+12.
+
+Delete 12 (a leaf: unlink). Node 11: left height 1, right $-1$,
+$\mathrm{bf} = -2$; left child 10 has $\mathrm{bf} = -1$: outside case,
+**right rotation at 11**, subtree becomes 10 over $(9, 11)$. Its height
+fell from 2 to 1, and that shrinkage is what insertion never produces.
+Now the root 8: left height 3, right height 1, $\mathrm{bf} = -2$; left
+child 5 has $\mathrm{bf} = -1$: outside case, **right rotation at 8**.
+Final tree: root 5; left 3 over $(2(1, \cdot), 4)$; right 8 over
+$(7(6, \cdot), 10(9, 11))$. All balance factors in $\{-1, 0\}$; the
+tree's height fell from 4 to 3. Total: **two rotations** from one
+deletion, at two different levels.
+
+Pattern: in a minimum-size (Fibonacci) tree, every node is tilted, so a
+deletion on the shallow side violates its parent, and the repairing
+rotation shrinks that subtree and passes the violation up; deleting the
+shallowest leaf of $T_h$ triggers a rebalance at every other level,
+$\Theta(h) = \Theta(\log n)$ rotations. This worst case is exactly what
+the red-black tree's $\le 3$-rotation deletion avoids, and the practical
+reason update-heavy libraries prefer it.
+</Solution>
+</Exercise>
+
+<Exercise>
+In a 2-3 tree, an insertion's split cascade can run all the way to the
+root, $\Theta(\log n)$ splits in the worst case. Prove that over any
+sequence of $n$ insertions into an initially empty 2-3 tree, the *total*
+number of splits is at most $n$, so the amortized split count per
+insertion is at most 1. Name the analysis method, and the earlier
+structure whose analysis had the same shape.
+
+<Solution>
+Count 3-nodes. A split happens only to a node that was a 3-node and
+received one key more; the split replaces it by two 2-nodes (destroying
+one 3-node) and promotes its middle key. So **every split destroys
+exactly one 3-node**. Where are 3-nodes created? Only when a 2-node
+receives a key, which happens at most once per insertion: the cascade
+ends either at the first 2-node ancestor, which becomes a 3-node (one
+creation, cascade over), at the root splitting (the new root is a
+2-node: zero creations), or at a 2-node leaf if there was no split at
+all (one creation). Every step before the cascade's end destroys a
+3-node and creates none. Hence over the whole history,
+$$
+\#\text{splits} = \#\text{3-nodes destroyed} \le \#\text{3-nodes created} \le n .
+$$
+Total split work over $n$ inserts is $O(n)$: at most one split per
+insertion on average, even though a single insertion can suffer
+$\Theta(\log n)$.
+
+The method is the **aggregate method** of
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the amortized-analysis
+lesson</Ref>, and the shape is the doubling array's: an expensive event
+(split, resize) must be paid for by many cheap events that set it up, so
+the total telescopes. Via the correspondence, this is also why a
+red-black tree's recoloring cascades cost $O(1)$ amortized: a color flip
+is the encoded split.
+</Solution>
+</Exercise>
+
+<Exercise>
+An event scheduler performs exactly two operations: insert a timestamped
+event, and remove-and-return the earliest event. (a) Give the cost of
+each on an AVL tree, including how remove-earliest finds its target.
+(b) List the capabilities the AVL invariant maintains that this workload
+never invokes. (c) The workload's shape needs are weak enough for the
+one shape rotations exist to avoid: a *complete* tree, which this
+lesson showed is a function of $n$ alone and stores in an array with no
+pointers. Propose the weakest per-node ordering condition on a complete
+tree that still makes the earliest event readable at the root in $O(1)$,
+and state what an insertion would have to repair.
+
+<Solution>
+(a) Insert: $O(\log n)$, the ordinary fixup. Remove-earliest: the
+minimum is the leftmost node, an $O(\log n)$ walk down left links
+(<Ref lesson="binary-search-trees">previous lesson</Ref>), plus an
+$O(\log n)$ delete with its possible rotation cascade.
+
+(b) The full sorted order: search for an arbitrary key, successor and
+predecessor of any element, range reports, in-order traversal. The
+scheduler asks only ever for one end of the order. Maintaining
+comparability of *every* pair of keys, which is what the BST invariant
+plus balance buys, is wasted on it.
+
+(c) It suffices that **every node's key is $\le$ both children's keys**:
+then the root is a minimum by induction along any downward path. Nothing
+constrains siblings, which is precisely the order given up. A complete
+tree's shape is determined by $n$, so an insertion appends at the one
+legal new slot (constant-time to locate in the array layout) and then
+must repair only the ordering along the *single root-to-leaf path*
+through that slot, $O(\lg n)$ comparisons, no rotations, since the shape
+is already correct by construction. This structure is the binary heap,
+and the repair walk is the sift of
+<Ref lesson="binary-heaps-and-priority-queues">the next lesson</Ref>,
+which also shows the surprise that building it from scratch costs
+$O(n)$, not $O(n \log n)$.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §13.1 the five red-black properties and Lemma 13.1 (the black-height argument reproduced here); §13.2 rotations, with Figure 13.2 the model for the rotation figure; §§13.3–13.4 the full insert/delete fixup case analysis this lesson deliberately summarizes rather than reproduces.
+2. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 7 "Binary Trees II: AVL" — rotations and their $O(1)$ relinking, the height-balance proof $N(h) \ge 2^{h/2}$, the local rebalance cases with full height arithmetic, and subtree augmentation. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+3. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §3.3: 2-3 trees, the left-leaning red-black correspondence, the $\le 2\lg n$ proposition and the $\sim 1.0\lg n$ typical-case measurement, and the telephone-company war story with the expert-witness quotation. Companion site: https://algs4.cs.princeton.edu/33balanced/
+4. P. Morin, *Open Data Structures*, 2013 — Ch. 9: red-black trees as simulated 2-4 trees, the three properties behind their library popularity (height $\le 2\log n$, worst-case $O(\log n)$ updates, $O(1)$ amortized rotations). https://opendatastructures.org/
+5. K. Schwarz, *Stanford CS166: Data Structures*, Lectures 06–07 "Balanced Trees" — the derive-don't-memorize treatment of the red-black rules via the 2-3-4 isometry, and the fact sheet used here: $\le 2$ rotations per insertion, $\le 3$ per deletion, $O(1)$ amortized recolorings. https://web.stanford.edu/class/archive/cs/cs166/cs166.1266/
+6. L. J. Guibas, R. Sedgewick, "A Dichromatic Framework for Balanced Trees," *19th Annual Symposium on Foundations of Computer Science*, 8–21, 1978 — the paper that introduced the red-black encoding and showed the known balancing schemes fit one two-color framework. https://doi.org/10.1109/SFCS.1978.3
+7. G. M. Adelson-Velsky, E. M. Landis, "An algorithm for the organization of information," *Doklady Akademii Nauk SSSR* 146, 263–266, 1962 (English translation in *Soviet Mathematics Doklady* 3, 1259–1263) — the original AVL paper: the first balancing scheme and the $1.44\lg n$ height bound.
+</References>

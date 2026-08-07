@@ -1,0 +1,724 @@
+Merge sort is one instance of a general pattern — split a problem into
+smaller instances of itself, solve them recursively, and combine the
+results — and the same pattern designs algorithms for problems that look
+nothing like sorting. Until now the course has analyzed algorithms it was
+handed: the analysis module built the pricing tools, and the sorting
+module spent them on merge sort and quicksort, naming their shared shape
+<Ref lesson="comparison-sorting-merge-and-quicksort">divide-and-conquer</Ref>.
+This lesson opens the design-paradigms module, where the direction
+reverses: the pattern becomes a method for producing an algorithm that
+does not exist yet. The proving ground is integer multiplication, a
+problem with no sorting in it anywhere; the finding is that the split
+by itself contributes nothing, the first honest attempt landing back on
+$\Theta(n^2)$, and that the combine step is where a divide-and-conquer
+design is won or lost. The route: the pattern restated as a four-decision
+checklist, the checklist run on the Tower of Hanoi as a warm-up, then on
+multiplication, where a 1960 algebraic trick rescues the failed design;
+last, the same trick at matrix scale, and the boundary where the paradigm
+stops working.
+
+## The template: four decisions and the recurrence they induce
+
+The sorting module's two algorithms, re-read as a sequence of decisions
+rather than a pair of programs, answer the same four questions. Stated
+once, generally:
+
+1. **Split.** How is an instance cut into smaller instances of the same
+   problem? (Merge sort: at the midpoint, blind to the values.)
+2. **Return contract.** What exactly does a solved subproblem hand back?
+   (Each half comes back sorted; the recursion is trusted for this,
+   never re-checked.)
+3. **Combine.** How do the sub-answers become the whole answer, and at
+   what cost? (The two-finger merge, $\Theta(n)$.)
+4. **Recurrence.** The three previous answers fix $a$, $b$, and $f(n)$
+   in $T(n) = a\,T(n/b) + f(n)$, and the
+   <Ref lesson="recurrences-and-master-theorem">Master theorem</Ref>
+   prices the design before a line of it is coded. (Merge sort:
+   $T(n) = 2T(n/2) + \Theta(n) = \Theta(n \lg n)$.)
+
+<Figure
+  src="./figures/template-card.svg"
+  alt="A four-row design card listing the split, return contract, combine, and recurrence decisions of a divide-and-conquer algorithm, each row filled in with merge sort's answer"
+  caption="The design card, filled in for the known instance. A new design fills the same four slots."
+/>
+
+The fourth row is the reason the checklist is worth writing down. An
+iterative algorithm must be built before its loop can be counted; a
+divide-and-conquer design is priced **at the design stage**, because the
+recurrence depends only on the three choices, not on any implementation.
+A designer who fills in the first three slots and gets an unacceptable
+fourth row throws the design away without coding it; this lesson does
+exactly that once.
+
+Two boundary notes on the pattern, both established in
+<Ref lesson="comparison-sorting-merge-and-quicksort">the sorting
+lesson</Ref> and load-bearing here. The subproblems must be *disjoint*
+instances of the same problem: the clause recursive Fibonacci violates,
+and the final section returns to. And recursion into a *single* smaller
+instance (binary search discarding one half) is conventionally called
+*decrease-and-conquer*: the template covers it with $a = 1$, but with one
+call there is nothing to combine, and none of this lesson's design
+tension exists there.
+
+## Tower of Hanoi: the combine can be trivial
+
+Before multiplication, one run of the checklist on a problem where three
+of the four slots are almost empty: recursion in its purest form. The
+*Tower of Hanoi* is a physical puzzle published in 1883 by the French
+mathematician Édouard Lucas: $n$ disks of decreasing size are stacked on
+one of three pegs, the whole stack must move to another peg, and the
+rules allow moving only one disk at a time and never placing a disk on a
+smaller one.
+
+Every disk blocks the ones below it, so the largest disk can move only
+when the other $n-1$ are stacked, in order, on the spare peg. That
+observation is the entire algorithm.
+
+<FigureSequence
+  name="hanoi"
+  alt="Three frames of the recursive Tower of Hanoi move: the top n minus 1 disks are parked on the spare peg by recursion, the largest disk moves to the destination in one move, and the parked disks are re-stacked onto it by a second recursion"
+  caption="The recursive move: park n−1 disks by recursion, move the largest, re-stack the n−1 by recursion."
+/>
+
+<Task>
+Step the three frames and write the recurrence before reading on: count
+one $T(n-1)$ per recursive frame and $1$ for the middle frame.
+</Task>
+
+```text
+Hanoi(n, src, dst, tmp):
+  if n > 0
+    Hanoi(n−1, src, tmp, dst)    ▷ park the n−1 smaller disks
+    move disk n from src to dst  ▷ one move
+    Hanoi(n−1, tmp, dst, src)    ▷ re-stack them on top
+```
+
+The checklist: the split peels one disk off ($n \to n-1$, twice); the
+return contract is "the $n-1$ smaller disks now sit, legally stacked, on
+the named peg"; the combine is nothing at all: the second recursive call
+*is* the rest of the answer. The move count obeys
+
+$$
+T(n) = 2\,T(n-1) + 1, \qquad T(0) = 0,
+$$
+
+and unrolling gives $T(n) = 1 + 2 + 4 + \cdots + 2^{n-1} = 2^n - 1$
+(check: $T(1)=1$, $T(2)=3$, $T(3)=7$; induction confirms the pattern in
+an exercise below, and no algorithm does better).
+
+The recurrence is deliberately outside the $a\,T(n/b) + f(n)$ form: the
+instance shrinks by subtraction, not by a constant factor, so the
+<Ref lesson="recurrences-and-master-theorem">Master theorem</Ref> does
+not apply. Summing levels still prices the tree: depth $i$ holds $2^i$
+calls of constant work each, the same doubling trend as any
+leaf-dominated tree. But subtraction makes the tree $n$ levels deep
+instead of $\lg n$, with $2^n$ leaves instead of $n^{\log_b a}$. Two
+recursive calls are exponential or cheap depending entirely on how fast
+the instance shrinks.
+
+<KeyFact>
+Lucas's promotional legend has monks moving $64$ golden disks by this
+algorithm; $2^{64} - 1 \approx 1.8 \times 10^{19}$ moves at one per
+second is about **585 billion years**, roughly forty times the age of
+the universe. Two calls on $n-1$ cost $2^n$; two calls on $n/2$ cost
+$n \lg n$. The split geometry, before anything else, decides polynomial
+against exponential.
+</KeyFact>
+
+<Exercise>
+In a run of `Hanoi(n, ...)`, how many times does disk $k$ move
+($k = n$ the largest, $k = 1$ the smallest)? Derive a formula, then
+check it by summing over all disks. Write the recurrence for the count
+before opening the solution.
+
+<Solution>
+Strategy: the same unrolling as for $T(n)$, tracked per disk.
+
+Let $m_k(n)$ be the number of moves of disk $k$. Disk $n$ moves exactly
+once, at the middle line, and no recursive call touches it: $m_n(n) = 1$.
+For $k < n$, disk $k$ moves only inside the two recursive calls, each a
+full run on $n-1$ disks: $m_k(n) = 2\,m_k(n-1)$. Unrolling the doubling
+from $m_k(k) = 1$ gives
+$$
+m_k(n) = 2^{\,n-k}.
+$$
+The smallest disk moves $2^{n-1}$ times, every second move of the whole
+run. Check by summation:
+$\sum_{k=1}^{n} 2^{\,n-k} = 2^{n-1} + \cdots + 2 + 1 = 2^n - 1 = T(n)$,
+the total already derived. The transferable move: a per-element count in
+a recursion obeys its own recurrence, read off the same code.
+</Solution>
+</Exercise>
+
+## Multiplication: an ancient problem and a failed split
+
+<Figure
+  src="./figures/treviso-1478-multiplication.png"
+  alt="Two multiplication worksheets in 15th-century type: on the left, 934 times 314 set out as long multiplication with the partial products 3736, 934 and 2802 summing to 293276, a cross of casting-out-nines check digits beside it; on the right, the same product in a three-by-three lattice with 9 3 4 along the top and 3 1 4 down the right side, each cell split by a diagonal and the digits of 293276 read off the left and bottom edges"
+  caption="Two ways to multiply 934 × 314, printed in 1478: the long form with a casting-out-nines check, and the lattice."
+  float="right"
+  width="m"
+/>
+
+The second run of the checklist is on multiplication: given two $n$-digit
+numbers, compute their product. The digit-by-digit method a schoolchild
+still learns, shown in the figure in its 1478 typeset form, computes
+every product of a digit of $x$ with a digit of $y$: $n^2$ single-digit
+multiplications, $\Theta(n^2)$ time.
+
+The cost is real. Modern cryptography and computer algebra multiply
+integers thousands of digits long, and at $n = 10^6$ digits a
+$\Theta(n^2)$ method performs on the order of $10^{12}$ digit products:
+<Ref lesson="asymptotic-notation">the wall-clock ladder's</Ref> minutes,
+for one multiplication.
+
+### The obvious split: four quarter-size calls
+
+Merge sort halved its input and turned $\Theta(n^2)$ sorting into
+$\Theta(n \lg n)$; the precedent suggests halving the numbers should cut
+multiplication's cost the same way. Split each factor into a high and a
+low half of $m = n/2$ digits:
+
+$$
+x = 10^m a + b, \qquad y = 10^m c + d,
+$$
+
+so that $x = 1234$ splits as $a = 12$, $b = 34$. Multiplying out:
+
+$$
+x \cdot y \;=\; 10^{2m}\,ac \;+\; 10^m\,(ad + bc) \;+\; bd.
+$$
+
+The identity is a complete divide-and-conquer design. Split: cut each
+number's digit array in half, $\Theta(n)$. Return contract: each of the
+four sub-products $ac$, $ad$, $bc$, $bd$ is a genuine half-size instance
+of the same problem, computed recursively. Combine: multiplying by
+$10^{2m}$ or $10^m$ is a digit shift, and the additions are
+digit-by-digit, $\Theta(n)$ in total. The fourth row of the card:
+
+$$
+T(n) = 4\,T(n/2) + \Theta(n).
+$$
+
+This recurrence was solved in
+<Ref lesson="recurrences-and-master-theorem">the recurrences lesson</Ref>:
+the watershed is $n^{\log_2 4} = n^2$, the driving function is
+polynomially smaller, and case 1 of the Master theorem gives
+$T(n) = \Theta(n^2)$, leaf-dominated, with $n^2$ leaves doing the work.
+The design is discarded at the fourth row, exactly as the checklist
+allows: recursion reproduced the grade-school cost because its $n^2$
+leaf-level single-digit products are the same $n^2$ digit pairs the
+lattice computes directly. **Splitting alone bought nothing.** The
+precedent from sorting misled: merge sort's win was never the split
+(quicksort wins with all its work in the divide, merge sort with all of
+it in the combine); the win was that two half-size calls cost less than
+one full-size problem, and here the split produced four.
+
+## Karatsuba: three multiplications instead of four
+
+What the failed design needs is fewer recursive calls, and the count of
+calls is set by the combine's algebra: the combine needs the three
+coefficients $ac$, $ad + bc$, and $bd$, and the obvious way to get the
+middle one costs two multiplications. In 1960 Andrei Kolmogorov,
+conjecturing that $\Theta(n^2)$ was optimal, posed exactly this problem
+to a seminar at Moscow State University; within a week a 23-year-old
+student, Anatoly Karatsuba, brought back the counterexample below, and
+Kolmogorov, after presenting the result to the seminar himself,
+terminated the seminar. The observation, in the clean form later given
+by Knuth:
+
+$$
+ad + bc \;=\; ac + bd - (a - b)(c - d).
+$$
+
+Expanding the right side checks it in one line: $(a-b)(c-d) = ac - ad -
+bc + bd$, and subtracting that from $ac + bd$ leaves $ad + bc$. The
+consequence: the middle coefficient comes **free** from the two
+coefficients already needed, plus *one* new half-size multiplication,
+$(a-b)(c-d)$. Three recursive calls, not four.
+
+<Example title="Karatsuba on 1234 × 5678, every digit">
+Split at $m = 2$: $a = 12$, $b = 34$, $c = 56$, $d = 78$.
+
+**Three products** (each a half-size multiplication):
+$$
+ac = 12 \cdot 56 = 672, \qquad
+bd = 34 \cdot 78 = 2652,
+$$
+$$
+(a-b)(c-d) = (12 - 34)(56 - 78) = (-22)(-22) = 484.
+$$
+
+**Middle coefficient by subtraction**, no fourth multiplication:
+$$
+ad + bc = 672 + 2652 - 484 = 2840.
+$$
+(Direct check, using the two products the algorithm never computes:
+$ad + bc = 12 \cdot 78 + 34 \cdot 56 = 936 + 1904 = 2840$.)
+
+**Recombine with shifts:**
+$$
+1234 \times 5678
+= 672 \cdot 10^4 + 2840 \cdot 10^2 + 2652
+= 6{,}720{,}000 + 284{,}000 + 2{,}652
+= 7{,}006{,}652.
+$$
+
+Three two-digit multiplications and a handful of additions and shifts
+replaced four two-digit multiplications; recursing into the three
+sub-products (rather than calling them primitive) repeats the same trade
+at every level.
+</Example>
+
+<FigureSequence
+  name="karatsuba"
+  alt="Four frames of Karatsuba's method on 1234 times 5678: the split into high and low halves, the three recursive products 672, 2652, and 484, the middle coefficient 2840 formed by subtraction, and the shifted recombination summing to 7006652"
+  caption="One level of Karatsuba on 1234 × 5678. The middle coefficient is assembled, never multiplied for."
+/>
+
+<Task>
+Step the frames, then recompute frame 3's subtraction with the signs
+reversed, $(34-12)(78-56)$, and confirm the middle coefficient is
+unchanged: the two sign flips cancel. This is the step to double-check
+in any implementation.
+</Task>
+
+<Exercise>
+Compute $3141 \times 2718$ by one level of Karatsuba: give the split,
+the three products, the middle coefficient, and the recombination. One
+of the intermediate values is negative this time; carry its sign through.
+
+<Solution>
+Split at $m = 2$: $a = 31$, $b = 41$, $c = 27$, $d = 18$.
+
+Three products: $ac = 31 \cdot 27 = 837$; $bd = 41 \cdot 18 = 738$;
+$(a-b)(c-d) = (31 - 41)(27 - 18) = (-10)(9) = -90$.
+
+Middle coefficient: $ad + bc = 837 + 738 - (-90) = 1665$; the negative
+product is *subtracted*, so it adds. (Check: $31 \cdot 18 + 41 \cdot 27
+= 558 + 1107 = 1665$.)
+
+Recombination:
+$837 \cdot 10^4 + 1665 \cdot 10^2 + 738 = 8{,}370{,}000 + 166{,}500 +
+738 = 8{,}537{,}238$, which is $3141 \times 2718$. Unlike the worked
+example, here exactly one of $a-b$, $c-d$ is negative, so their product
+is negative; the identity needs no case analysis, only honest signed
+arithmetic.
+</Solution>
+</Exercise>
+
+### The recurrence: one deleted call moves the exponent
+
+The combine gained two additions and a subtraction, still $\Theta(n)$,
+and the call count dropped from four to three. The fourth row of the
+card changes accordingly:
+
+<Figure
+  src="./figures/four-vs-three.svg"
+  alt="Two recursion trees side by side: the four-call tree whose level totals double, summing to order n squared, and the three-call tree with one subtree deleted, whose level totals grow by three halves per level and sum to order n to the 1.585"
+  caption="One recursive call deleted at every node. Level totals grow ×2 per level on the left, ×3/2 on the right; the leaves, and with them the exponent, shrink from n² to n^lg 3."
+/>
+
+<Theorem title="Karatsuba's algorithm (Karatsuba–Ofman 1962)">
+Two $n$-digit numbers can be multiplied in
+$\Theta(n^{\lg 3}) = O(n^{1.585})$ time.
+
+<Proof>
+The algorithm: split as above, compute $ac$, $bd$, and $(a-b)(c-d)$ by
+three recursive calls, obtain $ad + bc$ from the identity, recombine
+with shifts and additions. Correctness is induction on $n$: the base
+case is a single-digit product, and the identity, verified above by
+expansion, makes the combine exact whenever the three sub-products are.
+The differences $a - b$ and $c - d$ have at most $m$ digits (plus a
+sign, handled by multiplying the signs separately), so all three calls
+are genuine half-size instances. The cost recurrence is
+$T(n) = 3\,T(n/2) + \Theta(n)$: watershed $n^{\log_2 3}$, with
+$\lg 3 = 1.5849\ldots$, and $f(n) = \Theta(n) = O(n^{\lg 3 - \epsilon})$
+for $\epsilon = 0.5$ is polynomially smaller. Case 1 of the
+<Ref lesson="recurrences-and-master-theorem">Master theorem</Ref> gives
+$T(n) = \Theta(n^{\lg 3})$. $\blacksquare$
+</Proof>
+</Theorem>
+
+The recurrences lesson's closing exercise priced this pair of
+recurrences blind, before either algorithm existed on the page: the
+ratio $n^2 / n^{\lg 3} = n^{0.415}$ is a factor of about **300 at a
+million digits**. That arithmetic now has an algorithm attached to each
+side.
+
+<Remark title="where the crossover sits in practice">
+The three-call recursion spends more on additions and bookkeeping per
+level than the grade-school method, so for short numbers the
+grade-school method wins; the asymptotic gain must first pay off the
+constant. CPython's integer multiplication draws the line concretely:
+`longobject.c` multiplies grade-school style until the smaller operand
+exceeds 70 of its internal 30-bit digits (roughly 600 decimal digits)
+and switches to Karatsuba above that. A designer who benchmarks only
+below the crossover would conclude the "better" algorithm is worse,
+which is <Ref lesson="asymptotic-notation">the first lesson's</Ref>
+crossover phenomenon operating inside a production runtime.
+</Remark>
+
+<Aside>
+Karatsuba's algorithm opened a race that is now closed, at least in
+theory. Splitting into $k$ pieces instead of two, with cleverer
+identities (Toom and Cook, 1963–66), gives $O(n^{1+\epsilon})$ for any
+$\epsilon > 0$; Fourier-transform methods (Schönhage–Strassen, 1971)
+reached $O(n \log n \log\log n)$; and in 2019 David Harvey and Joris
+van der Hoeven closed the problem with an $O(n \log n)$ algorithm,
+published in the *Annals of Mathematics* in 2021: sixty-one years from
+Kolmogorov's conjecture to the (conjecturally optimal) exponent. The
+practical frontier is far more conservative: production big-integer
+libraries run Karatsuba, Toom variants, and FFT methods in ranges chosen
+by benchmark, and the 2019 algorithm is not implemented anywhere;
+its constants pay off only past astronomical sizes.
+</Aside>
+
+## The design rule: the win lives in the combine
+
+The two multiplication designs differ in nothing but the combine's
+algebra, and the difference generalizes. In any leaf-dominated
+recurrence (a design whose split and combine are both linear is
+leaf-dominated whenever $a > b$) the answer is
+$\Theta(n^{\log_b a})$: the *exponent* is set by
+the call count $a$ and the shrink factor $b$, and the driving function
+is invisible in it. <Ref lesson="recurrences-and-master-theorem">The
+recurrences lesson</Ref> put it as "where the cost lives is where
+optimization pays": at the leaves, the only lever is $a$. Hence the
+design rule: **count the recursive calls first.** Before refining a
+split or tuning a combine, compute $\log_b a$ and compare it against the
+cost of the method to be beaten; if the exponent is not already an
+improvement, no amount of engineering in $f(n)$ will make one.
+
+The move that saved multiplication, spending cheap operations in the
+combine to delete an expensive recursive call, is a repeatable design
+device, and its most famous second use is matrix multiplication. The
+standard method multiplies two $n \times n$ matrices in $\Theta(n^3)$
+scalar operations. Partition each matrix into four $n/2 \times n/2$
+blocks, and the block formula for the product needs two block products
+per output block: eight half-size multiplications,
+$T(n) = 8\,T(n/2) + \Theta(n^2) = \Theta(n^{\lg 8}) = \Theta(n^3)$, the
+same null result as the four-call split, for the same reason. In 1969
+Volker Strassen produced seven combinations of block sums whose products
+reconstruct all four output blocks:
+
+$$
+T(n) = 7\,T(n/2) + \Theta(n^2) = \Theta(n^{\lg 7}) = O(n^{2.81}),
+$$
+
+the recurrence already solved among
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson's</Ref> exercises. The seven products themselves are an
+unilluminating page of algebra (CLRS §4.2 lists them); what transfers is
+the shape of the move, which is Karatsuba's exactly: extra $\Theta(n^2)$
+additions in the combine, one recursive call deleted, exponent moved.
+
+<Figure
+  src="./figures/strassen-blocks.svg"
+  alt="Two by two block partitions of matrices A and B multiplying into C, annotated with the naive count of eight half-size block products and Strassen's seven, and the resulting exponents lg 8 equals 3 versus lg 7 about 2.81"
+  caption="The same deletion at matrix scale: 8 block products → 7, exponent 3 → lg 7 ≈ 2.81."
+/>
+
+<KeyFact>
+The count-calls rule is conditional on leaf domination. In a
+root-dominated recurrence the total is $\Theta(f(n))$ and the call
+count does not appear in it at all, so deleting a call changes nothing
+and the only lever is the combine; in a balanced recurrence (merge
+sort's), a deleted call buys at most the $\lg n$ factor. Classify the
+recurrence first; hunt for a call-deleting identity only when the
+leaves dominate.
+</KeyFact>
+
+## ★ Closest pair: a combine that prunes
+
+Multiplication's combine won by algebra; a second classical design wins
+by geometry, and is sketched here because its combine illustrates the
+other standard way to make one cheap: pruning. Given $n$ points in the
+plane, find the pair at minimum distance; comparing all pairs costs
+$\Theta(n^2)$.
+
+Split by a vertical line through the median $x$-coordinate; recurse on
+each half; let $\delta$ be the smaller of the two answers. The combine
+must check whether some *cross* pair, one point on each side, beats
+$\delta$, and there are $\Theta(n^2/4)$ cross pairs, which would make
+the combine quadratic and the recurrence $\Theta(n^2)$. Two prunings rescue it. First, a cross pair closer than
+$\delta$ must have both points within distance $\delta$ of the line, so
+only a vertical *strip* of width $2\delta$ matters. Second, inside the
+strip, sorted by $y$: two points on the same side are at distance
+$\ge \delta$, so any $\delta \times 2\delta$ rectangle of the strip
+holds at most 8 points, and a point's partner, if it beats $\delta$,
+must be among the next 7 points in $y$-order. The combine drops to a
+sorted walk with 7 comparisons per point, $\Theta(n)$ given
+presorting, and
+
+$$
+T(n) = 2\,T(n/2) + \Theta(n) = \Theta(n \lg n),
+$$
+
+merge sort's recurrence on a problem with no order relation in sight.
+The full proof of the packing bound and the presorting bookkeeping are
+in Kleinberg–Tardos §5.4; nothing later in this course depends on them.
+What the sketch adds to the lesson is the pattern: when the combine
+looks quadratic, the design question is what structure (here, the
+minimum $\delta$ already in hand) proves most of the work unnecessary.
+
+## Where the paradigm stops: overlapping subproblems
+
+Every design in this lesson leaned on the disjointness clause of
+<Ref lesson="comparison-sorting-merge-and-quicksort">the
+divide-and-conquer definition</Ref>. Halves of an array, halves of a
+digit string, blocks of a matrix, sides of a line: in each case the
+subproblems share nothing, so each is solved once and the tree's cost is
+the honest total. The clause is not decoration. Recursive Fibonacci,
+the definition's near miss, splits $F(n)$ into $F(n-1)$ and $F(n-2)$,
+two smaller instances of the same problem whose subproblem trees overlap
+almost entirely: $F(n-2)$ is recomputed inside $F(n-1)$, and its
+subproblems again inside both, so the recursion tree holds exponentially
+many copies of a *linear* number of distinct subproblems. An exercise
+below counts the copies exactly, and the count is the doorstep of the
+module's third lesson: when subproblems overlap, the repair is not a
+better split but a memory (solve each distinct subproblem once, store
+the answer, and reuse it), which is dynamic programming.
+
+What is established: the four-slot design card (split, return contract,
+combine, recurrence), priced by the Master theorem before any code
+exists; Tower of Hanoi at $T(n) = 2T(n-1)+1 = 2^n - 1$, exponential
+because the instance shrinks by subtraction; the four-call
+multiplication split discarded at $\Theta(n^2)$ because splitting alone
+buys nothing; Karatsuba's identity deleting one call for
+$\Theta(n^{\lg 3}) = O(n^{1.585})$, and Strassen's $8 \to 7$ repeating
+the move at matrix scale for $O(n^{2.81})$; and the design rule that in
+leaf-dominated territory only the call count moves the exponent.
+<Ref lesson="greedy-algorithms">The next lesson</Ref> takes up the
+paradigm at the opposite pole from recursion: the greedy algorithm,
+which builds a solution by committing to the locally best choice and
+never revisiting it, and the exchange argument that certifies when that
+commitment is optimal. <Ref
+lesson="dynamic-programming-i-one-dimensional">The module's third
+lesson</Ref> takes up the case divide-and-conquer cannot price
+honestly, overlapping subproblems, and builds the paradigm that solves
+each subproblem exactly once.
+
+## Exercises
+
+<Exercise>
+The lesson guessed $T(n) = 2^n - 1$ for the Tower of Hanoi from the
+first values. (a) Prove it by induction, in the style of
+<Ref lesson="recurrences-and-master-theorem">the substitution
+method</Ref>. (b) Prove the matching lower bound: *every* correct
+solution, algorithmic or not, makes at least $2^n - 1$ moves. State the
+recurrence the lower bound obeys and where the rules of the puzzle
+enter.
+
+<Solution>
+**(a)** Claim: $T(n) = 2^n - 1$ for all $n \ge 0$, where
+$T(n) = 2T(n-1) + 1$, $T(0) = 0$. Base: $T(0) = 0 = 2^0 - 1$. Step:
+assume $T(n-1) = 2^{n-1} - 1$; then
+$T(n) = 2(2^{n-1} - 1) + 1 = 2^n - 2 + 1 = 2^n - 1$. Exact equality,
+with no constant to choose: unlike the asymptotic bounds of the
+substitution method, this hypothesis is a closed form and reproduces
+itself directly.
+
+**(b)** Let $M(n)$ be the minimum number of moves of any correct
+solution. Consider the first time the largest disk moves. At that
+moment every other disk must be off both the source peg (they started
+above the largest disk) and the destination peg (the largest disk may
+not land on a smaller one), so all $n-1$ smaller disks sit, legally
+stacked, on the single spare peg. Getting them there is a full
+$(n-1)$-disk transfer: at least $M(n-1)$ moves. After the largest
+disk's final move (at least 1 move in total), those $n-1$ disks must
+travel from the spare peg onto the destination: another full transfer,
+at least $M(n-1)$ moves. Hence $M(n) \ge 2M(n-1) + 1$ with
+$M(0) = 0$, so $M(n) \ge 2^n - 1$ by the induction of part (a). The
+algorithm attains the bound, so it is optimal. Both stacking rules
+were used, and the "no disk on a smaller one" rule is what forces the
+smaller disks onto one peg.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this design memo: "Karatsuba gains by splitting in half; splitting
+finer must gain more. Cut each number into three thirds of $n/3$ digits;
+the product needs the nine cross-products of the pieces, so
+$T(n) = 9\,T(n/3) + \Theta(n)$, and since the subproblems shrink faster,
+this beats Karatsuba." Name the failing step, compute what the proposed
+recurrence actually solves to, and state what a three-piece split would
+have to achieve to beat Karatsuba, including the call count that
+achieves it (a known result).
+
+<Solution>
+Which kind of problem: a Master-theorem classification hiding inside a
+plausible claim. The proposed recurrence solves to the watershed
+$n^{\log_3 9} = n^2$ (case 1, leaf-dominated), so the memo's design is
+another $\Theta(n^2)$ null result, and the failing step is "shrink
+faster, gain more": with $k$ pieces and all $k^2$ cross-products
+recursed on, the exponent is $\log_k k^2 = 2$ for *every* $k$. Finer
+splitting changes nothing by itself; only deleting calls moves the
+exponent.
+
+To beat Karatsuba, a three-piece split must get the call count below the
+value that matches him: $n^{\log_3 a} < n^{\lg 3}$ requires
+$\log_3 a < \lg 3 \approx 1.585$, that is, $a \le 5$ (since
+$\log_3 5 \approx 1.465 < 1.585 < \log_3 6 \approx 1.631$). Five is
+achievable: Toom's 3-way scheme (Toom–Cook multiplication, 1963–66)
+computes the five needed coefficients from five multiplications of
+$n/3$-digit pieces, giving
+$T(n) = 5\,T(n/3) + \Theta(n) = \Theta(n^{\log_3 5}) =
+O(n^{1.47})$, the next rung on the ladder the lesson's Aside describes.
+</Solution>
+</Exercise>
+
+<Exercise>
+A teammate implements Karatsuba from Karatsuba's original identity,
+$ad + bc = (a+b)(c+d) - ac - bd$, instead of the lesson's
+$ac + bd - (a-b)(c-d)$, and reports "same three multiplications, same
+recurrence." The code returns correct answers. (a) Verify the identity
+and check it on the worked example's numbers. (b) Diagnose the
+inaccuracy in "same recurrence": what is different about the operands of
+the third multiplication, and what does the honest recurrence look like?
+(c) Judge the claim's conclusion: does the difference change the
+asymptotic answer?
+
+<Solution>
+**(a)** $(a+b)(c+d) = ac + ad + bc + bd$; subtracting $ac$ and $bd$
+leaves $ad + bc$. On $1234 \times 5678$:
+$(12+34)(56+78) = 46 \cdot 134 = 6164$, and
+$6164 - 672 - 2652 = 2840$, the same middle coefficient as the
+subtractive form.
+
+**(b)** The operands grew. $a - b$ and $c - d$ are at most $m$ digits
+(plus sign), but $a + b$ and $c + d$ can *carry*: $46$ and $134$; the
+latter is three digits from two-digit halves. The third call is on
+$(m{+}1)$-digit numbers, so the honest recurrence is
+$T(n) = 2\,T(n/2) + T(n/2 + 1) + \Theta(n)$, not three clean calls on
+$n/2$.
+
+**(c)** The conclusion survives: a $+1$ in a subproblem size never
+changes a growth rate (the same domain-transformation fact that lets
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson</Ref> drop floors and ceilings), so both versions run in
+$\Theta(n^{\lg 3})$. The diagnosis is about the *argument*, not the
+answer: "same recurrence" is false, "same $\Theta$ class" is true, and
+the subtractive form, Knuth's simplification, exists precisely
+so that the clean recurrence is the honest one.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design a divide-and-conquer algorithm from scratch, running the lesson's
+card. An *inversion* in an array $A$ is a pair $i < j$ with
+$A[i] > A[j]$, a measure of how unsorted the array is (sorted: $0$;
+reverse-sorted: $n(n-1)/2$). Checking all pairs costs $\Theta(n^2)$.
+(a) Fill in the four slots: split, return contract, combine, recurrence.
+The productive contract makes each recursive call return something
+*more* than the count. (b) Run your algorithm on $[\,5, 2, 7, 1\,]$.
+(c) State the running time.
+
+<Solution>
+**(a)** Split: halves at the midpoint, as in merge sort. Return
+contract: each call returns its half's inversion count **and the half
+in sorted order**, the strengthening that makes the combine cheap.
+Combine: inversions are within the left half, within the right, or
+*cross* pairs; the recursive calls count the first two, and cross pairs
+are counted during a merge of the two sorted halves: when the merge
+copies right-half element $A[j]$ while left-half elements remain, that
+element is smaller than **all** of them, so add the number of elements
+remaining in the left half. Sorting does not change cross-inversion
+counts (each pair keeps its membership in left and right), so the merge
+counts them exactly, in $\Theta(n)$. Recurrence:
+$T(n) = 2\,T(n/2) + \Theta(n)$.
+
+**(b)** $[\,5, 2\,] \to$ sorted $[\,2, 5\,]$, 1 inversion. $[\,7, 1\,]
+\to [\,1, 7\,]$, 1 inversion. Merge $[\,2,5\,]$ with $[\,1,7\,]$: copy
+$1$ with two left elements remaining ($+2$ cross), copy $2$, copy $5$,
+copy $7$ ($+0$). Total $1 + 1 + 2 = 4$: the pairs $(5,2), (5,1), (2,1),
+(7,1)$.
+
+**(c)** Merge sort's recurrence: $\Theta(n \lg n)$, by Master case 2.
+The transferable move is the strengthened return contract: the count
+alone cannot be combined in $\Theta(n)$, and the sorted order is
+carried not because sorting was asked for but because the combine needs
+it, the same reason Karatsuba's calls return full products rather than
+digits.
+</Solution>
+</Exercise>
+
+<Exercise>
+Strassen's scheme rests on multiplying $2 \times 2$ block matrices with
+7 multiplications. (a) If someone found a $2 \times 2$ scheme with 6
+multiplications (block additions free, as usual), what running time
+would it give, and would it beat Strassen? (b) That search is closed:
+Winograd proved in 1971 that 7 is optimal for $2 \times 2$. Given that,
+state where faster-than-Strassen algorithms must come from, and check
+the claim against the recurrence's structure.
+
+<Solution>
+**(a)** $T(n) = 6\,T(n/2) + \Theta(n^2)$: watershed
+$n^{\lg 6} = n^{2.585}$, driving function polynomially smaller, case 1:
+$\Theta(n^{\lg 6}) = O(n^{2.59})$, beating Strassen's $n^{\lg 7} =
+n^{2.81}$.
+
+**(b)** With the $2 \times 2$ base blocked at 7, the parameters left in
+$n^{\log_b a}$ are $a$ *and* $b$: partition into $k \times k$ blocks
+($b = k$) and beat $\lg 7$ via $\log_k a < \log_2 7$, i.e. find
+$k \times k$ block-multiplication schemes using fewer than
+$7^{\lg k} = k^{\lg 7}$ multiplications. That is exactly where the
+post-Strassen algorithms live: enormous base schemes (and heavier
+machinery in the same spirit) have pushed the exponent below $2.38$,
+though every algorithm past Strassen is purely theoretical: the
+crossover sizes dwarf any real matrix. The structural check: the
+combine stays $\Theta(n^2)$, polynomially below any watershed above
+$n^2$, so these recurrences all stay leaf-dominated and the base
+scheme's count alone sets the exponent, which is the lesson's design
+rule with $b$ promoted to a design variable.
+</Solution>
+</Exercise>
+
+<Exercise>
+Count what recursion costs when the subproblems are *not* disjoint.
+Naive Fibonacci computes $F(n)$ by recursing on $F(n-1)$ and $F(n-2)$,
+with $F(0) = 0$, $F(1) = 1$ returned directly. Let $C(n)$ be the total
+number of calls (including the outermost). (a) Write the recurrence for
+$C(n)$ and tabulate it up to $n = 10$. (b) How many of those calls have
+argument $1$? Find the pattern in the table. (c) How many *distinct*
+subproblems does the run on $n$ have? Compare with (a) and name the
+clause of the divide-and-conquer definition that fails.
+
+<Solution>
+**(a)** A call on $n \ge 2$ makes two subcalls:
+$C(n) = 1 + C(n-1) + C(n-2)$, with $C(0) = C(1) = 1$. Tabulating:
+$1, 1, 3, 5, 9, 15, 25, 41, 67, 109, 177$; computing $F(10) = 55$
+takes $177$ calls, and the sequence grows by the same rule as Fibonacci
+itself: exponentially, like $\varphi^n$ with
+$\varphi \approx 1.618$.
+
+**(b)** Calls with argument $1$: reading off subtrees,
+$0, 1, 1, 2, 3, 5, 8, \ldots$; the count of $1$-calls in the run on
+$n$ is exactly $F(n)$ (each contributes $1$ to the final sum, and the
+sum of the base cases is the answer). Computing $F(30) = 832{,}040$
+recomputes the subproblem $F(1)$ over eight hundred thousand times.
+
+**(c)** The distinct subproblems are $F(0), F(1), \ldots, F(n)$: just
+$n + 1$ of them, against exponentially many calls. The failing clause
+is **disjointness**: $F(n-2)$ is a subproblem of both branches, so the
+recursion tree contains the same work many times, and the recurrence
+prices every copy. Storing each of the $n+1$ answers the first time it
+is computed and returning the stored value afterwards collapses the
+tree to $\Theta(n)$ work: that repair is *memoization*, the opening
+move of
+<Ref lesson="dynamic-programming-i-one-dimensional">dynamic
+programming</Ref>, which the module's third lesson builds into a
+paradigm.
+</Solution>
+</Exercise>
+
+<References>
+1. J. Erickson, *Algorithms*, 2019 — §1.3: Tower of Hanoi, the Benares legend, and the $2^n - 1$ analysis; §1.9: fast multiplication — the four-call split, the Kolmogorov seminar story in Karatsuba's own words, Knuth's subtractive form of the identity, and Figs. 1.14–1.15, the four-call and three-call recursion trees this lesson's central figure recreates; §0.2: lattice multiplication, the layout in this lesson's 1478 figure. Free online under CC BY 4.0: https://jeffe.cs.illinois.edu/teaching/algorithms/
+2. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §4.1: matrix multiplication by block partition and its $8T(n/2) + \Theta(1)$-flavored analysis; §4.2: Strassen's algorithm, with the seven products written out.
+3. A. Karatsuba, Yu. Ofman, "Multiplication of Multidigit Numbers on Automata," *Doklady Akademii Nauk SSSR* 145(2), 1962, pp. 293–294 (English translation: *Soviet Physics Doklady* 7, 1963, pp. 595–596) — the original publication of the three-multiplication algorithm.
+4. V. Strassen, "Gaussian Elimination is not Optimal," *Numerische Mathematik* 13, 1969, pp. 354–356 — the seven-product scheme and the $O(n^{\lg 7})$ bound.
+5. S. Winograd, "On Multiplication of 2 × 2 Matrices," *Linear Algebra and its Applications* 4(4), 1971, pp. 381–388 — the proof that seven multiplications are necessary, cited in the Strassen exercise.
+6. J. Kleinberg, É. Tardos, *Algorithm Design*, Pearson, 2005 — §5.4: the closest-pair algorithm with the full strip and packing argument the starred section sketches; §5.5: integer multiplication.
+7. D. Harvey, J. van der Hoeven, "Integer Multiplication in Time $O(n \log n)$," *Annals of Mathematics* 193(2), 2021, pp. 563–617 — the asymptotically optimal (conjecturally) multiplication algorithm closing the line Karatsuba opened.
+8. F. J. Swetz, *Capitalism and Arithmetic: The New Math of the 15th Century*, Open Court, 1987 — the full translation and study of the 1478 Treviso Arithmetic reproduced in the multiplication section's figure.
+</References>

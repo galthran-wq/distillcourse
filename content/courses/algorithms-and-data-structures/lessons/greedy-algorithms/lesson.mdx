@@ -1,0 +1,762 @@
+A greedy algorithm builds a solution by repeatedly making the choice that
+looks best right now, never reconsidering it — a strategy that is wrong for
+most problems and provably optimal for a specific, recognizable few. This
+lesson builds one greedy algorithm that is provably optimal, exhibits three
+plausible ones that are silently not, and extracts the proof technique, the
+exchange argument, that separates the two cases.
+
+The design-paradigms module opened with
+<Ref lesson="divide-and-conquer-design">divide-and-conquer design</Ref>, where
+the effort of a design sat in choosing the split and the combine, and the
+recurrence priced the result before any code existed. Greedy design inverts
+that balance. The code is the cheapest in this course, a sort followed by one
+linear sweep, and it runs and returns a feasible answer whether or not the
+ordering criterion is right. All of the effort moves into the correctness
+argument, so this lesson is mostly about proof: the obligation a greedy design
+carries, and the schema that discharges it when it can be discharged. Problems
+the schema cannot rescue, those whose choices require comparing subproblem
+answers, pass to
+<Ref lesson="dynamic-programming-i-one-dimensional">dynamic programming</Ref>,
+the module's next lesson.
+
+The route: the template and one problem where it provably works;
+counterexample hunting against three other criteria; the exchange argument
+carried in full and abstracted into a reusable schema; the two properties that
+mark a problem greedy-solvable; and knapsack, rod cutting, and coin change,
+where the same instinct fails by measurable margins.
+
+## Interval scheduling: the template on its best-known problem
+
+A proof obligation needs a concrete problem to attach to, and the paradigm's
+standard first problem supplies it: one conference room, eight booking
+requests, each a half-open time interval $[s_i, f_i)$; the room serves one
+booking at a time, and the goal is to grant as many requests as possible. The
+requests, already listed in order of finish time:
+
+| $i$ | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| $s_i$ | 1 | 3 | 0 | 4 | 2 | 7 | 8 | 12 |
+| $f_i$ | 4 | 5 | 6 | 7 | 9 | 10 | 14 | 16 |
+
+<Definition title="interval scheduling">
+An instance is a set of $n$ intervals $a_i = [s_i, f_i)$ with $s_i < f_i$. Two
+intervals are **compatible** if they do not overlap: $a_i$ and $a_j$ are
+compatible when $s_j \ge f_i$ or $s_i \ge f_j$. The problem asks for a
+maximum-size subset of pairwise compatible intervals.
+</Definition>
+
+Three cases fix the definition's boundary. Intervals $a_1 = [1,4)$ and
+$a_4 = [4,7)$ are compatible: the half-open convention makes a meeting that
+starts the instant another ends legal, with no gap required. A nested pair
+such as $[2,9)$ and $[4,7)$ is incompatible even though neither "crosses" the
+other; overlap, not crossing, is the test. And the near-miss: asking for the
+subset covering the most total *time* is a different problem with different
+optima; the objective clause, maximum *count*, is part of the definition.
+
+### The template: order, sweep, keep what fits
+
+The greedy template has three lines, none of which mention the problem:
+
+1. **Order** the candidates by a single, locally computed criterion.
+2. **Sweep** once through that order, taking each candidate that keeps the
+   partial solution feasible.
+3. **Never revisit** a decision: nothing is removed, nothing is reconsidered.
+
+For interval scheduling, take the criterion to be *earliest finish time*: the
+intuition is that finishing early leaves the room free for the most remaining
+requests. Sorting costs $O(n \log n)$, the sweep costs $O(n)$, and the
+feasibility test is one comparison, justified by a loop invariant in the
+closing exercises:
+
+```text
+GreedySelect(a₁ … aₙ, sorted by finish time):
+    A ← {a₁};  last ← 1
+    for m ← 2 to n:
+        if s[m] ≥ f[last]:        # compatible with everything selected
+            A ← A ∪ {aₘ};  last ← m
+    return A
+```
+
+<Example title="the sweep on the eight-request instance">
+Selected set $A$ and the finish time of the last selection, step by step.
+Take $a_1 = [1,4)$; the frontier is $f = 4$. Next $a_2 = [3,5)$: starts at
+$3 < 4$, rejected. $a_3 = [0,6)$: starts at $0 < 4$, rejected.
+$a_4 = [4,7)$: starts at $4 \ge 4$, taken; the frontier moves to $7$.
+$a_5 = [2,9)$: $2 < 7$, rejected. $a_6 = [7,10)$: $7 \ge 7$, taken; frontier
+$10$. $a_7 = [8,14)$: $8 < 10$, rejected. $a_8 = [12,16)$: $12 \ge 10$,
+taken.
+
+Result: $A = \{a_1, a_4, a_6, a_8\}$, four bookings. The theorem of this
+lesson certifies that no compatible subset of this instance has five.
+</Example>
+
+<Figure
+  src="./figures/timeline.svg"
+  alt="Eight intervals in finish-time order; the earliest-finish sweep selects four (amber) and rejects four (gray), each rejection annotated with the start time that falls before the current frontier"
+  caption="The sweep in finish order: each interval is taken exactly when its start clears the last selected finish (dashed lines)."
+/>
+
+<KeyFact>
+A wrong greedy does not crash and does not warn. For most orderings the sweep
+still returns a feasible answer, only a smaller one, so the paradigm's entire
+risk is silent suboptimality: an unproven greedy is a bug that no test suite
+reliably catches, because every output looks like a valid schedule.
+</KeyFact>
+
+## Three plausible criteria, and how counterexamples kill two
+
+Nothing in the template forces the earliest-finish criterion, and at least
+three alternatives sound equally reasonable: *earliest start time* (put the
+room to use as soon as possible), *shortest interval* (small commitments block
+the least), and *fewest conflicts* (take the request that collides with the
+fewest others). The first tool to apply to any proposed criterion is not a
+proof but a hunt: a single instance on which the criterion loses settles the
+question permanently, and it is far cheaper to find than a proof.
+
+### Two criteria die on three intervals
+
+Shortest-interval-first dies on three intervals. Take $[1,4)$, $[3,5)$, and
+$[4,7)$: the short middle interval straddles the boundary between the two long
+ones, so taking it blocks both, and the tally is one against
+earliest-finish-first's two.
+
+<Figure
+  src="./figures/counterexample-pair.svg"
+  alt="The same three intervals under two criteria: shortest-interval-first picks the short straddling interval and ends with one; earliest-finish-first picks the two long compatible intervals and ends with two"
+  caption="Three intervals, two criteria: the short interval straddles both long ones, and taking it costs a booking."
+/>
+
+The same motif is embedded in the running instance: $a_2 = [3,5)$ is its
+shortest interval, and starting the sweep there yields
+$\{a_2, a_6, a_8\}$, three bookings against the four above. One planted
+interval was enough to drag a plausible criterion below optimal on an
+instance of eight.
+
+<Exercise>
+Kill earliest-start-time-first: construct an instance of three intervals on
+which it selects strictly fewer intervals than earliest-finish-time-first,
+and state the general shape that makes such instances easy to generate.
+
+<Solution>
+Strategy hint: make the earliest starter expensive to take.
+
+Take $[0,9)$, $[1,3)$, and $[4,6)$. Earliest-start-first takes $[0,9)$, which
+overlaps both others; tally one. Earliest-finish-first takes $[1,3)$, then
+$[4,6)$; tally two. The general shape: one long interval that starts first
+and spans several short, mutually compatible ones. Starting early says
+nothing about finishing early, and it is the finish time that determines what
+remains schedulable.
+</Solution>
+</Exercise>
+
+### Fewest conflicts: no small instance kills it, and it is still wrong
+
+Fewest-conflicts-first resists this treatment longer: no three- or
+four-interval instance kills it, and it survives most instances a tester
+would type in. It is still wrong, and the smallest standard counterexample,
+eleven intervals arranged so that the least-conflicted interval is a trap, is
+the fewest-conflicts exercise at the end of the lesson.
+
+<Demo
+  name="GreedyVsOptimalCounterexample"
+  caption="Interval scheduling under a selectable criterion: earliest finish, shortest interval, or fewest conflicts."
+/>
+
+<Task>
+Rebuild the three-interval counterexample in the demo and confirm the tallies
+1 against 2. Then spend a few minutes trying to build any instance on which
+earliest-finish-first's tally is beaten by a compatible subset you can point
+to. The attempt fails on every instance; the next section proves that it must.
+</Task>
+
+The criterion that survived the hunt above now has to earn its guarantee.
+
+## The exchange argument: earliest finish first proved optimal
+
+Counterexamples and proofs are asymmetric: one instance refutes a criterion,
+but no number of surviving instances validates one, since the claim
+quantifies over every instance and every competing schedule. What must be
+shown: on every instance, the sweep's output is as large as every compatible
+subset. The method: take an arbitrary optimal schedule and morph it, one
+interval at a time, into the greedy schedule, showing that no step of the
+morph loses an interval.
+
+<FigureSequence
+  name="exchange"
+  alt="Three frames: an optimal schedule O and the greedy schedule G differing in their first interval; O's first interval swapped for greedy's with feasibility and count preserved; the swap repeated on the suffix until O equals G"
+  caption="The exchange argument: each swap replaces the optimal schedule's next divergent choice with greedy's, never losing an interval."
+/>
+
+<Task>
+Step through the three frames and check the two invariants of the morph at
+each step: the schedule stays conflict-free (the inserted interval finishes
+no later than the removed one did) and its size stays 3. Both checks reappear
+as the two named steps inside the proofs below.
+</Task>
+
+### The lemma, then the induction
+
+The proof splits into a lemma about the first choice and an induction that
+repeats it. Both are direct arguments; the only inequality either one uses is
+"greedy's pick finishes no later."
+
+<Theorem title="the greedy first choice is safe (Cormen et al., Thm. 15.1)">
+Let $g$ be an interval with the earliest finish time in the instance. Some
+maximum-size compatible subset contains $g$.
+
+<Proof>
+Let $X$ be any maximum-size compatible subset. If $g \in X$, done. Otherwise
+let $j$ be an earliest-finishing member of $X$; the claim is that
+$X' = (X \setminus \{j\}) \cup \{g\}$ is compatible and maximum-size.
+
+**Feasibility.** Take any $x \in X \setminus \{j\}$. Compatibility of $x$ and
+$j$ means $s_x \ge f_j$ or $s_j \ge f_x$. The second case is impossible: it
+would give $f_x \le s_j < f_j$, making $x$ finish strictly before $j$ and
+contradicting the choice of $j$ as earliest-finishing in $X$. So
+$s_x \ge f_j$. Since $g$ has the earliest finish time in the whole instance
+and $j$ is in the instance, $f_g \le f_j \le s_x$: every remaining member of
+$X$ starts at or after $g$ finishes, so $X'$ is compatible.
+
+**Size.** $g \notin X$, so the exchange removes one interval and adds one:
+$|X'| = |X|$, and $X'$ is maximum-size. $X'$ contains $g$.
+</Proof>
+</Theorem>
+
+The lemma covers greedy's first selection. The theorem repeats the exchange
+along the whole sweep; the proof mode is induction on the position of the
+first disagreement, and the roadmap is the figure above: locate the first
+difference, exchange, recurse on the suffix.
+
+<Theorem title="earliest finish first is optimal (Erickson §4.2)">
+On every instance, `GreedySelect` returns a compatible subset of maximum
+size.
+
+<Proof>
+Let $G = \langle g_1, \dots, g_k \rangle$ be the greedy schedule in sweep
+order. Among all maximum-size compatible subsets, choose one,
+$X = \langle x_1, \dots, x_m \rangle$ sorted by finish time, that agrees with
+$G$ on the longest possible prefix: $x_1 = g_1, \dots, x_{j-1} = g_{j-1}$
+with $j$ as large as possible.
+
+**The prefix is everything.** Suppose $j \le \min(k, m)$, so $x_j \ne g_j$.
+Both $x_j$ and $g_j$ are compatible with the shared prefix
+$g_1, \dots, g_{j-1}$, and $g_j$ is by construction the earliest-finishing
+interval in the instance compatible with that prefix: this is exactly what
+the sweep selects after its first $j-1$ selections. Hence
+$f_{g_j} \le f_{x_j}$. Every later $x_i$ with $i > j$ is compatible with
+$x_j$ and finishes no earlier (the argument from the lemma's feasibility
+step, applied inside $X$), so $s_{x_i} \ge f_{x_j} \ge f_{g_j}$. Replacing
+$x_j$ by $g_j$ therefore keeps $X$ compatible and keeps $|X| = m$, but
+lengthens the agreeing prefix, contradicting the choice of $X$. So no
+disagreement exists below position $\min(k,m)+1$: $X$ agrees with $G$ on its
+first $\min(k, m)$ entries.
+
+**No optimal schedule is longer.** Suppose $m > k$. Then $x_{k+1}$ exists and
+is compatible with $x_k = g_k$, so $s_{x_{k+1}} \ge f_{g_k}$. When the sweep
+reached $x_{k+1}$, its frontier was the finish time of some $g_i$ with
+$i \le k$, and $f_{g_i} \le f_{g_k} \le s_{x_{k+1}}$: the sweep would have
+selected $x_{k+1}$, contradicting $|G| = k$. So $m \le k$, and since $G$ is
+itself compatible, $m = k$: the greedy schedule is maximum-size.
+</Proof>
+</Theorem>
+
+<Task>
+Two comprehension checks on the proof. First, locate the single sentence in
+each proof where the greedy criterion is used; both are the inequality
+"finishes no later," and nothing else about earliest-finish is used anywhere.
+Second, run the morph on the figure's instance: with
+$O = \{[0,4), [5,7), [8,10)\}$ and $G = \{[1,3), [4,6), [7,9)\}$, write out
+the two intermediate schedules and confirm each is conflict-free of size 3.
+</Task>
+
+### The schema, stated once for reuse
+
+Strip the intervals out of the proof and the following remains, applicable
+to any greedy algorithm:
+
+1. **Assume** some optimal solution differs from the greedy one, and locate
+   the *first* difference along the greedy order.
+2. **Exchange** the optimal solution's choice at that position for the
+   greedy choice, and show the swap preserves feasibility and does not
+   worsen the objective; the greedy criterion supplies exactly the
+   inequality this step needs.
+3. **Induct**: repeated exchange morphs the optimal solution into the greedy
+   one with no loss, so the greedy solution is optimal.
+
+<Definition title="exchange argument">
+An **exchange argument** is a proof of greedy optimality of this shape: any
+optimal solution can be transformed, one choice at a time, to agree with the
+greedy solution, without ever decreasing its objective value.
+</Definition>
+
+<KeyFact>
+An exchange argument never shows the greedy solution beats an optimal one;
+it shows an optimal one can be bent to agree with it at no cost. The same
+three moves, with "interval" replaced by "edge crossing a cut," certify
+Kruskal's and Prim's algorithms in
+<Ref lesson="minimum-spanning-trees">minimum spanning trees</Ref>; the
+closing cut-property exercise has you run that instance of the schema now.
+</KeyFact>
+
+<Exercise>
+Prove that a different criterion is also optimal for interval scheduling:
+*latest start time first*, which scans the intervals in decreasing order of
+start time and takes each one compatible with everything taken so far. Write
+the exchange lemma for its first choice before opening the solution; the
+proof should be a near-verbatim replay of the one above.
+
+<Solution>
+Strategy hint: mirror the lemma, exchanging "finishes earliest" for "starts
+latest" throughout.
+
+**Lemma.** Let $g$ be an interval with the latest start time. Some
+maximum-size compatible subset contains $g$. *Proof.* Let $X$ be
+maximum-size with $g \notin X$, and let $j$ be a latest-starting member of
+$X$. For any $x \in X \setminus \{j\}$, compatibility means $s_j \ge f_x$ or
+$s_x \ge f_j$; the second would give $s_x \ge f_j > s_j$, contradicting the
+choice of $j$. So every other member finishes by $s_j$, and
+$s_g \ge s_j \ge f_x$: swapping $j$ for $g$ preserves compatibility and
+size. ∎
+
+**Theorem.** Induction exactly as in the body, with the sweep order
+reversed: among optimal schedules agreeing with greedy's on the longest
+prefix (in decreasing start order), a first disagreement could be exchanged
+away because greedy's pick starts no earlier, and a leftover interval beyond
+greedy's last pick would have been taken by the sweep.
+
+The two criteria are mirror images: reversing the time axis maps every
+interval $[s, f)$ to $[-f, -s)$, turning latest start into earliest finish,
+so the result also follows by applying the body's theorem to the reversed
+instance. Either argument is complete on its own.
+</Solution>
+</Exercise>
+
+## Two properties, and the fork to dynamic programming
+
+The proof succeeded for reasons worth naming, because they are the reusable
+diagnosis. Two properties carried it, and textbooks state both as the
+preconditions of the paradigm.
+
+<Definition title="greedy-choice property">
+A problem has the **greedy-choice property** when some optimal solution
+makes the locally best first choice; equivalently, when the greedy first
+choice is contained in at least one optimal solution. The exchange argument
+is the standard way to prove it.
+</Definition>
+
+<Definition title="optimal substructure">
+A problem has **optimal substructure** when an optimal solution contains,
+within it, an optimal solution to the subproblem that remains after its
+first choice.
+</Definition>
+
+Interval scheduling has both. The lemma is precisely the greedy-choice
+property. Optimal substructure is the cut-and-paste step hidden inside the
+induction: once $g_1$ is chosen, what remains is a fresh interval-scheduling
+instance, the intervals starting at or after $f_{g_1}$, and any improvement
+to the rest of the schedule would improve the whole, so the rest must be
+optimal for the residual instance.
+
+The fork between the module's paradigms sits exactly here. Dynamic
+programming, next lesson, needs only optimal substructure: it solves *every*
+subproblem a choice could leave behind, then makes each choice by comparing
+the subproblems' computed answers. A greedy algorithm is the degenerate case
+in which the comparison is a foregone conclusion: the greedy-choice property
+says the winner of that comparison is known before any subproblem is solved,
+so nothing needs to be tabulated and one sweep suffices. When the property
+fails, the comparison is genuinely necessary, and the problem is dynamic
+programming's.
+
+<Figure
+  src="./figures/decision-card.svg"
+  alt="A design card with two property rows, optimal substructure and greedy-choice property, forking to a greedy box (both hold: sort, sweep, O(n log n)) and a dynamic-programming box (substructure only: solve every subproblem and compare)"
+  caption="The fork: both properties give a greedy algorithm; optimal substructure alone hands the problem to dynamic programming."
+/>
+
+## Knapsack twice: one criterion, optimal and 27% off
+
+The fork is invisible in a problem statement until it is tested, and the
+sharpest demonstration is a pair of problems that differ by one clause. In
+the *fractional knapsack* problem, a knapsack of capacity $W$ pounds is to
+be filled from $n$ items, item $i$ weighing $w_i$ with value $v_i$, and
+items are divisible: any fraction of an item may be taken, with
+proportional value. The *0/1 knapsack* problem is identical except each
+item is taken whole or not at all.
+
+### The fractional case: density order, proved by a shift
+
+The plausible criterion is value density $v_i / w_i$: take the most
+valuable-per-pound item first. The standard three-item instance, capacity
+$W = 50$:
+
+| item | weight | value | $/lb |
+| --- | --- | --- | --- |
+| 1 | 10 | \$60 | 6 |
+| 2 | 20 | \$100 | 5 |
+| 3 | 30 | \$120 | 4 |
+
+<Example title="fractional knapsack, greedy by density">
+Take all of item 1: 10 lb used, \$60. Take all of item 2: 30 lb used,
+\$160. Item 3 no longer fits whole; take the fraction that fits,
+$20/30$ of it, worth $\tfrac{20}{30} \times 120 = \$80$. The knapsack is
+full at 50 lb and the value is $60 + 100 + 80 = \$240$.
+</Example>
+
+Density order is provably optimal here, by an exchange in the schema above:
+if a filling puts weight on a lower-density item while a higher-density item
+has supply left, shifting a small amount $\delta$ of weight from the low
+item to the high one changes the value by
+$\delta\,(v_h/w_h - v_l/w_l) \ge 0$, and repeating the shift morphs any
+optimal filling into the greedy one. The closing exercises carry this proof
+in full.
+
+### The 0/1 case: the same numbers, and the shift is illegal
+
+On the 0/1 problem the same criterion fails on the same three items. Greedy
+takes item 1, then item 2, and stops: item 3 needs 30 lb and only 20 remain.
+The load is \$160 with a fifth of the knapsack empty. The optimum skips the
+densest item entirely: items 2 and 3 fill all 50 lb for \$220.
+
+<Figure
+  src="./figures/knapsack-panels.svg"
+  alt="Three capacity bars: the fractional greedy fill reaching $240 with a 20-pound slice of item 3; the 0/1 greedy fill reaching $160 with 20 pounds empty; the 0/1 optimum of items 2 and 3 reaching $220"
+  caption="Same items, same criterion: divisibility is the entire difference between provably optimal and 27% below optimal."
+/>
+
+The diagnosis lands exactly on the schema's second step. The exchange that
+proved the fractional case moves $\delta$ pounds between items; in the 0/1
+problem no such move is legal, because a fraction of an item is not a
+solution. Removing item 1 and inserting "20 pounds of item 3" is not an
+available swap, so the greedy-choice property has no proof, and the
+counterexample confirms it has no truth. Optimal substructure still holds:
+whether to include item 1 depends on comparing the best load *with* it
+against the best load *without* it, two subproblems that must actually be
+solved. That comparison is the dynamic program that
+<Ref lesson="dynamic-programming-ii-two-dimensional">the 0/1 knapsack
+table</Ref> computes.
+
+<KeyFact>
+What licenses the density criterion is the feasible set, not the values:
+divisibility is what makes "shift $\delta$ pounds between items" a legal
+solution, so the exchange step has a move to make. Freezing each item to
+all-or-nothing destroys that move: what dies is the proof step, not the
+intuition, which reads identically in both problems — exactly why the
+failure is silent.
+</KeyFact>
+
+## Where the paradigm hands off
+
+Two more failures close the lesson, chosen because the next two lessons
+solve both problems exactly. They are the seam between this lesson and
+dynamic programming, stated with numbers.
+
+### Rod cutting: the best ratio yields 32, the optimum is 33
+
+A rod of length 7 is cut into integer-length pieces, and a
+piece of length $\ell$ sells for $v(\ell)$:
+
+| $\ell$ | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| $v(\ell)$ | 1 | 10 | 13 | 18 | 20 | 31 | 32 |
+
+The greedy instinct, cut the piece with the best value per unit length
+first, selects length 6 at $31/6 \approx 5.2$ per unit, leaves a remnant of
+length 1 worth 1, and totals $31 + 1 = 32$. The optimum is $2 + 2 + 3$ for
+$10 + 10 + 13 = 33$. No piece in the optimal cut has the best ratio; the
+value sits in a combination that no single-piece criterion sees, and the
+proof obligation could never have been met.
+
+<Figure
+  src="./figures/rod-cutting.svg"
+  alt="Two rods of length 7: the greedy cut of lengths 6 and 1 totaling 32, and the optimal cut of lengths 2, 2, 3 totaling 33, with unit ticks below"
+  caption="Rod cutting: the best single ratio yields 32; the optimum of 33 is a combination of second-best pieces."
+/>
+
+### Coin change, and the seam forward
+
+Coin change has the same shape: with denominations $\{1, 3, 4\}$ and target
+6, taking the largest coin first gives $4 + 1 + 1$, three coins, while the
+optimum is $3 + 3$, two. The coin-change exercise below dissects it,
+together with the reason the same greedy happens to be correct for US
+coinage.
+
+What is now established: the greedy template costs a sort and a sweep; its
+output is feasible always and optimal only when proved so; the exchange
+argument is the proof schema, and it works exactly when the problem has the
+greedy-choice property on top of optimal substructure. Rod cutting, coin
+change, and 0/1 knapsack have only the latter, and
+<Ref lesson="dynamic-programming-i-one-dimensional">dynamic programming
+I</Ref> opens by solving the first two with a one-dimensional table,
+computing the 33 and the two-coin answer that greed missed;
+<Ref lesson="dynamic-programming-ii-two-dimensional">dynamic programming
+II</Ref> settles 0/1 knapsack. The paradigm itself returns later with its
+proofs attached: Dijkstra's algorithm
+(<Ref lesson="shortest-paths-dijkstra">shortest paths</Ref>) finalizes
+nodes greedily, and Kruskal's and Prim's algorithms
+(<Ref lesson="minimum-spanning-trees">minimum spanning trees</Ref>) are
+exchange arguments over cuts. Huffman's optimal compression code is the
+other classical member of the family, proved by the same exchange schema;
+Cormen et al. §15.3 carries that proof.
+
+## Exercises
+
+<Exercise>
+Run `GreedySelect` on the eleven-activity instance below, already sorted by
+finish time, reporting the selected set and the frontier after each
+selection. Then exhibit a second maximum-size solution
+that the sweep does not produce, and state what this says about the
+theorem's claim.
+
+| $i$ | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| $s_i$ | 1 | 3 | 0 | 5 | 3 | 5 | 6 | 7 | 8 | 2 | 12 |
+| $f_i$ | 4 | 5 | 6 | 7 | 9 | 9 | 10 | 11 | 12 | 14 | 16 |
+
+<Solution>
+Take $a_1 = [1,4)$, frontier 4. Reject $a_2$ ($3 < 4$) and $a_3$
+($0 < 4$). Take $a_4 = [5,7)$, frontier 7. Reject $a_5, a_6$ (start
+$3, 5 < 7$) and $a_7$ ($6 < 7$). Take $a_8 = [7,11)$, frontier 11. Reject
+$a_9$ ($8 < 11$) and $a_{10}$ ($2 < 11$). Take $a_{11} = [12,16)$. Output
+$\{a_1, a_4, a_8, a_{11}\}$, four activities.
+
+A second maximum solution: $\{a_2, a_4, a_9, a_{11}\}$, the intervals
+$[3,5), [5,7), [8,12), [12,16)$, pairwise compatible and also of size 4.
+The theorem claims only that greedy's *size* is maximum, never that the
+maximum solution is unique or that greedy finds any particular one; the
+exchange argument morphs this second optimum into greedy's output without
+loss, which is exactly the sense in which both are optimal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim with an explicit instance: "The interval that conflicts
+with the fewest others blocks the least, so fewest-conflicts-first is
+optimal for interval scheduling." A correct refutation needs an instance,
+the tally under each strategy, and the name of the step of the exchange
+schema that has no proof for this criterion.
+
+<Solution>
+Strategy hint: build a four-interval optimal chain, then plant a trap
+interval that bridges the middle of the chain while everything else piles
+conflicts onto the chain's own members.
+
+The instance (11 intervals): a chain $A_1 = [0,4)$, $A_2 = [4,8)$,
+$A_3 = [8,12)$, $A_4 = [12,16)$; three copies of $[3,5)$; three copies of
+$[11,13)$; and the trap $X = [7,9)$.
+
+Conflict counts: $X$ overlaps only $A_2$ and $A_3$: 2 conflicts. $A_1$ and
+$A_4$ each conflict with three copies: 3. $A_2$ and $A_3$ each conflict
+with three copies plus $X$: 4. Each $[3,5)$ copy conflicts with $A_1$,
+$A_2$, and its two sister copies: 4; likewise each $[11,13)$ copy.
+
+Fewest-conflicts-first therefore takes $X$ first, which eliminates $A_2$
+and $A_3$. Whatever it does next, the schedule can contain at most one
+interval from $\{A_1, [3,5)\text{'s}\}$ and one from
+$\{A_4, [11,13)\text{'s}\}$: tally at most 3. The chain
+$\{A_1, A_2, A_3, A_4\}$ has size 4, and earliest-finish-first finds a
+size-4 schedule by the theorem.
+
+The unprovable step is the exchange (step 2 of the schema): swapping an
+optimal schedule's first choice for $X$ is not loss-free, since $X$'s two
+conflicts sit in the *middle* of the time axis and destroy two chain
+positions at once. Low conflict count bounds neither the finish time nor
+the damage a selection does to what remains.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Largest-coin-first is optimal for coin change, because each greedy
+coin covers the most remaining amount and therefore minimizes the coins
+still needed." Use denominations $\{1, 3, 4\}$ with target 6. Then explain
+what the correctness of largest-coin-first on US denominations
+$\{1, 5, 10, 25\}$ (a true fact, not proved here) does and does not imply
+about the criterion.
+
+<Solution>
+On $\{1,3,4\}$ with target 6, largest-coin-first takes 4, leaving 2, then
+$1 + 1$: three coins. The optimum is $3 + 3$: two coins. The claim's error
+is the inference "covers the most now $\Rightarrow$ fewest coins later";
+covering 4 leaves a remnant, 2, that the denomination set handles badly,
+while two mid-sized choices leave no remnant at all. It is rod cutting's
+failure in miniature: the best single step strands the remainder.
+
+The US-coin fact shows that greedy correctness is a property of the
+*instance family*, here the denomination set, not of the criterion: the
+same rule is optimal for every target on $\{1,5,10,25\}$ and wrong on
+$\{1,3,4\}$ at target 6. Surviving every test on one family is therefore
+no evidence for another, and only a proof for the family at hand closes
+the question. The general problem, minimum coins for an arbitrary
+denomination set, is solved by the table of
+<Ref lesson="dynamic-programming-i-one-dimensional">dynamic programming
+I</Ref>, which compares the subproblem answers greedy refuses to compute.
+</Solution>
+</Exercise>
+
+<Exercise>
+A problem this lesson has not treated. One machine, $n$ jobs; job $j$ needs
+$t_j$ consecutive minutes and carries a deadline $d_j$. Every job must run,
+back to back from time $0$ with no idle gaps, so a schedule is an ordering of
+the jobs; if job $j$ finishes at time $C_j$, its lateness is
+$\max(0,\, C_j - d_j)$, and the objective is to minimize the *maximum*
+lateness over all jobs. Design the algorithm: propose an ordering criterion,
+hunt counterexamples against it and against at least one rival criterion, and
+settle the survivor's status — an exchange lemma if you can prove one, a
+counterexample if you cannot.
+
+<Solution>
+Three criteria present themselves: shortest job first ($t_j$ ascending),
+smallest slack first ($d_j - t_j$ ascending), earliest deadline first
+($d_j$ ascending).
+
+Shortest-first dies on two jobs: $t_1 = 1, d_1 = 100$ and
+$t_2 = 10, d_2 = 10$. It runs job 1 first, so job 2 finishes at $11$,
+lateness $1$; the reverse order finishes job 2 at $10$ and job 1 at $11$,
+both on time, maximum lateness $0$. Smallest-slack-first dies on
+$t_1 = 1, d_1 = 2$ (slack $1$) and $t_2 = 10, d_2 = 10$ (slack $0$): it runs
+job 2 first and job 1 finishes at $11$, lateness $9$, while the reverse
+order's maximum lateness is $1$ (job 2 at $11$ against deadline $10$).
+
+Earliest deadline first survives the hunt, and the exchange lemma closes it —
+step 2 of the schema, instantiated as an adjacent swap. Call an *inversion* a
+consecutive pair out of deadline order: job $i$ directly before job $j$ with
+$d_i > d_j$. Swapping the two changes no other job's finish time. Job $j$
+moves earlier, so its lateness cannot increase. Job $i$ now finishes exactly
+where $j$ used to, at some time $f$, and
+$\max(0, f - d_i) \le \max(0, f - d_j)$ because $d_i > d_j$: job $i$'s new
+lateness is at most job $j$'s old one. The swap therefore never increases the
+maximum lateness. Any ordering other than earliest-deadline order contains an
+adjacent inversion, and each swap removes one inverted pair, so finitely many
+swaps morph any optimal schedule into earliest-deadline order at no cost
+(neighbors with equal deadlines may sit in either order; swapping them
+changes neither job's bound). Some optimal schedule is in earliest-deadline
+order: the greedy-choice property holds, and the criterion is provable, not
+merely unrefuted. The problem and this proof are Kleinberg and Tardos's
+§4.2, *scheduling to minimize lateness*.
+</Solution>
+</Exercise>
+
+<Exercise>
+Carry the fractional-knapsack exchange argument in full: prove that taking
+items in nonincreasing density order $v_1/w_1 \ge v_2/w_2 \ge \cdots$, each
+to the largest extent possible, maximizes the value of the load. Represent
+a solution as amounts $x_i \in [0, w_i]$ with $\sum_i x_i \le W$, and name
+the exact sentence of your proof that fails for the 0/1 problem.
+
+<Solution>
+Assume $\sum_i w_i > W$, otherwise every solution takes everything and the
+claim is trivial; then the greedy load $g$ fills the knapsack:
+$\sum_i g_i = W$, and any optimal load $x$ may be assumed to fill it too,
+since raising any $x_i$ never lowers the value.
+
+Suppose $x \ne g$ and let $i$ be the smallest index with $x_i \ne g_i$.
+Greedy takes the maximum legal amount of item $i$ given full agreement on
+items $1, \dots, i-1$, so $x_i < g_i$. Since both loads total $W$ and agree
+before $i$, some $j > i$ has $x_j > g_j$. Let
+$\delta = \min(g_i - x_i,\; x_j - g_j) > 0$ and shift $\delta$ pounds from
+item $j$ to item $i$: the new load $x'$ is feasible ($x'_i \le g_i \le
+w_i$, $x'_j \ge g_j \ge 0$, total unchanged) and its value changes by
+$$
+\delta \left( \frac{v_i}{w_i} - \frac{v_j}{w_j} \right) \ge 0,
+$$
+by the density ordering. So $x'$ is still optimal and agrees with $g$ on a
+longer prefix (either $x'_i = g_i$, or $x'_j = g_j$ and a later shift will
+finish index $i$). Each shift strictly reduces
+$\sum_i |x_i - g_i| > 0$ by $2\delta$, and the quantity cannot decrease
+forever below zero, so finitely many shifts transform $x$ into $g$ with no
+value lost: $g$ is optimal.
+
+The sentence that fails for 0/1 is the definition of the shift: "$x'$ is
+feasible" uses $x_i$ ranging over the continuum $[0, w_i]$, and with
+$x_i \in \{0, w_i\}$ the amount $\delta$ is forced to be a whole item,
+which need not fit. On the three-item instance of the lesson, exchanging
+item 1 for $\delta = 10$ pounds of item 3 is exactly the illegal move.
+</Solution>
+</Exercise>
+
+<Exercise>
+The sweep tests each new interval against only the *last* selected one,
+yet claims compatibility with the whole selected set. Justify the shortcut
+with a loop invariant, in the three-part form of
+<Ref lesson="loop-invariants-and-correctness">loop invariants and
+correctness</Ref>: state a claim that holds before every iteration of
+`GreedySelect`'s loop, discharge initialization, maintenance, and
+termination, and state precisely which property of the algorithm your
+invariant does and does not establish.
+
+<Solution>
+**Invariant.** Before the iteration with counter $m$: (i) $A$ is a
+pairwise-compatible subset of $\{a_1, \dots, a_{m-1}\}$; (ii)
+$\texttt{last} \in A$ and $f_{\texttt{last}} = \max\{f_i : a_i \in A\}$.
+
+**Initialization.** Before $m = 2$: $A = \{a_1\}$ is trivially compatible,
+$\texttt{last} = 1$, and $f_1$ is the maximum finish in $A$.
+
+**Maintenance.** Suppose the invariant holds before iteration $m$. If
+$s_m < f_{\texttt{last}}$, nothing changes and the invariant carries over
+with $m+1$. If $s_m \ge f_{\texttt{last}}$, then for every $a_i \in A$,
+part (ii) gives $f_i \le f_{\texttt{last}} \le s_m$, so $a_m$ is
+compatible with each of them and (i) holds for
+$A \cup \{a_m\}$. Setting $\texttt{last} = m$ restores (ii): the input is
+sorted by finish time, so $f_m \ge f_i$ for every $i \le m$, in particular
+for every member of the new $A$.
+
+**Termination.** The loop exits with $m = n + 1$, and (i) instantiated
+there says $A$ is a pairwise-compatible subset of the whole instance: the
+output is *feasible*, and the one-comparison test never admitted a
+conflict.
+
+What the invariant does not establish is optimality. Feasibility is a
+property of each state of the loop, which is what invariants certify;
+maximality is a comparison against every other schedule, which is what the
+exchange argument certifies. The lesson's guarantee is the conjunction of
+the two proofs, and neither substitutes for the other.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the exchange schema one module ahead. A connected weighted graph is a
+set of nodes joined by edges, each edge with a distinct positive weight; a
+*spanning tree* is a subset of edges that connects all nodes and contains
+no cycle, and a *minimum* spanning tree has the smallest total edge weight.
+Let $(S, V \setminus S)$ be any split of the nodes into two nonempty sets,
+and let $e$ be the lightest edge with one endpoint in each set. Prove that
+some minimum spanning tree contains $e$.
+
+<Solution>
+Strategy hint: this is step 2 of the schema with "interval" replaced by
+"edge crossing the split"; the swap partner is found on a cycle.
+
+Let $T$ be a minimum spanning tree, and suppose $e = (u, v) \notin T$.
+Since $T$ connects all nodes, it contains a path from $u$ to $v$, so
+$T \cup \{e\}$ contains a cycle through $e$. Walking that cycle from $u$
+(in $S$) to $v$ (in $V \setminus S$) and back, the walk changes sides at
+least twice, so the cycle contains a second edge $e'$ with one endpoint in
+each set. Exchange: $T' = (T \setminus \{e'\}) \cup \{e\}$.
+
+*Feasibility.* $T'$ has $|T|$ edges. Removing $e'$ from the cycle of
+$T \cup \{e\}$ breaks no connectivity, because the rest of the cycle still
+joins $e'$'s endpoints, so $T'$ is connected; a connected graph on $n$
+nodes with $n-1$ edges is acyclic, so $T'$ is a spanning tree.
+
+*No loss.* $e$ is the lightest edge crossing the split and $e'$ crosses
+it, so $w(e) < w(e')$ (weights distinct), giving
+$w(T') = w(T) - w(e') + w(e) < w(T)$. That contradicts $T$'s minimality,
+so the supposition fails: $e \in T$ for every minimum spanning tree, in
+particular for some.
+
+The statement just proved is the *cut property*, the single lemma from
+which <Ref lesson="minimum-spanning-trees">minimum spanning trees</Ref>
+derives the correctness of both Kruskal's algorithm (sort edges by weight,
+sweep, keep what creates no cycle) and Prim's (grow one tree by its
+lightest outgoing edge). Both are the greedy template of this lesson with
+the exchange already done.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §15.1: the activity-selection problem, its 11-activity instance (reused in this lesson's first closing exercise), and Theorem 15.1; §15.2: the greedy-choice property, optimal substructure, and the knapsack pair with the \$240/\$160/\$220 instance; §15.3: Huffman codes, the family member this course leaves to its information-theory sibling.
+2. J. Erickson, *Algorithms*, 2019 — §3.5: "Warning: Greed is Stupid," the case against trusting any greedy algorithm without a proof; §4.2–4.3: class scheduling, the unrolled-induction exchange proof this lesson's main theorem follows, and the general pattern. Free online under CC BY 4.0: https://jeffe.cs.illinois.edu/teaching/algorithms/
+3. E. Demaine, J. Ku, J. Solomon, MIT 6.006 *Introduction to Algorithms*, Spring 2020, Lecture 18 — the rod-cutting instance with the 32-versus-33 greedy counterexample, and its dynamic-programming solution. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+4. J. Kleinberg, É. Tardos, *Algorithm Design*, Pearson, 2005 — §4.1: interval scheduling proved by the "greedy stays ahead" method, the standard alternative to the exchange style taught here; §4.2: scheduling to minimize lateness, the adjacent-swap exchange proof behind the closing design exercise.
+5. S. Dasgupta, C. H. Papadimitriou, U. V. Vazirani, *Algorithms*, McGraw-Hill, 2008 — Chapter 5: greedy algorithms with the cut property as the organizing lemma for minimum spanning trees, the forward target of the closing cut-property exercise. Free author draft: https://cseweb.ucsd.edu/~dasgupta/book/index.html
+</References>

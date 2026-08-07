@@ -32,4 +32,26 @@ export const demos: Record<
   InfoNCESaturation: () => import("./information-theory/InfoNCESaturation"),
   LZ77Window: () => import("./information-theory/LZ77Window"),
   MIEstimatorBias: () => import("./information-theory/MIEstimatorBias"),
+  GrowthRaceChart: () =>
+    import("./algorithms-and-data-structures/GrowthRaceChart"),
+  RecursionTreeExplorer: () =>
+    import("./algorithms-and-data-structures/RecursionTreeExplorer"),
+  DynamicArrayGrowth: () =>
+    import("./algorithms-and-data-structures/DynamicArrayGrowth"),
+  HashCollisionExplorer: () =>
+    import("./algorithms-and-data-structures/HashCollisionExplorer"),
+  BSTInsertDelete: () =>
+    import("./algorithms-and-data-structures/BSTInsertDelete"),
+  RotationBalancer: () =>
+    import("./algorithms-and-data-structures/RotationBalancer"),
+  HeapSiftVisualizer: () =>
+    import("./algorithms-and-data-structures/HeapSiftVisualizer"),
+  UnionFindPathCompression: () =>
+    import("./algorithms-and-data-structures/UnionFindPathCompression"),
+  SortRaceComparator: () =>
+    import("./algorithms-and-data-structures/SortRaceComparator"),
+  QuickselectPivotChooser: () =>
+    import("./algorithms-and-data-structures/QuickselectPivotChooser"),
+  GreedyVsOptimalCounterexample: () =>
+    import("./algorithms-and-data-structures/GreedyVsOptimalCounterexample"),
 };

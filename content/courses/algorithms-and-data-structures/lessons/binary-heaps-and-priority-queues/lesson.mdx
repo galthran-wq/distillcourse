@@ -1,0 +1,854 @@
+A binary heap keeps only the minimum (or maximum) element easy to find, in
+exchange for giving up the ability to search for an arbitrary element — a
+trade that makes insert and extract-min both O(log n) using an array with no
+pointers at all.
+
+The module has spent two lessons buying the full sorted order:
+<Ref lesson="binary-search-trees">the BST lesson</Ref> priced every ordered
+operation at $O(h)$, and <Ref lesson="balanced-search-trees">the previous
+lesson</Ref> pinned $h$ to $O(\log n)$ at the cost of rotations, stored
+heights, and a fixup after every update. Its closing exercise then found a
+workload that wastes nearly all of that machinery: a scheduler that only
+inserts events and removes the earliest one never asks for search,
+successor, or a range, and the weakest per-node condition that still serves
+it needs no rotations at all. This lesson builds that structure in full: the
+binary heap, a complete tree packed into a plain array, and the priority
+queue interface it implements. It is the module's "less order for less cost"
+move made exact.
+
+The route: the interface and the scoreboard that motivates a new structure;
+the complete-tree-in-array layout; the heap property against the BST
+invariant; the two sift repairs; the $O(n)$ bottom-up build, this lesson's
+one counterintuitive result; and the workloads the finished queue serves.
+
+## The interface: insert, find-min, extract-min, and nothing else
+
+The structure is easier to design once the demands are written down, because
+there are only three of them, plus one optional fourth.
+
+<Definition title="priority queue">
+A **priority queue** maintains a collection of items, each carrying a
+comparable *key* (its priority), under the operations
+
+- $\textsc{Insert}(x)$: add item $x$ to the collection;
+- $\textsc{Find-Min}()$: return an item with the smallest key, without
+  removing it;
+- $\textsc{Extract-Min}()$: remove and return an item with the smallest key;
+- optionally $\textsc{Decrease-Key}(x, k)$: lower the key of an item $x$
+  already in the collection to $k$.
+
+A *max-priority queue* is the mirror image, built around the largest key.
+</Definition>
+
+Nothing in the interface mentions searching for a named key, the successor
+of a key, or the order of any two items that are not both minimal. This
+lesson works with min-priority queues throughout, because the heaviest
+client ahead in the course, <Ref lesson="shortest-paths-dijkstra">Dijkstra's
+algorithm</Ref>, wants the smallest tentative distance next; CLRS develops
+the max variant (the natural orientation for sorting in place), and every
+statement below mirrors by flipping each inequality.
+
+Structures already in hand serve this interface, each badly in one slot:
+
+| structure | insert | find-min | extract-min |
+| --- | --- | --- | --- |
+| unsorted dynamic array | $O(1)$ amortized | $\Theta(n)$ | $\Theta(n)$ |
+| array sorted descending | $\Theta(n)$ | $O(1)$ | $O(1)$ amortized |
+| balanced BST | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ |
+| **binary heap** (this lesson) | $O(\log n)$ | $O(1)$ | $O(\log n)$ |
+
+The two array rows are a dichotomy: maintain the full sorted order and pay
+$\Theta(n)$ on the way in (every insert shifts the tail, as in
+<Ref lesson="arrays-and-linked-lists">the array lesson</Ref>), or maintain
+no order and pay $\Theta(n)$ on the way out (every extraction scans). The
+balanced BST clears every column at $O(\log n)$, but it maintains the
+*entire* sorted order (pointers, stored heights, a rebalance per update) to
+answer a question that only ever touches one end of it. The heap row is
+the compromise the two array rows lack: logarithmic in the two mutating
+columns, constant in the reading column, and, as the rest of the lesson
+shows, achieved by a bare array with smaller constants than any pointer
+structure, plus one bonus the table omits: building one from $n$ unsorted
+items costs $O(n)$, not $O(n \log n)$.
+
+## The layout: a complete tree folded into an array
+
+Pointerlessness comes first, order second, because the layout is what the
+order will be repaired on. The previous lesson met the *complete* tree
+(every level full except possibly the last, which is filled left to right)
+as an obstacle: a complete tree's shape is a function of $n$ alone, so keeping a
+BST perfectly complete forces $\Theta(n)$ relabeling per update. Here the
+same fact is the asset. A shape that carries no information need not be
+stored: lay the nodes out in level order (root, then depth 1 left to right,
+then depth 2, and so on) in a plain array, and the tree structure becomes
+arithmetic on indices.
+
+With the root at index 0, node $i$'s neighbors sit at
+
+$$
+\mathrm{left}(i) = 2i + 1, \qquad
+\mathrm{right}(i) = 2i + 2, \qquad
+\mathrm{parent}(i) = \left\lfloor \tfrac{i-1}{2} \right\rfloor .
+$$
+
+The first formula is a counting argument: in level order, the children of
+the first $i$ nodes come before the children of node $i$, and each of those
+$i$ nodes contributes exactly two child slots starting at index 1, so node
+$i$'s left child lands at $1 + 2i$. The other two formulas invert it. CLRS
+places the root at index 1 instead, which gives the rounder
+$\mathrm{left}(i) = 2i$, $\mathrm{right}(i) = 2i+1$,
+$\mathrm{parent}(i) = \lfloor i/2 \rfloor$ at the price of an unused slot 0;
+this course stays 0-based, matching Python's
+[heapq](https://docs.python.org/3/library/heapq.html), Open Data
+Structures, and every mainstream language's arrays. Mixing the two
+conventions is a classic source of off-by-one bugs: pick one and state it,
+as here.
+
+<Figure
+  src="./figures/dual-view.svg"
+  alt="The array [11, 26, 20, 32, 29, 50, 41, 91, 65, 72] drawn twice: as ten indexed boxes and as a complete binary tree; index 2 and its children at indices 5 and 6 are color-linked in both views, with the arithmetic 2i+1 and 2i+2 written on arrows"
+  caption="One object, two views: the array is the tree in level order. Node 2's children live at indices 2·2+1 = 5 and 2·2+2 = 6 in both pictures."
+/>
+
+<Example title="index arithmetic on the ten-element array">
+Take the array $Q = [11, 26, 20, 32, 29, 50, 41, 91, 65, 72]$, $n = 10$,
+drawn above.
+
+**Children of index 2** (key 20): $\mathrm{left}(2) = 5$ (key 50) and
+$\mathrm{right}(2) = 6$ (key 41). **Parent of index 9** (key 72):
+$\lfloor 8/2 \rfloor = 4$ (key 29).
+
+**Where the leaves start.** Index $i$ is a leaf exactly when
+$\mathrm{left}(i) = 2i + 1 \ge n$, i.e. $i \ge \lceil (n-1)/2 \rceil =
+\lfloor n/2 \rfloor$. For $n = 10$: indices 5 through 9 are leaves, five of
+them: always $\lceil n/2 \rceil$ leaves, at least half the array.
+
+**A root-to-leaf path.** Starting from index 9 and applying
+$\mathrm{parent}$ repeatedly: $9 \to 4 \to 1 \to 0$, keys
+$72, 29, 26, 11$. Three edges, and $\lfloor \lg 10 \rfloor = 3$. Read
+upward, the keys on this path happen to decrease; the next section makes
+that a law.
+
+Each step of any such walk is one subtraction and one shift on an index
+into contiguous memory: the $O(1)$ address arithmetic of
+<Ref lesson="arrays-and-linked-lists">the array lesson</Ref>, with no
+pointer to chase.
+</Example>
+
+<Theorem title="height of a complete tree">
+A complete binary tree with $n \ge 1$ nodes has height exactly
+$\lfloor \lg n \rfloor$.
+
+<Proof>
+If the height is $h$, levels $0$ through $h-1$ are full and level $h$ holds
+at least one node, so $n \ge (2^h - 1) + 1 = 2^h$. All $h{+}1$ levels
+together hold at most $2^{h+1} - 1$ nodes, so $n < 2^{h+1}$. Taking $\lg$:
+$h \le \lg n < h + 1$, which is $h = \lfloor \lg n \rfloor$.
+</Proof>
+</Theorem>
+
+<KeyFact>
+A complete tree in an array needs no pointers because its shape is a
+function of $n$ alone: neighbors are computed, never stored, and the height
+is exactly $\lfloor \lg n \rfloor$ — 19 for a million keys, below the AVL
+ceiling of 28 and the red-black ceiling of 39 from
+<Ref lesson="balanced-search-trees">the previous lesson</Ref>, with no
+rebalancing machinery to maintain. The shape is perfect by construction;
+what remains to maintain is order.
+</KeyFact>
+
+<Exercise>
+(a) Derive the 1-based versions of all three index formulas (root at index
+1) from the 0-based ones. (b) For a heap of $n = 1000$ elements: give the
+index of the first leaf, the number of leaves, and the height. (c) List the
+full path of indices from index 872 to the root, and check its length
+against the height formula.
+
+<Solution>
+**(a)** Write $j = i + 1$ for the 1-based index of the node at 0-based
+index $i$. Then $\mathrm{left} = (2i + 1) + 1 = 2(i+1) = 2j$,
+$\mathrm{right} = (2i + 2) + 1 = 2j + 1$, and
+$\mathrm{parent} = \lfloor (i-1)/2 \rfloor + 1 =
+\lfloor (j-2)/2 \rfloor + 1 = \lfloor j/2 \rfloor$. The shifts of origin
+absorb the $\pm 1$s; the two conventions are the same tree.
+
+**(b)** First leaf: $\lfloor 1000/2 \rfloor = 500$; leaves: indices 500
+through 999, so $500$ of them; height: $\lfloor \lg 1000 \rfloor = 9$,
+since $2^9 = 512 \le 1000 < 1024 = 2^{10}$.
+
+**(c)** Repeated $\lfloor (i-1)/2 \rfloor$:
+$872 \to 435 \to 217 \to 108 \to 53 \to 26 \to 12 \to 5 \to 2 \to 0$. Nine
+edges, and the depth of index $i$ is $\lfloor \lg(i+1) \rfloor =
+\lfloor \lg 873 \rfloor = 9$: consistent, and at most the height computed
+in (b), as a depth must be.
+</Solution>
+</Exercise>
+
+## The heap property: order along paths, silence across them
+
+The array now stores a tree, but nothing yet makes the minimum findable.
+The order imposed is the one the previous lesson's closing exercise
+identified as sufficient.
+
+<Definition title="min-heap">
+A **min-heap** is an array $Q[0 \,..\, n{-}1]$, read as a complete binary
+tree, in which
+
+$$
+Q[\mathrm{parent}(i)] \le Q[i]
+\qquad \text{for every } 1 \le i \le n - 1 .
+$$
+
+Equivalently: every node's key is at most its children's keys (the
+**min-heap property**). A **max-heap** reverses the inequality.
+</Definition>
+
+Four instances fix the boundary of the definition. The canonical case is
+the running array $Q = [11, 26, 20, 32, 29, 50, 41, 91, 65, 72]$: checking
+all nine edges (each child against its parent) confirms it. A structurally
+different valid case: *any* ascending sorted array is a min-heap, since
+$\mathrm{parent}(i) < i$ and ascending order makes earlier entries smaller;
+the converse fails, as $Q$ itself shows by holding 26 before 20. The
+degenerate cases are $n \le 1$: no edges exist, so the condition holds
+vacuously, and likewise every leaf is trivially the root of a one-node
+heap, the fact the build algorithm starts from. The near-miss: swap
+$Q[4] = 29$ with $Q[9] = 72$ to get $[11, 26, 20, 32, 72, 50, 41, 91, 65,
+29]$, and exactly one clause fails, the edge $(4, 9)$. Only two clauses
+mention the swapped slots at all — $(1, 4)$ still holds, since $26 \le
+72$ — and although 72 now exceeds keys all over the tree, 41 and 50 among
+them, no clause notices, because the property never compares two nodes on
+different paths.
+
+<Figure
+  src="./figures/heap-vs-bst.svg"
+  alt="Two five-node trees over the keys 11, 20, 26, 29, 32: a min-heap with 11 at the root and a shaded region stating everything below is at least 11, and a BST with 26 at the root and shaded left and right regions holding keys smaller and larger than 26"
+  caption="Same five keys, two invariants. The heap constrains only parent-child edges: siblings are unordered and a key can live in either subtree. The BST constrains every pair across the root."
+/>
+
+<Theorem title="the root is a minimum">
+In a min-heap, $Q[0] \le Q[i]$ for every $i$; more generally, every node
+holds the minimum key of its own subtree.
+
+<Proof>
+Follow the parent chain from any index $i$ upward:
+$i, \mathrm{parent}(i), \mathrm{parent}(\mathrm{parent}(i)), \dots, 0$.
+Each step is an edge of the tree, so by the heap property the keys are
+nonincreasing read upward, and $Q[0] \le Q[i]$. The subtree statement is
+the same argument stopped at the subtree's root, which lies on every such
+chain from within it.
+</Proof>
+</Theorem>
+
+So $\textsc{Find-Min}$ reads $Q[0]$ in $O(1)$.
+
+### What the property does not order
+
+Everything else about the order has been given up, and the cost is
+concrete. Consider locating the key 29 in the running heap: the property
+says nothing about which subtree of the root any key lives in, so a search
+cannot discard half the tree the way
+<Ref lesson="binary-search-trees">the BST's one-comparison discard</Ref>
+does: locating an arbitrary named key inspects $\Theta(n)$ nodes in the
+worst case. Even the *maximum* is only known to be somewhere among the
+$\lceil n/2 \rceil$ leaves; the boundary exercise below proves that it
+must sit at one and that finding it costs $\Omega(n)$. Against the BST
+invariant, which determines the entire sorted
+order (its in-order walk is sorted), the heap property is a strictly weaker
+condition on the same $n - 1$ edges. The weakening is deliberate: fewer
+constraints hold, so fewer constraints can break when the array changes.
+
+<KeyFact>
+The heap property fixes the order of two slots exactly when one is an
+ancestor of the other; any other pair — siblings, cousins, any two
+leaves — can hold its keys in either order in some valid heap. The missing
+constraints are what make every repair in the next section a walk along a
+single root-leaf path.
+</KeyFact>
+
+## Sift-up and sift-down: every repair walks one root-leaf path
+
+The interface demands two mutations, and the complete shape leaves each of
+them exactly one legal move: a tree of $n{+}1$ nodes differs from a tree of
+$n$ nodes only in the next free array slot, so insertion must create index
+$n$, and deletion must destroy index $n{-}1$. Each mutation disturbs the
+invariant in one place, and the repair rides the disturbed path.
+
+### Insert: append, then sift up
+
+To insert key $x$, append it at index $n$ (the shape maintenance is the
+$O(1)$-amortized append of
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the dynamic-array
+lesson</Ref>), and observe that only one edge can now be violated: the one
+from the new leaf to its parent. *Sift-up* repairs it:
+
+```text
+sift_up(Q, i):
+    while i > 0 and Q[parent(i)] > Q[i]:
+        swap Q[i], Q[parent(i)]
+        i = parent(i)
+```
+
+Each swap moves $x$ one level up. The swap cannot break anything below: the
+displaced parent lands above keys that were inside its subtree a moment
+ago, and by the subtree-minimum theorem it was at most all of them. So at
+every step the whole array satisfies the heap property except possibly the
+one edge above $x$, and when the loop stops ($x$'s parent is no larger, or
+$x$ is the root) no violation remains.
+
+<FigureSequence
+  name="siftup"
+  alt="Four frames: 15 is appended at index 10 of the ten-element heap, swaps with its parent 29, swaps with its parent 26, and stops below the root 11; each frame shows the tree and the array with the moving key highlighted"
+  caption="Insert 15: append at index 10, then sift up. Before each frame, predict from the array alone whether a swap fires. Two swaps, then 11 ≤ 15 stops the walk."
+/>
+
+The walk visits at most one node per level of a tree of height
+$\lfloor \lg (n{+}1) \rfloor$ after the append, with one comparison and at
+most one swap per level: $O(\log n)$, and no rotation cases, no stored
+heights, no colors.
+
+### Extract-min: promote the last leaf, then sift down
+
+$\textsc{Extract-Min}$ must return $Q[0]$, but the shape only permits
+destroying the *last* slot. The standard move reconciles the two ends of
+the array: save $Q[0]$, move the last leaf $Q[n{-}1]$ to the root, shrink
+$n$ by one, and repair downward. The root is now the one possibly-violated
+node, and *sift-down* repairs it:
+
+```text
+sift_down(Q, i):
+    while left(i) < n:
+        c = index of the smaller child of i
+        if Q[i] <= Q[c]: stop
+        swap Q[i], Q[c]
+        i = c
+```
+
+The swap must use the **smaller** child: the key swapped up becomes the
+parent of the *other* child too, and only the smaller of the two is
+guaranteed to be at most its sibling. (The refutation exercise below breaks
+the left-child variant.) With that choice, the same one-violation argument
+as sift-up applies with the direction reversed, and the walk stops at a
+leaf or earlier.
+
+<FigureSequence
+  name="extract"
+  alt="Four frames: the root 11 of the ten-element heap is returned, the last leaf 72 is promoted to the root, 72 swaps with its smaller child 20, then with its smaller child 41, and stops as a leaf; each frame shows tree and array"
+  caption="Extract-min: 11 leaves, the last leaf 72 takes its place and sifts down, choosing the smaller child at each level. The new root 20 is the second-smallest key, as the theorem demands."
+/>
+
+Sift-down pays two comparisons per level, one to pick the smaller child and
+one to test the parent against it: at most $2\lfloor \lg n \rfloor$
+comparisons, against at most $\lfloor \lg(n{+}1) \rfloor$ for sift-up.
+Those counts are the entire cost story: the operations run on contiguous
+memory with no per-node allocation, which is why a binary heap's constants
+undercut every pointer-based $O(\log n)$ structure in the scoreboard.
+
+<Theorem title="heap operation costs">
+On an $n$-element binary heap, $\textsc{Find-Min}$ runs in $O(1)$, and
+$\textsc{Insert}$ and $\textsc{Extract-Min}$ run in $O(\log n)$ worst case.
+
+<Proof>
+$\textsc{Find-Min}$ reads $Q[0]$. Each of the other two performs $O(1)$
+work (append or swap-and-shrink) plus one sift, and a sift moves strictly
+along one root-leaf path, one level per iteration with $O(1)$ work per
+level. The path length is bounded by the tree's height,
+$\lfloor \lg n \rfloor$ by the height theorem.
+</Proof>
+</Theorem>
+
+<Demo
+  name="HeapSiftVisualizer"
+  caption="An array-backed min-heap: insert values and extract the minimum, watching the sift path light up in both the tree and the array."
+/>
+
+<Task>
+Insert five values in an order that triggers zero sift-up swaps (the demo's
+swap counter should stay at 0), then find an insertion order of the same
+five values that maximizes total swaps. Ascending order gives 0; the
+maximizing order is descending, and for five keys it forces $1+1+2+2 = 6$
+swaps: each new key climbs to the root from depth
+$\lfloor \lg(i+1) \rfloor$.
+</Task>
+
+<Exercise>
+The insert figure left an 11-element heap:
+$Q = [11, 15, 20, 32, 26, 50, 41, 91, 65, 72, 29]$. Trace
+$\textsc{Extract-Min}$ on it: give the returned key, each comparison and
+swap of the sift, and the final array. State how many comparisons the sift
+used against the $2\lfloor \lg n \rfloor$ bound.
+
+<Solution>
+Return $Q[0] = 11$. The last leaf 29 (index 10) moves to the root and $n$
+becomes 10: $[29, 15, 20, 32, 26, 50, 41, 91, 65, 72]$.
+
+**Level 1:** children of 0 are 15 and 20; smaller is 15; compare
+$29 > 15$: swap. $[15, 29, 20, 32, 26, 50, 41, 91, 65, 72]$, cursor at
+index 1.
+
+**Level 2:** children of 1 are $Q[3] = 32$ and $Q[4] = 26$; smaller is 26;
+compare $29 > 26$: swap. $[15, 26, 20, 32, 29, 50, 41, 91, 65, 72]$,
+cursor at index 4.
+
+**Level 3:** $\mathrm{left}(4) = 9$ holds 72, $\mathrm{right}(4) = 10 \ge
+n$: only child 72; compare $29 \le 72$: stop.
+
+Final array: $[15, 26, 20, 32, 29, 50, 41, 91, 65, 72]$. Comparisons: two
+per full level (pick child, test) at levels 1 and 2, one child-test at
+level 3, so 5 or 6 depending on how the single-child case is counted;
+either way within the bound $2\lfloor \lg 10 \rfloor = 6$. The transferable check:
+the new root 15 was the second-smallest key of the 11, as it must be.
+</Solution>
+</Exercise>
+
+### Decrease-key, and the handle problem
+
+$\textsc{Decrease-Key}(x, k)$ overwrites $x$'s key with the smaller $k$ and
+repairs with a sift-up from $x$'s slot, since a key that shrank can only
+violate the edge above it: $O(\log n)$, nothing new. The genuine
+difficulty is *finding* $x$'s slot, because a heap cannot search for it.
+Implementations that support the operation keep a side map (CLRS calls the
+entries *handles*) from item identity to current index, updated at every
+swap: a hash table or a direct-address array riding along with the heap.
+<Ref lesson="shortest-paths-dijkstra">Dijkstra's algorithm</Ref> is the
+canonical client: relaxing an edge lowers a vertex's tentative distance,
+which is precisely a decrease-key. The common engineering alternative
+skips the handles: insert a fresh copy with the lower key and discard
+stale entries as they surface at extraction, trading a fatter queue for a
+simpler structure. The Fibonacci heap, a structure of the advanced
+sequence, exists to make decrease-key $O(1)$ amortized.
+
+## Build-heap: n sift-downs cost O(n), not O(n log n)
+
+Several of the workloads ahead start with all $n$ items known upfront:
+heapsort builds a heap of the whole array, Dijkstra starts with every
+vertex in the queue, a simulation is seeded with an initial event list. The
+obvious build is $n$ inserts: at most $\lfloor \lg n \rfloor$ swaps each,
+$O(n \log n)$ total, and genuinely $\Theta(n \log n)$ on unlucky input (the
+derivation exercise below exhibits it). From the balanced-tree world one
+would expect that to be the end of the story: $n$ items into a logarithmic
+structure. It is not the end: building bottom-up with sift-down runs in
+$\Theta(n)$.
+
+The $O(n \log n)$ estimate is a correct upper bound whose *tightness* is
+the trap: it charges every operation the full height of the tree. What an
+individual sift actually pays is bounded by the length of its own walk:
+the node's *depth* for sift-up, the node's *height* for sift-down. The two
+quantities are distributed in opposite ways. At least half the nodes
+are leaves: depth $\lfloor \lg n \rfloor$ or so, but height 0. A quarter
+have height 1, an eighth height 2, and a single node has height
+$\lfloor \lg n \rfloor$. Sift-up therefore pays a large bill at almost
+every node, while sift-down pays nothing at half of them. A linear-time
+build must run sift-*down*, and must run it bottom-up so that each call's
+precondition (both child subtrees already heaps) holds when it fires:
+
+```text
+build_heap(Q):
+    for i = floor(n/2) - 1 downto 0:
+        sift_down(Q, i)
+```
+
+The loop skips the leaves (indices $\lfloor n/2 \rfloor$ through $n-1$),
+which are one-node heaps for free. Its correctness is a loop invariant of
+the shape drilled in
+<Ref lesson="loop-invariants-and-correctness">the correctness lesson</Ref>:
+before each iteration, every index greater than $i$ roots a min-heap;
+sift-down at $i$ preserves it, and at termination index 0 roots a heap.
+
+<FigureSequence
+  name="build"
+  alt="Five frames: build-heap runs right to left over the array [91, 32, 26, 65, 11, 50, 41, 20, 29, 72]; the calls at indices 4 and 2 do nothing, the calls at 3 and 1 each swap once, and the call at 0 sinks 91 three levels, yielding a valid min-heap"
+  caption="Build-heap on ten unsorted keys, one sift-down per frame, right to left from index 4. Predict each frame's swap count before advancing: the totals are 0, 1, 0, 1, 3 — five swaps for the whole build."
+/>
+
+### The counting: heights sum linearly
+
+Five swaps built a 10-element heap; a single worst-case *insert* into it
+can cost three. The general accounting needs one summation fact.
+
+<Theorem title="a geometric series with weights">
+$\displaystyle \sum_{h \ge 1} \frac{h}{2^h} = 2$.
+
+<Proof>
+Write $h$ as a sum of $h$ ones and swap the order of summation:
+$$
+\sum_{h \ge 1} \frac{h}{2^h}
+= \sum_{h \ge 1} \sum_{j=1}^{h} \frac{1}{2^h}
+= \sum_{j \ge 1} \sum_{h \ge j} \frac{1}{2^h}
+= \sum_{j \ge 1} \frac{1}{2^{j-1}}
+= 2 ,
+$$
+using twice the geometric-series sum
+$\sum_{h \ge j} 2^{-h} = 2^{-(j-1)}$ from
+<Ref lesson="recurrences-and-master-theorem">the recursion-tree
+lesson</Ref>.
+</Proof>
+</Theorem>
+
+<Theorem title="linear build-heap (Floyd 1964; CLRS §6.3)">
+$\textsc{Build-Heap}$ runs in $O(n)$ time on any $n$-element array; its
+total swap count is at most $2n$.
+
+<Proof>
+A complete tree on $n$ nodes has at most $\lceil n/2^{h+1} \rceil$ nodes of
+height $h$, and for $h \le \lfloor \lg n \rfloor$ this is at most $n/2^h$
+(since $\lceil x \rceil \le 2x$ whenever $x \ge \tfrac12$). A sift-down
+from a node of height $h$ performs at most $h$ swaps. Summing over levels:
+$$
+\text{swaps}
+\;\le\; \sum_{h \ge 1} \frac{n}{2^h} \cdot h
+\;=\; n \sum_{h \ge 1} \frac{h}{2^h}
+\;=\; 2n ,
+$$
+by the lemma above. Comparisons are at most twice the per-level count, and
+all remaining work is $O(1)$ per call on $O(n)$ calls.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/sum-heights.svg"
+  alt="A complete tree drawn as stacked level bars: the bottom level holds up to n/2 nodes with sift distance 0, the next n/4 with distance 1, then n/8 with distance 2, and the per-level products 0, n/4, n/4, 3n/16 sum to at most 2n"
+  caption="Why the sum is linear: node counts halve going up while sift distances only grow by one, so the per-level products shrink geometrically."
+/>
+
+Sharper counting is possible (Sedgewick's proposition puts the build at
+most $n$ exchanges and $2n$ comparisons), but the asymptotics are settled:
+the heights sum to $O(n)$ because half the tree sits at height zero. The
+result is Floyd's 1964 refinement of the heap Williams had introduced
+months earlier, and it does *not* make heap-based sorting linear: extracting
+$n$ minima still costs $\Theta(n \log n)$, as the closing exercise's counts
+show.
+
+<KeyFact>
+Direction decides the build. Sift-down from every internal node, bottom-up,
+sums *heights*: at most $2n$ swaps, $\Theta(n)$ total, on every input.
+Sift-up from every node, top-down ($n$ inserts), sums *depths*:
+$\Theta(n \log n)$ against adversarial input. Same tree, same repair
+primitive, opposite walks, different asymptotics.
+</KeyFact>
+
+## What runs on a priority queue
+
+The finished structure is small: one array, three index formulas, two
+sifts, one linear build. What it serves is a recurring cast of the rest of
+the course and of production systems.
+
+### Clients of extract-min
+
+**Event-driven simulation.** The pending events sit in a min-heap keyed by
+scheduled time; extract-min advances the clock to the next event, and
+handling an event may insert new ones. This is exactly the scheduler
+workload that closed <Ref lesson="balanced-search-trees">the previous
+lesson</Ref>, now with its intended structure underneath; a
+particle-collision simulator runs millions of predicted collisions through
+this loop.
+
+**Dijkstra's algorithm.** The frontier of unexplored vertices is a
+min-heap keyed by tentative distance; each relaxation is a decrease-key or
+a lazy re-insert. When <Ref lesson="shortest-paths-dijkstra">the
+weighted-graphs module</Ref> arrives, the priority queue it plugs in is
+this lesson's heap verbatim, and the $O((V{+}E)\log V)$ bound is this
+lesson's $O(\log n)$ multiplied through.
+
+**Top-$k$ of a stream.** To keep the $k$ largest of $n$ streamed items,
+hold a $k$-element *min*-heap of the current champions: the root is the
+weakest of them, each new item is compared against it and, if larger,
+replaces it and sifts down. Cost $O(n \log k)$ time in $O(k)$ memory,
+against $O(n \log n)$ and $O(n)$ for sort-then-take.
+
+<Figure
+  src="./figures/topk-champions.svg"
+  alt="A stream of items approaches a four-element min-heap holding the champions 41, 65, 72, 91; the next item 58 is compared against the root 41, evicts it, and sifts down, while the following item 33 loses to the root and is discarded after one comparison"
+  caption="Top-k of a stream, k = 4: the root of the champion min-heap is the weakest champion, so each arriving item either loses to it in one comparison or replaces it and sifts down."
+/>
+
+**Sorting.** Extracting from a heap $n$ times emits the keys in sorted
+order; the closing exercise performs it, and the next module names it
+heapsort and pairs it with the lower bound that no comparison sort beats.
+
+### What the libraries ship
+
+The libraries confirm the design point: Python's
+[heapq](https://docs.python.org/3/library/heapq.html) *is* this lesson's
+0-based array min-heap, and C++'s
+[std::priority_queue](https://en.cppreference.com/w/cpp/container/priority_queue)
+is a max-heap laid over a `vector`: in both, the "tree" shipped to
+millions of programs is index arithmetic over a flat array.
+
+<Aside>
+Nothing forces two children per node. A *$d$-ary heap* gives every node $d$
+children ($\mathrm{child}_j(i) = di + j + 1$, $\mathrm{parent}(i) =
+\lfloor (i-1)/d \rfloor$), shrinking the height to $\log_d n$: sift-up
+gets faster by the factor $\lg d$, while sift-down pays $d$ comparisons
+per level to find the smallest child. The trade favors workloads heavy in
+inserts and decrease-keys, Dijkstra on dense graphs being the textbook
+case, and on cached hardware $d = 4$ often beats $d = 2$ even without
+that skew, because a four-child block sits in one cache line. Sedgewick
+(§2.4) covers the variant as "multiway heaps."
+</Aside>
+
+What is established: a priority queue asks for insert, find-min, and
+extract-min only; a complete tree stored in level order makes the tree
+navigable by index arithmetic with height exactly $\lfloor \lg n \rfloor$;
+the heap property orders just the parent-child edges, which surrenders
+search but leaves every repair a single-path sift of cost $O(\log n)$; and
+building from $n$ unsorted keys costs $\Theta(n)$ because node heights sum
+linearly. The module's last structure,
+<Ref lesson="union-find">union-find</Ref>, drops even the path order:
+tracking which elements have merged into one group needs no order at all,
+only a forest of parent pointers and two amortized-constant operations.
+The heap's own sequel comes one module later: the closing exercise below
+sorts with it, and <Ref lesson="heapsort-and-the-sorting-lower-bound">the
+heapsort lesson</Ref> names that algorithm, makes it in-place, and proves
+the $\Omega(n \log n)$ floor under every comparison sort.
+
+## Exercises
+
+<Exercise>
+The array $A = [3, 9, 5, 12, 8, 4, 10, 14, 11, 16]$ claims to be a
+min-heap. (a) List every edge $(\mathrm{parent}, \mathrm{child})$ that
+violates the min-heap property. (b) Explain why no *single* sift-down call
+can repair $A$. (c) Repair it with the fewest sift-down calls, right to
+left, and give the resulting array.
+
+<Solution>
+**(a)** Check all nine edges: $(0,1)$: $3 \le 9$; $(0,2)$: $3 \le 5$;
+$(1,3)$: $9 \le 12$; $(1,4)$: $9 > 8$ **violated**; $(2,5)$: $5 > 4$
+**violated**; $(2,6)$: $5 \le 10$; $(3,7)$: $12 \le 14$; $(3,8)$: $12 > 11$
+**violated**; $(4,9)$: $8 \le 16$. Three bad edges, under three different
+parents (1, 2, 3).
+
+**(b)** One sift-down repairs violations only along the single path it
+walks. Index 2's subtree is disjoint from index 1's, so one call cannot
+reach both. Even within 1's subtree one call fails: sift-down at 1 swaps 9
+with the smaller child 8 and descends into index 4, never visiting 3, so
+the edge $(3, 8)$ survives. Three separate calls are needed.
+
+**(c)** Run sift-down at 3, then 2, then 1 (right to left, so each call's
+child subtrees are already heaps — the build-heap order on a suffix).
+At 3: children 14, 11, smaller 11; $12 > 11$: swap; index 8 is a leaf.
+Array $[3, 9, 5, 11, 8, 4, 10, 14, 12, 16]$. At 2: children 4, 10, smaller
+4; $5 > 4$: swap; index 5 is a leaf. Array
+$[3, 9, 4, 11, 8, 5, 10, 14, 12, 16]$. At 1: children 11, 8, smaller 8;
+$9 > 8$: swap; child of index 4 is $16 \ge 9$: stop. Final array:
+$$
+[3, 8, 4, 11, 9, 5, 10, 14, 12, 16] ,
+$$
+and a full edge check confirms all nine edges now hold. The transferable
+move: localized damage is repaired by heapifying the damaged suffix in
+build-heap order, not by rebuilding.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary-probe the structure, assuming all keys distinct. (a) What are the
+minimum and maximum numbers of elements in a heap of height $h$, and how do
+they yield the height formula $\lfloor \lg n \rfloor$? (b) Prove that the
+maximum key of a min-heap sits at a leaf. (c) Show that any of the
+$\lceil n/2 \rceil$ leaves can be the one, and conclude that finding the
+maximum costs $\Omega(n)$ comparisons. Name the missing constraint that
+does the damage.
+
+<Solution>
+**(a)** Height $h$ requires levels $0$ through $h-1$ full plus at least one
+node at level $h$: minimum $2^h$. Full through level $h$: maximum
+$2^{h+1} - 1$. So $2^h \le n \le 2^{h+1} - 1$, and inverting gives
+$h = \lfloor \lg n \rfloor$: the two bounds squeeze $\lg n$ between $h$
+and $h + 1$.
+
+**(b)** Suppose the maximum key sat at an internal node $v$. Then $v$ has a
+child, and the min-heap property makes that child's key at least $v$'s;
+with distinct keys, strictly greater, contradicting maximality. So the
+maximum is at a leaf.
+
+**(c)** Fix any leaf position $\ell$. Place the largest key at $\ell$ and
+distribute the others in ascending level order elsewhere; every parent then
+precedes its children in sorted rank, so the array is a valid min-heap with
+its maximum at $\ell$. Since all leaf positions are attainable and no heap
+edge connects one leaf to another, an algorithm that skips even one leaf
+can be fooled: an adversary puts the maximum in the unread slot. Every
+leaf must be examined: at least $\lceil n/2 \rceil - 1$ comparisons,
+$\Omega(n)$. The missing constraint is any ordering *between* leaves:
+exactly the cross-path silence the lesson traded away to make repairs
+single-path.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "In sift-down, any child smaller than the parent may be
+swapped up; always preferring the left child when both are smaller is
+correct and saves the child-to-child comparison." Give the smallest
+counterexample, run both variants on it, and name the exact requirement the
+left-child rule fails to guarantee.
+
+<Solution>
+Counterexample on three keys: $Q = [9, 7, 2]$, a root with two children.
+Both children are smaller than 9.
+
+**Correct rule** (smaller child, 2): swap gives $[2, 7, 9]$; both edges
+hold ($2 \le 7$, $2 \le 9$); done, a valid min-heap.
+
+**Left-child rule** (7): swap gives $[7, 9, 2]$. The procedure continues
+from index 1, whose subtree is a single node, and terminates. But edge
+$(0, 2)$ reads $7 > 2$: not a heap, and the walk will never revisit it.
+
+The failing requirement: after the swap, the promoted key becomes the
+parent of *both* children, so it must be $\le$ the sibling it was not
+compared against. Only the minimum child satisfies "$\le$ its sibling" by
+construction; the left child satisfies it only by luck. The saved
+comparison is exactly the one that carried the correctness.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson asserted that building by $n$ repeated inserts is
+$\Theta(n \log n)$ in the worst case. Derive it: (a) exhibit an insertion
+order into an initially empty min-heap that forces every sift-up to run to
+the root; (b) bound the total swap count from below by a sum, and evaluate
+it; (c) state the input on which the same $n$ inserts cost zero swaps, and
+reconcile the spread with build-heap's $\le 2n$.
+
+<Solution>
+**(a)** Insert the keys in strictly *decreasing* order. Each new key is
+smaller than every key already present, in particular smaller than each of
+its ancestors, so its sift-up swaps at every level: from index $i$ all the
+way to the root, at cost equal to its depth
+$\lfloor \lg (i+1) \rfloor$.
+
+**(b)** Total swaps
+$= \sum_{i=0}^{n-1} \lfloor \lg(i+1) \rfloor
+= \sum_{m=1}^{n} \lfloor \lg m \rfloor
+\ge \sum_{m > n/2} \lfloor \lg m \rfloor
+\ge \frac{n}{2}\left(\lfloor \lg n \rfloor - 1\right)
+= \Omega(n \log n)$,
+since each of the last $n/2$ values of $m$ exceeds $n/2$ and so has
+$\lfloor \lg m \rfloor \ge \lfloor \lg n \rfloor - 1$. With the
+$O(n \log n)$ upper bound from charging each insert the height, the build
+is $\Theta(n \log n)$ on this input.
+
+**(c)** Ascending order: every appended key is larger than its parent, the
+sift-up loop exits at its first test, and the total is 0 swaps ($n - 1$
+comparisons). So insert-based building ranges from $\Theta(n)$ to
+$\Theta(n \log n)$ *depending on input order*, while bottom-up build-heap
+is at most $2n$ swaps on *every* input. The reconciliation is the
+KeyFact's direction argument: sift-up bills each node its depth, and
+depths are large for the half of the nodes at the bottom, where heights
+are zero.
+</Solution>
+</Exercise>
+
+<Exercise>
+Sift-down's cost was bounded by the height $\lfloor \lg n \rfloor$. Bound
+it instead by a recurrence, the route CLRS takes. (a) Show that in a
+complete binary tree of $n$ nodes, each child's subtree holds at most
+$2n/3$ nodes, and identify the shape that approaches the bound. (b) Write
+the resulting recurrence for sift-down's worst-case time and solve it with
+the Master theorem, naming the case that applies.
+
+<Solution>
+**(a)** Let the root's subtrees hold $L$ and $R$ nodes, $n = 1 + L + R$.
+In a complete tree the two subtrees differ only in the bottom level, which
+lies entirely inside the left subtree in the extreme case: left a perfect
+tree of height $h$ ($L = 2^{h+1} - 1$) over a right perfect tree of height
+$h - 1$ ($R = 2^h - 1$), the last row exactly half full. Then $L \le 2n/3$
+is equivalent to $3(2^{h+1} - 1) \le 2(3 \cdot 2^h - 1)$, i.e.
+$3 \cdot 2^{h+1} - 3 \le 3 \cdot 2^{h+1} - 2$, which holds, with the ratio
+$L/n = (2^{h+1}-1)/(3 \cdot 2^h - 1) \to 2/3$ from below as $h$ grows. Any
+other completion of the bottom row only moves nodes from the left count to
+the right, lowering the larger fraction.
+
+**(b)** A sift-down does $\Theta(1)$ work at the current node and recurses
+into one child's subtree of size at most $2n/3$:
+$$
+T(n) \le T(2n/3) + \Theta(1) .
+$$
+In Master-theorem form ($T(n) = a\,T(n/b) + f(n)$ from
+<Ref lesson="recurrences-and-master-theorem">the Master-theorem
+lesson</Ref>): $a = 1$, $b = 3/2$, so
+$n^{\log_b a} = n^0 = 1$, and $f(n) = \Theta(1) = \Theta(n^0)$ matches it
+exactly: case 2, work spread evenly across the levels. The solution is
+$T(n) = \Theta(n^0 \lg n) = \Theta(\lg n)$: the recurrence recovers the
+direct height bound.
+</Solution>
+</Exercise>
+
+<Exercise>
+A number is a *taxicab number* if it is expressible as $a^3 + b^3$ in two
+genuinely different ways. Find the smallest one using a priority queue:
+design a scheme that enumerates all sums $a^3 + b^3$ with
+$1 \le a \le b \le 12$ in nondecreasing order while never holding more
+than 12 entries in the queue, argue that the output order is correct, and
+state how the smallest taxicab number announces itself in the output
+stream.
+
+<Solution>
+**Scheme.** For each fixed $a$, the sums $a^3 + b^3$ with
+$b = a, a{+}1, \dots, 12$ form an increasing stream. Seed a min-heap with
+the head of each stream: the 12 triples $(2a^3, a, a)$ for
+$a = 1, \dots, 12$, keyed on the sum. Repeatedly extract the minimum
+$(s, a, b)$, report $s$, and insert the stream's next element
+$(a^3 + (b{+}1)^3,\, a,\, b{+}1)$ if $b < 12$. The heap holds at most one
+entry per stream: never more than 12, against the 78 pairs materialized
+all at once by sort-everything.
+
+**Correctness.** Each stream is increasing, and the heap always holds every
+stream's smallest unreported element. The next sum overall must be some
+stream's current head (any later element of a stream exceeds that stream's
+head), and extract-min returns the smallest head, by the root-minimum
+theorem. This is a 12-way merge of sorted streams, the same
+pattern that merges sorted runs in external sorting.
+
+**The announcement.** Since the output is nondecreasing, a value expressible
+two ways is emitted *twice in a row*. Running the scheme, the extractions
+begin $2, 9, 16, 28, 35, 54, 65, \dots$ and the first repeat is
+$$
+1729 = 1^3 + 12^3 = 9^3 + 10^3 ,
+$$
+the Hardy–Ramanujan number. Cost: at most 78 extract-mins and 78 inserts
+on a $\le 12$-element heap, a few hundred comparisons in total.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run $\textsc{Build-Heap}$'s output to exhaustion:
+starting from the built heap $[11, 20, 26, 29, 32, 50, 41, 65, 91, 72]$,
+call $\textsc{Extract-Min}$ ten times. (a) Give the array after each of the
+first two extractions. (b) Write down the full output sequence and describe
+it. (c) Give the total asymptotic cost of build-plus-$n$-extractions, and
+state what a max-heap's extract (swap root with last, shrink, sift down)
+would leave sitting in the abandoned array slots.
+
+<Solution>
+**(a)** *First extraction:* return 11; the last leaf 72 goes to the root of
+a 9-element heap and sifts down: smaller child 20, swap; then children 29
+and 32, swap with 29; then children 65 and 91, swap with 65; index 7 is a
+leaf. Array: $[20, 29, 26, 65, 32, 50, 41, 72, 91]$. *Second extraction:*
+return 20; 91 goes to the root of an 8-element heap: smaller child 26,
+swap; then children 50 and 41, swap with 41; index 6 is a leaf. Array:
+$[26, 29, 41, 65, 32, 50, 91, 72]$.
+
+**(b)** Continuing: $11, 20, 26, 29, 32, 41, 50, 65, 72, 91$, the ten
+keys in ascending sorted order. No step consulted anything but the heap:
+repeated extract-min *is* a sorting algorithm, with each extraction
+delivering the minimum of what remains by the root-minimum theorem.
+
+**(c)** Build $\Theta(n)$, then $n$ extractions at $O(\log n)$ each:
+$O(n \log n)$ total, and the extraction phase dominates, which is why the
+linear build does not make the sort linear. In a max-heap, each
+extraction's root-with-last swap deposits the current *maximum* into the
+slot the heap just abandoned — position $n{-}1$, then $n{-}2$, and so on —
+so the abandoned suffix accumulates the keys in ascending order in place:
+the array sorts itself with no second array at all. You have executed
+heapsort one lesson early;
+<Ref lesson="heapsort-and-the-sorting-lower-bound">the heapsort
+lesson</Ref> names it, counts it exactly, and proves that its
+$\Theta(n \log n)$ cannot be beaten by any comparison-based sort.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §6.1: the heap as array-plus-tree (Fig. 6.1, the model for the dual-view figure) and the height exercise; §6.2: MAX-HEAPIFY and its $T(n) \le T(2n/3) + \Theta(1)$ recurrence (the review exercise); §6.3: BUILD-MAX-HEAP with the loop invariant and the $\sum h/2^{h+1}$ bound reproduced here; §6.5: priority queues, INCREASE-KEY, and the handle mapping. (§6.4, heapsort, is the next module's material.)
+2. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 8 "Binary Heaps" — the array↔complete-tree bijection, the priority-queue-sort scoreboard this lesson's table extends, the one-violation correctness arguments for both sifts, and the $\lg(n!)$ lower bound for insert-based building. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+3. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §2.4: swim/sink, the counted propositions ($\le 1 + \lg n$ compares per insert, $\le 2\lg n$ per extract, $\le 2n$ compares and $\le n$ exchanges for construction), multiway heaps, the event-driven collision simulation, and the taxicab exercise (2.4.25). Companion site: https://algs4.cs.princeton.edu/24pq/
+4. P. Morin, *Open Data Structures*, 2013 — §10.1: the BinaryHeap as an implicit tree in a 0-based array, the convention this lesson adopts. https://opendatastructures.org/
+5. J. W. J. Williams, "Algorithm 232: Heapsort," *Communications of the ACM* 7(6), 347–348, 1964 — the paper that introduced the binary heap.
+6. R. W. Floyd, "Algorithm 245: Treesort 3," *Communications of the ACM* 7(12), 701, 1964 — the bottom-up linear-time heap construction of the build theorem.
+</References>

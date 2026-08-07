@@ -1,0 +1,654 @@
+The Omega(n log n) lower bound applies only to algorithms that sort by
+comparing elements; counting sort and radix sort sort in O(n + k) time by
+using the elements' values as array indices instead.
+
+<Ref lesson="heapsort-and-the-sorting-lower-bound">The previous lesson</Ref>
+proved that bound by counting decision-tree leaves, then traced its exact
+boundary: the theorem binds any algorithm whose only window into the keys
+is two-outcome $\le$ tests. Its closing exercise stepped over that
+boundary, building a two-pass procedure that sorts a million single-digit
+severity codes with no comparisons anywhere in its code. This lesson names
+that procedure counting sort and finishes the module's sorting business:
+the placement pass, and why scanning it right to left makes the sort
+stable; radix sort, which chains stable passes to reach keys too wide for
+one tally array; the choice of digit size, which sorts any keys below
+$n^c$ in $\Theta(cn)$; and the price list against quicksort.
+
+## The step the decision tree cannot price
+
+The lower bound's proof ran on fan-out. A $\le$ test has two outcomes, so
+$h$ tests distinguish at most $2^h$ of the $n!$ input orderings, forcing
+$h \ge \lg(n!)$ on some input; nothing in the argument concerned sorting
+itself, only the two-way branching of the questions asked. The operation
+that escapes is ordinary array indexing: `C[A[j]]` computes a jump from a
+key's *value*, and one such step selects among $k$ continuations, not 2.
+An algorithm built from value-indexed steps lives outside the theorem's
+quantifier, and the two algorithms of this lesson are built from nothing
+else.
+
+<Figure
+  src="./figures/two-worlds.svg"
+  alt="Two panels: in the comparison model a test x lte y branches two ways and the Omega(n lg n) bound applies; in the indexing world a key's value jumps directly to one of k array slots in one step, outside the theorem, where Theta(n + k) is possible"
+  caption="The bound is a property of the left interface. C[A[j]] is a step in the right one: one operation, k outcomes."
+/>
+
+A natural reading of this lesson's headline is that counting sort
+*violates* the lower bound, or exposes a flaw in its proof. It does
+neither. The theorem quantifies over comparison sorts, and counting sort
+is not one: no comparison between two input elements occurs anywhere in
+it, so the theorem makes no claim about it at all. The test is the
+interface. A routine that sorts through an opaque comparator callback
+(C's `qsort`, Java's `Arrays.sort`, Python's `key=`) is a comparison sort
+whatever its internals, because a yes/no answer cannot be turned into an
+array index; counting sort refuses that interface and demands integer
+keys from a known range instead. The bound was never broken. It was
+traded for an assumption.
+
+## Counting sort: tally, prefix sums, place from the right
+
+The telemetry exercise sorted bare severity codes by tallying them and
+regenerating each value the tallied number of times, then found, in its
+last part, what real records need instead: for each value $v$, the
+starting slot of $v$'s block in the output, a *prefix sum* of the tallies.
+Counting sort is that design completed, with a third pass that carries
+whole records into place.
+
+The setting, on the module's conventions (0-based arrays throughout):
+every key is an integer in $\{0, \ldots, k-1\}$, and the running example
+is $n = 8$ keys over $\{0,\ldots,5\}$, so $k = 6$:
+$A = [\,2, 5, 3, 0, 2, 3, 0, 3\,]$. Three arrays take part: the input
+$A[0 \,..\, n{-}1]$, a counter array $C[0 \,..\, k{-}1]$ with one slot
+per possible *value*, and the output $B[0 \,..\, n{-}1]$.
+
+```text
+counting_sort(A[0..n−1], k):        ▷ every key an integer in {0,…,k−1}
+  C[0..k−1] ← all zeros             ▷ Θ(k)
+  for j ← 0 to n−1                  ▷ tally: Θ(n)
+    C[A[j]] ← C[A[j]] + 1           ▷ C[v] = # keys equal to v
+  for v ← 1 to k−1                  ▷ prefix sums: Θ(k)
+    C[v] ← C[v] + C[v−1]            ▷ C[v] = # keys ≤ v
+  for j ← n−1 downto 0              ▷ place, right to left: Θ(n)
+    C[A[j]] ← C[A[j]] − 1
+    B[C[A[j]]] ← A[j]
+  return B
+```
+
+After the tally, $C[v]$ counts the keys equal to $v$; after the prefix
+pass, $C[v]$ counts the keys **at most** $v$. That second number is an
+address: in sorted order, the keys equal to $v$ occupy exactly the block
+of slots $C[v{-}1] \,..\, C[v]-1$, because $C[v{-}1]$ keys are smaller
+and must sit to the left. The placement loop consumes each block from its
+top: decrement $C[v]$, and the new value is the highest slot of $v$'s
+block not yet used.
+
+<FigureSequence
+  name="counting"
+  alt="Four frames on the input 2 5 3 0 2 3 0 3: the three arrays A, C, B; the tally pass filling C with 2 0 2 3 0 1; the prefix pass turning C into 2 2 4 7 7 8; and the first placement, where A[7] = 3 reads C[3] = 7, decrements it to 6, and lands in B[6], shown as a highlighted flight path"
+  caption="Counting sort on the running example: tally, prefix sums, then the first right-to-left placement. No step compares two keys."
+/>
+
+<Task>
+Before frame 3, compute the running sums of $C = [\,2,0,2,3,0,1\,]$ by
+hand and check the frame against your six values. Before frame 4, predict
+which slot $A[7] = 3$ lands in, using only $C[3]$; the frame confirms
+slot 6.
+</Task>
+
+### The full trace: eight placements
+
+<Example title="counting sort of the running example, every state shown">
+Tally over $A = [\,2, 5, 3, 0, 2, 3, 0, 3\,]$: $C = [\,2, 0, 2, 3, 0, 1\,]$.
+Prefix sums: $C = [\,2, 2, 4, 7, 7, 8\,]$. The placement loop then walks
+$j = 7$ down to $0$; each row below shows the decremented counter, the
+slot it names, and $B$ so far.
+
+| $j$ | $A[j]$ | counter after decrement | slot | $B$ after the write |
+|---|---|---|---|---|
+| 7 | 3 | $C[3] = 6$ | 6 | $[\,\cdot,\cdot,\cdot,\cdot,\cdot,\cdot,3,\cdot\,]$ |
+| 6 | 0 | $C[0] = 1$ | 1 | $[\,\cdot,0,\cdot,\cdot,\cdot,\cdot,3,\cdot\,]$ |
+| 5 | 3 | $C[3] = 5$ | 5 | $[\,\cdot,0,\cdot,\cdot,\cdot,3,3,\cdot\,]$ |
+| 4 | 2 | $C[2] = 3$ | 3 | $[\,\cdot,0,\cdot,2,\cdot,3,3,\cdot\,]$ |
+| 3 | 0 | $C[0] = 0$ | 0 | $[\,0,0,\cdot,2,\cdot,3,3,\cdot\,]$ |
+| 2 | 3 | $C[3] = 4$ | 4 | $[\,0,0,\cdot,2,3,3,3,\cdot\,]$ |
+| 1 | 5 | $C[5] = 7$ | 7 | $[\,0,0,\cdot,2,3,3,3,5\,]$ |
+| 0 | 2 | $C[2] = 2$ | 2 | $[\,0,0,2,2,3,3,3,5\,]$ |
+
+$B = [\,0,0,2,2,3,3,3,5\,]$: sorted. The counters end at
+$C = [\,0, 2, 2, 4, 7, 7\,]$, each one now pointing at the *start* of its
+value's block: every slot was claimed exactly once.
+</Example>
+
+The cost reads straight off the four loops: $\Theta(k)$ initialization,
+$\Theta(n)$ tally, $\Theta(k)$ prefix, $\Theta(n)$ placement, so
+$\Theta(n + k)$ time, and $\Theta(n + k)$ extra space for $B$ and $C$.
+When $k = O(n)$, both are $\Theta(n)$: each key is touched twice, and no
+key is ever compared to another.
+
+<KeyFact>
+Merge sort's $O(n \lg n)$ is unconditional — any keys, any comparator.
+Counting sort is never "$O(n)$, full stop": time and space are
+$\Theta(n+k)$, with $k$ set by the key *range*, not by how many keys
+there are, and billed in full. A million keys drawn from
+$\{0,\ldots,10^{12}\}$ put $k \approx n^2$: the counter array outweighs
+the data by six orders of magnitude, and the zero-initialization loop
+alone dwarfs the sort. The algorithm's habitat is $k = O(n)$; an
+exercise below prices the escape from a wider range.
+</KeyFact>
+
+<Exercise>
+Run counting sort on $A = [\,6, 0, 2, 0, 1, 3, 4, 6, 1, 3, 2\,]$
+($n = 11$, keys in $\{0,\ldots,6\}$, so $k = 7$). Report $C$ after the
+tally, $C$ after the prefix pass, then every placement (value, counter
+after decrement, slot) in loop order, and the final $B$. Write the two
+$C$ states before opening the solution.
+
+<Solution>
+Tally: $C = [\,2, 2, 2, 2, 1, 0, 2\,]$. Prefix sums:
+$C = [\,2, 4, 6, 8, 9, 9, 11\,]$.
+
+Placements, $j = 10$ down to $0$:
+
+| $j$ | $A[j]$ | counter after decrement | slot |
+|---|---|---|---|
+| 10 | 2 | $C[2] = 5$ | 5 |
+| 9 | 3 | $C[3] = 7$ | 7 |
+| 8 | 1 | $C[1] = 3$ | 3 |
+| 7 | 6 | $C[6] = 10$ | 10 |
+| 6 | 4 | $C[4] = 8$ | 8 |
+| 5 | 3 | $C[3] = 6$ | 6 |
+| 4 | 1 | $C[1] = 2$ | 2 |
+| 3 | 0 | $C[0] = 1$ | 1 |
+| 2 | 2 | $C[2] = 4$ | 4 |
+| 1 | 0 | $C[0] = 0$ | 0 |
+| 0 | 6 | $C[6] = 9$ | 9 |
+
+$B = [\,0, 0, 1, 1, 2, 2, 3, 3, 4, 6, 6\,]$. Check the two 6s: input
+positions 0 and 7 landed at slots 9 and 10 respectively, in input order:
+the property the next section names.
+</Solution>
+</Exercise>
+
+## Right to left is what makes it stable
+
+The placement loop fixed one thing silently: $j$ runs from $n-1$ down to
+$0$. Either direction sorts. They differ on equal keys, and the
+difference is the property
+<Ref lesson="comparison-sorting-merge-and-quicksort">the merge sort
+lesson</Ref> defined as **stability**: equal keys appear in the output in
+the same relative order they held in the input.
+
+The right-to-left scan delivers it. After the prefix pass, $C[v]-1$ is the *top* slot of $v$'s
+block. The scan meets the input's **last** copy of $v$ first and hands it
+that top slot; the next copy met is the second-to-last in input order and
+takes the slot beneath. Copies are dealt slots from the top of the block
+downward in reverse input order, so, read left to right, the block lists
+them in input order: reversed twice is restored. In the trace above, the
+three 3s entered at input positions 2, 5, 7 and landed at slots 4, 5, 6.
+
+<Figure
+  src="./figures/stability.svg"
+  alt="Two panels sorting A = 3, 1, 3 with the first 3 marked amber and the second marked blue: scanning right to left, the blue 3 takes slot 2 and the amber 3 slot 1, preserving input order; scanning left to right, the amber 3 takes slot 2 first and the order of the equals is reversed"
+  caption="Same counters, opposite scan. Each copy takes the top free slot of its block, so only the right-to-left scan lists equals in input order."
+/>
+
+Scanning left to right with the same decrementing counters still sorts:
+the first copy simply claims the top slot, and the block comes out in
+reversed input order (CLRS exercise 8.2-3 asks for exactly this
+diagnosis). For bare integers the reversal is invisible. It matters the
+moment keys carry *satellite data*, the payload record that travels with
+the key, and it matters most when sorting twice: the merge sort lesson's
+transaction example sorted by time, then stably by city, and each city's
+block kept its time order because the second sort refused to reorder
+ties. Counting sort is about to be run $d$ times on one array. Stability
+is the property the whole chain will stand on.
+
+## Radix sort: the least significant digit goes first
+
+The $k$ in $\Theta(n+k)$ fences counting sort into narrow keys, and the
+fence is close: 32-bit keys already mean four billion counters. The
+repair is not a wider tally but a narrower one: split each key into
+**digits** in some base $b$, and counting-sort the whole array once per
+digit at $k = b$ per pass.
+
+The order of the passes is the design decision. Alphabetical filing says
+the leading digit first: sort on it, then refine. But sorting on the leading digit
+splits the array into $b$ groups that must each be sorted *separately*:
+recursion, per-group bookkeeping, $b$ new subproblems at every level.
+Radix sort does the opposite: sort the whole array on the **units**
+digit, then the whole array on the tens, and so on upward. Each pass
+appears to scramble what the previous one built; after the final,
+most-significant pass, the array is sorted.
+
+```text
+radix_sort(A[0..n−1], d):           ▷ keys have d digits in base b
+  for i ← 1 to d                    ▷ digit 1 = least significant
+    A ← counting_sort(A, k = b), keyed on digit i only
+```
+
+<FigureSequence
+  name="radix"
+  alt="Three frames sorting 329, 457, 657, 839, 436, 720, 355: pass 1 sorts on the units digit, pass 2 on the tens with the tied tens digits keeping pass 1's order, pass 3 on the hundreds, after which the column is fully sorted; each frame highlights the digit sorted on and annotates the sorted suffix property"
+  caption="Seven 3-digit keys, three stable passes. After pass i the keys are sorted on their last i digits — the annotation under each frame."
+/>
+
+<Task>
+Before each frame, predict where 720 will sit after the pass, reading
+only the highlighted digit column, then check. After frame 2, verify the
+annotation by reading the last two digits down the column: 20, 29, 36,
+39, 55, 57, 57, ascending.
+</Task>
+
+### Why sorting the small digits first works
+
+Each pass looks only at one digit, so keys that tie on it are ordered by
+the pass sort's tie policy. Counting sort's policy, just
+established, is *input order*, which at pass $i$ means the order the
+previous passes produced. That is the entire mechanism, and it proves the
+algorithm by induction.
+
+<Theorem title="radix sort correctness and cost (CLRS Lemma 8.3)">
+If the per-digit sort is stable and runs in $\Theta(n+k)$, then after
+pass $i$ the keys are sorted by their last $i$ digits, and radix sort
+sorts $n$ $d$-digit keys, each digit in $\{0,\ldots,k-1\}$, in
+$\Theta(d\,(n+k))$ time.
+
+<Proof>
+Induction on $i$. After pass 1 the keys are sorted on their last digit:
+that is what pass 1 does. Assume the claim after pass $i-1$, and take any
+two keys $x$, $y$ after pass $i$. If they differ on digit $i$, pass $i$
+put the smaller digit first, which is the correct order on the last $i$
+digits, since digit $i$ is the most significant of them. If they tie on
+digit $i$, stability kept their pass-$(i{-}1)$ relative order, which by
+hypothesis sorts their last $i-1$ digits — the correct order on $i$ tied
+leading digits. So the claim holds after pass $i$, and at $i = d$ the
+keys are sorted. Each of the $d$ passes costs $\Theta(n + k)$.
+$\blacksquare$
+</Proof>
+</Theorem>
+
+The proof uses stability exactly once, in the tie case, and that single
+use cannot be dropped. Take keys $21, 25, 23$ and run the chain with a correct but *unstable*
+tens pass. Pass 1, on units: $21, 23, 25$. Pass 2 sorts on the tens
+digit, where all three keys tie at 2 — so *any* output order is a correct
+"sort by tens", and an unstable pass is free to return $23, 25, 21$:
+legitimately sorted on its digit, and a scrambled array. Stability is
+what forbids the tie from discarding pass 1's work.
+
+### One pass of the chain, in full
+
+<Example title="pass 2 as a counting sort">
+Pass 2 receives $[\,720, 355, 436, 457, 657, 329, 839\,]$ and sorts it on
+the tens digit; the digit sequence is $[\,2, 5, 3, 5, 5, 2, 3\,]$ with
+$k = 10$. Tally: $C[2] = 2$, $C[3] = 2$, $C[5] = 3$, all others 0.
+Prefix sums: $C = [\,0, 0, 2, 4, 4, 7, 7, 7, 7, 7\,]$. Placements, right
+to left:
+
+| $j$ | key | digit | counter after decrement | slot |
+|---|---|---|---|---|
+| 6 | 839 | 3 | $C[3] = 3$ | 3 |
+| 5 | 329 | 2 | $C[2] = 1$ | 1 |
+| 4 | 657 | 5 | $C[5] = 6$ | 6 |
+| 3 | 457 | 5 | $C[5] = 5$ | 5 |
+| 2 | 436 | 3 | $C[3] = 2$ | 2 |
+| 1 | 355 | 5 | $C[5] = 4$ | 4 |
+| 0 | 720 | 2 | $C[2] = 0$ | 0 |
+
+Output: $[\,720, 329, 436, 839, 355, 457, 657\,]$, frame 2 of the
+sequence. The tens-tied pairs $(720, 329)$ and $(355, 457, 657)$ each
+kept pass 1's internal order.
+</Example>
+
+<Exercise>
+Finish the sort: run pass 3 on $[\,720, 329, 436, 839, 355, 457, 657\,]$,
+keyed on the hundreds digit, showing tally, prefix sums, and all seven
+placements. Then account the whole run: total operations for the three
+passes in terms of $n = 7$ and $k = 10$, and the general formula it
+instantiates.
+
+<Solution>
+Hundreds digits, in order: $[\,7, 3, 4, 8, 3, 4, 6\,]$. Tally:
+$C[3] = 2$, $C[4] = 2$, $C[6] = 1$, $C[7] = 1$, $C[8] = 1$. Prefix sums:
+$C = [\,0, 0, 0, 2, 4, 4, 5, 6, 7, 7\,]$. Placements, right to left:
+
+| $j$ | key | digit | counter after decrement | slot |
+|---|---|---|---|---|
+| 6 | 657 | 6 | $C[6] = 4$ | 4 |
+| 5 | 457 | 4 | $C[4] = 3$ | 3 |
+| 4 | 355 | 3 | $C[3] = 1$ | 1 |
+| 3 | 839 | 8 | $C[8] = 6$ | 6 |
+| 2 | 436 | 4 | $C[4] = 2$ | 2 |
+| 1 | 329 | 3 | $C[3] = 0$ | 0 |
+| 0 | 720 | 7 | $C[7] = 5$ | 5 |
+
+Output: $[\,329, 355, 436, 457, 657, 720, 839\,]$: sorted, matching
+frame 3.
+
+Accounting: each pass is one full counting sort, $\Theta(n + k)$: here
+$7 + 10$ counter-and-key touches per loop pair, three times over. In
+general $d$ passes cost $\Theta(d\,(n+k))$; for this run,
+$d(n+k) = 3 \times 17 = 51$ basic operations to sort 7 keys, against
+$\lceil \lg 7! \rceil = 13$ comparisons for an optimal comparison sort.
+At $n = 7$ the constant overhead dominates; the base-choice section shows
+when the trade flips.
+</Solution>
+</Exercise>
+
+A most-significant-digit-first radix sort does exist: it recurses into
+each leading-digit bin separately, never letting a later pass cross a bin
+boundary, and it earns its bookkeeping on *variable-length* keys such as
+strings (Sedgewick §5.1 develops it). For fixed-width keys, LSD's single
+unbranched loop wins, and LSD is what this lesson means by radix sort.
+
+<KeyFact>
+A radix chain is only as correct as its least stable pass, and the
+failure is silent: an unstable pass still leaves the array plausibly
+ordered on the digit it sorted. This is why the pass sort is counting
+sort rather than something faster-on-paper: stable by the direction of
+one loop, and $\Theta(n+k)$ so that $d$ passes stay linear.
+</KeyFact>
+
+<Aside>
+The algorithm predates the computer by half a century. Herman Hollerith's
+punched-card tabulating machines processed the 1890 United States census;
+the card sorters that followed (IBM's 80-series machines ran at 650 cards
+per minute) implemented exactly this loop in hardware and manual labor:
+set the machine to a column, feed the deck, and it distributes cards into
+bins by the digit punched there; the operator gathers the bins in order
+*without shuffling within a bin* — the stable pass, performed by hand —
+moves one column left, and repeats. Decks came out sorted, and the
+least-significant-first order was standard practice on machines that
+could read only one column at a time.
+</Aside>
+
+## Choosing the digit size: keys below n^c sort in Θ(cn)
+
+The lemma's $\Theta(d(n+k))$ leaves a dial that decimal notation hides:
+nothing says a digit is ten values. A $b$-bit binary key splits into
+$d = \lceil b/r \rceil$ digits of $r$ bits each, making every digit an
+integer below $2^r$, so one key width supports a whole family of radix
+sorts with cost $\Theta\!\left(\tfrac{b}{r}\,(n + 2^r)\right)$ (CLRS
+Lemma 8.4). Small $r$ means many cheap passes; large $r$ means few passes,
+each dragging a huge counter array.
+
+<Example title="digit sizes for a million 64-bit keys">
+$n = 2^{20} \approx 10^6$ keys, $b = 64$ bits each:
+
+| $r$ | passes $\lceil 64/r \rceil$ | counters $2^r$ | pass cost $n + 2^r$ | total, in units of $n$ |
+|---|---|---|---|---|
+| 8 | 8 | 256 | $\approx n$ | $\approx 8n$ |
+| 16 | 4 | $65{,}536$ | $\approx 1.06n$ | $\approx 4.3n$ |
+| 20 | 4 | $2^{20} = n$ | $2n$ | $8n$ |
+| 32 | 2 | $2^{32} = 4096\,n$ | $\approx 4097n$ | hopeless |
+
+The cheapest row is $r = 16$, not $r = \lg n = 20$, and the table is
+consistent about it: the pass count $\lceil 64/r \rceil$ is flat at 4
+for every $r$ from 16 to 21, and within such a plateau the smaller $r$
+wins, because shrinking $r$ only shrinks the counter array. The rule is
+$r$ up to about $\lg n$: for $r \le \lg n$ the counters cost no more
+than the keys they count, while pushing $r$ past $\lg n$ buys few
+passes at exponential counter cost — the $k$-boundary of counting sort,
+met per pass.
+</Example>
+
+With base $n$ (that is, $r = \lg n$), a key below $n^c$ has at most $c$
+digits, so the chain runs $c$ passes of cost $\Theta(n + n)$ each.
+
+<KeyFact>
+$n$ integers below $n^c$ sort in $\Theta(cn)$ time: write each key as $c$
+digits in base $n$ and run $c$ stable counting-sort passes. A million
+keys below $10^{12} = n^2$ need two passes; below $10^{18} = n^3$, three.
+"Linear-time sorting" always means this — linear in $n$, for keys
+polynomial in $n$ — and it charges one step per digit extraction, which
+the <Ref lesson="asymptotic-notation">word-RAM</Ref> grants only for keys
+that fit a machine word, where a shift and a mask isolate the digit.
+</KeyFact>
+
+<Figure
+  src="./figures/crossover.svg"
+  alt="A chart of work per key against key width b for a million keys: a flat blue line at 20 for any comparison sort, an amber line rising as b over 10 for base-n radix sort, crossing at 200 bits, with the region where radix does less work shaded and a marker at 64-bit keys showing about 6 touches versus 20 comparisons"
+  caption="Work per key at n = 2²⁰: comparison sorts pay lg n = 20 regardless of key width; base-n radix pays per bit. On paper, every machine-word key sits deep in radix territory."
+/>
+
+## Why quicksort still ships as the default
+
+The chart's margin survives contact with hardware only in part, and the
+reasons are the measured ones, not asymptotic. Radix sort's placement
+pass writes each record to a counter-directed slot: $n$ writes scattered
+across $b$ destination blocks, the access pattern
+<Ref lesson="arrays-and-linked-lists">the memory hierarchy punishes</Ref>,
+where quicksort's partition reads and writes two sequential fronts.
+The chain also needs the second array, ping-ponging $A$ and $B$ each
+pass, so it is not in place and doubles memory traffic. And a library
+default must sort anything through a caller's comparator, an interface
+radix sort cannot accept at all, the same interface fact that made the
+lower bound apply. Where the preconditions hold, radix sorts are
+production algorithms, not curiosities: GPU sorting libraries build on
+radix passes, database engines use them on integer columns, and
+fixed-width string keys (license plates, account numbers) sort in one
+stable pass per character. An exercise below runs the 64-bit accounting
+honestly.
+
+**A sibling algorithm moves the assumption instead of shrinking it.**
+*Bucket sort* (CLRS §8.4) handles keys
+that are not small integers but uniformly distributed reals in $[0,1)$:
+drop key $x$ into bucket $\lfloor n x \rfloor$ — value-as-index again —
+insertion-sort each bucket, and concatenate. Uniformity makes expected
+bucket sizes $O(1)$, so the expected total is $\Theta(n)$: the assumption
+has moved from the keys' *range* to their *distribution*, and the
+guarantee has moved from worst case to expectation.
+
+What is established: the module's sorting question is closed from both
+sides. Comparison sorting costs $\Theta(n \lg n)$, by three algorithms
+that achieve it and a decision tree that forbids better; and for integer
+keys, value-as-index sorting costs $\Theta(n+k)$ in one counting-sort
+pass or $\Theta(d(n+k))$ chained ($\Theta(cn)$ for keys below $n^c$),
+with stability as the chain's correctness condition and $k$ as its
+standing price. <Ref lesson="binary-search-and-order-statistics">The next
+lesson</Ref> turns from putting data in order to exploiting order:
+binary search, and the selection problem of finding the $t$-th smallest
+without sorting at all.
+
+## Exercises
+
+<Exercise>
+Prove counting sort's placement loop correct by a loop invariant in
+<Ref lesson="loop-invariants-and-correctness">the standard three-part
+form</Ref>, and conclude stability as a corollary. Use this invariant: at
+the start of the iteration with counter $j$, (i) for every value $v$,
+$C[v]$ equals the number of keys less than $v$ in all of $A$ plus the
+number of keys equal to $v$ in $A[0 \,..\, j]$; (ii) $B$ holds exactly
+the keys of $A[j{+}1 \,..\, n{-}1]$, and each placed copy of $v$ that is
+$t$-th among $A$'s copies of $v$ in input order sits at slot
+$(\#\text{keys} < v) + t - 1$. Write the initialization case yourself
+before opening.
+
+<Solution>
+**Initialization.** At $j = n-1$: clause (i) reads $C[v] = \#\{< v\} +
+\#\{= v\} = \#\{\le v\}$, which is what the prefix pass computed; clause
+(ii) is vacuous, $B$ empty.
+
+**Maintenance.** Suppose the invariant holds at $j$, and let $v = A[j]$
+be the $t$-th copy of $v$ in input order, so $A[0..j]$ contains exactly
+$t$ copies. By (i), $C[v] = \#\{< v\} + t$ before the body runs. The
+decrement makes it $\#\{< v\} + t - 1$, and the write puts $A[j]$ at that
+slot: clause (ii) for this copy, exactly. The slot is fresh: copies of
+$v$ placed earlier were the later ones in input order ($t' > t$), sitting
+at strictly higher slots, and copies of other values sit in disjoint
+blocks, since slots for $v$ stay within $[\#\{< v\},\, \#\{\le v\})$.
+Decrementing restores clause (i) for $j - 1$ ($A[0..j-1]$ holds $t-1$
+copies of $v$; no other counter moved).
+
+**Termination.** At $j = -1$, clause (ii) covers all $n$ keys: the
+copies of $v$ fill slots $[\#\{< v\},\, \#\{\le v\})$, so blocks of
+increasing values tile $B$ left to right: $B$ is sorted. And within a
+block, slot grows with input rank $t$: equal keys stand in input order. That
+last sentence is the stability proof, now formal. $\blacksquare$
+
+The transferable move: the invariant tracks not just "what is placed" but
+*where each copy must be*, which is what turns a sortedness proof into a
+stability proof at no extra cost.
+</Solution>
+</Exercise>
+
+<Exercise>
+A million keys ($n = 10^6$) arrive from the range
+$\{0, \ldots, 10^{12}\}$. (a) Price one counting sort at this $k$: time,
+space, and the step where the procedure dies in practice. Name the
+hypothesis whose failure is responsible. (b) Rescue the run: show these
+keys sort in $O(n)$ anyway, and state the general claim for keys below
+$n^3$ (CLRS exercise 8.3-5).
+
+<Solution>
+**(a)** Time is $\Theta(n + k) = \Theta(10^{12})$: the initialization and
+prefix loops walk every counter, so the procedure spends a million times
+the work of reading its input before using any of it. Space is $10^{12}$
+counters: terabytes against the input's mere megabytes. The dead
+hypothesis is $k = O(n)$: nothing in the algorithm is wrong, but its
+habitat assumption failed, and merge sort's unconditional
+$n \lg n \approx 2 \times 10^7$ comparisons win by five orders of
+magnitude.
+
+**(b)** Since $10^{12} = (10^6)^2 = n^2$, write each key as two base-$n$
+digits, $x = q \cdot n + s$ with $q = \lfloor x/n \rfloor$ and
+$s = x \bmod n$, and radix sort: two stable counting-sort passes at
+$k = n$, costing $\Theta(2(n + n)) = \Theta(n)$. In general, keys below
+$n^3$ have three base-$n$ digits and sort in three passes, $\Theta(n)$;
+keys below $n^c$, in $c$ passes, $\Theta(cn)$. The rescue is the whole
+design of radix sort: never tally the key, tally a digit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "The passes should be run most-significant digit
+first, since that digit matters most; with a stable sort for every pass,
+the chain works just as well as LSD." Give a two-key counterexample,
+name the exact branch of the correctness lemma's induction that fails,
+and state what the real MSD variant does instead.
+
+<Solution>
+Counterexample: keys $51$ and $19$. MSD-first pass on tens: $1 < 5$
+gives $[\,19, 51\,]$: correct so far. Next pass on units: $1 < 9$ gives
+$[\,51, 19\,]$. Final output unsorted, stability never once violated.
+
+The failing branch is the *differing-digit* case, not the tie case. The
+lemma's induction works because pass $i$ sorts the most significant digit
+seen so far, so keys differing on it are placed correctly and keys tying
+on it are protected by stability. Run MSD-first and the roles invert: the
+last pass sorts the *least* significant digit and freely reorders keys
+that differ on it ($51$ and $19$ do), regardless of the more significant
+digits already settled. Stability is powerless there, because stability
+only constrains ties.
+
+The real MSD radix sort recurses into each leading-digit bin separately,
+so no later pass ever compares across a bin boundary; it pays per-bin
+bookkeeping and wins only where variable-length keys make trailing digits
+meaningless (Sedgewick §5.1).
+</Solution>
+</Exercise>
+
+<Exercise>
+Counting sort's index computation requires nonnegative keys. (a) Extend
+it to keys in $\{-m, \ldots, m-1\}$ and trace your procedure on
+$A = [\,2, -3, 0, -3, 1\,]$ with $m = 3$, showing both $C$ states and all
+placements. Does the extension preserve stability? (b) Records carry
+dates (year, month, day), years within one century. Design a
+linear-time sort by date and state each pass's $k$.
+
+<Solution>
+**(a)** Index by $A[j] + m$: a shift maps $\{-m,\ldots,m-1\}$ onto
+$\{0,\ldots,2m-1\}$, so run counting sort on shifted keys with $k = 2m$
+and subtract $m$ on output. Trace, shifted keys $[\,5, 0, 3, 0, 4\,]$,
+$k = 6$: tally $C = [\,2, 0, 0, 1, 1, 1\,]$; prefix sums
+$C = [\,2, 2, 2, 3, 4, 5\,]$. Placements right to left: $j{=}4$ (key 4):
+slot 3; $j{=}3$ (key 0): slot 1; $j{=}2$ (key 3): slot 2; $j{=}1$ (key
+0): slot 0; $j{=}0$ (key 5): slot 4. Output $[\,0,0,3,4,5\,]$, unshifted
+$[\,-3,-3,0,1,2\,]$. Stability is untouched: the shift is applied
+per-key and preserves both order and ties, and the placement loop never
+changed. The two $-3$s exit in input order.
+
+**(b)** Three stable passes, least significant field first: by day
+($k = 31$), then by month ($k = 12$), then by year ($k = 100$). Each
+pass is $\Theta(n + k)$ with tiny $k$, so the total is $\Theta(n)$. The
+correctness lemma applies verbatim with mixed radices: a "digit" is any
+field of bounded range, and (year, month, day) is a 3-digit number whose
+digits have different bases. This is also what "sort by column C, then
+stably by B, then by A" does in any spreadsheet.
+</Solution>
+</Exercise>
+
+<Exercise>
+One million 64-bit record IDs must be sorted, and the team is choosing
+between radix sort with byte digits and the library quicksort. (a) Count
+each side's work on paper: radix passes and their $(n + k)$ costs against
+quicksort's expected $1.39\,n \lg n$ comparisons. (b) Name two hardware
+effects that erode radix's paper margin and one that widens it. (c)
+Design the measurement that settles the choice, and state what result
+would count as the paper model holding.
+
+<Solution>
+**(a)** Byte digits: $r = 8$, so $d = 64/8 = 8$ passes at $k = 256$.
+Each pass makes one tally sweep ($n$ reads), a 256-step prefix sum, and
+one placement sweep ($n$ reads plus $n$ record writes): about
+$8 \times 3n \approx 2.4 \times 10^7$ array operations. Quicksort:
+$1.39\, n \lg n \approx 1.39 \times 10^6 \times 19.9 \approx
+2.8 \times 10^7$ comparisons, each with its own loads and swap traffic.
+Paper verdict: roughly even on operation count, radix slightly ahead,
+with every radix operation a branchless increment or copy.
+
+**(b)** Eroding: the placement sweep scatters writes across 256
+destination regions spread over the 8 MB output array, defeating the
+cache line reuse that quicksort's two sequential partition fronts enjoy;
+and the $A$/$B$ ping-pong doubles memory traffic and footprint where
+quicksort works in place. Widening: radix has no data-dependent
+branches, so it suffers none of the branch mispredictions that
+quicksort's comparison loop takes on random data.
+
+**(c)** Sort the same $10^6$ records with both, masking keys to width
+$w = 8, 16, \ldots, 64$ bits so the radix pass count is $w/8$ while
+quicksort's work stays flat; plot wall time against $w$. The paper model
+holds if radix time grows linearly in $w$ and the crossover width is
+where the operation counts predict; a bend located where the working set
+crosses a cache size is the hardware speaking. The module-level moral:
+between models, asymptotics picks the shortlist and measurement picks
+the winner.
+</Solution>
+</Exercise>
+
+<Exercise>
+Counting sort's prefix array outlives the sort. Suppose the tally and
+prefix passes have run over $n$ keys from $\{0,\ldots,k-1\}$, so
+$C[v] = \#\{\text{keys} \le v\}$, and no placement pass is wanted. (a)
+Answer "how many keys lie in $[a, b]$?" in $O(1)$. (b) Find the $t$-th
+smallest key without touching the keys again, first in $O(k)$, then with
+$O(\lg k)$ probes of $C$. (c) State exactly where this machinery dies for
+64-bit keys.
+
+<Solution>
+**(a)** $C[b] - C[a-1]$, reading $C[-1] = 0$: keys at most $b$, minus
+keys strictly below $a$.
+
+**(b)** The $t$-th smallest is the smallest $v$ with $C[v] \ge t$: the
+first value whose "at most $v$" count reaches $t$. A left-to-right scan
+finds it in $O(k)$. Faster: $C$ is nondecreasing, so the predicate
+"$C[v] \ge t$" is false up to some point and true from then on: probe
+the middle of the candidate range, keep the half where the flip must
+lie, and repeat: $\lceil \lg k \rceil$ probes.
+
+**(c)** At $k = 2^{64}$ the array $C$ cannot be built, stored, or
+initialized: every answer in (a) and (b) is downstream of a
+$\Theta(k)$-space object. Removing that dependence is precisely
+<Ref lesson="binary-search-and-order-statistics">the next lesson's</Ref>
+business: the halving in (b) is *binary search*, stated there for any
+monotonic predicate with no table behind it, and "find the $t$-th
+smallest" is the *selection* problem, which quickselect solves for
+arbitrary comparable keys in expected $\Theta(n)$: comparisons again,
+range assumptions gone.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §8.2: COUNTING-SORT with the trace this lesson's figure sequence recreates (Fig. 8.2), the scan-direction diagnosis (exercise 8.2-3) and placement invariant (exercise 8.2-4); §8.3: RADIX-SORT, the card-sorting framing, Lemma 8.3 (correctness), Lemma 8.4 and the digit-size optimization, the dates example, and exercise 8.3-5; §8.4: bucket sort and its expected-linear analysis.
+2. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 5 — the direct-access-array → tuple sort → radix sort development, and the $O(cn)$ bound for keys below $n^c$ via base-$n$ digits. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+3. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §5.1: key-indexed counting as the primitive, LSD radix sort on fixed-length keys with stability as the stated correctness condition, and the MSD variant; the companion slides (algs4.cs.princeton.edu) carry the punched-card history, from Hollerith's 1890 census machines to the IBM 80-series sorters.
+4. P. Morin, *Open Data Structures*, 2013 — §11.2: counting sort and radix sort, sorting $w$-bit integers in $w/d$ counting-sort passes of $d$ bits each. Free online: https://opendatastructures.org/
+</References>

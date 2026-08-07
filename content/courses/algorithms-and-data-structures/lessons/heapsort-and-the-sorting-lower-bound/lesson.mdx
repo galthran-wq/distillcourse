@@ -1,0 +1,750 @@
+Merge sort and quicksort both run in O(n log n) time on average, and no
+comparison-based sorting algorithm can do better in the worst case — a fact
+provable without analyzing any specific algorithm, by counting how many
+comparisons any decision tree needs to distinguish all n! orderings.
+
+The module's roster so far holds two sorts, each flawed where the other is
+sound: <Ref lesson="comparison-sorting-merge-and-quicksort">merge sort</Ref>
+guarantees $\Theta(n \lg n)$ on every input but drags a $\Theta(n)$ buffer,
+while quicksort sorts in place but collapses to $\Theta(n^2)$ on sorted
+input under fixed pivots. This lesson first completes the roster with
+heapsort, assembled from <Ref lesson="binary-heaps-and-priority-queues">the
+heap lesson's</Ref> parts, in place *and* worst-case $O(n \lg n)$ at
+once. It then stops improving algorithms and prices the problem itself:
+a counting argument proves that $\Omega(n \lg n)$ comparisons is a wall for
+every comparison sort, including every one not yet invented: the course's
+first impossibility result. The route: the max-heap flip and the in-place
+extraction loop; the trace and the engineering verdict; the decision-tree
+model; the $\lg(n!)$ theorem; and the theorem's exact boundary, which the
+next lesson crosses.
+
+## Heapsort: extract-max into the slot the heap abandons
+
+The algorithm has already run once in this course. The closing exercise of
+<Ref lesson="binary-heaps-and-priority-queues">the heap lesson</Ref>
+extracted from a heap $n$ times, watched the keys emerge in sorted order,
+and noted that a *max*-heap's extraction (swap the root with the last
+element, shrink the heap, sift down) deposits each extracted maximum in
+exactly the array slot the shrinking heap gives up. This section turns that
+observation into the module's third sorting algorithm and counts what it
+costs, on the module's conventions: 0-based array, and the running example
+$A = [\,5,\ 2,\ 7,\ 1,\ 6,\ 3,\ 8,\ 4\,]$.
+
+### The max-heap flip
+
+Everything from the heap lesson mirrors by reversing one inequality. A
+**max-heap** requires $Q[\mathrm{parent}(i)] \ge Q[i]$ on every edge; the
+root holds a *maximum*; sift-down swaps with the **larger** child, for the
+mirrored reason that only the larger child is guaranteed to be at least its
+sibling:
+
+```text
+sift_down(A[0..m−1], i):          ▷ max-heap: the larger child rises
+  while left(i) < m
+    c ← index of the larger child of i
+    if A[i] ≥ A[c]: stop
+    swap A[i] ↔ A[c]
+    i ← c
+```
+
+The index formulas ($\mathrm{left}(i) = 2i+1$, $\mathrm{right}(i) = 2i+2$)
+and the bottom-up build are unchanged: running `sift_down` from index
+$\lfloor n/2 \rfloor - 1$ down to $0$ turns any array into a max-heap in
+$\Theta(n)$, at most $2n$ swaps, because
+<Ref lesson="binary-heaps-and-priority-queues">node heights sum
+linearly</Ref>. On the running example the build fires five swaps and
+produces $[\,8, 6, 7, 4, 2, 3, 5, 1\,]$.
+
+### The loop: one array, two regions
+
+Extraction wants the root removed, and the complete shape only permits
+destroying the last slot; the heap lesson reconciled the two by moving the
+last leaf to the root. For a max-heap the reconciling swap does double
+duty. The key leaving the root is the **largest in the heap**, and the slot
+being abandoned is exactly where ascending sorted order wants that key:
+position $m$ for a heap of size $m+1$. So the swap that shrinks the heap
+simultaneously grows a sorted suffix, and no second array is ever needed.
+
+```text
+HeapSort(A[0..n−1]):
+  build_max_heap(A)               ▷ Θ(n), sift-down from ⌊n/2⌋−1 downto 0
+  for m ← n−1 downto 1
+    swap A[0] ↔ A[m]              ▷ current maximum into its final slot
+    sift_down(A[0..m−1], 0)       ▷ repair the shrunken heap
+```
+
+The correctness claim is a loop invariant in the standard three-part form.
+
+<Theorem title="heapsort invariant (CLRS exercise 6.4-2)">
+At the start of the iteration with counter $m$: $A[0 \,..\, m]$ is a
+max-heap holding the $m+1$ smallest keys of the input, and
+$A[m{+}1 \,..\, n{-}1]$ holds the $n-m-1$ largest keys, in ascending sorted
+order. Consequently `HeapSort` sorts $A$.
+
+<Proof>
+**Initialization.** At $m = n-1$ the suffix is empty and the whole array is
+a max-heap, by the build's own invariant. All clauses hold.
+
+**Maintenance.** Suppose the invariant holds at $m$. The root $A[0]$ is a
+maximum of the heap, so it is the largest of the $m+1$ smallest keys, and
+therefore at most every key in the suffix. The swap places it at position
+$m$: directly left of the suffix, at most everything in it. The suffix
+grows to $n-m$ keys, still sorted, still the largest keys overall. The heap
+loses its root and gains the displaced leaf at position 0; both subtrees of
+the root are untouched max-heaps, so one `sift_down` restores the heap
+property on $A[0 \,..\, m{-}1]$, which now holds the $m$ smallest keys.
+The invariant holds at $m - 1$.
+
+**Termination.** After the $m = 1$ iteration, $A[1 \,..\, n{-}1]$ holds the
+$n-1$ largest keys in sorted order and $A[0]$ holds the minimum: the array
+is sorted. $\blacksquare$
+</Proof>
+</Theorem>
+
+The cost statement rides on the heap lesson's bounds: the build is
+$\Theta(n)$, and each of the $n-1$ sift-downs walks one root-leaf path of a
+heap of size at most $n$, at most $2\lfloor \lg n \rfloor$ comparisons
+each. **Worst case $O(n \lg n)$, extra space $O(1)$**: two loop indices and
+a swap temporary. Merge sort's guarantee without merge sort's buffer.
+
+<FigureSequence
+  name="heapsort"
+  alt="Five frames of heapsort on the running example: build-max-heap produces 8 6 7 4 2 3 5 1, then each round swaps the root with the last heap slot and sifts the promoted key down, while a sorted suffix accumulates right-to-left, shown shaded in both the tree and the array"
+  caption="Heapsort on the running example: the heap shrinks node by node, the sorted suffix grows slot by slot, and the array never leaves place."
+/>
+
+<Task>
+Before advancing each frame, predict which key the root-with-last swap
+promotes and how many swaps its sift-down needs; the next frame's swap
+count confirms or corrects you. Verify at every frame that the suffix is
+sorted and every suffix key exceeds every heap key; the trace table below
+tallies all the counts.
+</Task>
+
+### The trace: eight keys, 25 comparisons
+
+<Example title="heapsort of the running example, counted in full">
+The build costs 9 comparisons and 5 swaps and yields
+$[\,8, 6, 7, 4, 2, 3, 5, 1\,]$. Each round below shows the array after the
+boundary swap and the sift-down, with the sorted suffix after the bar.
+
+| $m$ | array after round | sift comparisons | sift swaps |
+|---|---|---|---|
+| 7 | $[\,7\,6\,5\,4\,2\,3\,1 \mid 8\,]$ | 4 | 2 |
+| 6 | $[\,6\,4\,5\,1\,2\,3 \mid 7\,8\,]$ | 4 | 2 |
+| 5 | $[\,5\,4\,3\,1\,2 \mid 6\,7\,8\,]$ | 2 | 1 |
+| 4 | $[\,4\,2\,3\,1 \mid 5\,6\,7\,8\,]$ | 3 | 1 |
+| 3 | $[\,3\,2\,1 \mid 4\,5\,6\,7\,8\,]$ | 2 | 1 |
+| 2 | $[\,2\,1 \mid 3\,4\,5\,6\,7\,8\,]$ | 1 | 1 |
+| 1 | $[\,1 \mid 2\,3\,4\,5\,6\,7\,8\,]$ | 0 | 0 |
+
+Total: $9 + 16 = 25$ comparisons and $5 + 8 + 7 = 20$ swaps (build, sifts,
+and the seven boundary swaps). On the identical input, merge sort spent 17
+comparisons and quicksort 16: heapsort runs half again as many, the small-n
+shadow of the $2n \lg n$ constant in its bound.
+</Example>
+
+<Exercise>
+Before computing, predict whether heapsort finds sorted input easier, the
+way merge sort did (12 comparisons against 17). (a) Run `build_max_heap` on
+$[\,1, 2, \ldots, 8\,]$; count swaps and compare against the running
+example's 5. (b) Run the first extraction round on your heap and explain
+why the promoted key sinks far on *every* round, whatever the original
+input order. (c) Build from reverse-sorted $[\,8, 7, \ldots, 1\,]$, state
+what the build costs there, and conclude how input order moves heapsort's
+total.
+
+<Solution>
+Strategy hint: ascending order means every parent is *smaller* than its
+children: the worst arrangement for a max-heap build.
+
+**(a)** The sifts at indices 3, 2, 1, 0 all fire: sift(3) swaps $4
+\leftrightarrow 8$; sift(2) swaps $3 \leftrightarrow 7$; sift(1) swaps $2
+\leftrightarrow 8$, then $2 \leftrightarrow 4$; sift(0) swaps $1
+\leftrightarrow 8$, then $1 \leftrightarrow 5$. Six swaps, one *more* than
+the shuffled example's five, yielding $[\,8, 5, 7, 4, 1, 6, 3, 2\,]$.
+Sorted input is heapsort's heaviest build.
+
+**(b)** Swap $8 \leftrightarrow 2$: $[\,2, 5, 7, 4, 1, 6, 3 \mid 8\,]$.
+The 2 sinks past 7 and 6 to a leaf (2 swaps): $[\,7, 5, 6, 4, 1, 2, 3
+\mid 8\,]$. The promoted key is always the one sitting in the heap's last
+slot, a leaf and hence one of the heap's *small* keys, so after landing on
+the root it nearly always sinks the full height. Every round pays close to
+its worst case regardless of what order the input arrived in.
+
+**(c)** Reverse-sorted input already satisfies the max-heap property
+(every parent exceeds its children), so the build fires **zero swaps**:
+its best case. The extraction phase then runs as always: the full run
+costs 24 comparisons, against 27 for ascending and 25 for the shuffled
+example. Conclusion: input order decides quicksort's *exponent* ($n \lg n$
+against $n^2$) and merge sort's *constant* (12 against 17); heapsort's
+totals sit in a band of three comparisons across all three inputs. With
+distinct keys even heapsort's best case is $\Theta(n \lg n)$ (CLRS
+exercise 6.4-5); the algorithm is essentially oblivious to input order.
+</Solution>
+</Exercise>
+
+### In practice: the guarantee runs third
+
+Given a sort that is in place *and* worst-case $O(n \lg n)$ (the
+combination the module has been missing), one would expect it to be every
+library's default. It is nobody's default, for three measured reasons. Its
+inner loop is longer: two comparisons per level against quicksort's one.
+Its constant is larger: about $2n \lg n$ comparisons on typical input,
+against $1.39\,n \lg n$ expected for randomized quicksort and $\le n \lg n$
+for merge sort. And its memory access fights the cache: sift-down hops
+from index $i$ to $2i{+}1$, so successive probes land $2^{0}, 2^{1},
+\ldots$ slots apart: for a million-key heap the root's sift touches
+twenty cache lines where <Ref lesson="arrays-and-linked-lists">the
+sequential scans the cache rewards</Ref> would touch a handful. Long-range
+swaps also make it unstable, like quicksort.
+
+<Figure
+  src="./figures/scoreboard.svg"
+  alt="Table comparing merge sort, randomized quicksort, and heapsort on worst-case and average comparisons, extra space, stability, and in-place operation, with a bottom row stating the lower bound lg n! that the rest of the lesson proves"
+  caption="The module's scoreboard. No mainstream algorithm holds all three of: in place, stable, worst-case n lg n. The bottom row is this lesson's remaining business."
+/>
+
+What heapsort owns is the role of **insurance**.
+<Ref lesson="comparison-sorting-merge-and-quicksort">The previous
+lesson's</Ref> engineering section ended with introsort, the algorithm
+inside C++ `std::sort`: it runs quicksort, counts recursion depth, and past $2 \lg n$
+levels (the signature of an engineered or unlucky pivot sequence)
+switches the offending subarray to heapsort. The everyday speed comes from
+quicksort; the worst-case $\Theta(n \lg n)$ *promise* in the
+documentation is heapsort's. It is the sort that runs rarely and matters
+always.
+
+<KeyFact>
+Heapsort is the module's only sort that is simultaneously in-place and
+worst-case $O(n \lg n)$, which is how `std::sort` can run quicksort yet
+still print an $O(n \lg n)$ guarantee: heapsort stands behind it. What no
+amount of engineering has produced is a fourth column: an in-place,
+*stable*, worst-case $n \lg n$ sort remains an open engineering trade
+(Sedgewick's "holy sorting grail").
+</KeyFact>
+
+With heapsort on the board, the module holds three sorts whose guarantees
+all hover at $n \lg n$ comparisons: $\le n \lg n$, $\approx 1.39\, n \lg
+n$ expected, $\le 2n \lg n$. Three independent designs stalling at the
+same function is either a habit shared by their designers or a property of
+the problem. The rest of the lesson proves it is the problem.
+
+## Every comparison sort is one fixed binary tree
+
+The previous lesson's closing exercise took the first step, for $n = 8$:
+a comparison sort's run is determined by the yes/no answers it receives,
+distinct input orderings must produce distinct answer sequences, and
+$2^k \ge 8! = 40320$ forces $k \ge 16$ comparisons on some input. This
+section rebuilds that argument as an object, a tree, general enough to
+quantify over every comparison sort at once, including randomized ones and
+ones not yet designed.
+
+The model is the one <Ref lesson="comparison-sorting-merge-and-quicksort">
+already defined</Ref>: a *comparison sort* learns about its input only
+through pairwise $\le$ tests. Each test has two outcomes, so each test
+delivers at most one bit; the entire question is how many bits the problem
+demands.
+
+### Three keys: six orderings, three comparisons
+
+Sorting $(a, b, c) = (6, 8, 5)$ by comparisons: test $a \le b$ (yes); test
+$b \le c$ (no); test $a \le c$ (no). Those three answers pin the order
+$c < a < b$, and no two answers could have: after $a \le b$ and $b > c$
+alone, both $c < a < b$ and $a \le c < b$ remain live, and they demand
+different rearrangements. Laying out every possible run of such a
+procedure (each comparison a branch point, each resolved ordering an
+endpoint) draws a binary tree, and for three keys the whole tree fits in
+one figure.
+
+<Figure
+  src="./figures/decision-tree-3.svg"
+  alt="The full decision tree for sorting three keys a, b, c: internal nodes compare two keys, left branches mean at most, right branches mean greater, and the six leaves hold the six orderings; a depth ruler shows depth 3, and the path for input 6, 8, 5 is highlighted ending at the leaf c a b"
+  caption="The decision tree for three keys: 3! = 6 leaves, depth 3, and lg 6 ≈ 2.58 says no tree with six leaves can be shallower. The highlighted path sorts (6, 8, 5)."
+/>
+
+The tree has $3! = 6$ leaves, one per ordering, and depth 3. Two orderings
+sit at depth 2, inputs whose first two answers already settle everything,
+and four need a third comparison. A tree of depth 2 could hold at most
+$2^2 = 4$ leaves, too few for 6 orderings, so **three comparisons are
+unavoidable** for three keys, and this tree spends exactly three: optimal.
+
+### The tree, defined
+
+<Definition title="decision tree of a comparison sort">
+Fix a deterministic comparison sort and an input size $n$. Its **decision
+tree** is the binary tree that tabulates every run of the algorithm on $n$
+distinct keys: each internal node records the pair of input positions
+compared at that moment, the left subtree continues the run after outcome
+$\le$ and the right subtree after outcome $>$, and each leaf records the
+rearrangement the algorithm finally applies. Control flow, swaps, and
+index arithmetic are all discarded; only the comparisons and the final
+answer remain.
+</Definition>
+
+The tree exists and is unique because the algorithm is deterministic: its
+first comparison is fixed (heapsort on eight keys always opens by
+comparing $A[3]$ with $A[7]$, whatever the values), and every later
+comparison depends only on the answers received so far. Four instances fix
+the definition's boundary.
+
+- **The canonical case.** The figure's tree for $n = 3$, realized up to
+  relabeling by insertion sort.
+- **A different surface.** $n = 2$: one internal node, two leaves. Every
+  correct sort of two keys has this same tree, whatever its code looks
+  like.
+- **The degenerate case.** $n = 1$: no comparison ever fires, and the
+  tree is a single leaf recording the identity rearrangement.
+- **The near miss.** The four-leaf tree in the next figure: correctly
+  shaped, comparison-labeled, permutation-leafed, and the decision tree
+  of *no* correct algorithm. The clause it violates is the subject of the
+  next paragraph.
+
+One number transfers directly: the tree's **height** (its longest
+root-to-leaf path) is the algorithm's worst-case comparison count,
+because some input drives the run to the deepest leaf.
+
+### Too few leaves means a wrong answer
+
+Correctness forces the tree to be big. Every one of the $n!$ orderings of
+$n$ distinct keys must steer the run to a leaf whose recorded
+rearrangement sorts *that* ordering, and one leaf cannot serve two
+orderings: a leaf applies one fixed rearrangement, and a rearrangement
+that sorts one ordering scrambles any other. So if two orderings reach the
+same leaf, the algorithm answers wrongly on at least one of them: a
+pigeonhole argument, run on the figure below.
+
+<Figure
+  src="./figures/collision.svg"
+  alt="A pruned comparison tree with only four leaves: the two input orderings 3,1,2 and 3,2,1 both answer no to a against b and no to a against c, reach the same leaf, receive the same rearrangement, and only the first output comes out sorted"
+  caption="Four leaves cannot serve 3! = 6 orderings: inputs (3,1,2) and (3,2,1) reach one leaf, whose fixed rearrangement sorts the first and fails the second."
+/>
+
+The tree in the figure answers both $(3,1,2)$ and $(3,2,1)$ with the
+rearrangement "output $b, c, a$": correct on the first ($1,2,3$), wrong on
+the second ($2,1,3$). Any comparison sort's decision tree therefore has at
+least $n!$ *reachable* leaves: leaves some actual input arrives at. This
+is the entire content of correctness that the lower bound will use; nothing
+about how the algorithm chooses its comparisons matters.
+
+<KeyFact>
+The decision tree quantifies over algorithms that do not exist yet: any
+future comparison sort is, for each $n$, some binary tree with at least
+$n!$ reachable leaves, and its worst-case comparison count is that tree's
+height. Proving all such trees deep proves all such algorithms slow: the
+step no analysis of individual algorithms could take.
+</KeyFact>
+
+<Exercise>
+(a) For $n = 4$ and $n = 5$, compute the smallest worst-case comparison
+count the leaf argument permits. (b) Merge sort's worst case on 4 keys is
+$4 \lg 4 - 4 + 1 = 5$ comparisons; check it against (a). Then compute
+merge sort's worst case on 5 keys and compare again. (c) Determine whether
+the $n = 5$ floor from (a) is achievable by any algorithm.
+
+<Solution>
+**(a)** $4! = 24$ leaves force height $\ge \lceil \lg 24 \rceil = 5$;
+$5! = 120$ leaves force $\ge \lceil \lg 120 \rceil = 7$.
+
+**(b)** At $n = 4$, merge sort's 5 meets the floor exactly: merge sort is
+comparison-optimal on four keys. At $n = 5$ it splits $3 + 2$: sorting 3
+costs at most 3 (one comparison for its pair, two to merge in the third),
+sorting 2 costs 1, and the final merge of $3 + 2$ costs at most 4: total
+**8**, one above the floor of 7.
+
+**(c)** Yes. Sort two pairs (2 comparisons), compare the two pair-maxima
+(1): this chains three keys $u < v < w$ with one more key hanging below
+$w$. Insert the fifth key into the 3-chain by binary search (2), then
+insert the hanging key into the at-most-3 candidates below its known
+superior (2): $2+1+2+2 = 7$. This is the Ford–Johnson merge-insertion
+scheme (1959), and Knuth §5.3.1 tabulates where such schemes meet the
+floor. So the leaf bound is exactly right at $n = 5$ and merge sort simply
+is not the algorithm that attains it. A lower bound binds problems, and
+only sometimes crowns a particular algorithm.
+</Solution>
+</Exercise>
+
+## Counting leaves: lg(n!) comparisons are unavoidable
+
+What remains is bookkeeping: many leaves force a deep tree. A binary tree
+of height $h$ has at most $2^h$ leaves: each level at most doubles the
+nodes of the level above, so level $h$ holds at most $2^h$ of anything.
+(Formally, induction on $h$: a tree of height 0 is one leaf, and a tree of
+height $h$ is a root with at most two subtrees of height at most $h-1$,
+hence at most $2 \cdot 2^{h-1}$ leaves.)
+
+<Figure
+  src="./figures/leaves-height.svg"
+  alt="A binary tree silhouette: one root, doubling levels, and a band of L leaves at the bottom; the annotations read L at most 2 to the h, and for sorting L at least n factorial, so h at least lg n factorial"
+  caption="Levels at most double, so L leaves force height at least lg L; sorting needs L ≥ n!."
+/>
+
+### Run the count at n = 8, then at every n
+
+At $n = 8$ the count reads: $8! = 40320$ leaves, so
+$h \ge \lg 40320 \approx 15.3$, and a comparison count is an integer, so
+$h \ge 16$: the previous lesson's answer, recovered from the tree.
+Merge sort's worst case of 17 sits one comparison above this floor.
+
+For general $n$, the floor is $\lg(n!)$, and one crude estimate shows it
+grows like $n \lg n$ with no need for Stirling's approximation: of the
+factors $n \cdot (n-1) \cdots 1$, the largest $n/2$ are each at least
+$n/2$, so
+
+$$
+n! \;\ge\; \left(\frac{n}{2}\right)^{n/2}
+\qquad\Longrightarrow\qquad
+\lg(n!) \;\ge\; \frac{n}{2}\,\lg\frac{n}{2} \;=\; \Omega(n \lg n).
+$$
+
+### The theorem and its corollary
+
+<Theorem title="comparison-sort lower bound (CLRS Theorem 8.1)">
+Every comparison sort performs, on some input of $n$ distinct keys, at
+least $\lceil \lg(n!) \rceil = \Omega(n \lg n)$ comparisons.
+
+<Proof>
+The algorithm's worst-case comparison count is the height $h$ of its
+decision tree. Correctness puts at least $n!$ reachable leaves in the
+tree; height $h$ permits at most $2^h$. So $2^h \ge n!$, hence
+$h \ge \lg(n!) \ge (n/2)\lg(n/2) = \Omega(n \lg n)$. $\blacksquare$
+</Proof>
+</Theorem>
+
+<Theorem title="optimality of merge sort and heapsort (CLRS Corollary 8.2)">
+Merge sort and heapsort are asymptotically optimal comparison sorts.
+
+<Proof>
+Their $O(n \lg n)$ worst-case comparison counts match the theorem's
+$\Omega(n \lg n)$ lower bound. $\blacksquare$
+</Proof>
+</Theorem>
+
+The theorem's number is concrete. At $n = 1000$, $\lg(1000!) \approx
+8{,}530$: **no comparison sort, however designed, sorts every arrangement
+of a thousand distinct keys in under 8,530 comparisons**, while merge
+sort's guarantee $n \lg n \approx 9{,}966$ sits 17% above that floor. The
+gap is the linear term ($\lg(n!) = n \lg n - n\lg e + O(\lg n)$, and
+$n \lg e \approx 1.44\,n$), which asymptotic notation absorbs: to within
+constants, the three algorithms of this module were already as good as
+comparison sorting gets.
+
+<KeyFact>
+The floor is necessary at every $n$ but attained only at small $n$: known
+procedures meet $\lceil \lg(n!) \rceil$ exactly through $n = 11$, and at
+$n = 12$ the true minimum is 30 comparisons, one above the floor's 29. A
+lower bound is a wall, not a promise that some algorithm reaches it; what
+merge sort and heapsort match is the $\Theta(n \lg n)$ growth rate.
+</KeyFact>
+
+<Aside>
+The procedures that meet the floor through $n = 11$ are the Ford–Johnson
+merge-insertion schemes (1959): 16 comparisons at $n = 8$, 26 at
+$n = 11$. The $n = 12$ failure is Wells's result: an exhaustive computer
+search (1965) proved that no 29-comparison procedure sorts twelve keys.
+The slack has a cause: counting leaves ignores the constraint that the
+two halves of each comparison's answer must both remain *sortable with
+the comparisons left*, and at $n = 12$ that constraint finally bites.
+Knuth §5.3.1 tabulates the known exact values.
+</Aside>
+
+### Three refinements: distinctness, average case, coins
+
+The theorem as stated assumes distinct keys, worst-case input, and a
+deterministic algorithm; each assumption can be dropped, at a stated
+price.
+
+First, **distinctness** costs nothing for the theorem's purpose: inputs
+with distinct keys are included in "worst case", so the bound stands for
+the general problem. When the input is known to repeat heavily, though,
+the outcome count shrinks below $n!$ and the floor genuinely drops, which
+is how <Ref lesson="comparison-sorting-merge-and-quicksort">three-way
+quicksort</Ref> earns near-linear time on few-valued data.
+
+Second, the bound holds **on average**, not only in the worst case: the
+$n!$ orderings occupy $n!$ distinct leaves, and the average depth of $k$
+leaves in a binary tree is at least $\lg k$ (an exercise below proves
+it), so even a uniformly random input costs expected $\lg(n!)$
+comparisons.
+
+Third, **randomization buys nothing**: fixing a randomized algorithm's
+coin flips leaves a deterministic algorithm with its own tree, so for
+every coin sequence the average over inputs is at least $\lg(n!)$, hence
+so is the expectation over both (Open Data Structures, Theorem 11.6).
+Quicksort's $1.39\,n \lg n$ expected comparisons stand within 39% of a
+floor no algorithm, coin-flipping or not, gets under.
+
+## The fence around the theorem: what a comparison sort cannot see
+
+The theorem is routinely compressed to "sorting takes $n \log n$", and the
+compression is false. The true statement binds three named things:
+**comparison sorts**, their **comparison counts**, in the **worst case or
+on average**. The falsehood drops all three qualifiers and asserts a
+law about the task of sorting itself.
+
+### The proof's engine is fan-out, and fan-out is escapable
+
+The task is not bound, and the
+proof itself says why: its engine is fan-out. A $\le$ test has two
+outcomes, so $h$ tests distinguish at most $2^h$ orderings; that is the
+whole argument. An algorithm permitted to *read* a key and use its value,
+as an array index, say, selects one of $k$ continuations in a single
+operation. Its runs form a tree of fan-out $k$, which reaches $k^h$
+outcomes in $h$ steps, and for $k$ near $n$ the same leaf-count argument
+demands only $h \ge \log_n(n!) = \Theta(n)$: a merely linear floor, no
+obstacle to linear-time sorting at all.
+
+<Figure
+  src="./figures/fan-out.svg"
+  alt="Two trees of the same height h side by side: the left one branches two ways per node, reaching at most 2 to the h leaves and forcing height at least lg n factorial, of order n lg n; the right one branches k ways per node, reaching k to the h leaves and forcing only height at least log base k of n factorial, which is of order n when k is near n"
+  caption="Same height, different fan-out: a ≤ test branches 2 ways, a value-indexed step k ways, so the leaf-count floor drops from Θ(n lg n) to Θ(n)."
+/>
+
+### Where the fence runs: the comparator callback
+
+The fence in practice runs along an API. Any routine that accepts an
+arbitrary comparator callback (C's `qsort`, C++ `std::sort`, Java's
+`Arrays.sort`, Python's `sort(key=...)`) is a comparison sort *by
+construction*: whatever it does internally, its only window into the keys
+is the two-outcome callback, so $\lceil \lg(n!) \rceil$ binds it. An
+algorithm that demands integer keys of bounded size refuses that
+interface, steps outside the model, and is bound by nothing in this
+lesson. The next lesson builds two such algorithms and runs them in
+$O(n + k)$.
+
+<KeyFact>
+The wall is a property of the interface, not of sorting:
+`sort(keys, compare)` cannot beat $\lg(n!)$ comparisons on every input,
+while `sort(small_ints)` can finish in two array passes. Check which
+interface a "faster than $n \log n$" claim uses before disbelieving it.
+</KeyFact>
+
+What is established: heapsort (build a max-heap in $\Theta(n)$, then swap
+the root into the shrinking heap's abandoned slot $n-1$ times) sorts in
+place in worst-case $O(n \lg n)$, is the guarantee behind introsort, and
+loses the constant-factor race to quicksort's locality; and the
+decision-tree theorem closes the comparison question, putting
+$\lceil \lg(n!) \rceil$ comparisons ($16$ at $n = 8$, $\approx 8{,}530$ at
+$n = 1000$) under every comparison sort, worst case and average, coins or
+no coins, with merge sort and heapsort optimal up to constants.
+<Ref lesson="linear-time-sorting">The next lesson</Ref> crosses the fence
+the theorem cannot: counting sort and radix sort index arrays by key value,
+compare nothing, and sort in $O(n + k)$; an exercise below has you
+invent the first of them.
+
+## Exercises
+
+<Exercise>
+The array $[\,2, 8, 7, 1, 3, 5, 6, 4\,]$ (partitioned by quicksort in the
+previous lesson's exercise) is handed to heapsort. (a) Run
+`build_max_heap`, reporting each sift-down's swaps and the final heap.
+(b) Run the first two extraction rounds, reporting the array after each.
+(c) The build used far fewer swaps than its $2n = 16$ budget. State which
+fact from the heap lesson caps the build at $\Theta(n)$, and why building
+by $n$ repeated inserts instead would forfeit the guarantee.
+
+<Solution>
+**(a)** sift(3): key 1, child 4: swap, giving $[\,2, 8, 7, 4, 3, 5, 6, 1\,]$.
+sift(2): key 7, children 5, 6: larger 6, and $7 \ge 6$: no swap.
+sift(1): key 8, children 4, 3: no swap. sift(0): key 2, children 8, 7:
+swap with 8, giving $[\,8, 2, 7, 4, 3, 5, 6, 1\,]$; then children 4, 3: swap
+with 4, giving $[\,8, 4, 7, 2, 3, 5, 6, 1\,]$; then child 1: $2 \ge 1$, stop.
+Three swaps total; heap $[\,8, 4, 7, 2, 3, 5, 6, 1\,]$.
+
+**(b)** Round 1: swap $8 \leftrightarrow 1$, sift 1 down past 7 and 6:
+$[\,7, 4, 6, 2, 3, 5, 1 \mid 8\,]$. Round 2: swap $7 \leftrightarrow 1$,
+sift 1 down past 6 and 5: $[\,6, 4, 5, 2, 3, 1 \mid 7, 8\,]$.
+
+**(c)** The cap is the heap lesson's height-sum theorem: bottom-up
+sift-down bills each node its *height*, and heights sum to at most $2n$
+because half the nodes are leaves of height 0. Building by $n$ inserts
+bills each node its *depth*, and depths sum to $\Theta(n \lg n)$ against
+adversarial (decreasing) input. Same repair primitive, opposite walk,
+different asymptotics. Heapsort's $O(n \lg n)$ total would survive
+either build, but the $\Theta(n)$ build is what makes the build phase
+free relative to the extraction phase.
+</Solution>
+</Exercise>
+
+<Exercise>
+The theorem bounded the *deepest* leaf of a comparison sort's decision
+tree. Bound the shallowest: show that no leaf can sit at depth less than
+$n - 1$, name the input this bounds, and exhibit an algorithm meeting the
+bound. (Hint: view the $d$ comparisons on a root-leaf path as edges of a
+graph on the $n$ input positions.)
+
+<Solution>
+Strategy hint: fewer than $n-1$ edges leave a graph on $n$ vertices
+disconnected.
+
+Take any leaf at depth $d$ and the comparison graph of its path: vertices
+are the $n$ input positions, edges the $d$ compared pairs. If
+$d < n - 1$, the graph is disconnected; split it into a component $S$ and
+the rest. Take an input that reaches this leaf, and build a second input
+by adding one large constant to every key in $S$, chosen big enough to
+flip the true order of at least one cross pair. Every comparison on the
+path joins two positions inside $S$ or two outside it, so every observed
+outcome is unchanged: the second input reaches the same leaf and receives
+the same rearrangement. But the two inputs' sorted orders differ, so the
+leaf answers one of them wrongly: contradiction. Hence every leaf sits at
+depth $\ge n - 1$.
+
+The shallowest leaf is the algorithm's *best case*: even on the friendliest
+input, already sorted, a correct comparison sort must spend at least
+$n - 1$ comparisons, because certifying sortedness means connecting all
+$n$ positions. Insertion sort meets the bound exactly: on ascending input
+it makes precisely $n - 1$ comparisons. The same tree, probed at its
+other end, prices the opposite extreme of the same algorithm.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Merging is as hard as sorting. A comparison-based
+merge of two sorted $n$-element runs must distinguish all the ways the
+final $2n$ keys could be arranged, so by the decision-tree argument it
+needs $\Omega(n \lg n)$ comparisons, and the two-finger merge's $2n - 1$
+bound from <Ref lesson="comparison-sorting-merge-and-quicksort">the
+previous lesson</Ref> cannot be right." Identify the wrong step and repair
+the count.
+
+<Solution>
+The wrong step is the leaf count. A decision tree needs one reachable leaf
+per *distinguishable outcome of the problem*, and merging's input is not
+an arbitrary arrangement: both runs arrive sorted, and the only unknown is
+which interleaving holds. Choosing which $n$ of the $2n$ output positions
+carry left-run keys determines the merge completely: $\binom{2n}{n}$
+outcomes, not $(2n)!$.
+
+Repaired count: $h \ge \lg \binom{2n}{n}$, and since
+$\binom{2n}{n} \ge 4^n / (2n+1)$,
+$$
+h \;\ge\; \lg\frac{4^n}{2n+1} \;=\; 2n - \lg(2n+1) ,
+$$
+a *linear* floor. At $n = 8$: $\lg \binom{16}{8} \approx 13.7$, so at
+least 14 comparisons, against the two-finger merge's worst case of 15:
+nearly tight, and a finer adversary argument (Knuth §5.3.2) closes the gap
+to exactly $2n - 1$. The refutation's moral is the method's real shape:
+the decision tree proves height $\ge \lg(\#\text{outcomes})$ for *any*
+problem in the comparison model, and the entire content lies in counting
+the outcomes the input actually leaves open.
+</Solution>
+</Exercise>
+
+<Exercise>
+Heapsort's bound and the lower bound stand a factor of two apart; measure
+the gap. (a) Bound the extraction phase: round $m$ sifts on a heap of $m$
+elements at a cost of at most $2\lfloor \lg m \rfloor$ comparisons; sum
+over the rounds and express the total in terms of a factorial. (b) Add the
+build and state heapsort's total against the $\lg(n!)$ floor. (c) Check
+the ratio on the lesson's trace numbers for $n = 8$.
+
+<Solution>
+**(a)** The rounds sift on heaps of sizes $n-1, n-2, \ldots, 1$:
+$$
+\sum_{m=1}^{n-1} 2\lfloor \lg m \rfloor
+\;\le\; 2 \sum_{m=1}^{n-1} \lg m
+\;=\; 2 \lg\bigl((n-1)!\bigr)
+\;\le\; 2\lg(n!) .
+$$
+
+**(b)** The build adds $O(n)$ comparisons (at most two per swap plus one
+stopping test per call, and swaps total $\le 2n$). So heapsort spends at
+most $2\lg(n!) + O(n)$ comparisons: **at most twice the theoretical
+minimum plus a linear term**, on every input. At $n = 1000$ that reads:
+floor $\approx 8{,}530$, heapsort's guarantee $\approx 17{,}000$ plus
+change.
+
+**(c)** At $n = 8$ the trace spent 25 comparisons against the floor of 16:
+ratio $1.56$, inside the factor-2 promise. The factor is real: each
+sift-down level buys one level of descent for two comparisons, one to choose the
+larger child and one to test it. Shrinking the factor is an engineering literature
+of its own: Floyd's variant sinks the promoted key to the bottom without
+testing, then sifts up, bringing the count toward $n \lg n$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson asserted that the lower bound holds on average. Prove the tree
+fact that carries it: in any binary tree with $k$ leaves, the average
+depth of the leaves is at least $\lg k$. Conclude the average-case bound,
+then extend it to randomized algorithms in two sentences.
+
+<Solution>
+Strategy hint: write the recurrence for total leaf depth and use
+convexity at the split.
+
+Let $D(T)$ be the sum of leaf depths (*external path length*) and
+$d(k) = \min \{ D(T) : T \text{ has } k \text{ leaves} \}$. A tree with
+$k \ge 2$ leaves is a root over subtrees with $a$ and $k - a$ leaves
+($1 \le a \le k-1$), and every leaf lies one level deeper than in its
+subtree, so
+$$
+d(k) = \min_{1 \le a \le k-1} \bigl[\, d(a) + d(k-a) \,\bigr] + k .
+$$
+Induction hypothesis: $d(j) \ge j \lg j$ (true at $j = 1$: $0 \ge 0$).
+The function $g(a) = a \lg a + (k-a)\lg(k-a)$ is convex and symmetric
+about $a = k/2$, so its minimum over the range is at $a = k/2$, giving
+$$
+d(k) \;\ge\; 2 \cdot \frac{k}{2}\lg\frac{k}{2} + k
+\;=\; k(\lg k - 1) + k \;=\; k \lg k .
+$$
+Average depth $= D/k \ge \lg k$.
+
+For sorting: the $n!$ orderings reach $n!$ distinct leaves, and a
+uniformly random ordering is a uniformly random such leaf, so the expected
+comparison count is the average depth $\ge \lg(n!)$: the average-case
+bound. For a randomized algorithm, condition on the coin flips: each coin
+sequence fixes a deterministic algorithm whose tree obeys the bound just
+proved, so the expected count is $\ge \lg(n!)$ for every coin sequence,
+hence also averaged over them (Open Data Structures, Theorem 11.6).
+</Solution>
+</Exercise>
+
+<Exercise>
+A telemetry job must sort one million records whose sort keys are integers
+in $\{0, 1, \ldots, 9\}$ (single-digit severity codes). (a) Design a
+procedure that sorts the bare keys using **no** key-to-key comparisons at
+all, and count its operations. (b) Explain precisely why this does not
+contradict Theorem 8.1, and what happens to the comparison floor itself
+when only ten distinct values exist. (c) Your procedure regenerates keys;
+records carry payloads. State what additional information the procedure
+must compute to *place* full records rather than regenerate keys.
+
+<Solution>
+**(a)** Allocate `count[0..9]`, zeroed. Pass 1: for each record, increment
+`count[key]`: one array index per record, no comparisons. Pass 2: for
+$v = 0$ to $9$, emit the value $v$ exactly `count[v]` times. About $2n =
+2{,}000{,}000$ array operations total, and the key's *value* did all the
+work that comparisons do elsewhere: indexing into `count` is a ten-way
+branch in one step.
+
+**(b)** The procedure inspects key values, so it is not a comparison sort
+and the theorem says nothing about it: the model's hypothesis, not its
+arithmetic, is what fails. Separately, the floor itself shrinks on this
+input class: with only ten values the distinguishable outcomes number
+$n! / (n_0! \cdots n_9!)$, whose logarithm is about $n \lg 10 \approx
+3.3n$ rather than $\lg(n!) \approx n\lg n$; even a comparison sort
+could do better here than the distinct-key floor, but never in $O(n)$;
+the value-indexing procedure is outside both fences.
+
+**(c)** To place records, "emit $v$ this many times" is useless; the
+procedure needs, for each value $v$, the *starting position* of $v$'s
+block in the output: the running total
+$\mathrm{count}[0] + \cdots + \mathrm{count}[v-1]$, a prefix sum. With
+those ten offsets, each record moves directly to its slot in one pass. You
+have invented **counting sort**, prefix sums and all;
+<Ref lesson="linear-time-sorting">the next lesson</Ref> names it, proves
+it stable, and chains it into radix sort for keys too wide for one
+counter array.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §6.4: the HEAPSORT procedure and the full trace of Fig. 6.4 (the model for this lesson's figure sequence), with the loop invariant of exercise 6.4-2 and the best-case result of exercise 6.4-5; §8.1: the decision-tree model (Fig. 8.1), Theorem 8.1, Corollary 8.2, and exercise 8.1-1 (the shallowest-leaf bound).
+2. P. Morin, *Open Data Structures*, 2013 — §11.1.3: heap-sort with the $2n\log n + O(n)$ comparison count (Theorem 11.4); §11.1.4: comparison trees, the two-orderings-one-leaf argument this lesson carries (Fig. 11.6), Theorem 11.5, and the extension to randomized algorithms (Theorem 11.6). Free online: https://opendatastructures.org/
+3. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §2.4: sink-based heapsort with counted propositions and Floyd's bounce refinement; §2.5: the sorting-algorithm characteristics table this lesson's scoreboard recreates, and the "holy sorting grail" framing. Companion lecture slides (algs4.cs.princeton.edu): the decision tree for three keys and the complexity-of-sorting framework.
+4. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 5 — the $\Omega(\log L)$ outcome-counting framing of the lower bound and the Stirling-free estimate $n! \ge (n/2)^{n/2}$. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+5. J. W. J. Williams, "Algorithm 232: Heapsort," *Communications of the ACM* 7(6), 347–348, 1964 — the paper that introduced both the binary heap and the algorithm this lesson completes.
+6. L. R. Ford Jr., S. M. Johnson, "A Tournament Problem," *American Mathematical Monthly* 66(5), 387–389, 1959 — merge-insertion sorting, the scheme meeting the $\lceil \lg n! \rceil$ floor at small $n$.
+7. D. E. Knuth, *The Art of Computer Programming*, Vol. 3: *Sorting and Searching*, 2nd ed., Addison-Wesley, 1998 — §5.3.1: minimum-comparison sorting, the $S(n)$ table, and Wells's $S(12) = 30$; §5.3.2: the exact $2n-1$ lower bound for merging.
+</References>
