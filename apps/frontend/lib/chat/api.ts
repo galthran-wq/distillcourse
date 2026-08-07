@@ -7,6 +7,12 @@ export interface ChatSummary {
   model: string;
   title: string | null;
   created_at: string;
+  /**
+   * When the chat was last written in — null for one nobody has said anything
+   * in yet, and only ever filled in by the listing, which is the one place a
+   * set of chats is compared.
+   */
+  last_message_at: string | null;
 }
 
 export interface ChatModel {

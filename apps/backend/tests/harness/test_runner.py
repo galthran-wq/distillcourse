@@ -2,6 +2,7 @@ import asyncio
 import json
 import uuid
 from collections.abc import AsyncGenerator, Sequence
+from datetime import UTC, datetime
 
 import pytest
 from pydantic_ai.messages import (
@@ -25,17 +26,37 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.harness import runner
-from app.harness.agent import tutor
+from app.harness.agent import namer, tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import LimitExceeded
 from app.harness.repository import HarnessRepository
 from app.models import Chat, Message
 from tests.harness.conftest import compacting
 
+QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
+
 
 def note(topic: str) -> str:
     """Look up a topic in the course."""
     return f"the course covers {topic}"
+
+
+async def named(repo: HarnessRepository, chat: Chat, title: str) -> None:
+    """The chat, named before any of what a test then says in it.
+
+    Every row one test writes carries the timestamp of the transaction the
+    suite wraps it in, so a title stamped with the clock would be later than
+    all of them. A chat that is up for renaming was named messages ago.
+    """
+    await repo.set_title(chat, title)
+    chat.titled_at = datetime(2020, 1, 1, tzinfo=UTC)
+    await repo.session.commit()
+
+
+async def moved_on(repo: HarnessRepository, chat: Chat) -> None:
+    """Enough said since the name was written to be worth another one."""
+    for _ in range(settings.TITLE_REFRESH_MESSAGES):
+        await repo.add_messages(chat, [QUESTION], role="user")
 
 
 def stored(rows: Sequence[Message]) -> str:
@@ -285,6 +306,104 @@ async def test_a_fresh_summary_does_not_trigger_another_compaction(
 
     rows = await repo.rows(chat)
     assert [row.marker for row in rows].count("compact") == 1
+
+
+async def test_a_chat_is_renamed_once_the_conversation_has_moved_on(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat)
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=TestModel(custom_output_text="Cross entropy and KL")),
+    ):
+        await runner.run(repo, chat, "and cross entropy?")
+
+    assert chat.title == "Cross entropy and KL"
+
+
+async def test_a_chat_keeps_its_name_until_then(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    await named(repo, chat, "what is entropy?")
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=TestModel(custom_output_text="Cross entropy and KL")),
+    ):
+        await runner.run(repo, chat, "and cross entropy?")
+
+    assert chat.title == "what is entropy?"
+
+
+async def test_a_rename_that_fails_costs_the_learner_nothing(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """What the chat is called is bookkeeping: a rename that cannot be written
+    is logged, and the turn the learner asked for stands."""
+    attempts = 0
+
+    def refuse(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        nonlocal attempts
+        attempts += 1
+        raise RuntimeError("openrouter is down")
+
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat)
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=FunctionModel(refuse)),
+    ):
+        answer = await runner.run(repo, chat, "and cross entropy?")
+
+    assert attempts == 1
+    assert answer == "a mean"
+    assert chat.title == "what is entropy?"
+
+
+async def test_a_rename_does_not_spend_the_daily_allowance(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """The platform naming its own chat is not the learner sending a message —
+    the footing a compaction stands on."""
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat)
+    spent = await repo.messages_today()
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=TestModel(custom_output_text="Cross entropy and KL")),
+    ):
+        await runner.run(repo, chat, "and cross entropy?")
+
+    assert chat.title == "Cross entropy and KL"
+    assert await repo.messages_today() == spent + 1
+
+
+async def test_a_streamed_run_renames_the_chat_before_the_stream_closes(
+    session_factory: async_sessionmaker[AsyncSession],
+    repo: HarnessRepository,
+    chat: Chat,
+) -> None:
+    """The panel asks the backend what the chat is called the moment the stream
+    ends, so a rename that lands after that is one nobody sees until the next
+    message."""
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat)
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=TestModel(custom_output_text="Cross entropy and KL")),
+    ):
+        chunks = await start(session_factory, repo, chat, "and cross entropy?")
+        [_ async for _ in chunks]
+
+    # The drain renamed it on a session of its own; this one still holds the
+    # chat as it was loaded.
+    await repo.session.refresh(chat)
+    assert chat.title == "Cross entropy and KL"
 
 
 async def test_a_system_run_does_not_spend_the_daily_allowance(

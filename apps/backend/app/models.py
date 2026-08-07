@@ -100,6 +100,13 @@ class Chat(Base):
     kind: Mapped[str] = mapped_column(String(16))
     model: Mapped[str] = mapped_column(String(128))
     title: Mapped[str | None] = mapped_column(String(60), default=None)
+    # When that title was written. Nothing else says how much of the
+    # conversation happened after it, which is what decides when the harness
+    # writes a new one. NULL is a chat nobody has named — the Telegram thread,
+    # which is one eternal conversation and is never listed.
+    titled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
     # A run holds the chat for as long as the claim is fresh; the deadline is
     # what releases a chat whose worker died mid-stream.
     active_run_id: Mapped[uuid.UUID | None] = mapped_column(default=None)

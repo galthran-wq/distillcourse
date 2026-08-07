@@ -97,6 +97,11 @@ class Settings(BaseSettings):
     MEMORY_WRITES_PER_RUN: int = 5
     MEMORY_INDEX_SOFT_CAP: int = 40
     COMPACT_AT_TOKENS: int = 200_000
+    # How much conversation has to pile up after a chat was named before the
+    # platform names it again. A title written from the first question stops
+    # describing the chat a few exchanges later, and the rail is a list of
+    # titles.
+    TITLE_REFRESH_MESSAGES: int = 8
     # Headroom for the next turn's system prompt, tools and reply.
     CONTEXT_RESERVE_TOKENS: int = 32_000
 

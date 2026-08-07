@@ -18,11 +18,11 @@ import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/ch
 import { parseCommand } from "@/lib/chat/commands";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
 import {
+  adoptSummary,
   busy,
   changeModel,
   clearSession,
   compactSession,
-  refreshSummary,
   selectSession,
   streamFailure,
   type Session,
@@ -59,23 +59,20 @@ export default function ChatPanel({ session, expanded }: Props) {
     listModels().then(setModels, report);
   }, []);
 
-  // Refetched on every open rather than accumulated: titles are written
-  // server-side from the first message, and other tabs add chats this one has
-  // never seen. The rail shows them without being asked, so it also follows the
-  // session — a new chat, a switch and the title arriving are all its summary
-  // changing.
+  // Refetched rather than accumulated: names and dates are written
+  // server-side, and other tabs add chats this one has never seen. One listing
+  // serves the rail's rows and the header's own name for the chat alike — the
+  // backend rewrites that name as the conversation moves past what it was
+  // first called. A settled run is when both may have changed, which is why
+  // status is a dependency; `useChat`'s onFinish is no use for it, since the
+  // SDK ignores its callbacks when it is handed a `chat` to drive.
   useEffect(() => {
-    if (!expanded && !menu) return;
-    webChats().then(setChats, report);
-  }, [expanded, menu, session.summary]);
-
-  // The backend names a chat after its first message, so the header can only
-  // learn the name once an answer is in. `useChat`'s onFinish is no use here:
-  // the SDK ignores its callbacks when it is handed a `chat` to drive.
-  useEffect(() => {
-    if (status !== "ready" || session.summary.title !== null) return;
-    refreshSummary().catch(report);
-  }, [status, session]);
+    if (busy(status)) return;
+    webChats().then((listed) => {
+      setChats(listed);
+      adoptSummary(listed);
+    }, report);
+  }, [expanded, menu, status, session.summary]);
 
   // The request took the passages off the composer as it was built, and this
   // one never got through — refused by the cap, or nothing answered at all.
@@ -176,6 +173,7 @@ export default function ChatPanel({ session, expanded }: Props) {
             <ChatList
               chats={chats}
               current={session.summary.id}
+              dated
               onSelect={(chat) => run(selectSession(chat))}
             />
           </nav>

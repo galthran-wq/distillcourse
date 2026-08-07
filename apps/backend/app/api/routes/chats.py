@@ -27,6 +27,10 @@ class ChatSummary(BaseModel):
     model: str
     title: str | None
     created_at: datetime
+    # When the chat was last written in, which is what the rail dates its rows
+    # by. Null for a chat nobody has said anything in yet, and filled in only
+    # by the listing — the one place a set of chats is compared.
+    last_message_at: datetime | None = None
 
 
 class NewChat(BaseModel):
@@ -128,7 +132,13 @@ async def models() -> list[ChatModel]:
 
 @router.get("")
 async def index(repo: RepositoryDep) -> list[ChatSummary]:
-    return [ChatSummary.model_validate(chat) for chat in await repo.list_chats()]
+    last = await repo.last_message_at()
+    return [
+        ChatSummary.model_validate(chat).model_copy(
+            update={"last_message_at": last.get(chat.id)}
+        )
+        for chat in await repo.list_chats()
+    ]
 
 
 @router.post("")

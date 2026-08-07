@@ -24,3 +24,27 @@ export function day(at: string | Date): string {
     year: "numeric",
   });
 }
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const WEEK = 7 * DAY;
+
+/**
+ * How long ago, in the room a list row has for it: "now", "5m", "2h", "3d",
+ * and a date once a count of days has stopped being read at a glance. The
+ * year is only worth its width when it is not this one.
+ *
+ * `now` is a parameter because a relative date is only as testable as the
+ * moment it is relative to.
+ */
+export function ago(at: string | Date, now: number = Date.now()): string {
+  const on = new Date(at);
+  const elapsed = now - on.getTime();
+  if (elapsed < MINUTE) return "now";
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
+  if (elapsed < WEEK) return `${Math.floor(elapsed / DAY)}d`;
+  const year = on.getFullYear() === new Date(now).getFullYear() ? undefined : "numeric";
+  return on.toLocaleDateString(undefined, { day: "numeric", month: "short", year });
+}
