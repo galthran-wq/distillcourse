@@ -36,15 +36,17 @@ def replying(text: str = "entropy is what you owe me") -> Iterator[None]:
         yield
 
 
-async def settled() -> None:
+async def settled(*, raising: bool = True) -> None:
     """Wait out the runs still in flight.
 
     A streamed run is a task that outlives the response that started it: its
     last act — naming the chat — happens once the client's stream has closed.
-    In production it has a connection of its own; in the suite it shares the
-    one the test is about to read on.
+    Nothing waits for that in production, where it has a connection of its own;
+    here it writes on the connection the test is about to read on and then roll
+    back. A teardown asks for `raising=False`: a drain that died is the test's
+    story to tell, not the fixture's.
     """
-    await asyncio.gather(*runner._drains)
+    await asyncio.gather(*runner._drains, return_exceptions=not raising)
 
 
 @dataclass(frozen=True)
@@ -119,11 +121,7 @@ async def connection() -> AsyncGenerator[AsyncConnection]:
     async with engine.connect() as connection:
         transaction = await connection.begin()
         yield connection
-        # A streamed run is a task that outlives the request that started it,
-        # and its last act — naming the chat — lands after the client's stream
-        # has closed. Nothing waits for that in production; here the connection
-        # it writes on is about to be rolled back and its loop closed.
-        await asyncio.gather(*runner._drains, return_exceptions=True)
+        await settled(raising=False)
         await transaction.rollback()
 
 

@@ -53,9 +53,9 @@ class Settings(BaseSettings):
     LOGFIRE_TOKEN: str | None = None
 
     OPENROUTER_API_KEY: str | None = None
-    # Kimi only for now: the deploy's egress reaches OpenRouter through a
-    # proxy whose exit IP Anthropic and Google refuse by their provider ToS,
-    # so offering those models would only sell dead options in the picker.
+    # Kimi alone: the deploy's egress reaches OpenRouter through a proxy whose
+    # exit IP Anthropic and Google refuse by their provider ToS, so offering
+    # those models would only sell dead options in the picker.
     CHAT_MODELS: list[ChatModel] = [
         ChatModel(
             openrouter_id="moonshotai/kimi-k3",
