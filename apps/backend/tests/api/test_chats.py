@@ -2,6 +2,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 
+import pytest
 from httpx import AsyncClient
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 from pydantic_ai.models.test import TestModel
@@ -9,7 +10,7 @@ from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.chats import _current_locator
-from app.core.config import settings
+from app.core.config import ChatModel, settings
 from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
@@ -58,8 +59,21 @@ async def test_an_anonymous_visitor_gets_nothing(client: AsyncClient) -> None:
 
 
 async def test_a_chat_is_created_listed_and_switched_to_another_model(
-    signed_in: AsyncClient,
+    signed_in: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # The deployed pool may be a single model; switching needs a second one.
+    monkeypatch.setattr(
+        settings,
+        "CHAT_MODELS",
+        [
+            *settings.CHAT_MODELS,
+            ChatModel(
+                openrouter_id="test/other",
+                display_name="Other",
+                context_window=1_000_000,
+            ),
+        ],
+    )
     created = (await signed_in.post("/api/v1/chats", json={"kind": "web"})).json()
     other = [
         model["openrouter_id"]

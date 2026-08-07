@@ -53,20 +53,13 @@ class Settings(BaseSettings):
     LOGFIRE_TOKEN: str | None = None
 
     OPENROUTER_API_KEY: str | None = None
+    # Kimi only for now: the deploy's egress reaches OpenRouter through a
+    # proxy whose exit IP Anthropic and Google refuse by their provider ToS,
+    # so offering those models would only sell dead options in the picker.
     CHAT_MODELS: list[ChatModel] = [
         ChatModel(
             openrouter_id="moonshotai/kimi-k3",
             display_name="Kimi K3",
-            context_window=1_048_576,
-        ),
-        ChatModel(
-            openrouter_id="anthropic/claude-opus-5",
-            display_name="Claude Opus 5",
-            context_window=1_000_000,
-        ),
-        ChatModel(
-            openrouter_id="google/gemini-3.6-flash",
-            display_name="Gemini 3.6 Flash",
             context_window=1_048_576,
         ),
     ]
