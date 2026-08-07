@@ -45,8 +45,8 @@ function transcript(
 /** That conversation as markup: what a test about what a message renders as. */
 export function rendered(
   messages: UIMessage[],
-  lessons: Lessons = LESSONS,
   status: ChatStatus = "ready",
+  lessons: Lessons = LESSONS,
 ): string {
   return renderToStaticMarkup(transcript(messages, lessons, CHAT, status));
 }
@@ -57,12 +57,12 @@ export function rendered(
  */
 export function shown(): {
   host: () => HTMLElement;
-  show: (messages: UIMessage[], chatId?: string) => void;
+  show: (messages: UIMessage[], status?: ChatStatus, chatId?: string) => void;
 } {
   const dom = mounted();
   return {
     host: dom.host,
-    show: (messages, chatId = CHAT) =>
-      act(() => dom.render(transcript(messages, LESSONS, chatId, "ready"))),
+    show: (messages, status = "ready", chatId = CHAT) =>
+      act(() => dom.render(transcript(messages, LESSONS, chatId, status))),
   };
 }

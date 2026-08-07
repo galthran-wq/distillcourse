@@ -42,23 +42,31 @@ function Question({ text, attached }: { text: string; attached: Quote[] }) {
 
 /**
  * The question is in and nothing has come back yet: three dots waiting where
- * the reply is about to be written. It goes the moment the first token
+ * the reply is about to be written. They go the moment the first token
  * arrives — from then on the answer appearing is itself the sign that
  * something is happening, and a second one beside it says nothing. The dots
- * are drawn here and paced in globals.css, which is also where the blanket
- * reduced-motion rule stills them.
+ * are drawn here and paced in globals.css.
  */
-function Waiting() {
+function Waiting({ status }: { status: ChatStatus }) {
+  const waiting = status === "submitted";
+
   return (
-    // The one live region in the transcript, and it can be one: it says a
-    // single thing, once, rather than reading the conversation out per token.
-    <p role="status" className="py-1">
-      <span className="sr-only">the tutor is answering…</span>
-      <span aria-hidden className="tutor-dots flex gap-1.5">
-        <span className="size-1.5 rounded-full bg-faint" />
-        <span className="size-1.5 rounded-full bg-faint" />
-        <span className="size-1.5 rounded-full bg-faint" />
-      </span>
+    // The region is mounted whether or not it has anything in it: a screen
+    // reader that announces mutations inside a live region announces nothing
+    // for one that arrives already filled. Empty it is out of flow, and it
+    // carries its own gap up to the last turn rather than sitting in the
+    // transcript's `space-y`, so an idle transcript does not end in a blank row.
+    <p role="status" className={waiting ? "mt-4 py-1" : "sr-only"}>
+      {waiting && (
+        <>
+          <span className="sr-only">the tutor is answering…</span>
+          <span aria-hidden className="tutor-dots flex gap-1.5">
+            <span className="size-1.5 rounded-full bg-faint" />
+            <span className="size-1.5 rounded-full bg-faint" />
+            <span className="size-1.5 rounded-full bg-faint" />
+          </span>
+        </>
+      )}
     </p>
   );
 }
@@ -102,57 +110,62 @@ export default function Messages({
   }
 
   return (
-    // No live region: an answer arrives a token at a time, and a transcript
-    // that announces itself on every one of them reads the whole conversation
-    // out again per token. Each turn says who spoke, which is what is needed.
+    // Exactly one live region in here, the waiting indicator below, which says
+    // one thing once. The answer itself has none: it arrives a token at a
+    // time, and a transcript that announces itself on every one of them reads
+    // the whole conversation out again per token. Each turn says who spoke,
+    // which is what is needed.
     <div ref={view} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 py-3">
       {/* Expanded, the panel is far wider than a column of prose should be. */}
-      <div className="mx-auto max-w-2xl space-y-4">
-        {messages.length === 0 && (
-          <p className="text-sm text-faint">
-            Ask about what you are reading. <code>/clear</code> starts a new chat,{" "}
-            <code>/compact</code> summarises this one.
-          </p>
-        )}
-        {messages.map((message, turn) => (
-          <article
-            // By position, not by id: the backend gives every stored question
-            // of every chat the same id — it derives one from fields a question
-            // has none of — so an id is not an identity here, and React
-            // reconciles a list of duplicates by matching the wrong nodes. A
-            // transcript is only ever appended to, which makes position one.
-            key={turn}
-            aria-label={message.role === "user" ? "You" : "Tutor"}
-            // A turn rises into place as it is added. The answer inside it is
-            // written a token at a time and does not animate: the element is
-            // there from the first token, and this only plays on the node
-            // React inserts.
-            className={`transition-[opacity,translate] duration-(--motion-base) starting:translate-y-1.5 starting:opacity-0 ${
-              message.role === "user"
-                ? "ml-auto w-fit max-w-[85%] rounded-md bg-accent/10 px-3 py-2"
-                : ""
-            }`}
-          >
-            {message.parts.map((part, index) => {
-              if (part.type === "text") {
-                return message.role === "user" ? (
-                  <Question
-                    key={index}
-                    text={part.text}
-                    attached={attachedQuotes(message.metadata)}
-                  />
-                ) : (
-                  <Markdown key={index} text={part.text} />
-                );
-              }
-              if (isToolUIPart(part)) {
-                return <ToolChip key={index} part={part} />;
-              }
-              return null;
-            })}
-          </article>
-        ))}
-        {status === "submitted" && <Waiting />}
+      <div className="mx-auto max-w-2xl">
+        <div className="space-y-4">
+          {messages.length === 0 && (
+            <p className="text-sm text-faint">
+              Ask about what you are reading. <code>/clear</code> starts a new chat,{" "}
+              <code>/compact</code> summarises this one.
+            </p>
+          )}
+          {messages.map((message, turn) => (
+            <article
+              // By position, not by id: the backend gives every stored question
+              // of every chat the same id — it derives one from fields a
+              // question has none of — so an id is not an identity here, and
+              // React reconciles a list of duplicates by matching the wrong
+              // nodes. A transcript is only ever appended to, which makes
+              // position one.
+              key={turn}
+              aria-label={message.role === "user" ? "You" : "Tutor"}
+              // A turn rises into place as it is added. The answer inside it is
+              // written a token at a time and does not animate: the element is
+              // there from the first token, and this only plays on the node
+              // React inserts.
+              className={`transition-[opacity,translate] duration-(--motion-base) starting:translate-y-1.5 starting:opacity-0 ${
+                message.role === "user"
+                  ? "ml-auto w-fit max-w-[85%] rounded-md bg-accent/10 px-3 py-2"
+                  : ""
+              }`}
+            >
+              {message.parts.map((part, index) => {
+                if (part.type === "text") {
+                  return message.role === "user" ? (
+                    <Question
+                      key={index}
+                      text={part.text}
+                      attached={attachedQuotes(message.metadata)}
+                    />
+                  ) : (
+                    <Markdown key={index} text={part.text} />
+                  );
+                }
+                if (isToolUIPart(part)) {
+                  return <ToolChip key={index} part={part} />;
+                }
+                return null;
+              })}
+            </article>
+          ))}
+        </div>
+        <Waiting status={status} />
       </div>
     </div>
   );

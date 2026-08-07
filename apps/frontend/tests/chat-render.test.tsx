@@ -2,7 +2,7 @@
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import type { UIMessage } from "ai";
-import { LESSONS, rendered, shown, turn } from "./chat-fixture";
+import { rendered, shown, turn } from "./chat-fixture";
 
 function reply(...parts: UIMessage["parts"]): string {
   return rendered([
@@ -94,7 +94,7 @@ describe("waiting for the tutor", () => {
   ];
 
   it("waits with an indicator between the question and the first token", () => {
-    const html = rendered(asked, LESSONS, "submitted");
+    const html = rendered(asked, "submitted");
 
     expect(html).toContain('role="status"');
     expect(html).toContain("the tutor is answering");
@@ -104,14 +104,14 @@ describe("waiting for the tutor", () => {
   });
 
   it("takes it away once the answer is coming", () => {
-    const html = rendered(answering, LESSONS, "streaming");
+    const html = rendered(answering, "streaming");
 
     expect(html).toContain("Because it is a mean.");
     expect(html).not.toContain("tutor-dots");
   });
 
   it("leaves nothing behind once the answer is in", () => {
-    expect(rendered(answering, LESSONS, "ready")).not.toContain("tutor-dots");
+    expect(rendered(answering, "ready")).not.toContain("tutor-dots");
   });
 });
 
@@ -187,7 +187,7 @@ describe("the transcript", () => {
     show(conversation("a", 2));
     // A whole other conversation replaces this one, and its questions carry
     // the same ids: nothing here may be matched up with what it replaced.
-    show(conversation("b", 2), "b");
+    show(conversation("b", 2), "ready", "b");
 
     expect(speakers()).toEqual(["You", "Tutor", "You", "Tutor"]);
     expect(host().textContent).not.toContain("a ask");
@@ -223,7 +223,7 @@ describe("the transcript", () => {
     const view = scrollable(1000, 400);
     scrollTo(120);
 
-    show(conversation("b", 2), "b");
+    show(conversation("b", 2), "ready", "b");
 
     expect(view.at()).toBe(1000);
   });

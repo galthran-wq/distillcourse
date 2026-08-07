@@ -13,29 +13,51 @@ export const MOTION_BASE_MS = 200;
 export const MOTION_FAST_MS = 150;
 
 /**
- * What makes a field read as one: a fill a step off whatever it sits on, and a
- * line around it that the accent takes while it is in use. The fill is
- * `--field` rather than a colour, so a surface that is itself panel-filled can
- * flip it — see globals.css. The radius is left to the two below, because two
+ * What makes a field read as one: a fill a step off whatever it sits on. The
+ * fill is `--field` rather than a colour, so a surface that is itself
+ * panel-filled can flip it — see globals.css. The radius, and the line the
+ * accent takes while the field is in use, are left to the two below: two
  * utilities for one property resolve by stylesheet order rather than by which
- * was written last.
+ * was written last, and the two states differ.
  */
 const FIELD_SURFACE =
-  "border border-line bg-(--field) transition-colors duration-(--motion-fast) hover:border-faint";
+  "border border-line bg-(--field) transition-colors duration-(--motion-fast)";
 
-/** Every bare text field: input, textarea, and the native time picker. */
-export const FIELD_CLASS = `${FIELD_SURFACE} block w-full rounded-sm px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-accent aria-invalid:border-accent`;
+/**
+ * Every bare text field: input, textarea, and the native time picker. The
+ * accent takes its line while it is focused; `hover:` and `focus:` are two
+ * different pseudo-classes at the same specificity, so the one written last
+ * wins on a hovered focused field and that is `focus:border-accent`.
+ */
+export const FIELD_CLASS = `${FIELD_SURFACE} hover:border-faint block w-full rounded-sm px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-accent aria-invalid:border-accent`;
 
 /**
  * A field that is a box around controls rather than a control itself — the
  * tutor's composer, whose send button sits inside the same shape as its
- * textarea. Everything about the state is on the box, including the ring, so
- * the control inside has to turn its own off (`focus:outline-none`) — the
- * site's focus ring would otherwise land around the textarea inside the field
- * rather than around the field. The radius is the surface one: this holds
- * controls rather than being one.
+ * textarea. Everything about the state is on the box: the accent takes its
+ * line while anything inside it has focus, and the hover line is explicitly
+ * not-focused (`focus-within:` and `hover:` are the same specificity, so
+ * without that the hover line would win over the accent one for as long as the
+ * pointer stayed on the field). The ring is the box's too, so the control
+ * inside turns its own off with `FIELD_BOX_INPUT_CLASS` — the site's ring would
+ * otherwise land around the textarea rather than around the field. It is keyed
+ * on that control being `:focus-visible` rather than on `focus-within:`, so the
+ * box is ringed exactly when the control it stands in for would have been —
+ * including a pointer press, which a text field matches `:focus-visible` on,
+ * the same as every bare field on the site. The send button beside it is not
+ * that control: it kept its own ring, and would otherwise be ringed twice. The
+ * radius is the surface one: this holds controls rather than being one.
  */
-export const FIELD_BOX_CLASS = `${FIELD_SURFACE} flex items-end gap-1.5 rounded-md p-1.5 focus-within:border-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent`;
+export const FIELD_BOX_CLASS = `${FIELD_SURFACE} flex items-end gap-1.5 rounded-md p-1.5 not-focus-within:hover:border-faint focus-within:border-accent has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-offset-2 has-[textarea:focus-visible]:outline-accent`;
+
+/**
+ * The control inside such a box. It draws nothing: the fill, the line and the
+ * ring are the box's, and the last of those only works if the control gives
+ * its own up. Geometry — size, flex, how it scrolls, its padding — is the
+ * caller's, as everywhere else in this file.
+ */
+export const FIELD_BOX_INPUT_CLASS =
+  "bg-transparent text-sm text-ink placeholder:text-faint focus:outline-none";
 
 /**
  * The text above a field. It carries the gap down to the field, so FIELD_CLASS

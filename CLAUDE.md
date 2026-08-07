@@ -69,9 +69,11 @@ Rules that override defaults:
   a small outlined control, mostly naming a thing rather than doing one — are
   their own controls and say so. Every text field carries
   `FIELD_CLASS` with a `FIELD_LABEL_CLASS` label — or, where the field is a box
-  holding controls rather than a bare one, `FIELD_BOX_CLASS` on the box and
-  nothing but geometry on what sits in it (the tutor's composer, whose send
-  button is inside the field) — every mono micro-cap
+  holding controls rather than a bare one, the pair `FIELD_BOX_CLASS` on the
+  box and `FIELD_BOX_INPUT_CLASS` on the control inside it, which leaves the
+  caller only geometry (the tutor's composer, whose send button is inside the
+  field): the border, the fill and the ring are the box's, and the control
+  hands its ring over — every mono micro-cap
   `LABEL_CLASS`. The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
   `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown —
@@ -81,10 +83,8 @@ Rules that override defaults:
   Motion belongs to that layer too, and there is no animation library: an
   entrance is an `@starting-style` transition (`starting:` utilities, or a rule
   in `globals.css` where the element's geometry already lives there), nothing
-  runs longer than `--motion-base` — except an idle loop, which has to be
-  slower to read as breathing and so is a multiple of it (the dots the
-  transcript waits for the first token with) — and one blanket
-  `prefers-reduced-motion`
+  runs longer than `--motion-base`, except an idle loop, which is a multiple
+  of it, and one blanket `prefers-reduced-motion`
   rule at the end of `globals.css` turns all of it off — a component never
   repeats that rule for itself. An exit needs the element to stay mounted
   while it plays: that is `useExitDelay` in `lib/ui/exit.ts`, fed
