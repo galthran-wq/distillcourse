@@ -49,6 +49,25 @@ const SOURCE_CORPORA = Object.entries(RENDERING)
   .filter(([, rendering]) => rendering === "source")
   .map(([corpus]) => `${corpus}:`);
 
+export interface LessonParts {
+  course: string;
+  lesson: string;
+  anchor: string | null;
+}
+
+/**
+ * A `lesson:` locator taken apart. The one place the grammar above is read
+ * backwards, for the callers that want the two slugs rather than the key they
+ * compose into — the `@`-autocomplete, which offers a course before it offers
+ * a lesson of it.
+ */
+export function lessonParts(locator: string): LessonParts | null {
+  const match = LESSON_SECTION.exec(locator);
+  if (match === null) return null;
+  const [, course, lesson, anchor] = match;
+  return { course, lesson, anchor: anchor ?? null };
+}
+
 export interface LessonLocator {
   /** The lesson it names, under the key the rest of the platform uses. */
   key: string;
@@ -56,10 +75,9 @@ export interface LessonLocator {
 }
 
 export function parseLessonLocator(locator: string): LessonLocator | null {
-  const match = LESSON_SECTION.exec(locator);
-  if (match === null) return null;
-  const [, course, lesson, anchor] = match;
-  return { key: lessonKey(course, lesson), anchor: anchor ?? null };
+  const parts = lessonParts(locator);
+  if (parts === null) return null;
+  return { key: lessonKey(parts.course, parts.lesson), anchor: parts.anchor };
 }
 
 /** The course a `course:` locator names, or null when it names something else. */

@@ -37,6 +37,7 @@ from app.harness.limits import (
 )
 from app.harness.prompts import ContextBlock, Medium, RunKind, assemble
 from app.harness.repository import HarnessRepository, Role
+from app.harness.title import retitle
 from app.harness.usage import usage_row
 from app.memory import repository as memory
 from app.memory.repository import Recollection
@@ -199,6 +200,7 @@ async def _open_run(
     user_messages: Sequence[ModelMessage],
     medium: Medium,
     role: Role,
+    prompt: str,
 ) -> list[ModelMessage]:
     if not await repo.claim_run(chat, run_id):
         raise RunBusy
@@ -209,11 +211,7 @@ async def _open_run(
         await repo.add_messages(chat, user_messages, role=role, run_id=run_id)
         # A chat is named after the learner's first question, never after a
         # prompt the platform wrote for itself.
-        if (
-            role == "user"
-            and chat.title is None
-            and (prompt := _prompt_text(user_messages))
-        ):
+        if role == "user" and chat.title is None and prompt:
             await repo.set_title(chat, prompt)
     except Exception:
         # Nothing is in flight, so the chat must not stay claimed until the
@@ -330,7 +328,7 @@ async def run(
         await check_cost_ceiling(repo.session)
     run_id = uuid.uuid4()
     user_message = ModelRequest(parts=[UserPromptPart(content=prompt)])
-    history = await _open_run(repo, chat, run_id, [user_message], medium, role)
+    history = await _open_run(repo, chat, run_id, [user_message], medium, role, prompt)
     deps = HarnessDeps(repo=repo, chat=chat, outbox=outbox)
     try:
         result = await tutor.run(
@@ -371,16 +369,17 @@ async def _drain(
     current_locator: str | None,
     queue: asyncio.Queue[BaseChunk | None],
 ) -> None:
-    try:
-        async with session_factory() as session:
-            repo = HarnessRepository(session, user_id)
+    async with session_factory() as session:
+        repo = HarnessRepository(session, user_id)
+        chat: Chat | None = None
+        result: AgentRunResult[str] | None = None
+        failure: str | None = None
+        try:
             chat = await repo.get_chat(chat_id)
             if chat is None:
                 return
             deps = HarnessDeps(repo=repo, chat=chat, current_locator=current_locator)
-            result: AgentRunResult[str] | None = None
             text: list[str] = []
-            failure: str | None = None
 
             def capture(completed: AgentRunResult[str]) -> None:
                 nonlocal result
@@ -426,11 +425,18 @@ async def _drain(
                     "releasing run {run_id} failed",
                     run_id,
                 )
-    finally:
-        # Outside everything: the client is reading this queue, and a stream
-        # that is never terminated hangs the browser for as long as it waits.
-        # By here the run is over and what it produced has been stored.
-        queue.put_nowait(None)
+        finally:
+            # The client is reading this queue and their composer is dead until
+            # it ends, so nothing above may be skipped and nothing below may be
+            # waited on: by here the turn is stored and the chat is free, which
+            # is everything the learner's next message needs.
+            queue.put_nowait(None)
+        if chat is not None and result is not None and failure is None:
+            await _guarded(
+                retitle(repo, chat, run_id, result.usage),
+                "renaming the chat after run {run_id} failed",
+                run_id,
+            )
 
 
 async def _relay(queue: asyncio.Queue[BaseChunk | None]) -> AsyncGenerator[BaseChunk]:
@@ -460,9 +466,13 @@ async def start_stream(
     # message just submitted is taken from the request.
     adapter.run_input.messages = adapter.run_input.messages[-1:]
     user_messages = adapter.sanitize_messages(adapter.messages)
+    # Read before the fence goes on: `_prefix` writes into the same part, and a
+    # chat named after that is a chat named after the passage the learner
+    # attached rather than after what they asked about it.
+    prompt = _prompt_text(user_messages)
     if quotes is not None:
         _prefix(user_messages, quotes)
-    history = await _open_run(repo, chat, run_id, user_messages, "web", "user")
+    history = await _open_run(repo, chat, run_id, user_messages, "web", "user", prompt)
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
     task = asyncio.create_task(
         _drain(

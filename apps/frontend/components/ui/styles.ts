@@ -13,12 +13,50 @@ export const MOTION_BASE_MS = 200;
 export const MOTION_FAST_MS = 150;
 
 /**
- * Every text field: input, textarea, and the native time picker. The fill is
- * `--field` rather than a colour, so a surface that is itself panel-filled can
- * flip it and keep the field a step off what it sits on — see globals.css.
+ * What makes a field read as one: a fill a step off whatever it sits on. The
+ * fill is `--field` rather than a colour, so a surface that is itself
+ * panel-filled can flip it — see globals.css. The radius, and the line the
+ * accent takes while the field is in use, are left to the two below: two
+ * utilities for one property resolve by stylesheet order rather than by which
+ * was written last, and the two states differ.
  */
-export const FIELD_CLASS =
-  "block w-full rounded-sm border border-line bg-(--field) px-3 py-2 text-sm text-ink transition-colors duration-(--motion-fast) placeholder:text-faint hover:border-faint focus:border-accent aria-invalid:border-accent";
+const FIELD_SURFACE =
+  "border border-line bg-(--field) transition-colors duration-(--motion-fast)";
+
+/** What typed text looks like, wherever it is typed. */
+const FIELD_TEXT = "text-sm text-ink placeholder:text-faint";
+
+/**
+ * Every bare text field: input, textarea, and the native time picker. The
+ * accent takes its line while it is focused; `hover:` and `focus:` are two
+ * different pseudo-classes at the same specificity, and tailwind emits `focus:`
+ * after `hover:`, so the accent line wins on a hovered focused field. Where in
+ * this string the two are written makes no difference to that.
+ */
+export const FIELD_CLASS = `${FIELD_SURFACE} ${FIELD_TEXT} hover:border-faint block w-full rounded-sm px-3 py-2 focus:border-accent aria-invalid:border-accent`;
+
+/**
+ * A field that is a box around controls rather than a control itself — the
+ * tutor's composer, whose send button sits inside the same shape as its
+ * textarea. Everything about the state is on the box: the accent takes its
+ * line while anything inside it has focus, and the hover line is explicitly
+ * not-focused (`focus-within:` and `hover:` are the same specificity, so
+ * without that the hover line would win over the accent one for as long as the
+ * pointer stayed on the field). The ring is the box's too, which is why
+ * `field-box` is in here: it is the site's one ring, stated once in globals.css
+ * beside the rule for everything else, and the control inside gives its own up
+ * with `FIELD_BOX_INPUT_CLASS`. The radius is the surface one: this holds
+ * controls rather than being one.
+ */
+export const FIELD_BOX_CLASS = `${FIELD_SURFACE} field-box flex items-end gap-1.5 rounded-md p-1.5 not-focus-within:hover:border-faint focus-within:border-accent`;
+
+/**
+ * The control inside such a box — a textarea or an input. It draws nothing: the
+ * fill, the line and the ring are the box's, and the last of those only works
+ * if the control gives its own up. Geometry — size, flex, how it scrolls, its
+ * padding — is the caller's, as everywhere else in this file.
+ */
+export const FIELD_BOX_INPUT_CLASS = `${FIELD_TEXT} bg-transparent focus:outline-none`;
 
 /**
  * The text above a field. It carries the gap down to the field, so FIELD_CLASS
@@ -45,19 +83,31 @@ export const POPOVER_CLASS =
  */
 export const MENU_CLASS = `${POPOVER_CLASS} right-0 top-full mt-1.5 origin-top-right p-1.5`;
 
+// Everything about such a row except how it lays its contents out. The display
+// is left off because it is the one thing a caller replaces, and there is no
+// tailwind-merge here: a second display utility in the same class list resolves
+// by stylesheet order rather than by the order it is written.
+const MENU_ROW =
+  "w-full rounded-sm px-2.5 py-2 text-left text-[13px] transition-colors duration-(--motion-fast) hover:bg-line/60";
+
 /** One row of such a panel, whether that row is a link or a button. */
-export const MENU_ITEM_CLASS =
-  "block w-full rounded-sm px-2.5 py-2 text-left text-[13px] transition-colors duration-(--motion-fast) hover:bg-line/60";
+export const MENU_ITEM_CLASS = `block ${MENU_ROW}`;
+
+/** The same row where it carries columns of its own — a name and a date. */
+export const MENU_ROW_CLASS = `flex ${MENU_ROW}`;
 
 /**
  * A chip: a small outlined control that names a thing rather than performing
  * an action — the passage a selection offers to the tutor, and the same
  * passage again beside the message it was sent with. Not a Button, and it
  * says so here rather than in each place one is drawn. Geometry is the
- * caller's: one floats at the selection, the others sit in a row.
+ * caller's: one floats at the selection, the others sit in a row. The display
+ * is the caller's too, for the reason `MENU_ROW` gives — a chip inside a
+ * sentence is `inline-flex` and one in a row is `flex`, and two display
+ * utilities in the same class list resolve by stylesheet order.
  */
 export const CHIP_CLASS =
-  "flex items-center rounded-sm border border-line bg-paper text-[12px] text-soft transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink";
+  "items-center rounded-sm border border-line bg-paper text-[12px] text-soft transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink";
 
 export type ButtonVariant = "solid" | "outline" | "ghost";
 /**

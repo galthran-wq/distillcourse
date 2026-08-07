@@ -53,8 +53,20 @@ def untrusted(source: str, body: str) -> str:
     """Fence text that came from outside the platform, naming where it came
     from. `base.md` is where the tutor is told that what is inside a fence is
     data — so anything reaching the model from the open web goes through here,
-    whether it arrives as a context block or as a tool result."""
-    return f'<untrusted source="{source}">\n{body}\n</untrusted>'
+    whether it arrives as a context block, a tool result or a transcript.
+
+    The tags are escaped out of the body here rather than by each caller: an
+    unescaped `</untrusted>` inside it would close the fence early and put
+    everything after it back in the platform's own voice. The ampersand goes
+    first, which is what makes the escaping reversible — text that already
+    spells out `&lt;untrusted` must not come back out as a tag nobody wrote.
+    """
+    fenced = (
+        body.replace("&", "&amp;")
+        .replace("<untrusted", "&lt;untrusted")
+        .replace("</untrusted", "&lt;/untrusted")
+    )
+    return f'<untrusted source="{source}">\n{fenced}\n</untrusted>'
 
 
 def learner_quote(text: str, locator: str) -> str:
@@ -62,19 +74,10 @@ def learner_quote(text: str, locator: str) -> str:
 
     Fenced like any other quoted material: the selection is lesson prose, or
     something they pasted into the page, and an instruction found in it is
-    still data. The tags are escaped out of the text itself — an unescaped
-    `</untrusted>` in the selection would close the fence and put the rest of
-    it back in the learner's own voice. The ampersand is escaped first, which
-    is what makes the escaping reversible: a selection that already spells out
-    `&lt;untrusted` must not come back out of the panel as a tag nobody wrote.
+    still data.
     """
     quoted = "\n".join(f"> {line}" for line in text[:QUOTE_LENGTH].splitlines())
-    fenced = (
-        quoted.replace("&", "&amp;")
-        .replace("<untrusted", "&lt;untrusted")
-        .replace("</untrusted", "&lt;/untrusted")
-    )
-    return untrusted(QUOTE_SOURCE, f"{fenced}\n>\n> — [[{locator}]]")
+    return untrusted(QUOTE_SOURCE, f"{quoted}\n>\n> — [[{locator}]]")
 
 
 def learner_quotes(quotes: Sequence[tuple[str, str]]) -> str | None:

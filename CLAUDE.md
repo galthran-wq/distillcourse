@@ -68,19 +68,32 @@ Rules that override defaults:
   action a view has, `outline`, `ghost`; menu rows, the switch and the chip —
   a small outlined control, mostly naming a thing rather than doing one — are
   their own controls and say so. Every text field carries
-  `FIELD_CLASS` with a `FIELD_LABEL_CLASS` label, every mono micro-cap
-  `LABEL_CLASS`. The chip a referenced passage is shown as carries
+  `FIELD_CLASS` with a `FIELD_LABEL_CLASS` label — or, where the field is a box
+  holding controls rather than a bare one, the pair `FIELD_BOX_CLASS` on the
+  box and `FIELD_BOX_INPUT_CLASS` on the control inside it, which leaves the
+  caller only geometry (the tutor's composer, whose send button is inside the
+  field): the border, the fill and the ring are the box's, and the control
+  hands its ring over. Every mono micro-cap carries `LABEL_CLASS`.
+  The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
-  `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown —
+  `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown,
+  and `MENU_ROW_CLASS` in place of `MENU_ITEM_CLASS` where the row lays
+  columns of its own out (a name and a date) rather than one label —
   all from `ui/styles.ts`, with only geometry left to the caller. Never
   hand-roll one of those in a page or a demo; the
-  focus ring is global (`@layer base`, so a utility can still override it).
+  focus ring is global (`@layer base`, so a utility can still override it) —
+  including the one such a box wears for the control in it, which is the same
+  rule in `globals.css` with `.field-box` added to its selector list, never a
+  second statement of the ring in a class string.
   Motion belongs to that layer too, and there is no animation library: an
   entrance is an `@starting-style` transition (`starting:` utilities, or a rule
   in `globals.css` where the element's geometry already lives there), nothing
-  runs longer than `--motion-base`, and one blanket `prefers-reduced-motion`
-  rule at the end of `globals.css` turns all of it off — a component never
-  repeats that rule for itself. An exit needs the element to stay mounted
+  runs longer than `--motion-base`, except an idle loop, which is a multiple
+  of it, and `.anchor-flash` — the 2s one-shot marking the heading a reference
+  sent the reader to, which is a message rather than a movement and is the one
+  selector the blanket `prefers-reduced-motion` rule at the end of
+  `globals.css` carves out. That rule turns off everything else, and a
+  component never repeats it for itself. An exit needs the element to stay mounted
   while it plays: that is `useExitDelay` in `lib/ui/exit.ts`, fed
   `MOTION_BASE_MS`/`MOTION_FAST_MS` from `ui/styles.ts` — the millisecond
   copies of the two tokens, retuned with them. Never a second timer. A menu

@@ -103,15 +103,20 @@ export async function changeModel(model: string): Promise<void> {
   session.set({ summary, chat: current.chat });
 }
 
-/** The backend titles a chat from its first message; this is how it arrives. */
-export async function refreshSummary(): Promise<void> {
+/**
+ * The backend names a chat itself — from its first message, and again once the
+ * conversation has moved past it — so the name arrives out of the listing the
+ * panel already fetches rather than from a request of its own.
+ */
+export function adoptSummary(chats: ChatSummary[]): void {
   const current = session.get();
   if (current === null) return;
-  const listed = (await webChats()).find((chat) => chat.id === current.summary.id);
-  // Only on a real change, or the panel that asked for this would be rendered
-  // back into asking for it; and not at all if the chat was switched meanwhile.
+  const listed = chats.find((chat) => chat.id === current.summary.id);
+  // Only on a real change of the name, or the panel that asked for this would
+  // be rendered back into asking for it. The dates the same listing carries
+  // belong to the rail, which reads them from the listing itself.
   if (listed === undefined || listed.title === current.summary.title) return;
-  if (session.get() === current) session.set({ summary: listed, chat: current.chat });
+  session.set({ summary: listed, chat: current.chat });
 }
 
 export function useSession(): Session | null {

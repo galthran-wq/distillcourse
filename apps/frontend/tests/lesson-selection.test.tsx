@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from "vitest";
+import { act } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import SelectionReference from "@/components/lessons/SelectionReference";
 import {
   BUTTON_HEIGHT,
   buttonPosition,
   selectedPassage,
   type Passage,
 } from "@/lib/lesson/selection";
+import { mounted } from "./utils/dom";
 
 // A lesson as far as a selection is concerned: prose under two headings, and
 // the surrounding page, which is not the material.
@@ -102,5 +105,86 @@ describe("the button that offers the passage", () => {
 
   it("stays in the viewport when the selection is entirely above it", () => {
     expect(buttonPosition(at(-400, -300)).top).toBe(8);
+  });
+});
+
+const { host, render } = mounted();
+
+function offer(): HTMLButtonElement | null {
+  return host().querySelector("button");
+}
+
+function show(id: string): void {
+  select(id);
+  act(() => document.dispatchEvent(new Event("pointerup")));
+}
+
+describe("the affordance the passage is offered through", () => {
+  beforeEach(() => {
+    act(() => render(<SelectionReference course="info-theory" lesson="entropy" />));
+  });
+
+  it("appears once the gesture that made the selection is over", () => {
+    select("first");
+
+    expect(offer()).toBeNull();
+
+    act(() => document.dispatchEvent(new Event("pointerup")));
+
+    expect(offer()?.textContent).toBe("reference in chat");
+  });
+
+  it("goes away with the selection, without waiting for a press to report it", () => {
+    show("first");
+    // What a click elsewhere does in a browser that collapses the selection
+    // after the pointerup rather than before it: the press is heard while the
+    // passage is still there, so the press alone cannot be what withdraws it.
+    act(() => document.dispatchEvent(new Event("pointerup")));
+    expect(offer()).not.toBeNull();
+
+    act(() => {
+      window.getSelection()?.removeAllRanges();
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    expect(offer()).toBeNull();
+  });
+
+  it("goes away when the selection collapses to a caret", () => {
+    show("first");
+
+    act(() => {
+      window.getSelection()?.collapseToStart();
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    expect(offer()).toBeNull();
+  });
+
+  it("stays while the selection is only redrawn", () => {
+    show("first");
+
+    act(() => {
+      select("second");
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    expect(offer()).not.toBeNull();
+  });
+
+  it("does not read the selected text to decide whether it is still there", () => {
+    show("first");
+    const read = vi.spyOn(Selection.prototype, "toString");
+
+    // A drag fires this on every frame of the gesture, and what it has covered
+    // by then can be a chapter: whether anything is still selected is a
+    // question about the range, not about the text under it.
+    act(() => {
+      select("second");
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
   });
 });

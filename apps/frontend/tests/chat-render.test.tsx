@@ -86,6 +86,40 @@ describe("a rendered reply", () => {
   });
 });
 
+describe("waiting for the tutor", () => {
+  const asked = [turn("user", { type: "text", text: "why is this true?" })];
+  const answering = [
+    ...asked,
+    turn("assistant", { type: "text", text: "Because it is a mean." }),
+  ];
+
+  it("waits with an indicator between the question and the first token", () => {
+    const html = rendered(asked, { status: "submitted" });
+
+    expect(html).toContain("the tutor is answering");
+    // The classes the pacing in globals.css hangs on: without them the dots
+    // are three still circles and nothing says the tutor is working.
+    expect(html).toContain("tutor-dots");
+    expect(html).toContain("tutor-dot ");
+  });
+
+  it("takes it away once the answer is coming", () => {
+    const html = rendered(answering, { status: "streaming" });
+
+    expect(html).toContain("Because it is a mean.");
+    expect(html).not.toContain("the tutor is answering");
+  });
+
+  it("keeps the live region in place, empty, once the answer is in", () => {
+    const html = rendered(answering, { status: "ready" });
+
+    // Mounted in every state on purpose: a screen reader announces mutations
+    // inside a live region that was already there, not one that arrives full.
+    expect(html).toContain('role="status"');
+    expect(html).not.toContain("the tutor is answering");
+  });
+});
+
 const { host, show } = shown();
 
 /** Who spoke, in the order the transcript puts them on screen. */

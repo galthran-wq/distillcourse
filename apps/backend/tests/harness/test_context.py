@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.ingest import ingest
 from app.content.schemas import ContentIndex
-from app.core.config import settings
+from app.core.config import ChatModel, settings
 from app.harness import context, runner
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
@@ -129,10 +129,24 @@ async def test_a_platform_run_bills_the_default_model_whatever_the_chat_uses(
     monkeypatch.setattr(
         runner, "model_for", lambda openrouter_id: asked.append(openrouter_id)
     )
-    other = next(
-        model.openrouter_id
-        for model in settings.CHAT_MODELS
-        if model.openrouter_id != settings.DEFAULT_CHAT_MODEL
+
+    async def no_retitle(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    # Retitling is the platform's own spending too, but it is title.py's story;
+    # this test pins what the RUNS bill.
+    monkeypatch.setattr(runner, "retitle", no_retitle)
+    # The deployed pool may be a single model; billing needs a distinct one.
+    other = "test/other"
+    monkeypatch.setattr(
+        settings,
+        "CHAT_MODELS",
+        [
+            *settings.CHAT_MODELS,
+            ChatModel(
+                openrouter_id=other, display_name="Other", context_window=1_000_000
+            ),
+        ],
     )
     await repo.set_model(chat, other)
 

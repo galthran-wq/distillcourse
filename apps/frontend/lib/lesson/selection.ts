@@ -15,17 +15,29 @@ export interface Passage {
 }
 
 /**
+ * The selection still spans something: a range, and not a bare caret. Says
+ * nothing about the text, deliberately — this is what a `selectionchange` is
+ * answered with, and that fires through every frame of a drag, while
+ * `toString()` walks and serializes every node the range covers.
+ */
+export function selectionSpans(selection: Selection | null): selection is Selection {
+  return selection !== null && selection.rangeCount > 0 && !selection.isCollapsed;
+}
+
+/** …and what it spans is not whitespace alone. */
+function selectionHasText(selection: Selection | null): selection is Selection {
+  return selectionSpans(selection) && selection.toString().trim() !== "";
+}
+
+/**
  * What the reader has selected in the lesson they are on, or nothing. The text
  * is one line: it is quoted into a chat message, where a blank line would end
  * the quote and hand the rest to the tutor as the reader's own words.
  */
 export function selectedPassage(course: string, lesson: string): Passage | null {
   const selection = window.getSelection();
-  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) {
-    return null;
-  }
+  if (!selectionHasText(selection)) return null;
   const text = selection.toString().replace(/\s+/g, " ").trim();
-  if (text === "") return null;
 
   const range = selection.getRangeAt(0);
   const start = range.startContainer;

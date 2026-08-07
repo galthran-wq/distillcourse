@@ -43,6 +43,11 @@ tutor = Agent(
     tools=[Tool(function, sequential=True) for function in _BARRIERS],
 )
 
+# Naming a conversation is not the tutor doing anything, and an agent that
+# could reach a tool is an agent that could act on the learner's data while
+# writing six words. This one has no tools and no deps to reach them with.
+namer = Agent(name="namer")
+
 
 def chat_model(openrouter_id: str) -> ChatModel:
     # A chat outlives the pool it chose from: a model dropped from the config

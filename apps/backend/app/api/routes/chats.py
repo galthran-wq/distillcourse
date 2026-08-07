@@ -27,6 +27,9 @@ class ChatSummary(BaseModel):
     model: str
     title: str | None
     created_at: datetime
+    # When the chat was last written in — null for one nobody has said anything
+    # in yet, which a chat this API has only just created never has.
+    last_message_at: datetime | None = None
 
 
 class NewChat(BaseModel):
@@ -128,7 +131,13 @@ async def models() -> list[ChatModel]:
 
 @router.get("")
 async def index(repo: RepositoryDep) -> list[ChatSummary]:
-    return [ChatSummary.model_validate(chat) for chat in await repo.list_chats()]
+    """The reader's chats, most recently spoken in first — a column of dates
+    that does not descend is one nobody can read down. It is also the order
+    the panel resumes from when the chat it had is gone."""
+    return [
+        ChatSummary.model_validate(chat).model_copy(update={"last_message_at": last})
+        for chat, last in await repo.list_chats()
+    ]
 
 
 @router.post("")

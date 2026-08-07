@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
@@ -17,6 +17,22 @@ Role = Literal["user", "agent", "system"]
 Marker = Literal["clear", "compact"]
 
 TITLE_LENGTH = 60
+
+
+def _cut(title: str) -> str:
+    """A title at its length, cut at a locator boundary.
+
+    A name is the question that started the chat, brackets and all, and the
+    panel's header and the rail read those back as the places they name. One
+    section anchor is longer than the whole allowance, so a plain slice can
+    leave `[[lesson:course/lesson#the-ground-flo` behind — which nothing
+    resolves, and which is then shown raw until the chat is named again.
+    """
+    cut = title[:TITLE_LENGTH]
+    opened = cut.rfind("[[")
+    if opened > cut.rfind("]]"):
+        cut = cut[:opened]
+    return cut.rstrip()
 
 
 def _projection(messages: Sequence[ModelMessage]) -> list[dict[str, Any]]:
@@ -56,14 +72,34 @@ class HarnessRepository:
         )
         return chat
 
-    async def list_chats(self) -> Sequence[Chat]:
-        return (
-            await self.session.scalars(
-                select(Chat)
-                .where(Chat.user_id == self.user_id)
-                .order_by(Chat.created_at.desc())
-            )
-        ).all()
+    async def list_chats(self) -> list[tuple[Chat, datetime | None]]:
+        """Every chat of this learner with the moment it was last written in,
+        most recently used first.
+
+        The date is a maximum over the chat's own messages rather than a column
+        kept on it: the listing is the only reader, and a maximum cannot fall
+        out of step with what it is a maximum of. `ix_messages_chat_id_created_at`
+        is what keeps it off the heap. A chat nobody has spoken in has only its
+        creation to be dated and ordered by.
+
+        The join is inside the subquery as well as outside it: grouped over the
+        whole table, this reads every message on the instance to date one
+        learner's handful of chats.
+        """
+        last = (
+            select(Message.chat_id, func.max(Message.created_at).label("at"))
+            .join(Chat, Chat.id == Message.chat_id)
+            .where(Chat.user_id == self.user_id)
+            .group_by(Message.chat_id)
+            .subquery()
+        )
+        rows = await self.session.execute(
+            select(Chat, last.c.at)
+            .outerjoin(last, last.c.chat_id == Chat.id)
+            .where(Chat.user_id == self.user_id)
+            .order_by(func.coalesce(last.c.at, Chat.created_at).desc())
+        )
+        return list(rows.tuples().all())
 
     async def set_model(self, chat: Chat, model: str) -> None:
         chat.model = model
@@ -139,9 +175,54 @@ class HarnessRepository:
         )
         await self.session.commit()
 
-    async def set_title(self, chat: Chat, title: str) -> None:
-        chat.title = title[:TITLE_LENGTH]
+    async def set_title(self, chat: Chat, title: str | None) -> None:
+        """Name the chat and stamp when it was named. `None` stamps without
+        renaming: a naming pass that came back with nothing has still run, and
+        leaving the stamp where it was makes every following run pay for
+        another one."""
+        if title is not None:
+            chat.title = _cut(title)
+        # What "since the title was set" is counted from, and it is counted
+        # against `Message.created_at` — which the database stamps. Read from
+        # the same clock rather than this process's: skew between the two would
+        # move the rename trigger by however much of it there is.
+        chat.titled_at = await self.session.scalar(select(func.now()))
         await self.session.commit()
+
+    async def set_usage(
+        self, chat: Chat, run_id: uuid.UUID, usage: dict[str, Any]
+    ) -> None:
+        """Rewrite what a run cost, on the row `add_messages` hung it on.
+
+        For a spend that is only known after the turn was stored — the naming
+        pass, which runs once the learner's stream is closed and has no row of
+        its own to be recorded on.
+        """
+        await self.session.execute(
+            update(Message)
+            .where(
+                Message.chat_id == chat.id,
+                Message.run_id == run_id,
+                Message.usage.is_not(None),
+            )
+            .values(usage=usage)
+        )
+        await self.session.commit()
+
+    async def messages_since(self, chat: Chat, moment: datetime) -> int:
+        """How many of a chat's messages were stored after a moment, counted
+        without reading them: the rows carry jsonb, and the caller wants a
+        number."""
+        total = await self.session.scalar(
+            select(func.count())
+            .select_from(Message)
+            .where(
+                Message.chat_id == chat.id,
+                Message.created_at > moment,
+                Message.error.is_(None),
+            )
+        )
+        return int(total or 0)
 
     async def rows(self, chat: Chat) -> Sequence[Message]:
         return (

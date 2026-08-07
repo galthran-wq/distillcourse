@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncGenerator, Generator, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -16,6 +17,7 @@ from app.api.deps import get_current_user, get_session, get_session_factory
 from app.core import rate_limit
 from app.core.config import settings
 from app.core.db import engine
+from app.harness import runner
 from app.harness.agent import tutor
 from app.main import app
 from app.models import TgLink, User
@@ -32,6 +34,19 @@ def replying(text: str = "entropy is what you owe me") -> Iterator[None]:
     # tool tests, and TestModel would otherwise call all of them.
     with tutor.override(model=TestModel(custom_output_text=text), tools=[]):
         yield
+
+
+async def settled(*, raising: bool = True) -> None:
+    """Wait out the runs still in flight.
+
+    A streamed run is a task that outlives the response that started it: its
+    last act — naming the chat — happens once the client's stream has closed.
+    Nothing waits for that in production, where it has a connection of its own;
+    here it writes on the connection the test is about to read on and then roll
+    back. A teardown asks for `raising=False`: a drain that died is the test's
+    story to tell, not the fixture's.
+    """
+    await asyncio.gather(*runner._drains, return_exceptions=not raising)
 
 
 @dataclass(frozen=True)
@@ -106,6 +121,7 @@ async def connection() -> AsyncGenerator[AsyncConnection]:
     async with engine.connect() as connection:
         transaction = await connection.begin()
         yield connection
+        await settled(raising=False)
         await transaction.rollback()
 
 

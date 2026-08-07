@@ -76,9 +76,20 @@
    @layer base: a component that needs its own ring says so with a utility, and
    layer order — not specificity — decides that, so an unlayered rule here would
    beat every utility instead of losing to one. The ring follows whatever
-   border-radius the element already has. */
+   border-radius the element already has.
+
+   The second selector is the one place the ring is not drawn on the element
+   that has the focus: a field that is a box around controls (FIELD_BOX_CLASS)
+   wears it for the control inside, which gives its own up, so the ring lands
+   around the field rather than around a part of it. It is keyed on that
+   control being :focus-visible rather than on :focus-within, so the box is
+   ringed exactly when the control it stands in for would have been — including
+   a pointer press, which a text field matches :focus-visible on. A button such
+   a box may also hold is not that control: it is not named here, and keeps the
+   ring the first selector already gives it. */
 @layer base {
-  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible,
+  :where(.field-box):has(:is(input, textarea):focus-visible) {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
@@ -175,6 +186,21 @@ body {
   font-size: 0.88rem;
   line-height: 1.6;
   border: 1px solid var(--line);
+  background: var(--panel);
+}
+/* Shiki emits both palettes on every token (--shiki-light/--shiki-dark);
+   the pick follows the same three states the whole theme does: explicit
+   data-theme wins, otherwise the system preference. */
+.prose-lesson pre code span[style*="--shiki-"] {
+  color: var(--shiki-light);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .prose-lesson pre code span[style*="--shiki-"] {
+    color: var(--shiki-dark);
+  }
+}
+:root[data-theme="dark"] .prose-lesson pre code span[style*="--shiki-"] {
+  color: var(--shiki-dark);
 }
 .prose-lesson .katex-display {
   margin: 1.5em 0;
@@ -712,6 +738,30 @@ html {
   height: auto;
 }
 
+/* Where a window has room for it, the docked box is the reader's own: the four
+   lengths are the box they dragged the panel to, written out by
+   `lib/chat/panel-box`, which mirrors this query. The fallbacks are the same
+   four numbers as `lib/chat/stored`'s PANEL_MARGIN / LAUNCHER_CLEARANCE /
+   MIN_WIDTH / MIN_HEIGHT — 24px, 80px, 384px, 512px — which is where they are
+   declared, and which is the copy to change with this one. Under the
+   breakpoint there is nowhere to drag it to, and the base rule stands. */
+@media (min-width: 40rem) {
+  .chat-panel[data-shape="docked"] {
+    right: var(--panel-right, 1.5rem);
+    bottom: var(--panel-bottom, 5rem);
+    width: var(--panel-width, 24rem);
+    height: var(--panel-height, 32rem);
+  }
+}
+
+/* Being dragged: the box has to land under the pointer rather than one
+   motion-base behind it, and the header it is held by is not text being
+   selected. */
+.chat-panel.is-dragging {
+  transition-property: opacity, transform;
+  user-select: none;
+}
+
 /* Over the page, all but its margin; on a phone there is no margin to leave. */
 .chat-panel[data-shape="expanded"] {
   right: 0;
@@ -771,10 +821,16 @@ html {
   padding-left: 1.3em;
   list-style: revert;
 }
-.chat-prose a {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+/* In @layer base for the reason the focus ring is: a reference the reader
+   wrote is drawn as a chip in the middle of the sentence, and a chip says what
+   it looks like with CHIP_CLASS's utilities. Layer order — not specificity —
+   is what lets those win, so an unlayered rule here would beat them. */
+@layer base {
+  .chat-prose a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 .chat-prose code {
   font-family: var(--font-plex-mono), monospace;
@@ -814,6 +870,36 @@ html {
   font-size: 0.85em;
   font-style: normal;
   color: var(--faint);
+}
+
+/* ---------- waiting for the tutor ----------
+   Three dots where a reply is about to be written, and the single dot on a
+   tool chip while the tool is out — the same wait, so the same pacing. The
+   dots themselves are spans the components draw; only the pacing is here,
+   because a stagger is delays on siblings and there is no utility for that. It
+   is built out of the two motion tokens rather than out of numbers of its own:
+   an idle loop, unlike an entrance, has to be slower than a single
+   --motion-base to read as breathing rather than as a strobe, so it is a
+   multiple of one. The blanket reduced-motion rule at the foot of this file is
+   what turns it off, and leaves the dots still.
+
+   The loop is on the dot and the stagger on the row, so one dot is a dot: a
+   consumer with a single one needs no row around it to be paced. */
+.tutor-dot {
+  animation: tutor-dot calc(var(--motion-base) * 4) ease-in-out infinite;
+}
+.tutor-dots > .tutor-dot:nth-child(2) {
+  animation-delay: var(--motion-fast);
+}
+.tutor-dots > .tutor-dot:nth-child(3) {
+  animation-delay: calc(var(--motion-fast) * 2);
+}
+/* Only the middle of the cycle is stated: the ends are the dot's own style, so
+   an animation cut to nothing leaves it there, lit, rather than mid-fade. */
+@keyframes tutor-dot {
+  50% {
+    opacity: 0.3;
+  }
 }
 
 /* Where a reference landed the reader, marked until they have seen it. */

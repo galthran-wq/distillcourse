@@ -53,20 +53,13 @@ class Settings(BaseSettings):
     LOGFIRE_TOKEN: str | None = None
 
     OPENROUTER_API_KEY: str | None = None
+    # Kimi alone: the deploy's egress reaches OpenRouter through a proxy whose
+    # exit IP Anthropic and Google refuse by their provider ToS, so offering
+    # those models would only sell dead options in the picker.
     CHAT_MODELS: list[ChatModel] = [
         ChatModel(
             openrouter_id="moonshotai/kimi-k3",
             display_name="Kimi K3",
-            context_window=1_048_576,
-        ),
-        ChatModel(
-            openrouter_id="anthropic/claude-opus-5",
-            display_name="Claude Opus 5",
-            context_window=1_000_000,
-        ),
-        ChatModel(
-            openrouter_id="google/gemini-3.6-flash",
-            display_name="Gemini 3.6 Flash",
             context_window=1_048_576,
         ),
     ]
@@ -97,6 +90,10 @@ class Settings(BaseSettings):
     MEMORY_WRITES_PER_RUN: int = 5
     MEMORY_INDEX_SOFT_CAP: int = 40
     COMPACT_AT_TOKENS: int = 200_000
+    # How much conversation has to pile up after a chat was named before the
+    # platform names it again. How much of it the naming pass then reads is
+    # `harness/title.TITLE_WINDOW`, not this.
+    TITLE_REFRESH_MESSAGES: int = 8
     # Headroom for the next turn's system prompt, tools and reply.
     CONTEXT_RESERVE_TOKENS: int = 32_000
 

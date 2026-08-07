@@ -7,6 +7,8 @@ export interface ChatSummary {
   model: string;
   title: string | null;
   created_at: string;
+  /** When the chat was last written in; null for one nobody has spoken in. */
+  last_message_at: string | null;
 }
 
 export interface ChatModel {
@@ -16,8 +18,9 @@ export interface ChatModel {
 }
 
 /**
- * The reader's chats with the site, newest first. Telegram threads are left
- * out: the widget cannot render an eternal thread it does not own.
+ * The reader's chats with the site, most recently spoken in first. Telegram
+ * threads are left out: the widget cannot render an eternal thread it does not
+ * own.
  */
 export async function webChats(): Promise<ChatSummary[]> {
   const chats = await call<ChatSummary[]>("/chats");

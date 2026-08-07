@@ -1,6 +1,8 @@
 import json
 import uuid
+from datetime import UTC, datetime
 
+import pytest
 from httpx import AsyncClient
 from pydantic_ai.messages import ModelRequest, UserPromptPart
 from pydantic_ai.models.test import TestModel
@@ -8,11 +10,12 @@ from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.chats import _current_locator
-from app.core.config import settings
+from app.core.config import ChatModel, settings
 from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import User
+from tests.conftest import settled
 from tests.harness.conftest import compacting
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
@@ -57,8 +60,21 @@ async def test_an_anonymous_visitor_gets_nothing(client: AsyncClient) -> None:
 
 
 async def test_a_chat_is_created_listed_and_switched_to_another_model(
-    signed_in: AsyncClient,
+    signed_in: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # The deployed pool may be a single model; switching needs a second one.
+    monkeypatch.setattr(
+        settings,
+        "CHAT_MODELS",
+        [
+            *settings.CHAT_MODELS,
+            ChatModel(
+                openrouter_id="test/other",
+                display_name="Other",
+                context_window=1_000_000,
+            ),
+        ],
+    )
     created = (await signed_in.post("/api/v1/chats", json={"kind": "web"})).json()
     other = [
         model["openrouter_id"]
@@ -74,6 +90,46 @@ async def test_a_chat_is_created_listed_and_switched_to_another_model(
     assert created["model"] == settings.DEFAULT_CHAT_MODEL
     assert switched.json()["model"] == other
     assert [chat["id"] for chat in listed] == [created["id"]]
+
+
+async def test_the_listing_dates_a_chat_by_its_last_message(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """What the rail shows beside each row. A chat nobody has said anything in
+    is dated by nothing, not by the moment it was opened."""
+    repo = HarnessRepository(session, user.id)
+    spoken_in = await repo.create_chat(kind="web")
+    await repo.add_messages(spoken_in, [QUESTION], role="user")
+    empty = await repo.create_chat(kind="web")
+
+    listed = {
+        chat["id"]: chat["last_message_at"]
+        for chat in (await signed_in.get("/api/v1/chats")).json()
+    }
+
+    stored = (await repo.rows(spoken_in))[-1].created_at
+    assert datetime.fromisoformat(listed[str(spoken_in.id)]) == stored
+    assert listed[str(empty.id)] is None
+
+
+async def test_the_listing_puts_the_most_recently_used_chat_first(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """The rail dates its rows, so the rows have to descend by that date: a
+    chat opened first and used a minute ago belongs above one opened after it
+    and abandoned. A chat nobody has spoken in is placed by its creation."""
+    repo = HarnessRepository(session, user.id)
+    older = await repo.create_chat(kind="web")
+    empty = await repo.create_chat(kind="web")
+    await repo.add_messages(older, [QUESTION], role="user")
+    # One transaction wraps the suite and `now()` is its start, so every row it
+    # writes carries the same stamp: the message is dated apart by hand.
+    (await repo.rows(older))[-1].created_at = datetime(2030, 1, 1, tzinfo=UTC)
+    await session.commit()
+
+    listed = [chat["id"] for chat in (await signed_in.get("/api/v1/chats")).json()]
+
+    assert listed == [str(older.id), str(empty.id)]
 
 
 async def test_an_unknown_model_is_refused(signed_in: AsyncClient) -> None:
@@ -109,6 +165,7 @@ async def test_the_stream_answers_and_leaves_the_conversation_readable(
             f"/api/v1/chats/{chat.id}/stream",
             json=submission(chat.id, "lesson:information-theory/entropy"),
         )
+        await settled()
 
     messages = (await signed_in.get(f"/api/v1/chats/{chat.id}/messages")).json()
     assert response.status_code == 200
@@ -240,6 +297,7 @@ async def test_a_referenced_passage_reaches_the_model_fenced_as_untrusted(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert '<untrusted source="learner-quote">' in asked
@@ -271,6 +329,7 @@ async def test_every_referenced_passage_is_fenced_in_a_block_of_its_own(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert asked.count('<untrusted source="learner-quote">') == 2
@@ -300,6 +359,7 @@ async def test_a_quote_that_is_not_a_locator_is_dropped(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert asked.count('<untrusted source="learner-quote">') == 1
@@ -326,11 +386,37 @@ async def test_more_passages_than_the_cap_keeps_the_newest(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert asked.count('<untrusted source="learner-quote">') == prompts.QUOTE_COUNT
     assert "passage 19" in asked
     assert "passage 11" not in asked
+
+
+async def test_a_chat_is_named_after_the_question_and_not_the_passage(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """The fence goes into the same part as the question, above it. A name read
+    off the stored message would be the block — `<untrusted source=…` and the
+    opening of a passage the learner only pointed at."""
+    repo = HarnessRepository(session, user.id)
+    chat = await repo.create_chat(kind="web")
+    body = submission(chat.id) | {
+        "quotes": [
+            {
+                "text": "entropy is the average surprisal",
+                "locator": "lesson:information-theory/entropy#average",
+            }
+        ]
+    }
+
+    with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
+        await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
+
+    await session.refresh(chat)
+    assert chat.title == "what is entropy?"
 
 
 async def test_a_question_with_no_passages_carries_no_fence(
@@ -343,5 +429,6 @@ async def test_a_question_with_no_passages_carries_no_fence(
         await signed_in.post(
             f"/api/v1/chats/{chat.id}/stream", json=submission(chat.id) | {"quotes": []}
         )
+        await settled()
 
     assert "untrusted" not in str((await repo.rows(chat))[0].pydantic_ai)

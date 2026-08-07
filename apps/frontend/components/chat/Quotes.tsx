@@ -9,13 +9,22 @@ import { linkTo } from "@/lib/chat/references";
 import { useLessons } from "@/lib/content/links";
 import { useDismiss } from "@/lib/ui/dismiss";
 
-// The chip's own geometry, on top of the look every chip on the site shares.
-const CHIP = `${CHIP_CLASS} min-w-0 gap-1.5 py-1 pr-1.5 pl-2 text-left`;
+/**
+ * A chip in such a row, on top of the look every chip on the site shares. Both
+ * rows take it — the passages here and the places the message points at
+ * (`components/chat/Mentions`), which sit directly above them in the composer
+ * and would read as a second kind of chip if either restyled on its own.
+ */
+export const ROW_CHIP_CLASS = `${CHIP_CLASS} flex min-w-0 gap-1.5 py-1 pr-1.5 pl-2 text-left`;
 
-// A cap rather than a size, and it belongs to whatever the row holds: a short
-// passage takes what it needs, a long one is cut off at the point where a row
-// of them stops being scannable.
-const WIDTH = "max-w-64";
+/**
+ * A cap rather than a size, and it belongs to whatever the row holds: a short
+ * passage takes what it needs, a long one is cut off at the point where a row
+ * of them stops being scannable. Kept off the class above because the chip
+ * that can be taken off again puts it on the pair of buttons rather than on
+ * each of them.
+ */
+export const ROW_CHIP_WIDTH = "max-w-64";
 
 // How much of a passage a label reads out. The whole of one is a paragraph,
 // and a paragraph is not a control's name.
@@ -26,11 +35,16 @@ function opening(text: string): string {
 }
 
 /**
- * The row a message's passages sit in, above the question in the composer and
- * above it again in the bubble it was sent as — the same row in both places,
- * so a reference does not move when the message goes. It is also what a
- * preview opens against: a chip that wrapped onto a second row would otherwise
- * open its own preview off the side of a panel that cannot scroll to it.
+ * The row a message's chips sit in. The passages it quotes take this row above
+ * the question in the composer and this row again above the bubble it was sent
+ * as, so a passage does not move when the message goes; the places it points
+ * at (`components/chat/Mentions`) take a row of their own in the composer only
+ * — once sent they are inline in the prose, because that is where they were
+ * written.
+ *
+ * It is also what a preview opens against: a chip that wrapped onto a second
+ * row would otherwise open its own preview off the side of a panel that cannot
+ * scroll to it.
  */
 export function QuoteRow({ children }: { children: ReactNode }) {
   return <div className="relative mb-2 flex flex-wrap gap-1.5">{children}</div>;
@@ -62,12 +76,13 @@ function Label({ quote, title }: { quote: Quote; title?: string }) {
 export function SentQuote({ quote }: { quote: Quote }) {
   const target = linkTo(quote.locator, useLessons());
   const label = <Label quote={quote} title={target?.text} />;
+  const chip = `${ROW_CHIP_CLASS} ${ROW_CHIP_WIDTH}`;
 
   // A lesson the site no longer renders — a chat older than the course, a
   // lesson withdrawn since — leaves the passage readable with nothing to click.
-  if (target === null) return <span className={`${CHIP} ${WIDTH}`}>{label}</span>;
+  if (target === null) return <span className={chip}>{label}</span>;
   return (
-    <RevealLink href={target.url} className={`${CHIP} ${WIDTH}`} title={quote.text}>
+    <RevealLink href={target.url} className={chip} title={quote.text}>
       {label}
     </RevealLink>
   );
@@ -86,12 +101,12 @@ export function PendingQuote({ quote }: { quote: Quote }) {
   useDismiss(open, root, setOpen);
 
   return (
-    <div ref={root} className={`flex min-w-0 ${WIDTH}`}>
+    <div ref={root} className={`flex min-w-0 ${ROW_CHIP_WIDTH}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className={`${CHIP} flex-1 rounded-r-none border-r-0`}
+        className={`${ROW_CHIP_CLASS} flex-1 rounded-r-none border-r-0`}
       >
         <Label quote={quote} title={target?.text} />
       </button>
@@ -101,7 +116,7 @@ export function PendingQuote({ quote }: { quote: Quote }) {
         aria-label={`Drop the passage “${opening(quote.text)}”`}
         // Named per side: the chip's padding is uneven, and its `pl-2` is the
         // later rule of the two, so a shorthand here would lose the left of it.
-        className={`${CHIP} shrink-0 rounded-l-none pr-1.5 pl-1.5`}
+        className={`${ROW_CHIP_CLASS} shrink-0 rounded-l-none pr-1.5 pl-1.5`}
       >
         <CloseIcon className="size-3" />
       </button>

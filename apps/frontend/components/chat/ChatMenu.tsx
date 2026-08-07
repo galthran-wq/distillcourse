@@ -1,7 +1,6 @@
 "use client";
 
 import ChatList from "@/components/chat/ChatList";
-import { COMMANDS } from "@/lib/chat/commands";
 import type { ChatModel, ChatSummary } from "@/lib/chat/api";
 import { LABEL_CLASS, MENU_CLASS, MENU_ITEM_CLASS } from "@/components/ui/styles";
 
@@ -11,13 +10,15 @@ interface Props {
   models: ChatModel[];
   /** The panel is over the page, where the rail lists the chats beside it. */
   expanded: boolean;
-  onNew: () => void;
-  onCompact: () => void;
   onSelect: (chat: ChatSummary) => void;
   onModel: (model: string) => void;
 }
 
-const HEADING = `px-2.5 pt-3 pb-1 ${LABEL_CLASS}`;
+// The commands are not here: the composer's palette is where they are run
+// from. The gap above a heading is what separates its group from the group
+// above it, so it belongs to the use rather than to the constant: the first
+// heading in the menu has nothing above it and keeps the menu's own padding.
+const HEADING = `px-2.5 pb-1 ${LABEL_CLASS}`;
 const ITEM = `${MENU_ITEM_CLASS} truncate`;
 
 export default function ChatMenu({
@@ -25,21 +26,12 @@ export default function ChatMenu({
   chats,
   models,
   expanded,
-  onNew,
-  onCompact,
   onSelect,
   onModel,
 }: Props) {
   return (
     <div className={`${MENU_CLASS} max-h-96 w-64 overflow-y-auto`}>
-      <button type="button" className={`${ITEM} text-soft`} onClick={onNew}>
-        /clear — {COMMANDS.clear}
-      </button>
-      <button type="button" className={`${ITEM} text-soft`} onClick={onCompact}>
-        /compact — {COMMANDS.compact}
-      </button>
-
-      <p className={HEADING}>Model</p>
+      <p className={`${HEADING} pt-1.5`}>Model</p>
       {models.map((model) => (
         <button
           key={model.openrouter_id}
@@ -53,7 +45,7 @@ export default function ChatMenu({
 
       {/* Only where the rail is not: it appears at the same width the rail does. */}
       <div className={expanded ? "lg:hidden" : ""}>
-        <p className={HEADING}>Chats</p>
+        <p className={`${HEADING} pt-3`}>Chats</p>
         <ChatList
           chats={chats}
           current={current.id}
