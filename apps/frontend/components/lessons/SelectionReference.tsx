@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { setQuote } from "@/lib/chat/quote";
+import { CHIP_CLASS } from "@/components/ui/styles";
+import { addQuote } from "@/lib/chat/quote";
 import { openPanel } from "@/lib/chat/stored";
 import {
   BUTTON_HEIGHT,
@@ -39,7 +40,9 @@ export default function SelectionReference({
       // before the click it was pressed for is delivered.
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => {
-        setQuote({ text: passage.text, locator: passage.locator });
+        // Added, not set: a question can be about two passages, and the second
+        // selection is a second reference rather than a correction of the first.
+        addQuote({ text: passage.text, locator: passage.locator });
         // Quoting a passage is asking about it: the question is written in the
         // panel, so it comes up with the quote already in the composer.
         openPanel();
@@ -47,9 +50,9 @@ export default function SelectionReference({
         window.getSelection()?.removeAllRanges();
       }}
       style={{ ...buttonPosition(passage), height: BUTTON_HEIGHT }}
-      // Its own control — a chip that appears at the selection — but it hovers
-      // the way every outlined control on the site hovers.
-      className="fixed z-40 flex -translate-x-1/2 items-center rounded-sm border border-line bg-paper px-2.5 text-[12px] text-soft shadow-card transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink"
+      // A chip, floating at the selection rather than sitting in a row — so it
+      // brings its own placement and the shadow that lifts it off the prose.
+      className={`${CHIP_CLASS} fixed z-40 -translate-x-1/2 px-2.5 shadow-card`}
     >
       reference in chat
     </button>

@@ -8,10 +8,11 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { CloseIcon, SendIcon } from "@/components/chat/icons";
+import { SendIcon } from "@/components/chat/icons";
+import { PendingQuote, QuoteRow } from "@/components/chat/QuoteChip";
 import { Button } from "@/components/ui";
 import { FIELD_CLASS } from "@/components/ui/styles";
-import { dropQuote, useQuote } from "@/lib/chat/quote";
+import { useQuotes } from "@/lib/chat/quote";
 import { setDraft, useDraft } from "@/lib/chat/stored";
 
 interface Props {
@@ -23,7 +24,7 @@ interface Props {
 export default function Composer({ disabled, onSubmit }: Props) {
   // Outside the component, so that an unsent message survives a reload.
   const text = useDraft();
-  const quote = useQuote();
+  const quotes = useQuotes();
   const field = useRef<HTMLTextAreaElement>(null);
   const ready = !disabled && text.trim() !== "";
 
@@ -78,21 +79,14 @@ export default function Composer({ disabled, onSubmit }: Props) {
     <form onSubmit={submit} className="border-t border-line p-3">
       {/* The column the transcript above it is set in. */}
       <div className="mx-auto max-w-2xl">
-        {quote !== null && (
-          <div className="mb-2 flex items-start gap-2 rounded-sm border border-line border-l-2 border-l-accent bg-panel py-1.5 pr-1 pl-2.5">
-            <p className="line-clamp-2 flex-1 pt-1.5 text-[13px] text-soft">
-              {quote.text}
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={dropQuote}
-              aria-label="Drop the quoted passage"
-              className="shrink-0"
-            >
-              <CloseIcon className="size-3.5" />
-            </Button>
-          </div>
+        {quotes.length > 0 && (
+          <QuoteRow>
+            {quotes.map((quote) => (
+              // By value: two chips are two different passages — the store
+              // admits no duplicate — and nothing is inserted between them.
+              <PendingQuote key={`${quote.locator}\n${quote.text}`} quote={quote} />
+            ))}
+          </QuoteRow>
         )}
         <div className="relative">
           <textarea

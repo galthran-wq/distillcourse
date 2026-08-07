@@ -30,17 +30,34 @@ export const FIELD_LABEL_CLASS = "mb-1 block text-soft";
 export const LABEL_CLASS = "font-mono text-[11px] uppercase tracking-wider text-faint";
 
 /**
- * A panel hung under its trigger — the account menu, the chat menu. The caller
- * adds its own width and, where the list can run long, its own scrolling. It
- * opens out of the corner it hangs from; closing it is instant, since a menu
- * that lingers is a menu still in the way of what was chosen.
+ * The surface anything that opens over the page is drawn on — a menu, the
+ * preview of a referenced passage. It opens out of the corner it hangs from,
+ * which is the caller's to name along with where it hangs; closing it is
+ * instant, since something that lingers is still in the way of what was
+ * chosen.
  */
-export const MENU_CLASS =
-  "absolute right-0 top-full z-50 mt-1.5 origin-top-right rounded-md border border-line bg-panel p-1.5 shadow-popover transition-[opacity,scale] duration-(--motion-fast) starting:scale-95 starting:opacity-0";
+export const POPOVER_CLASS =
+  "absolute z-50 rounded-md border border-line bg-panel shadow-popover transition-[opacity,scale] duration-(--motion-fast) starting:scale-95 starting:opacity-0";
+
+/**
+ * A panel hung under its trigger — the account menu, the chat menu. The caller
+ * adds its own width and, where the list can run long, its own scrolling.
+ */
+export const MENU_CLASS = `${POPOVER_CLASS} right-0 top-full mt-1.5 origin-top-right p-1.5`;
 
 /** One row of such a panel, whether that row is a link or a button. */
 export const MENU_ITEM_CLASS =
   "block w-full rounded-sm px-2.5 py-2 text-left text-[13px] transition-colors duration-(--motion-fast) hover:bg-line/60";
+
+/**
+ * A chip: a small outlined control that names a thing rather than performing
+ * an action — the passage a selection offers to the tutor, and the same
+ * passage again beside the message it was sent with. Not a Button, and it
+ * says so here rather than in each place one is drawn. Geometry is the
+ * caller's: one floats at the selection, the others sit in a row.
+ */
+export const CHIP_CLASS =
+  "flex items-center rounded-sm border border-line bg-paper text-[12px] text-soft transition-colors duration-(--motion-fast) hover:border-faint hover:bg-panel hover:text-ink";
 
 export type ButtonVariant = "solid" | "outline" | "ghost";
 /**

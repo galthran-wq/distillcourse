@@ -63,14 +63,8 @@ def _current_locator(run_input: RequestData) -> str | None:
     return lesson if locators.LESSON.fullmatch(lesson) else None
 
 
-def _quote(run_input: RequestData) -> str | None:
-    """The passage the reader referenced, fenced before it is stored.
-
-    Sent as a field of its own rather than pasted into the message by the
-    client: the provenance marker `base.md` promises around quoted material is
-    written here, where the client cannot leave it off or close it early.
-    """
-    quote = (run_input.model_extra or {}).get("quote")
+def _passage(quote: object) -> tuple[str, str] | None:
+    """One entry of that field, or nothing if it is not a passage of a lesson."""
     if not isinstance(quote, dict):
         return None
     text, locator = quote.get("text"), quote.get("locator")
@@ -78,7 +72,23 @@ def _quote(run_input: RequestData) -> str | None:
         return None
     if not locators.LESSON_SECTION.fullmatch(locator):
         return None
-    return prompts.learner_quote(text, locator)
+    return text, locator
+
+
+def _quotes(run_input: RequestData) -> str | None:
+    """The passages the reader referenced, each fenced before it is stored.
+
+    Sent as a field of their own rather than pasted into the message by the
+    client: the provenance marker `base.md` promises around quoted material is
+    written here, where the client cannot leave it off or close it early. One
+    unusable entry drops itself and not the rest — the others are still
+    passages the question is about.
+    """
+    quotes = (run_input.model_extra or {}).get("quotes")
+    if not isinstance(quotes, list):
+        return None
+    passages = [found for quote in quotes if (found := _passage(quote)) is not None]
+    return prompts.learner_quotes(passages)
 
 
 async def _owned_chat(repo: HarnessRepository, chat_id: uuid.UUID) -> Chat:
@@ -176,7 +186,7 @@ async def stream(
             chat=chat,
             adapter=adapter,
             current_locator=_current_locator(adapter.run_input),
-            quote=_quote(adapter.run_input),
+            quotes=_quotes(adapter.run_input),
         )
     except LimitExceeded as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))

@@ -445,7 +445,7 @@ async def start_stream(
     chat: Chat,
     adapter: VercelAIAdapter[HarnessDeps, str],
     current_locator: str | None = None,
-    quote: str | None = None,
+    quotes: str | None = None,
 ) -> AsyncGenerator[BaseChunk]:
     """Start the run and hand back the client's view of it.
 
@@ -460,8 +460,8 @@ async def start_stream(
     # message just submitted is taken from the request.
     adapter.run_input.messages = adapter.run_input.messages[-1:]
     user_messages = adapter.sanitize_messages(adapter.messages)
-    if quote is not None:
-        _prefix(user_messages, quote)
+    if quotes is not None:
+        _prefix(user_messages, quotes)
     history = await _open_run(repo, chat, run_id, user_messages, "web", "user")
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
     task = asyncio.create_task(
