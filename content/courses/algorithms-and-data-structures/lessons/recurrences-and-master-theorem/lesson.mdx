@@ -1,0 +1,843 @@
+A divide-and-conquer algorithm's running time satisfies a recurrence — T(n)
+written in terms of T applied to smaller inputs — and solving that
+recurrence, not tracing the recursion by hand, is how its asymptotic running
+time is found. <Ref lesson="asymptotic-notation">The first lesson</Ref>
+fixed what a running time is (a word-RAM step count, compressed by $O$,
+$\Omega$, $\Theta$ to a growth rate), and every count so far came from
+loops, where per-line costs multiply by iteration counts.
+<Ref lesson="loop-invariants-and-correctness">The previous lesson</Ref>
+added the correctness tool and ended at the toolkit's gap: a recursive
+algorithm's cost statement is an equation in $T(n)$, not a product, because
+the cost of a call includes the cost of further calls. This lesson supplies
+the solving technique and completes the module. The route: read the
+recurrence off merge sort's code, solve it with a recursion tree, classify
+every such tree by the shape of its level sums, state that classification
+as the Master theorem, certify guesses by induction, and solve the
+recurrences the theorem does not cover.
+
+## From code to equation: reading the recurrence off merge sort
+
+The specimen is *merge sort*: the algorithm whose $50\,n \lg n$
+instruction count beat a thousandfold-faster machine running a $2n^2$ sort
+in <Ref lesson="asymptotic-notation">the first lesson</Ref>. That
+comparison took the $n \lg n$ count on faith; this lesson is where it
+comes from. The algorithm sorts by recursion:
+
+```text
+MergeSort(A[1..n]):
+  if n ≤ 1  return              ▷ Θ(1)
+  m ← ⌊n/2⌋                     ▷ Θ(1)
+  MergeSort(A[1..m])            ▷ T(⌊n/2⌋)
+  MergeSort(A[m+1..n])          ▷ T(⌈n/2⌉)
+  Merge(A[1..m], A[m+1..n])     ▷ Θ(n)
+```
+
+`Merge` combines two sorted halves into one sorted array by repeatedly
+moving the smaller of the two front elements into place: at most $n$
+moves and $n - 1$ comparisons, so $\Theta(n)$. The procedure itself, with
+its loop invariant, arrives in
+<Ref lesson="comparison-sorting-merge-and-quicksort">the sorting
+lesson</Ref>; here it is an $\Theta(n)$ combine step, and that is all the
+analysis needs.
+
+### Two kinds of cost
+
+The pseudocode's costs split in two. The two recursive calls are
+not steps of this call: each is a whole subproblem of half the size,
+priced by the same function $T$ being defined. Everything else (the
+test, the split, the merge) is work this call performs itself,
+$\Theta(n)$ in total. Adding the two kinds:
+
+$$
+T(n) = T(\lceil n/2 \rceil) + T(\lfloor n/2 \rfloor) + \Theta(n)
+\quad \text{for } n \ge 2, \qquad T(1) = \Theta(1).
+$$
+
+<Definition title="divide-and-conquer recurrence">
+A **recurrence** is an equation that defines $T(n)$ in terms of $T$ on
+smaller arguments, together with a base case. The divide-and-conquer form
+is
+$$
+T(n) = a\,T(n/b) + f(n),
+$$
+where the constant $a \ge 1$ counts the recursive calls, the constant
+$b > 1$ is the factor by which the input shrinks, and the **driving
+function** $f(n)$ is the cost of one call's own body: everything except
+the recursive calls.
+</Definition>
+
+### What the form covers
+
+Merge sort is the canonical instance: $a = 2$, $b = 2$, $f(n) =
+\Theta(n)$. The form also covers recursion with a single call: the
+halving loop proved correct at the end of
+<Ref lesson="loop-invariants-and-correctness">the previous lesson</Ref>
+does $\Theta(1)$ work (one comparison of the middle element) and then
+continues on half the range, which read recursively is $T(n) = T(n/2) +
+\Theta(1)$ with $a = 1$, $b = 2$. Two near-misses mark the definition's
+boundary, each violating one clause: $T(n) = T(n-1) + \Theta(n)$ shrinks
+by subtraction, not by a factor ($b > 1$ fails), and $T(n) = T(n/3) +
+T(2n/3) + \Theta(n)$ makes two calls whose sizes differ (no single
+$b$). Both are genuine running-time recurrences (the last section of
+this lesson solves them), but the machinery built for the
+$a\,T(n/b) + f(n)$ form will not apply.
+
+<Remark title="two standing conventions (CLRS §2.3, Erickson §1.7)">
+First: base cases are omitted from here on. Below any constant threshold
+$T(n) = \Theta(1)$ (a real program on a constant-size input takes
+constant time), and the choice of threshold never affects the growth
+rate. Second: floors and ceilings are dropped, so merge sort's recurrence
+is written $T(n) = 2T(n/2) + \Theta(n)$. This is legitimate, not sloppy:
+a change of variable (Erickson's *domain transformation*) converts any
+solution of the clean recurrence into one for the floored version at the
+cost of a constant, and this course asserts that fact once here rather
+than reproving it per recurrence. The $\Theta(n)$ inside the equation is
+the anonymous-function usage from
+<Ref lesson="asymptotic-notation">the first lesson</Ref>: some function
+of class $\Theta(n)$, details deliberately forgotten.
+</Remark>
+
+An equation that defines $T$ in terms of $T$ cannot be read off like a
+formula; something must remove the self-reference. Plugging in a specific
+size (computing $T(1000)$ by working down to the base case) yields one
+number, and a growth rate is a claim about all $n$ at once, the same
+obstacle that made <Ref lesson="loop-invariants-and-correctness">an
+unbounded loop</Ref> unprovable by finite case-checking. The finite
+handle this time is a picture.
+
+## The recursion tree: total work, summed level by level
+
+A *recursion tree* has one node for every subproblem the recursion ever
+creates. The value written at a node is the work its call does itself:
+the driving-function part only, since the recursive part is what the
+children are for. $T(n)$ is then the sum of all node values, and the sum
+is organized by summing each level and adding the level totals.
+
+<FigureSequence
+  name="msort-tree"
+  alt="Four frames building merge sort's recursion tree: the root with cn work, two children of cn/2 each, the full tree down to n leaves of cost c, and the level totals of cn each summed to cn(lg n + 1)"
+  caption="Merge sort's recursion tree. Doubling node counts and halving node costs cancel: every level totals cn."
+/>
+
+<Task>
+Step through the four frames. Before frame 3, compute the total for the
+level of four $cn/4$ nodes; before frame 4, compute the leaf level's
+total from the $n$ leaves alone. Both land on $cn$.
+</Task>
+
+<Example title="solving merge sort's recurrence by recursion tree">
+Solve $T(n) = 2T(n/2) + cn$, writing $c$ for the constant the $\Theta(n)$
+hides and taking $n$ a power of $2$ so the picture is exact.
+
+**Level totals.** Depth $i$ holds $2^i$ nodes, one per subproblem of size
+$n/2^i$, each doing $c \cdot n/2^i$ work: the level totals
+$2^i \cdot cn/2^i = cn$. The doubling of node counts and the halving of
+node costs cancel exactly, at every depth.
+
+**Number of levels.** The subproblem size at depth $i$ is $n/2^i$, which
+reaches the base-case size $1$ at $i = \lg n$ (the halving count from
+<Ref lesson="asymptotic-notation">the first lesson</Ref>, with $\lg$
+denoting $\log_2$). So the tree has internal levels at depths $0$ through
+$\lg n - 1$, plus a leaf level of $n$ base cases costing $c$ each.
+
+**Sum.** $\lg n$ internal levels of $cn$, plus $cn$ at the leaves:
+$$
+T(n) = cn \lg n + cn = \Theta(n \lg n).
+$$
+
+**Check at $n = 8$**, against the recurrence directly with $T(1) = c$:
+$T(2) = 2c + 2c = 4c$, $T(4) = 8c + 4c = 12c$, $T(8) = 24c + 8c = 32c$;
+and the formula gives $c \cdot 8 \cdot 3 + 8c = 32c$. Exact agreement,
+not just asymptotic.
+</Example>
+
+This settles the module's opening debt: merge sort costs
+$\Theta(n \lg n)$ on any machine, and the $50\,n\lg n$ figure of the
+first lesson was this solution with one machine's constant filled in.
+
+### The general tree: aᵗʰ powers against bᵗʰ shrinkage
+
+The same drawing works for any $T(n) = a\,T(n/b) + f(n)$, and only two
+quantities change. Depth $i$ holds $a^i$ nodes of size $n/b^i$, so its
+total is $a^i f(n/b^i)$; and sizes reach the base case at depth
+$\log_b n$.
+
+<Figure
+  src="./figures/leaves-count.svg"
+  alt="A branching diagram with 1, then a, then a-squared nodes per level, ending at a to the power log-b of n leaves, which equals n to the power log-b of a"
+  caption="Node counts multiply by a per level for log_b n levels; the leaf count is a^(log_b n) = n^(log_b a)."
+/>
+
+The leaf level holds
+$a^{\log_b n}$ nodes, and the exponent identity $a^{\log_b n} =
+n^{\log_b a}$ (take $\log_b$ of both sides: each is $\log_b a \cdot
+\log_b n$) rewrites that count as a power of $n$. For merge sort,
+$n^{\log_2 2} = n$ leaves; for $a = 4$, $b = 2$, already $n^{\log_2 4} =
+n^2$ of them.
+
+<KeyFact>
+The tree for $T(n) = a\,T(n/b) + f(n)$ has $n^{\log_b a}$ leaves, and
+this single quantity, not $a$ or $b$ separately, is what the driving
+function will be measured against. Since each leaf costs $\Theta(1)$, no
+divide-and-conquer algorithm of this form beats $\Omega(n^{\log_b a})$,
+whatever its $f$.
+</KeyFact>
+
+<Exercise>
+Solve $T(n) = 4T(n/2) + \Theta(n)$ by recursion tree: give the level
+totals as a function of the depth $i$, the number of levels, the leaf
+count, and the sum. Write the level totals for depths $0$, $1$, $2$
+before opening the solution.
+
+<Solution>
+Strategy: run the worked example's three steps with $a = 4$, $b = 2$,
+$f(n) = cn$.
+
+**Level totals.** Depth $i$ holds $4^i$ nodes of size $n/2^i$, each doing
+$cn/2^i$ work: the total is $4^i \cdot cn/2^i = 2^i cn$. Depths $0, 1,
+2$ total $cn$, $2cn$, $4cn$: the totals double per level instead of
+staying flat, because four subproblems at half size do twice the combined
+work of their parent.
+
+**Levels and leaves.** Sizes halve, so there are still $\lg n$ internal
+levels; the leaf count is $4^{\lg n} = n^{\log_2 4} = n^2$.
+
+**Sum.** The internal levels form an increasing geometric series:
+$$
+\sum_{i=0}^{\lg n - 1} 2^i cn
+= cn\,(2^{\lg n} - 1) = cn(n-1) = \Theta(n^2),
+$$
+and the $n^2$ leaves add $\Theta(n^2)$ more. So $T(n) = \Theta(n^2)$.
+
+The transferable move: when level totals grow geometrically, the whole
+sum is within a constant factor of its last term. The answer is the leaf
+level, and the leaf count $n^{\log_b a}$ is the answer's growth rate.
+</Solution>
+</Exercise>
+
+## Three shapes of level sums: root-dominated, balanced, leaf-dominated
+
+Two trees are now on the table: merge sort's, where every level totals
+the same $cn$, and the paired exercise's, where totals double per level
+and the leaves decide. From $\lg n$ levels one might expect every
+divide-and-conquer answer to carry a $\log$ factor; the two examples
+already show otherwise, and there is exactly one more possibility.
+
+The trend of the level totals is a ratio. One level's total is
+$a^i f(n/b^i)$, the next is $a^{i+1} f(n/b^{i+1})$, and for a polynomial
+driving function $f(n) = n^k$ the ratio between them is $a/b^k$: a
+constant, the same at every depth, so the level totals always form a
+geometric series. Three shapes, by whether that constant sits below, at,
+or above $1$:
+
+<Figure
+  src="./figures/three-shapes.svg"
+  alt="Three panels for T(n)=2T(n/2)+f(n) with f equal to n-squared, n, and 1: level-total bars that shrink (root-dominated, Theta of n squared), stay equal (balanced, Theta of n log n), and grow (leaf-dominated, Theta of n)"
+  caption="One tree shape, three driving functions. The trend of the per-level totals, not the depth, decides the answer."
+/>
+
+- **Root-dominated** (totals shrink by a constant factor): the whole sum
+  is at most a constant times the root's term, by the geometric-series
+  bound $w(1 + \alpha + \alpha^2 + \cdots) < w/(1-\alpha)$ for
+  $\alpha < 1$. Answer: $T(n) = \Theta(f(n))$. For
+  $T(n) = 2T(n/2) + n^2$ the totals are $n^2, n^2/2, n^2/4, \ldots$ and
+  the sum stays under $2n^2$: the entire recursion beneath the root is
+  cheaper than the root's own work.
+- **Balanced** (totals equal): the sum is one level's total times the
+  number of levels. Answer: $T(n) = \Theta(f(n) \log n)$, merge sort's
+  case and the only shape where the depth enters the answer.
+- **Leaf-dominated** (totals grow by a constant factor): the sum is
+  within a constant of the last term, the leaf level. Answer: $T(n) =
+  \Theta(n^{\log_b a})$. For $T(n) = 2T(n/2) + 1$ the totals are $1, 2,
+  4, \ldots, n$, summing below $2n$: $\Theta(n)$, with no $\log$ anywhere.
+
+The vocabulary is CMU 15-210's, which teaches the classification as the
+"brick method"; the three names are worth adopting because they say
+where the cost lives.
+
+<KeyFact>
+Where the cost lives is where optimization pays. Cheapening the driving
+function improves a root-dominated algorithm in full and a balanced one
+by at most the single $\log$ factor; in a leaf-dominated one it buys
+nothing: there the only lever is $a$, the number of recursive calls.
+</KeyFact>
+
+Which shape a recurrence takes is a comparison between two growth rates
+in disguise. The ratio $a/b^k$ is below $1$ exactly when $\log_b a < k$,
+that is, when $n^{\log_b a}$ grows slower than $f(n) = n^k$; above $1$
+exactly when it grows faster. So the trend of the level sums is decided
+by racing $f(n)$ against the leaf count $n^{\log_b a}$: whichever end of
+the tree wins the race is where the cost concentrates, and a tie is the
+balanced case. Stated as a theorem, that comparison is the next section.
+
+## The Master theorem: the classification stated once
+
+The three shapes were established by drawing trees. The Master theorem is
+the same trichotomy packaged as a test on $f(n)$, so that recurrences of
+the standard form can be solved by one comparison, with no tree drawn.
+The quantity $n^{\log_b a}$, the leaf count, is called the *watershed
+function*, since which side of it $f$ falls on determines everything.
+
+<Theorem title="Master theorem (CLRS Theorem 4.1, simplified)">
+Let $a \ge 1$ and $b > 1$ be constants, let $f(n)$ be nonnegative for
+large $n$, and let $T(n) = a\,T(n/b) + f(n)$ (floors or ceilings in the
+argument do not change the conclusion). Then:
+
+1. If $f(n) = O(n^{\log_b a - \epsilon})$ for some constant $\epsilon >
+   0$, then $T(n) = \Theta(n^{\log_b a})$.
+2. If $f(n) = \Theta(n^{\log_b a})$, then $T(n) = \Theta(n^{\log_b a}
+   \lg n)$.
+3. If $f(n) = \Omega(n^{\log_b a + \epsilon})$ for some constant
+   $\epsilon > 0$, and additionally $a f(n/b) \le c f(n)$ for some
+   constant $c < 1$ and all large $n$, then $T(n) = \Theta(f(n))$.
+</Theorem>
+
+The cases are the shapes: case 1 is leaf-dominated, case 2 balanced,
+case 3 root-dominated. The proof is the level-sum argument of the
+previous two sections made careful about floors, ceilings, and
+non-power-of-$b$ sizes; CLRS §4.6–4.7 carries it out, and this course
+takes it as read.
+
+<Figure
+  src="./figures/master-cases.svg"
+  alt="Decision diagram: compare f(n) with the watershed n to the log-b of a; three branches lead to case 1 leaf-dominated, case 2 balanced, and case 3 root-dominated, each with a worked instance"
+  caption="The theorem as a decision procedure: one watershed computation, one comparison, one worked instance per branch."
+/>
+
+<Remark title="the fine print, once">
+Three technical clauses, dealt with here so they never interrupt again.
+*Polynomial separation:* cases 1 and 3 require $f$ to differ from the
+watershed by a factor $n^\epsilon$, not merely to differ: $f(n) = n \lg
+n$ against watershed $n$ is bigger but not polynomially bigger, and falls
+into a gap between cases 2 and 3 where the theorem as stated says
+nothing (an exercise below solves exactly this recurrence by tree, and
+CLRS's full case 2 covers it by allowing $f = \Theta(n^{\log_b a} \lg^k
+n)$ with answer $\Theta(n^{\log_b a}\lg^{k+1} n)$). *Regularity:* the
+condition $a f(n/b) \le c f(n)$ in case 3 forbids driving functions that
+oscillate their way around geometric decay. For every polynomial $f(n) =
+n^k$ in case-3 territory, $a f(n/b) = (a/b^k) f(n)$ with $a/b^k < 1$, so
+the condition holds automatically; for this course's recurrences it is
+never an obstacle. *Base of the logarithm in* $\lg$: irrelevant inside
+$\Theta$, per <Ref lesson="asymptotic-notation">the first lesson</Ref>.
+</Remark>
+
+<Example title="four recurrences through the theorem">
+**Merge sort, $T(n) = 2T(n/2) + \Theta(n)$.** Watershed:
+$n^{\log_2 2} = n$. The driving function is $\Theta(n)$, the same order.
+Case 2: $T(n) = \Theta(n \lg n)$, agreeing with the tree.
+
+**Halving search, $T(n) = T(n/2) + \Theta(1)$.** Watershed:
+$n^{\log_2 1} = n^0 = 1$. The driving function is $\Theta(1)$, the same
+order. Case 2: $T(n) = \Theta(\lg n)$: the binary-search bound, now
+derived rather than counted.
+
+**Four half-size calls, $T(n) = 4T(n/2) + \Theta(n)$.** Watershed:
+$n^{\log_2 4} = n^2$. Here $f(n) = n = O(n^{2 - \epsilon})$ with
+$\epsilon = 1$: polynomially smaller. Case 1: $T(n) = \Theta(n^2)$,
+agreeing with the paired exercise's tree. This recurrence is what a
+first attempt at divide-and-conquer multiplication of $n$-digit numbers
+produces (splitting each number in half generates four half-size
+multiplications), and $\Theta(n^2)$ is no better than the grade-school
+method it tried to beat.
+<Ref lesson="divide-and-conquer-design">The design lesson</Ref> takes up
+what to do about that.
+
+**Heavy combine step, $T(n) = 2T(n/2) + \Theta(n^2)$.** Watershed: $n$.
+Here $f(n) = n^2 = \Omega(n^{1+\epsilon})$ with $\epsilon = 1$:
+polynomially larger. Regularity: $2f(n/2) = 2(n/2)^2 = \tfrac{1}{2}n^2
+\le \tfrac{1}{2} f(n)$, so $c = \tfrac{1}{2}$ works. Case 3: $T(n) =
+\Theta(n^2)$; the recursion adds only a constant factor on top of the
+root's own combine step.
+</Example>
+
+<Exercise>
+Classify and solve by the Master theorem: (a) $T(n) = 9T(n/3) +
+\Theta(n)$; (b) $T(n) = T(2n/3) + \Theta(1)$. Compute each watershed
+before comparing.
+
+<Solution>
+**(a)** $a = 9$, $b = 3$: watershed $n^{\log_3 9} = n^2$. The driving
+function $n = O(n^{2-\epsilon})$ for any $\epsilon \le 1$: polynomially
+smaller, case 1, $T(n) = \Theta(n^2)$. Leaf-dominated: nine one-third
+size subproblems triple the level totals ($9/3^1 = 3$), and the $n^2$
+leaves dominate.
+
+**(b)** $a = 1$, $b = 3/2$: watershed $n^{\log_{3/2} 1} = n^0 = 1$. The
+driving function $\Theta(1)$ matches it: case 2, $T(n) = \Theta(\lg n)$.
+The same shape as binary search: a single call and constant local work
+give $\Theta(\log n)$ regardless of the shrink factor, which only moves
+the constant.
+</Solution>
+</Exercise>
+
+<Task>
+Load the merge-sort preset ($a=2$, $b=2$, $f(n)=n$) and confirm the
+per-level totals come out flat. Then change only $f$: $f(n) = n^2$ should
+tilt the totals into a decreasing series (case 3) and $f(n) = 1$ into an
+increasing one (case 1). Finally, with $f(n) = n$ fixed, raise $a$ from
+$2$ to $3$: $a = 3$ is the smallest branching factor at which the leaves
+take over from a linear combine step.
+</Task>
+
+<Demo
+  name="RecursionTreeExplorer"
+  caption="Enter a, b, and f(n); the explorer draws the recursion tree, totals each level, and names the Master-theorem case. Presets: merge sort, binary search, a case-3 recurrence."
+/>
+
+## Substitution: guess, then prove it by induction
+
+The tree arguments leaned on simplifications: floors vanished, $n$ was a
+power of $b$, and level sums were read off as geometric. For this
+course's recurrences the simplifications are safe, but a method that
+certifies an answer without any of them exists and costs half a page.
+The *substitution method* guesses the bound, then proves it by induction
+on $n$, exactly the machinery
+<Ref lesson="loop-invariants-and-correctness">the previous
+lesson</Ref> used on loops. The tree supplies the guess; induction makes
+it a theorem.
+
+<Example title="certifying merge sort's upper bound by substitution">
+Claim: if $T(n) = 2T(n/2) + \Theta(n)$, then $T(n) = O(n \lg n)$.
+
+**Setup.** Let $c_2$ be a constant with the $\Theta(n)$ term at most
+$c_2 n$ for all large $n$ (such a $c_2$ exists by the definition of
+$\Theta$). The inductive hypothesis is the bound *with an explicit
+constant*: $T(m) \le c\,m \lg m$ for all $2 \le m < n$, where $c$ is
+chosen below.
+
+**Inductive step.** The recurrence hands each half to the hypothesis:
+$$
+T(n) \;\le\; 2 \cdot c\,\frac{n}{2} \lg\frac{n}{2} + c_2 n
+\;=\; cn(\lg n - 1) + c_2 n
+\;=\; cn \lg n - (c - c_2)\,n
+\;\le\; cn \lg n,
+$$
+where the last step holds as soon as $c \ge c_2$. The hypothesis
+reproduces itself at $n$, exactly as a loop invariant's maintenance step
+reproduces the invariant one iteration later.
+
+**Base.** $T(2)$ and $T(3)$ are constants; enlarging $c$ to
+$\max(c_2,\, T(2)/2,\, T(3)/(3\lg 3))$ makes $T(m) \le c\,m\lg m$ true
+outright there, grounding the induction. Hence $T(n) \le cn\lg n$ for
+all $n \ge 2$: $T(n) = O(n \lg n)$. The matching lower bound
+$T(n) = \Omega(n \lg n)$ runs the same computation with the inequalities
+reversed and a lower-bound constant for the $\Theta(n)$ term.
+</Example>
+
+<Figure
+  src="./figures/substitution-slack.svg"
+  alt="Bar diagram of the inductive step: the hypothesis applied to both halves yields cn lg n minus cn, the call's own cost adds back at most c2 times n, and the result stays under the target cn lg n whenever c is at least c2"
+  caption="The inductive step as a budget. The hypothesis delivers cn lg n with a whole cn to spare; the Θ(n) cost spends c₂n of that slack, and c ≥ c₂ keeps the result under the target."
+/>
+
+### The pitfall: asymptotic notation has no place in the hypothesis
+
+The inductive hypothesis must be an exact inequality with a named
+constant ($T(m) \le c\,m\lg m$), never an asymptotic claim. The
+tempting shortcut is a documented trap (CLRS §4.3 devotes a subsection
+to it), and it looks like this:
+
+$$
+T(n) \le 2 \cdot O(n/2) + \Theta(n) = O(n). \qquad \text{(wrong)}
+$$
+
+By this reasoning merge sort would be linear. The step fails because
+$O(n)$ is a set membership, not a quantity: each level of the induction
+is licensed to use its own hidden constant, and stacked over
+$\lg n$ levels the constants grow without bound, which is the very thing
+a single fixed $c$ exists to forbid. Redo the argument with the constant
+named and the failure is visible: from $T(m) \le c\,m$ the recurrence
+gives $T(n) \le cn + c_2 n$, and $cn + c_2 n \le cn$ holds for no
+positive $c_2$. The step is not false; it is unprovable, the same
+verdict the previous lesson issued for a
+<Ref lesson="loop-invariants-and-correctness">non-inductive
+invariant</Ref>, and the repair is the same in spirit: prove the exact
+statement, not a paraphrase of it. A second repair, strengthening a
+correct guess by subtracting a lower-order term, is run in the
+exercises.
+
+## Where the standard form breaks: unequal splits and subtraction
+
+The definition's two near-misses are still unsolved, and both matter:
+algorithms produce them. The Master theorem's hypotheses exclude them
+(no single $b$, or no $b$ at all), but the recursion tree never needed
+those hypotheses, only levels to sum.
+
+### An unequal split: T(n) = T(n/3) + T(2n/3) + Θ(n)
+
+This recurrence arises when a partitioning step splits its input into a
+one-third and a two-thirds piece: a quicksort whose pivot reliably
+lands in the middle third behaves exactly so, a fact
+<Ref lesson="comparison-sorting-merge-and-quicksort">the sorting
+lesson</Ref> uses. The tree is lopsided: subproblem sizes shrink by
+$3\times$ along the left edge and only by $1.5\times$ along the right,
+so different root-to-leaf paths have different lengths.
+
+<Figure
+  src="./figures/unbalanced-split.svg"
+  alt="The unbalanced recursion tree for T(n) = T(n/3) + T(2n/3) + cn, with the shortest path reaching size 1 after log base 3 of n levels and the longest after log base 3/2 of n levels; every level totals at most cn"
+  caption="An unbalanced tree still sums by levels: at most cn per level, between log₃ n and log₃/₂ n levels."
+/>
+
+Level sums still decide the total. As long as a level is complete, its
+nodes' sizes add to exactly $n$, so it totals exactly $cn$; once the
+shallow left branches start bottoming out (below depth $\log_3 n$),
+levels lose nodes and their totals drop below $cn$. The depth is set by
+the slowest-shrinking path: the rightmost, which multiplies sizes by
+$2/3$ per level and reaches the base case after $\log_{3/2} n$ levels.
+Two bounds follow: at most $cn$
+per level for at most $\log_{3/2} n = \Theta(\lg n)$ levels gives $T(n)
+= O(n \lg n)$, and the $\log_3 n$ complete top levels at exactly $cn$
+each give $T(n) = \Omega(n \lg n)$. So $T(n) = \Theta(n \lg n)$: the
+imbalance moved the constant, not the class. An uneven split costs
+nothing asymptotically as long as both pieces are a constant fraction of
+the whole.
+
+<Aside>
+A theorem does exist for multi-way and unequal splits: the Akra–Bazzi
+method (1998) solves $T(n) = \sum_i a_i T(n/b_i) + f(n)$ by finding the
+exponent $p$ with $\sum_i a_i / b_i^p = 1$. For the leaf-counting
+recurrence $L(n) = L(n/2) + L(n/3)$, for instance, it gives $L(n) =
+\Theta(n^p)$ for the $p \approx 0.788$ solving $(1/2)^p + (1/3)^p = 1$.
+It needs calculus this course does not assume, and belongs to the
+advanced sequence; the tree-plus-substitution pair covers everything this
+course meets.
+</Aside>
+
+### Shrinking by subtraction: T(n) = T(n−1) + Θ(n)
+
+Recursing on all but one element gives the other excluded shape. The
+"tree" is a path: level $i$ holds one node doing $c(n-i)$ work, there
+are $n$ levels, and the level totals $cn, c(n-1), c(n-2), \ldots$ form
+an arithmetic series, not a geometric one. No shape test applies, but
+none is needed, because direct summation finishes it:
+$$
+T(n) = \sum_{i=0}^{n-1} c\,(n - i) = c \cdot \frac{n(n+1)}{2} =
+\Theta(n^2).
+$$
+Halving-style recursion turned $\Theta(n)$ of per-level work into
+$\Theta(n \lg n)$ total; peeling one element at a time turns the same
+per-level work into $\Theta(n^2)$. This recurrence is quicksort's worst
+case (a pivot that repeatedly draws the smallest element), and the gap
+between the two answers is the central comparison of
+<Ref lesson="comparison-sorting-merge-and-quicksort">the sorting
+lesson</Ref>. (The word *recurrence* returns with a different referent in
+<Ref lesson="dynamic-programming-i-one-dimensional">dynamic
+programming</Ref>, where equations of this shape range over solution
+values rather than running times; until then, a recurrence prices
+recursion.)
+
+## The toolkit against a production sort
+
+The module closes by reading a deployed system with all three of its
+tools. CPython's `list.sort` is Timsort, Tim Peters's 2002 merge sort
+variant, since adopted by Java's object sort and V8's `Array.sort`; its
+design notes
+([listsort.txt](https://github.com/python/cpython/blob/main/Objects/listsort.txt))
+document the engineering the recurrence's terms absorb.
+
+### The merge policy is the balanced shape
+
+Timsort merges runs whose lengths roughly double from a minimum size up
+to $n$; each doubling generation moves every element at most once, which
+is the balanced shape read from the leaves upward: $\Theta(n)$ per
+generation, $\Theta(\lg n)$ generations, worst case $O(n \lg n)$, the
+case-2 answer.
+
+<Figure
+  src="./figures/timsort-generations.svg"
+  alt="Four rows of runs: eight minrun-sized runs at the bottom are merged pairwise into four runs, then two, then one sorted run of length n; each row moves about n elements in total"
+  caption="Timsort's merge generations. Run lengths double per generation and every generation moves ≈ n elements: merge sort's balanced shape, read from the leaves upward."
+/>
+
+At the bottom, runs shorter than a cutoff *minrun*
+(chosen between 32 and 64) are sorted by the insertion sort proved
+correct in <Ref lesson="loop-invariants-and-correctness">the previous
+lesson</Ref>, run with a binary search for the insertion point — still
+$\Theta(n^2)$, and quadratic cost is irrelevant at constant size. That
+cutoff is the recurrence's base-case convention
+turned into a tuning knob: $T(n) = \Theta(1)$ below a threshold, with
+the threshold chosen for cache behavior and merge balance.
+
+<KeyFact>
+Moving a production sort's insertion-sort cutoff moves its constant
+factor and can never move its $\Theta(n \lg n)$: the base-case threshold
+$n_0$ appears in the recurrence's solution only inside the constants the
+notation absorbs.
+</KeyFact>
+
+### What the recurrence cannot see
+
+The recurrence prices the worst case, and Timsort spends most of its
+design on inputs that are not worst case: on an already-sorted array it
+detects one run and finishes in
+$n - 1$ comparisons, $\Theta(n)$. That adaptivity is invisible to the
+$a\,T(n/b) + f(n)$ form, which fixes the split and the combine cost in
+advance; it is a genuine limit of the tool, not an error in it, and the
+worst-case guarantee the recurrence proves is what the adaptive
+machinery is not allowed to break.
+
+The module's toolkit is now complete: asymptotic notation to state costs,
+loop invariants to prove correctness, and recurrences (tree for the
+answer, substitution for the certificate, Master theorem for the
+standard form) to price recursion. The headline results:
+$T(n) = 2T(n/2) + \Theta(n) = \Theta(n \lg n)$ and its two neighbors
+$\Theta(n^{\log_b a})$ and $\Theta(f(n))$, decided by one watershed
+comparison. <Ref lesson="arrays-and-linked-lists">The next lesson</Ref>
+turns from analyzing algorithms to the structures they run on, starting
+with the two ways of storing a sequence; the recurrences return the
+moment the course meets its next recursive algorithm.
+
+## Exercises
+
+<Exercise>
+For each recurrence, first name the applicable tool (Master theorem,
+recursion tree, or direct summation) and say what rules the others out;
+then solve. (a) $T(n) = 3T(n/9) + \Theta(\sqrt{n}\,)$; (b) $T(n) =
+T(n/2) + \Theta(n)$; (c) $T(n) = T(n-1) + \Theta(1)$; (d) $T(n) =
+7T(n/2) + \Theta(n^2)$.
+
+<Solution>
+**(a) Master, case 2.** Standard form with $a = 3$, $b = 9$: watershed
+$n^{\log_9 3} = n^{1/2}$, and $f(n) = \Theta(\sqrt n)$ matches it.
+$T(n) = \Theta(\sqrt n \, \lg n)$.
+
+**(b) Master, case 3.** Watershed $n^{\log_2 1} = 1$; $f(n) = n =
+\Omega(n^{0+\epsilon})$, polynomially larger, and regularity holds:
+$1 \cdot f(n/2) = n/2 = \tfrac12 f(n)$. $T(n) = \Theta(n)$. The tree
+view: level totals $n, n/2, n/4, \ldots$ halve: root-dominated, sum
+under $2n$. Note the contrast with binary search's $T(n) = T(n/2) +
+\Theta(1) = \Theta(\lg n)$: same recursion, different driving function,
+different shape.
+
+**(c) Direct summation.** Not the standard form ($b > 1$ fails: the
+input shrinks by subtraction). The path-shaped tree has $n$ levels of
+$\Theta(1)$ each: $T(n) = \Theta(n)$, a recursive linear scan.
+
+**(d) Master, case 1.** Watershed $n^{\log_2 7} = n^{2.807\ldots}$;
+$f(n) = n^2 = O(n^{\log_2 7 - \epsilon})$ for any $\epsilon \le 0.8$.
+$T(n) = \Theta(n^{\log_2 7}) \approx \Theta(n^{2.81})$. (This is the
+recurrence of Strassen's 1969 matrix-multiplication algorithm: seven
+half-size multiplications instead of eight beat the $\Theta(n^3)$
+watershed of the obvious method.)
+</Solution>
+</Exercise>
+
+<Exercise>
+The boundary of case 2: solve $T(n) = 2T(n/2) + \Theta(n \lg n)$. First
+show that no case of the Master theorem as stated in this lesson
+applies, naming the failing hypothesis for each; then solve by recursion
+tree.
+
+<Solution>
+**No case applies.** The watershed is $n^{\log_2 2} = n$. Case 2 needs
+$f = \Theta(n)$; but $n \lg n \ne \Theta(n)$. Case 3 needs $f =
+\Omega(n^{1 + \epsilon})$ for a fixed $\epsilon > 0$; but $\lg n =
+O(n^\epsilon)$ for every $\epsilon > 0$, so $n \lg n$ is larger than $n$
+only by a sub-polynomial factor: the polynomial-separation hypothesis
+fails. Case 1 needs $f$ smaller; it is larger. The recurrence sits in
+the gap between cases 2 and 3.
+
+**Tree.** Depth $i$: $2^i$ nodes of size $n/2^i$, level total
+$2^i \cdot c\,(n/2^i)\lg(n/2^i) = cn(\lg n - i)$. The totals decrease
+linearly rather than geometrically: neither root- nor leaf-dominated,
+and "balanced" only approximately. Summing over the $\lg n$ internal
+levels:
+$$
+\sum_{i=0}^{\lg n - 1} cn(\lg n - i) = cn \sum_{j=1}^{\lg n} j =
+cn \cdot \frac{\lg n\,(\lg n + 1)}{2} = \Theta(n \lg^2 n),
+$$
+and the $n$ leaves add only $\Theta(n)$. So $T(n) = \Theta(n \lg^2 n)$.
+
+This is exactly what CLRS's full case 2 predicts: for $f =
+\Theta(n^{\log_b a} \lg^k n)$ with $k \ge 0$, $T(n) =
+\Theta(n^{\log_b a} \lg^{k+1} n)$ (here $k = 1$). The transferable move:
+a driving function on the watershed up to $\log$ factors adds one more
+$\log$ to itself.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Merge sort's tree has $\lg n$ levels because the input halves
+each level. Any recurrence that halves its input therefore costs its
+per-level work times $\lg n$; in particular $T(n) = 2T(n/2) + \Theta(1)$
+(constant work per call) solves to $\Theta(\lg n)$." Name the step
+that fails and give the correct solution, then state a recurrence for
+which the quoted conclusion is right.
+
+<Solution>
+The failing step is "per-level work times $\lg n$": multiplying one
+level's total by the level count is valid only when every level totals
+the same, the balanced shape. Here the totals are not equal. Depth $i$
+holds $2^i$ nodes doing $\Theta(1)$ each, so the totals run $1, 2, 4,
+\ldots, n$: an increasing geometric series, leaf-dominated, summing to
+less than $2n$. Correct solution: $T(n) = \Theta(n)$, also by Master
+case 1, since $f = \Theta(1) = O(n^{1-\epsilon})$ against watershed
+$n^{\log_2 2} = n$. (The claim also misreads "per-level work" as
+"per-call work"; even in the balanced case what multiplies by the depth
+is a level's total.)
+
+The conclusion is right for $T(n) = T(n/2) + \Theta(1) = \Theta(\lg n)$:
+with $a = 1$ there is one call per level, the level totals really are
+all $\Theta(1)$, and the sum is the level count. One recursive call
+versus two — invisible in the phrase "halves its input" — is the entire
+difference between $\Theta(\lg n)$ and $\Theta(n)$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The substitution repair the lesson deferred. For $T(n) = 2T(n/2) +
+\Theta(1)$ (solution $\Theta(n)$, by the previous exercise): (a) attempt
+a substitution proof of $T(n) = O(n)$ with the hypothesis $T(m) \le cm$
+and show the inductive step gets stuck, even though the bound being
+proved is true; (b) repair it with the hypothesis $T(m) \le cm - d$,
+finding the constraint on $d$; (c) explain why subtracting a term
+helps where enlarging $c$ does not.
+
+<Solution>
+**(a)** Let $d_0$ bound the $\Theta(1)$ term. From $T(m) \le cm$ for
+$m < n$:
+$$
+T(n) \le 2 \cdot c\,\frac{n}{2} + d_0 = cn + d_0,
+$$
+and $cn + d_0 \le cn$ fails for every $c$, since $d_0 > 0$. No choice of
+$c$, however large, absorbs the additive $d_0$: the step is unprovable
+as stated, the same verdict as the lesson's $O$-in-the-hypothesis
+pitfall, but for an honest guess.
+
+**(b)** Hypothesis $T(m) \le cm - d$ with $d \ge 0$ to be chosen:
+$$
+T(n) \le 2\left(c\,\frac{n}{2} - d\right) + d_0 = cn - 2d + d_0 =
+(cn - d) - (d - d_0) \le cn - d
+$$
+whenever $d \ge d_0$. The base case needs $c$ large enough that
+$T(m) \le cm - d$ holds for the constant-size starts, which one
+enlargement of $c$ arranges. Hence $T(n) \le cn - d = O(n)$.
+
+**(c)** The hypothesis is applied once per recursive call, so whatever
+is subtracted comes back doubled: $-d$ becomes $-2d$, leaving slack
+$d - d_0 \ge 0$ to swallow the driving cost. A larger $c$ cannot create
+that slack, because $c$ multiplies $n/2$ twice and returns exactly
+$cn$ with nothing to spare. A stronger claim is easier to prove: the
+same strengthening move the previous lesson used when a loop invariant
+could not reprove itself.
+</Solution>
+</Exercise>
+
+<Exercise>
+Insertion sort, recursively. <Ref lesson="loop-invariants-and-correctness">
+The previous lesson</Ref> proved insertion sort correct as a loop; it can
+be phrased as a recursion instead: to sort $A[1..n]$, recursively sort
+$A[1..n-1]$, then insert $A[n]$ into the sorted prefix by shifting larger
+elements right. (a) Write the recurrence for the worst case, stating what
+the driving function costs and which input realizes it. (b) Solve it.
+(c) Write and solve the best-case recurrence, and name the input class
+that realizes that one.
+
+<Solution>
+**(a)** The insertion step shifts every prefix element greater than
+$A[n]$; in the worst case (the prefix entirely greater, as when the
+input is reverse-sorted) it shifts all $n - 1$ of them: $\Theta(n)$.
+The recurrence is $T(n) = T(n-1) + \Theta(n)$.
+
+**(b)** Subtract-and-conquer, so direct summation (the Master theorem's
+$b > 1$ hypothesis fails): $T(n) = \sum_{k=1}^{n} \Theta(k) =
+\Theta(n^2)$, the same $\Theta(n^2)$ the loop analysis gave, as it must
+be: the recursion performs the identical shifts in the identical order,
+and only the bookkeeping changed.
+
+**(c)** On an already-sorted input the insertion step compares once and
+shifts nothing: $\Theta(1)$. Best case $T(n) = T(n-1) + \Theta(1) =
+\Theta(n)$. Same algorithm, two recurrences: worst and best case are
+separate functions of $n$, per
+<Ref lesson="asymptotic-notation">the first lesson</Ref>, and each gets
+its own equation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Splitting an $n$-digit multiplication into halves can be arranged to
+need four half-size multiplications plus $\Theta(n)$ digit additions,
+or, with a cleverer combination step, only three:
+$$
+T_4(n) = 4T_4(n/2) + \Theta(n), \qquad T_3(n) = 3T_3(n/2) + \Theta(n).
+$$
+(a) Solve both. (b) Grade-school multiplication costs $\Theta(n^2)$;
+state what each scheme gains over it. (c) For $n = 10^6$ digits, estimate
+the ratio of the two solutions' growth functions.
+
+<Solution>
+**(a)** Both are case 1 (leaf-dominated): the watershed exceeds
+$f(n) = n$ polynomially in each. $T_4$: watershed $n^{\log_2 4} = n^2$,
+so $T_4(n) = \Theta(n^2)$. $T_3$: watershed $n^{\log_2 3}$ with $\log_2
+3 = 1.585\ldots$, so $T_3(n) = \Theta(n^{1.585})$.
+
+**(b)** The four-call scheme gains nothing: recursion reproduced
+grade-school's $\Theta(n^2)$, because $n^2$ leaves do as much work as
+the $n^2$ digit-pairs of the direct method. The three-call scheme breaks
+below $n^2$: dropping one recursive call moved the exponent from
+$\log_2 4 = 2$ to $\log_2 3 \approx 1.585$. In a leaf-dominated
+recurrence the exponent comes straight from the branching factor, so
+the only way to speed it up is to make fewer calls.
+
+**(c)** $n^2 / n^{\log_2 3} = n^{2 - \log_2 3} = n^{0.415}$; at $n =
+10^6$ this is $10^{6 \times 0.415} \approx 10^{2.5}$, roughly a factor
+of $300$.
+
+The three-multiplication combination step actually exists: it is
+Karatsuba's algorithm, constructed in
+<Ref lesson="divide-and-conquer-design">the divide-and-conquer design
+lesson</Ref>; this exercise's arithmetic is the entire reason that
+construction is worth having.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the measurement that checks this lesson's headline. You implement
+merge sort and run the doubling experiment of
+<Ref lesson="asymptotic-notation">the first lesson</Ref>: time it at
+$n, 2n, 4n, \ldots$ and take ratios of consecutive times. (a) Derive the
+ratio $T(2n)/T(n)$ that $T(n) = \Theta(n \lg n)$ predicts, and evaluate
+it at $n = 2^{15}$ and $n = 2^{20}$. (b) State what ratios $\Theta(n)$
+and $\Theta(n^2)$ would predict, and which competitor is hard to
+distinguish from $n \lg n$. (c) Propose a better plot than raw ratios
+for confirming the $\lg$ factor, and state what result would count as
+agreement.
+
+<Solution>
+**(a)** For $T(n) = c\,n \lg n$:
+$$
+\frac{T(2n)}{T(n)} = \frac{2cn\,(\lg n + 1)}{cn \lg n} = 2 +
+\frac{2}{\lg n}.
+$$
+At $n = 2^{15}$: $2 + 2/15 \approx 2.13$. At $n = 2^{20}$: $2 + 2/20 =
+2.10$. The prediction is a ratio slightly above $2$, drifting down
+toward $2$ as $n$ grows.
+
+**(b)** $\Theta(n)$ predicts ratios converging to exactly $2$;
+$\Theta(n^2)$ predicts $4$. The quadratic is unmistakable after two
+doublings; the linear competitor differs from $n \lg n$ only by that
+slow drift ($2.13$ versus $2.00$ at $n = 2^{15}$), within the noise of
+casual timing: the first lesson's warning that the doubling signature
+cannot see logarithmic factors, now quantified.
+
+**(c)** Plot $T(n)/n$ against $\lg n$. Under $T = cn\lg n + c'n$ this is
+$c \lg n + c'$: a straight line, gaining a fixed increment $c$ per
+doubling. Agreement: the points fall on a line with positive slope
+(within measurement scatter), and the slope estimates the constant $c$
+of the recurrence's $\Theta(n)$ term. A horizontal line would falsify
+the $\lg$ factor ($T = \Theta(n)$); upward curvature would indicate a
+polynomial exponent above 1. This turns a factor the ratio test cannot
+see into the slope of a line: the counted model predicting the
+stopwatch, which is the standard of the first lesson's doubling
+experiment.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §2.3.2: the merge-sort recurrence and the level-by-level tree (Fig. 2.5) this lesson's sequence recreates; §4.3: the substitution method, the subtract-a-lower-order-term trick, and the asymptotic-notation-in-the-hypothesis pitfall; §4.4: the recursion-tree method and the unbalanced $T(n/3) + T(2n/3)$ tree (Fig. 4.2); §4.5: Theorem 4.1 (the Master theorem, including the $\lg^k$ form of case 2) and the worked applications this lesson reuses; §§4.6–4.7: the full proof and the Akra–Bazzi method, both beyond this course's scope.
+2. J. Erickson, *Algorithms*, 2019 — §1.7: recursion trees as the primary tool, the decreasing/equal/increasing level-sum trichotomy, Figs. 1.9–1.11, and "Ignoring Floors and Ceilings Is Okay, Honest" (the domain-transformation argument this lesson asserts without proof). Free online: https://jeffe.cs.illinois.edu/teaching/algorithms/
+3. CMU 15-210, *Parallel and Sequential Data Structures and Algorithms*, lecture notes "Asymptotics and Recurrences" — the brick method and the root-dominated / balanced / leaf-dominated vocabulary. https://www.cs.cmu.edu/~15210/notes/asymptotics.pdf
+4. J. L. Bentley, D. Haken, J. B. Saxe, "A General Method for Solving Divide-and-Conquer Recurrences," *ACM SIGACT News* 12(3), 1980, pp. 36–44 — the unified treatment the Master theorem descends from.
+5. T. Peters, "listsort.txt" (Timsort design notes), CPython source tree, Objects/listsort.txt — minrun selection (32–64), binary insertion sort below it, and the $O(n \log n)$ worst-case guarantee read against this lesson's case 2. https://github.com/python/cpython/blob/main/Objects/listsort.txt
+</References>

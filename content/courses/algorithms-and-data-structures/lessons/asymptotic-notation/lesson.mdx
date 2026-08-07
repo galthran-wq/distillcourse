@@ -1,0 +1,679 @@
+Two algorithms that solve the same problem can differ in running time by a
+factor that grows without bound as the input grows, and asymptotic notation
+is the language for stating exactly how. This lesson is the course's first
+move: it fixes what "running time" means (a count of elementary steps,
+expressed as a function of input size) and defines the three notations
+$O$, $\Omega$, $\Theta$ that reduce such counts to their growth rate. Every
+result that follows in the course, from hash-table lookups to shortest
+paths, is stated in this notation. The route: count the exact steps of a
+five-line loop, define the three notations formally, establish why constant
+factors are dropped, rank the growth rates that actually occur, and check
+the whole model against a stopwatch.
+
+## Running time is a step count
+
+A program stores a million records and, over its
+lifetime, looks each one up about once. If every lookup scans the whole
+collection, the total work is $10^6$ lookups $\times$ $10^6$ inspections
+$= 10^{12}$ inspections. A current processor core sustains about $10^9$
+elementary operations per second, so $10^{12}$ operations take about
+$1{,}000$ seconds: 16 minutes 40 seconds of full-speed computation for a
+workload that feels routine. A structure that keeps the same records
+sorted answers each lookup in a few dozen inspections instead. That gap
+is the one this course exists to explain, and it is a property of the algorithm, not
+of the hardware.
+
+Comparing algorithms by stopwatch confounds the algorithm with the machine,
+the language, and the compiler. The standard fix is a *model of
+computation*: the **word-RAM**, in which memory is a sequence of machine
+words and each arithmetic operation, comparison, or read/write of one word
+costs exactly one step. Running time is then the number of steps executed,
+a pure function $T(n)$ of the input size $n$, with no clock involved. The
+model is a deliberate simplification (it prices a cache miss and a register
+add identically), and the last section of this lesson tests how well it
+predicts real timings.
+
+### Counting the steps of a five-line loop
+
+A concrete count shows what $T(n)$ looks like. The procedure below sums
+$A[i] \cdot A[j]$ over all pairs $i < j$ of positions in an array of
+length $n$. Each line's cost is its number of executions: a loop header
+runs once per test, including the final test that fails and exits the
+loop.
+
+<FigureSequence
+  name="loop-cost"
+  alt="A five-line pairwise-product loop annotated with per-line execution counts, which sum to T(n) = n² + n + 3 and collapse to Θ(n²)"
+  caption="From per-line counts to a growth rate: the exact polynomial is machine-dependent bookkeeping; the leading term's growth rate is not."
+/>
+
+<Task>
+Step through the four frames. Before accepting the count for line 3,
+verify it at $n = 4$ by hand: the inner header runs $4 + 3 + 2 + 1 = 10$
+times, and $n(n+1)/2 = 10$.
+</Task>
+
+The exact total is $T(n) = n^2 + n + 3$. The two lower-order terms are
+already irrelevant at moderate sizes: at $n = 1000$, they contribute
+$1{,}003$ steps out of $1{,}001{,}003$: one part in a thousand. The
+constants are worse than irrelevant; they are arbitrary. Charging two
+steps for line 4 (a multiply and an add) instead of one changes the
+polynomial to $\tfrac{3}{2}n^2 + \tfrac{1}{2}n + 3$, and a different
+compiler or CPU changes it again. What no change of machine, language, or
+counting convention touches is the **shape** of the leading term: the count
+grows as $n^2$. Asymptotic notation is the tool for saying exactly that
+and nothing more.
+
+## One algorithm, three functions: worst, best, average
+
+Before the definitions, one complication. The pairwise loop above costs
+the same on every input of size $n$, so $T(n)$ is a single well-defined
+function. Most algorithms are not like that. Linear search, which scans an
+array until the target value is found or the array ends, costs 3 steps
+if the target sits in the first slot and about $n$ steps if it sits in the
+last or is absent:
+
+```text
+LinearSearch(A[1..n], x):
+  for i ← 1 to n
+    if A[i] = x  return i
+  return not-found
+```
+
+One algorithm therefore yields three different functions of $n$:
+
+- **worst case**: the maximum cost over all inputs of size $n$; here
+  about $n$ steps. This is the default meaning of "running time" in this
+  course; a worst-case bound is a guarantee.
+- **best case**: the minimum cost; here a constant, independent of $n$.
+- **average case**: the expected cost under a stated distribution of
+  inputs; here about $n/2$ steps for a target equally likely to sit in any
+  slot. The distribution must be stated; without it "average" means
+  nothing.
+
+The three are separate claims about separate functions, and the notation
+of the next section applies to each independently. Conflating them is the
+most common analysis error in practice, and the definitions below are what
+make the conflation checkable.
+
+## O, Ω, Θ: bounding growth up to a constant
+
+The counting section left a precise task: keep "grows as $n^2$", discard
+the coefficient and the lower-order terms. Every word in the following
+definitions is already familiar, so they come formally, boundary cases
+immediately after. All functions here map input sizes to step counts, so
+they are nonnegative for large $n$.
+
+<Definition title="O-notation">
+For a function $g(n)$, the set $O(g(n))$ (spoken "big-oh of $g$
+of $n$") consists of every function $f(n)$ for which there exist positive
+constants $c$ and $n_0$ such that
+
+$$
+0 \le f(n) \le c \cdot g(n) \quad \text{for all } n \ge n_0.
+$$
+
+Writing $f(n) = O(g(n))$ asserts that $f$ is a member of this set: $g$ is
+an **upper bound** on $f$'s growth, up to a constant factor, from some
+point on.
+</Definition>
+
+<Definition title="Ω-notation">
+$\Omega(g(n))$ (spoken "big-omega") is the mirror image: $f(n) = \Omega(g(n))$
+if there exist positive constants $c$ and $n_0$ such that
+$0 \le c \cdot g(n) \le f(n)$ for all $n \ge n_0$. Here $g$ is a **lower
+bound** on $f$'s growth.
+</Definition>
+
+<Definition title="Θ-notation">
+$\Theta(g(n))$ (spoken "theta") demands both sides at once: $f(n) =
+\Theta(g(n))$ if there exist positive constants $c_1$, $c_2$, and $n_0$
+such that
+
+$$
+0 \le c_1 \cdot g(n) \le f(n) \le c_2 \cdot g(n)
+\quad \text{for all } n \ge n_0.
+$$
+
+Then $g$ is a **tight bound**: $f$ is sandwiched between two constant
+multiples of $g$ for all large $n$.
+</Definition>
+
+<Figure
+  src="./figures/sandwich.svg"
+  alt="Three panels showing f(n) lying below c·g(n) for O, above c·g(n) for Ω, and between c₁·g(n) and c₂·g(n) for Θ, in each case only past the threshold n₀"
+  caption="The three definitions drawn: everything left of n₀ is exempt, and the constant c absorbs any fixed factor."
+/>
+
+The two constants divide the labor. The threshold $n_0$ makes the
+definition asymptotic: whatever happens for small $n$ is exempt, which is
+why the wiggles and crossings left of $n_0$ in the figure cost nothing.
+The factor $c$ makes the definition scale-blind: it absorbs any constant
+multiple, which is exactly what discards coefficients and machine speeds.
+
+<Example title="classifying the loop's count">
+Claim: $T(n) = n^2 + n + 3 = \Theta(n^2)$.
+
+**Upper bound.** Seek $c_2$, $n_0$ with $n^2 + n + 3 \le c_2 n^2$. Try
+$c_2 = 2$: the inequality $n^2 + n + 3 \le 2n^2$ rearranges to
+$n + 3 \le n^2$, true for every $n \ge 3$ (at $n = 3$: $6 \le 9$). So
+$c_2 = 2$, $n_0 = 3$ works, and $T(n) = O(n^2)$.
+
+**Lower bound.** Seek $c_1$ with $c_1 n^2 \le n^2 + n + 3$. Since $n + 3
+> 0$, the choice $c_1 = 1$ works for all $n \ge 1$, so $T(n) =
+\Omega(n^2)$.
+
+Both bounds hold for $n \ge 3$ with $c_1 = 1$, $c_2 = 2$; hence $T(n) =
+\Theta(n^2)$.
+
+**A near-miss.** $T(n) \ne O(n)$: the definition would require $n^2 + n +
+3 \le cn$ for all large $n$, which after dividing by $n$ demands
+$n + 1 + 3/n \le c$, impossible for any constant $c$ once $n > c$. The
+clause that fails is the existence of a single constant $c$ that works for
+all $n \ge n_0$.
+
+**Loose but valid.** $T(n) = O(n^3)$ is a true statement ($c = 1$, $n_0 =
+3$ suffices: at $n = 3$ the inequality $n^2 + n + 3 \le n^3$ reads $15 \le
+27$, and the gap only widens, since $n^3 \ge 3n^2 \ge n^2 + n + 3$ for
+$n \ge 3$): $O$ promises an upper bound, not the best one. Analyses in
+this course state the tightest bound they can prove.
+</Example>
+
+<Exercise>
+Show that $2n^3 + 5n = \Theta(n^3)$ by producing explicit constants
+$c_1$, $c_2$, $n_0$ and verifying both inequalities. Write the two
+inequalities down before checking any numbers.
+
+<Solution>
+Strategy: bound the lower-order term $5n$ by a multiple of $n^3$.
+
+**Upper bound.** Try $c_2 = 3$: $2n^3 + 5n \le 3n^3$ rearranges to $5n \le
+n^3$, i.e. $5 \le n^2$, true for $n \ge 3$. (Check $n = 3$: $54 + 15 = 69
+\le 81$.)
+
+**Lower bound.** $c_1 = 2$ works for all $n \ge 1$, since $2n^3 + 5n \ge
+2n^3$ whenever $5n \ge 0$.
+
+So $c_1 = 2$, $c_2 = 3$, $n_0 = 3$ certify $2n^3 + 5n = \Theta(n^3)$. The
+transferable move: a polynomial is always $\Theta$ of its leading term,
+because the leading term eventually dominates any fixed multiple of the
+rest.
+</Solution>
+</Exercise>
+
+### Θ is exactly O plus Ω
+
+<Theorem title="tight bound as two one-sided bounds (CLRS Theorem 3.1)">
+For any two functions $f(n)$ and $g(n)$: $f(n) = \Theta(g(n))$ if and only
+if $f(n) = O(g(n))$ and $f(n) = \Omega(g(n))$.
+
+<Proof>
+($\Rightarrow$) If $f(n) = \Theta(g(n))$ with constants $c_1, c_2, n_0$,
+then the right half of the sandwich, $f(n) \le c_2\, g(n)$ for $n \ge
+n_0$, is the definition of $f(n) = O(g(n))$ with $c = c_2$, and the left
+half, $c_1\, g(n) \le f(n)$, is the definition of $f(n) = \Omega(g(n))$
+with $c = c_1$.
+
+($\Leftarrow$) Suppose $f(n) = O(g(n))$ with constants $c'$, $n_0'$ and
+$f(n) = \Omega(g(n))$ with constants $c''$, $n_0''$. Set $c_1 = c''$,
+$c_2 = c'$, and $n_0 = \max(n_0', n_0'')$. For every $n \ge n_0$ both
+inequalities hold simultaneously, which is the definition of $f(n) =
+\Theta(g(n))$.
+</Proof>
+</Theorem>
+
+This theorem is the standard proof pattern for tight bounds, used
+throughout the course: prove $O$ by one argument, $\Omega$ by a different
+one, and conclude $\Theta$. The two arguments are usually not symmetric:
+the upper bound comes from counting the most the algorithm could possibly
+do, the lower bound from exhibiting an input that forces work.
+
+<Remark title="the equals sign is set membership">
+$O(g(n))$ is a set of functions, and the conventional "$f(n) = O(g(n))$"
+means $f(n) \in O(g(n))$. The equality symbol is a notational abuse the
+field has standardized on. One consequence: the statement is not
+symmetric. $n = O(n^2)$ is true and $n^2 = O(n)$ is false, so "$=$" here
+cannot be read as equality of any two objects. Strict variants
+(little-$o$ and little-$\omega$, which require the inequality for *every*
+positive $c$ rather than for some $c$) exist but are never needed in this
+course.
+</Remark>
+
+<Aside>
+Asymptotic notation also appears inside formulas, standing for an
+anonymous function of the stated class: $T(n) = 2T(n/2) + \Theta(n)$ means
+$T(n) = 2T(n/2) + f(n)$ for some unnamed $f(n) = \Theta(n)$. This is the
+form recurrences take in <Ref lesson="recurrences-and-master-theorem">a
+later lesson</Ref>: the notation deliberately forgets the details of the
+non-recursive work, because the solution never depends on them.
+</Aside>
+
+<KeyFact>
+$f(n) = O(g(n))$ promises only a ceiling: it is fully consistent with $f$
+growing much slower than $g$. A claim of tight fit is spelled $\Theta$,
+and an algorithm's $O$-bound alone never justifies choosing it over
+another.
+</KeyFact>
+
+## Why constants drop: every gap in growth rate has a crossover
+
+The definitions absorb constant factors by fiat; this section shows why
+that is the right choice rather than a convenience. The reason is that a
+difference in growth *rate* beats any difference in constant factor once
+$n$ is large enough, and "large enough" is a computable point, not a
+platitude.
+
+Take $100n$ versus $n^2$: a linear algorithm with a terrible constant
+against a quadratic algorithm with a perfect one. Setting $100n = n^2$
+gives $n = 100$. Below that size the quadratic algorithm genuinely wins:
+at $n = 10$ it costs $100$ steps against the linear algorithm's $1{,}000$.
+Past it, the ratio $n^2 / 100n = n/100$ grows without bound: at $n =
+10^6$, the "slow" linear algorithm is ten thousand times faster.
+
+<Figure
+  src="./figures/crossover.svg"
+  alt="Curves of 100n and n² crossing at n = 100, where both cost 10,000 steps; n² is below before the crossing and above after, with the gap growing"
+  caption="Constants shift the crossover point; they never remove it. Past n = 100 the growth rates alone decide."
+/>
+
+Machines are constant factors too, and the same arithmetic applies to
+them. Pit a fast computer executing $10^{10}$ instructions per second
+against one executing $10^7$, a factor of $1{,}000$ in raw hardware. Give
+the fast machine a hand-tuned quadratic sorting algorithm costing $2n^2$
+instructions (this is *insertion sort*, analyzed in a later module), and
+the slow machine a mediocre implementation of an $n \log n$ algorithm
+costing $50\, n \lg n$ instructions, where $\lg$ denotes $\log_2$
+(*merge sort*, likewise). Sorting
+$n = 10^7$ numbers:
+
+$$
+\text{fast machine: } \frac{2 \cdot (10^7)^2}{10^{10}} = 20{,}000 \text{ s}
+\;(\approx 5.5\text{ h}),
+\qquad
+\text{slow machine: } \frac{50 \cdot 10^7 \lg 10^7}{10^{7}} \approx
+1{,}163 \text{ s} \;(< 20 \text{ min}).
+$$
+
+<KeyFact>
+A machine 1,000 times faster loses the sort at $n = 10^7$ by a factor of
+17, and the deficit widens with $n$. Hardware and implementation quality
+move an algorithm's constant $c$; only a different algorithm moves its
+growth rate.
+</KeyFact>
+
+### The misreading to avoid
+
+A tight bound ranks algorithms in the limit, and only in the limit. A
+common misreading of the notation says more: that "$f(n) = O(n^2)$" means
+the algorithm takes about $n^2$ steps, and consequently that an $O(n \log
+n)$ algorithm always outruns an $O(n^2)$ one. Both halves are false, for
+two separate reasons already on the table. First, $O$ is a ceiling, not a
+description: an algorithm whose true cost is $3n$ is correctly described
+as $O(n^2)$, so the comparison may be between labels, not behaviors;
+this is the set-membership point of the previous section. Second, even
+when both bounds are tight, the definitions only speak past $n_0$ and up
+to constants: $100n$ versus $n^2$ ranks one way below $n = 100$ and the
+other way above. The correct reading: asymptotic notation predicts the
+eventual winner and stays silent about small inputs. For inputs known
+to stay small, a "worse" algorithm with a small constant
+is often the right engineering choice.
+
+## The growth ladder: nanoseconds to 10²⁸¹ millennia
+
+With the notation fixed, the growth rates that actually occur in practice
+form a short ladder, and the course's algorithms land on its rungs. In
+increasing order of growth:
+
+$$
+\Theta(1) \;<\; \Theta(\log n) \;<\; \Theta(n) \;<\; \Theta(n \log n)
+\;<\; \Theta(n^2) \;<\; \Theta(2^n),
+$$
+
+where $f < g$ means $f = O(g)$ but $g \ne O(f)$: each rung eventually
+dwarfs everything below it. The base of the logarithm never matters inside
+asymptotic notation: $\log_a n = \log_a b \cdot \log_b n$, and
+$\log_a b$ is a constant factor, absorbed by $c$ exactly like a machine
+speed. That is why the ladder writes $\log n$ with no base, and why the
+shorthand $\lg$ from the previous section can stand in for it whenever a
+concrete base helps the arithmetic.
+
+### The logarithmic rung, worked
+
+The rungs $n$ and $n^2$ came out of counts already on the table — linear
+search and the pairwise loop; $\log n$ has so far only been asserted. It
+comes from one mechanism, repeated halving, and the count is worth
+working once, because every later structure that halves — binary search,
+balanced trees, heaps — lands on this rung by the same argument.
+
+<Example title="classifying a halving count">
+The procedure counts how many times its argument can be halved before
+reaching 1:
+
+```text
+Halvings(n):
+  k ← 0
+  while n > 1
+    n ← ⌊n/2⌋
+    k ← k + 1
+  return k
+```
+
+Each iteration costs a fixed number of steps (one test, one halving, one
+increment), so classifying $T(n)$ reduces to classifying the iteration
+count. That count is exactly $\lfloor \lg n \rfloor$: the loop exits
+during the pass that carries the value below 2, and halving $k$ times
+divides $n$ by $2^k$, so the exit happens at the unique $k$ with
+$2^k \le n < 2^{k+1}$. (Check $n = 12$: $12 \to 6 \to 3 \to 1$, three
+halvings, and $\lfloor \lg 12 \rfloor = 3$ since $2^3 = 8 \le 12 < 16$.)
+
+Claim: $\lfloor \lg n \rfloor = \Theta(\log n)$.
+
+**Upper bound.** $\lfloor \lg n \rfloor \le \lg n$ for all $n \ge 2$, so
+$O(\lg n)$ holds with $c = 1$, $n_0 = 2$.
+
+**Lower bound.** $\lfloor \lg n \rfloor > \lg n - 1 \ge \tfrac{1}{2} \lg
+n$ whenever $\lg n \ge 2$, so $\Omega(\lg n)$ holds with $c =
+\tfrac{1}{2}$, $n_0 = 4$.
+
+**Any base.** The claim says $\Theta(\log n)$, base unwritten, and the
+constants justify it: $\log_{10} n = (\log_{10} 2) \lg n \approx 0.30
+\lg n$, so certifying the bound in base 10 only rescales $c_1$ and $c_2$
+by a fixed factor. The base moves the constant, never the class.
+</Example>
+
+<Exercise>
+Classify the number of decimal digits of $n$, which is $D(n) =
+\lfloor \log_{10} n \rfloor + 1$: show $D(n) = \Theta(\lg n)$ with
+explicit constants $c_1$, $c_2$, $n_0$. Write both inequalities down
+before checking any numbers.
+
+<Solution>
+Strategy: convert the base first, then bound the floor and the $+1$, as
+in the worked example. $\log_{10} n = (\log_{10} 2) \lg n \approx
+0.301 \lg n$.
+
+**Lower bound.** $D(n) \ge \log_{10} n \approx 0.301 \lg n$, so $c_1 =
+0.3$ works for all $n \ge 1$.
+
+**Upper bound.** $D(n) \le \log_{10} n + 1 \approx 0.301 \lg n + 1 \le
+\lg n$ once $1 \le 0.699 \lg n$, i.e. $n \ge 3$. So $c_2 = 1$, $n_0 = 3$.
+
+Hence $D(n) = \Theta(\lg n)$: counting digits in base 10 and counting
+halvings in base 2 sit on the same rung, separated only by the constant
+factor $\log_{10} 2 \approx 0.30$ that the notation absorbs.
+</Solution>
+</Exercise>
+
+### The ladder on a wall clock
+
+What the rungs mean in wall-clock terms, at one step per nanosecond:
+
+<Figure
+  src="./figures/wallclock.svg"
+  alt="Table of running times for the six growth classes at n = 10³, 10⁶, and 10⁹ on a machine executing one step per nanosecond, ranging from 1 ns to about 10²⁸¹ millennia"
+  caption="The ladder in wall-clock time. Feasibility is a property of the row, not of the hardware."
+/>
+
+Two cells anchor the ladder. The quadratic row at $n = 10^6$ reads 17
+minutes: this is precisely the $10^{12}$-inspection lookup workload from
+the opening of the lesson, which is quadratic in disguise ($n$ lookups
+over $n$ items). And the exponential row at $n$ as small as $1{,}000$
+reads $2^{1000} \approx 10^{301}$ steps, about $10^{281}$ millennia: a
+number with no physical meaning, since the observable universe holds an
+estimated $10^{80}$ particles. Exponential growth is not "slow"; it is a
+different category of object, and no conceivable hardware moves it into
+the feasible rows.
+
+<KeyFact>
+Between $\Theta(n \log n)$ and $\Theta(n^2)$ runs the practical boundary
+of the ladder: at $n = 10^9$, half a minute against 32 years. Most of this
+course's effort is spent moving problems from the second class into the
+first.
+</KeyFact>
+
+<Task>
+The demo opens on a linear axis zoomed to $n \le 200$, the frame that
+contains the crossover computed in the previous section. Before moving
+anything, predict where $n^2$ overtakes $100n$ and roughly how far $2^n$
+gets before leaving the frame. Then drag the horizon to check both
+predictions — the crossover marker should land at $n = 100$ — and find
+the largest $n$ for which $2^n$ still fits on the linear axis, comparing
+it against where $n^2$ exits.
+</Task>
+
+<Demo
+  name="GrowthRaceChart"
+  caption="Growth rates racing as n grows. Presets: small n, crossover zoom, exponential blowup; toggle between linear and logarithmic axes."
+/>
+
+## Checking the model: the doubling experiment
+
+The word-RAM count is a model, and a model earns trust by predicting
+measurements. The test case is *3-SUM*: given $n$ integers, decide whether
+any three of them sum to zero. The brute-force algorithm tries all $\binom{n}{3} \approx
+n^3/6$ triples, so the model predicts $\Theta(n^3)$. Cubic growth
+has a measurable signature: double the input, and the time should
+multiply by $2^3 = 8$.
+
+Sedgewick and Wayne ran exactly this experiment (measured timings from
+[*Algorithms*, 4th ed., §1.4](https://algs4.cs.princeton.edu/14analysis/);
+each ratio divides a row's time by the row above it):
+
+| $n$ | time (s) | ratio | $\lg$ ratio |
+|---:|---:|---:|---:|
+| 1,000 | 0.1 | — | — |
+| 2,000 | 0.8 | 8.0 | 3.0 |
+| 4,000 | 6.4 | 8.0 | 3.0 |
+| 8,000 | 51.1 | 8.0 | 3.0 |
+
+Three doublings, three ratios of 8, measured exponent $\lg 8 = 3$. (The
+smaller sizes of Sedgewick and Wayne's fuller table, which starts at
+$n = 250$, show ratios climbing toward 8 from below: fixed overheads
+dilute the cubic term until $n$ is large enough.) Plotting time against
+$n$ with both axes logarithmic sharpens the same test: a power law
+$T = a\, n^b$ becomes the straight line $\log T = \log a + b \log n$,
+and a least-squares fit to the measured points gives slope $b = 2.999$ —
+the model's 3, recovered from a stopwatch to three decimal places.
+
+<Figure
+  src="./figures/doubling-loglog.svg"
+  alt="Log-log plot of the measured 3-SUM times: four points from n = 1,000 to 8,000 lying on a straight line of fitted slope 2.999, a doubling triangle showing that ×2 in n gives ×8 in time, and an extrapolated point at n = 16,000 where the fit predicted 408.1 seconds and the measurement gave 410.8"
+  caption="The power law as a straight line: on log axes the fitted slope is the exponent. The rightmost point was predicted from the fit before it was measured."
+/>
+
+The fitted constant, $a \approx 10^{-10}$ seconds, is the part the model
+refuses to predict: it bundles the machine, the compiler, and the cache,
+and it changes when any of them do. The exponent is where the hypothesis
+earns its keep by prediction: extrapolating the fit to $n = 16{,}000$
+predicts 408.1 seconds, and the measured run took 410.8.
+
+<KeyFact>
+The algorithm determines the measured exponent; the machine, compiler,
+and cache determine only the constant. This is the same division the
+notation makes — $\Theta(n^3)$ is the machine-independent part, and $c$
+absorbs everything else — which is what makes an asymptotic claim
+checkable on any hardware.
+</KeyFact>
+
+### What the doubling signature cannot see
+
+The signature is blind to logarithmic factors: an $n \log n$ algorithm
+doubles to a ratio of $2 + \varepsilon$, indistinguishable from $2$ at
+realistic sizes, so a measured slope near 1 does not separate $\Theta(n)$
+from $\Theta(n \log n)$. And where this course keeps only the growth
+rate, Sedgewick and Wayne's *tilde notation* ($\sim \tfrac{1}{6}n^3$)
+keeps the leading coefficient too: a finer model, bought at the price of
+machine-dependence; this course does not adopt it.
+
+What stands at the end of this lesson: running time is a function of input
+size counted in word-RAM steps; worst, best, and average case are three
+such functions per algorithm; $O$, $\Omega$, and $\Theta$ compress a
+function to its growth rate, with explicit constants $c$, $n_0$
+witnessing every claim; and the compression is empirically honest,
+with measured exponents matching counted ones. What the notation cannot do is say
+whether an algorithm computes the right answer at all. That is the next
+lesson's subject: the loop invariant, the technique for proving an
+iterative algorithm correct without running it.
+
+## Exercises
+
+<Exercise>
+An engineer benchmarks two library functions and reports: "`sortA` is
+documented $O(n \log n)$ and `sortB` is documented $O(n^2)$, so `sortA`
+can never be slower than `sortB` on any input." Refute the claim, naming
+each step of the reasoning that fails.
+
+<Solution>
+Two independent steps fail.
+
+**Step 1: reading $O$ as a description.** Membership in $O(n^2)$ is
+consistent with any slower growth: `sortB` could run in $\Theta(n)$ time
+on the inputs in question (many quadratic-worst-case sorts are linear on
+nearly-sorted data) and be documented $O(n^2)$ with complete accuracy.
+The documentation compares ceilings, not behaviors.
+
+**Step 2: ignoring $c$ and $n_0$.** Even if both bounds were tight, the
+definitions constrain only $n \ge n_0$ and only up to constant factors.
+Concretely, $100\, n \lg n$ against $n^2$: at $n = 100$ the first costs
+$100 \cdot 100 \cdot 6.64 \approx 66{,}400$ against $10{,}000$: the
+"quadratic" algorithm is over six times faster, and stays faster up to
+$n \approx 1{,}000$ (where $n = 100 \lg n$ balances).
+
+A correct statement: if `sortA` is $\Theta(n \log n)$ and `sortB` is
+$\Theta(n^2)$ in the relevant case, then there exists an $n_0$ beyond
+which `sortA` is faster, with $n_0$ and the constants unknown until
+measured.
+</Solution>
+</Exercise>
+
+<Exercise>
+Constants live in unexpected places. Decide, with proof from the
+definition, whether (a) $2^{n+1} = O(2^n)$ and (b) $2^{2n} = O(2^n)$.
+
+<Solution>
+**(a) True.** $2^{n+1} = 2 \cdot 2^n$, so the definition is satisfied
+with $c = 2$, $n_0 = 1$: the shift by one lands in the constant factor,
+exactly where the notation absorbs it.
+
+**(b) False.** Suppose $2^{2n} \le c \cdot 2^n$ for all $n \ge n_0$.
+Dividing by $2^n$ gives $2^n \le c$, but $c$ must be a single constant,
+independent of $n$, and $2^n$ exceeds any constant once $n > \lg c$. The
+definition's requirement that $c$ be constant is the clause that fails: a
+factor of $2^n$ is not a constant factor. Inside an exponent, additive changes are harmless and
+multiplicative changes are fatal: the reverse of the rule for
+polynomials.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove a fact the lesson used silently: for functions $f$ and $g$ that are
+nonnegative for all large $n$,
+$\max(f(n), g(n)) = \Theta(f(n) + g(n))$.
+
+<Solution>
+Both bounds come from comparing the maximum to the sum directly, for $n$
+large enough that both functions are nonnegative.
+
+**Upper.** $\max(f, g) \le f + g$, since the other term is nonnegative.
+This is the definition of $O$ with $c = 1$.
+
+**Lower.** The larger of two numbers is at least their average:
+$\max(f, g) \ge \tfrac{1}{2}(f + g)$. This is $\Omega$ with $c =
+\tfrac{1}{2}$.
+
+With $c_1 = \tfrac{1}{2}$, $c_2 = 1$, and $n_0$ the point past which both
+are nonnegative, the sandwich holds, so $\max(f,g) = \Theta(f+g)$.
+Consequence: an algorithm made of two phases run in sequence has running
+time $\Theta$ of the costlier phase; analyses may always discard the
+cheaper of two sequential phases.
+</Solution>
+</Exercise>
+
+<Exercise>
+An algorithm scans an array left to right and returns immediately upon
+finding a zero entry. Classify each statement as correct, an
+overstatement, or an understatement, and give the tightest correct
+version: (a) "the running time is $\Theta(n)$"; (b) "the worst-case
+running time is $\Theta(n)$"; (c) "the running time is $O(n)$"; (d) "the
+best-case running time is $O(1)$".
+
+<Solution>
+(a) **Overstatement.** A blanket $\Theta(n)$ claims every input of size
+$n$ costs linear time, but an input with a zero in the first slot costs
+constant time. The best case breaks the lower half of the sandwich.
+
+(b) **Correct.** Restricted to worst-case inputs (no zero present, or
+zero in the last slot), the scan inspects all $n$ entries: $O(n)$ because
+never more, $\Omega(n)$ because that input forces all $n$, so $\Theta(n)$
+by the theorem on tight bounds.
+
+(c) **Correct, and blanket.** Every input of size $n$ costs at most about
+$n$ steps, so $O(n)$ holds for the running time as a whole: an upper
+bound may safely cover all cases.
+
+(d) **Correct but an understatement.** The best case costs a constant
+number of steps, which is $\Theta(1)$, not merely $O(1)$; the tightest
+version replaces $O$ with $\Theta$.
+
+The pattern: $\Theta$ blanket statements need every case to agree; $O$
+blanket statements need only the worst case; per-case statements should
+be $\Theta$ whenever both bounds are known.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the doubling experiment on the lesson's own loop. Implement
+`PairProducts` in any language, time it at $n = 2{,}000, 4{,}000,
+8{,}000, 16{,}000, \dots$ (repeating each measurement a few times), and
+compute the ratio of consecutive times. State before running: what ratio
+does $\Theta(n^2)$ predict, what measured ratios would you accept as
+agreement, and what result would falsify the count?
+
+<Solution>
+Prediction: doubling $n$ multiplies $n^2$ by 4, so the time ratios should
+converge to 4 ($\lg$ ratio $\to 2$) as $n$ grows. Reasonable agreement:
+ratios within roughly 10% of 4 at the larger sizes; small-$n$ ratios run
+low because fixed overheads (interpreter startup, timer resolution)
+dilute the quadratic term, the empirical face of $n_0$. A falsifying
+result is ratios converging to a different constant: e.g. steady ratios
+near 8 would mean the implementation is accidentally cubic (a common bug:
+recomputing a sum inside the inner loop). A ratio drifting slowly upward
+past 4 at large $n$ typically signals a memory-hierarchy effect: the
+model's constant-cost-per-step assumption fraying, not a wrong exponent.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson's opening claims a sorted structure answers a lookup among a
+million records in a few dozen inspections. Justify the number: an
+inspection of one item in a sorted array tells which half of the array
+the target lies in. Starting from $10^6$ candidates, how many
+halvings reach a single candidate, and what growth class does this place
+the cost in?
+
+<Solution>
+Each inspection halves the candidate range: $10^6 \to 5 \times 10^5 \to
+\dots \to 1$. The number of halvings is $\lceil \lg 10^6 \rceil = 20$,
+since $2^{20} = 1{,}048{,}576 > 10^6$ — the halving count classified as
+$\Theta(\log n)$ in the growth-ladder section. Twenty inspections for a
+million items is that logarithmic rung of the ladder: 20 ns in the
+wall-clock table against 1 ms for a linear scan. (Library implementations
+of sorted structures inspect closer to $2 \lg n \approx 40$ items, the
+"few dozen" of the opening: pointers and balance bookkeeping double the
+constant, never the growth rate.)
+
+This halving procedure is binary search; <Ref
+lesson="binary-search-and-order-statistics">a later lesson</Ref> states
+it precisely, and proving that the halving never discards the target is
+the opening example of <Ref lesson="loop-invariants-and-correctness">the
+next lesson</Ref> on loop invariants.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §1.2 (the faster-machine comparison), §3.1–3.2 (informal and formal definitions, Theorem 3.1, Fig. 3.2), §3.3 (standard functions and notational conventions).
+2. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 1 notes — the word-RAM model and the wall-clock table this lesson's version extends. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+3. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §1.4: the scientific-method framing of analysis, the 3-SUM timings, the doubling hypothesis, and tilde notation. Companion site: https://algs4.cs.princeton.edu/14analysis/
+4. J. Erickson, *Algorithms*, 2019 — §0.6: running time as a count of elementary steps, and why the count (not the clock) is the object of analysis. Free online: https://jeffe.cs.illinois.edu/teaching/algorithms/
+5. P. Morin, *Open Data Structures*, 2013 — §1.1: the need-for-efficiency arithmetic behind this lesson's opening numbers. Free online: https://opendatastructures.org/
+</References>

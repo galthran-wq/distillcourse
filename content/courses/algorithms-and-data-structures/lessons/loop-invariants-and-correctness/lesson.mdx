@@ -1,0 +1,870 @@
+An algorithm that terminates and returns an answer has not thereby been
+shown correct; a loop invariant is a claim that holds before every
+iteration, holds after the loop ends, and by holding at the end proves the
+algorithm right. <Ref lesson="asymptotic-notation">The previous
+lesson</Ref> built the cost half of the course's foundation: running time
+as a count of word-RAM steps, compressed by $O$, $\Omega$, $\Theta$ to a
+growth rate. Nothing in that analysis checks whether the answer being
+computed is the right one, and the notation has no way to say so. This
+lesson supplies the checking technique, the second of the two tools on
+which everything later in the course stands. The route: what a test can
+and cannot establish, the invariant and its three proof obligations, a
+complete proof for insertion sort, the two demands that make a candidate
+invariant usable, and termination as a separate obligation with its own
+method.
+
+## Tests sample, proofs cover
+
+Correctness is a claim about a *specification*: a *precondition* stating
+which inputs the algorithm accepts, and a *postcondition* stating what
+must be true of the output. For sorting, the precondition is "an array
+$A[1..n]$ of numbers" and the postcondition has two clauses: the output
+array holds the **same collection** of values the input held, and holds
+them in nondecreasing order. Both clauses are load-bearing: a procedure
+that overwrites the array with $1, 2, \ldots, n$ satisfies the ordering
+clause and sorts nothing.
+
+An algorithm is correct when every input satisfying the precondition
+yields an output satisfying the postcondition. That is a universally
+quantified claim over an infinite input space, and a test suite samples
+finitely many points of it. A million passing random tests are evidence;
+they are compatible with a bug that sits on exactly the inputs the sampler
+never draws: a nearly sorted array, a run of equal keys, an input of
+length $2^{30}$. A proof covers the whole space or it is not a proof.
+
+<Aside>
+A proof's coverage is bounded by its model, and the boundary has been hit
+in production. Column 4 of Bentley's *Programming Pearls* develops binary
+search together with its loop-invariant proof, and the proof is sound. In
+2006 Joshua Bloch reported that the Java runtime library's binary search,
+descended from that verified pseudocode, crashed on arrays longer than
+about $2^{30}$: the line `mid = (lo + hi) / 2` overflows fixed-width
+integers, something the proof's model (the idealized integers of
+<Ref lesson="asymptotic-notation">the word-RAM</Ref>) cannot express. The
+proof was a true statement about the algorithm; the machine ran a slightly
+different one. Testing had missed the case for nine years because no test
+used a billion-element array.
+</Aside>
+
+The obstacle to proving anything is that a loop's iteration count depends
+on the input. A direct argument would have to describe the state after
+iteration 1, after iteration 2, and so on through a number of steps that
+grows without bound; no finite text can do it case by case. The only
+finite handle on an unbounded process is a single claim, stated once,
+together with a proof that each iteration preserves it. That is
+mathematical induction restated for loops, and the rest of this lesson
+makes the restatement precise and puts it to work.
+
+### One claim, carried around the loop
+
+The claim is easiest to see on a loop with a three-line body. The
+procedure sums an array:
+
+```text
+SumArray(A[1..n]):
+  s ← 0
+  for i ← 1 to n
+    s ← s + A[i]
+  return s
+```
+
+Postcondition: the returned value equals $A[1] + A[2] + \cdots + A[n]$.
+Run it on $A = \langle 4, 1, 6, 3 \rangle$ and watch the pair $(i, s)$ at
+each loop-header test: $(1, 0)$, $(2, 4)$, $(3, 5)$, $(4, 11)$, $(5,
+14)$. One sentence fits every row: $s$ equals the sum of
+$A[1..i-1]$, the elements already processed, where the sum of the
+empty subarray $A[1..0]$ is $0$. The sentence is not a fact about one
+moment of the run; it is a fact about every checkpoint, carried around
+the loop and handed forward each lap.
+
+<FigureSequence
+  name="sum-invariant"
+  alt="Three frames: the claim s = sum of A[1..i−1] before an iteration, the body adding A[3] into s, and the same claim holding one slot further along"
+  caption="One iteration of SumArray: the claim holds before, the body runs once, and the same claim holds one slot further along."
+/>
+
+<Task>
+Step through the three frames, then check the final checkpoint by hand:
+at $i = 5$ the claim reads $s = A[1] + A[2] + A[3] + A[4] = 14$, and the
+header test $5 \le 4$ fails, so this is the value `return` hands back.
+The claim at the exit checkpoint is the postcondition.
+</Task>
+
+## The invariant and its three obligations
+
+The sentence that survived every checkpoint deserves its name and its
+proof scheme; both come from the induction it repackages.
+
+### The definition: a claim at every checkpoint
+
+<Definition title="loop invariant">
+A **loop invariant** is a claim about the program state, usually phrased
+in terms of the loop counter, that holds at every evaluation of the
+loop's condition: before the first iteration, between any two
+iterations, and at the final evaluation, the one that fails and exits
+the loop.
+</Definition>
+
+<Remark title="where a checkpoint sits">
+For a `for` loop, "before an iteration" means after the counter has been
+assigned its new value and before the header test runs. The loop `for i ←
+1 to n` therefore has checkpoints at $i = 1, 2, \ldots, n+1$; the last
+one, where the test fails, is the checkpoint the proof harvests, and the
+counter keeps that exit value $n + 1$ afterward. The convention matters
+at the edges: the claim $s = \sum_{k=1}^{i-1} A[k]$ is an invariant of
+`SumArray`, while the superficially similar $i \le n$ is not: it holds
+before every iteration that runs but fails at the exit checkpoint,
+violating the "every evaluation" clause of the definition.
+</Remark>
+
+### Three obligations: an induction that stops
+
+A claim of this kind proves the algorithm correct through three
+obligations, discharged separately:
+
+- **Initialization.** The invariant holds at the first checkpoint.
+- **Maintenance.** If the invariant holds before an iteration, executing
+  the body once makes it hold before the next.
+- **Termination.** The loop exits, and the invariant at the exit
+  checkpoint, combined with the exit condition, implies the
+  postcondition.
+
+<Figure
+  src="./figures/ladder.svg"
+  alt="Three rungs of a ladder: initialization at the bottom equated with an induction's base case, maintenance in the middle equated with the inductive step, and termination at the top where the induction stops and the claim is used"
+  caption="The three obligations are an induction that stops: base case, inductive step, and a finite point at which the established claim is put to use."
+/>
+
+The ladder is mathematical induction on the iteration number, with one
+difference. Ordinary induction proves a claim for all $n$ and never
+stops; here initialization is the base case, maintenance is the inductive
+step, and the induction runs only until the loop exits, at which point
+the accumulated claim is put to use. The same correspondence read in the
+other direction explains recursive algorithms: trusting a recursive call
+on a smaller input amounts to assuming the induction hypothesis, and no
+separate theory is needed. This course uses the point from
+<Ref lesson="comparison-sorting-merge-and-quicksort">merge sort</Ref>
+onward.
+
+<Aside>
+The technique is older than any algorithms textbook. Robert Floyd's 1967
+paper "Assigning Meanings to Programs" attached logical assertions to the
+points of a flowchart and proved programs by showing each command carries
+its entry assertion to its exit assertion; Hoare's 1969 axiomatization
+turned the loop case into a single inference rule whose hypothesis is
+exactly the maintenance obligation. The same machinery, mechanized, runs
+inside modern program verifiers: the invariant is what those tools ask
+the programmer to supply, because it is the one part machines still find
+hard to guess.
+</Aside>
+
+### SumArray discharged: the yield is one substitution
+
+<Example title="SumArray, all three obligations">
+**Claim.** `SumArray` returns $\sum_{k=1}^{n} A[k]$.
+
+**Invariant.** At the start of each iteration, $s = \sum_{k=1}^{i-1}
+A[k]$.
+
+**Initialization.** The first checkpoint is $i = 1$, immediately after
+`s ← 0`. The invariant reads $s = \sum_{k=1}^{0} A[k]$, an empty sum,
+which is $0$. It holds.
+
+**Maintenance.** Assume the invariant at the checkpoint with counter
+value $i \le n$: $s = \sum_{k=1}^{i-1} A[k]$. The body executes
+`s ← s + A[i]`, after which $s = \sum_{k=1}^{i} A[k]$. The counter then
+becomes $i + 1$, and the invariant with $i+1$ in place of $i$ reads
+$s = \sum_{k=1}^{(i+1)-1} A[k] = \sum_{k=1}^{i} A[k]$: exactly the value
+just computed. It holds at the next checkpoint.
+
+**Termination.** The counter rises by one per iteration toward the fixed
+bound $n$, so the loop exits at the checkpoint $i = n + 1$. Substituting
+the exit value into the invariant: $s = \sum_{k=1}^{n} A[k]$. The next
+statement returns $s$, which is the postcondition.
+</Example>
+
+The substitution in the last step is worth isolating, because it is the
+entire yield of the proof: initialization and maintenance manufacture a
+fact that is true at the exit; termination is where that fact is spent.
+
+<KeyFact>
+The whole harvest of a loop-invariant proof is one substitution: the exit
+value of the counter, put into the invariant. An invariant that says
+nothing useful at that value (however true, however easily maintained)
+proves nothing, which is the failure mode dissected two sections below.
+</KeyFact>
+
+<Exercise>
+Produce the parallel proof for the running maximum. Before opening the
+solution, write the invariant down: one sentence relating $m$ to
+$A[1..i-1]$.
+
+```text
+MaxArray(A[1..n]):   ▷ n ≥ 1
+  m ← A[1]
+  for i ← 2 to n
+    if A[i] > m
+      m ← A[i]
+  return m
+```
+
+State the invariant and discharge initialization, maintenance, and
+termination.
+
+<Solution>
+Strategy: mirror the sum proof, replacing "sum of" by "maximum of"; the
+one new wrinkle is that the body has two branches, so maintenance splits
+into two cases.
+
+**Invariant.** At the start of each iteration, $m = \max(A[1..i-1])$.
+
+**Initialization.** The first checkpoint is $i = 2$, after `m ← A[1]`.
+The invariant reads $m = \max(A[1..1]) = A[1]$. It holds. (The
+precondition $n \ge 1$ is what makes `A[1]` exist; on an empty array the
+maximum is undefined and so is the procedure.)
+
+**Maintenance.** Assume $m = \max(A[1..i-1])$ before the iteration with
+counter $i$. Case $A[i] > m$: the body sets $m$ to $A[i]$, which exceeds
+the maximum of $A[1..i-1]$ and therefore equals $\max(A[1..i])$. Case
+$A[i] \le m$: the body leaves $m$ unchanged, and since $A[i]$ does not
+exceed $m$, the old maximum is still the maximum of $A[1..i]$. In both
+cases the counter then becomes $i+1$ and the invariant holds with $i+1$
+in place of $i$.
+
+**Termination.** The loop exits at $i = n + 1$; the invariant reads
+$m = \max(A[1..n])$, which is what is returned.
+
+The transferable move: an `if` inside the body does not change the
+scheme; maintenance simply argues each branch to the same conclusion.
+</Solution>
+</Exercise>
+
+## Insertion sort, proved correct
+
+A three-line body made every obligation a one-liner; the same three
+obligations must now be discharged for a loop whose body is itself a
+loop. The specimen is *insertion sort*, the quadratic sorting algorithm
+whose $2n^2$ step count raced a faster machine in
+<Ref lesson="asymptotic-notation">the previous lesson</Ref>.
+
+### The algorithm and its three-clause invariant
+
+The algorithm is how card players sort a dealt hand. Everything picked up
+so far is held in order; each new card is slid in at the position where
+it fits. At any moment the hand is sorted, the next card is in flight,
+and the rest of the deal is face down.
+
+<Figure
+  src="./figures/cards.svg"
+  alt="A sorted hand of cards (2, 4, 5, 10), a next card 7 being inserted between 5 and 10, and a face-down pile, each bound to its array region: the sorted prefix A[1..i−1], the key A[i], and the unseen suffix A[i+1..n]"
+  caption="The card player's state, bound to the array: sorted hand = prefix A[1..i−1], card in flight = key, pile = the unseen suffix."
+/>
+
+In array form, with the metaphor dropped:
+
+```text
+InsertionSort(A[1..n]):
+  for i ← 2 to n
+    key ← A[i]
+    j ← i − 1
+    while j > 0 and A[j] > key
+      A[j+1] ← A[j]      ▷ shift right
+      j ← j − 1
+    A[j+1] ← key
+```
+
+The outer loop picks up $A[i]$ as `key`; the inner loop shifts every
+larger prefix element one slot right, opening a gap; the last line drops
+the key into the gap. The card player's "hand is always sorted" becomes the
+invariant:
+
+**Invariant.** At the start of each iteration of the `for` loop, (1) the
+subarray $A[1..i-1]$ holds the elements it held originally, (2) in
+nondecreasing order, and (3) each slot of $A[i..n]$ still holds the
+value it held originally.
+
+Clauses 1 and 2 are the sorting postcondition in miniature: the prefix
+holds the original elements (not copies, not replacements) in order.
+Clause 3 records that the loop has not yet disturbed the rest of the
+array; it is the clause maintenance will spend when it reads $A[i]$ and
+calls the value there "the element originally at position $i$." The
+trace below runs the algorithm on $\langle 5, 2, 4, 6, 1, 3 \rangle$,
+the sorted prefix shaded.
+
+<FigureSequence
+  name="insertion-trace"
+  alt="Six frames of insertion sort on the array 5,2,4,6,1,3: each frame shows one for-loop iteration with the sorted prefix shaded, the key highlighted, shift arrows for moved elements, and the grown prefix below; the last frame shows the exit checkpoint with the whole array sorted"
+  caption="Six checkpoints of insertion sort. The shaded region is the invariant's sorted prefix made visible: it grows by one slot per iteration and covers the array when the loop exits; the key's slot and everything right of it form the untouched suffix of clause 3."
+/>
+
+<Task>
+Before advancing past each frame, predict the number of shifts the inner
+loop will perform from the invariant region and the key alone. Frame 3 is
+the degenerate case: $A[3] = 5 \le 6$, the `while` body runs zero times,
+and the invariant still advances: verify the prefix grows without
+anything moving.
+</Task>
+
+### The proof: maintenance carries an inner invariant
+
+<Theorem title="correctness of insertion sort">
+For every array $A[1..n]$ of numbers, `InsertionSort` terminates with
+$A[1..n]$ holding the same collection of values it held initially,
+arranged in nondecreasing order.
+
+<Proof>
+The plan: the three obligations for the invariant above, with maintenance
+(the only nontrivial one) argued through a subsidiary invariant for the
+inner `while` loop.
+
+**Initialization.** The first checkpoint is $i = 2$, before any slot has
+been written. $A[1..1]$ holds its original element (clause 1), a
+one-element subarray is nondecreasing (clause 2), and every slot of
+$A[2..n]$ holds its original value (clause 3). All three hold.
+
+**Maintenance.** Fix an iteration with counter value $i$, and assume all
+three clauses: $A[1..i-1]$ holds its original elements in sorted order,
+and each slot of $A[i..n]$ holds its original value. By clause 3, the
+assignment `key ← A[i]` captures the element originally at position $i$,
+preserving it in a variable so the slot itself may be overwritten. For
+the inner loop, the claim is: at every test of the `while` condition,
+
+1. $0 \le j \le i - 1$;
+2. reading $A[1..j]$ followed by $A[j+2..i]$ (skipping slot $j+1$)
+   gives the sorted prefix from the start of this outer iteration, in
+   order: $A[1..j]$ is its first $j$ elements in place, and $A[j+2..i]$
+   is its remaining $i-1-j$ elements, each shifted one slot right;
+3. every element of $A[j+2..i]$ is greater than $\textit{key}$.
+
+*Inner initialization:* at $j = i - 1$, the subarray $A[1..i-1]$ is the
+prefix itself, $A[j+2..i] = A[i+1..i]$ is empty, and claims 2 and 3 are
+immediate (3 vacuously).
+
+*Inner maintenance:* the body runs only when $j > 0$ and
+$A[j] > \textit{key}$. It copies $A[j]$ into slot $j+1$ and decrements
+$j$. The skipped slot moves from $j+1$ to $j$: the copied element, which
+was the $j$-th of the sorted prefix, now heads the shifted block, so
+claim 2 still describes the prefix's elements in order; that element
+exceeds $\textit{key}$ by the loop test, extending claim 3; and $j$
+decreased by one, keeping claim 1.
+
+*Inner termination:* $j$ strictly decreases each pass and claim 1 bounds
+it below by $0$, so the loop exits, with $j = 0$ or $A[j] \le
+\textit{key}$. Either way every element of $A[1..j]$ is at most
+$\textit{key}$: vacuously if $j = 0$, and otherwise because $A[1..j]$ is
+sorted with last element $A[j] \le \textit{key}$. The final assignment
+`A[j+1] ← key` writes $\textit{key}$ into the skipped slot. The subarray $A[1..i]$ now reads:
+$A[1..j]$, sorted and $\le \textit{key}$; then $\textit{key}$; then
+$A[j+2..i]$, sorted (consecutive elements of the old sorted prefix) and
+$> \textit{key}$. It is nondecreasing end to end, giving clause 2. Its
+contents are the old prefix's elements plus $\textit{key}$: the former
+are the elements originally in $A[1..i-1]$ (clause 1 of the
+hypothesis), and $\textit{key}$ is the element originally at position
+$i$ (captured above under clause 3), so $A[1..i]$ holds precisely the
+elements it held originally, giving clause 1. Clause 3 survives the
+iteration as well: every write of the body
+(the inner loop's `A[j+1] ← A[j]` with $1 \le j \le i-1$, and the final
+`A[j+1] ← key` with $0 \le j \le i-1$) lands inside $A[1..i]$, so each
+slot of $A[i+1..n]$ still holds its original value. The counter becomes
+$i + 1$, and the outer invariant with $i+1$ in place of $i$, all three
+clauses of it, is exactly what was just established.
+
+**Termination.** The outer counter rises by one per iteration toward the
+fixed bound $n$: after at most $n - 1$ iterations the loop exits at the
+checkpoint $i = n + 1$. Substituting the exit value into the invariant:
+clause 3 speaks of the empty subarray $A[n+1..n]$ and asserts nothing,
+and clauses 1 and 2 read: $A[1..n]$ holds the elements it held
+originally, in nondecreasing order. That is the postcondition.
+</Proof>
+</Theorem>
+
+### What the proof cost, and what it did not touch
+
+The textbook treatment (CLRS §2.1) states clauses 1 and 2 as the
+invariant, leaves the untouched suffix tacit, and argues maintenance
+informally, deferring the inner loop; the proof above makes both the
+third clause and the inner argument explicit, and its price (three
+inner claims and a shift-by-shift analysis) is the full cost of "the
+body works" when the body is a loop. Nothing in either version counts steps: correctness and cost are
+separate deliverables, and the count from
+<Ref lesson="asymptotic-notation">the previous lesson</Ref> stands
+unchanged at worst-case $\Theta(n^2)$.
+
+## Choosing the invariant: sufficient at exit, inductive in between
+
+The proofs so far received their invariants ready-made. Constructing one
+is the actual skill, and it is governed by two demands pulling in
+opposite directions. At the exit checkpoint, the invariant plus the exit
+condition must **imply the postcondition**: strong enough to be worth
+having. And at every maintenance step, the invariant must be provable
+again from one source only, its own truth one checkpoint earlier plus
+the loop body: strong enough, in a different sense, to carry itself.
+
+The second demand is where intuition misleads: it is natural to suppose
+that any statement observed to hold at every checkpoint will serve in the
+proof. It will not, and the reason is structural: the maintenance
+obligation hands the prover the invariant and nothing else. Everything
+else about the run (the history of the counter, relations between
+variables the invariant omits) is forgotten between checkpoints. A claim
+can be true at every checkpoint of every run and still be unusable,
+because its own content is too thin to reprove it one iteration later.
+
+### A true claim that cannot reprove itself
+
+The failure is easiest to produce on purpose. The following procedure
+computes $n^2$ by summing the first $n$ odd numbers:
+
+```text
+SquareBySums(n):   ▷ n ≥ 0
+  s ← 0
+  t ← 1
+  for i ← 1 to n
+    s ← s + t
+    t ← t + 2
+  return s
+```
+
+At the checkpoints, $(i, s, t)$ runs $(1, 0, 1)$, $(2, 1, 3)$,
+$(3, 4, 5)$, $(4, 9, 7)$, $(5, 16, 9)$: the candidate claim
+$s = (i-1)^2$ is true at every one of them, and at the exit checkpoint
+$i = n+1$ it reads $s = n^2$, the postcondition itself. Sufficient at
+exit — and yet maintenance fails. From the hypothesis $s = (i-1)^2$
+alone, the body produces $s' = (i-1)^2 + t$, and the hypothesis says
+nothing about $t$: no algebra reaches $s' = i^2$. The step is not false;
+it is unprovable, which for a proof is the same defect.
+
+### The repair: strengthen the claim
+
+The repair is the counterintuitive move: **strengthen the claim**. Prove
+more, and maintenance gets more to work with, because the whole invariant
+returns as the hypothesis. Take the conjunction of $s = (i-1)^2$ with
+$t = 2i - 1$. Initialization: $(0, 1)$ at $i = 1$, and $0 = 0^2$,
+$1 = 2 \cdot 1 - 1$. Maintenance: from both clauses,
+$s' = (i-1)^2 + (2i-1) = i^2$ and $t' = (2i-1) + 2 = 2(i+1) - 1$: both
+clauses reproven at $i + 1$. Termination: at $i = n+1$, the first clause
+is $s = n^2$. The stronger statement is the provable one.
+
+### The spectrum: three ways a candidate fails
+
+<Figure
+  src="./figures/spectrum.svg"
+  alt="Claims about a loop arranged by logical strength: i ≤ n+1 is true but yields nothing at exit; s = (i−1)² is true but cannot reprove itself; the conjunction s = (i−1)² and t = 2i−1 is inductive and sufficient; A[1..i−1] holds the i−1 smallest elements is false at a checkpoint"
+  caption="The usable band: strong enough to imply the goal at exit and to reprove itself across one iteration, weak enough to be true at every checkpoint."
+/>
+
+The spectrum has failures on both flanks, and the worked examples of this
+lesson supply one of each kind:
+
+- **Too weak to conclude.** $i \le n + 1$ for `SumArray`: initialization
+  and maintenance are trivial, so all three obligations are discharged;
+  the exit substitution yields $n + 1 \le n + 1$, which is true and says
+  nothing about $s$.
+- **Too weak to maintain.** $s = (i-1)^2$ alone: true at every
+  checkpoint, sufficient at exit, not *inductive*: it cannot reprove
+  itself. A claim usable in maintenance must carry every fact the next
+  step needs.
+- **Too strong.** "$A[1..i-1]$ holds the $i-1$ smallest elements of the
+  array, in sorted order" for insertion sort: on the trace above, the
+  checkpoint $i = 2$ has $A[1] = 5$ while the array's smallest element is
+  $1$. The claim is simply false there, so it is not an invariant at all;
+  no obligation can be discharged for it. (It is, however, the exact
+  invariant of a different algorithm, one that repeatedly extracts the
+  minimum of the unsorted region, and the exercises meet its
+  nested-loop cousin in bubblesort.)
+
+<KeyFact>
+A usable invariant is inductive and sufficient: its truth before one
+iteration must imply its truth after, with no outside help, and its truth
+at the exit value must imply the postcondition. Strengthening a true
+claim can turn an unprovable maintenance step into a provable one: the
+stronger claim comes back as a stronger hypothesis.
+</KeyFact>
+
+## Termination: a quantity that falls and cannot fall forever
+
+Every proof above contained the phrase "the loop exits," and for the
+`for` loops it was earned in passing: a counter that rises by one per
+iteration toward a bound fixed in advance leaves the quantity
+$n + 1 - i$ falling by exactly one per pass, and a nonnegative integer
+can fall only finitely often. `for` loops of this shape terminate by
+construction. `while` loops carry no such guarantee: their exit
+condition can simply keep failing, and termination is a genuine
+obligation.
+
+### The measure: an integer that strictly decreases toward a floor
+
+The standard argument exhibits a *termination measure*: an integer
+quantity that strictly decreases on every iteration and is bounded below.
+The insertion-sort proof used one inside its maintenance step: the inner
+loop's $j$ falls by one per pass and cannot pass $0$, so the shifting
+stops. In the halving loop of the final exercise the measure is the width
+of the surviving range. Whatever the loop, the schema is identical:
+name the quantity, show the strict decrease, show the floor.
+
+<KeyFact>
+An integer quantity that strictly decreases and cannot go below a fixed
+bound changes at most (initial value − bound) times. Every termination
+argument in this course is an instance of this one sentence.
+</KeyFact>
+
+### Collatz: four lines nobody can prove terminating
+
+That the obligation is real is shown by how cheaply it can be made
+undischargeable:
+
+```text
+Collatz(n):   ▷ n ≥ 1
+  while n ≠ 1
+    if n is even
+      n ← n/2
+    else
+      n ← 3n + 1
+```
+
+Whether this four-line loop terminates for every starting value is the
+Collatz conjecture, open since 1937. The iterates refuse every candidate
+measure: they fall, then jump. From $27$ the sequence climbs to $9{,}232$
+before reaching $1$ on iteration $111$, and no quantity is known that
+decreases at every step. Computation has verified termination for every
+start up to $2^{68}$, about $3 \times 10^{20}$ values, and the count
+settles nothing: tests sample, proofs cover, and for this loop no proof
+exists in either direction.
+
+<Figure
+  src="./figures/collatz.svg"
+  alt="The Collatz iterates starting from 27 on a logarithmic axis: 111 iterations of rises and falls peaking at 9,232 on iteration 77 before reaching 1"
+  caption="The iterates from n = 27: 111 iterations, peak 9,232. A termination measure must fall every step; nothing known does."
+/>
+
+What stands at the end of this lesson: correctness is a specification
+made of a precondition and a postcondition; a loop is proved against it
+by an invariant discharged in three obligations (initialization,
+maintenance, termination), which is induction with a stopping point; a
+usable invariant is inductive and sufficient, and where the loop is a
+`while`, a decreasing bounded measure certifies the stopping point
+itself. Insertion sort is now proved correct, and its $\Theta(n^2)$ cost
+is known. What the toolkit still lacks is a way to price recursion:
+merge sort and its relatives spend their time in recursive calls, and
+their cost statements are equations in $T(n)$ that must be solved, not
+counted. <Ref lesson="recurrences-and-master-theorem">The next
+lesson</Ref> solves them.
+
+## Exercises
+
+<Exercise>
+Linear search scans for a value and may return from inside the loop:
+
+```text
+LinearSearch(A[1..n], x):
+  for i ← 1 to n
+    if A[i] = x  return i
+  return not-found
+```
+
+Postcondition: the returned value is an index $i$ with $A[i] = x$, or
+`not-found` if $x$ occurs nowhere in $A[1..n]$. State a loop invariant
+and prove the procedure correct. A loop with a `return` in its body has
+two ways out; the proof must handle both.
+
+<Solution>
+Strategy: the invariant should record what the completed iterations have
+ruled out.
+
+**Invariant.** At the start of each iteration, $x$ does not occur in
+$A[1..i-1]$.
+
+**Initialization.** At $i = 1$ the subarray $A[1..0]$ is empty, and $x$
+does not occur in an empty subarray. Vacuously true.
+
+**Maintenance.** Assume $x \notin A[1..i-1]$ before the iteration with
+counter $i$. The body compares $A[i]$ with $x$. If they are equal the
+procedure returns: there is no next checkpoint, and maintenance has
+nothing to show. Otherwise $A[i] \ne x$, which together with the
+hypothesis gives $x \notin A[1..i]$; the counter becomes $i+1$ and the
+invariant holds at the next checkpoint.
+
+**Termination, exit by exit.** Exit 1: `return i` runs only under the
+test $A[i] = x$, which is the postcondition's first clause directly (the
+invariant is not even needed). Exit 2: the header test fails at the
+checkpoint $i = n+1$, where the invariant reads $x \notin A[1..n]$, so
+returning `not-found` satisfies the second clause. The `for` loop
+terminates by its counter, so one of the two exits is reached.
+
+The transferable move: with early returns, "termination" becomes a case
+analysis over exit points, and each exit must imply the postcondition
+using whatever is known there.
+</Solution>
+</Exercise>
+
+<Exercise>
+Horner's rule evaluates a polynomial
+$P(x) = \sum_{k=0}^{n} A[k]\, x^k$, coefficients in $A[0..n]$, with one
+multiplication and one addition per loop pass:
+
+```text
+Horner(A[0..n], x):
+  p ← 0
+  for i ← n downto 0
+    p ← A[i] + x · p
+  return p
+```
+
+(a) Prove the procedure correct using the invariant: at the start of each
+iteration, $p = \sum_{k=0}^{n-(i+1)} A[k + i + 1]\, x^{k}$ (an empty sum
+is $0$). Note the loop runs downward, so the exit checkpoint is
+$i = -1$. (b) State the running time in $\Theta$-notation, and compare it
+with the algorithm that computes each term $A[k]\,x^k$ from scratch by
+repeated multiplication.
+
+<Solution>
+**(a) Initialization.** First checkpoint $i = n$: the sum's upper limit
+is $n - (n+1) = -1$, an empty sum, and $p = 0$. Holds.
+
+**Maintenance.** Assume $p = \sum_{k=0}^{n-i-1} A[k+i+1]\, x^k$ before
+the iteration with counter $i$. The body computes
+
+$$
+p' = A[i] + x \cdot \sum_{k=0}^{n-i-1} A[k+i+1]\, x^{k}
+   = A[i] + \sum_{k=0}^{n-i-1} A[k+i+1]\, x^{k+1}
+   = A[i] + \sum_{k=1}^{n-i} A[k+i]\, x^{k},
+$$
+
+reindexing with $k \to k-1$ in the last step. The leading term $A[i]$ is
+the $k = 0$ term of the final sum, so $p' = \sum_{k=0}^{n-i}
+A[k+i]\, x^k$. The counter then becomes $i - 1$, and the invariant with
+$i-1$ in place of $i$ reads $p = \sum_{k=0}^{n-(i-1)-1} A[k+i]\, x^k =
+\sum_{k=0}^{n-i} A[k+i]\, x^k$: exactly $p'$. Holds.
+
+**Termination.** The counter falls by one toward the fixed bound $0$, so
+the loop exits at the checkpoint $i = -1$. Substituting:
+$p = \sum_{k=0}^{n} A[k]\, x^k = P(x)$, which is returned.
+
+**(b)** One multiplication and one addition per pass, $n+1$ passes:
+$\Theta(n)$. The from-scratch algorithm spends $k$ multiplications
+building $x^k$, totalling $\sum_{k=0}^{n} k = n(n+1)/2 = \Theta(n^2)$ by
+the polynomial-classification argument from
+<Ref lesson="asymptotic-notation">the previous lesson</Ref>. Horner's
+rule buys a full growth-rate class, and the invariant is what certifies
+that the cheaper arithmetic still computes the same value.
+</Solution>
+</Exercise>
+
+<Exercise>
+Bubblesort sorts by repeatedly swapping adjacent out-of-order elements:
+
+```text
+Bubblesort(A[1..n]):
+  for i ← 1 to n − 1
+    for j ← n downto i + 1
+      if A[j] < A[j−1]
+        exchange A[j] and A[j−1]
+```
+
+Nested loops need nested invariants: the outer proof's maintenance step
+consumes the inner proof's conclusion. (a) State and prove an invariant
+for the inner loop (fix an outer iteration $i$; describe what is true of
+$A[j]$ at each inner checkpoint). (b) Using (a), state and prove the
+outer invariant and conclude correctness. (c) Count the comparisons
+exactly and state the worst-case running time in $\Theta$-notation.
+
+<Solution>
+Since the only write operation is `exchange`, the array's contents are
+permuted and never replaced, so the same-collection clause of the
+postcondition holds automatically; the work is the ordering clause.
+
+**(a) Inner invariant.** At the start of each inner iteration,
+$A[j] = \min(A[j..n])$, and $A[j..n]$ holds the same elements it held
+when this inner loop began. *Initialization:* at $j = n$, the subarray
+$A[n..n]$ is one element, its own minimum. *Maintenance:* if
+$A[j] < A[j-1]$, the exchange puts the smaller at position $j-1$; either
+way $A[j-1]$ ends up as $\min(A[j-1..n])$, since
+$\min(A[j-1..n]) = \min(A[j-1], \min(A[j..n]))$ and the hypothesis says
+the second argument is $A[j]$ (pre-exchange); the swap moves elements
+only within $A[j-1..n]$. The counter falls to $j - 1$. *Termination:*
+the loop exits at the checkpoint $j = i$, where the invariant reads
+$A[i] = \min(A[i..n])$.
+
+**(b) Outer invariant.** At the start of each outer iteration,
+$A[1..i-1]$ holds the $i-1$ smallest elements of the original array, in
+nondecreasing order, and $A[i..n]$ holds the rest. *Initialization:*
+at $i = 1$, both clauses are empty or trivial. *Maintenance:* by the
+hypothesis, every element of $A[i..n]$ is at least every element of
+$A[1..i-1]$; the inner loop permutes only $A[i..n]$ and, by (a), ends
+with $A[i] = \min(A[i..n])$. So $A[1..i]$ is now the $i$ smallest
+elements in order ($A[i]$ is at least $A[i-1]$, which sits among the
+$i-1$ smallest), and $A[i+1..n]$ holds the rest. *Termination:* exit at
+$i = n$: $A[1..n-1]$ holds the $n-1$ smallest in order, and $A[n]$ holds
+the one remaining element, necessarily the largest: the array is
+sorted.
+
+Note the outer invariant here is exactly the claim shown to be false
+for insertion sort: the two algorithms grow different prefixes, and the
+invariant is where the difference is stated precisely.
+
+**(c)** The inner loop always runs its full range: $n - i$ comparisons at
+outer iteration $i$, for a total of $\sum_{i=1}^{n-1} (n-i) =
+n(n-1)/2$ comparisons on every input. The worst case (indeed every
+case) is $\Theta(n^2)$: same class as insertion sort's worst case, but
+insertion sort's inner loop stops early on sorted prefixes while
+bubblesort's, as written, never does.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this proposed shortcut: "For insertion sort, the invariant
+'$A[1..i-1]$ is sorted' is simpler than the three-clause version and
+passes all three checks: a one-element subarray is sorted; inserting the
+key into a sorted subarray leaves it sorted; and at the exit checkpoint
+$i = n+1$ it gives '$A[1..n]$ is sorted,' which is what a sorting
+algorithm must produce. The three-clause invariant is overkill." Name the
+obligation that fails and produce a procedure that defeats the shortened
+argument.
+
+<Solution>
+Initialization and maintenance genuinely pass for the weakened claim; the
+failure is **termination**: "$A[1..n]$ is sorted" does not imply the
+postcondition, whose other clause requires the output to hold the same
+collection of values as the input. The exit substitution lands short of
+the specification.
+
+The defeating procedure makes the gap concrete:
+
+```text
+FakeSort(A[1..n]):
+  for i ← 1 to n
+    A[i] ← i
+```
+
+The claim "$A[1..i-1]$ is sorted" holds at every checkpoint
+(initialization and maintenance both pass), the loop terminates, and the
+exit checkpoint delivers a sorted array containing none of the input's
+values. Everything the shortened argument establishes is true of
+`FakeSort`, and `FakeSort` sorts nothing; therefore the shortened
+argument cannot establish correctness. The three-clause invariant is
+not overkill: each clause is spent somewhere. The ordering clause and
+the same-elements clause are both consumed at the exit, where each
+covers a failure the other cannot see, and the untouched-suffix clause
+is consumed inside maintenance, where it certifies that `key ← A[i]`
+picks up an original element rather than debris from earlier
+iterations.
+</Solution>
+</Exercise>
+
+<Exercise>
+Loops that run zero times still need proofs. (a) For `SumArray` with
+$n = 0$: identify which obligations do any work, state what the invariant
+asserts at the only checkpoint, and confirm the returned value meets the
+postcondition. (b) For `InsertionSort` with $n = 1$: same questions. (c)
+State the general principle: which obligation is doing the work whenever
+a loop body never executes, and what phrasing habit must the invariant
+adopt so that initialization is even well-defined in these cases.
+
+<Solution>
+**(a)** With $n = 0$ the header test $1 \le 0$ fails immediately: the
+first checkpoint and the exit checkpoint are the same, $i = 1$.
+Maintenance is never invoked: there is no iteration to maintain across.
+Initialization asserts $s = \sum_{k=1}^{0} A[k]$, the empty sum $0$;
+termination substitutes the same value and the postcondition asks for
+the sum of zero elements, which is $0$. The procedure returns $0$.
+Correct.
+
+**(b)** With $n = 1$ the test $2 \le 1$ fails at once; the single
+checkpoint is $i = 2$. The invariant asserts that $A[1..1]$ holds its
+original element in sorted order (true of any untouched one-element
+subarray) and that the empty suffix $A[2..1]$ is untouched (nothing to
+assert), and this is simultaneously the initialization argument and,
+substituted into the termination step, the postcondition for a
+one-element array. Correct, with the loop body never running.
+
+**(c)** When a body never executes, initialization and termination meet
+at the same checkpoint and carry the entire proof; maintenance holds
+vacuously. For this to work the invariant must be phrased to have a
+truth value on degenerate data: empty subarrays (with conventions like
+"the empty sum is 0" and "an empty or one-element subarray is sorted")
+rather than phrasings that presuppose at least one processed element. An
+invariant that begins "the largest element added so far…" has no meaning
+at the first checkpoint; the empty-case convention is not pedantry but
+the base case of the induction.
+</Solution>
+</Exercise>
+
+<Exercise>
+The following loop repeatedly halves a range of a sorted array:
+
+```text
+FirstAtLeast(A[1..n], x):   ▷ A sorted in nondecreasing order, n ≥ 1
+  lo ← 1
+  hi ← n
+  while lo < hi
+    mid ← ⌊(lo + hi)/2⌋
+    if A[mid] < x
+      lo ← mid + 1
+    else
+      hi ← mid
+  return lo
+```
+
+(a) State the invariant that makes the loop meaningful: a claim tying the
+range $[lo, hi]$ to where $x$ can still be. (b) Prove maintenance for
+both branches, using sortedness. (c) This is a `while` loop, so exhibit
+the termination measure and show it strictly decreases. (d) State what
+the invariant plus the exit condition delivers, and what one extra
+comparison after the loop decides.
+
+<Solution>
+Attempt (a) and (c) before opening: write the claim, then name the
+quantity that shrinks.
+
+**(a) Invariant.** At every test of the `while` condition:
+$1 \le lo \le hi \le n$, and if $x$ occurs anywhere in $A[1..n]$, then
+$x$ occurs in $A[lo..hi]$.
+
+*Initialization:* $lo = 1$, $hi = n$: the range is the whole array, so
+both clauses are immediate.
+
+**(b) Maintenance.** The body runs with $lo < hi$, and
+$mid = \lfloor (lo+hi)/2 \rfloor$ satisfies $lo \le mid < hi$ (the
+average of two distinct integers, rounded down, is at least the smaller
+and strictly less than the larger), so both updates keep
+$1 \le lo \le hi \le n$. Branch $A[mid] < x$: every position $p \le mid$
+has $A[p] \le A[mid] < x$ by sortedness, so no occurrence of $x$ lies in
+$A[lo..mid]$; if $x$ occurs in $A[lo..hi]$ it occurs in
+$A[mid+1..hi]$, the new range. Branch $A[mid] \ge x$: suppose $x$
+occurs at some $p$ with $mid < p \le hi$. Then
+$x = A[p] \ge A[mid] \ge x$ by sortedness, forcing $A[mid] = x$: position
+$mid$ is itself an occurrence, inside the new range $A[lo..mid]$. Either
+way the invariant survives.
+
+**(c) Termination measure:** $hi - lo$. In the first branch $lo$ rises
+to $mid + 1 > lo$; in the second $hi$ falls to $mid < hi$; in both the
+measure strictly decreases, and it is bounded below by $0$. The loop
+exits.
+
+**(d)** Exit condition: $lo = hi$ (the measure cannot go negative, and
+the test fails exactly at equality). The invariant then says: if $x$ is
+anywhere in $A$, it is in $A[lo..lo]$, a single slot. One comparison,
+$A[lo] = x$, decides presence; the loop shrank $n$ candidates to $1$
+without ever examining more than one element per halving.
+
+This loop is **binary search**, and the claim in (a) is its invariant:
+the range $[lo, hi]$ as the set of still-possible positions.
+<Ref lesson="binary-search-and-order-statistics">A later lesson</Ref>
+names it, counts the halvings ($\Theta(\log n)$, by the halving argument
+of <Ref lesson="asymptotic-notation">the first lesson</Ref>), and
+generalizes the loop from equality search to any monotone condition. The
+`mid` line is also the one that overflowed in the Java library,
+unnoticed for nine years (the aside in this lesson): the proof
+above is about the algorithm; carrying it to fixed-width arithmetic
+takes one more invariant clause, $lo + hi$ within machine range.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §2.1: insertion sort, the initialization/maintenance/termination scheme, and Figures 2.1–2.2 (the card metaphor and the six-element trace this lesson's figures recreate); Problems 2-2 (bubblesort) and 2-3 (Horner's rule), used in the exercises.
+2. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 1 notes — correctness of a fixed-size program on arbitrarily large inputs via induction. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+3. J. Erickson, *Algorithms*, 2019 — §1.2: the induction hypothesis as the license to trust a recursive call on a smaller input. Free online: https://jeffe.cs.illinois.edu/teaching/algorithms/
+4. R. W. Floyd, "Assigning Meanings to Programs," *Proceedings of Symposia in Applied Mathematics* 19, 1967, pp. 19–32 — the origin of attaching assertions to program points.
+5. C. A. R. Hoare, "An Axiomatic Basis for Computer Programming," *Communications of the ACM* 12(10), 1969, pp. 576–580 — the loop rule whose hypothesis is the maintenance obligation.
+6. J. Bentley, *Programming Pearls*, 2nd ed., Addison-Wesley, 2000, Column 4 — binary search developed together with its invariant proof; J. Bloch, "Extra, Extra – Read All About It: Nearly All Binary Searches and Mergesorts are Broken," Google Research blog, 2006 — the overflow report. https://research.google/blog/extra-extra-read-all-about-it-nearly-all-binary-searches-and-mergesorts-are-broken/
+7. D. Barina, "Convergence Verification of the Collatz Problem," *The Journal of Supercomputing* 77, 2021, pp. 2681–2688 — the computational check of all starting values below $2^{68}$.
+</References>

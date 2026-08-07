@@ -1,0 +1,670 @@
+A dynamic array supports appends past its current capacity by allocating a
+larger block and copying every element into it, an O(n) operation that
+nonetheless makes appending cost O(1) on average over any sequence of
+appends. The two previous lessons left exactly one flaw standing on the
+module's scoreboard: the ‡ capacity wall, the fact that a full
+<Ref lesson="arrays-and-linked-lists">array</Ref> cannot grow in place, and
+that the naive repair, growing by one slot per append, costs about $n^2/2$
+copies over $n$ appends. The
+<Ref lesson="stacks-and-queues">two-stack queue</Ref> ended on the same
+unfinished note: a structure whose totals were plainly cheap while its worst
+single operation was not, with the averaging left informal. This lesson
+supplies the missing tool, *amortized analysis* by the aggregate method, and
+uses it to knock the wall down. The route: the resize and its schedule; the
+full price of seventeen appends; the sum that bounds any $n$ appends by
+$3n$; the aggregate method and what "amortized" does and does not promise;
+why the growth factor must be a factor; and the shrink threshold that keeps
+the guarantee when deletions join in.
+
+## Growing on demand: the append that rebuilds the array
+
+The <Ref lesson="arrays-and-linked-lists">arrays lesson</Ref> established
+why the wall exists: the bytes adjacent to an array's block belong to other
+data, so a full block cannot extend in place, and the only continuation is
+to allocate a larger block and copy all $n$ elements across. A *dynamic
+array* builds that continuation into the append operation itself:
+
+```text
+Append(A, x):
+  if n = capacity:
+    allocate a new block of 2 · capacity slots    // the growth schedule
+    copy the n elements into it; free the old block
+    capacity ← 2 · capacity
+  A[n] ← x
+  n ← n + 1
+```
+
+Cost is counted in **slot-writes**: writing one element into one slot
+costs 1, so an append costs $1$ for the new element plus $n$ more if it
+triggered a resize. This is the same element-move accounting the
+arrays lesson used to price shifting. Allocation and freeing cost
+no more than the copying they bracket, so slot-writes track the true
+running time to within a constant.
+
+<Definition title="dynamic array">
+A **dynamic array** stores $n$ elements in the first $n$ slots of a backing
+array of $\text{capacity} \ge n$ slots, and appends by writing into slot
+$n$, first replacing the backing array with one twice as large and copying
+all $n$ elements whenever $n = \text{capacity}$. The first append
+into an empty structure allocates a block of 1 slot.
+</Definition>
+
+The one free choice in the definition is the line marked "growth schedule":
+the new block could instead be larger by a fixed increment
+($\text{capacity} + c$) or by a different factor. Doubling is the choice to
+justify; the schedule turns out to carry the entire guarantee, and a later
+section prices the alternatives.
+
+<FigureSequence
+  name="growth"
+  alt="Five appends into a doubling dynamic array: capacity grows 1, 2, 4, 4, 8, with blue arrows marking the elements copied at each resize and amber marking each newly written element"
+  caption="Appends a through e: three resizes, one free-slot append. Blue arrows are copies, amber is the new element."
+/>
+
+<Task>
+Step through the five frames keeping two tallies: total slot-writes and
+total appends. They should reach 12 and 5: the copies (1 + 2 + 4 = 7)
+already outweigh the appends, and the next section shows the imbalance
+never gets worse than 2 to 1.
+</Task>
+
+## Doubling priced: n appends cost less than 3n
+
+An append is expensive exactly when it lands on a full array, and doubling
+makes fullness rare in a precise pattern: the resize at capacity $2^j$
+banks $2^j$ free slots, which absorb the next $2^j$ appends at cost 1 each.
+Seventeen appends from empty cross that resize point five times, at
+capacities 1, 2, 4, 8, and 16.
+
+<Example title="seventeen appends, every write counted">
+Start empty and append 17 elements. A resize fires when the array is full,
+which happens at append $i$ exactly when $i - 1$ is a power of 2, so the
+cost of append $i$ is
+
+$$
+c_i \;=\;
+\begin{cases}
+i & \text{if } i - 1 \in \{1, 2, 4, 8, 16\} \quad (\text{copy } i-1 \text{, then write}),\\[2pt]
+1 & \text{otherwise.}
+\end{cases}
+$$
+
+The expensive appends are $i = 2, 3, 5, 9, 17$, costing $2, 3, 5, 9, 17$.
+Every other append costs 1. The total:
+
+$$
+\underbrace{17}_{\text{one write each}}
+\;+\;
+\underbrace{1 + 2 + 4 + 8 + 16}_{\text{copies at the five resizes}}
+\;=\; 17 + 31 \;=\; 48 .
+$$
+
+Average per append: $48 / 17 \approx 2.8$. The single worst append cost 17,
+yet the run as a whole paid under 3 per operation.
+</Example>
+
+<Figure
+  src="./figures/cost-bars.svg"
+  alt="Bar chart of per-append cost for appends 1 through 17, with spikes of height 2, 3, 5, 9, 17 at the resize appends, a flat floor of 1s elsewhere, and a running-average line staying below the dashed cost-3 guide"
+  caption="The cost profile of doubling: spikes that double in height and double in spacing, with the running average pinned under 3."
+/>
+
+### The sum: copies form a geometric series
+
+The trace generalizes without change. Over $n$ appends the resizes copy
+$1, 2, 4, \ldots, 2^{\lfloor \lg (n-1) \rfloor}$ elements: each copy is
+twice the previous one, and each is at most $n - 1$ because a resize copies
+only elements already appended.
+
+<Theorem title="total cost of n appends">
+Starting from an empty dynamic array with doubling, any $n$ appends cost
+fewer than $3n$ slot-writes: $n$ writes of new elements plus fewer than
+$2n$ copy-writes.
+
+<Proof>
+The plan: separate writes from copies, then sum the copies as a geometric
+series. Every append writes its own element once: $n$ slot-writes. Copies
+occur only at resizes, and the resize at append $i$ copies $i - 1$
+elements where $i - 1$ is a power of 2. Writing $k = \lfloor \lg (n-1)
+\rfloor$ for the largest power of 2 below $n$, the copy total is
+
+$$
+\sum_{j=0}^{k} 2^{\,j} \;=\; 2^{\,k+1} - 1 \;<\; 2 \cdot 2^{\,k} \;\le\; 2(n-1) \;<\; 2n ,
+$$
+
+the second step because a geometric series with ratio 2 is one less than
+twice its largest term. Total: $n$ writes plus fewer than $2n$ copies —
+fewer than $n + 2n = 3n$ slot-writes, with the inequality strict, so the
+bound is never attained. ∎
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/geometric-area.svg"
+  alt="Horizontal bars of length 16, 8, 4, 2, 1 for the five copy events of 17 appends, each half the one above, stacked over an outlined ruler of length 34 marked 2n"
+  caption="Why the copies stay under 2n: each copy is half the next, so the whole stack is less than twice its largest bar."
+/>
+
+The structure of the bound is worth keeping separate from its constant: the
+$3n$ is $n$ mandatory writes plus a copy bill that is really a bill for the
+*last* resize twice over: all earlier resizes together cost less than the
+final one. Doubling the spacing of the spikes at the same rate as their
+height is the entire mechanism.
+
+<Demo
+  name="DynamicArrayGrowth"
+  caption="Append into a live dynamic array: capacity doubles on overflow, and the chart tracks per-append cost against the cumulative average."
+/>
+
+<Task>
+The demo opens on the worked trace: 17 appends done, capacity 32, average
+$48/17 \approx 2.8$. Predict the next two expensive append numbers before
+clicking — a resize fires at capacity + 1 — then append past both to
+confirm. At 50 appends, read the average again: $113/50 = 2.26$, lower
+than the $2.8$ at append 17 and, like every value the amber line takes,
+under the dashed 3.
+</Task>
+
+<Exercise>
+A dynamic array is created with capacity 8 pre-allocated (still empty), and
+24 elements are appended. Predict which appends are expensive before
+computing anything, then compute every $c_i$, the total, and the average
+per append. Compare the average against the from-empty trace above.
+
+<Solution>
+Strategy hint: a resize fires when append $i$ finds the array full, so the
+spikes sit at $i = \text{capacity} + 1$ for each capacity the array passes
+through.
+
+Capacity 8 absorbs appends 1–8 at cost 1 each. Append 9 finds the array
+full: copy 8, write 1, cost 9, capacity 16. Appends 10–16 cost 1. Append 17
+copies 16, costs 17, capacity 32. Appends 18–24 cost 1.
+
+Total: $22 \cdot 1 + 9 + 17 = 48$ slot-writes for 24 appends, an average
+of $2$ against $2.8$ for 17 appends from empty. Pre-sizing removed the small
+early resizes (they cost $1 + 2 + 4 = 7$ of the from-empty run's 31
+copies), which is why libraries expose a capacity hint; the asymptotic
+class was already $O(1)$ per append without it.
+</Solution>
+</Exercise>
+
+## The aggregate method: bound the sequence, divide by its length
+
+The number $48/17$ is an average over one particular run. The claim worth
+having is stronger: *no* run of $n$ appends, however chosen, averages worse
+than 3. The theorem above already delivers it, since its bound holds for
+every $n$ and every run, and the analysis pattern has a name.
+
+<Definition title="amortized cost, aggregate method">
+Let a data structure start empty, and suppose every sequence of $m$
+operations costs at most $T(m)$ in the worst case. The **aggregate method**
+assigns each operation the **amortized cost** $T(m)/m$. For the dynamic
+array, $T(n) < 3n$ gives an amortized cost per append of less than 3
+slot-writes: $O(1)$.
+</Definition>
+
+The bound is **worst-case over sequences**: no probability enters
+anywhere. Average-case analysis assumes a distribution over inputs;
+expected time (the hash tables of
+<Ref lesson="hash-tables">the next lesson</Ref>) averages over random
+choices the structure itself makes; amortized analysis assumes nothing and
+holds against an adversary choosing the worst possible sequence.
+
+<Figure
+  src="./figures/guarantee-types.svg"
+  alt="Three bar charts of per-operation cost under the same dashed bound: worst-case keeps every bar under the line; amortized shows spikes above the line at fixed positions with a running average under it; expected shows tall bars at irregular positions"
+  caption="Three guarantees that all read O(1). Worst-case bounds every bar; amortized bounds the total — the spikes are certain and their positions known in advance; expected bounds an average over the structure's own random choices, and only there can bad luck raise the bill."
+/>
+
+<Aside>
+**Three kinds of guarantee (Morin, ODS §1.5).** Morin's financial
+comparison separates the three. A \$120,000
+house on a 120-month mortgage costs \$1,200 per month: a **worst-case**
+bound, paid every month. Buying it outright averages \$1,000 per month over
+the same decade: an **amortized** bound, cheaper in total, but one month
+bore the entire cost. Fire insurance priced from actuarial tables costs
+\$15 per month against an **expected** loss of \$10: the average is over
+randomness, and a bad draw costs the full \$120,000. Amortized and expected
+bounds are both averages; only one of them can be voided by bad luck.
+</Aside>
+
+### What amortized O(1) does not promise
+
+Amortized $O(1)$ append is a guarantee about totals: any $m$ appends cost
+$O(m)$. A common reading claims more: that amortized $O(1)$ means each
+individual append is fast. It does not, and the difference is not
+pedantry. The spikes in the cost profile are real operations that really
+execute: at $n = 2^{20}$, the next append copies 1,048,576 elements before
+writing one. The worst-case cost of one append remains $\Theta(n)$ under
+every growth schedule; what doubling buys is that the expensive appends
+are geometrically rare, never that they are gone.
+
+The correct model is a throughput guarantee without a latency guarantee. A
+batch job appending ten million elements runs in linear time and cannot be
+made to care which appends were slow; a real-time audio callback that must
+finish in 5 ms can be killed by a single resize it had no way to see
+coming. Where individual deadlines matter, engineering answers exist
+(pre-sizing past the largest expected $n$, or structures that spread each
+copy across many operations), but they are answers to a different question
+than the one amortized analysis poses.
+
+<KeyFact>
+The definition's from-empty clause is a second non-promise: amortized
+bounds price whole histories, so they say nothing about a sequence
+detached from the operations that built its starting state. One append
+into a full array of $n$ elements costs $n + 1$ by itself — the $3n$
+theorem never claimed otherwise, because that array's history already
+contains the $n$ appends that must be billed alongside it.
+</KeyFact>
+
+The aggregate method is not specific to arrays; it applies wherever
+per-operation worst cases overstate a sequence's total. The
+<Ref lesson="stacks-and-queues">two-stack queue</Ref> was one instance
+before the method had a name.
+
+<Exercise>
+A stack supports `Push(x)` and `MultiPop(k)`, which pops $\min(k, n)$
+elements at cost equal to the number popped. A single `MultiPop` costs up
+to $n$, so $m$ operations cost $O(m^2)$ by per-operation accounting. Use
+the aggregate method to prove the tight bound: any $m$ operations starting
+from an empty stack cost $O(m)$. State the invariant that caps the total
+pop count before opening the solution.
+
+<Solution>
+Strategy hint: bound pops by pushes, not by inspecting any single
+`MultiPop`.
+
+The invariant: an element can be popped at most once, and only after being
+pushed. A sequence of $m$ operations contains at most $m$ pushes, so all
+`MultiPop`s together pop at most $m$ elements: the total cost of every
+`MultiPop` in the sequence, summed, is at most $m$. Adding at most $m$ for
+the pushes themselves, $T(m) \le 2m$, so the amortized cost per operation
+is at most 2: $O(1)$, despite the $\Theta(n)$ worst case of one operation.
+The transferable move is the same one the dynamic array used: find the
+resource each expensive operation consumes (popped elements, banked free
+slots) and observe that cheap operations are the only source of it.
+</Solution>
+</Exercise>
+
+## The growth factor is load-bearing
+
+Doubling looks like a detail; it is the theorem. Replace the schedule with
+a fixed increment, growing to $\text{capacity} + c$ on overflow for a
+constant $c$, and the guarantee collapses. With increment $c$, a resize
+fires every $c$ appends, and the $j$-th resize copies about $jc$ elements,
+so $n$ appends pay
+
+$$
+c\,(1 + 2 + \cdots + n/c) \;\approx\; c \cdot \frac{(n/c)^2}{2}
+\;=\; \frac{n^2}{2c}
+$$
+
+copy-writes: $\Theta(n^2)$ total for any constant $c$, an amortized
+$\Theta(n)$ per append. The final exercise of
+<Ref lesson="arrays-and-linked-lists">the arrays lesson</Ref> computed the
+$c = 1$ case at $n(n-1)/2$ copies; a larger $c$ divides that bill by a
+constant and changes nothing about its shape. The arithmetic series grows
+quadratically because every resize copies nearly everything and the resizes
+never spread out: banking a *constant* number of free slots buys a constant
+number of cheap appends, while the next copy has grown by $c$.
+
+<Figure
+  src="./figures/fixed-increment.svg"
+  alt="Side-by-side bar charts of the same 17 appends: doubling shows five spikes over a flat floor totalling 48; the plus-one schedule shows a solid triangle of rising bars totalling 153"
+  caption="Same 17 appends, two schedules: doubling totals 48; growing by one slot totals 153, and the triangle's area grows as n²."
+/>
+
+Any *factor* strictly greater than 1 works. Growing by $g > 1$ makes the
+copy sizes a geometric series with ratio $g$, whose total is under
+$\frac{g}{g-1} \cdot n$: about $2n$ for $g = 2$, $1.5n$ for $g = 3$, $3n$
+for $g = 1.5$. The choice of $g$ trades copy work against wasted space (a
+just-resized array is $1/g$ full), and 2 is the customary compromise, not
+a law.
+
+<KeyFact>
+Growth must be *geometric*: multiplying capacity by any constant factor
+$g > 1$ gives amortized $O(1)$ appends, and adding any constant increment
+gives amortized $\Theta(n)$. What separates the two is whether each resize
+banks free slots proportional to the copy bill it just paid.
+</KeyFact>
+
+<Aside>
+**Growth factors in deployed libraries.** The mechanism is universal; the
+constant is not. GCC's C++
+`std::vector` doubles; Microsoft's grows by 1.5. Java's `ArrayList`
+grows by 1.5 (`oldCapacity + (oldCapacity >> 1)` in the OpenJDK source).
+CPython's `list` over-allocates by about 12.5%, a factor of roughly 1.125,
+betting that most lists stop growing early. All are factors greater than
+1: every mainstream growable array accepts the geometric-growth argument
+and haggles only over $g$.
+</Aside>
+
+## Shrinking: halve at one-quarter full, never at one-half
+
+Appends alone never shrink the array, and a structure that grew to a
+million elements and then deleted most of them holds a million slots for
+thousands of entries. The repair is contraction: copying into a *smaller*
+block when the array gets empty enough. The natural-looking rule is
+the mirror image of growth, halving the capacity when the array falls to
+half full. That rule is wrong, and it is wrong adversarially, not
+marginally.
+
+<Example title="the thrash: alternating at the boundary (Sedgewick–Wayne §1.3)">
+Take capacity 8 holding $n = 5$ under grow-at-full, halve-at-half, and run
+`pop, push, pop, push, ...`:
+
+- **pop** → $n = 4 = 8/2$: halve to capacity 4, copying 4 elements, cost 5.
+  The shrunken array is exactly full.
+- **push** → full: double to capacity 8, copying 4, writing 1, cost 5. The
+  state is exactly the starting one.
+- **pop** → the same shrink again; **push** → the same grow again, forever.
+
+Every operation in the alternation copies all $\approx n$ elements: $2k$
+operations cost about $5k$ slot-writes here, and $\Theta(kn)$ in general.
+The amortized cost per operation is $\Theta(n)$: the resizing array with
+the wrong shrink rule is no better than the fixed-increment schedule.
+</Example>
+
+<FigureSequence
+  name="thrash"
+  alt="Four frames: a pop at five-of-eight triggers a halving copy to an exactly-full capacity-4 array; a push triggers the doubling copy straight back; a second pop repeats the halving; the final frame shows the one-quarter rule absorbing the same pop with no resize, with shrink and grow thresholds marked"
+  caption="Halve-at-half thrashes because every resize lands on a boundary; the ¼ rule lands every resize at half full, with cheap operations banked on both sides."
+/>
+
+<Task>
+In frames 1–3, name after each operation the distance (in operations) to
+the next forced resize: it is 0 or 1 every time. In frame 4, read the two
+dashed thresholds and count the distances again: 2 pops down, 4 pushes up.
+</Task>
+
+### Hysteresis: the shrink threshold sits strictly below half
+
+The diagnosis from the frames: under halve-at-half, a resize can land the
+array *on* a threshold (a grow lands within one pop of the shrink
+trigger, a shrink lands exactly on the grow trigger), so no cheap
+operations need separate expensive ones. The repair separates the
+thresholds: keep growing at full, but **halve only when the array falls to
+one-quarter full**, landing the shrunken array at one-half full. Now every
+resize, in either direction, leaves the array near half full, a state from
+which any sequence needs many operations to force another resize. The
+design rule in general form: the shrink threshold must sit strictly below
+the grow threshold, and every resize must land the fill level strictly
+between the two.
+
+<Theorem title="mixed appends and deletes (aggregate; after Morin, ODS §2.1)">
+With grow-at-full to double capacity and shrink-at-quarter to half
+capacity, any sequence of $m$ appends and deletes-from-the-back, starting
+empty, costs $O(m)$ slot-writes: amortized $O(1)$ per operation.
+
+<Proof>
+The plan: show every resize is preceded by proportionally many operations,
+then charge each resize to the operations since the previous one.
+
+**Resizes land at half full.** A grow at capacity $k$ produces capacity
+$2k$ holding $k$ (plus the append that fired it): within one element of
+half. A shrink at capacity $k$ fires at $n = k/4$ and produces capacity
+$k/2$ holding $k/4$: exactly half.
+
+**Every resize is far from the previous one.** Consider a resize firing at
+capacity $k$, and the state just after the *previous* resize (or the empty
+start): the array held within one element of $k/2$ (capacity does not
+change between resizes, so it was $k$ then too). If the new resize is a
+grow, $n$ climbed from $\approx k/2$ to $k$: at least $k/2 - 1$ appends
+occurred in between. If it is a shrink, $n$ fell from $\approx k/2$ to
+$k/4$: at least $k/4 - 1$ deletes occurred. The resize copies at most $k$
+elements (a grow copies $k$, a shrink $k/4$), so in both cases
+
+$$
+\text{copies at this resize} \;\le\; 2 \cdot (\text{operations since the previous resize}) + 2 .
+$$
+
+**Sum over the sequence.** Each of the $m$ operations lies between exactly
+one pair of consecutive resizes, so summing over all $r \le m$ resizes
+gives total copies $\le 2m + 2r \le 4m$. Counting one more unit per
+operation for the operation itself, $T(m) \le 5m$. ∎
+</Proof>
+</Theorem>
+
+The same two thresholds bound the memory. Between resizes the array stays
+**between one-quarter and completely full**, so the allocated block never
+exceeds $4n$ slots: total space stays $\Theta(n)$, which was the point of
+shrinking at all. Sedgewick and Wayne's
+[Java accounting](https://algs4.cs.princeton.edu/13stacks/) makes it
+concrete: their resizing-array stack of $N$ items occupies between
+$\approx 8N$ bytes when full and $\approx 32N$ bytes just above
+one-quarter full.
+
+<KeyFact>
+The design rule generalizes beyond arrays: an expensive rebuild costing
+$k$ is harmless whenever the structure's rules force $\Omega(k)$ cheap
+operations between consecutive rebuilds. The ¼ rule engineers that
+property for deletes; the doubling schedule engineers it for appends; the
+<Ref lesson="hash-tables">hash table</Ref> reuses it for its bucket
+array.
+</KeyFact>
+
+What stands at the end of this lesson: the ‡ footnote is off the
+scoreboard. A doubling dynamic array appends in amortized $O(1)$, with
+the total for $n$ appends under $3n$ ($n$ writes plus under $2n$ copies).
+The guarantee requires geometric growth, fails for any fixed increment,
+and extends to mixed append/delete sequences exactly when the shrink
+threshold (one-quarter) sits strictly below the grow threshold (full).
+The aggregate method (bound the worst-case total of any sequence, divide
+by its length) is the named form of the argument, now applied three times:
+dynamic array, MULTIPOP stack, two-stack queue. This is the
+only amortized-analysis technique this course uses; the accounting and
+potential methods, which assign per-operation charges instead of bounding
+totals, are the general tools and belong to the advanced sequence.
+<Ref lesson="hash-tables">The next lesson</Ref> builds the hash table on
+this result: its bucket array resizes on a load-factor threshold by
+exactly the argument proved here, layered under an expected-time analysis
+of collisions: the two kinds of average, amortized and expected, working
+in the same structure without blurring.
+
+## Exercises
+
+<Exercise>
+A doubling dynamic array receives $n = 1{,}000{,}000$ appends from empty.
+(a) Compute the exact copy total and the exact overall total. (b) Compute
+both again for $n = 2^{20} + 1 = 1{,}048{,}577$ appends. (c) The bound
+$3n$ is loose in (a) and nearly tight in (b): state exactly which $n$ make
+the copy total approach $2n$, and why no $n$ reaches it.
+
+<Solution>
+(a) Resizes copy $1, 2, 4, \ldots, 2^{19}$ ($2^{19} = 524{,}288$ is the
+largest power of 2 below $10^6$; the resize at append $2^{19}+1$ is the
+last one, producing capacity $2^{20} > 10^6$). Copy total:
+$2^{20} - 1 = 1{,}048{,}575$. Overall: $10^6 + 1{,}048{,}575 =
+2{,}048{,}575 \approx 2.05n$, comfortably under $3n$.
+
+(b) One more resize fires at append $2^{20} + 1$, copying $2^{20}$. Copy
+total: $2^{21} - 1 = 2{,}097{,}151$. Overall: $1{,}048{,}577 +
+2{,}097{,}151 = 3{,}145{,}728$, which is $3n - 3$: within 3 slot-writes of
+the bound.
+
+(c) The copy total is $2^{k+1} - 1$ where $2^k$ is the largest power of 2
+below $n$. It approaches $2n$ exactly when $n = 2^k + 1$: one past a
+power of two, immediately after the biggest possible resize with the
+smallest possible $n$. It never reaches $2n$ because the series
+$1 + 2 + \cdots + 2^k$ falls one short of $2 \cdot 2^k$, and
+$2^k \le n - 1$. The general lesson: aggregate bounds are worst-case over
+all $n$, and the worst $n$ sit just past the resize points.
+</Solution>
+</Exercise>
+
+<Exercise>
+Re-run the doubling analysis for a growth factor of 3: on overflow the new
+block has $3 \times$ the capacity, starting from capacity 1. (a) Determine
+which appends are expensive and derive the copy total for $n$ appends as a
+sharp bound of the form $\alpha n$. (b) State the total-cost bound and
+compare it against doubling's $3n$. (c) Tripling copies less; name the
+price it pays, with the worst case quantified.
+
+<Solution>
+(a) Resizes fire at appends $2, 4, 10, 28, \ldots$ (when $i - 1 =
+3^{\,j}$), copying $1, 3, 9, \ldots, 3^{\,k}$ where $3^{\,k}$ is the
+largest power of 3 below $n$. The geometric series with ratio 3 sums to
+$\tfrac{3^{\,k+1} - 1}{2} < \tfrac{3}{2} \cdot 3^{\,k} < \tfrac{3}{2} n$:
+copy total under $1.5n$.
+
+(b) Adding $n$ element-writes: total under $2.5n$, an amortized cost under
+2.5 against doubling's 3. In general, factor $g$ gives copy total under
+$\tfrac{g}{g-1} n$: the series is dominated by its last term, and the
+domination sharpens as $g$ grows.
+
+(c) Space. Just after a resize the array is $1/3$ full, so the block can
+hold $3n$ slots for $n$ elements: waste up to $2n$ slots, against at most
+$n$ for doubling (and the mixed append/delete invariant weakens the same
+way). The strategy choice is a genuine trade: copy work scales as
+$\tfrac{g}{g-1}$, worst-case waste as $g - 1$; no $g$ wins both, which is
+why deployed libraries scatter across $1.125 \le g \le 2$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute or repair: "Amortized cost 3 per append means any $m$ append
+operations on a dynamic array cost at most $3m$." Produce the strongest
+counterexample you can, name the hypothesis of the aggregate bound that it
+violates, and state the repaired claim.
+
+<Solution>
+Counterexample: hand the adversary an array that already holds
+$n = 2^{20}$ elements at exactly full capacity, legitimately built by
+$2^{20}$ earlier appends, and let the "sequence" be the single operation
+$m = 1$: one append. It resizes and costs $2^{20} + 1$ slot-writes, which
+is not at most $3 \cdot 1$.
+
+The violated hypothesis is *starting from the empty structure*: the
+aggregate bound prices whole histories, and this sequence's history was
+amputated. The repaired claim: any $m$ appends **starting from empty**
+cost under $3m$; equivalently, for a sequence beginning at an arbitrary
+reachable state of $n$ elements, the cost is at most $3(m + n)$: charge
+the build of the starting state, and the bound is honest again. The
+failure mode is worth recognizing in the wild: quoting a per-operation
+amortized cost while discarding the prefix of the sequence that banked
+the structure's current state is the standard way to misuse an amortized
+bound.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the six operations `push, pop, push, pop, push, pop` on an array at
+capacity 8 holding $n = 8$ (full), pricing every operation in slot-writes,
+(a) under grow-at-full/halve-at-half, and (b) under
+grow-at-full/halve-at-quarter. (c) Identify, for each rule, the state the
+first resize lands in, and connect that single fact to the two totals.
+
+<Solution>
+(a) Halve-at-half. `push`: full, double to 16, copy 8, write, cost 9,
+$n = 9$. `pop`: $n = 8 = 16/2$, halve to 8, copy 8, cost 9. `push`: full
+again, double, copy 8, cost 9. `pop`: cost 9. `push`: cost 9. `pop`:
+cost 9. Total **54** for six operations: every operation resized.
+
+(b) Halve-at-quarter. `push`: cost 9 (the grow is identical), $n = 9$,
+capacity 16. `pop`: $n = 8$, and the shrink threshold is $16/4 = 4$: no
+resize, cost 1. `push`: $n = 9$, a free slot exists, cost 1. `pop`, `push`,
+`pop`: cost 1 each. Total **14**, and the next resize is at least 4
+operations away in either direction.
+
+(c) Under (a) the grow lands at 9 of 16, one pop from the shrink
+threshold of 8, and the shrink lands exactly full: each resize deposits
+the array on a boundary, so the next operation can resize again. Under (b)
+the grow lands at 9 of 16, five pops and seven pushes from the nearest
+thresholds. The totals differ by a factor that grows with $n$:
+$\Theta(n)$ versus $O(1)$ amortized, from moving one threshold.
+</Solution>
+</Exercise>
+
+<Exercise>
+A $k$-bit binary counter supports one operation, `Increment`, whose cost
+is the number of bits it flips: the trailing block of 1s flips to 0, then
+one 0 flips to 1 (so incrementing $0111$ costs 4). A single `Increment`
+can cost $k$. Prove by the aggregate method that $n$ increments from zero
+cost fewer than $2n$ bit-flips (amortized cost under 2) by counting how
+often each bit position flips.
+
+<Solution>
+Bit 0 flips on every increment: $n$ flips. Bit 1 flips on every second
+increment (when bit 0 carries): $\lfloor n/2 \rfloor$ flips. In general
+bit $i$ flips exactly $\lfloor n/2^i \rfloor$ times, once per completed
+block of $2^i$ increments. Total flips:
+
+$$
+\sum_{i=0}^{k-1} \left\lfloor \frac{n}{2^i} \right\rfloor
+\;<\; n \sum_{i=0}^{\infty} \frac{1}{2^i} \;=\; 2n .
+$$
+
+Amortized cost per increment: under 2 bit-flips, against a worst case of
+$k$. The counter is the dynamic array's argument inverted: the array's
+copies doubled in size and halved in frequency going up the series; the
+counter's flips halve in frequency going up the bit positions, and the
+same geometric series with ratio $\tfrac12$ caps the total. (This is CLRS
+§16.1's second aggregate example, and the structure of the sum recurs in
+<Ref lesson="binary-heaps-and-priority-queues">build-heap's</Ref> $O(n)$
+bound later in the course.)
+</Solution>
+</Exercise>
+
+<Exercise>
+The <Ref lesson="stacks-and-queues">circular buffer</Ref> ran a queue on a
+fixed array; a *growable* circular buffer doubles like a dynamic array,
+copying all $n$ resident elements (unwrapping them to start at slot 0 of
+the new block) when an enqueue finds it full. Dequeues never shrink it.
+Prove that any $m$ enqueue/dequeue operations from empty cost $O(m)$, and
+state why the wraparound (residents possibly spanning the array boundary)
+changes nothing in the argument.
+
+<Solution>
+Cost model: each operation costs 1, plus $n$ copies if an enqueue resizes.
+A resize fires at capacity $k$ only when $n = k$ residents exist, and the
+previous resize (or empty start) left at most $k/2$ residents (a resize
+doubles from a full array of $k/2$). Since only enqueues raise $n$, at
+least $k/2$ enqueues occurred since the previous resize: copies at this
+resize $\le 2 \cdot (\text{operations since the previous one})$. Each
+operation is charged once, so total copies $\le 2m$, and $T(m) \le 3m$:
+amortized $O(1)$.
+
+The wraparound is irrelevant because the argument never inspects *where*
+residents sit, only *how many* there are: the copy cost is $n$ moves
+whether the occupied window is contiguous or split across the boundary,
+and $n$ is all the accounting uses. The resident count is governed by
+enqueues alone, exactly as the dynamic array's $n$ was governed by
+appends; dequeues, like the two-stack queue's dequeues, only ever make
+the next resize farther away.
+</Solution>
+</Exercise>
+
+<Exercise>
+A hash table (next lesson's structure) stores $n$ keys in an array of $m$
+buckets and resizes like a dynamic array: when $n$ reaches $m$, it
+allocates $2m$ buckets and re-inserts all $n$ keys, at a cost of 1 per
+re-inserted key. Assume each ordinary insert also costs 1. Show that $n$
+inserts from an empty 1-bucket table do $O(n)$ total work, and state the
+one respect in which this analysis is *not* yet the next lesson's.
+
+<Solution>
+The resize costs are identical to the dynamic array's: re-insertions of
+$1, 2, 4, \ldots, 2^{\lfloor \lg(n-1)\rfloor}$ keys, totalling under $2n$,
+plus $n$ ordinary inserts: under $3n$ work, amortized $O(1)$ per insert.
+Nothing about the argument used what the array's slots hold: the aggregate
+bound prices the *resizing policy*, not the contents.
+
+What it does not yet cover: the assumption that an insert and a re-insert
+cost 1. In a hash table, an insert's cost depends on collisions (how many
+keys share the target bucket), and bounding it requires the expected-time
+analysis over hash-function randomness that
+<Ref lesson="hash-tables">the next lesson</Ref> supplies. There the two
+averages stack: expected $O(1)$ per operation from hashing, amortized
+$O(1)$ from this lesson's resize argument, and the load-factor threshold
+($n/m$ crossing a constant) is exactly a grow-at-nearly-full rule. You
+have just proved the half of the hash table's guarantee that needs no
+probability.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §16.1: aggregate analysis, with the MULTIPOP stack and the binary counter worked as its two examples; §16.4: dynamic tables, the 3n bound for expansion (§16.4.1), and the thrash sequence plus the ¼ rule for contraction (§16.4.2).
+2. P. Morin, *Open Data Structures*, 2013 — §1.5: worst-case vs. amortized vs. expected guarantees and the mortgage/insurance comparison; §2.1: the ArrayStack, whose grow/shrink lemma is the aggregate proof the mixed-sequence theorem here adapts. Free online: https://opendatastructures.org/
+3. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §1.3: the resizing-array stack, the ~3N array accesses for N appends, the push/pop thrash at the halving boundary, the 25–100% fullness invariant, and the 8N–32N-byte memory accounting. Companion site: https://algs4.cs.princeton.edu/13stacks/
+4. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 2 notes — the amortized-cost definition used here and the general shrink-below-grow threshold rule (r_d < r_i) for dynamic arrays. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+</References>

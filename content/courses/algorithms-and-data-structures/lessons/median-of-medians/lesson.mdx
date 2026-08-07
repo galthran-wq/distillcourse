@@ -1,0 +1,694 @@
+Quickselect's expected linear time collapses to O(n^2) against an
+adversarial pivot sequence; choosing the pivot as the median of medians of
+groups of five restores a guaranteed 30-70 split and makes selection
+worst-case linear. The sorting module closed with
+<Ref lesson="binary-search-and-order-statistics">quickselect</Ref>:
+expected $\Theta(n)$ for any rank, worst case $\Theta(n^2)$, and its final
+exercise walked into an apparent circle: a deterministic escape needs a
+pivot guaranteed to be near-central, a near-central element is
+approximately a median, and finding medians is the very selection problem
+the pivot was meant to solve. This chapter, off the course's main line,
+breaks the circle: the pivot need only be approximately central, and an
+approximate median can be computed by recursion on an array one fifth the
+size. Nothing later in the course depends on this chapter.
+
+The route: the specification a pivot rule must meet; the construction,
+run in full on 25 concrete elements; the counting argument that
+guarantees the 30-70 split; the recurrence
+$T(n) \le T(n/5) + T(7n/10) + O(n)$ and why fractions summing below one
+force linear time; why groups of five and not three; and the honest
+accounting against the randomized algorithm.
+
+## The specification: a guaranteed-central pivot, found in linear time
+
+The flaw to be repaired was quantified in
+<Ref lesson="binary-search-and-order-statistics">the order-statistics
+lesson</Ref>: quickselect's cost is governed by
+$T(n) \le \max_{0 \le \ell \le n-1} T(\ell) + O(n)$, where $\ell$ is the
+size of the surviving side. A pivot sequence that always picks an
+extreme element gives $T(n) = T(n-1) + O(n) = \Theta(n^2)$, the
+subtractive recurrence of
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson</Ref>. Random pivots make that sequence improbable; no input can
+force it, but no run is protected from it either.
+
+### Two demands in tension
+
+A worst-case guarantee therefore needs a deterministic pivot rule with
+two properties, each pulling against the other:
+
+- **rank control**: the pivot's rank is guaranteed, for every input, to
+  lie a constant fraction inside both ends, so every partition discards
+  a constant fraction of the array;
+- **linear cost**: the rule itself runs in $O(n)$, or the pivot search
+  swallows the time it was meant to save.
+
+### Lowering the demand: the exact median of a sample
+
+An exact median satisfies the first property perfectly and, as far as
+the course has shown, costs a sort. The repair is to lower the demand:
+compute the exact median of a small sample whose structure forces it to
+be an approximate median of the whole, and compute it by calling the
+selection algorithm itself on the sample.
+
+The repair was found in 1973 by Manuel Blum, Robert Floyd, Vaughan
+Pratt, Ronald Rivest, and Robert Tarjan, in the paper that first proved
+selection needs no sorting
+([*Time Bounds for Selection*](https://doi.org/10.1016/S0022-0000(73)80033-9)).
+The sample has size $n/5$: small enough that the extra recursion leaves
+the total work linear. The next three sections deliver each promise in
+turn.
+
+## The construction: medians of five, then the median of those
+
+### Group, take medians, recurse
+
+The sample is built in one pass. Split the array into
+$\lceil n/5 \rceil$ groups of five consecutive elements (the last group
+may be smaller). Find each group's median by brute force: five elements
+are a constant-size problem, and a fixed comparison network settles the
+median of five in at most 6 comparisons.
+
+Collect the $\lceil n/5 \rceil$ group medians into an array $M$, and
+call the selection algorithm recursively on $M$ to get their median: the
+*median of medians*, written $\mathit{mom}$. Then proceed exactly as
+quickselect: partition the full array around $\mathit{mom}$ and recurse
+into the one side containing rank $k$.
+
+```text
+MomSelect(A[1..n], k):                ▷ k-th smallest of n distinct keys
+  if n ≤ 25
+    sort A and return A[k]            ▷ constant-size base case
+  m ← ⌈n/5⌉
+  for i ← 1 to m
+    M[i] ← median of A[5i−4 .. 5i]    ▷ brute force, ≤ 6 comparisons each
+  mom ← MomSelect(M[1..m], ⌈m/2⌉)     ▷ recursion 1: choose the pivot
+  r ← Partition(A[1..n], mom)         ▷ mom lands in its true rank r
+  if k = r        return A[r]
+  else if k < r   return MomSelect(A[1..r−1], k)      ▷ recursion 2
+  else            return MomSelect(A[r+1..n], k − r)  ▷ recursion 2
+```
+
+### Two recursions, two jobs
+
+The procedure recurses for two different purposes, and keeping them
+separate is the key to reading it. **Recursion 1** steers: it computes
+the pivot, on an array of size $m \approx n/5$. **Recursion 2**
+searches: it is ordinary quickselect descent, on the surviving side of
+the partition, which the next section bounds by $7n/10$ plus a constant.
+One recursion is being used to guarantee the good behavior of another.
+
+### One round on 25 elements
+
+<FigureSequence
+  name="momselect"
+  alt="Four frames of one MomSelect round on 25 elements: the elements split into five groups of five; each group sorted with its median highlighted; the five medians collected and their median 44 found recursively; the partition around 44 coloring 13 smaller elements blue and leaving 11 larger, with the guarantee that each side holds at most 16"
+  caption="One MomSelect round on n = 25, k = 10: group, take medians, recurse for the median of medians, partition."
+/>
+
+<Task>
+Step the frames. After frame 3, predict which elements frame 4 must mark
+as guaranteed smaller than the pivot: the groups whose medians are at
+most 44 each contribute their median and the two elements below it, nine
+elements in all. Check frame 4: the actual smaller side (13 elements)
+exceeds the guaranteed nine.
+</Task>
+
+<Example title="one MomSelect round on 25 elements, k = 10">
+$A = [\,12, 47, 3, 88, 29,\; 61, 8, 95, 34, 50,\; 22, 71, 15, 9, 41,\;
+83, 36, 5, 64, 77,\; 18, 55, 92, 26, 44\,]$, seeking the 10th smallest.
+(The base-case cutoff is ignored so the round is visible.)
+
+**Group medians.** Five groups of five, each sorted by brute force:
+
+| group | contents | sorted | median |
+|---|---|---|---|
+| 1 | 12, 47, 3, 88, 29 | 3, 12, **29**, 47, 88 | 29 |
+| 2 | 61, 8, 95, 34, 50 | 8, 34, **50**, 61, 95 | 50 |
+| 3 | 22, 71, 15, 9, 41 | 9, 15, **22**, 41, 71 | 22 |
+| 4 | 83, 36, 5, 64, 77 | 5, 36, **64**, 77, 83 | 64 |
+| 5 | 18, 55, 92, 26, 44 | 18, 26, **44**, 55, 92 | 44 |
+
+At most $5 \times 6 = 30$ comparisons for all five.
+
+**The pivot.** $M = [\,29, 50, 22, 64, 44\,]$, and
+$\texttt{MomSelect}(M, 3)$ returns the 3rd smallest of the five medians:
+$\mathit{mom} = 44$.
+
+**Partition.** Partitioning $A$ around 44 places 13 elements on the low
+side and 11 on the high side; the pivot lands at rank $r = 14$.
+
+**Recurse.** $k = 10 < 14$: the answer lies in the 13-element low side,
+still at rank 10 (it is 29). The two recursive calls together touched
+$5 + 13 = 18$ elements, against the original 25: the total recursive
+load shrank, which is the fact the running-time analysis will live on.
+</Example>
+
+<Exercise>
+Run one MomSelect round on
+$A = [\,40, 7, 62, 25, 13,\; 91, 33, 58, 2, 76,\; 49, 20, 85, 66, 11\,]$
+for $k = 8$ (the median of the 15 elements). Give the three group
+medians, the pivot, the rank the pivot lands at, the side and rank the
+recursion continues with, and check both sides against the guarantee
+that each holds at most $15 - 6 = 9$ elements. Write the group medians
+down before opening the solution.
+
+<Solution>
+Sorted groups: $\{7, 13, \mathbf{25}, 40, 62\}$,
+$\{2, 33, \mathbf{58}, 76, 91\}$, $\{11, 20, \mathbf{49}, 66, 85\}$:
+medians $M = [\,25, 58, 49\,]$. Their median is $\mathit{mom} = 49$.
+
+Partitioning around 49: the elements smaller than 49 are
+$\{40, 7, 25, 13, 33, 2, 20, 11\}$, eight of them, so 49 lands at rank
+$r = 9$; six elements sit above. $k = 8 < 9$: recurse on the 8-element
+low side, still seeking rank 8, which is 40.
+
+Guarantee check: $g = 3$ groups, so $\lceil g/2 \rceil = 2$ medians are
+$\le \mathit{mom}$ (25 and 49), each bringing its two smaller group-mates:
+$2 \times 3 = 6$ elements guaranteed $\le 49$, so the high side holds at
+most $15 - 6 = 9$; symmetrically for the low side. Actual sides: 8 and
+6, both within the bound. The transferable check: the guarantee counts
+three elements per contributing group, and only for half the groups; the
+actual split is usually better.
+</Solution>
+</Exercise>
+
+## The guarantee: three-tenths eliminated on each side, unconditionally
+
+The example's split (13 against 11) was comfortable; the claim to prove
+is that no input produces an uncomfortable one. The argument is a
+counting argument on a picture.
+
+### The grid: count ranks, not positions
+
+Draw the array as a $5 \times (n/5)$ grid, one group per column, each
+column sorted small to large, and the columns arranged left to right by
+their medians. The algorithm never performs this arrangement; the grid
+exists only to count ranks, and rank counts do not depend on where
+elements physically sit.
+
+<Figure
+  src="./figures/grid.svg"
+  alt="Seven columns of five dots, each column sorted top to bottom, columns ordered by their amber median dots; the pivot x sits at the central median; a blue shaded region covers the top three rows of the left four columns, at least 3n/10 elements known to be at most x, and a green region covers the bottom three rows of the right four columns, at least 3n/10 elements known to be at least x"
+  caption="The grid argument: half the columns have medians ≤ x, and each such column contributes three elements ≤ x. Recreated from CLRS Figure 9.3."
+/>
+
+<Theorem title="the elimination bound">
+Let $n$ be a multiple of 5, let $g = n/5$, and let $\mathit{mom}$ be the
+median of the $g$ group medians. Then at least $3n/10$ elements of the
+array are $\le \mathit{mom}$ and at least $3n/10$ are
+$\ge \mathit{mom}$. Consequently each side of the partition around
+$\mathit{mom}$ contains at most $7n/10$ elements, whichever side the
+recursion enters.
+
+<Proof>
+$\mathit{mom}$ is the $\lceil g/2 \rceil$-th smallest of the $g$
+medians, so $\lceil g/2 \rceil$ medians (counting $\mathit{mom}$ itself)
+are $\le \mathit{mom}$: in the grid, the median dots of the left half of
+the columns. Each such median sits above two smaller elements of its own
+column, and those two are $\le$ their median $\le \mathit{mom}$. Each of
+the $\lceil g/2 \rceil$ columns therefore contributes three elements
+$\le \mathit{mom}$, giving
+$3\lceil g/2 \rceil \ge 3g/2 = 3n/10$ elements $\le \mathit{mom}$: the
+shaded upper-left region of the figure.
+
+Symmetrically, $\lfloor g/2 \rfloor + 1$ medians are
+$\ge \mathit{mom}$, each with two larger column-mates, giving
+$3(\lfloor g/2 \rfloor + 1) \ge 3g/2 = 3n/10$ elements
+$\ge \mathit{mom}$: the lower-right region.
+
+The partition's low side contains only elements strictly smaller than
+$\mathit{mom}$, so it excludes the $\ge 3n/10$ elements that are
+$\ge \mathit{mom}$: at most $n - 3n/10 = 7n/10$ elements remain.
+The same count bounds the high side.
+</Proof>
+</Theorem>
+
+### A floor on elimination, not a prediction
+
+Against the worked example: $n = 25$, $g = 5$, and
+$\lceil g/2 \rceil = 3$ medians (22, 29, 44) are $\le 44$, contributing
+the nine elements $\{9, 15, 22\}$, $\{3, 12, 29\}$, $\{18, 26, 44\}$.
+The guarantee says each partition side holds at most $25 - 9 = 16$; the
+actual sides held 13 and 11. The bound is a floor on elimination, not a
+prediction of the split.
+
+<Remark title="floors, ceilings, and the partial last group">
+Exact bookkeeping perturbs every count by a constant, not by a growth
+rate: $\lceil n/5 \rceil$ groups, a last group of fewer than five, and
+the $\lceil m/2 \rceil$-th median shift the guarantee to
+$3n/10 - O(1)$ eliminated and $7n/10 + O(1)$ kept (at most six extra
+elements under one standard accounting). The recurrence with these
+constants still solves to $O(n)$, by the same license for brushing
+floors, ceilings, and lower-order terms that
+<Ref lesson="recurrences-and-master-theorem">the recurrences lesson</Ref>
+established. Implementations differ only in where they hide the slop:
+CLRS trims the input to a multiple of five with a $\Theta(n)$
+preprocessing loop; Erickson pads the last group with $+\infty$
+sentinels.
+</Remark>
+
+<KeyFact>
+The 30-70 split is unconditional: it is a counting fact about ranks,
+true for every input and every adversary, where the randomized
+guarantee of <Ref lesson="binary-search-and-order-statistics">the
+previous lesson</Ref> is an expectation that an unlucky run of pivot
+draws can void. That difference in kind, not the constants, is what
+this algorithm exists to supply.
+</KeyFact>
+
+## The recurrence: two fractions that sum below one
+
+A good pivot alone does not finish the analysis, because MomSelect pays
+for it with a second recursive call. Each invocation on $n$ elements
+does $O(n)$ local work (group medians and partition), plus a steering
+call on $n/5$ elements, plus a searching call on at most $7n/10$
+elements:
+
+$$
+T(n) \;\le\; T(n/5) + T(7n/10) + cn .
+$$
+
+### Outside the Master theorem's shape
+
+This recurrence has two subproblems with different shrink factors, so
+no single $b$ in $aT(n/b) + f(n)$ fits it. It belongs to the
+unequal-split family
+<Ref lesson="recurrences-and-master-theorem">the recurrences lesson</Ref>
+handled with the recursion-tree method, which never needed the Master
+theorem's hypotheses, only levels to sum.
+
+The decisive quantity is the total size handed to the two calls:
+$n/5 + 7n/10 = 9n/10$. Every node of the recursion tree passes at most
+$9/10$ of its own input down to its children, so the level totals decay
+geometrically, and the root's $cn$ dominates the whole tree.
+
+<Figure
+  src="./figures/mom-tree.svg"
+  alt="The recursion tree for T(n) = T(n/5) + T(7n/10) + cn: a root doing cn work with children cn/5 and 7cn/10, grandchildren cn/25, 7cn/50, 7cn/50, 49cn/100, and a level-sum column showing cn, nine-tenths cn, nine-tenths squared cn, totaling at most 10cn"
+  caption="Level sums shrink by 9/10 per level: a geometric series, total ≤ 10cn."
+/>
+
+### The geometric series, made a theorem
+
+<Theorem title="worst-case linear selection (Blum–Floyd–Pratt–Rivest–Tarjan 1973)">
+MomSelect finds the $k$-th smallest of $n$ elements in $\Theta(n)$ time
+in the worst case.
+
+<Proof>
+The proof mode is a recursion-tree bound on
+$T(n) \le T(n/5) + T(7n/10) + cn$; floors, ceilings, and the additive
+constant in $7n/10 + O(1)$ are suppressed under the license above.
+
+A node processing $s$ elements does $cs$ local work and hands its two
+children a total of $s/5 + 7s/10 = (9/10)\,s$ elements. By induction on
+depth, the total input size across all nodes at depth $t$ is at most
+$(9/10)^t\, n$, so the total work at depth $t$ is at most
+$c\,(9/10)^t\, n$. The tree is lopsided (the steering branch bottoms out
+after $\log_5 n$ levels, the searching branch only after
+$\log_{10/7} n$), but that is immaterial: branches that have already
+bottomed out contribute zero to deeper levels, which only helps the
+bound. Summing the geometric series,
+
+$$
+T(n) \;\le\; \sum_{t \ge 0} c \left(\tfrac{9}{10}\right)^{t} n
+\;=\; 10\,cn \;=\; O(n).
+$$
+
+The matching $\Omega(n)$ is immediate: the first call reads all $n$
+elements. A substitution proof certifies the same bound and handles the
+exact constants (CLRS Theorem 9.3).
+</Proof>
+</Theorem>
+
+<KeyFact>
+The linearity test for any recurrence of this shape is one addition:
+with recursive calls on fractions $a_1, \ldots, a_j$ of the input and
+linear local work, the level sums decay geometrically exactly when
+$a_1 + \cdots + a_j < 1$, and the total is $cn / (1 - \sum_i a_i)$.
+MomSelect sits at $\frac{1}{5} + \frac{7}{10} = \frac{9}{10}$. The next
+section shows what happens at exactly 1.
+</KeyFact>
+
+## Why five: every cheaper group size crosses the line
+
+### Groups of three: the same guarantee, a worse recurrence
+
+Every ingredient of the construction seems to survive a cheaper group
+size. Groups of three have brute-force medians at 3 comparisons instead
+of 6, and the same grid argument still eliminates a constant fraction:
+half the $n/3$ medians are $\le \mathit{mom}$, each bringing one smaller
+group-mate, so $2 \cdot \frac{1}{2} \cdot \frac{n}{3} = n/3$ elements
+are settled on each side.
+
+From that, one would expect the same $O(n)$ result with smaller
+constants. The recurrence says the opposite. With groups of three, the
+steering call costs $T(n/3)$ and the searching call keeps up to
+$n - n/3 = 2n/3$:
+
+$$
+T(n) \;\le\; T(n/3) + T(2n/3) + cn ,
+\qquad \tfrac{1}{3} + \tfrac{2}{3} = 1 .
+$$
+
+The fractions sum to exactly one: each node hands its children the same
+total size it received, so level sums never decay.
+<Ref lesson="recurrences-and-master-theorem">The recurrences lesson</Ref>
+solved exactly this recurrence: every complete level totals $cn$, the
+tree has $\Theta(\log n)$ levels, and the answer is $\Theta(n \log n)$.
+Selection with groups of three is no faster than sorting; the entire
+construction returns nothing.
+
+<Figure
+  src="./figures/three-tree.svg"
+  alt="The recursion tree for T(n) = T(n/3) + T(2n/3) + cn: the same tree layout as the previous figure, but the level-sum column reads cn at every level, totaling Theta(n log n) over Theta(log n) levels"
+  caption="Groups of 3: fractions sum to exactly 1, level sums stay at cn, and the total is Θ(n log n) — no faster than sorting."
+/>
+
+### The criterion: fractions that sum below one
+
+The comparison of the two trees locates the design constraint
+precisely. Elimination is not the criterion; both group sizes eliminate
+a constant fraction. The criterion is that the two recursive fractions
+**sum below one**.
+
+The group size controls both fractions at once: smaller groups make the
+steering call bigger ($n/3$ against $n/5$) and eliminate less per group
+(2 elements against 3). Groups of seven also pass, with fractions
+$\frac{1}{7} + \frac{5}{7} = \frac{6}{7}$; an exercise below carries
+the count.
+
+### Even sizes: four sits exactly at the line
+
+An even group has no middle element; the standard convention is the
+*lower median*, the $\frac{g}{2}$-th smallest of a group of $g$. With
+it, the count for groups of four runs as before. Sort a group as
+$a \le b \le c \le d$, median $b$: half the $n/4$ group medians are
+$\le \mathit{mom}$, each bringing one smaller group-mate, so
+$2 \cdot \frac{1}{2} \cdot \frac{n}{4} = n/4$ elements are settled
+below $\mathit{mom}$.
+
+The guarantee is now asymmetric. A group whose median is
+$\ge \mathit{mom}$ contributes $b$, $c$, and $d$: three elements, hence
+$3n/8$ settled above. The searching call keeps up to $n - n/4 = 3n/4$
+in the bad direction, the steering call costs $T(n/4)$, and
+$\frac{1}{4} + \frac{3}{4} = 1$: the same stalled tree as groups of
+three, $\Theta(n \log n)$.
+
+Groups of six do pass the test — the fractions come to
+$\frac{1}{6} + \frac{3}{4} = \frac{11}{12}$, and an exercise below runs
+the count — but $11/12$ decays slower than five's $9/10$ and a
+brute-force median of six costs more than one of five. Five is the
+smallest group size, odd or even, whose fractions sum below one, and
+that arithmetic is the entire content of the constant.
+
+<KeyFact>
+The general test, for odd groups of $g = 2t+1$: the steering fraction
+is $\frac{1}{g}$, the elimination is $\frac{(t+1)}{2g}n$ per side, and
+the two fractions sum to $1 + \frac{1-t}{2g}$ — below one exactly when
+$t \ge 2$, that is, $g \ge 5$. The constant five is not tuned for
+speed; it is the smallest value at which a one-line inequality turns
+true.
+</KeyFact>
+
+## The price of the guarantee: 16n against 4n
+
+### Counting the constant
+
+The worst-case bound is bought with large constants, and this section
+prices them honestly. Per invocation on $n$ elements, the group medians
+cost $6 \cdot n/5 = 6n/5$ comparisons, and partitioning adds only about
+$2n/5$ more: the grid argument has already settled $3n/10$ elements on
+each side of the pivot without further comparisons.
+
+The comparison recurrence is $C(n) \le C(n/5) + C(7n/10) + 8n/5$, and
+the same geometric series gives $C(n) \le 16n$ worst-case comparisons;
+the first exercise derives this. Randomized quickselect makes about
+$4n$ comparisons in expectation, by a sharper analysis than
+<Ref lesson="binary-search-and-order-statistics">the previous
+lesson's</Ref> generation argument, which proved the cruder $8n$.
+
+The deterministic guarantee therefore costs roughly a factor of four in
+comparisons, and more in practice: the group-median pass touches memory
+in a pattern caches serve poorly.
+
+### The crossover with sorting: 65,536 elements
+
+Against full sorting the constant bites too. Sorting and reading off
+rank $k$ costs about $n \lg n$ comparisons, so $16n$ undercuts it only
+once $\lg n > 16$: past $n = 2^{16} = 65{,}536$ elements. Below that
+size, the guaranteed-linear algorithm loses even to the
+$\Theta(n \log n)$ method it exists to beat.
+
+<Figure
+  src="./figures/crossover.svg"
+  alt="Comparisons per element against input size on a log scale: horizontal lines at 4 (randomized quickselect, expected) and 16 (MomSelect, worst case), and a rising lg n line for full sorting that crosses the 16 line at n = 2 to the 16, 65,536; the quickselect line lies below both everywhere"
+  caption="Comparisons per element: 16n undercuts n lg n only past n = 2¹⁶ = 65,536, and randomized quickselect's 4n sits below both at every size."
+/>
+
+<Aside>
+**The comparison-count frontier.** $16n$ prices this construction under
+this analysis, not the selection problem itself; the original 1973
+paper already tuned its algorithm's constant well below the textbook
+account. For the median, Schönhage, Paterson, and Pippenger (1976) got
+down to $3n + o(n)$ comparisons with a heavier machinery of merging
+"factories", and [Dor and
+Zwick](https://doi.org/10.1137/S0097539795288611) brought the constant
+under $2.95n$; the best known lower bounds sit just above $2n$ (also
+Dor and Zwick). The exact comparison cost of the median remains open
+half a century after linearity itself was settled.
+</Aside>
+
+### What survives in practice: introselect
+
+So the algorithm's value is not in replacing randomized quickselect on
+typical data; it does not, and standard-library implementations reflect
+that. David Musser's 1997 *introselect* (the selection half of
+[introsort](https://doi.org/10.1002/(SICI)1097-024X(199708)27:8%3C983::AID-SPE117%3E3.0.CO;2-%23),
+behind C++'s `std::nth_element` in common toolchains) runs plain
+quickselect and switches to a median-of-medians fallback only when the
+recursion depth reveals a run of bad pivots: expected-case constants,
+worst-case guarantee, each supplied by the algorithm that owns it.
+
+The same division answers "which one" directly: randomized quickselect
+where the workload is typical and a slow run costs only latency; the
+deterministic pivot where the input is adversarial or a hard deadline
+makes $\Theta(n^2)$ an outage. The construction's other export is the
+technique itself: a recursion used to **steer** another recursion, with
+the recurrence discipline (fractions summing below one) that makes the
+combination affordable.
+
+What is established: selection of any order statistic is $\Theta(n)$ in
+the worst case in the comparison model, by a pivot rule whose 30-70
+split is a counting guarantee rather than an expectation, at the price
+of a $16n$ comparison constant that keeps randomized quickselect the
+default in practice. The module's price list is now complete, with its
+selection row upgraded from "expected" to "guaranteed".
+
+No later lesson uses this chapter; the core path resumes with
+<Ref lesson="divide-and-conquer-design">divide-and-conquer design</Ref>,
+where recurrence shapes like the ones compared here become tools for
+designing algorithms rather than analyzing them.
+
+## Exercises
+
+<Exercise>
+Derive the comparison bound the lesson stated. Given
+$C(n) \le C(n/5) + C(7n/10) + \frac{8n}{5}$: (a) bound $C(n)$ by
+summing the recursion tree's levels; (b) verify the answer by
+substitution, and observe where it is tight; (c) state the general
+constant for local work $\gamma n$ and fractions summing to
+$\sigma < 1$.
+
+<Solution>
+**(a)** Level $t$ of the tree processes at most $(9/10)^t n$ elements
+in total, hence does at most $\frac{8}{5}(9/10)^t n$ comparisons. The
+geometric series gives
+$C(n) \le \frac{8n}{5} \sum_{t \ge 0} (9/10)^t = \frac{8n}{5} \cdot 10
+= 16n$.
+
+**(b)** Substitute the guess $C(n) \le 16n$ into the right-hand side:
+$16 \cdot \frac{n}{5} + 16 \cdot \frac{7n}{10} + \frac{8n}{5} =
+\frac{16n}{5} + \frac{56n}{5} + \frac{8n}{5} = 16n$. The induction
+closes with equality: no slack at all, so 16 is exactly the constant
+this recurrence supports, and any smaller constant fails the induction.
+
+**(c)** The same series gives
+$C(n) \le \gamma n / (1 - \sigma)$: local work divided by the decay
+gap. For MomSelect, $\gamma = 8/5$ and $1 - \sigma = 1/10$: a small
+per-level cost amplified tenfold by a decay rate close to the edge.
+That amplification is why the constants are large even though every
+single step is cheap.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Groups of 3 eliminate a constant fraction of the
+array on each side, exactly like groups of 5, so the same argument
+makes selection with groups of 3 run in $O(n)$." Name the step of the
+lesson's argument that fails, and state the true running time.
+
+<Solution>
+The elimination premise is correct: with $g = n/3$ groups, half the
+medians are $\le \mathit{mom}$ and each brings one smaller group-mate,
+so $2 \cdot \frac{g}{2} = n/3$ elements are eliminated on each side, and
+the searching call keeps at most $2n/3$: a genuine constant-fraction
+guarantee.
+
+The step that fails is the geometric decay of the recursion tree, which
+never followed from elimination alone. The steering call now costs
+$T(n/3)$, and the fractions sum to $\frac{1}{3} + \frac{2}{3} = 1$:
+each node hands its children as much total input as it received, level
+sums hold constant at $cn$, and over the tree's $\Theta(\log n)$ levels
+the total is $\Theta(n \log n)$, as
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson</Ref> computed for this exact recurrence.
+
+The claim smuggles in "constant fraction eliminated $\Rightarrow$
+linear", but the lesson's criterion is stricter: the two recursive
+fractions must sum strictly below one. At exactly one, selection by
+this construction is no faster than sorting.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that groups of 7 also give worst-case linear selection (CLRS
+Ex. 9.3-1). Count the elimination bound, write the recurrence, verify
+the fraction test, and compute the decay constant
+$\sum_t r^t$ to compare against the groups-of-5 tree.
+
+<Solution>
+With $g = n/7$ groups, $\mathit{mom}$ is the median of the $g$ group
+medians, so at least $g/2$ medians are $\le \mathit{mom}$, and each
+brings the three smaller elements of its own sorted group of seven:
+$4 \cdot \frac{g}{2} = \frac{4}{2} \cdot \frac{n}{7} = \frac{2n}{7}$
+elements eliminated on each side. The searching call keeps at most
+$n - 2n/7 = 5n/7$, and the steering call runs on $n/7$ medians:
+
+$$
+T(n) \le T(n/7) + T(5n/7) + cn,
+\qquad \tfrac{1}{7} + \tfrac{5}{7} = \tfrac{6}{7} < 1 .
+$$
+
+The fraction test passes, so the level sums decay with ratio $6/7$ and
+$T(n) \le cn \sum_t (6/7)^t = 7cn = O(n)$. The decay constant 7 beats
+the groups-of-5 tree's 10, but $c$ itself grows: a brute-force median
+of seven costs more comparisons per group than a median of five, and
+the per-level total shifts accordingly. Any odd group size of at least
+five works; the fraction test, not elimination, is what small sizes
+fail.
+</Solution>
+</Exercise>
+
+<Exercise>
+The body ran the even-size count for groups of four. Run it for groups
+of six: take the group median to be the lower median (the 3rd smallest
+of six), count how many elements a contributing group settles on each
+side of $\mathit{mom}$, write the recurrence for the worse side, and
+decide whether groups of six give linear selection. If they do, compare
+the decay constant against the groups-of-5 tree's 10.
+
+<Solution>
+With $m = n/6$ groups, half the group medians are $\le \mathit{mom}$.
+A group sorted $a_1 \le \cdots \le a_6$ has lower median $a_3$, so a
+contributing group settles $a_1, a_2, a_3$: three elements, giving
+$3 \cdot \frac{m}{2} = \frac{n}{4}$ elements below $\mathit{mom}$.
+
+The other direction is stronger: a group whose median is
+$\ge \mathit{mom}$ settles $a_3, a_4, a_5, a_6$, four elements, so
+$4 \cdot \frac{m}{2} = \frac{n}{3}$ sit above. The worse surviving side
+is $n - n/4 = 3n/4$, and the steering call costs $T(n/6)$:
+
+$$
+T(n) \le T(n/6) + T(3n/4) + cn,
+\qquad \tfrac{1}{6} + \tfrac{3}{4} = \tfrac{11}{12} < 1 .
+$$
+
+The test passes: groups of six are linear, with decay constant
+$\sum_t (11/12)^t = 12$ against five's 10 — a slower-shrinking tree —
+and a costlier brute-force median (six elements per group instead of
+five). Even sizes from six up work; none beats five. What sinks four,
+like three, is the sum landing exactly on one, not the evenness itself.
+</Solution>
+</Exercise>
+
+<Exercise>
+Use MomSelect as a black box to make quicksort's worst case
+$O(n \log n)$ (CLRS Ex. 9.3-3). Specify the pivot rule, write the
+resulting recurrence, solve it with the tools of
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson</Ref>, and explain why production sorts obtain the same bound a
+different way.
+
+<Solution>
+Pivot rule: at each quicksort call on a subarray of size $s$, run
+$\texttt{MomSelect}(A, \lceil s/2 \rceil)$ to find the subarray's true
+median in $\Theta(s)$, and partition around it. Both sides then hold at
+most $\lceil s/2 \rceil$ elements, so
+
+$$
+T(n) \le 2\,T(n/2) + \Theta(n)
+$$
+
+(the $\Theta(n)$ covers selection plus partition). This is merge sort's
+recurrence: Master theorem case 2, $T(n) = \Theta(n \log n)$, now as
+quicksort's worst case, since no input can produce an unbalanced split.
+
+Production sorts decline this construction because the $\Theta(n)$
+hides MomSelect's $16n$-scale constant at every level of the sort. C++
+standard libraries instead ship introsort: random-flavored quicksort
+that monitors its own recursion depth and, past $\approx 2\lg n$,
+abandons quicksort for heapsort, whose
+<Ref lesson="heapsort-and-the-sorting-lower-bound">$O(n \log n)$ worst
+case</Ref> costs nothing extra to invoke. Same guarantee, cheaper
+insurance: the fallback only ever runs on the rare bad path.
+</Solution>
+</Exercise>
+
+<Exercise>
+Four recurrences, four fates. For each, first name the applicable tool,
+then solve:
+(a) $T(n) = T(n/5) + T(7n/10) + cn$;
+(b) $T(n) = T(n/3) + T(2n/3) + cn$;
+(c) $T(n) = 4\,T(n/2) + cn$;
+(d) $T(n) = 3\,T(n/2) + cn$.
+For each, compute the per-level growth ratio of the recursion tree's
+level sums and classify: decaying, constant, or growing.
+
+<Solution>
+The ratio is $\sum_i a_i \cdot (\text{fraction}_i)$: the total size
+handed down per unit of input.
+
+**(a)** Ratio $\frac{1}{5} + \frac{7}{10} = \frac{9}{10} < 1$: decaying,
+root-dominated, $T(n) = \Theta(n)$ (this lesson).
+
+**(b)** Ratio $\frac{1}{3} + \frac{2}{3} = 1$: constant level sums,
+$\Theta(\log n)$ levels, $T(n) = \Theta(n \log n)$ (the recurrences
+lesson's unequal split).
+
+**(c)** Master-shaped: ratio $4 \cdot \frac{1}{2} = 2 > 1$: level sums
+double, the leaves dominate, and the total is the leaf count,
+$T(n) = \Theta(n^{\log_2 4}) = \Theta(n^2)$ (Master case 1).
+
+**(d)** Ratio $3 \cdot \frac{1}{2} = \frac{3}{2} > 1$: still
+leaf-dominated, $T(n) = \Theta(n^{\log_2 3}) = \Theta(n^{1.585})$.
+
+The step from (c) to (d), cutting four half-size recursive calls to
+three, moves the exponent from 2 to 1.585 while the local work stays
+linear. That move, applied to multiplying $n$-digit numbers, is
+Karatsuba's algorithm, the opening result of
+<Ref lesson="divide-and-conquer-design">the divide-and-conquer design
+lesson</Ref>: you have just computed its payoff before meeting the
+algorithm.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §9.3: the SELECT algorithm, Figure 9.3 (the grid argument this lesson's figure recreates), and Theorem 9.3 (the substitution proof of linearity); Ex. 9.3-1 (groups of 7), Ex. 9.3-3 (worst-case $O(n \log n)$ quicksort), Ex. 9.3-5 (median of five in six comparisons).
+2. J. Erickson, *Algorithms*, 2019 — §1.8: MomSelect, the two-recursions reading, the block-size "sanity check" (why 5 works and 3 does not, with the paired recursion trees of Fig. 1.13 this lesson's tree figures recreate), and the fine-grained comparison accounting behind the $8n/5$-per-level recurrence and the $16n$ bound; its footnote gives the $\approx 4n$ expected-comparison figure for randomized pivots. Free online: https://jeffe.cs.illinois.edu/teaching/algorithms/
+3. M. Blum, R. W. Floyd, V. Pratt, R. L. Rivest, R. E. Tarjan, "Time Bounds for Selection," *Journal of Computer and System Sciences* 7(4), 1973, pp. 448–461 — the original worst-case linear selection algorithm (PICK) and the first proof that selection does not require sorting.
+4. E. Demaine, S. Devadas, N. Lynch, *MIT 6.046J Design and Analysis of Algorithms*, Spring 2015, Lecture 2 notes — a compact treatment of median finding: the column diagram and the recurrence, with exercise variants. https://ocw.mit.edu/courses/6-046j-design-and-analysis-of-algorithms-spring-2015/
+5. D. R. Musser, "Introspective Sorting and Selection Algorithms," *Software: Practice and Experience* 27(8), 1997, pp. 983–993 — introsort and introselect: the depth-triggered fallback design that makes the worst-case guarantee free on typical inputs.
+6. A. Schönhage, M. Paterson, N. Pippenger, "Finding the Median," *Journal of Computer and System Sciences* 13(2), 1976, pp. 184–199 — the median in $3n + o(n)$ comparisons, the long-standing record the aside refers to.
+7. D. Dor, U. Zwick, "Selecting the Median," *SIAM Journal on Computing* 28(5), 1999, pp. 1722–1758 — the median in under $2.95n$ comparisons, the current upper-bound record on the comparison-count frontier.
+</References>
