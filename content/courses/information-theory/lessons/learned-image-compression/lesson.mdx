@@ -90,14 +90,17 @@ factorisation depend on the image.
 
 ## The rate term is a cross-entropy
 
-The bitstream is produced by an arithmetic coder, which reaches the expected
-code length of whatever distribution it is handed and no better
-(<Ref lesson="arithmetic-coding"/>). So the file size is decided before the
-coder runs, by the probability model the encoder and decoder agree on. Call
-that model the *entropy model* $p_{\hat y}$, and call the distribution the
-latents actually follow the *marginal* $m$. The two are different objects: $m$
-is whatever the analysis transform produces on real photographs, and nobody
-knows it; $p_{\hat y}$ is a parametric density that gets fitted.
+Of the four trained stages, only the third decides how large the file is. The
+transforms and the quantizer settle which integers get written; the length of
+the bitstream is then fixed by the probability model the encoder and decoder
+agree on, because an arithmetic coder reaches the expected code length of
+whatever distribution it is handed and no better
+(<Ref lesson="arithmetic-coding"/>). File size is decided before the coder
+runs. Call that model the *entropy model* $p_{\hat y}$, and call the
+distribution the latents actually follow the *marginal* $m$. The two are
+different objects: $m$ is whatever the analysis transform produces on real
+photographs, and nobody knows it; $p_{\hat y}$ is a parametric density that
+gets fitted.
 
 The rate is then the cross-entropy of one against the other:
 
@@ -224,18 +227,17 @@ arithmetic coder is handed.
 
 <Figure
   src="./figures/noise-pmf.svg"
-  alt="A dashed Gaussian, its convolution with a unit-width uniform drawn in amber, and probability bars at each integer whose tops lie exactly on the amber curve, with the slab of Gaussian mass between minus one half and plus one half shaded"
-  caption="The shaded slab's area is the probability of the value 0, and it is also the height of the amber curve at 0: the relaxed density evaluated at integers is the quantizer's distribution."
+  alt="A dashed Gaussian, its convolution with a unit-width uniform drawn in amber, and probability bars at each integer whose tops lie exactly on the amber curve; two slabs of Gaussian mass are marked, the filled one between minus one half and plus one half with area 0.383 and the dashed one between one half and three halves with area 0.242, each equal to the bar height at that integer"
+  caption="Each slab's area is the probability of one quantised value and the height of the amber curve at that integer — 0.383 at k = 0, 0.242 at k = 1: the relaxed density evaluated at integers is the quantizer's distribution."
 />
 
 <Task>
-Check the identity on the figure at $k = 1$: read the amber curve's height at
-$1$, then read the dashed Gaussian's mass between $0.5$ and $1.5$ off the
-shaded-slab construction shifted one unit right. Both are $0.242$. Then say
-what breaks if the entropy model is fitted as a bare Gaussian instead of a
-Gaussian convolved with a uniform: the curve at $k$ is no longer the mass of
-the bin, so the arithmetic coder's probabilities no longer sum to one over the
-integers.
+Check the identity on the figure at $k = 1$: the amber curve's height there and
+the area of the dashed slab — the $k = 0$ construction shifted one bin right —
+are both $0.242$. Then state what breaks if the entropy model is fitted as a
+bare Gaussian instead of a Gaussian convolved with a uniform: name the numbers
+the arithmetic coder would then be handed at the integers, and the property of
+a probability mass function they would fail.
 </Task>
 
 The relaxation is a real departure and the paper treats it as one. Training
@@ -385,12 +387,11 @@ Collecting steps 2 to 4 gives $0 + \lambda D + R$ plus constants.
 />
 
 <Task>
-Step through the frames and name the hypothesis each identification needs.
-Frame 4's amber connector fails if the noise has any width other than $1$,
-because then $\mathbb{E}_q[\log q]$ is a non-zero constant that changes with
-the encoder's scale; the blue connector fails if the likelihood is not
-Gaussian, because then $-\log p(x \mid \tilde y)$ is some other function of the
-error and $\lambda$ is no longer a plain multiplier on squared distance.
+Step through the frames. Frame 4 prints one hypothesis on each connector:
+unit-width noise on the amber one, a Gaussian likelihood on the blue. For each,
+name the step of the proof above that stops holding when the hypothesis is
+dropped, and say what the corresponding term of the objective becomes instead.
+The exercises do the algebra.
 </Task>
 
 ### The rate the codec pays, against the rate the theory allows
@@ -437,9 +438,9 @@ y})$ says what a wrong choice costs. The question is whether it is wrong.
 
 ### The structure is visible
 
-It is, and the evidence is a picture rather than an argument. Rendering the
-latents of a trained factorised-prior model as an image shows large responses
-clustered along edges and inside textured regions and near-zero responses
+It is wrong, and the failure is spatial. Rendering the latents of a trained
+factorised-prior model as an image leaves the scene readable: large responses
+cluster along edges and inside textured regions, near-zero responses
 elsewhere. A factorised model cannot represent that: it assigns each
 coefficient the same distribution wherever it sits, so it must be too wide in
 the flat regions and too narrow at the edges, and it pays on both.
@@ -519,50 +520,37 @@ smallest, and it never exceeds four per cent of it.
 ### What it buys
 
 That sliver is what separates the model from its predecessor, and the
-separation is measured on the same 24 photographs, aggregated into the pair of
-rate-distortion curves below. Distortion is reported as peak
-signal-to-noise ratio, a logarithmic
-restatement of mean squared error, so $1$ dB at equal rate is a factor of
-$1.26$ in squared error. Trained for squared error, the factorised-prior model
-beats JPEG by about $2.6$ dB at $1$ bit per pixel — $35.4$ dB against
-$32.8$ — and beats every published network-based codec trained on the same
-measure. It does not reach BPG, the still-image encapsulation of the HEVC
-video standard, which sits about $1.7$ dB above it at that rate. The
-hyperprior closes roughly five sixths of that gap: it runs about $0.2$ dB
-under BPG at $1$ bit per pixel and holds within that margin up to $1.5$. At
-$0.2$ bits per pixel it closes about half, from $1.1$ dB to $0.6$; the gap
-shuts faster at high rates than at low. Read the curves at matched PSNR
-instead of matched rate and the same result is a rate: near $1$ bit per pixel
-the hyperprior model reaches the factorised model's quality at about $0.8$
-bits per pixel, so a saving of some $0.2$ bits per pixel is bought with the
-$0.02$ the side channel costs there.
+separation is measured on the same 24 photographs — each model trained twice,
+once against squared error and once against MS-SSIM, and plotted against BPG
+(the still-image encapsulation of the HEVC video standard), JPEG and three
+earlier learned codecs. The top panel reports distortion as peak
+signal-to-noise ratio, a logarithmic restatement of mean squared error, so
+$1$ dB at equal rate is a factor of $1.26$ in squared error.
 
-{/* img rd-curves-kodak: the paper's two measured rate-distortion plots
-    stacked — PSNR against bits per pixel on top, MS-SSIM in decibels against
-    bits per pixel below — for the hyperprior and factorised-prior models
-    (each trained twice, once per metric) against BPG 4:4:4, JPEG 4:2:0 and
-    three earlier learned codecs. The reader must be able to see two things:
-    in the top panel the factorised-prior curve sitting between JPEG and BPG
-    with the hyperprior curve pulled up almost onto BPG, the two converging as
-    the rate rises; in the bottom panel the same two models above every
-    conventional codec, with BPG and JPEG at the bottom of the ranking. Keep
-    both axes, both legends and every plotted series legible. Candidate
-    images.yaml id `variationali-fig5-rd-curves` — J. Ballé, D. Minnen,
-    S. Singh, S. J. Hwang, N. Johnston, "Variational Image Compression with a
-    Scale Hyperprior", ICLR 2018, PDF p. 8, Figure 5 (crop to the two plots,
-    dropping the printed caption and the running head);
-    https://arxiv.org/pdf/1802.01436; placement centered */}
+<Figure
+  src="./figures/rd-curves-kodak.png"
+  alt="Two stacked plots of distortion against bits per pixel, aggregated over the Kodak set. Top, PSNR in decibels: an orange BPG curve highest, the blue hyperprior curve just beneath it and converging with it above one bit per pixel, the magenta factorized-prior curve roughly one and a half decibels lower, then a dark green and a cyan learned codec, and grey JPEG lowest; two further blue and magenta curves, the models trained for MS-SSIM, run far below all of them. Bottom, MS-SSIM in decibels: the blue and magenta MS-SSIM-trained curves are highest, then green Rippel (2017), then the same two models trained for squared error, then orange BPG, with grey JPEG lowest."
+  caption="The measurement, both metrics, same 24 photographs. Top: under PSNR the hyperprior (blue squares) rides just under BPG and about one and a half decibels above the factorised prior (magenta squares). Bottom: under MS-SSIM the learned models sit above every conventional codec and BPG and JPEG fall to the bottom."
+/>
 
-Trained instead for the perceptual index MS-SSIM, a value $d$ between $0$ and
-$1$ that the plot converts to decibels as $-10\log_{10}(1 - d)$ so that
-differences near the top of the range stay visible, the factorised model matches
-Rippel and Bourdev's 2017 codec, then the best published result on that index
-and a considerably more complex system: within about a quarter of a decibel of
-it below $0.5$ bits per pixel and ahead of it above. The hyperprior model is
-above it at every rate on the curve, by $0.4$ dB at $0.2$ bits per pixel
-widening to about $1$ dB at $0.8$. JPEG and BPG, both built around squared
-error, fall to the bottom of that ranking — the same reversal the next section
-takes apart.
+Under squared error the hyperprior comes close enough to BPG to change the
+shape of the argument: about a quarter of a decibel under it at $1$ bit per
+pixel, with the factorised prior more than a decibel further down. Read the
+top panel at matched quality rather than matched rate and that margin is a
+rate — the hyperprior reaches the factorised model's $1$-bpp quality at about
+$0.8$ bpp. Two tenths of a bit per pixel of file, bought with the two
+hundredths the side channel costs at that rate: a return near ten to one, and
+the only thing that changed between the two models is the entropy model.
+
+The bottom panel measures the same reconstructions with MS-SSIM, a perceptual
+index $d$ between $0$ and $1$ that the plot converts to decibels as
+$-10\log_{10}(1 - d)$ so differences near the top of its range stay visible.
+It reverses the ranking. The models trained on that index sit above every
+conventional codec; the factorised one matches Rippel and Bourdev's 2017
+codec, then the best published result on the index and a considerably more
+complex system, and the hyperprior is above it at every rate. JPEG and BPG,
+both built around squared error, fall to the bottom. The two panels order the
+same codecs differently, and the next section takes that apart.
 
 <KeyFact>
 Those bits carry nothing about the image: $\hat z$ is computed from $\hat y$,
@@ -660,6 +648,12 @@ compressors on a single file. Here the network is fixed and small against any
 realistic image corpus, so the adjustment is real but does not change the
 verdict; a codec trained per image would be a different case entirely.
 
+<Figure
+  src="./figures/decoder-amortised.svg"
+  alt="A log-log plot of bits per image against the number of images coded with the same decoder. A blue dashed horizontal line marks the reported rate at ten to the fifth bits per image. An amber curve, the weights amortised plus that rate, starts near 1.6 times ten to the eighth at one image, falls steeply, passes through twice the reported rate at about 1,600 images, and settles onto the dashed line beyond about 160,000."
+  caption="Assuming a ten-million-weight decoder at 16 bits a weight and a 0.19 bpp photograph, the omitted term is a per-image cost that shrinks as 1/N: it doubles the bill up to a few thousand images and is negligible past a hundred thousand."
+/>
+
 ### R(D) is a limit for a source that does not exist here
 
 The rate-distortion function is defined for a known distribution and attained
@@ -682,6 +676,14 @@ matters less relative to distortion, so the pressure toward a factorised
 representation weakens. Rate-distortion optimality does not imply an
 independent representation, which is why there is work left for a hyperprior
 to do.
+
+<KeyFact>
+Both failures are in the accounting, not in the codec. The decoder's own bits
+are omitted from a quantity that is otherwise a two-part code, and the limit
+the objective is named after is undefined for the source it is trained on. A
+reported rate-distortion point is therefore a measurement of one system, not a
+distance from an optimum.
+</KeyFact>
 
 ## ★ What came next
 
@@ -792,6 +794,77 @@ the squared error, which is the $6$ dB per bit rule of
 **The transferable move.** $\lambda$ has units of bits per unit of distortion,
 so a codec with a fixed quantiser step and a free transform gain has exactly
 one degree of freedom, and $\lambda$ sets it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Redo the theorem's proof under two changed hypotheses, one at a time. Write
+$n$ for the number of latent coefficients and $d$ for the number of image
+pixels.
+
+**(a) Noise of the wrong width.** Keep every hypothesis except the noise: let
+$q(\tilde y \mid x) = \prod_i \mathcal{U}\bigl(\tilde y_i \mid y_i - \tfrac
+w2,\, y_i + \tfrac w2\bigr)$ for a fixed $w \neq 1$. Recompute Step 2 and write
+the loss Steps 1–4 now produce. Then substitute $\tilde y' = \tilde y / w$ and
+show the extra term is exactly what that rescaling produces — so state what $w$
+is a reparameterisation of, and what the deployed codec, whose quantizer still
+rounds to the nearest integer, is handed at the integers.
+
+**(b) A likelihood that is not Gaussian.** Replace the likelihood with a
+Laplacian, $p(x \mid \tilde y) = \prod_{j=1}^{d} \tfrac{1}{2b} \exp\bigl(-\lvert
+x_j - \tilde x_j \rvert / b\bigr)$. Redo Step 3 and state what the multiplier
+multiplies now.
+
+<Solution>
+**(a) Step 2 with width $w$.** Each factor of $q$ is a uniform density of
+height $1/w$ on its support, so $\log q = -n \log w$ there and
+$\mathbb{E}_q[\log q] = -n \log w$ — a constant, but not zero. Steps 1, 3 and 4
+are untouched, so the loss is
+
+$$
+L_w = R_w + \lambda D - n \log w + \text{const}, \qquad
+R_w = \mathbb{E}_{\tilde y \sim m}\bigl[-\log p_{\tilde y}(\tilde y)\bigr].
+$$
+
+**What the extra term is.** Put $\tilde y' = \tilde y / w$, whose noise is
+unit-width by construction. Coefficient by coefficient the densities are
+related by $p_{\tilde y_i}(\tilde y_i) = w^{-1} p_{\tilde y_i'}(\tilde y_i')$,
+so $-\log p_{\tilde y_i} = \log w - \log p_{\tilde y_i'}$, and summing over the
+$n$ coefficients gives $R_w = n \log w + R'$ with $R'$ the rate of the rescaled
+system. The $-n \log w$ in the loss cancels that term exactly. Taking
+$g_s'(\tilde y') = g_s(w \tilde y')$ leaves the reconstruction and $D$
+unchanged. So training with width $w$ and transform $g_a$ is the same
+optimisation as training with unit width and transform $g_a / w$: $w$ is not a
+new hypothesis but the encoder's gain under another name, and the trained
+optimum is unchanged.
+
+**What it costs at deployment.** The shipped quantizer still rounds to the
+nearest integer, step $1$. Under width $w$ the trained prior evaluated at an
+integer $k$ is the base density's mass on $[k - \tfrac w2, k + \tfrac w2]$,
+which is not $P[\hat y = k]$; those numbers sum to $w$ over the integers rather
+than to $1$, so they are not a distribution the arithmetic coder can use. The
+relaxation matches the deployment only when the noise width equals the
+quantizer step, and Step 2's exact zero is that same fact written in algebra.
+
+**(b) Step 3 with a Laplacian.** Taking logs,
+
+$$
+-\log p(x \mid \tilde y) = \frac{1}{b} \lVert x - \tilde x \rVert_1
++ d \log 2b,
+$$
+
+whose second term is fixed once $b$ is. Steps 1, 2 and 4 do not involve the
+likelihood, so with $\lambda = 1/b$ the objective is
+$R + \lambda\, \mathbb{E}\bigl[\lVert x - \tilde x \rVert_1\bigr]$ plus
+constants: the same Lagrangian, with $\lambda$ now pricing mean *absolute*
+error.
+
+**The transferable move.** Any likelihood of the form $p(x \mid \tilde y)
+\propto \exp\bigl(-\lambda\, \rho(x, \tilde x)\bigr)$ with a normaliser that
+does not depend on $\phi$ or $\theta$ gives $R + \lambda \mathbb{E}[\rho]$.
+Choosing the distortion measure and choosing the likelihood are the same act,
+which is why the choice cannot be postponed to evaluation time —
+the point the section on metrics makes with photographs.
 </Solution>
 </Exercise>
 
@@ -1009,10 +1082,11 @@ not the rate.
 
 <References>
 1. J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston, "Variational Image Compression with a Scale Hyperprior," ICLR 2018 (arXiv:1802.01436) — §1 for the JPEG/HEVC side-information analogy, §2 for the rate-as-cross-entropy identity (eqs. 1–2), the uniform-noise relaxation and the derivation of eq. 3 used as this lesson's theorem, §3 for the hyperprior (eqs. 7–10), §4.1 for the architecture and eq. 11, §4.2 for the Kodak results, the MS-SSIM/squared-error artifact comparison and the side-information measurement. https://arxiv.org/abs/1802.01436
-2. D. P. Kingma, M. Welling, "Auto-Encoding Variational Bayes," ICLR 2014 (arXiv:1312.6114) — eq. 1 decomposes $\log p(x)$ into a divergence to the true posterior plus the evidence lower bound; eq. 3 splits the bound into a reconstruction term and a divergence to the prior. Appendix B gives the closed-form Gaussian case. https://arxiv.org/abs/1312.6114
-3. D. Minnen, J. Ballé, G. Toderici, "Joint Autoregressive and Hierarchical Priors for Learned Image Compression," NeurIPS 2018 (arXiv:1809.02736) — the successor model: an autoregressive context model on top of the hyperprior, reported at $8.4\%$ smaller bitstreams than BPG and the first learned codec ahead of BPG on both PSNR and MS-SSIM. https://arxiv.org/abs/1809.02736
-4. O. Rippel, L. Bourdev, "Real-Time Adaptive Image Compression," ICML 2017, *Proceedings of Machine Learning Research* 70, pp. 2922–2930 (arXiv:1705.05823) — the MS-SSIM state of the art the factorized-prior model matches and the hyperprior model passes in the curves read above; a multiscale architecture with an adversarial loss and a context-adaptive entropy coder. https://arxiv.org/abs/1705.05823
-5. V. K. Goyal, "Theoretical Foundations of Transform Coding," *IEEE Signal Processing Magazine* 18(5), 2001 — the transform-coding framework the learned codec instantiates, including why a decorrelating transform followed by scalar quantisation is near-optimal for Gaussian sources.
-6. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 10 for the rate-distortion function, its convexity and the Lagrangian form used here.
-7. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* — §23.1 for the definition of $R(D)$ and the converse showing no scheme beats it, the statement this lesson's codec cannot be claimed to attain.
+2. J. Ballé, V. Laparra, E. P. Simoncelli, "End-to-end Optimized Image Compression," ICLR 2017 (arXiv:1611.01704) — the predecessor: the factorized-prior codec measured against the hyperprior throughout §4.2 above. §3 states the objective $R + \lambda D$ and the additive-uniform-noise relaxation, with eq. 10 the identity $p_{\tilde y}(n) = P_q(n)$ this lesson draws at the integers; §3.1 casts the result as a variational autoencoder; §4, figure 4, is the empirical check — relaxed against quantized rate and distortion over 2,169 training images — that the 2018 paper cites in place of a proof. https://arxiv.org/abs/1611.01704
+3. D. P. Kingma, M. Welling, "Auto-Encoding Variational Bayes," ICLR 2014 (arXiv:1312.6114) — eq. 1 decomposes $\log p(x)$ into a divergence to the true posterior plus the evidence lower bound; eq. 3 splits the bound into a reconstruction term and a divergence to the prior. Appendix B gives the closed-form Gaussian case. https://arxiv.org/abs/1312.6114
+4. D. Minnen, J. Ballé, G. Toderici, "Joint Autoregressive and Hierarchical Priors for Learned Image Compression," NeurIPS 2018 (arXiv:1809.02736) — the successor model: an autoregressive context model on top of the hyperprior, reported at $8.4\%$ smaller bitstreams than BPG and the first learned codec ahead of BPG on both PSNR and MS-SSIM. https://arxiv.org/abs/1809.02736
+5. O. Rippel, L. Bourdev, "Real-Time Adaptive Image Compression," ICML 2017, *Proceedings of Machine Learning Research* 70, pp. 2922–2930 (arXiv:1705.05823) — the MS-SSIM state of the art the factorized-prior model matches and the hyperprior model passes in the curves read above; a multiscale architecture with an adversarial loss and a context-adaptive entropy coder. https://arxiv.org/abs/1705.05823
+6. V. K. Goyal, "Theoretical Foundations of Transform Coding," *IEEE Signal Processing Magazine* 18(5), 2001 — the transform-coding framework the learned codec instantiates, including why a decorrelating transform followed by scalar quantisation is near-optimal for Gaussian sources.
+7. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 10 for the rate-distortion function, its convexity and the Lagrangian form used here.
+8. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441, 2016) — §23.2 for the definition of the fundamental limit $R(D)$ (Definition 23.1) and the general converse (Theorem 23.2, $\log M \ge \min I(X;\hat X)$ over conditionals meeting the distortion budget), which is the chain this lesson's three-gap decomposition runs; §24.2 for Shannon's theorem identifying $R(D)$ with the information rate-distortion function for a memoryless source — both of them statements about a known distribution, which is why the codec cannot be claimed to attain either. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
 </References>
