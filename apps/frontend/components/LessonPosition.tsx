@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { clearPosition, setPosition } from "@/lib/lesson/position";
+import { anchorUnder, clearPosition, setPosition } from "@/lib/lesson/position";
 
 interface Props {
   course: string;
@@ -16,34 +16,46 @@ interface Props {
  */
 export default function LessonPosition({ course, lesson, headings }: Props) {
   // The prop is a fresh array on every render; the ids are what actually
-  // changes, and re-running the observer for a new reference is pointless.
+  // changes, and re-running the listeners for a new reference is pointless.
   const ids = headings.join(" ");
 
   useEffect(() => {
     const order = ids === "" ? [] : ids.split(" ");
-    setPosition({ course, lesson, anchor: order[0] ?? null });
-
-    // Track the set of headings currently inside the top-quarter band and
-    // deterministically report the one earliest in document order. When the
-    // band is empty (e.g. mid-section prose), keep the previous one.
-    const visible = new Set<string>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) visible.add(entry.target.id);
-          else visible.delete(entry.target.id);
-        }
-        const first = order.find((id) => visible.has(id));
-        if (first !== undefined) setPosition({ course, lesson, anchor: first });
-      },
-      { rootMargin: "-5% 0px -75% 0px" },
-    );
-    for (const id of order) {
+    // Looked up once: the ids are what the effect is keyed on, so the elements
+    // they name do not change under it, and a scroll handler has no business
+    // walking the document.
+    const found = order.flatMap((id) => {
       const heading = document.getElementById(id);
-      if (heading !== null) observer.observe(heading);
-    }
+      return heading === null ? [] : [{ id, heading }];
+    });
+
+    const measure = (): void => {
+      const tops = found.map(({ id, heading }) => ({
+        id,
+        top: heading.getBoundingClientRect().top,
+      }));
+      const below =
+        document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      setPosition({
+        course,
+        lesson,
+        anchor: anchorUnder(tops, window.innerHeight, below),
+      });
+    };
+
+    measure();
+    window.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    // Not every move of a heading is a scroll or a resize: an image settling,
+    // a figure hydrating or a details block opening shifts the page under a
+    // reader who has not touched it, and leaves the store naming a section
+    // they are no longer in.
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
 
     return () => {
+      window.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
       observer.disconnect();
       clearPosition(course, lesson);
     };
