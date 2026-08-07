@@ -42,3 +42,23 @@ export function mounted(tag = "div"): Mounted {
 
   return { host: () => host, render: (tree) => root.render(tree) };
 }
+
+/**
+ * The reader typing, given as the whole value the field ends up holding.
+ *
+ * React dedupes a change event against the value it last saw, and that tracker
+ * lives on the element's own `value` setter — so a test that assigns to it is
+ * the one case React ignores. Writing through the prototype is what a keystroke
+ * does.
+ */
+export function type(
+  field: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+): void {
+  const prototype =
+    field instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(field, value);
+  act(() => field.dispatchEvent(new Event("input", { bubbles: true })));
+}

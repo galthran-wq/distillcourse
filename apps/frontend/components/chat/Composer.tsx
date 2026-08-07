@@ -20,6 +20,7 @@ import { FIELD_BOX_CLASS, FIELD_BOX_INPUT_CLASS } from "@/components/ui/styles";
 import { matchCommands, type Command } from "@/lib/chat/commands";
 import { useQuotes, type Quote } from "@/lib/chat/quote";
 import { setDraft, useDraft } from "@/lib/chat/stored";
+import { useDismiss } from "@/lib/ui/dismiss";
 
 interface Props {
   /** A run is in flight: the chat takes one at a time. */
@@ -33,18 +34,22 @@ export default function Composer({ disabled, onSubmit }: Props) {
   const text = useDraft();
   const quotes = useQuotes();
   const field = useRef<HTMLTextAreaElement>(null);
+  const column = useRef<HTMLDivElement>(null);
   const ready = !disabled && text.trim() !== "";
 
-  // The palette is the draft read as a command, not a state of its own: what
-  // is typed decides what it lists and so whether it is there at all. The one
-  // thing it remembers is having been dismissed, which the next keystroke
-  // takes back — typing is what opened it.
-  const [dismissed, setDismissed] = useState(false);
+  // What the palette lists is the draft read as a command, not a state of its
+  // own. Whether it is up at all is one, and typing is what puts it there: the
+  // draft outlives the tab, and a line the reader comes back to a day later
+  // was not typed just now and opens nothing. It goes away like any other menu
+  // here — Escape or a press away from it — and sending is the third way.
+  const [offered, setOffered] = useState(false);
   const [chosen, setChosen] = useState(0);
   const commands = matchCommands(text);
-  const open = commands.length > 0 && !dismissed && !disabled;
+  const open = offered && commands.length > 0 && !disabled;
   // The list shortens as the reader types; the highlight cannot outrun it.
   const active = Math.min(chosen, commands.length - 1);
+
+  useDismiss(open, column, setOffered);
 
   // One row until the message needs more, up to the cap the class sets — and
   // the field's own scrollHeight is the only measure of what it needs, which
@@ -82,11 +87,17 @@ export default function Composer({ disabled, onSubmit }: Props) {
 
   function send(message: string): void {
     setDraft("");
+    setOffered(false);
     onSubmit(message, quotes);
   }
 
+  // The one place a message leaves the composer, so the open palette is
+  // answered for here rather than at each of the two ways in: a slash on its
+  // own is nothing the tutor could answer, and the send button sits under the
+  // list as much as the Enter key does.
   function submit(event: FormEvent): void {
     event.preventDefault();
+    if (open) return pick(commands[active]);
     if (!ready) return;
     send(text.trim());
   }
@@ -98,31 +109,23 @@ export default function Composer({ disabled, onSubmit }: Props) {
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    // While the palette is up these keys are its: the caret stays where it is,
-    // and Escape is spent here rather than reaching the expanded panel, which
-    // would take the Escape as being told to collapse.
-    if (open) {
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        const step = event.key === "ArrowDown" ? 1 : commands.length - 1;
-        return setChosen((active + step) % commands.length);
-      }
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        return setDismissed(true);
-      }
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        return pick(commands[active]);
-      }
+    // The arrows walk the list while it is up, and the caret stays where it
+    // is. Escape is not handled here: `useDismiss` above takes it, the way it
+    // does for every other menu on this site.
+    if (open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      return setChosen((active + step + commands.length) % commands.length);
     }
-    // Enter sends, shift+Enter breaks the line — a chat input, not a form field.
+    // Enter sends, shift+Enter breaks the line — a chat input, not a form
+    // field. What it sends with the palette up is `submit`'s to say.
     if (event.key === "Enter" && !event.shiftKey) submit(event);
   }
 
   function type(draft: string): void {
     setDraft(draft);
-    setDismissed(false);
+    // Typing is what opens the palette, and what takes a dismissal back.
+    setOffered(true);
     // A different list, so the highlight starts at the top of it again.
     setChosen(0);
   }
@@ -131,8 +134,10 @@ export default function Composer({ disabled, onSubmit }: Props) {
     <form onSubmit={submit} className="border-t border-line p-3">
       {/* The column the transcript above it is set in, and what the palette
           opens against: over the whole composer, the attached passages
-          included, since it is about the line being written rather than them. */}
-      <div className="relative mx-auto max-w-2xl">
+          included, since it is about the line being written rather than them.
+          It is the palette's extent too — a press anywhere in here is aimed at
+          the message being written and leaves the list up. */}
+      <div ref={column} className="relative mx-auto max-w-2xl">
         {open && <CommandPalette commands={commands} active={active} onPick={pick} />}
         {quotes.length > 0 && (
           <QuoteRow>

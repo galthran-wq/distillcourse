@@ -5,7 +5,7 @@ import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
 import type { ChatListing, ChatModel, ChatSummary } from "@/lib/chat/api";
 import { setDraft } from "@/lib/chat/stored";
-import { mounted } from "./utils/dom";
+import { mounted, type } from "./utils/dom";
 
 // jsdom has no ResizeObserver, and the field watches its own width to know how
 // many rows the draft wraps into. Nothing here changes that width.
@@ -40,18 +40,17 @@ function field(): HTMLTextAreaElement {
   return box;
 }
 
-/**
- * The reader typing, given as the whole draft: React reads a controlled field
- * back off the DOM node, so the value has to be set the way a keystroke sets
- * it rather than through the property React itself has patched.
- */
-function types(draft: string): void {
-  const value = Object.getOwnPropertyDescriptor(
-    HTMLTextAreaElement.prototype,
-    "value",
-  )?.set;
-  value?.call(field(), draft);
-  act(() => field().dispatchEvent(new Event("input", { bubbles: true })));
+/** A reader arriving at a composer that already holds a draft, as a reload does. */
+function reloads(draft: string): void {
+  act(() => render(null));
+  setDraft(draft);
+  composer();
+}
+
+function send(): HTMLButtonElement {
+  const button = host().querySelector<HTMLButtonElement>('[aria-label="Send"]');
+  if (button === null) throw new Error("the composer has no send button");
+  return button;
 }
 
 function press(key: string): void {
@@ -91,7 +90,7 @@ afterEach(() => {
 
 describe("the command palette", () => {
   it("opens on a slash into an empty composer", () => {
-    types("/");
+    type(field(), "/");
 
     expect(listed()).toEqual(["/clear", "/compact"]);
     // With what each one does: a list of two slashes explains nothing.
@@ -100,30 +99,30 @@ describe("the command palette", () => {
     expect(field().getAttribute("aria-expanded")).toBe("true");
   });
 
+  // Which drafts name a command is `lib/chat/commands`', and tested there.
+  // What the composer adds is that with none of them named it is a message
+  // field again and says nothing about a list.
   it("stays out of an ordinary question", () => {
-    types("why is this true?");
-    expect(listed()).toEqual([]);
+    type(field(), "why is this true?");
 
-    // The tutor, not the widget, is the one who can answer this.
-    types("what does /clear do?");
     expect(listed()).toEqual([]);
     expect(field().getAttribute("aria-expanded")).toBeNull();
   });
 
   it("filters by what has been typed so far", () => {
-    types("/c");
+    type(field(), "/c");
     expect(listed()).toEqual(["/clear", "/compact"]);
 
-    types("/co");
+    type(field(), "/co");
     expect(listed()).toEqual(["/compact"]);
 
     // Nothing to offer is what closes it: /help is a message like any other.
-    types("/help");
+    type(field(), "/help");
     expect(listed()).toEqual([]);
   });
 
   it("runs the command Enter is on", () => {
-    types("/");
+    type(field(), "/");
     press("Enter");
 
     expect(sent).toEqual(["/clear"]);
@@ -132,7 +131,7 @@ describe("the command palette", () => {
   });
 
   it("walks the list with the arrows", () => {
-    types("/");
+    type(field(), "/");
     expect(highlighted()).toBe("/clear");
 
     press("ArrowDown");
@@ -149,19 +148,30 @@ describe("the command palette", () => {
   });
 
   it("starts the highlight over when the list changes", () => {
-    types("/");
+    type(field(), "/");
     press("ArrowDown");
 
-    types("/c");
+    type(field(), "/c");
 
     expect(highlighted()).toBe("/clear");
   });
 
   it("runs the one the reader clicks", () => {
-    types("/");
+    type(field(), "/");
 
     act(() => options()[1].click());
 
+    expect(sent).toEqual(["/compact"]);
+  });
+
+  it("runs the highlighted one from the send button", () => {
+    type(field(), "/");
+    press("ArrowDown");
+
+    act(() => send().click());
+
+    // Not the bare slash the field holds, which is nothing the tutor could
+    // answer and would spend a message off the day's allowance saying so.
     expect(sent).toEqual(["/compact"]);
   });
 
@@ -171,7 +181,7 @@ describe("the command palette", () => {
       reached.push(event.key);
     };
     window.addEventListener("keydown", listener);
-    types("/cl");
+    type(field(), "/cl");
 
     press("Escape");
 
@@ -184,17 +194,40 @@ describe("the command palette", () => {
     window.removeEventListener("keydown", listener);
   });
 
+  it("closes on a press away from it", () => {
+    type(field(), "/cl");
+
+    act(() =>
+      document.body.dispatchEvent(new Event("pointerdown", { bubbles: true })),
+    );
+
+    expect(listed()).toEqual([]);
+    // As with Escape: the press put the list away, not the line.
+    expect(field().value).toBe("/cl");
+  });
+
+  it("stays out of a draft the reader came back to", () => {
+    reloads("/c");
+
+    // The draft outlives the tab; nothing was typed, and typing is what opens
+    // the palette — a reader returning to a line is not offered a list.
+    expect(listed()).toEqual([]);
+
+    type(field(), "/cl");
+    expect(listed()).toEqual(["/clear"]);
+  });
+
   it("comes back when the reader goes on typing", () => {
-    types("/");
+    type(field(), "/");
     press("Escape");
 
-    types("/c");
+    type(field(), "/c");
 
     expect(listed()).toEqual(["/clear", "/compact"]);
   });
 
   it("leaves a command typed out in full working", () => {
-    types("/clear");
+    type(field(), "/clear");
     expect(listed()).toEqual(["/clear"]);
 
     press("Enter");
@@ -203,7 +236,7 @@ describe("the command palette", () => {
   });
 
   it("leaves it working with the palette dismissed", () => {
-    types("/compact");
+    type(field(), "/compact");
     press("Escape");
 
     press("Enter");
@@ -214,7 +247,7 @@ describe("the command palette", () => {
   it("stays away while the tutor is answering", () => {
     composer(true);
 
-    types("/");
+    type(field(), "/");
 
     // Nothing can be sent in the middle of a run, a command included.
     expect(listed()).toEqual([]);
