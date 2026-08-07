@@ -24,6 +24,8 @@ import WindowTradeoffMap from "./digital-signal-processing/WindowTradeoffMap";
 import PeakParabolaFit from "./digital-signal-processing/PeakParabolaFit";
 import PhaseFalseResolution from "./digital-signal-processing/PhaseFalseResolution";
 import LocalizationResolutionLedger from "./digital-signal-processing/LocalizationResolutionLedger";
+import PeriodogramVarianceEnvelope from "./digital-signal-processing/PeriodogramVarianceEnvelope";
+import WelchAveragingPipeline from "./digital-signal-processing/WelchAveragingPipeline";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -187,6 +189,8 @@ export const figures: Record<string, RegisteredFigure> = {
   PeakParabolaFit: { component: PeakParabolaFit },
   PhaseFalseResolution: { component: PhaseFalseResolution },
   LocalizationResolutionLedger: { component: LocalizationResolutionLedger },
+  PeriodogramVarianceEnvelope: { component: PeriodogramVarianceEnvelope },
+  WelchAveragingPipeline: { component: WelchAveragingPipeline },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },

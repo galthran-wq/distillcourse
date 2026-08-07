@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "lesson": "correlation-psd-and-welch",
+  "review": "independent report-only math/source QA",
+  "status": "FAIL",
+  "verdict": "The population/estimator mathematics, normalizations, frozen CV values, frame counts, and four of six solutions are correct, but the lesson is not source/math-ready until six reproducibility and contract defects are repaired.",
+  "blockers": [
+    {
+      "id": "B1",
+      "severity": "FAIL",
+      "location": "lesson.mdx:259-277; welch-study.mjs:41-45,126-155,205-224",
+      "problem": "The prose presents one frozen tone-plus-noise, 96-trial study, but the executable has two different branches: empirical CV is computed from 96 pure CN(0,1) records with no tones, while tone resolution is a deterministic exact frame-start mean plus a unit noise floor and uses no Monte Carlo trials. The lesson also never states the sample-CV formula even though its audit ledger requires it; the code uses sample variance with denominator T-1.",
+      "patch_ready_fix": "Replace line 259 with two explicit contracts: 'The resolution branch evaluates the exact frame-start mean for 0.5e^{j2pi0.18n}+0.5e^{j2pi0.22n} plus the unit noise floor. Separately, the variability branch generates T=96 pure CN(0,1) records and probes f=0.3125.' Then define Pbar=(1/T)sum_t P_t, s^2=(1/(T-1))sum_t(P_t-Pbar)^2, and CV=s/Pbar. Preserve the current frozen values after that clarification. Mirror the same split in the demo footer, which currently names one composite signal beside noise-only empirical CVs."
+    },
+    {
+      "id": "B2",
+      "severity": "FAIL",
+      "location": "lesson.mdx:231-245",
+      "problem": "The quantity called a normalized window inner product omits complex conjugation and explicit overlap support. The printed formula is valid only for the real Hann used by the study, whereas the preceding Welch estimator is stated for a general periodic window.",
+      "patch_ready_fix": "Use rho_h=[sum_{n=0}^{M-1-hH} w[n+hH]w*[n]]/U for 0<=hH<M (and rho_h=0 otherwise), or explicitly restrict the entire dependence derivation to real-valued Hann windows. Keep |rho_h|^2 in K_eff. State that the K_eff expression is the same-frequency circular-complex-white-Gaussian result; for the real Hann the current numerical values are unchanged."
+    },
+    {
+      "id": "B3",
+      "severity": "FAIL",
+      "location": "lesson.mdx:263-271; figures/welch-resolution-variance.svg:15-18,28-34; welch-study.mjs:220-260",
+      "problem": "The text asserts that M=4096 separates the tones and the key figure treats ENBW<0.04 as the resolution acceptance boundary, but the frozen executable resolution study evaluates only M in {32,64,128,2048}. ENBW relative to tone spacing is a scale, not the declared two-local-maxima/1 dB-valley test. M=512 points are also marked in the joint region without a frozen resolution row.",
+      "patch_ready_fix": "Extend resolutionStudy to the 50%-overlap M values {32,64,128,512,2048,4096} and assert the extreme verdicts. The existing algorithm gives M=512: peaks 0.180039/0.219956, maximum error 0.000044, valley 19.358973 dB, resolves=true; M=4096: the same displayed peak locations/error, valley 28.166839 dB, resolves=true. In the SVG relabel the vertical ENBW=0.04 line as a reference scale, not a pass inequality, and encode resolution PASS/FAIL from the executable peak/valley verdict."
+    },
+    {
+      "id": "B4",
+      "severity": "FAIL",
+      "location": "lesson.mdx:311-318 (research-shaped exercise solution)",
+      "problem": "The exercise requires a frozen generator, record length, window, frequency, two reported CVs, and fixed-seed 95% bootstrap intervals. Its solution supplies only a protocol and ideal predictions; it freezes none of those choices and reports no reproduced result, so it fails the complete-solution standard.",
+      "patch_ready_fix": "Add executable code and one exact result ledger. A verified patch-ready ledger using the lesson's generator style is: circular CN(0,1), M=256, periodic Hann U=96, f=0.25, K=16, 50 outer trials, data seed 0x16a11ce, bootstrap seed 0xb0057a9, 10000 paired percentile resamples. It gives raw mean 1.383506958, CV 1.059174456, 95% CI [0.871138071,1.233857774]; averaged mean 1.024077785, CV 0.284891804, 95% CI [0.226048384,0.335027394]. Both intervals contain the population predictions 1 and 0.25. State the percentile indexing rule or generate the interval in the shown code."
+    },
+    {
+      "id": "B5",
+      "severity": "FAIL",
+      "location": "lesson.mdx:321-328 (strategy-choice solution)",
+      "problem": "The prompt requires an FFT length to be predeclared, but the solution says only L>=512. It also says 'the frozen 50 trials' although the only frozen study uses 96 trials, and it claims a full-record periodogram 'easily separates' without limiting that statement to its narrow resolution kernel or the declared mean-curve test.",
+      "patch_ready_fix": "Choose an exact L, for example L=8192 to match the 1/8192-cycle resolution grid, and either change the exercise to 'at least 50 trials' and use the frozen T=96 result (M=512,H=256,K=63,CV=0.140159), or add a separately frozen T=50 row. Say that the full-record kernel is narrow enough for the mean resolution criterion while a single noisy realization remains unstable; do not guarantee two visible peaks in every realization."
+    },
+    {
+      "id": "B6",
+      "severity": "FAIL",
+      "location": "lesson.mdx:342",
+      "problem": "The Stoica-Moses citation points to an Ohio State HTTPS endpoint whose certificate is expired and fails normal TLS verification. The course source ledger already records a working author-hosted official source.",
+      "patch_ready_fix": "Replace https://www2.ece.ohio-state.edu/~randy/SAtext/ with https://user.it.uu.se/~pst23965/ref.html (HTTP 200 and linked by research/sources.yaml), or link its author-hosted PDF https://user.it.uu.se/~pst23965/SAS-new.pdf. Keep the current chapter/section pointer."
+    }
+  ],
+  "equation_audit": [
+    {
+      "topic": "WSS and autocorrelation",
+      "status": "PASS",
+      "evidence": "mu_x constant and r_xx[ell]=E{x[n+ell]x*[n]} use the correct conjugation and lag dependence; r_xx[-ell]=r_xx*[ell] follows. WSS is correctly separated from ergodicity and strict stationarity."
+    },
+    {
+      "topic": "PSD transform pair and units",
+      "status": "PASS",
+      "evidence": "The exp(-j omega ell) analysis sign, exp(+j omega ell) inverse sign, 1/(2pi), r_xx[0] power integral, cycles/sample conversion, and unit-variance-white-noise check S=1 are mutually consistent. The generalized DC line for x[n]=A has angular weight 2pi E|A|^2."
+    },
+    {
+      "topic": "Biased sample autocorrelation and periodogram",
+      "status": "PASS",
+      "evidence": "The fixed-N estimator, conjugate mirroring, zero extension, and identity I_N(f)=|sum x[n]exp(-j2pi fn)|^2/N are exact. For [1,-1,1,-1], rhat=[1,-3/4,1/2,-1/4], Shat(0)=0, and Shat(pi)=4 were independently recomputed."
+    },
+    {
+      "topic": "Bias, variance, MSE, and inconsistency",
+      "status": "PASS",
+      "evidence": "bias=E Shat-S, var=E|Shat-E Shat|^2, and MSE=var+|bias|^2 are correct. Circular complex Gaussian white-noise periodogram powers have mean S, variance S^2, and order-one CV; the prose's 'close approximation' is conservative (under the frozen white-Gaussian model it is exact at a fixed ordinate)."
+    },
+    {
+      "topic": "Welch normalization and units",
+      "status": "PASS",
+      "evidence": "K=1+floor((N_total-M)/H), U=sum|w|^2, the unscaled forward transform, P_m=|X_m|^2/U, and arithmetic average are correct for two-sided density per cycles/sample. Per-Hz scaling by f_s U, real one-sided interior-bin doubling, no complex/IQ folding, and 10log10 for power are correct."
+    },
+    {
+      "topic": "Overlap dependence",
+      "status": "FAIL",
+      "evidence": "All real-periodic-Hann numerical rho/K_eff results are correct, but the general printed inner product needs the B2 conjugation/support repair."
+    }
+  ],
+  "frozen_number_audit": {
+    "status": "PASS_WITH_CONTRACT_FIXES_B1_B3",
+    "raw_cv": {
+      "N256": 0.843520,
+      "N1024": 0.812286,
+      "N4096": 0.869418,
+      "N16384": 1.061033
+    },
+    "frame_counts": {
+      "M32_H16": 1023,
+      "M64_H32": 511,
+      "M128_H64": 255,
+      "M512_H512": 32,
+      "M512_H256": 63,
+      "M512_H128": 125,
+      "M2048_H1024": 15,
+      "M4096_H2048": 7
+    },
+    "overlap_M512": [
+      { "overlap": 0, "K_eff": 32, "empirical_cv": 0.178210 },
+      { "overlap": 0.5, "K_eff": 59.734114, "empirical_cv": 0.140159 },
+      { "overlap": 0.75, "K_eff": 65.213007, "empirical_cv": 0.126204 }
+    ],
+    "extremes": {
+      "M32": { "resolution": "MERGED", "empirical_cv": 0.034780 },
+      "M2048": { "resolution": "SEPARATED", "K_eff": 14.260563, "empirical_cv": 0.267121 },
+      "M4096": { "resolution": "SEPARATED but not frozen/asserted by the current study", "K_eff": 6.681818, "empirical_cv": 0.402942 }
+    }
+  },
+  "solution_audit": [
+    { "solution": 1, "location": "lesson.mdx:116-146", "status": "PASS", "note": "Complete biased-autocorrelation computation and two Fourier evaluations." },
+    { "solution": 2, "location": "lesson.mdx:283-295", "status": "PASS", "note": "Correct WSS/non-WSS, generalized-line, and unavailable-lag boundary classification." },
+    { "solution": 3, "location": "lesson.mdx:297-309", "status": "PASS", "note": "Correctly refutes consistency by retaining the nonvanishing variance term." },
+    { "solution": 4, "location": "lesson.mdx:311-319", "status": "FAIL", "note": "Protocol only; missing frozen setup, executable reproduction, CV outputs, and confidence intervals (B4)." },
+    { "solution": 5, "location": "lesson.mdx:321-329", "status": "FAIL", "note": "Does not predeclare exact L and invokes nonexistent frozen 50-trial data (B5)." },
+    { "solution": 6, "location": "lesson.mdx:331-339", "status": "PASS", "note": "Correctly identifies support/hop onset limits and frame-order information discarded by Welch; exactly one forward Ref." }
+  ],
+  "source_audit": [
+    {
+      "source": "Stoica and Moses, Spectral Analysis of Signals",
+      "status": "PASS_CONTENT_FAIL_URL",
+      "verified_local": "stoica-s1.txt ch. 1 sections 1.3-1.5 and ch. 2 sections 2.2-2.7 cover the WSS/PSD pair, biased covariance, correlogram identity, Fejer-kernel bias, persistent periodogram variance, and Welch averaging. Bibliographic source is real; repair the URL per B6."
+    },
+    {
+      "source": "Oppenheim, Schafer, and Buck, Discrete-Time Signal Processing, 2nd ed.",
+      "status": "PASS",
+      "verified_local": "oppenheim-s3.txt ch. 10 sections 10.6-10.7 and Appendix A support normalization U, bias/variance, 1/K independent averaging, resolution-variance tradeoff, overlap diminishing returns, and random-process definitions. Edition/authors match research/sources.yaml."
+    },
+    {
+      "source": "Julius O. Smith III, Spectral Audio Signal Processing",
+      "status": "PASS",
+      "verified_local": "jos-s2.txt ch. 6 sections 6.4-6.13 cover sample/population autocorrelation, PSD integral, impulse-not-white boundary, unstable periodogram, Welch framing, frame count, and resolution/stability. Official URL returned HTTP 200."
+    },
+    {
+      "source": "Harris, Proceedings of the IEEE 66(1), 1978",
+      "status": "PASS",
+      "verified_local": "harris.txt section IV.A-C supports sum-of-squares noise normalization, coherent/incoherent gain distinction, ENBW, overlap correlation, and correlated-average variance."
+    }
+  ],
+  "verification": {
+    "study_command": "node content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/correlation-psd-and-welch/welch-study.mjs",
+    "study_result": "PASS; deterministic JSON reproduced all frozen assertions and values",
+    "validator_command": "npm run validate -- digital-signal-processing",
+    "validator_result": "0 errors, 0 warnings",
+    "independent_checks": [
+      "Recomputed all biased-autocorrelation example values and Fourier sums.",
+      "Recomputed all K, K_eff, predicted CV, empirical CV, ENBW, and null-to-null values from study output.",
+      "Ran an expanded in-memory resolution audit for M=512 and M=4096 without editing source; exact results are recorded in B3.",
+      "Ran an independent 50x16 fixed-seed bootstrap reproduction without editing source; patch-ready results are recorded in B4.",
+      "Checked working official source URLs; Uppsala and JOS returned HTTP 200, while the current Ohio State Stoica URL failed TLS certificate validation."
+    ]
+  }
+}

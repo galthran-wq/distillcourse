@@ -68,4 +68,6 @@ export const demos: Record<
     import("./digital-signal-processing/DtmfDecisionLab"),
   WeakToneWindowLab: () =>
     import("./digital-signal-processing/WeakToneWindowLab"),
+  WelchTradeoffLab: () =>
+    import("./digital-signal-processing/WelchTradeoffLab"),
 };
