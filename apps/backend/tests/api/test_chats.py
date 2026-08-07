@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import UTC, datetime
 
 from httpx import AsyncClient
 from pydantic_ai.messages import ModelRequest, UserPromptPart
@@ -74,6 +75,46 @@ async def test_a_chat_is_created_listed_and_switched_to_another_model(
     assert created["model"] == settings.DEFAULT_CHAT_MODEL
     assert switched.json()["model"] == other
     assert [chat["id"] for chat in listed] == [created["id"]]
+
+
+async def test_the_listing_dates_a_chat_by_its_last_message(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """What the rail shows beside each row. A chat nobody has said anything in
+    is dated by nothing, not by the moment it was opened."""
+    repo = HarnessRepository(session, user.id)
+    spoken_in = await repo.create_chat(kind="web")
+    await repo.add_messages(spoken_in, [QUESTION], role="user")
+    empty = await repo.create_chat(kind="web")
+
+    listed = {
+        chat["id"]: chat["last_message_at"]
+        for chat in (await signed_in.get("/api/v1/chats")).json()
+    }
+
+    stored = (await repo.rows(spoken_in))[-1].created_at
+    assert datetime.fromisoformat(listed[str(spoken_in.id)]) == stored
+    assert listed[str(empty.id)] is None
+
+
+async def test_the_listing_puts_the_most_recently_used_chat_first(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """The rail dates its rows, so the rows have to descend by that date: a
+    chat opened first and used a minute ago belongs above one opened after it
+    and abandoned. A chat nobody has spoken in is placed by its creation."""
+    repo = HarnessRepository(session, user.id)
+    older = await repo.create_chat(kind="web")
+    empty = await repo.create_chat(kind="web")
+    await repo.add_messages(older, [QUESTION], role="user")
+    # One transaction wraps the suite and `now()` is its start, so every row it
+    # writes carries the same stamp: the message is dated apart by hand.
+    (await repo.rows(older))[-1].created_at = datetime(2030, 1, 1, tzinfo=UTC)
+    await session.commit()
+
+    listed = [chat["id"] for chat in (await signed_in.get("/api/v1/chats")).json()]
+
+    assert listed == [str(older.id), str(empty.id)]
 
 
 async def test_an_unknown_model_is_refused(signed_in: AsyncClient) -> None:

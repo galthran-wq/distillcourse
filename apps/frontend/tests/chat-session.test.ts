@@ -1,17 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatSummary } from "@/lib/chat/api";
+import type { ChatListing } from "@/lib/chat/api";
 import type { StoredChat } from "@/lib/chat/stored";
 
-const WEB: ChatSummary = {
+const WEB: ChatListing = {
   id: "c1",
   kind: "web",
   model: "moonshotai/kimi-k3",
   title: "why is this true?",
   created_at: "2026-08-05T10:00:00Z",
+  last_message_at: "2026-08-05T10:04:00Z",
 };
-const TELEGRAM: ChatSummary = { ...WEB, id: "tg", kind: "telegram", title: null };
-const FRESH: ChatSummary = { ...WEB, id: "c2", title: null };
+const TELEGRAM: ChatListing = { ...WEB, id: "tg", kind: "telegram", title: null };
+const FRESH: ChatListing = { ...WEB, id: "c2", title: null };
 
 type Route = () => Response;
 
@@ -330,21 +331,36 @@ describe("the chat session", () => {
   });
 
   it("takes the title the backend wrote from the first message", async () => {
-    const listing = [FRESH];
     served({
-      "GET /api/v1/chats": json(listing),
+      "GET /api/v1/chats": json([FRESH]),
       "GET /api/v1/chats/c2/messages": json([]),
     });
-    const { refreshSummary, resumeSession } = await session();
+    const { adoptSummary, resumeSession } = await session();
     const untitled = await resumeSession();
     expect(untitled.summary.title).toBeNull();
 
-    listing[0] = { ...FRESH, title: "why is this true?" };
-    await refreshSummary();
+    adoptSummary([{ ...FRESH, title: "why is this true?" }]);
 
     const titled = await resumeSession();
     expect(titled.summary.title).toBe("why is this true?");
     expect(titled.chat).toBe(untitled.chat);
+  });
+
+  it("takes the title again when the backend renames the chat", async () => {
+    // The name is not written once: the backend rewrites it as the
+    // conversation moves past the question it was named for.
+    served({
+      "GET /api/v1/chats": json([WEB]),
+      "GET /api/v1/chats/c1/messages": json([]),
+    });
+    const { adoptSummary, resumeSession } = await session();
+    const open = await resumeSession();
+
+    adoptSummary([{ ...WEB, title: "Entropy and cross entropy" }]);
+
+    const renamed = await resumeSession();
+    expect(renamed.summary.title).toBe("Entropy and cross entropy");
+    expect(renamed.chat).toBe(open.chat);
   });
 
   it("leaves the session alone when the title has not changed", async () => {
@@ -352,13 +368,14 @@ describe("the chat session", () => {
       "GET /api/v1/chats": json([FRESH]),
       "GET /api/v1/chats/c2/messages": json([]),
     });
-    const { refreshSummary, resumeSession } = await session();
+    const { adoptSummary, resumeSession } = await session();
     const open = await resumeSession();
 
-    await refreshSummary();
+    adoptSummary([{ ...FRESH, last_message_at: "2026-08-05T11:00:00Z" }]);
 
-    // A republished session re-renders the panel, which asks for the title
-    // again: an unchanged one has to leave the store untouched.
+    // A republished session re-renders the panel, which asks for the listing
+    // again: a chat whose name has not changed has to leave the store
+    // untouched, dated later or not.
     expect(await resumeSession()).toBe(open);
   });
 

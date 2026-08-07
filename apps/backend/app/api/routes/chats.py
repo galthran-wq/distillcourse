@@ -29,6 +29,20 @@ class ChatSummary(BaseModel):
     created_at: datetime
 
 
+class ChatListing(ChatSummary):
+    """A chat as the rail lists it.
+
+    The date is the listing's alone: it is a maximum over the chat's messages,
+    and the listing is the one place a set of chats is compared. A summary
+    handed back by `create` or `patch` is one chat with nothing to compare it
+    to, and must not advertise a field it would always answer null for.
+    """
+
+    # When the chat was last written in — null for one nobody has said
+    # anything in yet.
+    last_message_at: datetime | None
+
+
 class NewChat(BaseModel):
     # No kind: this API opens web chats and nothing else. The Telegram thread is
     # the backend's to create (`app.telegram.thread.of`), there is exactly one
@@ -127,8 +141,21 @@ async def models() -> list[ChatModel]:
 
 
 @router.get("")
-async def index(repo: RepositoryDep) -> list[ChatSummary]:
-    return [ChatSummary.model_validate(chat) for chat in await repo.list_chats()]
+async def index(repo: RepositoryDep) -> list[ChatListing]:
+    last = await repo.last_message_at()
+    listing = [
+        ChatListing(
+            **ChatSummary.model_validate(chat).model_dump(),
+            last_message_at=last.get(chat.id),
+        )
+        for chat in await repo.list_chats()
+    ]
+    # By the date the rail shows, not by creation: a chat opened yesterday and
+    # used a minute ago belongs above one opened this morning and abandoned,
+    # and a column of dates that does not descend is one nobody can read down.
+    # A chat nobody has spoken in has only its creation to be placed by.
+    listing.sort(key=lambda chat: chat.last_message_at or chat.created_at, reverse=True)
+    return listing
 
 
 @router.post("")

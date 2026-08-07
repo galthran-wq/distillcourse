@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
@@ -141,7 +141,28 @@ class HarnessRepository:
 
     async def set_title(self, chat: Chat, title: str) -> None:
         chat.title = title[:TITLE_LENGTH]
+        # What "since the title was set" is counted from, and it is counted
+        # against `Message.created_at` — which the database stamps. Read from
+        # the same clock rather than this process's: skew between the two would
+        # move the rename trigger by however much of it there is.
+        chat.titled_at = await self.session.scalar(select(func.now()))
         await self.session.commit()
+
+    async def last_message_at(self) -> dict[uuid.UUID, datetime]:
+        """When each of this learner's chats was last written in.
+
+        A max over the rows themselves rather than a column kept on the chat:
+        the listing is the only reader, and a maximum cannot fall out of step
+        with what it is a maximum of. `ix_messages_chat_id_created_at` is what
+        keeps it off the heap.
+        """
+        rows = await self.session.execute(
+            select(Message.chat_id, func.max(Message.created_at))
+            .join(Chat, Chat.id == Message.chat_id)
+            .where(Chat.user_id == self.user_id)
+            .group_by(Message.chat_id)
+        )
+        return dict(rows.tuples().all())
 
     async def rows(self, chat: Chat) -> Sequence[Message]:
         return (

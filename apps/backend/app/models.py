@@ -100,6 +100,14 @@ class Chat(Base):
     kind: Mapped[str] = mapped_column(String(16))
     model: Mapped[str] = mapped_column(String(128))
     title: Mapped[str | None] = mapped_column(String(60), default=None)
+    # When that title was written. Nothing else says how much of the
+    # conversation happened after it, which is what decides when the harness
+    # writes a new one. NULL until a first message names the chat. The Telegram
+    # thread is stamped like any other and then never renamed: it is one
+    # eternal conversation and is never listed (`harness/title.py`).
+    titled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
     # A run holds the chat for as long as the claim is fresh; the deadline is
     # what releases a chat whose worker died mid-stream.
     active_run_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
@@ -113,6 +121,13 @@ class Chat(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        # The chat rail dates every chat of a reader in one pass — the maximum
+        # `created_at` per `chat_id` — which the index on `chat_id` alone can
+        # only serve by reading each of those rows, jsonb blobs and all, off
+        # the heap.
+        Index("ix_messages_chat_id_created_at", "chat_id", "created_at"),
+    )
 
     # uuid7 is time-ordered, so `ORDER BY id` is the chat's message order and
     # no separate sequence column is needed.

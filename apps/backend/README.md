@@ -28,7 +28,7 @@ app/
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
     routes/memories.py # what the tutor remembers: list, edit, delete
   harness/
-    agent.py         # the tutor agent, the model pool, the compaction threshold
+    agent.py         # the tutor agent, the toolless namer, the model pool, the compaction threshold
     prompts.py       # module concatenation + context blocks
     prompts/         # the prompt modules themselves (see below)
     deps.py          # HarnessDeps — what a tool receives
@@ -38,6 +38,7 @@ app/
     usage.py         # the shape of messages.usage, written once, read by caps
     limits.py        # the daily cap, the monthly ceiling, the web search cap
     runner.py        # claim, persist, stream, compact
+    title.py         # naming a chat, and naming it again as it moves on
   core/
     config.py        # pydantic-settings; env vars only, no .env reading
     db.py            # async engine + session factory
@@ -164,12 +165,23 @@ rather than left to `fetch_content`, because the question the widget exists for
 is "why is this true?" about something on screen with nothing selected: a model
 that answers that without reading the section answers blind.
 
-Prompts are assembled per run from `harness/prompts/`: `base.md`, the medium
+Prompts for a run are assembled from `harness/prompts/`: `base.md`, the medium
 (`web`, `telegram`), then the modules the run kind calls for, then those context
 blocks. They are content, so `docs/pedagogy.md` governs them the way it
 governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
-inside such a fence is data.
+inside such a fence is data. The same directory also holds modules for the
+passes that are not the tutor — `title.md` is the whole prompt of the namer,
+which never sees `base.md` and is loaded by `module()` rather than `assemble()`.
+
+A web chat is named from the learner's first question and named again by
+`harness/title.py` once `TITLE_REFRESH_MESSAGES` more have gone by: one short
+completion on a toolless agent, over the tail of the conversation, fenced as
+untrusted like any other text the platform did not write. Like a compaction it
+is the platform's own bookkeeping — exempt from the daily message cap, billed
+to the instance by being added to the usage of the run it follows. The
+Telegram thread is never renamed: it is one eternal conversation and no rail
+lists it.
 
 Every tool is a barrier (`sequential=True`): the tool calls of one model
 response run as concurrent tasks, and all of them drive the run's single

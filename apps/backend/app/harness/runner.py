@@ -37,6 +37,7 @@ from app.harness.limits import (
 )
 from app.harness.prompts import ContextBlock, Medium, RunKind, assemble
 from app.harness.repository import HarnessRepository, Role
+from app.harness.title import retitle
 from app.harness.usage import usage_row
 from app.memory import repository as memory
 from app.memory.repository import Recollection
@@ -342,6 +343,14 @@ async def run(
             ),
             run_id=str(run_id),
         )
+        # Before the turn is stored, so what naming spends is added to the run's
+        # usage and rides the row `_close_run` writes it on — the row the
+        # monthly ceiling is summed from.
+        await _guarded(
+            retitle(repo, chat, result.usage),
+            "renaming the chat after run {run_id} failed",
+            run_id,
+        )
         await _close_run(
             repo, chat, run_id, result=result, partial_text="", failure=None
         )
@@ -413,6 +422,17 @@ async def _drain(
                 failure = str(exc)
                 queue.put_nowait(ErrorChunk(error_text=failure))
             finally:
+                # Before the turn is stored, so the naming spend rides the
+                # usage row `_close_safely` writes; and well before the queue
+                # is terminated below, since the panel asks for the chat's name
+                # the moment the stream closes and a rename that lands after
+                # that is one the reader does not see until their next message.
+                if result is not None and failure is None:
+                    await _guarded(
+                        retitle(repo, chat, result.usage),
+                        "renaming the chat after run {run_id} failed",
+                        run_id,
+                    )
                 await _close_safely(
                     repo,
                     chat,
