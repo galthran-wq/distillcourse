@@ -42,6 +42,13 @@ interface Props {
   expanded: boolean;
 }
 
+/**
+ * How long the backend's naming pass is given before the listing is taken
+ * again. Generous rather than tight: it is a whole completion, and the cost of
+ * being early is one listing that says what the last one did.
+ */
+export const RENAME_MS = 8000;
+
 /** What went wrong, in the reader's terms — or that nothing answered at all. */
 function failure(error: unknown): string {
   return error instanceof ApiError ? error.message : "the server is unreachable";
@@ -80,13 +87,22 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
     // Several of these can be in flight — a menu opened while a run settles —
     // and they are not ordered, so a superseded one must not be what lands.
     let live = true;
-    webChats().then((listed) => {
-      if (!live) return;
-      setChats(listed);
-      adoptSummary(listed);
-    }, report);
+    const load = (): void => {
+      webChats().then((listed) => {
+        if (!live) return;
+        setChats(listed);
+        adoptSummary(listed);
+      }, report);
+    };
+    load();
+    // The rename is a completion of its own that the backend starts only after
+    // the stream is terminated, so the listing taken at the settle is from
+    // before it. One more, once that pass has had time to land — without it the
+    // new name is invisible until the reader's next turn settles.
+    const renamed = setTimeout(load, RENAME_MS);
     return () => {
       live = false;
+      clearTimeout(renamed);
     };
   }, [expanded, menu, status, session.summary]);
 
