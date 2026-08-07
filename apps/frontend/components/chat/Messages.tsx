@@ -40,6 +40,29 @@ function Question({ text, attached }: { text: string; attached: Quote[] }) {
   );
 }
 
+/**
+ * The question is in and nothing has come back yet: three dots waiting where
+ * the reply is about to be written. It goes the moment the first token
+ * arrives — from then on the answer appearing is itself the sign that
+ * something is happening, and a second one beside it says nothing. The dots
+ * are drawn here and paced in globals.css, which is also where the blanket
+ * reduced-motion rule stills them.
+ */
+function Waiting() {
+  return (
+    // The one live region in the transcript, and it can be one: it says a
+    // single thing, once, rather than reading the conversation out per token.
+    <p role="status" className="py-1">
+      <span className="sr-only">the tutor is answering…</span>
+      <span aria-hidden className="tutor-dots flex gap-1.5">
+        <span className="size-1.5 rounded-full bg-faint" />
+        <span className="size-1.5 rounded-full bg-faint" />
+        <span className="size-1.5 rounded-full bg-faint" />
+      </span>
+    </p>
+  );
+}
+
 export default function Messages({
   messages,
   chatId,
@@ -129,7 +152,7 @@ export default function Messages({
             })}
           </article>
         ))}
-        {status === "submitted" && <p className="text-[13px] text-faint">thinking…</p>}
+        {status === "submitted" && <Waiting />}
       </div>
     </div>
   );

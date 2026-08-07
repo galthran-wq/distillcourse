@@ -11,7 +11,7 @@ import {
 import { SendIcon } from "@/components/chat/icons";
 import { PendingQuote, QuoteRow } from "@/components/chat/Quotes";
 import { Button } from "@/components/ui";
-import { FIELD_CLASS } from "@/components/ui/styles";
+import { FIELD_BOX_CLASS } from "@/components/ui/styles";
 import { useQuotes, type Quote } from "@/lib/chat/quote";
 import { setDraft, useDraft } from "@/lib/chat/stored";
 
@@ -32,9 +32,9 @@ export default function Composer({ disabled, onSubmit }: Props) {
   // One row until the message needs more, up to the cap the class sets — and
   // the field's own scrollHeight is the only measure of what it needs, which
   // is only the truth once the height it was given is released. scrollHeight
-  // is the content box plus its padding, and the height set here is a
-  // border-box height, so the border has to be added back or the field is
-  // permanently two pixels short of its own text.
+  // is the content box plus its padding, while the height set here is a
+  // border-box height, so whatever the box adds outside the padding is added
+  // back or the field is permanently short of its own text.
   const fit = useCallback((): void => {
     const box = field.current;
     if (box === null) return;
@@ -89,7 +89,10 @@ export default function Composer({ disabled, onSubmit }: Props) {
             ))}
           </QuoteRow>
         )}
-        <div className="relative">
+        {/* The field is the box, not the textarea: the send button sits in it
+            beside the text rather than floating over the corner of it, and the
+            border and the ring belong to the two of them together. */}
+        <div className={FIELD_BOX_CLASS}>
           <textarea
             ref={field}
             value={text}
@@ -98,7 +101,10 @@ export default function Composer({ disabled, onSubmit }: Props) {
             rows={1}
             aria-label="Message the tutor"
             placeholder={disabled ? "the tutor is answering…" : "Ask about this section"}
-            className={`${FIELD_CLASS} max-h-36 min-h-11 resize-none overflow-y-auto pr-12`}
+            // Nothing of its own: no fill, no line, and not the site's focus
+            // ring — the box carries all three, and the height matches the
+            // send button beside it so one line of text sits level with it.
+            className="max-h-36 min-h-10 flex-1 resize-none overflow-y-auto bg-transparent px-2.5 py-2.5 text-sm text-ink placeholder:text-faint focus:outline-none"
           />
           <Button
             type="submit"
@@ -106,7 +112,6 @@ export default function Composer({ disabled, onSubmit }: Props) {
             size="icon"
             disabled={!ready}
             aria-label="Send"
-            className="absolute right-0.5 bottom-0.5"
           >
             <SendIcon />
           </Button>

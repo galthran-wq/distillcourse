@@ -13,12 +13,29 @@ export const MOTION_BASE_MS = 200;
 export const MOTION_FAST_MS = 150;
 
 /**
- * Every text field: input, textarea, and the native time picker. The fill is
+ * What makes a field read as one: a fill a step off whatever it sits on, and a
+ * line around it that the accent takes while it is in use. The fill is
  * `--field` rather than a colour, so a surface that is itself panel-filled can
- * flip it and keep the field a step off what it sits on — see globals.css.
+ * flip it — see globals.css. The radius is left to the two below, because two
+ * utilities for one property resolve by stylesheet order rather than by which
+ * was written last.
  */
-export const FIELD_CLASS =
-  "block w-full rounded-sm border border-line bg-(--field) px-3 py-2 text-sm text-ink transition-colors duration-(--motion-fast) placeholder:text-faint hover:border-faint focus:border-accent aria-invalid:border-accent";
+const FIELD_SURFACE =
+  "border border-line bg-(--field) transition-colors duration-(--motion-fast) hover:border-faint";
+
+/** Every bare text field: input, textarea, and the native time picker. */
+export const FIELD_CLASS = `${FIELD_SURFACE} block w-full rounded-sm px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-accent aria-invalid:border-accent`;
+
+/**
+ * A field that is a box around controls rather than a control itself — the
+ * tutor's composer, whose send button sits inside the same shape as its
+ * textarea. Everything about the state is on the box, including the ring, so
+ * the control inside has to turn its own off (`focus:outline-none`) — the
+ * site's focus ring would otherwise land around the textarea inside the field
+ * rather than around the field. The radius is the surface one: this holds
+ * controls rather than being one.
+ */
+export const FIELD_BOX_CLASS = `${FIELD_SURFACE} flex items-end gap-1.5 rounded-md p-1.5 focus-within:border-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent`;
 
 /**
  * The text above a field. It carries the gap down to the field, so FIELD_CLASS

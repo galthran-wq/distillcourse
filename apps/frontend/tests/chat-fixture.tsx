@@ -1,6 +1,6 @@
 import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { UIMessage } from "ai";
+import type { ChatStatus, UIMessage } from "ai";
 import Messages from "@/components/chat/Messages";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
 import { mounted } from "./utils/dom";
@@ -29,17 +29,26 @@ export function turn(role: UIMessage["role"], ...parts: UIMessage["parts"]): UIM
  * page of the site has one: a test that renders without it is testing a
  * situation the site does not have.
  */
-function transcript(messages: UIMessage[], lessons: Lessons, chatId: string) {
+function transcript(
+  messages: UIMessage[],
+  lessons: Lessons,
+  chatId: string,
+  status: ChatStatus,
+) {
   return (
     <LessonsProvider value={lessons}>
-      <Messages messages={messages} chatId={chatId} status="ready" />
+      <Messages messages={messages} chatId={chatId} status={status} />
     </LessonsProvider>
   );
 }
 
 /** That conversation as markup: what a test about what a message renders as. */
-export function rendered(messages: UIMessage[], lessons: Lessons = LESSONS): string {
-  return renderToStaticMarkup(transcript(messages, lessons, CHAT));
+export function rendered(
+  messages: UIMessage[],
+  lessons: Lessons = LESSONS,
+  status: ChatStatus = "ready",
+): string {
+  return renderToStaticMarkup(transcript(messages, lessons, CHAT, status));
 }
 
 /**
@@ -54,6 +63,6 @@ export function shown(): {
   return {
     host: dom.host,
     show: (messages, chatId = CHAT) =>
-      act(() => dom.render(transcript(messages, LESSONS, chatId))),
+      act(() => dom.render(transcript(messages, LESSONS, chatId, "ready"))),
   };
 }

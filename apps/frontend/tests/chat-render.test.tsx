@@ -2,7 +2,7 @@
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import type { UIMessage } from "ai";
-import { rendered, shown, turn } from "./chat-fixture";
+import { LESSONS, rendered, shown, turn } from "./chat-fixture";
 
 function reply(...parts: UIMessage["parts"]): string {
   return rendered([
@@ -83,6 +83,35 @@ describe("a rendered reply", () => {
     });
 
     expect(html).toContain("search lessons failed");
+  });
+});
+
+describe("waiting for the tutor", () => {
+  const asked = [turn("user", { type: "text", text: "why is this true?" })];
+  const answering = [
+    ...asked,
+    turn("assistant", { type: "text", text: "Because it is a mean." }),
+  ];
+
+  it("waits with an indicator between the question and the first token", () => {
+    const html = rendered(asked, LESSONS, "submitted");
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain("the tutor is answering");
+    // The class the pacing in globals.css hangs on: without it the dots are
+    // three still circles and nothing says the tutor is working.
+    expect(html).toContain("tutor-dots");
+  });
+
+  it("takes it away once the answer is coming", () => {
+    const html = rendered(answering, LESSONS, "streaming");
+
+    expect(html).toContain("Because it is a mean.");
+    expect(html).not.toContain("tutor-dots");
+  });
+
+  it("leaves nothing behind once the answer is in", () => {
+    expect(rendered(answering, LESSONS, "ready")).not.toContain("tutor-dots");
   });
 });
 
