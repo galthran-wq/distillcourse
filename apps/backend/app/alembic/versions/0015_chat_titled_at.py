@@ -1,4 +1,4 @@
-"""when a chat was last named
+"""when a chat was last named, and messages by chat and time
 
 Revision ID: 0015
 Revises: 0014
@@ -24,7 +24,14 @@ def upgrade() -> None:
     # is what makes an old chat with a stale title get a fresh one on its next
     # run — which is the point of the rename.
     op.execute("UPDATE chats SET titled_at = created_at WHERE title IS NOT NULL")
+    # The rail dates every chat of a reader in one pass — max(created_at)
+    # grouped by chat_id — and ix_messages_chat_id can only serve that by
+    # reading each of those rows, jsonb blobs and all, off the heap.
+    op.create_index(
+        "ix_messages_chat_id_created_at", "messages", ["chat_id", "created_at"]
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ix_messages_chat_id_created_at", table_name="messages")
     op.drop_column("chats", "titled_at")

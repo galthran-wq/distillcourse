@@ -14,7 +14,7 @@ import {
   PlusIcon,
 } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
-import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
+import { listModels, webChats, type ChatListing, type ChatModel } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
 import {
@@ -44,7 +44,7 @@ function failure(error: unknown): string {
 export default function ChatPanel({ session, expanded }: Props) {
   const { messages, sendMessage, status, error } = useChat({ chat: session.chat });
   const [models, setModels] = useState<ChatModel[]>([]);
-  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chats, setChats] = useState<ChatListing[]>([]);
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const header = useRef<HTMLElement>(null);
@@ -68,10 +68,17 @@ export default function ChatPanel({ session, expanded }: Props) {
   // SDK ignores its callbacks when it is handed a `chat` to drive.
   useEffect(() => {
     if (busy(status)) return;
+    // Several of these can be in flight — a menu opened while a run settles —
+    // and they are not ordered, so a superseded one must not be what lands.
+    let live = true;
     webChats().then((listed) => {
+      if (!live) return;
       setChats(listed);
       adoptSummary(listed);
     }, report);
+    return () => {
+      live = false;
+    };
   }, [expanded, menu, status, session.summary]);
 
   // The request took the passages off the composer as it was built, and this

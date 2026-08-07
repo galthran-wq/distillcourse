@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
@@ -141,8 +141,11 @@ class HarnessRepository:
 
     async def set_title(self, chat: Chat, title: str) -> None:
         chat.title = title[:TITLE_LENGTH]
-        # What "since the title was set" is counted from below.
-        chat.titled_at = datetime.now(UTC)
+        # What "since the title was set" is counted from, and it is counted
+        # against `Message.created_at` — which the database stamps. Read from
+        # the same clock rather than this process's: skew between the two would
+        # move the rename trigger by however much of it there is.
+        chat.titled_at = await self.session.scalar(select(func.now()))
         await self.session.commit()
 
     async def last_message_at(self) -> dict[uuid.UUID, datetime]:
@@ -150,7 +153,8 @@ class HarnessRepository:
 
         A max over the rows themselves rather than a column kept on the chat:
         the listing is the only reader, and a maximum cannot fall out of step
-        with what it is a maximum of.
+        with what it is a maximum of. `ix_messages_chat_id_created_at` is what
+        keeps it off the heap.
         """
         rows = await self.session.execute(
             select(Message.chat_id, func.max(Message.created_at))
@@ -184,19 +188,6 @@ class HarnessRepository:
     async def history(self, chat: Chat) -> list[ModelMessage]:
         return ModelMessagesTypeAdapter.validate_python(
             [row.pydantic_ai for row in await self.live_rows(chat)]
-        )
-
-    async def messages_since_title(self, chat: Chat) -> int:
-        """How much conversation the chat has had since it was last named.
-
-        Counted over the live rows, so a compaction resets it the way it resets
-        the history: what a renaming pass would be shown is what triggers it.
-        A chat nobody has named has no moment to count from.
-        """
-        if chat.titled_at is None:
-            return 0
-        return sum(
-            1 for row in await self.live_rows(chat) if row.created_at > chat.titled_at
         )
 
     async def context_tokens(self, chat: Chat) -> int:

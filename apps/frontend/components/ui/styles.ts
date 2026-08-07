@@ -45,9 +45,18 @@ export const POPOVER_CLASS =
  */
 export const MENU_CLASS = `${POPOVER_CLASS} right-0 top-full mt-1.5 origin-top-right p-1.5`;
 
+// Everything about such a row except how it lays its contents out. The display
+// is left off because it is the one thing a caller replaces, and there is no
+// tailwind-merge here: a second display utility in the same class list resolves
+// by stylesheet order rather than by the order it is written.
+const MENU_ROW =
+  "w-full rounded-sm px-2.5 py-2 text-left text-[13px] transition-colors duration-(--motion-fast) hover:bg-line/60";
+
 /** One row of such a panel, whether that row is a link or a button. */
-export const MENU_ITEM_CLASS =
-  "block w-full rounded-sm px-2.5 py-2 text-left text-[13px] transition-colors duration-(--motion-fast) hover:bg-line/60";
+export const MENU_ITEM_CLASS = `block ${MENU_ROW}`;
+
+/** The same row where it carries columns of its own — a name and a date. */
+export const MENU_ROW_CLASS = `flex ${MENU_ROW}`;
 
 /**
  * A chip: a small outlined control that names a thing rather than performing

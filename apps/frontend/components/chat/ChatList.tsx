@@ -1,11 +1,11 @@
 "use client";
 
-import type { ChatSummary } from "@/lib/chat/api";
+import type { ChatListing } from "@/lib/chat/api";
 import { ago } from "@/lib/day";
-import { MENU_ITEM_CLASS } from "@/components/ui/styles";
+import { MENU_ROW_CLASS } from "@/components/ui/styles";
 
 interface Props {
-  chats: ChatSummary[];
+  chats: ChatListing[];
   current: string;
   /**
    * The row look. In the menu these rows sit among the command and model rows
@@ -19,11 +19,12 @@ interface Props {
    * they find it; the menu is a switcher and has no width for a second column.
    */
   dated?: boolean;
-  onSelect: (chat: ChatSummary) => void;
+  onSelect: (chat: ChatListing) => void;
 }
 
-// A chat title is arbitrary length and these are the two places that list them.
-const ROW = `${MENU_ITEM_CLASS} flex items-baseline gap-2`;
+// The rail's row: a name that takes what is left and a date that keeps its own
+// width. The title is arbitrary length, so the truncation is on the name.
+const ROW = `${MENU_ROW_CLASS} items-baseline gap-2`;
 
 /** The reader's other conversations — in the panel's menu, and in its rail. */
 export default function ChatList({

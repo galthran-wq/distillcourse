@@ -8,6 +8,7 @@ import {
   loadMessages,
   setChatModel,
   webChats,
+  type ChatListing,
   type ChatSummary,
 } from "@/lib/chat/api";
 import { API } from "@/lib/api-base";
@@ -108,7 +109,7 @@ export async function changeModel(model: string): Promise<void> {
  * conversation has moved past it — so the name arrives out of the listing the
  * panel already fetches rather than from a request of its own.
  */
-export function adoptSummary(chats: ChatSummary[]): void {
+export function adoptSummary(chats: ChatListing[]): void {
   const current = session.get();
   if (current === null) return;
   const listed = chats.find((chat) => chat.id === current.summary.id);

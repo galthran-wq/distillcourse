@@ -2,12 +2,12 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatList from "@/components/chat/ChatList";
-import type { ChatSummary } from "@/lib/chat/api";
+import type { ChatListing } from "@/lib/chat/api";
 import { mounted } from "./utils/dom";
 
 const NOW = new Date("2026-08-07T12:00:00Z");
 
-function chat(id: string, last: string | null): ChatSummary {
+function chat(id: string, last: string | null): ChatListing {
   return {
     id,
     kind: "web",
@@ -20,7 +20,7 @@ function chat(id: string, last: string | null): ChatSummary {
 
 const { host, render } = mounted("nav");
 
-function shown(chats: ChatSummary[], dated = true): void {
+function shown(chats: ChatListing[], dated = true): void {
   act(() =>
     render(<ChatList chats={chats} current="c1" dated={dated} onSelect={() => {}} />),
   );

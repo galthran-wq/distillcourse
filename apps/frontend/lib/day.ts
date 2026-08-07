@@ -15,13 +15,15 @@ function calendar(at: string): Date {
 // have to look past. Locale comes from the browser.
 // A `Date` as well as a timestamp, because a square of the activity grid is a
 // calendar day the browser built rather than an instant the API sent.
-export function day(at: string | Date): string {
+// `withYear` is off only where the year is already known to be this one and
+// the column is too narrow to spend width on it — see `ago`.
+export function day(at: string | Date, withYear = true): string {
   const on =
     typeof at === "string" && DATE_ONLY.test(at) ? calendar(at) : new Date(at);
   return on.toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
-    year: "numeric",
+    year: withYear ? "numeric" : undefined,
   });
 }
 
@@ -45,6 +47,5 @@ export function ago(at: string | Date, now: number = Date.now()): string {
   if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`;
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
   if (elapsed < WEEK) return `${Math.floor(elapsed / DAY)}d`;
-  const year = on.getFullYear() === new Date(now).getFullYear() ? undefined : "numeric";
-  return on.toLocaleDateString(undefined, { day: "numeric", month: "short", year });
+  return day(on, on.getFullYear() !== new Date(now).getFullYear());
 }

@@ -30,6 +30,7 @@ from app.harness.agent import namer, tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import LimitExceeded
 from app.harness.repository import HarnessRepository
+from app.harness.usage import REQUESTS
 from app.models import Chat, Message
 from tests.harness.conftest import compacting
 
@@ -53,14 +54,42 @@ async def named(repo: HarnessRepository, chat: Chat, title: str) -> None:
     await repo.session.commit()
 
 
-async def moved_on(repo: HarnessRepository, chat: Chat) -> None:
-    """Enough said since the name was written to be worth another one."""
-    for _ in range(settings.TITLE_REFRESH_MESSAGES):
+async def moved_on(
+    repo: HarnessRepository, chat: Chat, messages: int = settings.TITLE_REFRESH_MESSAGES
+) -> None:
+    """Enough said since the name was written to be worth another one — or, at
+    a caller's own count, not quite enough."""
+    for _ in range(messages):
         await repo.add_messages(chat, [QUESTION], role="user")
+
+
+def counting(text: str, calls: list[str]) -> FunctionModel:
+    """A model that records having been reached.
+
+    A naming pass runs inside `_guarded`, so a title left unchanged is not on
+    its own evidence that no completion was paid for.
+    """
+
+    def turn(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        calls.append(text)
+        return ModelResponse(parts=[TextPart(content=text)])
+
+    return FunctionModel(turn)
 
 
 def stored(rows: Sequence[Message]) -> str:
     return json.dumps([row.pydantic_ai for row in rows])
+
+
+def sent(messages: list[ModelMessage]) -> str:
+    """The prompt a pass was given, as the model received it."""
+    return "".join(
+        part.content
+        for message in messages
+        if isinstance(message, ModelRequest)
+        for part in message.parts
+        if isinstance(part, UserPromptPart) and isinstance(part.content, str)
+    )
 
 
 async def start(
@@ -326,7 +355,67 @@ async def test_a_chat_is_renamed_once_the_conversation_has_moved_on(
 async def test_a_chat_keeps_its_name_until_then(
     repo: HarnessRepository, chat: Chat
 ) -> None:
+    """Nothing is spent either — the name is unchanged because the namer was
+    never reached, not because what it wrote was thrown away."""
+    named_by: list[str] = []
     await named(repo, chat, "what is entropy?")
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=counting("Cross entropy and KL", named_by)),
+    ):
+        await runner.run(repo, chat, "and cross entropy?")
+
+    assert named_by == []
+    assert chat.title == "what is entropy?"
+
+
+async def test_a_chat_one_message_short_of_the_threshold_keeps_its_name(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """The trigger at its boundary: the turn this run stores lands the chat on
+    one message fewer than a rename takes."""
+    named_by: list[str] = []
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat, settings.TITLE_REFRESH_MESSAGES - 2)
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=counting("Cross entropy and KL", named_by)),
+    ):
+        await runner.run(repo, chat, "and cross entropy?")
+
+    assert named_by == []
+    assert chat.title == "what is entropy?"
+
+
+async def test_the_telegram_thread_is_never_renamed(repo: HarnessRepository) -> None:
+    """One eternal conversation that no rail lists: a name for it is a name
+    nobody reads, and paying for one would put a completion on the reply path
+    of every message the learner sends."""
+    named_by: list[str] = []
+    thread = await repo.create_chat(kind="telegram")
+    await named(repo, thread, "what is entropy?")
+    await moved_on(repo, thread)
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=counting("Cross entropy and KL", named_by)),
+    ):
+        await runner.run(repo, thread, "and cross entropy?")
+
+    assert named_by == []
+    assert thread.title == "what is entropy?"
+
+
+async def test_a_rename_is_billed_to_the_run_it_follows(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """A naming pass writes no message of its own, so the only place its cost
+    can be recorded is the usage row of the run it follows — which is what the
+    monthly ceiling is summed from."""
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat)
 
     with (
         tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
@@ -334,7 +423,47 @@ async def test_a_chat_keeps_its_name_until_then(
     ):
         await runner.run(repo, chat, "and cross entropy?")
 
-    assert chat.title == "what is entropy?"
+    usage = (await repo.rows(chat))[-1].usage
+    assert usage is not None
+    assert usage[REQUESTS] == 2
+
+
+async def test_a_rename_reads_the_conversation_and_not_the_platform(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """What the namer is handed. The platform stores its own prompts as
+    requests like the learner's, so a compaction summary taken off the message
+    class alone comes back as the reader saying it — and a summary is what this
+    pass is meant to replace, not to quote."""
+    summary = ModelRequest(
+        parts=[UserPromptPart(content="Summary of the conversation so far: entropy")]
+    )
+    seen: list[str] = []
+
+    def capture(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        seen.append(sent(messages))
+        return ModelResponse(parts=[TextPart(content="Cross entropy and KL")])
+
+    # A compaction keeps its own row and cuts everything above it, so the
+    # summary is the first of the rows the namer's window is cut from.
+    await repo.add_messages(chat, [summary], role="system", marker="compact")
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat, settings.TITLE_REFRESH_MESSAGES - 2)
+
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=FunctionModel(capture)),
+    ):
+        await runner.run(repo, chat, "and cross entropy?")
+
+    assert len(seen) == 1
+    # Fenced, like every other text the platform did not write.
+    assert seen[0].startswith('<untrusted source="chat-transcript">')
+    assert "Summary of the conversation so far" not in seen[0]
+    assert seen[0].count("learner: what is entropy?") == (
+        settings.TITLE_REFRESH_MESSAGES - 2
+    )
+    assert "learner: and cross entropy?" in seen[0]
 
 
 async def test_a_rename_that_fails_costs_the_learner_nothing(

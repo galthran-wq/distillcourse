@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.harness import context
-from app.harness.agent import compact_threshold, model_for, namer, tutor
+from app.harness.agent import compact_threshold, model_for, tutor
 from app.harness.deps import HarnessDeps
 from app.harness.limits import (
     LimitExceeded,
@@ -35,8 +35,9 @@ from app.harness.limits import (
     check_run_allowed,
     spend_memory_write,
 )
-from app.harness.prompts import ContextBlock, Medium, RunKind, assemble, module
+from app.harness.prompts import ContextBlock, Medium, RunKind, assemble
 from app.harness.repository import HarnessRepository, Role
+from app.harness.title import retitle
 from app.harness.usage import usage_row
 from app.memory import repository as memory
 from app.memory.repository import Recollection
@@ -177,55 +178,6 @@ async def summarize(
             break
         await memory.save(repo.session, repo.user_id, candidate, source="agent")
     return compaction.summary
-
-
-# What a naming pass reads of each message. Six words are decided by how a
-# turn opens, and reading a full context to write them would cost more than
-# the answer being named.
-TITLE_EXCERPT = 500
-
-
-def _transcript(messages: Sequence[ModelMessage]) -> str:
-    """The conversation as plain text, for a pass that is about what was talked
-    about rather than about continuing it.
-
-    Flattened rather than handed over as a message history: a window cut from
-    the middle of one can open on a tool result whose call is above the cut,
-    which providers reject outright.
-    """
-    lines = []
-    for message in messages:
-        speaker = "learner" if isinstance(message, ModelRequest) else "tutor"
-        for part in message.parts:
-            if isinstance(part, UserPromptPart | TextPart) and isinstance(
-                part.content, str
-            ):
-                lines.append(f"{speaker}: {part.content[:TITLE_EXCERPT]}")
-    return "\n\n".join(lines)
-
-
-async def _retitle(repo: HarnessRepository, chat: Chat) -> None:
-    """Name a chat again once it has moved past the question it was named for.
-
-    The platform's own bookkeeping, on the footing `summarize()` stands on: it
-    spends the instance's budget and not the learner's daily allowance, which
-    is what writing no message of theirs makes true. What it costs is in the
-    run's trace rather than on a `messages` row — there is no turn here to
-    hang one on, and an invented row would be a message the next run reads.
-
-    The ceiling was checked by the run this follows, and one short completion
-    per `TITLE_REFRESH_MESSAGES` messages cannot outrun that check.
-    """
-    if await repo.messages_since_title(chat) < settings.TITLE_REFRESH_MESSAGES:
-        return
-    history = await repo.history(chat)
-    named = await namer.run(
-        _transcript(history[-settings.TITLE_REFRESH_MESSAGES :]),
-        model=model_for(settings.DEFAULT_CHAT_MODEL),
-        instructions=module("title.md"),
-    )
-    if title := named.output.strip():
-        await repo.set_title(chat, title)
 
 
 async def compact(
@@ -391,6 +343,14 @@ async def run(
             ),
             run_id=str(run_id),
         )
+        # Before the turn is stored, so what naming spends is added to the run's
+        # usage and rides the row `_close_run` writes it on — the row the
+        # monthly ceiling is summed from.
+        await _guarded(
+            retitle(repo, chat, result.usage),
+            "renaming the chat after run {run_id} failed",
+            run_id,
+        )
         await _close_run(
             repo, chat, run_id, result=result, partial_text="", failure=None
         )
@@ -406,11 +366,6 @@ async def run(
         await _guarded(
             repo.release_run(chat, run_id), "releasing run {run_id} failed", run_id
         )
-    # After the claim, so the rename is not what a learner's next message
-    # collides with; and only here, since a run that raised never reaches it.
-    await _guarded(
-        _retitle(repo, chat), "renaming the chat after run {run_id} failed", run_id
-    )
     return result.output
 
 
@@ -467,6 +422,17 @@ async def _drain(
                 failure = str(exc)
                 queue.put_nowait(ErrorChunk(error_text=failure))
             finally:
+                # Before the turn is stored, so the naming spend rides the
+                # usage row `_close_safely` writes; and well before the queue
+                # is terminated below, since the panel asks for the chat's name
+                # the moment the stream closes and a rename that lands after
+                # that is one the reader does not see until their next message.
+                if result is not None and failure is None:
+                    await _guarded(
+                        retitle(repo, chat, result.usage),
+                        "renaming the chat after run {run_id} failed",
+                        run_id,
+                    )
                 await _close_safely(
                     repo,
                     chat,
@@ -480,16 +446,6 @@ async def _drain(
                     "releasing run {run_id} failed",
                     run_id,
                 )
-                # Still before the queue is terminated below: the panel asks
-                # for the chat's name the moment the stream closes, so a
-                # rename that lands after that is one the reader does not see
-                # until their next message.
-                if failure is None:
-                    await _guarded(
-                        _retitle(repo, chat),
-                        "renaming the chat after run {run_id} failed",
-                        run_id,
-                    )
     finally:
         # Outside everything: the client is reading this queue, and a stream
         # that is never terminated hangs the browser for as long as it waits.
