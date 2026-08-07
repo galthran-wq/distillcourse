@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -10,6 +11,9 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 # How much of a selection travels with the question. A reader who selects a
 # whole lesson is not quoting it; past this the tutor has the locator.
 QUOTE_LENGTH = 2000
+# How many selections one question may carry, matching the composer's own cap
+# (`lib/chat/quote.MAX_QUOTES`): a cap only a client keeps is not a cap.
+QUOTE_COUNT = 8
 QUOTE_SOURCE = "learner-quote"
 
 Medium = Literal["web", "telegram"]
@@ -60,13 +64,32 @@ def learner_quote(text: str, locator: str) -> str:
     something they pasted into the page, and an instruction found in it is
     still data. The tags are escaped out of the text itself — an unescaped
     `</untrusted>` in the selection would close the fence and put the rest of
-    it back in the learner's own voice.
+    it back in the learner's own voice. The ampersand is escaped first, which
+    is what makes the escaping reversible: a selection that already spells out
+    `&lt;untrusted` must not come back out of the panel as a tag nobody wrote.
     """
     quoted = "\n".join(f"> {line}" for line in text[:QUOTE_LENGTH].splitlines())
-    fenced = quoted.replace("<untrusted", "&lt;untrusted").replace(
-        "</untrusted", "&lt;/untrusted"
+    fenced = (
+        quoted.replace("&", "&amp;")
+        .replace("<untrusted", "&lt;untrusted")
+        .replace("</untrusted", "&lt;/untrusted")
     )
     return untrusted(QUOTE_SOURCE, f"{fenced}\n>\n> — [[{locator}]]")
+
+
+def learner_quotes(quotes: Sequence[tuple[str, str]]) -> str | None:
+    """Every passage attached to one question, as the block that goes above it.
+
+    A fence each, rather than one fence around all of them: the mitigation is
+    per passage — a run of them is a run of separately marked quotations, and
+    two passages from different sections are two references, not one long one.
+    Nothing to say when nothing was attached.
+    """
+    if not quotes:
+        return None
+    return "\n\n".join(
+        learner_quote(text, locator) for text, locator in quotes[:QUOTE_COUNT]
+    )
 
 
 def _render(block: ContextBlock) -> str:

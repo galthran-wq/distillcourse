@@ -3,11 +3,42 @@
 import { isToolUIPart, type ChatStatus, type UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import Markdown from "@/components/chat/Markdown";
+import { QuoteRow, SentQuote } from "@/components/chat/Quotes";
 import ToolChip from "@/components/chat/ToolChip";
+import { attachedQuotes, quoted, type Quote } from "@/lib/chat/quote";
 
 // Within this much of the end counts as reading the newest message. Anything
 // further up is the reader looking at something, and the transcript stays put.
 const AT_END = 32;
+
+/**
+ * A question as it was sent. The passages it referenced are stored above it,
+ * each inside the provenance fence the backend wrote — that is for the model,
+ * not for the reader, so they come back out as the chips they were attached
+ * as, which is also what makes them survive a reload.
+ */
+function Question({ text, attached }: { text: string; attached: Quote[] }) {
+  const question = quoted(text);
+  // The fences are written server-side, so the message the widget has just
+  // added carries none of them: what it went with rides on it instead, until
+  // the stored form of it is loaded.
+  const quotes = question.quotes.length > 0 ? question.quotes : attached;
+
+  return (
+    <>
+      {quotes.length > 0 && (
+        <QuoteRow>
+          {quotes.map((quote, index) => (
+            // By position: the message is stored and never edited, so the list
+            // is fixed for as long as it is on screen.
+            <SentQuote key={index} quote={quote} />
+          ))}
+        </QuoteRow>
+      )}
+      <Markdown text={question.text} />
+    </>
+  );
+}
 
 export default function Messages({
   messages,
@@ -81,7 +112,15 @@ export default function Messages({
           >
             {message.parts.map((part, index) => {
               if (part.type === "text") {
-                return <Markdown key={index} text={part.text} />;
+                return message.role === "user" ? (
+                  <Question
+                    key={index}
+                    text={part.text}
+                    attached={attachedQuotes(message.metadata)}
+                  />
+                ) : (
+                  <Markdown key={index} text={part.text} />
+                );
               }
               if (isToolUIPart(part)) {
                 return <ToolChip key={index} part={part} />;

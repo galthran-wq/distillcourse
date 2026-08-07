@@ -164,6 +164,7 @@ describe("the chat session", () => {
       panel: "closed",
       chatId: "c2",
       draft: "",
+      quotes: "",
       owner: "",
     });
   });

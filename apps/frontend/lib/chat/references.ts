@@ -21,8 +21,15 @@ function courseTitle(slug: string, lessons: Lessons): string | undefined {
   return Object.entries(lessons).find(([key]) => key.startsWith(prefix))?.[1].course;
 }
 
-/** The page a locator names and what to call it, if the site renders one. */
-function page(locator: string, lessons: Lessons): { url: string; text: string } | null {
+/**
+ * The page a locator names and what to call it, if the site renders one — for
+ * the references written into a message and for the passages attached beside
+ * it alike, so both stop pointing at a lesson on the same day it is withdrawn.
+ */
+export function linkTo(
+  locator: string,
+  lessons: Lessons,
+): { url: string; text: string } | null {
   const course = parseCourseLocator(locator);
   if (course !== null) {
     const title = courseTitle(course, lessons);
@@ -49,7 +56,7 @@ function resolve(
       children: [{ type: "text", value: label ?? locator }],
     };
   }
-  const target = page(locator, lessons);
+  const target = linkTo(locator, lessons);
   if (target === null) return null;
   return {
     type: "link",

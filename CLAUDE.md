@@ -65,11 +65,15 @@ Rules that override defaults:
   `pre`) are surfaces too and write the surface radius out as `0.5rem`: they
   style markdown, not a class list.
   Anything that reads as a button is `ui/Button` — `solid` for the one primary
-  action a view has, `outline`, `ghost`; menu rows, the switch and the
-  selection chip are their own controls and say so. Every text field carries
+  action a view has, `outline`, `ghost`; menu rows, the switch and the chip —
+  a small outlined control, mostly naming a thing rather than doing one — are
+  their own controls and say so. Every text field carries
   `FIELD_CLASS` with a `FIELD_LABEL_CLASS` label, every mono micro-cap
-  `LABEL_CLASS`, every dropdown `MENU_CLASS`/`MENU_ITEM_CLASS`, all from
-  `ui/styles.ts`. Never hand-roll the look of one in a page or a demo; the
+  `LABEL_CLASS`. The chip a referenced passage is shown as carries
+  `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
+  `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown —
+  all from `ui/styles.ts`, with only geometry left to the caller. Never
+  hand-roll one of those in a page or a demo; the
   focus ring is global (`@layer base`, so a utility can still override it).
   Motion belongs to that layer too, and there is no animation library: an
   entrance is an `@starting-style` transition (`starting:` utilities, or a rule
