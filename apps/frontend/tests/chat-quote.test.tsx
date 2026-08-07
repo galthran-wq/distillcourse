@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { afterEach, describe, expect, it } from "vitest";
-import { PendingQuote } from "@/components/chat/QuoteChip";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { PendingQuote } from "@/components/chat/Quotes";
 import {
   MAX_QUOTES,
   addQuote,
   dropQuote,
   quoted,
+  restoreQuotes,
   takeQuotes,
   type Quote,
 } from "@/lib/chat/quote";
@@ -29,6 +30,7 @@ const SECOND: Quote = {
  * fence around it. */
 function fenced({ text, locator }: Quote): string {
   const escaped = text
+    .replace(/&/g, "&amp;")
     .replace(/<untrusted/g, "&lt;untrusted")
     .replace(/<\/untrusted/g, "&lt;/untrusted");
   return [
@@ -49,7 +51,11 @@ function stored(quotes: Quote[], question: string): string {
 }
 
 afterEach(() => {
+  // Both ends of a send: what is attached now, and what a request already took
+  // off the composer. The passages outlive the tab, so they outlive a test too.
+  restoreQuotes();
   takeQuotes();
+  window.localStorage.clear();
 });
 
 function asked(text: string): string {
@@ -109,6 +115,37 @@ describe("passages referenced from the lesson", () => {
     dropQuote(PASSAGE);
 
     expect(takeQuotes()).toEqual([SECOND]);
+  });
+
+  it("come back when the message they went with never got through", () => {
+    addQuote(PASSAGE);
+    addQuote(SECOND);
+    takeQuotes();
+    restoreQuotes();
+
+    expect(takeQuotes()).toEqual([PASSAGE, SECOND]);
+  });
+
+  it("come back once, and behind nothing selected since", () => {
+    addQuote(PASSAGE);
+    takeQuotes();
+    addQuote(SECOND);
+    addQuote(PASSAGE);
+    restoreQuotes();
+    // Restoring again would attach a passage the reader has since taken off.
+    restoreQuotes();
+
+    expect(takeQuotes()).toEqual([PASSAGE, SECOND]);
+  });
+
+  it("survive a reload, with the draft they belong to", async () => {
+    addQuote(PASSAGE);
+    // The store is read out of the browser's storage when the module loads,
+    // which is the only thing a reload does that a test can reproduce.
+    vi.resetModules();
+    const reloaded = await import("@/lib/chat/quote");
+
+    expect(reloaded.takeQuotes()).toEqual([PASSAGE]);
   });
 });
 
@@ -191,6 +228,18 @@ describe("a sent message carrying passages", () => {
     expect(message.text).toBe("is this right?");
   });
 
+  it("keeps a passage that only spells the fence out as text", () => {
+    const literal: Quote = {
+      text: "the escaping is written &lt;untrusted, and &amp; is an ampersand",
+      locator: PASSAGE.locator,
+    };
+    const message = quoted(stored([literal], "why?"));
+
+    // Undoing the escaping is not the same as fabricating a tag out of a
+    // passage that merely mentions one.
+    expect(message.quotes).toEqual([literal]);
+  });
+
   it("shows a passage from a lesson the site no longer renders, unlinked", () => {
     const html = asked(
       stored([{ ...PASSAGE, locator: "lesson:info-theory/gone#nowhere" }], "why?"),
@@ -198,6 +247,17 @@ describe("a sent message carrying passages", () => {
 
     expect(html).toContain(PASSAGE.text);
     expect(html).not.toContain("<a ");
+  });
+
+  it("shows its chips before the stored form of it comes back", () => {
+    // What the widget adds when send is pressed: the question, and the
+    // passages it went with. The fences are the backend's, and arrive with the
+    // next load of the transcript.
+    const just = turn("user", { type: "text", text: "why the average?" });
+    const html = rendered([{ ...just, metadata: { quotes: [PASSAGE, SECOND] } }]);
+
+    expect(html).toContain('href="/courses/info-theory/lessons/entropy#the-average"');
+    expect(html).toContain('href="/courses/info-theory/lessons/entropy#surprise"');
   });
 
   it("leaves a message that carries none alone", () => {

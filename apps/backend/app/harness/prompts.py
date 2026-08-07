@@ -64,11 +64,15 @@ def learner_quote(text: str, locator: str) -> str:
     something they pasted into the page, and an instruction found in it is
     still data. The tags are escaped out of the text itself — an unescaped
     `</untrusted>` in the selection would close the fence and put the rest of
-    it back in the learner's own voice.
+    it back in the learner's own voice. The ampersand is escaped first, which
+    is what makes the escaping reversible: a selection that already spells out
+    `&lt;untrusted` must not come back out of the panel as a tag nobody wrote.
     """
     quoted = "\n".join(f"> {line}" for line in text[:QUOTE_LENGTH].splitlines())
-    fenced = quoted.replace("<untrusted", "&lt;untrusted").replace(
-        "</untrusted", "&lt;/untrusted"
+    fenced = (
+        quoted.replace("&", "&amp;")
+        .replace("<untrusted", "&lt;untrusted")
+        .replace("</untrusted", "&lt;/untrusted")
     )
     return untrusted(QUOTE_SOURCE, f"{fenced}\n>\n> — [[{locator}]]")
 

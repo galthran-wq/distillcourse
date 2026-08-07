@@ -14,6 +14,8 @@ const LEFT_BY_U1: StoredChat = {
   panel: "docked",
   chatId: "c1",
   draft: "half a question",
+  // The passages that half a question is about: one unsent message with it.
+  quotes: '[{"text":"the average surprisal","locator":"lesson:c/l#one"}]',
   owner: "u1",
 };
 
@@ -47,6 +49,7 @@ describe("what the widget remembers", () => {
       panel: "docked",
       chatId: "c1",
       draft: "why is this true?",
+      quotes: "",
       owner: "",
     });
     expect(storedChatId()).toBe("c1");
@@ -73,7 +76,13 @@ describe("what the widget remembers", () => {
 
     // It opens rather than closing, the field it never knew is dropped, and
     // the fields it shares with this version survive.
-    expect(entry()).toEqual({ panel: "docked", chatId: "c1", draft: "", owner: "" });
+    expect(entry()).toEqual({
+      panel: "docked",
+      chatId: "c1",
+      draft: "",
+      quotes: "",
+      owner: "",
+    });
     expect(storedChatId()).toBe("c1");
   });
 
@@ -106,7 +115,13 @@ describe("what the widget remembers", () => {
 
     // Whoever signs in next on this browser gets an empty composer; where the
     // panel sits is not theirs to inherit or lose.
-    expect(entry()).toEqual({ panel: "docked", chatId: "", draft: "", owner: "" });
+    expect(entry()).toEqual({
+      panel: "docked",
+      chatId: "",
+      draft: "",
+      quotes: "",
+      owner: "",
+    });
   });
 
   it("drops the previous reader's draft on a load that opens anonymous", async () => {
@@ -117,7 +132,13 @@ describe("what the widget remembers", () => {
     // them: only the entry knows the draft in it is not the current reader's.
     setUser(null);
 
-    expect(entry()).toEqual({ panel: "docked", chatId: "", draft: "", owner: "" });
+    expect(entry()).toEqual({
+      panel: "docked",
+      chatId: "",
+      draft: "",
+      quotes: "",
+      owner: "",
+    });
   });
 
   it("keeps the draft when the load could not ask who is signed in", async () => {

@@ -9,16 +9,17 @@ import {
   type KeyboardEvent,
 } from "react";
 import { SendIcon } from "@/components/chat/icons";
-import { PendingQuote, QuoteRow } from "@/components/chat/QuoteChip";
+import { PendingQuote, QuoteRow } from "@/components/chat/Quotes";
 import { Button } from "@/components/ui";
 import { FIELD_CLASS } from "@/components/ui/styles";
-import { useQuotes } from "@/lib/chat/quote";
+import { useQuotes, type Quote } from "@/lib/chat/quote";
 import { setDraft, useDraft } from "@/lib/chat/stored";
 
 interface Props {
   /** A run is in flight: the chat takes one at a time. */
   disabled: boolean;
-  onSubmit: (text: string) => void;
+  /** The passages come with the text: they are what the question is about. */
+  onSubmit: (text: string, quotes: Quote[]) => void;
 }
 
 export default function Composer({ disabled, onSubmit }: Props) {
@@ -67,7 +68,7 @@ export default function Composer({ disabled, onSubmit }: Props) {
     event.preventDefault();
     if (!ready) return;
     setDraft("");
-    onSubmit(text.trim());
+    onSubmit(text.trim(), quotes);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {

@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { CloseIcon } from "@/components/chat/icons";
+import RevealLink from "@/components/chat/RevealLink";
 import { CHIP_CLASS, POPOVER_CLASS } from "@/components/ui/styles";
 import { dropQuote, type Quote } from "@/lib/chat/quote";
 import { linkTo } from "@/lib/chat/references";
 import { useLessons } from "@/lib/content/links";
-import { reveal } from "@/lib/lesson/anchor";
 import { useDismiss } from "@/lib/ui/dismiss";
 
 // The chip's own geometry, on top of the look every chip on the site shares.
@@ -15,17 +14,26 @@ const CHIP = `${CHIP_CLASS} min-w-0 gap-1.5 py-1 pr-1.5 pl-2 text-left`;
 
 // A cap rather than a size, and it belongs to whatever the row holds: a short
 // passage takes what it needs, a long one is cut off at the point where a row
-// of them stops being scannable. One of the two below is a chip, the other a
-// chip with a button welded to it.
+// of them stops being scannable.
 const WIDTH = "max-w-64";
+
+// How much of a passage a label reads out. The whole of one is a paragraph,
+// and a paragraph is not a control's name.
+const SPOKEN = 40;
+
+function opening(text: string): string {
+  return text.length <= SPOKEN ? text : `${text.slice(0, SPOKEN).trimEnd()}…`;
+}
 
 /**
  * The row a message's passages sit in, above the question in the composer and
  * above it again in the bubble it was sent as — the same row in both places,
- * so a reference does not move when the message goes.
+ * so a reference does not move when the message goes. It is also what a
+ * preview opens against: a chip that wrapped onto a second row would otherwise
+ * open its own preview off the side of a panel that cannot scroll to it.
  */
 export function QuoteRow({ children }: { children: ReactNode }) {
-  return <div className="mb-2 flex flex-wrap gap-1.5">{children}</div>;
+  return <div className="relative mb-2 flex flex-wrap gap-1.5">{children}</div>;
 }
 
 /**
@@ -59,16 +67,9 @@ export function SentQuote({ quote }: { quote: Quote }) {
   // lesson withdrawn since — leaves the passage readable with nothing to click.
   if (target === null) return <span className={`${CHIP} ${WIDTH}`}>{label}</span>;
   return (
-    <Link
-      href={target.url}
-      // Client-side, and from the layout the panel lives in: the conversation
-      // survives the navigation the click causes.
-      onClick={() => reveal(target.url.split("#")[1] ?? null)}
-      className={`${CHIP} ${WIDTH}`}
-      title={quote.text}
-    >
+    <RevealLink href={target.url} className={`${CHIP} ${WIDTH}`} title={quote.text}>
       {label}
-    </Link>
+    </RevealLink>
   );
 }
 
@@ -81,17 +82,15 @@ export function PendingQuote({ quote }: { quote: Quote }) {
   const target = linkTo(quote.locator, useLessons());
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const preview = useId();
 
   useDismiss(open, root, setOpen);
 
   return (
-    <div ref={root} className={`relative flex min-w-0 ${WIDTH}`}>
+    <div ref={root} className={`flex min-w-0 ${WIDTH}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-controls={preview}
         className={`${CHIP} flex-1 rounded-r-none border-r-0`}
       >
         <Label quote={quote} title={target?.text} />
@@ -99,17 +98,19 @@ export function PendingQuote({ quote }: { quote: Quote }) {
       <button
         type="button"
         onClick={() => dropQuote(quote)}
-        aria-label={`Drop the passage “${quote.text}”`}
-        className={`${CHIP} shrink-0 rounded-l-none px-1.5`}
+        aria-label={`Drop the passage “${opening(quote.text)}”`}
+        // Named per side: the chip's padding is uneven, and its `pl-2` is the
+        // later rule of the two, so a shorthand here would lose the left of it.
+        className={`${CHIP} shrink-0 rounded-l-none pr-1.5 pl-1.5`}
       >
         <CloseIcon className="size-3" />
       </button>
       {open && (
         <p
-          id={preview}
           // Over the composer rather than under it: the field is at the bottom
-          // of the panel, and there is nothing below it to open into.
-          className={`${POPOVER_CLASS} bottom-full left-0 mb-1.5 max-h-48 w-72 origin-bottom-left overflow-y-auto p-3 text-[13px] text-soft`}
+          // of the panel, and there is nothing below it to open into. The width
+          // of the row rather than of the chip, for the reason the row gives.
+          className={`${POPOVER_CLASS} bottom-full right-0 left-0 mb-1.5 max-h-48 origin-bottom overflow-y-auto p-3 text-[13px] text-soft`}
         >
           {quote.text}
         </p>

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui";
 import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
+import { restoreQuotes, type Quote } from "@/lib/chat/quote";
 import {
   busy,
   changeModel,
@@ -76,18 +77,29 @@ export default function ChatPanel({ session, expanded }: Props) {
     refreshSummary().catch(report);
   }, [status, session]);
 
+  // The request took the passages off the composer as it was built, and this
+  // one never got through — refused by the cap, or nothing answered at all.
+  // The question can be asked again, so they go back rather than being lost.
+  useEffect(() => {
+    if (error !== undefined) restoreQuotes();
+  }, [error]);
+
   function run(work: Promise<unknown>, done: string | null = null): void {
     setMenu(false);
     setNotice(null);
     work.then(() => setNotice(done), report);
   }
 
-  function submit(text: string): void {
+  function submit(text: string, quotes: Quote[]): void {
     const command = parseCommand(text);
     if (command === "clear") return run(clearSession());
     if (command === "compact") return run(compactSession(), "history compacted");
     setNotice(null);
-    void sendMessage({ text });
+    // The passages ride along on the message so the bubble shows them at once.
+    // What is actually sent to the backend is still the field the transport
+    // takes them out of the composer for; this copy is the widget's own, and
+    // the backend has no use for it.
+    void sendMessage({ text, metadata: { quotes } });
   }
 
   const line = error === undefined ? notice : streamFailure(error);

@@ -3,9 +3,9 @@
 import { isToolUIPart, type ChatStatus, type UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import Markdown from "@/components/chat/Markdown";
-import { QuoteRow, SentQuote } from "@/components/chat/QuoteChip";
+import { QuoteRow, SentQuote } from "@/components/chat/Quotes";
 import ToolChip from "@/components/chat/ToolChip";
-import { quoted } from "@/lib/chat/quote";
+import { attachedQuotes, quoted, type Quote } from "@/lib/chat/quote";
 
 // Within this much of the end counts as reading the newest message. Anything
 // further up is the reader looking at something, and the transcript stays put.
@@ -17,14 +17,18 @@ const AT_END = 32;
  * not for the reader, so they come back out as the chips they were attached
  * as, which is also what makes them survive a reload.
  */
-function Question({ text }: { text: string }) {
+function Question({ text, attached }: { text: string; attached: Quote[] }) {
   const question = quoted(text);
+  // The fences are written server-side, so the message the widget has just
+  // added carries none of them: what it went with rides on it instead, until
+  // the stored form of it is loaded.
+  const quotes = question.quotes.length > 0 ? question.quotes : attached;
 
   return (
     <>
-      {question.quotes.length > 0 && (
+      {quotes.length > 0 && (
         <QuoteRow>
-          {question.quotes.map((quote, index) => (
+          {quotes.map((quote, index) => (
             // By position: the message is stored and never edited, so the list
             // is fixed for as long as it is on screen.
             <SentQuote key={index} quote={quote} />
@@ -109,7 +113,11 @@ export default function Messages({
             {message.parts.map((part, index) => {
               if (part.type === "text") {
                 return message.role === "user" ? (
-                  <Question key={index} text={part.text} />
+                  <Question
+                    key={index}
+                    text={part.text}
+                    attached={attachedQuotes(message.metadata)}
+                  />
                 ) : (
                   <Markdown key={index} text={part.text} />
                 );

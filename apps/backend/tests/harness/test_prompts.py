@@ -67,6 +67,16 @@ def test_passages_past_the_cap_are_dropped() -> None:
     assert f"passage {QUOTE_COUNT}" not in block
 
 
+def test_a_passage_spelling_out_the_escaping_is_escaped_again() -> None:
+    """The escaping has to be reversible, or the panel reading the message
+    back turns a passage that merely mentions `&lt;untrusted` into a tag
+    nobody wrote. The ampersand goes first, which is what makes it so."""
+    block = learner_quotes([("the page prints &lt;untrusted here", "lesson:c/l#one")])
+    assert block is not None
+    assert "&amp;lt;untrusted" in block
+    assert "&lt;untrusted here" not in block
+
+
 def test_run_kind_selects_its_module() -> None:
     chat = assemble("web", "chat")
     assert "## Review" not in chat

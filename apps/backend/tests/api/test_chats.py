@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.chats import _current_locator
 from app.core.config import settings
+from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import User
@@ -303,6 +304,33 @@ async def test_a_quote_that_is_not_a_locator_is_dropped(
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert asked.count('<untrusted source="learner-quote">') == 1
     assert "hello" not in asked
+
+
+async def test_more_passages_than_the_cap_keeps_the_newest(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """The cap the composer keeps is not a cap, and the end it keeps is the
+    newest: the composer evicts the oldest, so a list longer than the cap is
+    read from its tail — and it is cut there before any of it is validated."""
+    repo = HarnessRepository(session, user.id)
+    chat = await repo.create_chat(kind="web")
+    body = submission(chat.id) | {
+        "quotes": [
+            {
+                "text": f"passage {n}",
+                "locator": f"lesson:information-theory/entropy#s{n}",
+            }
+            for n in range(20)
+        ]
+    }
+
+    with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
+        await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+
+    asked = str((await repo.rows(chat))[0].pydantic_ai)
+    assert asked.count('<untrusted source="learner-quote">') == prompts.QUOTE_COUNT
+    assert "passage 19" in asked
+    assert "passage 11" not in asked
 
 
 async def test_a_question_with_no_passages_carries_no_fence(

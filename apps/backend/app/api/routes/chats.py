@@ -87,7 +87,15 @@ def _quotes(run_input: RequestData) -> str | None:
     quotes = (run_input.model_extra or {}).get("quotes")
     if not isinstance(quotes, list):
         return None
-    passages = [found for quote in quotes if (found := _passage(quote)) is not None]
+    # Bounded before anything in it is looked at: a client is free to send ten
+    # thousand entries, and none of them is worth a pass of the locator
+    # pattern. The tail, because the composer's cap evicts the oldest — what a
+    # reader who went past it still has attached is the end of their list.
+    passages = [
+        found
+        for quote in quotes[-prompts.QUOTE_COUNT :]
+        if (found := _passage(quote)) is not None
+    ]
     return prompts.learner_quotes(passages)
 
 
