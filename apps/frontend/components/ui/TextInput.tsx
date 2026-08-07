@@ -1,5 +1,7 @@
 "use client";
 
+import { FIELD_CLASS, FIELD_LABEL_CLASS } from "./styles";
+
 interface Props {
   label: string;
   value: string;
@@ -20,7 +22,7 @@ export function TextInput({
 }: Props) {
   return (
     <label className="block text-sm">
-      <span>{label}</span>
+      <span className={FIELD_LABEL_CLASS}>{label}</span>
       <input
         type="text"
         value={value}
@@ -28,7 +30,7 @@ export function TextInput({
         placeholder={placeholder}
         maxLength={maxLength}
         aria-label={ariaLabel ?? label}
-        className="mt-1 block min-h-11 w-full rounded border border-line bg-panel px-2 font-mono text-sm focus:border-accent focus:outline-none"
+        className={`${FIELD_CLASS} min-h-11 font-mono`}
       />
     </label>
   );
