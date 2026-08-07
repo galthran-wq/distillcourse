@@ -1,89 +1,31 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import ChatMenu from "@/components/chat/ChatMenu";
-import Composer from "@/components/chat/Composer";
 import type { ChatModel, ChatSummary } from "@/lib/chat/api";
-import { setDraft } from "@/lib/chat/stored";
+import { composing } from "./chat-fixture";
 import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
 stubResizeObserver();
 // The palette carries the row the arrows walked to into view with them.
 stubScrollIntoView();
 
-const { host, render } = mounted();
-
-/** What the composer handed the widget, in the order it was sent. */
-let sent: string[] = [];
-
-function composer(disabled = false): void {
-  act(() =>
-    render(
-      <Composer
-        disabled={disabled}
-        onSubmit={(text) => {
-          sent.push(text);
-        }}
-      />,
-    ),
-  );
-}
-
-function field(): HTMLTextAreaElement {
-  const box = host().querySelector("textarea");
-  if (box === null) throw new Error("the composer has no field");
-  return box;
-}
-
-/** A reader arriving at a composer that already holds a draft, as a reload does. */
-function reloads(draft: string): void {
-  act(() => render(null));
-  setDraft(draft);
-  composer();
-}
-
-function send(): HTMLButtonElement {
-  const button = host().querySelector<HTMLButtonElement>('[aria-label="Send"]');
-  if (button === null) throw new Error("the composer has no send button");
-  return button;
-}
-
-function press(key: string): void {
-  act(() =>
-    field().dispatchEvent(
-      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
-    ),
-  );
-}
-
-function options(): HTMLElement[] {
-  return [...host().querySelectorAll<HTMLElement>('[role="option"]')];
-}
-
-/** What the palette lists, as the commands it names. */
-function listed(): string[] {
-  return options().map((row) => row.querySelector("span")?.textContent ?? "");
-}
-
-/** The row Enter would run. */
-function highlighted(): string | undefined {
-  return listed().find(
-    (_, index) => options()[index].getAttribute("aria-selected") === "true",
-  );
-}
-
-beforeEach(() => {
-  sent = [];
-  composer();
-});
-
-afterEach(() => {
-  // The draft outlives the tab, so it outlives a test too.
-  setDraft("");
-  window.localStorage.clear();
-});
-
 describe("the command palette", () => {
+  const { host, composer, field, press, options, listed, reloads, sent } = composing();
+
+  function send(): HTMLButtonElement {
+    const button = host().querySelector<HTMLButtonElement>('[aria-label="Send"]');
+    if (button === null) throw new Error("the composer has no send button");
+    return button;
+  }
+
+  /** The row Enter would run. */
+  function highlighted(): string | undefined {
+    return listed().find(
+      (_, index) => options()[index].getAttribute("aria-selected") === "true",
+    );
+  }
+
   it("opens on a slash into an empty composer", () => {
     type(field(), "/");
 
@@ -265,6 +207,8 @@ const MODELS: ChatModel[] = [
 ];
 
 describe("the chat menu", () => {
+  const { host, render } = mounted();
+
   it("has one home for each function and is not the commands'", () => {
     act(() =>
       render(

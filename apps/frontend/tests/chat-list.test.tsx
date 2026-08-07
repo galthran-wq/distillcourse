@@ -3,24 +3,10 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatList from "@/components/chat/ChatList";
 import type { ChatSummary } from "@/lib/chat/api";
-import { LessonsProvider, type Lessons } from "@/lib/content/links";
+import { LessonsProvider } from "@/lib/content/links";
 import { SectionsProvider } from "@/lib/content/sections";
-import type { LessonSections } from "@/lib/content/site";
+import { LESSONS, SECTIONS } from "./chat-fixture";
 import { mounted } from "./utils/dom";
-
-const LESSONS: Lessons = {
-  "lesson:us-history/indigenous-america": {
-    title: "Indigenous America",
-    course: "US history",
-    href: "/courses/us-history/lessons/indigenous-america",
-  },
-};
-
-const SECTIONS: LessonSections = {
-  "lesson:us-history/indigenous-america": [
-    { depth: 2, id: "cahokia", text: "Cahokia and the Mississippians" },
-  ],
-};
 
 const NOW = new Date("2026-08-07T12:00:00Z");
 

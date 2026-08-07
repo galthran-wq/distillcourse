@@ -21,43 +21,12 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import Composer from "@/components/chat/Composer";
 import { asked, mentions, typingAt, write, type Mention } from "@/lib/chat/mention";
-import { LessonsProvider, type Lessons } from "@/lib/content/links";
-import { SectionsProvider } from "@/lib/content/sections";
-import type { LessonSections } from "@/lib/content/site";
-import { setDraft } from "@/lib/chat/stored";
-import { rendered, shown, turn } from "./chat-fixture";
-import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
+import { LESSONS, SECTIONS, composing, rendered, shown, turn } from "./chat-fixture";
+import { stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
 stubResizeObserver();
 const scrolled = stubScrollIntoView();
-
-const LESSONS: Lessons = {
-  "lesson:us-history/indigenous-america": {
-    title: "Indigenous America",
-    course: "US history",
-    href: "/courses/us-history/lessons/indigenous-america",
-  },
-  "lesson:us-history/european-empires": {
-    title: "European empires",
-    course: "US history",
-    href: "/courses/us-history/lessons/european-empires",
-  },
-  "lesson:info-theory/entropy": {
-    title: "Entropy",
-    course: "Information theory",
-    href: "/courses/info-theory/lessons/entropy",
-  },
-};
-
-const SECTIONS: LessonSections = {
-  "lesson:us-history/indigenous-america": [
-    { depth: 2, id: "cahokia", text: "Cahokia and the Mississippians" },
-    { depth: 3, id: "the-mound", text: "The mound" },
-    { depth: 2, id: "the-southwest", text: "The Southwest" },
-  ],
-};
 
 /** What the autocomplete offers for a draft whose caret is at its end. */
 function offered(draft: string): Mention[] {
@@ -308,45 +277,7 @@ describe("the chip a sent reference is drawn as", () => {
 });
 
 describe("the composer's autocomplete", () => {
-  const { host, render } = mounted();
-  let sent: string[] = [];
-
-  function composer(): void {
-    act(() =>
-      render(
-        <SectionsProvider value={SECTIONS}>
-          <LessonsProvider value={LESSONS}>
-            <Composer
-              disabled={false}
-              onSubmit={(text) => {
-                sent.push(text);
-              }}
-            />
-          </LessonsProvider>
-        </SectionsProvider>,
-      ),
-    );
-  }
-
-  function field(): HTMLTextAreaElement {
-    const box = host().querySelector("textarea");
-    if (box === null) throw new Error("the composer has no field");
-    return box;
-  }
-
-  function press(key: string): void {
-    act(() =>
-      field().dispatchEvent(
-        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
-      ),
-    );
-  }
-
-  function listed(): string[] {
-    return [...host().querySelectorAll<HTMLElement>('[role="option"]')].map(
-      (row) => row.querySelector("span")?.textContent ?? "",
-    );
-  }
+  const { host, field, press, listed, sent } = composing();
 
   /** The chips above the field: what the message is pointed at. */
   function chips(): string[] {
@@ -354,17 +285,6 @@ describe("the composer's autocomplete", () => {
       (chip) => chip.textContent ?? "",
     );
   }
-
-  beforeEach(() => {
-    sent = [];
-    composer();
-  });
-
-  afterEach(() => {
-    // The draft outlives the tab, so it outlives a test too.
-    setDraft("");
-    window.localStorage.clear();
-  });
 
   it("opens on an @ and narrows as the reader types", () => {
     type(field(), "@");
