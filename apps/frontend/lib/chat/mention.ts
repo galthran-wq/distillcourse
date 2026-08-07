@@ -1,6 +1,6 @@
 import { courseTitle } from "@/lib/chat/references";
 import type { Lessons } from "@/lib/content/links";
-import { LESSON_PREFIX, lessonKey, sectionKey } from "@/lib/content/locator";
+import { lessonKey, lessonParts, sectionKey } from "@/lib/content/locator";
 import type { LessonSections } from "@/lib/content/site";
 
 /**
@@ -18,21 +18,24 @@ import type { LessonSections } from "@/lib/content/site";
  */
 
 const SLUG = "[a-z0-9-]";
-// An anchor is not a slug: rehype-slug writes whatever the heading gives it.
-// The bound is the locator grammar's (lib/content/locator).
-const ANCHOR = "[^\\s#]";
+// An anchor is not a slug — rehype-slug writes whatever the heading gives it,
+// including the letters of whatever script it is written in — but it is not
+// "anything but a space" either: it keeps letters, digits and `-` and drops
+// the rest. The narrower class is what stops the full stop that ends the
+// sentence from being read as part of the section it ends.
+const ANCHOR = "[\\p{L}\\p{N}_-]";
 
 // Written at the start of the line or after a space, so an email address in a
 // question is an email address.
 const WRITTEN = new RegExp(
   `(^|\\s)@(${SLUG}+)(?:/(${SLUG}+)(?:#(${ANCHOR}+))?)?`,
-  "g",
+  "gu",
 );
 
 // The same shape half-typed: every part may still be empty, and the presence
 // of the separator — not of what follows it — is what says which level the
 // reader has reached.
-const TYPING = new RegExp(`^(${SLUG}*)(?:/(${SLUG}*)(?:#(${ANCHOR}*))?)?$`);
+const TYPING = new RegExp(`^(${SLUG}*)(?:/(${SLUG}*)(?:#(${ANCHOR}*))?)?$`, "u");
 
 /** How many rows the list offers. Past this it is a directory, not a prompt. */
 const LIMIT = 8;
@@ -71,13 +74,6 @@ export interface Mention {
   depth?: 2 | 3;
 }
 
-/** The course and lesson a `lesson:` key names. */
-function parts(key: string): [string, string] | null {
-  if (!key.startsWith(LESSON_PREFIX)) return null;
-  const path = key.slice(LESSON_PREFIX.length).split("/");
-  return path.length === 2 ? [path[0], path[1]] : null;
-}
-
 /**
  * What has been typed against what a row is called. A row matches on the start
  * of its slug or title, or on the start of any word inside either — so `@amer`
@@ -91,7 +87,7 @@ function matches(typed: string, ...names: string[]): boolean {
     const lower = name.toLowerCase();
     return (
       lower.startsWith(query) ||
-      lower.split(/[^a-z0-9]+/).some((word) => word.startsWith(query))
+      lower.split(/[^\p{L}\p{N}]+/u).some((word) => word.startsWith(query))
     );
   });
 }
@@ -113,7 +109,7 @@ export function typingAt(draft: string, caret: number): Typing | null {
   // runs to the end of what was written: a caret put back into the middle of
   // one is still inside that one, and choosing a row replaces the whole of it
   // rather than leaving its tail behind.
-  const after = /^[a-z0-9/#-]*/.exec(draft.slice(caret))?.[0] ?? "";
+  const after = /^[\p{L}\p{N}_\/#-]*/u.exec(draft.slice(caret))?.[0] ?? "";
   return {
     at,
     to: caret + after.length,
@@ -127,8 +123,8 @@ export function typingAt(draft: string, caret: number): Typing | null {
 function courseRows(typed: string, lessons: Lessons): Mention[] {
   const named = new Map<string, string>();
   for (const [key, link] of Object.entries(lessons)) {
-    const path = parts(key);
-    if (path !== null && !named.has(path[0])) named.set(path[0], link.course);
+    const path = lessonParts(key);
+    if (path !== null && !named.has(path.course)) named.set(path.course, link.course);
   }
   return [...named]
     .filter(([slug, title]) => matches(typed, slug, title))
@@ -151,20 +147,20 @@ function courseRows(typed: string, lessons: Lessons): Mention[] {
 function lessonRows(course: string | null, typed: string, lessons: Lessons): Mention[] {
   const rows: Mention[] = [];
   for (const [key, link] of Object.entries(lessons)) {
-    const path = parts(key);
+    const path = lessonParts(key);
     if (path === null) continue;
-    if (course !== null && path[0] !== course) continue;
+    if (course !== null && path.course !== course) continue;
     const named =
       course === null
-        ? matches(typed, path[1], link.title, path[0], link.course)
-        : matches(typed, path[1], link.title);
+        ? matches(typed, path.lesson, link.title, path.course, link.course)
+        : matches(typed, path.lesson, link.title);
     if (!named) continue;
     rows.push({
       kind: "lesson",
       locator: key,
       title: link.title,
       under: course === null ? link.course : "",
-      written: `@${path[0]}/${path[1]}`,
+      written: `@${path.course}/${path.lesson}`,
     });
   }
   return rows;

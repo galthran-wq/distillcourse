@@ -5,9 +5,11 @@ import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
 import type { ChatListing, ChatModel, ChatSummary } from "@/lib/chat/api";
 import { setDraft } from "@/lib/chat/stored";
-import { mounted, stubResizeObserver, type } from "./utils/dom";
+import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
 stubResizeObserver();
+// The palette carries the row the arrows walked to into view with them.
+stubScrollIntoView();
 
 const { host, render } = mounted();
 

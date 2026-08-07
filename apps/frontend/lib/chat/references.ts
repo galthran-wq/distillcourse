@@ -50,6 +50,27 @@ export function linkTo(
   return { url: `${link.href}${anchor}`, text: heading?.text ?? link.title };
 }
 
+/**
+ * The same message where it is named rather than rendered: every locator in it
+ * reduced to what the chip would have read, and the rest left alone. A chat is
+ * titled with the question that started it (`app/harness/runner.py`), and a
+ * question written with `@` carries `[[lesson:…]]` — so the rail and the
+ * panel's header would otherwise show the brackets in the same panel where the
+ * message itself shows the chip. A locator the site cannot resolve stays the
+ * text it is, exactly as it does in the message.
+ */
+export function plain(
+  text: string,
+  lessons: Lessons,
+  sections: LessonSections = {},
+): string {
+  return text.replace(REFERENCE, (whole, locator: string, label?: string) => {
+    if (label !== undefined) return label;
+    if (isSourceLocator(locator)) return locator;
+    return linkTo(locator, lessons, sections)?.text ?? whole;
+  });
+}
+
 function resolve(
   locator: string,
   label: string | undefined,

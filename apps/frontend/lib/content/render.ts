@@ -11,12 +11,19 @@ import rehypePrettyCode from "rehype-pretty-code";
 import { rehypeCollectToc, type TocEntry } from "./toc";
 
 /**
- * The one pipeline a lesson goes through. Everything that has to agree with
- * the anchors on the page — the table of contents beside it, the section index
- * the `@`-autocomplete offers — is produced by a call in here rather than by a
- * pipeline of its own, for the reason the content index gives (CLAUDE.md): a
- * second pipeline is a second answer, and the day the two differ the site
- * points readers at anchors that are not there.
+ * The one pipeline a lesson is rendered through. What the site itself has to
+ * agree with the anchors on the page about — the table of contents beside it,
+ * the section index the `@`-autocomplete offers — comes off a call in here
+ * rather than off a pipeline of its own: a second pipeline is a second answer,
+ * and the day the two differ the site points readers at anchors that are not
+ * there.
+ *
+ * The content index is not one of them and cannot be: `./index-export` slugs
+ * over hast it assembles itself, because what it needs from a lesson is its
+ * prose in chunks rather than a component tree. Its anchors are what the
+ * backend's search hits point at, so they do have to match these — the shared
+ * ground is rehype-slug over the same headings, and nothing here may be
+ * reordered around it without that end being read too (CLAUDE.md).
  */
 
 const REMARK = [remarkGfm, remarkMath];

@@ -28,9 +28,10 @@ import { SectionsProvider } from "@/lib/content/sections";
 import type { LessonSections } from "@/lib/content/site";
 import { setDraft } from "@/lib/chat/stored";
 import { rendered, shown, turn } from "./chat-fixture";
-import { mounted, stubResizeObserver, type } from "./utils/dom";
+import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
 stubResizeObserver();
+const scrolled = stubScrollIntoView();
 
 const LESSONS: Lessons = {
   "lesson:us-history/indigenous-america": {
@@ -222,6 +223,22 @@ describe("the question as it is sent", () => {
     expect(asked("@us-history/withdrawn", LESSONS)).toBe("@us-history/withdrawn");
   });
 
+  it("ends a reference where the anchor does, not where the sentence does", () => {
+    // rehype-slug writes an anchor out of letters, digits and hyphens, so the
+    // punctuation after one is punctuation and not part of what is pointed at.
+    expect(asked("what is @info-theory/entropy#the-average?", LESSONS)).toBe(
+      "what is [[lesson:info-theory/entropy#the-average]]?",
+    );
+    expect(asked("see @info-theory/entropy#the-average, above", LESSONS)).toBe(
+      "see [[lesson:info-theory/entropy#the-average]], above",
+    );
+    // The letters it keeps are the letters of whatever script the heading is
+    // written in, which is why the class is not "anything but a space".
+    expect(asked("read @info-theory/entropy#энтропия-ℓ.", LESSONS)).toBe(
+      "read [[lesson:info-theory/entropy#энтропия-ℓ]].",
+    );
+  });
+
   it("carries several of them, and the words between", () => {
     expect(
       asked("@us-history/indigenous-america or @info-theory/entropy?", LESSONS),
@@ -233,6 +250,17 @@ describe("the question as it is sent", () => {
 
 describe("the chip a sent reference is drawn as", () => {
   const transcript = shown();
+  // The page the chip lands on: following one scrolls to the heading it names
+  // and marks it, which needs that heading to be in the document.
+  let heading: HTMLHeadingElement;
+
+  beforeEach(() => {
+    heading = document.createElement("h2");
+    heading.id = "the-average";
+    document.body.append(heading);
+  });
+
+  afterEach(() => heading.remove());
 
   /** The reader's question, as the composer rewrote it on the way out. */
   function question(draft: string): string {
@@ -262,10 +290,6 @@ describe("the chip a sent reference is drawn as", () => {
   });
 
   it("scrolls to the section and marks it when it is followed", async () => {
-    Element.prototype.scrollIntoView = vi.fn();
-    const heading = document.createElement("h2");
-    heading.id = "the-average";
-    document.body.append(heading);
     transcript.show([
       turn("user", {
         type: "text",
@@ -279,8 +303,7 @@ describe("the chip a sent reference is drawn as", () => {
 
     // The same landing a reference the tutor wrote gets (lib/lesson/anchor).
     expect(heading.classList.contains("anchor-flash")).toBe(true);
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
-    heading.remove();
+    expect(scrolled).toHaveBeenCalled();
   });
 });
 
@@ -382,6 +405,32 @@ describe("the composer's autocomplete", () => {
     press("Enter");
     expect(field().value).toBe("@us-history/indigenous-america#cahokia");
     expect(chips()).toEqual(["Cahokia and the Mississippians"]);
+  });
+
+  it("puts the caret after a reference it rewrote to what it already read", () => {
+    // The caret goes back into the middle of a finished reference — between
+    // the "h" and the "o" of "cahokia" — so the row the list offers is the one
+    // already written and taking it changes nothing about the draft.
+    type(field(), "@us-history/indigenous-america#cahokia and more", 34);
+    expect(listed()).toEqual(["Cahokia and the Mississippians"]);
+
+    press("Enter");
+
+    expect(field().value).toBe("@us-history/indigenous-america#cahokia and more");
+    // At the end of the reference, which is where the next keystroke belongs —
+    // not back in the middle of it, where the draft not having changed would
+    // otherwise have left it.
+    expect(field().selectionStart).toBe(38);
+  });
+
+  it("carries the row the arrows walk to into view with them", () => {
+    type(field(), "@");
+    scrolled.mockClear();
+
+    press("ArrowDown");
+
+    // The list is capped: the row Enter takes has to be a row that can be read.
+    expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
   });
 
   it("sends the locator, not the @ the reader wrote", () => {

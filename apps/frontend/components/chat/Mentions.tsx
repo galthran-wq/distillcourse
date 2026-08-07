@@ -1,8 +1,8 @@
 "use client";
 
-import { QuoteRow } from "@/components/chat/Quotes";
+import Palette from "@/components/chat/Palette";
+import { QuoteRow, ROW_CHIP_CLASS, ROW_CHIP_WIDTH } from "@/components/chat/Quotes";
 import RevealLink from "@/components/chat/RevealLink";
-import { CHIP_CLASS, MENU_ROW_CLASS, POPOVER_CLASS } from "@/components/ui/styles";
 import { references, type Mention } from "@/lib/chat/mention";
 import { linkTo } from "@/lib/chat/references";
 import { useLessons } from "@/lib/content/links";
@@ -23,9 +23,9 @@ interface Props {
 }
 
 /**
- * The places a question can point at, offered while the reader writes an `@`.
- * It hangs over the composer the way the command palette does — the field is
- * at the bottom of the panel, so there is only up to open into.
+ * The places a question can point at, offered while the reader writes an `@` —
+ * the rows of the list `components/chat/Palette` draws, which is where
+ * everything about how it opens and how it is walked lives.
  */
 export default function MentionPalette({ mentions, active, onPick }: Props) {
   // Only where the list holds more than one kind — which is only before the
@@ -34,53 +34,46 @@ export default function MentionPalette({ mentions, active, onPick }: Props) {
   const mixed = mentions.some((one) => one.kind !== mentions[0].kind);
 
   return (
-    <div
+    <Palette
       id={MENTIONS_ID}
-      role="listbox"
-      aria-label="Places in the courses"
-      className={`${POPOVER_CLASS} right-0 bottom-full left-0 mb-1.5 max-h-64 origin-bottom overflow-y-auto p-1.5`}
-    >
-      {mentions.map((mention, index) => (
-        <button
-          key={mention.locator}
-          id={mentionRowId(index)}
-          type="button"
-          role="option"
-          aria-selected={index === active}
-          // The press must not take the focus out of the field: that is where
-          // the reference is being written and where the reader goes on typing.
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => onPick(mention)}
-          className={`${MENU_ROW_CLASS} items-baseline gap-2 ${
-            index === active ? "bg-line/60 text-ink" : "text-soft"
-          } ${mention.depth === 3 ? "pl-5" : ""}`}
-        >
-          <span className="min-w-0 flex-1 truncate text-left">{mention.title}</span>
-          {mention.under !== "" && (
-            <span className="max-w-32 shrink-0 truncate text-faint">{mention.under}</span>
-          )}
-          {/* Which of the three depths the row is: at the top of the list a
-              course and a lesson of it can read almost the same. */}
-          {mixed && (
-            <span className="shrink-0 font-mono text-[11px] text-faint">
-              {mention.kind}
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
+      label="Places in the courses"
+      active={active}
+      onPick={(index) => onPick(mentions[index])}
+      rows={mentions.map((mention, index) => ({
+        id: mentionRowId(index),
+        className: mention.depth === 3 ? "pl-5" : undefined,
+        children: (
+          <>
+            <span className="min-w-0 flex-1 truncate text-left">{mention.title}</span>
+            {mention.under !== "" && (
+              <span className="max-w-32 shrink-0 truncate text-faint">
+                {mention.under}
+              </span>
+            )}
+            {/* Which of the three depths the row is: at the top of the list a
+                course and a lesson of it can read almost the same. */}
+            {mixed && (
+              <span className="shrink-0 font-mono text-[11px] text-faint">
+                {mention.kind}
+              </span>
+            )}
+          </>
+        ),
+      }))}
+    />
   );
 }
 
-// A chip's own geometry, on top of the look every chip on the site shares —
-// the same line the attached passages take (components/chat/Quotes).
-const CHIP = `${CHIP_CLASS} min-w-0 max-w-64 gap-1.5 px-2 py-1`;
+// The whole chip: the geometry the attached passages take, and the same cap
+// on how wide one of them gets.
+const CHIP = `${ROW_CHIP_CLASS} ${ROW_CHIP_WIDTH}`;
 
 /**
  * The references written in a question, as chips: above the field while it is
  * being written, so that choosing one from the list visibly attaches
  * something, and pointed at the section they name so the reader can check
- * where it goes before asking.
+ * where it goes before asking. The chip is the passages' own — the two rows
+ * sit one above the other in the composer and are one row of chips to read.
  */
 export function MentionRow({ draft }: { draft: string }) {
   const lessons = useLessons();
