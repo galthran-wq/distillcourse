@@ -1,7 +1,6 @@
 "use client";
 
 import ChatList from "@/components/chat/ChatList";
-import { COMMANDS } from "@/lib/chat/commands";
 import type { ChatListing, ChatModel, ChatSummary } from "@/lib/chat/api";
 import { LABEL_CLASS, MENU_CLASS, MENU_ITEM_CLASS } from "@/components/ui/styles";
 
@@ -11,13 +10,15 @@ interface Props {
   models: ChatModel[];
   /** The panel is over the page, where the rail lists the chats beside it. */
   expanded: boolean;
-  onNew: () => void;
-  onCompact: () => void;
   onSelect: (chat: ChatListing) => void;
   onModel: (model: string) => void;
 }
 
-const HEADING = `px-2.5 pt-3 pb-1 ${LABEL_CLASS}`;
+// The commands are not here: the composer's palette is where they are run
+// from. `first:` is written after the unvaried utilities in the stylesheet, so
+// the heading at the top of the menu keeps the menu's own padding rather than
+// adding the gap that separates one group from the one above it.
+const HEADING = `px-2.5 pt-3 pb-1 first:pt-1.5 ${LABEL_CLASS}`;
 const ITEM = `${MENU_ITEM_CLASS} truncate`;
 
 export default function ChatMenu({
@@ -25,20 +26,11 @@ export default function ChatMenu({
   chats,
   models,
   expanded,
-  onNew,
-  onCompact,
   onSelect,
   onModel,
 }: Props) {
   return (
     <div className={`${MENU_CLASS} max-h-96 w-64 overflow-y-auto`}>
-      <button type="button" className={`${ITEM} text-soft`} onClick={onNew}>
-        /clear — {COMMANDS.clear}
-      </button>
-      <button type="button" className={`${ITEM} text-soft`} onClick={onCompact}>
-        /compact — {COMMANDS.compact}
-      </button>
-
       <p className={HEADING}>Model</p>
       {models.map((model) => (
         <button

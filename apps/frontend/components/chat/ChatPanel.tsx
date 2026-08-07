@@ -154,8 +154,6 @@ export default function ChatPanel({ session, expanded }: Props) {
             chats={chats}
             models={models}
             expanded={expanded}
-            onNew={() => run(clearSession())}
-            onCompact={() => run(compactSession(), "history compacted")}
             onSelect={(chat) => run(selectSession(chat))}
             onModel={(id) => run(changeModel(id))}
           />
