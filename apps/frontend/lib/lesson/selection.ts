@@ -14,14 +14,19 @@ export interface Passage {
   left: number;
 }
 
-/** Nothing is selected: no range, a bare caret, or whitespace alone. */
-export function selectionEmpty(selection: Selection | null): boolean {
-  return (
-    selection === null ||
-    selection.rangeCount === 0 ||
-    selection.isCollapsed ||
-    selection.toString().trim() === ""
-  );
+/**
+ * The selection still spans something: a range, and not a bare caret. Says
+ * nothing about the text, deliberately — this is what a `selectionchange` is
+ * answered with, and that fires through every frame of a drag, while
+ * `toString()` walks and serializes every node the range covers.
+ */
+export function selectionSpans(selection: Selection | null): selection is Selection {
+  return selection !== null && selection.rangeCount > 0 && !selection.isCollapsed;
+}
+
+/** …and what it spans is not whitespace alone. */
+export function selectionHasText(selection: Selection | null): selection is Selection {
+  return selectionSpans(selection) && selection.toString().trim() !== "";
 }
 
 /**
@@ -31,7 +36,7 @@ export function selectionEmpty(selection: Selection | null): boolean {
  */
 export function selectedPassage(course: string, lesson: string): Passage | null {
   const selection = window.getSelection();
-  if (selection === null || selectionEmpty(selection)) return null;
+  if (!selectionHasText(selection)) return null;
   const text = selection.toString().replace(/\s+/g, " ").trim();
 
   const range = selection.getRangeAt(0);

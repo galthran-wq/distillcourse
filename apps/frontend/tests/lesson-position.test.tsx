@@ -85,6 +85,13 @@ describe("the section on screen", () => {
     expect(anchorUnder(page(-2400, -1100, 560), VIEWPORT, 0)).toBe("s3");
   });
 
+  it("waits for the foot of the page before it does", () => {
+    // 200 px of scrolling still left. The closing heading is on screen, but
+    // the reader is reading the section above it, which fills the top third of
+    // the viewport — and that is the section they are in.
+    expect(anchorUnder(page(-2400, -1100, 550), VIEWPORT, 200)).toBe("s2");
+  });
+
   it("is nothing at all in a lesson without headings", () => {
     expect(anchorUnder([], VIEWPORT, 0)).toBeNull();
   });
@@ -92,41 +99,92 @@ describe("the section on screen", () => {
 
 const { render } = mounted();
 
+interface Watch {
+  target: Element;
+  callback: ResizeObserverCallback;
+}
+
 // jsdom has no ResizeObserver and the spy makes one: enough of it to mount,
-// and to let a test move the page the way nothing else here can.
-const observing = new Set<ResizeObserverCallback>();
+// and to let a test move the page the way nothing else here can. Keyed on the
+// target as well as the callback, so a registration one component leaves
+// behind cannot be taken down — or fired — on another's behalf.
+const observing = new Set<Watch>();
 class TestResize implements ResizeObserver {
   constructor(private readonly callback: ResizeObserverCallback) {}
-  observe(): void {
-    observing.add(this.callback);
+  observe(target: Element): void {
+    observing.add({ target, callback: this.callback });
   }
-  unobserve(): void {
-    observing.delete(this.callback);
+  unobserve(target: Element): void {
+    this.forget((watch) => watch.target === target);
   }
   disconnect(): void {
-    observing.delete(this.callback);
+    this.forget(() => true);
+  }
+  private forget(match: (watch: Watch) => boolean): void {
+    for (const watch of observing) {
+      if (watch.callback === this.callback && match(watch)) observing.delete(watch);
+    }
   }
 }
 globalThis.ResizeObserver = TestResize;
 
-/** The page changing height under a reader who has not touched it. */
-function reflow(): void {
-  act(() => {
-    for (const callback of observing) callback([], new TestResize(() => {}));
+// Nothing under test is meant to leave a watch behind, but a leak that did
+// would otherwise fire inside a later test's `reflow`.
+beforeEach(() => observing.clear());
+
+/**
+ * The frame the spy coalesces its measuring into: it answers a scroll, a
+ * resize and the observer with one measurement, so nothing it was told about
+ * has reached the store until this has run.
+ */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   });
 }
 
-// jsdom lays nothing out, so the headings are told where they are.
+/** The reader scrolling, and the frame that answers it. */
+async function scrolled(): Promise<void> {
+  window.dispatchEvent(new Event("scroll"));
+  await settle();
+}
+
+/** The page changing height under a reader who has not touched it. */
+async function reflow(): Promise<void> {
+  for (const { callback } of observing) callback([], new TestResize(() => {}));
+  await settle();
+}
+
+function find(id: string): HTMLElement {
+  const heading = document.getElementById(id);
+  if (heading === null) throw new Error(`no #${id} on the page`);
+  return heading;
+}
+
+// A reader partway down a real page: the spy subtracts this back out of the
+// document height, and a zero would leave that subtraction unexercised.
+const SCROLLED = 1800;
+
+// jsdom lays nothing out, so the headings are told where they are — and that
+// they have a box at all, which jsdom denies every element.
 function layout(tops: Record<string, number>, below: number): void {
   for (const [id, top] of Object.entries(tops)) {
-    const heading = document.getElementById(id);
-    if (heading === null) throw new Error(`no #${id} on the page`);
-    heading.getBoundingClientRect = () => ({ top }) as DOMRect;
+    const box = { top } as DOMRect;
+    find(id).getBoundingClientRect = () => box;
+    find(id).getClientRects = () => [box] as unknown as DOMRectList;
   }
+  Object.defineProperty(window, "scrollY", { value: SCROLLED, configurable: true });
   Object.defineProperty(document.documentElement, "scrollHeight", {
-    value: VIEWPORT + window.scrollY + below,
+    value: VIEWPORT + SCROLLED + below,
     configurable: true,
   });
+}
+
+/** What a browser reports for a heading inside a closed block: no box, and a
+ *  top of zero — which is above any reading line. */
+function boxless(id: string): void {
+  find(id).getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+  find(id).getClientRects = () => [] as unknown as DOMRectList;
 }
 
 function spy(...headings: string[]): void {
@@ -141,17 +199,17 @@ describe("the spy on a lesson page", () => {
   // The headings live in a container of their own: the React host `mounted`
   // appended is in the body too, and writing the fixture to `body.innerHTML`
   // would detach it.
-  const page = document.createElement("main");
+  const fixture = document.createElement("main");
 
   beforeEach(() => {
-    page.innerHTML = `<h2 id="a"></h2><h2 id="b"></h2><h2 id="c"></h2>`;
-    document.body.prepend(page);
+    fixture.innerHTML = `<h2 id="a"></h2><h2 id="b"></h2><h2 id="c"></h2>`;
+    document.body.prepend(fixture);
     window.innerHeight = VIEWPORT;
   });
 
-  afterEach(() => page.remove());
+  afterEach(() => fixture.remove());
 
-  it("leaves its readers alone while the reader stays in one section", () => {
+  it("leaves its readers alone while the reader stays in one section", async () => {
     let renders = 0;
     function Reader() {
       useLessonPosition();
@@ -172,13 +230,13 @@ describe("the spy on a lesson page", () => {
     // A scroll within the section: measured every time, worth telling the ToC
     // and the chat widget about none of them.
     layout({ a: -3400, b: -1300, c: 1100 }, 2500);
-    act(() => window.dispatchEvent(new Event("scroll")));
+    await scrolled();
 
     expect(currentLocator()).toBe("lesson:info-theory/entropy#b");
     expect(renders).toBe(settled);
   });
 
-  it("reports where the reader is now, not where a band last saw them", () => {
+  it("reports where the reader is now, not where a band last saw them", async () => {
     layout({ a: 500, b: 2600, c: 5000 }, 6000);
     spy("a", "b", "c");
     expect(currentLocator()).toBe("lesson:info-theory/entropy#a");
@@ -186,12 +244,37 @@ describe("the spy on a lesson page", () => {
     // A scroll that lands mid-section: no heading is anywhere near the top of
     // the viewport, and the reader is under the second one all the same.
     layout({ a: -2900, b: -800, c: 1600 }, 3000);
-    act(() => window.dispatchEvent(new Event("scroll")));
+    await scrolled();
 
     expect(currentLocator()).toBe("lesson:info-theory/entropy#b");
   });
 
-  it("follows the page moving under a reader who has not scrolled", () => {
+  it("reaches the closing section only once the page has no further to go", async () => {
+    // The tail of a lesson is shorter than a screen, so its heading sits
+    // halfway down the viewport at the foot of the page and never rises to the
+    // reading line — but a screenful earlier the reader is still above it.
+    layout({ a: -2400, b: -1100, c: 560 }, 200);
+    spy("a", "b", "c");
+    expect(currentLocator()).toBe("lesson:info-theory/entropy#b");
+
+    layout({ a: -2400, b: -1100, c: 560 }, 0);
+    await scrolled();
+
+    expect(currentLocator()).toBe("lesson:info-theory/entropy#c");
+  });
+
+  it("ignores a heading the page is not showing", () => {
+    // The ToC collects headings nested inside blocks, and a proof, a solution
+    // and an aside all render closed: an unrendered heading reports a top of
+    // zero, which would otherwise outrank the section actually on screen.
+    layout({ a: -2900, b: -800, c: 1600 }, 3000);
+    boxless("b");
+    spy("a", "b", "c");
+
+    expect(currentLocator()).toBe("lesson:info-theory/entropy#a");
+  });
+
+  it("follows the page moving under a reader who has not scrolled", async () => {
     layout({ a: 500, b: 2600, c: 5000 }, 6000);
     spy("a", "b", "c");
     expect(currentLocator()).toBe("lesson:info-theory/entropy#a");
@@ -199,12 +282,31 @@ describe("the spy on a lesson page", () => {
     // A figure above the fold settles into its full height: no scroll, no
     // resize, and the reader is in a different section than a moment ago.
     layout({ a: -2900, b: -800, c: 1600 }, 3000);
-    reflow();
+    await reflow();
 
     expect(currentLocator()).toBe("lesson:info-theory/entropy#b");
   });
 
-  it("stops reporting once the reader leaves the lesson", () => {
+  it("measures once for a gesture that scrolls and reflows together", async () => {
+    layout({ a: 500, b: 2600, c: 5000 }, 6000);
+    spy("a", "b", "c");
+    let reads = 0;
+    find("a").getBoundingClientRect = () => {
+      reads += 1;
+      return { top: -2900 } as DOMRect;
+    };
+
+    // Reading layout once per source would read it three times here, and each
+    // read is followed by a write that re-renders the ToC and the chat widget.
+    window.dispatchEvent(new Event("scroll"));
+    window.dispatchEvent(new Event("resize"));
+    await reflow();
+
+    expect(reads).toBe(1);
+    expect(currentLocator()).toBe("lesson:info-theory/entropy#a");
+  });
+
+  it("stops reporting once the reader leaves the lesson", async () => {
     layout({ a: 500, b: 2600, c: 5000 }, 6000);
     spy("a");
     act(() => render(<></>));
@@ -212,8 +314,8 @@ describe("the spy on a lesson page", () => {
     expect(currentLocator()).toBeNull();
     // A listener or an observer left behind would measure the page the reader
     // has left and put its position back.
-    act(() => window.dispatchEvent(new Event("scroll")));
-    reflow();
+    await scrolled();
+    await reflow();
 
     expect(currentLocator()).toBeNull();
   });
