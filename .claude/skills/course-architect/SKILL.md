@@ -51,7 +51,11 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
 
 4. **On completion:** run `npm run validate <slug>`; then report to the
    human: the outcomes, the module arc (one line each), the source list with
-   roles, and where the dossier lives. Remind them:
+   roles, and where the dossier lives. If the workflow result lists
+   `not_fully_read` sources (books the swarm could not find or could only
+   read second-hand), surface them PROMINENTLY — never silently omit a
+   source: the human will obtain copies from the publishers, and the read
+   can be re-run for them. Remind them:
    - curate `course.yaml` AND the per-lesson research briefs in the worktree
      (this is the main editorial checkpoint — the briefs steer every future
      lesson), including which planned visuals are `source:` real images and
