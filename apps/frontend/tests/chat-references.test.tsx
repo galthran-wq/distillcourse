@@ -3,7 +3,7 @@ import type { Lessons } from "@/lib/content/links";
 import { LESSONS, rendered, turn } from "./chat-fixture";
 
 function reply(text: string, lessons: Lessons = LESSONS): string {
-  return rendered([turn("assistant", { type: "text", text })], "ready", lessons);
+  return rendered([turn("assistant", { type: "text", text })], { lessons });
 }
 
 describe("a reference in a reply", () => {

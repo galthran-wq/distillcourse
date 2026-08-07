@@ -230,7 +230,18 @@ export default function Composer({ disabled, onSubmit }: Props) {
         {/* The field is the box, not the textarea: the send button sits in it
             beside the text rather than floating over the corner of it, and the
             border and the ring belong to the two of them together. */}
-        <div className={FIELD_BOX_CLASS}>
+        <div
+          className={FIELD_BOX_CLASS}
+          // The box is wider and taller than the text in it — its padding, the
+          // gap, and the column over the send button once the draft wraps. All
+          // of that reads as the field, and used to be textarea surface where a
+          // press put the caret; it still is.
+          onMouseDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            event.preventDefault();
+            field.current?.focus();
+          }}
+        >
           <textarea
             ref={field}
             value={text}

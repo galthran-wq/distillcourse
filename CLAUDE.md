@@ -73,13 +73,16 @@ Rules that override defaults:
   box and `FIELD_BOX_INPUT_CLASS` on the control inside it, which leaves the
   caller only geometry (the tutor's composer, whose send button is inside the
   field): the border, the fill and the ring are the box's, and the control
-  hands its ring over — every mono micro-cap
-  `LABEL_CLASS`. The chip a referenced passage is shown as carries
+  hands its ring over. Every mono micro-cap carries `LABEL_CLASS`.
+  The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
   `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown —
   all from `ui/styles.ts`, with only geometry left to the caller. Never
   hand-roll one of those in a page or a demo; the
-  focus ring is global (`@layer base`, so a utility can still override it).
+  focus ring is global (`@layer base`, so a utility can still override it) —
+  including the one such a box wears for the control in it, which is the same
+  rule in `globals.css` with `.field-box` added to its selector list, never a
+  second statement of the ring in a class string.
   Motion belongs to that layer too, and there is no animation library: an
   entrance is an `@starting-style` transition (`starting:` utilities, or a rule
   in `globals.css` where the element's geometry already lives there), nothing
