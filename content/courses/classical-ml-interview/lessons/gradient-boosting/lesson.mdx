@@ -1,0 +1,350 @@
+Gradient boosting fits each new tree to the negative gradient of the loss at the current predictions — for squared error, literally the residuals — turning boosting into gradient descent in function space. This chapter derives that statement, runs the algorithm by hand on five points, and prices out its control knobs. The route: the function-space view of boosting, the tree-as-gradient-step fix, the generic algorithm with a worked run, the pseudo-residual table for four losses, the coupled knobs (shrinkage, depth, subsampling, early stopping), and the closing comparison with random forests.
+
+## Boosting any loss: gradient descent in function space
+
+<Ref lesson="adaboost" /> ended with an equivalence: AdaBoost is forward-stagewise minimization of the exponential loss. That derivation is also a limitation. Every step of it used $y_i h(x_i) = \pm 1$ and the algebra of $e^{-yF}$, so the recipe is welded to **one loss and one task**: exponential loss, binary classification. Regression under squared or absolute error, robust regression under Huber loss, and probability estimation under log-loss all need boosting too, and none of them factors the way the exponential loss does.
+
+[Friedman (2001)](https://doi.org/10.1214/aos/1013203451) removed the weld with one observation: training only ever evaluates the model $F$ at the $n$ training inputs. The training loss
+
+$$
+J(F) = \sum_{i=1}^{n} L\bigl(y_i, F(x_i)\bigr)
+$$
+
+is therefore a function of just $n$ numbers $\bigl(F(x_1), \dots, F(x_n)\bigr)$. Treat those $n$ fitted values as the parameter vector, and the machinery of <Ref lesson="gradient-descent" /> applies verbatim: compute the gradient, step against it.
+
+### The gradient of the loss is computed per point
+
+A concrete computation first. Five points, squared loss $L = \tfrac12 (y - F)^2$:
+
+| $i$ | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- |
+| $x_i$ | 1 | 2 | 3 | 4 | 5 |
+| $y_i$ | 4 | 4 | 12 | 14 | 16 |
+
+Start every prediction at the mean, $F(x_i) = 10$. The partial derivative of $J$ with respect to the $i$-th coordinate touches one term of the sum:
+
+$$
+\frac{\partial J}{\partial F(x_i)} = \frac{\partial}{\partial F(x_i)} \tfrac12 \bigl(y_i - F(x_i)\bigr)^2 = -\bigl(y_i - F(x_i)\bigr),
+$$
+
+so the **negative gradient is the residual vector**: $-g = (4-10,\, 4-10,\, 12-10,\, 14-10,\, 16-10) = (-6, -6, 2, 4, 6)$. A gradient-descent step in this space says: lower the predictions at points 1–2, raise them at points 3–5, each in proportion to its error. "Fit the residuals", the folk description of boosting, is the special case of "step against the gradient" that squared loss produces.
+
+<Figure
+  src="./figures/function-space.svg"
+  alt="Two panels: gradient descent on loss contours in parameter space with the update theta minus eta grad J, and gradient boosting in function space where the n fitted values are the coordinates, blue arrows mark the per-point negative gradient, and an amber tree fit to those values gives the update F plus nu h"
+  caption="The same update in two spaces. In function space the coordinates are the n fitted values, and the step direction is a tree fit to the per-point negative gradient."
+/>
+
+<KeyFact>
+Gradient boosting is gradient descent whose parameter vector is the $n$ fitted values $F(x_i)$; the negative gradient has one component per training point, and for squared loss that component is exactly the residual $y_i - F(x_i)$.
+</KeyFact>
+
+## The finite-data fix: a tree approximates the gradient step
+
+The raw function-space update, $F(x_i) \leftarrow F(x_i) - \rho\, g_i$ at each training point, has an obvious flaw: it adjusts $n$ table entries and says **nothing about any other $x$**. Iterated to convergence it drives every training residual to zero, which is memorization, not learning; and the resulting "model" cannot predict at a new input at all.
+
+Friedman's fix constrains the step to come from a family of functions that do generalize. Instead of adding the exact negative-gradient vector, add the member of a base-learner class $\mathcal H$ (here: regression trees) closest to it in least squares (Friedman's Eq. 11):
+
+$$
+h_m = \arg\min_{h \in \mathcal H} \sum_{i=1}^{n} \bigl(r_{im} - h(x_i)\bigr)^2,
+\qquad
+r_{im} = -\left[\frac{\partial L\bigl(y_i, F(x_i)\bigr)}{\partial F(x_i)}\right]_{F = F_{m-1}} .
+$$
+
+The tree agrees with the gradient step at the training points as well as a tree can, and, being a tree, it is defined everywhere else too. A step size then comes from a one-dimensional *line search* on the actual loss, $\rho_m = \arg\min_\rho \sum_i L\bigl(y_i, F_{m-1}(x_i) + \rho\, h_m(x_i)\bigr)$ (Eq. 12), and the model advances: $F_m = F_{m-1} + \rho_m h_m$.
+
+<Definition title="pseudo-residual">
+The *pseudo-residual* of point $i$ at stage $m$ is the negative gradient of the loss at the current prediction, $r_{im} = -\partial L\bigl(y_i, F(x_i)\bigr) / \partial F(x_i)$ evaluated at $F = F_{m-1}$. For squared loss it equals the ordinary residual; for every other loss it is the quantity that plays the residual's role.
+</Definition>
+
+<Remark title="the tree is always fit by least squares">
+Step $h_m$ is a least-squares regression fit **regardless of the outer loss**: even when boosting absolute error or log-loss, the inner tree minimizes squared error against the pseudo-residuals. The outer loss enters at exactly two places: it generates the pseudo-residuals (what the tree is fit *to*), and it drives the line search (how far to step). Interviewers probe this: "you're minimizing absolute loss, so the trees minimize absolute error, right?" is a trap, and the correct answer is no.
+</Remark>
+
+### Per-leaf steps: the TreeBoost refinement
+
+A $J$-leaf regression tree is a sum of indicator functions, $h(x) = \sum_{j=1}^{J} \bar r_{jm}\, \mathbf 1(x \in R_{jm})$, with disjoint regions. One global multiplier $\rho_m$ is therefore needlessly coarse: the line search separates over leaves, and each leaf can take its own optimal step (Friedman §4.3, Eq. 18):
+
+$$
+\gamma_{jm} = \arg\min_{\gamma} \sum_{x_i \in R_{jm}} L\bigl(y_i, F_{m-1}(x_i) + \gamma\bigr).
+$$
+
+The tree keeps its structure from the least-squares fit; only its leaf *values* are recomputed against the true loss. For squared loss $\gamma_{jm}$ is the leaf mean of the residuals (the fit is already optimal); for absolute loss it is the leaf **median**; for log-loss it has no closed form and libraries take a single Newton step per leaf, the idea <Ref lesson="xgboost" /> builds its entire objective on.
+
+<KeyFact>
+One base learner, any differentiable loss: the tree is always a least-squares fit to the pseudo-residuals, and the loss re-enters only through those pseudo-residuals and the per-leaf line search.
+</KeyFact>
+
+## The algorithm, and two rounds by hand
+
+<Definition title="gradient tree boosting (ESL Algorithm 10.3)">
+Given data $(x_i, y_i)_{i=1}^n$, a differentiable loss $L$, iterations $M$, and learning rate $\nu$:
+
+1. Initialize with the best constant: $F_0(x) = \arg\min_{\gamma} \sum_i L(y_i, \gamma)$.
+2. For $m = 1, \dots, M$:
+   1. Compute pseudo-residuals $r_{im} = -\bigl[\partial L(y_i, F(x_i)) / \partial F(x_i)\bigr]_{F = F_{m-1}}$.
+   2. Fit a regression tree to $\{(x_i, r_{im})\}$ by least squares, giving leaves $R_{1m}, \dots, R_{Jm}$.
+   3. For each leaf, $\gamma_{jm} = \arg\min_\gamma \sum_{x_i \in R_{jm}} L\bigl(y_i, F_{m-1}(x_i) + \gamma\bigr)$.
+   4. Update $F_m(x) = F_{m-1}(x) + \nu \sum_j \gamma_{jm}\, \mathbf 1(x \in R_{jm})$.
+3. Output $F_M$.
+</Definition>
+
+The initialization is part of the algorithm, not a formality: the best constant is the **mean** for squared loss, the **median** for absolute loss, and the **log-odds of the base rate** for classification. Quoting "initialize at zero" for an asymmetric loss is a standard interview slip.
+
+<Example title="two rounds on five points, stumps, ν = 0.5">
+The five-point dataset above, squared loss, depth-1 trees (stumps from <Ref lesson="decision-trees" />), $\nu = 0.5$.
+
+**Initialize.** $F_0 = \bar y = 10$. Pseudo-residuals $r_1 = (-6, -6, 2, 4, 6)$; training MSE $= 128/5 = 25.6$.
+
+**Round 1: fit.** Scan the stump splits on the residuals: $x < 2.5$ gives leaf means $-6$ and $+4$ with SSE $= 0 + (2{-}4)^2 + 0 + (6{-}4)^2 = 8$; the alternatives score $83$ ($x<1.5$), $44.7$ ($x<3.5$), $83$ ($x<4.5$). Take $h_1$: value $-6$ for $x < 2.5$, else $+4$. For squared loss the leaf means are already the per-leaf line-search optima $\gamma_{j1}$.
+
+**Round 1: update.** $F_1 = F_0 + 0.5\, h_1 = (7, 7, 12, 12, 12)$. New pseudo-residuals: $r_2 = (4{-}7,\, 4{-}7,\, 0,\, 2,\, 4) = (-3, -3, 0, 2, 4)$. MSE $= 38/5 = 7.6$.
+
+**Round 2: fit.** On $r_2$, the splits $x<2.5$ (leaves $-3$, $+2$) and $x<3.5$ (leaves $-2$, $+3$) tie at SSE $= 8$; ties are broken arbitrarily; take $x < 2.5$.
+
+**Round 2: update.** $F_2 = F_1 + 0.5\, h_2 = (5.5,\, 5.5,\, 13,\, 13,\, 13)$, residuals $(-1.5, -1.5, -1, 1, 3)$, MSE $= 15.5/5 = 3.1$.
+
+The loss trajectory $25.6 \to 7.6 \to 3.1$ is monotone, as gradient steps with a line search must be; shrinkage deliberately leaves most of each round's residual on the table for later rounds to claim. Exercise 2 runs the same mechanics on a fresh dataset.
+</Example>
+
+<FigureSequence
+  name="stages"
+  alt="Five frames of boosting on a one-dimensional noisy dataset, each with a model panel above and a residual panel below: the flat mean fit with large structured residuals; a stump fit to those residuals; the updated fit after one shrunken stump with smaller residuals; the fit after ten rounds; the fit after one hundred rounds hugging the data with residuals reduced to noise"
+  caption="One boosting run, watched through both panels: every round fits a stump to the bottom panel and adds ν times it to the top panel. MSE falls 6.50 → 4.26 → 1.31 → 0.11."
+/>
+
+<Task>
+Step through the five frames watching the residual panel only: the structure (left half low, right half high) drains out of it round by round, until at $m = 100$ nothing but noise remains. Confirm in frame 3 that the fit stepped toward the stump by less than the stump's full height: that gap is the shrinkage $\nu = 0.3$.
+</Task>
+
+### Classification: boost the log-odds, sigmoid at the end
+
+Nothing above assumed regression. For binary labels $y \in \{0, 1\}$, let $F$ be the **log-odds score** and use the cross-entropy loss of <Ref lesson="logistic-regression" />, $L = -y F + \log(1 + e^{F})$ with $p = \sigma(F)$. The recipe is unchanged: initialize at the log-odds of the base rate, $F_0 = \log\frac{\bar p}{1 - \bar p}$; each round fits a regression tree (not a classification tree; the targets $r_i$ are real numbers) to the pseudo-residuals; leaf values take one Newton step $\gamma_j = \sum_{\text{leaf}} r_i \,/\, \sum_{\text{leaf}} p_i(1 - p_i)$; and the final probability is $\hat p(x) = \sigma\bigl(F_M(x)\bigr)$. The trees vote in log-odds space, exactly where logistic regression's linear score lives, and the sigmoid is applied once, at the end.
+
+## One table, four losses: what the pseudo-residual becomes
+
+Differentiating each loss in $F$ gives the lesson's central table (ESL Table 10.2):
+
+| loss | $L(y, F)$ | pseudo-residual $-\partial L / \partial F$ | initialization $F_0$ |
+| --- | --- | --- | --- |
+| squared | $\tfrac12 (y - F)^2$ | $y - F$ | mean |
+| absolute | $\lvert y - F \rvert$ | $\operatorname{sign}(y - F)$ | median |
+| Huber | quadratic near 0, linear beyond $\delta$ | $y - F$ clipped to $[-\delta, \delta]$ | median-based |
+| deviance ($y \in \{0,1\}$) | $-yF + \log(1 + e^F)$ | $y - p$, $\;p = \sigma(F)$ | $\log\frac{\bar p}{1 - \bar p}$ |
+
+<Figure
+  src="./figures/pseudo-residuals.svg"
+  alt="Four small panels plotting the pseudo-residual for squared, absolute, Huber, and deviance losses: a straight line through the origin, a step function at plus and minus one, a line clipped at plus and minus delta, and the curve one minus sigma of F bounded between zero and one"
+  caption="The shape of the pull each loss exerts per point: unbounded and linear, sign-only, clipped, and probability-bounded."
+/>
+
+The shapes are the robustness story. Squared loss pulls proportionally to the error, so one 100-unit outlier tugs as hard as fifty 2-unit points: outliers own the early trees. Absolute loss caps every point's pull at $\pm 1$; Huber interpolates. The deviance pseudo-residual $y - p$ is bounded in $(-1, 1)$, which is one concrete reason boosted log-loss degrades more gracefully under label noise than AdaBoost's exponential weights (the failure mode measured in <Ref lesson="adaboost" />).
+
+<KeyFact>
+For log-loss the pseudo-residual is $y - p$: the same gradient signal as logistic regression's $(y - p)x$, with the tree replacing the fixed feature vector $x$ as the thing that decides where the correction applies.
+</KeyFact>
+
+<Aside>
+The AnyBoost view stitches both boosting chapters together. Choosing the base learner that maximizes $\sum_i r_i h(x_i)$, the inner product with the negative gradient, is gradient descent restricted to a function family; for classes closed under scaling this matches the least-squares projection up to constants. Under exponential loss the pseudo-residual magnitudes are $e^{-y_i F(x_i)}$, AdaBoost's weights, so [Weinberger's CS4780 lecture 19](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote19.html) derives AdaBoost and gradient boosting as the same algorithm instantiated at two losses. Gradient boosting's practical edge is that it never needs the loss to factor: any differentiable $L$ supplies pseudo-residuals.
+</Aside>
+
+## The knobs and their couplings
+
+Four hyperparameters control a gradient-boosting model, and none of them tunes independently of the others.
+
+### Shrinkage: small ν plus large M beats large steps
+
+Friedman (§5) scales each round's contribution by a *learning rate* $\nu \in (0, 1]$ (step 2.4 of the algorithm) and measured the consequence on simulated regression data: with $\nu = 1$ the test error bottoms out early, around $M \approx 15$ at error $\approx 0.48$, then **rises** as further full-strength trees chase noise; with $\nu = 0.125$ the minimum arrives late, $M = 146$, but reaches $\approx 0.32$. Smaller steps explore the function space more finely and leave the search less committed to any single tree's mistakes.
+
+<Figure
+  src="./figures/nu-frontier.svg"
+  alt="Test error versus boosting iterations for learning rates 1, 0.25, and 0.125: the largest rate reaches a shallow minimum near 0.48 at about 15 iterations then climbs, while smaller rates descend more slowly to lower minima, 0.32 at 146 iterations for the smallest"
+  caption="The ν–M frontier, styled after Friedman's Fig. 1 with his Table 1 numbers: smaller ν reaches a lower minimum, later. A ν quoted without its M is meaningless."
+/>
+
+The two knobs form one dial: halving $\nu$ roughly doubles the $M$ needed, so the practical recipe is **fix $\nu$ small** ($0.01$–$0.1$), set $M$ large, and let early stopping choose the endpoint. Compute cost scales linearly in $M$, which is the only argument for larger $\nu$.
+
+<Demo
+  name="BoostingStagesExplorer"
+  caption="A 1D boosting run under your control: iteration slider, residual panel, and a ν toggle (0.1 vs 1.0) at fixed M."
+/>
+
+<Task>
+Set $\nu = 1.0$ and slide $M$ up: the fit snaps to the data fast and then roughens as late trees fit noise. Reset to $\nu = 0.1$ and repeat: the same $M$ buys a smoother fit that is still improving. Find the iteration where the $\nu = 1.0$ run's residual panel stops shrinking.
+</Task>
+
+### Tree depth caps the interaction order
+
+A stump is a function of one feature, so a sum of stumps is an **additive model**: $F(x) = \sum_j f_j(x_j)$, with each feature contributing independently. No number of boosting rounds changes that. A term coupling two features, like $x_1 x_2$, is expressible only by a tree that splits on both along one path, which requires depth $\ge 2$ ($J \ge 3$ leaves). In general a $J$-leaf tree involves at most $J - 1$ splitting variables, so the ensemble's ANOVA expansion stops at interaction order $J - 1$ (Friedman §7).
+
+<Figure
+  src="./figures/depth-interaction.svg"
+  alt="Left: two stumps on x1 and x2 sum to a four-cell surface whose cell values are forced to be row effect plus column effect. Right: one depth-two tree splits x1 and then x2 inside one branch, producing a three-leaf surface where x2 matters only when x1 is large, a genuine interaction"
+  caption="Why depth is a modeling statement: stump ensembles can only add per-feature effects; one extra level of depth buys joint effects of feature pairs."
+/>
+
+Depth is therefore a statement about the data, not a generic capacity dial: ESL's guidance is that $4 \le J \le 8$ works well in practice ("stumps and a bit"), with real interaction orders above 2 rare. This is also half of the answer to "why shallow trees here but deep trees in forests"; the other half is in the closing section.
+
+### Subsampling and stopping: the remaining two knobs
+
+**Row subsampling.** [Friedman (2002)](https://doi.org/10.1016/S0167-9473(01)00065-2) found that fitting each round's tree on a random **half of the rows** (drawn without replacement, fraction $\eta \approx 0.5$) improves test error on most datasets while halving the cost per round: *stochastic gradient boosting*. The randomization decorrelates successive trees, importing a diluted version of the bootstrap idea from <Ref lesson="bagging-random-forests" /> into the sequential world; modern libraries add column subsampling in the same spirit.
+
+**Early stopping.** $M$ is a genuine complexity parameter: past the validation minimum, additional rounds keep lowering training loss while test error climbs. The protocol is the one from <Ref lesson="cross-validation-bootstrap" />: hold out a validation set (or cross-validate), track error per round, and keep the $F_{M^*}$ at the minimum. The model at every intermediate $M$ is available for free, since boosting is additive.
+
+<Figure
+  src="./figures/iterations-overfit.svg"
+  alt="Test error versus ensemble size for a random forest and a boosted model: the forest curve decreases monotonically to a plateau, while the boosting curve dips below it to a minimum marked as the early-stop point and then rises as iterations continue"
+  caption="The structural contrast: a forest's B is not a complexity parameter and more trees only converge; boosting's M is one, and past the validation minimum more rounds overfit."
+/>
+
+<KeyFact>
+The knobs are coupled: $\nu$ trades against $M$ (small $\nu$, large $M$, early-stopped is the default), depth sets the interaction order rather than raw capacity, and subsampling buys decorrelation plus speed. Quoting any one setting without the others answers no interview question.
+</KeyFact>
+
+## Gradient boosting versus random forests
+
+Both ensembles combine trees; they are otherwise opposite designs, and "compare them" is the module's canonical closing question.
+
+| axis | random forest | gradient boosting |
+| --- | --- | --- |
+| training | parallel: trees independent given the data | sequential: tree $m$ fits the gradient left by $1..m{-}1$ |
+| base tree | deep, low-bias, high-variance | shallow ($J \approx 4$–$8$), high-bias |
+| error term attacked | variance: $\rho\sigma^2 + (1-\rho)\sigma^2/B$ | bias: each round adds expressive power |
+| ensemble-size knob | $B$ only converges; never overfits | $M$ is a complexity parameter; early-stop it |
+| tuning burden | light: $m \approx \sqrt p$ defaults work | real: $\nu$, $M$, depth, subsample all interact |
+| typical standing | robust baseline, hard to break | state of the art on tabular data, easier to break |
+
+The division of labor explains the base-tree choice on both sides. Averaging leaves bias untouched, so a forest must start from low-bias (deep) trees and spend the ensemble on variance; boosting accumulates capacity across rounds, so each tree can stay small, and depth is reserved for the interaction order the data actually needs. Both families inherit the interpretability toolkit, split-gain feature importances and partial dependence plots (Friedman §8), with the same caveats as in <Ref lesson="bagging-random-forests" />.
+
+## Exercises
+
+<Exercise>
+The set piece: "why is it called *gradient* boosting? Derive the connection for squared loss." Write the training loss as a function of the $n$ fitted values, compute its gradient, state the exact function-space update, and explain where the tree enters and why it must.
+
+<Solution>
+Treat the fitted values $\mathbf F = (F(x_1), \dots, F(x_n))$ as the parameter vector. The training loss is $J(\mathbf F) = \sum_i \tfrac12 (y_i - F(x_i))^2$, and since each term touches one coordinate,
+
+$$
+\frac{\partial J}{\partial F(x_i)} = -(y_i - F(x_i)),
+$$
+
+so the negative gradient is the residual vector $\mathbf r = \mathbf y - \mathbf F$. Exact gradient descent in this space is $F(x_i) \leftarrow F(x_i) + \rho\, (y_i - F(x_i))$: nudge every prediction toward its target.
+
+That update is defined only at the $n$ training points and generalizes to no new $x$; iterated, it merely memorizes the training set. The fix is to restrict the step direction to a family of functions: fit a regression tree $h_m$ to the residuals by least squares (the closest tree to the negative gradient) and update $F_m = F_{m-1} + \nu\, h_m$ everywhere. Each boosting round is therefore one approximate gradient-descent step on the training loss, taken inside the space of trees: hence "gradient" boosting. For a general differentiable loss, the residuals are replaced by the pseudo-residuals $r_i = -\partial L(y_i, F(x_i))/\partial F(x_i)$, and the same derivation goes through.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mechanics by hand: run three rounds of gradient boosting with stumps and $\nu = 0.5$ under squared loss on
+
+| $x_i$ | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- |
+| $y_i$ | 3 | 5 | 13 | 13 | 16 |
+
+Give $F_0$, each round's pseudo-residuals, the best stump (check all four splits), the updated model, and the final predictions $F_3$.
+
+<Solution>
+**Initialize.** $F_0 = \bar y = 50/5 = 10$. Pseudo-residuals $r = y - F_0 = (-7, -5, 3, 3, 6)$.
+
+**Round 1.** Stump SSEs: $x<1.5$: leaves $-7$, $1.75$, SSE $66.75$; $x<2.5$: leaves $-6$, $4$, SSE $(1+1) + (1+1+4) = 8$; $x<3.5$: leaves $-3$, $4.5$, SSE $60.5$; $x<4.5$: leaves $-1.5$, $6$, SSE $83$. Best: $x < 2.5$, $h_1 = (-6 \mid +4)$. Update: $F_1 = F_0 + 0.5\,h_1 = (7, 7, 12, 12, 12)$.
+
+**Round 2.** $r = y - F_1 = (-4, -2, 1, 1, 4)$. SSEs: $x<1.5$: $18$; $x<2.5$: leaves $-3$, $2$, SSE $(1+1)+(1+1+4) = 8$; $x<3.5$: $17.2$; $x<4.5$: $18$. Best: $x<2.5$ again, $h_2 = (-3 \mid +2)$: shrinkage left the same structure profitable a second time. $F_2 = (5.5, 5.5, 13, 13, 13)$.
+
+**Round 3.** $r = y - F_2 = (-2.5, -0.5, 0, 0, 3)$. SSEs: $x<1.5$: $7.69$; $x<2.5$: $8$; $x<3.5$: $8$; $x<4.5$: leaves $-0.75$, $3$, SSE $3.0625 + 0.0625 + 0.5625 + 0.5625 + 0 = 4.25$. Best: $x < 4.5$, $h_3 = (-0.75 \mid +3)$: the ensemble finally isolates the underpredicted point $x = 5$.
+
+**Final model.** $F_3 = F_2 + 0.5\,h_3 = (5.125,\ 5.125,\ 12.625,\ 12.625,\ 14.5)$. Training MSE fell monotonically, $25.6 \to 7.6 \to 3.1 \to 1.41$: each round is a descent step with a line-searched leaf value, so the training loss cannot increase.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="logistic-regression" />: "what is the pseudo-residual for log-loss? Show your work." Starting from $L = -\bigl[y \log p + (1-y)\log(1-p)\bigr]$ with $p = \sigma(F)$, derive $-\partial L/\partial F$ and connect the result to logistic regression's gradient.
+
+<Solution>
+Substitute $\log p = F - \log(1 + e^F)$ and $\log(1-p) = -\log(1 + e^F)$ (both from $p = \sigma(F) = e^F/(1+e^F)$):
+
+$$
+L = -yF + \log(1 + e^F).
+$$
+
+Differentiate in $F$: $\partial L/\partial F = -y + \frac{e^F}{1 + e^F} = -y + \sigma(F) = p - y$, so the pseudo-residual is
+
+$$
+r = -\frac{\partial L}{\partial F} = y - p .
+$$
+
+Alternatively, by the chain rule through $p$: $\partial L/\partial p = -(y/p) + (1-y)/(1-p)$ and $\partial p/\partial F = p(1-p)$; the product telescopes to $p - y$, the same cancellation as in the logistic-regression chapter.
+
+Connection: logistic regression's gradient per example is $(y - p)\,x$: the same error signal $y - p$, steered by the fixed feature vector $x$. Gradient boosting keeps the signal and replaces the steering: a tree is fit to the $y - p$ values and decides, adaptively, which region of input space receives the correction. Boosted classification is logistic regression whose features are learned one tree at a time.
+</Solution>
+</Exercise>
+
+<Exercise>
+"You can set the learning rate to 0.01 or 0.3. What are the trade-offs, and what else must change with it?" Give the full answer, including the numbers this chapter quotes and the failure mode of quoting $\nu$ alone.
+
+<Solution>
+$\nu$ scales each round's contribution, so it trades directly against the iteration count: roughly, halving $\nu$ doubles the $M$ needed to reach the same training fit. The generalization asymmetry is what makes the choice non-neutral: Friedman's simulation had $\nu = 1$ bottom out near test error $0.48$ around $M \approx 15$ and then rise, while $\nu = 0.125$ reached $\approx 0.32$ at $M = 146$: smaller steps found a strictly better minimum, later. Small $\nu$ costs compute (time per round is constant, so total cost scales with $M$) and buys a lower, flatter test-error curve that is also more forgiving to stop late.
+
+With $\nu = 0.01$: expect thousands of rounds, mandatory early stopping on a validation set, and the best final accuracy. With $\nu = 0.3$: fast, usable as a default in libraries, but the validation minimum is sharper and typically higher.
+
+The co-tuning point: $\nu$ and $M$ form one effective dial, so "we use $\nu = 0.05$" without an $M$ (or an early-stopping rule) specifies nothing; and comparing two learning rates at a fixed small $M$ biases the comparison toward the larger $\nu$. The standard protocol is $\nu \in [0.01, 0.1]$, $M$ large, $M^*$ chosen on validation error.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="bias-variance" /> and <Ref lesson="bagging-random-forests" />: "why does boosting use shallow trees while random forests use deep ones?" Answer with both the error-decomposition argument and the interaction-order argument.
+
+<Solution>
+Error decomposition: averaging $B$ identically distributed trees leaves bias exactly unchanged and reduces only variance ($\rho\sigma^2 + (1-\rho)\sigma^2/B$), so a forest must begin with trees whose problem *is* variance: deep, low-bias trees. Bagged stumps would average to a stump-shaped underfit. Boosting is the mirror image: the additive model $F_M = F_0 + \nu\sum_m h_m$ grows its expressive power across rounds, so bias is repaired by the sum, not by any single tree; each tree can and should be weak, because the ensemble's complexity (and overfitting risk) lives in $M$, which is separately controlled by early stopping.
+
+Interaction order: a boosted ensemble of $J$-leaf trees is capped at interaction order $J - 1$: stumps yield a purely additive model, depth 2 adds pairwise effects, and so on. Depth in boosting is thus a targeted modeling choice (how many features may act jointly), and real datasets rarely need order above a handful, hence $J \approx 4$–$8$. A forest has no additive accumulation to lean on: each tree alone must capture whatever interactions exist, which again demands depth.
+</Solution>
+</Exercise>
+
+<Exercise>
+"How does a gradient-boosting model produce probabilities?" Walk the full pipeline for a dataset with 200 negatives and 50 positives, ending with the predicted probability at a point where the trees sum to $0.9$.
+
+<Solution>
+The model boosts the log-odds score $F$, not the probability. Initialization: the base rate is $\bar p = 50/250 = 0.2$, so $F_0 = \log\frac{0.2}{0.8} = \log \tfrac14 \approx -1.386$, so the model starts by predicting the prior for everyone. Each round computes pseudo-residuals $r_i = y_i - p_i$ with $p_i = \sigma(F(x_i))$, fits a regression tree to them, sets each leaf value by one Newton step $\gamma_j = \sum r_i / \sum p_i(1-p_i)$, and adds $\nu$ times the tree to $F$. All accumulation happens on the log-odds scale.
+
+At prediction time the trees' contributions sum to $0.9$ here, so $F(x) = -1.386 + 0.9 = -0.486$ and
+
+$$
+\hat p(x) = \sigma(-0.486) = \frac{1}{1 + e^{0.486}} \approx 0.381 .
+$$
+
+The sigmoid is applied exactly once, at the end. Two follow-ups worth pre-empting: initializing at $F_0 = 0$ would silently assert $\bar p = 0.5$, wrong for this 4:1 imbalanced set and slow to unlearn; and the scores being log-odds is what makes the per-leaf Newton denominators $p(1-p)$ appear.
+</Solution>
+</Exercise>
+
+<Exercise>
+"Your GBM's validation error starts rising after iteration 300 while training error keeps falling. What is happening, and what do you do? Would a random forest behave the same way?" Include the protocol connection to <Ref lesson="cross-validation-bootstrap" />.
+
+<Solution>
+Diagnosis: overfitting in $M$. Each round keeps taking descent steps on the *training* loss, so training error falls by construction; past the point where the remaining pseudo-residuals are mostly noise, new trees fit that noise and generalization degrades. This is expected behavior, not a bug: $M$ is a complexity parameter.
+
+Actions, in order: keep the iteration-300 model (boosting is additive, so $F_{300}$ is already sitting inside $F_M$); institute early stopping (stop when validation error fails to improve for a patience window) rather than a fixed $M$; if accuracy needs to improve rather than merely stop degrading, lower $\nu$ and re-run with a larger budget, add row/column subsampling, or shrink tree depth. If the validation set is small enough that the minimum's location is noisy, choose $M^*$ by cross-validation instead of a single split, per the protocols of the cross-validation chapter.
+
+A random forest would not behave this way: its trees are fit independently to bootstrap resamples, nothing chases residuals, and adding trees only converges the average; $B$ is not a complexity parameter. The rising-validation-curve signature is specific to sequential, loss-chasing ensembles.
+</Solution>
+</Exercise>
+
+<Exercise>
+"You're boosting with absolute loss $L = \lvert y - F \rvert$. The library still fits each tree by least squares — is that a bug?" Explain exactly where the absolute loss enters the algorithm, including the initialization and the leaf values.
+
+<Solution>
+Not a bug: it is the algorithm. The absolute loss enters at three places and the tree-fitting step is deliberately not one of them.
+
+First, initialization: $F_0 = \arg\min_\gamma \sum_i \lvert y_i - \gamma \rvert$ is the **median** of the $y_i$, not the mean. Second, the pseudo-residuals: $-\partial \lvert y - F \rvert / \partial F = \operatorname{sign}(y - F)$, a vector of $\pm 1$'s: every point pulls with the same unit strength, which is precisely the robustness to outliers. Third, the leaf values: the per-leaf line search $\gamma_j = \arg\min_\gamma \sum_{\text{leaf}} \lvert y_i - F(x_i) - \gamma \rvert$ is the **median of the residuals in the leaf**.
+
+The tree in between is a least-squares regression fit to the $\pm 1$ pseudo-residual values: its job is only to find a partition of the input space that separates positive pulls from negative pulls, i.e. to approximate the gradient direction within the tree family. The outer loss has already been fully encoded in what the tree is fit to and in what the leaves will output. Presenting "fit the residuals by the outer loss" as the general algorithm is the classic wrong answer; the general objects are the pseudo-residuals and the per-leaf line search.
+</Solution>
+</Exercise>
+
+<References>
+1. J. H. Friedman, "Greedy Function Approximation: A Gradient Boosting Machine," *Annals of Statistics* 29(5), 2001 — §2: optimization in function space; Eqs. 11–12 and Algorithm 1: the least-squares fit to the negative gradient plus line search; §4.1–4.3: LS_Boost, LAD, and the per-leaf TreeBoost step (Eq. 18); §4.5: logistic boosting; §5: shrinkage (Fig. 1, Table 1); §7: tree size as interaction order; §8: importance and partial dependence. https://doi.org/10.1214/aos/1013203451
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §10.9–10.10: Algorithm 10.3 and Table 10.2 (the gradients table); §10.11: right-sized trees and interaction order; §10.12: shrinkage and subsampling; §10.13: interpretation. https://hastie.su.domains/ElemStatLearn/
+3. J. H. Friedman, "Stochastic Gradient Boosting," *Computational Statistics & Data Analysis* 38(4), 2002 — row subsampling at fraction ≈ 0.5 and its accuracy gains. https://doi.org/10.1016/S0167-9473(01)00065-2
+4. K. Q. Weinberger, "Lecture 19: Boosting," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — boosting as gradient descent in function space (AnyBoost) and the GBRT reduction to fitting trees on ∂ℓ/∂H. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote19.html
+5. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §18.5: boosting, including the gradient-boosting and functional-gradient-descent framing. https://probml.github.io/pml-book/book1.html
+6. J. Starmer, "Gradient Boost Part 1–2 (Regression)" and "Part 3–4 (Classification)," StatQuest (YouTube), 2019 — the average-then-residual-trees mechanics and the log-odds leaf computations this chapter's worked examples parallel.
+</References>

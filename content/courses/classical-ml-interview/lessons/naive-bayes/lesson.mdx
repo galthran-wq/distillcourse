@@ -1,0 +1,453 @@
+Naive Bayes assumes features are conditionally independent given the class; the assumption is false almost everywhere, and the classifier works anyway. This chapter builds the classifier from Bayes' rule plus that single assumption, runs a spam filter by hand down to the final posterior, and repairs the zero-count failure with Laplace smoothing. The route: the parameter explosion that forces the assumption, the worked spam example, maximum-likelihood parameters as counts and their smoothed MAP versions, the three event models, the proof that naive Bayes is a linear classifier, and the regimes where it is the right tool.
+
+## The modeling problem: p(x | y) needs 2^d − 1 numbers
+
+Bayes' rule turns class-conditional distributions into a classifier. For a feature vector $x = (x_1, \dots, x_d)$ and label $y$,
+
+$$
+p(y \mid x) = \frac{p(x \mid y)\, p(y)}{p(x)},
+\qquad
+\hat y = \arg\max_{y}\; p(x \mid y)\, p(y),
+$$
+
+where the denominator $p(x)$ is dropped because it is the same for every class. A classifier built this way is *generative*: it models how each class produces feature vectors, via the class-conditional $p(x \mid y)$ and the prior $p(y)$, and inverts the model with Bayes' rule. <Ref lesson="logistic-regression" /> is the *discriminative* alternative, modeling $p(y \mid x)$ directly; the trade-off between the two is the subject of <Ref lesson="lda-gda" />.
+
+The obstacle is the size of $p(x \mid y)$. Represent a message by binary word-presence features. With $d = 3$ vocabulary words the table of $p(x \mid y = \text{spam})$ has $2^3 = 8$ rows and $7$ free numbers. With $d = 30$ it has $2^{30} - 1 = 1{,}073{,}741{,}823$ free numbers per class. With a realistic vocabulary of 50,000 words the outcome space has $2^{50000}$ configurations ([CS229 notes](https://cs229.stanford.edu/main_notes.pdf), §4.2): no corpus visits more than a vanishing fraction of the rows, so almost every row's count is zero and the table is **unlearnable**, not merely large.
+
+<Figure
+  src="./figures/paramcount.svg"
+  alt="Left: the full joint table for p(x|y) with 2^d rows, crossed out, tallying about a billion free numbers per class at d = 30. Right: d small per-feature tables under the naive factorization, tallying 30 numbers per class"
+  caption="What the assumption buys: the exponential joint table collapses into d one-dimensional tables."
+/>
+
+<Definition title="conditional independence">
+Random variables $X$ and $Y$ are **conditionally independent** given $Z$ if $p(x, y \mid z) = p(x \mid z)\, p(y \mid z)$ for all values, equivalently $p(x \mid y, z) = p(x \mid z)$: once $Z$ is known, observing $Y$ changes nothing about $X$.
+</Definition>
+
+Naive Bayes applies this assumption to every pair of features, given the class. The chain rule factors any class-conditional exactly; the assumption deletes the conditioning on earlier features:
+
+$$
+p(x \mid y) = \prod_{j=1}^{d} p(x_j \mid x_1, \dots, x_{j-1},\, y)
+\;\overset{\text{NB}}{=}\; \prod_{j=1}^{d} p(x_j \mid y).
+$$
+
+For binary features the right-hand side needs $d$ numbers per class: $2d + 1$ parameters in total for two classes including the prior, against $2(2^d - 1) + 1$ for the full model. Linear in $d$, down from exponential.
+
+<Definition title="naive Bayes classifier">
+Given class priors $p(y)$ and per-feature class-conditionals $p(x_j \mid y)$, the **naive Bayes** prediction for input $x$ is
+
+$$
+\hat y = \arg\max_{c}\; p(y = c) \prod_{j=1}^{d} p(x_j \mid y = c).
+$$
+</Definition>
+
+The factorization has a generative story ([Weinberger, CS4780 lecture 5](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote05.html)): flip a biased coin to pick the class, then generate each feature from that class's own one-dimensional distribution, independently. For text: each class owns a loaded $|V|$-sided die, rolled once per token position.
+
+<Figure
+  src="./figures/generative.svg"
+  alt="Graphical model with a class node y fanning out to feature nodes x1 through xd and no edges between the features, above the factored formula p(y) times the product of p(xj given y) with colors binding node to factor"
+  caption="The generative story: one arrow per feature, no edges between features. Each node is one factor of the model."
+/>
+
+<Remark title="conditional, not marginal, independence">
+The statement "naive Bayes assumes the features are independent" is wrong as written, and interviewers probe exactly this. The assumption is independence *given the class*; marginally the features may be arbitrarily correlated. In a mail corpus, `win` and `prize` co-occur far more often than independence predicts, because both are driven by the spam class; within the spam class alone, seeing one may say little extra about the other. Mixtures of classes create marginal correlation out of conditionally independent parts.
+</Remark>
+
+<KeyFact>
+The naive assumption replaces one $d$-dimensional density per class with $d$ one-dimensional ones, cutting the parameter count from exponential to linear in $d$; that reduction is the entire method.
+</KeyFact>
+
+## A spam filter by hand: counts, products, verdict
+
+Six training messages, preprocessed by lowercasing and keeping only the six vocabulary words $V = \{$`win`, `money`, `prize`, `now`, `meeting`, `report`$\}$:
+
+| message | tokens kept | label |
+| --- | --- | --- |
+| "Win money now!!!" | win, money, now | spam |
+| "Win a prize now" | win, prize, now | spam |
+| "Win money, prize inside" | win, money, prize | spam |
+| "Meeting now?" | meeting, now | ham |
+| "Money for the report" | money, report | ham |
+| "If we win: meeting now" | win, meeting, now | ham |
+
+Priors from label frequencies: $p(\text{spam}) = p(\text{ham}) = 3/6 = 1/2$. Per-class token counts, with each word's probability estimated as its share of the class's tokens (spam has 9 tokens, ham has 7); the next section shows these relative frequencies are exactly the maximum-likelihood estimates:
+
+| word | count in spam | $\phi_{j \mid \text{spam}}$ | count in ham | $\phi_{j \mid \text{ham}}$ |
+| --- | --- | --- | --- | --- |
+| win | 3 | 3/9 | 1 | 1/7 |
+| money | 2 | 2/9 | 1 | 1/7 |
+| prize | 2 | 2/9 | 0 | 0 |
+| now | 2 | 2/9 | 2 | 2/7 |
+| meeting | 0 | 0 | 2 | 2/7 |
+| report | 0 | 0 | 1 | 1/7 |
+| total | 9 | 1 | 7 | 1 |
+
+A new message arrives: **"win money now"**. Score each class by prior times the product of its word probabilities (this is the joint $p(x, y)$, the posterior's numerator):
+
+$$
+\text{spam:}\quad \tfrac12 \cdot \tfrac{3}{9} \cdot \tfrac{2}{9} \cdot \tfrac{2}{9} = \tfrac{12}{1458} = 0.00823,
+\qquad
+\text{ham:}\quad \tfrac12 \cdot \tfrac{1}{7} \cdot \tfrac{1}{7} \cdot \tfrac{2}{7} = \tfrac{2}{686} = 0.00292.
+$$
+
+Normalizing restores the posterior, since $p(x)$ is the sum of the two joint scores:
+
+$$
+p(\text{spam} \mid x) = \frac{0.00823}{0.00823 + 0.00292} = 0.738 .
+$$
+
+Verdict: spam, with probability $0.74$.
+
+{/* fig SpamPosteriorSteps: 4-frame sequence of the spam computation on one shared layout. Frame 1: the six-message corpus (token lists with spam/ham labels, spam rows tinted amber, ham blue) and the two priors p(spam)=p(ham)=1/2. Frame 2: the corpus collapses into the two count tables (win 3, money 2, prize 2, now 2 | win 1, money 1, now 2, meeting 2, report 1) and each count divides by the class token total, 9 and 7, becoming the phi tables; highlight one cell (win: 3 -> 3/9) to show the binding. Frame 3: test message "win money now" appears; under each class the product is assembled term by term with each factor color-linked to its phi-table cell: 1/2 * 3/9 * 2/9 * 2/9 = 0.00823 (amber) and 1/2 * 1/7 * 1/7 * 2/7 = 0.00292 (blue). Frame 4: normalization: a single horizontal bar of length 0.00823+0.00292 split amber 0.738 / blue 0.262, with 0.00823/(0.00823+0.00292)=0.738 in KaTeX and the verdict SPAM boxed. One thing changes per frame; keep tables pixel-identical across frames 2-4. */}
+<FigureSequence
+  name="SpamPosteriorSteps"
+  alt="Four frames: the six-message corpus with priors, counts becoming probability tables, the two products assembled factor by factor for the test message, and the normalization bar giving posterior 0.738 spam"
+  caption="The full pipeline: corpus → counts → probabilities → products → posterior. Every number in the verdict traces back to a count."
+/>
+
+<Task>
+Step through the four frames, then classify the message "money report now" by hand with the same tables: the scores are $\tfrac12 \cdot \tfrac{2}{9} \cdot 0 \cdot \tfrac{2}{9} = 0$ for spam and $\tfrac12 \cdot \tfrac17 \cdot \tfrac17 \cdot \tfrac27 = 0.00292$ for ham, so the posterior is ham with probability 1. A single zero count (`report` never appears in spam) silences the class entirely; the next section treats this failure.
+</Task>
+
+### Log space: the implementation that survives real messages
+
+<Remark title="sum logs, never multiply probabilities">
+A real email has hundreds of tokens with word probabilities around $10^{-3}$ to $10^{-5}$; a 200-token product sits near $10^{-600}$ and underflows double precision, which fails below $\approx 10^{-308}$. The fix is the one <Ref lesson="mle-map" /> used for likelihoods: work with sums of logs. For the example, the spam score is $\ln\tfrac12 + \ln\tfrac13 + \ln\tfrac29 + \ln\tfrac29 = -4.800$ and the ham score is $-0.693 - 1.946 - 1.946 - 1.253 = -5.838$. The argmax is unchanged (log is increasing), and the posterior is recovered by exponentiating after subtracting the larger score: $e^{0} = 1$ and $e^{-1.038} = 0.354$, so $p(\text{spam} \mid x) = 1/(1 + 0.354) = 0.738$, as before. Interviewers routinely check for this detail.
+</Remark>
+
+<KeyFact>
+Training a naive Bayes classifier is counting, and prediction is adding log-counts: one pass over the data, no iterative optimization anywhere.
+</KeyFact>
+
+## Parameters are counts: MLE, then the zero-count failure
+
+The fractions in the table are not a heuristic. Write the log-likelihood of the whole labeled corpus under the generative model: each message contributes $\log p(y_i) + \sum_j \log p(x_{ij} \mid y_i)$, so the objective splits into a sum of independent pieces, one for the prior and one per feature per class. Each piece is a Bernoulli or categorical log-likelihood, and by the two-step recipe of <Ref lesson="mle-map" /> its maximizer is the relative frequency. The MLEs are
+
+$$
+\hat p(y = c) = \frac{n_c}{n},
+\qquad
+\hat\phi_{j \mid c} = \frac{N_{jc}}{N_c},
+$$
+
+with $n_c$ the number of class-$c$ documents, $N_{jc}$ the count of word $j$ in class $c$, and $N_c$ the total token count of class $c$. Exercise 7 derives the categorical case in full with a Lagrange multiplier.
+
+### The zero-count catastrophe: one unseen word vetoes both classes
+
+Counts of zero become probabilities of zero, and a zero factor annihilates a product. The Task above showed the mild version: a word unseen in *one* class forces posterior 0 for that class, however strong the other evidence. The fatal version is a word unseen in *either* class. The message "win money voucher now" contains `voucher`, which no training message uses, so $\hat\phi_{\text{voucher} \mid c} = 0/N_c = 0$ for both classes and
+
+$$
+p(\text{spam} \mid x) = \frac{\tfrac12 \cdot \tfrac39 \cdot \tfrac29 \cdot 0 \cdot \tfrac29}{\tfrac12 \cdot \tfrac39 \cdot \tfrac29 \cdot 0 \cdot \tfrac29 \;+\; \tfrac12 \cdot \tfrac17 \cdot \tfrac17 \cdot 0 \cdot \tfrac27} = \frac{0}{0}:
+$$
+
+the classifier is undefined on any message containing any new word. The [CS229 notes](https://cs229.stanford.edu/main_notes.pdf) (§4.2.1) use exactly this failure, a mail mentioning the previously unseen word "neurips", to motivate the fix; statistically it is the boundary pathology of <Ref lesson="mle-map" /> (the MLE that declares unseen events impossible), now fatal because products amplify a single zero into a vetoed class.
+
+{/* fig ZeroCountRepair: two near-identical panels side by side joined by a bold arrow labeled "Laplace, alpha = 1: add one fake occurrence of every word". Left panel "unsmoothed MLE": the test message "win money voucher now"; the voucher factor rendered as 0/9 and 0/7 in both class products, each product collapsing to 0, and the posterior 0/0 flagged with a warning badge "undefined". Right panel "smoothed": the same two products with ghost +1 segments stacked on every count (dashed outline, the mle-map pseudo-count motif), denominators 9+7=16 and 7+7=14, factors 4/16 * 3/16 * 1/16 * 3/16 and 2/14 * 2/14 * 1/14 * 3/14, products 2.7e-4 (amber) and 1.6e-4 (blue), posterior 0.64 spam. Only the ghost counts and resulting numbers differ between panels; layout otherwise identical. KaTeX for all fractions. */}
+<Figure
+  name="ZeroCountRepair"
+  alt="Two panels: the unsmoothed pipeline where the unseen word voucher zeroes both class products and leaves a 0/0 posterior, and the Laplace-smoothed pipeline where ghost pseudo-counts on every word give a defined posterior of 0.64 spam"
+  caption="One unseen word makes the posterior 0/0. One pseudo-count per word repairs it."
+/>
+
+### Laplace smoothing: one fake occurrence of every word
+
+<Definition title="Laplace (add-α) smoothing">
+Laplace smoothing with pseudo-count $\alpha > 0$ replaces the multinomial MLE by
+
+$$
+\hat\phi_{j \mid c} = \frac{N_{jc} + \alpha}{N_c + \alpha\,|V|},
+$$
+
+where $|V|$ is the vocabulary size. The denominator grows by $\alpha |V|$, one pseudo-count per vocabulary word, so the smoothed estimates still sum to 1 over $j$. The default is $\alpha = 1$, *add-one* smoothing.
+</Definition>
+
+The denominator is the detail hand-computations get wrong: it grows by $\alpha |V|$, **not by** $\alpha$. Each of the $|V|$ words receives its own fake occurrence, and the fake occurrences all land in the same token total.
+
+This is not an ad-hoc patch but the MAP estimate of <Ref lesson="mle-map" />: a $\text{Beta}(2,2)$ prior added one hallucinated head and one hallucinated tail to the coin's tally, and its multivariate generalization, a $\text{Dirichlet}(2, \dots, 2)$ prior over the categorical $\phi_{\cdot \mid c}$, adds one hallucinated occurrence of each word (Exercise 7). The prior's pull fades as real counts accumulate, at rate $O(1/N_c)$, exactly as the coin's did.
+
+<Example title="the smoothed verdict on the unseen word">
+Add `voucher` to the vocabulary, so $|V| = 7$, and smooth with $\alpha = 1$. Spam counts $(3,2,2,2,0,0,0)$ become $(4,3,3,3,1,1,1)$ over denominator $9 + 7 = 16$; ham counts $(1,1,0,2,2,1,0)$ become $(2,2,1,3,3,2,1)$ over $7 + 7 = 14$. The message "win money voucher now" now scores
+
+$$
+\text{spam:}\;\; \tfrac12 \cdot \tfrac{4}{16} \cdot \tfrac{3}{16} \cdot \tfrac{1}{16} \cdot \tfrac{3}{16} = 2.75 \times 10^{-4},
+\qquad
+\text{ham:}\;\; \tfrac12 \cdot \tfrac{2}{14} \cdot \tfrac{2}{14} \cdot \tfrac{1}{14} \cdot \tfrac{3}{14} = 1.56 \times 10^{-4},
+$$
+
+and the posterior is $2.75/(2.75 + 1.56) = 0.64$: spam, at reduced confidence. The unseen word contributes a near-neutral factor ($\tfrac{1}{16}$ against $\tfrac{1}{14}$) instead of a veto, and every other factor moved slightly toward uniform, which is the bias the prior buys in exchange for never producing a zero.
+</Example>
+
+<KeyFact>
+Unseen words make the naive Bayes posterior 0/0; Laplace smoothing repairs it by adding α pseudo-counts to every count, with the denominator growing by α|V|, and is exactly MAP estimation under a Dirichlet prior.
+</KeyFact>
+
+## Event models: what p(x_j | y) is a distribution over
+
+The factorization leaves open what each factor is. Three standard choices cover practice; the first two are compared for text in [McCallum and Nigam's classic study](https://www.cs.cmu.edu/~knigam/papers/multinomial-aaaiws98.pdf), the third handles continuous features.
+
+**Multivariate Bernoulli.** $x_j \in \{0, 1\}$ records whether word $j$ appears; $\phi_{j \mid c}$ is the fraction of class-$c$ *documents* containing it. Every vocabulary word contributes a factor: $\phi_{j\mid c}$ if present, $1 - \phi_{j \mid c}$ if absent. Absent words carry evidence.
+
+**Multinomial.** The document is a token stream; each token is a roll of the class's $|V|$-sided die, and $\phi_{j \mid c}$ is estimated from token counts, as in the spam example above. A word occurring twice contributes its factor twice; words absent from the document contribute nothing. (The multinomial coefficient and the document length are class-independent and cancel in the posterior.) With large vocabularies the multinomial model usually classifies text better.
+
+**Gaussian.** For continuous $x_j$, take $p(x_j \mid y = c) = \mathcal N(x_j;\, \mu_{jc}, \sigma^2_{jc})$ with per-class mean and variance fitted by the Gaussian MLE of <Ref lesson="mle-map" />: the class sample mean and the $1/n$ sample variance of feature $j$.
+
+<Figure
+  src="./figures/eventmodels.svg"
+  alt="Three panels for the message win money win now: a Bernoulli presence vector with a 1 for win despite the repeat, a multinomial count vector with a 2 for win, and two Gaussian curves over a continuous length feature with the observation marked"
+  caption="One message, three event models: presence bits, token counts, or per-class densities on a continuous feature."
+/>
+
+Because the factors multiply, one classifier can mix event models freely: word counts through a multinomial, message length through a Gaussian, each feature contributing its own factor. This is [Bishop's](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) point about combining heterogeneous data (§1.5.4, §8.2.2, with an X-ray image and a blood test in place of words and lengths).
+
+<Example title="Gaussian naive Bayes joins the spam filter">
+Add one continuous feature: the message length $\ell$ in characters, with fitted class models $\ell \mid \text{spam} \sim \mathcal N(30, 10^2)$ and $\ell \mid \text{ham} \sim \mathcal N(80, 25^2)$ (spam is short). The test message "win money now" has $\ell = 25$. Densities:
+
+$$
+p(\ell \mid \text{spam}) = \frac{1}{10\sqrt{2\pi}}\, e^{-(25-30)^2 / 200} = 0.0399 \times 0.883 = 0.0352,
+$$
+
+$$
+p(\ell \mid \text{ham}) = \frac{1}{25\sqrt{2\pi}}\, e^{-(25-80)^2 / 1250} = 0.0160 \times 0.0889 = 0.00142 .
+$$
+
+Multiply into the earlier scores: spam $0.00823 \times 0.0352 = 2.90 \times 10^{-4}$, ham $0.00292 \times 0.00142 = 4.14 \times 10^{-6}$. Posterior: $2.90/(2.90 + 0.0414) \cdot 10^{-4}$ normalized gives $p(\text{spam} \mid x) = 0.986$. The length evidence, a factor of $24.8$ in spam's favor, moves the posterior from $0.74$ to $0.99$. A density may exceed 1 without harm; only ratios enter the posterior.
+</Example>
+
+<Aside>
+Class priors under imbalance. The prior factor $p(y)$ is estimated from label frequencies, so a 100:1 ham-to-spam corpus hands ham a hundred-fold head start that the word factors must overcome; naive Bayes is sensitive to this in exactly the way Bayes' rule dictates. When the training frequencies do not match deployment (a common interview probe), replace the estimated priors with known population base rates: the word factors are untouched and only the constant $\log p(y)$ term shifts. Bishop §1.5.4 develops this base-rate correction; the general treatment of imbalanced evaluation is in <Ref lesson="classification-metrics" />.
+</Aside>
+
+<KeyFact>
+The event model is a per-feature choice, and factors multiply across models: Bernoulli for presence, multinomial for counts, Gaussian for continuous features, all in one classifier.
+</KeyFact>
+
+## Naive Bayes is a linear classifier in log space
+
+The products hide a familiar shape. Write a document as its count vector $c = (c_1, \dots, c_{|V|})$, $c_j$ the number of times word $j$ occurs.
+
+<Theorem title="multinomial naive Bayes is linear">
+For two classes with priors $\pi_1, \pi_0$ and multinomial parameters $\phi_{j \mid 1}, \phi_{j \mid 0}$, the posterior log-odds of class 1 are affine in the count vector:
+
+$$
+\ln \frac{p(y = 1 \mid x)}{p(y = 0 \mid x)}
+= \underbrace{\ln \frac{\pi_1}{\pi_0}}_{b}
+\;+\; \sum_{j=1}^{|V|} c_j \underbrace{\ln \frac{\phi_{j \mid 1}}{\phi_{j \mid 0}}}_{w_j}
+= w^\top c + b .
+$$
+
+<Proof>
+By Bayes' rule the posterior ratio equals the joint ratio, since $p(x)$ cancels: $p(y{=}1 \mid x)/p(y{=}0 \mid x) = \pi_1 p(x \mid 1) / \bigl(\pi_0 p(x \mid 0)\bigr)$. The multinomial likelihood of the counts is $p(x \mid c) \propto \prod_j \phi_{j \mid c}^{\,c_j}$, with a proportionality constant (the multinomial coefficient) that is the same for both classes and cancels in the ratio. Taking logs turns the products into $\ln \pi_c + \sum_j c_j \ln \phi_{j \mid c}$, and subtracting the class-0 expression from the class-1 expression gives the display. The decision rule "predict 1 when the log-odds are positive" is therefore the halfspace test $w^\top c + b \ge 0$.
+</Proof>
+</Theorem>
+
+Each word carries one weight, the log-ratio of its class probabilities: positive for spam-evidence words, negative for ham-evidence words, and prediction is a dot product with the counts. The Bernoulli model is affine in the presence indicators by the same computation, with the absent-word $(1 - \phi)$ factors folding into the bias.
+
+{/* fig NbLinearScore: the log-odds as a literal dot product, computed from the smoothed spam tables. Top: a two-row grid, row 1 the count vector of "win money voucher now" over the 7-word vocabulary (win 1, money 1, prize 0, now 1, meeting 0, report 0, voucher 1), row 2 the weight vector w_j = ln(phi_j|spam / phi_j|ham): win +0.56, money +0.27, prize +0.97, now -0.13, meeting -1.23, report -0.83, voucher -0.13; positive weights amber (spam evidence), negative blue (ham evidence); bias b = ln(1/2 / 1/2) = 0 shown at the end. Pairwise products drop to a sum line: 0.56 + 0.27 - 0.13 - 0.13 + 0 = 0.56, then sigma(0.56) = 0.64 in KaTeX with the note "matches the smoothed posterior". Highlight the aligned columns so count-times-weight reads vertically. */}
+<Figure
+  name="NbLinearScore"
+  alt="The smoothed spam model rendered as a dot product: the count vector of the test message aligned above per-word weights, positive spam weights in amber and negative ham weights in blue, summing to score 0.56 whose sigmoid 0.64 matches the smoothed posterior"
+  caption="Prediction is a dot product: each word's weight is the log-ratio of its class probabilities. σ(0.56) = 0.64 reproduces the smoothed posterior exactly."
+/>
+
+<Task>
+Verify one weight from the smoothed tables: $w_{\text{prize}} = \ln\bigl(\tfrac{3/16}{1/14}\bigr) = \ln 2.625 = 0.97$, and check the score of "win money voucher now": $0.56 + 0.27 - 0.13 - 0.13 = 0.56$, whose sigmoid $1/(1 + e^{-0.56}) = 0.64$ matches the posterior computed from the products.
+</Task>
+
+### The same hypothesis, two ways to fit it
+
+The functional form $p(y = 1 \mid x) = \sigma(w^\top c + b)$ is precisely <Ref lesson="logistic-regression" />. The difference is how the parameters are chosen. Naive Bayes fits $w$ *generatively*, from per-class counts, in one pass and in closed form; logistic regression fits the same form *discriminatively*, by iterative maximization of the conditional likelihood, with no independence assumption. When the conditional-independence assumption actually holds, the two converge to the same classifier as $n \to \infty$; when it fails, logistic regression's asymptotic error is at least as good, but [Ng and Jordan's comparison](https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf) shows naive Bayes approaches its asymptote after $O(\log d)$ examples against $O(d)$ for logistic regression: with few examples and many features, the generative fit can win before the discriminative one has converged. <Ref lesson="lda-gda" /> develops this trade-off as the module's centerpiece.
+
+### Why it classifies well while the assumption fails
+
+Classification only requires the **argmax** to survive, not the probabilities. Violated independence typically distorts the two scores in correlated ways, and the decision is unchanged whenever the distortion does not push the log-odds across zero; Domingos and Pazzani (1997) formalize this, showing naive Bayes is optimal under zero-one loss on a strictly larger region than where its probability estimates are correct. The empirical emblem is in [Murphy's PML §9.3](https://probml.github.io/pml-book/book1.html): a Bernoulli naive Bayes on binarized MNIST digits, whose per-class parameter vectors render as blurry class-template images and whose pixel-independence assumption is plainly false, still reaches 84.3% test accuracy.
+
+The probabilities themselves do not survive. Correlated features re-submit the same evidence several times, and each re-submission adds its full weight to the log-odds, pushing posteriors toward 0 and 1: naive Bayes is systematically **overconfident**. Exercise 4 computes the effect exactly by duplicating a message's tokens. A reported $p(\text{spam} \mid x) = 0.999$ from a naive Bayes model is a ranking statement, not a calibrated frequency; calibration diagnostics and repairs are treated in <Ref lesson="classification-metrics" />.
+
+<KeyFact>
+Multinomial naive Bayes is a linear classifier whose weights are log-count ratios; false independence assumptions distort its probabilities toward overconfidence long before they flip its argmax, which is why the classifier outlives its assumption.
+</KeyFact>
+
+## When naive Bayes wins: small data, high dimensions, streams
+
+The regimes follow from the two facts established above: training is counting, and the model is high-bias, low-variance.
+
+- **Tiny training sets.** With $d$ parameters per class fitted independently, the estimates stabilize on samples where a discriminative fit is still noisy; the $O(\log d)$ versus $O(d)$ sample-complexity gap is the formal version.
+- **High-dimensional sparse features.** Text with $|V| = 50{,}000$ costs $2|V|$ counts and one pass; nothing is inverted, nothing iterates, there is no learning rate.
+- **Streaming and online updates.** New labeled data updates the model by incrementing counts; no refitting.
+- **Heterogeneous features.** Mixed count, binary, and continuous features multiply into one posterior, per the event-models section.
+- **The baseline role.** A smoothed naive Bayes is the standard first classifier against which anything more expensive must justify itself.
+
+It loses where its assumption bites: strongly correlated features double-count evidence (near-duplicate features, n-gram overlaps, pixel neighborhoods), its probability outputs need recalibration before use in cost-sensitive decisions, and Gaussian factors misfit multimodal or heavy-tailed continuous features. When correlated-feature structure matters and data are plentiful, the discriminative twin of the same linear form is the standard replacement.
+
+## Exercises
+
+<Exercise>
+The tweet-classification set piece (adapted from [Huyen, *Machine Learning Interviews*, §8.1.2](https://huyenchip.com/ml-interviews-book/)). Training data:
+
+| tweet | label |
+| --- | --- |
+| "what a cute puppy" | positive |
+| "my hamster is adorable" | positive |
+| "the puppy looks upset" | negative |
+| "upset about my hamster" | negative |
+
+Classify "the hamster is upset with the puppy". Use per-class presence probabilities for the three content words `hamster`, `upset`, `puppy` (fraction of the class's tweets containing the word, multiplying present words only), and priors from the labels. Compute the posterior (a) unsmoothed and (b) with add-one smoothing $(\text{count} + 1)/(n_c + 2)$, and state both verdicts.
+
+<Solution>
+Priors: $p(+) = p(-) = 2/4 = 1/2$.
+
+(a) Unsmoothed presence probabilities: positive class: `puppy` $1/2$, `hamster` $1/2$, `upset` $0/2 = 0$. Negative class: `puppy` $1/2$, `hamster` $1/2$, `upset` $2/2 = 1$. Scores:
+
+$$
++ :\; \tfrac12 \cdot \tfrac12 \cdot \tfrac12 \cdot 0 = 0,
+\qquad
+- :\; \tfrac12 \cdot \tfrac12 \cdot \tfrac12 \cdot 1 = \tfrac18 .
+$$
+
+Posterior: negative with probability $\frac{1/8}{0 + 1/8} = 1$. The zero count for `upset` in the positive class vetoes it outright, the zero-count failure of the chapter.
+
+(b) Smoothed: positive: `puppy` $(1{+}1)/(2{+}2) = \tfrac12$, `hamster` $\tfrac12$, `upset` $(0{+}1)/4 = \tfrac14$. Negative: `puppy` $\tfrac12$, `hamster` $\tfrac12$, `upset` $(2{+}1)/4 = \tfrac34$. Scores:
+
+$$
++ :\; \tfrac12 \cdot \tfrac12 \cdot \tfrac12 \cdot \tfrac14 = \tfrac{1}{32},
+\qquad
+- :\; \tfrac12 \cdot \tfrac12 \cdot \tfrac12 \cdot \tfrac34 = \tfrac{3}{32}.
+$$
+
+Posterior: $p(- \mid x) = \frac{3/32}{1/32 + 3/32} = \tfrac34$. Verdict: negative, with probability $0.75$ instead of the unsmoothed model's overconfident certainty.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "a word appears in your test message but never appeared in training. What happens, and how do you fix it?" Answer in full, then quantify the fix's strength: recompute the chapter's smoothed posterior for "win money voucher now" with $\alpha = 0.1$ instead of $\alpha = 1$ ($|V| = 7$), and state the limiting behavior as $\alpha \to 0$ and $\alpha \to \infty$.
+
+<Solution>
+What happens: the MLE gives the word probability $0/N_c = 0$ in every class, each class's product acquires a factor 0, and the posterior is $0/0$: undefined, for any message containing the word. Fix: Laplace smoothing, $\hat\phi_{j \mid c} = (N_{jc} + \alpha)/(N_c + \alpha|V|)$, which is MAP estimation under a Dirichlet prior; $\alpha = 1$ is the standard default (one fake occurrence of each word).
+
+With $\alpha = 0.1$: spam denominators $9 + 0.7 = 9.7$, ham $7 + 0.7 = 7.7$.
+
+$$
+\text{spam:}\;\; \tfrac12 \cdot \tfrac{3.1}{9.7} \cdot \tfrac{2.1}{9.7} \cdot \tfrac{0.1}{9.7} \cdot \tfrac{2.1}{9.7} = 7.72 \times 10^{-5},
+\qquad
+\text{ham:}\;\; \tfrac12 \cdot \tfrac{1.1}{7.7} \cdot \tfrac{1.1}{7.7} \cdot \tfrac{0.1}{7.7} \cdot \tfrac{2.1}{7.7} = 3.61 \times 10^{-5}.
+$$
+
+Posterior: $7.72/(7.72 + 3.61) = 0.68$, against $0.64$ at $\alpha = 1$: lighter smoothing keeps the estimates closer to the raw counts, so the seen words' spam evidence weighs more.
+
+Limits: as $\alpha \to 0$ the smoothed estimates approach the MLE and the $0/0$ failure returns; as $\alpha \to \infty$ every $\hat\phi_{j\mid c} \to 1/|V|$, the word factors cancel between classes, and the posterior collapses to the priors ($1/2$ here). $\alpha$ interpolates between trusting the counts and ignoring them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Parallel to the Gaussian worked example: the same message tokens "win money now" arrive in a message of length $\ell = 60$ characters, with the fitted length models $\mathcal N(30, 10^2)$ for spam and $\mathcal N(80, 25^2)$ for ham and the unsmoothed word scores from the chapter (spam $0.00823$, ham $0.00292$). Compute the combined posterior and the verdict.
+
+<Solution>
+Length densities:
+
+$$
+p(60 \mid \text{spam}) = \tfrac{1}{10\sqrt{2\pi}} e^{-(60-30)^2/200} = 0.0399 \times e^{-4.5} = 4.43 \times 10^{-4},
+$$
+
+$$
+p(60 \mid \text{ham}) = \tfrac{1}{25\sqrt{2\pi}} e^{-(60-80)^2/1250} = 0.0160 \times e^{-0.32} = 0.0116 .
+$$
+
+Combined scores: spam $0.00823 \times 4.43 \times 10^{-4} = 3.65 \times 10^{-6}$; ham $0.00292 \times 0.0116 = 3.39 \times 10^{-5}$. Posterior:
+
+$$
+p(\text{spam} \mid x) = \frac{3.65}{3.65 + 33.9} = 0.097 .
+$$
+
+Verdict: ham, with probability $0.90$. The words favored spam at odds $2.8{:}1$, but a 60-character length is $26$ times likelier under the ham model ($0.0116 / 4.43\times10^{-4}$), and the factors multiply: the length evidence outvotes the words. In log space: word evidence $+1.04$ toward spam, length evidence $\ln(4.43\times10^{-4}/0.0116) = -3.26$, net $-2.22$, and $\sigma(-2.22) = 0.097$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "why is it called *naive*? Give a concrete case where the assumption hurts." Make the overconfidence quantitative: every token of "win money now" is duplicated (the message becomes "win money now win money now"), which adds no information. Using the unsmoothed tables and the linearity theorem, compute the posterior before and after duplication.
+
+<Solution>
+"Naive" names the conditional-independence assumption $p(x \mid y) = \prod_j p(x_j \mid y)$: every feature is treated as fresh, independent evidence given the class, which real features (correlated words, duplicated fields) violate.
+
+From the log-space computation, the log-odds of spam for "win money now" are $s = 1.04$ (priors are equal and contribute 0), giving $\sigma(1.04) = 0.74$. Duplicating every token doubles every count $c_j$, and by the theorem the log-odds are linear in the counts, so the score doubles: $s' = 2 \times 1.04 = 2.08$, and
+
+$$
+p(\text{spam} \mid x') = \sigma(2.08) = \frac{1}{1 + e^{-2.08}} = 0.89 .
+$$
+
+The duplicated message contains exactly the information of the original, but the classifier's confidence rises from $0.74$ to $0.89$ because the copy is counted as independent corroboration. Perfectly correlated features double-count evidence; partially correlated ones do the same in lesser degree, which is why naive Bayes posteriors crowd toward 0 and 1 and should be read as rankings, not calibrated probabilities.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that Gaussian naive Bayes with class-shared variances yields a linear decision boundary: with $p(x_j \mid y = c) = \mathcal N(x_j; \mu_{jc}, \sigma_j^2)$ (the variance $\sigma_j^2$ common to both classes), prove the log-odds are affine in $x$. State what changes when the variances differ per class.
+
+<Solution>
+The log-odds are
+
+$$
+\ln\frac{p(y{=}1 \mid x)}{p(y{=}0 \mid x)}
+= \ln\frac{\pi_1}{\pi_0} + \sum_{j=1}^d \Bigl[ \ln p(x_j \mid 1) - \ln p(x_j \mid 0) \Bigr].
+$$
+
+Each Gaussian term is $-\ln(\sigma_j\sqrt{2\pi}) - (x_j - \mu_{jc})^2 / (2\sigma_j^2)$. The normalizers are class-independent (shared $\sigma_j$) and cancel; the quadratic difference expands as
+
+$$
+\frac{(x_j - \mu_{j0})^2 - (x_j - \mu_{j1})^2}{2\sigma_j^2}
+= \frac{\mu_{j1} - \mu_{j0}}{\sigma_j^2}\, x_j + \frac{\mu_{j0}^2 - \mu_{j1}^2}{2\sigma_j^2},
+$$
+
+because the $x_j^2$ terms subtract away. The log-odds are therefore $w^\top x + b$ with $w_j = (\mu_{j1} - \mu_{j0})/\sigma_j^2$: affine in $x$, a linear boundary, and again the logistic-regression functional form with generatively fitted parameters.
+
+With per-class variances $\sigma_{j1}^2 \ne \sigma_{j0}^2$, neither the normalizers nor the $x_j^2$ coefficients cancel: the log-odds keep terms $x_j^2 (1/\sigma_{j0}^2 - 1/\sigma_{j1}^2)/2$ and the boundary is quadratic. This is the axis-aligned special case of LDA versus QDA, developed with full covariance matrices in <Ref lesson="lda-gda" />.
+</Solution>
+</Exercise>
+
+<Exercise>
+Parameter accounting. For $d = 30$ binary features and two classes, count the parameters of (a) the full generative model with an unrestricted table for $p(x \mid y)$, and (b) naive Bayes. Then explain why the full model fails statistically, not just computationally, on any realistic corpus.
+
+<Solution>
+(a) Each class-conditional table assigns a probability to each of $2^{30}$ configurations, constrained to sum to 1: $2^{30} - 1 = 1{,}073{,}741{,}823$ free parameters per class, so $2(2^{30} - 1) = 2{,}147{,}483{,}646$ plus 1 for the prior: $2{,}147{,}483{,}647$ parameters (incidentally $2^{31} - 1$).
+
+(b) Naive Bayes: one Bernoulli parameter per feature per class, $2 \times 30 = 60$, plus 1 prior: $61$.
+
+Statistical failure of (a): the MLE of each table entry is its relative frequency among the class's training examples. A corpus of even $10^6$ documents populates at most $10^6$ of the $10^9$ rows, so almost every row's estimate is $0$, and any test message whose exact configuration was unseen (which is nearly every test message) receives probability 0 under both classes: the $0/0$ failure, now for the whole vector rather than one word. More data barely helps, because the number of rows grows exponentially in $d$ while corpora grow linearly. The naive factorization is what makes the estimation problem match the data actually available.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="mle-map" />: derive the smoothing formula from first principles. (a) Show by constrained maximization that the multinomial MLE for class $c$ is $\hat\phi_{j \mid c} = N_{jc}/N_c$. (b) Show that the MAP estimate under a $\text{Dirichlet}(\alpha{+}1, \dots, \alpha{+}1)$ prior, $p(\phi) \propto \prod_j \phi_j^{\alpha}$, is the Laplace-smoothed estimate, and connect it to the Beta pseudo-counts of the coin.
+
+<Solution>
+(a) Dropping the class index, the token counts $n_1, \dots, n_{|V|}$ with $\sum_j n_j = N$ have log-likelihood $\ell(\phi) = \sum_j n_j \ln \phi_j$ subject to $\sum_j \phi_j = 1$. Lagrangian: $\sum_j n_j \ln\phi_j + \lambda(1 - \sum_j \phi_j)$. Stationarity: $n_j/\phi_j = \lambda$, so $\phi_j = n_j/\lambda$; the constraint gives $\sum_j n_j / \lambda = 1$, hence $\lambda = N$ and $\hat\phi_j = n_j / N$: relative frequency, the two-step recipe with one constraint. (Concavity of $\ln$ makes the stationary point the maximum.)
+
+(b) The log-posterior adds the log-prior: $\sum_j (n_j + \alpha) \ln \phi_j + \text{const}$, which is the log-likelihood of a padded count vector $n_j + \alpha$ summing to $N + \alpha|V|$. By part (a) applied to the padded counts,
+
+$$
+\hat\phi_j^{\text{MAP}} = \frac{n_j + \alpha}{N + \alpha |V|},
+$$
+
+which is exactly add-$\alpha$ smoothing. For $|V| = 2$ the Dirichlet is the Beta prior of the coin chapter, and $\alpha = 1$ (prior $\text{Dirichlet}(2,\dots,2)$) is the one-hallucinated-head-and-tail estimate generalized to one hallucinated occurrence of every word: the same fake-data reading, and the same $O(1/N)$ washout as real counts accumulate.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "is naive Bayes generative or discriminative, and what does that mean?" Define both terms, place naive Bayes and logistic regression, and give one concrete advantage of each side, citing the sample-complexity result.
+
+<Solution>
+A *generative* classifier models the joint distribution, $p(x \mid y)$ and $p(y)$, and classifies by Bayes' rule; a *discriminative* classifier models the conditional $p(y \mid x)$ directly and never models $x$. Naive Bayes is generative (it specifies how each class emits features); logistic regression is discriminative. Both, for the multinomial/shared-variance cases, produce the same hypothesis class, $p(y{=}1 \mid x) = \sigma(w^\top x + b)$; they differ in how $w$ is fitted.
+
+Generative advantage: data efficiency and cheap machinery. The parameters are per-class counts, fitted in one pass, updatable online, and Ng and Jordan (2002) show naive Bayes reaches its asymptotic error after $O(\log d)$ examples versus $O(d)$ for logistic regression, so it can dominate in the small-$n$, large-$d$ regime; a generative model also handles missing features by dropping their factors, and permits swapping priors for population base rates.
+
+Discriminative advantage: robustness to model misspecification. Logistic regression assumes nothing about feature dependence, so when conditional independence fails its asymptotic error is at least as low as naive Bayes' (and its probabilities are not overconfident by double-counting). With enough data, the discriminative fit of the same linear form wins. The full development is <Ref lesson="lda-gda" />.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §4.2: naive Bayes derivation and MLE count formulas; §4.2.1: Laplace smoothing motivated by the unseen-word 0/0 failure; §4.2.2: Bernoulli versus multinomial event models. https://cs229.stanford.edu/main_notes.pdf
+2. K. Q. Weinberger, "Lecture 5: Bayes Classifier and Naive Bayes," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — the generative story, categorical/multinomial/Gaussian estimators with smoothing as MAP, and the proof that naive Bayes is a linear classifier. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote05.html
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §9.3: naive Bayes classifiers, including Bernoulli naive Bayes on binarized MNIST with class-template parameter images and 84.3% test accuracy. https://probml.github.io/pml-book/book1.html
+4. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.5.4: combining heterogeneous data (X-ray plus blood test) via conditional independence and base-rate priors; §4.2.3: discrete-feature class-conditionals; §8.2.2: the naive Bayes graphical model. https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf
+5. A. McCallum, K. Nigam, "A Comparison of Event Models for Naive Bayes Text Classification," AAAI-98 Workshop on Learning for Text Categorization, 1998 — multivariate Bernoulli versus multinomial, with the multinomial winning at larger vocabulary sizes. https://www.cs.cmu.edu/~knigam/papers/multinomial-aaaiws98.pdf
+6. A. Y. Ng, M. I. Jordan, "On Discriminative vs. Generative Classifiers: A Comparison of Logistic Regression and Naive Bayes," *Advances in Neural Information Processing Systems* 14, 2002 — the O(log d) versus O(d) sample-complexity comparison. https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf
+7. P. Domingos, M. Pazzani, "On the Optimality of the Simple Bayesian Classifier under Zero-One Loss," *Machine Learning*, 29, 1997 — why the argmax survives independence violations that ruin the probability estimates.
+8. C. Huyen, *Machine Learning Interviews*, free web book — §8.1.2: the four-tweet naive Bayes hand computation adapted in Exercise 1. https://huyenchip.com/ml-interviews-book/
+</References>

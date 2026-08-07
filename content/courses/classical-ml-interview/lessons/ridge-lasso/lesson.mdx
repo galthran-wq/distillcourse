@@ -1,0 +1,491 @@
+Adding a penalty on coefficient size trades bias for variance; the shape of the penalty — disk or diamond — decides whether coefficients shrink or vanish. This chapter derives both penalized estimators and builds the three standard answers to the interview question "why does L1 produce exact zeros while L2 only shrinks": the soft-thresholding algebra, the constraint geometry, and the Laplace prior. The route: the variance failure of OLS on a two-point dataset, the ridge closed form and its SVD reading, soft thresholding derived in the orthonormal case, the diamond-versus-disk picture, the prior behind each penalty, and the practical checklist of standardization, cross-validated $\lambda$, and the elastic net.
+
+Notation: coefficients are written $\beta$ in this chapter, matching the regularization literature; it is the same vector called $\theta$ in <Ref lesson="ols" />.
+
+## The failure: an exact fit that cannot generalize
+
+Two training points, $(x, y) = (1, 1.2)$ and $(2, 2.8)$, determine a line exactly: $\hat y = -0.4 + 1.6x$ passes through both, so the training RSS is $0$ and no other line scores better. The data came from $y = 0.5 + x + \varepsilon$; the noise ($-0.3$ on the first point, $+0.3$ on the second) tilted the fitted slope from $1$ to $1.6$. On four fresh test points from the same source, $(0.5, 1.1), (1.5, 1.9), (2.5, 3.1), (3, 3.4)$, the exact-fit line accumulates squared error $0.49 + 0.01 + 0.25 + 1.00 = 1.75$.
+
+The penalized fit computed in the next section, with $\lambda = 0.3$, gives up $0.18$ of training RSS and lands on $\hat y = 0.5 + x$: test error $0.04$, a **44-fold reduction**. This is [StatQuest's two-point demonstration](https://www.youtube.com/watch?v=Q81RR3yKn30) reduced to numbers.
+
+<Figure
+  src="./figures/twopoint.svg"
+  alt="Left: a line through two training points with zero training error but large errors on four blue test points, tally 1.75. Right: the ridge line with slope 1 misses the train points slightly but nearly hits every test point, tally 0.04"
+  caption="Minimum training error is the wrong target: paying 0.18 of train RSS buys a 44× smaller test error."
+/>
+
+<Task>
+Verify both tallies from the line equations: the OLS line predicts $(0.4, 2.0, 3.6, 4.4)$ at the test inputs, the ridge line predicts $(1.0, 2.0, 3.0, 3.5)$; square and sum the gaps to $1.75$ and $0.04$.
+</Task>
+
+In the language of <Ref lesson="bias-variance" />, the exact fit is a high-variance procedure: retrain on two fresh points and the slope swings wildly, because $\operatorname{Var}(\hat\beta \mid X) = \sigma^2 (X^\top X)^{-1}$ blows up whenever $X^\top X$ is small or near-singular (few points, correlated features, $p \approx n$; the failure catalog of <Ref lesson="ols" />). Since only the sum noise $+$ bias² $+$ variance is the score, a procedure that accepts a little bias to remove a lot of variance wins. *Regularization* is the standard construction: add a penalty on coefficient size to the training objective.
+
+### The menu: one loss, three penalties
+
+Every estimator in this chapter minimizes the same squared loss plus a penalty; only the penalty changes. [Weinberger's CS4780 note](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote10.html) organizes the whole family this way.
+
+| method | objective | effect on coefficients |
+| --- | --- | --- |
+| OLS | $\tfrac12\lVert X\beta - y\rVert^2$ | unbiased, high variance |
+| ridge | $\tfrac12\lVert X\beta - y\rVert^2 + \tfrac{\lambda}{2}\lVert\beta\rVert_2^2$ | all shrink toward $0$, none reach it |
+| lasso | $\tfrac12\lVert X\beta - y\rVert^2 + \lambda\lVert\beta\rVert_1$ | shrink, some exactly $0$ |
+| elastic net | $\tfrac12\lVert X\beta - y\rVert^2 + \lambda\bigl(\alpha\lVert\beta\rVert_1 + \tfrac{1-\alpha}{2}\lVert\beta\rVert_2^2\bigr)$ | zeros plus grouping |
+
+Conventions differ across sources ([ESL](https://hastie.su.domains/ElemStatLearn/) writes the RSS without the $\tfrac12$); rescaling $\lambda$ absorbs the difference, and the $\tfrac12$ factors here keep gradients clean. The intercept is never penalized: shrinking $\beta_0$ would make the fit depend on where $y$'s origin sits. The standard bookkeeping centers $y$ and the columns of $X$, fits the penalized model without an intercept, and sets $\beta_0 = \bar y$.
+
+<KeyFact>
+Regularized regression deliberately violates the Gauss–Markov premise: it accepts bias to cut variance, because expected test error scores only the sum of the two.
+</KeyFact>
+
+## Ridge: shrink everything, invert always
+
+*Ridge regression* ([Hoerl and Kennard, 1970](https://www.tandfonline.com/doi/abs/10.1080/00401706.1970.10488634)) is the L2 row of the table. The computation first, on the two-point dataset.
+
+<Example title="the two-point ridge fit, by hand">
+Minimize $J(\beta_0, \beta_1) = \tfrac12\bigl[(1.2 - \beta_0 - \beta_1)^2 + (2.8 - \beta_0 - 2\beta_1)^2\bigr] + \tfrac{\lambda}{2}\beta_1^2$ (intercept unpenalized).
+
+Setting $\partial J/\partial \beta_0 = 0$: $\;2\beta_0 + 3\beta_1 = 4$, so $\beta_0 = 2 - 1.5\beta_1$.
+
+Setting $\partial J/\partial \beta_1 = 0$: $\;(1.2 - \beta_0 - \beta_1) + 2(2.8 - \beta_0 - 2\beta_1) = \lambda\beta_1$, i.e. $6.8 - 3\beta_0 - 5\beta_1 = \lambda\beta_1$. Substituting $\beta_0$:
+
+$$
+0.8 - 0.5\beta_1 = \lambda \beta_1
+\quad\Longrightarrow\quad
+\beta_1 = \frac{1.6}{1 + 2\lambda}, \qquad \beta_0 = 2 - 1.5\beta_1 .
+$$
+
+At $\lambda = 0$: $(\beta_0, \beta_1) = (-0.4, 1.6)$, the OLS line. At $\lambda = 0.3$: $(0.5, 1.0)$, the line of the figure above. As $\lambda \to \infty$: $\beta_1 \to 0$ and $\beta_0 \to 2 = \bar y$, the intercept-only null model. One knob slides the fit continuously from "trust the data completely" to "predict the mean".
+</Example>
+
+### The closed form: a two-line extension of OLS
+
+<Definition title="ridge estimator">
+For centered data and $\lambda \ge 0$, the *ridge estimator* minimizes
+
+$$
+J(\beta) = \tfrac12 \lVert X\beta - y \rVert^2 + \tfrac{\lambda}{2} \lVert \beta \rVert_2^2 .
+$$
+</Definition>
+
+<Theorem title="ridge closed form, unique for every λ > 0">
+For any $\lambda > 0$ the objective has the unique minimizer
+
+$$
+\hat\beta^{\text{ridge}} = (X^\top X + \lambda I)^{-1} X^\top y ,
+$$
+
+regardless of the rank of $X$, including $p > n$.
+
+<Proof>
+By the two gradient identities of <Ref lesson="ols" />, $\nabla J = X^\top X \beta - X^\top y + \lambda\beta = (X^\top X + \lambda I)\beta - X^\top y$. Setting it to zero gives $(X^\top X + \lambda I)\beta = X^\top y$.
+
+Invertibility: $X^\top X$ is symmetric positive semi-definite, so its eigenvalues $\mu_j$ satisfy $\mu_j \ge 0$ (indeed $v^\top X^\top X v = \lVert Xv\rVert^2 \ge 0$). Adding $\lambda I$ shifts every eigenvalue by $\lambda$ without changing eigenvectors: $(X^\top X + \lambda I)v = (\mu_j + \lambda)v$. All eigenvalues are $\ge \lambda > 0$, so $X^\top X + \lambda I$ is positive definite, hence invertible. The Hessian $\nabla^2 J = X^\top X + \lambda I \succ 0$ makes $J$ strictly convex, so the stationary point is the unique global minimum.
+</Proof>
+</Theorem>
+
+The eigenvalue shift is the payoff sentence for interviews: OLS fails exactly when some $\mu_j = 0$ (collinearity, the dummy trap, $p > n$), and $\lambda$ **lifts every eigenvalue off zero**. Ridge always has a unique answer, which is why it is the standard repair promised at the end of <Ref lesson="ols" />. Exercise 1 asks for this derivation unaided.
+
+The statistical reading: $\mathbb E[\hat\beta^{\text{ridge}}] = (X^\top X + \lambda I)^{-1} X^\top X\, \beta \ne \beta$ for $\lambda > 0$, so ridge is **biased**; in exchange its variance is smaller than OLS's for every $\lambda > 0$. In the orthonormal case the whole trade is scalar, $\hat\beta^{\text{ridge}}_j = \hat\beta_j/(1+\lambda)$ with variance $\sigma^2/(1+\lambda)^2$, and Exercise 4 shows a strictly positive $\lambda$ always beats $\lambda = 0$ in mean squared error: the escape from Gauss–Markov flagged in <Ref lesson="ols" />.
+
+<KeyFact>
+$X^\top X + \lambda I$ has eigenvalues $\mu_j + \lambda \ge \lambda > 0$: ridge is strictly convex with a unique closed form even under exact collinearity or $p > n$, and $\lambda$ dials bias up and variance down.
+</KeyFact>
+
+## The SVD view: shrink low-variance directions hardest
+
+Which coefficients does ridge shrink, and by how much. Concretely: for a two-feature design whose singular values are $d_1 = 4$ and $d_2 = 1$, ridge with $\lambda = 2$ keeps $16/(16+2) \approx 0.89$ of the fit's component along the first principal direction of the data and only $1/(1+2) \approx 0.33$ along the second. The general statement uses the SVD $X = UDV^\top$ with singular values $d_1 \ge \dots \ge d_p \ge 0$:
+
+$$
+X\hat\beta^{\text{ols}} = \sum_{j=1}^{p} u_j\, (u_j^\top y),
+\qquad
+X\hat\beta^{\text{ridge}} = \sum_{j=1}^{p} u_j\, \frac{d_j^2}{d_j^2 + \lambda}\, (u_j^\top y).
+$$
+
+OLS projects $y$ onto the column space (the hat-matrix geometry of <Ref lesson="ols" />); ridge performs the same projection and then **damps each coordinate** by $d_j^2/(d_j^2 + \lambda)$. Directions with large $d_j$, where the feature cloud is spread out and the data pin the fit down, pass almost untouched; directions with small $d_j$, where the coefficient estimate rests on almost no evidence and carries the most variance, are crushed. This is [ESL §3.4.1](https://hastie.su.domains/ElemStatLearn/)'s picture of ridge, and the same directions return as principal components in <Ref lesson="pca" />.
+
+<Figure
+  src="./figures/svd.svg"
+  alt="An elongated cloud of feature points with an amber arrow along its long axis labeled keep 0.89 and a blue arrow along its short axis labeled keep 0.33, for lambda equal to 2"
+  caption="Ridge trusts directions the data cover well: shrink factor d²⁄(d²+λ) per principal direction of X."
+/>
+
+<Aside>
+Derivation of the shrinkage formula. With $X = UDV^\top$, $X^\top X = VD^2V^\top$, so $(X^\top X + \lambda I)^{-1} = V(D^2 + \lambda I)^{-1}V^\top$ and
+
+$$
+X\hat\beta^{\text{ridge}} = UDV^\top \cdot V(D^2+\lambda I)^{-1}V^\top \cdot VDU^\top y
+= U\,D(D^2+\lambda I)^{-1}D\,U^\top y ,
+$$
+
+a diagonal matrix of factors $d_j^2/(d_j^2+\lambda)$ between $U$ and $U^\top$. Setting $\lambda = 0$ recovers $UU^\top y$, the orthogonal projection.
+</Aside>
+
+Summing the shrink factors generalizes the parameter count. The *effective degrees of freedom* of a ridge fit is
+
+$$
+\operatorname{df}(\lambda) = \operatorname{tr}\bigl[X(X^\top X + \lambda I)^{-1}X^\top\bigr] = \sum_{j=1}^{p} \frac{d_j^2}{d_j^2 + \lambda},
+$$
+
+which equals $p$ at $\lambda = 0$ (the $\operatorname{tr}(H) = p$ of <Ref lesson="ols" />, Exercise 8 there) and decays to $0$ as $\lambda \to \infty$: ridge spends a fraction of a parameter per direction. Exercise 5 computes one.
+
+<KeyFact>
+Ridge shrinks the fit along each principal direction of $X$ by $d_j^2/(d_j^2+\lambda)$: low-variance directions, where OLS coefficients are noisiest, are shrunk hardest.
+</KeyFact>
+
+## Lasso: the penalty with a corner
+
+The *lasso* (least absolute shrinkage and selection operator; [Tibshirani, 1996](https://www.jstor.org/stable/2346178)) replaces $\lVert\beta\rVert_2^2$ with $\lVert\beta\rVert_1 = \sum_j |\beta_j|$. The change looks minor and is not: $|\beta_j|$ is non-differentiable at $0$, so no gradient can be set to zero there, no closed form exists for general $X$, and exactly that corner is where the zeros come from.
+
+### One coordinate, solved completely
+
+The orthonormal case ($X^\top X = I$) reduces the lasso to $p$ independent scalar problems, and the scalar problem is solvable by case analysis. A number first.
+
+<Example title="two scalar lasso problems">
+Minimize $g(\beta) = \tfrac12(\beta - z)^2 + \lambda|\beta|$, where $z$ is the OLS estimate for this coordinate.
+
+**Case $z = 3$, $\lambda = 1$.** For $\beta > 0$ the objective is smooth with $g'(\beta) = \beta - 3 + 1$, zero at $\beta = 2$: value $g(2) = \tfrac12 + 2 = 2.5$, against $g(3) = 3$ and $g(0) = 4.5$. The minimizer is $2 = z - \lambda$: the OLS value **shifted toward zero** by $\lambda$.
+
+**Case $z = 0.7$, $\lambda = 1$.** The candidate $\beta = z - \lambda = -0.3$ has flipped sign; on $\beta > 0$ the derivative $\beta - 0.7 + 1 > 0$ everywhere, so the objective only rises to the right of $0$, and by the mirror argument it only rises to the left. Check: $g(0) = 0.245$, $g(0.2) = 0.325$, $g(-0.2) = 0.605$. The minimizer is exactly $0$.
+</Example>
+
+<Theorem title="soft thresholding">
+For $\lambda > 0$ and $z \in \mathbb R$, the unique minimizer of $g(\beta) = \tfrac12(\beta - z)^2 + \lambda|\beta|$ is
+
+$$
+S_\lambda(z) = \operatorname{sign}(z)\,\bigl(|z| - \lambda\bigr)_+ =
+\begin{cases}
+z - \lambda & z > \lambda \\
+0 & |z| \le \lambda \\
+z + \lambda & z < -\lambda .
+\end{cases}
+$$
+
+Consequently, for an orthonormal design ($X^\top X = I$) the lasso solution is coordinate-wise soft thresholding of OLS: $\hat\beta^{\text{lasso}}_j = S_\lambda(\hat\beta_j)$.
+
+<Proof>
+$g$ is strictly convex (a strictly convex quadratic plus a convex term), so the minimizer is unique.
+
+**Case $z > \lambda$.** On $\beta > 0$: $g'(\beta) = \beta - z + \lambda$, which vanishes at $\beta = z - \lambda > 0$, an interior stationary point of a convex function. On $\beta < 0$: $g'(\beta) = \beta - z - \lambda < 0$, so $g$ is strictly decreasing there and no minimum exists left of $0$. Global minimizer: $z - \lambda$.
+
+**Case $z < -\lambda$.** Symmetric: $\beta = z + \lambda < 0$.
+
+**Case $|z| \le \lambda$.** On $\beta > 0$: $g'(\beta) = \beta - z + \lambda \ge \beta > 0$, so $g$ strictly increases to the right of $0$. On $\beta < 0$: $g'(\beta) = \beta - z - \lambda \le \beta < 0$, so $g$ strictly decreases up to $0$. The minimum sits at the corner: $\beta = 0$. This case is the sparsity mechanism: a whole interval of OLS values, $|z| \le \lambda$, is mapped to exactly $0$.
+
+**Orthonormal reduction.** With $X^\top X = I$, $\hat\beta = X^\top y$ and
+
+$$
+\tfrac12\lVert y - X\beta\rVert^2 + \lambda\lVert\beta\rVert_1
+= \sum_{j=1}^p \Bigl[\tfrac12\bigl(\beta_j - \hat\beta_j\bigr)^2 + \lambda|\beta_j|\Bigr] + \text{const},
+$$
+
+one scalar problem per coordinate.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="softthresh"
+  alt="Three frames building the soft-thresholding curve: the identity line for lambda zero, the line shifted toward zero by lambda with a sign-flip region marked, and the clipped S-curve with the ridge proportional-shrink line and the hard-threshold curve added"
+  caption="Soft thresholding in three moves: start from OLS, subtract λ from the magnitude, clip at zero. Frame 3 adds the other two estimators of the orthonormal comparison."
+/>
+
+<Task>
+Step through the frames and read off $S_1(2.4)$, $S_1(0.7)$, and $S_1(-0.9)$ from the final curve: the values should be $1.4$, $0$, and $0$. Exercise 2 reruns the case analysis with different numbers.
+</Task>
+
+### Three estimators, one comparison
+
+In the orthonormal design all three classical selection/shrinkage methods act coordinate-wise on the OLS estimate ([ESL Table 3.4](https://hastie.su.domains/ElemStatLearn/)):
+
+| estimator | action on $\hat\beta_j$ | character |
+| --- | --- | --- |
+| best subset (size $M$) | $\hat\beta_j \cdot \mathbf 1\bigl[\lvert\hat\beta_j\rvert \ge \lvert\hat\beta_{(M)}\rvert\bigr]$ | hard threshold: keep or kill |
+| ridge | $\hat\beta_j / (1 + \lambda)$ | proportional shrink, never $0$ |
+| lasso | $\operatorname{sign}(\hat\beta_j)\bigl(\lvert\hat\beta_j\rvert - \lambda\bigr)_+$ | shift and clip: shrink *and* select |
+
+The lasso is the only row that is both continuous in the data and exactly zero on a region, which is why it behaves as **continuous variable selection**. Beyond the orthonormal case no closed form exists; solvers run cyclic coordinate descent, whose every coordinate update is precisely one soft-threshold step (the `glmnet` algorithm; [Murphy §11.4](https://probml.github.io/pml-book/book1.html)), or trace the whole path by LARS. Nothing in this chapter needs either algorithm's details.
+
+<KeyFact>
+Algebraic answer number one to "why exact zeros": the L1 penalty maps the entire interval $\lvert\hat\beta_j\rvert \le \lambda$ of OLS values to exactly $0$, while the L2 penalty divides by $1+\lambda$, which never produces $0$ from a nonzero input.
+</KeyFact>
+
+## The geometry: corners are where zeros happen
+
+Both penalized problems have an equivalent *constrained* form:
+
+$$
+\min_\beta \tfrac12\lVert X\beta - y\rVert^2 \;\;\text{s.t.}\;\; \lVert\beta\rVert_1 \le t
+\qquad\text{and}\qquad
+\min_\beta \tfrac12\lVert X\beta - y\rVert^2 \;\;\text{s.t.}\;\; \lVert\beta\rVert_2^2 \le t^2 ,
+$$
+
+budget $t$ playing the role of $\lambda$ ([ISLP §6.2](https://www.statlearning.com/), Eqs. 6.8–6.9). The RSS is a convex quadratic whose contours are ellipses centered at $\hat\beta^{\text{ols}}$; the solution is the first point where an expanding ellipse touches the constraint region.
+
+<Figure
+  src="./figures/geometry.svg"
+  alt="Two panels with RSS contour ellipses around the OLS point: on the left the ellipse first touches the L1 diamond at its corner on the beta-2 axis so beta-1 is zero; on the right it touches the L2 disk at a point off both axes"
+  caption="The constrained view: ellipses grow from β̂ until they hit the budget region. Diamonds get hit at corners; disks get hit anywhere."
+/>
+
+The diamond $\lVert\beta\rVert_1 \le t$ has **corners on the axes**, and corners protrude: for a generic ellipse orientation the first contact is at a corner, where one coordinate is exactly $0$. The disk has no corners; the tangency point is generically off both axes, and a zero coordinate would require the ellipse to line up with an axis exactly, an event of probability zero. In higher dimensions the effect strengthens: the L1 ball's boundary is mostly edges and faces of low dimension (many coordinates zero at once), so lasso solutions land on sparse faces. This is the picture behind [ESL Fig. 3.11](https://hastie.su.domains/ElemStatLearn/) and answer number two.
+
+<Remark title="penalized and constrained forms: the equivalence, and the standard conflation">
+For each $\lambda > 0$ the penalized solution $\hat\beta(\lambda)$ solves the constrained problem with budget $t = \lVert\hat\beta(\lambda)\rVert$, and conversely every active budget $t < \lVert\hat\beta^{\text{ols}}\rVert$ corresponds to some $\lambda$: the two are Lagrangian views of one convex problem, with $\lambda$ decreasing as $t$ grows. The standard conflation is to describe the penalized objective while drawing the constrained picture without saying so; the diamond figure above is the **constrained** formulation, and an interviewer probing the equivalence expects the $\lambda \leftrightarrow t$ correspondence stated.
+</Remark>
+
+<KeyFact>
+Geometric answer number two: RSS ellipses meet the L1 diamond at corners, which sit on the axes, so contact forces coordinates to zero; the L2 disk is smooth and gets touched off-axis.
+</KeyFact>
+
+## The priors: Gaussian shrinks, Laplace sparsifies
+
+<Ref lesson="mle-map" /> established the bridge: MAP estimation is loss plus penalty, with the penalty equal to $-\log p(\beta)$, and its Exercise 8 derived ridge from a Gaussian prior. Under Gaussian noise with variance $\sigma^2$, a Gaussian prior $\beta_j \sim \mathcal N(0, \tau^2)$ yields the ridge objective with $\lambda = \sigma^2/\tau^2$; a Laplace prior $p(\beta_j) = \tfrac{1}{2b}e^{-|\beta_j|/b}$ yields the lasso with $\lambda = \sigma^2/b$ (Exercise 8 rederives this). Noisier data or a tighter prior means a larger $\lambda$.
+
+<Figure
+  src="./figures/priors.svg"
+  alt="Gaussian and Laplace densities over a coefficient on one axis: the Laplace density has a sharp cusp with more mass at zero and visibly heavier tails, with negative log labels mapping Gaussian to the L2 penalty and Laplace to the L1 penalty"
+  caption="The prior behind each penalty. The Laplace cusp at 0 encodes the belief 'most coefficients are essentially zero, a few are large'."
+/>
+
+The shapes explain the behaviors. The Laplace density concentrates extra mass at $0$ (at equal variance, its peak is about $1.8\times$ the Gaussian's) and keeps heavier tails: the prior belief is a **sparse world**, most coefficients negligible, a few large. The marginal-cost view says the same thing as calculus: the L2 penalty's derivative $2\beta$ vanishes as $\beta \to 0$, so the push toward zero fades out and never finishes the job, while the L1 penalty's push is a constant $\lambda$ all the way in, enough to pin a coefficient at exactly $0$. That is answer number three, and the cusp in the figure is the same corner the geometry section met on the diamond.
+
+<Remark title="for the probing interviewer: mode, not mean">
+The lasso is the *posterior mode* under the Laplace prior. The full posterior is a continuous distribution, so the event $\beta_j = 0$ has posterior probability zero, and the *posterior mean* is almost surely not sparse. Sparsity is a property of MAP point estimation, not of the Bayesian posterior itself; fully Bayesian treatments of the Laplace prior (the Bayesian lasso) return dense means with credible intervals ([Murphy §11.4](https://probml.github.io/pml-book/book1.html)).
+</Remark>
+
+<KeyFact>
+Bayesian answer number three: ridge is MAP under a Gaussian prior ($\lambda = \sigma^2/\tau^2$), lasso is MAP under a Laplace prior ($\lambda = \sigma^2/b$), and the Laplace cusp at zero is what makes the mode land exactly there.
+</KeyFact>
+
+## Why L1 sparsifies: the three answers on one card
+
+The strong interview answer gives all three, in one or two sentences each:
+
+1. **Algebra.** In the orthonormal case the lasso solution is $\operatorname{sign}(\hat\beta_j)(\lvert\hat\beta_j\rvert - \lambda)_+$: every OLS coefficient with $\lvert\hat\beta_j\rvert \le \lambda$ maps to exactly $0$. Ridge divides by $1 + \lambda$ instead, which never reaches $0$.
+2. **Geometry.** In the constrained form, RSS ellipses expanding from $\hat\beta^{\text{ols}}$ first touch the L1 diamond at a corner (or low-dimensional face), where coordinates are zero; the L2 disk is smooth, so tangency is generically off-axis.
+3. **Prior.** L1 is the log of a Laplace prior, whose cusp concentrates probability at zero; L2 is the log of a Gaussian, whose flat top pushes toward zero ever more weakly as coefficients get small.
+
+## Practice: standardize, cross-validate, elastic net
+
+Three operational facts complete the interview answer.
+
+### The penalty reads raw units
+
+$\lVert\beta\rVert^2$ adds coefficients across features as if they were comparable, but a coefficient's size depends on its feature's units: measure a length in millimeters instead of meters and its coefficient shrinks by $10^3$, so the penalty barely touches it. OLS is scale-equivariant (rescaling a feature rescales its coefficient, same fit); **penalized fits are not**, and Exercise 7 shows the fitted function changing under a unit change. Standard practice: center and scale every feature to unit variance before fitting, and leave the intercept out of the penalty ([ISLP §6.2](https://www.statlearning.com/), Eq. 6.6).
+
+### λ is chosen by cross-validation
+
+$\lambda$ is a hyperparameter, not a fitted quantity: it is chosen by minimizing estimated test error over a log-spaced grid using $k$-fold cross-validation, machinery developed in <Ref lesson="cross-validation-bootstrap" /> along with the one-standard-error rule that prefers the most-regularized model within one SE of the minimum.
+
+### Correlated features: the lasso's flaw and the elastic-net fix
+
+Given a group of highly correlated features, ridge **splits the weight** among them (for exactly duplicated features, equally: Exercise 6), while the lasso **picks one arbitrarily** and zeros the rest; which one it picks can change under resampling, so lasso-based feature selection is unstable on correlated designs (a caveat that returns in <Ref lesson="feature-engineering" />). The lasso also selects at most $n$ features when $p > n$. The *elastic net* ([Zou and Hastie, 2005](https://rss.onlinelibrary.wiley.com/doi/10.1111/j.1467-9868.2005.00503.x)) mixes the two penalties, $\lambda\bigl(\alpha\lVert\beta\rVert_1 + \tfrac{1-\alpha}{2}\lVert\beta\rVert_2^2\bigr)$: the L1 part keeps exact zeros, the strictly convex L2 part makes the solution unique, spreads weight across correlated groups, and removes the $n$-feature cap.
+
+### The diagnostic picture: coefficient paths
+
+Plotting every coefficient against $\lambda$ shows the two penalties' signatures at a glance and is the standard first look at a regularized fit.
+
+<Figure
+  src="./figures/paths.svg"
+  alt="Two panels of coefficient values versus lambda: ridge curves decay smoothly toward zero without reaching it, lasso paths are piecewise linear and hit exactly zero one coefficient at a time, with one amber coefficient traced in both panels"
+  caption="Coefficient paths: ridge shrinks all coefficients smoothly; lasso paths are piecewise linear and hit exact zero at finite λ, one feature at a time."
+/>
+
+<Demo
+  name="CoefficientPathExplorer"
+  caption="Ridge and lasso coefficient paths on one 8-feature problem, with a movable λ. Presets: none, moderate, heavy."
+/>
+
+<Task>
+Slide $\lambda$ up from the none preset and count active features in each panel: lasso coefficients hit exactly zero one at a time while every ridge coefficient stays nonzero at any finite $\lambda$; at the heavy preset, check that the surviving lasso features are the ones whose paths started largest.
+</Task>
+
+<KeyFact>
+Standardize features before penalizing (the penalty is scale-sensitive), never penalize the intercept, choose $\lambda$ by cross-validation, and reach for the elastic net when correlated features make the lasso's selection arbitrary.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+The set piece: derive the ridge closed form from scratch. State the objective, compute its gradient, solve, and prove that $X^\top X + \lambda I$ is invertible for every $\lambda > 0$, including when $p > n$.
+
+<Solution>
+Objective: $J(\beta) = \tfrac12\lVert X\beta - y\rVert^2 + \tfrac{\lambda}{2}\lVert\beta\rVert_2^2$.
+
+Gradient, using $\nabla(\theta^\top A\theta) = 2A\theta$ for symmetric $A$ and $\nabla(a^\top\theta) = a$:
+
+$$
+\nabla J = X^\top X\beta - X^\top y + \lambda\beta = (X^\top X + \lambda I)\beta - X^\top y .
+$$
+
+Setting it to zero: $(X^\top X + \lambda I)\beta = X^\top y$.
+
+Invertibility. $X^\top X$ is symmetric, and for any $v$, $v^\top X^\top X v = \lVert Xv\rVert^2 \ge 0$, so it is positive semi-definite with eigenvalues $\mu_1, \dots, \mu_p \ge 0$. If $X^\top X v = \mu v$ then $(X^\top X + \lambda I)v = (\mu + \lambda)v$: the eigenvalues shift by $\lambda$, so all eigenvalues of $X^\top X + \lambda I$ are at least $\lambda > 0$. A symmetric matrix with strictly positive eigenvalues is positive definite and invertible. This holds for any rank of $X$; when $p > n$, $X^\top X$ has at least $p - n$ zero eigenvalues, and the shift lifts them all. Hence
+
+$$
+\hat\beta^{\text{ridge}} = (X^\top X + \lambda I)^{-1}X^\top y ,
+$$
+
+unique because the Hessian $X^\top X + \lambda I \succ 0$ makes $J$ strictly convex.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the soft-thresholding rule for the scalar lasso $g(\beta) = \tfrac12(\beta - z)^2 + \lambda|\beta|$ by the full case analysis, then evaluate it at $\lambda = 1.5$ for $z = 2.4$, $z = -0.9$, and $z = -2.1$. Compare with the ridge answers $z/(1+\lambda)$ at the same inputs.
+
+<Solution>
+Case analysis. On $\beta > 0$, $g$ is smooth with $g'(\beta) = \beta - z + \lambda$; on $\beta < 0$, $g'(\beta) = \beta - z - \lambda$.
+
+If $z > \lambda$: the stationary point $\beta = z - \lambda$ is positive and valid; on $\beta < 0$ the derivative is $\beta - z - \lambda < 0$, so $g$ decreases toward $0$ from the left and no competing minimum exists. Minimizer $z - \lambda$.
+
+If $z < -\lambda$: by symmetry, $\beta = z + \lambda < 0$.
+
+If $|z| \le \lambda$: on $\beta > 0$, $g'(\beta) = \beta - z + \lambda \ge \beta > 0$ ($g$ rising); on $\beta < 0$, $g'(\beta) = \beta - z - \lambda \le \beta < 0$ ($g$ falling). Both sides slope up away from the origin, so the minimum is at $\beta = 0$.
+
+Combined: $S_\lambda(z) = \operatorname{sign}(z)(|z| - \lambda)_+$.
+
+Evaluations at $\lambda = 1.5$: $S_{1.5}(2.4) = 0.9$; $S_{1.5}(-0.9) = 0$ since $|-0.9| \le 1.5$; $S_{1.5}(-2.1) = -0.6$.
+
+Ridge: $2.4/2.5 = 0.96$, $-0.9/2.5 = -0.36$, $-2.1/2.5 = -0.84$. Every ridge output is nonzero; the lasso zeroed the middle one exactly.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question (asked in this form at Uber, per *Ace the Data Science Interview*): what are the differences between L1 and L2 regularization, and when do you use which? Give the complete answer, including why L1 produces exact zeros.
+
+<Solution>
+**Shared purpose.** Both add a penalty on coefficient size to the squared loss, trading bias for variance; both have a Bayesian reading as a prior; $\lambda$ is chosen by cross-validation for either.
+
+**Differences.**
+
+1. *Sparsity.* L1 sets coefficients exactly to zero; L2 only shrinks. Three arguments, any one of which should be produced in full: (a) algebra: in the orthonormal case L1 gives $\operatorname{sign}(\hat\beta_j)(|\hat\beta_j| - \lambda)_+$, which maps the whole band $|\hat\beta_j| \le \lambda$ to $0$, while L2 gives $\hat\beta_j/(1+\lambda) \ne 0$; (b) geometry: in the constrained form the RSS ellipses hit the L1 diamond at corners on the axes, while the smooth L2 disk is touched off-axis; (c) priors: L1 is a Laplace prior with a cusp of probability mass at $0$, L2 a Gaussian whose penalty gradient $2\beta$ vanishes near $0$ and never pins a coefficient there.
+2. *Solution form.* Ridge has the closed form $(X^\top X + \lambda I)^{-1}X^\top y$ and is unique for every $\lambda > 0$; the lasso has no general closed form (non-differentiable at zero) and is solved by coordinate descent or LARS, with possible non-uniqueness under exact collinearity.
+3. *Correlated features.* Ridge spreads weight across a correlated group; the lasso picks one member arbitrarily and zeros the rest, unstably under resampling. With $p > n$ the lasso selects at most $n$ features.
+
+**When which.** L1 when sparsity is itself the goal: interpretability, feature selection, many irrelevant features suspected. L2 when the signal is spread over many correlated features, when $p > n$ stability matters, or when pure prediction accuracy is the goal. Elastic net when both properties are wanted: correlated groups plus selection.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="bias-variance" />: describe what happens to bias, variance, and expected test error as $\lambda \to 0$ and as $\lambda \to \infty$. Then make it exact in the orthonormal case: with $\hat\beta_j \sim$ mean $\beta_j$, variance $\sigma^2$, compute the bias, variance, and MSE of $\hat\beta^{\text{ridge}}_j = \hat\beta_j/(1+\lambda)$ as functions of $\lambda$, find the MSE-minimizing $\lambda$, and show some $\lambda > 0$ always beats $\lambda = 0$.
+
+<Solution>
+**Limits.** As $\lambda \to 0$ the estimator tends to OLS: zero bias (under the Gauss–Markov assumptions), maximal variance among the family. As $\lambda \to \infty$ all penalized coefficients go to $0$ and the fit collapses to the intercept-only null model $\hat y = \bar y$: maximal squared bias, essentially zero variance. Expected test error is noise $+$ bias² $+$ variance, so it traces a U over $\lambda$, and the working value sits at the bottom.
+
+**Orthonormal computation.** Write $b = \beta_j$, $\hat b = \hat\beta_j$ with $\mathbb E[\hat b] = b$, $\operatorname{Var}(\hat b) = \sigma^2$. Then $\hat b_\lambda = \hat b/(1+\lambda)$ has
+
+$$
+\operatorname{Bias} = \frac{b}{1+\lambda} - b = \frac{-\lambda b}{1+\lambda},
+\qquad
+\operatorname{Var} = \frac{\sigma^2}{(1+\lambda)^2},
+\qquad
+\operatorname{MSE}(\lambda) = \frac{\lambda^2 b^2 + \sigma^2}{(1+\lambda)^2}.
+$$
+
+Differentiate:
+
+$$
+\operatorname{MSE}'(\lambda)
+= \frac{2\lambda b^2 (1+\lambda)^2 - 2(1+\lambda)(\lambda^2 b^2 + \sigma^2)}{(1+\lambda)^4}
+= \frac{2(\lambda b^2 - \sigma^2)}{(1+\lambda)^3}.
+$$
+
+At $\lambda = 0$: $\operatorname{MSE}'(0) = -2\sigma^2 < 0$, so the MSE strictly decreases as $\lambda$ leaves zero: **some positive $\lambda$ always beats OLS**, whatever the true $b$. The minimum is at $\lambda^\ast = \sigma^2/b^2$ (noisy estimates or small true coefficients call for heavy shrinkage), with
+
+$$
+\operatorname{MSE}(\lambda^\ast) = \frac{\sigma^2 b^2}{b^2 + \sigma^2} < \sigma^2 = \operatorname{MSE}(0).
+$$
+
+This is the concrete escape from Gauss–Markov: OLS is only best among *unbiased* linear estimators, and the biased family beats it in MSE.
+</Solution>
+</Exercise>
+
+<Exercise>
+A centered design has singular values $d = (5, 2, 1)$. Compute the ridge effective degrees of freedom $\operatorname{df}(\lambda) = \sum_j d_j^2/(d_j^2 + \lambda)$ at $\lambda = 0$ and $\lambda = 4$, state which direction loses the largest fraction of its degree of freedom, and connect the $\lambda = 0$ value to a hat-matrix fact from <Ref lesson="ols" />.
+
+<Solution>
+Squared singular values: $d^2 = (25, 4, 1)$.
+
+At $\lambda = 0$: $\operatorname{df} = 1 + 1 + 1 = 3 = p$. This is $\operatorname{tr}(H) = p$: at $\lambda = 0$ the ridge smoother is the OLS hat matrix, an orthogonal projector onto a $p$-dimensional subspace, and its trace counts the parameters the fit consumes.
+
+At $\lambda = 4$:
+
+$$
+\operatorname{df}(4) = \frac{25}{29} + \frac{4}{8} + \frac{1}{5} = 0.862 + 0.5 + 0.2 = 1.562 .
+$$
+
+The fit now spends about $1.56$ effective parameters instead of $3$. Per direction, the retained fractions are $0.862$, $0.5$, $0.2$: the smallest singular value ($d_3 = 1$, the lowest-variance principal direction) loses the most, keeping only $20\%$ of its degree of freedom, while the dominant direction keeps $86\%$. As $\lambda \to \infty$ every ratio, and hence $\operatorname{df}$, goes to $0$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: two features are highly correlated. What does ridge do, what does the lasso do, and what fixes the problem? Prove the ridge claim for the extreme case of two identical columns, $X = [x \;\; x]$.
+
+<Solution>
+**Ridge splits the weight.** With identical columns the fit depends on the coefficients only through their sum $s = \beta_1 + \beta_2$:
+
+$$
+J = \tfrac12\lVert y - (\beta_1 + \beta_2)x\rVert^2 + \tfrac{\lambda}{2}(\beta_1^2 + \beta_2^2).
+$$
+
+For fixed $s$, the loss term is fixed and $\beta_1^2 + \beta_2^2$ is uniquely minimized at $\beta_1 = \beta_2 = s/2$ (strict convexity of the square). So the ridge solution puts exactly half the weight on each copy; for merely correlated features the split is approximate rather than exact.
+
+**Lasso is indifferent, hence arbitrary.** The penalty $\lambda(|\beta_1| + |\beta_2|)$ equals $\lambda|s|$ for any same-sign split of $s$, so every such split, including $(s, 0)$ and $(0, s)$, achieves the same objective: the solution is non-unique, and a numerical solver picks one copy and zeros the other. On real correlated (not identical) features, which one survives depends on noise, so the selected set is unstable under resampling.
+
+**The fix.** The elastic net adds a strictly convex L2 term, making the solution unique and pushing correlated features toward shared, equal coefficients while the L1 term still zeros genuinely irrelevant ones. Practical alternatives: drop or merge near-duplicates before fitting, or use plain ridge when selection is not required.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: why standardize features before regularizing? Demonstrate with a computation: centered data $x = (-1, 0, 1)$, $y = (-2, 0, 2)$, single coefficient, ridge with $\lambda = 2$. Fit once with $x$ and once with the rescaled feature $x' = 10x$, and compare the two fitted functions. Check that OLS does not have this problem.
+
+<Solution>
+Single-feature ridge minimizes $\tfrac12\sum_i(y_i - \beta x_i)^2 + \tfrac{\lambda}{2}\beta^2$, giving $\hat\beta = x^\top y / (x^\top x + \lambda)$.
+
+**Original units.** $x^\top y = (-1)(-2) + 0 + (1)(2) = 4$, $x^\top x = 2$: $\hat\beta = 4/(2+2) = 1$. Fitted function: $\hat y = 1 \cdot x$.
+
+**Rescaled.** $x'^\top y = 40$, $x'^\top x' = 200$: $\hat\beta' = 40/202 \approx 0.198$. In original units the fitted function is $\hat y = 0.198 \cdot 10x = 1.98x$, nearly the OLS fit, against $\hat y = x$ before. Same data, same $\lambda$, different model: multiplying the feature by $10$ shrank its coefficient by roughly $10$, cut its penalty share by roughly $100$, and effectively de-regularized it.
+
+**OLS check.** $\hat\beta_{\text{OLS}} = 4/2 = 2$ versus $40/200 = 0.2$, and $0.2 \times 10x = 2x$: the fitted function is identical. OLS is scale-equivariant; the penalty is what breaks the equivariance.
+
+Conclusion: with unstandardized features, the penalty's strength per feature is set silently by units. Scale features to unit variance first so a single $\lambda$ means the same thing for all of them, and leave the intercept unpenalized.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="mle-map" />: derive the lasso as a MAP estimate. Model $y_i = \beta^\top x_i + \varepsilon_i$ with $\varepsilon_i \sim \mathcal N(0, \sigma^2)$ i.i.d. and independent Laplace priors $p(\beta_j) = \tfrac{1}{2b}e^{-|\beta_j|/b}$. Show the MAP problem is the lasso and identify $\lambda$. State the caveat about what, exactly, is sparse.
+
+<Solution>
+Negative log-likelihood (Gaussian noise, as in <Ref lesson="ols" />):
+
+$$
+-\log p(D \mid \beta) = \frac{1}{2\sigma^2}\sum_{i=1}^n (y_i - \beta^\top x_i)^2 + \text{const}.
+$$
+
+Negative log-prior:
+
+$$
+-\log p(\beta) = \sum_{j=1}^p \frac{|\beta_j|}{b} + \text{const} = \frac{1}{b}\lVert\beta\rVert_1 + \text{const}.
+$$
+
+MAP minimizes the sum; dropping constants and multiplying by $\sigma^2 > 0$ (argmin unchanged):
+
+$$
+\hat\beta_{\text{MAP}} = \arg\min_\beta\; \tfrac12\sum_i (y_i - \beta^\top x_i)^2 + \frac{\sigma^2}{b}\lVert\beta\rVert_1 ,
+$$
+
+the lasso with $\lambda = \sigma^2/b$: more noise or a tighter prior (smaller $b$) means stronger sparsification. Replacing the Laplace prior with $\mathcal N(0, \tau^2)$ replaces the L1 term with $\tfrac{1}{2\tau^2}\lVert\beta\rVert_2^2$ and gives ridge with $\lambda = \sigma^2/\tau^2$.
+
+Caveat: this identifies the lasso with the posterior *mode*. The posterior itself is a continuous density, so $P(\beta_j = 0 \mid D) = 0$ and the posterior mean is not sparse; "the Laplace prior causes sparsity" is a statement about MAP point estimation only.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §3.4.1: ridge, the SVD shrinkage view, and effective degrees of freedom; §3.4.2–3.4.3: the lasso, Table 3.4's orthonormal comparison, and Fig. 3.11's diamond-versus-disk geometry. https://hastie.su.domains/ElemStatLearn/
+2. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §6.2: shrinkage methods, the constrained formulations (Eqs. 6.8–6.9), Credit-data coefficient paths, and choosing λ by cross-validation. https://www.statlearning.com/
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §11.3: ridge as MAP with a Gaussian prior; §11.4: lasso, the Laplace-prior reading, coordinate descent, and the elastic net. https://probml.github.io/pml-book/book1.html
+4. K. Q. Weinberger, "Lecture 10: Empirical Risk Minimization," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — the loss-plus-regularizer framing this chapter's menu table follows. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote10.html
+5. R. Tibshirani, "Regression Shrinkage and Selection via the Lasso," *Journal of the Royal Statistical Society, Series B*, 58(1), 1996 — the original lasso paper.
+6. A. E. Hoerl, R. W. Kennard, "Ridge Regression: Biased Estimation for Nonorthogonal Problems," *Technometrics*, 12(1), 1970 — the original ridge paper.
+7. H. Zou, T. Hastie, "Regularization and Variable Selection via the Elastic Net," *Journal of the Royal Statistical Society, Series B*, 67(2), 2005 — the elastic net, the grouping effect, and the lasso's at-most-n selection limit.
+8. J. Starmer, "Regularization Part 1: Ridge (L2) Regression," StatQuest (YouTube), 2018 — the two-point overfitting demonstration recreated in this chapter's opening figure. https://www.youtube.com/watch?v=Q81RR3yKn30
+</References>

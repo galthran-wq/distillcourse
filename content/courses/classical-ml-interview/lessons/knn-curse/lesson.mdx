@@ -1,0 +1,334 @@
+The simplest classifier — vote among the nearest training points — is asymptotically within a factor of two of optimal, and high dimensionality is exactly what breaks it. This chapter establishes both halves quantitatively, since they anchor two of the most common interview threads: $k$ as a bias–variance dial, and the curse of dimensionality argued with numbers rather than hand-waving. The route: the $k$-NN rule executed by hand, the choice of $k$, the Bayes error floor and the Cover–Hart bound, the geometry of high-dimensional space, and the practical checklist that follows from it.
+
+## The rule: vote among the k nearest points
+
+$k$-NN has no training step. The model **is** the stored training set; a prediction is a lookup executed at query time. The whole algorithm fits in one worked instance.
+
+<Example title="3-NN by hand">
+Six labeled training points in two dimensions, and a query $q = (3, 3)$:
+
+| point | $x_1$ | $x_2$ | label | $\lVert x - q \rVert^2$ |
+| --- | --- | --- | --- | --- |
+| a | 1 | 2 | green | $4 + 1 = 5$ |
+| b | 2 | 4 | blue | $1 + 1 = 2$ |
+| c | 3 | 1 | green | $0 + 4 = 4$ |
+| d | 4 | 4 | blue | $1 + 1 = 2$ |
+| e | 5 | 2 | green | $4 + 1 = 5$ |
+| f | 5 | 5 | blue | $4 + 4 = 8$ |
+
+Sorting by distance: $b$ and $d$ at $\sqrt{2} \approx 1.41$, then $c$ at $2$, then $a$ and $e$ at $\sqrt{5} \approx 2.24$, then $f$ at $\sqrt{8} \approx 2.83$. The $k = 3$ neighbor set is $\{b, d, c\}$; the vote is blue 2, green 1. Prediction: **blue**.
+
+For regression the vote becomes an average: if the six points carried numeric targets instead of labels, the prediction would be the mean target of $\{b, d, c\}$.
+</Example>
+
+<Figure
+  src="./figures/knn-vote.svg"
+  alt="Six labeled points, an amber query star, a dashed circle through the three nearest neighbors, and a sorted distance list ending in the vote blue 2 versus green 1"
+  caption="The worked query: the dashed circle passes through the 3rd neighbor; everything inside votes."
+/>
+
+<Definition title="k-nearest-neighbor rule">
+Given training pairs $(x_1, y_1), \dots, (x_n, y_n)$, a distance $d(\cdot,\cdot)$, and a query $x$, let $x_{(1)}, \dots, x_{(k)}$ be the $k$ training points closest to $x$. The $k$-NN **classifier** predicts the majority label among $y_{(1)}, \dots, y_{(k)}$; the $k$-NN **regressor** predicts their average $\tfrac{1}{k}\sum_{\ell=1}^{k} y_{(\ell)}$.
+</Definition>
+
+### Distance, ties, and weights
+
+The default distance is Euclidean, the $p = 2$ member of the *Minkowski* family $d(x, z) = \left(\sum_j |x_j - z_j|^p\right)^{1/p}$; $p = 1$ gives Manhattan distance, and cosine distance replaces the family for sparse text vectors. The metric is a genuine hyperparameter: it defines what "near" means, and <Ref lesson="bias-variance" /> applies only after that meaning is fixed.
+
+Two ties can occur. A **vote tie** (even $k$, equal counts) is avoided by choosing odd $k$ for binary problems, or resolved toward the nearest neighbor's class. A **distance tie** at the $k$-th position is resolved by including all tied points or by any fixed ordering. The common refinement is *distance-weighted* voting: each neighbor votes with weight $1/d(x, x_{(\ell)})$, which resolves most ties and lets near neighbors dominate far ones.
+
+<KeyFact>
+$k$-NN spends nothing at training time and everything at prediction time: train cost $O(1)$ beyond storing the data, prediction cost $O(nd)$ per query for $n$ points in $d$ dimensions. This is the reverse of every parametric model in this course.
+</KeyFact>
+
+The $O(nd)$ scan (plus an $O(n)$ quickselect for the $k$ smallest) is the practical bottleneck: memory holds all $n$ points forever, and latency grows with the training set. Space-partitioning indexes such as k-d trees cut lookup to $O(\log n)$ in low dimension but degrade back to a linear scan once $d$ reaches a few tens, for exactly the geometric reasons quantified below.
+
+## k is the bias–variance dial
+
+<Ref lesson="bias-variance" /> established that expected test error decomposes as noise + bias² + variance, and quoted the $k$-NN regression case in closed form ([ESL](https://hastie.su.domains/ElemStatLearn/) Eq. 7.10):
+
+$$
+\operatorname{Err}(x_0) = \sigma^2 + \left[f(x_0) - \frac{1}{k}\sum_{\ell=1}^{k} f(x_{(\ell)})\right]^2 + \frac{\sigma^2}{k}.
+$$
+
+The dial reads directly off the formula. Growing $k$ divides the variance term by $k$; the price is bias, because the average runs over neighbors $x_{(\ell)}$ that sit farther and farther from $x_0$, dragging $\tfrac1k \sum f(x_{(\ell)})$ away from $f(x_0)$.
+
+### Two corners: k = 1 memorizes, k = n predicts one class
+
+At $k = 1$ each training point is its own nearest neighbor, so **training error is exactly zero** regardless of the data: the memorizing, high-variance corner of the dartboard from the previous chapter. At $k = n$ every query sees the same neighbor set, and the classifier predicts the global majority class everywhere: the constant, high-bias corner. Every useful $k$ lies between the two corners.
+
+<Figure
+  src="./figures/boundaries.svg"
+  alt="Three panels of the same two-class scatter with k-NN boundaries at k equal 1, 15, and 51: jagged islands around single points, a smooth boundary, and an oversmoothed one, with train and test errors under each"
+  caption="One training set, three dials. k = 1: islands around noise points, train 0.00 but test 0.28. k = 15: test 0.23. k = 51: structure starts to wash out, test 0.24."
+/>
+
+The middle panel wins on test error (0.23 against 0.28 and 0.24) while losing on training error, the same divergence the U-curve formalizes. [ESL §2.3](https://hastie.su.domains/ElemStatLearn/) runs this comparison on its mixture data (Figs. 2.2–2.3), and [ISLP §2.2.3](https://www.statlearning.com) repeats it with $k = 1$ against $k = 100$.
+
+<Demo
+  name="KnnBoundaryExplorer"
+  caption="Two-class data with a k slider from 1 to 51: the decision boundary redraws and train/test error update live."
+/>
+
+<Task>
+Start at $k = 1$ and confirm train error 0 with islands around single points inside the other class. Slide $k$ up: the islands vanish and test error falls, then turns back up once the boundary oversmooths. Record the $k$ where test error bottoms out.
+</Task>
+
+### The U-curve, remeasured on k
+
+Sweeping $k$ on the same data and plotting error against $k$ on a reversed log axis reproduces the canonical picture: training error rises with $k$ while test error traces a U, with its minimum near $k = 19$ here and the Bayes floor (next section) unreachable below.
+
+<Figure
+  src="./figures/error-vs-k.svg"
+  alt="Training and test error versus k on a reversed log axis: training error climbs from zero at k equal 1 while test error dips to a minimum near k equal 19, above a dashed Bayes-error line at 0.21"
+  caption="The U-curve with 1/k as the flexibility axis. Train error is 0 at k = 1 and says nothing about the minimum at k ≈ 19."
+/>
+
+In practice $k$ is selected by cross-validation (protocols in <Ref lesson="cross-validation-bootstrap" />); odd values avoid vote ties. There is no universal default: the right $k$ depends on $n$, the noise level, and the geometry of the class boundary.
+
+<KeyFact>
+$k$ is the bias–variance dial run in reverse of the usual flexibility knobs: small $k$ means high flexibility (low bias, high variance), large $k$ means the opposite. $k = 1$ has zero training error by construction, which is a statement about variance, not about quality.
+</KeyFact>
+
+## The floor: the Bayes classifier and the Cover–Hart bound
+
+A concrete instance first. At some query $x$, suppose the true conditional probabilities are $P(y = 1 \mid x) = 0.7$ and $P(y = 0 \mid x) = 0.3$. Any classifier must output 0 or 1; predicting 1 errs with probability $0.3$, predicting 0 errs with probability $0.7$. The best possible move is the majority conditional, and its error $0.3$ cannot be improved by any amount of data or modeling.
+
+<Definition title="Bayes classifier and Bayes error">
+The **Bayes classifier** predicts $h^*(x) = \arg\max_y P(y \mid x)$. Its error rate,
+$$
+R^* = \mathbb{E}_x\!\left[1 - \max_y P(y \mid x)\right],
+$$
+the **Bayes error**, is the minimum achievable by any classifier: the classification analogue of the irreducible noise $\sigma^2$ in the squared-loss decomposition.
+</Definition>
+
+The Bayes classifier is unusable directly, because $P(y \mid x)$ is unknown; it exists as the benchmark every method is measured against. $k$-NN can be read as a plug-in approximation to it: the neighbor vote $\tfrac1k \sum \mathbb{1}[y_{(\ell)} = 1]$ estimates $P(y = 1 \mid x)$ from the labels nearest to $x$, and the majority vote takes the argmax of that estimate. The same floor returns in <Ref lesson="lda-gda" />, where a model of $P(y \mid x)$ is fit explicitly.
+
+### Cover–Hart: 1-NN lands within a factor of two, asymptotically
+
+For binary labels write $\eta(x) = P(y = 1 \mid x)$, so the pointwise Bayes error is $r(x) = \min(\eta(x), 1 - \eta(x))$.
+
+<Theorem title="Cover–Hart, 1967">
+Under mild regularity conditions, the error rate $R_n$ of the 1-NN classifier on $n$ training samples converges as $n \to \infty$ to
+$$
+R_\infty = \mathbb{E}_x\!\left[2\,\eta(x)\bigl(1 - \eta(x)\bigr)\right],
+\qquad
+R^* \;\le\; R_\infty \;\le\; 2R^*(1 - R^*) \;\le\; 2R^*.
+$$
+
+<Proof>
+Sketch. As $n \to \infty$, the nearest neighbor $x_{(1)}$ of a query $x$ converges to $x$ (in any region with positive density, ever more points fall in every ball around $x$). The predicted label is the neighbor's label, a draw from $\eta(x_{(1)}) \approx \eta(x)$, independent of the query's own label draw. The two independent draws disagree with probability
+$$
+\eta(x)\bigl(1 - \eta(x)\bigr) + \bigl(1 - \eta(x)\bigr)\eta(x) = 2\,\eta(x)\bigl(1-\eta(x)\bigr),
+$$
+which is the asymptotic pointwise error. Writing it as $2r(x)(1 - r(x))$ with $r(x) = \min(\eta, 1-\eta)$ and taking expectations gives $R_\infty = \mathbb{E}[2r(1-r)] \le 2\mathbb{E}[r] = 2R^*$; the tighter $2R^*(1-R^*)$ follows from Jensen's inequality, since $t \mapsto 2t(1-t)$ is concave. The lower bound $R_\infty \ge R^*$ holds because no classifier beats Bayes.
+</Proof>
+</Theorem>
+
+On the concrete instance: with $\eta(x) = 0.7$ everywhere, the Bayes error is $0.3$ and the asymptotic 1-NN error is $2 \times 0.7 \times 0.3 = 0.42$, between the floor $0.3$ and the cap $0.6$. The theorem says memorizing the data and asking one neighbor already discards at most half of the achievable performance, with no model fitted at all.
+
+<Remark title="the bound is asymptotic, and the curse attacks its premise">
+The entire argument rests on "$x_{(1)} \to x$ as $n \to \infty$." At finite $n$ the guarantee is only as good as the premise that the nearest neighbor is actually close, and the next section shows that in high dimension this premise fails at any realistic $n$: the two headline results of this chapter are in direct tension, and interviews probe exactly that tension. Cover and Hart's paper proves the asymptotic statement; it makes no claim about $n = 10^6$ points in $d = 1000$.
+</Remark>
+
+<KeyFact>
+Asymptotically, 1-NN's error is at most twice the Bayes error: $R^* \le R_\infty \le 2R^*(1-R^*)$. The guarantee needs the nearest neighbor to be genuinely near, which is a statement about $n$ relative to the dimension.
+</KeyFact>
+
+## The curse of dimensionality, quantified
+
+"Nearest" neighbors are useful only if they are *near*: the vote estimates $P(y \mid x)$ from labels of points whose conditionals resemble $\eta(x)$. Three computations show that in high dimension, near neighbors do not exist at any feasible sample size. All three run on the simplest possible model: $n$ points uniform in the unit cube $[0,1]^d$.
+
+### Edge length: a "local" neighborhood spans most of every axis
+
+Take $d = 10$ and ask for the cubical neighborhood that captures 10% of the data. Its volume must be $0.1$, so its edge is $0.1^{1/10} \approx 0.80$: the "neighborhood" spans **80% of the range of every coordinate**. Generally, capturing a fraction $r$ needs edge
+
+$$
+e_d(r) = r^{1/d},
+$$
+
+and the exponent $1/d$ destroys locality. For a 1% neighborhood ($r = 0.01$), the edge lengths are:
+
+| $d$ | 2 | 10 | 100 | 1000 |
+| --- | --- | --- | --- | --- |
+| $e_d(0.01)$ | 0.10 | 0.63 | 0.955 | 0.9954 |
+
+In $d = 1000$, the cube that holds 1% of the data spans 99.5% of every axis. The word "local" no longer describes anything.
+
+<Figure
+  src="./figures/edge-length.svg"
+  alt="Curves of edge length r to the power 1 over d for d equal 1, 2, 3, 10, with the point r equal 0.1 on the d equal 10 curve marked at edge 0.79"
+  caption="e_d(r) = r^(1/d), after ESL Fig. 2.6: by d = 10 even a 10% neighborhood needs 80% of each axis."
+/>
+
+<Aside>
+The sample-size arithmetic behind the same fact, from [CS4780's lecture 2](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote02_kNN.html): to keep $k$ neighbors within a genuinely local cube of edge $0.1$ in $d = 100$, the data must fill $\left(1/0.1\right)^{100} = 10^{100}$ such cells with $k$ points each, so $n \approx k \cdot 10^{100}$. Estimates put the number of electrons in the observable universe near $10^{80}$. No dataset closes that gap; density does not survive exponentiation.
+</Aside>
+
+### Volume concentrates in the outer shell
+
+The second computation asks where the volume of a ball sits. Peel a shell of relative thickness $\varepsilon = 0.1$ off a $d$-dimensional ball: the interior is a ball of radius $0.9$ of the original, with volume fraction $(1 - \varepsilon)^d$, so the shell holds $1 - (1-\varepsilon)^d$ of the volume.
+
+<Example title="the 10% shell">
+For $\varepsilon = 0.1$:
+$$
+d = 2:\; 1 - 0.9^2 = 0.19, \qquad
+d = 10:\; 1 - 0.9^{10} = 0.65, \qquad
+d = 100:\; 1 - 0.9^{100} = 0.99997.
+$$
+In two dimensions the outer 10% shell is a thin rind holding a fifth of the volume. By $d = 100$ it holds everything but $3 \times 10^{-5}$: essentially **all volume touches the surface**. This is Eq. (1.76) of [Bishop §1.4](https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/), which uses it to argue that high-dimensional intuition imported from 3D is simply wrong.
+</Example>
+
+<FigureSequence
+  name="shell"
+  alt="Three frames of a ball with its outer 10 percent shell shaded: a thin annulus at d equal 2 holding 19 percent, a thick shell at d equal 10 holding 65 percent, and the whole disk at d equal 100 holding essentially all volume"
+  caption="The same ε = 0.1 shell at d = 2, 10, 100; shaded area is drawn to scale with the shell's volume share."
+/>
+
+<Task>
+Step through the three frames and track the only thing that changes: the interior's share $(1-\varepsilon)^d$ collapsing from 0.81 to 0.35 to $3\times10^{-5}$. Verify the $d = 10$ frame by computing $0.9^{10} \approx 0.349$ on paper.
+</Task>
+
+Sparsity has a matching one-line formula. For $N$ points uniform in the unit ball in $d$ dimensions, the median distance from the center to the **nearest** of them is
+
+$$
+\operatorname{dist}(d, N) = \left(1 - \tfrac{1}{2}^{1/N}\right)^{1/d}
+$$
+
+([ESL §2.5](https://hastie.su.domains/ElemStatLearn/), Eq. 2.24; Exercise 7 derives it). With $N = 500$ points in $d = 10$, the median nearest neighbor sits at distance $0.52$: more than halfway to the boundary. Every query point is closer to the edge of the data than to its own nearest sample, so prediction is extrapolation, not interpolation.
+
+### Distances concentrate: nearest ≈ farthest
+
+The third computation kills the ranking itself. For two independent uniform points in $[0,1]^d$, the squared distance $\lVert X - Z \rVert^2 = \sum_{j=1}^d (X_j - Z_j)^2$ is a sum of $d$ i.i.d. terms, so its mean grows linearly in $d$ while its standard deviation grows only as $\sqrt{d}$: the distance itself is $\Theta(\sqrt{d})$ with $O(1)$ spread, and the **ratio** of farthest to nearest distance tends to 1.
+
+<Figure
+  src="./figures/distance-hist.svg"
+  alt="Histograms of pairwise distances divided by the square root of d for 400 uniform points: a broad distribution at d equal 2 with max over min about 4900, and a narrow spike at d equal 100 with max over min about 1.7"
+  caption="All pairwise distances among 400 uniform points, normalized by √d. At d = 100 the max/min ratio is 1.7: 'nearest' barely differs from 'farthest'."
+/>
+
+In the simulation behind the figure, the $d = 2$ distances span more than three orders of magnitude; at $d = 100$ every pair sits within a factor of 1.7 of every other. When all points are almost equidistant, the $k$ "nearest" are an effectively arbitrary sample, their labels carry no more information about $\eta(x)$ than random draws, and the vote degrades toward the global majority vote.
+
+<Remark title="why k-NN still works on real data">
+Distance concentration is a statement about data that genuinely fills $d$ dimensions. Real datasets rarely do: pixels, word counts, and sensor channels are highly correlated, so the data concentrates near a low-dimensional manifold embedded in the ambient space. CS4780's worked exception makes the point with data lying on a hyperplane: distances then behave like distances in the intrinsic dimension, not the ambient one, and $k$-NN performs according to the former. The curse is governed by intrinsic dimensionality, which is why $k$-NN on raw 784-pixel digit images works far better than the $d = 784$ arithmetic predicts.
+</Remark>
+
+<KeyFact>
+Three numbers to quote in an interview: a 1%-of-the-data neighborhood in $d = 100$ spans 95.5% of every axis; the outer 10% shell of a $d = 100$ ball holds 99.997% of its volume; and pairwise distances at $d = 100$ agree within a factor of about 1.7. High-dimensional neighborhoods are not local, so distance-based votes lose their premise.
+</KeyFact>
+
+## Practice: scaling, shrinking d, and when k-NN is right
+
+### Scale features before measuring distance
+
+Euclidean distance adds squared coordinate differences with equal weight, so the feature with the largest numeric range silently owns the metric. Concretely: customers described by (age in years, income in dollars), query $(30,\ 60000)$, candidate A $(31,\ 61000)$, candidate B $(55,\ 60500)$. Raw squared distances: A at $1^2 + 1000^2 \approx 10^6$, B at $25^2 + 500^2 \approx 2.5 \times 10^5$, so the metric declares B the nearest neighbor: a 500-dollar income difference outweighs a 25-year age difference, and age never enters the comparison at all. After standardizing each feature to unit variance (say $\mathrm{sd}_{\text{age}} = 10$ years, $\mathrm{sd}_{\text{income}} = 30000$ dollars), A sits at $0.1^2 + 0.033^2 \approx 0.011$ and B at $2.5^2 + 0.017^2 \approx 6.25$: A, the same-age customer, is the neighbor. Standardization or min–max scaling before any distance computation is mandatory for $k$-NN, and interviewers plant unscaled-feature scenarios deliberately; encodings and scalers are treated in <Ref lesson="feature-engineering" />.
+
+### Shrink the dimension, or fix the metric
+
+The mitigations follow from the diagnosis. **Dimensionality reduction** projects to few directions before measuring distance; <Ref lesson="pca" /> is the standard preprocessing step ahead of $k$-NN. **Feature selection** drops coordinates that only add noise to the metric; with 50 irrelevant features added, each contributes a random term to every squared distance, drowning the informative ones. **Metric learning** fits the distance itself, learning a Mahalanobis matrix so that same-class points come out near; one sentence to say it exists (LMNN is the standard reference point), one forward pointer to embeddings as its modern descendant.
+
+### When k-NN is the right answer
+
+$k$-NN is the correct interview recommendation when the data is low-dimensional (or low intrinsic dimension after reduction), $n$ is moderate, training must be free or the dataset changes constantly (new points are just appended), a nonparametric boundary is needed, or a strong baseline is wanted before anything parametric is tuned. It handles multiclass without modification and its predictions are explainable by exhibiting the neighbors. It is the wrong answer when prediction latency or memory is constrained, when $d$ is large with dense unstructured features, or when features mix scales and types without careful preprocessing.
+
+<Remark title="k-NN is not k-means">
+The perennial name-confusion question: $k$-NN is a **supervised** prediction rule that stores labeled data and votes at query time; its $k$ counts neighbors per query. $k$-means is an **unsupervised** partitioning algorithm that iteratively moves $k$ cluster centers to summarize unlabeled data; its $k$ counts clusters, fixed for the whole dataset. The only shared ingredient is a distance metric; <Ref lesson="kmeans" /> develops the latter.
+</Remark>
+
+## Exercises
+
+<Exercise>
+Training set: $a = (1,1)$ green, $b = (3,1)$ green, $c = (2,4)$ blue, $d = (4,3)$ blue, $e = (0,3)$ green, $f = (0,0)$ blue. Query $q = (2, 2)$, Euclidean distance. Compute the 1-NN and 3-NN classifications. Then state what happens at $k = 6$ and give two standard resolutions. Finally, using targets $y_a = 2.0$, $y_b = 3.0$, $y_c = 7.0$, $y_d = 8.0$, $y_e = 1.0$, $y_f = 5.0$, compute the 3-NN regression prediction.
+
+<Solution>
+Squared distances to $q$: $a$: $1 + 1 = 2$; $b$: $1 + 1 = 2$; $c$: $0 + 4 = 4$; $d$: $4 + 1 = 5$; $e$: $4 + 1 = 5$; $f$: $4 + 4 = 8$.
+
+**1-NN:** $a$ and $b$ tie at $\sqrt{2}$; both are green, so the prediction is green either way. **3-NN:** neighbor set $\{a, b, c\}$, vote green 2, blue 1: green.
+
+**$k = 6$:** all points vote and the count is green 3, blue 3, a tie: with $k = n$ and balanced classes the classifier carries no information. Standard resolutions: use odd $k$ (for binary labels), or weight votes by inverse distance. Distance-weighted here: green $1/\sqrt2 + 1/\sqrt2 + 1/\sqrt5 \approx 1.86$ against blue $1/2 + 1/\sqrt5 + 1/\sqrt8 \approx 1.30$, so green wins.
+
+**3-NN regression:** average the targets of $\{a, b, c\}$: $(2.0 + 3.0 + 7.0)/3 = 4.0$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review. Use the closed-form $k$-NN decomposition $\operatorname{Err}(x_0) = \sigma^2 + \left[f(x_0) - \tfrac{1}{k}\sum_{\ell=1}^{k} f(x_{(\ell)})\right]^2 + \sigma^2/k$ with $\sigma^2 = 1$ and $f(x_0) = 5$. The true function values at the 9 nearest neighbors of $x_0$, in distance order, are $4.9,\ 4.7,\ 4.8,\ 4.5,\ 4.0,\ 3.8,\ 3.5,\ 3.0,\ 2.6$. Compute the expected error for $k = 1$, $k = 3$, and $k = 9$, identify which term dominates in each case, and pick the best of the three.
+
+<Solution>
+**$k=1$:** neighbor average $= 4.9$, bias $= 5 - 4.9 = 0.1$, bias² $= 0.01$; variance $= 1/1 = 1$. Total $= 1 + 0.01 + 1 = 2.01$. Variance dominates.
+
+**$k=3$:** average $= (4.9 + 4.7 + 4.8)/3 = 4.8$, bias² $= 0.2^2 = 0.04$; variance $= 1/3 \approx 0.333$. Total $\approx 1.373$.
+
+**$k=9$:** average $= 35.8/9 \approx 3.978$, bias² $= 1.022^2 \approx 1.045$; variance $= 1/9 \approx 0.111$. Total $\approx 2.156$. Bias dominates: the far neighbors sit where $f$ has drifted well below $f(x_0)$.
+
+Best of the three: $k = 3$, where neither term is inflated. This is the bias–variance dial from the decomposition chapter made numeric: growing $k$ trades $\sigma^2/k$ against the drift of the neighborhood average.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the edge-length formula $e_d(r) = r^{1/d}$ for the sub-cube of $[0,1]^d$ that captures a fraction $r$ of uniformly distributed data, then compute the edge needed to capture 10% and 1% of the data in $d = 100$. State in one sentence why the result breaks $k$-NN.
+
+<Solution>
+For uniform data, the captured fraction equals the sub-cube's volume. A cube of edge $e$ has volume $e^d$, so $e^d = r$ gives $e = r^{1/d}$.
+
+$d = 100$: for $r = 0.1$, $e = 0.1^{1/100} = e^{\ln(0.1)/100} = e^{-0.0230} \approx 0.977$; for $r = 0.01$, $e = 0.01^{1/100} = e^{-0.0461} \approx 0.955$.
+
+A neighborhood containing even 1% of the data spans 95.5% of the range of every single coordinate, so the "nearest" neighbors are not local: their conditional distribution $P(y \mid x)$ need not resemble the query's, which is the assumption the vote relies on.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compute the fraction of a $D$-dimensional ball's volume lying within $\varepsilon = 0.01$ of its surface for $D = 3$ and $D = 500$. Use $1 - (1-\varepsilon)^D$ and give both numbers to two significant figures.
+
+<Solution>
+$D = 3$: $1 - 0.99^3 = 1 - 0.970299 \approx 0.030$: a 1% skin holds 3% of the volume, matching low-dimensional intuition.
+
+$D = 500$: $0.99^{500} = e^{500 \ln 0.99} = e^{500 \times (-0.010050)} = e^{-5.025} \approx 0.0066$, so the shell fraction is $1 - 0.0066 \approx 0.99$. In 500 dimensions, 99% of the ball's volume lies within 1% of its surface: volume concentrates entirely in the shell.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "You built a $k$-NN model on 12 features and it worked; a colleague added 50 more features (various units, some likely irrelevant) and accuracy collapsed. Explain why and state what you would do, in order."
+
+<Solution>
+Two compounding causes. **Scaling:** the new features arrive in arbitrary units, and Euclidean distance is owned by whichever feature has the largest numeric range, so the old informative features may have been drowned outright. **The curse:** each irrelevant feature adds a noise term $(x_j - z_j)^2$ to every squared distance; with 50 of them the distances concentrate and the neighbor ranking decouples from the 12 features that mattered, pushing the vote toward the global majority.
+
+In order: (1) standardize all features before any distance computation; (2) remove or down-weight irrelevant features: feature selection, or a supervised relevance check per feature; (3) reduce dimension before the metric, e.g. PCA to the leading components; (4) re-tune $k$ by cross-validation on the corrected pipeline, since the old $k$ was chosen for a different geometry; (5) if performance still lags, switch to a model whose metric is learned or irrelevant-feature-robust (metric learning, or trees). "More features" is not free for distance-based methods; each one must earn its place in the metric.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "What is the difference between $k$-NN and $k$-means?" Give the answer as a four-row comparison: supervision, what $k$ denotes, what is computed at training time, and what a prediction/output is.
+
+<Solution>
+| | $k$-NN | $k$-means |
+| --- | --- | --- |
+| supervision | supervised (labeled data) | unsupervised (no labels) |
+| meaning of $k$ | neighbors consulted per query | number of clusters for the whole dataset |
+| training | none: store the data | iterative: alternate assignment and center updates until convergence |
+| output | a label (vote) or value (average) for each query | a partition of the data plus $k$ centroids |
+
+The shared ingredient is a distance metric; everything else differs. Bonus point interviewers listen for: $k$-NN's cost is at prediction time, $k$-means' at training time.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the median nearest-neighbor distance formula for $N$ points uniform in the unit ball in $d$ dimensions: $\operatorname{dist}(d, N) = (1 - \tfrac{1}{2}^{1/N})^{1/d}$, then evaluate it for $N = 500$, $d = 10$ and interpret the number. Use the fact that the fraction of the unit ball's volume within radius $x$ of the center is $x^d$.
+
+<Solution>
+For one uniform point, $P(\text{distance from center} > x) = 1 - x^d$. For $N$ independent points, the nearest exceeds $x$ with probability $(1 - x^d)^N$. The median $m$ of the nearest-neighbor distance solves $(1 - m^d)^N = \tfrac12$, so $1 - m^d = \tfrac{1}{2}^{1/N}$ and $m = (1 - \tfrac{1}{2}^{1/N})^{1/d}$.
+
+$N = 500$, $d = 10$: $\tfrac{1}{2}^{1/500} = e^{-0.693/500} \approx 0.99861$, so $1 - \tfrac{1}{2}^{1/500} \approx 0.001385$ and $m = 0.001385^{1/10} = e^{\ln(0.001385)/10} \approx e^{-0.658} \approx 0.52$.
+
+With 500 samples in 10 dimensions, the typical query's nearest neighbor is more than halfway to the boundary of the support: farther from the query than the boundary of the entire dataset in relative terms. Estimation at the query point is extrapolation from a distant sample, exactly the failure of the "nearest neighbor is near" premise that Cover–Hart requires.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Q. Weinberger, "Lecture 2: k-Nearest Neighbors / Curse of Dimensionality," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — the k-NN rule, the Cover–Hart proof, the edge-length table, and the hyperplane exception. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote02_kNN.html
+2. T. M. Cover, P. E. Hart, "Nearest Neighbor Pattern Classification," *IEEE Transactions on Information Theory* 13(1), 1967, pp. 21–27 — the asymptotic 2× bound.
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §2.3 (k-NN on the mixture data), §2.5 (the curse: Fig. 2.6 and Eq. 2.24), §7.3 (Eq. 7.10, the k-NN bias–variance decomposition), §13.3 (practical k-NN). https://hastie.su.domains/ElemStatLearn/
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §2.2.3: KNN as an approximation to the Bayes classifier. https://www.statlearning.com
+5. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.4 (Eq. 1.76): the curse of dimensionality and the shell-volume computation. https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+6. C. Huyen, *Introduction to Machine Learning Interviews*, self-published web book — §8.1: how k-NN questions are asked and graded. https://huyenchip.com/ml-interviews-book/
+</References>

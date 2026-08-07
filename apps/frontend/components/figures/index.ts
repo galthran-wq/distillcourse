@@ -26,6 +26,24 @@ import PhaseFalseResolution from "./digital-signal-processing/PhaseFalseResoluti
 import LocalizationResolutionLedger from "./digital-signal-processing/LocalizationResolutionLedger";
 import PeriodogramVarianceEnvelope from "./digital-signal-processing/PeriodogramVarianceEnvelope";
 import WelchAveragingPipeline from "./digital-signal-processing/WelchAveragingPipeline";
+import BiasVarianceProofSteps from "./classical-ml-interview/BiasVarianceProofSteps";
+import LogisticGradientSteps from "./classical-ml-interview/LogisticGradientSteps";
+import OddsRatioCard from "./classical-ml-interview/OddsRatioCard";
+import CeVsMseLoss from "./classical-ml-interview/CeVsMseLoss";
+import SpamPosteriorSteps from "./classical-ml-interview/SpamPosteriorSteps";
+import ZeroCountRepair from "./classical-ml-interview/ZeroCountRepair";
+import NbLinearScore from "./classical-ml-interview/NbLinearScore";
+import GenDiscTaxonomy from "./classical-ml-interview/GenDiscTaxonomy";
+import GdaSigmoidSteps from "./classical-ml-interview/GdaSigmoidSteps";
+import GenDiscScorecard from "./classical-ml-interview/GenDiscScorecard";
+import BernoulliExpFamSteps from "./classical-ml-interview/BernoulliExpFamSteps";
+import GlmAssemblyLine from "./classical-ml-interview/GlmAssemblyLine";
+import UniformGradientCard from "./classical-ml-interview/UniformGradientCard";
+import PoissonCalibrationVerdict from "./classical-ml-interview/PoissonCalibrationVerdict";
+import ConfusionMatrixMaster from "./classical-ml-interview/ConfusionMatrixMaster";
+import HoeffdingBin from "./classical-ml-interview/HoeffdingBin";
+import VcBoundAnatomy from "./classical-ml-interview/VcBoundAnatomy";
+import KmeansDescentLemmas from "./classical-ml-interview/KmeansDescentLemmas";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -191,6 +209,24 @@ export const figures: Record<string, RegisteredFigure> = {
   LocalizationResolutionLedger: { component: LocalizationResolutionLedger },
   PeriodogramVarianceEnvelope: { component: PeriodogramVarianceEnvelope },
   WelchAveragingPipeline: { component: WelchAveragingPipeline },
+  BiasVarianceProofSteps: { component: BiasVarianceProofSteps, frames: 4 },
+  LogisticGradientSteps: { component: LogisticGradientSteps, frames: 4 },
+  OddsRatioCard: { component: OddsRatioCard },
+  CeVsMseLoss: { component: CeVsMseLoss },
+  SpamPosteriorSteps: { component: SpamPosteriorSteps, frames: 4 },
+  ZeroCountRepair: { component: ZeroCountRepair },
+  NbLinearScore: { component: NbLinearScore },
+  GenDiscTaxonomy: { component: GenDiscTaxonomy },
+  GdaSigmoidSteps: { component: GdaSigmoidSteps, frames: 3 },
+  GenDiscScorecard: { component: GenDiscScorecard },
+  BernoulliExpFamSteps: { component: BernoulliExpFamSteps, frames: 3 },
+  GlmAssemblyLine: { component: GlmAssemblyLine },
+  UniformGradientCard: { component: UniformGradientCard },
+  PoissonCalibrationVerdict: { component: PoissonCalibrationVerdict },
+  ConfusionMatrixMaster: { component: ConfusionMatrixMaster },
+  HoeffdingBin: { component: HoeffdingBin },
+  VcBoundAnatomy: { component: VcBoundAnatomy },
+  KmeansDescentLemmas: { component: KmeansDescentLemmas },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },

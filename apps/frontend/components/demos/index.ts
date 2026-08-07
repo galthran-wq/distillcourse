@@ -70,4 +70,27 @@ export const demos: Record<
     import("./digital-signal-processing/WeakToneWindowLab"),
   WelchTradeoffLab: () =>
     import("./digital-signal-processing/WelchTradeoffLab"),
+  BiasVarianceExplorer: () =>
+    import("./classical-ml-interview/BiasVarianceExplorer"),
+  GradientDescentExplorer: () =>
+    import("./classical-ml-interview/GradientDescentExplorer"),
+  KnnBoundaryExplorer: () =>
+    import("./classical-ml-interview/KnnBoundaryExplorer"),
+  CoefficientPathExplorer: () =>
+    import("./classical-ml-interview/CoefficientPathExplorer"),
+  ThresholdMetricsExplorer: () =>
+    import("./classical-ml-interview/ThresholdMetricsExplorer"),
+  SvmMarginExplorer: () =>
+    import("./classical-ml-interview/SvmMarginExplorer"),
+  KernelBoundaryExplorer: () =>
+    import("./classical-ml-interview/KernelBoundaryExplorer"),
+  TreeDepthExplorer: () =>
+    import("./classical-ml-interview/TreeDepthExplorer"),
+  BoostingStagesExplorer: () =>
+    import("./classical-ml-interview/BoostingStagesExplorer"),
+  KMeansStepper: () => import("./classical-ml-interview/KMeansStepper"),
+  PcaExplorer: () => import("./classical-ml-interview/PcaExplorer"),
+  PerplexityExplorer: () =>
+    import("./classical-ml-interview/PerplexityExplorer"),
+  EmStepper: () => import("./classical-ml-interview/EmStepper"),
 };

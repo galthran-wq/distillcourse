@@ -1,0 +1,407 @@
+XGBoost replaces the first-order gradient step with a Newton step: a second-order Taylor expansion of the loss gives closed-form leaf weights and an exact split-gain formula. This chapter derives both results with every algebraic step shown, since "derive the XGBoost gain" is a standing senior-interview request that the [original paper](https://arxiv.org/abs/1603.02754) compresses into four equations. The route: the flaw the second order fixes, the regularized objective and its $g/h$ expansion, the leaf-weight and structure-score derivation, the gain formula executed numerically on six points, the regularization inventory, sparsity-aware default directions, and the systems layer plus the LightGBM/CatBoost landscape.
+
+## The flaw: structure is chosen blind to curvature and complexity
+
+<Ref lesson="gradient-boosting" /> fit each round's tree by least squares to the pseudo-residuals, then repaired the leaf values by a per-leaf line search on the true loss. Two things about that recipe are approximations of convenience.
+
+**Curvature is ignored where it matters most.** The split search minimizes a squared-error surrogate against the negative gradient: only first-derivative information decides the tree's *structure*. Curvature sneaks in at the very end, in the one Newton step per leaf that libraries use for log-loss, but by then the splits are already frozen.
+
+**Complexity is priced outside the objective.** Depth caps, shrinkage $\nu$, and subsampling all control overfitting, yet none of them appears in the loss being minimized; the objective itself would happily grow any tree to purity.
+
+[Chen & Guestrin (2016)](https://arxiv.org/abs/1603.02754) repair both in one line: expand the loss to second order per point (a Newton step in function space, upgrading the gradient step of <Ref lesson="gradient-descent" />), and add an explicit complexity penalty on the tree.
+
+<Definition title="regularized boosting objective">
+At round $t$, with predictions $\hat y_i^{(t-1)}$ carried over and a new tree $f_t$ to be chosen, XGBoost minimizes
+
+$$
+\mathrm{obj}^{(t)} = \sum_{i=1}^{n} l\bigl(y_i,\, \hat y_i^{(t-1)} + f_t(x_i)\bigr) + \Omega(f_t),
+\qquad
+\Omega(f) = \gamma\, T + \tfrac{1}{2}\lambda \sum_{j=1}^{T} w_j^2,
+$$
+
+where $T$ is the tree's number of leaves and $w_j$ its $j$-th leaf value. $\gamma$ charges a fixed toll per leaf; $\lambda$ is an L2 penalty on the leaf values themselves.
+</Definition>
+
+<KeyFact>
+In XGBoost one regularized objective decides everything: the leaf values, the split decisions, and the stopping rule all fall out of the same formula, where vanilla gradient boosting chose structure from a squared-error surrogate that ignores curvature and priced complexity by external knobs.
+</KeyFact>
+
+## The objective: a second-order expansion with one g and one h per point
+
+A concrete expansion first. For squared loss $l = \tfrac12(\hat y - y)^2$, adding a correction $f$ to the current prediction $\hat y$ gives, exactly,
+
+$$
+l(y, \hat y + f) = \underbrace{\tfrac12 (\hat y - y)^2}_{\text{constant in } f} + (\hat y - y)\, f + \tfrac12 f^2 .
+$$
+
+The coefficient of $f$ is the first derivative of the loss at the current prediction, $\hat y - y$ (the negative residual), and the coefficient of $\tfrac12 f^2$ is the second derivative, $1$. For squared loss the "approximation" has no error term.
+
+### The general move: Taylor to second order, then drop constants
+
+For any twice-differentiable loss, define per point
+
+$$
+g_i = \frac{\partial\, l(y_i, \hat y)}{\partial \hat y}\bigg|_{\hat y = \hat y_i^{(t-1)}},
+\qquad
+h_i = \frac{\partial^2 l(y_i, \hat y)}{\partial \hat y^2}\bigg|_{\hat y = \hat y_i^{(t-1)}},
+$$
+
+and expand each term of the objective around the current prediction. The zeroth-order terms $l(y_i, \hat y_i^{(t-1)})$ do not depend on the tree being chosen, so they drop, leaving the working objective (the paper's Eq. 3):
+
+$$
+\tilde{\mathrm{obj}}^{(t)} = \sum_{i=1}^{n} \Bigl[ g_i\, f_t(x_i) + \tfrac12\, h_i\, f_t(x_i)^2 \Bigr] + \gamma T + \tfrac12 \lambda \sum_{j=1}^{T} w_j^2 .
+$$
+
+For log-loss the derivatives were computed in <Ref lesson="logistic-regression" />: with $p = \sigma(\hat y)$, the first derivative is $g = p - y$ and differentiating once more through $\sigma' = \sigma(1-\sigma)$ gives $h = p(1-p)$.
+
+<Figure
+  src="./figures/gh-table.svg"
+  alt="Table of g and h for squared and logistic loss with the lambda-zero leaf weight column showing that squared loss recovers the mean residual, gradient boosting's leaf"
+  caption="The two losses that matter in interviews. Squared loss has h ≡ 1, so at λ = 0 the machinery below collapses to GBM's mean-residual leaf."
+/>
+
+<Remark title="the expansion is in function space">
+The Taylor expansion is in the *function value* $f_t(x_i)$, not in any parameter vector: the same treat-the-$n$-fitted-values-as-coordinates move that defined gradient boosting. Gradient boosting linearized the loss in those coordinates and stepped along the slope; XGBoost fits a quadratic in them and jumps to its minimum. The relationship is exactly gradient descent versus Newton's method, transplanted from parameter space to function space.
+</Remark>
+
+<Remark title="h must be non-negative">
+Everything below minimizes a quadratic in $w$ with leading coefficient $\sum h_i + \lambda$, which is a minimization only if that coefficient is positive. Convex losses guarantee $h_i \ge 0$; a custom loss with negative second derivative makes the "optimal" leaf a maximum and the derivation invalid. This is why library documentation demands convex (or Hessian-clamped) custom objectives.
+</Remark>
+
+## Leaf weights in closed form: w* = −G/(H+λ)
+
+Fix the tree's *structure*: a map $q$ sending each input to a leaf, with $I_j = \{\, i : q(x_i) = j \,\}$ the set of training points in leaf $j$. A tree is constant on each leaf, $f_t(x_i) = w_{q(x_i)}$, so the sum over points regroups into a sum over leaves:
+
+$$
+\tilde{\mathrm{obj}}^{(t)}
+= \sum_{j=1}^{T} \Bigl[ \Bigl(\textstyle\sum_{i \in I_j} g_i\Bigr) w_j + \tfrac12 \Bigl(\textstyle\sum_{i \in I_j} h_i + \lambda\Bigr) w_j^2 \Bigr] + \gamma T
+= \sum_{j=1}^{T} \Bigl[ G_j\, w_j + \tfrac12 (H_j + \lambda)\, w_j^2 \Bigr] + \gamma T,
+$$
+
+with $G_j = \sum_{i \in I_j} g_i$ and $H_j = \sum_{i \in I_j} h_i$. The $\tfrac12\lambda w_j^2$ penalty merged into the quadratic term; the coupling between leaves is gone, and each $w_j$ can be optimized alone.
+
+<Theorem title="optimal leaf weight and structure score">
+For a fixed structure $q$ with $H_j + \lambda > 0$, the objective above is minimized by
+
+$$
+w_j^{*} = -\frac{G_j}{H_j + \lambda},
+$$
+
+and the minimum value, the **structure score** of $q$, is
+
+$$
+\tilde{\mathrm{obj}}^{*}(q) = -\frac12 \sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T .
+$$
+
+<Proof>
+Each leaf contributes an independent one-variable quadratic $\varphi(w) = G w + \tfrac12(H+\lambda)w^2$. Setting $\varphi'(w) = G + (H+\lambda)w = 0$ gives $w^* = -G/(H+\lambda)$, a minimum since $\varphi'' = H + \lambda > 0$. Substituting back:
+
+$$
+\varphi(w^*) = G \cdot \frac{-G}{H+\lambda} + \frac12 (H+\lambda)\frac{G^2}{(H+\lambda)^2}
+= -\frac{G^2}{H+\lambda} + \frac12 \frac{G^2}{H+\lambda}
+= -\frac12 \frac{G^2}{H+\lambda}.
+$$
+
+Summing over leaves and restoring the $\gamma T$ term gives the structure score.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="derivation"
+  alt="Five frames staging the XGBoost derivation: the second-order objective with g and h highlighted, the regrouping per leaf into G and H, the one-leaf quadratic with its vertex at minus G over H plus lambda, the assembled structure score, and the split gain as before minus after with the gamma toll"
+  caption="The whole derivation in five moves: expand, regroup, minimize each leaf's parabola, assemble the score, subtract before from after."
+/>
+
+<Task>
+Step through the five frames and, at frame 3, verify the vertex algebra yourself: substitute $w^* = -G/(H+\lambda)$ into $Gw + \tfrac12(H+\lambda)w^2$ and confirm the two terms combine to $-\tfrac12\, G^2/(H+\lambda)$.
+</Task>
+
+### The score on a concrete leaf
+
+<Example title="one leaf, three points">
+A leaf holds three points with gradients $g = (-2, -1.5, -1)$ and $h = 1$ each (squared loss); take $\lambda = 1$. Then $G = -4.5$, $H = 3$, and
+
+$$
+w^{*} = -\frac{-4.5}{3 + 1} = 1.125,
+\qquad
+\text{leaf contribution} = -\frac12 \cdot \frac{(-4.5)^2}{3+1} = -\frac{20.25}{8} \approx -2.53 .
+$$
+
+All three gradients are negative, meaning every point is underpredicted, so the leaf takes a positive correction; $\lambda = 1$ shrinks it below the unregularized value $4.5/3 = 1.5$. The more negative a leaf's contribution $-\tfrac12 G_j^2/(H_j+\lambda)$, the more that leaf reduces the loss.
+</Example>
+
+<Remark title="the StatQuest nickname">
+StatQuest calls $G^2/(H+\lambda)$ a leaf's *similarity score*: coherent gradients (all pulling one way) make $G^2$ large, mixed gradients cancel. The nickname is fine as mnemonics, but in an interview reproduce the derivation: the quantity is (twice) the loss reduction the leaf achieves at its optimal weight, not a similarity heuristic.
+</Remark>
+
+Setting $h \equiv 1$ (squared loss) and $\lambda = 0$ gives $w_j^* = -G_j/|I_j| = $ the mean residual of the leaf: exactly the leaf value gradient boosting assigns under squared error. **GBM is the special case** of this machinery with curvature constant and regularization off.
+
+<KeyFact>
+Once the structure is fixed, nothing is left to tune: the optimal leaf weight is $-G/(H+\lambda)$ in closed form, and plugging it back scores the entire tree shape as $-\tfrac12 \sum_j G_j^2/(H_j+\lambda) + \gamma T$.
+</KeyFact>
+
+## The split gain: score before minus score after
+
+The structure score turns "which split is best" into arithmetic. Splitting one leaf with sums $(G, H)$ into a left child $(G_L, H_L)$ and right child $(G_R, H_R)$, with $G = G_L + G_R$ and $H = H_L + H_R$, changes the structure score by
+
+$$
+\underbrace{-\tfrac12 \frac{G^2}{H+\lambda} + \gamma}_{\text{before: one leaf}}
+\;-\;
+\underbrace{\Bigl( -\tfrac12 \frac{G_L^2}{H_L+\lambda} - \tfrac12 \frac{G_R^2}{H_R+\lambda} + 2\gamma \Bigr)}_{\text{after: two leaves}},
+$$
+
+and since lower scores are better, the improvement is the negation of that change (the paper's Eq. 7):
+
+$$
+\mathrm{Gain} = \frac12 \left[ \frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda} \right] - \gamma .
+$$
+
+This is the quantity XGBoost's exact greedy algorithm (the paper's Algorithm 1) evaluates for every candidate split of every feature, in one linear scan over each feature's sorted values, accumulating $G_L, H_L$ left to right. $\gamma$ appears exactly once, as the price of the one extra leaf the split creates: a split must buy more loss reduction than $\gamma$ to be worth it.
+
+<Example title="a split evaluated end to end">
+Six points sorted by a feature $x$, with $g = (-2, -1.5, -1, 1, 2, 2.5)$ and $h = 1$ each; $\lambda = 1$, $\gamma = 1$. Candidate: split between the third and fourth points.
+
+Left sums: $G_L = -4.5$, $H_L = 3$. Right sums: $G_R = 5.5$, $H_R = 3$. Parent: $G = 1$, $H = 6$. The three score fractions:
+
+$$
+\frac{G_L^2}{H_L+\lambda} = \frac{20.25}{4} = 5.0625,
+\qquad
+\frac{G_R^2}{H_R+\lambda} = \frac{30.25}{4} = 7.5625,
+\qquad
+\frac{G^2}{H+\lambda} = \frac{1}{7} \approx 0.1429 .
+$$
+
+$$
+\mathrm{Gain} = \tfrac12\,(5.0625 + 7.5625 - 0.1429) - 1 = 6.2411 - 1 = 5.24 > 0
+\quad\Rightarrow\quad \text{split.}
+$$
+
+The parent fraction is tiny because the mixed gradients nearly cancel ($G = 1$); separating the negative-$g$ points from the positive-$g$ points is what creates the gain. For contrast, splitting after the first point scores $\tfrac12(4/2 + 9/6 - 0.1429) - 1 \approx 0.68$: positive, but far worse. The scan keeps the maximum. If the winner is taken, the children's weights are $w_L^* = 4.5/4 = 1.125$ and $w_R^* = -5.5/4 = -1.375$.
+</Example>
+
+<Figure
+  src="./figures/split-eval.svg"
+  alt="Six points on a feature axis with per-point g and h, the candidate split marked between points three and four, the left, right, and parent G and H sums, the three score fractions, and the gain computation ending in a split verdict"
+  caption="The gain formula executed end to end: sums, three fractions, subtract, pay γ, compare to zero. Exercise 3 repeats this with fresh numbers."
+/>
+
+<Remark title="γ prunes more than it stops">
+A negative gain does not simply halt growth. XGBoost's depth-wise growth expands splits with positive raw gain up to `max_depth`, then a bottom-up pass removes splits whose gain falls below $\gamma$. The order matters: a low-gain split survives if a deeper split beneath it pays, so $\gamma$ acts as post-pruning (the tree's analogue of cost-complexity pruning from <Ref lesson="decision-trees" />), not as a greedy stopping rule that could miss profitable structure below a weak split.
+</Remark>
+
+## The regularization inventory: six knobs, one objective
+
+Interviewers ask for the list; the derivation above says what each item does mechanically.
+
+- **$\lambda$ (`reg_lambda`, default 1)** sits in every denominator: it shrinks each leaf weight by the factor $H/(H+\lambda)$ toward zero and damps gains, hitting hardest the leaves with little Hessian mass. It is a ridge penalty from <Ref lesson="ridge-lasso" /> applied to leaf values (an `reg_alpha` L1 twin exists).
+- **$\gamma$ (`min_split_loss`, default 0)** is the per-leaf toll: the minimum gain a split must clear, enforced by pruning as above.
+- **Shrinkage $\eta$** multiplies each tree's leaf weights before they join the ensemble, inherited unchanged from <Ref lesson="gradient-boosting" /> and co-tuned with the round count.
+- **Row and column subsampling** are inherited from stochastic boosting and <Ref lesson="bagging-random-forests" />: each tree (or level) sees a random fraction of rows and features.
+- **`min_child_weight`** requires each child's $H$ to exceed a threshold. For squared loss $h \equiv 1$, so it is a minimum leaf size; for log-loss it thresholds $\sum p_i(1-p_i)$, the mass of *uncertainty* in the leaf, and stops splits in regions the model already predicts confidently.
+- **`max_depth`** caps interaction order, exactly as in the previous chapter.
+
+<Figure
+  src="./figures/knobs.svg"
+  alt="The same small tree scored under three settings: lambda and gamma zero with large leaf weights and both splits kept, lambda five shrinking every leaf weight, and gamma two deleting the low-gain sub-split"
+  caption="What the two objective knobs physically do: λ shrinks every leaf weight through its denominator; γ deletes splits whose gain cannot pay the toll."
+/>
+
+<KeyFact>
+`min_child_weight` does not count points, it counts Hessian mass: under log-loss a child needs enough $\sum p(1-p)$, so the constraint binds precisely in low-uncertainty regions where further splits would fit noise in confident predictions.
+</KeyFact>
+
+## Missing values: a learned default direction per split
+
+Real tabular data is sparse three ways: genuinely missing entries, zeros in sparse encodings, and the blocks of zeros one-hot encoding produces. XGBoost's *sparsity-aware split finding* (the paper's Algorithm 3) handles all three with one mechanism. When scanning a feature's candidate splits, only the points with **present** values are enumerated; the points with missing values are treated as a block and routed wholesale, first all-left and then all-right. Each candidate split is therefore scored twice, and the winning direction is stored on the node as its *default direction*.
+
+<Figure
+  src="./figures/default-direction.svg"
+  alt="One split node shown twice: the missing-value stream routed left scoring worse, then routed right scoring better, with the better default kept on the node"
+  caption="Each candidate split is scored with the missing block sent left, then right; the node keeps the direction with the better objective."
+/>
+
+At inference, a missing value simply follows the stored default branch: no imputation step exists in the pipeline at all. The scan's cost is linear in the number of *present* entries, which on the paper's sparse Allstate data made the sparsity-aware scan about 50× faster than a naive dense one. Two interview follow-ups: the default direction is learned per split, not global, so different nodes may route missing values differently; and if a feature was never missing in training, no signal chose its default, so inference-time missing values fall to the implementation's tie-break (current XGBoost routes them right) — the robust answer is that train-time and serving-time missingness must match, which is a <Ref lesson="feature-engineering" /> pipeline concern, not a model concern.
+
+## Scale: weighted quantiles and the systems layer
+
+### Approximate splits: the objective is a weighted least squares
+
+Exact greedy enumerates every distinct feature value; at billions of rows that is infeasible, so Algorithm 2 proposes only a few dozen candidate thresholds per feature from quantiles. The correct notion of "quantile" falls out of the objective. Completing the square in the working objective:
+
+$$
+g_i f + \tfrac12 h_i f^2 = \tfrac12 h_i \Bigl( f - \bigl(-\tfrac{g_i}{h_i}\bigr) \Bigr)^2 - \tfrac{g_i^2}{2 h_i},
+$$
+
+so up to constants the round is a **weighted least-squares regression**: each point demands the Newton target $-g_i/h_i$ with weight $h_i$. Candidate splits should therefore be quantiles of the feature weighted by $h$, which is what the paper's weighted quantile sketch computes with provable error bounds. Points with large curvature count for more of the "mass" being divided evenly.
+
+### The systems section, in one paragraph
+
+The rest of the paper's speed is engineering: feature columns are stored pre-sorted in compressed *column blocks* so the sort is paid once, not per node, and the linear scans parallelize over features; cache-aware prefetching and block sizing keep the gradient lookups (which are random-access by row index) from thrashing; and block compression plus disk sharding let training run out-of-core on data that exceeds RAM. The 2016 evidence, historical numbers but the reason the library won: exact greedy XGBoost took 0.68 s per tree on the 1M-row Higgs benchmark against scikit-learn's 28.5 s at the same test AUC (0.830), and 17 of the 29 Kaggle challenge-winning solutions published in 2015 used XGBoost.
+
+## The landscape: XGBoost, LightGBM, CatBoost
+
+| library | the one-line addition | reach for it when |
+| --- | --- | --- |
+| [XGBoost](https://arxiv.org/abs/1603.02754) (2016) | Newton boosting + explicit $\Omega$ + sparsity-aware splits + the systems layer | the tuned all-rounder; default interview answer |
+| [LightGBM](https://papers.nips.cc/paper_files/paper/2017/hash/6449f44a102fde848669bdd9eb6b76fa-Abstract.html) (2017) | histogram splits, **leaf-wise** growth (deepen the best leaf, not the whole level), GOSS sampling that keeps large-$g$ points | very large $n$: typically fastest and most memory-lean; watch `num_leaves`, since leaf-wise trees overfit sooner |
+| [CatBoost](https://arxiv.org/abs/1706.09516) (2018) | ordered target statistics for categorical features + ordered boosting against target leakage | many high-cardinality categorical columns; the encoding trap it avoids is covered in <Ref lesson="feature-engineering" /> |
+
+<Figure
+  src="./figures/family-tree.svg"
+  alt="Family tree from AdaBoost to gradient boosting to XGBoost, branching into LightGBM and CatBoost, each edge labeled with the idea it added"
+  caption="One idea per edge: any-loss boosting, then the Newton step with an explicit penalty and systems, then per-library specializations."
+/>
+
+The positioning fact that closes the module: on small-to-medium **tabular** data, boosted trees remain the strongest default. [Grinsztajn et al. (2022)](https://arxiv.org/abs/2207.08815) benchmarked 45 tabular datasets and found tree ensembles still outperforming deep learning models of that era at moderate sample sizes, attributing it to trees' ease with irregular target functions, uninformative features, and non-rotation-invariant data. Deep nets win when inputs have exploitable structure (images, text, audio) or when representations must be learned; on a feature table, the methods of this module are the benchmark to beat.
+
+## Exercises
+
+<Exercise>
+The set piece: starting from the round-$t$ objective $\sum_i l(y_i, \hat y_i^{(t-1)} + f_t(x_i)) + \gamma T + \tfrac12\lambda\sum_j w_j^2$, derive the optimal leaf weight and the split-gain formula. Every step must be justified: the expansion, the regrouping, the minimization, and the subtraction.
+
+<Solution>
+**Step 1: expand.** Taylor-expand each loss term to second order in the tree's output $f_t(x_i)$ around the current prediction, with $g_i = \partial l/\partial\hat y$ and $h_i = \partial^2 l/\partial\hat y^2$ evaluated at $\hat y_i^{(t-1)}$:
+
+$$
+l(y_i, \hat y_i^{(t-1)} + f_t(x_i)) \approx l(y_i, \hat y_i^{(t-1)}) + g_i f_t(x_i) + \tfrac12 h_i f_t(x_i)^2 .
+$$
+
+The zeroth-order terms are constants with respect to $f_t$ and drop from the argmin.
+
+**Step 2: regroup by leaf.** A tree with structure $q$ and leaf values $w$ outputs $f_t(x_i) = w_{q(x_i)}$. Partition points into leaf sets $I_j$ and swap the order of summation:
+
+$$
+\tilde{\mathrm{obj}} = \sum_{j=1}^{T}\Bigl[ G_j w_j + \tfrac12 (H_j + \lambda) w_j^2 \Bigr] + \gamma T,
+\qquad G_j = \sum_{i\in I_j} g_i,\; H_j = \sum_{i\in I_j} h_i,
+$$
+
+where the $\tfrac12\lambda w_j^2$ penalty joined leaf $j$'s quadratic term.
+
+**Step 3: minimize each leaf.** The leaves are decoupled; each is a one-variable convex quadratic (convex because $H_j + \lambda > 0$). Setting the derivative $G_j + (H_j+\lambda)w_j$ to zero gives $w_j^* = -G_j/(H_j+\lambda)$; substituting back, the leaf's minimal contribution is $-\tfrac12 G_j^2/(H_j+\lambda)$. Hence the structure score $\tilde{\mathrm{obj}}^*(q) = -\tfrac12\sum_j G_j^2/(H_j+\lambda) + \gamma T$.
+
+**Step 4: subtract.** Splitting a leaf $(G,H)$ into $(G_L,H_L)$ and $(G_R,H_R)$ replaces one score term with two and adds one leaf to $T$. Gain = score before − score after:
+
+$$
+\mathrm{Gain} = \frac12\left[ \frac{G_L^2}{H_L+\lambda} + \frac{G_R^2}{H_R+\lambda} - \frac{(G_L+G_R)^2}{H_L+H_R+\lambda} \right] - \gamma .
+$$
+
+Positive gain means the split lowers the regularized objective; the greedy algorithm takes the maximum-gain split per node.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="logistic-regression" />: derive $g$ and $h$ for the logistic loss $l = -\bigl[y\log p + (1-y)\log(1-p)\bigr]$ with $p = \sigma(\hat y)$, and state precisely what `min_child_weight` thresholds under this loss.
+
+<Solution>
+Substituting $p = \sigma(\hat y)$ turns the loss into $l = -y\hat y + \log(1 + e^{\hat y})$. First derivative:
+
+$$
+g = \frac{\partial l}{\partial \hat y} = -y + \frac{e^{\hat y}}{1+e^{\hat y}} = p - y .
+$$
+
+Second derivative, using $\sigma' = \sigma(1-\sigma)$:
+
+$$
+h = \frac{\partial}{\partial \hat y}(p - y) = \frac{\partial p}{\partial \hat y} = p(1-p) .
+$$
+
+`min_child_weight` requires $\sum_{i \in \text{child}} h_i \ge c$, i.e. $\sum p_i(1-p_i) \ge c$. Each term is at most $0.25$ (at $p = 0.5$) and near zero when $p$ is near 0 or 1. The constraint therefore thresholds the child's total *predictive uncertainty*: a region of confident predictions has tiny Hessian mass regardless of how many points it holds, so splitting there is blocked. Under squared loss $h \equiv 1$ and the same parameter degenerates to a minimum leaf count.
+</Solution>
+</Exercise>
+
+<Exercise>
+Hand evaluation: six points sorted by a feature, $g = (-4, -2, 3, 1, -1, 3)$, $h = 1$ each, $\lambda = 1$, $\gamma = 0.5$. Candidate A splits after the second point; candidate B after the fourth. Compute both gains, decide which split (if either) to make, and give the resulting leaf weights.
+
+<Solution>
+Parent sums: $G = -4-2+3+1-1+3 = 0$, $H = 6$, so the parent fraction is $0^2/7 = 0$.
+
+**Candidate A** (left = points 1–2): $G_L = -6$, $H_L = 2$; $G_R = 6$, $H_R = 4$.
+
+$$
+\mathrm{Gain}_A = \tfrac12\Bigl[\tfrac{36}{3} + \tfrac{36}{5} - 0\Bigr] - 0.5 = \tfrac12(12 + 7.2) - 0.5 = 9.6 - 0.5 = 9.1 .
+$$
+
+**Candidate B** (left = points 1–4): $G_L = -2$, $H_L = 4$; $G_R = 2$, $H_R = 2$.
+
+$$
+\mathrm{Gain}_B = \tfrac12\Bigl[\tfrac{4}{5} + \tfrac{4}{3} - 0\Bigr] - 0.5 = \tfrac12(0.8 + 1.3333) - 0.5 \approx 1.067 - 0.5 = 0.567 .
+$$
+
+Both clear zero, so take the maximum: candidate A, gain $9.1$. Leaf weights: $w_L^* = -(-6)/(2+1) = 2$ and $w_R^* = -6/(4+1) = -1.2$. Note the parent's cancellation ($G = 0$) makes the whole gain come from separating opposing gradients, and candidate A separates them far more cleanly.
+</Solution>
+</Exercise>
+
+<Exercise>
+"XGBoost versus vanilla gradient boosting: name the four substantive differences." Give each with its mechanical consequence.
+
+<Solution>
+1. **Second-order (Newton) versus first-order.** GBM fits trees to the negative gradient and repairs leaf values by line search; XGBoost expands the loss to second order, so both leaf values ($-G/(H+\lambda)$) and split decisions (the gain formula) use curvature. Consequence: a principled, loss-aware split criterion instead of a squared-error surrogate.
+2. **Explicit regularization in the objective.** $\gamma T + \tfrac12\lambda\|w\|^2$ (plus `min_child_weight` on Hessian mass) prices complexity inside the minimization; GBM controls complexity only through external knobs (depth, $\nu$, subsampling), which XGBoost also inherits.
+3. **Sparsity-aware split finding.** Learned per-node default directions handle missing values, zeros, and one-hot sparsity natively with cost linear in present entries; vanilla GBM implementations require dense, imputed input.
+4. **Systems design.** Pre-sorted compressed column blocks, feature-parallel split scans, cache-aware access, and out-of-core training: the 2016-era measurement was 0.68 s per tree versus scikit-learn's 28.5 s at equal AUC.
+
+A good answer also names what did *not* change: the additive model, shrinkage, subsampling, and the function-space view carry over from GBM unchanged.
+</Solution>
+</Exercise>
+
+<Exercise>
+"How does XGBoost handle missing values during training? What happens at inference when a feature value is missing, and what if that feature was never missing in training?"
+
+<Solution>
+**Training.** For each candidate split, only points with present values are enumerated in the sorted scan; the missing-value points are routed as a block, once all-left and once all-right, and each option is scored by the gain formula. The direction with the better objective is stored on the node as its default direction. This one mechanism covers genuine missingness, sparse-matrix zeros, and one-hot zeros, and makes the scan's cost linear in the number of present entries.
+
+**Inference.** A missing value follows the node's stored default direction: no imputation happens anywhere. Different nodes may route missing values differently, since each learned its own default.
+
+**Never-missing feature.** Then training saw no missing block, so no data chose the default; the stored direction is the implementation's tie-break (current XGBoost sends such values to the right child). Because that choice is arbitrary rather than learned, the correct engineering answer is to prevent the situation: the serving pipeline should not produce missingness patterns absent from training, and if it can, training data should include them.
+</Solution>
+</Exercise>
+
+<Exercise>
+"If you set $\lambda = 0$ and $\gamma = 0$, is XGBoost the same algorithm as scikit-learn's gradient boosting?" Answer for squared loss and for log-loss.
+
+<Solution>
+No in general. With $\lambda = \gamma = 0$, XGBoost is still *Newton* boosting: leaf weights are $-G/H$ and splits maximize $\tfrac12[G_L^2/H_L + G_R^2/H_R - G^2/H]$, both using second derivatives. Classic GBM is first-order: trees are fit by least squares to $-g$ and leaf values come from a per-leaf line search.
+
+**Squared loss:** $h \equiv 1$, the quadratic expansion is exact, $-G/H$ is the mean residual, and the gain reduces to the variance-reduction split criterion, so the two algorithms coincide in principle. Remaining differences are implementation: XGBoost's `reg_lambda` *defaults to 1*, so λ must be zeroed explicitly, and defaults like `min_child_weight` = 1, histogram binning, and column subsampling settings still cause different trees.
+
+**Log-loss:** the algorithms differ substantively. GBM's tree structure is chosen against pseudo-residuals $y - p$ with an unweighted squared-error surrogate; XGBoost's structure is chosen by the $g,h$ gain in which low-confidence points ($h = p(1-p)$ large) weigh more. GBM applies one Newton step only at the leaf-value stage; XGBoost's whole objective is the Newton quadratic. Same family, different trees.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="ridge-lasso" />: XGBoost's $\lambda$ is described as "a ridge penalty on the leaf scores." Make that exact: write the leaf weight at penalty $\lambda$ as (shrinkage factor) × (unpenalized weight), and compare the factor to ridge regression's per-direction shrinkage $d_j^2/(d_j^2+\lambda)$.
+
+<Solution>
+Unpenalized ($\lambda = 0$) the leaf weight is $w^*(0) = -G/H$. With the penalty,
+
+$$
+w^*(\lambda) = -\frac{G}{H+\lambda} = \frac{H}{H+\lambda}\cdot\Bigl(-\frac{G}{H}\Bigr) = \frac{H}{H+\lambda}\, w^*(0) :
+$$
+
+a pure multiplicative shrinkage toward zero, never a sign flip and never an exact zero (that would need L1, which is `reg_alpha`). The factor $H/(H+\lambda)$ has exactly the form of ridge regression's SVD shrinkage $d_j^2/(d_j^2+\lambda)$ with the Hessian mass $H$ playing the role of $d_j^2$: directions (there, principal components; here, leaves) with little curvature information are shrunk hardest, and well-supported ones are barely touched. The mechanism is the same because both come from adding $\tfrac12\lambda w^2$ to a quadratic objective and re-minimizing.
+</Solution>
+</Exercise>
+
+<Exercise>
+"You have 40 million rows of clickstream data with 300 features, a dozen of them categorical with thousands of levels. Would you use XGBoost, LightGBM, or CatBoost, and what would you watch out for?"
+
+<Solution>
+A defensible ranking: **LightGBM first** for the scale. Histogram-based splits and leaf-wise growth make it typically the fastest and most memory-efficient at $n$ in the tens of millions, and GOSS reduces the scan further by keeping the large-gradient rows and subsampling the rest. Watch `num_leaves`: leaf-wise growth reaches deep, specific structure quickly, so it overfits sooner than depth-wise growth; cap leaves, use early stopping on a proper validation split.
+
+**CatBoost if the categorical columns dominate the signal.** Thousand-level categories one-hot encode into thousands of sparse columns and naive target encoding leaks the label; CatBoost's ordered target statistics compute each row's encoding only from "earlier" rows, avoiding the leak natively. The cost is generally slower training than LightGBM at this scale.
+
+**XGBoost remains correct but needs the most preparation here:** categories must be encoded externally (with the out-of-fold discipline from the feature-engineering chapter), and its histogram mode narrows, without erasing, LightGBM's speed edge. Whatever the library, the boosting-side controls are the same objects derived in this chapter: $\lambda$, $\gamma$/leaf caps, $\eta$ with early stopping, `min_child_weight`, and subsampling.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Chen, C. Guestrin, "XGBoost: A Scalable Tree Boosting System," *KDD 2016* — §2.2: the regularized objective (Eq. 2), the second-order expansion (Eq. 3), leaf weights and structure score (Eqs. 5–6, Fig. 2), split gain (Eq. 7); §3.1–3.3: exact greedy (Alg. 1), approximate splits (Alg. 2), weighted quantile sketch and the weighted-least-squares rewrite; §3.4: sparsity-aware splits (Alg. 3, Fig. 4); §4: column blocks, cache-aware access, out-of-core; §6: Higgs timing (Table 3) and the Kaggle adoption count. https://arxiv.org/abs/1603.02754
+2. J. H. Friedman, "Greedy Function Approximation: A Gradient Boosting Machine," *Annals of Statistics* 29(5), 2001 — the first-order + line-search baseline this chapter's Newton step upgrades. https://doi.org/10.1214/aos/1013203451
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §10.10–10.12: gradient tree boosting and its regularization, for the contrast with the second-order objective. https://hastie.su.domains/ElemStatLearn/
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §18.5: boosting, including XGBoost's objective in the same notation family as this chapter. https://probml.github.io/pml-book/book1.html
+5. G. Ke et al., "LightGBM: A Highly Efficient Gradient Boosting Decision Tree," *NeurIPS 2017* — histogram splits, GOSS, and exclusive feature bundling. https://papers.nips.cc/paper_files/paper/2017/hash/6449f44a102fde848669bdd9eb6b76fa-Abstract.html
+6. L. Prokhorenkova, G. Gusev, A. Vorobev, A. V. Dorogush, A. Gulin, "CatBoost: Unbiased Boosting with Categorical Features," *NeurIPS 2018* — ordered target statistics and ordered boosting. https://arxiv.org/abs/1706.09516
+7. L. Grinsztajn, E. Oyallon, G. Varoquaux, "Why Do Tree-Based Models Still Outperform Deep Learning on Typical Tabular Data?" *NeurIPS 2022 Datasets and Benchmarks* — the tabular positioning evidence. https://arxiv.org/abs/2207.08815
+8. XGBoost documentation, "Frequently Asked Questions" and parameter reference — missing-value handling and the `reg_lambda`, `min_child_weight`, `min_split_loss` defaults quoted here. https://xgboost.readthedocs.io/en/stable/faq.html
+9. J. Starmer, "XGBoost Part 1–4," StatQuest (YouTube), 2019–2020 — the similarity-score presentation of $G^2/(H+\lambda)$ with small worked numbers, paralleled by this chapter's examples.
+</References>

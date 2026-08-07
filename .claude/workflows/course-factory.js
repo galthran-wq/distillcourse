@@ -149,12 +149,19 @@ const at = root
   ? `Repo root for ALL file reads and writes: ${root} (a git worktree). Use absolute paths under it; never touch any other checkout of this repo.\n\n`
   : ''
 
+// Optional human design intent (format, audience, angle) — binding for both
+// canon selection and structure synthesis when the course is not a plain
+// "teach subject X" (e.g. interview prep, a workshop, an exam crammer).
+const brief = argv.brief
+  ? `\n\nCourse design intent from the human (binding — shape source choice and structure around it): ${argv.brief}`
+  : ''
+
 if (phaseArg === 'structure') {
   const topic = argv.topic ?? slug
 
   phase('Canon')
   const canon = await agent(
-    `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials, but NEVER omit a canonical source just because you found no accessible copy — include it anyway; inaccessible sources are reported to the human, who can obtain copies from the publishers. Return via structured output; put verified URLs where you have them.`,
+    `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials, but NEVER omit a canonical source just because you found no accessible copy — include it anyway; inaccessible sources are reported to the human, who can obtain copies from the publishers. Return via structured output; put verified URLs where you have them.${brief}`,
     { label: 'canon-scout', model: 'sonnet', schema: CANON_SCHEMA },
   )
   const sources = canon.sources.slice(0, 20)
@@ -214,7 +221,7 @@ if (phaseArg === 'structure') {
   phase('Synthesize')
   const synthesis = await agent(
     [
-      `${at}You are the course architect for the course "${topic}" (slug: ${slug}) in this repo. Read docs/pedagogy.md (C rules AND L2/L10/L15/L16, E6/E7, D1 — they constrain what you plan), docs/content-model.md, docs/playbook-core.md, the domain overlay (docs/playbook-math.md for a mathematical subject, docs/playbook-history.md for a historical one), docs/voita-playbook.md (lesson skeleton, framework-first + flaw-driven sequencing, density norms), and the example .claude/skills/course-architect/examples/course.yaml.`,
+      `${at}You are the course architect for the course "${topic}" (slug: ${slug}) in this repo. Read docs/pedagogy.md (C rules AND L2/L10/L15/L16, E6/E7, D1 — they constrain what you plan), docs/content-model.md, docs/playbook-core.md, the domain overlay (docs/playbook-math.md for a mathematical subject, docs/playbook-history.md for a historical one), docs/voita-playbook.md (lesson skeleton, framework-first + flaw-driven sequencing, density norms), and the example .claude/skills/course-architect/examples/course.yaml.${brief}`,
       `Source summaries from the reading swarm (JSON): ${JSON.stringify(summaries)}`,
       `Produce, in content/courses/${slug}/:`,
       `1. course.yaml — outcomes first (Bloom), then modules/lessons per the pedagogy rules (no lesson-count cap — scope follows the material; no padding or micro-slicing, every lesson has one substantive goal) (easy openers, acyclic prerequisites, spiral reinforces, technical noun-phrase titles, declarative openings, demo specs only where the concept is dynamic AND the reader can DO something in it per D1 — sliders on a curve the lesson already plots do not qualify). Mark advanced off-path chapters \`type: extra\` — the core path must survive skipping them; no non-extra lesson may list one as a prerequisite (lint: extra-prereq). Include intro, course-level prerequisites, key_results, sources.`,

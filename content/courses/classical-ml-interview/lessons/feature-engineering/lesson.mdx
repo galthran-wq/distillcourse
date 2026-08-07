@@ -1,0 +1,289 @@
+Model quality is bounded by feature quality; encoding, scaling, and selecting features are engineering decisions with failure modes interviewers probe directly. This chapter organizes the practical round's feature questions as three decisions, each closed by the same audit. The route: the audit question itself, categorical encoding with the target-encoding leak worked in numbers, the scaling-sensitivity table that consolidates five earlier lessons, missing-data triage, the filter/wrapper/embedded selection taxonomy, and a transaction mini-case of constructed features with a leakage audit per feature.
+
+## Three decisions, one audit question
+
+On tabular data, the model is rarely the bottleneck: a gradient-boosted ensemble on raw columns is routinely beaten by the same ensemble on well-constructed features, and every classical model has hard requirements (numeric inputs, comparable scales, no missing values) that the raw table violates. Feature work decomposes into three decisions: **encode** categoricals into numbers, **scale** numerics where the model cares, **select** the subset worth keeping.
+
+Each decision creates the same failure opportunity. Every feature transform that is *fit to data* (a per-category mean, a scaler's $\mu$ and $\sigma$, a selected feature set) is part of the procedure being validated, and <Ref lesson="cross-validation-bootstrap" id="the-wrong-way-data-dependent-steps-outside-the-loop">the wrong-way-CV set piece</Ref> showed what happens otherwise: screening 5,000 null features on all rows before the fold loop reported 3% error on data with no signal. The audit question for every transform in this chapter is therefore fixed: **what data were its parameters computed from**, and would that data exist at prediction time?
+
+Two leak channels recur. *Label leakage*: the transform reads $y$ (target encoding, supervised selection), so an out-of-fold row's label can shape its own features. *Row leakage*: the transform reads test rows' $x$ values (a scaler or imputer fit on the full table), so test statistics contaminate training. The first is the violent one; the second is smaller but breaks the same protocol.
+
+<KeyFact>
+Every fitted transform is part of the model. Fit it on training folds only, inside the CV loop, exactly as the model itself is fit; a transform fit on all rows makes the held-out folds partly training data.
+</KeyFact>
+
+## Encoding: from levels to numbers
+
+A categorical feature with levels $\{$Paris, Lyon, Nice$\}$ has no arithmetic: models need numbers, and the map from levels to numbers is a modeling decision, not bookkeeping.
+
+### One-hot: L columns and the dummy trap
+
+*One-hot encoding* replaces a feature with $L$ levels by $L$ indicator columns, one per level. For an unpenalized linear model with an intercept, the $L$ indicators sum to the all-ones column, so keeping all $L$ makes $X^\top X$ exactly singular: the *dummy trap*, the perfect-collinearity failure of <Ref lesson="ols" /> in its most common disguise. The standard fix drops one level as the **reference level**, encoding $L-1$ dummies whose coefficients read as offsets from the reference (the treatment coding of [ISLP §3.3.1](https://www.statlearning.com/)).
+
+Two footnotes interviewers reward. With a ridge or lasso penalty the singularity is gone (<Ref lesson="ridge-lasso" />: $X^\top X + \lambda I$ is always invertible), and practice often keeps all $L$ columns; but then dropping a reference level instead creates an asymmetry, since the reference's effect hides in the unpenalized intercept while every other level's offset is shrunk. And one-hot scales badly in $L$: a 10,000-level merchant ID becomes 10,000 sparse columns, most levels rare, each rare level's coefficient estimated from a handful of rows at high variance. Trees dislike the blowup for a different reason: each indicator split isolates a single level, so the gain per split is diluted and the level structure eats depth.
+
+### Ordinal codes: only for true orders
+
+*Ordinal encoding* maps levels to integers. It is correct when the order is real (S $<$ M $<$ L, education stages) and a silent model error when it is not: assigning Paris $=0$, Lyon $=1$, Nice $=2$ forces a linear model to fit one slope along an arbitrary sequence, imposing that Lyon's effect sits between the other two. Exercise 6 computes the damage on six rows: the fitted coefficient's size and the fit's quality change when the same cities are renumbered, while one-hot recovers the per-city means under any numbering.
+
+Trees are the exception: a split threshold on an integer code carves the level set into two groups, and a few stacked splits can carve most groupings, so **trees tolerate arbitrary codes**: the reason label-encoded categoricals are common with gradient boosting and unacceptable in a linear model.
+
+### Target encoding: the statistic that leaks by construction
+
+*Target encoding* (mean encoding) replaces each level with a target statistic of that level, typically the mean of $y$: one column regardless of $L$, which is exactly what a 10,000-level ID needs. The catch is visible on seven rows.
+
+<Example title="the n=1 category memorizes its own label">
+Binary target, feature `city`:
+
+| row | city | $y$ | naive encoding |
+| --- | --- | --- | --- |
+| 1 | Paris | 1 | $2/3 \approx 0.67$ |
+| 2 | Paris | 0 | $2/3 \approx 0.67$ |
+| 3 | Paris | 1 | $2/3 \approx 0.67$ |
+| 4 | Lyon | 0 | $1/3 \approx 0.33$ |
+| 5 | Lyon | 1 | $1/3 \approx 0.33$ |
+| 6 | Lyon | 0 | $1/3 \approx 0.33$ |
+| 7 | Nice | 1 | $1.00$ |
+
+The naive encoding computes each level's mean over **all** rows, own row included. Nice occurs once, so its "statistic" is exactly its own label: row 7's feature value is $y_7$, copied into $x$. Any model splits on encoding $\ge 0.9$ and predicts row 7 perfectly during training and validation; in production, the next Nice customer gets the value $1.00$ whatever their outcome, and the advantage evaporates. The leak is not confined to $n=1$: every row's own label enters its encoding with weight $1/n_c$, so the feature is correlated with the target by construction, most strongly for the rare levels that target encoding exists to serve.
+
+Smoothing toward the global mean $\bar y = 4/7$, as in [Micci-Barreca's empirical-Bayes scheme](https://dl.acm.org/doi/10.1145/507533.507538) $\;\tilde x_c = (n_c \bar y_c + m \bar y)/(n_c + m)$, shrinks the noisy per-level means (with $m = 2$, Nice moves from $1.00$ to $(1 + 2 \cdot 0.571)/3 \approx 0.71$). Smoothing is a variance fix, not a leak fix: the own label still sits inside $\bar y_c$.
+</Example>
+
+### The fixes: out-of-fold, leave-one-out, ordered
+
+All three fixes implement one principle: **a row's encoding must not contain that row's label**.
+
+<FigureSequence
+  name="target-leak"
+  alt="Three frames on one seven-row table: naive per-category means computed including each row's own label with the n=1 Nice row's encoding equal to its own label; K-fold encoding where each row's value comes from the other fold only; ordered encoding where each row's value is the running mean of preceding rows plus a prior"
+  caption="One table, three encoders. The only thing that changes is which rows are allowed to contribute to a row's statistic."
+/>
+
+<Task>
+Step through the three frames and track row 7 (Nice, $y=1$): its encoding moves from $1.00$ (naive: its own label) to $0.33$ (K-fold: the other fold's global mean, since the other fold has no Nice rows) to $0.50$ (ordered: the prior, since no Nice row precedes it). Verify frame 3's row 5 by hand: one preceding Lyon row with $y=0$ plus prior $p=0.5$, $a=1$ gives $(0 + 0.5)/2 = 0.25$.
+</Task>
+
+**K-fold encoding** partitions the training rows into folds and encodes each row using statistics from the *other* folds only, with the global mean as fallback for levels absent there. **Leave-one-out** encoding is the $k = n$ limit: row $i$ gets $(S_c - y_i)/(n_c - 1)$, the level's mean without itself. **Ordered encoding**, the [CatBoost](https://arxiv.org/abs/1706.09516) construction, draws a random permutation and encodes each row from the *preceding* rows of its level only, plus a prior: $\tilde x_i = (S_{<i} + a\,p)/(n_{<i} + a)$, mimicking a stream in which every statistic is computed strictly from the past.
+
+<Aside>
+Why the softer fixes are not perfectly clean. Leave-one-out removes the direct copy, but $(S_c - y_i)/(n_c - 1)$ is still a deterministic function of $y_i$ given the level's total: on a small level whose other labels are constant, the encoded value reveals the own label exactly (inverted), and a flexible learner finds the pattern. K-fold encoding is clean at the level of individual rows, but the fold statistics still share the training labels, and under heavy level imbalance the per-fold means of a rare level swing enough for a booster to overfit the fold structure; the residual optimism is small but measurable. The strict answers are ordered encoding or a disjoint held-out block used only to compute encodings; the CatBoost paper calls the general failure *target leakage* and its fix the *ordering principle*. In an interview, present K-fold as the standard practical fix and name the residual leak as the reason CatBoost exists.
+</Aside>
+
+### Choosing an encoding
+
+One decision remains: which encoder for which feature-model pair. **Feature hashing** completes the menu: hash each level into one of $B$ buckets, no fitting, no label, collisions absorbed as noise. Hashing is the leak-free, memory-bounded fallback for extreme cardinality and streaming data, at the price of interpretability.
+
+<Figure
+  src="./figures/encoding-map.svg"
+  alt="Decision flowchart for categorical encoding: ordered levels go to ordinal codes; low cardinality goes to one-hot with a reference level for unpenalized linear models; high cardinality splits by model into hashing or out-of-fold target encoding for linear models and native splits or target encoding for trees, with the 10,000-level merchant ID example routed to the target-encoding leaf"
+  caption="The encoding decision. The amber path routes the interview's standard example: merchant_id, 10,000 levels, gradient-boosted trees."
+/>
+
+<KeyFact>
+One-hot for low cardinality (drop a reference level in unpenalized linear models), ordinal only for true orders or trees, and for high cardinality a target statistic that excludes the row's own label: out-of-fold, leave-one-out, or ordered. Naive target encoding copies labels into features.
+</KeyFact>
+
+## Scaling: distance, penalty, gradient — or order
+
+Two customer features: income in dollars, spanning $[2 \times 10^4, 2 \times 10^5]$, and age in years, spanning $[20, 70]$. Euclidean distance between two customers is $\sqrt{(\Delta \text{income})^2 + (\Delta \text{age})^2}$; a \$10,000 income gap contributes $10^8$ to the sum, a 40-year age gap contributes $1.6 \times 10^3$. k-NN on this table is a one-feature model: age is present in the columns and absent from every distance. Units, not relevance, decided the weighting.
+
+### Three scalers
+
+**Standardization** maps $x \mapsto (x - \mu)/\sigma$: mean 0, variance 1 per column, the default (`StandardScaler`). **Min-max scaling** maps $x \mapsto (x - \min)/(\max - \min)$ onto $[0,1]$: bounded, but a single outlier compresses everyone else into a sliver, since $\max$ and $\min$ are the two least robust statistics available. **Robust scaling** uses $(x - \text{median})/\text{IQR}$, the outlier-resistant variant. All three are linear maps fit per column; none changes what a model *can* express, only what the model's geometry or penalty *measures*.
+
+### Which models care: the mechanism, per model
+
+Five earlier lessons each met scale sensitivity locally; the consolidated table names the mechanism per model, which is the form the interview answer takes ("which of these need scaling, and *why*").
+
+<Figure
+  src="./figures/scaling-table.svg"
+  alt="Table of model families against whether they need feature scaling and the mechanism: k-NN and k-means through distance, RBF SVM through the kernel's squared distance, PCA through per-axis variance, ridge and lasso through the penalty reading raw units, gradient-descent-trained models through loss-surface conditioning, and trees, forests, and boosting unaffected because splits use order only"
+  caption="The consolidated sensitivity table: the mechanism, not the model name, is the answer."
+/>
+
+The mechanisms, one line each, with where each was established:
+
+- **Distance**: k-NN (<Ref lesson="knn-curse" />) and k-means (<Ref lesson="kmeans" />) compare raw coordinates; the largest-unit feature owns the metric, as in the income example.
+- **Kernel**: the RBF kernel $\exp(-\gamma \lVert x - x' \rVert^2)$ of <Ref lesson="svm-dual-kernels" /> is a distance in disguise; one dominant feature makes the kernel one-dimensional.
+- **Variance**: PCA maximizes projected variance (<Ref lesson="pca" />), and variance carries units squared: an unscaled income column *is* the first principal component.
+- **Penalty**: $\lVert \beta \rVert$ adds coefficients as if comparable, and a unit change re-weights the penalty per feature: the computation of <Ref lesson="ridge-lasso" /> Exercise 7.
+- **Gradient conditioning**: mismatched scales elongate the loss bowl and force the small learning rates and zig-zag paths of <Ref lesson="gradient-descent" />; standardization is a cheap preconditioner.
+- **Order-based splits**: a tree split $x_j \le t$ depends only on the ranking of values, and any strictly monotone transform preserves rankings, so trees, random forests, and boosting are **scale-invariant**: the partition found is identical, only the thresholds relabel.
+
+### Fit the scaler on train only
+
+$\mu$, $\sigma$, $\min$, $\max$ are fitted parameters. Computing them on the full table before splitting hands each training fold a summary of the test rows: row leakage, the mild channel, and the same protocol violation as imputing or screening outside the loop. The mechanical fix is the pipeline object ([scikit-learn's `Pipeline`](https://scikit-learn.org/stable/modules/compose.html)): bundle scaler and model, cross-validate the bundle, and every fold refits both.
+
+<KeyFact>
+Models that measure distances, variances, penalties, or gradients need scaled features; models that split on order do not. The scaler's statistics are fitted parameters: train folds only.
+</KeyFact>
+
+## Missing data: the mechanism decides the remedy
+
+Rubin's taxonomy takes three sentences. *MCAR* (missing completely at random): missingness is independent of everything, as when a sensor drops 3% of readings uniformly. *MAR* (missing at random): missingness depends on **observed** columns, as when younger respondents skip the income question, so the gaps are explainable from age. *MNAR* (missing not at random): missingness depends on the **missing value itself**, as when high earners decline to answer, so the gap is evidence about the hidden number.
+
+<Figure
+  src="./figures/missingness.svg"
+  alt="Three panels for MCAR, MAR, and MNAR: a sensor dropping random readings with any handling acceptable; younger users skipping the income field with imputation from observed features; high earners hiding income where the missingness indicator itself carries signal and is highlighted"
+  caption="Missingness triage: the recommended handling per mechanism. Under MNAR the indicator column is the signal."
+/>
+
+The remedies, ordered by weight:
+
+- **Deletion** (drop rows) is safe only under MCAR with few affected rows; under MAR or MNAR it biases the sample toward whoever answers, and at 5% missingness across 20 independent columns it deletes roughly $1 - 0.95^{20} \approx 64\%$ of rows.
+- **Mean/median imputation** (median for skewed columns) is the standard baseline: unbiased for the column mean under MCAR, but it flattens the column's variance and its correlations, and under MNAR it writes the *average* value precisely where the evidence says the value was extreme.
+- **Missingness indicator**: add a binary column `income_missing` alongside the imputed value. Under MNAR the indicator is often more predictive than the column itself: refusing to state income predicts default better than any imputed number. Cheap, and the first thing to try when missingness looks informative.
+- **Model-based imputation** in one line: predict each incomplete column from the others (k-NN or iterated regressions); better statistics, more machinery, and every one of these models must itself be fit inside the fold.
+- **Native tree handling**: CART routes rows with a missing split feature by *surrogate splits* (backup features that mimic the primary split), and <Ref lesson="xgboost" /> learns a per-split *default direction* for missing values from the training gradients, treating missingness as signal without imputation. In practice, with a boosted-tree model, "leave the NaNs in" is frequently the right answer.
+
+The audit applies unchanged: an imputer's means and medians are fitted parameters, computed on training folds only. Imputing the full table before the split is the same wrong-way error as pre-loop screening.
+
+<KeyFact>
+Diagnose the mechanism first: deletion needs MCAR, imputation covers MAR, and under MNAR the missingness indicator itself is a feature, often the strongest one in the group.
+</KeyFact>
+
+## Feature selection: filter, wrapper, embedded
+
+Fewer features mean lower variance (fewer parameters per data point), cheaper serving, and audits a human can read. The three strategy families differ in what they optimize and what they cost ([ESL §3.3](https://hastie.su.domains/ElemStatLearn/), [ISLP §6.1](https://www.statlearning.com/)).
+
+<Figure
+  src="./figures/selection-triptych.svg"
+  alt="Three pipelines side by side: filter scoring each feature against the target and thresholding, wrapper searching feature subsets with cross-validated fits, embedded fitting a lasso whose zeros drop features; cost and honesty tallies per pipeline, all three placed inside the CV fold with a struck-out ghost pipeline selecting once on all data"
+  caption="The selection taxonomy with cost and honesty tallies. Whatever the strategy, the label-reading step runs inside each fold."
+/>
+
+**Filter methods** score each feature against the target one at a time (correlation for linear signal, mutual information for general dependence) and keep the top scorers: one pass, $O(p)$, the only option at $p \gg n$ scale, and the standard first screen in genomics-style problems (ESL ch. 18). Two blindnesses: interactions (two features individually independent of $y$ can jointly determine it, the XOR pattern) and redundancy (the ten best-scoring features may be ten copies of the same signal).
+
+**Wrapper methods** search over feature *subsets*, scoring each candidate set by cross-validated model fits. Best-subset search is $2^p$ and infeasible beyond $p \approx 30$; *forward stepwise* (greedily add the best next feature) and *backward elimination* (greedily drop the least useful) are the tractable versions, with the subset size chosen by CV or by the analytic scores $C_p$/AIC/BIC that penalize size without a validation set (ISLP §6.1.3). Expensive and honest, with one classical caveat: the p-values a final stepwise model reports are computed as if the model had been fixed in advance, and after a search that examined many models they are invalid: the post-selection inference problem flagged in <Ref lesson="regression-diagnostics" />.
+
+**Embedded methods** make selection a side effect of fitting. The lasso (<Ref lesson="ridge-lasso" />) zeroes coefficients during optimization: one fit, one $\lambda$ path, selection and shrinkage together. Tree-ensemble importances (<Ref lesson="bagging-random-forests" />) rank features from split gains or permutation damage. Both carry known biases: the lasso **picks one member arbitrarily** from a correlated group (the instability proven in <Ref lesson="ridge-lasso" /> Exercise 6), so selection should be reported as feature *groups*, not single winners; Gini importance inflates high-cardinality and continuous features, and permutation importance splits credit across correlated features.
+
+The placement rule outranks the strategy choice. Every one of these methods reads labels, so selection performed once on the full dataset before cross-validation reproduces the wrong-way set piece of <Ref lesson="cross-validation-bootstrap" />: ESL's null-data version of exactly this mistake reported 3% CV error where the truth was 50%. Selection runs inside each fold, as a pipeline stage; Exercise 5 quantifies the direction and drivers of the optimism.
+
+<KeyFact>
+Filter is cheap and blind to interactions, wrapper is expensive and honest, embedded is one fit with known biases: lasso's arbitrary pick among correlated features, importance's cardinality inflation. All three read labels, so all three select inside the CV fold.
+</KeyFact>
+
+## Constructed features: the transaction mini-case
+
+Selection removes columns; construction is the other direction, and on tabular problems it is where the accuracy lives. The standard toolkit: **interactions and ratios** (debt-to-income carries what no linear function of debt and income alone can, since linear models cannot form products; trees build interactions only up to their depth, the interaction-order cap of <Ref lesson="gradient-boosting" />); **log and Box-Cox transforms** for right-skewed positives such as incomes and counts, pulling decades onto comparable scale for linear models (trees are indifferent: monotone); **binning** continuous variables into indicator steps, buying a linear model piecewise-nonlinearity at the price of within-bin information; **date decomposition** (hour-of-day, day-of-week, time-since-last-event); and **domain aggregates**, statistics of an entity's history. PCA components used as constructed features are the same move in learned coordinates: <Ref lesson="pca" /> supplies the machinery, and the fit-on-train-only rule applies to the components exactly as to a scaler.
+
+Aggregates are where production leaks hide, because history has a direction. The mini-case: a transactions table (`customer_id`, `amount`, `timestamp`, label `is_fraud`), predicting fraud **at transaction time**. Three candidate features:
+
+1. `mean_amount_30d`: the customer's average amount over the 30 days *before* this transaction, current row excluded.
+2. `txn_count_1h`: the customer's transaction count in the hour before this one.
+3. `chargebacks_7d_after`: chargebacks filed on the account in the 7 days *after* the transaction.
+
+<Figure
+  src="./figures/audit-card.svg"
+  alt="Leakage audit card stamping three engineered features: transaction count in the past hour available at prediction time, thirty-day mean amount available only if computed strictly from rows before the current timestamp with the current row excluded, and chargebacks in the following week not available because chargebacks are the recorded consequence of the fraud label itself"
+  caption="The audit card: one question per feature. The failing feature's arrow traces to its future-information source."
+/>
+
+The audit question, per feature: **is this computable at prediction time, from information available then?** Feature 2 passes: the past hour exists when the transaction arrives. Feature 1 is a *depends*: computed with a strict `timestamp < t` cutoff excluding the current row it passes; computed as a calendar-month average over the full table it includes the current and later rows, and the aggregate leaks the row it describes. Feature 3 fails outright: chargebacks are the recorded *consequence* of fraud, so the feature is a proxy for the label written into $x$. Offline it looks like the best feature in the table (suspiciously strong importance is the standard tell); in production it is all zeros, because the following week has not happened. Post-outcome timestamps, status fields updated after the fact, and aggregates that include the current row are the recurring instances; the full leakage taxonomy is the subject of <Ref lesson="imbalance-leakage" />.
+
+<KeyFact>
+Every constructed feature answers one audit question: computable at prediction time, from information available then? Aggregates need a strict as-of cutoff that excludes the current row; anything downstream of the outcome is the label in disguise.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Interview question: encode a 10,000-level `merchant_id` for (a) a logistic-regression model, (b) XGBoost. Give the options, their costs, and the trade-offs.
+
+<Solution>
+**(a) Logistic regression.** One-hot is the textbook answer and fails at this cardinality: 10,000 sparse columns, most merchants rare, so most coefficients are fit on a handful of rows with high variance (and without regularization, any merchant absent from a training fold leaves an unidentified coefficient). Workable options: one-hot restricted to the top-$m$ merchants by frequency plus an "other" bucket (loses the tail's signal); feature hashing into $B \sim 10^2$–$10^3$ buckets (no fitting, no label, collisions as noise, leak-free, uninterpretable); out-of-fold target encoding with smoothing (one dense column carrying exactly the per-merchant signal a linear model cannot learn itself, at the price of the leakage machinery: encodings must exclude the row's own label and be computed inside each CV fold). For a linear model, target encoding is usually the strongest option because it injects a nonlinear per-level statistic the model could not represent otherwise.
+
+**(b) XGBoost.** One-hot is actively harmful: each indicator split isolates one merchant, gain per split is diluted, and the tree spends depth enumerating levels. Plain ordinal codes work mechanically (trees threshold on order, and stacked splits carve level subsets) but make split search awkward at 10,000 levels. The production answers: target encoding, out-of-fold or ordered (precisely CatBoost's built-in ordered target statistic), or a library's native categorical handling. Trade-off summary: hashing is safest and dumbest; target encoding is strongest and carries the leak machinery; one-hot is only for low cardinality, and for trees not even then.
+</Solution>
+</Exercise>
+
+<Exercise>
+Parallel to the worked example. Feature `device` with rows: phone $y{=}1$, phone $y{=}0$, tablet $y{=}1$, desktop $y{=}0$, desktop $y{=}0$, desktop $y{=}1$. (a) Compute the naive target encoding for every row and identify the leak. (b) Fix it with 2-fold encoding using folds $F_1 = \{1, 3, 4\}$, $F_2 = \{2, 5, 6\}$ (row numbers in the order listed). (c) Fix it with ordered encoding in the listed order, prior $p = 0.5$, $a = 1$.
+
+<Solution>
+**(a) Naive.** Level means over all rows: phone $= (1+0)/2 = 0.5$; tablet $= 1/1 = 1.0$; desktop $= (0+0+1)/3 = 1/3$. Row 3 (tablet, $n=1$) receives exactly its own label, $1.0$: the feature column contains the target for that row. Every other row also contains its own label at weight $1/n_c$.
+
+**(b) 2-fold.** Statistics from the *other* fold. $F_2$'s stats: phone (row 2): mean $0$; desktop (rows 5, 6): mean $0.5$; no tablet; $F_2$ global mean $= 1/3$. Encodings for $F_1$: row 1 (phone) $\to 0$; row 3 (tablet, unseen in $F_2$) $\to 1/3$ (fallback global); row 4 (desktop) $\to 0.5$. $F_1$'s stats: phone (row 1): $1$; tablet (row 3): $1$; desktop (row 4): $0$; global $2/3$. Encodings for $F_2$: row 2 (phone) $\to 1$; row 5 (desktop) $\to 0$; row 6 (desktop) $\to 0$. No row's own label enters its value; tablet's memorized $1.0$ became a neutral $1/3$.
+
+**(c) Ordered**, $\tilde x_i = (S_{<i} + 0.5)/(n_{<i} + 1)$ over preceding same-level rows: row 1 phone: $(0 + 0.5)/1 = 0.5$; row 2 phone: $(1 + 0.5)/2 = 0.75$; row 3 tablet: $0.5$ (no history, prior); row 4 desktop: $0.5$; row 5 desktop: $(0 + 0.5)/2 = 0.25$; row 6 desktop: $(0 + 0.5)/3 \approx 0.17$. Every value uses strictly earlier rows: the stream never sees its own or any later label.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of five earlier lessons: for each of k-NN, k-means, RBF-SVM, ridge regression, logistic regression trained by gradient descent, and random forest, state whether feature scaling changes the fitted model and name the mechanism.
+
+<Solution>
+**k-NN: yes.** Predictions are votes among nearest neighbors under Euclidean distance; distance sums squared raw differences, so the largest-unit feature dominates the metric and neighborhoods reshuffle under rescaling.
+
+**k-means: yes.** Both Lloyd steps (assignment and centroid update) minimize squared Euclidean distortion; rescaling a feature reweights the objective and moves the converged partition.
+
+**RBF-SVM: yes.** $K(x, x') = \exp(-\gamma \lVert x - x' \rVert^2)$ contains the same distance; an unscaled dominant feature makes the kernel effectively one-dimensional, and the meaning of $\gamma$ changes with units.
+
+**Ridge: yes.** The penalty $\lambda \lVert \beta \rVert_2^2$ adds coefficients whose sizes depend on their features' units; rescaling a feature rescales its coefficient and silently re-weights its share of the penalty (the fitted function changes, unlike OLS, which is scale-equivariant).
+
+**Logistic regression by GD: the optimum is unchanged, the optimization is not.** Without a penalty the maximum-likelihood solution is scale-equivariant, but mismatched scales elongate the loss surface's contours, forcing small learning rates and slow zig-zag convergence; standardization preconditions the problem. (With the usual L2 penalty, the fitted model itself also changes, as for ridge.)
+
+**Random forest: no.** Every split $x_j \le t$ depends only on the ordering of values within a feature; strictly monotone transforms preserve orderings, so the found partition is identical and only threshold labels change. Scaling is wasted work for trees, forests, and boosting.
+</Solution>
+</Exercise>
+
+<Exercise>
+Pick a missing-data strategy for each scenario, and justify against the mechanism taxonomy: (a) a temperature logger loses 2% of readings to random radio dropouts, 100k rows, downstream model is linear regression; (b) an income field is empty for 30% of loan applicants, and product analytics show refusals concentrate among applicants with thin credit files and among the highest earners; (c) a hospital dataset where lab test results are missing for patients whose doctors judged the test unnecessary, downstream model is gradient boosting.
+
+<Solution>
+**(a)** MCAR: dropout is independent of everything. At 2% on 100k rows, deletion is clean and costs ~2,000 rows; mean imputation is equally defensible. Either passes; deletion is simpler and unbiased here precisely because the mechanism is MCAR.
+
+**(b)** MNAR: missingness depends on the hidden income itself (high earners refuse), plus a MAR component (thin files, observable). Deletion discards 30% and biases the sample toward middling earners; mean imputation writes the average income exactly where the evidence points to extremes. The right move: impute (median, or model-based from observed fields) *and* add an `income_missing` indicator, which under this mechanism carries real signal: refusal itself predicts the outcome. With a linear downstream model the indicator also lets the model fit a separate intercept for refusers.
+
+**(c)** Informative missingness (the doctor's judgment encodes the patient's state), downstream model is trees: leave the values missing and let the booster's sparsity-aware default directions route them, learning per-split whether "not tested" behaves like "healthy"; equivalently, XGBoost treats missingness as signal natively. An explicit indicator column is a harmless belt-and-suspenders addition. Imputing a population mean would *erase* the doctor-judgment signal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="cross-validation-bootstrap" />: a colleague runs lasso on the full dataset ($n = 200$, $p = 5{,}000$, weak signal), keeps the 40 features with nonzero coefficients, then reports 10-fold CV accuracy of a model refit on those 40 features. State the direction of the bias, the mechanism, what makes it large or small, and two correct protocols.
+
+<Solution>
+**Direction: optimistic.** The reported CV score is biased low (error) / high (accuracy) relative to generalization.
+
+**Mechanism.** The lasso's selection read all 200 labels, including the labels of every future held-out fold. At $p = 5{,}000 \gg n = 200$, many features reach spurious sample association with $y$ by chance; the lasso keeps exactly those, and the chance associations persist inside each fold's held-out rows because those rows' labels helped select them. The folds are therefore not fresh data, and CV validates only the refit, not the procedure that chose the 40 features. This is ESL's wrong-way set piece with lasso in place of univariate screening: on pure-noise data the same design reported ~3% error against a truth of 50%.
+
+**Magnitude drivers.** Bias grows with $p/n$ (more chance associations to find), with the weakness of the true signal (more of the selected set is noise), and with the aggressiveness of selection ($5{,}000 \to 40$). With strong signal and $p \ll n$ the same mistake can be nearly harmless, which is why it survives code review.
+
+**Correct protocols.** (1) Pipeline CV: make lasso selection a stage inside each fold, so each fold's feature set is chosen from that fold's training rows only; the resulting score also honestly reflects the selection's own variability (the selected sets will differ per fold; report the groups, not one winner). (2) Nested CV when $\lambda$ is also tuned: inner folds choose $\lambda$ (and hence the feature set), outer folds score the whole recipe. With plentiful data, a held-out test set never touched by any selection substitutes for the outer loop.
+</Solution>
+</Exercise>
+
+<Exercise>
+Six rows: city A with $y = 8, 12$; city B with $y = 28, 32$; city C with $y = 18, 22$. (a) Fit simple OLS on the ordinal code A $=0$, B $=1$, C $=2$ and report the per-city predictions. (b) Refit with the code A $=0$, C $=1$, B $=2$. (c) State what one-hot encoding gives, and the lesson.
+
+<Solution>
+**(a)** Means: $\bar x = 1$, $\bar y = 20$. $S_{xy} = \sum (x_i - 1)(y_i - 20)$: city A ($x=0$): $(-1)(-12) + (-1)(-8) = 20$; city B ($x=1$): $0$; city C ($x=2$): $(1)(-2) + (1)(2) = 0$. So $S_{xy} = 20$, $S_{xx} = 2(1) + 0 + 2(1) = 4$, slope $= 5$, intercept $= 20 - 5 = 15$: $\hat y = 15 + 5x$. Predictions: A $\to 15$, B $\to 20$, C $\to 25$ against true means $10, 30, 20$: wrong for every city, because the code forces one monotone slope along an arbitrary ordering in which B's large effect sits mid-sequence.
+
+**(b)** Same computation with B and C swapped: city C now $x=1$ contributes $0$; city B now $x=2$ contributes $(1)(8) + (1)(12) = 20$; with A's $20$, $S_{xy} = 40$, slope $= 10$, intercept $= 10$: $\hat y = 10 + 10x$, predicting A $\to 10$, C $\to 20$, B $\to 30$: exactly the true means, because this arbitrary renumbering happens to be monotone in the city effects. Same data, same model class: the coefficient doubled ($5 \to 10$) and the fit went from wrong to perfect on the strength of a relabeling.
+
+**(c)** One-hot (two dummies plus intercept, A as reference) has one parameter per city and recovers $\hat y_A = 10$, $\hat y_B = 30$, $\hat y_C = 20$ under *any* numbering. Lesson: ordinal codes feed a linear model a fake quantitative axis whose ordering and spacing become modeling assumptions; use them only when the order is real. A tree would be indifferent: thresholds on either coding can isolate each city in two splits.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: name a feature that looks fine in offline evaluation but is leaky in production, explain the mechanism, and give the audit that catches it.
+
+<Solution>
+Standard instances (any one suffices, with the mechanism). **A post-outcome status field**: `account_status` contains "closed for fraud" for fraud cases, so training on a snapshot taken after outcomes were recorded imports the label into a feature; offline CV looks superb because the leak is present on both sides of the split, and production performance collapses because at scoring time the status is still "active". **An aggregate including the current row**: "customer's 30-day average amount" computed over a calendar window that contains the transaction being scored, so each row's feature contains part of its own information and the true as-of value at prediction time differs. **A future-window aggregate**: chargebacks, returns, or support tickets counted in the days *after* the event being predicted, pure consequence-of-label. **Same-batch statistics**: features normalized by the mean of a batch that includes future rows.
+
+The audit: for each feature, ask **"at the moment the prediction is needed, is this value computable from data that exists then?"** Operationally, rebuild the feature with a strict as-of timestamp cutoff (`data.timestamp < t`, current row excluded) and re-evaluate; a feature whose importance collapses under the cutoff was leaking. The corroborating tells: one feature with suspiciously dominant importance, and offline scores that look too good against the task's known difficulty. Time-split validation, the deployment-faithful protocol of <Ref lesson="cross-validation-bootstrap" />, catches the temporal instances that shuffled folds hide.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §3.3: subset selection (best-subset, forward/backward stepwise); §7.10.2: the wrong way to cross-validate, restated here as the selection placement rule; ch. 18: p ≫ N problems and univariate screening. https://hastie.su.domains/ElemStatLearn/
+2. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §3.3: qualitative predictors, dummy variables, and interactions; §6.1: subset selection and the Cp/AIC/BIC scores. https://www.statlearning.com/
+3. D. Micci-Barreca, "A Preprocessing Scheme for High-Cardinality Categorical Attributes in Classification and Prediction Problems," *ACM SIGKDD Explorations*, 3(1), 2001 — the empirical-Bayes smoothing form of target encoding. https://dl.acm.org/doi/10.1145/507533.507538
+4. L. Prokhorenkova, G. Gusev, A. Vorobev, A. V. Dorogush, A. Gulin, "CatBoost: Unbiased Boosting with Categorical Features," *NeurIPS*, 2018 — target leakage in greedy target statistics and the ordered-encoding fix. https://arxiv.org/abs/1706.09516
+5. J. Starmer, "One-Hot, Label, Target and K-Fold Target Encoding, Clearly Explained!!!," StatQuest (YouTube), 2023 — the encoding walkthrough whose leak demonstration this chapter's worked table follows. https://www.youtube.com/watch?v=589nCGeWG1w
+6. C. Huyen, *Introduction to Machine Learning Interviews*, self-published web book — §7.2: training-data questions (leakage, missing values); §5.1.3: dimensionality reduction as feature construction. https://huyenchip.com/ml-interviews-book/
+7. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §1.5.1: data preprocessing and featurization. https://probml.github.io/pml-book/book1.html
+8. scikit-learn developers, "Preprocessing data" and "Pipelines and composite estimators," scikit-learn User Guide — StandardScaler/MinMaxScaler/RobustScaler conventions and the Pipeline mechanics that enforce fit-on-train-only. https://scikit-learn.org/stable/modules/preprocessing.html
+</References>
