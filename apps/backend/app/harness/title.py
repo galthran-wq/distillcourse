@@ -1,4 +1,4 @@
-import asyncio
+import uuid
 from collections.abc import Sequence
 
 from pydantic_ai.messages import ModelMessagesTypeAdapter, TextPart, UserPromptPart
@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.harness.agent import model_for, namer
 from app.harness.prompts import module, untrusted
 from app.harness.repository import HarnessRepository
+from app.harness.usage import usage_row
 from app.models import Chat, Message
 
 # How much of the conversation one naming pass reads: the last few messages,
@@ -53,45 +54,39 @@ def _transcript(rows: Sequence[Message]) -> str:
     return "\n\n".join(lines)
 
 
-async def retitle(repo: HarnessRepository, chat: Chat, usage: RunUsage) -> None:
+async def retitle(
+    repo: HarnessRepository, chat: Chat, run_id: uuid.UUID, usage: RunUsage
+) -> None:
     """Name a chat again once it has moved past the question it was named for.
 
-    Web chats only. A name is read in one place — the rail — and the Telegram
-    thread is never listed there: it is one eternal conversation, and naming it
-    would put a completion on the reply path of every message the learner
-    sends, for a name nobody sees.
+    Web chats only: the Telegram thread is one eternal conversation that no
+    rail lists, so a name for it is a completion nobody reads.
 
-    The platform's own bookkeeping, on the footing `summarize()` stands on: it
+    The platform's own bookkeeping, on the footing `summarize()` stands on — it
     spends the instance's budget and not the learner's daily allowance, which
-    is what writing no message of theirs makes true. What it costs is folded
-    into the run's own usage row — there is no turn here to hang a row on, and
-    an invented one would be a message the next run reads — which is how the
-    monthly ceiling comes to see it.
-
-    The ceiling was checked by the run this follows, and one short completion
-    per `TITLE_REFRESH_MESSAGES` messages cannot outrun that check.
+    is what writing no message of theirs makes true. It runs once the stream is
+    closed and the turn is stored, so what it costs is added to the run's usage
+    row rather than written with it; there is no turn of its own to hang a row
+    on, and an invented one would be a message the next run reads.
     """
     if chat.kind != "web" or chat.titled_at is None:
         return
-    rows = await repo.live_rows(chat)
-    # Counted over the live rows, so a compaction resets it the way it resets
-    # the history: what this pass would be shown is what triggers it.
-    since = sum(1 for row in rows if row.created_at > chat.titled_at)
-    if since < settings.TITLE_REFRESH_MESSAGES:
+    # Counted rather than read: only about one run in four goes on to want the
+    # rows, and a chat far past its last compaction is a lot of jsonb to load
+    # for a number. The count does not see that cut, so a compaction since the
+    # last naming brings the next one forward — never past it.
+    if (
+        await repo.messages_since(chat, chat.titled_at)
+        < settings.TITLE_REFRESH_MESSAGES
+    ):
         return
-    # Bounded, because the caller holds the learner's stream open until this
-    # returns: a namer that answers slowly would keep their composer disabled
-    # long after the reply finished rendering, and one that never answers would
-    # keep it disabled for as long as the browser waits.
-    async with asyncio.timeout(settings.TITLE_TIMEOUT_SECONDS):
-        named = await namer.run(
-            # Fenced like every other text the platform did not write: a line
-            # in the conversation asking for a particular name is material to
-            # be named, not an instruction.
-            untrusted(TITLE_SOURCE, _transcript(rows[-TITLE_WINDOW:])),
-            model=model_for(settings.DEFAULT_CHAT_MODEL),
-            instructions=module("title.md"),
-            usage=usage,
-        )
+    rows = await repo.live_rows(chat)
+    named = await namer.run(
+        untrusted(TITLE_SOURCE, _transcript(rows[-TITLE_WINDOW:])),
+        model=model_for(settings.DEFAULT_CHAT_MODEL),
+        instructions=module("title.md"),
+        usage=usage,
+    )
     if title := named.output.strip():
         await repo.set_title(chat, title)
+    await repo.set_usage(chat, run_id, usage_row(usage))

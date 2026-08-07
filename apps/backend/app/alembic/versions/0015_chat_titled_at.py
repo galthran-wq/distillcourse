@@ -24,14 +24,16 @@ def upgrade() -> None:
     # is what makes an old chat with a stale title get a fresh one on its next
     # run — which is the point of the rename.
     op.execute("UPDATE chats SET titled_at = created_at WHERE title IS NOT NULL")
-    # The rail dates every chat of a reader in one pass — max(created_at)
-    # grouped by chat_id — and ix_messages_chat_id can only serve that by
-    # reading each of those rows, jsonb blobs and all, off the heap.
     op.create_index(
         "ix_messages_chat_id_created_at", "messages", ["chat_id", "created_at"]
     )
+    # Replaced, not joined: the composite is a prefix match for every query
+    # ix_messages_chat_id served, and keeping both would have the busiest table
+    # in the schema maintain two btrees on the same leading column.
+    op.drop_index(op.f("ix_messages_chat_id"), table_name="messages")
 
 
 def downgrade() -> None:
+    op.create_index(op.f("ix_messages_chat_id"), "messages", ["chat_id"])
     op.drop_index("ix_messages_chat_id_created_at", table_name="messages")
     op.drop_column("chats", "titled_at")

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatListing } from "@/lib/chat/api";
+import type { ChatSummary } from "@/lib/chat/api";
 import type { StoredChat } from "@/lib/chat/stored";
 
-const WEB: ChatListing = {
+const WEB: ChatSummary = {
   id: "c1",
   kind: "web",
   model: "moonshotai/kimi-k3",
@@ -11,8 +11,8 @@ const WEB: ChatListing = {
   created_at: "2026-08-05T10:00:00Z",
   last_message_at: "2026-08-05T10:04:00Z",
 };
-const TELEGRAM: ChatListing = { ...WEB, id: "tg", kind: "telegram", title: null };
-const FRESH: ChatListing = { ...WEB, id: "c2", title: null };
+const TELEGRAM: ChatSummary = { ...WEB, id: "tg", kind: "telegram", title: null };
+const FRESH: ChatSummary = { ...WEB, id: "c2", title: null };
 
 type Route = () => Response;
 

@@ -1,16 +1,16 @@
 "use client";
 
 import ChatList from "@/components/chat/ChatList";
-import type { ChatListing, ChatModel, ChatSummary } from "@/lib/chat/api";
+import type { ChatModel, ChatSummary } from "@/lib/chat/api";
 import { LABEL_CLASS, MENU_CLASS, MENU_ITEM_CLASS } from "@/components/ui/styles";
 
 interface Props {
   current: ChatSummary;
-  chats: ChatListing[];
+  chats: ChatSummary[];
   models: ChatModel[];
   /** The panel is over the page, where the rail lists the chats beside it. */
   expanded: boolean;
-  onSelect: (chat: ChatListing) => void;
+  onSelect: (chat: ChatSummary) => void;
   onModel: (model: string) => void;
 }
 

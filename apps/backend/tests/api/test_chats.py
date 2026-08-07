@@ -15,6 +15,7 @@ from app.harness import prompts
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
 from app.models import User
+from tests.conftest import settled
 from tests.harness.conftest import compacting
 
 QUESTION = ModelRequest(parts=[UserPromptPart(content="what is entropy?")])
@@ -164,6 +165,7 @@ async def test_the_stream_answers_and_leaves_the_conversation_readable(
             f"/api/v1/chats/{chat.id}/stream",
             json=submission(chat.id, "lesson:information-theory/entropy"),
         )
+        await settled()
 
     messages = (await signed_in.get(f"/api/v1/chats/{chat.id}/messages")).json()
     assert response.status_code == 200
@@ -295,6 +297,7 @@ async def test_a_referenced_passage_reaches_the_model_fenced_as_untrusted(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert '<untrusted source="learner-quote">' in asked
@@ -326,6 +329,7 @@ async def test_every_referenced_passage_is_fenced_in_a_block_of_its_own(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert asked.count('<untrusted source="learner-quote">') == 2
@@ -355,6 +359,7 @@ async def test_a_quote_that_is_not_a_locator_is_dropped(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert asked.count('<untrusted source="learner-quote">') == 1
@@ -381,6 +386,7 @@ async def test_more_passages_than_the_cap_keeps_the_newest(
 
     with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
         await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
 
     asked = str((await repo.rows(chat))[0].pydantic_ai)
     assert asked.count('<untrusted source="learner-quote">') == prompts.QUOTE_COUNT
@@ -398,5 +404,6 @@ async def test_a_question_with_no_passages_carries_no_fence(
         await signed_in.post(
             f"/api/v1/chats/{chat.id}/stream", json=submission(chat.id) | {"quotes": []}
         )
+        await settled()
 
     assert "untrusted" not in str((await repo.rows(chat))[0].pydantic_ai)

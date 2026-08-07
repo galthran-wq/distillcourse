@@ -123,9 +123,11 @@ class Message(Base):
     __tablename__ = "messages"
     __table_args__ = (
         # The chat rail dates every chat of a reader in one pass — the maximum
-        # `created_at` per `chat_id` — which the index on `chat_id` alone can
+        # `created_at` per `chat_id` — which an index on `chat_id` alone can
         # only serve by reading each of those rows, jsonb blobs and all, off
-        # the heap.
+        # the heap. It is the only index on `chat_id` there is: this one is a
+        # prefix match for every query a plain one would serve, and `messages`
+        # is the table the platform writes to most.
         Index("ix_messages_chat_id_created_at", "chat_id", "created_at"),
     )
 
@@ -133,7 +135,7 @@ class Message(Base):
     # no separate sequence column is needed.
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7)
     chat_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("chats.id", ondelete="CASCADE"), index=True
+        ForeignKey("chats.id", ondelete="CASCADE")
     )
     run_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
     role: Mapped[str] = mapped_column(String(16))

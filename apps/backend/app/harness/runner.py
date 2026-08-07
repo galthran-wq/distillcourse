@@ -343,14 +343,6 @@ async def run(
             ),
             run_id=str(run_id),
         )
-        # Before the turn is stored, so what naming spends is added to the run's
-        # usage and rides the row `_close_run` writes it on — the row the
-        # monthly ceiling is summed from.
-        await _guarded(
-            retitle(repo, chat, result.usage),
-            "renaming the chat after run {run_id} failed",
-            run_id,
-        )
         await _close_run(
             repo, chat, run_id, result=result, partial_text="", failure=None
         )
@@ -380,16 +372,17 @@ async def _drain(
     current_locator: str | None,
     queue: asyncio.Queue[BaseChunk | None],
 ) -> None:
-    try:
-        async with session_factory() as session:
-            repo = HarnessRepository(session, user_id)
+    async with session_factory() as session:
+        repo = HarnessRepository(session, user_id)
+        chat: Chat | None = None
+        result: AgentRunResult[str] | None = None
+        failure: str | None = None
+        try:
             chat = await repo.get_chat(chat_id)
             if chat is None:
                 return
             deps = HarnessDeps(repo=repo, chat=chat, current_locator=current_locator)
-            result: AgentRunResult[str] | None = None
             text: list[str] = []
-            failure: str | None = None
 
             def capture(completed: AgentRunResult[str]) -> None:
                 nonlocal result
@@ -422,17 +415,6 @@ async def _drain(
                 failure = str(exc)
                 queue.put_nowait(ErrorChunk(error_text=failure))
             finally:
-                # Before the turn is stored, so the naming spend rides the
-                # usage row `_close_safely` writes; and well before the queue
-                # is terminated below, since the panel asks for the chat's name
-                # the moment the stream closes and a rename that lands after
-                # that is one the reader does not see until their next message.
-                if result is not None and failure is None:
-                    await _guarded(
-                        retitle(repo, chat, result.usage),
-                        "renaming the chat after run {run_id} failed",
-                        run_id,
-                    )
                 await _close_safely(
                     repo,
                     chat,
@@ -446,11 +428,18 @@ async def _drain(
                     "releasing run {run_id} failed",
                     run_id,
                 )
-    finally:
-        # Outside everything: the client is reading this queue, and a stream
-        # that is never terminated hangs the browser for as long as it waits.
-        # By here the run is over and what it produced has been stored.
-        queue.put_nowait(None)
+        finally:
+            # The client is reading this queue and their composer is dead until
+            # it ends, so nothing above may be skipped and nothing below may be
+            # waited on: by here the turn is stored and the chat is free, which
+            # is everything the learner's next message needs.
+            queue.put_nowait(None)
+        if chat is not None and result is not None and failure is None:
+            await _guarded(
+                retitle(repo, chat, run_id, result.usage),
+                "renaming the chat after run {run_id} failed",
+                run_id,
+            )
 
 
 async def _relay(queue: asyncio.Queue[BaseChunk | None]) -> AsyncGenerator[BaseChunk]:

@@ -76,7 +76,9 @@ Rules that override defaults:
   hands its ring over. Every mono micro-cap carries `LABEL_CLASS`.
   The chip a referenced passage is shown as carries
   `CHIP_CLASS`; a menu or a preview that hangs open over the page carries
-  `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown —
+  `POPOVER_CLASS`, plus `MENU_CLASS`/`MENU_ITEM_CLASS` when it is a dropdown,
+  and `MENU_ROW_CLASS` in place of `MENU_ITEM_CLASS` where the row lays
+  columns of its own out (a name and a date) rather than one label —
   all from `ui/styles.ts`, with only geometry left to the caller. Never
   hand-roll one of those in a page or a demo; the
   focus ring is global (`@layer base`, so a utility can still override it) —

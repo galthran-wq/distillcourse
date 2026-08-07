@@ -14,7 +14,7 @@ import {
   PlusIcon,
 } from "@/components/chat/icons";
 import { Button } from "@/components/ui";
-import { listModels, webChats, type ChatListing, type ChatModel } from "@/lib/chat/api";
+import { listModels, webChats, type ChatModel, type ChatSummary } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
 import { startPanelDrag } from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
@@ -50,7 +50,7 @@ function failure(error: unknown): string {
 export default function ChatPanel({ session, panel, expanded }: Props) {
   const { messages, sendMessage, status, error } = useChat({ chat: session.chat });
   const [models, setModels] = useState<ChatModel[]>([]);
-  const [chats, setChats] = useState<ChatListing[]>([]);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const header = useRef<HTMLElement>(null);

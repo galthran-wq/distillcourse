@@ -2,7 +2,7 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatList from "@/components/chat/ChatList";
-import type { ChatListing } from "@/lib/chat/api";
+import type { ChatSummary } from "@/lib/chat/api";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
 import { SectionsProvider } from "@/lib/content/sections";
 import type { LessonSections } from "@/lib/content/site";
@@ -24,7 +24,7 @@ const SECTIONS: LessonSections = {
 
 const NOW = new Date("2026-08-07T12:00:00Z");
 
-function chat(id: string, last: string | null): ChatListing {
+function chat(id: string, last: string | null): ChatSummary {
   return {
     id,
     kind: "web",
@@ -37,7 +37,7 @@ function chat(id: string, last: string | null): ChatListing {
 
 const { host, render } = mounted("nav");
 
-function shown(chats: ChatListing[], dated = true): void {
+function shown(chats: ChatSummary[], dated = true): void {
   act(() =>
     render(
       <SectionsProvider value={SECTIONS}>

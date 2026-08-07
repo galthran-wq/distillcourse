@@ -18,7 +18,7 @@ async def test_a_chat_of_another_user_is_out_of_reach(
     await other_repo.add_messages(theirs, [QUESTION], role="user")
 
     assert await repo.get_chat(theirs.id) is None
-    assert theirs.id not in [chat.id for chat in await repo.list_chats()]
+    assert theirs.id not in [chat.id for chat, _ in await repo.list_chats()]
     assert await repo.messages_today() == 0
 
 
