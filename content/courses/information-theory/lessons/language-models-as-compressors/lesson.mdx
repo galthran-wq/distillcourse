@@ -323,13 +323,22 @@ and LibriSpeech audio at one byte per sample.
   caption="Compression rate on three 1 GB corpora, all compressors given the same 2048-byte chunks. The model is lowest in every column, including the two modalities it was never trained on."
 />
 
-On text the largest model reaches $8.3\%$ of raw size, which is $0.66$ bits per
-byte, against gzip's $32.3\%$ with unlimited context, or $2.58$ bits per byte.
-On images it reaches $48.0\%$ against PNG's $61.7\%$ on the same chunks and
-$58.5\%$ with whole-image context. On audio it reaches $21.0\%$ against FLAC's
-$30.3\%$ chunked and $30.9\%$ unchunked, so the model is below the specialist
-under either protocol in both modalities. Neither images nor audio appeared in
-the model's training mix, which was internet text and books.
+Every bar in the figure is the matched-chunk protocol: the classical
+compressors were cut into the same 2048-byte pieces the model is limited to.
+Under it the largest model reaches $8.3\%$ of raw size on text, which is $0.66$
+bits per byte, against $48.1\%$ for gzip and $50.0\%$ for LZMA2; $48.0\%$ on
+images, against gzip's $68.6\%$ and PNG's $61.7\%$; and $21.0\%$ on audio,
+against gzip's $38.5\%$ and FLAC's $30.3\%$.
+
+Given whole files instead of chunks, gzip and PNG do considerably better, and
+those are the harder numbers for the model: gzip compresses `enwik9` to
+$32.3\%$, or $2.58$ bits per byte, and PNG the image stream to $58.5\%$. FLAC
+gains nothing from the longer input and is marginally worse at $30.9\%$. The
+model is below both specialists under either protocol. The full-context
+$32.3\%$ is the gzip rate the rest of this lesson compares against, and what the
+chunked protocol costs gzip to reach $48.1\%$ is the next section's subject.
+Neither images nor audio appeared in the model's training mix, which was
+internet text and books.
 
 The interesting claim is not that a bigger model predicts text better. It is
 that the ranking on images and audio survives at all. A compressor is a bet on
@@ -400,12 +409,15 @@ one of them once per token produced. No published comparison reports
 compression rate at matched compute, because the two systems do not overlap on
 that axis at any setting.
 
-The trade is not new, and the classical field measured it directly.
-[MacKay](https://www.inference.org.uk/itprnn/book.pdf) (§6.5) timed the
-compressors of 2003 as well as scoring them. On a 20,942-byte text file gzip
-took $0.10$ seconds and reached $39\%$, while `ppmz`, a context-mixing coder,
-reached $32\%$. On a sparse binary file gzip reached $2.1\%$ in $0.22$ seconds
-and `ppmz` reached $1.04\%$ in $533$: half the file for 2,400 times the time.
+The trade is not new, and the classical field measured it directly. The two
+files that scored gzip in <Ref lesson="compression-is-prediction"/> — a 20 KB
+chapter of LaTeX source, where gzip reached $39\%$, and a million-character
+sparse binary file, where it reached $2.1\%$ — were also timed by
+[MacKay](https://www.inference.org.uk/itprnn/book.pdf) (§6.5), and the timings
+are what this section needs from that benchmark. gzip took $0.10$ seconds on the
+text and $0.22$ on the sparse file. `ppmz`, a context-mixing coder of the same
+era, beat it on both, reaching $32\%$ and $1.04\%$, but its run on the sparse
+file took $533$ seconds: half the file for 2,400 times the time.
 The pre-neural state of the art was already a compressor nobody deployed, for
 exactly the reason the models are not deployed now.
 
@@ -439,10 +451,11 @@ half is $140$ GB.
 
 <Task>
 Step through the three frames watching the model's stacked total against gzip's
-flat $32.3\%$. Read the model's total off frame 2 and off frame 3 and divide
-the two: the corpus grew by a factor of a thousand, the parameter block did not
-move, and the ranking crosses back. Nothing about either compressor changed
-between frames 2 and 3.
+flat $32.3\%$. The blue parameter block is the same $140$ GB in frames 2 and 3,
+but frame 2 prints it as $140$ times the corpus and frame 3 as $14\%$ of it,
+while the amber data term reads $8.3\%$ in both. That one term carries the
+model's total from $14{,}008.3\%$ down to $22.3\%$, which is below gzip's
+$32.3\%$. Nothing about either compressor changed between the two frames.
 </Task>
 
 <Theorem title="the crossover corpus size">
@@ -747,7 +760,7 @@ The charge of $\beta = 16$ bits per parameter is a storage convention, not a
 requirement: a parameter only needs to be specified to the precision the data
 can distinguish. Estimate that precision for a model with $k$ parameters fitted
 to $n$ observations, then recompute the 70B crossover under your estimate, and
-state which assumption of the estimate is doing the work.
+state which assumption the estimate depends on.
 
 <Solution>
 **The estimate.** A parameter estimated from $n$ observations has a standard
@@ -764,7 +777,7 @@ convention is already near the estimate, and the crossover moves from $583$ GB
 to $547$ GB. The estimate only bites when $n$ is small: at $n = 10^{6}$ it
 gives $10$ bits per parameter and a crossover of $364$ GB.
 
-**Which assumption works.** The $\sqrt{n}$ rate assumes the parameters are
+**The assumption the estimate depends on.** The $\sqrt{n}$ rate assumes the parameters are
 identifiable and each is pinned down by the data independently. A 70B-parameter
 network fitted to $10^{9}$ bytes has far more parameters than observations, so
 most directions in parameter space are not pinned down at all and the true
