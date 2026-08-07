@@ -1,0 +1,429 @@
+Not every cluster is a blob: linkage hierarchies and density-based clustering recover structure k-means cannot, at the price of different hyperparameters. This chapter runs agglomerative clustering by hand on a five-point dissimilarity matrix under two linkages, establishes what a dendrogram does and does not encode, works DBSCAN's core/border/noise classification on a concrete picture, and closes with the referee questions: the silhouette score, the adjusted Rand index, and a four-way selection table over k-means, hierarchical clustering, DBSCAN, and Gaussian mixtures.
+
+## Two escapes from k-means' commitments
+
+The failure gallery of <Ref lesson="kmeans" /> traced every k-means breakdown to three commitments: clusters are convex Voronoi cells around centroids, the number $k$ is fixed before the data is seen, and every point is assigned to some cluster, outliers included. Rings, crescents, and unequal blobs violate the first commitment; ambiguous elbow plots expose the second; stray points corrupt the means under the third.
+
+This chapter develops the two standard escapes. *Hierarchical clustering* drops the commitment to $k$: it computes all $n-1$ nested merges once and lets the number of clusters be read off afterwards, from a tree. *DBSCAN* drops the commitment to shape and to total assignment: it defines a cluster as a connected region of high density, which can be a ring as easily as a blob, and it labels low-density points as noise instead of forcing them into a cluster.
+
+<KeyFact>
+k-means' three commitments (convex cells, $k$ fixed upfront, every point assigned) are exactly what the two methods of this chapter relax: hierarchies defer the choice of $k$; density-based clustering permits arbitrary shapes and explicit noise.
+</KeyFact>
+
+## Agglomerative clustering: merge the closest pair, repeat
+
+The input is a *dissimilarity matrix*: one number $d_{ij} \ge 0$ per pair of objects, symmetric, zero on the diagonal. The five objects below are the chapter's running example; interviews present the problem in exactly this form.
+
+| | A | B | C | D | E |
+| --- | --- | --- | --- | --- | --- |
+| **A** | 0 | 2 | 8 | 9 | 10 |
+| **B** | 2 | 0 | 3 | 7 | 8 |
+| **C** | 8 | 3 | 0 | 4 | 6 |
+| **D** | 9 | 7 | 4 | 0 | 1 |
+| **E** | 10 | 8 | 6 | 1 | 0 |
+
+No coordinates are given and none are needed. This table is not even metric: $d_{AC} = 8$ exceeds $d_{AB} + d_{BC} = 5$, so no arrangement of five points in Euclidean space reproduces it. Agglomerative clustering runs regardless, which is a genuine practical advantage: any pairwise dissimilarity works, including ones computed from correlations or edit distances ([ISLP §12.4.2](https://www.statlearning.com)).
+
+The procedure: start with $n$ singleton clusters. At each step, merge the two closest clusters and record the dissimilarity at which they merged (the *merge height*). After $n-1$ merges one cluster remains, and the recorded history is the *dendrogram*. One rule is missing: once a cluster holds several points, "closest" needs a definition of cluster-to-cluster distance. That rule is the *linkage*. The run below uses **single linkage**: the distance between two clusters is the distance between their closest pair of members.
+
+### The run: single linkage, four merges
+
+<Example title="single-linkage run on the five-point matrix">
+**Merge 1.** The smallest off-diagonal entry is $d_{DE} = 1$: merge $\{D, E\}$ at height 1. The new row is the elementwise minimum of $D$'s and $E$'s rows: $d(\{D,E\}, A) = \min(9,10) = 9$, $d(\{D,E\}, B) = \min(7,8) = 7$, $d(\{D,E\}, C) = \min(4,6) = 4$.
+
+| | A | B | C | $\{D,E\}$ |
+| --- | --- | --- | --- | --- |
+| **A** | 0 | 2 | 8 | 9 |
+| **B** | 2 | 0 | 3 | 7 |
+| **C** | 8 | 3 | 0 | 4 |
+| **$\{D,E\}$** | 9 | 7 | 4 | 0 |
+
+**Merge 2.** Smallest entry: $d_{AB} = 2$. Merge $\{A, B\}$ at height 2; new row $d(\{A,B\}, C) = \min(8,3) = 3$, $d(\{A,B\}, \{D,E\}) = \min(9,7) = 7$.
+
+| | $\{A,B\}$ | C | $\{D,E\}$ |
+| --- | --- | --- | --- |
+| **$\{A,B\}$** | 0 | 3 | 7 |
+| **C** | 3 | 0 | 4 |
+| **$\{D,E\}$** | 7 | 4 | 0 |
+
+**Merge 3.** Smallest entry: $d(\{A,B\}, C) = 3$. Merge to $\{A, B, C\}$ at height 3; the remaining distance is $d(\{A,B,C\}, \{D,E\}) = \min(7, 4) = 4$.
+
+**Merge 4.** The final merge joins everything at height 4. Merge history: $\{D,E\}$ at 1, $\{A,B\}$ at 2, $\{A,B,C\}$ at 3, all at 4.
+</Example>
+
+<FigureSequence
+  name="agglo-run"
+  alt="Five frames of a single-linkage agglomerative run: the five-by-five dissimilarity matrix shrinks by one row per merge while the dendrogram grows one fusion per frame, ending with the complete four-merge tree"
+  caption="One merge per frame: the smallest matrix entry (amber) becomes the next fusion; the new row is the min of the two merged rows."
+/>
+
+<Task>
+Step through the five frames tracking the highlighted entry. At each step, verify that the amber matrix entry equals the height of the amber fusion drawn in the next frame, and that each new row is the elementwise minimum of the two rows it replaces.
+</Task>
+
+### Same matrix, different tree: linkage is a modeling choice
+
+**Complete linkage** replaces the minimum by the maximum: the distance between two clusters is the distance between their *farthest* pair of members. Rerunning the same matrix changes the answer.
+
+<Example title="complete-linkage rerun">
+**Merges 1–2** are identical (singleton merges do not involve the linkage yet in the choice of pair): $\{D,E\}$ at 1, then $\{A,B\}$ at 2. The maintained rows differ: $d(\{D,E\}, C) = \max(4,6) = 6$, $d(\{A,B\}, C) = \max(8,3) = 8$, $d(\{A,B\}, \{D,E\}) = \max(9,7,10,8) = 10$.
+
+**Merge 3.** The candidates are now $8$, $6$, and $10$; the smallest is $d(C, \{D,E\}) = 6$. C merges with $\{D, E\}$, not with $\{A, B\}$.
+
+**Merge 4.** $d(\{A,B\}, \{C,D,E\}) = \max(8, 9, 10, 3, 7, 8) = 10$: final merge at height 10.
+
+Merge history: $\{D,E\}$ at 1, $\{A,B\}$ at 2, $\{C,D,E\}$ at 6, all at 10. Cutting each tree into two clusters gives $\{A,B,C\} \mid \{D,E\}$ under single linkage but $\{A,B\} \mid \{C,D,E\}$ under complete linkage.
+</Example>
+
+The disagreement is entirely about C, and the mechanism is visible in the matrix: C has one short link to the $\{A,B\}$ side ($d_{BC} = 3$) and one long one ($d_{AC} = 8$). Single linkage listens only to the best link, so C chains onto $\{A,B\}$; complete linkage listens only to the worst, and C's worst link to $\{D,E\}$ (which is 6) beats its worst link to $\{A,B\}$ (which is 8).
+
+<KeyFact>
+The data does not determine the tree; the pair (data, linkage) does. On the same five-point matrix, single and complete linkage assign C to different clusters, so quoting a hierarchical clustering without naming its linkage is meaningless.
+</KeyFact>
+
+## The linkage taxonomy: four rules, four artifacts
+
+<Definition title="linkage criteria">
+For clusters $G$ and $H$ with pairwise dissimilarities $d_{ij}$:
+
+$$
+d_{\text{single}}(G,H) = \min_{i \in G,\, j \in H} d_{ij}, \qquad
+d_{\text{complete}}(G,H) = \max_{i \in G,\, j \in H} d_{ij},
+$$
+
+$$
+d_{\text{average}}(G,H) = \frac{1}{|G|\,|H|} \sum_{i \in G} \sum_{j \in H} d_{ij}, \qquad
+d_{\text{Ward}}(G,H) = \frac{|G|\,|H|}{|G|+|H|}\, \lVert \bar{x}_G - \bar{x}_H \rVert^2 .
+$$
+
+The Ward criterion equals the increase in total within-cluster sum of squares caused by the merge, so it requires Euclidean coordinates; the other three accept any dissimilarity.
+</Definition>
+
+Ward's rule ([Ward, 1963](https://doi.org/10.1080/01621459.1963.10500845)) is the distortion objective $J$ of <Ref lesson="kmeans" /> optimized by a different search: instead of Lloyd's alternating descent at a fixed $k$, Ward greedily performs the merge that increases $J$ least, producing the whole hierarchy. It inherits k-means' taste for compact, spherical, similar-sized clusters, and it is the default linkage in scikit-learn.
+
+Each rule has a characteristic artifact, stated sharply in [ESL §14.3.12](https://hastie.su.domains/ElemStatLearn/):
+
+- **Single** chains: one short link between two groups (a noise bridge) welds them, so single linkage tracks elongated shapes well but produces straggly clusters that merge through any path of close points. Exercise 2 works a chaining instance.
+- **Complete** crowds: merge height is a cluster's worst internal pair, so clusters stay compact with small diameter, and large or elongated true clusters get broken in half. A point can end up closer to members of other clusters than to its own.
+- **Average** compromises between the two, but its merge heights depend on the numeric scale of the dissimilarities: a monotone transformation of the $d_{ij}$ (say squaring) can change the tree, while single and complete linkage depend only on the ranking of the entries.
+- **Ward** produces even-sized, variance-tight groups; it is the sensible default when clusters are believed compact, and inapplicable when only a non-Euclidean dissimilarity exists.
+
+<Figure
+  src="./figures/linkage-gallery.svg"
+  alt="Four panels showing the same elongated-cluster-plus-blob dataset cut into two clusters under single, complete, average, and Ward linkage, with single peeling one stray point, complete breaking the elongated cluster, and average and Ward splitting at the bridge"
+  caption="One dataset, four linkages, four different two-cluster answers: the artifact of each rule labeled in its panel."
+/>
+
+<Remark title="greedy and irreversible">
+Agglomerative clustering never revisits a merge: an early fusion that later proves unfortunate (two points joined by a noise bridge, say) stays in the tree, and every subsequent height is computed relative to it. The algorithm costs $O(n^2)$ memory for the matrix and $O(n^3)$ time naively ($O(n^2 \log n)$ with a heap), which caps it at tens of thousands of points.
+</Remark>
+
+<Aside>
+The choice of dissimilarity matters as much as the linkage. ISLP's shopper example: two customers who buy the same items in the same proportions, one of them at ten times the volume, are far apart in Euclidean distance but perfectly correlated across items. Correlation-based dissimilarity ($1 - \text{corr}$) groups shoppers by taste; Euclidean distance groups them by spend. Both are defensible clusterings of the same table, answering different business questions. Since three of the four linkages accept any dissimilarity, this choice is a free modeling input of hierarchical clustering, unavailable to k-means.
+</Aside>
+
+<KeyFact>
+Ward is k-means' sibling: it greedily minimizes the increase of the same within-cluster sum of squares $J$, needs Euclidean coordinates, and prefers the same compact spherical clusters. Single, complete, and average need only a dissimilarity ranking, which is the flexibility argument for hierarchies.
+</KeyFact>
+
+## Dendrogram literacy: height carries information, position does not
+
+Cutting a dendrogram with a horizontal line at height $h$ produces one cluster per branch crossed: the clusters are the maximal subtrees whose internal fusions all sit below $h$. On the single-linkage tree of the running example, a cut at $h = 3.5$ crosses two branches and yields $\{A,B,C\} \mid \{D,E\}$; a cut at $h = 2.5$ yields three clusters $\{A,B\} \mid \{C\} \mid \{D,E\}$. One run of the algorithm therefore contains every granularity at once, and $k$ is chosen after seeing the structure, by choosing where to cut. In practice the cut is placed across a long vertical gap: a range of heights where no fusions occur, indicating well-separated groups at that granularity.
+
+Reading a dendrogram correctly is a standard interview probe, because the plot invites a specific misreading. Two facts:
+
+- **The vertical axis is meaningful.** The height at which two clusters fuse is their linkage dissimilarity at merge time: fusions near the bottom join similar groups, fusions near the top join dissimilar ones.
+- **The horizontal axis is not.** At each of the $n-1$ internal nodes the two subtrees can be drawn in either order, so $2^{n-1}$ leaf orderings ($16$ for the running example) draw the same tree. Two leaves standing side by side may be maximally dissimilar; similarity between leaves is read from the height of their lowest common fusion, never from adjacency on the page.
+
+<Figure
+  src="./figures/dendrogram-literacy.svg"
+  alt="The single-linkage dendrogram of the running example with a cut at height 3.5 producing two clusters, a checked correct reading based on fusion heights, and a struck-out wrong reading based on horizontal adjacency of C and D"
+  caption="The literacy card: fusion heights are data, leaf order is typesetting. C is drawn beside D yet fuses with it only at the top."
+/>
+
+One structural caveat closes the topic. The dendrogram imposes nesting: the $k=3$ clustering is always a refinement of the $k=2$ clustering. When the data is genuinely hierarchical (species taxonomies, document topic trees, corporate org charts) this is exactly right. When the best 2-partition and the best 3-partition of the data are unrelated (customers split by gender, or alternatively three ways by nationality, ISLP's example), the tree structure is an assumption the data violates, and a flat method at each $k$ can outperform any single hierarchy.
+
+<KeyFact>
+A dendrogram encodes fusion heights, not leaf positions: $2^{n-1}$ orderings draw the same tree. Cutting at a height gives a partition, and all cuts are nested, which helps exactly when the data is hierarchical and hurts when it is not.
+</KeyFact>
+
+## DBSCAN: clusters are connected dense regions
+
+Density-based clustering starts from a different intuition: a cluster is a region where points are crowded, whatever its shape, and points in no crowded region belong to no cluster. [DBSCAN](https://www.aaai.org/Papers/KDD/1996/KDD96-037.pdf) (Ester, Kriegel, Sander, and Xu, KDD 1996) operationalizes crowdedness with two parameters: a radius $\varepsilon$ and a count threshold minPts.
+
+The concrete picture first. Twelve points in the plane, $\varepsilon = 1$, $\text{minPts} = 3$, with neighborhood counts including the point itself:
+
+<Example title="classifying twelve points">
+Points: $P_1(1,1)$, $P_2(1,2)$, $P_3(2,1)$, $P_4(2,2)$, $P_5(3,1)$, $P_6(6,4)$, $P_7(7,4)$, $P_8(6,5)$, $P_9(7,5)$, $P_{10}(5,4)$, $P_{11}(4,6.5)$, $P_{12}(9,1)$.
+
+Count each point's $\varepsilon$-neighborhood (all points at distance $\le 1$; diagonal neighbors at distance $\sqrt{2} \approx 1.41$ do not qualify):
+
+| point | neighbors within $\varepsilon = 1$ | count | verdict |
+| --- | --- | --- | --- |
+| $P_1$ | $P_2, P_3$ | 3 | core |
+| $P_2$ | $P_1, P_4$ | 3 | core |
+| $P_3$ | $P_1, P_4, P_5$ | 4 | core |
+| $P_4$ | $P_2, P_3$ | 3 | core |
+| $P_5$ | $P_3$ | 2 | border (in core $P_3$'s ball) |
+| $P_6$ | $P_7, P_8, P_{10}$ | 4 | core |
+| $P_7$ | $P_6, P_9$ | 3 | core |
+| $P_8$ | $P_6, P_9$ | 3 | core |
+| $P_9$ | $P_7, P_8$ | 3 | core |
+| $P_{10}$ | $P_6$ | 2 | border (in core $P_6$'s ball) |
+| $P_{11}$ | none | 1 | noise |
+| $P_{12}$ | none | 1 | noise |
+
+The core points $P_1$–$P_4$ are mutually reachable through $\varepsilon$-steps, as are $P_6$–$P_9$; no $\varepsilon$-step connects the two groups. Result: clusters $\{P_1,\dots,P_5\}$ and $\{P_6,\dots,P_{10}\}$, noise $\{P_{11}, P_{12}\}$. No $k$ was supplied; two clusters emerged.
+</Example>
+
+<Figure
+  src="./figures/dbscan-anatomy.svg"
+  alt="The twelve-point dataset with epsilon-balls drawn around a core point with three neighbors, a border point with two neighbors adjacent to a core, and a noise point with no neighbors, plus a legend for the three point types"
+  caption="The three point types of DBSCAN on the worked dataset: the entire algorithm is these three verdicts plus connectivity."
+/>
+
+<Task>
+Verify $P_{10}$'s row by hand: compute its distances to $P_6$ through $P_9$ and to $P_{11}$, confirm exactly one lands within $\varepsilon = 1$, and confirm the border verdict follows because that one neighbor ($P_6$) is core.
+</Task>
+
+<Definition title="core, border, and noise">
+Fix $\varepsilon > 0$ and an integer $\text{minPts} \ge 1$. The **$\varepsilon$-neighborhood** of a point $p$ is $N_\varepsilon(p) = \{q : d(p,q) \le \varepsilon\}$, including $p$ itself. A point is a **core point** if $|N_\varepsilon(p)| \ge \text{minPts}$; a **border point** if it is not core but lies in the $\varepsilon$-neighborhood of some core point; **noise** otherwise. A **cluster** is a maximal set of points connected through core points: two core points belong to the same cluster when a chain of core points links them with consecutive distances $\le \varepsilon$, and each border point joins a cluster of a core point that covers it.
+</Definition>
+
+The definition is also the algorithm: compute the connected components of the graph whose vertices are core points and whose edges join core points within $\varepsilon$ of each other, then attach each border point to a component that covers it. Implementations discover the components by region-expansion, growing each cluster outward from an unvisited core point through one neighborhood query per point. With a spatial index answering each query in $O(\log n)$, the total is $O(n \log n)$; without one, $n$ scans give $O(n^2)$.
+
+The strengths follow directly from the definition. Cluster shape is unconstrained, because connectivity through $\varepsilon$-chains follows the data wherever the density leads, including around a ring. No $k$ is chosen; the number of components is an output. Noise is an explicit verdict, so a stray point corrupts nothing.
+
+<Figure
+  src="./figures/dbscan-vs-kmeans.svg"
+  alt="Two concentric rings with scattered stray points clustered by k-means, which splits both rings with a chord and absorbs the strays, and by DBSCAN, which recovers each ring as a cluster and labels the strays noise"
+  caption="The payoff comparison on two rings plus strays: convex Voronoi cells cannot contain a ring at any k; density connectivity can."
+/>
+
+### One ε cannot fit two densities
+
+DBSCAN's parameters encode a single global density threshold: roughly, clusters are regions where minPts points fit in an $\varepsilon$-ball. When the data contains one dense and one sparse cluster, no single threshold serves both. An $\varepsilon$ calibrated to the dense cluster leaves the sparse cluster's points below the count threshold: all noise. An $\varepsilon$ calibrated to the sparse cluster is so large at the dense end that it chains the dense cluster to anything nearby. Exercise 5 works this failure.
+
+<Figure
+  src="./figures/epsilon-dilemma.svg"
+  alt="A dense cluster and a sparse cluster with a small epsilon circle that captures neighbors only in the dense cluster and a large dashed epsilon circle that would chain the dense cluster through stray points, beside a sorted k-distance plot with the knee marked as the epsilon estimate"
+  caption="The ε dilemma (left) and the standard compromise (right): sort each point's distance to its minPts-th neighbor and take ε at the knee."
+/>
+
+**Choosing the parameters.** The original paper's *k-distance heuristic*: compute each point's distance to its $\text{minPts}$-th nearest neighbor, sort the values in decreasing order, and set $\varepsilon$ at the knee of the curve; points left of the knee (large $k$-distances) are the noise the threshold excludes. For minPts, the paper uses 4 for 2D data; the common rule of thumb is $\text{minPts} \ge d + 1$, doubled when the data is noisy. Two further caveats belong in any interview answer. In high dimensions, the distance concentration of <Ref lesson="knn-curse" /> flattens the k-distance curve, since nearest and farthest neighbors converge; density thresholds lose meaning along with distances. And standardize features first: $\varepsilon$ is a radius in the same Euclidean metric that k-means and k-NN use, so an unscaled feature owns it the same way.
+
+<Remark title="two minor non-guarantees">
+A border point can lie within $\varepsilon$ of core points from two different clusters; it joins whichever cluster's expansion reaches it first, so DBSCAN's output is order-dependent on exactly these points (core assignments are deterministic). And the noise label is a density verdict at one threshold, not an outlier-detection guarantee: a point flagged as noise under one $(\varepsilon, \text{minPts})$ can be a border point under another.
+</Remark>
+
+<Aside>
+The successors fix the single-threshold limitation. [OPTICS](https://doi.org/10.1145/304182.304187) (Ankerst et al., 1999) removes $\varepsilon$ by ordering points by reachability distance, effectively computing the clustering at every $\varepsilon$ at once; clusters at different densities appear as valleys of the reachability plot. [HDBSCAN](https://doi.org/10.1007/978-3-642-37456-2_14) (Campello, Moulavi, and Sander, 2013) builds a hierarchy of DBSCAN solutions over all densities and extracts the most stable clusters, connecting this section back to dendrograms: it is hierarchical clustering over density levels, cut adaptively per branch rather than at one height.
+</Aside>
+
+<KeyFact>
+DBSCAN's clusters are the connected components of core points under $\varepsilon$-reachability: arbitrary shapes, no $k$, explicit noise. The price is one global density threshold; clusters of different densities need OPTICS or HDBSCAN.
+</KeyFact>
+
+## Scoring a clustering: silhouette and ARI
+
+Single and complete linkage produced two competing partitions of the running matrix, disagreeing about C. Without labels, the standard referee is the silhouette ([Rousseeuw, 1987](https://doi.org/10.1016/0377-0427%2887%2990125-7)): per point, compare the mean distance to its own cluster against the mean distance to the nearest other cluster.
+
+For C in the single-linkage partition $\{A,B,C\} \mid \{D,E\}$: mean distance to its own clustermates $a(C) = (8+3)/2 = 5.5$; mean distance to the other cluster $b(C) = (4+6)/2 = 5.0$. C sits closer, on average, to the cluster it is not in.
+
+<Definition title="silhouette">
+For a point $i$ in cluster $C_I$ with $|C_I| > 1$, let
+
+$$
+a(i) = \frac{1}{|C_I| - 1} \sum_{j \in C_I,\, j \ne i} d(i,j), \qquad
+b(i) = \min_{J \ne I} \; \frac{1}{|C_J|} \sum_{j \in C_J} d(i,j).
+$$
+
+The **silhouette** of $i$ is $s(i) = \dfrac{b(i) - a(i)}{\max(a(i), b(i))} \in [-1, 1]$, with $s(i) = 0$ by convention when $|C_I| = 1$. The mean of $s(i)$ over all points scores the whole clustering.
+</Definition>
+
+Values near $+1$ mean the point is much closer to its own cluster than to any other; near $0$, it sits between clusters; negative, it is on average closer to another cluster than to its own, evidence of misassignment. The score needs only the dissimilarity matrix, so it applies to the non-Euclidean running example without modification, and it is the peaked choose-$k$ criterion promised in <Ref lesson="kmeans" />: unlike distortion, the mean silhouette does not improve automatically as $k$ grows.
+
+<Figure
+  src="./figures/silhouette-computed.svg"
+  alt="Point C with its two amber intra-cluster distances 8 and 3 and two blue distances 4 and 6 to the other cluster, the computation a equals 5.5, b equals 5.0, s equals minus 0.09, and a minus-one-to-one scale bar with the value marked just below zero"
+  caption="s(C) = −0.09 under the single-linkage partition: the bridge point is on the fence, leaning toward the other cluster."
+/>
+
+<Example title="mean silhouette of the single-linkage partition">
+Partition $\{A,B,C\} \mid \{D,E\}$, using the running matrix:
+
+- $A$: $a = (2+8)/2 = 5$, $b = (9+10)/2 = 9.5$, $s = 4.5/9.5 = 0.474$
+- $B$: $a = (2+3)/2 = 2.5$, $b = (7+8)/2 = 7.5$, $s = 5/7.5 = 0.667$
+- $C$: $a = 5.5$, $b = 5.0$, $s = -0.5/5.5 = -0.091$
+- $D$: $a = 1$, $b = (9+7+4)/3 = 6.667$, $s = 5.667/6.667 = 0.850$
+- $E$: $a = 1$, $b = (10+8+6)/3 = 8$, $s = 7/8 = 0.875$
+
+Mean silhouette: $(0.474 + 0.667 - 0.091 + 0.850 + 0.875)/5 = 0.555$. Exercise 6 computes the complete-linkage partition's mean and settles which tree the silhouette prefers.
+</Example>
+
+**When labels exist**, clustering output is compared against them with the [adjusted Rand index](https://doi.org/10.1007/BF01908075) (Hubert and Arabie, 1985). The raw Rand index is the fraction of point pairs on which two partitions agree (both together or both apart); its expected value under random labeling is well above 0, so ARI rescales it as $(\text{RI} - \mathbb{E}[\text{RI}]) / (\max \text{RI} - \mathbb{E}[\text{RI}])$: 1 for identical partitions, near 0 for chance agreement, negative for worse than chance. Being pair-based, it never requires matching cluster names to label names and handles differing cluster counts.
+
+One warning closes the section. The silhouette's geometry rewards compact, roughly convex clusters: on the two-rings dataset it scores DBSCAN's correct ring clusters poorly, because every ring point's own cluster contains far-away points on the opposite side of the ring while the other ring passes nearby. A metric with a shape assumption cannot referee methods whose point is to drop that assumption.
+
+<KeyFact>
+Silhouette compares mean intra-cluster distance to nearest-other-cluster distance per point and needs no labels; ARI compares against labels, adjusted for chance. Silhouette itself assumes compact clusters, so it must not be used to referee density-based results across paradigms.
+</KeyFact>
+
+## Choosing the paradigm: the selection table
+
+All distance-based clustering shares one precondition, stated for the third time in this course: standardize features first. The metric-domination arithmetic of <Ref lesson="knn-curse" />, applied to k-means in <Ref lesson="kmeans" />, applies verbatim to linkage distances and to DBSCAN's $\varepsilon$; Exercise 7 runs the numbers once more. With that settled, the paradigm choice is a table lookup on the data's shape and the task's requirements.
+
+| | k-means | agglomerative | DBSCAN | GMM (<Ref lesson="gmm-em" />) |
+| --- | --- | --- | --- | --- |
+| cluster model | convex Voronoi cells | whatever the linkage builds | connected dense regions, any shape | ellipsoids (per-component Gaussian) |
+| number of clusters | $k$ upfront | cut chosen after the run | none; $\varepsilon$, minPts instead | $k$ upfront |
+| noise handling | none, all points assigned | none, all points are leaves | explicit noise label | soft: low responsibility everywhere |
+| input needed | coordinates (Euclidean) | any dissimilarity matrix | any metric distance | coordinates (Euclidean) |
+| scalability | $O(nkd)$ per iteration; millions of points | $O(n^2)$ memory; tens of thousands | $O(n \log n)$ with an index | $O(nkd^2)$ per iteration |
+| output | partition + centroids | full dendrogram, every $k$ at once | partition + noise set | densities + soft assignments |
+
+The reading, in interview form: k-means for large $n$ with roughly spherical clusters when centroids and fast scoring of new points are wanted; hierarchical when the hierarchy itself is the deliverable, when $n$ is small enough for the matrix, or when only a custom dissimilarity exists; DBSCAN for irregular shapes, unknown cluster count, and data with genuine noise; Gaussian mixtures, developed next, when clusters overlap and calibrated soft memberships or per-cluster shapes are needed.
+
+## Exercises
+
+<Exercise>
+Interview set piece. Perform agglomerative clustering with **complete linkage** on the following dissimilarity matrix; report every merge with its height and the two-cluster partition.
+
+| | V | W | X | Y | Z |
+| --- | --- | --- | --- | --- | --- |
+| **V** | 0 | 3 | 7 | 9 | 8 |
+| **W** | 3 | 0 | 6 | 8 | 7 |
+| **X** | 7 | 6 | 0 | 2 | 5 |
+| **Y** | 9 | 8 | 2 | 0 | 4 |
+| **Z** | 8 | 7 | 5 | 4 | 0 |
+
+<Solution>
+**Merge 1.** Smallest entry $d_{XY} = 2$: merge $\{X,Y\}$ at height 2. New row (elementwise max): $d(\{X,Y\}, V) = \max(7,9) = 9$, $d(\{X,Y\}, W) = \max(6,8) = 8$, $d(\{X,Y\}, Z) = \max(5,4) = 5$.
+
+**Merge 2.** Remaining entries: $d_{VW} = 3$, $d_{VZ} = 8$, $d_{WZ} = 7$, and the new row $9, 8, 5$. Smallest is 3: merge $\{V,W\}$ at height 3. New row: $d(\{V,W\}, \{X,Y\}) = \max(9,8) = 9$, $d(\{V,W\}, Z) = \max(8,7) = 8$.
+
+**Merge 3.** Entries: $d(\{X,Y\}, Z) = 5$, $d(\{V,W\}, Z) = 8$, $d(\{V,W\}, \{X,Y\}) = 9$. Merge $\{X,Y,Z\}$ at height 5.
+
+**Merge 4.** $d(\{V,W\}, \{X,Y,Z\}) = \max(7,9,8,6,8,7) = 9$: final merge at height 9.
+
+History: $\{X,Y\}$ at 2, $\{V,W\}$ at 3, $\{X,Y,Z\}$ at 5, all at 9. The two-cluster cut (any height in $(5, 9)$) gives $\{V,W\} \mid \{X,Y,Z\}$. For contrast, single linkage merges identically until the end but at heights $2, 3, 4, 6$: same partition here, different tree heights.
+</Solution>
+</Exercise>
+
+<Exercise>
+Single versus complete linkage: state the characteristic failure of each, then demonstrate both on the one-dimensional dataset $\{0,\ 1,\ 2.1,\ 3.3,\ 4.6,\ 6\}$ (gaps $1, 1.1, 1.2, 1.3, 1.4$): give each linkage's merge history and two-cluster cut.
+
+<Solution>
+**Failures.** Single linkage chains: merge height is the single closest pair, so any path of small gaps welds groups regardless of overall extent. Complete linkage crowds: merge height is the widest internal pair, so it keeps diameters small and breaks large or stretched clusters.
+
+**Single linkage.** The smallest gap is always the next adjacent pair: merges at heights $1$ ($\{0,1\}$), $1.1$ (join $2.1$), $1.2$ (join $3.3$), $1.3$ (join $4.6$), $1.4$ (join $6$): a caterpillar tree with every fusion between $1$ and $1.4$. The two-cluster cut splits at the largest gap: $\{0, 1, 2.1, 3.3, 4.6\} \mid \{6\}$. The chain absorbed everything; the "second cluster" is one stray endpoint.
+
+**Complete linkage.** Merge 1: $\{0,1\}$ at 1. Merge 2: smallest remaining pairwise distance is $d(2.1, 3.3) = 1.2$: merge at 1.2. Merge 3: $d(4.6, 6) = 1.4$. Merge 4: $d(\{0,1\}, \{2.1,3.3\}) = 3.3$ versus $d(\{2.1,3.3\}, \{4.6,6\}) = 3.9$ versus $d(\{0,1\},\{4.6,6\}) = 6$: merge the first pair at 3.3. Final merge at $6$. Two-cluster cut: $\{0, 1, 2.1, 3.3\} \mid \{4.6, 6\}$: balanced compact groups, produced by imposing small diameters on a dataset that is really one evenly spreading chain.
+
+Neither answer is "correct": the dataset has no gap structure, and each linkage imposes its own bias on it. That is the demonstration.
+</Solution>
+</Exercise>
+
+<Exercise>
+Dendrogram literacy. Using the single-linkage dendrogram of the running example (fusions: $\{D,E\}$ at 1, $\{A,B\}$ at 2, $\{A,B,C\}$ at 3, all at 4, drawn with leaf order A, B, C, D, E): (a) a colleague concludes that C and D are similar because they are drawn side by side; give the correct reading and the general rule. (b) How many leaf orderings draw this tree? (c) What partition does a cut at height 2.5 produce, and what is the largest number of clusters any cut can produce?
+
+<Solution>
+**(a)** Adjacency on the page is typesetting, not data: at every internal node the two subtrees may be drawn in either order. Similarity is read from the height of the lowest common fusion. C and D first share a cluster at height 4, the top of the tree, so the dendrogram asserts they are in the most dissimilar pair of groups it ever joins. The correct statements about C: it joins $\{A,B\}$ at height 3 (and indeed $d_{BC} = 3$), and its group fuses with $\{D,E\}$ only at 4.
+
+**(b)** Each of the $n - 1 = 4$ internal nodes flips independently: $2^4 = 16$ orderings.
+
+**(c)** A cut at 2.5 crosses the branches above $\{A,B\}$, $C$, and $\{D,E\}$: three clusters $\{A,B\} \mid \{C\} \mid \{D,E\}$. A cut below every fusion (any $h < 1$) gives the maximum: $n = 5$ singleton clusters.
+</Solution>
+</Exercise>
+
+<Exercise>
+Execute DBSCAN by hand with $\varepsilon = 1$, $\text{minPts} = 3$ (counts include the point itself) on: $a(0,0)$, $b(1,0)$, $c(0,1)$, $d(1,1)$, $e(2,0)$, $f(3,0)$, $g(5,3)$, $h(6,3)$, $i(5.5,3.8)$, $j(8,0)$. Classify every point as core, border, or noise, list the clusters, and then state what changes with $\text{minPts} = 4$.
+
+<Solution>
+Neighborhoods at distance $\le 1$ (diagonals $\sqrt 2 \approx 1.41$ excluded; $d(g,i) = d(h,i) = \sqrt{0.25 + 0.64} \approx 0.94 \le 1$):
+
+| point | neighbors | count | verdict |
+| --- | --- | --- | --- |
+| $a$ | $b, c$ | 3 | core |
+| $b$ | $a, d, e$ | 4 | core |
+| $c$ | $a, d$ | 3 | core |
+| $d$ | $b, c$ | 3 | core |
+| $e$ | $b, f$ | 3 | core |
+| $f$ | $e$ | 2 | border ($e$ is core) |
+| $g$ | $h, i$ | 3 | core |
+| $h$ | $g, i$ | 3 | core |
+| $i$ | $g, h$ | 3 | core |
+| $j$ | none | 1 | noise |
+
+Core points $a, b, c, d, e$ are chained through consecutive distances $\le 1$ (e.g. $a\!-\!b\!-\!e$), so they form one component; $f$ attaches as border. Clusters: $\{a,b,c,d,e,f\}$ and $\{g,h,i\}$; noise: $\{j\}$.
+
+**With minPts = 4:** only $b$ (count 4) remains core. The single cluster is $b$ with its neighborhood as border points: $\{b, a, d, e\}$. Point $c$ is within $\varepsilon$ only of $a$ and $d$, which are no longer core, so $c$ becomes noise; likewise $f$ (its only neighbor $e$ lost core status) and all of $g, h, i$ (counts 3). Result: one cluster $\{a, b, d, e\}$, noise $\{c, f, g, h, i, j\}$. Raising minPts by one collapsed a two-cluster answer into one cluster plus mass noise: DBSCAN's output is sensitive to the density threshold, which is why the k-distance heuristic exists.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "Your data has one dense cluster and one sparse cluster. What does DBSCAN do, and what would you try?" Answer in full, using the definitions.
+
+<Solution>
+DBSCAN's $(\varepsilon, \text{minPts})$ pair encodes one global density threshold: a cluster needs minPts points per $\varepsilon$-ball. With two densities, no single threshold works. Set $\varepsilon$ small enough that the dense cluster's points are core, and the sparse cluster's points have neighborhoods of size 1 or 2: none reach minPts, no core points form, and the entire sparse cluster is labeled noise. Set $\varepsilon$ large enough that sparse points become core, and at the dense end the balls become so wide that the dense cluster chains through any intermediate stray points into neighboring structure; the two clusters may merge outright.
+
+What to try, in order: (1) re-examine scaling, since one unstandardized feature distorts all densities; (2) run DBSCAN at two thresholds and reconcile, which is ad hoc but sometimes sufficient; (3) switch to OPTICS, which orders points by reachability and exposes clusters at every density as valleys of the reachability plot, or HDBSCAN, which builds the hierarchy over all density levels and extracts the most stable cluster per branch: the standard modern answer, with no $\varepsilon$ at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compute the mean silhouette of the complete-linkage partition $\{A,B\} \mid \{C,D,E\}$ of the running matrix, showing $a$, $b$, and $s$ for every point. Compare with the single-linkage partition's mean of $0.555$ and state which tree the silhouette prefers and what property of C drives the comparison.
+
+<Solution>
+Using the running dissimilarity matrix:
+
+- $A$: $a = 2$, $b = (8+9+10)/3 = 9$, $s = 7/9 = 0.778$
+- $B$: $a = 2$, $b = (3+7+8)/3 = 6$, $s = 4/6 = 0.667$
+- $C$: $a = (4+6)/2 = 5$, $b = (8+3)/2 = 5.5$, $s = 0.5/5.5 = 0.091$
+- $D$: $a = (4+1)/2 = 2.5$, $b = (9+7)/2 = 8$, $s = 5.5/8 = 0.688$
+- $E$: $a = (6+1)/2 = 3.5$, $b = (10+8)/2 = 9$, $s = 5.5/9 = 0.611$
+
+Mean: $(0.778 + 0.667 + 0.091 + 0.688 + 0.611)/5 = 2.835/5 = 0.567$.
+
+The complete-linkage partition scores $0.567$ against single linkage's $0.555$: the silhouette (weakly) prefers giving C to $\{D,E\}$. The driver is C itself: it is a bridge point, nearly equidistant between the groups ($s(C) = -0.091$ in one partition, $+0.091$ in the other), and every other point scores high in both partitions. The margin is thin because the data genuinely leaves C on the fence; the silhouette's contribution is to quantify that ambiguity rather than hide it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review. A clustering built on raw features put customer $p = (30,\ 60000)$ (age in years, income in dollars) in a cluster with $q = (55,\ 60500)$, leaving $r = (31,\ 61000)$ as the nearest member of the other cluster. (a) Compute $s(p)$ on the raw features. (b) Recompute after dividing each feature by its standard deviation ($\mathrm{sd}_{\text{age}} = 10$, $\mathrm{sd}_{\text{income}} = 30000$). (c) Explain the reversal using the argument this course first made for k-NN.
+
+<Solution>
+With one clustermate and one nearest-other point, $a(p) = d(p,q)$ and $b(p) = d(p,r)$.
+
+**(a) Raw.** $d(p,q) = \sqrt{25^2 + 500^2} = \sqrt{625 + 250000} \approx 500.6$; $d(p,r) = \sqrt{1^2 + 1000^2} \approx 1000.0$. So $s(p) = (1000.0 - 500.6)/1000.0 \approx 0.50$: the clustering looks comfortably correct.
+
+**(b) Standardized.** Differences to $q$: $(2.5,\ 0.0167)$, so $d(p,q) = \sqrt{6.25 + 0.0003} \approx 2.500$. Differences to $r$: $(0.1,\ 0.0333)$, so $d(p,r) = \sqrt{0.01 + 0.0011} \approx 0.105$. Now $b < a$ and $s(p) = (0.105 - 2.500)/2.500 \approx -0.96$: nearly the worst possible score; $p$ belongs with $r$.
+
+**(c)** Euclidean distance sums squared coordinate differences with equal weight, so the feature with the largest numeric range (income, in dollars) owns the metric, and the 25-year age difference between $p$ and $q$ never registered: the metric-domination argument of <Ref lesson="knn-curse" />. The silhouette inherits the defect because it is built entirely from the same distances. Standardize before any distance-based clustering, and before evaluating one.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "When would you choose k-means over DBSCAN, and the reverse?" Give both directions with the specific properties that decide, tying each to the algorithms' definitions.
+
+<Solution>
+**k-means over DBSCAN** when: (1) $n$ is large and speed matters, since $O(nkd)$ per Lloyd iteration on coordinates beats neighborhood queries, and mini-batch variants stream; (2) clusters are roughly spherical and similar in spread, matching the convex Voronoi cells the assignment step draws; (3) centroids are themselves the deliverable (prototypes, quantization codebooks) or new points must be scored fast, one distance per center; (4) a fixed $k$ is imposed by the task. DBSCAN offers none of these: no centroids, no fixed $k$, and scoring a new point requires a neighborhood query.
+
+**DBSCAN over k-means** when: (1) clusters are non-convex (rings, arms, trails), which no k-means partition can represent at any $k$, since Voronoi cells are intersections of half-spaces; (2) the number of clusters is unknown and should be an output; (3) the data contains genuine noise that must not corrupt cluster statistics, since k-means' mean-update chases every outlier it is forced to assign, while DBSCAN's noise verdict excludes them; (4) a meaningful density scale exists and dimensions are low enough for distances to discriminate.
+
+Both require standardized features, and both degrade in high dimensions with distance concentration; when clusters overlap softly or have distinct elliptical shapes, the answer is neither: a Gaussian mixture.
+</Solution>
+</Exercise>
+
+<References>
+1. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §12.4.2: the agglomerative algorithm, linkages, dendrogram interpretation and its pitfalls, choice of dissimilarity. https://www.statlearning.com
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §14.3.12: single-linkage chaining, complete-linkage crowding, group average and its scale dependence. https://hastie.su.domains/ElemStatLearn/
+3. M. Ester, H.-P. Kriegel, J. Sander, X. Xu, "A Density-Based Algorithm for Discovering Clusters in Large Spatial Databases with Noise," *Proc. KDD*, 1996 — the DBSCAN definitions, algorithm, and the k-distance heuristic. https://www.aaai.org/Papers/KDD/1996/KDD96-037.pdf
+4. J. H. Ward, "Hierarchical Grouping to Optimize an Objective Function," *JASA* 58, 1963 — the variance-merging criterion.
+5. P. J. Rousseeuw, "Silhouettes: A Graphical Aid to the Interpretation and Validation of Cluster Analysis," *Journal of Computational and Applied Mathematics* 20, 1987 — the silhouette definition and its reading.
+6. L. Hubert, P. Arabie, "Comparing Partitions," *Journal of Classification* 2, 1985 — the adjusted Rand index.
+7. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §21.1–21.2: clustering evaluation and hierarchical clustering in modern notation. https://probml.github.io/pml-book/book1.html
+8. M. Ankerst, M. M. Breunig, H.-P. Kriegel, J. Sander, "OPTICS: Ordering Points To Identify the Clustering Structure," *Proc. SIGMOD*, 1999; R. J. G. B. Campello, D. Moulavi, J. Sander, "Density-Based Clustering Based on Hierarchical Density Estimates," *Proc. PAKDD*, 2013 — the multi-density successors of DBSCAN.
+9. J. Starmer, *StatQuest*: "Hierarchical Clustering" and "Clustering with DBSCAN, Clearly Explained" (YouTube) — step-by-step mechanics of the merge sequence and the core/border/noise walk-through.
+10. C. Huyen, *Introduction to Machine Learning Interviews*, self-published web book — §8.1: how clustering comparisons are asked. https://huyenchip.com/ml-interviews-book/
+</References>

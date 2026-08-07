@@ -1,0 +1,771 @@
+Union-find tracks a partition of elements into disjoint groups under two
+operations — merge two groups, ask whether two elements are in the same
+group — without ever needing to enumerate a group's members.
+
+This module has been trading order for speed one notch at a time:
+<Ref lesson="balanced-search-trees">balanced search trees</Ref> maintain the
+full sorted order at $O(\log n)$ per operation, the
+<Ref lesson="binary-heaps-and-priority-queues">binary heap</Ref> keeps only
+parent-before-child order for a cheaper constant, and the heap lesson closed
+by naming the one structure still missing: a tracker for which elements have
+merged into one group, which needs no order at all. This lesson builds that
+structure three times, each version fixing the previous one's named flaw,
+and ends at the strangest running time in this course: $m$ operations cost
+$O(m\,\alpha(n))$, where $\alpha(n)$ is a function that reaches 4 at
+$n = 2{,}048$ and is still 4 for every $n$ the observable universe could
+store. As the module's closing lesson, it cashes the structure out on a
+physics question, the percolation threshold, that is only computable because
+the structure is this fast.
+
+The route: the interface and its partition invariant; quick-find and its
+quadratic wall; parent-pointer forests and union by rank; path compression;
+the function $\alpha$ and the bound it names; and percolation, the closing
+study.
+
+## Two operations, one invariant: find and union over a partition
+
+The structures of this module all answered ordered questions: smallest key,
+predecessor, range. The questions here are cruder. Elements start isolated,
+connections arrive one at a time, and the only query is *are these two in
+the same group yet*. A social network adding friendships, pixels merging
+into blobs in an image, and variables declared equivalent in a compiler all
+ask exactly this, and none of them ever needs a group's member list, only a
+yes or no.
+
+### The interface
+
+<Definition title="disjoint-set data structure (union-find)">
+A **disjoint-set data structure** maintains a collection of disjoint sets
+$S_1, \ldots, S_k$ whose union is the $n$ elements created so far. Each set
+is named by a **representative**, one of its own members. The operations:
+
+- $\text{Make-Set}(x)$: create the singleton set $\{x\}$, with $x$ as
+  representative; $x$ must not already exist.
+- $\text{Find}(x)$: return the representative of the set containing $x$.
+- $\text{Union}(x, y)$: replace the sets containing $x$ and $y$ by their
+  union (a no-op if they are already the same set).
+
+Two elements are in the same set exactly when their $\text{Find}$ results
+are equal.
+</Definition>
+
+The collection is always a *partition*: every element belongs to exactly one
+set, so a union only ever merges, never splits or overlaps. Which member
+serves as representative is the structure's own business; the only promise
+is that the answer stays stable between unions. Throughout, $n$ counts the
+$\text{Make-Set}$ operations and $m \ge n$ counts all operations; since
+each union reduces the number of sets by one, at most $n - 1$ unions can
+ever execute.
+
+<Figure
+  src="./figures/partition.svg"
+  alt="Ten elements in four groups with ringed representatives; union(g, i) merges two groups into one, and find(i) returns the merged group's representative f"
+  caption="The invariant is a partition: union merges two blobs, find names a blob by its representative, and no operation ever lists a blob's members."
+/>
+
+### The recurring client: dynamic connectivity
+
+One client is worth fixing now because it recurs. Given a graph's edges one
+at a time, run $\text{Make-Set}$ on every vertex, then
+$\text{Union}(u, v)$ for each edge: two vertices end in the same set
+exactly when a path connects them, so the sets *are* the connected
+components. When the edge list is static, a graph traversal (a later
+module's tool) computes components in one pass; union-find earns its place
+when edges arrive dynamically and connectivity questions interleave with
+the arrivals: the query "are $p$ and $q$ connected" must be answerable
+after every single edge. A second client, checking whether a candidate edge
+would close a cycle while building a spanning network, drives
+<Ref lesson="minimum-spanning-trees">Kruskal's algorithm</Ref> two modules
+from now; an exercise below runs it before it has a name.
+
+## Quick-find: the id array pays n per union
+
+The <Ref lesson="arrays-and-linked-lists">array</Ref> answer stores the
+partition as literally as possible: number the elements $0$ to $n-1$ and
+keep an array `id` where `id[p]` is the representative of $p$'s set.
+$\text{Find}(p)$ is one array read, $O(1)$. Equality of two finds is two
+reads. Sedgewick and Wayne call this *quick-find*, and its flaw sits in the
+remaining operation: $\text{Union}(p, q)$ must rewrite **every** cell
+equal to `id[p]`. The whole array is scanned, and up to $n - 1$ cells
+rewritten: $\Theta(n)$ per union.
+
+<Example title="a union sequence that costs Θ(n²)">
+Take $n = 10$ elements and merge them into one group by
+$\text{Union}(0,1), \text{Union}(0,2), \ldots, \text{Union}(0,9)$,
+where before each call element $0$'s group holds everything merged so far.
+The $i$-th union relabels the current group of $i$ elements: it writes $1,
+2, 3, \ldots, 9$ cells respectively, an arithmetic series totalling $45$
+writes, on top of the $10$ cells scanned per call.
+
+For general $n$ the same sequence writes
+$1 + 2 + \cdots + (n-1) = n(n-1)/2$ cells: $\Theta(n^2)$ for $n - 1$
+unions, plus $\Theta(n)$ scan work per call. Reordering the arguments does
+not help, because some group must grow to size $n$, and every element that
+enters it late pays for every element already there.
+</Example>
+
+### Thirty years against six seconds
+
+At small $n$ the quadratic bill is invisible. At the scale union-find is
+actually used, it is disqualifying: $10^9$ unions on $10^9$ elements cost
+more than $10^{18}$ array accesses, and at the round rate of $10^9$
+operations per second that is over 30 years of computing. The structure
+this lesson ends with handles the same workload in about six seconds
+(Sedgewick–Wayne §1.5). Quick-find's diagnosis, in one line: it keeps the
+trees flat, and flatness is exactly what costs $n$ per union to maintain.
+
+## The forest: union by rank caps height at lg n
+
+The repair inverts the price structure. Instead of every element storing
+its representative directly, each element stores a *parent*, and only the
+root of the resulting tree is the representative: a **disjoint-set
+forest**, one tree per set, `parent[r] = r` marking each root.
+
+<Figure
+  src="./figures/two-views.svg"
+  alt="The same three-set partition stored as a quick-find id array with flat one-hop stars, and as a parent-pointer forest where find(9) walks two hops through node 4 to root 8"
+  caption="One partition, two representations. Quick-find stores the answer and pays to maintain it; the forest stores a parent and pays at query time."
+/>
+
+$\text{Find}(x)$ now follows parent pointers until it reaches a self-loop
+and returns that root. $\text{Union}(x, y)$ finds both roots and makes
+one root the parent of the other: a single pointer write, after two finds.
+Merging is now trivially cheap. The cost has moved into $\text{Find}$,
+and with no further rule it moves all the way to the old worst case: the
+sequence $\text{Union}(1,2), \text{Union}(2,3), \ldots,
+\text{Union}(n-1, n)$, with each new root attached under the next, builds
+a chain of height $n - 1$, and a find at the bottom walks all of it. The
+forest alone relocates the $\Theta(n)$; it does not remove it.
+
+### Rank: link the shallower tree underneath
+
+Which root becomes the parent was left unspecified, and the choice is the
+entire fix. Give every node a **rank**, an upper bound on its height
+(number of edges on the longest downward path), starting at 0. When two
+roots meet, the smaller rank goes under the larger, so the merged tree's
+height does not grow; only when the ranks are equal does the tie-winner's
+rank increase.
+
+```text
+Make-Set(x):                Link(r, s):                  // r, s are roots
+  parent[x] ← x               if rank[r] > rank[s]:
+  rank[x]   ← 0                 parent[s] ← r
+                              else:
+Union(x, y):                    parent[r] ← s
+  Link(Find(x), Find(y))        if rank[r] = rank[s]:
+                                  rank[s] ← rank[s] + 1
+```
+
+<FigureSequence
+  name="rank"
+  alt="Three frames: two roots r and s of ranks 2 and 1 are compared; the rank-1 root s is linked under the rank-2 root r with no rank change; in the equal-rank case r links under s, as in the pseudocode's else branch, and rank of s ticks from 2 to 3"
+  caption="Union by rank: unequal merges are free in height; only an equal-rank merge increments a rank."
+/>
+
+<Example title="eight elements under union by rank">
+Run $\text{Union}(1,2)$, $\text{Union}(3,4)$, $\text{Union}(5,6)$,
+$\text{Union}(7,8)$, then $\text{Union}(1,3)$, $\text{Union}(5,7)$,
+then $\text{Union}(1,5)$, with $\text{Link}$ as written (on a tie the
+second root wins).
+
+Round one: four ties among rank-0 roots, so $1 \to 2$, $3 \to 4$,
+$5 \to 6$, $7 \to 8$ (arrow = parent), and roots $2, 4, 6, 8$ reach
+rank 1. Round two: roots $2$ and $4$ tie at rank 1, so $2 \to 4$ and
+$\text{rank}[4] = 2$; likewise $6 \to 8$, $\text{rank}[8] = 2$. Final
+union: roots $4$ and $8$ tie at rank 2, so $4 \to 8$ and
+$\text{rank}[8] = 3$.
+
+The result is a tree of $8 = 2^3$ nodes with root rank 3 and height 3
+(the path $1 \to 2 \to 4 \to 8$). Every rank increment doubled the number
+of nodes under the root: rank $r$ was reached only by merging two rank-
+$(r-1)$ trees.
+</Example>
+
+The example's doubling is the theorem, and the proof is nothing but the
+example made general.
+
+<Theorem title="union by rank bounds height by lg n">
+In a disjoint-set forest maintained with union by rank (no other rule), a
+root of rank $r$ heads a tree of at least $2^r$ nodes. Consequently every
+rank, and hence every tree height, is at most $\lfloor \lg n \rfloor$, and
+$\text{Find}$ costs $O(\log n)$ in the worst case.
+
+<Proof>
+Induction on the number of $\text{Link}$ operations. A new singleton has
+rank 0 and $1 = 2^0$ node. A link of unequal ranks changes no rank, and
+the winning root's tree only gains nodes, so the claim is preserved. A
+link of equal ranks $r - 1$ produces a root of rank $r$ whose tree is the
+union of two disjoint trees, each of at least $2^{r-1}$ nodes by the
+induction hypothesis: at least $2^r$ nodes.
+
+A non-root's rank never changes, and a root's tree never loses nodes, so
+the bound holds for every node at all times. If some node had rank
+$r > \lfloor \lg n \rfloor$, its root (of rank $\ge r$, since ranks
+strictly increase toward the root) would head more than $n$ nodes. Rank
+bounds height by construction: a tree's longest path grows only when its
+root's rank does. ∎
+</Proof>
+</Theorem>
+
+<KeyFact>
+The doubling step is the same one that priced this course's other cheap
+averages: a dynamic array's resize doubles capacity, and here a rank
+increment doubles tree size. Whenever the only way a cost measure can grow
+is by doubling something bounded by $n$, that measure is stuck at
+$\lg n$. The argument recurs once more in the exercises, on quick-find's
+own weighted repair.
+</KeyFact>
+
+<Exercise>
+Run $\text{Union}(1,2)$, $\text{Union}(3,4)$, $\text{Union}(1,3)$,
+$\text{Union}(5,6)$, $\text{Union}(1,5)$ on six fresh elements, with
+the pseudocode above (ties: second root wins; $\text{Union}$'s two finds
+use plain root-walking for now, no repointing). Give the final `parent`
+table, each root's rank, and the cost in pointer-walks of the most
+expensive $\text{Find}$ that occurred. Write your predicted final tree
+shape before tracing.
+
+<Solution>
+$\text{Union}(1,2)$: tie at rank 0, $1 \to 2$, $\text{rank}[2] = 1$.
+$\text{Union}(3,4)$: $3 \to 4$, $\text{rank}[4] = 1$.
+$\text{Union}(1,3)$: roots 2 and 4 tie at rank 1, $2 \to 4$,
+$\text{rank}[4] = 2$. $\text{Union}(5,6)$: $5 \to 6$,
+$\text{rank}[6] = 1$. $\text{Union}(1,5)$: $\text{Find}(1)$ walks
+$1 \to 2 \to 4$, two pointer-walks, the run's most expensive; root 6 has
+rank $1 < 2$, so $6 \to 4$ and no rank changes.
+
+Final: `parent` $= [\,1{:}\,2,\ 2{:}\,4,\ 3{:}\,4,\ 4{:}\,4,\ 5{:}\,6,\
+6{:}\,4\,]$, a tree rooted at 4 with height 2; $\text{rank}[4] = 2$,
+$\text{rank}[2] = \text{rank}[6] = 1$. Six nodes, rank 2, and
+$6 \ge 2^2$: the theorem's inequality, not equality, because the last
+merge was unequal.
+</Solution>
+</Exercise>
+
+## Path compression: every find flattens its own path
+
+Union by rank leaves finds at $\Theta(\log n)$, and that bound is tight: a
+sequence of equal-rank merges builds the example's $2^3$-node tree at
+height 3, its shape frozen forever, and every find on its deepest node
+pays full price again. The waste is visible: a find *learns* the root of
+every node it passes and then throws the information away. Path
+compression keeps it.
+
+```text
+Find(x):
+  if parent[x] ≠ x:
+    parent[x] ← Find(parent[x])    // point every visited node at the root
+  return parent[x]
+```
+
+The recursion walks up to the root, and as it unwinds it repoints every
+node on the path directly at that root. The tree gets shallower as a side
+effect of being queried; ranks are deliberately left untouched.
+
+<FigureSequence
+  name="compress"
+  alt="Three frames: find(a) walks a four-edge path a, b, c, d to root e; the unwinding repoints a, b, and c directly at e while old edges fade; the final tree has a through d as direct children of e with their subtrees intact"
+  caption="One find(a) on a four-edge path: walk up, then repoint. Nodes hanging below b and d keep their parents and ride along."
+/>
+
+<Example title="what one find buys">
+On the chain of the figure, $\text{Find}(a)$ walks 4 pointers and then
+rewrites 3 (node $d$ already pointed at the root): 7 pointer touches,
+within a constant factor of the uncompressed find. Every later
+$\text{Find}$ on $a$, $b$, or $c$ now costs 1 walk instead of up to 4,
+and any node in the subtrees of $b$ or $d$ has its path shortened too,
+without ever having been touched. Compression at most doubles the find
+that performs it and can only shorten every find that follows.
+</Example>
+
+Two details keep the bookkeeping honest. First, compression never changes
+a rank: recomputing true heights would cost more than it saves, so after
+compression a rank is only an *upper bound* on height, which is all the
+theorem above ever used. Second, the two-pass recursion is not the only
+way to compress; *path halving* and *path splitting* repoint nodes at
+their grandparents in a single pass, and every result below holds for
+them unchanged.
+
+<Demo
+  name="UnionFindPathCompression"
+  caption="A live forest under union and find. Presets: naive union, union by rank only, both optimizations."
+/>
+
+<Task>
+In the demo, use the naive-union preset to build a chain of height 6
+(union 0–1, 1–2, …, 5–6), and record what a find at the bottom costs.
+Switch to the full-optimization preset: the replayed history now leaves
+no tree taller than 1. To see compression itself fire, press Clear and,
+still under both optimizations, run union 0–1, union 2–3, union 0–2:
+node 3 now sits at depth 2. Issue find(3) twice — the first walks two
+pointers and repoints 3 at the root, the second walks one.
+</Task>
+
+## Together: m operations cost O(m α(n))
+
+Each heuristic alone caps a sequence's cost at $\Theta(m \log n)$ in the
+worst case (for union by rank the bound is tight; an exercise builds the
+instance). Together they interlock: rank keeps any path a find
+must walk short from the start, and compression destroys the path so it
+cannot be walked twice. The combined bound is not $O(m \log n)$ and not
+quite $O(m)$, and pinning it down took the field three tries.
+
+<Theorem title="Tarjan 1975; CLRS §19.4">
+With union by rank and path compression, any sequence of $m$
+$\text{Make-Set}$, $\text{Union}$, and $\text{Find}$ operations, $n$
+of them $\text{Make-Set}$, runs in $O(m\,\alpha(n))$ total time, where
+$\alpha$ is the inverse Ackermann function defined below. The bound is
+tight when $m = \Theta(n)$; the sharp form for all $m$ is the
+two-parameter $\Theta(m\,\alpha(m, n))$ of Tarjan's paper, discussed at
+the end of this section.
+</Theorem>
+
+<Remark title="the proof is cited, not given">
+The proof is a potential-method amortized analysis roughly ten pages long
+(CLRS §19.4), and this course's aggregate method from
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the amortized-analysis
+lesson</Ref> does not reach it. This lesson's job is the statement: what
+$\alpha$ is, why "effectively constant" is honest, and what the bound does
+and does not promise per operation.
+</Remark>
+
+### 1972: two rules and a bound that refused to be linear
+
+<Figure
+  float="right"
+  width="m"
+  src="./figures/tarjan-1972-collapsing-rule.png"
+  alt="Hand-drawn diagram from Tarjan's 1972 report. On the left, tree T: five nodes labelled a, b, c, d, e in a single upward path, each carrying a triangle subtree. A double arrow points right to tree T-prime, where a, b, c and d all hang directly off the root e, each still carrying its triangle."
+  caption="Tarjan's own drawing of the Collapsing Rule. A FIND on a walks the path a, b, c, d, e; afterwards every node the walk touched hangs straight off the root, its subtree (the triangle) coming along. The path is destroyed, so no later find can pay for it twice."
+/>
+
+Both heuristics predate their modern names. In a 1972 Cornell technical
+report,
+["On the Efficiency of a Good But Not Linear Set Union Algorithm"](https://ecommons.cornell.edu/bitstream/1813/5942/1/72-148.pdf),
+Robert Tarjan analyzes the forest algorithm with a *Weighting Rule* (link
+the tree with fewer elements under the larger, the by-size variant of
+rank) and a *Collapsing Rule* ("after a FIND, make all nodes reached
+during the FIND operation sons of the root"), the motivating application
+being `EQUIVALENCE` statements in Fortran compilers. Hopcroft and Ullman
+had proved the combination runs in $O(n \log^* n)$; Tarjan's report gives
+a new proof and, more importantly, the first lower bound showing the
+algorithm is **not** linear: its cost grows as $n\,\alpha(n)$ for a
+recursively defined $\alpha$ that creeps to infinity. Three years later he
+closed the gap, proving the true bound is $\Theta(m\,\alpha(m, n))$ with
+$\alpha$ essentially the inverse of Ackermann's function. The report's
+conclusion flags what had been found: "This is probably the first example
+of a simple algorithm with such a complicated running time."
+
+One more turn tightened the story into a boundary. Fredman and Saks
+proved in 1989 that *any* data structure for the problem, in the
+cell-probe model, must spend $\Omega(m\,\alpha(m, n))$ time on some
+sequences: the strange function is in the problem, not in this
+algorithm's analysis.
+
+### The ladder to α: functions that grow too fast to picture
+
+$\alpha$ is defined by inverting a hierarchy of fast-growing functions.
+CLRS's version defines, for $k \ge 0$, the level-$k$ function $A_k$, where
+each level iterates the one below it ($f^{(i)}$ means $f$ applied $i$
+times):
+
+$$
+A_0(j) = j + 1, \qquad A_k(j) = A_{k-1}^{(j+1)}(j) \quad (k \ge 1).
+$$
+
+Level 1 already doubles: $A_1(j) = 2j + 1$. Level 2 is exponential:
+$A_2(j) = 2^{j+1}(j+1) - 1$. Evaluating each level at $j = 1$ shows the
+takeoff:
+
+$$
+A_0(1) = 2, \quad A_1(1) = 3, \quad A_2(1) = 7, \quad A_3(1) = 2047,
+$$
+
+and $A_4(1) = A_3(2047) \ge A_2(2047) = 2^{2048} \cdot 2048 - 1 >
+2^{2056}$: a number of more than 600 digits, against roughly $10^{80}$
+atoms in the observable universe, and $2^{2056}$ is only a crude floor
+for it.
+
+<Definition title="the inverse Ackermann function">
+$$
+\alpha(n) = \min\{\, k : A_k(1) \ge n \,\},
+$$
+the lowest level whose function, evaluated at 1, already reaches $n$. From
+the values above: $\alpha(n) = 0$ for $n \le 2$, $1$ for $n = 3$, $2$ for
+$4 \le n \le 7$, $3$ for $8 \le n \le 2047$, and $4$ for every $n$ from
+$2048$ up to $A_4(1)$.
+</Definition>
+
+A second ladder calibrates how slow that is. The *iterated logarithm*
+$\lg^* n$ counts how many times $\lg$ must be applied to bring $n$ to
+at most 1: equivalently, the height of the tower of 2s needed to reach
+$n$. This is the $\log^* $ in Hopcroft and Ullman's bound, and it was the
+best-known bound's growth rate before 1975.
+
+<Figure
+  src="./figures/tower.svg"
+  alt="A ladder of values 2, 4, 16, 65536, 2^65536 where each rung is 2 to the previous rung, labeled with lg* equal to 1 through 5, annotated with the 19,729-digit size of the top rung, the 10^80 atom count, and the value table of alpha"
+  caption="The iterated logarithm counts rungs in the tower of 2s; lg* n = 5 first requires the 19,729-digit number 2^65536. α grows more slowly still."
+/>
+
+<Task>
+From the ladder, read off $\lg^* 16$, $\lg^* 65{,}536$, and
+$\lg^* 2^{65{,}536}$, then place $10^{80}$ on it: $10^{80} < 2^{266} <
+2^{65{,}536}$, so every physically meaningful $n$ has $\lg^* n \le 5$,
+and $\alpha(n) \le 4$ already at the rung below.
+</Task>
+
+<KeyFact>
+$\alpha(n) \le 4$ for every input that fits in this universe, yet
+$\alpha(n) \to \infty$: union-find is *not* a constant-amortized-time
+structure, and by Fredman–Saks no structure for this problem can be. The
+phrase "effectively constant" compresses exactly this: constant for every
+$n$ you will meet, unbounded in the limit the theory must answer for.
+</KeyFact>
+
+The bound is amortized, and the standard misreading claims more. It is
+tempting to conclude that every individual operation is now near-constant;
+that is false, and not by a technicality. A single find can still walk
+$\Theta(\log n)$ pointers — the rank theorem's bound is tight until
+compression has had its chance — and the $O(m\,\alpha(n))$ theorem prices
+whole sequences, exactly like the dynamic array's occasional $\Theta(n)$
+resize inside an $O(1)$-amortized append. The discriminating case is the
+freshly built equal-rank tree of height $\lg n$: its first deep find pays
+$\lg n$, and only the finds after it enjoy the flattened tree. An exercise
+below makes the construction precise.
+
+One symbol collision needs a sentence: this $\alpha(n)$ shares a letter
+with the <Ref lesson="hash-tables">hash table's</Ref> load factor
+$\alpha = n/m$, and both usages are standard. The load factor is a design
+ratio an engineer controls; $\alpha(n)$ here is a fixed function of the
+input size, and no formula in this course ever contains both.
+
+<Aside>
+Tarjan's tight 1975 bound is actually stated with a two-parameter
+$\alpha(m, n)$ that shrinks as the operation count $m$ grows relative to
+$n$: with enough finds per element, compression amortizes even better,
+and CS166's lecture notes derive a whole family of intermediate bounds
+$O(m + n \lg^{**\cdots*} n)$ on the way down. The single-parameter
+$\alpha(n)$ used above upper-bounds the two-parameter version, so
+$O(m\,\alpha(n))$ is the safe simplification, and both are $\le 4$ in
+practice. Sedgewick and Wayne quote the Hopcroft–Ullman form
+$O(n + m \lg^* n)$ as "within a constant factor of reading the input",
+the form of the claim that matters to an engineer.
+</Aside>
+
+## Percolation: the module's structures on a physics question
+
+The module ends by spending its results. *Percolation* is a model physics
+uses for porous media, conductivity, and epidemics: an $N \times N$ grid
+of sites, each independently **open** with probability $p$ (imagine pores
+in rock), and the system **percolates** when a chain of neighboring open
+sites connects the top row to the bottom row (water soaks through). The
+model has a sharp transition: for large $N$ there is a threshold $p^*$
+such that a system with $p > p^*$ almost certainly percolates and one
+with $p < p^*$ almost certainly does not. No formula for $p^*$ on the
+square lattice is known; every decimal of it that physics has was
+measured by simulation, so the simulation's speed is the binding
+constraint on what physics knows about $p^*$.
+
+<Figure
+  src="./figures/percolation.svg"
+  alt="An 8-by-8 percolation grid with blocked, open, and full sites, a blue open path connecting top to bottom, and amber virtual top and bottom nodes wired to the open sites of the first and last rows"
+  caption="A percolating 8×8 system. Each first- or last-row site is unioned with its amber virtual site when it opens, so the percolation test is one find–find comparison."
+/>
+
+### One trial as a union-find workload
+
+The Monte Carlo estimate runs one trial as a pure union-find workload.
+Map site $(i, j)$ to element $i \cdot N + j$, the same index arithmetic
+that flattened the <Ref lesson="binary-heaps-and-priority-queues">heap's
+tree into an array</Ref>, and add two *virtual* elements, top and bottom.
+Start with all $N^2$ sites blocked; repeatedly open a uniformly random
+blocked site, unioning it with each of its (up to 4) already-open
+neighbors — and, if it lies in the first or last row, with the top or
+bottom virtual element respectively; stop the moment
+$\text{Find}(\text{top}) = \text{Find}(\text{bottom})$. The fraction of sites open at that moment
+is one estimate of $p^*$; the trial's answer is one number, and the
+estimate is the mean over many trials.
+
+The virtual sites are what make the stopping test cheap: without them,
+"does any of $N$ top sites connect to any of $N$ bottom sites" is $N^2$
+find-pairs per check; with them it is one. A full trial performs about
+$N^2$ opens, at most $4N^2 + 2N$ unions, and one connectivity check per
+open: $O(N^2)$ operations total, hence $O(N^2\,\alpha(N^2))$ time,
+effectively the cost of touching each site a constant number of times.
+Under quick-find the same trial costs $\Theta(N^4)$; at $N = 1000$ that
+is the difference between milliseconds and hours *per trial*, and a
+usable estimate needs thousands of trials. The measured answer:
+
+<KeyFact>
+$p^* \approx 0.592746$ for the square lattice — a physical constant
+known only through simulation, and computable to that precision only
+because $m$ union-find operations cost $O(m\,\alpha(n))$ rather than
+$O(mn)$.
+</KeyFact>
+
+### What the study uses, and where the idealization bends
+
+The study uses, by name: the disjoint-set forest with both heuristics
+(this lesson), amortized cost accounting to price the workload
+(<Ref lesson="dynamic-arrays-and-amortized-analysis">the aggregate
+method's lesson</Ref>), and array index arithmetic in place of pointers
+(the module's recurring representation trick). Where the idealization
+bends in practice: the amortized guarantee says nothing about which
+individual find is slow, which is harmless here because a simulation
+cares only about totals; the virtual-bottom trick conflates every
+bottom-connected component once the system percolates, so a renderer that
+wants to color exactly the top-connected sites needs a second structure
+or a rescan; and union-find supports the experiment at all only because
+opening sites is monotone: the structure has no un-union, so any model
+where connections can be removed needs different machinery entirely.
+
+What is established: the partition interface (make-set, find, union); the
+id-array representation with $O(1)$ finds and $\Theta(n)$ unions; the
+parent-pointer forest, where union by rank caps height at
+$\lfloor \lg n \rfloor$ by the doubling argument, and path compression
+flattens every queried path; the combined
+$O(m\,\alpha(n))$ bound, sharpened to $\Theta(m\,\alpha(m,n))$ by Tarjan
+1975 and unimprovable by Fredman–Saks, with $\alpha(n) \le 4$ for every
+physical input; and one
+scientific constant, $p^* \approx 0.593$, measured with the structure.
+This closes the module: full order, heap order, and no order are all
+priced. The course's next module puts data *in* order, starting with
+<Ref lesson="comparison-sorting-merge-and-quicksort">merge sort and
+quicksort</Ref>; union-find itself returns in
+<Ref lesson="minimum-spanning-trees">the minimum-spanning-tree
+lesson</Ref>, where Kruskal's algorithm calls it once per edge as a cycle
+test.
+
+## Exercises
+
+<Exercise>
+Sixteen elements, $1$ through $16$, all fresh. Run, with union by rank
+and path compression (ties: the second argument's root wins):
+$\text{Union}(i, i{+}1)$ for $i = 1, 3, 5, \ldots, 15$; then
+$\text{Union}(i, i{+}2)$ for $i = 1, 5, 9, 13$; then
+$\text{Union}(1, 5)$, $\text{Union}(11, 13)$, $\text{Union}(1, 10)$;
+then $\text{Find}(2)$ and $\text{Find}(9)$. Give both find results,
+the final `parent` table, the root's rank, and the final tree's true
+height. Point out a node whose rank exceeds its height.
+
+<Solution>
+Round one links $1{\to}2$, $3{\to}4$, $5{\to}6$, $7{\to}8$, $9{\to}10$,
+$11{\to}12$, $13{\to}14$, $15{\to}16$; the eight winners reach rank 1.
+Round two merges equal-rank pairs: $2{\to}4$, $6{\to}8$, $10{\to}12$,
+$14{\to}16$, each winner reaching rank 2.
+
+$\text{Union}(1,5)$: $\text{Find}(1)$ walks $1 \to 2 \to 4$ and
+compresses $1{\to}4$; $\text{Find}(5)$ compresses $5{\to}8$; ranks 2
+and 2 tie, so $4{\to}8$, $\text{rank}[8] = 3$.
+$\text{Union}(11,13)$: finds compress $13{\to}16$; roots 12 and 16 tie
+at rank 2, so $12{\to}16$, $\text{rank}[16] = 3$.
+$\text{Union}(1,10)$: $\text{Find}(1)$ walks $1 \to 4 \to 8$,
+compressing $1{\to}8$; $\text{Find}(10)$ compresses $10{\to}16$; roots
+8 and 16 tie at rank 3, so $8{\to}16$ and $\text{rank}[16] = 4$.
+
+$\text{Find}(2)$ walks $2 \to 4 \to 8 \to 16$, returns **16**, and
+compresses $2{\to}16$ and $4{\to}16$. $\text{Find}(9)$ walks
+$9 \to 10 \to 16$, returns **16**, and compresses $9{\to}16$.
+
+Final `parent` (element: parent): $1{:}8$, $2{:}16$, $3{:}4$, $4{:}16$,
+$5{:}8$, $6{:}8$, $7{:}8$, $8{:}16$, $9{:}16$, $10{:}16$, $11{:}12$,
+$12{:}16$, $13{:}16$, $14{:}16$, $15{:}16$, $16{:}16$. Root 16 has rank
+4, but the true height is 2 (longest path: $3 \to 4 \to 16$ or
+$1 \to 8 \to 16$). Node 16 itself is the requested witness (rank 4,
+height 2), because compression flattened paths without touching ranks;
+node 8 (rank 3, height 1) works too.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show the $\Theta(m \log n)$ bound for union by rank *alone* is tight:
+for $n = 2^k$, exhibit a sequence of $m \ge 4n$ operations costing
+$\Omega(m \log n)$, and identify exactly which missing rule your sequence
+exploits.
+
+<Solution>
+Build the balanced tree of the eight-element worked example at scale:
+pair up the $n$ singletons with $n/2$ unions, pair the resulting
+rank-1 roots, and so on, $k = \lg n$ rounds of equal-rank merges. Every
+union's two finds are applied to current roots, so each costs $O(1)$;
+after $n - 1$ unions one tree remains, with root rank $k$ and, because
+every merge was an equal-rank tie, a node $x$ at depth exactly $k$ (the
+worked example's node 1 at depth 3 is the case $k = 3$).
+
+Without compression, finds do not modify the tree, so the remaining
+$m - (2n - 1)$ operations can all be $\text{Find}(x)$, each walking
+exactly $k = \lg n$ edges. Total cost:
+$\Omega((m - 2n)\lg n) = \Omega(m \log n)$, since $m \ge 4n$ makes
+$m - 2n \ge m/2$. The exploited
+gap is precisely that a find leaves the path it walked in place: the
+Collapsing Rule is the rule whose absence the adversary repeats the same
+walk against.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "With both optimizations, find runs in $O(\alpha(n))$ time, so
+every individual operation is effectively constant; a real-time system
+can therefore bound each find's latency by a small constant." Name the
+false step, give the state that breaks the claim, and state what the
+theorem actually licenses.
+
+<Solution>
+The false step is reading an amortized bound as a per-operation
+worst-case bound. The breaking state is the previous exercise's balanced
+tree: buildable by $n - 1$ unions under both optimizations (its unions
+touch only roots, so compression never fires), it contains a node at
+depth $\lg n$, and the first $\text{Find}$ on that node walks
+$\lg n + 1$ pointers: $\Theta(\log n)$, not $O(\alpha(n))$, for that one
+operation. At $n = 2^{20}$ that is a 21-step find inside a structure
+advertised as "effectively constant".
+
+What the theorem licenses: *any sequence* of $m$ operations totals
+$O(m\,\alpha(n))$, so the expensive find is paid for by the flattening it
+performs — the same throughput-without-latency shape as
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the dynamic array's
+resize spike</Ref>, whose amortized $O(1)$ append also contains
+$\Theta(n)$ moments. A latency-bound system must budget for the
+$\Theta(\log n)$ single find (still far better than quick-find's
+$\Theta(n)$ union), or keep the forest pre-flattened by policy.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson chose rank; Tarjan's Weighting Rule chose size. Define union
+by size: store in each root the number of nodes under it, and link the
+root of the smaller tree under the root of the larger (ties arbitrary),
+adding the sizes. (a) Prove that with union by size (no compression),
+every node's depth is at most $\lg n$. (b) Construct a state where union
+by size and union by rank link a pair of trees in *opposite* directions,
+and verify both keep their height bounds.
+
+<Solution>
+**(a)** Track one node $x$. Its depth increases (by exactly 1) only when
+the root of its current tree, of size $s$, is linked under another root
+of size $s' \ge s$: the merged tree has size $s + s' \ge 2s$. So each
+depth increase at least doubles the size of $x$'s tree, which started at
+1 and cannot exceed $n$: at most $\lg n$ increases, hence depth
+$\le \lfloor \lg n \rfloor$. This is the worked theorem's doubling run
+through sizes instead of ranks.
+
+**(b)** Build tree $A$ on $\{1,2,3,4\}$ by $\text{Union}(1,2)$,
+$\text{Union}(3,4)$, $\text{Union}(1,3)$: root 4 (tie convention),
+rank 2, size 4, height 2. Build tree $B$ as a star: with elements
+$5, \ldots, 10$, $\text{Union}(5,6)$ makes root 6 rank 1, and
+$\text{Union}(7,6), \ldots, \text{Union}(10,6)$ each hang a rank-0
+singleton under 6. Root 6: rank 1, size 6, height 1. Now union the two:
+by rank, $6 \to 4$ (rank 1 under rank 2), height stays 2; by size,
+$4 \to 6$ (size 4 under size 6), height becomes 3. Both respect their
+bounds: $2 \le \lg 10$ and $3 \le \lg 10 \approx 3.32$. The two rules
+are different heuristics with the same guarantee, which is why the
+lesson proves only one.
+</Solution>
+</Exercise>
+
+<Exercise>
+Quick-find has its own weighted repair. Keep the `id` array, and
+additionally keep, for each set, a member list and a size; let
+$\text{Union}$ relabel the members of the **smaller** set (instead of
+whichever set $p$ names). Prove by the aggregate method that any
+sequence with $n$ $\text{Make-Set}$s costs $O(m + n \log n)$ total,
+against $\Theta(m + n^2)$ unweighted, and say where the same argument
+appeared earlier in the course.
+
+<Solution>
+Charge relabeling to the elements relabeled. When element $x$ is
+relabeled, it was in the smaller set of the two, so the merged set holds
+at least twice the elements $x$'s set held: $x$'s set size at least
+doubles per relabeling of $x$. Sizes start at 1 and never exceed $n$, so
+$x$ is relabeled at most $\lg n$ times, and total relabeling work over
+all elements is $O(n \log n)$. Every operation additionally does $O(1)$
+work (finds are one read; a union's scan is replaced by walking the
+smaller member list, already counted). Total: $O(m + n \log n)$,
+amortized $O(\log n)$ per make-set and $O(1)$ per find.
+
+The argument is the aggregate method of
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the dynamic-array
+lesson</Ref>: bound the whole sequence, divide by its length, with the
+doubling observation capping how often the expensive event can recur:
+the third appearance of that doubling cap in this lesson alone, after
+ranks and sizes. (This weighted quick-find is CLRS's weighted-union
+heuristic for the linked-list representation, Theorem 19.1.)
+</Solution>
+</Exercise>
+
+<Exercise>
+A weighted undirected graph has vertices $\{A, B, C, D, E, F\}$ and
+edges, already sorted by weight:
+$(A,B,1)$, $(C,D,2)$, $(B,C,3)$, $(A,D,4)$, $(D,E,5)$, $(B,E,6)$,
+$(E,F,7)$. Process the edges in this order, maintaining a union-find
+structure over the vertices: for each edge, if its endpoints are in
+different sets, *keep* the edge and union them; otherwise *discard* it.
+List the kept edges, the total weight kept, and describe what the kept
+edges form. State the cost of the whole pass in union-find operations.
+
+<Solution>
+$(A,B,1)$: different sets, keep; $\{A,B\}$. $(C,D,2)$: keep;
+$\{C,D\}$. $(B,C,3)$: keep; $\{A,B,C,D\}$. $(A,D,4)$:
+$\text{Find}(A) = \text{Find}(D)$, discard: this edge would close
+the cycle $A\!-\!B\!-\!C\!-\!D$. $(D,E,5)$: keep; $\{A,\ldots,E\}$.
+$(B,E,6)$: same set, discard. $(E,F,7)$: keep; all six vertices in one
+set.
+
+Kept: $\{(A,B), (C,D), (B,C), (D,E), (E,F)\}$, total weight
+$1 + 2 + 3 + 5 + 7 = 18$: five edges on six vertices, connected and
+acyclic by construction, which makes them a spanning tree. The pass costs two finds per
+edge plus at most $V - 1$ unions: $O(E)$ operations, hence
+$O(E\,\alpha(V))$ time on top of the sort.
+
+You have just executed **Kruskal's algorithm**, and the tree is a
+minimum spanning tree; <Ref lesson="minimum-spanning-trees">the MST
+lesson</Ref> proves the greedy choice correct via the cut property and
+names union-find as exactly the cycle test that makes the algorithm
+fast.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the percolation study. Implement the trial loop of the closing
+section (any language; a 40-line program suffices), and estimate $p^*$
+for $N = 20$, $N = 100$, and, if your machine cooperates, $N = 500$,
+using at least 1,000 trials each. Before running, state your acceptance
+criterion: what result would you count as agreeing with
+$p^* \approx 0.592746$, and why should the small-$N$ estimates *not*
+match it exactly?
+
+<Solution>
+Sketch (per trial): `parent`/`rank` arrays of size $N^2 + 2$, virtual
+indices $N^2$ (top) and $N^2{+}1$ (bottom); shuffle the site order or
+sample without replacement; open sites one by one, unioning each with
+open neighbors (and with a virtual site if in row 0 or $N{-}1$); stop
+when $\text{Find}(\text{top}) = \text{Find}(\text{bottom})$; record
+opened-fraction. Report the mean and the standard error
+$s/\sqrt{T}$ over $T$ trials.
+
+Acceptance criterion: the per-trial threshold of a finite grid is a
+random variable concentrated near $p^*$ only as $N \to \infty$, so the
+right check is a *trend*: means within a few times the standard error
+of roughly $0.59$–$0.60$ at $N = 20$, within about $0.005$ of $0.593$
+at $N = 100$, and closer still at $N = 500$, with the estimates
+approaching $0.592746$ from run to run as $N$ grows. Typical measured
+values land near $0.59$ for $N = 20$ and $0.593$ for $N = 100$. A flat
+or diverging trend, or means outside a few standard errors of $0.593$
+at $N \ge 100$, means a bug; the classic one is forgetting that
+opening a site must union with *each* open neighbor, not just one.
+Timing the $N = 500$ run against a quick-find swap-in (feasible at
+$N = 50$, hopeless at $N = 500$) reproduces this lesson's entire
+argument as a measurement.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — Ch. 19: the operations and connected-components client (§19.1), the linked-list representation and weighted-union heuristic (§19.2), forests with union by rank and path compression (§19.3), and the $A_k$ hierarchy, $\alpha$, and the full $O(m\,\alpha(n))$ potential-method proof (§19.4).
+2. R. E. Tarjan, "On the Efficiency of a Good But Not Linear Set Union Algorithm," Cornell University Computer Science TR 72-148, November 1972 — the Weighting and Collapsing Rules, a new proof of the Hopcroft–Ullman $O(n \log^* n)$ bound, and the first nonlinear lower bound. https://ecommons.cornell.edu/bitstream/1813/5942/1/72-148.pdf
+3. R. E. Tarjan, "Efficiency of a Good But Not Linear Set Union Algorithm," *Journal of the ACM* 22(2), 1975, pp. 215–225 — the tight $\Theta(m\,\alpha(m,n))$ bound.
+4. J. E. Hopcroft, J. D. Ullman, "Set Merging Algorithms," *SIAM Journal on Computing* 2(4), 1973, pp. 294–303 — the $O(n \log^* n)$ upper bound that stood from 1972 to 1975.
+5. M. L. Fredman, M. E. Saks, "The Cell Probe Complexity of Dynamic Data Structures," *21st ACM Symposium on Theory of Computing*, 1989, pp. 345–354 — the $\Omega(m\,\alpha(m,n))$ lower bound for any data structure solving the problem.
+6. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §1.5: the quick-find → quick-union → weighted → compressed ladder, the 30-years-vs-6-seconds accounting, and the percolation case study with the virtual-site trick. Companion site: https://algs4.cs.princeton.edu/15uf/
+7. K. Schwarz, Stanford CS166 *Advanced Data Structures*, Lecture 18 (Spring 2026 archive) — the iterated-logarithm family and the derivation of the $O(m + n \lg^{*(k)} n)$ bound family whose optimum is $\alpha$. https://web.stanford.edu/class/archive/cs/cs166/cs166.1266/
+</References>

@@ -1,0 +1,424 @@
+The OLS guarantees hold only under explicit assumptions, and interviewers probe exactly the cases where each assumption breaks. This chapter turns the Gauss–Markov ladder of <Ref lesson="ols" /> into a working diagnostic routine: for each violation, the symptom, the plot or statistic that detects it, and the standard remedy. The route: the checklist itself, residual-plot reading, heteroscedasticity, multicollinearity and the variance inflation factor, outliers against leverage against influence, and what $R^2$ does and does not certify.
+
+## The checklist: which violation costs which guarantee
+
+<Ref lesson="ols" /> established the assumption ladder: the closed form needs full column rank, unbiasedness adds linearity and exogeneity, BLUE adds spherical errors, and exact $t$/$F$ inference adds normality. Diagnostics audit that ladder on a fitted model. [ISLP ch. 3](https://www.statlearning.com/) organizes the audit around six standard problems, and this chapter follows the list.
+
+| # | Problem | Assumption hit | Symptom | First remedy |
+|---|---------|----------------|---------|--------------|
+| 1 | Non-linearity | GM1 (linearity) | curved residual plot | transform or add polynomial features |
+| 2 | Correlated errors | GM3 (uncorrelated) | residuals track in time order | time-series models; time-aware validation |
+| 3 | Heteroscedasticity | GM3 (equal variance) | funnel-shaped residual plot | log transform, WLS, robust SEs |
+| 4 | Outliers | none (a data issue) | studentized residual beyond ±3 | investigate; robust loss |
+| 5 | High leverage | none (a data issue) | $h_{ii} \gg p/n$ | investigate; check influence |
+| 6 | Collinearity | GM4 (near-violation) | inflated SEs, unstable signs | drop or combine features; ridge |
+
+<KeyFact>
+Every row follows one pattern: the coefficient table can look plausible and $R^2$ healthy while a specific plot or statistic exposes the violation. A fitted model never announces that its own assumptions are broken; the checks are external.
+</KeyFact>
+
+## Residual plots: one picture catches three violations
+
+The workhorse diagnostic is the *residual plot*: residuals $r_i = y_i - \hat y_i$ against fitted values $\hat y_i$. Fitted values, not raw $y_i$, go on the horizontal axis: OLS makes the residual vector orthogonal to $\hat y$ (<Ref lesson="ols" />), so under a correct model the plot is a structureless band, whereas residuals plotted against $y_i$ correlate with the axis even when nothing is wrong.
+
+Under GM1–GM3 the residuals carry no visible structure: even spread, mean zero at every fitted level, no drift. Each violation leaves its own signature.
+
+<Figure
+  src="./figures/gallery.svg"
+  alt="Four residual-versus-fitted panels: an even structureless band, a U-shaped curved pattern, a funnel of growing spread, and a slow wave of residuals tracking in time order"
+  caption="The residual-plot gallery: even band (pass), curvature (non-linearity), funnel (heteroscedasticity), tracking (correlated errors)."
+/>
+
+<Task>
+Cover the panel labels and classify each of the four panels: pass, curvature, funnel, or tracking. This is a literal interview format: a screenshot of a residual plot and the question "what do you see and what do you do about it".
+</Task>
+
+### Curvature: the model is missing a term
+
+On the `Auto` dataset in [ISLP ch. 3](https://www.statlearning.com/), regressing fuel economy on horsepower leaves a pronounced U-shape: residuals positive at both ends of the fitted range, negative in the middle. The relationship bends and the straight line cuts through it. Adding a quadratic term `horsepower²` removes most of the pattern and lifts $R^2$ from $0.61$ to $0.69$.
+
+The remedy family is feature transformation: polynomials, interactions, $\log x$, $\sqrt{x}$. GM1 requires linearity **in the parameters** only, so transformed features stay inside the OLS machinery of <Ref lesson="ols" />.
+
+### Tracking: correlated errors fake a larger sample
+
+Residuals that drift in slow waves when plotted in time order are correlated: each error resembles its neighbor. The coefficient estimates survive, but the standard-error formula was derived under uncorrelated errors. With positive autocorrelation the data contain fewer independent observations than $n$, so the reported standard errors and confidence intervals are too narrow: the model is more confident than the evidence allows.
+
+Remedies sit outside plain OLS: generalized least squares with a time-series error model, and, for honest evaluation, time-based splits instead of random folds, developed in <Ref lesson="cross-validation-bootstrap" />.
+
+<KeyFact>
+A correct linear model leaves residuals with no structure. Curvature indicts linearity, a funnel indicts equal variance, tracking in time order indicts independence, and each points to its own remedy.
+</KeyFact>
+
+## Heteroscedasticity: coefficients survive, standard errors do not
+
+Income against spending, firm size against revenue, house size against price: in each case the response varies more at higher levels. The spread of the errors grows with the signal, which is the funnel of the gallery.
+
+<Definition title="heteroscedasticity">
+Errors are *heteroscedastic* when their variance depends on the predictors: $\operatorname{Var}(\varepsilon_i \mid x_i) = \sigma_i^2$, not a common $\sigma^2$. The constant-variance case is *homoscedasticity*, half of assumption GM3.
+</Definition>
+
+### What breaks and what does not
+
+Unbiasedness survives. The one-line argument from <Ref lesson="ols" /> was $\hat\theta = \theta + (X^\top X)^{-1}X^\top\varepsilon$ with $\mathbb{E}[\varepsilon \mid X] = 0$: only exogeneity entered, never GM3. The point estimates are as trustworthy as before.
+
+What breaks is the variance line. The formula $\operatorname{Var}(\hat\theta \mid X) = \sigma^2 (X^\top X)^{-1}$ substituted $\operatorname{Var}(\varepsilon \mid X) = \sigma^2 I$; with $\operatorname{Var}(\varepsilon \mid X) = \Sigma = \operatorname{diag}(\sigma_1^2, \dots, \sigma_n^2)$ the true covariance is the **sandwich**
+
+$$
+\operatorname{Var}(\hat\theta \mid X) = (X^\top X)^{-1} X^\top \Sigma\, X (X^\top X)^{-1},
+$$
+
+which Exercise 8 derives. Every reported standard error, $t$-statistic, p-value, and confidence interval is computed from the wrong formula, and the Gauss–Markov optimality is gone: OLS remains unbiased but is no longer minimum-variance among linear unbiased estimators. The classic true/false trap, "heteroscedasticity biases the OLS coefficients", is false.
+
+### Three remedies, from data fix to formula fix
+
+**Variance-stabilizing transform.** When spread grows proportionally with the level, the noise is multiplicative: $y = f(x)\cdot\eta$. Taking logs makes it additive with constant variance, $\log y = \log f(x) + \log\eta$. Regressing $\log y$ is the standard first move, and the funnel visibly closes.
+
+<Figure
+  src="./figures/hetero-fix.svg"
+  alt="Two residual plots side by side: a funnel-shaped plot for the raw response, and an even band for the log-transformed response after applying the log transform"
+  caption="The standard fix working: multiplicative noise produces a funnel on y (left) and an even band on log y (right)."
+/>
+
+**Weighted least squares.** If the variances $\sigma_i^2$ are known or modeled, minimize $\sum_i w_i r_i^2$ with $w_i = 1/\sigma_i^2$: precise observations count more. WLS is BLUE under heteroscedasticity, restoring the Gauss–Markov guarantee that plain OLS lost.
+
+**Robust (sandwich) standard errors.** Keep the OLS point estimates and repair only the reported uncertainty: estimate the sandwich by plugging $\operatorname{diag}(\hat r_1^2, \dots, \hat r_n^2)$ in place of $\Sigma$, following [White (1980)](https://www.jstor.org/stable/1912934). One estimator, honest error bars, no variance model required.
+
+<KeyFact>
+Heteroscedasticity leaves the OLS coefficients unbiased; it invalidates their standard errors and forfeits BLUE. Fix the variance (transform, WLS) or fix the error bars (sandwich); the point estimates need no fixing.
+</KeyFact>
+
+## Multicollinearity: the sum is determined, the split is not
+
+Two nearly redundant features make the *split* of their shared effect unidentifiable while the total stays pinned down. The failure is visible at hand-computation scale.
+
+<Example title="a 2% wiggle in y flips a sign">
+Two features, no intercept: $x_1 = (1, 2, 3)$ and $x_2 = (1.01,\ 2,\ 2.99)$, nearly proportional. The normal-equations ingredients from <Ref lesson="ols" />:
+
+$$
+X^\top X = \begin{pmatrix} 14 & 13.98 \\ 13.98 & 13.9602 \end{pmatrix},
+\qquad
+\det(X^\top X) = 14 \times 13.9602 - 13.98^2 = 0.0024 .
+$$
+
+The determinant is tiny: the columns are nearly dependent, so the inverse divides by $0.0024$ and magnifies everything.
+
+**Response A:** $y = (2, 4, 6)$. Then $X^\top y = (28,\ 27.96)$ and
+
+$$
+\hat\theta = \frac{1}{0.0024}
+\begin{pmatrix} 13.9602 & -13.98 \\ -13.98 & 14 \end{pmatrix}
+\begin{pmatrix} 28 \\ 27.96 \end{pmatrix}
+= \begin{pmatrix} 2 \\ 0 \end{pmatrix}.
+$$
+
+**Response B:** $y = (2,\ 4.1,\ 5.9)$, the same targets moved by at most $0.1$. Then $X^\top y = (27.9,\ 27.861)$ and the same solve gives
+
+$$
+\hat\theta = \frac{1}{0.0024}
+\begin{pmatrix} 13.9602 \times 27.9 - 13.98 \times 27.861 \\ 14 \times 27.861 - 13.98 \times 27.9 \end{pmatrix}
+= \frac{1}{0.0024}
+\begin{pmatrix} -0.0072 \\ 0.012 \end{pmatrix}
+= \begin{pmatrix} -3 \\ 5 \end{pmatrix}.
+$$
+
+A $2\%$ perturbation of the response moved $\hat\theta_1$ from $2$ to $-3$ and flipped its sign. The fitted values barely moved: fit B predicts $(2.05,\ 4,\ 5.95)$. And the **sum** $\hat\theta_1 + \hat\theta_2$ is $2$ in both fits: the data determine the combined effect of the pair precisely, and the split between them not at all.
+</Example>
+
+<Task>
+Verify the determinant and the Response B solve by hand; the two matrix products take a minute each. Then check the sum $\hat\theta_1 + \hat\theta_2 = 2$ in both fits.
+</Task>
+
+### The symptoms in a coefficient table
+
+*Multicollinearity* is near-linear dependence among predictors: not the exact singularity that kills the closed form (<Ref lesson="ols" />), but close enough to inflate the inverse. In a fitted model it shows up as:
+
+- **Huge standard errors** on the involved coefficients, with wide confidence intervals crossing zero;
+- **Sign and magnitude instability**: coefficients that swing when a few rows change or when a correlated feature enters or leaves;
+- **Individually insignificant, jointly significant**: the $F$-test for the group rejects while every individual $t$-test fails, because each feature is redundant given the others. Reading coefficient Z-scores next to the correlation matrix, as in the prostate-data table of [ESL §3.2](https://hastie.su.domains/ElemStatLearn/), is the standard way to spot the pattern.
+
+<Figure
+  src="./figures/ellipse.svg"
+  alt="Left: scatter of x1 versus x2 lying nearly on a line. Right: coefficient plane with a joint-uncertainty ellipse strongly elongated along the line beta1 plus beta2 equals 2, with the two example fits marked on it"
+  caption="Correlated features (left) elongate the joint uncertainty ellipse along β₁+β₂ = const (right): the sum is pinned, the split slides. Both fits of the worked example sit on the same line."
+/>
+
+### VIF: the diagnostic is just an R²
+
+For predictor $j$, the exact variance identity is
+
+$$
+\operatorname{Var}(\hat\beta_j)
+= \frac{\sigma^2}{(1 - R_j^2)\,\sum_i (x_{ij} - \bar x_j)^2},
+$$
+
+where $R_j^2$ is the fit of $x_j$ regressed on all the other predictors. The first factor beyond the ordinary one-feature variance is the inflation.
+
+<Definition title="variance inflation factor">
+The *variance inflation factor* of predictor $j$ is
+$$
+\mathrm{VIF}_j = \frac{1}{1 - R_j^2},
+$$
+where $R_j^2$ is the $R^2$ from regressing $x_j$ on the remaining predictors. $\mathrm{VIF}_j = 1$ when $x_j$ is uncorrelated with the rest; values above $5$ ($R_j^2 = 0.8$) to $10$ ($R_j^2 = 0.9$) are the conventional flags, and the standard error of $\hat\beta_j$ is inflated by $\sqrt{\mathrm{VIF}_j}$.
+</Definition>
+
+The compute-by-hand recipe requires no new machinery: run $p$ auxiliary regressions, one per feature against the others, and read off each $R_j^2$. VIF is an $R^2$ wearing a different name.
+
+<Figure
+  src="./figures/vif.svg"
+  alt="Three-step pipeline: regress feature j on the other features, read off R squared, compute VIF as one over one minus R squared; below, a four-feature table with R squared values 0.30, 0.75, 0.90, 0.95 giving VIFs 1.4, 4.0, 10.0, 20.0 and verdicts"
+  caption="The VIF pipeline on a four-feature example: one auxiliary regression per feature, then the 1/(1−R²) conversion and the 5–10 threshold."
+/>
+
+### Remedies, and the distinction interviewers want
+
+Three standard remedies. **Drop** one feature of the correlated cluster; the survivor's coefficient absorbs the shared effect, so its interpretation changes. **Combine** the cluster into one feature: a sum, an average, a domain index, or a principal component (<Ref lesson="pca" />). **Ridge**: the estimator-side fix from <Ref lesson="ridge-lasso" />, where $\lambda$ lifts every eigenvalue of $X^\top X$ off zero and trades a little bias for a large variance reduction, exactly the flat-valley repair.
+
+<KeyFact>
+Multicollinearity damages inference and interpretation, not necessarily prediction. The fitted surface is stable wherever data support it, so test error can be fine while every coefficient and p-value is untrustworthy. Stating this distinction is usually the point of the interview question.
+</KeyFact>
+
+The damage to interpretation is concrete: the standard gloss "$\hat\beta_j$ is the change in $\hat y$ per unit of $x_j$, *holding the other features fixed*" describes a counterfactual the data never exhibit when $x_j$ moves in lockstep with its correlates. The same mechanism produces the classic sign reversal between simple and multiple regression: the added features absorb the shared variance, and the leftover partial effect can point the other way. Simpson's paradox is this phenomenon with a categorical confounder; Exercise 5 works the canonical case.
+
+## Outliers, leverage, influence: three different dangers
+
+An *outlier* is unusual in $y$: its response sits far from the trend, leaving a large residual. A *high-leverage* point is unusual in $x$: its predictors sit far from the bulk of the data, regardless of its response. *Influence* is the combination: a point that actually changes the fitted coefficients, which requires being off-trend **and** far out in $x$.
+
+<Figure
+  src="./figures/leverage.svg"
+  alt="Three panels with the same base scatter and fitted line: an added point above the middle of the cloud barely moves the line; an added far-right point on the trend leaves the line unchanged; an added far-right point off the trend visibly tilts the line"
+  caption="Same base data, one added point (amber): large residual at low leverage (left) and high leverage on-trend (middle) barely move the fit; the combination (right) rewrites the slope. Dashed blue: fit without the added point."
+/>
+
+### Leverage: the hat-matrix diagonal
+
+Leverage is read off machinery already built. From <Ref lesson="ols" />, $\hat y = Hy$ with $H = X(X^\top X)^{-1}X^\top$, so $\hat y_i = \sum_j h_{ij} y_j$: row $i$ of $H$ says whose responses shape point $i$'s fitted value.
+
+<Definition title="leverage">
+The *leverage* of observation $i$ is $h_{ii}$, the $i$-th diagonal entry of the hat matrix: the weight of $y_i$ in its own fitted value, $h_{ii} = \partial \hat y_i / \partial y_i$. With an intercept, $1/n \le h_{ii} \le 1$; the leverages sum to $\operatorname{tr}(H) = p$, so the average is $p/n$, and the working flag is $h_{ii} > 2p/n$ or $3p/n$. In simple regression,
+$$
+h_{ii} = \frac{1}{n} + \frac{(x_i - \bar x)^2}{\sum_{l} (x_l - \bar x)^2}:
+$$
+leverage grows quadratically with distance from $\bar x$.
+</Definition>
+
+<Example title="one far-out x owns its own fit">
+Data $x = (1, 2, 3, 4, 10)$, simple regression, so $n = 5$, $p = 2$. Mean $\bar x = 4$; deviations $(-3, -2, -1, 0, 6)$; $\sum_l (x_l - \bar x)^2 = 9 + 4 + 1 + 0 + 36 = 50$.
+
+For the point at $x = 10$:
+$$
+h = \frac{1}{5} + \frac{6^2}{50} = 0.2 + 0.72 = 0.92 .
+$$
+
+The average leverage is $p/n = 0.4$, so $0.92$ is far beyond the $2p/n = 0.8$ flag. A leverage of $0.92$ means $92\%$ of this point's fitted value comes from its own response: the line passes near it almost regardless of the other four points, which is exactly the danger.
+</Example>
+
+### Studentized residuals: leverage hides its own outliers
+
+Raw residuals are not comparable across points, because $r = (I - H)y$ gives $\operatorname{Var}(r_i) = \sigma^2 (1 - h_{ii})$ under GM1–GM3: high-leverage points get **automatically small residuals** since the line chases them. The comparable quantity is the *studentized residual*
+
+$$
+t_i = \frac{r_i}{\hat\sigma \sqrt{1 - h_{ii}}},
+$$
+
+with $|t_i| > 3$ the conventional outlier flag. Scanning raw residuals misses exactly the most dangerous points.
+
+### Cook's distance: residual times leverage
+
+<Definition title="Cook's distance">
+For observation $i$,
+$$
+D_i = \frac{t_i^2}{p} \cdot \frac{h_{ii}}{1 - h_{ii}} ,
+$$
+a scaled measure of how far the whole fitted vector moves when observation $i$ is deleted, introduced by [Cook (1977)](https://www.jstor.org/stable/1268249). It is large only when the studentized residual and the leverage are both substantial; working flags are $D_i > 4/n$ or, conservatively, $D_i > 1$.
+</Definition>
+
+The practical protocol: **investigate before deleting**. A unit mix-up or sensor glitch is fixed or removed with cause; a genuine extreme observation is information about the tail of the population, and silently deleting it is unreported model surgery. Deletion is the last resort and is disclosed.
+
+<Aside>
+The keep-everything alternative is robust regression: swap the Gaussian likelihood behind least squares (<Ref lesson="ols" />) for a heavy-tailed one. A Student-$t$ likelihood, or the Huber loss (quadratic for small residuals, linear beyond a threshold $\delta$), bounds each point's pull on the fit, so outliers get down-weighted automatically instead of deleted manually. Murphy, *Probabilistic Machine Learning: An Introduction*, §11.6 develops both; the L1/median connection appeared in Exercise 7 of <Ref lesson="ols" />.
+</Aside>
+
+<KeyFact>
+A large residual at low leverage mainly inflates $\hat\sigma$, and with it every standard error; a high-leverage point off the trend rewrites the slope. Cook's distance ranks points by realized damage: residual × leverage.
+</KeyFact>
+
+## R² and adjusted R²: fit is not validity
+
+With an intercept, the Pythagorean identity of <Ref lesson="ols" /> centers into the decomposition $\sum_i (y_i - \bar y)^2 = \sum_i (\hat y_i - \bar y)^2 + \mathrm{RSS}$: total variation splits into explained plus residual.
+
+<Definition title="R² and adjusted R²">
+$$
+R^2 = 1 - \frac{\mathrm{RSS}}{\mathrm{TSS}}, \qquad \mathrm{TSS} = \sum_i (y_i - \bar y)^2 ,
+$$
+the fraction of response variance the fit explains; in simple regression it equals the squared correlation of $x$ and $y$. The *adjusted* version replaces sums of squares by variance estimates with their degrees of freedom, $p$ being the number of coefficients:
+$$
+\bar R^2 = 1 - \frac{\mathrm{RSS}/(n - p)}{\mathrm{TSS}/(n - 1)}
+= 1 - (1 - R^2)\,\frac{n - 1}{n - p} .
+$$
+</Definition>
+
+<Theorem title="R² never decreases when features are added">
+If model B contains all features of model A plus extra ones, then $R^2_B \ge R^2_A$ on the training data.
+
+<Proof>
+The models are nested: every fit available to A is available to B by setting the extra coefficients to zero. Minimizing RSS over a superset cannot give a larger minimum, so $\mathrm{RSS}_B \le \mathrm{RSS}_A$, while TSS depends only on $y$. Hence $R^2_B \ge R^2_A$.
+</Proof>
+</Theorem>
+
+The theorem rigs every $R^2$ comparison in favor of the larger model: even pure-noise features rate as progress. Adjusted $R^2$ charges $n - p$ for them and falls once a feature's contribution is below chance level.
+
+<Figure
+  src="./figures/r2-inflation.svg"
+  alt="R squared and adjusted R squared plotted against the number of pure-noise features added to a fixed 50-observation regression: R squared climbs steadily while adjusted R squared declines"
+  caption="Junk features added to a fixed dataset (n = 50): R² climbs by construction; adjusted R² falls because each addition costs a degree of freedom and buys noise."
+/>
+
+Adjusted $R^2$ is still an in-sample heuristic. The honest arbiter of model comparisons is held-out error, via the resampling protocols of <Ref lesson="cross-validation-bootstrap" />.
+
+### What R² does not certify
+
+**Not model validity.** [Anscombe's quartet](https://www.jstor.org/stable/2682899) (1973) is four datasets with the same fitted line and the same $R^2 \approx 0.67$: one genuinely linear and noisy, one smoothly curved, one outlier-driven, one held up by a single high-leverage point. The summary statistics are identical; only the plots tell them apart. Both failure directions occur: a high $R^2$ with a wrong (curved) model, and a low $R^2$ with a correct model on noisy data.
+
+**Not causality.** $R^2$ measures the fit of an observational association; a regression of ice-cream sales on drowning deaths has a healthy $R^2$ through the weather.
+
+<Remark title="p-value dredging">
+Coefficient p-values are valid for a model specified before looking at the data. Stepwise-selecting features over a large pool and then reading the survivors' p-values is multiple testing in disguise: the selection searched many hypotheses and reported the extremes, so the printed p-values overstate the evidence. Diagnostics in this chapter judge an assumed model; they are not a license to search model space and quote single-model inference afterwards.
+</Remark>
+
+<KeyFact>
+$R^2$ measures in-sample fit of this model on this sample, and nothing else: it certifies neither the functional form (Anscombe), nor out-of-sample accuracy (it never decreases with added features), nor causality.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Interview question: "You add a feature to your regression and $R^2$ rises from $0.700$ to $0.703$. Is the model better?" Answer quantitatively: $n = 50$, and the model grows from $5$ to $6$ predictors plus an intercept ($p$: $6 \to 7$). Compute adjusted $R^2$ for both models and state what a rising $R^2$ does and does not show.
+
+<Solution>
+$R^2$ cannot fall when a feature is added (nested models), so the rise by itself shows nothing.
+
+Adjusted values with $\bar R^2 = 1 - (1 - R^2)(n-1)/(n-p)$:
+
+Before, $p = 6$: $\bar R^2 = 1 - 0.300 \times 49/44 = 1 - 0.334 = 0.666$.
+
+After, $p = 7$: $\bar R^2 = 1 - 0.297 \times 49/43 = 1 - 0.338 = 0.662$.
+
+Adjusted $R^2$ **falls**: the $0.003$ gain in fit is below the chance-level improvement a junk feature buys, so the penalized criterion judges the addition harmful. The complete answer adds that both quantities are in-sample; the decision should rest on cross-validated error (<Ref lesson="cross-validation-bootstrap" />), and if the feature survives that, on whether it is available at prediction time.
+</Solution>
+</Exercise>
+
+<Exercise>
+Feature 1 regressed on the other features gives $R_1^2 = 0.9$. Compute $\mathrm{VIF}_1$, the factor by which the standard error of $\hat\beta_1$ is inflated, and state the recipe you just used and the conventional thresholds.
+
+<Solution>
+$\mathrm{VIF}_1 = 1/(1 - 0.9) = 10$. The variance of $\hat\beta_1$ is $10\times$ what it would be with an uncorrelated feature, so the standard error is inflated by $\sqrt{10} \approx 3.16$: confidence intervals are three times wider and the $t$-statistic three times smaller than the feature's information content warrants.
+
+Recipe: regress $x_1$ on all remaining predictors (auxiliary regression), read off the $R^2$ of that fit, and take $1/(1 - R_1^2)$. Thresholds: $\mathrm{VIF} = 1$ means uncorrelated; above $5$–$10$ (i.e. $R_j^2$ above $0.8$–$0.9$) is the conventional flag for problematic collinearity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two Sigma interview question, worked in full: "What happens to your regression coefficients when features are multicollinear? How do you detect it and how do you fix it?"
+
+<Solution>
+**Effects.** Near-linear dependence among predictors makes $X^\top X$ nearly singular, so $(X^\top X)^{-1}$, and with it $\operatorname{Var}(\hat\theta) = \sigma^2 (X^\top X)^{-1}$, blows up along the near-null directions. Concretely: coefficient standard errors inflate by $\sqrt{\mathrm{VIF}_j}$; estimates become unstable, swinging or flipping sign under small data perturbations (the worked example: a $2\%$ change in $y$ moved a coefficient from $2$ to $-3$); individual $t$-tests fail while the group $F$-test rejects; and the "holding others fixed" interpretation collapses because the data never vary one feature alone. OLS remains unbiased: the problem is variance, not bias. Predictions in the region the data cover can remain accurate throughout, because only well-supported directions of coefficient space affect fitted values there.
+
+**Detection.** Compute $\mathrm{VIF}_j = 1/(1 - R_j^2)$ from the auxiliary regression of each feature on the rest; flag values above $5$–$10$. Cheaper first looks: the pairwise correlation matrix (which misses multi-feature dependence) and the insignificant-$t$/significant-$F$ fingerprint.
+
+**Fixes.** (1) Drop one feature per correlated cluster, accepting that the survivor absorbs the shared effect. (2) Combine the cluster into a single feature: sum, average, index, or principal component. (3) Ridge regression: $(X^\top X + \lambda I)^{-1}$ lifts every eigenvalue off zero, trading a little bias for a large variance reduction. (4) If only predictions matter, document the collinearity and leave the estimator alone.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "Your OLS residual plot shows a funnel: spread grows with the fitted value. What breaks, what does not break, and what do you do?"
+
+<Solution>
+The funnel is heteroscedasticity: $\operatorname{Var}(\varepsilon_i)$ grows with the signal level, violating the equal-variance half of GM3.
+
+**Not broken:** unbiasedness and consistency of $\hat\theta$; the derivation $\mathbb{E}[\hat\theta \mid X] = \theta$ uses only exogeneity.
+
+**Broken:** the covariance formula $\sigma^2(X^\top X)^{-1}$, hence every standard error, $t$-statistic, p-value, and confidence interval computed from it; and the Gauss–Markov BLUE property, since weighted least squares now has lower variance.
+
+**Actions**, in the usual order: (1) log-transform the response if the spread is proportional to the level (multiplicative noise becomes additive); (2) weighted least squares with $w_i = 1/\sigma_i^2$ if the variance structure is known or modeled; (3) keep OLS and report White sandwich standard errors, $(X^\top X)^{-1} X^\top \operatorname{diag}(\hat r_i^2) X (X^\top X)^{-1}$, if only the inference needs repair.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "In a simple regression of demand on price, the price coefficient is positive. Adding product-category and seasonality features makes it negative. Explain what happened and which coefficient is right."
+
+<Solution>
+The simple-regression coefficient measures the raw association: expensive products (premium categories, holiday seasons) also sell well, so price and demand rise together across the pooled data. The added features absorb that shared variance; the multiple-regression coefficient is the partial association of price with demand *within* a category and season, where higher price does suppress demand. A sign reversal under aggregation over a confounding grouping is Simpson's paradox.
+
+Neither coefficient is "wrong": they answer different questions. The partial (negative) coefficient is the relevant one for the causal-flavored question "what happens if we change the price of this product", provided the added controls capture the confounding; the marginal (positive) one describes the observational pattern across the catalog. Under strong price–category collinearity the partial estimate also carries an inflated standard error, so its sign should be checked for stability (VIF, refit on subsets) before being reported.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the dataset $x = (1, 2, 3, 4, 10)$ of the worked example, compute the leverage of all five points, verify that they sum to $p = 2$, and flag the high-leverage points by the $2p/n$ rule.
+
+<Solution>
+$\bar x = 4$, $\sum_l (x_l - \bar x)^2 = 50$, and $h_i = \tfrac15 + (x_i - 4)^2/50$:
+
+$$
+h = \bigl(0.2 + \tfrac{9}{50},\ 0.2 + \tfrac{4}{50},\ 0.2 + \tfrac{1}{50},\ 0.2 + 0,\ 0.2 + \tfrac{36}{50}\bigr)
+= (0.38,\ 0.28,\ 0.22,\ 0.20,\ 0.92).
+$$
+
+Sum: $0.38 + 0.28 + 0.22 + 0.20 + 0.92 = 2.00 = p$, matching $\operatorname{tr}(H) = p$ from <Ref lesson="ols" />. Average $p/n = 0.4$; flag threshold $2p/n = 0.8$. Only the point at $x = 10$ exceeds it ($0.92$): one high-leverage point, four ordinary ones.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "Point A sits in the middle of the $x$-range with a huge residual. Point B sits far to the right in $x$, close to the fitted line. Which is more dangerous?" Answer using leverage, studentized residuals, and Cook's distance.
+
+<Solution>
+**Point A**: large residual, low leverage ($x$ near $\bar x$ means $h_{ii}$ near its minimum). Its Cook's distance $D = (t^2/p)\, h/(1-h)$ is moderate because the leverage factor is small: it cannot move the slope much. Its damage channel is $\hat\sigma$: one huge residual inflates the variance estimate, widening every standard error and depressing $R^2$.
+
+**Point B**: high leverage, small residual, so its Cook's distance is currently small too: it is not damaging the present fit. But two caveats make it the more dangerous point. First, its small residual is partly automatic: $\operatorname{Var}(r_i) = \sigma^2(1 - h_{ii})$, so the fit chases high-leverage points and hides their misfit; the studentized residual $r_i / (\hat\sigma\sqrt{1 - h_{ii}})$ is the honest check. Second, B holds veto power: if its response is wrong (a data error) or the trend bends out there, the slope is rewritten by this single point, since the rest of the data provide no support in that $x$-region.
+
+Verdict: A is currently costing accuracy of inference; B is a single point of failure for the slope. Check B's provenance and studentize its residual; a fit this dependent on one observation should be flagged regardless of its current Cook's distance.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="ols" />: starting from $\hat\theta = \theta + (X^\top X)^{-1}X^\top\varepsilon$, derive $\operatorname{Var}(\hat\theta \mid X)$ when $\operatorname{Var}(\varepsilon \mid X) = \Sigma$ is an arbitrary covariance matrix. Verify that your formula reduces to $\sigma^2(X^\top X)^{-1}$ when $\Sigma = \sigma^2 I$, and state how White's estimator makes the general formula usable.
+
+<Solution>
+Write $A = (X^\top X)^{-1}X^\top$, so $\hat\theta - \theta = A\varepsilon$. For any fixed matrix $A$,
+
+$$
+\operatorname{Var}(A\varepsilon \mid X) = A\,\operatorname{Var}(\varepsilon \mid X)\,A^\top = A \Sigma A^\top ,
+$$
+
+hence
+
+$$
+\operatorname{Var}(\hat\theta \mid X)
+= (X^\top X)^{-1} X^\top \Sigma\, X (X^\top X)^{-1} ,
+$$
+
+the sandwich: bread $(X^\top X)^{-1}$, filling $X^\top \Sigma X$.
+
+Reduction: with $\Sigma = \sigma^2 I$,
+
+$$
+(X^\top X)^{-1} X^\top (\sigma^2 I) X (X^\top X)^{-1}
+= \sigma^2 (X^\top X)^{-1} (X^\top X)(X^\top X)^{-1}
+= \sigma^2 (X^\top X)^{-1} ,
+$$
+
+the textbook formula from <Ref lesson="ols" />: the sandwich collapses exactly when the errors are spherical.
+
+$\Sigma$ is unobservable, but under heteroscedastic independent errors it is diagonal, and White (1980) showed that substituting $\operatorname{diag}(\hat r_1^2, \dots, \hat r_n^2)$ for $\Sigma$ gives a consistent estimator of the sandwich. That is the "robust standard errors" option in every regression package: OLS point estimates, sandwich-based error bars.
+</Solution>
+</Exercise>
+
+<References>
+1. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — ch. 3, "Potential Problems": the six-item checklist (non-linearity, correlated errors, heteroscedasticity, outliers, leverage, collinearity) with the residual-plot and Auto-data examples this chapter follows; also $R^2$ and qualitative predictors. https://www.statlearning.com/
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §3.2: coefficient variance $\sigma^2(X^\top X)^{-1}$, Z-scores, and the prostate-data coefficient table; §3.2.2 on correlated predictors. https://hastie.su.domains/ElemStatLearn/
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §11.6: robust linear regression via Student-$t$ likelihood and Huber loss. https://probml.github.io/pml-book/book1.html
+4. F. J. Anscombe, "Graphs in Statistical Analysis," *The American Statistician*, 27(1), 1973 — the quartet: identical regression summaries, four different datasets.
+5. H. White, "A Heteroskedasticity-Consistent Covariance Matrix Estimator and a Direct Test for Heteroskedasticity," *Econometrica*, 48(4), 1980 — the sandwich estimator behind robust standard errors.
+6. R. D. Cook, "Detection of Influential Observation in Linear Regression," *Technometrics*, 19(1), 1977 — the deletion-based influence measure.
+7. N. Singh, K. Huo, *Ace the Data Science Interview*, 2021 — ch. 6: the multicollinearity interview question (effects, VIF, remedies) worked as Exercise 3 here.
+</References>

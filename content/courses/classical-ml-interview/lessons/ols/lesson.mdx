@@ -1,0 +1,519 @@
+The least-squares estimator has a closed form, (XᵀX)⁻¹Xᵀy, and its derivation is among the most common whiteboard requests in classical-ML interviews. This chapter performs that derivation with every step shown, reads the result as an orthogonal projection, identifies least squares as Gaussian maximum likelihood, and states exactly which assumption buys which guarantee. The route: the residual-sum-of-squares objective on a three-point dataset, the two matrix-calculus identities and the normal equations, the projection geometry and the hat matrix, the MLE connection, the Gauss–Markov theorem with its assumption ladder, and the ways XᵀX fails.
+
+## The objective: residual sum of squares in matrix form
+
+Three data points: $(x, y) = (1, 1),\ (2, 2),\ (3, 2)$. A line $\hat y = \theta_0 + \theta_1 x$ is scored by its *residuals* $r_i = y_i - \hat y_i$, the vertical gaps between data and line, aggregated into the *residual sum of squares* $\mathrm{RSS} = \sum_i r_i^2$.
+
+Two candidates, evaluated numerically. The line $\hat y = x$ predicts $(1, 2, 3)$, leaving residuals $(0, 0, -1)$ and $\mathrm{RSS} = 1$. The line $\hat y = 0.5 + 0.5x$ predicts $(1, 1.5, 2)$, leaving residuals $(0, 0.5, 0)$ and $\mathrm{RSS} = 0.25$. The best line over all $(\theta_0, \theta_1)$, computed in the next section, is $\hat y = \tfrac{2}{3} + \tfrac{1}{2}x$ with $\mathrm{RSS} = \tfrac{1}{6} \approx 0.167$.
+
+<Figure
+  src="./figures/rss.svg"
+  alt="Three data points with the least-squares line and the three residuals drawn as vertical segments; the squared residuals 1/36, 4/36, 1/36 are tallied to RSS = 1/6"
+  caption="What OLS minimizes: the sum of squared vertical gaps. For the best line the tally is 1/36 + 4/36 + 1/36 = 1/6."
+/>
+
+<Task>
+Verify the figure's tally: square the residuals $-\tfrac16, \tfrac13, -\tfrac16$ and sum them; the total should be $\tfrac{1}{36} + \tfrac{4}{36} + \tfrac{1}{36} = \tfrac{1}{6}$.
+</Task>
+
+### The design matrix absorbs the intercept
+
+Stacking the $n$ examples as rows turns the search over lines into linear algebra. A leading column of ones carries the intercept, so one matrix product computes all $n$ predictions at once.
+
+<Definition title="design matrix and the OLS problem">
+Given $n$ examples with $d$ features, the *design matrix* $X \in \mathbb{R}^{n \times p}$, $p = d + 1$, has row $i$ equal to $(1, x_{i1}, \dots, x_{id})$, and $y \in \mathbb{R}^n$ stacks the targets. *Ordinary least squares* (OLS) minimizes
+
+$$
+J(\theta) = \tfrac{1}{2}\,\lVert X\theta - y \rVert^2 = \tfrac{1}{2} \sum_{i=1}^{n} \bigl(\theta^\top x_i - y_i\bigr)^2 ,
+\qquad \theta \in \mathbb{R}^p .
+$$
+
+The factor $\tfrac12$ changes no argmin; it cancels the 2 produced by differentiation.
+</Definition>
+
+For the three-point dataset,
+
+$$
+X = \begin{pmatrix} 1 & 1 \\ 1 & 2 \\ 1 & 3 \end{pmatrix},
+\qquad
+y = \begin{pmatrix} 1 \\ 2 \\ 2 \end{pmatrix},
+$$
+
+and $J(\theta)$ is half the squared Euclidean length of the residual vector $X\theta - y$: a **convex quadratic** in $\theta$.
+
+<Aside>
+Two transpose conventions coexist in the standard sources. [CS229](https://cs229.stanford.edu/main_notes.pdf) and ESL put examples in rows, giving $\hat\theta = (X^\top X)^{-1} X^\top y$; [Weinberger's CS4780 note](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote08.html) puts examples in columns, and the same estimator prints as $w = (XX^\top)^{-1} X y$. The two formulas are one result under a renaming $X \leftrightarrow X^\top$. This course fixes rows-as-examples throughout; in an interview, state the convention before writing anything.
+</Aside>
+
+<KeyFact>
+OLS minimizes the squared Euclidean length of the residual vector $X\theta - y$; the objective is a convex quadratic, which is why a closed form exists at all.
+</KeyFact>
+
+## The derivation: two identities and the normal equations
+
+$J$ is differentiable and convex, so its minimizers are exactly the zeros of its gradient (local minima of convex functions are global; <Ref lesson="gradient-descent" /> proves this). What must be computed is $\nabla_\theta J$, and two identities are the entire toolkit.
+
+<Theorem title="the two gradient identities">
+For $a \in \mathbb{R}^p$ and symmetric $A \in \mathbb{R}^{p \times p}$,
+
+$$
+\nabla_\theta \,(a^\top \theta) = a,
+\qquad
+\nabla_\theta \,(\theta^\top A\, \theta) = 2A\theta .
+$$
+
+<Proof>
+First identity: $a^\top\theta = \sum_i a_i \theta_i$, so $\partial (a^\top\theta)/\partial \theta_k = a_k$, the $k$-th entry of $a$.
+
+Second identity: $\theta^\top A \theta = \sum_{i,j} A_{ij}\theta_i \theta_j$. Differentiating with respect to $\theta_k$ picks up the terms with $i = k$ and the terms with $j = k$:
+
+$$
+\frac{\partial}{\partial \theta_k} \sum_{i,j} A_{ij}\theta_i\theta_j
+= \sum_j A_{kj}\theta_j + \sum_i A_{ik}\theta_i
+= (A\theta)_k + (A^\top \theta)_k .
+$$
+
+The gradient is $(A + A^\top)\theta$, which equals $2A\theta$ when $A = A^\top$.
+</Proof>
+</Theorem>
+
+### Expand, differentiate, set to zero
+
+Expanding the square (the cross terms $-\tfrac12\theta^\top X^\top y$ and $-\tfrac12 y^\top X\theta$ are equal scalars, each the other's transpose):
+
+$$
+J(\theta) = \tfrac{1}{2}(X\theta - y)^\top (X\theta - y)
+= \tfrac{1}{2}\,\theta^\top X^\top X\, \theta \;-\; y^\top X \theta \;+\; \tfrac{1}{2}\, y^\top y .
+$$
+
+The first term is the quadratic identity with $A = X^\top X$, which is symmetric; the second is the linear identity with $a = X^\top y$; the third is constant in $\theta$:
+
+$$
+\nabla_\theta J(\theta) = X^\top X\, \theta - X^\top y .
+$$
+
+Setting the gradient to zero gives the *normal equations*, a system of $p$ linear equations in $p$ unknowns:
+
+$$
+X^\top X\, \theta = X^\top y .
+$$
+
+<FigureSequence
+  name="derivation"
+  alt="Four frames building the OLS derivation: the expanded objective, the gradient assembled from the two identities, the normal equations, and the boxed closed form with its invertibility condition"
+  caption="The set-piece derivation, one move per frame: expand, differentiate by the two identities, set to zero, solve."
+/>
+
+<Task>
+Step through the four frames, then close the page and reproduce the derivation on paper unaided: expand $J$, differentiate using the two identities, set the gradient to zero, state the invertibility condition. Dimension check on the result: $X^\top X$ is $p \times p$ and $X^\top y$ is $p \times 1$, so the gradient is a $p$-vector, matching $\theta$.
+</Task>
+
+### Second-order check and the closed form
+
+The Hessian of $J$ is $\nabla^2 J = X^\top X$, and for any $v \in \mathbb{R}^p$,
+
+$$
+v^\top X^\top X\, v = \lVert Xv \rVert^2 \ge 0,
+$$
+
+so $X^\top X \succeq 0$: $J$ is convex and every stationary point is a global minimum. If $X$ has full column rank, then $Xv \ne 0$ for $v \ne 0$, the Hessian is positive definite, $J$ is strictly convex, and the minimizer is unique.
+
+<Theorem title="OLS closed form">
+If $\operatorname{rank}(X) = p$, the unique minimizer of $J(\theta) = \tfrac12 \lVert X\theta - y\rVert^2$ is
+
+$$
+\hat\theta = (X^\top X)^{-1} X^\top y .
+$$
+
+<Proof>
+Full column rank makes $X^\top X$ positive definite, hence invertible, so the normal equations have the unique solution $\hat\theta = (X^\top X)^{-1}X^\top y$. Convexity of $J$ (Hessian $X^\top X \succeq 0$) upgrades this stationary point to the global minimum, and strict convexity makes it the only one.
+</Proof>
+</Theorem>
+
+<Example title="the three-point dataset, solved">
+For $X$ and $y$ above:
+
+$$
+X^\top X = \begin{pmatrix} 3 & 6 \\ 6 & 14 \end{pmatrix},
+\qquad
+X^\top y = \begin{pmatrix} 5 \\ 11 \end{pmatrix}.
+$$
+
+The determinant is $3 \cdot 14 - 6 \cdot 6 = 6$, so
+
+$$
+(X^\top X)^{-1} = \frac{1}{6}\begin{pmatrix} 14 & -6 \\ -6 & 3 \end{pmatrix},
+\qquad
+\hat\theta = \frac{1}{6}\begin{pmatrix} 14 & -6 \\ -6 & 3 \end{pmatrix}\begin{pmatrix} 5 \\ 11 \end{pmatrix}
+= \frac{1}{6}\begin{pmatrix} 4 \\ 3 \end{pmatrix}
+= \begin{pmatrix} 2/3 \\ 1/2 \end{pmatrix}.
+$$
+
+The fitted line is $\hat y = \tfrac23 + \tfrac12 x$ with predictions $\bigl(\tfrac76, \tfrac53, \tfrac{13}{6}\bigr)$, residuals $\bigl(-\tfrac16, \tfrac13, -\tfrac16\bigr)$, and $\mathrm{RSS} = \tfrac{1}{36} + \tfrac{4}{36} + \tfrac{1}{36} = \tfrac16$: better than both candidates of the first section, as claimed.
+</Example>
+
+The same two matrix products and one solve handle any scale. On the [CS229](https://cs229.stanford.edu/main_notes.pdf) Portland housing dataset (47 houses, living area in square feet predicting price in thousands of dollars), the closed form returns $\hat\theta_0 = 71.27$ and $\hat\theta_1 = 0.1345$: a baseline of 71,270 dollars plus 134.50 dollars per square foot.
+
+<Figure
+  src="./figures/pipeline.svg"
+  alt="Pipeline from a table of five Portland houses through the closed form to the fitted coefficients 71.27 and 0.1345 and a prediction of 407.5 thousand dollars for a 2500 square foot house"
+  caption="Closed form to prediction, end to end: data matrix in, θ̂ out, one inner product per new house."
+/>
+
+<KeyFact>
+The whole derivation is four moves: expand the square, apply $\nabla(\theta^\top A\theta) = 2A\theta$ and $\nabla(a^\top\theta) = a$, set $\nabla J = X^\top X\theta - X^\top y$ to zero, and check $X^\top X \succeq 0$. Interviewers ask for exactly these moves.
+</KeyFact>
+
+## The geometry: the fit is a projection
+
+Rearranging the normal equations exposes their meaning:
+
+$$
+X^\top X \hat\theta = X^\top y
+\quad\Longleftrightarrow\quad
+X^\top (y - X\hat\theta) = 0 .
+$$
+
+The residual vector $r = y - X\hat\theta$ is **orthogonal to every column** of $X$. On the three-point example: $r = \bigl(-\tfrac16, \tfrac13, -\tfrac16\bigr)$, the ones column gives $-\tfrac16 + \tfrac13 - \tfrac16 = 0$, and the feature column gives $1 \cdot (-\tfrac16) + 2 \cdot \tfrac13 + 3 \cdot (-\tfrac16) = 0$.
+
+Orthogonality of the residual to $\operatorname{col}(X)$, the span of the columns, means $\hat y = X\hat\theta$ is the point of $\operatorname{col}(X)$ **closest** to $y$: least squares drops a perpendicular from the target vector onto the subspace of all achievable prediction vectors.
+
+<Figure
+  src="./figures/projection.svg"
+  alt="The column space of X drawn as a plane, the target vector y above it, the fitted vector y-hat as the foot of the perpendicular, and the residual as the orthogonal connecting segment"
+  caption="ŷ is the orthogonal projection of y onto col(X); the residual r = y − ŷ is perpendicular to the plane."
+/>
+
+<Definition title="hat matrix">
+The *hat matrix* is $H = X(X^\top X)^{-1}X^\top \in \mathbb{R}^{n \times n}$. It maps targets to fitted values, $\hat y = X\hat\theta = Hy$, and is the orthogonal projector onto $\operatorname{col}(X)$: symmetric, idempotent ($H^2 = H$), with $\operatorname{tr}(H) = p$ (Exercise 8).
+</Definition>
+
+Two consequences used repeatedly later. With an intercept, the ones column is in $X$, so $\mathbf{1}^\top r = 0$: **residuals sum to zero**. And $y = \hat y + r$ with $\hat y \perp r$ gives the Pythagorean split $\lVert y\rVert^2 = \lVert \hat y\rVert^2 + \lVert r\rVert^2$ (Exercise 3), the identity behind the $R^2$ decomposition of <Ref lesson="regression-diagnostics" />.
+
+<KeyFact>
+The normal equations are the orthogonality condition $X^\top r = 0$: solving least squares is projecting $y$ onto the column space of $X$, with $\hat y = Hy$.
+</KeyFact>
+
+## Least squares is Gaussian maximum likelihood
+
+Nothing so far used probability: the closed form is linear algebra. A noise model adds the statistical reading. Assume
+
+$$
+y_i = \theta^\top x_i + \varepsilon_i,
+\qquad \varepsilon_i \sim \mathcal{N}(0, \sigma^2) \text{ i.i.d.}
+$$
+
+By the two-step recipe of <Ref lesson="mle-map" />, the log-likelihood is
+
+$$
+\ell(\theta) = \sum_{i=1}^n \log \mathcal{N}\bigl(y_i \mid \theta^\top x_i, \sigma^2\bigr)
+= -\frac{n}{2}\log(2\pi\sigma^2) \;-\; \frac{1}{2\sigma^2}\sum_{i=1}^n \bigl(y_i - \theta^\top x_i\bigr)^2 .
+$$
+
+The first term is free of $\theta$ and the second is $-\mathrm{RSS}/(2\sigma^2)$, so maximizing $\ell$ is minimizing RSS: **the MLE is the OLS estimator**. Maximizing over $\sigma^2$ as well gives $\hat\sigma^2 = \mathrm{RSS}/n$, biased low by the same degrees-of-freedom effect as the Gaussian variance MLE of <Ref lesson="mle-map" />; the unbiased version divides by $n - p$.
+
+The identification localizes the Gaussian precisely. Squared error is not a neutral default: it is the negative Gaussian log-density in disguise, and swapping the noise density swaps the loss. Laplace noise turns the MLE into least *absolute* deviations (Exercise 7).
+
+<KeyFact>
+Under i.i.d. Gaussian noise, maximizing the likelihood and minimizing the residual sum of squares are the same problem: least squares is the Gaussian MLE.
+</KeyFact>
+
+## Gauss–Markov: what BLUE requires and what it buys
+
+The closed form needed only $\operatorname{rank}(X) = p$. Statistical guarantees for $\hat\theta$ need assumptions about how $y$ was generated, and the standard list is:
+
+- **GM1, linearity:** $y = X\theta + \varepsilon$ for some true $\theta$ (linear in the *parameters*; the columns of $X$ may be arbitrary transforms of raw inputs);
+- **GM2, exogeneity:** $\mathbb{E}[\varepsilon \mid X] = 0$;
+- **GM3, spherical errors:** $\operatorname{Var}(\varepsilon \mid X) = \sigma^2 I$ (equal variances, uncorrelated across observations);
+- **GM4, no perfect collinearity:** $\operatorname{rank}(X) = p$.
+
+Normality is absent from this list.
+
+### Unbiasedness needs only GM1, GM2, GM4
+
+Substituting the model into the estimator:
+
+$$
+\hat\theta = (X^\top X)^{-1}X^\top (X\theta + \varepsilon)
+= \theta + (X^\top X)^{-1}X^\top \varepsilon ,
+$$
+
+so $\mathbb{E}[\hat\theta \mid X] = \theta$ by GM2: the estimation error is a linear image of the noise, and the noise has conditional mean zero. Adding GM3 gives the covariance in one line:
+
+$$
+\operatorname{Var}(\hat\theta \mid X)
+= (X^\top X)^{-1}X^\top (\sigma^2 I)\, X (X^\top X)^{-1}
+= \sigma^2 (X^\top X)^{-1} .
+$$
+
+<Theorem title="Gauss–Markov">
+Under GM1–GM4, the OLS estimator is BLUE: the **b**est **l**inear **u**nbiased **e**stimator. For every estimator $\tilde\theta = Cy$ that is linear in $y$ and unbiased for all $\theta$,
+
+$$
+\operatorname{Var}(\tilde\theta \mid X) - \operatorname{Var}(\hat\theta \mid X) \succeq 0 ,
+$$
+
+so every linear combination $c^\top\theta$ is estimated with variance at least that of $c^\top\hat\theta$.
+
+<Proof>
+Write $C = (X^\top X)^{-1}X^\top + D$; the matrix $D$ is the deviation from OLS. Unbiasedness for all $\theta$ forces
+
+$$
+\mathbb{E}[Cy \mid X] = CX\theta = \theta + DX\theta = \theta \ \ \text{for all } \theta
+\quad\Longrightarrow\quad DX = 0 .
+$$
+
+Then, using $\operatorname{Var}(Cy \mid X) = \sigma^2 CC^\top$ and expanding,
+
+$$
+\sigma^2 CC^\top
+= \sigma^2\Bigl[(X^\top X)^{-1} + (X^\top X)^{-1}X^\top D^\top + DX(X^\top X)^{-1} + DD^\top\Bigr] .
+$$
+
+The middle terms vanish: $DX = 0$ and $(X^\top X)^{-1}X^\top D^\top = \bigl(DX(X^\top X)^{-1}\bigr)^\top = 0$. Hence
+
+$$
+\operatorname{Var}(\tilde\theta \mid X) = \sigma^2 (X^\top X)^{-1} + \sigma^2 DD^\top
+= \operatorname{Var}(\hat\theta \mid X) + \sigma^2 DD^\top ,
+$$
+
+and $DD^\top \succeq 0$ since $v^\top DD^\top v = \lVert D^\top v\rVert^2 \ge 0$. Equality holds only at $D = 0$, i.e. only for OLS itself.
+</Proof>
+</Theorem>
+
+### The assumption ladder: which claim needs what
+
+The guarantees stack, and each rung of the stack adds exactly one assumption. Interviewers probe the layering directly: "what breaks if errors are heteroscedastic" is a question about rung three, not rung two.
+
+<Figure
+  src="./figures/ladder.svg"
+  alt="Four rungs from bottom to top: closed form needing only full rank, unbiasedness adding linearity and exogeneity, BLUE adding spherical errors, and exact t and F inference adding normality"
+  caption="Each guarantee adds one assumption. Normality enters only at the top rung."
+/>
+
+The classic trap question is "does OLS assume Gaussian errors". It does not: rungs one through three never mention normality. Gaussianity is needed only for the top rung, the *exact* finite-sample distribution $\hat\theta \sim \mathcal{N}\bigl(\theta, \sigma^2(X^\top X)^{-1}\bigr)$ and the $t$ and $F$ tests built on it; without it, large-sample inference still goes through by the central limit theorem. Exercise 6 assembles the full answer.
+
+<Remark title="BLUE is a restricted optimum">
+Gauss–Markov compares OLS only against *linear unbiased* competitors. [ESL §3.2.2](https://hastie.su.domains/ElemStatLearn/) notes the escape route explicitly: a biased estimator can trade a little squared bias for a large variance reduction and beat OLS in mean squared error. Ridge regression is the canonical construction and is the subject of <Ref lesson="ridge-lasso" />; the James–Stein estimator is the historical shock result of the same kind. Minimum-variance-unbiased is not minimum-error.
+</Remark>
+
+<KeyFact>
+Under linearity, exogeneity, spherical errors, and full rank, OLS is the minimum-variance linear unbiased estimator. Normality is not on the list; it buys exact $t$/$F$ inference, nothing else.
+</KeyFact>
+
+## When XᵀX is singular: collinearity and p > n
+
+The closed form divides by $X^\top X$, and three standard situations make that matrix singular:
+
+1. **A duplicated or linearly dependent feature.** Temperature in °C and in °F, or a feature equal to the sum of two others: some $v \ne 0$ has $Xv = 0$.
+2. **The dummy-variable trap.** One-hot encoding all $K$ levels of a categorical feature alongside an intercept: the $K$ dummy columns sum to the ones column, an exact dependence (Exercise 5).
+3. **More features than examples, $p > n$.** Then $\operatorname{rank}(X) \le n < p$, so full column rank is impossible regardless of the data.
+
+Singularity does not make the problem unsolvable; it makes the solution non-unique. The normal equations remain consistent, and their solution set is an affine subspace: infinitely many coefficient vectors, all producing the *same* fitted vector $\hat y$. The objective has a flat-bottomed valley along the null-space directions.
+
+<Figure
+  src="./figures/collinearity.svg"
+  alt="Left: two nearly parallel column vectors spanning almost a line. Right: extremely elongated contours of the objective with a dashed line of near-minimizers along the flat valley floor"
+  caption="Near-collinear columns (left) make the loss surface a flat-bottomed valley (right): many coefficient vectors fit almost equally well."
+/>
+
+Near-singularity is the practically common case: $X^\top X$ is invertible but ill-conditioned, and coefficients become wildly unstable while predictions stay fine. <Ref lesson="regression-diagnostics" /> quantifies this with variance inflation factors.
+
+**The fixes.** Recode the features (drop one dummy level, remove the duplicate). Or replace the inverse with the Moore–Penrose pseudoinverse, $\hat\theta = X^{+}y$, which selects the minimum-norm minimizer. Or regularize: $X^\top X + \lambda I$ is positive definite for any $\lambda > 0$, so ridge regression restores a unique closed form — the standard fix and the opening move of <Ref lesson="ridge-lasso" />.
+
+<Remark title="solve, don't invert">
+Production code never forms $(X^\top X)^{-1}$ explicitly. It solves the linear system, by Cholesky factorization of $X^\top X$ or, more stably, by QR factorization of $X$ itself: forming $X^\top X$ squares the condition number, $\kappa(X^\top X) = \kappa(X)^2$, so QR-based solvers (what `numpy.linalg.lstsq` and R's `lm` use) lose half as many digits on ill-conditioned data.
+</Remark>
+
+<KeyFact>
+Singular $X^\top X$ means non-identifiable coefficients with identical fits: the failure is uniqueness, not existence, and ridge or the pseudoinverse restores uniqueness.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+The set piece: derive the closed-form OLS solution from scratch. State the objective in matrix form, expand it, compute the gradient using the two identities (state them), set it to zero, and give the second-order argument that the stationary point is the unique global minimum when $X$ has full column rank.
+
+<Solution>
+Objective: $J(\theta) = \tfrac12\lVert X\theta - y\rVert^2 = \tfrac12 (X\theta - y)^\top(X\theta - y)$.
+
+Expand; the two cross terms are equal scalars ($\theta^\top X^\top y = y^\top X\theta$):
+
+$$
+J(\theta) = \tfrac12\, \theta^\top X^\top X \theta - y^\top X\theta + \tfrac12\, y^\top y .
+$$
+
+Identities: $\nabla_\theta (a^\top\theta) = a$ and $\nabla_\theta(\theta^\top A\theta) = 2A\theta$ for symmetric $A$. Apply them with $A = X^\top X$ (symmetric by construction) and $a = X^\top y$; the constant term dies:
+
+$$
+\nabla_\theta J = \tfrac12 \cdot 2\, X^\top X\theta - X^\top y = X^\top X\theta - X^\top y .
+$$
+
+Setting the gradient to zero gives the normal equations $X^\top X\theta = X^\top y$. If $\operatorname{rank}(X) = p$, then for $v \ne 0$, $v^\top X^\top X v = \lVert Xv\rVert^2 > 0$, so $X^\top X$ is positive definite, hence invertible:
+
+$$
+\hat\theta = (X^\top X)^{-1}X^\top y .
+$$
+
+Second-order argument: the Hessian is $\nabla^2 J = X^\top X \succ 0$, so $J$ is strictly convex; the unique stationary point is the unique global minimizer.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compute the OLS fit by hand for the dataset $(x, y) = (0, 1), (1, 3), (2, 4)$: write $X$ and $y$, form $X^\top X$ and $X^\top y$, solve for $\hat\theta$, compute the residual vector, and verify that it is orthogonal to both columns of $X$.
+
+<Solution>
+$$
+X = \begin{pmatrix} 1 & 0 \\ 1 & 1 \\ 1 & 2 \end{pmatrix}, \quad
+y = \begin{pmatrix} 1 \\ 3 \\ 4 \end{pmatrix}, \quad
+X^\top X = \begin{pmatrix} 3 & 3 \\ 3 & 5 \end{pmatrix}, \quad
+X^\top y = \begin{pmatrix} 8 \\ 11 \end{pmatrix}.
+$$
+
+Determinant $3 \cdot 5 - 3 \cdot 3 = 6$, so
+
+$$
+\hat\theta = \frac16 \begin{pmatrix} 5 & -3 \\ -3 & 3 \end{pmatrix} \begin{pmatrix} 8 \\ 11 \end{pmatrix}
+= \frac16 \begin{pmatrix} 40 - 33 \\ -24 + 33 \end{pmatrix}
+= \begin{pmatrix} 7/6 \\ 3/2 \end{pmatrix}:
+\qquad \hat y = \tfrac76 + \tfrac32 x .
+$$
+
+Fitted values $\bigl(\tfrac76, \tfrac{8}{3}, \tfrac{25}{6}\bigr)$; residuals $r = \bigl(1 - \tfrac76,\ 3 - \tfrac83,\ 4 - \tfrac{25}{6}\bigr) = \bigl(-\tfrac16, \tfrac13, -\tfrac16\bigr)$.
+
+Orthogonality: ones column, $-\tfrac16 + \tfrac13 - \tfrac16 = 0$; feature column, $0 \cdot (-\tfrac16) + 1 \cdot \tfrac13 + 2 \cdot (-\tfrac16) = \tfrac13 - \tfrac13 = 0$. Both inner products vanish, confirming $X^\top r = 0$.
+</Solution>
+</Exercise>
+
+<Exercise>
+From the normal equations alone, prove: (a) $X^\top r = 0$ for the OLS residual $r = y - X\hat\theta$; (b) if the model contains an intercept, the residuals sum to zero; (c) $\hat y^\top r = 0$; (d) the Pythagorean identity $\lVert y \rVert^2 = \lVert \hat y \rVert^2 + \lVert r \rVert^2$.
+
+<Solution>
+(a) $X^\top r = X^\top(y - X\hat\theta) = X^\top y - X^\top X\hat\theta = 0$, since $\hat\theta$ solves $X^\top X\theta = X^\top y$.
+
+(b) With an intercept, the first column of $X$ is $\mathbf{1}$. The first row of $X^\top r = 0$ reads $\mathbf{1}^\top r = \sum_i r_i = 0$.
+
+(c) $\hat y^\top r = (X\hat\theta)^\top r = \hat\theta^\top (X^\top r) = \hat\theta^\top 0 = 0$.
+
+(d) Decompose $y = \hat y + r$ and expand:
+
+$$
+\lVert y\rVert^2 = (\hat y + r)^\top(\hat y + r)
+= \lVert\hat y\rVert^2 + 2\,\hat y^\top r + \lVert r\rVert^2
+= \lVert\hat y\rVert^2 + \lVert r\rVert^2 ,
+$$
+
+the cross term vanishing by (c).
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: why minimize squared error rather than absolute error? Give the full answer: the statistical justification, the computational one, and what absolute error offers in exchange.
+
+<Solution>
+**For squared error.** (1) Statistical: under i.i.d. Gaussian noise, minimizing RSS is exactly maximum likelihood, and the resulting estimator targets the conditional mean $\mathbb{E}[y \mid x]$. (2) Computational: the objective is a differentiable, strictly convex quadratic (given full rank), so the minimizer is unique and available in closed form via the normal equations; the smooth gradient also suits every iterative scheme. (3) Structural: squared error produces the projection geometry, orthogonal residuals, and the entire Gauss–Markov theory.
+
+**For absolute error.** Minimizing $\sum_i |y_i - \theta^\top x_i|$ is the MLE under Laplace noise (Exercise 7) and targets the conditional *median*. Each residual contributes a bounded slope $\pm 1$ to the objective regardless of its size, so outliers pull the fit far less: absolute error is robust where squared error, with its quadratically growing penalty, lets one wild point dominate the solution.
+
+**The price of L1:** no closed form (the problem is a linear program), non-differentiability at zero residuals, and possibly non-unique solutions.
+
+**Summary:** squared error buys the closed form, the mean, and clean theory, at the cost of outlier sensitivity; absolute error buys robustness and the median, at the cost of computation and uniqueness.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: when is $X^\top X$ not invertible, and what do you do about it? Give three concrete scenarios, and for the one-hot case exhibit the exact linear dependence.
+
+<Solution>
+**Scenario 1: linearly dependent features.** A duplicated column, or a feature that is an exact linear function of others (temperature in two units, a total alongside its parts). Then $Xv = 0$ for some $v \ne 0$, so $X^\top X v = 0$.
+
+**Scenario 2: the dummy-variable trap.** One-hot encode a $K$-level categorical feature into columns $d_1, \dots, d_K$ and keep an intercept column $\mathbf{1}$. Every row lies in exactly one category, so
+
+$$
+d_1 + d_2 + \cdots + d_K = \mathbf{1},
+$$
+
+an exact linear dependence among $p$ columns. The standard remedy is dropping one level (the reference category), or dropping the intercept.
+
+**Scenario 3: $p > n$.** Rank is at most $\min(n, p) = n < p$, so $X^\top X$ ($p \times p$, rank $\le n$) is always singular, whatever the data.
+
+**Remedies.** Recode or drop the dependent features; use the pseudoinverse $\hat\theta = X^{+}y$, which returns the minimum-norm solution among the infinitely many minimizers; or add a ridge penalty, since $X^\top X + \lambda I \succ 0$ for any $\lambda > 0$ restores a unique closed form. In all cases the fitted values $\hat y$ were never ambiguous; only the coefficients were.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: does OLS require Gaussian errors? Answer in the layered form: state what holds with no distributional assumption at all, what each Gauss–Markov assumption adds, and exactly where normality first becomes necessary.
+
+<Solution>
+No. The requirements layer as follows.
+
+**No statistical assumptions:** the closed form $\hat\theta = (X^\top X)^{-1}X^\top y$ exists and is the unique RSS minimizer whenever $\operatorname{rank}(X) = p$. This is linear algebra about the observed $X$, not a claim about any data-generating process.
+
+**Linearity + exogeneity (GM1, GM2):** $\hat\theta = \theta + (X^\top X)^{-1}X^\top\varepsilon$ has conditional mean $\theta$: unbiasedness.
+
+**Adding spherical errors (GM3):** $\operatorname{Var}(\hat\theta \mid X) = \sigma^2(X^\top X)^{-1}$, and the Gauss–Markov theorem makes OLS minimum-variance among linear unbiased estimators. Still no normality.
+
+**Where normality enters:** only for exact finite-sample inference. With $\varepsilon \mid X \sim \mathcal{N}(0, \sigma^2 I)$, the estimator is exactly $\mathcal{N}(\theta, \sigma^2(X^\top X)^{-1})$, and the $t$ and $F$ tests and confidence intervals are exact; normality also makes OLS the MLE. Without it, inference is recovered asymptotically through the central limit theorem.
+
+The trap in the question is conflating the estimator's optimality (rungs 1–3, no normality) with the classical inference machinery (rung 4, normality or large samples).
+</Solution>
+</Exercise>
+
+<Exercise>
+Review from <Ref lesson="mle-map" />: suppose the noise is Laplace rather than Gaussian, $p(\varepsilon) = \tfrac{1}{2b}\exp(-|\varepsilon|/b)$. Derive the MLE objective by the two-step recipe and identify the resulting estimator. Then specialize to the intercept-only model $y_i = \theta_0 + \varepsilon_i$ and show the MLE of $\theta_0$ is the sample median.
+
+<Solution>
+**Step 1, log-likelihood.** With $\varepsilon_i = y_i - \theta^\top x_i$ i.i.d. Laplace,
+
+$$
+\ell(\theta) = \sum_{i=1}^n \log \frac{1}{2b} e^{-|y_i - \theta^\top x_i|/b}
+= -n\log(2b) - \frac{1}{b}\sum_{i=1}^n \bigl|y_i - \theta^\top x_i\bigr| .
+$$
+
+**Step 2, maximize.** The first term is constant in $\theta$, so
+
+$$
+\hat\theta_{\text{MLE}} = \arg\min_\theta \sum_{i=1}^n \bigl|y_i - \theta^\top x_i\bigr| :
+$$
+
+least absolute deviations. The noise density's shape becomes the loss's shape, exactly as the Gaussian's square became RSS.
+
+**Intercept-only case.** Minimize $g(c) = \sum_i |y_i - c|$. Away from the data points, $g'(c) = \#\{i : y_i < c\} - \#\{i : y_i > c\}$: each point below $c$ pushes the derivative up by one, each point above pulls it down by one. The derivative is negative while fewer than half the points are below $c$ and positive once more than half are, so the minimum sits where the counts balance: any median of $y_1, \dots, y_n$ (for even $n$, any point of the middle interval, conventionally its midpoint). Least squares in the same model gives $\hat\theta_0 = \bar y$, the mean; the L1/L2 contrast is the median/mean contrast.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove the three stated properties of the hat matrix $H = X(X^\top X)^{-1}X^\top$: symmetry, idempotence, and $\operatorname{tr}(H) = p$. State why the trace is read as the number of parameters the fit consumes.
+
+<Solution>
+**Symmetry.** $(X^\top X)^{-1}$ is symmetric as the inverse of a symmetric matrix, so
+
+$$
+H^\top = \bigl(X(X^\top X)^{-1}X^\top\bigr)^\top = X\,\bigl((X^\top X)^{-1}\bigr)^\top X^\top = H .
+$$
+
+**Idempotence.**
+
+$$
+H^2 = X(X^\top X)^{-1}\underbrace{X^\top X (X^\top X)^{-1}}_{=\,I}X^\top = X(X^\top X)^{-1}X^\top = H .
+$$
+
+Idempotence is the algebraic signature of a projection: projecting a second time changes nothing, and indeed $H\hat y = \hat y$ for any $\hat y \in \operatorname{col}(X)$.
+
+**Trace.** By the cyclic property of the trace,
+
+$$
+\operatorname{tr}(H) = \operatorname{tr}\bigl(X(X^\top X)^{-1}X^\top\bigr)
+= \operatorname{tr}\bigl((X^\top X)^{-1}X^\top X\bigr) = \operatorname{tr}(I_p) = p .
+$$
+
+The trace of a projector equals the dimension of the subspace projected onto, here $\dim \operatorname{col}(X) = p$: the fit has $p$ degrees of freedom, one per estimated coefficient. This is the quantity generalized as "effective degrees of freedom" when ridge shrinks the projection in <Ref lesson="ridge-lasso" />.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §1.1: the Portland housing running example; §1.2: the matrix-derivative toolkit and the normal-equations derivation this chapter mirrors; §1.3: the probabilistic (Gaussian MLE) interpretation. https://cs229.stanford.edu/main_notes.pdf
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §3.2: the projection geometry, hat matrix, and sampling properties; §3.2.2: the Gauss–Markov theorem and the remark that biased estimators can beat OLS in MSE. https://hastie.su.domains/ElemStatLearn/
+3. K. Q. Weinberger, "Lecture 8: Linear Regression," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — OLS as Gaussian MLE and ridge as MAP in compact notation (columns-as-examples convention). https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote08.html
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — ch. 3: coefficient interpretation, standard errors, confidence intervals, and qualitative (one-hot) predictors. https://www.statlearning.com/
+</References>

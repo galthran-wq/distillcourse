@@ -1,0 +1,434 @@
+Replacing k-means' hard assignments with posterior probabilities gives the Gaussian mixture model; EM alternates computing those responsibilities with weighted maximum likelihood, and each iteration provably increases the likelihood. This chapter derives both steps in full and proves the monotonicity claim, which is the heaviest unsupervised set piece in interviews ("derive EM for a GMM"). The route: the mixture density and its latent variable, why direct maximum likelihood stalls on a log of a sum, the E-step executed by hand on five points, the M-step derived by differentiation, the Jensen/ELBO argument for monotone likelihood, k-means recovered as the $\sigma^2 \to 0$ limit, and the pathologies (singularities, local optima, slow convergence, choosing $K$) that the guarantee does not cover.
+
+## The model: clusters as Gaussians with weights
+
+<Ref lesson="kmeans" /> ended on failures with one common cause: the assignment step outputs a hard label, under one implicit cluster shape (spherical, same scale for all clusters). The mouse data defeated it even though every cluster was convex, because squared Euclidean distance cannot express "this cluster is bigger than that one." The fix is to stop partitioning and start **modeling the density**: let each cluster be a Gaussian with its own mean, its own covariance, and its own share of the data.
+
+A concrete instance in one dimension: the density
+
+$$
+p(x) = 0.6\,\mathcal N(x \mid -1,\ 0.67) + 0.4\,\mathcal N(x \mid 2.5,\ 0.25)
+$$
+
+says that 60% of points come from a broad Gaussian at $-1$ and 40% from a tight one at $2.5$. Evaluated at $x = 0$: $0.6 \times 0.230 + 0.4 \times 0.000003 \approx 0.138$, almost entirely the left component's contribution. Every value of $x$ gets a probability density, something k-means never provided.
+
+<Definition title="Gaussian mixture model">
+A **Gaussian mixture model** (GMM) with $K$ components is the density
+
+$$
+p(x) = \sum_{k=1}^{K} \pi_k\, \mathcal N(x \mid \mu_k, \Sigma_k),
+\qquad \pi_k \ge 0, \quad \sum_{k=1}^K \pi_k = 1,
+$$
+
+with mixing weights $\pi_k$, component means $\mu_k$, and component covariances $\Sigma_k$.
+</Definition>
+
+### The latent variable: which component generated the point
+
+The mixture is equivalently a two-stage sampling story. Draw a component label $z \in \{1, \dots, K\}$ with $p(z = k) = \pi_k$; then draw $x$ from that component, $p(x \mid z = k) = \mathcal N(x \mid \mu_k, \Sigma_k)$. Marginalizing out $z$ recovers the mixture: $p(x) = \sum_k p(z = k)\, p(x \mid z = k)$. The label $z$ is a *latent variable*: it existed in the sampling story but is not in the data set.
+
+Clustering then becomes an inference problem: compute, for each $x_n$, the posterior over the label that generated it. Bayes' rule produces that posterior, and it gets a name.
+
+<Definition title="responsibilities">
+The **responsibility** of component $k$ for point $x_n$ is the posterior probability
+
+$$
+\gamma_{nk} = p(z_n = k \mid x_n)
+= \frac{\pi_k\, \mathcal N(x_n \mid \mu_k, \Sigma_k)}
+       {\sum_{j=1}^{K} \pi_j\, \mathcal N(x_n \mid \mu_j, \Sigma_j)} .
+$$
+
+For each point the responsibilities are non-negative and sum to 1 over $k$: a distribution over components, not a label.
+</Definition>
+
+<Figure
+  src="./figures/hard-vs-soft.svg"
+  alt="Six points on a line assigned by k-means as full one-color label bars against the same points under a GMM E-step with bars split by responsibility, one boundary point split 0.55 to 0.45"
+  caption="Same points, two output types: k-means emits a label per point, the GMM E-step emits a posterior. The boundary point's γ = (0.55, 0.45) is the model's actual output."
+/>
+
+<KeyFact>
+Responsibilities are posteriors, not memberships: a GMM's output at a point is a distribution over components. Rounding $\gamma = (0.55, 0.45)$ to a hard label throws away exactly the information the model was built to provide.
+</KeyFact>
+
+## Why direct maximum likelihood stalls: the log of a sum
+
+The parameters $\theta = \{\pi_k, \mu_k, \Sigma_k\}$ should come from maximum likelihood on the observed data. The two-step recipe of <Ref lesson="mle-map" /> (write the log-likelihood, set the derivative to zero) starts as usual:
+
+$$
+\ell(\theta) = \sum_{n=1}^{N} \log \Bigl( \sum_{k=1}^{K} \pi_k\, \mathcal N(x_n \mid \mu_k, \Sigma_k) \Bigr).
+$$
+
+The sum sits **inside** the logarithm. For a single Gaussian the log reaches the exponential and the objective separates into clean quadratic terms; here it cannot, so setting $\partial\ell/\partial\mu_k = 0$ leaves $\mu_k$ entangled with every other parameter through the responsibilities, and no closed form exists. (Writing out that derivative is Exercise 1's first insight: the stationarity conditions are exactly "weighted MLE under the current responsibilities," which is what EM iterates.)
+
+### The chicken-and-egg structure
+
+The blockage has a precise shape, and interviewers expect it named:
+
+- **If the labels $z_n$ were known**, maximum likelihood would be trivial: fit each Gaussian to its own points and set $\pi_k$ to the class fractions, the per-class closed-form fits of <Ref lesson="lda-gda" />.
+- **If the parameters were known**, the labels' posterior would be trivial: Bayes' rule, the same inversion <Ref lesson="naive-bayes" /> runs at prediction time.
+
+Each half is easy given the other; neither is available. The *expectation–maximization* (EM) algorithm formalizes the obvious alternation: fill in the labels softly (with responsibilities), refit, repeat. The rest of the chapter makes each half exact and then proves the loop climbs the likelihood.
+
+<KeyFact>
+Direct MLE for a mixture has no closed form because the log cannot pass the sum over components. EM replaces the intractable problem with an alternation of two problems that both have closed forms.
+</KeyFact>
+
+## The E-step: Bayes' rule, executed by hand
+
+Five points on a line: $x = (-2, -1, 0, 2, 3)$. Initialize with equal weights $\pi = (0.5, 0.5)$, means $\mu = (-1, 2)$, and variances $\sigma^2 = (1, 1)$. The E-step computes every responsibility from the definition; interviewers ask for exactly this table.
+
+<Example title="responsibilities for five points">
+Numerators $\pi_k \mathcal N(x_n \mid \mu_k, \sigma_k^2)$ and the normalized responsibilities:
+
+| $x_n$ | $\pi_1 \mathcal N_1$ | $\pi_2 \mathcal N_2$ | $\gamma_{n1}$ | $\gamma_{n2}$ |
+| --- | --- | --- | --- | --- |
+| $-2$ | $0.1210$ | $0.0001$ | $0.9994$ | $0.0006$ |
+| $-1$ | $0.1995$ | $0.0022$ | $0.9890$ | $0.0110$ |
+| $0$  | $0.1210$ | $0.0270$ | $0.8176$ | $0.1824$ |
+| $2$  | $0.0022$ | $0.1995$ | $0.0110$ | $0.9890$ |
+| $3$  | $0.0001$ | $0.1210$ | $0.0006$ | $0.9994$ |
+
+Sample row, $x_3 = 0$: $\pi_1 \mathcal N(0 \mid -1, 1) = 0.5 \times 0.2420 = 0.1210$ and $\pi_2 \mathcal N(0 \mid 2, 1) = 0.5 \times 0.0540 = 0.0270$, so $\gamma_{31} = 0.1210 / (0.1210 + 0.0270) = 0.8176$. The two outer points are effectively decided; the point at $0$ is shared $82{:}18$. Each row sums to 1.
+</Example>
+
+<Remark title="compute responsibilities in log space">
+For a point far from every component both numerators underflow: at $x = 40$ under the initialization above, each $\pi_k \mathcal N_k$ is below $10^{-300}$, the edge of double precision. The remedy is the log-space discipline of <Ref lesson="naive-bayes" />: compute $s_k = \log\pi_k + \log\mathcal N(x_n \mid \mu_k, \sigma_k^2)$, subtract $\max_k s_k$, and exponentiate only the differences (the log-sum-exp trick). The responsibilities depend only on the differences $s_k - s_j$, which stay tame.
+</Remark>
+
+## The M-step: weighted maximum likelihood, derived
+
+With responsibilities in hand, the M-step refits the parameters. The objective it maximizes is the *expected complete-data log-likelihood*: the log-likelihood the data would have if the labels were observed, $\log p(X, Z \mid \theta) = \sum_n \sum_k \mathbb 1[z_n{=}k] \bigl( \log \pi_k + \log \mathcal N(x_n \mid \mu_k, \Sigma_k) \bigr)$, averaged over the E-step's posterior, which replaces the indicator by $\gamma_{nk}$:
+
+$$
+Q(\theta) = \sum_{n=1}^{N} \sum_{k=1}^{K} \gamma_{nk} \bigl( \log \pi_k + \log \mathcal N(x_n \mid \mu_k, \Sigma_k) \bigr).
+$$
+
+Unlike $\ell(\theta)$, this is a log of Gaussians, not a log of a sum: it separates over components and differentiates cleanly.
+
+<Theorem title="M-step updates">
+With $N_k = \sum_n \gamma_{nk}$ (the effective count of component $k$), the maximizer of $Q$ over $\theta$ is
+
+$$
+\mu_k = \frac{1}{N_k} \sum_{n=1}^N \gamma_{nk}\, x_n, \qquad
+\Sigma_k = \frac{1}{N_k} \sum_{n=1}^N \gamma_{nk}\, (x_n - \mu_k)(x_n - \mu_k)^\top, \qquad
+\pi_k = \frac{N_k}{N}:
+$$
+
+each component's weighted sample mean, weighted sample covariance, and share of the total responsibility.
+
+<Proof>
+Written for one dimension ($\Sigma_k = \sigma_k^2$); the multivariate case is identical with matrix calculus. Expand $\log \mathcal N(x \mid \mu_k, \sigma_k^2) = -\tfrac12 \log(2\pi\sigma_k^2) - (x - \mu_k)^2 / (2\sigma_k^2)$.
+
+**Means.** $\displaystyle \frac{\partial Q}{\partial \mu_k} = \sum_n \gamma_{nk} \frac{x_n - \mu_k}{\sigma_k^2} = 0 \;\Longrightarrow\; \mu_k = \frac{\sum_n \gamma_{nk} x_n}{\sum_n \gamma_{nk}} = \frac{1}{N_k}\sum_n \gamma_{nk} x_n$. This is the single-Gaussian mean MLE of <Ref lesson="mle-map" /> with each point counted $\gamma_{nk}$ times.
+
+**Variances.** Treating $\sigma_k^2$ as the variable, $\displaystyle \frac{\partial Q}{\partial \sigma_k^2} = -\frac{N_k}{2\sigma_k^2} + \frac{\sum_n \gamma_{nk}(x_n - \mu_k)^2}{2\sigma_k^4} = 0 \;\Longrightarrow\; \sigma_k^2 = \frac{1}{N_k}\sum_n \gamma_{nk} (x_n - \mu_k)^2$.
+
+**Weights.** Only $\sum_k N_k \log \pi_k$ involves $\pi$, maximized subject to $\sum_k \pi_k = 1$. The Lagrangian $\sum_k N_k \log\pi_k + \lambda(\sum_k \pi_k - 1)$ gives $N_k/\pi_k + \lambda = 0$, so $\pi_k = -N_k/\lambda$; summing over $k$ forces $-\lambda = \sum_k N_k = N$, hence $\pi_k = N_k / N$.
+
+Second-order checks are the single-Gaussian ones, component by component, since $Q$ separates.
+</Proof>
+</Theorem>
+
+<Example title="one M-step on the five points">
+From the E-step table: $N_1 = 0.9994 + 0.9890 + 0.8176 + 0.0110 + 0.0006 = 2.818$ and $N_2 = 5 - N_1 = 2.182$. The updates:
+
+$$
+\mu_1 = \frac{0.9994(-2) + 0.9890(-1) + 0.8176(0) + 0.0110(2) + 0.0006(3)}{2.818} = \frac{-2.964}{2.818} = -1.052,
+$$
+
+and symmetrically $\mu_2 = 4.964 / 2.182 = 2.275$. Variances against the new means: $\sigma_1^2 = 0.680$, $\sigma_2^2 = 0.766$. Weights: $\pi_1 = 2.818/5 = 0.564$, $\pi_2 = 0.436$. The log-likelihood rises from $-9.34$ to $-8.94$; two more iterations reach the fixed point $\mu = (-1.00, 2.50)$, $\sigma^2 = (0.67, 0.25)$, $\pi = (0.6, 0.4)$ at $\ell = -8.46$, the density that opened the chapter.
+</Example>
+
+### The algorithm
+
+1. Initialize $\pi_k, \mu_k, \Sigma_k$ (standard practice: run k-means, use its cluster means, covariances, and size fractions).
+2. **E-step:** compute all responsibilities $\gamma_{nk}$ from the current parameters (Bayes' rule).
+3. **M-step:** update $\mu_k, \Sigma_k, \pi_k$ by the weighted formulas above.
+4. Evaluate $\ell(\theta)$; stop when its increase (or the parameter change) falls below a tolerance.
+
+<FigureSequence
+  name="em-run"
+  alt="Five frames of EM on five 1D points: initial curves, responsibility bars appearing, curves moving after the M-step, responsibilities sharpening, and the converged fit with a monotone log-likelihood staircase inset"
+  caption="The full run on the five-point dataset, one half-step per frame. The ℓ readout climbs −9.34 → −8.94 → −8.57 → −8.46 and then stops moving."
+/>
+
+<Task>
+Step through the five frames tracking the point at $x = 0$. Verify its responsibility from the tables ($\gamma_1 = 0.82$ under the initialization, $0.95$ after one iteration) and confirm the $\ell$ readout never decreases at any half-step.
+</Task>
+
+[ESL §8.5](https://hastie.su.domains/ElemStatLearn/) runs the same two-component loop on 20 waiting times (Table 8.1, Algorithm 8.1); its weight estimate moves $\hat\pi = 0.485 \to 0.546$ over the iterations, and reproducing a few of those rows by hand is the standard rehearsal for the whiteboard version. [Bishop §9.2.2](https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/) shows the 2D picture on Old Faithful (Fig. 9.8), the dataset the demo below imitates.
+
+<Demo
+  name="EmStepper"
+  caption="EM one half-step at a time on Old-Faithful-style 2D data: the E-step recolors points by responsibility, the M-step moves and reshapes the ellipses, and the log-likelihood readout climbs monotonically. Toggle: k-means hard assignment on the same data."
+/>
+
+<Task>
+Step one full iteration and watch the boundary points: they hold intermediate colors after every E-step. Flip the k-means toggle and confirm the same points snap to one color, which is the entire difference between the two algorithms' outputs.
+</Task>
+
+## Why the likelihood never decreases: Jensen and the ELBO
+
+The loop above is plausible; the claim that each iteration cannot lower $\ell(\theta)$ is a theorem, and its proof is a two-line sandwich once one inequality is in place. The inequality is [Jensen's](https://cs229.stanford.edu/main_notes.pdf): for a concave function, chords lie below the graph, so the function of an average is at least the average of the function. Applied to the (concave) logarithm: $\log \mathbb E[X] \ge \mathbb E[\log X]$, with equality exactly when $X$ is constant.
+
+<Figure
+  src="./figures/jensen.svg"
+  alt="The concave log curve with a chord between two points below it; at the mean the curve value log 2 equals 0.69 while the chord value 0.28 is lower"
+  caption="Jensen for the concave log: log E[X] ≥ E[log X]. Moving an expectation inside a log can only lower the value, which is the direction a lower bound needs."
+/>
+
+### The bound: any q gives one
+
+Take one data point $x$ and any distribution $q(z)$ over the $K$ component labels with $q(z) > 0$. Multiply and divide inside the marginal, then apply Jensen to the expectation over $q$:
+
+$$
+\log p(x \mid \theta)
+= \log \sum_{z} q(z)\, \frac{p(x, z \mid \theta)}{q(z)}
+\;\ge\; \sum_{z} q(z) \log \frac{p(x, z \mid \theta)}{q(z)}
+\;=\; \mathcal L(q, \theta).
+$$
+
+<Definition title="evidence lower bound">
+The right-hand side $\mathcal L(q, \theta) = \mathbb E_{q}\bigl[\log p(x, z \mid \theta) - \log q(z)\bigr]$ is the **evidence lower bound** (ELBO). Summed over data points it lower-bounds the full log-likelihood for every choice of $q$, and direct algebra gives the exact gap:
+
+$$
+\log p(x \mid \theta) = \mathcal L(q, \theta) + \mathrm{KL}\bigl(q(z) \,\|\, p(z \mid x, \theta)\bigr) .
+$$
+</Definition>
+
+The KL term is non-negative and equals zero exactly when $q$ is the posterior $p(z \mid x, \theta)$, i.e. when $q$ assigns the responsibilities. So the bound touches the log-likelihood precisely at the E-step's choice, and both EM steps become coordinate ascent on the single function $\mathcal L$: the E-step maximizes it over $q$ (closing the KL gap at the current $\theta$), the M-step maximizes it over $\theta$ (and maximizing $\mathcal L$ over $\theta$ at fixed $q$ is maximizing $Q(\theta)$, since the $-\log q$ term does not involve $\theta$). The structure mirrors the two-block descent that proved k-means converges, one level up: there the blocks were assignments and centers on $J$; here they are $q$ and $\theta$ on $\mathcal L$.
+
+<Theorem title="EM monotonicity">
+Let $\theta^{(t+1)}$ be produced from $\theta^{(t)}$ by one E-step and one M-step. Then $\ell(\theta^{(t+1)}) \ge \ell(\theta^{(t)})$.
+
+<Proof>
+Let $q^{(t)}(z_n) = p(z_n \mid x_n, \theta^{(t)})$ be the E-step posterior. Three links:
+
+$$
+\ell(\theta^{(t)}) \overset{\text{(a)}}{=} \mathcal L(q^{(t)}, \theta^{(t)})
+\overset{\text{(b)}}{\le} \mathcal L(q^{(t)}, \theta^{(t+1)})
+\overset{\text{(c)}}{\le} \ell(\theta^{(t+1)}).
+$$
+
+(a) With $q$ equal to the posterior at $\theta^{(t)}$ the KL gap is zero, so the bound is tight there. (b) The M-step chooses $\theta^{(t+1)}$ to maximize $\mathcal L(q^{(t)}, \cdot)$, so no other $\theta$, in particular $\theta^{(t)}$, scores higher. (c) The ELBO lower-bounds $\ell$ at **every** $\theta$ for any fixed $q$ (Jensen), including at $\theta^{(t+1)}$ where $q^{(t)}$ is no longer the posterior. Chaining the three gives the claim.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="bound"
+  alt="Three frames on one theta axis: the log-likelihood curve with a bound strictly below it, the E-step lifting the bound to touch at the current theta, and the M-step moving to the bound's maximum where the likelihood is necessarily higher"
+  caption="The geometry of one EM iteration: lift the bound to touch (E-step), ride it to its maximum (M-step). Bishop's Figs. 9.11–9.14 draw the same picture."
+/>
+
+<Task>
+Step through the three frames and match each one to a link in the proof: frame 2 is equality (a), frame 3's move along the blue curve is inequality (b), and the amber dot sitting above the blue dot at $\theta_1$ is inequality (c).
+</Task>
+
+<Remark title="what the theorem does and does not say">
+Two standard collapses of this argument lose points. First, the tightness in (a) holds at the **current** $\theta^{(t)}$ only; after the M-step moves $\theta$, the bound is strict again, which is why link (c) is Jensen and not equality: both steps are needed for the sandwich. Second, monotone ascent is **not** convergence to the global maximum: the sequence $\ell(\theta^{(t)})$ converges (when it is bounded), and under regularity conditions the parameters approach a stationary point of $\ell$, which can be a poor local maximum or even a saddle point ([Dempster, Laird & Rubin, 1977](https://doi.org/10.1111/j.2517-6161.1977.tb01600.x), Theorem 1; the saddle caveat is real, see the pathologies below).
+</Remark>
+
+<Remark title="EM beyond mixtures">
+Nothing in the argument used Gaussians. The 1977 paper frames EM for any model with missing or latent data: the E-step computes the expected complete-data log-likelihood $Q(\theta \mid \theta^{(t)})$ under the current posterior over whatever is unobserved, the M-step maximizes it. The same two steps fit hidden Markov models (there the E-step is the forward–backward algorithm and the whole loop is Baum–Welch), factor analysis, and regression with missing covariates. EM is maximum-likelihood machinery, not a Bayesian method: no prior is involved, and the E-step's posterior is over latent variables, not parameters. Adding a log-prior to the M-step objective gives *MAP-EM*, the regularized variant met again below.
+</Remark>
+
+<KeyFact>
+One EM iteration is: make the ELBO tight at the current parameters (E-step), then maximize it (M-step). The sandwich $\ell(\theta^{(t)}) = \mathcal L \le \mathcal L' \le \ell(\theta^{(t+1)})$ proves the likelihood never decreases — and proves nothing about reaching the global optimum.
+</KeyFact>
+
+## k-means as the σ² → 0 limit
+
+Fix every covariance to a shared, shrinking sphere: $\Sigma_k = \epsilon I$ with $\epsilon \to 0$, weights fixed. The responsibilities become
+
+$$
+\gamma_{nk} = \frac{\pi_k \exp\bigl(-\lVert x_n - \mu_k \rVert^2 / 2\epsilon\bigr)}
+                   {\sum_j \pi_j \exp\bigl(-\lVert x_n - \mu_j \rVert^2 / 2\epsilon\bigr)} .
+$$
+
+Divide numerator and denominator by the largest term. Every ratio is $(\pi_k/\pi_j)\exp\bigl(-(\lVert x_n - \mu_k\rVert^2 - \lVert x_n - \mu_j\rVert^2)/2\epsilon\bigr)$, and as $\epsilon \to 0$ the exponential drives each ratio to $0$ or $\infty$ by the **sign of the distance difference** alone; the fixed $\pi$'s cannot compete with a diverging exponent. So $\gamma_{nk} \to 1$ for the nearest center and $0$ otherwise (ties excepted): the E-step becomes k-means' assignment step. The M-step's weighted means, fed 0/1 weights, become plain cluster means: the update step. [Bishop §9.3.2](https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/) completes the account: in the same limit the expected complete-data log-likelihood approaches $-J/2\epsilon + \text{const}$, so EM's ascent turns into descent on exactly the distortion $J$ that <Ref lesson="kmeans" /> minimized.
+
+<Figure
+  src="./figures/limit.svg"
+  alt="Responsibility of the right component as a function of position for shared variances 1, 0.3, and 0.05, steepening from a gentle sigmoid into a step at the midpoint between the two means"
+  caption="γ₂(x) between two centers as the shared variance shrinks: the posterior steepens into the nearest-center step. k-means is EM with its uncertainty frozen out."
+/>
+
+<KeyFact>
+k-means is the $\sigma^2 \to 0$ limit of EM on a shared-spherical-covariance GMM: responsibilities harden into nearest-center labels and the weighted means become cluster means. The three practical differences follow: soft vs hard assignments, learned per-cluster covariances and weights vs one frozen shape, a density model vs a partition.
+</KeyFact>
+
+## Pathologies: what the guarantee does not cover
+
+Monotone ascent on $\ell$ is compatible with everything that follows; each item is a standard interview probe.
+
+### Singularities: the likelihood is unbounded
+
+Center one component on a single data point, $\mu_k = x_n$, and shrink its variance. That point contributes a factor $\mathcal N(x_n \mid x_n, \sigma_k^2) = 1/\sqrt{2\pi\sigma_k^2} \to \infty$, while every other point stays covered by the remaining components, so $\ell \to \infty$ along a curve in parameter space. A run that drifts near this ridge shows the classic symptom: one component's variance collapsing toward machine precision while the reported likelihood soars.
+
+<Figure
+  src="./figures/singularity.svg"
+  alt="Left panel: one mixture component spiking on a single data point as its variance goes to zero, sending the likelihood to infinity; right panel: the same data with a variance floor capping the spike"
+  caption="The singularity (left) and the standard repair (right): a variance floor or a MAP-EM prior forces every component to explain more than one point."
+/>
+
+<Remark title="the unconstrained MLE does not exist">
+For a mixture with unequal, unconstrained variances the maximum-likelihood problem is technically ill-posed: $\sup_\theta \ell(\theta) = \infty$, so "the MLE" does not exist without constraints ([ESL §8.5](https://hastie.su.domains/ElemStatLearn/) flags this next to its worked example). EM's guarantee is monotone ascent to a stationary point of a possibly unbounded surface; the useful fits are the finite local maxima. Remedies: a floor $\sigma_k^2 \ge \epsilon$, a shared covariance, or MAP-EM with a prior on $\Sigma_k$, the same move that <Ref lesson="mle-map" /> used to keep small-sample estimates off the boundary.
+</Remark>
+
+### Local optima, saddle points, and labels
+
+Different initializations reach different stationary points, so practice mirrors k-means: several restarts, keep the run with the highest final $\ell$, and initialize from a k-means run by default. The stationary points are not always maxima: in the published discussion of the 1977 paper, G. D. Murray reported a bivariate-normal missing-data example whose likelihood has a saddle point at correlation $\rho = 0$, and about 5% of his EM runs converged to it. A separate non-issue to name and dismiss: the likelihood is invariant under permuting component indices (*label switching*), so "component 1" is an artifact of initialization, not an identified object.
+
+### Slow convergence on overlapping components
+
+EM's convergence is linear, and the 1977 paper computes the rate: the slowdown factor is the **fraction of missing information**, i.e. how much the latent labels would have told you beyond what the data already say. Well-separated components mean nearly-decided responsibilities, little missing information, fast convergence. Overlapping components mean the opposite; in the same published discussion, R. Sundberg reported rate eigenvalues above $0.98$ for such fits: per-iteration progress of under 2%, hundreds of iterations. EM crawls exactly when the clustering question is genuinely hard.
+
+### Choosing K: penalized likelihood replaces the elbow
+
+Raw likelihood cannot select $K$ for the same reason distortion could not select $k$ in <Ref lesson="kmeans" />: more components never fit worse. But a GMM is a probabilistic model, so model-selection criteria apply: choose $K$ minimizing $\mathrm{BIC} = -2\hat\ell_K + d_K \log N$ (or the milder $\mathrm{AIC} = -2\hat\ell_K + 2d_K$), where $d_K$ counts parameters (for full covariances in $d$ dimensions, $d_K = (K{-}1) + K\bigl(d + d(d{+}1)/2\bigr)$). The penalty turns "always add a component" into a trade against parameter count, replacing the elbow plot's subjective bend with an optimizable number; this is a concrete advantage of model-based clustering.
+
+<Figure
+  src="./figures/mouse.svg"
+  alt="Mouse-shaped data clustered by k-means with the ear clusters annexing parts of the head, beside the same data fit by a GMM whose three ellipses match the true circles"
+  caption="The mouse data from the k-means chapter, revisited: per-component weights and covariances let EM fit what hard spherical assignment could not."
+/>
+
+<KeyFact>
+The complete pathology answer: likelihood spikes are singularities (floor the variances or go MAP-EM), monotone ascent still lands in initialization-dependent local optima (restart; seed from k-means), overlap makes convergence crawl (missing-information rate), and $K$ is chosen by BIC/AIC, not by the likelihood itself.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+The set piece: for a two-component 1D GMM with parameters $\theta = (\pi, \mu_1, \sigma_1^2, \mu_2, \sigma_2^2)$ and density $p(x) = \pi \mathcal N(x \mid \mu_1, \sigma_1^2) + (1-\pi) \mathcal N(x \mid \mu_2, \sigma_2^2)$, derive the E-step and the M-step from scratch: write the expected complete-data log-likelihood and obtain every update by differentiation.
+
+<Solution>
+**E-step.** The latent label $z_n \in \{1, 2\}$ has prior $p(z_n = 1) = \pi$. Bayes' rule gives the responsibility
+
+$$
+\gamma_n = p(z_n = 1 \mid x_n) = \frac{\pi\, \mathcal N(x_n \mid \mu_1, \sigma_1^2)}{\pi\, \mathcal N(x_n \mid \mu_1, \sigma_1^2) + (1-\pi)\, \mathcal N(x_n \mid \mu_2, \sigma_2^2)},
+$$
+
+and $1 - \gamma_n$ for component 2.
+
+**Objective.** The complete-data log-likelihood is $\sum_n \bigl[\mathbb 1[z_n{=}1](\log\pi + \log\mathcal N_1(x_n)) + \mathbb 1[z_n{=}2](\log(1{-}\pi) + \log\mathcal N_2(x_n))\bigr]$; taking its expectation under the posterior replaces the indicators by $\gamma_n$ and $1-\gamma_n$:
+
+$$
+Q = \sum_n \gamma_n \Bigl( \log\pi - \tfrac12\log(2\pi\sigma_1^2) - \tfrac{(x_n-\mu_1)^2}{2\sigma_1^2} \Bigr)
+  + \sum_n (1-\gamma_n) \Bigl( \log(1{-}\pi) - \tfrac12\log(2\pi\sigma_2^2) - \tfrac{(x_n-\mu_2)^2}{2\sigma_2^2} \Bigr).
+$$
+
+**M-step.** Let $N_1 = \sum_n \gamma_n$, $N_2 = N - N_1$.
+
+Means: $\partial Q/\partial\mu_1 = \sum_n \gamma_n (x_n - \mu_1)/\sigma_1^2 = 0 \Rightarrow \mu_1 = \frac{1}{N_1}\sum_n \gamma_n x_n$; symmetrically $\mu_2 = \frac{1}{N_2}\sum_n (1-\gamma_n) x_n$.
+
+Variances: $\partial Q/\partial\sigma_1^2 = -N_1/(2\sigma_1^2) + \sum_n \gamma_n (x_n-\mu_1)^2/(2\sigma_1^4) = 0 \Rightarrow \sigma_1^2 = \frac{1}{N_1}\sum_n \gamma_n (x_n - \mu_1)^2$, and symmetrically for $\sigma_2^2$.
+
+Weight: $\partial Q/\partial\pi = N_1/\pi - N_2/(1-\pi) = 0 \Rightarrow N_1(1-\pi) = N_2\pi \Rightarrow \pi = N_1/N$. (With two components the simplex constraint is built into the $\pi, 1{-}\pi$ parameterization, so no Lagrange multiplier is needed; with $K > 2$ one multiplier gives $\pi_k = N_k/N$ the same way.)
+
+Each stationary point is a maximum by the same second-derivative checks as the single-Gaussian MLE, since $Q$ separates over components.
+</Solution>
+</Exercise>
+
+<Exercise>
+Hand execution: four points $x = (0, 1, 3, 4)$, current parameters $\pi = (0.5, 0.5)$, $\mu = (1, 3)$, $\sigma_1^2 = \sigma_2^2 = 1$. Compute all eight responsibilities, then the M-step updates for $\pi$ and both means. (Useful identity: with equal weights and variances, $\gamma_{n2} = \sigma(2x_n - 4)$ here, where $\sigma$ is the logistic function.)
+
+<Solution>
+The ratio of numerators is $\frac{\mathcal N(x \mid 3, 1)}{\mathcal N(x \mid 1, 1)} = \exp\bigl(\tfrac{(x-1)^2 - (x-3)^2}{2}\bigr) = e^{2x - 4}$, so $\gamma_{n2} = 1/(1 + e^{-(2x_n - 4)}) = \sigma(2x_n - 4)$:
+
+| $x_n$ | $\gamma_{n1}$ | $\gamma_{n2}$ |
+| --- | --- | --- |
+| $0$ | $0.982$ | $0.018$ |
+| $1$ | $0.881$ | $0.119$ |
+| $3$ | $0.119$ | $0.881$ |
+| $4$ | $0.018$ | $0.982$ |
+
+Effective counts: $N_1 = 0.982 + 0.881 + 0.119 + 0.018 = 2.0$, $N_2 = 2.0$ (the configuration is symmetric about $x = 2$). Weights: $\pi = (0.5, 0.5)$, unchanged. Means:
+
+$$
+\mu_1 = \frac{0.982(0) + 0.881(1) + 0.119(3) + 0.018(4)}{2.0} = \frac{1.310}{2.0} = 0.655,
+\qquad
+\mu_2 = \frac{6.690}{2.0} = 3.345 .
+$$
+
+The means move apart: each component discounts the far pair by its small responsibility instead of ignoring it, and the discounted pull is outweighed by the near pair sitting off-center.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview set piece: "Prove that EM never decreases the observed-data likelihood." Give the complete argument: the bound, why the E-step makes it tight, and the chain of inequalities.
+
+<Solution>
+For any $q(z) > 0$ and any $\theta$, Jensen's inequality on the concave log gives the ELBO:
+
+$$
+\log p(x \mid \theta) = \log \sum_z q(z) \frac{p(x, z \mid \theta)}{q(z)} \ge \sum_z q(z) \log \frac{p(x, z \mid \theta)}{q(z)} = \mathcal L(q, \theta),
+$$
+
+and the exact gap is $\log p(x \mid \theta) - \mathcal L(q, \theta) = \mathrm{KL}(q \,\|\, p(z \mid x, \theta)) \ge 0$, zero iff $q$ equals the posterior at $\theta$.
+
+E-step: set $q^{(t)} = p(z \mid x, \theta^{(t)})$, so $\mathcal L(q^{(t)}, \theta^{(t)}) = \ell(\theta^{(t)})$ — the bound is tight at the current parameters. M-step: $\theta^{(t+1)} = \arg\max_\theta \mathcal L(q^{(t)}, \theta)$. Chain:
+
+$$
+\ell(\theta^{(t)}) = \mathcal L(q^{(t)}, \theta^{(t)}) \le \mathcal L(q^{(t)}, \theta^{(t+1)}) \le \ell(\theta^{(t+1)}),
+$$
+
+where the first inequality holds because $\theta^{(t+1)}$ maximizes $\mathcal L(q^{(t)}, \cdot)$, and the second because the ELBO lower-bounds $\ell$ at every $\theta$, including $\theta^{(t+1)}$, where $q^{(t)}$ is no longer the posterior. The subtlety graders listen for: tightness is used only at $\theta^{(t)}$; at $\theta^{(t+1)}$ only the inequality direction is available, and that is all the proof needs.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review: "GMM versus k-means — give three concrete differences, then show that one algorithm is a limit of the other." Produce the differences and the full limit derivation.
+
+<Solution>
+**Differences.** (1) Output type: k-means emits a hard label per point; the GMM E-step emits a posterior distribution $\gamma_n$ over components. (2) Cluster geometry: k-means implicitly assumes one shared spherical scale (its cells are Voronoi cells with hyperplane boundaries); a GMM learns a covariance $\Sigma_k$ and a weight $\pi_k$ per component, so it can fit elongated, rotated, and different-sized clusters. (3) Model class: a GMM is a density model — it assigns likelihoods to new points, supports BIC/AIC for choosing $K$, and can generate samples; k-means is a partition of the training set with a distortion score.
+
+**Limit.** Fix $\Sigma_k = \epsilon I$ for all $k$. Then
+
+$$
+\gamma_{nk} = \frac{\pi_k \exp(-\lVert x_n - \mu_k \rVert^2 / 2\epsilon)}{\sum_j \pi_j \exp(-\lVert x_n - \mu_j \rVert^2 / 2\epsilon)} .
+$$
+
+Let $k^* = \arg\min_k \lVert x_n - \mu_k \rVert^2$ (assume unique). Dividing through by the $k^*$ term, every other ratio is $(\pi_j / \pi_{k^*}) \exp(-\Delta_j / 2\epsilon)$ with $\Delta_j > 0$, which $\to 0$ as $\epsilon \to 0$; the fixed weight ratio cannot offset a diverging exponent. Hence $\gamma_{nk^*} \to 1$ and all others $\to 0$: the E-step becomes nearest-center assignment. The M-step means, fed 0/1 responsibilities, become plain cluster means: Lloyd's update step. EM on this restricted family, in the limit, is exactly k-means, and the expected complete-data log-likelihood behaves as $-J/2\epsilon + \text{const}$, so maximizing it is minimizing the distortion $J$ of the k-means chapter.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview scenario: your GMM run reports a component with variance $10^{-12}$, responsibility concentrated on a single point, and a spectacular log-likelihood. What happened, why is the number not good news, and what are the fixes? Connect one fix to MAP estimation.
+
+<Solution>
+The run found a **singularity**, not a fit: with $\mu_k$ on one data point and $\sigma_k^2 \to 0$, that point's density factor $1/\sqrt{2\pi\sigma_k^2}$ diverges, so $\ell \to \infty$ along this direction: the unconstrained mixture likelihood is unbounded and its global "MLE" does not exist. The huge likelihood is the pathology itself: the component memorizes one point and describes nothing.
+
+Fixes: (1) a variance floor, $\sigma_k^2 \ge \epsilon$ (equivalently, add a small ridge $\epsilon I$ to each $\Sigma_k$ update); (2) restart when a component collapses (detect $N_k \approx 1$ or $\sigma_k^2$ under tolerance), re-seeding that component; (3) MAP-EM: put an inverse-gamma / inverse-Wishart prior on the variances and maximize $Q(\theta) + \log p(\theta)$ in the M-step. The MAP connection is the one from the MLE/MAP chapter: the prior acts like pseudo-observations of spread added to every component, which keeps the estimate off the $\sigma^2 = 0$ boundary exactly as Beta pseudo-counts kept the coin estimate off $\hat\theta = 1$; the prior's influence washes out as the component's effective count $N_k$ grows.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "Why fit a GMM with EM instead of running plain gradient ascent on the log-likelihood?" Give the honest two-sided answer.
+
+<Solution>
+Gradient ascent is possible: $\ell(\theta)$ is differentiable, and its gradient even has the same structure EM exposes (the responsibilities appear in $\partial\ell/\partial\theta$). The case for EM: (1) the parameters are constrained ($\pi$ lives on the simplex, $\Sigma_k$ must be positive definite), and naive gradient steps leave the feasible set, while EM's closed-form updates respect both constraints automatically (weighted fractions sum to 1; weighted covariances are PSD by construction); (2) no learning rate to tune: each M-step is an exact maximization, and each iteration provably increases $\ell$; (3) the updates are interpretable weighted MLEs, which is also why the derivation is a standard interview answer.
+
+The case against, stated honestly: gradient methods can handle the constraints by reparameterization (softmax for $\pi$, Cholesky factors for $\Sigma_k$) and then plug into standard autodiff stacks, which matters when the mixture is one differentiable block inside a larger model. And EM's convergence is linear with rate governed by the fraction of missing information, so on heavily overlapping components a well-tuned second-order or accelerated gradient method can beat it. Both approaches converge only to stationary points; neither buys the global optimum.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question (asked at Netflix, per *Ace the Data Science Interview*): "Explain the EM algorithm in general, and name a use case beyond Gaussian mixtures." Give the general statement and two non-GMM uses.
+
+<Solution>
+General statement: EM is a maximum-likelihood procedure for models with latent or missing data, where $\ell(\theta) = \log \sum_Z p(X, Z \mid \theta)$ is intractable but the complete-data likelihood $p(X, Z \mid \theta)$ is easy. Iterate: **E-step** — compute the posterior over the unobserved $Z$ at the current $\theta^{(t)}$ and form $Q(\theta \mid \theta^{(t)}) = \mathbb E_{Z \sim p(Z \mid X, \theta^{(t)})}[\log p(X, Z \mid \theta)]$; **M-step** — set $\theta^{(t+1)} = \arg\max_\theta Q(\theta \mid \theta^{(t)})$. The ELBO argument guarantees $\ell$ never decreases, and the framework is exactly Dempster, Laird & Rubin's 1977 formulation (their $Q$-function).
+
+Uses beyond GMMs: (1) **hidden Markov models** — the latent variables are the state sequence; the E-step is the forward–backward algorithm and the full loop is Baum–Welch, the classical trainer for speech and sequence models; (2) **missing data** — fit a joint model (e.g. a multivariate Gaussian) when some entries of some rows are unobserved: the E-step fills in expectations of the missing entries (and their second moments) given the observed ones, the M-step refits; this was the motivating setting of the 1977 paper. (Also acceptable: factor analysis / probabilistic PCA, mixtures of experts, semi-supervised classification with unlabeled data as latent labels.)
+</Solution>
+</Exercise>
+
+<References>
+1. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §9.2: the GMM, latent variable, and responsibilities (Eq. 9.13); §9.2.2: EM for GMMs and the Old Faithful run (Fig. 9.8); §9.3.2: k-means as the $\epsilon \to 0$ limit; §9.4: the $\ell = \mathcal L + \mathrm{KL}$ decomposition and the bound geometry (Figs. 9.11–9.14). https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+2. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford University, 2023 — ch. 11: Jensen's inequality, the ELBO derivation, and EM for mixtures in the notation interviews expect. https://cs229.stanford.edu/main_notes.pdf
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §8.5: the two-component 1D worked example (Table 8.1, Algorithm 8.1) and the likelihood-unboundedness warning. https://hastie.su.domains/ElemStatLearn/
+4. A. P. Dempster, N. M. Laird, D. B. Rubin, "Maximum Likelihood from Incomplete Data via the EM Algorithm," *Journal of the Royal Statistical Society, Series B* 39(1), 1977 — the general $Q$-function formulation, the monotonicity theorem, and the missing-information convergence rate; the published discussion contains Murray's saddle-point example and Sundberg's slow-rate report. https://doi.org/10.1111/j.2517-6161.1977.tb01600.x
+5. C. Huyen, *Introduction to Machine Learning Interviews*, self-published web book — §8.1: how EM and GMM questions are asked, including the k-means comparison. https://huyenchip.com/ml-interviews-book/
+6. N. Singh, K. Huo, *Ace the Data Science Interview*, 2021 — the Netflix "explain EM and a use case" question.
+</References>

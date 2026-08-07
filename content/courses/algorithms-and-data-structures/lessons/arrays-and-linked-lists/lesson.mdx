@@ -1,0 +1,666 @@
+Arrays and linked lists both store an ordered sequence of elements, and
+choosing between them is a matter of which operation — random access or
+insertion at an arbitrary position — the workload needs to be fast. The
+first module built the tools for pricing algorithms:
+<Ref lesson="asymptotic-notation">asymptotic notation</Ref> to state costs,
+loop invariants and recurrences to prove and solve them. This lesson turns
+those tools on the structures algorithms run on, starting with the two
+elementary ways of storing a sequence, and it sets the format every
+structure lesson in this module follows: name the operations first, then
+price each one, then enter the results in a running scoreboard. The route:
+the interface both structures implement, the array and its address
+arithmetic, the linked list and its pointer surgery, the doubly linked
+variant, the combined scoreboard, and the constant factors the scoreboard
+hides.
+
+## One interface, two implementations
+
+Pricing a data structure requires saying what it must do before saying how
+it does it. An *interface* is the list of supported operations and their
+meaning; an *implementation* is a memory representation plus the
+algorithms that carry the operations out. The interface is the problem,
+the implementation a solution, and one interface admits many
+implementations with different costs. Every comparison in this module is a
+comparison of implementations of one fixed interface.
+
+The interface both structures of this lesson implement is the **Sequence**:
+maintain an ordered sequence $x_0, x_1, \ldots, x_{n-1}$, where the order
+is whatever the caller made it (nothing is sorted). Its operations:
+
+| operation | meaning |
+|---|---|
+| `get(i)` / `set(i, x)` | read or replace the element at position $i$ |
+| `insert(i, x)` / `delete(i)` | add or remove at position $i$, shifting later positions by one |
+| front and back forms | the special cases $i = 0$ and $i = n$ of insert/delete |
+| `search(v)` | return a position holding value $v$, if any |
+
+Restricting this interface to its two ends yields the stack and the queue,
+the subject of <Ref lesson="stacks-and-queues">the next lesson</Ref>; here
+the full interface stays in force. The rest of the lesson prices every
+operation, as a function of the sequence length $n$, under each of the two
+classical representations in turn.
+
+## Arrays: an address computation buys O(1) access
+
+The first representation stores the sequence the way memory itself is laid
+out. A concrete instance: eight 8-byte elements placed at consecutive
+addresses starting at address 512. Element 0 occupies bytes 512–519,
+element 1 bytes 520–527, and element $i$ starts at $512 + 8i$: the address
+of any element is one multiplication and one addition away, with $n$
+appearing nowhere in the formula.
+
+<Figure
+  src="./figures/array-memory.svg"
+  alt="Eight array cells at consecutive addresses 512 through 568, with the address computation addr(5) = 512 + 5 × 8 = 552 annotated onto element 5"
+  caption="Contiguous storage: the index is not looked up anywhere; it is arithmetic on the base address."
+/>
+
+<Definition title="array">
+An **array** stores $n$ elements of a common size $w$ bytes in one
+contiguous block of memory starting at a *base address* $b$: element $i$
+occupies the $w$ bytes starting at $b + i \cdot w$. In the
+<Ref lesson="asymptotic-notation">word-RAM model</Ref>, where arithmetic
+on machine words and one memory access each cost one step, `get(i)` and
+`set(i, x)` therefore cost $\Theta(1)$: a multiply, an add, and one
+memory access, for any $i$ and any $n$.
+</Definition>
+
+If elements differ in size, $w$ is not a constant and $b + i \cdot w$
+computes nothing; the standard repair is to store same-size *pointers* (a
+pointer is a machine word whose value is a memory address) to the
+variably-sized objects, and pay one extra memory access to follow one. The
+boundary case is the empty array, $n = 0$: a base address and a length of
+zero, with no element bytes at all.
+
+The formula also answers only questions posed by index. `search(v)` poses
+the reverse question, a position given a value, and $b + i \cdot w$ runs
+from index to address, never from value to index. Since nothing is
+sorted, no cell's contents constrain any other's, and the only algorithm
+is the scan: compare $x_0, x_1, \ldots$ against $v$ until a match,
+$\Theta(n)$ worst case (the match can sit in the last cell, or in none).
+Contiguity makes each comparison cheap; it does not reduce their number.
+
+<Aside>
+The same arithmetic scales to two dimensions. An $m \times n$ matrix
+stored in *row-major order* concatenates its rows into one array, so
+$M[i][j]$ lives at index $i \cdot n + j$ (with 0-origin indexing), one
+extra multiply per access; *column-major order*, used by Fortran and its
+numerical descendants, concatenates columns instead, putting $M[i][j]$ at
+$j \cdot m + i$. CLRS §10.1 (Figure 10.1) shows one matrix stored four
+ways. Nothing later in this course needs more than the row-major formula.
+</Aside>
+
+### Insertion pays for the order in shifts
+
+The same adjacency that computes addresses is the array's liability the
+moment the sequence changes. `insert(2, x)` on the array below must make
+position 2 free while keeping every element's position meaningful, and
+adjacency leaves only one way: move elements $2$ through $n-1$ one slot
+right, then write $x$. That is $n - i$ element moves for position $i$;
+inserting at the front moves all $n$ elements, and `delete(i)` mirrors it
+with $n - i - 1$ moves left. Both are $\Theta(n)$ in the worst case.
+
+<Figure
+  src="./figures/array-insert.svg"
+  alt="Inserting x at index 2 of a six-element array: elements c through f each shift one slot right before x is written into the freed slot"
+  caption="insert(2, x): the freed slot is paid for by moving every later element."
+/>
+
+The moves are not bookkeeping; they dominate real workloads. Building an
+$n$-element sequence by repeatedly inserting at the front costs
+$n + (n-1) + \cdots + 1 \approx n^2/2$ moves: at $n = 10^6$ that is
+$5 \times 10^{11}$ steps, minutes of full-speed computation on the
+<Ref lesson="asymptotic-notation">wall-clock ladder</Ref>, for a job a
+linked list finishes in $10^6$ steps.
+
+### Capacity is fixed at allocation
+
+The array has a second structural limit, independent of shifting: the
+bytes adjacent to the block belong to other data, so the block cannot grow
+in place. An array's capacity is fixed when it is allocated. While spare
+slots remain past position $n - 1$, appending at the back is a single
+$\Theta(1)$ write; when they run out, the only continuation is to allocate
+a larger block and copy all $n$ elements into it, a $\Theta(n)$ event.
+How to schedule those copies so that appending stays cheap on average is
+deliberately deferred: it is the entire subject of
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the dynamic-arrays
+lesson</Ref>, two lessons from now. Until then, "array" means fixed
+capacity.
+
+<KeyFact>
+Adjacency does double duty: it stores the order and computes the address.
+Every cell of the array's scoreboard row follows from that one fact:
+access is one multiplication because neighbors sit $w$ bytes apart, and
+insertion is $n$ moves because the order has nowhere else to live.
+</KeyFact>
+
+## Singly linked lists: pointers buy O(1) splicing
+
+The array's insertion cost came from storing order as adjacency, so the
+second representation stores order explicitly and lets the elements sit
+anywhere.
+
+<Definition title="singly linked list">
+A **singly linked list** stores each element in its own separately
+allocated *node*: a small block holding the value and one pointer,
+`next`, the address of the successor node. A variable `head` holds the
+address of the first node, and the last node's `next` holds the special
+value `nil`, meaning no successor. The empty list is `head = nil`, and a
+one-node list is the boundary case where that node is simultaneously
+first and last.
+</Definition>
+
+<Figure
+  src="./figures/sll-node.svg"
+  alt="A head pointer and four linked nodes, each a value field plus a next field, with scattered memory addresses printed under the nodes and the last next field slashed as nil"
+  caption="A singly linked list of 12, 99, 37, 5. The nodes' addresses are arbitrary; only the pointers order them."
+/>
+
+The price appears immediately in the static operations. No arithmetic
+computes the address of element $i$, because the nodes are wherever the
+allocator put them: the only route to position $i$ is to start at `head`
+and follow `next` pointers $i$ times, so `get(i)` and `set(i, x)` cost
+$\Theta(i)$ steps, worst case $\Theta(n)$. `search(v)` walks the same way
+and is $\Theta(n)$ too, exactly as it was for the unsorted array.
+
+What the pointers buy is the dynamic operations, and the purchase is
+local: rewriting one pointer re-routes the entire remainder of the list.
+
+<Example title="insertion at the head (Sedgewick–Wayne §1.3)">
+Insert value $x$ at the front of the list. The steps, in order:
+
+```text
+InsertFront(L, x):
+  u ← allocate node          // u.value ← x
+  u.next ← L.head            // u's successor is the old first node
+  L.head ← u                 // u becomes the first node
+```
+
+Three steps, none of which mentions $n$: the cost is $\Theta(1)$ whether
+the list holds four nodes or four billion. Compare the array, where the
+same operation moved all $n$ elements. The second line runs before the
+third for a reason the next subsection makes exact; note for now that
+after line 2 the old first node is pointed to by both `L.head` and
+`u.next`, and line 3 then retargets `L.head` safely.
+</Example>
+
+### Splicing after a known node: two writes
+
+The general form of the trick inserts after any node $p$ a caller already
+holds, wherever $p$ sits in the list. Two pointer writes do it.
+
+<FigureSequence
+  name="splice"
+  alt="Three frames: a new node u is allocated below the list; u.next is set to p's successor q; then p.next is set to u, completing the splice p, u, q"
+  caption="Insert after a known node p: allocate, aim u at q, then aim p at u. Two writes, at any position, in any length of list."
+/>
+
+<Task>
+Step through the three frames counting incoming pointers. After frame 2
+the successor $q$ has two (from `p.next` and `u.next`); after frame 3 it
+has one again, and $u$ has one. At no frame does any node's count reach
+zero; that is the property the write order is protecting.
+</Task>
+
+### The order of the two writes is load-bearing
+
+Write `u.next` before touching `p.next`: the new node must point out into
+the list before any list pointer is aimed at it. A natural belief says
+otherwise: that the two assignments are independent bookkeeping and can
+be issued in either order. They cannot. `p.next` is the *only* pointer to
+the successor $q$ and everything after it; executing `p.next ← u` first
+destroys that pointer, and the subsequent `u.next ← p.next` copies what
+`p.next` now holds, which is $u$'s own address. The result is a self-loop
+at $u$ and an unreachable tail: no error is raised, the data is simply
+gone.
+
+<Figure
+  src="./figures/splice-wrong.svg"
+  alt="The two splice writes issued in reverse order: p points at u, u's next points back at u itself, and the old successor q with the rest of the list is grayed out as unreachable"
+  caption="Reversed order: u.next ← p.next executes after p.next was overwritten, so it copies u's own address."
+/>
+
+<KeyFact>
+A pointer write destroys its old value. A splice is correct exactly when
+every node still in the sequence keeps at least one incoming pointer at
+every intermediate step. That forces the order: aim the new node's
+outgoing pointer first, and only then aim an existing pointer at it. When
+an operation must overwrite the only copy of an address it still needs,
+save it in a local first (`InsertFront`'s reading of `L.head` on line 2
+is exactly this save).
+</KeyFact>
+
+<Exercise>
+Write `DeleteAfter(p)`, which removes the node following $p$ from a singly
+linked list (assume it exists). State the single pointer write it needs
+and its cost. Then explain why `Delete(x)` (remove the node $x$ itself,
+given only a reference to $x$) cannot be done the same way, and what it
+costs instead. Write your pointer assignment down before opening the
+solution.
+
+<Solution>
+Strategy hint: the node to remove is `p.next`; the write must make the
+list skip it.
+
+```text
+DeleteAfter(p):
+  p.next ← p.next.next
+```
+
+One write, $\Theta(1)$, at any position. No save is needed here because
+nothing being kept loses its last incoming pointer: the removed node loses
+its only one, which is the goal.
+
+`Delete(x)` needs the *predecessor* of $x$ (the node whose `next` field
+must change), and a singly linked node stores no route back to it. The
+only way to find the predecessor is to walk from `head` until some node's
+`next` equals $x$: $\Theta(n)$ worst case. The transferable observation: the expensive part of a
+pointer-structure operation is never the splice, always locating the
+node whose field changes.
+</Solution>
+</Exercise>
+
+### Positional insert and delete: the walk dominates the splice
+
+Every splice priced so far starts from a node the caller already holds:
+`InsertFront` holds `head`, `InsertAfter` holds $p$. The Sequence
+operations `insert(i, x)` and `delete(i)` start from an index, and the
+difference is the entire cost. Reaching the node before position $i$ is
+the same pointer-following walk that made `get(i)` cost $\Theta(i)$; only
+after it do the two constant-time writes run. On a singly linked list,
+`insert(i, x)` and `delete(i)` therefore cost a $\Theta(i)$ walk plus a
+$\Theta(1)$ splice, worst case $\Theta(n)$: the same class as the array's
+shifts.
+
+Set that against the most widely repeated claim about linked lists: that
+they insert in $O(1)$ where arrays pay $O(n)$. As a price for the
+interface operation `insert(i, x)`, the claim is false. The splice really
+is two writes, but the writes are the cheap part; locating the splice
+point dominates, and no arrangement of forward pointers removes the walk.
+The correct statement is conditional: **splicing costs $\Theta(1)$ given
+a handle on the neighboring node, and $\Theta(n)$ given only an index.**
+A text editor whose cursor already holds the current line's node inserts
+the next line in constant time; the same editor told to insert at line
+4,000 walks 4,000 nodes first. What the list sells cheaply is the edit,
+never the address.
+
+A `tail` pointer, maintained alongside `head`, extends the trick to the
+back: `InsertBack` becomes a splice after `tail`, $\Theta(1)$. Deleting at
+the back does not follow: the operation must retarget the *predecessor* of
+`tail`, and reaching that predecessor is the $\Theta(n)$ walk just
+diagnosed. That asymmetry is the flaw the next structure repairs: every
+neighbor is reachable forward, none backward.
+
+## Doubly linked lists: a pointer back buys O(1) deletion
+
+The repair is mechanical: give every node a second pointer, `prev`,
+holding the address of its predecessor. The cost is one extra machine word
+per node and one extra write per update; the payoff is that the
+predecessor problem disappears. Deleting a node $x$ given only $x$ becomes
+two writes, because $x$'s own fields name both neighbors:
+
+```text
+Delete(x):
+  x.prev.next ← x.next
+  x.next.prev ← x.prev
+```
+
+<Figure
+  src="./figures/dll-delete.svg"
+  alt="Three doubly linked nodes; the middle node x is faded, and two new pointers bypass it: x.prev's next field re-aimed at x.next, and x.next's prev field re-aimed at x.prev"
+  caption="Delete given the node: the neighbors are read out of x itself, then linked to each other. Θ(1)."
+/>
+
+As written, `Delete(x)` crashes at the boundaries: the first node has
+`x.prev = nil` and the last has `x.next = nil`, so each end needs its own
+conditional, and the empty and one-node lists add more. The standard cure
+is a *sentinel* (CLRS §10.2; Morin calls it the dummy node): one permanent
+node holding no value, linked so that the list is circular. The
+sentinel's `next` is the first real node, its `prev` the last, and an
+empty list is the sentinel pointing at itself both ways. Every real node
+then has two genuine neighbors, every case of insert and delete is the
+unconditional two-write version, and the head and tail special cases
+cease to exist. The price is one node's worth of memory per list.
+
+What `prev` does not buy is position. `get(i)`, `insert(i, x)`, and
+`delete(i)` still walk, at best from whichever end is nearer, which
+halves the constant and not the class: the doubly linked row's index
+columns stay at $\Theta(n)$, and its gains are confined to the
+handle-based operations.
+
+<KeyFact>
+Delete-given-node in $\Theta(1)$ is the operation the doubly linked list
+exists for, and later structures buy it on purpose:
+<Ref lesson="hash-tables">chained hash tables</Ref> store each bucket as a
+doubly linked list precisely so that an element found by its key can be
+unhooked in constant time.
+</KeyFact>
+
+## The scoreboard: no row dominates
+
+Two representations and one interface are now fully priced, and a natural
+expectation is that the newer, more elaborate structure should win
+overall. The table shows the opposite: every $\Theta(1)$ in one row faces
+a $\Theta(n)$ in another, and the array's one unbeatable cell, `get(i)`,
+is exactly the cell both list rows lose.
+
+<Figure
+  src="./figures/scoreboard.svg"
+  alt="A table of worst-case costs for array, singly linked list, and doubly linked list across get, insert/delete at position i, insert/delete at front and back, insert after a node, delete given a node, and search, with the array's O(1) get and the doubly linked list's O(1) delete-given-node highlighted"
+  caption="Scoreboard v1: the module's running artifact. Later lessons narrow its columns, repair its cells, or change the interface."
+/>
+
+<Task>
+Read the table against the lesson: for each $\Theta(n)$ cell, name the
+walk or the shift that causes it (array cells are shifts plus the
+capacity copy; list cells are walks to a position or a predecessor). Every
+entry should trace back to one of the two mechanisms.
+</Task>
+
+The table is this module's running artifact, extended lesson by lesson.
+<Ref lesson="stacks-and-queues">Stacks and queues</Ref> keep only the
+front/back columns, where the list rows already show $1$s and the array
+row still shows two $n$s at the front; clearing those two cells with a
+*circular buffer*, an array indexed so that its front moves instead of
+its data, is the next lesson's array-side work.
+<Ref lesson="dynamic-arrays-and-amortized-analysis">Dynamic arrays</Ref>
+attack the ‡ footnote, the capacity wall; and
+<Ref lesson="hash-tables">hash tables</Ref> change the interface itself,
+trading positions for keys. Structures later in the course
+(<Ref lesson="binary-search-trees">search trees</Ref>, heaps) enter the
+same way: operations first, then a row of prices.
+
+<KeyFact>
+There is no best sequence structure, only a best structure for a stated
+operation mix: reads by index favor the array, edits at known positions
+favor a linked list, and a workload with both is a genuine design
+problem; the standard resolutions (dynamic arrays, then search trees)
+each claim a later lesson.
+</KeyFact>
+
+## Equal Θ, unequal time: contiguity and constants
+
+The scoreboard also ties: traversing all $n$ elements is $\Theta(n)$ in
+every row, and search is $\Theta(n)$ everywhere. The notation certifies
+that the growth rates match; it says nothing about the constants, and for
+these two structures the constants systematically favor the array.
+
+The reason is the memory hardware. Main memory delivers data in blocks of
+adjacent bytes, and processors cache recently fetched blocks: reading one
+array element brings its neighbors along, so a sequential sweep finds most
+of its next elements already on hand. A linked-list traversal has no such
+geometry. Each node sits wherever the allocator placed it, each `next`
+hop can land in a block not yet fetched, and no fetch helps predict the
+following one. Same $\Theta(n)$, different number of trips to memory,
+which is why iterating an array is often several times faster in practice
+than iterating a list of equal length, without any asymptotic difference
+to point to.
+
+<Figure
+  src="./figures/memory-access.svg"
+  alt="Two memory strips: an array traversal sweeping straight across adjacent highlighted cells, and a linked-list traversal hopping between scattered cells in allocation order"
+  caption="The access patterns behind equal Θ(n): one sweep over adjacent words versus a hop per node."
+/>
+
+A linked-list node holding one reference costs about 40 bytes in
+Sedgewick and Wayne's accounting for Java
+([*Algorithms* §1.3](https://algs4.cs.princeton.edu/13stacks/)): 8 for
+the payload reference and roughly 32 of object overhead and link, five
+times the 8 bytes per element the equivalent array spends. The bookkeeping that
+languages with garbage collection or manual allocation attach to each
+separate node varies, but some per-node overhead exists in all of them;
+an array pays its allocation cost once for the whole block.
+
+Neither constant enters the notation, but both steer designs later in
+the course: <Ref lesson="binary-heaps-and-priority-queues">the binary
+heap</Ref> stores a complete binary tree in a plain array, locating each
+node's children by index arithmetic, precisely so that a tree's
+operations run on contiguous memory with no pointers at all.
+
+What stands at the end of this lesson: one Sequence interface with two
+priced implementations; the array's row built entirely on adjacency
+($\Theta(1)$ access, $\Theta(n)$ edits, fixed capacity), the list rows
+built entirely on pointers ($\Theta(n)$ access, $\Theta(1)$ splices, with
+`prev` extending the $\Theta(1)$ to delete-given-node); and scoreboard v1
+recording all of it. Two flaws stand open on the board: the array's
+capacity wall, taken up by
+<Ref lesson="dynamic-arrays-and-amortized-analysis">dynamic arrays and
+amortized analysis</Ref>, and the fact that no row is uniformly fast.
+<Ref lesson="stacks-and-queues">The next lesson</Ref> exploits the second
+observation from the other side: restrict the interface to the ends, and
+the list rows already serve every remaining operation in $\Theta(1)$; the
+array's two front cells still read $\Theta(n)$, and that flaw is what the
+circular buffer removes there.
+
+## Exercises
+
+<Exercise>
+An array of 4-byte integers has base address 2048. (a) Compute the address
+of element 305. (b) A debugger shows a write at address 3268; which
+element was written? (c) The same block is reinterpreted as an array of
+16-byte structures; which element does address 3268 fall in, and at what
+offset inside it?
+
+<Solution>
+(a) $2048 + 305 \cdot 4 = 2048 + 1220 = 3268$.
+
+(b) Invert the formula: $i = (3268 - 2048)/4 = 1220/4 = 305$. Element
+305: the same location as (a), as it must be.
+
+(c) With $w = 16$: $(3268 - 2048)/16 = 1220/16 = 76.25$, so the address
+falls in element 76 (which starts at $2048 + 76 \cdot 16 = 3264$), at
+offset $3268 - 3264 = 4$ bytes. The transferable move: the address
+formula runs in both directions (multiply to locate an index, divide
+with remainder to identify one), and everything depends on the element
+width $w$, which is why an array requires same-size elements.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague's insert-after reads:
+
+```text
+InsertAfter(p, x):
+  u ← allocate node        // u.value ← x
+  p.next ← u
+  u.next ← p.next
+```
+
+The claim attached to it: "both orders of the two writes produce the same
+list, since the assignments touch different fields." Refute the claim:
+state exactly what list results from this code, name the step at which
+the reasoning fails, and give the one-line repair that keeps this
+assignment order legal.
+
+<Solution>
+Result: after `p.next ← u`, the field `p.next` holds $u$'s address and its
+old value, the address of the successor $q$, exists nowhere. The next line
+`u.next ← p.next` therefore copies $u$'s own address into `u.next`. The
+final structure is $p \to u \to u \to \cdots$: a self-loop at $u$, with
+$q$ and every node after it unreachable. Any later traversal loops
+forever on $u$.
+
+The failed step is "the assignments touch different fields": the second
+assignment does not touch a different *value*. Its right-hand side reads
+`p.next`, which the first assignment overwrote, so the two writes are
+linked through a read-after-write dependence: they commute only if
+neither reads what the other writes.
+
+Repair keeping this order: save the successor first.
+
+```text
+  q ← p.next
+  p.next ← u
+  u.next ← q
+```
+
+The local $q$ preserves the one address the sequence was about to
+destroy, the same save that line 2 of the worked `InsertFront` example
+performs by reading `L.head` into `u.next` before line 3 overwrites it.
+</Solution>
+</Exercise>
+
+<Exercise>
+The splice `InsertAfter(p, x)` covers every position except one. (a)
+Identify the insertion the operation cannot express, and the additional
+case a general `insert(i, x)` on a plain singly linked list must handle;
+include the empty list in your accounting. (b) Show that giving the list a
+permanent valueless *dummy head* node (the sentinel idea in singly linked
+form, with `head` pointing at the dummy forever) eliminates every
+one of those cases, making `insert(0, x)` and `DeleteFront` ordinary
+`InsertAfter`/`DeleteAfter` calls. State what the dummy costs.
+
+<Solution>
+(a) `InsertAfter` needs a predecessor node, and position 0 has none:
+inserting at the front must write `head` itself rather than any node's
+`next` field. A general `insert(i, x)` therefore branches: $i = 0$ writes
+`head` (this branch also covers the empty list, where `head = nil` and no
+$p$ exists at all); $i > 0$ walks to node $i - 1$ and splices. Deletion
+mirrors it: `delete(0)` writes `head`, everything else writes a `next`
+field.
+
+(b) With a permanent dummy node $d$ and the real elements starting at
+`d.next`, position $i$'s predecessor is always a node: it is $d$ for
+$i = 0$ and the $(i-1)$-th real node otherwise. `insert(0, x)` is
+`InsertAfter(d, x)`; `DeleteFront` is `DeleteAfter(d)`; the empty list is
+$d$ with `d.next = nil`, and the same two-write splice inserts into it.
+No operation ever writes a variable other than a node field, so the
+branches disappear from the code rather than being handled correctly by
+it. The cost is one node of memory per list, permanently: negligible for
+one list, worth weighing when there are millions of tiny lists, which is
+CLRS's caution about sentinels.
+
+The pattern generalizes: a boundary case vanishes when the boundary is
+given a resident object, and the doubly linked sentinel of the lesson is
+the same move applied at both ends at once.
+</Solution>
+</Exercise>
+
+<Exercise>
+For each workload, choose array, singly linked list (head and tail
+pointers), or doubly linked list, and justify the choice by naming the
+scoreboard cells that decide it, including at least one cell that rules
+an alternative out.
+
+(a) A table of 4,096 calibration constants, written once at startup and
+read by computed index tens of millions of times per second.
+
+(b) A text editor's line buffer: the cursor holds a reference to the
+current line's node, and edits insert a line after the cursor or delete
+the cursor's own line.
+
+(c) An append-only event log of unpredictable final size, written one
+record at a time and read exactly once, front to back, at the end of the
+day.
+
+<Solution>
+(a) **Array.** The hot operation is `get(i)`: $\Theta(1)$ for the array
+against $\Theta(n)$ for both lists, and with reads dominating by seven
+orders of magnitude nothing else weighs. Fixed capacity is harmless: the
+size is known and constant. The cache behavior of contiguous reads is a
+second, constant-factor argument on the same side.
+
+(b) **Doubly linked list.** Both hot operations start from a node
+reference: insert-after is $\Theta(1)$ on either list, but delete-given-node
+is the cell that separates the rows: $\Theta(1)$ doubly linked against
+$\Theta(n)$ singly linked (the predecessor walk). The array is ruled out
+twice over: line numbers shift on every edit, and `insert(i)`/`delete(i)`
+are $\Theta(n)$ in shifts.
+
+(c) **Singly linked list with a tail pointer** meets the letter of the
+scoreboard: insert-back $\Theta(1)$ with no capacity assumption, and the
+single sequential read is $\Theta(n)$ everywhere. An array is ruled out
+as specified because capacity is unpredictable and each reallocation
+costs $\Theta(n)$; `prev` pointers would buy nothing, since delete-back
+and delete-given-node never occur. The honest footnote: the array's
+traversal constants are better, so if the capacity problem were solved,
+contiguous storage would win this workload too, which is the case for
+the dynamic array, two lessons ahead.
+
+The transferable move: name the workload's hot operations first, read
+their column, and only then break ties with constants.
+</Solution>
+</Exercise>
+
+<Exercise>
+A doubly linked list can reach position $i$ from whichever end is nearer:
+walking forward from the front costs $i$ hops, backward from the back
+costs $n - i$, so `get(i)` costs $c \cdot (1 + \min(i,\, n - i))$ steps
+for some constant $c$ (this is Morin's ODS §3.2 bound). Using the
+definitions from <Ref lesson="asymptotic-notation">the asymptotic-notation
+lesson</Ref>: (a) classify the worst case over $i$ with explicit
+constants, and (b) classify the *average* over $i$ drawn uniformly from
+$\{0, \ldots, n-1\}$, again with explicit constants. Write both
+inequalities before checking numbers.
+
+<Solution>
+Take $c = 1$ (a constant factor moves nothing in either claim) and work
+with $f(i) = 1 + \min(i, n-i)$.
+
+**(a) Worst case: $\Theta(n)$.** The maximum of $\min(i, n-i)$ over
+$0 \le i \le n-1$ is attained at $i = \lfloor n/2 \rfloor$, where it is at
+least $n/2 - 1$ and at most $n/2$. Upper bound: $f(i) \le 1 + n/2 \le n$
+for $n \ge 2$, so $O(n)$ with $c = 1$, $n_0 = 2$. Lower bound: the
+worst-case cost is at least $n/2$ once $n \ge 4$ (at
+$i=\lfloor n/2 \rfloor$, $\min(i,n-i) \ge n/2 - 1 \ge n/4$ for $n \ge 4$,
+so $f \ge n/4$), giving $\Omega(n)$ with $c = \tfrac14$, $n_0 = 4$. Note
+the halving buys a factor of 2: a constant, invisible to $\Theta$.
+
+**(b) Average case: still $\Theta(n)$.** The average is
+$\bar{f}(n) = 1 + \tfrac{1}{n}\sum_{i=0}^{n-1} \min(i, n-i)$. Upper
+bound: every term is at most $n/2$, so $\bar{f}(n) \le 1 + n/2 \le n$ for
+$n \ge 2$: $O(n)$ with $c = 1$, $n_0 = 2$. Lower bound: for the $n/2$ or
+more indices in the middle half, $n/4 \le i \le 3n/4$, each term is at
+least $n/4$; those terms alone sum to at least
+$\tfrac{n}{2} \cdot \tfrac{n}{4} = n^2/8$, so
+$\bar{f}(n) \ge n/8$: $\Omega(n)$ with $c = \tfrac18$, $n_0 = 8$ (taking
+$n$ large enough that "middle half" contains at least $n/2$ integer
+indices).
+
+Conclusion: walking from the nearer end improves the constant, never the
+class. A uniformly random access still pays linear time, which is why no
+amount of pointer cleverness rescues `get(i)` on a list.
+</Solution>
+</Exercise>
+
+<Exercise>
+A programmer works around fixed capacity the simplest way: the array is
+always exactly full, and each append allocates a new block one element
+larger, copies everything across, and writes the new element at the end.
+Starting from an empty array, compute the total number of element copies
+performed by $n$ consecutive appends, classify the total and the average
+cost per append, and evaluate the total at $n = 10^5$.
+
+<Solution>
+The $k$-th append (the array holds $k - 1$ elements) allocates a block of
+size $k$, copies $k - 1$ elements, and writes one. Total copies over $n$
+appends:
+
+$$
+\sum_{k=1}^{n} (k-1) = 0 + 1 + 2 + \cdots + (n-1) = \frac{n(n-1)}{2}
+= \Theta(n^2).
+$$
+
+The average per append is $(n-1)/2 = \Theta(n)$: appending, the cheapest
+operation on the board, has been made as expensive per operation as
+inserting at an array's front. At $n = 10^5$
+the total is $\tfrac{10^5 (10^5 - 1)}{2} \approx 5 \times 10^9$ copies:
+seconds of work to append a hundred thousand elements one at a time.
+
+This quadratic total is the wall the next-but-one lesson removes, and the
+repair is a change of growth schedule, not of structure: growing the
+block *geometrically* (doubling) instead of by one makes the copies sum
+to less than $2n$ over any $n$ appends, so the average per append is
+$\Theta(1)$: the amortized-analysis result of
+<Ref lesson="dynamic-arrays-and-amortized-analysis">dynamic arrays and
+amortized analysis</Ref>. You have just computed the "before" side of
+that lesson's headline comparison.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §10.1: contiguous storage, the address formula, and row-/column-major matrix layout (Fig. 10.1); §10.2: singly and doubly linked lists, LIST-INSERT/LIST-DELETE, and sentinels (Figs. 10.4–10.5, Exercise 10.2-1).
+2. P. Morin, *Open Data Structures*, 2013 — §1.2: the interface/implementation distinction this module's format is built on; Ch. 3: SLList and DLList, the dummy node, and the $O(1 + \min(i, n-i))$ access bound. Free online: https://opendatastructures.org/
+3. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 2 notes — the Sequence interface and the accumulating operations table that scoreboard v1 adapts. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+4. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §1.3: the linked-list stack with the oldfirst insertion trace, and the 40-bytes-per-node memory accounting. Companion site: https://algs4.cs.princeton.edu/13stacks/
+</References>

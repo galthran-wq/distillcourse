@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "status": "ready_with_frozen_numeric_contract",
+  "lesson": "fft-factorization-and-layout",
+  "component": "FftBudgetLab",
+  "course_spec": "Choose a mixed-radix N=960 plan with at least 8x fewer complex multiply-adds than direct evaluation, match a small direct DFT below 1e-10, and make omitted permutations or scaling fail loudly; falsify the belief that FFT means power-of-two only.",
+  "course_spec_assessment": "The interaction is D1-worthy, but the course entry does not define its factor editor, cost unit, deterministic input, validation length, mixed-radix recurrence, comparison bins, digit permutation, scale fault, presets, or exact pass logic. This preflight freezes those values without editing course.yaml.",
+  "d1_buildable": true,
+  "d1_sentence": "The learner replaces a visibly incomplete power-of-two plan with factors that multiply to 960, watches the historical work bar cross the 8x target, and then independently breaks and restores output order and forward scaling while exact direct-DFT errors expose each interface failure.",
+  "blocker_count": 0,
+  "planned_loc": 200,
+  "dependency_count": 0,
+  "targets": {
+    "component_file": "components/demos/digital-signal-processing/FftBudgetLab.tsx",
+    "registry_file": "components/demos/index.ts",
+    "registry_entry": "FftBudgetLab: () => import(\"./digital-signal-processing/FftBudgetLab\"),",
+    "lesson_embed": "<Demo name=\"FftBudgetLab\" caption=\"Factor 960, cross the eight-times work target, then restore the ordering and scaling contracts until both direct checks pass.\" />"
+  },
+  "implementation_contract": {
+    "export": "default function FftBudgetLab() with no required props",
+    "client_boundary": "Put use client before imports. Store only five radix-choice indices plus restoreNaturalOrder and rawForwardScale booleans; derive plan validity, work, preset index, transforms, errors, targets, and bars synchronously without effects, timers, browser APIs, or network.",
+    "kit": "Panel outer container; PresetGroup for four named scenarios; five Slider controls for radix-choice indices; two Button toggles with aria-pressed; TargetList for the three tasks; Readout for live ledgers. No UI primitive changes are required.",
+    "styling": "Tailwind theme classes and two simple CSS-width work bars using house amber #e2903a and blue #4c8dd6 plus text/shape redundancy. No chart package, CSS file, fixed light background, or dependency.",
+    "performance": "Always run the N=30 full check. Run the N=960 transform and 16-bin audit only when the active radices multiply to 960 and historical cost is at most 115200; otherwise display skipped with the reason. Thus the direct [960] preset supplies the cost baseline without performing a 960-radix transform. The passing worst case stays below 115200 declared CMA units plus 15360 direct-bin terms and must remain below 200 ms."
+  },
+  "budget_math": {
+    "N": 960,
+    "factorization": "960=4*4*4*3*5=2^6*3*5",
+    "active_radices": "filter the five stage slots to remove radix 1; repeated factors are valid",
+    "valid_plan": "product of active radices equals 960 exactly",
+    "non_power_condition": "at least one active radix has noninteger log2; any valid decomposition of 960 must carry the factors 3 and 5 somewhere",
+    "historical_unit": "Cooley-Tukey complex multiply-add units from T=N sum_i r_i; keep this separate from the radix-2 twiddle/addition ledger used by static figures",
+    "direct_units": 921600,
+    "direct_formula": "960^2=921600",
+    "eight_x_boundary_units": 115200,
+    "boundary_rule": "PASS when valid_plan, non_power_condition, and T<=115200; equality passes",
+    "passing_plan": [4, 4, 4, 3, 5],
+    "passing_factor_sum": 20,
+    "passing_units": 19200,
+    "passing_ratio": 48,
+    "editor_choices": [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 24, 30, 32, 40, 48, 60, 64, 80, 96, 120, 160, 192, 240, 320, 480, 960],
+    "invalid_display": "If the active-radix product is not 960, show product/960 and no budget verdict or candidate bar; do not apply N sum r to a factor list for another length.",
+    "bars": "Direct is a fixed 100% amber bar labeled 921600. A valid candidate is a blue bar of width 100*T/921600 percent, with a labeled 12.5% threshold marker; numerical labels remain authoritative."
+  },
+  "deterministic_input": {
+    "generator": "Use uint32 state=0x13579bdf. Before every scalar draw update state=(Math.imul(state,1664525)+1013904223)>>>0 and set u=state/4294967296. For each n draw twice and set x[n]=(2u_re-1)+j(2u_im-1). Restart from the same seed independently for N=30 and N=960.",
+    "first_three_samples": [
+      [-0.30652717407792807, 0.32770388247445226],
+      [-0.22288826666772366, -0.619939147029072],
+      [0.26342737954109907, -0.06893340637907386]
+    ],
+    "precision": "JavaScript Number throughout; Math.cos and Math.sin; no rounding before the final formatted readout"
+  },
+  "transform_and_interface": {
+    "reference": "For every requested natural bin k, compute X[k]=sum_n x[n] exp(-j2pi kn/N) directly with the unscaled negative-sign convention.",
+    "recursive_mixed_radix": "For N=rM and n=rm+s, recursively transform each strided subsequence x[rm+s] with the remaining factors. For k=kPrime+Mq, return Y[k]=sum_{s=0}^{r-1} A_s[kPrime] exp(-j2pi k s/N), for kPrime=0,...,M-1 and q=0,...,r-1. The base N=1 returns its sole sample. This recurrence returns natural k order.",
+    "small_validation": "N=30, fixed factors [2,3,5], full 30-bin direct DFT. It exercises radix 2, 3, and 5 regardless of the current N=960 plan.",
+    "large_audit": "N=960, current valid under-budget factor plan, direct bins [0,1,2,3,5,8,13,21,34,55,89,144,233,377,610,959]. Compare only those 16 natural bins and label the result a partial audit, not a full direct DFT.",
+    "relative_error": "||Y-X||_2/max(||X||_2,Number.EPSILON), accumulated over all 30 bins for the small check and the declared 16 bins for the large audit",
+    "error_threshold": "strictly less than 1e-10",
+    "digit_reversal_fault": "For factor bases [r0,...,rL-1], write k=d0+r0*d1+... in least-significant-first digits and store natural Y[k] at p=d(L-1)+r(L-1)*d(L-2)+... . When restoreNaturalOrder=false, compare this stored array by address directly with natural reference bins; when true, apply the inverse permutation first.",
+    "scale_fault": "When rawForwardScale=true multiply by 1. When false multiply every output by 1/N, deliberately applying inverse-style scaling to the forward result.",
+    "fault_order": "Apply digit-reversed storage first and the scale factor second. The two toggles are independent and reversible."
+  },
+  "state_and_interaction": {
+    "stored_state": [
+      "stageChoiceIndices: exactly five indices into editor_choices",
+      "restoreNaturalOrder: boolean",
+      "rawForwardScale: boolean"
+    ],
+    "initial_state": "Power-of-two wall: [4,4,4,1,1], restoreNaturalOrder=true, rawForwardScale=true. The product is 64 rather than 960, so the first failure is visible before interaction.",
+    "presets": [
+      {
+        "label": "Power-of-two wall",
+        "state": "[4,4,4,1,1], order restored, raw forward scale",
+        "observable": "active product 64/960; invalid plan; candidate budget and N=960 audit are unavailable"
+      },
+      {
+        "label": "Direct 960",
+        "state": "[960,1,1,1,1], order restored, raw forward scale",
+        "observable": "valid one-stage plan, T=921600, ratio 1x, budget FAIL; N=960 audit skipped by the cost guard"
+      },
+      {
+        "label": "Mixed-radix pass",
+        "state": "[4,4,4,3,5], order restored, raw forward scale",
+        "observable": "product 960, T=19200, ratio 48x, N=30 full error 5.1613794579441145e-15, N=960 audit error 2.8711519851015984e-14; all targets PASS"
+      },
+      {
+        "label": "Broken contracts",
+        "state": "[4,4,4,3,5], order not restored, forward divided by N",
+        "observable": "budget still passes, but N=30 error is 1.000492483135688 and N=960 audit error is 0.9998561931085311; numeric target FAIL"
+      }
+    ],
+    "controls": [
+      "Named PresetGroup with exactly the four scenarios above; active index clears when any stage or toggle differs.",
+      "Five Slider controls use min=0, max=27, step=1 and map indices to editor_choices. Display radix 1 as unused and announce stage number plus chosen radix with aria-valuetext.",
+      "Restore natural order Button and Raw forward scale Button expose aria-pressed, use at least 44 px targets, and state both the enabled contract and the disabled fault in visible text."
+    ],
+    "guided_tasks": [
+      "Start at Power-of-two wall. Change stage radices until their product is exactly 960 and the plan contains a non-power-of-two factor.",
+      "Keep a valid plan and reduce T to at most 115200. Confirm [4,4,4,3,5] reaches 19200 and 48x while Direct 960 remains at 1x.",
+      "With the mixed plan, turn off one interface toggle at a time, observe error above 1e-10, then restore both until the N=30 full check and N=960 partial audit pass."
+    ]
+  },
+  "readouts_and_targets": {
+    "target_list": [
+      "Factor 960: active product=960 and at least one active radix is not a power of two.",
+      "Work budget: valid historical T<=115200, equivalently direct/candidate>=8.",
+      "DFT contract: both interface toggles enabled, N=30 full error<1e-10, and when audited N=960 error<1e-10."
+    ],
+    "readout_fields": [
+      "active factor expression, product, factor sum, valid/invalid",
+      "direct units 921600, candidate units or unavailable, ratio, 8x boundary 115200",
+      "non-power factor present/absent",
+      "restore order and raw forward scale enabled/fault",
+      "N=30 full relative L2 error and PASS/FAIL",
+      "N=960 16-bin relative L2 audit error, PASS/FAIL, or explicit skip reason"
+    ],
+    "mobile": "At 360 px stack presets, five sliders, toggles, bars, TargetList, and Readout. Factor labels and numerical costs may wrap but no control or bar causes horizontal scroll.",
+    "accessibility": "Native kit buttons/sliders, keyboard access, visible focus, 44 px targets, aria-valuetext on indexed sliders, aria-pressed on toggles, and polite live updates for target/error changes. Bars repeat every result in text and never rely on hue. No motion."
+  },
+  "deterministic_checks": [
+    "Power-of-two wall [4,4,4]: product=64, so it cannot be a factor plan for 960 and receives no misleading cost pass.",
+    "Direct 960 [960]: product=960, sum=960, T=921600, ratio=1, budget FAIL; large audit is skipped by the declared guard.",
+    "Mixed [4,4,4,3,5]: product=960, sum=20, T=19200, 19200<=115200, ratio=48, and non-power radices 3 and 5 are visible.",
+    "N=30 [2,3,5], correct interfaces: full relative L2 error=5.1613794579441145e-15, PASS.",
+    "N=30, order omitted only: relative error=1.4128775357394214, FAIL.",
+    "N=30, forward divided by 30 only: relative error=0.9666666666666668, FAIL.",
+    "N=30, both faults: relative error=1.000492483135688, FAIL.",
+    "N=960 [4,4,4,3,5], correct interfaces over the 16 audit bins: relative error=2.8711519851015984e-14, PASS.",
+    "N=960 mixed plan, order omitted only: audit error=1.2098977153389652, FAIL.",
+    "N=960 mixed plan, forward divided by 960 only: audit error=0.9989583333333334, FAIL.",
+    "N=960 mixed plan, both faults: audit error=0.9998561931085311, FAIL.",
+    "The mixed-plan digit-reversal destination addresses for the 16 audited natural indices are [0,240,480,720,300,120,420,315,510,825,380,25,391,416,513,959].",
+    "N=1 returns the input with zero stages; repeated factors are accepted; an invalid product never enters recursive evaluation."
+  ],
+  "scope_guards": [
+    "Do not call 19200 a count of radix-2 twiddle slots or compare it directly with the static N=8 twiddle ledger; it is the named historical complex multiply-add budget.",
+    "Do not claim the FFT changes X[k]. Any changed natural-order, raw-forward answer is an interface bug exposed by the validator.",
+    "Do not imply power-of-two sizes are required. The passing plan visibly includes radix 3 and radix 5.",
+    "Do not claim the 16-bin N=960 audit is a full direct comparison; the full direct comparison is N=30.",
+    "Do not turn a prime stopping case for this factorization into a claim that no fast prime-length transform exists.",
+    "Do not add benchmark timing or a universal runtime crossover; this lab is an operation-budget and correctness lab."
+  ],
+  "validation_plan": [
+    "Run a standalone deterministic TypeScript or JavaScript harness reproducing every preset, LCG sample, cost, permutation address, and error above before UI review.",
+    "Confirm use client is first, default export has no required props, imports are React plus components/ui only, and the component remains at or below 200 physical lines.",
+    "Run npx tsc --noEmit and scoped eslint on FftBudgetLab.tsx plus the demo registry.",
+    "After the lesson exists, run npm run validate -- digital-signal-processing fft-factorization-and-layout.",
+    "Inspect light/dark desktop and 360 px; keyboard-run all presets, all slider endpoints, both toggles independently, and verify preset clearing plus polite target announcements."
+  ],
+  "checklist_expectation": {
+    "D1": "PASS: the learner must construct a non-power-of-two factor plan, cross a quantitative work boundary, and diagnose two independent numerical interface failures; a static figure cannot supply plan search or reversible fault injection.",
+    "D2": "PASS by plan: deterministic local arithmetic only; the N=960 audit is guarded to under-budget plans, bounded by 115200 declared CMA units plus 15360 direct-bin terms and no async work.",
+    "D3": "PASS by plan: the incomplete power-of-two state is the initial productive failure, and four named scenarios anchor invalid, direct, passing, and contract-broken states.",
+    "D4": "PASS by plan: three ordered tasks have exact observable outcomes and the five stage slots plus independent toggles remain open to exploration.",
+    "D5": "PASS by plan: one client component, existing UI kit, no dependency, keyboard/touch controls, textual redundancy, responsive bars, and a hard 200-line budget."
+  }
+}

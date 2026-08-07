@@ -1,0 +1,562 @@
+An LTI system is completely determined by its response to one unit impulse, and convolution assembles the response to every input.
+
+<Ref lesson="sampled-sequences">Sampled Sequences and Physical Units</Ref> fixed the index, units, sample period, and out-of-record convention before any operation was allowed. Its closing decomposition wrote a finite record as scaled, shifted impulses but left two assembly rules unnamed. A **system** is any rule that takes a sequence in and produces a sequence out: the room that adds echo to a voice, the loudspeaker that colors it, three lines of code that average samples. LTI abbreviates *linear, time-invariant* — the two properties defined below — and their value is economic: no test can measure a system's response to every possible input, and for an LTI system none has to, because one measured response, to a single unit impulse, determines the response to every input. This lesson supplies the two rules that license that claim, derives the convolution sum that executes it, and keeps the finite-buffer boundary visible in every calculation.
+
+The route: compute one literal three-tap filter output, separate linearity from time invariance, derive convolution from impulse decomposition, compare finite-buffer implementations, and identify a sparse echo kernel from measurements.
+
+## Start from the contract, not the formula
+
+The prerequisite ended with $x=[2,-1,0,3]$ on $n=0,1,2,3$, extended by zero elsewhere. Retrieve that representation before adding a system.
+
+<Exercise>
+Without looking back, write this record as a sum of shifted unit impulses. Then state the integer domain, the outside-record convention, and the physical unit of $\delta[n]$ if $x[n]$ is measured in volts.
+
+<Solution>
+The unit impulse is $1$ at its named index and $0$ at every other integer, so
+
+$$
+x[n]=2\delta[n]-\delta[n-1]+3\delta[n-3].
+$$
+
+The stored domain is $n=0,1,2,3$, and the zero extension defines $x[n]=0$ outside it. The impulse is dimensionless; the coefficients $2$, $-1$, and $3$ carry volts. This distinction matters because a system response can change the amplitude unit, while shifting an impulse changes only its index.
+</Solution>
+</Exercise>
+
+### Four overlap sums fix the index convention
+
+Now take a short input — two samples of a calibrated microphone record like the previous lesson's, so its values carry volts:
+
+$$
+x=[1,2] \text{V}
+$$
+
+and a three-tap echo kernel
+
+$$
+h=[1,0.5,0.25].
+$$
+
+Both names are inherited from filter hardware: a **tap** is one stored coefficient — the point where a delay line is tapped — and a **kernel** is the complete coefficient array a filter applies to its input. This kernel models a direct sound followed by two echoes: each input sample passes once at full strength, again one sample later at half strength, and once more two samples later at quarter strength. Both arrays start at index $0$ and are zero outside their stored ranges. The output has four potentially nonzero samples. Compute each one by aligning coefficients whose indices add to the output index:
+
+$$
+\begin{aligned}
+y[0] &= 1(1)=1,\\
+y[1] &= 2(1)+1(0.5)=2.5,\\
+y[2] &= 2(0.5)+1(0.25)=1.25,\\
+y[3] &= 2(0.25)=0.5.
+\end{aligned}
+$$
+
+Thus
+
+$$
+y=[1,2.5,1.25,0.5]\ \text{V}.
+$$
+
+This is already convolution, before the abstraction: every output index collects all input–kernel products whose indices add to that index. The kernel entries are dimensionless gains here, so the output retains volts. If each tap represented another physical operator, its units would have to make each summed term compatible.
+
+<FigureSequence
+  name="three-tap-flip-slide"
+  alt="Four frames slide a flipped three-tap kernel across x=[1,2], highlighting the products that form output samples 1, 2.5, 1.25, and 0.5."
+  caption="Each output sample is the sum of products whose input and kernel indices add to the same n."
+/>
+
+<Example title="the four overlaps of a three-tap kernel">
+The index ledger prevents the common off-by-one error:
+
+| output index $n$ | aligned products | sum |
+|---:|---|---:|
+| 0 | $x[0]h[0]$ | $1$ |
+| 1 | $x[1]h[0]+x[0]h[1]$ | $2.5$ |
+| 2 | $x[1]h[1]+x[0]h[2]$ | $1.25$ |
+| 3 | $x[1]h[2]$ | $0.5$ |
+
+The support starts at $0+0$ and ends at $1+2$. No term at $n=4$ survives because every required input or kernel value lies in its zero extension.
+</Example>
+
+<Exercise>
+Use the same three-tap kernel $h=[1,0.5,0.25]$ with $v=[2,-1]$, both starting at index $0$ and extended by zero. Compute all four output samples twice: first from the overlap ledger, then as $2h[n]-h[n-1]$. Explain why the two methods must agree if the system has the properties developed next.
+
+<Solution>
+The overlap calculation gives
+
+$$
+\begin{aligned}
+z[0]&=2(1)=2,\\
+z[1]&=(-1)(1)+2(0.5)=0,\\
+z[2]&=(-1)(0.5)+2(0.25)=0,\\
+z[3]&=(-1)(0.25)=-0.25.
+\end{aligned}
+$$
+
+Therefore $z=[2,0,0,-0.25]$. The shifted-copy calculation is
+
+$$
+2[1,0.5,0.25,0]-[0,1,0.5,0.25]
+=[2,0,0,-0.25].
+$$
+
+The methods agree because $v[n]=2\delta[n]-\delta[n-1]$: linearity preserves the two weights and addition, while time invariance turns the delayed impulse into the same response delayed by one sample.
+</Solution>
+</Exercise>
+
+The arithmetic exposes the useful structure. It does not yet justify applying that structure to an arbitrary black box. That requires two independent tests.
+
+## Linearity preserves weights; time invariance preserves shifts
+
+Write a system as an operator $T$ that maps the entire input sequence $x$ to the entire output sequence $y=T\{x\}$. The notation $T\{x\}[n]$ selects sample $n$ after the system acts; $T$ does not act on one isolated sample.
+
+<Definition title="discrete-time LTI system">
+A system $T$ is **linear** if, for every allowed pair of input sequences $x_1,x_2$ and scalars $a,b$,
+
+$$
+T\{a x_1+b x_2\}[n]=aT\{x_1\}[n]+bT\{x_2\}[n].
+$$
+
+It is **time invariant** if, whenever $T\{x\}[n]=y[n]$, every integer shift $n_0$ obeys
+
+$$
+T\{x[\,\cdot-n_0]\}[n]=y[n-n_0].
+$$
+
+An **LTI system** satisfies both clauses on the declared signal domain and boundary convention.
+</Definition>
+
+### The two tests fail independently
+
+The three-tap rule $T\{x\}[n]=x[n]+0.5x[n-1]+0.25x[n-2]$ is the canonical case: distributing over a weighted sum proves linearity, and replacing $n$ by $n-n_0$ commutes with every integer shift. A structurally different LTI example is a pure delay $T\{x\}[n]=x[n-7]$. The zero system is a boundary case; it maps every input to zero and still passes both tests.
+
+The rule $T\{x\}[n]=n x[n]$ is a near miss that violates exactly the time-invariance clause. It is linear, but delaying first gives $n x[n-n_0]$, while delaying the output gives $(n-n_0)x[n-n_0]$. Conversely, $T\{x\}[n]=x^2[n]$ is time invariant but not linear because squaring creates cross terms and does not preserve general scaling. A scaling test therefore cannot establish time invariance, and a shift test cannot establish linearity. Construct one additional system of each near-miss type and identify the single failed clause before using the label LTI.
+
+The boundary convention belongs in the definition. A finite-array routine that silently clips a shifted input at its buffer edge may fail the shift test even when its intended infinite-sequence rule is time invariant. Test the mathematical system and the implemented interface separately.
+
+## One impulse response generates every LTI response
+
+The unit impulse is the indexed probe that connects the two LTI clauses.
+
+<Definition title="impulse response">
+For a discrete-time system $T$, its **impulse response** is
+
+$$
+h[n]=T\{\delta\}[n].
+$$
+
+If $T$ is LTI, this one sequence determines the response to every input for which the resulting sum is defined.
+</Definition>
+
+For the canonical three-tap filter, $h=[1,0.5,0.25]$: applying a unit impulse exposes its three coefficients. A pure seven-sample delay has the structurally different response $h[n]=\delta[n-7]$. The zero system has the boundary response $h[n]=0$. For the nonlinear squarer, $T\{\delta\}=\delta$ is still an impulse response, but it is not a complete system description: $T\{2\delta\}=4\delta$ cannot be predicted by scaling that response to $2\delta$. The sufficiency claim depends on LTI, not on the act of measuring an impulse.
+
+### Superposition turns the decomposition into a response
+
+Now decompose any finite-support sequence over the integers:
+
+$$
+x[n]=\sum_{m=-\infty}^{\infty}x[m]\delta[n-m].
+$$
+
+The index $m$ names each source location. Apply $T$ to both sides. Linearity moves the sum and weights outside the system:
+
+$$
+T\{x\}[n]
+=\sum_{m=-\infty}^{\infty}x[m]T\{\delta[\,\cdot-m]\}[n].
+$$
+
+Time invariance supplies the missing response. Because a shift of the impulse produces the same shift of its response,
+
+$$
+T\{\delta[\,\cdot-m]\}[n]=h[n-m].
+$$
+
+Combining the two steps yields
+
+$$
+y[n]=\sum_{m=-\infty}^{\infty}x[m]h[n-m].
+$$
+
+For finite-support sequences, only finitely many terms survive, so every step is ordinary finite algebra. For infinite-support sequences, the signal domain and convergence assumptions must also license the series and the interchange of $T$ with its limiting sum; LTI alone does not settle convergence.
+
+<Figure
+  src="./figures/impulse-decomposition.svg"
+  alt="The input x=[1,2] splits into a unit impulse and a twice-weighted delayed impulse; one LTI response becomes h[n] and 2h[n-1], which add to [1,2.5,1.25,0.5]."
+  caption="Linearity preserves the weights and sum; time invariance reuses one impulse response at each shift."
+/>
+
+The derivation is the reason an impulse response is sufficient. Linearity retains each sample's weight; time invariance turns one measured response into every shifted response. Remove either property and one equality fails.
+
+<KeyFact>
+The reusable LTI impulse response is a zero-state measurement: a nonzero initial state contributes a separate zero-input response, so convolution with $h$ predicts the total output only after that state is reset or its contribution is added.
+</KeyFact>
+
+## Convolution is the assembly operation
+
+The sum derived from impulse decomposition is common enough to name, and its name fixes the non-wrapping operation on the ordinary integer line.
+
+<Definition title="linear convolution">
+The **linear convolution** of sequences $x$ and $h$ is
+
+$$
+(x*h)[n]=\sum_{m=-\infty}^{\infty}x[m]h[n-m].
+$$
+
+For an LTI system with impulse response $h$, the output is $y=x*h$. The word *linear* here distinguishes the non-wrapping integer-index operation from circular convolution; it does not by itself certify that an arbitrary implementation is a linear system.
+</Definition>
+
+### Shifted copies and flip-and-slide are one calculation
+
+The canonical short calculation uses $x=[1,2]$ and $h=[1,-1]$, both starting at zero and zero outside their supports:
+
+$$
+y[0]=1,\qquad y[1]=-1+2=1,\qquad y[2]=-2,
+$$
+
+so
+
+$$
+[1,2]*[1,-1]=[1,1,-2].
+$$
+
+The shifted-response view gives the same result:
+
+$$
+y[n]=h[n]+2h[n-1]
+=[1,-1,0]+[0,2,-2]=[1,1,-2].
+$$
+
+A structurally different case is a two-sample running sum, $h=[1,1]$, applied to a long stream: $y[n]=x[n]+x[n-1]$. The unit impulse is a boundary identity, $x*\delta=x$, while the zero kernel is an annihilator, $x*0=0$. Three-point circular convolution is a near miss to this definition because it reduces $n-m$ modulo $3$ and wraps tail terms to the beginning instead of evaluating sequences on the ordinary integer line. Invent a two-tap kernel and a three-sample input, predict the linear output support before calculating, and identify the first circular term that would wrap.
+
+The apparent flip in $h[n-m]$ is bookkeeping, not a physical reversal of the stored filter. For a fixed $n$, increasing $m$ reads $h$ in decreasing index order. In a real-time FIR implementation, the equivalent rule is usually written as a dot product between coefficients and current/past input samples; no buffer needs to be visibly reversed.
+
+## Finite buffers force a boundary decision
+
+The infinite-sequence sum becomes ambiguous in software until the finite-buffer contract chooses an extension and an output range.
+
+### Linear and circular outputs disagree at the tail
+
+If $x$ has $L_x$ consecutive nonzero samples and $h$ has $L_h$, both under zero extension, their output can have
+
+$$
+L_y=L_x+L_h-1
+$$
+
+samples. Its first support index is the sum of the two first indices, and its last support index is the sum of the two last indices. This support check catches dropped tail samples before any numerical comparison.
+
+For example, let
+
+$$
+x=[1,2,-1],\qquad h=[1,0.5].
+$$
+
+Zero-extended linear convolution gives
+
+$$
+x*h=[1,2.5,0,-0.5].
+$$
+
+Three-point circular convolution instead pads $h$ to $[1,0.5,0]$ and reduces every index modulo $3$. The linear tail $-0.5$ wraps onto the first sample, producing
+
+$$
+x\mathbin{\circledast}_3 h=[0.5,2.5,0].
+$$
+
+Neither answer is universally correct. The first models finite nonperiodic records with zero outside; the second models period-three sequences or a transform-domain computation that intentionally wraps. Zero-padding before a circular algorithm is how an implementation can represent the longer linear result without wraparound.
+
+### Sum, matrix, and buffer agree under one contract
+
+The same linear convolution has three useful computational views:
+
+$$
+\begin{bmatrix}
+y[0]\\y[1]\\y[2]\\y[3]
+\end{bmatrix}
+=
+\begin{bmatrix}
+1&0&0\\
+0.5&1&0\\
+0&0.5&1\\
+0&0&0.5
+\end{bmatrix}
+\begin{bmatrix}
+x[0]\\x[1]\\x[2]
+\end{bmatrix},
+$$
+
+or as the convolution sum, or sample by sample with a two-place state buffer. The Toeplitz matrix exposes every dependency; the sum supports algebra; the circular buffer avoids copying old samples in a real-time implementation. They are equivalent only when coefficient order, initial buffer state, output range, and boundary handling match.
+
+<Figure
+  name="ConvolutionThreeViews"
+  alt="Three aligned panels compute x=[1,2,-1] convolved with h=[1,0.5] as overlap sums, a four-by-three Toeplitz matrix product, and a one-sample streaming buffer with a final zero flush."
+  caption="The sum, matrix, and state buffer agree only when coefficient order, zero initialization, output range, and final flush agree."
+/>
+
+### Streaming requires zero initialization and a final flush
+
+For a live stream, $y[n]=x[n]+0.5x[n-1]$ can be emitted after $x[n]$ arrives if the previous sample is stored. For a finite file, the state must start from the declared prehistory and run long enough to emit the tail.
+
+<Example title="the streaming form needs initialization and a flush">
+Implement $y[n]=x[n]+0.5x[n-1]$ for the finite input $x=[1,2,-1]$ using a one-sample circular state buffer. List the buffer value read, the current input, and the emitted output at each call, including initialization and flush. Then write the equivalent Toeplitz matrix.
+
+Initialize the stored previous input to zero. Process and flush as follows:
+
+| call | current $x[n]$ | stored $x[n-1]$ read | output $y[n]$ | value stored next |
+|---:|---:|---:|---:|---:|
+| 0 | 1 | 0 | 1 | 1 |
+| 1 | 2 | 1 | 2.5 | 2 |
+| 2 | -1 | 2 | 0 | -1 |
+| 3, flush | 0 | -1 | -0.5 | 0 |
+
+The equivalent batch computation is
+
+$$
+\begin{bmatrix}1\\2.5\\0\\-0.5\end{bmatrix}
+=
+\begin{bmatrix}
+1&0&0\\
+0.5&1&0\\
+0&0.5&1\\
+0&0&0.5
+\end{bmatrix}
+\begin{bmatrix}1\\2\\-1\end{bmatrix}.
+$$
+
+The flush is part of the finite zero-extended result. Dropping it emits a truncated stream, while preloading a nonzero state implements a different boundary condition. A causal filter may add computational latency in hardware, but causality, support, and wall-clock scheduling are separate claims. The transferable check is to compare the stream's emitted index range with the matrix row count.
+</Example>
+
+## A sparse echo makes the kernel measurable
+
+The same index and boundary contract now turns abstract taps into propagation paths that can be measured and tested.
+
+### Sparse taps represent distinct propagation paths
+
+An audible three-tap echo is better represented by three nonzero taps separated in time than by three adjacent audio samples. At $f_s=8$ kHz, let
+
+$$
+h[n]=\delta[n]+a\delta[n-400]+b\delta[n-960].
+$$
+
+The delays are $400/8000=50$ ms and $960/8000=120$ ms, so
+
+$$
+y[n]=x[n]+a x[n-400]+b x[n-960].
+$$
+
+The first path is dry, and the other two are delayed gains. A general input produces three shifted copies that can overlap, but the same kernel must predict every input if the device is LTI.
+
+<Figure
+  src="./figures/sparse-echo-paths.svg"
+  alt="At 8 kilohertz, one input splits into a dry path at zero delay, an early echo with gain a at 400 samples or 50 milliseconds, and a late echo with gain b at 960 samples or 120 milliseconds, then recombines without wraparound."
+  caption="A sparse echo kernel creates dry, 50 ms, and 120 ms copies on one ordinary linear time axis."
+/>
+
+### Prediction must come before identification
+
+<Task>
+Before viewing the readout, add the three coefficients in the target $[0.70,0.25,0.10]$ and the initial candidate $[0.90,0.05,0.10]$, then predict whether their output traces will separate under the constant probe. Predict again for the impulse probe and name the first output indices that should differ. Run both probes, then tune the candidate. Pass only when every tap is within $0.01$ and the impulse normalized $L^2$ output error is below $1\%$. Record which observation falsifies the claim that a steady constant output uniquely determines three taps.
+</Task>
+
+<Demo
+  name="EchoKernelLab"
+  caption="Tune the candidate echo kernel on the constant observation, then switch to the impulse probe and validate it."
+/>
+
+### One equation cannot identify three independent taps
+
+The two coefficient sums in the prediction are both $1.05$. For an input that is constant at $C$ for every integer, the settled output is
+
+$$
+y[n]=C(h[0]+h[1]+h[2]).
+$$
+
+The repeated observation supplies one independent equation, so its convolution design matrix has rank $1$. The candidates $[0.70,0.25,0.10]$ and $[0.90,0.05,0.10]$ therefore produce the same constant output even though two taps differ by $0.20$.
+
+This non-identifiability claim requires the eternal-constant or steady-state-only boundary. For a finite constant record extended by zero, retained startup samples expose partial sums: $y[0]=Ch[0]$, $y[1]=C(h[0]+h[1])$, and $y[2]=C(h[0]+h[1]+h[2])$. Those three equations recover a causal three-tap kernel. Cropping away the startup edge discards that information.
+
+The held-out impulse instead gives $y[0]=h[0]$, $y[1]=h[1]$, and $y[2]=h[2]$. These are three independent coordinates, so the impulse design matrix has rank $3$. A different-looking probe is useful only when it adds independent excitation.
+
+The lab scores the held-out output with
+
+$$
+E(\hat y,y)=
+\frac{\lVert \hat y-y\rVert_2}
+{\max(\lVert y\rVert_2,\varepsilon)},
+$$
+
+where $\varepsilon$ is machine epsilon. If both vectors are zero, $E=0$; if the target is zero and the prediction is not, division by $\varepsilon$ makes the trial fail decisively. Passing supports this three-tap model on the declared observations; it does not prove that a noisy physical device is globally LTI.
+
+The echo closes the argument: a declared impulse response predicts an arbitrary input because LTI licenses shifted, weighted reuse, and convolution performs that reuse with explicit boundaries. The remaining limitation is internal memory created by feedback. A compact difference equation can generate an impulse response with an indefinitely long tail, so the next calculation begins from that tail rather than from another finite kernel.
+
+## Exercises
+
+<Exercise>
+Let $x=[1,2,-1]$ and $h=[1,0.5]$, both starting at $0$ and extended by zero. Compute $y=x*h$ by listing the products at each of the four output indices. Then reconstruct the same result as a sum of three weighted, shifted copies of $h$ and state the support.
+
+<Solution>
+By output index,
+
+$$
+\begin{aligned}
+y[0]&=x[0]h[0]=1,\\
+y[1]&=x[1]h[0]+x[0]h[1]=2+0.5=2.5,\\
+y[2]&=x[2]h[0]+x[1]h[1]=-1+1=0,\\
+y[3]&=x[2]h[1]=-0.5.
+\end{aligned}
+$$
+
+The shifted-copy form is
+
+$$
+y[n]=h[n]+2h[n-1]-h[n-2].
+$$
+
+Using a common four-sample ledger,
+
+$$
+[1,0.5,0,0]+[0,2,1,0]-[0,0,1,0.5]
+=[1,2.5,0,-0.5].
+$$
+
+The support is $n=0,1,2,3$, with maximum possible length $3+2-1=4$. The transferable check is to predict the endpoints by adding support endpoints before doing arithmetic.
+</Solution>
+</Exercise>
+
+<Exercise>
+Establish three boundary identities from the convolution sum: (a) $x*\delta$, (b) the output when $x=[c]$ contains one sample at index $n_0$, and (c) $x*0$. Include the start index and units in each answer.
+
+<Solution>
+For the impulse identity,
+
+$$
+(x*\delta)[n]=\sum_m x[m]\delta[n-m]=x[n],
+$$
+
+because only $m=n$ survives. The start index and units therefore remain those of $x$.
+
+If the one-sample sequence is $x[n]=c\delta[n-n_0]$, then
+
+$$
+(x*h)[n]=c h[n-n_0].
+$$
+
+Its support begins at $n_0$ plus the first index of $h$, and its units are the units of $c$ times those of $h$. Finally,
+
+$$
+(x*0)[n]=\sum_m x[m]0=0
+$$
+
+at every integer. The zero output has no smallest nonzero support index; its declared amplitude unit can still match the system output interface. These cases are useful tests for code paths that mishandle empty support, index offsets, or units.
+
+A one-tap kernel with coefficient $1$ is the identity only when its tap is at index $0$. The same coefficient attached to index $d$ implements $y[n]=x[n-d]$, a delay rather than an index-preserving identity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim “a constant input uniquely identifies a three-tap FIR kernel.” Let $x[n]=2$ for all integers and suppose the measured output is $y[n]=3$. Construct two different kernels supported on $0,1,2$ that both fit the observation, then give one finite probe that distinguishes them and compute its two outputs.
+
+<Solution>
+For a constant input and $h=[h_0,h_1,h_2]$,
+
+$$
+y[n]=2(h_0+h_1+h_2).
+$$
+
+The observation requires only $h_0+h_1+h_2=1.5$. Two valid choices are
+
+$$
+h_A=[1,0.4,0.1],\qquad h_B=[1,0.2,0.3].
+$$
+
+Both produce the constant output $3$. A unit impulse, defined on all integers and zero except at $n=0$, distinguishes them immediately:
+
+$$
+\delta*h_A=[1,0.4,0.1],\qquad
+\delta*h_B=[1,0.2,0.3].
+$$
+
+A short nonconstant probe such as $[1,-1]$ would also work. The transferable diagnosis is rank: the constant steady-state measurement constrains only one coefficient sum, leaving two independent degrees of freedom.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design a reproducible three-path room-echo measurement at $f_s=16$ kHz. Specify a probe, a recording window, how tap indices become milliseconds, how you estimate signs and gains, and an agreement threshold on a second input. Include one condition under which the three-tap model should be rejected.
+
+<Solution>
+One valid protocol is:
+
+1. Send a calibrated unit-sample pulse followed by zeros, at a level below clipping. Record input and output with synchronized clocks for $0.25$ s, or $4000$ samples, long enough to include the expected echoes.
+2. Subtract the measured baseline. Search the output for the dry peak and two later peaks above a predeclared noise threshold. If their indices relative to the dry peak are $D_1,D_2$, report delays $1000D_i/16000$ ms.
+3. Divide each signed peak amplitude by the measured input-pulse amplitude to estimate the three gains. Preserve negative signs; do not replace the response by magnitudes.
+4. Lock the gains and delays. Apply a second input, for example a short pseudorandom $\pm1$ sequence followed by enough zeros to flush the response. Predict its zero-extended linear convolution.
+5. Accept provisionally only if every tap repeated from a second impulse measurement is within $0.01$ and
+
+$$
+\frac{\lVert y_{\text{meas}}-y_{\text{pred}}\rVert_2}
+{\lVert y_{\text{meas}}\rVert_2}<0.01
+$$
+
+over the declared output window.
+
+Reject the three-tap LTI model if significant repeatable energy appears outside the three paths, if gains change with probe amplitude, if delays drift, or if the validation error exceeds the threshold after alignment. Those outcomes indicate omitted paths, nonlinearity, time variation, or a synchronization error rather than “close enough” convolution.
+</Solution>
+</Exercise>
+
+<Exercise>
+For $x=[1,2,-1]$ and $h=[1,0.5]$, compute both zero-padded linear convolution and three-point circular convolution. Identify the exact wrapped term and decide which operation models a nonperiodic echo recorded in a finite file.
+
+<Solution>
+Linear convolution is
+
+$$
+x*h=[1,2.5,0,-0.5].
+$$
+
+For three-point circular convolution, pad $h$ to $[1,0.5,0]$ and use indices modulo $3$:
+
+$$
+\begin{aligned}
+y_c[0]&=x[0]h[0]+x[1]h[2]+x[2]h[1]=1+0-0.5=0.5,\\
+y_c[1]&=x[0]h[1]+x[1]h[0]+x[2]h[2]=0.5+2+0=2.5,\\
+y_c[2]&=x[0]h[2]+x[1]h[1]+x[2]h[0]=0+1-1=0.
+\end{aligned}
+$$
+
+Thus $x\mathbin{\circledast}_3h=[0.5,2.5,0]$. The term $x[2]h[1]=-0.5$, which belongs at linear index $3$, wraps to circular index $0$. A finite nonperiodic echo requires linear convolution, including its tail. Circular convolution is appropriate only if period-three extension is part of the model or if sufficient zero-padding prevents the wrap.
+</Solution>
+</Exercise>
+
+<Exercise>
+A microphone placed near its own loudspeaker returns a fraction of each output to the input; when that loop's gain exceeds one, the setup howls. The simplest model of such a **feedback system** — one whose current output reuses a stored past output — at initial rest obeys
+
+$$
+y[n]=x[n]+1.2y[n-1],\qquad y[-1]=0.
+$$
+
+Apply $x[n]=\delta[n]$. Compute $y[0]$ through $y[5]$, identify the homogeneous mode that controls the tail after the impulse, and state what remains to be decided before calling the system stable.
+
+<Solution>
+At $n=0$,
+
+$$
+y[0]=1+1.2(0)=1.
+$$
+
+For $n\ge1$, the input is zero, so repeated substitution gives
+
+$$
+\begin{aligned}
+y[1]&=1.2,\\
+y[2]&=1.44,\\
+y[3]&=1.728,\\
+y[4]&=2.0736,\\
+y[5]&=2.48832.
+\end{aligned}
+$$
+
+The impulse response is $h[n]=(1.2)^n$ for $n\ge0$ and zero for $n<0$. Its tail is controlled by the homogeneous mode $(1.2)^n$, which grows instead of decaying. A finite six-sample calculation reveals the trend but does not by itself state the stability criterion; one must connect the infinite impulse-response tail to bounded-input bounded-output behavior. <Ref lesson="difference-equations-and-stability">Difference Equations and Stability</Ref> makes that connection and separates the recurrence rule from its initial conditions. The transferable move is to expose a recurrence's zero-input mode before judging a finite trace.
+</Solution>
+</Exercise>
+
+<References>
+1. Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, *Discrete-Time Signal Processing*, 2nd ed. — ch. 2, §§2.1.1 and 2.2–2.4 derive impulse decomposition, distinguish linearity from time invariance, and obtain the convolution sum. https://www.pearson.com/en-us/subject-catalog/p/discrete-time-signal-processing/P200000003226/9780137549771
+2. Sophocles J. Orfanidis, *Introduction to Signal Processing*, 2nd ed. — ch. 3, §§3.2–3.3 establish the LTI representation; ch. 4, §§4.1.1–4.1.7 and §§4.3.2–4.3.4 compare direct, Toeplitz, flip-and-slide, transient, tapped-delay-line, and circular-buffer forms. https://www.ece.rutgers.edu/~orfanidi/intro2sp/
+3. Dennis Freeman, *Signals and Systems*, MIT 6.003, Fall 2011 — Session 8, slides 15–48, develops linearity, time invariance, shifted-impulse decomposition, and convolution; Problem Set 5, Problems 1–3, supplies worked convolution and response calculations. https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/
+4. Steven W. Smith, *The Scientist and Engineer's Guide to Digital Signal Processing* — chs. 5–7 motivate superposition, shift invariance, input-side and output-side convolution, and finite-array edge effects. https://www.dspguide.com/
+</References>

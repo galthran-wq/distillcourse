@@ -1,0 +1,700 @@
+A binary search tree keeps every left-subtree key smaller and every
+right-subtree key larger than its root, which turns search, insertion, and
+deletion into O(h) operations for a tree of height h. The elementary-structures
+module ended on a deliberate sacrifice:
+<Ref lesson="hash-tables">the hash table</Ref> bought expected $O(1)$
+dictionary operations by scattering keys on purpose, and every question about
+order (minimum, successor, the keys in a range) became a full-table scan.
+This lesson opens the ordered-structures module with the structure that
+restores those queries without giving up updates. What it cannot promise is
+the value of $h$: the height depends on the order the keys arrive, and the
+commonest arrival orders are the worst ones. That flaw is stated precisely at
+the end, and <Ref lesson="balanced-search-trees">the next lesson</Ref> removes
+it.
+
+The route: the invariant, and the misreading of it that silently breaks
+search; search and insert as one root-to-leaf walk; the in-order walk and the
+ordered queries hashing could not answer; deletion and its two-child case; and
+the full range of $h$, from $\lceil\lg(n+1)\rceil - 1$ down a chain to
+$n - 1$, with the insertion orders that produce each end.
+
+## The invariant: every key in the subtree, not just the child
+
+Throughout the lesson the running example stores the
+ten keys $11, 20, 26, 29, 32, 41, 50, 65, 72, 91$ in the shape below: 41 at
+the root, a four-node subtree of smaller keys hanging off its left link, a
+four-node subtree of larger keys off its right link, and the same split
+repeated inside each subtree: at node 20, the keys 11 below-left and
+26, 29, 32 below-right.
+
+<Figure
+  src="./figures/running-tree.svg"
+  alt="A ten-node binary search tree rooted at 41, with the entire left subtree (11, 20, 26, 29, 32) boxed as 'every key < 41' and the right subtree (50, 65, 72, 91) boxed as 'every key > 41'"
+  caption="The running example. The invariant at the root constrains all nine other keys, not just the two children."
+/>
+
+<Definition title="binary search tree">
+A **binary search tree** (BST) is a binary tree with one key per node in
+which, for *every* node $x$: every key in $x$'s left subtree is smaller than
+$x.\mathit{key}$, and every key in $x$'s right subtree is larger. Keys are
+assumed distinct; inserting a key already present overwrites its associated
+value, as in a hash table.
+</Definition>
+
+The condition quantifies over whole subtrees. Three instances fix its
+boundary. The running tree is the canonical case. A single chain (1 with
+right child 2 with right child 3) satisfies the definition too: nothing
+requires two children, and this degenerate case returns at the end of the
+lesson. The third instance fails the definition while passing the check most
+readers substitute for it.
+
+### The child-only misreading
+
+A widespread misreading checks each node against its children alone: left
+child smaller, right child larger. The check is strictly weaker than the
+invariant, and a tree that passes it can still lose keys. In the three-node
+tree below, 10 is left of 20 and 25 is right of 10, so both local checks
+pass, but 25 sits in 20's *left subtree* while exceeding 20, which violates the
+definition's subtree clause.
+
+<Figure
+  src="./figures/invariant.svg"
+  alt="Left: a root k with its left subtree shaded 'all keys < k' and right subtree 'all keys > k'. Right: a tree with root 20, left child 10, and 25 as 10's right child; both child checks pass, but a search for 25 goes right from 20 into an empty subtree"
+  caption="The invariant binds subtrees (left). The child-only check passes on the right-hand tree, and a search for 25 fails anyway."
+/>
+
+The reason the weaker check fails is the reason the structure works at all:
+search discards an entire subtree on the strength of **one comparison**. At
+node 20, the comparison $25 > 20$ sends the search right, which is only sound
+if *no* key in the left subtree exceeds 20. The child-only tree breaks exactly
+that promise: 25 is present, and the search reports it absent. A tree is a
+BST when every discard the invariant licenses is safe: the condition on
+subtrees is not pedantry but the precondition of every operation in this
+lesson.
+
+<KeyFact>
+The invariant constrains both entire subtrees of every node, not just the two
+child nodes — and it is exactly the condition every rotation in
+<Ref lesson="balanced-search-trees">the next lesson</Ref> must preserve while
+restructuring the tree.
+</KeyFact>
+
+## Search and insert: one root-to-leaf walk
+
+The invariant turns lookup into repeated discarding. To find key $k$, compare
+it with the root: equal means found, smaller means the right subtree cannot
+contain $k$, larger means the left cannot. Either way one comparison moves
+the search into a single subtree, and the loop repeats until the key or a
+`nil` link turns up.
+
+```text
+Tree-Search(T, k):
+    x = T.root
+    while x ≠ nil and k ≠ x.key
+        if k < x.key:  x = x.left
+        else:          x = x.right
+    return x                        # the node holding k, or nil
+```
+
+The nodes visited form one simple path downward from the root. A downward
+path in a tree of *height* $h$ (the number of edges on the longest
+root-to-leaf path, so a single node has height 0) contains at most $h + 1$
+nodes, so search costs $O(h)$: the cost of every operation in this lesson is
+$1 + {}$the depth of the node where the walk stops.
+
+<FigureSequence
+  name="search"
+  alt="Four frames of an unsuccessful search for 27 in the running tree: 27 is compared against 41 (go left), 20 (go right), 29 (go left), then 26, whose right link is nil; the final frame shows a dashed node 27 attached at that nil"
+  caption="Searching the running tree for 27: one comparison per frame, one subtree discarded per comparison. The nil where the search dies is where an insert would attach 27."
+/>
+
+<Task>
+Step through the four frames counting keys the search can still be hiding
+among: 10 before the first comparison, then 5, 3, 1, 0. Each comparison
+discards the current node and one entire subtree: that is the invariant at
+work, and it is what the child-only tree of the previous section could not
+guarantee.
+</Task>
+
+### Insert: the same walk, plus one link
+
+An unsuccessful search ends at a `nil` link, and that link is the one place
+the missing key can live without disturbing any other node. Insertion runs
+the search with a trailing pointer $y$ (the parent one step behind $x$), and
+when $x$ falls off the tree, hangs a fresh node on the link the search
+followed. CLRS's version also stores a parent pointer in each node; the
+trailing pointer makes it unnecessary here, and nothing below needs one.
+
+```text
+Tree-Insert(T, k):
+    y = nil;  x = T.root            # y trails one step behind x
+    while x ≠ nil
+        y = x
+        if k < x.key:  x = x.left
+        else:          x = x.right
+    z = new node(k)                 # z.left = z.right = nil
+    if   y == nil:   T.root  = z    # tree was empty
+    elif k < y.key:  y.left  = z
+    else:            y.right = z
+```
+
+Two consequences, both load-bearing later. Insert costs $O(h)$, the same walk
+as search. And **every insert attaches at a leaf position**: no key ever
+enters the interior, so the shape of the tree is entirely a record of the
+order in which the keys arrived.
+
+<Example title="inserting 27 into the running tree">
+The walk is the one in the figure sequence: $27 < 41$ go left, $27 > 20$ go
+right, $27 < 29$ go left, $27 > 26$ go right, and 26's right link is `nil`.
+The trailing pointer holds $y = 26$, so the new node becomes 26's right
+child, at depth 4. Four comparisons; the tree's height grows from 3 to 4. The
+in-order position is right where the key belongs: between 26 and 29.
+</Example>
+
+<Exercise>
+Into the original ten-key running tree (without 27), insert 45, then 46, then
+44, in that order. For each key give the comparison sequence, the parent it
+attaches to, and its depth; then give the height of the resulting tree and
+name the single inserted key responsible for it.
+
+<Solution>
+Strategy: each insert is an unsuccessful search; trace it against the current
+tree, which the earlier inserts have grown.
+
+**45**: $45 > 41$ right, $45 < 65$ left, $45 < 50$ left, then `nil`. Attaches as
+50's left child, depth 3. Three comparisons.
+
+**46**: $46 > 41$, $46 < 65$, $46 < 50$, $46 > 45$, then `nil`. Attaches as 45's
+right child, depth 4. Four comparisons.
+
+**44**: $44 > 41$, $44 < 65$, $44 < 50$, $44 < 45$, then `nil`. Attaches as 45's
+left child, depth 4. Four comparisons.
+
+The height is now 4, and either of 46 or 44 accounts for it (each sits at
+depth 4; 46 got there first). The transferable observation: 45, 46, 44 arrived
+in nearly sorted order and stacked into a little chain under 50: a preview,
+three keys wide, of the failure mode the last section prices out.
+</Solution>
+</Exercise>
+
+## Order restored: the in-order walk is sorted
+
+Search and insert alone recreate what the hash table already did, at $O(h)$
+instead of expected $O(1)$. The reason to pay comparison costs at all is that
+the invariant stores the *sorted order* in the tree's shape, where a hash
+function deliberately destroyed it. The instrument that reads the order back
+out is a three-line recursion.
+
+```text
+Inorder(x):
+    if x ≠ nil
+        Inorder(x.left);  emit x.key;  Inorder(x.right)
+```
+
+<Theorem title="the in-order walk emits sorted order">
+On any BST with $n$ nodes, `Inorder(root)` emits all $n$ keys in increasing
+order, in $\Theta(n)$ time.
+
+<Proof>
+Induction on $n$. An empty subtree emits nothing. For a subtree rooted at
+$x$, the call emits the left subtree's keys (in increasing order, by the
+induction hypothesis), then $x.\mathit{key}$, then the right subtree's keys
+(increasing, likewise). The invariant places every left-subtree key below
+$x.\mathit{key}$ and every right-subtree key above it, so the concatenation
+is increasing. Time: the procedure is called exactly once on every node and
+once on every `nil` link, and a tree with $n$ nodes has $n + 1$ `nil` links,
+so the work is constant per call over $2n + 1$ calls: $\Theta(n)$.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/inorder.svg"
+  alt="The running tree drawn with each node vertically above its key's position on a number line; dashed guides drop each of the ten keys onto the line in sorted order 11 through 91"
+  caption="The tree drawn with in-order x-coordinates: projecting the nodes downward reads out 11, 20, 26, 29, 32, 41, 50, 65, 72, 91, sorted, as the theorem requires."
+/>
+
+### Minimum, successor, range
+
+The ordered queries all reduce to short walks. The **minimum** is reached by
+following left links from the root until one is `nil` (in the running tree,
+$41 \to 20 \to 11$), and the maximum symmetrically; cost $O(h)$. The
+**successor** of a node $x$ (the next key in sorted order) splits into two
+cases:
+
+```text
+Successor(x):
+    if x.right ≠ nil: return Minimum(x.right)   # leftmost node of right subtree
+    y = parent of x
+    while y ≠ nil and x == y.right              # climb while arriving from the right
+        x = y;  y = parent of y
+    return y
+```
+
+If $x$ has a right subtree, the walk after emitting $x$ enters it and emits
+its leftmost node first, so the successor lies *down* the tree. If not, every
+key below $x$ has already been emitted, and the successor is the nearest
+ancestor reached from the left. Either case walks one path, down or up:
+$O(h)$.
+
+<Example title="successor of 41 and of 32">
+**Successor of 41** (the down case): 41 has a right child, so the successor
+is the minimum of the subtree rooted at 65. Follow left links: $65 \to 50$,
+and 50's left link is `nil`. The successor is 50, two edges below the start.
+
+**Successor of 32** (the climb): 32 has no right child. Its parent is 29,
+and 32 is 29's *right* child; keep climbing. 29's parent is 20, and 29 is
+20's right child; keep climbing. 20's parent is 41, and 20 is 41's *left*
+child, so the climb stops: the successor is 41, three edges up. The
+stopping rule is the invariant read backwards: 32 is the largest key in
+41's left subtree, so the
+next key in sorted order is 41 itself.
+</Example>
+
+A **range query** (report every key in $[a, b]$) recurses from the root,
+entering a subtree only if the invariant allows it to contain keys in the
+interval. The walk visits the two boundary search paths plus every reported
+node: $O(h + r)$ for $r$ results. On the running tree, $[25, 45]$ yields
+$26, 29, 32, 41$ from a walk that never touches 11, 72, or 91.
+
+<Exercise>
+On the running tree, execute $\text{Successor}(91)$ step by step, naming
+each node the climb visits and the value returned. Then run the range query
+$[18, 50]$: list every node the recursion visits, the keys it reports in
+order, and check the two unreported visits against the $O(h + r)$ bound.
+
+<Solution>
+$\text{Successor}(91)$: 91's right link is `nil`, so climb. 91's parent is
+65, and 91 is its right child; climb. 65's parent is 41, and 65 is its
+right child; climb. 41 has no parent, so $y = \text{nil}$ and the procedure
+returns `nil`: 91 is the maximum, and a climb that reaches the root from the
+right is exactly the certificate that no key exceeds the start.
+
+Range $[18, 50]$: at the root, $18 \le 41 \le 50$, so both subtrees may hold
+results: report 41, recurse both ways. At 20 (in range, report): recurse
+both ways. At 11: $11 < 18$, and its left subtree holds only smaller keys,
+so the recursion skips it; 11's right link is `nil`; nothing reported. At 29
+(report): both children 26 and 32 are in range; report both. At 65:
+$65 > 50$, so only its left subtree can contribute: visit 50, report it.
+
+Reported in order: $20, 26, 29, 32, 41, 50$, so $r = 6$. Visited: 8 of the
+10 nodes; 72 and 91 are never touched. The two visited-but-unreported nodes,
+11 and 65, lie on the boundary search paths for 18 and for 50 — the $O(h)$
+term of the bound; every other visit produced a result.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Every query that cost the hash table a $\Theta(m + n)$ scan (minimum,
+successor, range) costs $O(h)$ here, plus $O(1)$ per result reported. A
+sorted array answers the same queries in $O(\log n)$ but pays $\Theta(n)$
+per insert; the BST is the first structure in the course that keeps the
+ordered queries *and* $O(h)$ updates. Making $h$ behave like $\log n$ is the
+remaining step: a balanced BST is binary search made insertable.
+</KeyFact>
+
+## Deletion: the two-child case borrows the successor
+
+Insertion only ever touches a leaf position; deletion cannot be so confined,
+because the key to remove may sit anywhere, including at the root. The
+structural cases are decided by how many children the target node $z$ has.
+
+**Leaf**: replace the parent's link to $z$ with `nil`. **One child**: replace
+the parent's link to $z$ with $z$'s only child; the whole subtree keeps its
+position relative to every ancestor, because it occupied the same side of
+each of them as $z$ did. **Two children**: no single link can absorb two
+subtrees, so instead of removing the node, replace its *key*: overwrite $z$
+with its successor $y$, then delete $y$ from where it stood. That second
+deletion is always one of the easy cases, by the lemma the whole scheme rests
+on.
+
+<Theorem title="the successor of a two-child node has no left child">
+If $z$ has two children, its successor $y$ is the leftmost node of $z$'s
+right subtree, and $y.\mathit{left} = \text{nil}$.
+
+<Proof>
+$z$'s right subtree is nonempty, so the in-order walk emits its leftmost node
+immediately after $z$: that node is the successor $y$. Leftmost means the
+walk that reaches it follows left links until one is `nil`, so
+$y.\mathit{left} = \text{nil}$, and $y$ has at most a right child.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/delete-cases.svg"
+  alt="Three before-and-after pairs: deleting the leaf 11 unlinks it; deleting 91, which has the single child 72, splices 72 up; deleting 20, which has two children, lifts its successor 26 into its place"
+  caption="The three deletion cases on pieces of the running tree. Only the two-child case moves a second node, and the lemma guarantees that node is easy to move."
+/>
+
+<Example title="deleting 20 from the running tree">
+$z = 20$ has children 11 and 29. Its successor is the leftmost node of the
+subtree rooted at 29: follow left links, $29 \to 26$, `nil`. So $y = 26$,
+and as promised it has no left child (here, no children at all).
+
+Step 1, splice $y$ out: 26's parent 29 takes over 26's right subtree, which
+is empty, so $29.\mathit{left} \gets \text{nil}$. Step 2, put $y$ in $z$'s
+place: 26 becomes 41's left child, with $26.\mathit{left} \gets 11$ and
+$26.\mathit{right} \gets 29$.
+
+The invariant survives: 26 was the *least* key exceeding 20, so it is larger
+than everything in 20's left subtree and smaller than everything remaining
+in the right subtree (whose minimum it was); and it lies between the same
+ancestors' keys as 20 did, so every constraint above the vacated position
+still holds. The same three clauses justify every two-child deletion, not
+just this one. Check against the figure: $11 < 26 < 29 < 32$, and all four
+remain below 41.
+</Example>
+
+When the successor happens to be $z$'s right child itself, step 1 disappears
+and $y$ simply moves up with its right subtree attached (CLRS's Figure 12.4
+distinguishes the two sub-cases; the code needs one `if`). The whole
+operation is a search for $z$ plus a minimum-walk below it, all along one
+descending path: $O(h)$. The mirror scheme, replacing $z$ with its
+*predecessor* (the rightmost node of the left subtree), is symmetric and
+equally correct.
+
+<Remark title="Hibbard deletions skew the tree">
+The two-child scheme is *Hibbard deletion*, published by Thomas Hibbard in
+1962 with a proof that deleting one random key from a random tree leaves the
+shape distribution random. The guarantee does not survive repetition: over a
+long sequence of alternating random insertions and Hibbard deletions the
+always-take-the-successor asymmetry accumulates, and the average search path
+drifts from logarithmic to $\Theta(\sqrt{n}\,)$. Alternating randomly between
+successor and predecessor does not restore the logarithm, and a deletion
+procedure as simple as Hibbard's that provably preserves randomness is a
+long-standing open problem (Sedgewick–Wayne §3.2). Deletion, not search, is
+where the mathematics of BSTs stops being settled.
+</Remark>
+
+<Exercise>
+Delete 65 from the original ten-key running tree. Name the case, identify the
+successor and verify the lemma's promise about it, list every link that
+changes, and state the in-order output of the resulting tree.
+
+<Solution>
+$z = 65$ has two children (50 and 91): the two-child case. The successor is
+the leftmost node of the subtree rooted at 91: follow left links,
+$91 \to 72$, whose left link is `nil`. So $y = 72$, and the lemma's promise
+holds: $y.\mathit{left} = \text{nil}$. Here $y$ has no right child either,
+which the lemma does not require.
+
+Links: splice 72 out ($91.\mathit{left} \gets \text{nil}$); install it
+($41.\mathit{right} \gets 72$, $72.\mathit{left} \gets 50$,
+$72.\mathit{right} \gets 91$). Three pointer writes after the splice.
+
+In-order output: $11, 20, 26, 29, 32, 41, 50, 72, 91$, the old sequence with
+65 removed, which is the check that the deletion respected the invariant.
+</Solution>
+</Exercise>
+
+## Height decides everything: from lg n down a chain to n − 1
+
+Every bound so far reads $O(h)$, which is only as good as $h$. Both extremes
+are attainable on the same key set, and they differ by a factor of
+$n/\lg n$.
+
+**The floor.** A binary tree of height $h$ has at most
+$1 + 2 + 4 + \cdots + 2^h = 2^{h+1} - 1$ nodes, so $n$ nodes force
+$h \ge \lceil\lg(n+1)\rceil - 1$ (writing $\lg$ for $\log_2$). For $n = 8$
+that is height 3, and the bushy tree below attains it.
+
+**The ceiling.** Nothing stops every node from having one child: a chain of
+$n$ nodes is a legal BST of height $n - 1$, and it is not an exotic
+construction. Insert $1, 2, \ldots, 8$ in sorted order: each new key exceeds
+every key present, so every comparison sends it right, and it attaches as the
+right child of the previous key. Eight keys build a chain of height 7, and
+the build itself costs $0 + 1 + \cdots + 7 = 28$ comparisons; in general
+$n(n-1)/2$, the same quadratic bill as the colliding
+<Ref lesson="hash-tables">HashDoS keys</Ref>, produced here by nothing more
+adversarial than sorted input.
+
+<Figure
+  src="./figures/insertion-order.svg"
+  alt="Two BSTs on the keys 1 through 8: inserting in sorted order yields a right-leaning chain of height 7; inserting in the order 5, 2, 7, 1, 3, 6, 8, 4 yields a bushy tree of height 3, with a height ruler beside each"
+  caption="The same 8 keys, two arrival orders: sorted input builds a chain of height 7; the order 5, 2, 7, 1, 3, 6, 8, 4 builds the minimum height, 3."
+/>
+
+The chain is a familiar object with a new name: it is
+<Ref lesson="arrays-and-linked-lists">a singly linked list</Ref> that pays
+for a second pointer per node and never uses it, and every operation on it
+(search, insert, min, successor) degrades to the list's $\Theta(n)$ walk.
+The structure has not failed gracefully; it has become the structure this
+module was built to escape.
+
+<Demo
+  name="BSTInsertDelete"
+  caption="Insert and delete keys in a live BST; the readout tracks the current height against ⌈lg(n+1)⌉ − 1."
+/>
+
+<Task>
+Insert 1 through 8 in sorted order and watch the height readout climb to 7,
+one level per key after the first. Clear, then insert the same keys as
+5, 2, 7, 1, 3, 6, 8, 4
+and confirm the height lands on 3, the floor for eight keys. Then load the
+delete-heavy preset and scrub the history slider through its four deletions:
+at each deletion of a two-child node, the key that appears in its place is
+its successor, lifted out of the right subtree — the Hibbard move, one
+frame per operation.
+</Task>
+
+### The average case: random order is provably good
+
+Between the extremes sits the case the structure was hoped to live in:
+insertion orders with no pattern. A random arrival order stays within a
+factor of three of the height floor, in expectation and with almost no
+spread.
+
+<Theorem title="random insertion order (Sedgewick–Wayne 3.2; Reed 2003)">
+Insert $n$ distinct keys in uniformly random order into an empty BST. Then
+the expected number of comparisons for a search or insert is
+$\sim 2 \ln n \approx 1.39 \lg n$, and the expected *height* is
+$\sim 4.311 \ln n \approx 2.99 \lg n$, with variance $O(1)$.
+</Theorem>
+
+The two constants measure different things: $1.39\lg n$ is the depth of an
+average node, $2.99 \lg n$ the depth of the deepest one, and both are within
+a small constant of the ideal $\lg n$. The first result falls out of a
+correspondence between BSTs and quicksort's partitioning, drawn in
+<Ref lesson="comparison-sorting-merge-and-quicksort">the sorting
+module</Ref>; the height result is far more delicate: the exact constant
+$4.311\ldots$ was only pinned down by Reed in 2003, half a century after the
+structure entered use.
+
+Random-BST heights can be sampled without building the trees: Robson's
+algorithm draws from the height distribution directly, which is how sizes up
+to $n = 10^{21}$ (orders of magnitude more keys than any machine could
+store) are reachable at all.
+
+<Figure
+  src="./figures/random-bst-height-measured.png"
+  alt="Scatter plot of measured random-BST height against the number of keys n. The horizontal axis is logarithmic, running from 10^0 to 10^21; the vertical axis is height, 0 to 200. Thousands of points climb in a narrow band along a straight fitted line, from height 0 at small n to about 190 at n = 10^21. A callout box points at the line and reads: this trendline has slope approximately 2.91, the theory matches what we see IRL."
+  caption="Sampled heights of random BSTs (vertical) against n on a log axis (horizontal), out to n = 10²¹. The fitted line has slope ≈ 2.91 per lg n, within a few percent of the asymptotic 2.99 — and the points stay within a few nodes of it at every size, which is what O(1) variance looks like."
+/>
+
+<KeyFact>
+Three numbers summarize the shape question. A BST's height is at least
+$\lceil\lg(n+1)\rceil - 1$ and at most $n - 1$; random insertion order lands
+near the floor ($1.39\lg n$ average depth, $2.99\lg n$ expected height);
+sorted insertion order lands exactly on the ceiling. The structure's cost is
+not a property of the data; it is a property of the data's *arrival order*.
+</KeyFact>
+
+## Sorted arrival is the common case, not the corner case
+
+If random order is good, one repair suggests itself: shuffle the keys before
+inserting. But a dictionary is an online structure: keys arrive one at a
+time, interleaved with searches that must be answered now, and an online
+structure does not get to reorder its future. Worse, the Hibbard-deletion
+remark showed that even a genuinely random history stops being random once
+deletions run long enough. Randomness of arrival is not an assumption a
+library can impose; it is a hope about the workload.
+
+And the hope fails on ordinary inputs. Auto-incrementing database IDs,
+timestamped log records, and files read from an alphabetized directory all
+arrive sorted; a batch merged from sorted exports arrives in long ascending
+runs. Each such run stacks into a chain, exactly as $1$ through $8$ did, and
+drives $h$ toward $n$. The worst case of this structure is not an adversary's
+construction, as the hash table's was; it is routine input.
+
+What is now established: the BST invariant constrains whole subtrees, and one
+comparison per node is sound exactly because of it; search, insert, delete,
+min, successor all cost $O(h)$, with the two-child deletion resolved by a
+successor that provably has at most one child; the in-order walk emits sorted
+order, restoring every query hashing gave up; and $h$ ranges from
+$\lceil\lg(n+1)\rceil - 1$ to $n - 1$ with the arrival order, not the key
+set, selecting the point in that range. The open flaw is that nothing in the
+structure pushes back when insertions stack up on one side.
+<Ref lesson="balanced-search-trees">The next lesson</Ref> adds that
+pushback: a local $O(1)$ restructuring, the rotation, applied under a
+height invariant after each update, forcing $h = O(\log n)$ for every
+arrival order, sorted ones included.
+
+## Exercises
+
+<Exercise>
+Build the BST that results from inserting $30, 10, 45, 5, 25, 40, 50, 20$
+into an empty tree, in that order. Give the tree's shape (parent of each
+key), its height, and its in-order output. Then determine how many of the
+$8! = 40{,}320$ insertion orders of these keys produce a chain of height 7,
+and justify the count.
+
+<Solution>
+Tracing each insert: 30 is the root; 10 goes left of 30; 45 right of 30;
+5 left of 10; 25 right of 10; 40 left of 45; 50 right of 45; 20 left of 25
+(path $30 \to 10 \to 25 \to 20$). Parents: $10, 45 \to 30$; $5, 25 \to 10$;
+$40, 50 \to 45$; $20 \to 25$. Height 3 (node 20 at depth 3). In-order:
+$5, 10, 20, 25, 30, 40, 45, 50$, sorted, as the walk theorem requires.
+
+Chains: a chain arises exactly when every insert attaches to the previous
+node inserted at its single free direction. More precisely, a BST is a chain
+of height 7 iff at every node, all remaining keys lie on one side. There are
+exactly $2^{7} = 128$ chains *as shapes* (each level independently continues
+left or right), but per shape only **one** insertion order produces it: the
+chain's nodes from root to leaf, in that order, since each node must be
+present before its child attaches and no key may precede its ancestor. So
+$128$ of $40{,}320$ orders ($0.3\%$) produce height 7. The extreme shapes are
+rare under random order, which is the combinatorial reason behind the
+$2.99\lg n$ expected height; sorted arrival picks one of them every time.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Deleting a key and immediately reinserting it restores the tree you
+started with, since the same key ends up in the tree either way." Exhibit a
+counterexample on the running tree, and name the structural asymmetry between
+insertion and deletion that the claim overlooks.
+
+<Solution>
+Delete the root 41, then reinsert it. Deletion is the two-child case: the
+successor of 41 is $\text{Minimum}(65\text{'s subtree}) = 50$, which is
+spliced out ($65.\mathit{left} \gets \text{nil}$) and installed at the root
+with children 20 and 65. Reinserting 41 now runs an unsuccessful search:
+$41 < 50$ left, $41 > 20$ right, $41 > 29$ right, $41 > 32$ right; it
+attaches as the right child of 32, at depth 4. The root is 50, and 41 is an
+interior key turned leaf: not the original tree.
+
+The asymmetry: **insertion can only attach at a leaf position, while deletion
+can vacate the interior.** A deletion at an interior node promotes its
+successor into the interior slot, and no subsequent insert can put the old
+key back there, because inserts never displace an occupant. This one-way
+traffic is also the mechanism behind the Hibbard drift: each two-child
+deletion pulls a key up from the right subtree, and the reinserted keys pile
+up at the leaves.
+</Solution>
+</Exercise>
+
+<Exercise>
+An in-order traversal can be run without recursion: call
+$\text{Minimum}(root)$, then call $\text{Successor}$ $n - 1$ times. A single
+successor call costs $O(h)$, so the obvious bound on the whole traversal is
+$O(nh)$. Prove the exact total is $\Theta(n)$, independent of the tree's
+shape, and name the accounting technique this argument is an instance of.
+
+<Solution>
+Charge the work to edges rather than to calls. Every step of every successor
+call (and of the initial minimum-walk) moves along one edge of the tree,
+either downward (entering a right subtree and descending its left spine) or
+upward (climbing while arriving from the right). Follow any single edge
+$(parent, child)$ across the whole traversal: it is traversed **downward
+exactly once** (the walk enters each subtree once, since the traversal
+visits each key once in sorted order) and therefore **upward exactly once**,
+since every descent into a subtree is eventually matched by the climb that
+leaves it. A tree on $n$ nodes has $n - 1$ edges, so the total work is at
+most $2(n-1)$ edge-steps plus $O(1)$ per call: $\Theta(n)$.
+
+The technique is the **aggregate method** of
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the amortized-analysis
+lesson</Ref>: bound the total over a sequence, then observe the per-operation
+average: here $O(1)$ amortized per successor call, even though a single call
+can cost $h$. The doubling array's argument had the same shape: rare
+expensive operations, a total that telescopes.
+</Solution>
+</Exercise>
+
+<Exercise>
+For each workload, choose the structure (hash table, BST, or sorted array)
+and give the deciding cost. (a) A spell-checker's dictionary: fixed word
+list, membership queries only. (b) A live leaderboard: scores inserted and
+removed continuously, with "show the ten best" and "how many scores exceed
+$s$?" queries. (c) An event log queried by time range, whose records arrive
+in timestamp order. State which item is a trap and why.
+
+<Solution>
+The first question for each is <Ref lesson="hash-tables">the hash-table
+lesson's</Ref> closing table: are any of the queries *ordered*?
+
+(a) **Hash table.** Membership is an equality query; order is never asked
+for. Expected $O(1)$ beats any comparison structure, and the fixed key set
+means no deletion subtleties. (A sorted array with binary search is the
+defensible runner-up at $O(\log n)$, with better cache behavior.)
+
+(b) **BST.** Every query is ordered (top-$k$ is a walk from the maximum;
+count-above-$s$ is a range/rank query) and the data changes continuously, so
+the sorted array's $\Theta(n)$ insert disqualifies it and the hash table
+cannot answer the queries at all. Costs: $O(h)$ per update, $O(h + k)$ for
+top-$k$.
+
+(c) The trap. The queries are ordered ranges, so the reflex answer is again
+"BST" — except the records **arrive in timestamp order**, which is exactly
+sorted insertion: this lesson's BST would build a chain and answer range
+queries in $\Theta(n)$. With the tools of this module so far, a sorted array
+appended at the end dominates: timestamps only grow, so every insert is an
+append, amortized $O(1)$ by the doubling argument, and a range query costs
+$O(\log n + r)$ via binary search. The structure that handles (c) with interleaved *non*-appending
+updates is precisely the <Ref lesson="balanced-search-trees">balanced
+BST</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+In a random BST on keys $\{0, 1, \ldots, n-1\}$ (built by inserting a
+uniformly random permutation), consider an unsuccessful search for a value
+$x < 0$, below every key. Show that node $i$ lies on this search path if and
+only if $i$ was inserted before all of $0, 1, \ldots, i-1$, and use that to
+prove the expected length of the path is
+$H_n = 1 + \tfrac{1}{2} + \cdots + \tfrac{1}{n} \approx \ln n$.
+
+<Solution>
+The search for $x < 0$ goes left at every comparison, so its path is the
+*left spine*: the root, the root's left child, and so on down. A node joins
+the left spine at insertion time exactly when it is smaller than every key
+already present (its insertion walk also goes left at every comparison, and
+it attaches below the previous minimum), and once on the spine it stays
+there, because inserts never displace a node. So node $i$ lies on the spine
+iff $i$ was a running minimum of the insertion sequence, that is, iff $i$
+was inserted before all of $0, 1, \ldots, i-1$.
+
+Let $X_i$ indicate that event. In a uniformly random permutation, each of the
+$i + 1$ keys $\{0, \ldots, i\}$ is equally likely to appear first, so
+$\Pr[X_i = 1] = \frac{1}{i+1}$. By linearity of expectation,
+
+$$
+\mathbb{E}\Bigl[\sum_{i=0}^{n-1} X_i\Bigr]
+= \sum_{i=0}^{n-1} \frac{1}{i+1}
+= H_n = \ln n + O(1).
+$$
+
+The transferable move is the same indicator-plus-linearity pattern as the
+hash table's collision counting, and the general version (Open Data
+Structures §7.1) bounds the search path for *every* value by two harmonic
+sums, $\approx 2\ln n$, which is where the theorem's $1.39\lg n$ comes
+from.
+</Solution>
+</Exercise>
+
+<Exercise>
+A search index ingests $n = 10^6$ records keyed by an auto-incrementing
+integer ID, inserted into this lesson's BST in arrival order. Compute the
+height after the build, the total comparisons the build performs, and the
+cost of one search afterward. Then compute what each figure would be if the
+height were held at $2\lg(n+1)$ throughout, and state the ratio of the two
+build costs.
+
+<Solution>
+Arrival order is sorted order, so the tree is a chain: height
+$n - 1 = 999{,}999$. The build costs
+$\sum_{i=1}^{n}(i-1) = n(n-1)/2 \approx 5 \times 10^{11}$ comparisons, and a
+search afterward walks up to $10^6$ nodes: the linked-list bill for every
+operation.
+
+Held at $h \le 2\lg(n+1) \approx 40$: each insert costs at most about 40
+comparisons, so the build costs $\le 4 \times 10^{7}$ (four orders of
+magnitude below $5 \times 10^{11}$), and a search costs at most about 40
+against a million. The ratio of build costs is
+$\frac{n(n-1)/2}{2n\lg(n+1)} = \frac{n-1}{4\lg(n+1)} \approx 12{,}500$.
+
+The bound $2\lg(n+1)$ was not chosen at random: it is exactly the height
+guarantee a red-black tree maintains while paying only $O(1)$ rotations per
+update; the mechanism is the subject of
+<Ref lesson="balanced-search-trees">balanced search trees</Ref>, and this
+exercise measures exactly the gap that mechanism closes.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §12.1 the invariant and the in-order walk (Theorem 12.1); §12.2 search, minimum, successor, all $O(h)$ (Theorem 12.2); §12.3 `Tree-Insert` and the four-case `Tree-Delete` built on `Transplant`, with Figures 12.3–12.4 the deletion drawings here are modeled on.
+2. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §3.2: cost of search/insert as $1 + {}$depth, the $\sim 2\ln n$ average via the quicksort-partitioning correspondence, Hibbard deletion and the $\sqrt{n}$ drift under prolonged updates, and the symbol-table scoreboard this module keeps filling in. Companion site: https://algs4.cs.princeton.edu/32bst/
+3. P. Morin, *Open Data Structures*, 2013 — Ch. 6: the unbalanced `BinarySearchTree` in full code; §7.1: random BSTs and the harmonic-sum analysis of search-path length that the random-order exercise reproduces in its easiest case. https://opendatastructures.org/
+4. B. Reed, "The Height of a Random Binary Search Tree," *Journal of the ACM* 50(3), 306–332, 2003 — $\mathbb{E}[H_n] = \alpha\ln n - \beta\ln\ln n + O(1)$ with $\alpha = 4.31107\ldots$, and $\mathrm{Var}[H_n] = O(1)$: the exact constants behind the height claims quoted here.
+5. K. Schwarz, *Stanford CS166: Data Structures*, Lecture 08 "Random Binary Search Trees" — the concentration story told with measurements: sampled heights up to $n = 10^{21}$ (via Robson's height-sampling algorithm) against the $\gamma \approx 2.988$ asymptote. https://web.stanford.edu/class/archive/cs/cs166/cs166.1266/lectures/08/
+6. T. N. Hibbard, "Some Combinatorial Properties of Certain Trees with Applications to Searching and Sorting," *Journal of the ACM* 9(1), 13–28, 1962 — the original two-child deletion scheme and the one-deletion randomness-preservation proof.
+</References>

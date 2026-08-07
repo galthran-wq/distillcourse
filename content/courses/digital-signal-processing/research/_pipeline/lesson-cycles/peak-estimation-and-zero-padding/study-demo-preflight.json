@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "status": "ready_with_frozen_executable_study_and_proposed_demo_contract",
+  "lesson": "peak-estimation-and-zero-padding",
+  "scope": "Research preflight only. course.yaml currently has demo: null. This contract proposes PeakEstimationLab but does not edit the course, lesson, component, registry, or UI kit.",
+  "source_grounding": [
+    ".claude/skills/lesson-factory/SKILL.md (model gate explicitly waived by the user; all other constraints retained)",
+    ".claude/skills/demo-builder/SKILL.md and checklist/example",
+    "docs/pedagogy.md, docs/playbook-core.md, docs/playbook-math.md, docs/components.md",
+    "content/courses/digital-signal-processing/research/peak-estimation-and-zero-padding.md",
+    "research reads/summaries for jos-sasp ch. 5, MIT 6.341 lectures 15/17 and PS9, Lyons 3.11, Schaedler 24-26, Oppenheim-Schafer 10.2, and Stoica-Moses 2.3"
+  ],
+  "study": {
+    "file": "peak-study.mjs",
+    "run": "node content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/peak-estimation-and-zero-padding/peak-study.mjs",
+    "runtime_randomness": false,
+    "dependencies": ["node:assert/strict"],
+    "output": "One JSON report; any contract violation exits nonzero via an assertion."
+  },
+  "frozen_inputs_and_units": {
+    "sample_rate_hz": 1024,
+    "sample_index": "n=0,...,N-1 (half-open record)",
+    "reference_record_samples_N0": 64,
+    "original_bin_coordinate": "q=N0*f/fs",
+    "one_original_bin_hz": 16,
+    "tone_type": "analytic complex exponential; this removes negative-frequency image leakage",
+    "single_tone": "x[n]=exp(j*2*pi*(10.31/64)*n), amplitude 1, frequency 164.96 Hz, phase 0",
+    "record_lengths_samples": [64, 256],
+    "padding_factors": [1, 4, 16],
+    "transform_length": "L=Q*N; only L-N zeros are appended",
+    "windows": {
+      "rectangular": "w[n]=1",
+      "periodic_hann": "w[n]=0.5-0.5*cos(2*pi*n/N)",
+      "periodic_blackman": "w[n]=0.42-0.5*cos(2*pi*n/N)+0.08*cos(4*pi*n/N)"
+    },
+    "normalization": "All magnitudes divide by sum_n w[n], so a bin-centered unit complex tone reads 1 (0 dB).",
+    "db_floor": "Only the three-bin interpolation input floors magnitude at 1e-14 (-280 dB) to make exact-null floating residuals symmetric; raw linear magnitudes control all other checks."
+  },
+  "formulas": {
+    "dtft": "X_N(q)=(1/sum w)*sum_{n=0}^{N-1} w[n]x[n]exp(-j*2*pi*q*n/N0)",
+    "zero_padded_dft": "X_L[k]=X_N(q=k*N0/L); zero-valued terms n=N,...,L-1 add nothing",
+    "grid_spacing": "Delta q=N0/L original bins and Delta f=fs/L Hz",
+    "hann_main_lobe": "First null offsets are +/-2*N0/N original bins; null-to-null width is 4*N0/N original bins =4*fs/N Hz",
+    "db_parabola": "For dB samples alpha,beta,gamma around largest grid sample, p=0.5*(alpha-gamma)/(alpha-2*beta+gamma), q_hat=(k+p)/Q, and A_hat_dB=beta-0.25*(alpha-gamma)*p",
+    "two_tone": "x_phi[n]=exp(j*2*pi*10*n/64)+exp(j*(2*pi*10.5*n/64+phi))",
+    "bump_rule": "On q=9+r/4096, r=0,...,10240, a bump is a strict local maximum in [9.5,11] with magnitude at least 50% of the maximum over [9,11.5]."
+  },
+  "expected_numeric_outputs": {
+    "fixed_64_sample_hann_padding": [
+      {"Q": 1, "L": 64, "grid_hz": 16, "grid_original_bins": 1, "main_lobe_hz": 64, "main_lobe_original_bins": 4},
+      {"Q": 4, "L": 256, "grid_hz": 4, "grid_original_bins": 0.25, "main_lobe_hz": 64, "main_lobe_original_bins": 4},
+      {"Q": 16, "L": 1024, "grid_hz": 1, "grid_original_bins": 0.0625, "main_lobe_hz": 64, "main_lobe_original_bins": 4}
+    ],
+    "same_1_hz_grid_different_duration": [
+      {"N": 64, "Q": 16, "L": 1024, "duration_ms": 62.5, "main_lobe_hz": 64, "main_lobe_original_bins": 4},
+      {"N": 256, "Q": 4, "L": 1024, "duration_ms": 250, "main_lobe_hz": 16, "main_lobe_original_bins": 1}
+    ],
+    "db_parabola_q_true_10_31": [
+      {"window": "rectangular", "Q": 1, "q_hat": 10.142955877, "error_original_bins": -0.167044123, "error_hz": -2.672705975, "amplitude_error_db": -1.220083858},
+      {"window": "hann", "Q": 1, "q_hat": 10.325906317, "error_original_bins": 0.015906317, "error_hz": 0.254501077, "amplitude_error_db": 0.133184452},
+      {"window": "blackman", "Q": 1, "q_hat": 10.316584228, "error_original_bins": 0.006584228, "error_hz": 0.105347654, "amplitude_error_db": 0.04075429},
+      {"window": "rectangular", "Q": 4, "error_original_bins": 0.001007881},
+      {"window": "hann", "Q": 4, "error_original_bins": 0.00018676},
+      {"window": "blackman", "Q": 4, "error_original_bins": 0.000090502}
+    ],
+    "relative_phase_pair": [
+      {"N": 64, "phase_deg": 0, "bump_count": 1, "locations_q": [10.25]},
+      {"N": 64, "phase_deg": 90, "bump_count": 2, "locations_q": [9.582764, 10.917236], "errors_from_true_q": [-0.417236, 0.417236], "intervening_valley_q": 10.25, "valley_depth_db": 29.346024},
+      {"N": 256, "phase_deg": 0, "bump_count": 2, "locations_q": [9.968506, 10.531494], "errors_from_true_q": [-0.031494, 0.031494]},
+      {"N": 256, "phase_deg": 90, "bump_count": 2, "locations_q": [9.999023, 10.500977], "errors_from_true_q": [-0.000977, 0.000977]}
+    ]
+  },
+  "invariants_and_acceptance": [
+    {"id": "same_dtft", "pass": "For Q in {1,4,16}, max complex difference between the zero-padded DFT and direct DTFT at every displayed coordinate is <1e-12."},
+    {"id": "padding_not_resolution", "pass": "At N=64, grid spacing decreases 16 -> 4 -> 1 Hz while Hann null-to-null width remains 64 Hz =4 original bins."},
+    {"id": "duration_is_resolution", "pass": "At common L=1024 and 1 Hz display spacing, N=256 narrows the Hann lobe to 16 Hz =1 original bin, exactly one quarter of N=64 width; both first-null residuals are <1e-12."},
+    {"id": "window_dependent_bias", "pass": "The three Q=1 frequency biases match the frozen values within 1e-9 original bin and are not equal; every Q=4 absolute bias is <0.002 original bin."},
+    {"id": "phase_false_bumps", "pass": "N=64 has one qualifying bump at 0 degrees but two at 90 degrees, and both quadrature bump-to-tone assignment errors exceed 0.4 original bin."},
+    {"id": "longer_pair_control", "pass": "At N=256 both 0- and 90-degree cases have two qualifying peaks, each within 0.05 original bin of its true tone."}
+  ],
+  "boundary_cases": [
+    "Exactly bin-centered and half-bin isolated tones return zero frequency error for all three declared windows under the dB floor convention.",
+    "If alpha-2*beta+gamma is zero (for example three equal dB samples), p is undefined and the demo must show no estimate rather than divide by zero.",
+    "Zero amplitude has no peak and no dB estimate; disable the estimator and label the precondition amplitude>0.",
+    "Coincident tones reduce to one phasor-summed line, or cancel at equal amplitude/opposite phase; bump count cannot identify two components.",
+    "The three-point estimator is valid only for one isolated local peak. The two-tone phase experiment intentionally violates that model.",
+    "All PASS/FAIL decisions use raw double-precision values; rounded numbers are display-only."
+  ],
+  "demo_contract": {
+    "component_proposal": "PeakEstimationLab",
+    "d1_verdict": "PASS",
+    "d1_sentence": "The learner changes spectral sampling, informative duration, window, and relative phase and watches grid density, physical lobe width, interpolation bias, and the number and trustworthiness of apparent peaks change independently.",
+    "why_not_static": "The guided task requires holding L fixed while exchanging padding for real samples, hitting an error target, and perturbing phase to make a visually persuasive two-bump answer fail against known truth.",
+    "initial_state": "Phase trap: pair mode, rectangular N=64, Q=16, phi=90 degrees; two deep, symmetric bumps are visible at q=9.582764 and 10.917236 while truth markers remain at q=10 and 10.5 and the location audit reads FAIL.",
+    "presets": [
+      {"label": "Coarse peak", "state": "single, rectangular, N=64, Q=1", "observable": "absolute error 0.167044 original bin; FAIL <0.1 target"},
+      {"label": "Padded peak", "state": "single, rectangular, N=64, Q=4", "observable": "absolute error 0.001008 original bin while width stays 4 original bins; PASS"},
+      {"label": "Phase trap", "state": "pair, rectangular, N=64, Q=16, phi=90", "observable": "two bumps, each displaced 0.417236 original bin; FAIL truth audit"},
+      {"label": "Long record", "state": "pair, rectangular, N=256, Q=4, phi=90", "observable": "same L=1024 and 1 Hz grid, narrowed lobe, two peaks within 0.001 original bin"}
+    ],
+    "stored_state": [
+      "mode: single|pair",
+      "window: rectangular|hann|blackman",
+      "N: 64|256",
+      "Q: 1|4|16, constrained so L>=N",
+      "relativePhaseDeg: 0..90 in 1-degree steps"
+    ],
+    "controls": [
+      "Panel outer container and PresetGroup for the four named presets; activeIndex is null after manual departure.",
+      "Kit Button group for mode and window; native aria-pressed semantics.",
+      "Indexed Slider for N and Q, with display and aria-valuetext reporting samples, L, and Hz.",
+      "Phase Slider in pair mode, 0..90 degrees, step 1; exact 0 and 90 degree Button anchors remain keyboard reachable.",
+      "No random API, timer, network, worker, animation, or new dependency."
+    ],
+    "guided_tasks": [
+      "From Coarse peak, change only Q until absolute frequency error is <0.1 original bin; Q=4 is the first allowed pass and width must remain 4 original bins.",
+      "At N=64,Q=1,q=10.31, switch windows and compare the signed frequency and amplitude biases without calling any window unbiased.",
+      "From Phase trap, toggle 90 to 0 degrees: two false bumps collapse to one although tones and record length do not change.",
+      "Compare Phase trap with Long record: L and the 1 Hz grid remain fixed, duration changes 62.5 to 250 ms, and the truth-location audit passes."
+    ],
+    "readouts": [
+      "N, duration ms, Q, L, display spacing in Hz and original bins",
+      "window null-to-null width in Hz and original bins",
+      "single mode: true q/f, center bin, p, q_hat/f_hat, signed frequency error, fitted amplitude error",
+      "pair mode: phase, qualifying bump count and locations, truth-assignment errors, PASS/FAIL",
+      "persistent causal label: padding adds DTFT coordinates; acquired duration changes the lobe"
+    ],
+    "visual": "Responsive SVG over q=[8.5,12] with a normalized dB path, sampled coordinates as dots, first-null guides, truth markers, fitted parabola in single mode, and bump/valley labels in pair mode. Use currentColor/theme classes and shape/dash cues, not hue alone.",
+    "feedback_budget": "At most about 513 plotted q values times 256 samples per input plus three estimator samples; compute synchronously. Use the study's finer 1/4096 grid only for frozen acceptance values, not live rendering.",
+    "accessibility": "Existing Panel/PresetGroup/Button/Slider/Readout/TargetList primitives; native keyboard controls, >=44 px targets, live text equivalent to the SVG, no horizontal scroll at 360 px.",
+    "honesty_limits": "Noiseless analytic complex tones isolate the window phenomena. This is not a real-cosine, SNR, probability-of-detection, or universal Rayleigh-resolution claim; two visible bumps are explicitly not evidence of two unbiased estimates."
+  },
+  "demo_acceptance": {
+    "D1": "PASS when all four guided tasks expose independently changing quantities and truth-based failure, not merely moving curves.",
+    "D2": "PASS when every control updates in one frame under 200 ms with no asynchronous work.",
+    "D3": "PASS when initial Phase trap and exactly four named presets match the frozen readouts.",
+    "D4": "PASS when target states use raw values and the first passing padding factor and fixed-L duration comparison are recognizable.",
+    "D5": "PASS when one default-exported client component uses only existing UI primitives, no dependency/network/global state, and remains approximately <=200 LOC.",
+    "numeric": "PASS only if all six study assertions in invariants_and_acceptance pass in the standalone script and equivalent component tests.",
+    "manual": "Keyboard-run all controls; inspect light/dark at desktop and 360 px; verify preset clearing, aria-live readouts, endpoint finiteness, and non-color truth/failure cues."
+  }
+}

@@ -1,0 +1,387 @@
+Nearly every model in this course is fit by minimizing a loss, and three iterative schemes — batch gradient descent, stochastic gradient descent, and Newton's method — cover almost all of classical practice. This chapter derives the gradient-descent update from the first-order Taylor expansion, runs it with numbers, and prices all three schemes against each other. The route: training as empirical risk minimization, the batch update and its descent guarantee, the learning rate's three regimes, stochastic and mini-batch variants, Newton's method and its $O(d^3)$ step, convexity with the classical-loss ledger, and the practical checks interviewers probe: feature scaling, loss curves, gradient verification.
+
+## Training is empirical risk minimization
+
+In <Ref lesson="mle-map" /> the two-step recipe maximized a log-likelihood $\ell(\theta)$ by solving $\ell'(\theta) = 0$ in closed form. Maximizing $\ell$ is minimizing $-\ell$, so every MLE computed there was already a loss minimization; the closed form was a luxury of the model, not of the method. This section states the general frame once, and the rest of the chapter supplies the machinery for models where the stationarity equation has no closed-form solution.
+
+<Definition title="empirical risk minimization">
+Given training pairs $(x_1, y_1), \dots, (x_n, y_n)$, a model $f(x; \theta)$, and a per-example loss $L(y, \hat y)$, the *empirical risk* (training loss) is
+
+$$
+J(\theta) = \frac{1}{n} \sum_{i=1}^n L\bigl(y_i,\ f(x_i; \theta)\bigr),
+$$
+
+and *empirical risk minimization* (ERM) fits the model by $\hat\theta = \arg\min_\theta J(\theta)$.
+</Definition>
+
+Every fit in this course instantiates this template: squared loss gives ordinary least squares (<Ref lesson="ols" />), the negative Bernoulli log-likelihood gives logistic regression's cross-entropy, hinge loss plus an L2 penalty gives the SVM, and MAP estimation adds a penalty term equal to the negative log-prior. When the loss is a negative log-likelihood, ERM **is** maximum likelihood.
+
+Closed-form minimizers are the exception. Least squares yields the normal equations; the Gaussian and Bernoulli MLEs solve in one line. Logistic regression already does not: setting its gradient to zero produces a transcendental equation with no algebraic solution, so the argmin must be approached iteratively.
+
+<KeyFact>
+Fitting a classical model means minimizing an empirical risk $J(\theta)$, with maximum likelihood as the special case loss $=$ negative log-likelihood; when $\nabla J = 0$ has no closed-form solution, an iterative scheme produces the minimizer.
+</KeyFact>
+
+## Batch gradient descent: step against the gradient
+
+A concrete run before the general rule. Take $J(x) = x^2$, so $J'(x) = 2x$, with start $x^{(0)} = 4$ and step size $\eta = 0.2$:
+
+$$
+x^{(1)} = 4 - 0.2 \cdot 8 = 2.4, \qquad
+x^{(2)} = 2.4 - 0.2 \cdot 4.8 = 1.44, \qquad
+x^{(3)} = 1.44 - 0.2 \cdot 2.88 = 0.864 .
+$$
+
+The loss falls $16 \to 5.76 \to 2.07 \to 0.75$. Each update multiplies the iterate by the same factor, $x^{(k+1)} = (1 - 2\eta)\,x^{(k)} = 0.6\,x^{(k)}$: geometric convergence to the minimizer $x = 0$.
+
+<Definition title="gradient descent">
+*Gradient descent* minimizes a differentiable $J$ by iterating
+
+$$
+\theta^{(k+1)} = \theta^{(k)} - \eta\, \nabla J\bigl(\theta^{(k)}\bigr),
+$$
+
+where $\eta > 0$ is the *learning rate* (step size). *Batch* gradient descent computes $\nabla J$ on the full training set: one step costs $n$ per-example gradients, $O(nd)$ arithmetic for $d$ parameters.
+</Definition>
+
+### Why the negative gradient: the first-order Taylor argument
+
+For a small step $s$, the first-order Taylor expansion gives $J(\theta + s) \approx J(\theta) + \nabla J(\theta)^\top s$. Among all steps of a fixed small length, the inner product $\nabla J^\top s$ is most negative when $s$ points exactly opposite the gradient (Cauchy–Schwarz), so $-\nabla J$ is the direction of **steepest descent** of the linearization. This is the derivation in [Weinberger's CS4780 lecture 7](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote07.html): gradient descent is the repeated move "minimize the local linear model, but only trust it nearby". The learning rate encodes the "nearby".
+
+<Theorem title="guaranteed decrease for small steps">
+Suppose $\nabla J$ is $L$-Lipschitz ($\lVert \nabla J(u) - \nabla J(v) \rVert \le L \lVert u - v \rVert$; "$L$-smooth"). Then one gradient step with $\eta \le 1/L$ satisfies
+
+$$
+J\bigl(\theta - \eta \nabla J(\theta)\bigr) \;\le\; J(\theta) - \frac{\eta}{2}\, \lVert \nabla J(\theta) \rVert^2 ,
+$$
+
+so the loss strictly decreases wherever $\nabla J(\theta) \ne 0$; decrease holds for every $\eta < 2/L$.
+
+<Proof>
+$L$-smoothness gives the quadratic upper bound $J(v) \le J(u) + \nabla J(u)^\top (v - u) + \frac{L}{2}\lVert v - u \rVert^2$ (integrate the Lipschitz condition along the segment). Substitute $v = u - \eta \nabla J(u)$:
+
+$$
+J(v) \le J(u) - \eta \lVert \nabla J(u) \rVert^2 + \frac{L \eta^2}{2} \lVert \nabla J(u) \rVert^2
+= J(u) - \eta \Bigl(1 - \frac{L\eta}{2}\Bigr) \lVert \nabla J(u) \rVert^2 .
+$$
+
+The coefficient $\eta(1 - L\eta/2)$ is positive for $0 < \eta < 2/L$ and at least $\eta/2$ for $\eta \le 1/L$.
+</Proof>
+</Theorem>
+
+Convergence is therefore conditional: smoothness plus a small enough step, and for convergence to the *global* minimum, convexity (the section below). No unconditional claim survives an interview.
+
+On real data the picture is the classic contour plot. [The CS229 notes](https://cs229.stanford.edu/main_notes.pdf) (§1.1) run batch gradient descent on the least-squares loss for 47 Portland houses, price in \$1000s against living area in square feet; the iterates converge to intercept $\theta_0 = 71.27$ and slope $\theta_1 = 0.1345$, and the trajectory marches perpendicular to the loss contours into the bowl's bottom.
+
+<FigureSequence
+  name="gd-path"
+  alt="Four frames of a gradient-descent trajectory on the contours of an elongated quadratic bowl: after 1, 3, 8, and 20 steps the amber path zig-zags across the narrow valley and settles onto its floor near the minimum"
+  caption="Batch GD on J(θ) = ½(θ₁² + 10θ₂²) from θ⁽⁰⁾ = (−8, 3), η = 0.17. The path overshoots the steep direction every step and crawls along the shallow one."
+/>
+
+<Task>
+Step through the four frames. The steep coordinate obeys $\theta_2 \leftarrow (1 - 10\eta)\,\theta_2 = -0.7\,\theta_2$, flipping sign every step; the shallow one obeys $\theta_1 \leftarrow 0.83\,\theta_1$. Verify both patterns on the path: zig-zag across the valley for the first ~8 steps, then a slow crawl along its floor.
+</Task>
+
+<KeyFact>
+Gradient descent is repeated minimization of the local linear model: $\theta \leftarrow \theta - \eta \nabla J$ decreases a smooth loss whenever $\eta < 2/L$, at a cost of one full-data gradient, $O(nd)$, per step.
+</KeyFact>
+
+## The learning rate: too small, right, too large
+
+On the quadratic $J(x) = x^2$ the whole trichotomy is one multiplier. The update is $x^{(k+1)} = (1 - 2\eta)\, x^{(k)}$, so after $k$ steps $x^{(k)} = (1 - 2\eta)^k x^{(0)}$, and everything depends on $|1 - 2\eta|$:
+
+- **Too small** ($\eta = 0.02$): multiplier $0.96$; convergence is monotone but needs hundreds of steps for the loss to fall meaningfully.
+- **Right** ($\eta = 0.3$): multiplier $0.4$; the loss drops by a factor $0.16$ per step. At $\eta = 0.5$ the multiplier is $0$: exact convergence in one step (this value returns below as the Newton step).
+- **Too large** ($\eta = 1.05$): multiplier $-1.1$; the iterates alternate sign and **grow** by 10% per step, so the loss diverges geometrically. Convergence holds exactly for $0 < \eta < 1$, which is the theorem's $\eta < 2/L$ with $L = J'' = 2$.
+
+<Figure
+  src="./figures/lr-trichotomy.svg"
+  alt="Loss versus iteration for gradient descent on x squared from x0 = 3 at three learning rates: 0.02 decays very slowly, 0.3 drops to zero within three steps, 1.05 grows without bound"
+  caption="Three learning rates on J(x) = x². The learning rate is the one hyperparameter that can make the loss increase."
+/>
+
+For $\tfrac12 < \eta < 1$ the multiplier is negative but less than 1 in magnitude: the iterates overshoot the minimum each step yet still converge, which is exactly the zig-zag of the contour figure above: the steep direction of that bowl has $\eta$ in its oscillating regime while the shallow direction is in its slow regime. One $\eta$ must serve every curvature direction at once; the spread between the two is taken up again in the feature-scaling section.
+
+<Demo
+  name="GradientDescentExplorer"
+  caption="Gradient descent on an elongated quadratic bowl: learning-rate slider, step button, per-iteration loss readout. Presets: small η, good η, divergent η, Newton step."
+/>
+
+<Task>
+Run the three learning-rate presets and read the loss after 10 iterations in each: small η should still be far from the minimum, good η should have essentially converged, and the divergent preset should show the loss growing every step. Find by hand the slider threshold where convergence turns into oscillating divergence.
+</Task>
+
+<KeyFact>
+Below $2/L$ the learning rate only sets the speed; above it, gradient descent diverges geometrically. It is the single hyperparameter whose bad values make the loss increase, which is why the loss curve is monitored per iteration.
+</KeyFact>
+
+## Stochastic and mini-batch gradient descent: pay for one gradient, not n
+
+The batch update's flaw is its price tag. The empirical risk is an average, $J(\theta) = \frac1n \sum_i J_i(\theta)$ with $J_i$ the loss on example $i$, so one batch step evaluates $n$ per-example gradients; at $n = 10^6$ and $d = 10^3$ that is $10^9$ multiply-adds for a single parameter update.
+
+*Stochastic gradient descent* (SGD) replaces the exact gradient with the gradient of one uniformly drawn example:
+
+$$
+\theta \leftarrow \theta - \eta\, \nabla J_i(\theta), \qquad i \sim \text{Uniform}\{1, \dots, n\}.
+$$
+
+The estimate is **unbiased**: $\mathbb E_i[\nabla J_i(\theta)] = \frac1n \sum_j \nabla J_j(\theta) = \nabla J(\theta)$. Each step is $n$ times cheaper and points in the right direction on average; the price is variance, visible as a jittery trajectory.
+
+<Figure
+  src="./figures/sgd-vs-batch.svg"
+  alt="Two contour panels of the same quadratic bowl: batch gradient descent traces a smooth path into the minimum at n gradients per step, while SGD traces a jittery path that reaches and then hovers around the same minimum at one gradient per step"
+  caption="Same bowl, same start. Batch GD moves smoothly at n gradients per step; SGD jitters toward the minimum at one gradient per step and then hovers in a noise ball whose radius scales with η."
+/>
+
+*Mini-batch* gradient descent averages the gradient over a random batch of $B$ examples: variance shrinks by the factor $B$, cost grows by the factor $B$, and batches of 32–256 vectorize efficiently on modern hardware, which is why mini-batch SGD is the default at scale.
+
+**Schedules.** With a constant $\eta$, SGD does not converge to $\theta^*$: the gradient noise keeps kicking the iterate around a region whose radius scales with $\eta$. Classical theory ([Robbins and Monro, 1951](https://doi.org/10.1214/aoms/1177729586)) guarantees convergence when the rate decays with $\sum_t \eta_t = \infty$ and $\sum_t \eta_t^2 < \infty$, for instance $\eta_t \propto 1/t$; practice mostly uses cruder step decay, cutting $\eta$ by a constant factor on a fixed schedule or when the validation loss plateaus. The gradient noise also acts as a mild implicit regularizer by preventing exact minimization of the training loss; stronger claims about noise escaping bad local minima are empirical folklore from the non-convex deep-learning setting, not classical results.
+
+**When batch is fine.** For classical problem sizes (a convex loss, $n$ in the thousands) full-batch methods are unproblematic and often preferred: logistic regression is routinely fit by full-batch Newton steps (next section), and [Murphy's PML §8.4](https://probml.github.io/pml-book/book1.html) frames SGD as the regime of large $n$, streaming data, or both.
+
+<Aside>
+Two standard refinements, one paragraph each. **Momentum** keeps an exponentially weighted average of past gradients and steps along it; successive opposing gradients (the zig-zag direction) cancel in the average while consistent ones (the valley direction) accumulate, damping oscillation without shrinking $\eta$. **Adagrad** gives every coordinate its own learning rate, $\theta_j \leftarrow \theta_j - \tfrac{\eta}{\sqrt{G_j + \varepsilon}}\, g_j$ where $G_j$ accumulates the squared gradients of coordinate $j$: rarely updated or flat coordinates keep large effective rates, steep ones get small rates. CS4780's lecture 7 presents both as the standard patches on plain SGD; RMSProp and Adam are descendants of the same per-coordinate idea.
+</Aside>
+
+<KeyFact>
+For the cost of one batch step, SGD makes n noisy but unbiased updates; with a decaying schedule it converges on convex losses, and with mini-batches of 32–256 it is the default fit at large n. At classical sizes (convex loss, small n) batch methods remain the right tool.
+</KeyFact>
+
+## Newton's method: use curvature, pay O(d³)
+
+Gradient descent used a linear model of the loss; the linear model knows the slope but not how far to go. On $J(x) = x^2$ from $x^{(0)} = 4$, the second derivative $J'' = 2$ fixes the step exactly: $x^{(1)} = 4 - J'(4)/J''(4) = 4 - 8/2 = 0$, the minimum in one step, from any start. This is the $\eta = \tfrac12 = 1/L$ step of the trichotomy section, now derived rather than tuned.
+
+<Definition title="Newton's method">
+Expand $J$ to second order around $\theta$: $\hat J(\theta + s) = J(\theta) + \nabla J(\theta)^\top s + \tfrac12 s^\top H s$, with $H = \nabla^2 J(\theta)$ the Hessian. If $H \succ 0$, the quadratic model is minimized by solving $\nabla \hat J = 0$:
+
+$$
+s = -H^{-1} \nabla J(\theta), \qquad \theta \leftarrow \theta - H^{-1} \nabla J(\theta).
+$$
+
+There is no learning rate: the curvature sets the step length.
+</Definition>
+
+On a quadratic loss the second-order model is not an approximation but the function itself, so Newton lands on the exact minimizer in a single step, whatever the conditioning. Near a minimum of a smooth loss the convergence is *quadratic*: the error is roughly squared each iteration, doubling the number of correct digits per step.
+
+<Figure
+  src="./figures/newton-jump.svg"
+  alt="Contours of the elongated quadratic bowl with two trajectories from the same start: a blue 20-step zig-zag gradient-descent path and a single amber Newton arrow straight to the minimum, with per-step costs O(nd) versus O(nd squared plus d cubed) noted below"
+  caption="On a quadratic, Newton's step −H⁻¹∇J jumps to the minimum in one iteration; GD takes 20. The price sits in the step itself: forming H costs O(nd²) and solving costs O(d³)."
+/>
+
+**The price.** The Hessian has $d^2$ entries; forming it for an empirical risk costs $O(nd^2)$ and solving $Hs = -\nabla J$ costs $O(d^3)$. At $d = 10^4$ the Hessian alone is $10^8$ doubles, 800 MB; at $d = 10^5$ it is 80 GB and the solve is $\sim 3 \times 10^{14}$ flops per step. This arithmetic, worked in Exercise 3, is the complete answer to "why is Newton never used for deep networks or any large-$d$ model". At small $d$ the trade reverses: logistic regression with hundreds of features is classically fit by Newton's method, where the iteration takes the form of *iteratively reweighted least squares* (IRLS, [Bishop PRML §4.3.3](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf)), converging in a handful of steps.
+
+<Example title="Newton's method diverging">
+Far from the minimum the quadratic model can be arbitrarily wrong. Take $f(x) = \sqrt{1 + x^2}$, minimized at $x = 0$, with $f'(x) = x/\sqrt{1+x^2}$ and $f''(x) = (1 + x^2)^{-3/2} > 0$. The Newton update is
+
+$$
+x^{(k+1)} = x^{(k)} - \frac{f'(x^{(k)})}{f''(x^{(k)})} = x^{(k)} - x^{(k)}\bigl(1 + (x^{(k)})^2\bigr) = -\bigl(x^{(k)}\bigr)^3 .
+$$
+
+From $x^{(0)} = 0.5$ the iterates are $-0.125,\ 0.00195,\ -7.4 \times 10^{-9}$: extremely fast convergence. From $x^{(0)} = 1.5$ they are $-3.375,\ 38.4,\ -56{,}623$: divergence, despite $f$ being convex and smooth. The curvature at the iterate is nearly zero, so the model's minimum lies far away, and the full step overshoots catastrophically.
+</Example>
+
+When the loss is non-convex the failure is structural rather than numerical: where $H$ is not positive definite the "minimizer" of the quadratic model does not exist, and the Newton step can point uphill or straight into a saddle point. The standard fixes: *damped Newton* scales the step by a line-search factor; the CS4780 hybrid runs cheap gradient-descent steps first and switches to Newton only near the optimum, where the quadratic model is trustworthy; quasi-Newton methods (BFGS, and limited-memory L-BFGS) build a positive-definite curvature estimate from successive gradients, avoiding both the $O(nd^2)$ Hessian and the $O(d^3)$ solve.
+
+<KeyFact>
+Newton's step −H⁻¹∇J solves quadratics in one iteration and converges quadratically near a minimum, but costs O(nd² + d³) per step and requires positive-definite curvature: the method of choice for logistic regression at small d, ruled out entirely at large d.
+</KeyFact>
+
+## Convexity: when the minimum found is the minimum
+
+All three schemes are local: they consult slope and curvature at the current point and can only follow them downhill. The property that upgrades local search into a global guarantee is convexity. A first check on $J(x) = x^2$: for the endpoints $x = -1.4$ and $y = 1.8$, the midpoint value is $J(0.2) = 0.04$ while the average of the endpoint values is $(1.96 + 3.24)/2 = 2.6$; the graph passes below the chord.
+
+<Definition title="convex function">
+$f$ is *convex* if for all $x, y$ and all $\lambda \in [0, 1]$,
+
+$$
+f\bigl(\lambda x + (1 - \lambda) y\bigr) \;\le\; \lambda f(x) + (1 - \lambda) f(y):
+$$
+
+every chord lies on or above the graph. It is *strictly convex* if the inequality is strict for $x \ne y$, $\lambda \in (0,1)$; strict convexity implies at most one minimizer.
+</Definition>
+
+<Figure
+  src="./figures/convexity.svg"
+  alt="Left panel: a convex parabola with a chord drawn above it and the vertical gap marked nonnegative. Right panel: a non-convex double-well curve where gradient descent from a start point on the right slope ends in the local minimum instead of the lower global one"
+  caption="Convex: every chord lies above the graph and the one minimum is global. Non-convex: descent from x₀ stops at the local minimum and never sees the global one."
+/>
+
+<Theorem title="first- and second-order tests">
+For differentiable $f$: convexity is equivalent to $f(y) \ge f(x) + \nabla f(x)^\top (y - x)$ for all $x, y$, that is, every tangent plane is a global underestimator. For twice-differentiable $f$: convexity is equivalent to $\nabla^2 f(x) \succeq 0$ everywhere. Proofs: [Boyd and Vandenberghe, *Convex Optimization*](https://web.stanford.edu/~boyd/cvxbook/), §3.1.3–3.1.4.
+</Theorem>
+
+The second-order test is the working tool: a loss is certified convex by showing its Hessian is positive semidefinite, as Exercises 4 and 7 do for least squares and the logistic loss. The first-order test is what makes convexity pay off:
+
+<Theorem title="for convex functions, local means global">
+Every local minimum of a convex $f$ is a global minimum; if $f$ is differentiable, every stationary point ($\nabla f(x) = 0$) is a global minimum.
+
+<Proof>
+Let $x$ be a local minimum and suppose $f(y) < f(x)$ for some $y$. Points $z_\lambda = (1-\lambda)x + \lambda y$ satisfy $f(z_\lambda) \le (1-\lambda) f(x) + \lambda f(y) < f(x)$ for every $\lambda \in (0, 1]$, and $z_\lambda \to x$ as $\lambda \to 0$: arbitrarily close to $x$ there are strictly lower values, contradicting local minimality. For the differentiable case, $\nabla f(x) = 0$ plugged into the first-order test gives $f(y) \ge f(x)$ for all $y$ directly.
+</Proof>
+</Theorem>
+
+For a convex loss, therefore, whatever gradient descent (with a suitable $\eta$), SGD (with a decaying schedule), or Newton's method converges to is *the* answer; the schemes differ only in cost, never in the quality of the endpoint. This is the practical content of the interviewers' favorite question "why do we care that the loss is convex".
+
+### The classical-ML convexity ledger
+
+| training objective | convex in the parameters? | consequence |
+| --- | --- | --- |
+| OLS $\lVert X\theta - y \rVert^2$ | yes: Hessian $2X^\top X \succeq 0$ | any scheme finds the global minimum (Exercise 4) |
+| ridge | strictly: $2X^\top X + 2\lambda I \succ 0$ | unique global minimum |
+| lasso | convex but non-differentiable at $0$ | global minimum; needs subgradient or coordinate methods, <Ref lesson="ridge-lasso" /> |
+| logistic NLL (cross-entropy) | yes (Exercise 7) | Newton/IRLS or GD find the global MLE |
+| SVM: hinge $+$ L2 | yes (a quadratic program) | global; solved through the dual, <Ref lesson="svm-dual-kernels" /> |
+| $k$-means distortion | no: discrete assignments | Lloyd's algorithm reaches a local optimum; restarts, <Ref lesson="kmeans" /> |
+| GMM log-likelihood | no | EM reaches a local optimum, <Ref lesson="gmm-em" /> |
+| decision-tree fitting | not a continuous optimization | greedy splitting, no gradient at all, <Ref lesson="decision-trees" /> |
+
+Two different failures sit in the lower half of the ledger, with two different remedies. The lasso objective is **non-smooth but convex**: the global guarantee survives, only the tool changes (subgradients, coordinate descent). The $k$-means and GMM objectives are **non-convex**: no algorithm inherits a global guarantee, and the remedies are restarts and EM's monotone-improvement property. Smooth non-convex losses additionally contain saddle points, where the gradient vanishes without a minimum; plain GD stalls near them and Newton's method is actively attracted to them.
+
+<Remark title="constrained problems: the forward reference">
+This chapter minimizes over all of $\mathbb R^d$. Adding constraints ($\min f$ subject to $g_i(\theta) \le 0$) brings in Lagrange multipliers and the KKT optimality conditions, developed in [Murphy's PML §8.5](https://probml.github.io/pml-book/book1.html); that machinery is exactly what <Ref lesson="svm-dual-kernels" /> uses to derive the SVM dual.
+</Remark>
+
+<KeyFact>
+Convexity converts "the algorithm stopped" into "the problem is solved": every local minimum is global. The linear-model losses of this course (OLS, ridge, lasso, logistic, hinge) are all convex; the clustering and mixture objectives are not, which is why restarts and EM exist.
+</KeyFact>
+
+## Practice: scaling, monitoring, checking
+
+### Feature scaling makes the contours round
+
+The zig-zag of the contour figures is a conditioning problem. On a quadratic bowl with curvatures $\lambda_{\min}$ and $\lambda_{\max}$ (the Hessian's extreme eigenvalues), stability bounds the learning rate by the steepest direction, $\eta < 2/\lambda_{\max}$, while progress along the shallowest direction goes as $(1 - \eta\lambda_{\min})$ per step; the achievable convergence rate is governed by the *condition number* $\kappa = \lambda_{\max}/\lambda_{\min}$, and the iteration count grows with $\kappa$. Features measured on different scales (square feet next to number of bedrooms) produce exactly such elongated bowls. Standardizing each feature to zero mean and unit variance equalizes the curvatures, and the same $\eta$ then serves every direction.
+
+<Figure
+  src="./figures/scaling-contours.svg"
+  alt="Two contour panels: unscaled features give elongated ellipses with condition number 10 and a zig-zag descent path; standardized features give circular contours with condition number 1 and a straight path into the minimum"
+  caption="Same problem before and after standardizing features. On round contours −∇J points straight at the minimum; scaling is the cheapest speedup gradient descent has."
+/>
+
+Which models this matters for is a standard interview probe, answered in full in <Ref lesson="feature-engineering" />: gradient-based and distance-based methods care; tree-based methods split one feature at a time and are scale-invariant.
+
+### Read the loss curve; check the gradient
+
+The training-loss curve is the diagnostic instrument. Monotone decrease flattening out: working as designed. Barely moving from the start: $\eta$ too small, or a vanishing gradient. Rising or NaN: $\eta$ too large or a wrong sign in the gradient; the theorem above says a correct gradient with a small enough step *cannot* increase a smooth loss, so a rising curve always indicts the step size or the code. Hand-derived gradients are verified by a *gradient check*: compare each analytic component against the central finite difference $\bigl(J(\theta + \varepsilon e_j) - J(\theta - \varepsilon e_j)\bigr)/(2\varepsilon)$ with $\varepsilon \approx 10^{-5}$ and demand relative agreement to several decimal places.
+
+<KeyFact>
+Gradient descent's iteration count scales with the condition number κ of the loss; standardizing features is the cheapest fix, a rising loss curve indicts η or the gradient code, and finite differences settle the latter.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Interview question: "what happens when the learning rate is too large?" Show it exactly on $J(x) = x^2$: run gradient descent from $x^{(0)} = 3$ with $\eta = 1.1$ for four steps, computing every iterate and its loss, then state for which $\eta$ the iteration converges and connect the threshold to the chapter's $2/L$ condition.
+
+<Solution>
+$J'(x) = 2x$, so the update is $x^{(k+1)} = x^{(k)} - 2\eta x^{(k)} = (1 - 2.2)\,x^{(k)} = -1.2\, x^{(k)}$. Iterates:
+
+$$
+3 \;\to\; -3.6 \;\to\; 4.32 \;\to\; -5.184 \;\to\; 6.2208,
+$$
+
+with losses $9 \to 12.96 \to 18.66 \to 26.87 \to 38.70$: each step multiplies the loss by $(-1.2)^2 = 1.44$. The sign alternates (overshoot past the minimum every step) while the magnitude grows: geometric divergence.
+
+In general $x^{(k)} = (1 - 2\eta)^k x^{(0)}$ converges iff $|1 - 2\eta| < 1$, i.e. $0 < \eta < 1$. Here $L = J'' = 2$, so the condition is exactly $\eta < 2/L$. At $\eta = 1$ the iterates oscillate between $\pm 3$ forever; at $\eta = 0.5 = 1/L$, $x^{(1)} = 0$ in one step (the Newton step, since $\eta = 1/J''$).
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "batch vs stochastic vs mini-batch gradient descent — compare costs and say when each wins." Give per-update cost, gradient quality, and the regime where each is the right choice, for an empirical risk over $n$ examples in $d$ dimensions.
+
+<Solution>
+**Batch:** per update, $n$ per-example gradients, $O(nd)$; the gradient is exact, steps are stable, and classical convergence guarantees apply directly. Wins when $n$ is small enough that a full pass is cheap and the loss is convex: classical problems (OLS by normal equations aside, logistic regression by Newton/batch GD) with $n$ in the thousands.
+
+**Stochastic ($B = 1$):** per update, one gradient, $O(d)$; unbiased ($\mathbb E_i[\nabla J_i] = \nabla J$) but high-variance, so the path jitters and a constant $\eta$ only reaches a noise ball around the minimum; a decaying schedule ($\sum \eta_t = \infty$, $\sum \eta_t^2 < \infty$) is needed for convergence. Wins for very large $n$ and streaming/online data, where even one full pass is expensive.
+
+**Mini-batch ($B \approx 32$–$256$):** per update, $O(Bd)$; gradient variance falls by the factor $B$, and batched arithmetic vectorizes on modern hardware, so the wall-clock cost per example is close to SGD's while the direction is much cleaner. Wins in almost every large-$n$ setting; it is the practical default.
+
+Accounting identity worth saying aloud: one batch step costs the same number of gradient evaluations as $n$ SGD steps; when far from the optimum, many cheap noisy steps make more progress than one exact step of equal cost.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "why isn't Newton's method used for deep networks — or any model with many parameters?" Make the answer quantitative for $d = 10^5$ parameters: memory for the Hessian at 8 bytes per entry, the arithmetic order of one Newton solve, and the comparison to a gradient step. Add the structural problem that appears when the loss is non-convex.
+
+<Solution>
+The Hessian has $d^2 = 10^{10}$ entries; at 8 bytes each that is $80$ GB: it cannot even be stored, let alone formed (forming it for an empirical risk costs $O(nd^2)$ on top). Solving the Newton system $Hs = -\nabla J$ by a dense factorization costs $O(d^3) = 10^{15}$ flop-order arithmetic per step. A gradient step costs $O(nd)$ and needs $O(d)$ memory beyond the data: for large $d$ the per-step ratio is roughly a factor of $d$ in memory and $d^2$ in arithmetic.
+
+Structurally, a non-convex loss has regions where $H$ is not positive definite; there the quadratic model has no minimum, and the Newton direction can point uphill or into a saddle point (Newton solves $\nabla J = 0$, and saddles satisfy it). The practical compromises: damped Newton (line search on the Newton direction), gradient steps first and Newton only near the optimum, or quasi-Newton methods such as L-BFGS, which maintain a low-memory positive-definite approximation to $H^{-1}$ built from recent gradients.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that $f(\theta) = \lVert A\theta - b \rVert^2$ is convex, and find all its stationary points. What extra condition makes the minimizer unique?
+
+<Solution>
+Expand: $f(\theta) = \theta^\top A^\top A\, \theta - 2 b^\top A \theta + b^\top b$, so $\nabla f(\theta) = 2 A^\top A \theta - 2 A^\top b$ and the Hessian is $\nabla^2 f = 2 A^\top A$, constant in $\theta$. For any $v$: $v^\top (2A^\top A) v = 2 \lVert A v \rVert^2 \ge 0$, so the Hessian is positive semidefinite everywhere and $f$ is convex by the second-order test.
+
+Stationarity: $\nabla f = 0$ gives $A^\top A\, \theta = A^\top b$, the normal equations of <Ref lesson="ols" />. By the local-equals-global theorem, every solution is a global minimizer. If $A$ has full column rank, then $Av = 0$ only for $v = 0$, the Hessian is positive definite, $f$ is strictly convex, and the minimizer is unique: $\theta = (A^\top A)^{-1} A^\top b$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review from <Ref lesson="mle-map" />. For the 10-flip dataset with 6 heads, the negative log-likelihood of the coin is $J(\theta) = -6 \ln \theta - 4 \ln(1 - \theta)$. Compute $J'(\theta)$, run two gradient-descent steps from $\theta^{(0)} = 0.5$ with $\eta = 0.01$, and state where the iteration is heading and why it must get there.
+
+<Solution>
+$J'(\theta) = -\dfrac{6}{\theta} + \dfrac{4}{1 - \theta}$.
+
+Step 1: $J'(0.5) = -12 + 8 = -4$, so $\theta^{(1)} = 0.5 - 0.01 \cdot (-4) = 0.54$.
+
+Step 2: $J'(0.54) = -6/0.54 + 4/0.46 = -11.111 + 8.696 = -2.415$, so $\theta^{(2)} = 0.54 + 0.0242 = 0.564$.
+
+The iterates climb toward $0.6 = n_H/n$, the MLE computed in closed form in the mle-map chapter (there by solving $\ell'(\theta) = 0$ directly). Convergence to the global minimizer is guaranteed because $J$ is strictly convex on $(0,1)$: $J''(\theta) = 6/\theta^2 + 4/(1-\theta)^2 > 0$, so the unique stationary point is the global minimum, and small-enough gradient steps decrease $J$ monotonically toward it. The two routes, closed-form stationarity when available and iterative descent when not, are the same minimization.
+</Solution>
+</Exercise>
+
+<Exercise>
+Feature scaling, quantitatively. Let $J(\theta) = \tfrac12(\theta_1^2 + 100\,\theta_2^2)$, a bowl with curvatures $1$ and $100$ ($\kappa = 100$). (a) For which $\eta$ does gradient descent converge in both coordinates? (b) With $\eta = 0.019$, how many iterations shrink $\theta_1$ by a factor of 100? (c) After rescaling so both curvatures equal 1, what does $\eta = 1$ do?
+
+<Solution>
+The coordinates decouple: $\theta_1 \leftarrow (1 - \eta)\theta_1$ and $\theta_2 \leftarrow (1 - 100\eta)\theta_2$.
+
+(a) Convergence needs $|1 - \eta| < 1$ and $|1 - 100\eta| < 1$; the binding constraint is the steep coordinate: $0 < \eta < 2/100 = 0.02$. The steepest curvature caps the step for every direction.
+
+(b) At $\eta = 0.019$: $\theta_2$ contracts fast (factor $|1 - 1.9| = 0.9$ with alternating sign), but $\theta_1$ contracts only by $0.981$ per step. For a factor-100 reduction: $0.981^k \le 0.01 \Rightarrow k \ge \ln 100 / (-\ln 0.981) \approx 4.605/0.0192 \approx 240$ iterations. The iteration count is set by $\kappa$: the allowed $\eta$ is $\sim 2/\lambda_{\max}$ while the slow coordinate needs $\sim \lambda_{\min}^{-1}$-sized steps.
+
+(c) With both curvatures 1 the update is $\theta \leftarrow (1 - \eta)\theta$; $\eta = 1$ maps any start to the exact minimum in one step. Scaling turned a 240-iteration problem into a 1-step problem, which is the content of the scaling figure.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "show that the logistic loss is convex." Prove that the softplus function $f(z) = \log(1 + e^z)$ is convex in $z$, then conclude that the logistic-regression NLL is convex in the weights $w$. Use $\sigma(z) = 1/(1 + e^{-z})$.
+
+<Solution>
+Differentiate: $f'(z) = \dfrac{e^z}{1 + e^z} = \sigma(z)$, and $f''(z) = \sigma'(z) = \sigma(z)\bigl(1 - \sigma(z)\bigr)$. Since $\sigma(z) \in (0, 1)$ for all $z$, $f''(z) > 0$ everywhere: $f$ is (strictly) convex by the second-order test.
+
+The per-example logistic NLL with label $y \in \{0, 1\}$ and score $z = w^\top x$ can be written $-y z + \log(1 + e^{z})$ (expand $-y\log\sigma(z) - (1-y)\log(1-\sigma(z))$ using $\log \sigma(z) = z - \log(1+e^z)$ and $\log(1 - \sigma(z)) = -\log(1 + e^z)$). Both terms are convex in $z$: the first is linear, the second is softplus. A convex function of $z$ composed with the affine map $z = w^\top x$ is convex in $w$, and a sum (over examples) of convex functions is convex. Hence the full NLL is convex in $w$, so gradient descent or Newton/IRLS finds the global MLE; this is the reason logistic regression is reliable to fit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "does gradient descent always converge? To the global minimum?" Give the full answer: the failure with a fixed too-large step, the convex smooth case, the non-convex case, and the non-smooth case, each with an example from this chapter.
+
+<Solution>
+No, on both counts, without hypotheses.
+
+**Divergence:** even on the convex smooth $J(x) = x^2$, any $\eta > 2/L = 1$ diverges geometrically (Exercise 1). Convergence claims always carry a step-size condition such as $\eta < 2/L$.
+
+**Convex and smooth, suitable $\eta$:** the descent lemma gives monotone decrease, the iterates approach a stationary point, and by the local-equals-global theorem a stationary point of a convex function is a global minimum; the OLS, ridge, and logistic losses live here.
+
+**Non-convex, smooth:** at best convergence to a stationary point, which may be a local minimum or a saddle ($\nabla J = 0$ without minimality). The double-well figure traps GD in a local minimum depending on the start; the GMM log-likelihood and $k$-means distortion are the course's non-convex objectives, handled by EM and restarts rather than by a guarantee.
+
+**Convex, non-smooth:** the gradient does not exist everywhere (lasso's $|\cdot|$ at 0), so plain gradient descent is not even defined there; subgradient or coordinate-descent methods take over, and the global guarantee of convexity survives.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §1.1: LMS on the Portland housing data, the batch-GD contour trajectory, and the stochastic variant. https://cs229.stanford.edu/main_notes.pdf
+2. K. Q. Weinberger, "Lecture 7: Gradient Descent (and Beyond)," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — the Taylor-expansion derivation, Adagrad, Newton's method with its divergence cases, and the GD-then-Newton hybrid. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote07.html
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — ch. 8: first-order methods (§8.2), second-order methods (§8.3), SGD with schedules (§8.4), constrained optimization and KKT (§8.5). https://probml.github.io/pml-book/book1.html
+4. S. Boyd, L. Vandenberghe, *Convex Optimization*, Cambridge University Press, 2004 — ch. 3: convex functions and the first/second-order characterizations; §9.2–9.5: descent methods and Newton's method. https://web.stanford.edu/~boyd/cvxbook/
+5. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §4.3.3: Newton's method for logistic regression as iteratively reweighted least squares.
+6. H. Robbins, S. Monro, "A Stochastic Approximation Method," *Annals of Mathematical Statistics*, 22, 1951 — the step-size conditions Ση = ∞, Ση² < ∞ for stochastic iterations.
+7. Y. S. Abu-Mostafa, *Learning From Data*, Caltech CS156, 2012 — Lecture 9: logistic regression and the fixed-step gradient-descent framing. https://work.caltech.edu/lectures.html
+8. C. Huyen, *Introduction to Machine Learning Interviews*, free web book — §5.1.4: the calculus and convexity questions (convexity proofs, Jacobians, Hessians) asked in ML interviews. https://huyenchip.com/ml-interviews-book/
+</References>

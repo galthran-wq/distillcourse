@@ -1,0 +1,396 @@
+A sampled main lobe can locate one isolated tone between bins, but denser FFT samples do not add observation time or separate unresolved components.
+
+<Ref lesson="windows-leakage-and-resolution">Windows, Leakage, and Resolution</Ref> established that $N$ acquired, windowed samples fix a continuous main-lobe shape and its coherent amplitude calibration. <Ref lesson="fft-factorization-and-layout">FFT Factorization and Machine Layout</Ref> established that an FFT changes the evaluation schedule without changing the declared DFT coefficients. This lesson uses those facts to separate two claims that similar-looking spectra often blur: localization of one isolated peak and physical resolution of multiple components.
+
+The route is the exact zero-padding identity, a local frequency-and-amplitude fit, the fit's window-dependent bias, a phase-controlled failure of the two-bump test, and an acquisition decision that keeps localization distinct from resolution.
+
+<Task>
+Work closed-book before opening the answers. (1) Distinguish $N$ acquired samples from an $L$-point FFT with $L\ge N$. (2) At fixed sample rate $f_s$, name which length controls record duration and which controls displayed frequency spacing. (3) Recall which window property governs close comparable tones and which property governs a weak tone beside a strong one. (4) State the course's forward-transform sign and the coherent-response correction for a complex tone.
+</Task>
+
+<Aside title="Retrieval answers">
+$N$ is the number of informative samples and the window length; $L$ is the number of DFT coordinates evaluated after $L-N$ zeros are appended. Record duration is $N/f_s$, while padded-grid spacing is $f_s/L$. Main-lobe width governs separation of close comparable tones, while local sidelobe response governs masking of a weak neighbor. The course uses the unscaled negative-sign forward transform. A bin-centered analytic complex tone is calibrated by dividing its raw magnitude by $C_w=\sum_n w[n]$.
+</Aside>
+
+## A denser grid samples the same finite-record spectrum
+
+### Padding changes coordinates without changing observation
+
+The first distinction is visible in one fixed record. Let the sample rate be $f_s=1024$ samples/s and acquire $N=64$ samples of the analytic complex tone
+
+$$
+x[n]=e^{j2\pi(10.31/64)n},\qquad 0\le n<64.
+$$
+
+Its physical frequency is $10.31(f_s/64)=164.96$ Hz. The signal is explicitly complex, so it contains only the displayed positive-frequency exponential; no negative-frequency image from a real cosine enters the comparison. Apply the periodic Hann window from the prerequisite, $w[n]=0.5-0.5\cos(2\pi n/N)$. The 64 acquired samples span $N/f_s=62.5$ ms and produce a Hann null-to-null main-lobe width of $4f_s/N=64$ Hz.
+
+With $L=64$, the raw transform evaluates the lobe every $f_s/L=16$ Hz. Appending $960$ zeros and using $L=1024$ evaluates it every $1$ Hz. The second plot has sixteen times as many coordinates per original-record bin, and its largest sampled value lies much nearer the continuous maximum. It still represents the same 62.5 ms observation and the same 64 Hz main lobe.
+
+<Task>
+Step through the sequence. Before the second frame, predict which labels may change when only $L$ changes. Before the third, identify the first change that can narrow the main lobe in hertz.
+</Task>
+
+<FigureSequence name="padding-versus-observation" alt="Three fixed-axis frames show one 64-sample Hann-windowed analytic tone on 64-point and 1024-point grids, followed by a 256-sample observation whose main lobe is four times narrower." caption="Padding makes the same finite-record curve easier to sample; acquiring four times as many informative samples makes the physical lobe four times narrower." />
+
+The identity behind the first two frames contains no approximation. Define the continuous finite-record DTFT
+
+$$
+X_w(e^{j\omega})=\sum_{n=0}^{N-1}x[n]w[n]e^{-j\omega n}.
+$$
+
+After appending zeros to length $L\ge N$, the unscaled $L$-point transform is
+
+$$
+\begin{aligned}
+X_L[k]
+&=\sum_{n=0}^{L-1}x_L[n]e^{-j2\pi kn/L}\\
+&=\sum_{n=0}^{N-1}x[n]w[n]e^{-j2\pi kn/L}\\
+&=X_w(e^{j2\pi k/L}),\qquad 0\le k<L.
+\end{aligned}
+$$
+
+The zero-valued terms vanish in the second line. Increasing $L$ changes only the evaluation frequencies
+
+$$
+\omega_k=\frac{2\pi k}{L}\ \text{radians/sample},
+\qquad
+f_k=\frac{k f_s}{L}\ \text{Hz}.
+$$
+
+One *original-record bin* is $f_s/N$ Hz. One padded-grid step is $f_s/L=(N/L)(f_s/N)$ Hz, or $N/L$ original-bin units. This vocabulary prevents a padded bin from silently replacing the physical unit set by the acquired record.
+
+<Theorem title="zero padding preserves the finite-record DTFT">
+Fix an integer $N\ge1$, a sample rate $f_s>0$, acquired samples $x[n]$ on $0\le n<N$, and a length-$N$ window $w[n]$. For an integer $L\ge N$, define $x_L[n]=x[n]w[n]$ for $0\le n<N$ and $x_L[n]=0$ for $N\le n<L$. Then every length-$L$ DFT coefficient equals the finite-record DTFT sample
+
+$$
+X_L[k]=X_w(e^{j2\pi k/L}),\qquad 0\le k<L.
+$$
+
+<Proof>
+The three-line identity above substitutes the zero extension and removes its zero-valued terms. The remaining sum is exactly the definition of $X_w(e^{j\omega})$ evaluated at $\omega=2\pi k/L$.
+</Proof>
+</Theorem>
+
+**Corollary for the fixed acquisition and window.** With the same $N$, $f_s$, $x[n]$, and $w[n]$, padding leaves the acquired duration $N/f_s$ unchanged. It also leaves the window transform
+
+$$
+W(e^{j\omega})=\sum_{n=0}^{N-1}w[n]e^{-j\omega n}
+$$
+
+unchanged, so its main-lobe width in radians/sample and, at the fixed $f_s$, in hertz cannot depend on $L$. Padding reduces coordinate-sampling error by selecting a denser finite subset of the same $X_w(e^{j\omega})$.
+
+### Longer acquisition changes the window kernel
+
+Now acquire $N=256$ informative samples at the same $f_s$, physical tone frequency, and periodic-Hann convention, while keeping $L=1024$. Duration becomes $250$ ms, the display spacing remains $1$ Hz, and the Hann main lobe narrows from $64$ Hz to $16$ Hz. The apparent smoothness of the plot has been held fixed while the evidence changes.
+
+<Definition title="spectral resolution">
+*Spectral resolution* is the ability of a finite observation and window to support distinct frequency claims, not merely the spacing of plotted FFT samples.
+</Definition>
+
+The canonical resolution change is the longer $N=256$ observation. A structurally different valid change selects a narrower-main-lobe window while accepting its other leakage and calibration costs. The degenerate $N=1$ record is valid data but carries no useful separation evidence. A longer $L$ with the same $N$ is the near-miss: it supplies more coordinates while violating the requirement that resolving evidence change. A proposed resolution improvement is decided by whether the acquired aperture or the signal model changed, not by whether the plotted line became smoother.
+
+<Task>
+Generate one additional resolution-improving example and one non-example. For each, state whether it changes acquired duration, the declared window kernel, or the signal model; the non-example must change only display or computation.
+</Task>
+
+## Three local samples estimate one isolated peak
+
+### A concave local fit returns location and height
+
+The unchanged-DTFT result gives a legitimate use for a larger $L$: it places samples close enough to one isolated maximum that a local curve can estimate the maximum between coordinates. The method estimates both location and height, but each result inherits the single-peak model.
+
+Let $k^*$ be the largest sampled point of an interior local maximum. First divide raw magnitudes by the coherent response $C_w=\sum_{n=0}^{N-1}w[n]$, then express the three neighboring analytic-tone amplitudes in decibels:
+
+$$
+\alpha=20\log_{10}\frac{|X_L[k^*-1]|}{C_w},\quad
+\beta=20\log_{10}\frac{|X_L[k^*]|}{C_w},\quad
+\gamma=20\log_{10}\frac{|X_L[k^*+1]|}{C_w}.
+$$
+
+*Parabolic peak interpolation*, also called quadratic peak interpolation, fits $y(r)=a(r-p)^2+b$ through these values at local coordinates $r=-1,0,1$. The dimensionless offset $p$ is measured in padded-grid bins from $k^*$, not in original bins or hertz. Solving the three equations gives
+
+$$
+p=\frac12\frac{\alpha-\gamma}{\alpha-2\beta+\gamma},
+\qquad
+\widehat b=\beta-\frac14(\alpha-\gamma)p.
+$$
+
+The frequency and analytic-tone amplitude-magnitude estimates are
+
+$$
+\widehat f=(k^*+p)\frac{f_s}{L},
+\qquad
+\widehat A=10^{\widehat b/20}.
+$$
+
+{/* fig PeakParabolaFit: three dB samples alpha, beta, gamma at k-star minus one, k-star, k-star plus one; fitted concave parabola and vertex offset p; KaTeX formulas for p, fitted height, and frequency mapping; amber estimate versus blue samples; responsive stacked layout */}
+<Figure name="PeakParabolaFit" alt="Three adjacent log-magnitude samples define a concave fitted parabola whose vertex lies p padded bins from the largest sample and supplies an interpolated peak height." caption="The fit is a local model of one isolated peak; its vertex is not valid merely because three numbers are available." />
+
+<Example title="frequency and amplitude from one concave triplet">
+Suppose a calibrated analytic-tone spectrum has $\alpha=-6$ dB, $\beta=0$ dB, and $\gamma=-2$ dB at $k^*-1,k^*,k^*+1$. Let $k^*=40$, $L=1024$, and $f_s=4096$ samples/s, so one padded-grid step is $4$ Hz. Then
+
+$$
+\begin{aligned}
+p
+&=\frac12\frac{-6-(-2)}{-6-2(0)+(-2)}
+=\frac12\frac{-4}{-8}
+=\frac14,\\
+\widehat f
+&=(40+0.25)(4\ \text{Hz})
+=161\ \text{Hz},\\
+\widehat b
+&=0-\frac14[-6-(-2)]\left(\frac14\right)
+=0.25\ \text{dB},\\
+\widehat A
+&=10^{0.25/20}
+\approx1.029.
+\end{aligned}
+$$
+
+The positive correction from $0$ to $0.25$ dB is the fitted height above the largest sampled coordinate. It is not another coherent-gain correction: $C_w$ was already applied before $\alpha,\beta,\gamma$ were formed.
+</Example>
+
+### Scale, isolation, and curvature decide admissibility
+
+For a real cosine at an interior positive-frequency bin whose positive- and negative-frequency window lobes satisfy the same isolation check, each conjugate spectral line carries half the cosine amplitude. Replace the three normalized magnitudes by $2|X_L[k]|/C_w$ before taking decibels. Omit that factor of two at DC and, for even $L$, Nyquist. This translation is separate from interpolation and cannot be inferred from the fitted height.
+
+Define $D=\alpha-2\beta+\gamma=2a=y''(r)$, the fitted parabola's signed curvature. It must be negative for a concave peak and nonzero for a finite vertex. The selected point must also be an interior local maximum, and a correctly centered three-sample fit normally satisfies $|p|\le1/2$. An endpoint, non-maximum, zero-curvature triplet, or offset outside that branch is rejected rather than forced into a frequency report.
+
+<Exercise>
+A calibrated zero-padded spectrum has $\alpha=-12$ dB, $\beta=0$ dB, and $\gamma=-6$ dB at bins $19$, $20$, and $21$. The grid spacing is $10$ Hz. Compute $p$, the interpolated frequency, and the fitted peak height. Before opening the solution, write the denominator and identify the signal-shape assumption that makes the fit admissible.
+
+<Solution>
+The denominator is
+
+$$
+\alpha-2\beta+\gamma=-12-2(0)-6=-18\ \text{dB},
+$$
+
+which is negative and therefore describes a concave local fit. The offset is
+
+$$
+p=\frac12\frac{-12-(-6)}{-18}
+=\frac12\frac{-6}{-18}=\frac16.
+$$
+
+Bin 20 is at $200$ Hz because the grid spacing is $10$ Hz, so
+
+$$
+\widehat f=(20+1/6)(10\ \text{Hz})=201.666\ldots\ \text{Hz}.
+$$
+
+The fitted height is
+
+$$
+\widehat b=0-\frac14[-12-(-6)]\left(\frac16\right)=0.25\ \text{dB}.
+$$
+
+If $\alpha-2\beta+\gamma=0$, the fitted curvature is zero and no unique finite parabolic vertex exists; division is rejected. The calculation also assumes that all three samples belong to one isolated local maximum. The $0.25$ dB height cannot be converted into a physical amplitude until the transform scale, coherent response, and complex-versus-real convention are stated.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The estimator report is incomplete without peak selection, signed curvature $D$, branch, transform scale, window calibration, amplitude-magnitude convention, and positive/negative-image isolation clauses.
+</KeyFact>
+
+## Padding reduces grid error until the peak model becomes the limit
+
+### Window shape sets deterministic interpolation bias
+
+The local calculation was exact for its fitted parabola, but a practical window lobe is generally not an exact parabola in decibels. The resulting systematic difference between an estimate and the true tone parameter is *bias* from model mismatch, distinct from random scatter across noisy records.
+
+For the frozen $N=64$ analytic tone at original-bin coordinate $q=10.31$, a coarse $L=N$ grid and the three-point dB fit give different errors for different periodic windows. In original-bin units, the rectangular estimate errs by about $-0.1670$, the Hann estimate by $+0.01591$, and the periodic Blackman estimate by $+0.006584$. With $L=4N$, all three absolute errors fall below $0.002$ original bin in the deterministic study. The new samples shorten the interval over which the parabola approximates the unchanged lobe.
+
+<Figure src="./figures/interpolation-error-by-padding.svg" alt="Peak-interpolation error decreases with padding factor for rectangular, periodic Hann, and periodic Blackman windows, while the three curves retain different window-dependent values." caption="Denser sampling shrinks the local approximation interval; it does not make distinct window lobes share one interpolation error law." />
+
+Two symmetry cases have zero frequency error under the declared estimator. A bin-centered tone has equal side samples and $p=0$. A tone exactly halfway between grid coordinates gives tied central choices; consistent indexing produces $p=+1/2$ from the lower center or $p=-1/2$ from the upper center, which identifies the same frequency. These zeros do not make the estimator generally unbiased between them.
+
+An ideal Gaussian window transform is exceptional because its log magnitude is exactly quadratic before practical truncation. Rectangular, Hann, and Blackman lobes are not exact dB parabolas. Their local Taylor approximations improve as the evaluation samples approach the maximum, which is why noiseless isolated-tone error can approach zero as $L/N$ grows. A nonzero asymptotic floor would require another declared effect such as a neighboring tone, noise, quantization, or a different peak model; padding alone does not create such a floor.
+
+### A denser grid cannot repair a violated peak model
+
+The improvement stops addressing the measurement problem when the single-peak assumption fails. A nearby component contributes a complex window response at the same three coordinates. Low signal-to-noise ratio can also make the selected largest point follow a noise fluctuation rather than the tone lobe. In both cases, a very large $L$ supplies a finely sampled version of the contaminated peak. It does not restore the isolated-lobe model.
+
+Zero amplitude is a sharper boundary than low amplitude. All log magnitudes are undefined, phase is undefined, and frequency cannot be inferred from an absent line. Three coincident complex tones form one phasor sum at one frequency; they can reinforce, partially cancel, or cancel exactly. No peak interpolator can recover the number of coincident components from that sum.
+
+## Relative phase can manufacture two misleading maxima
+
+### Fixed frequencies can produce a phase-controlled peak trap
+
+The bias boundary becomes decisive when two window lobes overlap. Their complex values add before magnitude is taken, so relative phase can change the number and location of visible maxima without changing either physical tone frequency.
+
+Use the study's explicit analytic complex pair at $f_s=1024$ samples/s:
+
+$$
+x_\phi[n]
+=e^{j2\pi(10/64)n}
++e^{j(2\pi(10.5/64)n+\phi)}.
+$$
+
+The true frequencies are $160$ Hz and $168$ Hz. This study freezes $N_0=64$ as its reference aperture, so one reference-bin unit is $f_s/N_0=16$ Hz and the two tones are separated by $0.5$ reference bin. Under a rectangular $N=64$ record, the in-phase case $\phi=0$ has one qualifying maximum at $q=10.25$. Changing only the relative phase to $\phi=\pi/2$ creates two deep-looking bumps at approximately $q=9.5828$ and $q=10.9172$. Assigning them in order to the two true tones gives errors of about $-0.4172$ and $+0.4172$ in the fixed $N_0$ reference-bin unit. The display looks more separated while both location estimates move away from truth.
+
+{/* fig PhaseFalseResolution: two fixed-axis panels for equal analytic tones at q=10 and q=10.5 under rectangular N=64; in-phase panel has one maximum at 10.25, quadrature panel has maxima at 9.5828 and 10.9172; thin truth guides, amber maxima, numeric errors, bottom scoped verdict; panels stack on mobile */}
+<Figure name="PhaseFalseResolution" alt="Two equal-tone spectra with identical frequencies and record length but different relative phase show one central maximum in phase and two displaced false maxima in quadrature." caption="Two bumps are not two trustworthy estimates when changing only relative phase creates them and moves them away from the known component frequencies." />
+
+<Task>
+Compare every displayed maximum with the two truth guides. Accept separation only if both locations remain within the declared tolerance under both phase cases; reject the $N=64$ record even though its quadrature panel has two maxima.
+</Task>
+
+The misconception is that two visible bumps prove two resolved sinusoids with unbiased peak locations. The frozen comparison rejects it: local-maxima count changes under a phase perturbation that leaves frequency, amplitude, window, duration, and grid unchanged. The replacement is a scoped stability check. For a declared window, separation, phase set, and location tolerance, both component estimates must remain near the truth under every tested phase. This operational check is not a universal resolution theorem, but it detects the specific false-positive mechanism.
+
+### Stable truth locations, not peak count, test this pair
+
+Acquire $N=256$ samples while keeping the same physical tones and a common $L=1024$ display. The record now spans $250$ ms instead of $62.5$ ms. Its current-record bin is $f_s/N=4$ Hz, distinct from the frozen $16$ Hz reference-bin unit. In the deterministic study, both phase cases produce two qualifying maxima, and every maximum lies within $0.05$ of the fixed $N_0=64$ reference-bin unit, hence within $0.8$ Hz or $0.2$ current-record bin. The longer record changed the complex-lobe overlap; padding the short record could only show that overlap more precisely.
+
+<Aside title="Source note: the reproduced phase test">
+The in-phase and quadrature comparison adapts the controlled two-sinusoid sequence in Julius O. Smith III, *Spectral Audio Signal Processing*, Chapter 5, §5.4.1 and Figures 5.7 through 5.9. The course figure regenerates the curves from the analytic complex formula above, uses its own frozen frequencies and peak rule, and reports locations against known truth rather than copying the published drawing.
+</Aside>
+
+## Acquisition buys resolution while interpolation buys localization
+
+### A localization claim may spend computation
+
+The preceding results make the engineering choice depend on the claim. One isolated off-bin tone in a fixed record is a localization problem. Two components merged by that record's window are a resolution problem. The first can use denser evaluation and a local estimator; the second needs more informative observation, a changed window with audited tradeoffs, or a stronger explicitly tested signal model.
+
+{/* fig LocalizationResolutionLedger: responsive two-row decision ledger; columns claim, held evidence, action, changed quantity, failure check; row 1 isolated localization uses larger L and interpolation while N and lobe stay fixed; row 2 component separation uses longer N or changed window/model and audits phase-stable truth locations; amber action and blue evidence */}
+<Figure name="LocalizationResolutionLedger" alt="A decision ledger sends one isolated fixed-record peak to denser FFT sampling and interpolation, but sends unresolved components to longer acquisition or a changed window or model." caption="The permitted action follows the claim: improve coordinates for localization, improve evidence for resolution." />
+
+For the $N=64$ Hann record, increasing $L$ from $64$ to $1024$ changes the grid from $16$ Hz to $1$ Hz and reduces the largest-bin coordinate bound from one-half to one-thirty-second of an original bin. The record remains $62.5$ ms and the main lobe remains $64$ Hz wide. This is a correct and efficient use of a longer FFT when the tone is isolated and the interpolation checks pass.
+
+### A resolution claim must change evidence
+
+For two tones inside that same lobe, the larger $L$ gives more samples of their coherent sum. Acquiring $N=256$ samples changes duration to $250$ ms and narrows the same-family Hann main lobe to $16$ Hz. A different window could also change main-lobe width, but the preceding lesson requires its sidelobe, coherent-gain, scalloping, and noise-bandwidth costs to be re-audited. A multi-component parametric model can make a stronger claim only by adding assumptions; it is not a consequence of zero padding.
+
+An auditable peak report therefore records $f_s$, informative length $N$, FFT length $L$, window and endpoint convention, forward scale, analytic-versus-real signal convention, coherent response, peak-selection rule, local fit, and rejection checks. A resolution report additionally records the component geometry, a perturbation set such as relative phase, a location or separation tolerance, and the acquisition or model change that supplied new evidence.
+
+The single deterministic move is now established: dense sampling plus a checked local model estimates frequency and amplitude magnitude for one isolated windowed sinusoid, while record duration and window shape bound component separation. Correlation, PSD, and Welch Estimation next treats a different failure: repeated random records do not yield one stable squared-magnitude spectrum merely because each record receives a dense FFT grid.
+
+## Exercises
+
+<Exercise>
+Diagnose four boundaries of the declared estimator: (a) one exactly bin-centered nonzero analytic tone, (b) one exactly half-bin tone, (c) zero amplitude, and (d) two equal coincident analytic tones. For each, state what is identifiable, the expected $p$ or tie behavior, and the clause that decides the case.
+
+<Solution>
+**(a) Bin centered.** Symmetry gives $\alpha=\gamma$, so the numerator of $p$ is zero and $p=0$ when curvature is nonzero. Frequency is the center coordinate. Coherent-response calibration recovers the complex amplitude under the declared window.
+
+**(b) Half bin.** The two largest samples tie. Choosing the lower as $k^*$ gives $p=+1/2$; choosing the upper gives $p=-1/2$. Both produce the same $k^*+p$ and therefore the same frequency. The branch boundary is admissible only with consistent tie handling.
+
+**(c) Zero amplitude.** Every magnitude is zero, so its logarithm, peak location, frequency, and phase are undefined. The required nonzero isolated local maximum is absent. Returning $p=0$ would confuse a software default with evidence.
+
+**(d) Coincident tones.** Both terms share one frequency and add as phasors. Equal phase doubles the complex amplitude; opposite phase cancels to case (c); other phases produce an intermediate single amplitude. The finite record identifies at most the resulting phasor at one frequency, not two components. The transferable boundary is identifiability: interpolation refines a represented peak but cannot count hidden decompositions of the same signal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim “two visible bumps imply unbiased frequency estimates” using the $N=64$ rectangular pair at $q=10$ and $q=10.5$, where $q$ is measured in the fixed $N_0=64$ reference-bin unit. Compare the in-phase and $90^\circ$ cases, identify the failed inference, and give a replacement test scoped to this experiment.
+
+<Solution>
+The physical frequencies, amplitudes, $N$, window, and evaluation grid remain fixed. At relative phase $0^\circ$, the magnitude has one qualifying maximum at $q=10.25$. At $90^\circ$, it has two at about $q=9.5828$ and $q=10.9172$. Ordered assignment to the true coordinates $10$ and $10.5$ gives errors about $-0.4172$ and $+0.4172$ in the fixed $N_0$ reference-bin unit.
+
+The failed step maps the count of local maxima directly to the number and locations of physical components. Overlapping complex window responses add before magnitude is taken, so relative phase can create or move maxima. The replacement test for this frozen experiment requires two maxima whose assigned locations remain within the declared tolerance under both displayed phases. The $N=64$ record fails because the in-phase case has only one maximum and the quadrature locations are badly displaced. This conclusion applies to the declared rectangular window, separation, and phase set; it is not a universal threshold for every estimator.
+</Solution>
+</Exercise>
+
+<Exercise>
+Starting from $y(r)=a(r-p)^2+b$ and the three conditions $y(-1)=\alpha$, $y(0)=\beta$, $y(1)=\gamma$, derive the formulas for $p$ and $b$. Diagnose zero and positive values of $\alpha-2\beta+\gamma$.
+
+<Solution>
+Substitution gives
+
+$$
+\alpha=a(1+2p+p^2)+b,
+\quad
+\beta=ap^2+b,
+\quad
+\gamma=a(1-2p+p^2)+b.
+$$
+
+Subtracting the last equation from the first yields
+
+$$
+\alpha-\gamma=4ap.
+$$
+
+Adding the first and third and subtracting twice the second yields
+
+$$
+\alpha-2\beta+\gamma=2a,
+\qquad
+a=\frac{\alpha-2\beta+\gamma}{2}.
+$$
+
+When $a\ne0$, substitute it into $p=(\alpha-\gamma)/(4a)$:
+
+$$
+p=\frac12\frac{\alpha-\gamma}{\alpha-2\beta+\gamma}.
+$$
+
+From $\beta=ap^2+b$, $b=\beta-ap^2$. Also $2ap=(\alpha-\gamma)/2$, so $ap^2=(\alpha-\gamma)p/4$. Hence
+
+$$
+b=\beta-\frac14(\alpha-\gamma)p.
+$$
+
+If $\alpha-2\beta+\gamma=0$, then $a=0$: the fit has zero curvature and no unique finite vertex. If the quantity is positive, then $a>0$ and the vertex is a minimum, not the required spectral maximum. The transferable step is to test curvature before interpreting the algebraic vertex as a peak.
+</Solution>
+</Exercise>
+
+<Exercise>
+Choose a plan for each claim: (a) locate one isolated off-bin tone more precisely from a fixed $N=64$ record; (b) separate two tones lying inside that record's window main lobe. For each, state which of $N$, $L$, duration, grid spacing, and main-lobe width changes. Report widths in hertz and distinguish the fixed $N_0=64$ reference-bin unit from a current-record bin if $N$ changes. Include the amplitude-calibration and FFT-interface checks inherited from the prerequisites.
+
+<Solution>
+**(a) Isolated localization.** Hold $N=64$, $f_s$, and $w[n]$ fixed; choose a larger $L$, append zeros after windowing, and apply a checked local interpolator. Duration $N/f_s$ and main-lobe width remain fixed. Grid spacing changes from $f_s/64$ to $f_s/L$. The local maximum must be isolated and concave with $|p|\le1/2$. Divide analytic-tone magnitudes by $C_w=\sum_nw[n]$ before interpreting amplitude magnitude; use the one-sided factor two only for an interior real cosine whose positive- and negative-frequency window lobes satisfy the same isolation check. These checks retrieve <Ref lesson="windows-leakage-and-resolution">Windows, Leakage, and Resolution</Ref>.
+
+**(b) Component separation.** Increasing $L$ alone is rejected because it samples the merged curve more densely. Acquire a longer record, so $N$ and duration increase and the same-family main lobe narrows in hertz, or change the window or signal model and audit the new assumptions. Keep physical tone frequencies fixed while $N$ changes. At the lesson's $f_s=1024$ samples/s, the fixed $N_0=64$ reference bin is $16$ Hz while an $N=256$ current-record bin is $4$ Hz; neither unit changes the physical width reported in hertz. In both cases the FFT must satisfy the negative-sign, raw-forward-scale, natural-order, and declared-length interface from <Ref lesson="fft-factorization-and-layout">FFT Factorization and Machine Layout</Ref>. The transferable cue is the requested claim: coordinates are enough for localization, while resolution requires changed evidence.
+</Solution>
+</Exercise>
+
+<Exercise>
+Generate $50$ seeded, equal-length white-noise records. Hold $N=64$, the periodic Hann window, $L=1024$, the raw-forward scale, coherent normalization, and interior bin $k=160$ fixed. Report all $50$ values of $|X_L[k]/C_w|^2$, their mean, sample standard deviation, and coefficient of variation. Explain why a smooth zero-padded trace cannot remove trial-to-trial spread.
+
+<Solution>
+The following executable JavaScript fixes the generator as well as the transform conventions. The linear-congruential generator updates an unsigned 32-bit state, and Box-Muller converts pairs of uniform values to unit-variance Gaussian samples.
+
+```js
+let state = 0x20260806 >>> 0;
+function uniform() {
+  state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+  return (state + 0.5) / 4294967296;
+}
+function normal() {
+  const u1 = uniform(), u2 = uniform();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+const N = 64, L = 1024, k = 160;
+const w = Array.from({ length: N }, (_, n) =>
+  0.5 - 0.5 * Math.cos(2 * Math.PI * n / N));
+const Cw = w.reduce((s, v) => s + v, 0);
+const power = Array.from({ length: 50 }, () => {
+  let re = 0, im = 0;
+  for (let n = 0; n < N; n++) {
+    const x = normal(), a = 2 * Math.PI * k * n / L;
+    re += x * w[n] * Math.cos(a);
+    im -= x * w[n] * Math.sin(a);
+  }
+  return (re * re + im * im) / (Cw * Cw);
+});
+const mean = power.reduce((s, v) => s + v, 0) / power.length;
+const sd = Math.sqrt(power.reduce((s, v) => s + (v - mean) ** 2, 0)
+  / (power.length - 1));
+console.log(power, mean, sd, sd / mean);
+```
+
+Rounded to six decimal places, the powers are
+
+`0.010471, 0.076704, 0.001461, 0.046961, 0.004612, 0.004346, 0.006858, 0.004023, 0.000680, 0.015879, 0.001513, 0.043340, 0.023508, 0.006603, 0.001614, 0.008501, 0.015898, 0.009387, 0.012623, 0.006047, 0.001579, 0.008107, 0.016164, 0.010799, 0.000257, 0.075756, 0.005330, 0.006680, 0.006787, 0.046901, 0.046354, 0.025559, 0.016485, 0.015249, 0.008129, 0.005903, 0.012629, 0.013373, 0.103785, 0.010186, 0.023448, 0.034820, 0.103530, 0.016693, 0.030797, 0.008466, 0.055802, 0.010275, 0.030309, 0.037212`.
+
+The mean is $0.021767896$, the sample standard deviation is $0.024899643$, and the coefficient of variation is $0.024899643/0.021767896=1.143870026$. Each padded transform densely samples its own record's deterministic finite DTFT. Padding does not combine independent records, so it cannot reduce variation across realizations. A probabilistic estimator and an averaging rule are now required; <Ref lesson="correlation-psd-and-welch">Correlation, PSD, and Welch Estimation</Ref> develops that next step.
+</Solution>
+</Exercise>
+
+<References>
+1. Julius O. Smith III, *Spectral Audio Signal Processing*, Chapter 5, §§5.4.1, 5.6.1, and 5.6.2 — relative-phase resolution failures, three-point quadratic interpolation, and window-dependent interpolation bias. https://ccrma.stanford.edu/~jos/sasp/
+2. Richard G. Lyons, *Understanding Digital Signal Processing*, 3rd ed., Chapter 3, §3.11 — zero padding as denser frequency-domain sampling, window-before-padding order, informative-sample amplitude normalization, and the distinction between grid density and close-tone resolution.
+3. Alan V. Oppenheim, *Discrete-Time Signal Processing, MIT 6.341*, Lecture 17, pp. 1–3, and Problem Set 9, Problem 9.7 with solution p. 12 — finite-window main lobes, spectral sampling, zero-padding misconceptions, and separation of sample density from record-length resolution. https://ocw.mit.edu/courses/6-341-discrete-time-signal-processing-fall-2005/
+4. Jack Schaedler, *Seeing Circles, Sines, and Signals*, Lessons 24–25 — fixed-data leakage and side-by-side comparison of appended zeros with longer observation. https://jackschaedler.github.io/circles-sines-signals/
+</References>

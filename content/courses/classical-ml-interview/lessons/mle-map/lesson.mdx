@@ -1,0 +1,402 @@
+Most classical estimators are maximum-likelihood estimates in disguise, and every standard regularizer is the log of a prior. This chapter makes both claims computational: it derives the maximum-likelihood estimates for the coin and the Gaussian in full, introduces MAP estimation as likelihood times prior, and performs the one-line algebra that turns a Gaussian or Laplace prior into an L2 or L1 penalty. The route: the likelihood function, the two-step recipe worked on the coin, the Gaussian mean and its biased variance, Beta priors as pseudo-counts, priors as regularizers, and the MLE-versus-MAP comparison interviewers ask for directly.
+
+## The likelihood function: data fixed, parameters free
+
+A coin with unknown heads probability $\theta$ is flipped 10 times, independently, and lands
+
+$$
+D = \text{H, T, H, H, T, H, T, H, H, T} \qquad (n_H = 6 \text{ heads},\ n_T = 4 \text{ tails}).
+$$
+
+Independence makes the probability of this exact sequence a product of per-flip probabilities: a factor $\theta$ for each head, $1 - \theta$ for each tail, so $P(D \mid \theta) = \theta^6 (1-\theta)^4$. Evaluated at three candidate values:
+
+- $\theta = 0.5$: $P(D \mid \theta) = 0.5^{10} \approx 9.8 \times 10^{-4}$;
+- $\theta = 0.6$: $0.6^6 \cdot 0.4^4 \approx 11.9 \times 10^{-4}$;
+- $\theta = 0.9$: $0.9^6 \cdot 0.1^4 \approx 0.53 \times 10^{-4}$.
+
+The value $\theta = 0.6$ makes the observed data about 22% more probable than the fair coin and roughly 22 times more probable than $\theta = 0.9$. Ranking parameter values by the probability they assign to the data actually seen is the entire idea of maximum likelihood.
+
+<Definition title="likelihood and the MLE">
+Given observed data $D$ and a model $p(D \mid \theta)$, the *likelihood* is the function
+
+$$
+L(\theta) = p(D \mid \theta),
+$$
+
+read as a function of $\theta$ with $D$ held fixed. The *maximum-likelihood estimate* (MLE) is $\hat\theta_{\text{MLE}} = \arg\max_\theta L(\theta)$. For $n$ i.i.d. observations $x_1, \dots, x_n$ the likelihood factorizes, $L(\theta) = \prod_{i=1}^n p(x_i \mid \theta)$, and the *log-likelihood* is the sum $\ell(\theta) = \sum_{i=1}^n \log p(x_i \mid \theta)$.
+</Definition>
+
+<Figure
+  src="./figures/likelihood.svg"
+  alt="Likelihood curve theta^6 (1-theta)^4 on the left and its logarithm on the right, both peaking at theta = 0.6 with dashed guides marking the shared argmax"
+  caption="L(θ) and ℓ(θ) for the 10-flip dataset: the log reshapes the curve but the argmax stays at 0.6."
+/>
+
+### Why the log: same argmax, easier calculus
+
+Maximizing $\ell = \log L$ instead of $L$ changes nothing and fixes two problems. Nothing changes because the logarithm is **strictly increasing**: it reorders no values, so both functions peak at the same $\theta$. The fixes: the product becomes a sum with one differentiable term per data point, and the numerics survive. A product of a thousand fair-coin probabilities is $2^{-1000} \approx 10^{-301}$, at the edge of double-precision underflow near $10^{-308}$; the log-likelihood is a tame $-1000 \log 2 \approx -693$. Exercise 7 turns this into the standard interview answer.
+
+<Remark title="the likelihood is not a probability over θ">
+$L(\theta)$ is a probability of the *data*, indexed by $\theta$; it is not a distribution over $\theta$ and need not integrate to 1 in $\theta$ (for the coin, $\int_0^1 \theta^6(1-\theta)^4\, d\theta = 1/2310$). Statements such as "the probability that $\theta = 0.6$" require a prior and Bayes' rule, the subject of the MAP section below.
+</Remark>
+
+<KeyFact>
+The likelihood scores each parameter value by the probability it assigns to the data actually observed; the MLE is the value under which the data are least surprising.
+</KeyFact>
+
+## The recipe: write the log-likelihood, set the derivative to zero
+
+Every MLE computation in this course is the same two moves. **Step 1:** write $\ell(\theta) = \sum_i \log p(x_i \mid \theta)$. **Step 2:** solve $\ell'(\theta) = 0$ and confirm the stationary point is a maximum, by a second-derivative check or by concavity. The recipe is distribution-generic: nothing about it assumes Gaussian data, and no step changes when the model does.
+
+<Example title="Bernoulli MLE, derived in full">
+For $n$ flips with $n_H$ heads and $n_T = n - n_H$ tails,
+
+$$
+\ell(\theta) = n_H \log \theta + n_T \log(1-\theta).
+$$
+
+Differentiate and set to zero:
+
+$$
+\ell'(\theta) = \frac{n_H}{\theta} - \frac{n_T}{1-\theta} = 0
+\;\Longrightarrow\; n_H(1-\theta) = n_T\,\theta
+\;\Longrightarrow\; \hat\theta = \frac{n_H}{n_H + n_T} = \frac{n_H}{n}.
+$$
+
+Maximum check: $\ell''(\theta) = -n_H/\theta^2 - n_T/(1-\theta)^2 < 0$ everywhere on $(0,1)$, so $\ell$ is strictly concave and the interior stationary point is the global maximum. For the running dataset, $\hat\theta = 6/10 = 0.6$, matching the curve above. The MLE is the empirical frequency — the estimate everyone uses without calling it maximum likelihood.
+</Example>
+
+<FigureSequence
+  name="recipe"
+  alt="Three frames building the Bernoulli MLE: the product likelihood, the log turning it into a sum, and the derivative set to zero with the boxed answer 0.6"
+  caption="The two-step recipe on the coin: product, log, solve. The boxed answer is the empirical frequency n_H/n."
+/>
+
+<Task>
+Step through the three frames, then rerun the recipe on a fresh dataset without looking: 20 flips, 13 heads. The derivative equation should give $\hat\theta = 13/20 = 0.65$; Exercise 1 asks for every step in writing.
+</Task>
+
+<Remark title="boundary cases: the derivative test can fail">
+If $n_H = 0$ or $n_H = n$, the equation $\ell'(\theta) = 0$ has no solution in $(0,1)$: $\ell$ is monotone and the maximum sits on the boundary, $\hat\theta = 0$ or $1$. The formula $n_H/n$ still reports the right value, but the justification is the boundary check, not the vanishing derivative. The boundary case is also the recipe's failure mode as an estimator: after three flips that all land heads, the MLE declares tails impossible, $\hat P(\text{T}) = 0$. [Weinberger's CS4780 note](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote04.html) uses exactly this example to motivate the prior added in the MAP section.
+</Remark>
+
+## Gaussian MLE: the sample mean and a biased variance
+
+Five readings from a noisy sensor: $x = (4.9,\ 5.7,\ 6.2,\ 4.4,\ 5.8)$. Their mean is $\bar x = 27.0/5 = 5.4$; the squared deviations from it are $0.25, 0.09, 0.64, 1.00, 0.16$, summing to $2.14$. The two Gaussian MLEs computed below are $\hat\mu = 5.4$ and $\hat\sigma^2 = 2.14/5 = 0.428$; the divisor is $n$, not $n-1$, and that choice is the subject of the theorem that follows.
+
+<Example title="Gaussian MLE, derived in full">
+For $x_1, \dots, x_n$ i.i.d. from $\mathcal N(\mu, \sigma^2)$,
+
+$$
+\ell(\mu, \sigma^2) = -\frac{n}{2}\log(2\pi\sigma^2) - \frac{1}{2\sigma^2}\sum_{i=1}^n (x_i - \mu)^2 .
+$$
+
+**Mean.** $\displaystyle \frac{\partial \ell}{\partial \mu} = \frac{1}{\sigma^2}\sum_{i=1}^n (x_i - \mu) = 0 \;\Longrightarrow\; \hat\mu = \frac{1}{n}\sum_{i=1}^n x_i = \bar x$.
+
+**Variance.** Treating $\sigma^2$ as the variable and substituting $\hat\mu$,
+
+$$
+\frac{\partial \ell}{\partial \sigma^2} = -\frac{n}{2\sigma^2} + \frac{1}{2\sigma^4}\sum_{i=1}^n (x_i - \hat\mu)^2 = 0
+\;\Longrightarrow\;
+\hat\sigma^2 = \frac{1}{n}\sum_{i=1}^n (x_i - \bar x)^2 .
+$$
+
+Both stationary points are maxima: $\ell$ is concave in $\mu$ for fixed $\sigma^2$, and along $\sigma^2$ the function rises from $-\infty$ (as $\sigma^2 \to 0$ with nonzero deviations) to the stationary point and decays beyond it.
+</Example>
+
+<Theorem title="the MLE of the variance is biased">
+For i.i.d. draws with mean $\mu$ and variance $\sigma^2$,
+
+$$
+\mathbb E\left[\hat\sigma^2\right] = \frac{n-1}{n}\,\sigma^2 .
+$$
+
+<Proof>
+Insert $\mu$ and expand: $\sum_i (x_i - \bar x)^2 = \sum_i (x_i - \mu)^2 - n(\bar x - \mu)^2$, since the cross term $2(\bar x - \mu)\sum_i(x_i - \mu) = 2n(\bar x - \mu)^2$ folds into the square. Take expectations: $\mathbb E[\sum_i (x_i - \mu)^2] = n\sigma^2$, and $\mathbb E[n(\bar x - \mu)^2] = n \operatorname{Var}(\bar x) = n \cdot \sigma^2/n = \sigma^2$. Hence $\mathbb E[\sum_i (x_i - \bar x)^2] = (n-1)\sigma^2$, and dividing by $n$ gives the claim.
+</Proof>
+</Theorem>
+
+The estimate is biased **low**: deviations are measured around $\bar x$, which was itself fit to the same data and sits closer to the sample than the true $\mu$ does. One degree of freedom went into estimating the mean. *Bessel's correction* divides by $n - 1$ instead, giving the unbiased $s^2 = \frac{1}{n-1}\sum_i (x_i - \bar x)^2$; for the sensor data, $s^2 = 2.14/4 = 0.535$ against $\hat\sigma^2 = 0.428$. The gap is the factor $(n-1)/n = 0.8$ exactly.
+
+<Remark title="properties of the MLE">
+Under standard regularity conditions the MLE is *consistent* (converges to the true parameter as $n \to \infty$), asymptotically normal, and *asymptotically efficient* (attains the minimum possible variance in the limit); it is also *invariant under reparameterization*: the MLE of $g(\theta)$ is $g(\hat\theta)$ for any function $g$ ([Murphy, PML §4.2, §4.7](https://probml.github.io/pml-book/book1.html)). None of this protects small samples: the variance bias above and the $\hat\theta = 1$ boundary estimate are both small-$n$ failures, and the second is what MAP estimation repairs.
+</Remark>
+
+<KeyFact>
+The $1/n$ variance is the maximum-likelihood estimate and underestimates $\sigma^2$ by the factor $(n-1)/n$; dividing by $n-1$ (Bessel's correction) removes the bias. Interviewers ask for the proof, which is four lines.
+</KeyFact>
+
+## MAP estimation: the prior as hallucinated data
+
+Bayes' rule applied to parameters turns the likelihood into a distribution over $\theta$:
+
+$$
+p(\theta \mid D) = \frac{p(D \mid \theta)\, p(\theta)}{p(D)} \;\propto\; p(D \mid \theta)\, p(\theta),
+$$
+
+where $p(\theta)$ is a *prior* encoding what is believed before seeing data, and the denominator does not involve $\theta$.
+
+<Definition title="MAP estimate">
+The *maximum a posteriori* (MAP) estimate is the mode of the posterior,
+
+$$
+\hat\theta_{\text{MAP}} = \arg\max_\theta\, p(\theta \mid D) = \arg\max_\theta\, \bigl[\log p(D \mid \theta) + \log p(\theta)\bigr].
+$$
+
+MAP is the MLE objective plus one extra term, the log-prior; a flat prior makes the term constant and returns the MLE.
+</Definition>
+
+For the coin the standard prior is the Beta distribution, $p(\theta) \propto \theta^{\alpha-1}(1-\theta)^{\beta-1}$ with $\alpha, \beta > 0$. Multiplying by the likelihood $\theta^{n_H}(1-\theta)^{n_T}$ gives a posterior of the same functional form, $\theta^{\,n_H+\alpha-1}(1-\theta)^{\,n_T+\beta-1}$: a $\text{Beta}(n_H + \alpha,\ n_T + \beta)$ distribution. A prior whose posterior stays in the same family is called *conjugate*, and conjugacy is why the coin computation stays closed-form.
+
+<Example title="MAP for the coin, derived in full">
+A second dataset: 10 flips, $n_H = 8$ heads. The MLE is $8/10 = 0.8$. Take a $\text{Beta}(2,2)$ prior, a symmetric bump peaked at $\tfrac12$. The log-posterior, up to a constant, is
+
+$$
+\log p(\theta \mid D) = (n_H + \alpha - 1)\log\theta + (n_T + \beta - 1)\log(1-\theta) + \text{const},
+$$
+
+which is a Bernoulli log-likelihood with padded counts, so the recipe gives its maximum immediately:
+
+$$
+\hat\theta_{\text{MAP}} = \frac{n_H + \alpha - 1}{n + \alpha + \beta - 2}
+= \frac{8 + 1}{10 + 2} = \frac{9}{12} = 0.75 .
+$$
+
+The prior pulls the estimate from $0.8$ toward $\tfrac12$; with $\alpha = \beta = 1$ (uniform prior) the formula collapses to $n_H/n$, the MLE.
+</Example>
+
+<Figure
+  src="./figures/posterior.svg"
+  alt="Beta(2,2) prior, normalized likelihood peaking at 0.8, and Beta(10,4) posterior peaking at 0.75 on one axis, with the MLE and MAP marked as ticks"
+  caption="Prior × likelihood → posterior for the 8-heads data: the posterior mode (MAP, 0.75) sits between the likelihood peak (MLE, 0.8) and the prior mode (0.5)."
+/>
+
+### Pseudo-counts: the prior is fake data
+
+The MAP formula reads as bookkeeping: a $\text{Beta}(\alpha, \beta)$ prior adds $\alpha - 1$ *hallucinated* heads and $\beta - 1$ hallucinated tails to the tally, then computes an empirical frequency on the padded counts. This is Weinberger's reading of the Beta prior, and it explains the small-sample repair directly: three real heads plus one fake head and one fake tail give $\hat\theta_{\text{MAP}} = 4/5$ instead of the MLE's $\hat\theta = 1$, so tails is no longer declared impossible.
+
+<Figure
+  src="./figures/pseudocounts.svg"
+  alt="Bar chart of 8 observed heads and 2 observed tails with one hallucinated flip stacked on each bar as a dashed ghost segment, next to the MAP formula evaluating to 0.75"
+  caption="The pseudo-count view: each symbol in the MAP formula reads one bar segment. The prior is fake data added to the tally."
+/>
+
+Padding counts before dividing is *smoothing*, and this is its first appearance in the course: the same move returns as Laplace smoothing in <Ref lesson="naive-bayes" />, where unseen words would otherwise zero out an entire class posterior. In the language of <Ref lesson="bias-variance" />, the prior adds a controlled amount of bias (the pull toward $\tfrac12$) to remove variance (the wild estimates small samples produce); the exercises make that trade quantitative.
+
+<Remark title="MAP depends on the parameterization">
+The MAP estimate is the mode of a *density*, and densities pick up a Jacobian factor under a change of variables, so the mode moves: a uniform prior on $\theta$ and a uniform prior on the log-odds $\log\frac{\theta}{1-\theta}$ give different MAP estimates for the same data. The MLE has no such defect, since the likelihood is reparameterization-invariant. This asymmetry is an occasional interview probe.
+</Remark>
+
+<KeyFact>
+A conjugate prior is fake data: Beta(α, β) adds α − 1 heads and β − 1 tails before the frequency is computed, which is why MAP smooths small samples and why its influence washes out as real counts accumulate.
+</KeyFact>
+
+## Priors are regularizers: −log turns densities into penalties
+
+Maximizing is minimizing the negative, and the signs are worth writing once in full, since dropping one is the standard error:
+
+$$
+\hat\theta_{\text{MAP}}
+= \arg\max_\theta\,\bigl[\log p(D \mid \theta) + \log p(\theta)\bigr]
+= \arg\min_\theta\,\bigl[\underbrace{-\log p(D \mid \theta)}_{\text{loss (NLL)}} \;+\; \underbrace{(-\log p(\theta))}_{\text{penalty}}\bigr].
+$$
+
+MAP estimation is loss minimization with a penalty, and the penalty is the negative log of the prior density. Two priors generate the two standard penalties:
+
+- **Gaussian prior**, $\theta_j \sim \mathcal N(0, \tau^2)$ independently: $-\log p(\theta) = \frac{1}{2\tau^2}\lVert\theta\rVert_2^2 + \text{const}$ — an **L2 penalty**, with strength set by $1/\tau^2$ (a tight prior penalizes hard).
+- **Laplace prior**, $p(\theta_j) = \frac{1}{2b} e^{-|\theta_j|/b}$: $-\log p(\theta) = \frac{1}{b}\lVert\theta\rVert_1 + \text{const}$ — an **L1 penalty**.
+
+<Figure
+  src="./figures/bridge.svg"
+  alt="Gaussian density mapping under negative log to a quadratic ridge penalty, and Laplace density mapping to an absolute-value lasso penalty with its corner at zero marked"
+  caption="−log turns prior densities into penalties: Gaussian → L2 (ridge), Laplace → L1 (lasso). The Laplace corner at 0 is where exact zeros will come from."
+/>
+
+Two results from [Bishop's PRML §1.2.5–1.2.6](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) complete the bridge and are stated here for later chapters to re-derive. First, under i.i.d. Gaussian noise the negative log-likelihood of a regression model *is* the sum of squared errors, so least squares is Gaussian MLE (derived in <Ref lesson="ols" />); the Gaussian enters through this specific noise model, not through the MLE recipe itself. Second, adding a Gaussian prior on the weights turns that objective into least squares plus $\lambda\lVert w\rVert_2^2$ with $\lambda = \sigma^2/\tau^2$: ridge regression is MAP. The Laplace prior gives the lasso the same way; <Ref lesson="ridge-lasso" /> cashes in both. Exercise 8 walks the ridge derivation end to end.
+
+<KeyFact>
+Every standard penalized objective is a MAP problem read in log space: the loss is the negative log-likelihood and the regularizer is the negative log-prior. Gaussian prior ⇒ L2, Laplace prior ⇒ L1.
+</KeyFact>
+
+## MLE versus MAP: the comparison interviewers want
+
+The direct question ("compare MLE and MAP mathematically") is answered by one table:
+
+| | MLE | MAP |
+| --- | --- | --- |
+| objective | $\arg\max_\theta \log p(D \mid \theta)$ | $\arg\max_\theta \log p(D \mid \theta) + \log p(\theta)$ |
+| prior | none (equivalently flat) | explicit $p(\theta)$: pseudo-data, or a penalty |
+| small samples | overfits; boundary estimates like $\hat\theta = 1$ | smoothed toward the prior mode |
+| as $n \to \infty$ | consistent, asymptotically efficient | $\log p(\theta)$ is $O(1)$ against an $O(n)$ log-likelihood: MAP $\to$ MLE |
+| reparameterization | invariant | not invariant (mode of a density) |
+| failure mode | zero probability for unseen events | a wrong prior biases the estimate; still a point estimate, no uncertainty kept |
+
+The two estimates coincide in exactly two regimes. With a **flat prior** over the feasible range, the log-prior is constant and the objectives are equal (for the coin, $\text{Beta}(1,1)$). And **asymptotically**: the log-likelihood grows linearly in $n$ while the log-prior stays fixed, so the prior's pull fades at rate $O(1/n)$; in the pseudo-count formula the fake flips are simply outnumbered.
+
+<Figure
+  src="./figures/estimate-path.svg"
+  alt="MLE and MAP estimate trajectories against the number of flips on one simulated stream with true theta 0.7: the MLE starts at 1 after an initial run of heads while the MAP curve starts near 0.5, and the two merge as n grows"
+  caption="One simulated coin stream, true θ = 0.7. The MLE rides the early run of heads to 1.0; the Beta(2,2) MAP starts near ½. By n ≈ 100 the prior has washed out."
+/>
+
+<Task>
+Read the figure at $n = 3$, $n = 10$, and $n = 100$ and compute the vertical gap between the curves from the formulas $n_H/n$ and $(n_H+1)/(n+2)$: with the stream's first six flips all heads, the gap at $n = 3$ is $1 - 4/5 = 0.2$, and by $n = 100$ it is below $0.01$.
+</Task>
+
+## Exercises
+
+<Exercise>
+The set piece: a coin is flipped 20 times and lands heads 13 times. Derive the MLE of $\theta = P(\text{heads})$ from scratch: write the likelihood of the data, take the log, differentiate, solve, and verify the stationary point is a maximum.
+
+<Solution>
+Likelihood of the observed sequence: $L(\theta) = \theta^{13}(1-\theta)^{7}$. Log-likelihood: $\ell(\theta) = 13\log\theta + 7\log(1-\theta)$.
+
+Derivative set to zero:
+
+$$
+\ell'(\theta) = \frac{13}{\theta} - \frac{7}{1-\theta} = 0
+\;\Longrightarrow\; 13(1-\theta) = 7\theta
+\;\Longrightarrow\; \hat\theta = \frac{13}{20} = 0.65 .
+$$
+
+Maximum check: $\ell''(\theta) = -13/\theta^2 - 7/(1-\theta)^2 < 0$ on $(0,1)$, so $\ell$ is strictly concave and $\hat\theta = 0.65$ is the global maximizer. In general $\hat\theta = n_H/n$, the empirical frequency.
+</Solution>
+</Exercise>
+
+<Exercise>
+A coin is flipped 3 times and lands heads all 3 times. Compute the MLE of $\theta$; the MAP estimate under a $\text{Beta}(2,2)$ prior; and the MAP estimate under a uniform prior. State what the middle answer fixes.
+
+<Solution>
+MLE: $\hat\theta = n_H/n = 3/3 = 1$. Note the derivative test fails here: $\ell(\theta) = 3\log\theta$ is strictly increasing on $(0,1)$, so the maximum sits on the boundary.
+
+$\text{Beta}(2,2)$ MAP: $\hat\theta_{\text{MAP}} = \frac{n_H + \alpha - 1}{n + \alpha + \beta - 2} = \frac{3+1}{3+2} = \frac{4}{5} = 0.8$.
+
+Uniform prior is $\text{Beta}(1,1)$: $\hat\theta_{\text{MAP}} = \frac{3+0}{3+0} = 1$, identical to the MLE, since a flat prior adds a constant to the log-objective.
+
+The $\text{Beta}(2,2)$ answer fixes the boundary pathology: the MLE declares tails impossible after three flips, while one hallucinated head and one hallucinated tail keep $\hat\theta$ off the boundary and $P(\text{tails}) = 0.2 > 0$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that the maximum-likelihood estimator of the Gaussian variance, $\hat\sigma^2 = \frac1n \sum_i (x_i - \bar x)^2$, is biased, computing $\mathbb E[\hat\sigma^2]$ exactly, and state the unbiased alternative. Reproduce the argument on paper before opening the solution.
+
+<Solution>
+Decompose around the true mean $\mu$:
+
+$$
+\sum_{i=1}^n (x_i - \bar x)^2 = \sum_{i=1}^n \bigl[(x_i - \mu) - (\bar x - \mu)\bigr]^2
+= \sum_{i=1}^n (x_i - \mu)^2 - n(\bar x - \mu)^2,
+$$
+
+since the cross term is $-2(\bar x - \mu)\sum_i (x_i - \mu) = -2n(\bar x - \mu)^2$, and $-2n(\bar x-\mu)^2 + n(\bar x-\mu)^2 = -n(\bar x - \mu)^2$.
+
+Take expectations. Each $\mathbb E[(x_i-\mu)^2] = \sigma^2$ gives $n\sigma^2$ for the first sum; for the second, $\mathbb E[(\bar x - \mu)^2] = \operatorname{Var}(\bar x) = \sigma^2/n$, so $\mathbb E[n(\bar x - \mu)^2] = \sigma^2$. Hence
+
+$$
+\mathbb E\Bigl[\sum_i (x_i - \bar x)^2\Bigr] = (n-1)\sigma^2
+\quad\Longrightarrow\quad
+\mathbb E[\hat\sigma^2] = \frac{n-1}{n}\,\sigma^2 < \sigma^2 .
+$$
+
+The estimator is biased low because deviations are taken around the fitted $\bar x$ rather than the true $\mu$. The unbiased version divides by $n-1$ (Bessel's correction): $s^2 = \frac{1}{n-1}\sum_i (x_i - \bar x)^2$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Counts of arrivals in five equal time windows are $2, 4, 1, 3, 0$. Model them as i.i.d. $\text{Poisson}(\lambda)$, with $p(x \mid \lambda) = e^{-\lambda}\lambda^x / x!$, and derive the MLE of $\lambda$ by the two-step recipe. Evaluate it on the data.
+
+<Solution>
+Log-likelihood for $x_1,\dots,x_n$:
+
+$$
+\ell(\lambda) = \sum_{i=1}^n \bigl(-\lambda + x_i \log\lambda - \log x_i!\bigr)
+= -n\lambda + \Bigl(\sum_i x_i\Bigr)\log\lambda - \sum_i \log x_i! .
+$$
+
+Derivative set to zero: $\ell'(\lambda) = -n + \frac{\sum_i x_i}{\lambda} = 0 \Rightarrow \hat\lambda = \frac{1}{n}\sum_i x_i = \bar x$. Maximum check: $\ell''(\lambda) = -\sum_i x_i / \lambda^2 < 0$ whenever any count is positive.
+
+Data: $\sum_i x_i = 10$, $n = 5$, so $\hat\lambda = 2$ arrivals per window. As with the coin and the Gaussian mean, the MLE is the sample average of the sufficient statistic.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: under what conditions do the MLE and the MAP estimate coincide? Give both conditions and justify the asymptotic one with a growth-rate argument.
+
+<Solution>
+Condition 1: a flat (uniform) prior over the feasible parameter range. Then $\log p(\theta)$ is constant, the two objectives differ by a constant, and their argmaxes are equal. For the coin this is the $\text{Beta}(1,1)$ prior, whose pseudo-counts $\alpha - 1 = \beta - 1 = 0$ add nothing.
+
+Condition 2: asymptotically, as $n \to \infty$ (with a prior that is positive around the true parameter). The objective is $\ell(\theta) + \log p(\theta)$, where $\ell(\theta) = \sum_{i=1}^n \log p(x_i \mid \theta)$ grows linearly in $n$ while $\log p(\theta)$ is a fixed function of $\theta$, independent of $n$. Dividing by $n$, the MAP objective is $\frac1n \ell(\theta) + O(1/n)$: the prior's contribution vanishes and the two maximizers converge. Concretely, for the coin, $\hat\theta_{\text{MAP}} = \frac{n_H + \alpha - 1}{n + \alpha + \beta - 2} \to \frac{n_H}{n}$ since the fixed pseudo-counts are swamped by the real ones.
+</Solution>
+</Exercise>
+
+<Exercise>
+A drawer holds two coins: one fair, one with heads on both sides. A coin is picked uniformly at random and flipped 5 times; all 5 flips land heads. Compute the posterior probability that the picked coin is the two-headed one, by a full Bayes computation.
+
+<Solution>
+Let $U$ = "two-headed coin", $F$ = "fair coin", with priors $P(U) = P(F) = \tfrac12$. Likelihoods of the evidence $E$ = "5 heads": $P(E \mid U) = 1$ and $P(E \mid F) = (\tfrac12)^5 = \tfrac{1}{32}$.
+
+Bayes' rule:
+
+$$
+P(U \mid E) = \frac{P(E \mid U)P(U)}{P(E \mid U)P(U) + P(E \mid F)P(F)}
+= \frac{1 \cdot \tfrac12}{1 \cdot \tfrac12 + \tfrac{1}{32} \cdot \tfrac12}
+= \frac{1}{1 + \tfrac{1}{32}} = \frac{32}{33} \approx 0.97 .
+$$
+
+The fair coin retains probability $1/33 \approx 0.03$. The structure is the MAP structure of this chapter with a two-point parameter space: posterior $\propto$ likelihood $\times$ prior, and the evidence term in the denominator normalizes over both hypotheses.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: why is the log-likelihood maximized instead of the likelihood itself? Give the three standard reasons, including a concrete numerical-underflow example.
+
+<Solution>
+(1) **Same answer.** $\log$ is strictly increasing, so $\arg\max L = \arg\max \log L$: no information is lost and no solution changes.
+
+(2) **Easier calculus.** For i.i.d. data $L$ is a product of $n$ factors; its derivative requires the product rule across all of them. $\ell = \sum_i \log p(x_i \mid \theta)$ differentiates term by term, and for exponential-family models the sum is concave, so the stationary point is the global maximum.
+
+(3) **Numerics.** Products of many probabilities underflow floating point: $1{,}000$ fair-coin flips give $L = 2^{-1000} \approx 9 \times 10^{-302}$, at the edge of double precision (smallest normal double $\approx 2 \times 10^{-308}$), and $1{,}100$ flips underflow to exactly 0, destroying the argmax. The log-likelihood is $-1000\log 2 \approx -693$, a perfectly representable number, which is why software sums log-probabilities rather than multiplying probabilities.
+</Solution>
+</Exercise>
+
+<Exercise>
+Linear regression as MAP. Model $y_i = w^\top x_i + \varepsilon_i$ with $\varepsilon_i \sim \mathcal N(0, \sigma^2)$ i.i.d., and put the prior $w_j \sim \mathcal N(0, \tau^2)$ independently on each of the $d$ weights. Show that the MAP estimate solves
+
+$$
+\hat w_{\text{MAP}} = \arg\min_w\; \sum_{i=1}^n \bigl(y_i - w^\top x_i\bigr)^2 + \lambda \lVert w \rVert_2^2,
+\qquad \lambda = \frac{\sigma^2}{\tau^2},
+$$
+
+the ridge-regression objective.
+
+<Solution>
+Negative log-likelihood: $p(y_i \mid x_i, w) = \mathcal N(y_i \mid w^\top x_i, \sigma^2)$, so
+
+$$
+-\log p(D \mid w) = \frac{1}{2\sigma^2}\sum_{i=1}^n (y_i - w^\top x_i)^2 + \frac{n}{2}\log(2\pi\sigma^2).
+$$
+
+Negative log-prior: $-\log p(w) = \frac{1}{2\tau^2}\lVert w \rVert_2^2 + \frac{d}{2}\log(2\pi\tau^2)$.
+
+MAP minimizes the sum; drop the $w$-free constants:
+
+$$
+\hat w_{\text{MAP}} = \arg\min_w\; \frac{1}{2\sigma^2}\sum_i (y_i - w^\top x_i)^2 + \frac{1}{2\tau^2}\lVert w \rVert_2^2 .
+$$
+
+Multiply through by $2\sigma^2$ (a positive constant, argmin unchanged):
+
+$$
+\hat w_{\text{MAP}} = \arg\min_w\; \sum_i (y_i - w^\top x_i)^2 + \frac{\sigma^2}{\tau^2}\lVert w \rVert_2^2,
+$$
+
+which is ridge with $\lambda = \sigma^2/\tau^2$: high noise or a tight prior means more shrinkage. Replacing the Gaussian prior by Laplace$(0, b)$ replaces $\frac{1}{2\tau^2}\lVert w\rVert_2^2$ with $\frac1b \lVert w \rVert_1$ and yields the lasso; both are developed in the ridge and lasso chapter.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Q. Weinberger, "Lecture 4: Estimating Probabilities from Data," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — the coin-toss MLE/MAP arc, Beta conjugacy, and the "hallucinated" pseudo-count reading this chapter reuses. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote04.html
+2. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.2.5–1.2.6: Gaussian-noise MLE as least squares and Gaussian-prior MAP as ridge (Eqs. 1.60–1.67); §2.1–2.2: the Beta–Bernoulli conjugate pair. https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §4.2: worked MLEs for Bernoulli, categorical, Gaussian, and linear regression; §4.5: MAP estimation and regularization; §4.7.6: the bias of the variance MLE. https://probml.github.io/pml-book/book1.html
+4. N. Singh, K. Huo, *Ace the Data Science Interview*, 2021 — ch. 5: the fair-versus-unfair-coin Bayes problem; ch. 6: the MLE-versus-MAP comparison question.
+</References>

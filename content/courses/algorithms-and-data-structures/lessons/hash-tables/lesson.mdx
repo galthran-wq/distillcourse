@@ -1,0 +1,1138 @@
+A hash table maps a key to an array index by computing a hash function,
+turning search, insert, and delete into expected O(1) operations at the cost
+of losing the sorted order an array index would otherwise carry. The
+module's scoreboard has one cell still blank. Both structures in
+<Ref lesson="arrays-and-linked-lists">the arrays and linked lists
+lesson</Ref> answer `search(v)` in $\Theta(n)$, and the
+<Ref lesson="dynamic-arrays-and-amortized-analysis">dynamic array</Ref>
+removed the capacity wall without touching that row. This lesson fills it
+with a bound no structure built on key comparisons can reach, and pays for
+it in a currency the course has not spent before: the guarantee holds *in
+expectation* over a random choice the structure itself makes, not for every
+input.
+
+The route: why a computed index is the only way past the comparison
+barrier; why collisions are forced and arrive when the table is nearly
+empty; chaining and its $\Theta(1 + \alpha)$ cost; open addressing, its
+probe sequences and its deletion trap; the clustering that ruins a nearly
+full table; the resize that keeps $\alpha$ bounded; what real hash
+functions compute; what the word "expected" quantifies over; and the
+production incident that turned the answer to that last question into a
+CVE.
+
+## Computing the index: the only way past the comparison barrier
+
+The $\Theta(n)$ search row is not an accident of arrays and linked lists.
+Sorting the array first improves it: binary search, whose invariant
+(<Ref lesson="loop-invariants-and-correctness">the target, if present, lies
+within the current bounds</Ref>) halves the candidate range each step,
+answers a lookup in $\Theta(\log n)$ comparisons. That is the floor for
+every algorithm of this kind.
+
+### The comparison barrier
+
+Suppose an algorithm learns about keys only by comparing
+them: each step asks one yes/no question of the form $k < k'$. Its whole
+execution is then a binary tree of comparisons, one root-to-leaf path per
+input, and the tree needs at least $n + 1$ leaves, one for each possible
+answer ("the key sits at position $i$" for each $i$, plus "absent"). A
+binary tree with $n + 1$ leaves has height at least $\lg(n+1)$, and some
+input drives the algorithm down a longest path. Any comparison-based
+search therefore costs $\Omega(\log n)$ in the worst case, and the sorted
+array already attains it. The same counting argument, applied to sorting
+instead of searching, is carried in full in
+<Ref lesson="heapsort-and-the-sorting-lower-bound">the sorting lower-bound
+lesson</Ref>.
+
+### Direct addressing: the key as the index
+
+Getting under $\log n$ requires an operation that splits the possibilities
+more than two ways in one step. Array indexing is exactly that operation:
+computing an address from an index selects one of $m$ slots in constant
+time, whatever $m$ is. So the key must become an index.
+
+<Definition title="direct-address table">
+Let every key be drawn from a universe $U = \{0, 1, \ldots, u-1\}$. A
+**direct-address table** is an array $T[0 \ldots u-1]$ in which the element
+with key $k$, if present, is stored in slot $k$, and every other slot holds
+`nil`. Search, insert, and delete are single array accesses.
+</Definition>
+
+<Example title="employee records by ID">
+A payroll system keys records by an employee ID assigned in order from 0 and
+never exceeding 9,999. Allocate $T[0 \ldots 9999]$. Looking up employee
+4,187 reads $T[4187]$; hiring employee 6,002 writes $T[6002]$; a departure
+writes `nil`. Every operation is one memory access: $O(1)$ in the **worst
+case**, not on average, with no assumption about which IDs are in use.
+
+Space is $10{,}000$ pointers, about 80 KB, whether the company has ten
+employees or ten thousand.
+</Example>
+
+<Figure
+  src="./figures/direct-address.svg"
+  alt="An array indexed 0 through u−1 in which keys 2, 5 and 8 are stored in the slots matching their own values with no hash function; a bracket under the array marks all u slots as allocated while only three are in use"
+  caption="The key is the address: no hash, no collisions, worst-case O(1) — and Θ(u) slots on the bill whether or not they are used."
+/>
+
+The example works because $u$ was small. Change the key from an ID to a
+ten-letter surname and the table has $26^{10} \approx 1.4 \times 10^{14}$
+slots. Storing one bit per possible name would take 17.6 TB, for a payroll
+of a few thousand people. The space bill is $\Theta(u)$ and it is charged
+whether or not the keys are used.
+
+<KeyFact>
+Direct addressing buys worst-case $O(1)$ by spending $\Theta(u)$ space, and
+$u$ is a property of the key type rather than of the data. Every remaining
+idea in this lesson is a way of paying $\Theta(n)$ space instead, and the
+worst case is what gets sold to fund it.
+</KeyFact>
+
+## Compression forces collisions, and they arrive almost immediately
+
+Direct addressing fails on one count only: the table is indexed by the whole
+of $U$. The repair is to compute a small index from a large key.
+
+<Definition title="hash function, hash table, collision">
+A **hash function** is a map $h : U \to \{0, 1, \ldots, m-1\}$ computable in
+$O(1)$ time, where $m$ is the number of slots and is chosen proportional to
+the number $n$ of keys stored, not to $|U|$. A **hash table** stores the
+element with key $k$ using slot $h(k)$. Two keys $k_1$ and $k_2$ that are
+distinct but satisfy $h(k_1) = h(k_2)$ **collide**.
+</Definition>
+
+Since $|U| > m$, no such $h$ is injective: by the pigeonhole principle some
+slot receives at least two keys of $U$. That much is unavoidable and, on its
+own, unalarming, because it says nothing about the keys actually stored.
+
+<Figure
+  src="./figures/funnel.svg"
+  alt="A large region U of all possible keys, with an inner dashed region K of stored keys, fanning through the hash function into an array of m slots; two keys land in the same highlighted slot"
+  caption="The hash function compresses a universe of size |U| into m ≈ n slots. Two keys sharing a slot is a collision."
+/>
+
+### The birthday bound
+
+From "collisions exist somewhere in $U$" one would expect that a table with
+far more slots than keys in play rarely sees one. The arithmetic says the
+opposite.
+
+<Example title="365 slots, 23 keys (CLRS §5.4.1)">
+Take $m = 365$ slots and insert $k$ keys whose hash values behave like
+independent uniform draws. The probability that all $k$ land in distinct
+slots is
+
+$$
+\begin{aligned}
+\Pr[\text{all distinct}]
+&= \Bigl(1 - \tfrac{1}{m}\Bigr)\Bigl(1 - \tfrac{2}{m}\Bigr)\cdots
+  \Bigl(1 - \tfrac{k-1}{m}\Bigr) \\[2pt]
+&\le\; e^{-1/m}\,e^{-2/m}\cdots e^{-(k-1)/m}
+\;=\; e^{-k(k-1)/2m},
+\end{aligned}
+$$
+
+using $1 + x \le e^{x}$ at each factor. The right-hand side drops to
+$\tfrac{1}{2}$ once $k(k-1) \ge 2m\ln 2 = 506$, that is, once $k \ge 23$.
+
+So 23 keys in a 365-slot table give better than even odds of a collision.
+The table is then $23/365 = 6.3\%$ full.
+</Example>
+
+<Figure
+  src="./figures/first-collision.svg"
+  alt="Curve of the probability that some two of k keys share a slot in a 365-slot table, rising through 0.5 at k = 23 and above 0.99 by k = 60"
+  caption="With 365 slots, even odds of a collision at 23 keys — while the table is 6% full."
+/>
+
+The threshold scales as the square root of the table size: the first
+collision appears after about $\sqrt{\pi m / 2}$ insertions, which is 24 for
+$m = 365$ and 1,253 for a table of a million slots. A million-slot table
+collides after about a thousand keys, at a fill of one part in eight
+hundred.
+
+<KeyFact>
+Collision handling is not a fallback for unlucky inputs; it is on the path
+of essentially every insertion sequence long enough to matter. A hash table
+is defined by its collision policy as much as by its hash function.
+</KeyFact>
+
+## Chaining: the expected cost is 1 + α
+
+Collisions being certain, the structure needs somewhere to put the loser.
+The cheapest answer reuses the other elementary structure of this module:
+give each slot a linked list, and let colliding keys share it.
+
+```text
+Chained-Hash-Insert(T, x):      prepend x to the list T[h(x.key)]
+Chained-Hash-Search(T, k):      walk the list T[h(k)], comparing keys
+Chained-Hash-Delete(T, x):      unlink x from the list T[h(x.key)]
+```
+
+Insert as written is $O(1)$ in the worst case, since it prepends without
+looking at the list — but that bound belongs to the *multiset* insert, which
+stores a second copy of a key already present. A dictionary insert must
+reject or overwrite a duplicate, so it searches the chain before prepending,
+and its cost is that of an unsuccessful search, the quantity the theorems
+below bound. Delete is $O(1)$ given a pointer to the element itself, because
+<Ref lesson="arrays-and-linked-lists">a doubly linked list</Ref> removes a
+known node in constant time. Search is the operation with a cost worth
+analysing: it walks one list end to end.
+
+<Example title="nine keys into nine slots">
+Take $m = 9$, $h(k) = k \bmod 9$, and insert $5, 28, 19, 15, 20, 33, 12,
+17, 10$ in that order. The hash values are $5, 1, 1, 6, 2, 6, 3, 8, 1$, so
+the lists are
+
+$$
+\begin{aligned}
+T[1] &= \langle 10, 19, 28 \rangle, &\quad
+T[2] &= \langle 20 \rangle, &\quad
+T[3] &= \langle 12 \rangle, \\[2pt]
+T[5] &= \langle 5 \rangle, &\quad
+T[6] &= \langle 33, 15 \rangle, &\quad
+T[8] &= \langle 17 \rangle,
+\end{aligned}
+$$
+
+with slots 0, 4, and 7 empty. Each list reads back-to-front relative to
+insertion order, because insert prepends.
+
+Searching for 28 computes $h(28) = 1$ and examines 10, then 19, then 28:
+three keys. Searching for 20 examines one. Averaged over all nine stored
+keys, a successful search examines
+$(1{+}2{+}3) + 1 + 1 + 1 + (1{+}2) + 1 = 13$ keys in total, or
+$13/9 \approx 1.44$ per search, even though nine keys are in the table.
+</Example>
+
+<Figure
+  src="./figures/chaining.svg"
+  alt="A nine-slot table with linked lists hanging off slots 1, 2, 3, 5, 6 and 8; the chain at slot 1 holding 10, 19, 28 is highlighted as the path of a search for 28"
+  caption="Nine keys, nine slots, α = 1: the longest chain holds three keys and the average holds one."
+/>
+
+### The load factor and the uniformity assumption
+
+The ratio that controlled that average has a name.
+
+<Definition title="load factor">
+For a table of $m$ slots holding $n$ keys, the **load factor** is
+$\alpha = n/m$: the average number of keys per slot. Under chaining
+$\alpha$ may exceed 1, since a list is unbounded.
+</Definition>
+
+The analysis needs one assumption about $h$, stated here and interrogated
+in a later section.
+
+<Definition title="independent uniform hashing">
+Hashing is **independent uniform** when each key's hash value is uniform on
+$\{0, \ldots, m-1\}$ and independent of every other key's, while remaining a
+fixed value for a fixed key. It is an idealisation: no implementable
+function satisfies it, and Section 7 gives the practical approximations.
+</Definition>
+
+### The two chaining theorems
+
+Write $n_j$ for the length of list $T[j]$. Then $n_j$ counts the keys with
+$h(k) = j$; each of the $n$ keys contributes 1 with probability $1/m$, so
+$\mathbb{E}[n_j] = n/m = \alpha$ for every slot $j$.
+
+<Theorem title="unsuccessful search under chaining (CLRS 11.1)">
+Under independent uniform hashing, a search for a key not stored in the
+table examines $\alpha$ keys on average and costs $\Theta(1 + \alpha)$ time.
+
+<Proof>
+The searched key $k$ is not in the table, so $h(k)$ is uniform on the $m$
+slots and independent of where the stored keys landed. The search walks
+$T[h(k)]$ to its end, examining $n_{h(k)}$ keys, and
+$\mathbb{E}[n_{h(k)}] = \alpha$. Adding the $O(1)$ needed to compute $h(k)$
+and address the slot gives $\Theta(1 + \alpha)$: the $1$ is the hash
+computation, which happens even when the list is empty, and the $\alpha$ is
+the walk.
+</Proof>
+</Theorem>
+
+A successful search cannot be treated the same way, because it never lands
+on an empty slot and is more likely to land on a long list than a short one.
+The answer is the same to within a constant.
+
+<Theorem title="successful search under chaining (CLRS 11.2)">
+Under independent uniform hashing, and assuming the searched-for key is
+equally likely to be any of the $n$ stored keys, a successful search
+examines $1 + \tfrac{\alpha}{2} - \tfrac{\alpha}{2n}$ keys on average and
+costs $\Theta(1 + \alpha)$ time.
+
+<Proof>
+The plan: count examinations per key from the insertion order, then average
+over the $n$ keys.
+
+Number the keys $k_1, \ldots, k_n$ in insertion order. Because insertion
+prepends, the keys standing before $k_i$ in its list are exactly those
+inserted after it that hashed to the same slot. Searching for $k_i$
+therefore examines
+$$
+1 + \#\{\,j > i \;:\; h(k_j) = h(k_i)\,\}
+$$
+keys. Each of the $n - i$ later keys collides with $k_i$ with probability
+$1/m$, so the expectation is $1 + (n-i)/m$ by linearity.
+
+Averaging over $i$, which is uniform on $1, \ldots, n$:
+$$
+\frac{1}{n}\sum_{i=1}^{n}\Bigl(1 + \frac{n-i}{m}\Bigr)
+= 1 + \frac{1}{nm}\cdot\frac{n(n-1)}{2}
+= 1 + \frac{n-1}{2m}
+= 1 + \frac{\alpha}{2} - \frac{\alpha}{2n}.
+$$
+This is at most $1 + \alpha/2$, and at least 1, so the total time including
+the hash computation is $\Theta(1 + \alpha)$.
+</Proof>
+</Theorem>
+
+Applied to the nine-key example, the formula predicts
+$1 + 8/18 = 1.44$ examinations, matching the $13/9$ counted by hand. The
+match is exact because that key set happens to contain exactly four pairs
+sharing a slot, which is the number a random assignment would produce on
+average; the exercise on counting colliding pairs derives that number.
+
+<KeyFact>
+Both theorems depend on $n$ and $m$ only through $\alpha = n/m$. A table
+holding ten keys in ten slots and a table holding ten million in ten million
+have the same expected search cost. That is the whole content of "$O(1)$
+regardless of how many keys the table holds", and it holds only while
+$\alpha$ is kept bounded.
+</KeyFact>
+
+<Exercise>
+Take $m = 7$ and $h(k) = k \bmod 7$, and insert $15, 22, 29, 8, 4, 19, 27$
+in that order. List the contents of every slot, give $\alpha$, count the
+total number of key examinations over the seven successful searches, and
+compare the per-search average against the theorem's prediction. The two
+disagree: say why, naming the property of this key set that the theorem's
+hypothesis excludes.
+
+<Solution>
+Strategy hint: reduce each key mod 7 first and look at the multiset of
+results before computing anything else.
+
+Hash values: $15 \equiv 1$, $22 \equiv 1$, $29 \equiv 1$, $8 \equiv 1$,
+$4 \equiv 4$, $19 \equiv 5$, $27 \equiv 6$. Prepending gives
+
+$$
+T[1] = \langle 8, 29, 22, 15 \rangle, \quad
+T[4] = \langle 4 \rangle, \quad
+T[5] = \langle 19 \rangle, \quad T[6] = \langle 27 \rangle,
+$$
+
+with slots 0, 2, 3 empty. Here $n = m = 7$, so $\alpha = 1$.
+
+Examinations: the four-key list costs $1 + 2 + 3 + 4 = 10$ over its four
+searches, and each singleton costs 1, for a total of 13. The average is
+$13/7 \approx 1.86$.
+
+The theorem predicts $1 + (n-1)/(2m) = 1 + 6/14 \approx 1.43$. The observed
+average is a third higher because the key set is not hashed uniformly by
+this function: $15, 22, 29$ and $8$ form an arithmetic progression with
+common difference 7, and $k \bmod 7$ maps every term of such a progression
+to the same slot. The hypothesis that fails is uniformity, and it fails as a
+joint property of the function and the data, not of either alone. The
+transferable move: when a measured cost sits above the $1 + \alpha/2$ line,
+look for structure in the keys that the hash function preserves.
+</Solution>
+</Exercise>
+
+## Open addressing: probing instead of chaining
+
+Chaining costs one pointer per stored key and one pointer dereference per
+step of a search, and a dereference into a freshly allocated list node is a
+cache miss. Open addressing removes both costs by refusing to store anything
+outside the table.
+
+### Probe sequences
+
+Every key gets a **probe sequence** instead of a single slot: the hash
+function takes a probe number as a second argument,
+$h : U \times \{0, \ldots, m-1\} \to \{0, \ldots, m-1\}$, and
+$\langle h(k,0), h(k,1), \ldots, h(k,m-1)\rangle$ must be a permutation of
+all $m$ slots, so that every slot is eventually tried. Insert probes until
+it finds an empty slot. Search probes the same sequence and stops on a
+match, on an empty slot, or after $m$ probes.
+
+The simplest choice is **linear probing**, $h(k, i) = (h_1(k) + i) \bmod m$:
+try the home slot, then the next slot, and so on, wrapping at the end. It
+needs no second hash function and reads consecutive memory addresses.
+
+### Deletion needs tombstones
+
+The search rule "stop at the first empty slot" is what makes probing
+correct: a key is inserted at the first empty slot of its sequence, so an
+empty slot encountered during a search proves the key was never inserted.
+That same rule makes deletion unsafe.
+
+<FigureSequence
+  name="probe"
+  alt="Four frames on a five-slot linear-probing table: three keys colliding at slot 0 fill slots 0, 1, 2; deleting the middle key writes nil into slot 1; a search for the third key stops at that nil and reports absent; replacing the nil with a tombstone restores the search"
+  caption="Deleting the middle of a probe chain hides the key after it. A tombstone is a slot marked deleted, which search walks past and insert may reuse."
+/>
+
+<Task>
+Step through the four frames tracking one number: the number of slots the
+search for key 20 examines. It is 3 in frame 1, 2 in frame 3 (and returns
+the wrong answer), and 3 again in frame 4. Then check the rule that frame 3
+violates: 20 was inserted at the first empty slot of its sequence, so no
+slot before it in that sequence may ever become empty while 20 is stored.
+</Task>
+
+<Example title="the deletion that hides a key">
+Take $m = 5$ and $h_1(k) = k \bmod 5$, and insert 10, 15, 20 in that order.
+All three have home slot 0. Key 10 takes slot 0. Key 15 probes slot 0
+(occupied), then slot 1 (free) and takes it. Key 20 probes slots 0 and 1
+(occupied), then slot 2 (free) and takes it.
+
+Now delete 15 by writing `nil` into slot 1, the obvious deletion for an
+array. Then search for 20: it probes slot 0, finds 10, probes slot 1, finds
+`nil`, and returns "absent". Key 20 is still sitting in slot 2, and no
+sequence of legal operations will ever find it again.
+
+The repair is to write a distinguished **tombstone** value into slot 1
+instead of `nil`. Search treats a tombstone as occupied and keeps probing;
+insert treats it as free and may overwrite it. Search for 20 then probes
+slots 0, 1, 2 and finds the key.
+</Example>
+
+The tombstone fixes correctness and damages the analysis. A tombstone
+occupies a slot without holding a key, so probe lengths stop being a
+function of $\alpha = n/m$ and start depending on the history of deletions;
+a table that has seen many deletions must be rebuilt from scratch to clear
+them. This is the reason chaining is usually preferred where keys are
+deleted often: unlinking a list node disturbs nothing else.
+
+## Clustering: why a nearly full open-addressed table collapses
+
+The probe analysis needs its own idealisation, one step stronger than
+independent uniform hashing: assume each key's probe sequence is equally
+likely to be any of the $m!$ permutations of the slots. Under that
+assumption the cost of a miss has a closed form.
+
+<Theorem title="probes in an unsuccessful search (CLRS 11.6)">
+In an open-addressed table with load factor $\alpha = n/m < 1$, assuming
+independent uniform permutation hashing and no deletions, an unsuccessful
+search makes at most $1/(1-\alpha)$ probes on average.
+
+<Proof>
+Let $X$ be the number of probes. At least one probe always happens, and an
+$i$-th probe happens only if the first $i-1$ all hit occupied slots. The
+first probe hits an occupied slot with probability $n/m$; given $j-1$
+occupied hits, the $j$-th probe examines one of the $m - (j-1)$ unexamined
+slots, of which $n - (j-1)$ are occupied. Hence
+
+$$
+\Pr[X \ge i]
+= \frac{n}{m}\cdot\frac{n-1}{m-1}\cdots\frac{n-i+2}{m-i+2}
+\;\le\; \Bigl(\frac{n}{m}\Bigr)^{i-1} = \alpha^{\,i-1},
+$$
+
+each factor being at most $n/m$ because $n < m$ makes
+$(n-j)/(m-j) \le n/m$. Summing the tail probabilities,
+
+$$
+\mathbb{E}[X] = \sum_{i \ge 1}\Pr[X \ge i]
+\;\le\; \sum_{i \ge 1}\alpha^{\,i-1}
+= \frac{1}{1-\alpha}.
+$$
+</Proof>
+</Theorem>
+
+The geometric series is the whole content of the bound: half a table full
+costs at most 2 probes, nine-tenths full costs at most 10, and the pole at
+$\alpha = 1$ is real, since a full table has no empty slot to stop on. An
+insert pays the same bill, because it is an unsuccessful search followed by
+one write.
+
+### Primary clustering
+
+Linear probing is worse than the idealisation, and for a nameable reason:
+its $m$ probe sequences are all the same walk started at different
+points, so occupied slots merge into contiguous runs, and a run grows faster
+the longer it is: a run of length $\ell$ captures any key whose home slot is
+one of $\ell$ positions. Knuth's analysis of this *primary clustering*
+replaces $1/(1-\alpha)$ by
+
+$$
+\begin{aligned}
+\text{search hit:}&\quad \frac{1}{2}\left(1 + \frac{1}{1-\alpha}\right)
+\text{ probes}, \\[6pt]
+\text{search miss or insert:}&\quad
+\frac{1}{2}\left(1 + \frac{1}{(1-\alpha)^{2}}\right) \text{ probes.}
+\end{aligned}
+$$
+
+The squared denominator is what makes a nearly full linear-probing table
+unusable. At $\alpha = 0.5$ a miss costs 2.5 probes; at $\alpha = 0.9$ it
+costs 50.5.
+
+<Figure
+  src="./figures/load-curves.svg"
+  alt="Expected slots touched per operation against load factor: chaining rises linearly from 1 to under 2, linear-probing hits rise slowly then sharply past 0.85, and linear-probing misses leave the top of the chart before 0.8"
+  caption="Chaining degrades linearly in α; linear probing degrades as 1/(1−α)², and a table over 80% full is finished."
+/>
+
+<Aside>
+**Variants that soften clustering.** Double hashing sets
+$h(k,i) = (h_1(k) + i\,h_2(k)) \bmod m$ with $h_2(k)$ coprime to $m$, giving
+$\Theta(m^2)$ distinct probe sequences instead of $m$, which removes primary
+clustering and lets the table run closer to full. Two-probe chaining hashes
+each key to two slots and inserts it into the shorter of the two lists,
+which drops the expected longest chain from $\Theta(\log m / \log\log m)$ to
+$\Theta(\log\log m)$. Cuckoo hashing goes further and achieves worst-case
+$O(1)$ search by evicting and re-placing displaced keys. None of the three
+changes the shape of the argument in this lesson, and all belong to the
+advanced sequence.
+</Aside>
+
+### The two policies, measured
+
+The demo holds both policies over the same eight-slot table, so the costs
+above can be read off a live instance.
+
+<Demo
+  name="HashCollisionExplorer"
+  caption="Insert keys into a small table under a selectable hash function and collision policy; bucket contents and probe sequences update live."
+/>
+
+<Task>
+Under the default preset, `oak` and `ash` already share bucket 6. Use the
+preview line under the input box to find a third key that lands in bucket 6
+(`rye` is one), insert it, and read off the cost of finding it under each
+policy: chaining examines 3 keys, linear probing makes 3 probes. Now select
+the near-full preset — five keys spread over the eight slots — and re-insert
+`oak`, `ash`, and your third key in that order, bringing the table to
+$\alpha = 8/8 = 1$. Chaining still examines 3 keys; linear probing now makes
+7 probes, because the walk from bucket 6 wraps past six occupied slots
+before it reaches the key.
+</Task>
+
+<KeyFact>
+The two policies fail differently, and the difference decides the choice.
+Chaining's cost is linear in $\alpha$ and stays finite past $\alpha = 1$;
+open addressing's cost has a pole at $\alpha = 1$ and cannot store more keys
+than slots. Open addressing is the faster structure at low load and the only
+one that can be catastrophically mistuned.
+</KeyFact>
+
+## Keeping α bounded: the resize threshold
+
+Both cost formulas are guarantees about $\alpha$, and nothing so far keeps
+$\alpha$ from growing: a table with fixed $m$ has $\alpha = n/m$ rising
+without bound as keys arrive. The fix is the one already proved in
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the dynamic-array
+lesson</Ref>, whose aggregate argument showed that doubling a block on
+overflow makes the copies geometrically rare and costs amortized $O(1)$ per
+append.
+
+A hash table applies it with $\alpha$ in place of fullness: when $n/m$
+crosses a threshold, allocate $2m$ slots and re-insert all $n$ keys. Every
+key must be re-hashed rather than copied, since $h$ depends on $m$, but the
+accounting is unchanged: re-insertions at successive resizes total
+$1 + 2 + 4 + \cdots < 2n$, so $n$ inserts do $O(n)$ work overall. Deployed
+thresholds sit where the cost curves are still flat: about $\alpha = 0.75$
+for Java's `HashMap`, $\alpha = \tfrac{1}{2}$ for a linear-probing table,
+and up to $\alpha \approx 8$ for chaining implementations that accept longer
+lists in exchange for a smaller array.
+
+<KeyFact>
+Two different averages hold this structure up at once, and neither implies
+the other. Amortized $O(1)$, over the whole sequence of operations, is what
+bounds the resize work; it assumes nothing and cannot be defeated by any
+input. Expected $O(1)$, over the hash function's randomness, is what bounds
+the collision work, and the next two sections are about exactly what that
+second average can and cannot promise.
+</KeyFact>
+
+## Hash functions in practice: division, multiply-shift, and Java's 31
+
+Independent uniform hashing was an assumption about a function no program
+contains. What programs contain are cheap arithmetic recipes, and their
+quality is the difference between the analysis above and the incident below.
+
+### The division method
+
+The *division method* takes $h(k) = k \bmod m$. It costs one division and
+is the function used in every example so far. Its weakness is that it keeps
+only what survives the modulus: with $m = 2^{p}$, $k \bmod m$ is the low $p$
+bits of $k$ and every higher bit is discarded, so keys differing only in
+their high bits all collide. This is why the division method is paired with
+$m$ prime and not close to a power of 2, and why the earlier exercise's
+arithmetic progression of stride 7 collapsed into one slot of a 7-slot
+table.
+
+### The multiply-shift method
+
+The *multiply-shift method* takes $m = 2^{\ell}$ deliberately and mixes
+the bits first: multiply $k$ by a fixed odd $w$-bit constant $a$, keep the
+low $w$ bits of the product, and take their top $\ell$ bits as the hash
+value. Every bit of $k$ influences the result through the carries of the
+multiplication, and the whole function is three machine instructions.
+
+<Figure
+  src="./figures/hash-recipes.svg"
+  alt="Two panels: the division method with m a power of two copies the low p bits of the key into the hash and never reads the high bits; multiply-shift routes every input bit through crossing lines into the top ℓ bits it keeps"
+  caption="What each recipe keeps. Division by a power of two copies the low bits and never reads the rest; multiply-shift routes every bit of the key into the hash before keeping the top of the word."
+/>
+
+<Aside>
+**Multiply-shift, worked.** With $w = 32$, $\ell = 14$ (so $m = 16{,}384$),
+$a = 2{,}654{,}435{,}769$ and $k = 123{,}456$: the product $ka$ is
+$327{,}706{,}022{,}297{,}664 = 76{,}300 \cdot 2^{32} + 17{,}612{,}864$, so
+the low word is $r_0 = 17{,}612{,}864$, whose top 14 bits give
+$h(k) = 67$. Nothing here is divisible by anything about 123,456: the
+constant scatters it.
+</Aside>
+
+### Java's base-31 string hash
+
+String keys need a rule for combining characters, and Java's is the one
+worth knowing because of what happens next. `String.hashCode()` evaluates a
+base-31 polynomial in the characters by Horner's method:
+
+$$
+h(s) = s[0]\cdot 31^{L-1} + s[1]\cdot 31^{L-2} + \cdots + s[L-1],
+$$
+
+computed as `hash = s[i] + 31 * hash` in a single pass, with the result
+taken modulo $2^{32}$. For `"call"` this is
+$99 \cdot 31^{3} + 97 \cdot 31^{2} + 108 \cdot 31 + 108 = 3{,}045{,}982$.
+The multiplier is odd and small, so `31 * hash` compiles to a shift and a
+subtract, and using a prime spreads the low bits of successive characters
+across the whole word.
+
+Every one of these recipes is *fixed*: the same function, in the same
+library, on every machine that runs the program. That property is the
+subject of the next two sections.
+
+## What "expected" quantifies over: the hash function, not the keys
+
+The theorems above are stated with "on average" and proved with
+expectations, and the phrase hides a choice about what the randomness ranges
+over. Getting that choice wrong is the standard error about hash tables, and
+it is an error in both directions.
+
+### The claim to hold
+
+Expected $O(1)$ means: for *any* set of keys, chosen
+by anyone including an adversary who has read the source code, the cost
+averaged over the table's *own random choices* is $O(1)$.
+
+### The misconception
+
+A common reading takes the average to be over inputs,
+as though the keys arrived at random and hash tables were fast on typical
+data and slow on unlucky data. A second reading, opposite and equally
+common, concludes from the $\Theta(n)$ worst case that hashing is merely
+good in practice and bad in theory.
+
+Both are wrong, and the first is wrong in a way that has consequences. A
+fixed hash function has no randomness at all, so nothing is being averaged
+over except the input distribution, and no such distribution is guaranteed.
+Worse, an adversary can always destroy it.
+
+<Theorem title="every fixed hash function has a bad key set">
+Let $h : U \to \{0, \ldots, m-1\}$ be any function. If
+$|U| > (n-1)m$, there is a set $S \subseteq U$ of $n$ keys with
+$h(k) = h(k')$ for all $k, k' \in S$.
+
+<Proof>
+Contrapositive, by pigeonhole. If no slot received $n$ or more keys of $U$,
+then every one of the $m$ slots receives at most $n - 1$ keys, so
+$|U| \le m(n-1)$, contradicting the hypothesis.
+</Proof>
+</Theorem>
+
+The hypothesis is satisfied by every realistic key type. For 20-character
+strings and a million-slot table, $(n-1)m$ with $n = 10^{6}$ is $10^{12}$,
+against $|U| = 26^{20} \approx 2 \times 10^{28}$. Such a set exists; whether
+anyone can *find* it is a separate question, answered in the affirmative by
+the next section.
+
+### The replacement model
+
+Randomness has to enter the algorithm, not be
+assumed of the data. The algorithm cannot use a random *value* — a hash
+function must return the same slot for the same key on every call, or
+nothing inserted can be found again. What it can do is choose the
+*function* at random, once, from a family of them, at program start.
+The theorem above still holds for each individual member of the family, but
+the adversary must commit to its key set before the coin is flipped, and no
+single key set is bad for most members of a well-chosen family. A family
+$\mathcal{H}$ is called **universal** when any two distinct keys collide
+under a randomly drawn $h \in \mathcal{H}$ with probability at most $1/m$,
+which is exactly the property both chaining theorems used. Universal
+families exist, are cheap, and give the $\Theta(1 + \alpha)$ bounds with the
+uniformity assumption discharged instead of assumed; constructing one and
+proving the bound belongs to the advanced sequence.
+
+<Figure
+  src="./figures/quantifier-order.svg"
+  alt="Two three-step timelines: in the guarantee the adversary fixes the keys, then the table draws h at random, and every search costs expected Θ(1+α); with a fixed published function the draw already happened, the adversary picks keys knowing h, and every operation hits the Θ(n) worst case"
+  caption="The same theorem under two orders of events: keys committed before the draw leave no key set bad on average; a function published before the keys leaves one key set bad always."
+/>
+
+### The discriminating case
+
+Randomized quicksort makes the same move for
+the same reason. A fixed pivot rule has an input that forces $\Theta(n^2)$;
+a random pivot has no such input, and only bad luck, not bad data, can
+produce the worst case. Order of quantifiers is the entire difference:
+*for every input, the expectation over coin flips is small* is a promise,
+while *for a random input, the cost is small* is a hope about the world.
+
+<KeyFact>
+An expected-time guarantee is void the moment the randomness is removed,
+and a fixed library hash function is exactly that removal. What remains is
+the worst case, $\Theta(n)$ per operation, available to anyone who can
+choose the keys.
+</KeyFact>
+
+## HashDoS: the worst case, weaponized
+
+Chaining's worst case had been stated in textbooks for decades before anyone
+put a price on it. Between 2003 and 2011 it turned into a remote
+denial-of-service technique against every major web platform, and the
+mechanism is nothing more than the two facts above put together: the hash
+function is fixed and published, and a fixed hash function has a bad key
+set.
+
+<Figure
+  float="right"
+  width="m"
+  src="./figures/hashdos-cve-2012-2739.png"
+  alt="Red Hat Bugzilla page for bug 750533, alias CVE-2012-2739, summary 'CVE-2012-2739 java: hash table collisions CPU usage DoS (oCERT-2011-003)', status CLOSED WONTFIX, reported 2011-11-01 by Jan Lieskovsky"
+  caption="Reported 2011-11-01, severity medium, status CLOSED WONTFIX — the function stayed, and the repair went into the collision policy instead."
+/>
+
+### Finding the key set is easy for base-31
+
+Two-character strings hash to
+$s[0]\cdot 31 + s[1]$, so `"Aa"` gives $65 \cdot 31 + 97 = 2112$ and `"BB"`
+gives $66 \cdot 31 + 66 = 2112$. The two blocks are interchangeable in a
+strong sense: in the Horner expansion of a longer string, a two-character
+block at a fixed position contributes its own value times a fixed power of
+31, so swapping `"Aa"` for `"BB"` anywhere leaves the total unchanged.
+Concatenating $N$ blocks, each chosen freely from $\{$`"Aa"`, `"BB"`$\}$,
+yields $2^{N}$ distinct strings of length $2N$ with identical hash codes.
+Twenty characters give 1,024 colliding keys; forty give a million, at the
+cost of writing them out.
+
+### The cost of inserting them
+
+A chained hash table checks for a duplicate key before inserting — the
+search-before-insert that made the dictionary insert cost an unsuccessful
+search in the chaining section — so insert number $i$ into a single shared
+list compares against the $i-1$ keys already there. Inserting $n$ mutually
+colliding keys therefore costs
+
+$$
+0 + 1 + 2 + \cdots + (n-1) = \frac{n(n-1)}{2} \approx \frac{n^{2}}{2}
+$$
+
+key comparisons, against $n$ for the same keys under a working hash
+function. At $n = 20{,}000$ that is about $2 \times 10^{8}$ comparisons for
+one request, and the request itself is a few hundred kilobytes of POST body.
+
+<Figure
+  src="./figures/attack.svg"
+  alt="Two eight-slot tables side by side: ordinary keys spread one per slot with total insert cost n; attacker-chosen keys all chained into slot 3 with insert cost i−1 for the i-th key and total n(n−1)/2"
+  caption="The same code, the same table, two key sets: n insertions cost n or n²/2 depending only on who chose the keys."
+/>
+
+### The record
+
+Crosby and Wallach named the technique *algorithmic
+complexity attack* at USENIX Security in 2003 and demonstrated it against
+the Bro intrusion-detection system, disabling the server with less traffic
+than a dial-up modem could send, and against Perl 5.8.0's associative
+arrays. In December 2011 Alexander Klink and Julian Wälde showed at the 28th
+Chaos Communication Congress that the same construction applied to the web
+application platforms of the day, where a form POST is parsed into a hash
+table keyed by parameter name. The Java instance was filed as Red Hat bug
+750533 and assigned CVE-2012-2739: "a specially-crafted set of keys could
+trigger hash function collisions, which can degrade performance of HashMap
+or Hashtable by changing hash table operations complexity from an
+expected/average O(1) to the worst case O(n)."
+
+### What the attack uses and what fixes it
+
+The theorem weaponized is the
+worst case of chaining, $\Theta(n)$ per search, which the analysis of
+Section 3 discharged by assuming uniformity that `String.hashCode` does not
+provide. The load factor was never the problem: the tables under attack sat
+at whatever $\alpha$ their resize policy allowed, and every key landed in
+one slot regardless. Nor is the fix a better fixed function, since the
+existence theorem applies to any function whatever. The fix is the one named
+in the previous section: choose the hash function at random at process
+start. Perl, Ruby, Python (from 3.3, standardised on SipHash by PEP 456) and
+Rust's default hasher all now key their string hash with a per-process
+random value, so the colliding family an attacker computes offline is a
+family for somebody else's process.
+
+<Aside>
+**The other repair, and where it points.** Java kept `String.hashCode`
+unchanged, for compatibility: the function is specified in the language API
+and programs depend on its values. `HashMap` instead changed its collision
+policy. Since Java 8, a bucket that accumulates eight or more entries
+converts its linked list into a balanced search tree keyed on the hash
+value, which caps the cost of a fully collided bucket at $O(\log n)$ per
+operation rather than $O(n)$. That turns $2 \times 10^{8}$ comparisons into
+a few hundred thousand and makes the attack an inconvenience. The structure
+it reaches for is the subject of
+<Ref lesson="balanced-search-trees">the balanced-tree lesson</Ref>, and the
+fact that a hash bucket's fallback is a tree is a fair summary of how the
+two structures divide the work.
+</Aside>
+
+<KeyFact>
+The distance between a hash table's expected and worst-case cost is not an
+academic footnote; it is the attack surface. Any hash table whose keys come
+from outside the program and whose hash function is fixed and published is a
+quadratic-time algorithm waiting for a request.
+</KeyFact>
+
+## What hashing gives up: every question about order
+
+Expected $O(1)$ was bought with the compression $h$, and $h$ was chosen to
+scatter. A good hash function destroys every relationship between keys that
+is not equality: adjacent keys land in unrelated slots, and the slot order
+carries no information about the key order.
+
+That forecloses an entire class of queries. Finding the minimum key means
+scanning all $m$ slots. Finding the successor of $k$ means the same scan.
+Reporting every key in $[a, b]$, or iterating the keys in sorted order,
+means a scan plus a sort. None of these is a matter of tuning: no
+resize policy or probe rule recovers order that the hash function deleted on
+purpose.
+
+<Figure
+  src="./figures/order-gap.svg"
+  alt="A table comparing sorted array and hash table costs for search, insert/delete, min/max, successor and range queries; the hash column is fast for the first two rows and Theta(m+n) for the last three"
+  caption="The trade, priced: expected Θ(1) for the unordered dictionary operations, a full table scan for every ordered one."
+/>
+
+What is now established: a hash function maps a large universe into
+$m \approx n$ slots, collisions are forced by pigeonhole and arrive after
+about $\sqrt{m}$ insertions, chaining costs $\Theta(1 + \alpha)$ expected
+per operation and open addressing $1/(1-\alpha)$ probes, a resize on a
+load-factor threshold keeps $\alpha$ bounded at amortized $O(1)$ by the
+dynamic-array argument, and the expectation in all of it is over the choice
+of hash function, so a fixed function leaves the $\Theta(n)$ worst case
+reachable by anyone who picks the keys. That closes the module: arrays,
+linked lists, stacks, queues, dynamic arrays and hash tables are the
+structures the rest of the course builds on, and
+<Ref lesson="graph-representations">graph representations</Ref> will use a
+hash table as an adjacency structure directly.
+
+The blank cell that remains is the ordered one.
+<Ref lesson="binary-search-trees">The next lesson</Ref> takes up the
+structure that answers minimum, successor and range queries in $O(h)$ time
+for a tree of height $h$, and the lesson after it makes $h$ stay at
+$O(\log n)$.
+
+## Exercises
+
+<Exercise>
+A table holds $n$ keys in $m$ slots. For $\alpha = 0.5$, $0.75$, $0.9$ and
+$0.99$, tabulate the expected cost of an unsuccessful search under (a)
+chaining, (b) idealised open addressing, and (c) linear probing. Then push
+past the edge: state what each of the three does at $\alpha = 1$ and at
+$\alpha = 4$, and name the hypothesis of the open-addressing theorem that
+excludes the second case.
+
+<Solution>
+Chaining examines $\alpha$ keys plus the $O(1)$ hash: $1.5$, $1.75$, $1.9$,
+$1.99$ in the units of the $1 + \alpha$ formula.
+
+Idealised open addressing, $1/(1-\alpha)$: $2$, $4$, $10$, $100$ probes.
+
+Linear probing, $\tfrac{1}{2}(1 + 1/(1-\alpha)^2)$: $2.5$, $8.5$, $50.5$,
+$5000.5$ probes.
+
+**At $\alpha = 1$.** Chaining is fine: $1 + \alpha = 2$, one key examined
+per unsuccessful search on average, and the nine-key example in the text was
+exactly this case. Both open-addressing formulas divide by zero, and the
+underlying structure has genuinely failed: with $n = m$ every slot is
+occupied, an unsuccessful search probes all $m$ slots before it can conclude
+anything, and an insert has nowhere to go.
+
+**At $\alpha = 4$.** Chaining still works, with lists of average length 4
+and expected cost $1 + 4 = 5$: nothing in the two chaining theorems required
+$\alpha < 1$, because a linked list has no capacity. Open addressing cannot
+reach $\alpha = 4$ at all. The hypothesis is $\alpha < 1$ in the statement of
+the probe theorem, and it is not a technical convenience: the proof bounds
+$\Pr[X \ge i] \le \alpha^{i-1}$ and then sums the geometric series, which
+converges only for $\alpha < 1$. Structurally, $\alpha \le 1$ is forced
+because open addressing stores at most one key per slot.
+</Solution>
+</Exercise>
+
+<Exercise>
+For each workload, choose direct addressing, chaining, or linear probing,
+and give the deciding cost. (a) A compiler's symbol table: a few thousand
+identifier strings, built once, then queried heavily, never deleted. (b) A
+connection tracker keyed by 16-bit port number, with entries added and
+removed thousands of times a second. (c) A cache keyed by URL, with a fixed
+memory budget and frequent eviction. (d) A counter keyed by IP addresses
+read from untrusted network traffic.
+
+<Solution>
+(a) **Linear probing.** The workload is search-dominated with no deletions,
+which is exactly the regime where open addressing's advantages apply and its
+one weakness (tombstones) never arises. Keeping $\alpha \le \tfrac{1}{2}$
+puts a hit at $\tfrac{1}{2}(1 + 2) = 1.5$ probes of contiguous memory,
+against chaining's $1 + \alpha/2 = 1.25$ key comparisons plus a pointer
+dereference per step; the dereference is the more expensive of the two on
+real hardware.
+
+(b) **Direct addressing.** The universe is $2^{16} = 65{,}536$ keys, so a
+direct-address table costs about half a megabyte and gives worst-case $O(1)$
+for all three operations with no hash function, no collisions, and no
+analysis. Hashing here would spend work to lose a guarantee. The deciding
+quantity is $|U|$, not $n$.
+
+(c) **Chaining.** Frequent eviction means frequent deletion, and deletion is
+where open addressing needs tombstones and periodic rebuilds. Chaining
+deletes in $O(1)$ given the node and leaves the rest of the table
+undisturbed.
+
+(d) **Chaining or probing, but with a randomly keyed hash function**, which
+is the deciding property rather than the collision policy. The keys come
+from an untrusted source, so the existence theorem applies: with any fixed
+published hash function an attacker can send addresses that all collide.
+Note that (d) is the only item here where the choice turns on where the keys
+come from rather than on the operation mix.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Hash table lookups are $O(1)$, so a lookup in a table of $n$ keys
+takes constant time regardless of what the keys are." Give the strongest
+counterexample you can construct, name the quantifier in the claim that is
+misplaced, and state the repaired claim precisely enough that the
+counterexample no longer breaks it.
+
+<Solution>
+**Counterexample.** Fix any implementation with a published hash function
+$h$, and take $m = 10^{6}$ slots and $n = 10^{6}$ keys. Because
+$|U| > (n-1)m$ for any realistic key type, a set of $10^{6}$ keys exists
+with $h(k)$ equal for all of them, and for base-31 string hashing it can be
+written down directly as the `"Aa"`/`"BB"` family. Insert them. Every key
+sits in one chain of length $10^{6}$, and a lookup for the last one examines
+a million keys: $\Theta(n)$, at load factor exactly 1. No resize helps,
+since doubling $m$ leaves all $10^{6}$ keys in one slot of the larger table.
+
+**The misplaced quantifier.** The claim reads "for all key sets, the cost is
+$O(1)$", with no average anywhere. The theorems say "for all key sets, the
+*expectation over the hash function's randomness* is $O(1)$". Dropping the
+inner expectation converts a statement about the algorithm's coin flips into
+a false statement about the data.
+
+**The repaired claim.** For every set of keys and every sequence of
+operations on them, if the hash function is drawn at random from a universal
+family at table creation, then the expected number of keys examined by any
+one search is at most $1 + \alpha$, where the expectation is over that draw
+alone. The counterexample no longer applies: the attacker must fix the key
+set before the draw, and a fixed pair of distinct keys collides with
+probability at most $1/m$ over the draw, so no fixed key set makes the
+expectation large.
+</Solution>
+</Exercise>
+
+<Exercise>
+The chaining theorems bound a search; this exercise counts collisions
+directly. Under independent uniform hashing, derive the expected number of
+unordered pairs of distinct keys that share a slot when $n$ keys are placed
+in $m$ slots. Evaluate it for the nine-key example in the text and check it
+against the chains listed there. Then evaluate it at $m = 365$ and find the
+smallest $n$ making it at least 1; compare that $n$ with the 23 of the
+birthday computation and explain, in one sentence, why the two numbers are
+not the same quantity.
+
+<Solution>
+For each unordered pair $\{k_i, k_j\}$ of distinct keys, let $X_{ij} = 1$ if
+$h(k_i) = h(k_j)$ and 0 otherwise. Conditioned on $h(k_i)$, the key $k_j$
+lands in that same slot with probability $1/m$, so
+$\mathbb{E}[X_{ij}] = 1/m$. There are $\binom{n}{2}$ pairs, and linearity of
+expectation needs no independence between pairs:
+
+$$
+\mathbb{E}\Bigl[\textstyle\sum_{i<j} X_{ij}\Bigr]
+= \binom{n}{2}\frac{1}{m} = \frac{n(n-1)}{2m}.
+$$
+
+**The nine-key check.** $n = m = 9$ gives $\tfrac{9 \cdot 8}{18} = 4$
+expected colliding pairs. The actual chains were of lengths 3, 1, 1, 1, 2, 1,
+contributing $\binom{3}{2} + \binom{2}{2} = 3 + 1 = 4$ pairs. The
+observed count equals the expectation exactly, which is why the measured
+average search cost $13/9$ matched the formula's $1 + 8/18$ to the digit:
+the successful-search cost is $1 + (\text{colliding pairs})/n$, so the two
+statements are the same statement.
+
+**At $m = 365$.** Solve $n(n-1)/730 \ge 1$, that is $n(n-1) \ge 730$:
+$n = 27$ gives $702$ and $n = 28$ gives $756$, so $n = 28$.
+
+**Why 28 and not 23.** The two ask different questions: 23 is the point
+where the *probability of at least one* collision reaches $\tfrac{1}{2}$,
+while 28 is the point where the *expected number* of collisions reaches 1,
+and a count whose mean is 1 can easily be 0 (Markov's inequality bounds the
+probability of at least one collision by the mean, which is why the
+probability threshold is crossed first).
+</Solution>
+</Exercise>
+
+<Exercise>
+A chained hash table starts with $m = 1$ slot and doubles $m$ whenever
+$n/m$ would exceed 1, re-hashing every stored key into the new array.
+Charging 1 unit per key insertion and 1 per re-hashed key, and assuming a
+hash function good enough that every chain has $O(1)$ expected length,
+compute the total work of $n$ inserts from empty and the amortized cost per
+insert. Then state which part of your bound came from an expectation and
+which came from an aggregate argument, and give a sequence of operations
+that makes the per-operation cost $\Theta(n)$ without contradicting either
+bound.
+
+<Solution>
+**The total.** Resizes occur when $n$ reaches $1, 2, 4, \ldots$, and the
+resize at size $2^{j}$ re-hashes $2^{j}$ keys. Over $n$ inserts the resize
+work is
+$$
+\sum_{j=0}^{\lfloor \lg (n-1)\rfloor} 2^{j} = 2^{\lfloor \lg(n-1)\rfloor + 1} - 1 < 2n,
+$$
+by the same geometric sum as the dynamic array's copy bill. Adding the $n$
+ordinary insertions gives $T(n) < 3n$, so the amortized cost is under 3
+units per insert: $O(1)$.
+
+**Which average is which.** The aggregate argument
+(<Ref lesson="dynamic-arrays-and-amortized-analysis">the dynamic-array
+lesson</Ref>) supplies the $<3n$ total: it is worst-case over sequences,
+assumes no distribution, and would hold against an adversary choosing the
+insertion order. The expectation supplies the "1 unit per insertion" cost
+model itself: an insertion into a chained table costs $\Theta(1 + \alpha)$
+*in expectation over the hash function*, and $\alpha \le 1$ by the resize
+rule. Remove the randomness and the unit cost is wrong, which invalidates
+the total even though the aggregate argument is untouched.
+
+**A $\Theta(n)$ operation.** Insert $n-1$ keys, then insert the key that
+takes $n$ past the threshold: that single insert re-hashes all $n-1$ stored
+keys and costs $\Theta(n)$. This contradicts nothing. The amortized bound is
+a statement about totals over a sequence starting from empty, never a
+latency bound on one operation, exactly as for the dynamic array. Separately,
+inserting $n$ keys that all collide would also cost $\Theta(n)$ on the last
+one, but that failure has a different cause: it breaks the expectation, not
+the aggregate.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the base-31 collision family and price the attack. (a) Verify by
+hand that `"Aa"` and `"BB"` have equal Java hash codes. (b) Prove that
+concatenating $N$ blocks, each independently `"Aa"` or `"BB"`, yields
+$2^{N}$ strings of length $2N$ with the same hash code, and say where in the
+argument you used the fact that the block length is constant. (c) A server
+parses a POST body into a chained hash table keyed by parameter name.
+Estimate the number of key comparisons for 50,000 such parameters, and the
+number for the same count of ordinary parameter names. (d) State what
+measurement would confirm the mechanism rather than merely showing the
+server is slow.
+
+<Solution>
+(a) `"Aa"` is characters 65 and 97: $65 \cdot 31 + 97 = 2015 + 97 = 2112$.
+`"BB"` is 66 and 66: $66 \cdot 31 + 66 = 2046 + 66 = 2112$. Equal.
+
+(b) Write the string as blocks $b_0 b_1 \cdots b_{N-1}$, each two characters,
+total length $L = 2N$. Horner's expansion gives
+$h(s) = \sum_{i=0}^{L-1} s[i]\,31^{L-1-i}$. Group the terms of block $j$,
+which occupies positions $2j$ and $2j+1$:
+$$
+\begin{aligned}
+s[2j]\,31^{L-1-2j} + s[2j+1]\,31^{L-2-2j}
+&= \bigl(s[2j]\cdot 31 + s[2j+1]\bigr)\,31^{L-2-2j} \\[2pt]
+&= 2112 \cdot 31^{\,L-2-2j},
+\end{aligned}
+$$
+the same value for either choice of block, since both blocks have inner
+value 2112. So $h(s) = 2112 \sum_{j=0}^{N-1} 31^{L-2-2j}$ depends only on
+$N$, not on the choices, and the $2^{N}$ strings are distinct because the
+blocks differ. Constant block length is what makes the exponent
+$L - 2 - 2j$ a function of the block index alone; blocks of differing
+lengths would shift the exponents of all later blocks and the factorisation
+would fail. (The argument is unaffected by the modulo $2^{32}$ Java applies,
+since the reduction is a ring homomorphism.)
+
+(c) Colliding: $\binom{50{,}000}{2} = 50{,}000 \cdot 49{,}999 / 2 \approx
+1.25 \times 10^{9}$ key comparisons, each also comparing two equal-hash
+strings character by character. Ordinary: with the table resized to keep
+$\alpha \le 1$, about $1 + \alpha/2 \le 1.5$ comparisons per insert, so
+roughly $7.5 \times 10^{4}$ in total. The ratio is about four orders of
+magnitude, from a request of identical size.
+
+(d) Timing alone cannot distinguish this from any other slow path. The
+mechanism-confirming measurement is the *shape* of the cost curve: send
+$n$ colliding parameters for $n = 5{,}000, 10{,}000, 20{,}000, 40{,}000$ and
+check that CPU time per request grows by a factor of about 4 for each
+doubling of $n$ (quadratic), while the same counts of ordinary parameter
+names grow by a factor of about 2 (linear). A second confirmation is
+distributional: instrument the table and report the length of its longest
+chain, which should be $n$ under attack and $\Theta(\log m / \log\log m)$
+otherwise.
+</Solution>
+</Exercise>
+
+<Exercise>
+A read-only dictionary of $n$ keys is to be built once and queried many
+times. Option A stores the keys in a sorted array and answers a lookup by
+binary search. Option B stores them in a chained hash table at
+$\alpha = 1$. (a) Compare the expected lookup costs at $n = 10^{6}$. (b)
+Now add three queries the application also needs: the smallest key, the
+successor of a given key, and all keys in a range $[a, b]$ containing $r$ of
+them. Give the cost of each under both options. (c) State the structure that
+would be needed to get Option B's lookup cost together with Option A's
+answers to (b), and name the one quantity that structure must control.
+
+<Solution>
+(a) Binary search costs $\lceil \lg (10^{6} + 1)\rceil = 20$ comparisons
+worst case, about 20 on average too. The hash table costs one hash
+computation plus $1 + \alpha/2 = 1.5$ key comparisons expected. Independent
+of $n$: at $n = 10^{9}$ binary search costs 30 and the table still costs
+1.5.
+
+(b) Sorted array: minimum is $A[0]$, $\Theta(1)$; successor is a binary
+search, $\Theta(\log n)$; the range query is one binary search for $a$ and
+then a walk, $\Theta(\log n + r)$. Hash table: all three require examining
+every slot and every chain, $\Theta(m + n)$, and the range query then needs
+its $r$ results sorted. At $n = 10^{6}$ that is a million-slot scan against
+20 comparisons.
+
+(c) A structure that keeps the keys ordered while allowing updates: a
+**binary search tree**, whose in-order traversal is sorted and which answers
+minimum, successor and range queries by walking a root-to-leaf path.
+Lookups then cost $\Theta(h)$ for the tree's height $h$, and the quantity
+that must be controlled is exactly $h$: an unbalanced tree built from sorted
+insertions degenerates to a chain of height $n$, making every operation
+$\Theta(n)$. That is the trade the two next lessons work out —
+<Ref lesson="binary-search-trees">binary search trees</Ref> establish the
+$\Theta(h)$ costs and show $h$ can be as bad as $n$, and
+<Ref lesson="balanced-search-trees">balanced search trees</Ref> force
+$h = O(\log n)$. The comparison here also shows what is not recoverable: no
+tree reaches $\Theta(1)$ lookups, because a tree of comparisons is subject
+to the $\Omega(\log n)$ barrier of Section 1, and only leaving the
+comparison model bought the constant.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §11.1 direct-address tables; §11.2 chaining, with Theorems 11.1 and 11.2 (the successful-search proof there runs through triple-indexed indicator variables and reaches the same $1 + \alpha/2 - \alpha/2n$); §11.3 the division, multiplication and multiply-shift methods, and §11.3.2 universal hashing with the collision bound this lesson only names; §11.4 open addressing, Theorem 11.6 and Theorem 11.8; §5.4.1 the birthday computation.
+2. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §3.4: Java's `hashCode` contract and the base-31 string hash, separate chaining against linear probing with the resize thresholds used in practice, Knuth's parking-problem formulation of clustering, and the HashDoS war story with the `"Aa"`/`"BB"` table. Companion site: https://algs4.cs.princeton.edu/34hash/
+3. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 4 notes — the comparison-model decision-tree argument giving the $\Omega(\log n)$ search lower bound, and the direct-access-array space calculation ($26^{10}$ names, 17.6 TB). https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+4. G. Blelloch et al., *15-210: Parallel and Sequential Data Structures and Algorithms*, Carnegie Mellon, lecture notes on hashing — the pigeonhole claim that every fixed hash function admits a bad key set, and a careful statement of the order of quantifiers in "expected $O(1)$", including the two misreadings refuted in Section 8. https://www.cs.cmu.edu/~15210/notes/hashing.pdf
+5. S. A. Crosby, D. S. Wallach, "Denial of Service via Algorithmic Complexity Attacks," *12th USENIX Security Symposium*, 2003 — the original demonstration against Bro and Perl 5.8.0, with the bandwidth measurements. https://www.usenix.org/legacy/events/sec03/tech/crosby.html
+6. A. Klink, J. Wälde, "Efficient Denial of Service Attacks on Web Application Platforms," 28th Chaos Communication Congress, December 2011 — the 2011 disclosure; tracked as oCERT-2011-003 and, for Java, as CVE-2012-2739 in Red Hat bug 750533, whose description is quoted in Section 9. https://bugzilla.redhat.com/show_bug.cgi?id=750533
+7. C. Heimes, "PEP 456 — Secure and Interchangeable Hash Algorithm," Python Enhancement Proposals, 2013 — the reasoning behind replacing a fixed string hash with a randomly keyed one (SipHash), and the compatibility constraints that shaped it. https://peps.python.org/pep-0456/
+8. D. E. Knuth, *The Art of Computer Programming*, Vol. 3: *Sorting and Searching*, 2nd ed., Addison-Wesley, 1998 — §6.4: the analysis of linear probing, including the $\tfrac12(1 + 1/(1-\alpha))$ and $\tfrac12(1 + 1/(1-\alpha)^2)$ formulas quoted here and the parking-lot model behind primary clustering.
+</References>

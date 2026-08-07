@@ -1,0 +1,860 @@
+Finding a target in sorted data takes O(log n) comparisons by binary
+search, and finding the k-th smallest element without fully sorting takes
+expected O(n) time by quickselect, a variant of quicksort's partition that
+recurses into only one side. So far the sorting module has only spent:
+$\Theta(n \lg n)$ to put keys in comparison order, with
+<Ref lesson="heapsort-and-the-sorting-lower-bound">a decision tree</Ref>
+certifying the price, and $\Theta(cn)$ for integer keys by
+<Ref lesson="linear-time-sorting">stepping outside the comparison
+model</Ref>. What stands open is the return on that investment: what a
+sorted array is *for*, and whether a question short of full order, the
+k-th smallest, must pay the full sorting price. This lesson closes the
+module with both answers. The route: binary search with its invariant and
+its optimality proof; the generalization to monotone predicates, where the
+array disappears; a case study in speeding up an algorithm by reduction to
+sorted structure; and quickselect, which answers a rank query for less
+than the cost of one sort.
+
+## Binary search: one comparison discards half
+
+The unsorted baseline was set in
+<Ref lesson="arrays-and-linked-lists">the elementary-structures
+module</Ref>: to learn whether a value $x$ occurs in an array you scan it,
+$\Theta(n)$ per query, and no order of inspection helps, because any
+unexamined cell could hold $x$. Sorted order changes what one comparison
+buys. Compare $x$ against the middle element of a sorted array: if the
+middle is smaller than $x$, then so is everything left of it, and half the
+array is eliminated without being looked at. Repeating the step on the
+surviving half is *binary search*.
+
+### The convention: half-open ranges, chosen once
+
+The delicate part of binary search has never been the idea; it is the
+bookkeeping at the boundaries. This course fixes one convention and reuses
+it everywhere: the candidate range is **half-open**, written $[lo, hi)$,
+containing the indices $lo, lo+1, \ldots, hi-1$ and not $hi$. Three
+consequences pay for the choice: the empty range is simply $lo = hi$, with
+no $\pm 1$ special case; the number of candidates is $hi - lo$, which will
+serve directly as the termination measure of
+<Ref lesson="loop-invariants-and-correctness">the invariants
+lesson</Ref>; and both updates in the loop body write clean values,
+$mid + 1$ or $mid$, never $mid - 1$.
+
+```text
+BinarySearch(A[1..n], x):        ▷ A sorted nondecreasing
+  lo ← 1;  hi ← n + 1            ▷ candidate range [lo, hi), initially all of A
+  while lo < hi
+    mid ← lo + ⌊(hi − lo)/2⌋
+    if A[mid] < x       lo ← mid + 1
+    else if A[mid] > x  hi ← mid
+    else                return mid
+  return absent
+```
+
+The `mid` line is written as $lo + \lfloor (hi-lo)/2 \rfloor$ rather than
+the algebraically equal $\lfloor (lo+hi)/2 \rfloor$ for one
+implementation reason: in fixed-width arithmetic $lo + hi$ can overflow
+where $hi - lo$ cannot, the bug that sat in the Java library's binary
+search for nine years
+(<Ref lesson="loop-invariants-and-correctness">the invariants lesson's
+aside</Ref>).
+
+### The invariant, carried in the standard three parts
+
+The closing exercise of
+<Ref lesson="loop-invariants-and-correctness">the invariants lesson</Ref>
+proved a halving loop correct over a closed interval; this is the same
+proof scheme on the half-open convention, stated once here because every
+variant in this lesson leans on it.
+
+<Theorem title="correctness of binary search">
+For a sorted array $A[1..n]$, `BinarySearch` returns an index $mid$ with
+$A[mid] = x$ if $x$ occurs in $A$, and `absent` otherwise, after at most
+$\lfloor \lg n \rfloor + 1$ iterations.
+
+<Proof>
+The invariant, at every test of the `while` condition:
+$1 \le lo \le hi \le n+1$, and if $x$ occurs anywhere in $A[1..n]$, it
+occurs in $A[lo..hi-1]$.
+
+**Initialization.** $[lo, hi) = [1, n+1)$ covers every index, so both
+clauses hold.
+
+**Maintenance.** The body runs with $lo < hi$, so
+$lo \le mid < hi$: the probed index is inside the range. Branch
+$A[mid] < x$: by sortedness every index $\le mid$ holds a key
+$\le A[mid] < x$, so no occurrence of $x$ lies at or left of $mid$, and
+shrinking to $[mid+1, hi)$ preserves the invariant. Branch $A[mid] > x$:
+symmetrically, no occurrence lies at or right of $mid$, and $[lo, mid)$
+preserves it. The equality branch returns an index with $A[mid] = x$,
+which is the postcondition's first clause directly.
+
+**Termination.** The measure $hi - lo$ is a nonnegative integer, and both
+updates strictly decrease it: the new sizes are
+$hi - mid - 1$ and $mid - lo$, both at most
+$\lfloor (hi-lo)/2 \rfloor$. A size that at least halves each iteration
+falls from $n$ below $1$ within $\lfloor \lg n \rfloor + 1$ iterations.
+If the loop exits, $lo = hi$: the range is empty, and the invariant says
+that if $x$ were present it would lie in an empty set. Returning `absent`
+is correct.
+</Proof>
+</Theorem>
+
+Each iteration does $O(1)$ work, so the running time is $O(\lg n)$: the
+logarithmic rung of
+<Ref lesson="asymptotic-notation">the growth ladder</Ref>, reached by the
+same repeated-halving count as there. The numbers are worth holding: a
+million sorted keys are searched in at most **20 iterations**, a billion
+in 30, and $2^{32}$ in 33.
+
+### The trace: three comparisons find, four certify absence
+
+<Example title="searching 16 sorted keys for 61">
+$A = [\,3, 7, 11, 15, 22, 28, 34, 41, 47, 53, 61, 66, 74, 80, 89, 95\,]$,
+target $x = 61$.
+
+| $lo$ | $hi$ | size | $mid$ | $A[mid]$ | verdict |
+|---|---|---|---|---|---|
+| 1 | 17 | 16 | 9 | 47 | $47 < 61$: $lo \leftarrow 10$ |
+| 10 | 17 | 7 | 13 | 74 | $74 > 61$: $hi \leftarrow 13$ |
+| 10 | 13 | 3 | 11 | 61 | found, return 11 |
+
+Three probes, and the sizes ran $16 \to 7 \to 3$: each at most half its
+predecessor.
+</Example>
+
+<FigureSequence
+  name="bsearch"
+  alt="Four frames of binary search for 61 on a 16-element sorted array: the half-open candidate range shaded, the mid element probed, the range halving each frame, ending in the found verdict at index 11"
+  caption="Binary search for x = 61: one probe per frame, half the range gone per probe."
+/>
+
+<Task>
+Step the frames and, before each one, predict the next mid index and
+which update fires. Then check the claim under frame 4: name a target
+that would force all 5 iterations (any x that keeps missing equality,
+for instance one smaller than every element).
+</Task>
+
+A failed search is not a weaker outcome; it certifies absence through the
+same invariant. Searching the same array for $x = 60$:
+
+| $lo$ | $hi$ | size | $mid$ | $A[mid]$ | verdict |
+|---|---|---|---|---|---|
+| 1 | 17 | 16 | 9 | 47 | $lo \leftarrow 10$ |
+| 10 | 17 | 7 | 13 | 74 | $hi \leftarrow 13$ |
+| 10 | 13 | 3 | 11 | 61 | $hi \leftarrow 11$ |
+| 10 | 11 | 1 | 10 | 53 | $lo \leftarrow 11$ |
+| 11 | 11 | 0 | | | empty range: `absent` |
+
+The exit state $[11, 11)$ is an empty candidate range, and the invariant
+turns it into a certificate of absence: if 60 occurred anywhere in the
+array it would lie in that empty range, so it occurs nowhere, and no
+cell beyond the four probed was ever read.
+
+<Exercise>
+(a) Trace `BinarySearch` on the array above for $x = 34$, giving every
+$(lo, hi, mid)$ state. (b) Exhibit a target that forces the full
+$\lfloor \lg 16 \rfloor + 1 = 5$ iterations, and show its trace reaches
+an empty range. (c) A sorted log of $2^{32}$ timestamps is searched for
+one value: bound the iterations, and compare against scanning.
+
+<Solution>
+**(a)** $[1, 17)$: $mid = 9$, $A[9] = 47 > 34$, so $hi \leftarrow 9$.
+$[1, 9)$: $mid = 5$, $A[5] = 22 < 34$, so $lo \leftarrow 6$. $[6, 9)$:
+$mid = 7$, $A[7] = 34 = x$: return 7. Three iterations.
+
+**(b)** Any absent target works if every probe misses equality; the
+extreme ones are cleanest. For $x = 1$: sizes $16 \to 8 \to 4 \to 2 \to 1
+\to 0$ via $mid = 9, 5, 3, 2, 1$, every probe answering "too large",
+ending at $[1,1)$: five iterations, then `absent`. (With $x = 1$ each
+update is $hi \leftarrow mid$, and the left piece $mid - lo$ is exactly
+half of an even-size range, so the sizes halve exactly.)
+
+**(c)** At most $\lfloor \lg 2^{32} \rfloor + 1 = 33$ iterations, about
+66 comparisons with the two tests per iteration. A scan reads on average
+$2^{31} \approx 2 \times 10^9$ cells. The ratio is about sixty
+million; that gap is the module's entire reason for sorting.
+</Solution>
+</Exercise>
+
+## Optimality: 20 questions is the floor, not a trick
+
+Twenty probes for a million keys invites the question of whether a
+cleverer probe pattern could do better still. For algorithms that learn
+about the keys only by comparing, the answer is no, and the proof is the
+technique this module already owns:
+<Ref lesson="heapsort-and-the-sorting-lower-bound">the decision-tree
+argument</Ref>, which lower-bounded sorting by counting the $n!$ leaves a
+correct sort's tree of comparison outcomes must reach. Search is the same
+argument with a smaller leaf count.
+
+<Theorem title="comparison-search lower bound (MIT 6.006, Lecture 4)">
+Any comparison-based algorithm that decides whether $x$ occurs among $n$
+stored keys, and where, performs at least $\lceil \lg (n+1) \rceil$
+comparisons on some input.
+
+<Proof>
+Fix a correct algorithm. Its run is dictated by the outcomes of its
+comparisons, so all runs form one binary tree: each internal node a
+two-outcome comparison, each leaf a verdict. A correct algorithm must be
+able to issue $n + 1$ distinct verdicts: "found at position $i$" for each
+of the $n$ positions, and "absent". Two inputs deserving different
+verdicts must reach different leaves, so the tree has at least $n+1$
+reachable leaves. A binary tree with $n+1$ leaves has height at least
+$\lceil \lg(n+1) \rceil$, and some root-to-leaf path, which is to say
+some input, forces that many comparisons.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/search-tree-7.svg"
+  alt="A binary decision tree for searching among 7 keys: comparison nodes with two outcomes each, eight outcome leaves (found at positions 1 through 7, plus absent), and a depth ruler showing the forced depth of 3"
+  caption="Search among n = 7 keys: 8 verdicts force 8 leaves, and 8 leaves force depth lg 8 = 3."
+/>
+
+### Meeting the floor, and the ways around it
+
+Binary search meets the floor: $\lceil \lg(n+1) \rceil$ equals
+$\lfloor \lg n \rfloor + 1$, exactly its iteration bound, so no
+comparison-based method can beat it by more than the constant between
+"iterations" and "comparisons". The escape routes are the ones the module
+has already mapped: give up on comparisons and index by value, which is
+how <Ref lesson="hash-tables">a hash table</Ref> answers membership in
+expected $O(1)$, at the cost of every order question: a hash table cannot
+say "the smallest key at least $x$", and a sorted array answers it with
+the same 20 probes.
+
+<KeyFact>
+The module's two lower bounds are one argument at two leaf counts: $n!$
+reachable verdicts force $\lg(n!) = \Omega(n \lg n)$ comparisons to sort;
+$n + 1$ verdicts force $\lceil \lg(n+1) \rceil$ to search. Binary search
+is optimal in the comparison model, so any future claim of faster search
+is a claim about a different model.
+</KeyFact>
+
+## The monotone predicate: binary search with no array
+
+The correctness proof used sortedness in exactly one place: to argue that
+the answer to "$A[mid] < x$?", replicated leftward, eliminates the left
+piece. Strip the array away and keep that shape. Let $f$ be a yes/no
+question on the integers $lo_0, \ldots, hi_0 - 1$ whose answers, read
+left to right, are a block of F followed by a block of T: once true,
+always true. Nothing else about $f$ is needed for halving to work.
+
+<Definition title="monotone predicate">
+A predicate $f$ on an integer range is **monotone** if $f(t)$ true
+implies $f(t+1)$ true for every $t$ in the range. Its **flip point** is
+the first index where $f$ is true, or the range's upper end if $f$ is
+false throughout.
+</Definition>
+
+### The loop with the equality branch gone
+
+```text
+FirstTrue(f, lo, hi):            ▷ f monotone on [lo, hi)
+  while lo < hi
+    mid ← lo + ⌊(hi − lo)/2⌋
+    if f(mid)   hi ← mid
+    else        lo ← mid + 1
+  return lo                      ▷ the flip point
+```
+
+The invariant is the one from binary search with the equality branch
+gone: $f$ is false at every index left of $lo$ and true at every index at
+or right of $hi$, so the flip point always lies in $[lo, hi]$, and when
+the range empties, $lo = hi$ names it. Each iteration evaluates $f$
+once, so $\lceil \lg (hi_0 - lo_0) \rceil$ evaluations decide what a
+scan would need $hi_0 - lo_0$ evaluations to find.
+
+### Sorted lookup is one instance of the predicate
+
+<Figure
+  src="./figures/predicate-strip.svg"
+  alt="A strip of sixteen cells reading F ten times then T six times, with the flip point marked at the first T; below, the sorted 16-element array aligned under it, showing that the predicate A[i] >= 61 produces exactly this strip"
+  caption="A monotone predicate is an F-block then a T-block; FirstTrue finds the seam. Sorted-array lookup is the instance f(i) := A[i] ≥ x."
+/>
+
+Sorted-array search is now a special case: take
+$f(i) := A[i] \ge x$ on $[1, n+1)$. Sortedness of $A$ is precisely
+monotonicity of this $f$, and `FirstTrue` returns the first index holding
+a key $\ge x$: the slot where $x$ lives if present (one equality test
+settles which), and the slot where $x$ would be inserted if absent. This
+is the library form of binary search: C++ `std::lower_bound` and
+[Python's `bisect`](https://docs.python.org/3/library/bisect.html) are
+`FirstTrue` with exactly this predicate, which is why they return an
+insertion point rather than a found/absent flag.
+
+### Binary search on the answer
+
+<Example title="the first n with n² ≥ 2000 — no array anywhere">
+The predicate $f(t) := t^2 \ge 2000$ is monotone on $[1, 100)$ because
+squaring is increasing on positive integers, and $f$ is evaluated on
+demand: no length-99 table of squares exists at any point.
+
+| $[lo, hi)$ | $mid$ | $mid^2$ | verdict |
+|---|---|---|---|
+| $[1, 100)$ | 50 | 2500 | T: $hi \leftarrow 50$ |
+| $[1, 50)$ | 25 | 625 | F: $lo \leftarrow 26$ |
+| $[26, 50)$ | 38 | 1444 | F: $lo \leftarrow 39$ |
+| $[39, 50)$ | 44 | 1936 | F: $lo \leftarrow 45$ |
+| $[45, 50)$ | 47 | 2209 | T: $hi \leftarrow 47$ |
+| $[45, 47)$ | 46 | 2116 | T: $hi \leftarrow 46$ |
+| $[45, 46)$ | 45 | 2025 | T: $hi \leftarrow 45$ |
+
+The range $[45, 45)$ is empty: the flip point is $45$, and indeed
+$44^2 = 1936 < 2000 \le 2025 = 45^2$. Seven evaluations of $f$ replaced
+up to 99.
+</Example>
+
+The pattern scales to answers no table could hold, and it has a working
+name: **binary search on the answer**. To find the least capacity, speed,
+or budget that suffices for a task, define $f(c) :=$ "capacity $c$ is
+feasible", check that more capacity never turns feasible into infeasible
+(monotonicity), and run `FirstTrue` over the numeric answer range. Each
+evaluation of $f$ is itself a computation, typically a greedy simulation
+costing $O(n)$, so the least sufficient capacity below some bound $W$
+costs $O(n \lg W)$: logarithmically many simulations instead of one per
+candidate capacity. An exercise below runs one such search in full.
+
+<KeyFact>
+Monotonicity is a proof obligation, not a formality: `FirstTrue` never
+checks it. On a predicate whose answers are not one F-block then one
+T-block, the loop still terminates and still returns an index, a wrong
+one, silently, because a halving step may discard the side holding the
+true flip point. Establish once-true-always-true before searching,
+exactly as sortedness must hold before `BinarySearch`.
+</KeyFact>
+
+<Exercise>
+Compute $\lfloor \sqrt{3000} \rfloor$ with `FirstTrue`, without a square
+root routine. State the predicate and its range, run the trace, and say
+how the flip point yields the floor of the root. Write the predicate
+down before opening the solution.
+
+<Solution>
+Strategy: the floor of the root is the *last* $t$ with $t^2 \le 3000$,
+and the last F sits directly left of the first T.
+
+Take $f(t) := t^2 > 3000$ on $[1, 100)$, monotone since squares increase.
+Trace: $[1,100)$, $mid = 50$, $2500$: F, $lo \leftarrow 51$. $[51,100)$,
+$mid = 75$, $5625$: T, $hi \leftarrow 75$. $[51,75)$, $mid = 63$,
+$3969$: T, $hi \leftarrow 63$. $[51,63)$, $mid = 57$, $3249$: T,
+$hi \leftarrow 57$. $[51,57)$, $mid = 54$, $2916$: F,
+$lo \leftarrow 55$. $[55,57)$, $mid = 56$, $3136$: T, $hi \leftarrow 56$.
+$[55,56)$, $mid = 55$, $3025$: T, $hi \leftarrow 55$. Empty range: flip
+point 55.
+
+The first $t$ with $t^2 > 3000$ is 55, so the last $t$ with
+$t^2 \le 3000$ is $55 - 1 = 54$, and $\lfloor \sqrt{3000} \rfloor = 54$:
+check $54^2 = 2916 \le 3000 < 3025 = 55^2$. Seven squarings. The
+transferable move: "last F" questions are answered as "first T minus
+one", keeping a single loop shape instead of maintaining a mirrored
+variant.
+</Solution>
+</Exercise>
+
+## Reduction to sorted structure: ThreeSum from N³ to N² log N
+
+Per-query arithmetic is settled; the case study that closes the search
+half of the lesson is a whole algorithm redesigned around it. The
+*3-sum problem*: given $N$ integers, count the triples
+that sum to exactly zero, a computation used as a hardness yardstick
+across computational geometry. The obvious algorithm tries every triple:
+three nested loops, $N^3/6$ combinations examined, $\Theta(N^3)$.
+
+### Sort once, then probe per pair
+
+Sorted order dismantles the innermost loop. Fix the first two elements
+$a[i]$ and $a[j]$: the third must equal $-(a[i] + a[j])$, and asking
+whether that specific value is present is a membership query. So: sort
+the array once, $\Theta(N \lg N)$; then for each of the $N^2/2$ pairs,
+binary search for $-(a[i]+a[j])$ among the elements past $j$, counting
+the hits. The innermost $\Theta(N)$ scan became a $\lg N$ probe:
+
+| algorithm | structure it uses | cost |
+|---|---|---|
+| `ThreeSum` (brute force) | none | $\Theta(N^3)$ |
+| `TwoSumFast` (pairs summing to 0) | sort once + binary search per element | $\Theta(N \lg N)$ |
+| `ThreeSumFast` | sort once + binary search per pair | $\Theta(N^2 \lg N)$ |
+
+At $N = 8000$, the brute force examines $N^3/6 \approx 8.5 \times
+10^{10}$ triples, while the reduction spends $N^2/2 \cdot \lg N \approx
+4 \times 10^8$ probe steps: roughly **200 times less work**, and the
+factor keeps growing with $N$ because it is $N / (3 \lg N)$, a gap between
+rungs of <Ref lesson="asymptotic-notation">the growth ladder</Ref>, not a
+constant. The same move with one loop fewer takes the 2-sum problem from
+$\Theta(N^2)$ to $\Theta(N \lg N)$.
+
+### Containment inner loops are the general target
+
+The design lesson generalizes past this problem. Whenever an algorithm's
+inner loop asks *does the collection contain this value*, the loop is a
+candidate for reduction to sorted structure: pay $\Theta(N \lg N)$ once,
+then answer each containment question for $\lg N$. It is the same trade
+<Ref lesson="hash-tables">the hash table</Ref> offers at expected $O(1)$
+per query, and the sorted version keeps what hashing surrenders: order
+queries, ranges, nearest-above, and the predicate searches of the
+previous section, all on the same sorted array.
+
+## Selection: the k-th smallest without the sort
+
+Both dividends so far required the array already sorted, an
+$n \lg n$ investment amortized over many queries. The module's last
+question is about a single query that *looks* like it needs the whole
+investment: the $k$-th smallest element. An engineer asking for the
+median response time in a log, or the 95th-percentile latency, is asking
+for one order statistic, not for sorted output.
+
+<Definition title="order statistic">
+The **k-th order statistic** of $n$ keys is the $k$-th smallest: the key
+that would occupy slot $k$ if the keys were sorted. The **median** is the
+$\lceil n/2 \rceil$-th. Finding the $k$-th order statistic for a given
+$k$ is the **selection problem**.
+</Definition>
+
+Two calibration points bracket the problem. At $k = 1$ selection is the
+running minimum: one scan, $n - 1$ comparisons, and no correct algorithm
+does better, because every key other than the answer must lose at least
+one comparison to be ruled out, and each comparison creates at most one
+new loser (an exercise below builds on this). At arbitrary $k$, sorting
+and indexing costs $\Theta(n \lg n)$. The question is whether general $k$
+sits with the minimum at $\Theta(n)$ or with sorting at
+$\Theta(n \lg n)$.
+
+### Quickselect: partition, then keep one side
+
+The answer reuses
+<Ref lesson="comparison-sorting-merge-and-quicksort">Lomuto
+partition</Ref> from the quicksort lesson: it spends $n - 1$ comparisons
+to place a pivot into its final sorted slot $q$, smaller keys left,
+larger keys right. Quicksort
+recurses on both sides. But a selection query needs only one: the pivot's
+landing slot $q$ *is* its rank, so if $q = k$ the pivot is the answer; if
+$k < q$ the $k$-th smallest lies entirely in the left side; if $k > q$,
+entirely in the right. The other side is discarded unread. Hoare
+published this one-armed quicksort in 1961 as
+[Algorithm 65, FIND](https://dl.acm.org/doi/10.1145/366622.366647), on
+the same journal page as quicksort itself.
+
+```text
+QuickSelect(A[p..r], k):         ▷ p ≤ k ≤ r; pivot chosen at random
+  if p = r  return A[p]
+  q ← Partition(A[p..r])         ▷ pivot lands in final slot q
+  if k = q       return A[q]
+  else if k < q  return QuickSelect(A[p..q−1], k)
+  else           return QuickSelect(A[q+1..r], k)
+```
+
+Correctness is an induction on the subarray size, resting on the claim
+the quicksort lesson proved about `Partition`: after it returns,
+$A[p..q-1] \le A[q] < A[q+1..r]$, so slot $q$ holds the key of rank $q$,
+and a target rank on either side can be found by solving the same problem
+on that side alone. The recursion always holds $k$ within $[p, r]$, and a
+one-element subarray is its own answer.
+
+<Example title="the 4th smallest of 12 keys, two partitions">
+$A = [\,50, 10, 40, 30, 60, 5, 25, 55, 15, 45, 20, 35\,]$, $k = 4$.
+
+**Call 1**, on $A[1..12]$ with pivot 35 (the last element): the Lomuto
+scan makes 11 comparisons and leaves
+$[\,10, 30, 5, 25, 15, 20, \mathbf{35}, 55, 60, 45, 40, 50\,]$ with
+$q = 7$. Since $4 < 7$, the answer lies in $A[1..6]$; slots 7 through 12,
+half the array, are discarded after a single pass over them.
+
+**Call 2**, on $A[1..6] = [\,10, 30, 5, 25, 15, 20\,]$ with pivot 20: 5
+comparisons leave $[\,10, 5, 15, \mathbf{20}, 30, 25\,]$ with $q = 4$.
+Now $q = k$: return 20.
+
+Total: $11 + 5 = 16$ comparisons. Sorting 12 keys to read off one slot
+costs about 30 comparisons at the
+<Ref lesson="heapsort-and-the-sorting-lower-bound">decision-tree
+floor</Ref> $\lceil \lg 12! \rceil = 29$, and the gap widens with $n$.
+</Example>
+
+<FigureSequence
+  name="qselect"
+  alt="Three frames of quickselect for rank 4 on 12 elements: the first partition around pivot 35 lands it in slot 7 and discards slots 7 through 12; the second partition around pivot 20 lands it in slot 4, which is the target rank, returning 20"
+  caption="Quickselect for k = 4: each partition retires its pivot at its true rank and discards the side the answer cannot be in."
+/>
+
+<Task>
+In the demo, load the random preset with target rank 4 and pick pivots
+by hand: land the answer in two partitions, which requires each pivot's
+slot to bracket rank 4 as tightly as you can manage. Then switch to the
+adversarial preset and count partitions until the range is one cell; it
+should take 11, one per discarded element.
+</Task>
+
+<Demo
+  name="QuickselectPivotChooser"
+  caption="Quickselect with hand-picked or random pivots: each partition discards one side. Presets: random pivots, adversarial first-element pivots."
+/>
+
+## Expected linear time: the work shrinks geometrically
+
+Whether this is fast hangs on the pivots, exactly as in quicksort, but
+the accounting differs in one decisive way. Quicksort keeps both sides,
+so every level of its recursion costs about $n$ and only the *depth* is
+at stake. Quickselect keeps one side, so the cost per level is the size
+of the one surviving range, and that size is what the pivot controls.
+
+### Central pivots make the costs a geometric series
+
+Call a pivot **central** if its rank lands in the middle half of the
+current range, between the 25th and 75th percentiles. A central pivot's
+partition discards at least a quarter of the range, whichever side
+survives, so the survivor has at most $3/4$ of the keys. If every pivot
+were central, the partition costs would form a geometric series:
+
+$$
+n + \tfrac{3}{4}n + \left(\tfrac{3}{4}\right)^{2} n + \cdots
+\;<\; n \sum_{t=0}^{\infty} \left(\tfrac{3}{4}\right)^{t} \;=\; 4n .
+$$
+
+At $n = 64$ the terms run $64, 48, 36, 27, 20\tfrac14, \ldots$, and the
+whole stack fits under $4 \cdot 64 = 256$: linear total work from a
+shrinking series, where quicksort's non-shrinking levels sum to
+$n \lg n$.
+
+<Figure
+  src="./figures/series-bars.svg"
+  alt="Bar chart of per-partition work for n equals 64 under always-central pivots: bars 64, 48, 36, 27 and shrinking, each at most three quarters of the last; beside it the bars stacked into a single column staying under a dashed cap labeled 4n equals 256"
+  caption="Central pivots at n = 64: each partition costs at most ¾ of the last, and the stacked total stays under 4n = 256."
+/>
+
+### Random pivots run the series at half speed
+
+A random pivot is not always central, but it is central with probability
+$1/2$, since half the ranks of the current range lie in its middle half,
+and a non-central pivot still never grows the range. So the expected
+picture is the series above run at half speed: about two partitions per
+$3/4$-shrink instead of one.
+
+<Theorem title="expected linear selection (CLRS Theorem 9.2)">
+On $n$ distinct keys, quickselect with uniformly random pivots finds the
+$k$-th order statistic in expected $\Theta(n)$ time, for every $k$ and
+every input order.
+
+<Proof>
+Group the successive partitions into *generations*: generation $t$ begins
+once the live range has at most $(3/4)^t n$ keys and ends when it first
+drops to $(3/4)^{t+1} n$. Every partition in generation $t$ costs at most
+$(3/4)^t n$ comparisons, since that bounds the live size. A partition
+whose pivot is central ends the generation, and centrality has
+probability at least $1/2$ regardless of the range's contents, so the
+number of partitions in a generation is dominated by the flips of a fair
+coin waiting for heads: 2 in expectation. By linearity of expectation
+the total expected work is at most
+
+$$
+\sum_{t \ge 0} 2 \cdot \left(\tfrac{3}{4}\right)^{t} n = 8n = O(n),
+$$
+
+and $\Omega(n)$ is immediate: the first partition alone reads the whole
+array. The lower-order care (rounding of $n/4$, and that a generation
+cannot be skipped backward) is carried in CLRS §9.2, Lemma 9.1; the
+constants survive it.
+</Proof>
+</Theorem>
+
+The distinctness hypothesis is inherited from `Partition`: on an
+all-equal array the Lomuto scan produces the extreme split every time,
+the failure <Ref lesson="comparison-sorting-merge-and-quicksort">the
+quicksort lesson</Ref> dissected, and three-way partitioning is the
+repair there and here.
+
+### The worst case is quadratic, and it is the pivots' fault
+
+Expected linear is not guaranteed linear. Feed quickselect a pivot
+sequence in which every pivot is the largest surviving key, and each
+partition retires only the pivot itself: the live range shrinks by one,
+the costs run $(n-1) + (n-2) + \cdots + 1 = n(n-1)/2$, and the run is
+$\Theta(n^2)$: even for $k = 1$, where a plain scan needs $n - 1$
+comparisons. With random pivots no *input* arranges this, only a run of
+coin flips of probability vanishing in $n$, the same quantifier shift
+randomized quicksort bought. What randomization does not supply is a
+guarantee. A deterministic rule that always produces a provably central
+enough pivot at $O(n)$ cost would make selection worst-case linear; such
+a rule exists, choosing the pivot as the median of medians of groups of
+five, and it is the subject of
+<Ref lesson="median-of-medians">the optional extra lesson</Ref>: an
+optional deepening, used by nothing later in the course. The forward
+exercise below walks to the exact wall it removes.
+
+<KeyFact>
+Quickselect is expected $\Theta(n)$ for every input and every rank: at
+most about $8n$ comparisons in expectation, from a geometric series of
+shrinking partitions. The shrinkage is the whole mechanism, and it is
+also the vulnerability: a pivot sequence that stops the shrinking costs
+$n(n-1)/2$, quadratic even to find the minimum.
+</KeyFact>
+
+## The module's account, closed
+
+The scoreboard collects what four lessons established. Sorting costs
+$\Theta(n \lg n)$ in comparisons, achieved by merge sort, heapsort, and
+expected by quicksort, and forced by the decision tree; integer keys
+below $n^c$ sort in $\Theta(cn)$ outside the comparison model. This
+lesson banked the returns: membership and rank queries on the sorted
+result for $\Theta(\lg n)$ each, provably optimal; threshold searches
+over any monotone predicate at the same price with no array at all;
+whole-algorithm speedups by reduction to sorted structure; and single
+rank queries in expected $\Theta(n)$ with no sort anywhere.
+
+<Figure
+  src="./figures/scoreboard.svg"
+  alt="A table of the module's costs: unsorted membership Theta(n); comparison sorting Theta(n log n); integer-key sorting Theta(cn); sorted-array search Theta(log n) optimal; minimum in exactly n minus 1 comparisons; k-th smallest in expected Theta(n) by quickselect; worst-case linear selection existing in the optional extra lesson"
+  caption="The sorting-and-searching module's price list. Amber rows are this lesson's entries."
+/>
+
+What is established: binary search, proved by the module's standard
+invariant scheme, answers sorted-array queries in
+$\lfloor \lg n \rfloor + 1$ iterations and is optimal in the comparison
+model by the decision-tree bound; the same loop answers any monotone
+predicate, making "least sufficient answer" questions logarithmic;
+sort-plus-binary-search turns containment inner loops from $\Theta(N)$
+to $\Theta(\lg N)$, taking 3-sum from $N^3$ to $N^2 \lg N$; and
+quickselect delivers any order statistic in expected $\Theta(n)$, worst
+case $\Theta(n^2)$, with a worst-case-linear pivot rule available in
+<Ref lesson="median-of-medians">the optional lesson</Ref> for readers
+who want the guarantee. The course now changes direction: with the
+structures and the sorting toolkit in hand,
+<Ref lesson="divide-and-conquer-design">the next module</Ref> studies the
+design paradigms themselves, beginning with divide-and-conquer as a
+method for problems that look nothing like sorting.
+
+## Exercises
+
+<Exercise>
+Duplicates expose a gap in `BinarySearch`'s contract. On
+$A = [\,2, 4, 4, 4, 4, 7, 9, 9, 12, 15\,]$: (a) trace `BinarySearch` for
+$x = 4$ and observe which occurrence it returns. (b) Express the *first*
+occurrence of $x$ and the position *one past the last* occurrence as flip
+points of two monotone predicates, and compute both for $x = 4$ using
+`FirstTrue`. (c) Show the two flip points also answer "how many
+occurrences" and "is it present at all", including for the absent value
+$x = 8$.
+
+<Solution>
+**(a)** $[1, 11)$: $mid = 6$, $A[6] = 7 > 4$, $hi \leftarrow 6$.
+$[1, 6)$: $mid = 3$, $A[3] = 4 = x$: return 3. The contract promises an
+index holding $x$, and 3 is one, but it is neither the first nor the
+last of the four occurrences; which one comes back is an accident of the
+probe sequence.
+
+**(b)** First occurrence: flip point of $f(i) := A[i] \ge x$. One past
+last: flip point of $g(i) := A[i] > x$. Both predicates are monotone on a
+sorted array, and $f$ flips no later than $g$. For $x = 4$:
+$f$ reads F at index 1 and T from index 2 on, so `FirstTrue` returns 2;
+$g$ reads F through index 5 (values $\le 4$) and T from index 6, so it
+returns 6. The occurrences occupy exactly $[2, 6)$.
+
+**(c)** The count is the gap: $6 - 2 = 4$ occurrences. Presence is the
+test $f\text{-flip} < g\text{-flip}$, or equivalently
+$A[f\text{-flip}] = x$ with the flip in range. For $x = 8$: the first
+$i$ with $A[i] \ge 8$ is 7 (value 9) and the first with $A[i] > 8$ is
+also 7, so the range $[7, 7)$ is empty: zero occurrences, absent, and
+the search never needed a special not-found code path. This pair of flip
+points is exactly C++'s `equal_range`; the transferable move is that
+questions about a *block* of equal keys become arithmetic on two flip
+points.
+</Solution>
+</Exercise>
+
+<Exercise>
+A conveyor must ship the packages
+$[\,18, 4, 25, 9, 13, 8, 7, 20\,]$, in this order, within 3 days; each
+day it carries consecutive packages whose weights sum to at most a
+capacity $c$, the same $c$ every day. Find the least sufficient $c$,
+using as few feasibility simulations as your tools allow, and state the
+general cost for $n$ packages and capacities up to $W$.
+
+<Solution>
+Which kind of problem: a least-sufficient-answer question, so the tool is
+`FirstTrue` over capacities, with $f(c) :=$ "the packages fit in at most
+3 days at capacity $c$". $f(c)$ is evaluated by one greedy simulation:
+fill the current day until the next package would overflow, then start a
+new day; this is optimal for fixed $c$ because starting a new day earlier
+never helps. $f$ is monotone: any packing that fits at capacity $c$ fits
+unchanged at $c + 1$.
+
+Range: $c$ below $\max = 25$ cannot carry the heaviest package, and
+$c = \text{total} = 104$ fits in one day, so search $[25, 105)$.
+
+Probes: $f(65)$: days $\{18,4,25,9\},\{13,8,7,20\}$: 2 days, T,
+$hi \leftarrow 65$. $f(45)$: $\{18,4\},\{25,9\},\{13,8,7\},\{20\}$: 4
+days, F, $lo \leftarrow 46$. $f(55)$: $\{18,4,25\},\{9,13,8,7\},\{20\}$:
+3, T, $hi \leftarrow 55$. $f(50)$: $\{18,4,25\},\{9,13,8,7\},\{20\}$: 3,
+T, $hi \leftarrow 50$. $f(48)$: same split: 3, T, $hi \leftarrow 48$.
+$f(47)$: $\{18,4,25\},\{9,13,8,7\},\{20\}$: 3, T, $hi \leftarrow 47$.
+$f(46)$: $\{18,4\},\{25,9\},\{13,8,7\},\{20\}$: 4, F,
+$lo \leftarrow 47$. Range $[47,47)$: the answer is $c = 47$, seven
+simulations for an 80-wide range, and $47 = 18 + 4 + 25$ is visibly
+tight: day one is full to the last unit.
+
+General cost: each simulation is $\Theta(n)$, the range is at most $W$
+wide, so $O(n \lg W)$ total, against $\Theta(nW)$ for simulating every
+candidate capacity.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson stated that the minimum costs exactly $n - 1$ comparisons.
+(a) Prove the lower bound: any correct comparison algorithm for the
+minimum makes at least $n - 1$ comparisons. (b) Now find the minimum
+*and* the maximum together. Independent scans cost $2n - 2$; do better,
+processing the keys in pairs, and count exactly on
+$[\,50, 10, 40, 30, 60, 5, 25, 55\,]$. (c) State the general count for
+even $n$.
+
+<Solution>
+**(a)** Call a key a *loser* once it has been compared to a smaller key.
+A correct algorithm cannot stop while two keys have never lost: either
+could still be the minimum, and inputs exist agreeing with all
+comparisons made so far in which one or the other is. Each comparison
+creates at most one new loser, and $n - 1$ keys must end as losers, so
+at least $n - 1$ comparisons occur. This is the leaf-counting style of
+<Ref lesson="heapsort-and-the-sorting-lower-bound">the decision-tree
+lesson</Ref> in adversary form: the bound quantifies over all algorithms,
+including ones not yet invented.
+
+**(b)** Pair the keys and compare within each pair first; then only pair
+losers can be the minimum and only pair winners the maximum. On the
+eight keys: pairs $(50,10), (40,30), (60,5), (25,55)$ cost 4
+comparisons, splitting into losers $\{10, 30, 5, 25\}$ and winners
+$\{50, 40, 60, 55\}$. A minimum scan over the losers costs 3 and yields
+5; a maximum scan over the winners costs 3 and yields 60. Total
+$4 + 3 + 3 = 10$, against $2 \cdot 8 - 2 = 14$ for independent scans.
+
+**(c)** $n/2$ intra-pair comparisons, then $n/2 - 1$ each for the two
+scans: $3n/2 - 2$ (CLRS §9.1 gives the odd-$n$ variant,
+$3\lfloor n/2 \rfloor$). The saving has one source: the intra-pair
+comparison feeds *both* tournaments, where independent scans learn
+nothing from each other's comparisons. The count $3n/2 - 2$ is optimal,
+by an adversary argument extending (a).
+</Solution>
+</Exercise>
+
+<Exercise>
+A teammate adapts `FirstTrue` to return the *last* index with
+$A[i] \le x$ directly, using a closed interval:
+
+```text
+LastAtMost(A[1..n], x):    ▷ A sorted; assume A[1] ≤ x
+  lo ← 1;  hi ← n
+  while lo < hi
+    mid ← lo + ⌊(hi − lo)/2⌋
+    if A[mid] ≤ x   lo ← mid
+    else            hi ← mid − 1
+  return lo
+```
+
+(a) Find an input on which the loop never terminates, and identify the
+exact proof obligation from
+<Ref lesson="loop-invariants-and-correctness">the invariants lesson</Ref>
+that fails. (b) Repair the procedure with the smallest change that
+restores the obligation, or by reduction to `FirstTrue`, and justify.
+
+<Solution>
+**(a)** Take any 2-wide final range with the answer at $lo$: for
+instance $A = [\,5, 9\,]$, $x = 5$. Then $lo = 1$, $hi = 2$,
+$mid = 1 + \lfloor 1/2 \rfloor = 1$, and $A[1] = 5 \le 5$ takes the
+branch $lo \leftarrow mid = 1$: the state $(lo, hi) = (1, 2)$ maps to
+itself forever. The failed obligation is **termination**: the measure
+$hi - lo$ does not strictly decrease in the $lo \leftarrow mid$ branch,
+because rounding *down* allows $mid = lo$. Initialization and
+maintenance are both fine; the invariant (the answer lies in
+$[lo, hi]$) is true at every checkpoint of the infinite run, which is
+exactly why observing the invariant hold is not a proof of correctness.
+
+**(b)** Smallest change: round *up*, $mid \leftarrow lo + \lceil (hi -
+lo)/2 \rceil$. Then $mid > lo$ whenever $lo < hi$, so
+$lo \leftarrow mid$ strictly raises $lo$, and $hi \leftarrow mid - 1$
+strictly lowers $hi$: the measure falls in both branches, and the
+invariant survives unchanged since the branch bodies still discard only
+disqualified indices. The rule of thumb: the rounding direction must
+match the branch that keeps `mid`, and each surviving-range update must
+exclude at least one index. Alternatively, delete the procedure and
+return $\texttt{FirstTrue}(f, 1, n+1) - 1$ with $f(i) := A[i] > x$, the
+move from the square-root exercise: one audited loop shape, reused,
+beats a second loop with its own boundary proof.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "A dashboard needs the 100 smallest of a million
+response times, in increasing order. Sorted output is required, so the
+full $\Theta(n \lg n)$ sort is required." Name the step that fails and
+produce the cheaper algorithm, with its expected cost in operations for
+$n = 10^6$, $k = 100$.
+
+<Solution>
+The failing step is "sorted output is required, so a full sort is
+required": the dashboard needs order among $k = 100$ keys, and the claim
+silently purchases order among all $10^6$.
+
+The cheaper algorithm: run quickselect for rank $k$. When it returns,
+slot $k$ holds the $k$-th smallest; moreover every retired pivot sits at
+its true rank with smaller keys entirely to its left, and the recursion
+that ended at slot $k$ only ever narrowed within sides of such pivots,
+so $A[1..k]$ holds exactly the $k$ smallest keys, unordered. (Induction
+along the retired pivots: each discarded right side lay entirely above a
+pivot of rank $\le k$ only when the recursion went left; symmetric on
+the right.) Then sort just $A[1..k]$.
+
+Cost: expected about $8n$ comparisons for the selection, plus
+$O(k \lg k)$ for the small sort: at $n = 10^6$, $k = 100$, roughly
+$8 \times 10^6 + 100 \cdot 7 \approx 8 \times 10^6$ operations, against
+$n \lg n \approx 2 \times 10^7$ comparisons for the full sort, and the
+gap grows to unbounded factors as $n$ grows with $k$ fixed. The general
+statement: "top-$k$ in order" costs $O(n + k \lg k)$ expected, linear in
+$n$ whenever $k \lg k = O(n)$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run quickselect for $k = 1$, the minimum, on 12 distinct keys, against
+an adversary who arranges that every chosen pivot is the largest key
+still in play. (a) Count the comparisons exactly. (b) Give the count for
+general $n$ and compare with the scan from the min-max exercise. (c) The
+lesson's expected-linear theorem survives because randomization makes
+this pivot sequence improbable, not impossible. State what a
+*deterministic* pivot rule would have to guarantee for a worst-case
+$\Theta(n)$ bound, and check the two requirements pull against each
+other.
+
+<Solution>
+**(a)** Each partition around the current maximum compares the pivot
+with every other live key and retires only the pivot: the live counts
+run $12, 11, \ldots, 2$, costing $11 + 10 + \cdots + 1 = 66$
+comparisons before the range is a single cell holding the minimum.
+
+**(b)** $(n-1) + (n-2) + \cdots + 1 = n(n-1)/2 = \Theta(n^2)$, against
+$n - 1$ for the plain scan: the adversary makes the clever algorithm a
+factor $n/2$ worse than the naive one, the same subtractive recurrence
+$T(n) = T(n-1) + \Theta(n)$ that governs quicksort's worst case.
+
+**(c)** The rule must produce, for every input and at $O(n)$ cost per
+call, a pivot whose rank is guaranteed to lie a constant fraction inside
+both ends: rank between $\alpha n$ and $(1-\alpha)n$ for a fixed
+$\alpha > 0$, so every partition discards at least $\alpha n$ keys and
+the geometric series of the lesson reappears with ratio $1 - \alpha$.
+The tension: a guaranteed-central pivot is itself an order statistic,
+approximately a median, and computing a median *is* the selection
+problem the pivot was supposed to help solve. Escaping the circle
+requires a pivot that is only *approximately* central but computable by
+recursion on a much smaller array; that construction, the median of
+medians of groups of five, is
+<Ref lesson="median-of-medians">the optional extra lesson</Ref>, and
+this exercise is the wall it exists to remove.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — Exercise 2.3-6: binary search and its $\Theta(\lg n)$ argument; Chapter 9: order statistics, with §9.1 (minimum in $n-1$ comparisons, simultaneous min-max in $3\lfloor n/2 \rfloor$) and §9.2 (RANDOMIZED-SELECT; Lemma 9.1 and Theorem 9.2, the helpful-partitionings analysis this lesson's proof compresses).
+2. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 4 notes — the comparison model and the $\lceil \lg(n+1) \rceil$ search lower bound via decision trees with $n+1$ outcome leaves. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+3. J. Erickson, *Algorithms*, 2019 — §1.5: partition; §1.8: quickselect ("one-armed quicksort"), the good-pivot framing, and the geometric-series recurrence $T(n) \le T(\alpha n) + O(n) = O(n)$; the same section develops median of medians, the optional lesson's subject. Free online: https://jeffe.cs.illinois.edu/teaching/algorithms/
+4. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §1.4: the 3-sum case study (ThreeSum, TwoSumFast, ThreeSumFast) and binary search as `rank()`; §1.1: the halving-interval worked example. Companion site: https://algs4.cs.princeton.edu/
+5. C. A. R. Hoare, "Algorithm 65: Find," *Communications of the ACM* 4(7), 1961, pp. 321–322 — quickselect's original publication, on the same page as Algorithm 64 (Quicksort).
+</References>

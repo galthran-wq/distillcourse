@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "lesson": "correlation-psd-and-welch",
+  "mode": "report-only preflight; Fable model gate explicitly overridden by user; no lesson or source edits",
+  "preflight": {
+    "branch": "course/digital-signal-processing",
+    "validation": "npm run validate digital-signal-processing: 0 errors, 0 warnings",
+    "verdict": "ready",
+    "blocking_issue": null
+  },
+  "exact_boundary": {
+    "single_move": "Replace deterministic interpretation of one squared finite transform with an explicitly normalized estimator of the two-sided PSD of a declared WSS process, then evaluate raw-periodogram bias/variance and Welch's resolution-variance-overlap tradeoff.",
+    "opening_input": "The predecessor's final exercise fixed N=64, periodic Hann, L=1024, one interior bin, and 50 seeded white-noise realizations; its raw squared magnitudes had mean 0.021767896, sample SD 0.024899643, and CV 1.143870026. Reuse this only as the motivating empirical failure: padding sampled each realization more densely but did not average realizations.",
+    "required_argument_order": [
+      "Distinguish an ensemble random process from one realization and state WSS before forming a PSD.",
+      "Define autocorrelation and the PSD transform pair under one sign and integration convention; verify unit-variance white noise.",
+      "Form a finite biased sample autocorrelation and connect its correlogram to the rectangular periodogram without equating sample average and expectation.",
+      "Separate periodogram bias from persistent variance; asymptotic unbiasedness does not imply consistency.",
+      "Define a window-power-normalized modified periodogram and Welch average; vary segment length and quantify resolution/CV.",
+      "Show that overlapped frames are correlated evidence, so frame count is not independent-average count.",
+      "Close by retaining frames in order as the information Welch discards."
+    ],
+    "must_not_expand_into": [
+      "Re-deriving DFT/DTFT, FFT factorization, zero-padding interpolation, coherent gain, ENBW, window endpoint conventions, or deterministic close-tone resolution.",
+      "STFT time-frequency localization, spectrogram design, COLA/WOLA, synthesis windows, reconstruction, or subband/filter-bank interpretation.",
+      "AR, MUSIC, Capon, multitaper, Blackman-Tukey design, confidence-band theory, or general nonstationary spectral estimation beyond a short boundary note."
+    ]
+  },
+  "continuity": {
+    "spine": "Random and changing signals require PSD estimators and local spectra whose bias, variance, time resolution, and reconstruction are declared.",
+    "inherits": [
+      "From peak-estimation-and-zero-padding: L samples the same finite-record DTFT more densely; N, f_s, and w[n] set acquired aperture and physical resolving evidence.",
+      "From windows-leakage-and-resolution: window shape controls leakage/main-lobe tradeoffs; use the declared periodic endpoint convention and ENBW rather than re-deriving either.",
+      "From dtft-and-frequency-response and the notation ledger: analysis uses exp(-j omega n), synthesis uses exp(+j omega n), forward DFT is unscaled, bins are stored unshifted unless explicitly displayed otherwise."
+    ],
+    "opening_bridge": "Ref peak-estimation-and-zero-padding and remind the reader that padding is interpolation, not averaging; cite the predecessor's CV=1.14387 result as the unresolved random-estimator problem.",
+    "handoff": {
+      "to": "stft-spectrograms-and-reconstruction",
+      "established_here": "Welch averages normalized windowed periodograms across frames to estimate a stationary PSD, trading segment-length resolution for lower variance while overlap reduces effective independence.",
+      "left_open": "Welch discards frame order and therefore cannot locate spectral change; the next lesson keeps X[ell,k], chooses time hop and endpoint padding, and adds COLA/WOLA reconstruction.",
+      "hard_limit": "Do not teach that Welch overlap must satisfy COLA. Uniform analysis weighting may motivate a hop, but exact synthesis is a different next-lesson contract."
+    }
+  },
+  "stochastic_and_sample_conventions": {
+    "process": "x[n] is one realization of a discrete-time random process. WSS means mu_x=E{x[n]} is constant and r_xx[ell]=E{x[n+ell]x*[n]} depends only on ell. Strict stationarity is stronger and is not required.",
+    "mean": "Core formulas assume zero mean or a declared known mean removed. If a sample mean/detrend is removed, state it and acknowledge the additional finite-record bias; a nonzero mean otherwise contributes a DC spectral line.",
+    "ergodicity": "WSS alone does not license replacing E{.} by a time average. Ergodicity/mixing is the extra modeling bridge; every finite sample quantity remains an estimator.",
+    "autocorrelation_pair": "r_xx[ell]=E{x[n+ell]x*[n]}; r_xx[-ell]=r_xx*[ell]. S_xx(exp(j omega))=sum_ell r_xx[ell]exp(-j omega ell), and r_xx[ell]=(1/(2 pi)) integral_{-pi}^{pi} S_xx(exp(j omega))exp(j omega ell)domega.",
+    "sample_autocorrelation": "For 0<=ell<N, use the biased estimate rhat_b[ell]=(1/N)sum_{n=0}^{N-1-ell}x[n+ell]x*[n], mirror by conjugate symmetry, and state zero outside available lags. The unbiased alternative divides by N-ell but has noisier high lags and its correlogram need not remain nonnegative.",
+    "periodogram_link": "For a rectangular length-N record, the DTFT of rhat_b is exactly Ihat_N(omega)=|sum_{n=0}^{N-1}x[n]exp(-j omega n)|^2/N. This equality is between two finite-record estimators, not between a realization and the ensemble PSD.",
+    "welch": "Let M be segment/window length, R hop, L>=M FFT length, K=1+floor((N_total-M)/R), U=sum_{n=0}^{M-1}|w[n]|^2, X_m[k]=sum_n w[n]x[n+mR]exp(-j2 pi kn/L), P_m[k]=|X_m[k]|^2/U, and Shat_W[k]=(1/K)sum_m P_m[k]. L controls only frequency-grid sampling; M and w[n] control smoothing/resolution.",
+    "overlap": "Overlapping frames share samples. Their normalized window inner product rho_w[R]=sum_n w[n]w[n-R]/sum_n w[n]^2 diagnoses correlation, but periodogram correlation/variance depends on its square and on process assumptions. Never replace K by 'K independent averages' without an effective-DOF calculation or empirical trial audit.",
+    "statistics": "Bias is E{Shat}-S; variance is E{|Shat-E{Shat}|^2}; MSE=variance+|bias|^2. The demo's CV is the across-seeded-trial sample SD divided by across-trial sample mean at a predeclared frequency/bin; report trial count (>=50) and the exact evaluation neighborhood."
+  },
+  "psd_units_contract": {
+    "canonical": "Use the two-sided normalized-angular PSD on -pi<=omega<pi. Under the course transform pair, r_xx[0]=(1/(2 pi))integral S_xx(exp(j omega))domega. The ledger calls its values power per radians/sample; always print the dω/(2π) integration measure to remove normalization ambiguity.",
+    "white_noise_check": "For zero-mean white noise of variance sigma_x^2, r_xx[ell]=sigma_x^2 delta[ell] and S_xx(exp(j omega))=sigma_x^2. Unit variance therefore plots flat at 1 in the canonical two-sided convention.",
+    "hz_conversion": "With f=omega f_s/(2 pi), define S_xx,Hz(f)=S_xx(exp(j2 pi f/f_s))/f_s so integral from -f_s/2 to f_s/2 equals r_xx[0]. Thus unit-variance discrete white noise is flat at 1/f_s power/Hz.",
+    "one_sided_real": "Only for real x[n], form a one-sided per-Hz PSD on 0<=f<=f_s/2 by doubling positive interior frequencies and leaving DC and, for even L, Nyquist undoubled. Its integral equals r_xx[0]. Do not apply this folding to complex/IQ data.",
+    "fft_estimator_scaling": "Because the course forward FFT is unscaled, divide each two-sided modified periodogram by U=sum|w|^2 for the canonical angular normalization, or by f_s U for per-Hz density. Then apply the one-sided doubling rule only if requested. Do not divide by coherent gain C_w; C_w calibrates deterministic tone amplitude, while U calibrates noise power density.",
+    "display": "A dB PSD is 10 log10(S/S_ref), never 20 log10. State S_ref and retain units as dB relative to one signal-unit^2/(Hz or canonical angular unit)."
+  },
+  "source_claim_ledger": [
+    {
+      "claim": "WSS/ensemble definition, PSD-autocorrelation transform pair, total-power integral, and lag-sign consequences.",
+      "primary": "Stoica and Moses, ch. 1 §§1.3-1.5, printed pp. 4-12.",
+      "local": [
+        "research/texts/stoica-s1.txt:1218-1450",
+        "research/_pipeline/reads/stoica-s1.json: chapter_map/key_results",
+        "research/_pipeline/scopes/stoica-moses.json",
+        "research/_pipeline/summaries/stoica-moses.json"
+      ]
+    },
+    {
+      "claim": "Biased/unbiased sample covariance distinction, correlogram-periodogram equivalence, periodogram bias, persistent variance/inconsistency, and Welch averaging tradeoff.",
+      "primary": "Stoica and Moses, ch. 2 §§2.2-2.7, printed pp. 22-52.",
+      "local": [
+        "research/texts/stoica-s1.txt:2435-2649, 2827-3157, 3159-3486, 4440-4618",
+        "research/_pipeline/reads/stoica-s1.json: key_results for §§2.2-2.7",
+        "research/_pipeline/summaries/stoica-moses.json"
+      ]
+    },
+    {
+      "claim": "Chapter-6 teaching cases: sample versus true autocorrelation/PSD, impulse-not-white stationarity counterexample, raw-periodogram instability, Welch average, and resolution-versus-stability.",
+      "primary": "Julius O. Smith III, Spectral Audio Signal Processing, ch. 6 §§6.4-6.13.",
+      "local": [
+        "research/texts/jos-s2.txt:5098-5355, 5749-6015, 6124-6450",
+        "research/_pipeline/reads/jos-s2.json: Chapter 6 key_results/gems",
+        "research/_pipeline/scopes/jos-sasp.json",
+        "research/_pipeline/summaries/jos-sasp.json"
+      ]
+    },
+    {
+      "claim": "Independent-average 1/K variance law, resolution-versus-segment-count tradeoff, overlap diminishing returns, and random-process/ergodicity checks.",
+      "primary": "Oppenheim, Schafer, and Buck, ch. 10 §§10.6-10.7 and Appendix A §§A.1-A.4.",
+      "local": [
+        "research/texts/oppenheim-s3.txt:10210-10670, 10893-11050, Appendix A beginning near 15097",
+        "research/_pipeline/reads/oppenheim-s3.json: key_results for ch. 10 and Appendix A",
+        "research/_pipeline/scopes/oppenheim-schafer.json",
+        "research/_pipeline/summaries/oppenheim-schafer.json"
+      ]
+    },
+    {
+      "claim": "ENBW/noise-power normalization and overlap correlation show why overlapped frames are not automatically independent evidence.",
+      "primary": "Harris, §IV.A-C, journal pp. 54-57 (PDF pp. 4-7), eqs. 8-19.",
+      "local": [
+        "research/texts/harris.txt:242-493",
+        "research/_pipeline/reads/harris-s1.json: §IV.A-C key_results",
+        "research/_pipeline/scopes/harris-windows.json",
+        "research/_pipeline/summaries/harris-windows.json"
+      ]
+    }
+  ],
+  "misconceptions": [
+    {
+      "myth": "A longer raw periodogram becomes stable because its expected value approaches the PSD.",
+      "replacement": "Bias can shrink while variance stays of order S^2; consistency requires both to vanish.",
+      "discriminator": "Repeat a fixed normalized bin across >=50 equal-length seeded white-noise trials as N grows, keeping padding separate from averaging."
+    },
+    {
+      "myth": "One realization's lag average is the ensemble expectation because the process is WSS.",
+      "replacement": "WSS fixes first/second moments across time; ergodicity is the additional premise connecting long time averages to ensemble moments.",
+      "discriminator": "Contrast white noise with a constant random variable across time: both can be WSS, but one realization of the latter never reveals the ensemble distribution."
+    },
+    {
+      "myth": "A deterministic impulse is white noise because both spectra are flat.",
+      "replacement": "White noise is a stationary random-process model with zero nonzero-lag correlation; an impulse is a nonstationary deterministic sequence.",
+      "discriminator": "Compare block autocorrelations: only the impulse-containing block is nonzero."
+    },
+    {
+      "myth": "Fifty-percent overlap doubles the independent evidence or guarantees the advertised variance reduction.",
+      "replacement": "Overlap increases frame count while shared samples correlate estimates; window, hop, and process determine effective degrees of freedom.",
+      "discriminator": "At fixed M and record length, compare empirical CV for nonoverlap, 50%, and heavier overlap and report both K and measured CV."
+    },
+    {
+      "myth": "Window normalization for a tone and for a PSD is the same.",
+      "replacement": "Use C_w=sum w for deterministic amplitude and U=sum|w|^2 for noise-power density.",
+      "discriminator": "Unit-variance white noise must average to 1 in the two-sided canonical PSD regardless of chosen window."
+    },
+    {
+      "myth": "A smoother Welch curve is unconditionally better.",
+      "replacement": "Averaging spends segment length and broadens the effective spectral kernel; smoothing can merge the required 0.04-cycles/sample tone pair.",
+      "discriminator": "The demo must satisfy tone separation and CV<0.30 simultaneously, not optimize visual smoothness."
+    }
+  ],
+  "authoring_limits": {
+    "keeper_numbers": [
+      "Predecessor raw-periodogram CV: 1.14387 over 50 seeded trials.",
+      "Demo tone separation: 0.04 cycles/sample.",
+      "Demo acceptance: CV below 0.30 over at least 50 seeded trials."
+    ],
+    "source_use": "Use Stoica-Moses as mathematical authority, Oppenheim-Schafer as corroborating canonical treatment, Smith for the chapter-6 examples, and Harris only for ENBW/overlap correlation. Cite chapter/section pointers in References; avoid provenance narration.",
+    "exercise_guardrail": "The brief's warm-up adopts the biased N-denominator autocorrelation. The forward exercise alone may preserve frames in order and Ref stft-spectrograms-and-reconstruction; it must not solve STFT design or reconstruction.",
+    "figure_guardrail": "All four planned visuals are regenerated draw-tier explanations/simulations; no sourced raster or source plot is needed."
+  },
+  "inputs_read": [
+    ".claude/skills/lesson-factory/SKILL.md (full)",
+    ".claude/skills/lesson-author/SKILL.md (full)",
+    "directly relevant L8-L13 sections of docs/pedagogy.md, docs/playbook-core.md, docs/voita-playbook.md, docs/playbook-math.md, and docs/components.md",
+    "content/courses/digital-signal-processing/course.yaml (spine and spectral-measurement entries)",
+    "content/courses/digital-signal-processing/concepts.yaml (six relevant concepts)",
+    "content/courses/digital-signal-processing/lessons/peak-estimation-and-zero-padding/lesson.mdx",
+    "content/courses/digital-signal-processing/research/correlation-psd-and-welch.md",
+    "content/courses/digital-signal-processing/research/stft-spectrograms-and-reconstruction.md",
+    "content/courses/digital-signal-processing/research/notation-ledger.yaml",
+    "named Stoica-Moses, JOS ch. 6, Oppenheim-Schafer, and Harris local scope/read/summary records and cited local text spans"
+  ]
+}

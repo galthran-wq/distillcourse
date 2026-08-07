@@ -1,0 +1,420 @@
+Training error is a biased estimate of test error; resampling — cross-validation and the bootstrap — is how classical ML measures generalization honestly. This chapter builds the standard protocols and the judgment calls interviewers probe: which $k$, which splitter, which score is safe to report. The route: why training error fails, hold-out and its two flaws, $k$-fold and LOOCV with the least-squares shortcut, the bias–variance argument for $k = 5$ or $10$, honest hyperparameter selection with nested CV and the one-standard-error rule, the wrong-way-CV leakage set piece, the bootstrap with the 0.632 computation, and the splitters for time series and grouped data.
+
+## The problem: training error cannot rank models
+
+The concrete failure is already on record. In <Ref lesson="bias-variance" />, a degree-9 polynomial fit to 10 noisy points reached training MSE $0.0$ while its test MSE was $175$: the fit threaded the noise, and the training score rewarded it for doing so.
+
+The mechanism is structural, not an artifact of polynomials. Training error evaluates the model on the same noise realizations the fit already adapted to, so it **falls monotonically with flexibility** and says nothing about the right-hand half of the U-curve. Any procedure that picks models by training score picks the most overfit candidate available.
+
+Two distinct jobs therefore need held-out data ([ESL §7.2](https://hastie.su.domains/ElemStatLearn/)): *model selection*, choosing among flexibilities and hyperparameters, and *model assessment*, estimating the chosen model's generalization error. With abundant data, a three-way train/validation/test split does both. The methods of this chapter exist for the usual case: data too scarce to carve up once and throw most of it away.
+
+<KeyFact>
+Selecting or assessing models requires an error estimate computed on data the fit has never touched; training error fails because it is scored on the noise the fit already saw.
+</KeyFact>
+
+## Hold-out: one split, two flaws
+
+The *validation-set approach* is the baseline protocol: randomly split the $n$ rows once, for instance 70/30, fit on the larger part, score on the smaller. One extra fit, one number.
+
+The number is unstable. [ISLP §5.1.1](https://www.statlearning.com) runs this on the `Auto` data (392 cars, MPG against polynomial functions of horsepower): every random split agrees that degree 2 beats degree 1, but the estimated MSE shifts by several units from split to split, and the apparent best degree moves with it.
+
+<Figure
+  src="./figures/holdout-variance.svg"
+  alt="Left panel: ten validation-MSE-versus-degree curves from ten random hold-out splits, widely scattered with minima at different degrees; right panel: the ten corresponding 10-fold CV curves forming a tight bundle"
+  caption="Ten random splits of the same data. Hold-out estimates scatter and disagree on the best degree; 10-fold CV estimates of the same quantity form a tight bundle."
+/>
+
+The two flaws, named: **variance**, since the estimate depends on which rows landed in the validation set; and **waste**, since the model is fit on only ~70% of the data, and a procedure trained on fewer points has systematically higher error (the learning-curve logic of <Ref lesson="bias-variance" />), so the estimate is also biased pessimistic for the model that will finally be trained on all $n$.
+
+## k-fold cross-validation: every point validates once
+
+Both flaws have one fix: rotate the held-out block and average.
+
+<Definition title="k-fold cross-validation">
+Randomly partition the $n$ observations into $k$ folds $F_1, \dots, F_k$ of near-equal size. For $j = 1, \dots, k$: fit the procedure on all data except $F_j$, and let $e_j$ be its score (MSE, error rate, log-loss) on $F_j$. The **cross-validation estimate** is
+
+$$
+\mathrm{CV}_k = \frac{1}{k} \sum_{j=1}^{k} e_j .
+$$
+</Definition>
+
+Every observation is validated exactly once and trains $k - 1$ times, so no data is wasted on a permanent hold-out; averaging $k$ rotated scores removes the luck of a single split. The model actually shipped is then **refit on all $n$ rows**; $\mathrm{CV}_k$ is the estimate attached to it.
+
+<Figure
+  src="./figures/splits.svg"
+  alt="Three split schematics stacked: a single 70/30 hold-out split, five 5-fold bars with the held-out block rotating through the five positions, and a LOOCV bar of many single-point cells with one held out"
+  caption="The three protocols as one picture: hold-out is one row of the 5-fold diagram; LOOCV is the k = n limit."
+/>
+
+### LOOCV: the k = n limit, free for least squares
+
+Pushing $k$ to $n$ gives *leave-one-out cross-validation*: $n$ fits, each on $n - 1$ points, each scored on the single omitted point. Maximal use of data, deterministic (no fold randomness), and in general $n$ times the cost. For least squares the cost collapses to one fit:
+
+<Theorem title="LOOCV shortcut for least squares">
+For a least-squares fit with hat matrix $H = X(X^\top X)^{-1}X^\top$, fitted values $\hat{y} = Hy$, and leverages $h_i = H_{ii} < 1$,
+
+$$
+\mathrm{CV}_{(n)} = \frac{1}{n} \sum_{i=1}^{n} \left( \frac{y_i - \hat{y}_i}{1 - h_i} \right)^{\!2},
+$$
+
+computed entirely from the single fit on all $n$ points (ISLP Eq. 5.2).
+
+<Proof>
+It suffices to show $y_i - \hat{y}_{(i)} = (y_i - \hat{y}_i)/(1 - h_i)$, where $\hat{y}_{(i)}$ is the prediction at $x_i$ of the fit that omits point $i$.
+
+Let $\beta_{(i)}$ be that fit, and build a modified response $\tilde{y}$ equal to $y$ except $\tilde{y}_i = \hat{y}_{(i)}$. Then $\beta_{(i)}$ is the least-squares solution for $\tilde{y}$ on **all** $n$ points: for any $\beta$,
+
+$$
+\sum_{j} (\tilde{y}_j - x_j^\top \beta)^2 \;\ge\; \sum_{j \ne i} (y_j - x_j^\top \beta)^2 \;\ge\; \sum_{j \ne i} (y_j - x_j^\top \beta_{(i)})^2 \;=\; \sum_{j} (\tilde{y}_j - x_j^\top \beta_{(i)})^2 ,
+$$
+
+the last equality because $\beta_{(i)}$ has zero residual at the substituted point $i$.
+
+Fitted values are linear in the response, $\hat{y} = Hy$ row by row, so applying row $i$ of $H$ to $\tilde{y}$:
+
+$$
+\hat{y}_{(i)} = \sum_j H_{ij}\tilde{y}_j = \hat{y}_i - h_i y_i + h_i \hat{y}_{(i)}
+\;\;\Longrightarrow\;\;
+\hat{y}_{(i)}(1 - h_i) = \hat{y}_i - h_i y_i .
+$$
+
+Subtracting both sides from $y_i(1 - h_i)$ gives $y_i - \hat{y}_{(i)} = (y_i - \hat{y}_i)/(1 - h_i)$.
+</Proof>
+</Theorem>
+
+The leverage $h_i$ is the same quantity that measures a point's pull on its own fitted value in <Ref lesson="regression-diagnostics" />; high-leverage points get their residuals inflated most, exactly because the full fit bent toward them.
+
+<Example title="LOOCV two ways on three points">
+Data: $(0, 1), (1, 2), (2, 2)$. The least-squares line is $\hat{y} = \tfrac{7}{6} + \tfrac{1}{2}x$ (means $\bar{x} = 1$, $\bar{y} = \tfrac{5}{3}$; slope $= 1/2$). Fitted values and residuals:
+
+$$
+\hat{y} = \left(\tfrac{7}{6},\; \tfrac{5}{3},\; \tfrac{13}{6}\right), \qquad
+e = \left(-\tfrac{1}{6},\; \tfrac{1}{3},\; -\tfrac{1}{6}\right).
+$$
+
+Leverages, from $h_i = \tfrac{1}{n} + (x_i - \bar{x})^2 / \sum_j (x_j - \bar{x})^2$ with $\sum_j (x_j - \bar{x})^2 = 2$:
+
+$$
+h = \left(\tfrac{1}{3} + \tfrac{1}{2},\; \tfrac{1}{3},\; \tfrac{1}{3} + \tfrac{1}{2}\right) = \left(\tfrac{5}{6},\; \tfrac{1}{3},\; \tfrac{5}{6}\right).
+$$
+
+Shortcut terms $\bigl(e_i/(1 - h_i)\bigr)^2$: $\;\bigl(-\tfrac{1}{6}/\tfrac{1}{6}\bigr)^2 = 1$, $\;\bigl(\tfrac{1}{3}/\tfrac{2}{3}\bigr)^2 = \tfrac{1}{4}$, $\;1$. So $\mathrm{CV}_{(3)} = \tfrac{1}{3}\left(1 + \tfrac{1}{4} + 1\right) = \tfrac{3}{4}$.
+
+Direct check, three actual refits: omit point 1 and the line through $(1,2), (2,2)$ is $\hat{y} = 2$, error at $x = 0$: $(1 - 2)^2 = 1$. Omit point 2: line through $(0,1), (2,2)$ is $\hat{y} = 1 + \tfrac{1}{2}x$, error at $x = 1$: $(2 - 1.5)^2 = \tfrac{1}{4}$. Omit point 3: line through $(0,1), (1,2)$ is $\hat{y} = 1 + x$, error at $x = 2$: $(2 - 3)^2 = 1$. Same three terms, $\mathrm{CV}_{(3)} = \tfrac{3}{4}$.
+</Example>
+
+<KeyFact>
+$k$-fold CV validates every point exactly once and trains each fit on $n(1 - 1/k)$ points; for least squares, the $n$ refits of LOOCV collapse to one fit through the identity $y_i - \hat{y}_{(i)} = (y_i - \hat{y}_i)/(1 - h_i)$.
+</KeyFact>
+
+## Choosing k: the trade-off applies to the estimator itself
+
+$\mathrm{CV}_k$ is itself an estimator, of a scalar (test error), and the vocabulary of <Ref lesson="bias-variance" /> applies to it verbatim. The choice of $k$ trades its bias against its variance, and stating the trade at this meta-level is what separates a memorized "$k = 5$ or $10$" from an answer.
+
+**Bias.** Each CV fit trains on $n(1 - 1/k)$ points. Procedures trained on fewer points err more, so $\mathrm{CV}_k$ overestimates the error of the final model trained on all $n$: pessimistic bias, largest at small $k$ (5-fold trains on 80% of the data). LOOCV trains on $n - 1$ points and is nearly unbiased.
+
+**Variance.** LOOCV's $n$ training sets are nearly identical: any two share $n - 2$ points. The $n$ fitted models are therefore almost the same model, their single-point errors are strongly positively correlated, and the mean of $n$ correlated quantities does not enjoy the $1/n$ variance reduction of independent ones: the same correlation floor $\rho\sigma^2$ that limits bagging in <Ref lesson="bagging-random-forests" />. At $k = 5$ or $10$ the training sets overlap less, the fold scores decorrelate, and the estimate moves less from dataset to dataset ([ISLP §5.1.4](https://www.statlearning.com)).
+
+**Cost.** LOOCV is $n$ fits unless a shortcut exists; $k$-fold is $k$ fits at any model class. The consensus default, $k = 5$ or $10$ with stratification, traces to [Kohavi's 1995 study](https://ai.stanford.edu/~ronnyk/accEst.pdf) and has held since.
+
+<Remark title="the standard story, and its footnote">
+The LOOCV-variance argument above is the textbook account, and it is genuinely contested: [Bengio and Grandvalet (2004)](https://www.jmlr.org/papers/v5/grandvalet04a.html) proved no unbiased estimator of the variance of $k$-fold CV exists, and for stable estimators LOOCV's variance can in fact be low. In an interview, give the standard account and flag the nuance in one sentence.
+</Remark>
+
+A second subtlety is what the number estimates. Because every CV fit is a fresh fit to a fresh subsample, $\mathrm{CV}_k$ estimates the **expected error of the procedure** ("fit this recipe to $\sim n(1 - 1/k)$ points", averaged over draws), not the conditional error of the one model you finally trained. ESL §7.10.1 and §7.12 show CV tracks the expected error well and the conditional error of the specific fit poorly. The distinction is asked directly.
+
+<KeyFact>
+The choice of $k$ is the bias–variance trade-off applied to the error estimator: LOOCV is nearly unbiased but expensive and high-variance under the standard account; $k = 5$–$10$ accepts a small pessimistic bias for a steadier, cheaper estimate.
+</KeyFact>
+
+<Aside>
+Validation and regularization are two attacks on the same unknown, the optimism gap $E_\text{out} - E_\text{in}$. Regularization subtracts an analytic proxy for the gap from the training objective (<Ref lesson="ridge-lasso" />); validation measures the gap empirically on data the fit never saw. [Learning From Data, Lecture 13](https://work.caltech.edu/telecourse) develops the parallel, along with the $K = N/5$ rule of thumb for the size of a dedicated validation set: large enough to be reliable, small enough not to starve training.
+</Aside>
+
+## Model selection: a minimized score is optimistic
+
+CV's main use is choosing hyperparameters: compute $\mathrm{CV}_k(\lambda)$ over a grid, pick the minimizer. The choice is sound. Reporting the winning score as the model's expected error is not, because a **minimum of noisy estimates is biased low**: the same score cannot both select the winner and grade it.
+
+<Example title="the min-of-two computation">
+Two finalist models on a two-class problem where the labels are pure noise: both have true error $0.5$. A small validation set gives error estimates $\hat{e}_1, \hat{e}_2$, idealized as independent uniforms on $[0, 1]$; each is individually unbiased, $\mathbb{E}[\hat{e}_m] = 0.5$.
+
+Select the better-looking model and report its score. The reported quantity is $\min(\hat{e}_1, \hat{e}_2)$, and
+
+$$
+\Pr\bigl(\min(\hat{e}_1, \hat{e}_2) > t\bigr) = (1 - t)^2
+\;\;\Longrightarrow\;\;
+\mathbb{E}\bigl[\min\bigr] = \int_0^1 (1 - t)^2 \, dt = \tfrac{1}{3}.
+$$
+
+Two unbiased estimates became one estimate biased low by $\tfrac{1}{6}$, with no change to either model. With $m$ candidates the bias grows: $\mathbb{E}[\min] = 1/(m+1)$ (Exercise 4). This is [Learning From Data](https://work.caltech.edu/telecourse)'s one-line proof that a validation set, once used for selection, is partly a training set.
+</Example>
+
+The discipline that follows: whatever data chose anything (a hyperparameter, a feature set, an early-stopping point) cannot also grade the result. With ample data, the three-way split does this: tune on validation, then touch the test set once. With scarce data, the CV loop itself gets wrapped:
+
+<Definition title="nested cross-validation">
+An outer $k$-fold loop estimates performance; inside each outer training set, an inner CV loop selects hyperparameters. Each outer test fold scores a model whose tuning never saw it, so the outer average estimates the error of the **whole tuning procedure**, not of one hyperparameter value.
+</Definition>
+
+<Figure
+  src="./figures/nested-cv.svg"
+  alt="Nested cross-validation: an outer five-fold bar with one amber outer test fold, the outer training folds expanded into an inner four-fold bar where a green inner validation fold rotates to pick lambda, then refit and score on the outer test fold"
+  caption="Nested CV: the inner loop picks λ*, the outer fold scores the tuned recipe. No fold both chooses and grades."
+/>
+
+On small biological datasets, [Varma and Simon (2006)](https://doi.org/10.1186/1471-2105-7-91) measured the difference: reporting the tuned CV score was substantially optimistic even on null data, while the nested estimate was nearly unbiased. The cost is multiplicative ($k_\text{outer} \times k_\text{inner} \times |\text{grid}|$ fits), which is why nested CV is the answer for *small-data* rigor and a plain final test set suffices when data is plentiful.
+
+### The one-standard-error rule: prefer parsimony inside the noise
+
+CV curves near their minimum are typically flat, and the exact argmin is fold-assignment noise. The standard tiebreak:
+
+<Definition title="one-standard-error rule">
+Estimate the standard error of each CV score from the fold scores, $\mathrm{SE} = \mathrm{sd}(e_1, \dots, e_k)/\sqrt{k}$. Among all models whose CV score is within one SE of the minimum, choose the most parsimonious (fewest features, strongest regularization).
+</Definition>
+
+On the `Credit` data in [ISLP §6.1.3](https://www.statlearning.com), the CV curve over best-subset sizes is essentially flat from 3 to 11 predictors; the rule picks 3. The logic is the meta-level bias–variance argument again: differences smaller than the estimator's own noise are not evidence, and when scores tie, the simpler model's lower variance wins.
+
+<KeyFact>
+The CV score that selected a hyperparameter is an optimistic estimate of the selected model's error. Grade the winner on data that never voted: a final test set, or the outer loop of nested CV.
+</KeyFact>
+
+## The wrong way: data-dependent steps outside the loop
+
+The canonical CV blunder is running a data-dependent preprocessing step once, on all rows, before the fold loop. [ESL §7.10.2](https://hastie.su.domains/ElemStatLearn/) makes it quantitative with a null scenario: $N = 50$ samples in two equal classes, $p = 5000$ Gaussian predictors all independent of the labels. The true error rate of any classifier is 50%.
+
+The wrong protocol: (1) screen the 5,000 predictors on all 50 samples and keep the 100 most correlated with the labels; (2) cross-validate a 1-nearest-neighbor classifier on those 100. Reported CV error in ESL's simulation: **about 3%**, on data with no signal whatsoever.
+
+<Figure
+  src="./figures/wrong-way.svg"
+  alt="Two pipelines compared: on the left, feature screening on all labels sits above the cross-validation loop and reports 3 percent error against a true 50 percent; on the right, the screening step sits inside the fold loop and reports an honest 50 percent"
+  caption="ESL's null-data set piece: the only difference is whether screening runs before the loop or inside it. Order of operations is the whole game."
+/>
+
+The mechanism: with 5,000 candidates and only 50 points, some predictors reach sample correlations near $0.3$ with the labels by pure chance, and the screen finds exactly those. The held-out fold's labels participated in that screen, so at scoring time the fold is not fresh data: its labels already shaped the feature set. Screening inside each fold, on the training folds only, restores the estimate to an honest ~50%.
+
+The general rule is the **pipeline framing**: every step whose parameters depend on the data (feature screening, standardization, imputation, target encoding, resampling for imbalance) is part of the procedure being validated, and must be refit inside each fold on the training folds alone (in scikit-learn, a `Pipeline` passed to `cross_val_score`). ESL notes the one exception: an *unsupervised* step that never touches labels, such as variance-based filtering, may run once outside. The supervised variants of this trap recur in <Ref lesson="feature-engineering" /> (target encoding) and <Ref lesson="imbalance-leakage" /> (the leakage taxonomy).
+
+<KeyFact>
+Cross-validation validates a procedure, so the procedure's every data-dependent step must run inside the fold loop. A label-using step run once on all data converts the held-out folds into training data and the CV score into fiction.
+</KeyFact>
+
+## The bootstrap: a sampling distribution from one sample
+
+Cross-validation estimates prediction error. The *bootstrap* answers a different question: how variable is any statistic computed from a sample of size $n$ (a coefficient, a ratio, an AUC) when no standard-error formula is available.
+
+The need-then-method case is ISLP §5.2's portfolio problem. Invest a fraction $\alpha$ in asset $X$ and $1 - \alpha$ in asset $Y$; the variance-minimizing split is
+
+$$
+\alpha = \frac{\sigma_Y^2 - \sigma_{XY}}{\sigma_X^2 + \sigma_Y^2 - 2\sigma_{XY}},
+$$
+
+estimated by plugging in sample variances and covariances from $n = 100$ observed return pairs. $\hat{\alpha}$ is a nonlinear function of three estimated moments; no textbook SE formula applies. The bootstrap manufactures one:
+
+<Definition title="bootstrap">
+A **bootstrap sample** $Z^{*}$ draws $n$ observations *with replacement* from the observed sample $Z = \{z_1, \dots, z_n\}$, so individual points repeat and others are omitted. Recomputing a statistic $\hat{\alpha}^{*b}$ on each of $B$ bootstrap samples gives the **bootstrap standard error**
+
+$$
+\mathrm{SE}_B(\hat{\alpha}) = \sqrt{\frac{1}{B - 1} \sum_{b=1}^{B} \bigl(\hat{\alpha}^{*b} - \bar{\alpha}^{*}\bigr)^2},
+$$
+
+the spread of the statistic across resamples, used as an estimate of its true sampling variability.
+</Definition>
+
+<Figure
+  src="./figures/bootstrap-world.svg"
+  alt="Bootstrap schematic: a three-point original sample resampled with replacement into bootstrap samples with visible repeats, each producing an alpha-hat estimate, feeding a histogram whose spread is the bootstrap standard error"
+  caption="One sample, B resamples, B recomputed statistics: their histogram stands in for the unobservable sampling distribution."
+/>
+
+The substitution being made: ideally, $\mathrm{SE}(\hat{\alpha})$ would come from drawing fresh datasets from the population, which is impossible with one sample. The bootstrap **treats the sample as the population** and redraws from it.
+
+<Example title="the portfolio check">
+In ISLP's simulation the population is known ($\sigma_X^2 = 1$, $\sigma_Y^2 = 1.25$, $\sigma_{XY} = 0.5$, so the true $\alpha = 0.6$), which permits the ideal experiment: 1,000 fresh simulated datasets of 100 pairs give the true $\mathrm{SE}(\hat{\alpha}) \approx 0.083$.
+
+The bootstrap gets to see only one dataset of 100 pairs. $B = 1{,}000$ resamples of it give $\mathrm{SE}_B = 0.087$. One observed sample reproduced, to within a few percent, a quantity that nominally requires a thousand samples.
+</Example>
+
+Two cautions, one sentence each. Bootstrap intervals degrade on very small $n$ and on heavy-tailed statistics, where the sample is a poor stand-in for the population; and the method fails outright for extreme-value statistics such as the sample maximum.
+
+### The 0.632 computation: what a resample misses
+
+Concrete first, at $n = 5$: one draw misses the tracked point $z_3$ with probability $\tfrac{4}{5}$, and five independent draws miss it with probability $(4/5)^5 \approx 0.328$. A third of the sample never makes it into the resample. The general statement is a fixed interview set piece (ISLP Exercise 5.4.2):
+
+<Theorem title="the 1 − 1/e limit">
+The probability that a given observation $z_i$ appears in a bootstrap sample of size $n$ is
+
+$$
+\Pr(z_i \in Z^{*}) = 1 - \left(1 - \frac{1}{n}\right)^{\!n} \;\xrightarrow{\;n \to \infty\;}\; 1 - e^{-1} \approx 0.632 .
+$$
+
+<Proof>
+Each of the $n$ draws is uniform over the $n$ points, so a single draw is not $z_i$ with probability $1 - 1/n$. The draws are independent, so all $n$ miss with probability $(1 - 1/n)^n$, and $z_i$ appears with the complementary probability. The limit is the standard one: $(1 - 1/n)^n \to e^{-1}$, from $n \ln(1 - 1/n) \to -1$.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="oob"
+  alt="Three frames deriving the 0.632 rule: one draw misses the tracked point with probability 1 minus 1 over n; n independent draws miss with that quantity to the n-th power; the limit 1 over e with a bar splitting the sample into 63.2 percent in and 36.8 percent out"
+  caption="The 0.632 derivation in three moves: one draw, n independent draws, the limit. The blue 36.8% is the resample's out-of-bag set."
+/>
+
+<Task>
+Step through the three frames, then compute the appearance probability for $n = 10$ by hand: $1 - 0.9^{10}$ should land at $0.651$, already close to the limiting $0.632$. Note from frame 2 how little the miss probability moves between $n = 5$ and $n = 100$: $0.328$ to $0.366$.
+</Task>
+
+The number's consequence: a bootstrap sample contains only $\approx 63.2\%$ of the distinct observations, so the $\approx 36.8\%$ left out are a free validation set for anything trained on that resample. This is precisely the *out-of-bag* mechanism of <Ref lesson="bagging-random-forests" />: each bagged tree leaves out ~1/3 of the points, and scoring each point with only the trees that never saw it yields a test-error estimate with no held-out data at all.
+
+<Aside>
+The same overlap explains why the naive bootstrap is a poor direct estimator of prediction error: training and evaluation sets share ~63% of their points, so the estimate is optimistic. Efron's .632 estimator repairs it by blending the leave-one-out bootstrap error $\widehat{\mathrm{Err}}^{(1)}$ (each point predicted only by resamples that missed it) with training error, $\widehat{\mathrm{Err}}^{(.632)} = 0.368\,\overline{\mathrm{err}} + 0.632\,\widehat{\mathrm{Err}}^{(1)}$; the .632+ variant adjusts the weights for heavily overfit models ([Efron and Tibshirani, 1997](https://doi.org/10.2307/2965703)). In practice, CV remains the default for error estimation and the bootstrap the default for standard errors.
+</Aside>
+
+<KeyFact>
+A bootstrap sample contains about 63.2% of the distinct data points; the missing 36.8% ($\to 1/e$) are the out-of-bag set, the free hold-out behind random forests' OOB error.
+</KeyFact>
+
+## When random folds are invalid
+
+Random fold assignment presumes the rows are exchangeable: any subset is statistically like any other. Three common data shapes break that premise, and each has a dedicated splitter.
+
+**Time series.** Shuffled folds train on the future to predict the past, which is exactly the information a deployed forecaster will not have; autocorrelation turns that into a large optimistic bias. The valid protocol is *forward chaining* (evaluation on a rolling origin, [Hyndman and Athanasopoulos, FPP3 §5.10](https://otexts.com/fpp3/tscv.html)): train on an expanding (or sliding) window, validate on the block immediately after it, roll forward, average. When features are windowed aggregates, an *embargo gap* between train and validation blocks keeps the windows from straddling the boundary.
+
+<Figure
+  src="./figures/timeseries-cv.svg"
+  alt="Forward-chaining splits with expanding training windows and validation blocks always after them, contrasted with a shuffled k-fold assignment on the same series where training blocks after the validation blocks are struck out as future leakage"
+  caption="Forward chaining keeps validation strictly after training; shuffled folds fit the model on the future of the points it is scored on."
+/>
+
+**Grouped rows.** When multiple rows share a source (several transactions per customer, several images per patient), random folds put the same source on both sides of the split, and the model is graded partly on recognizing sources it trained on. *Group k-fold* assigns all rows of a group to the same side; the score then estimates performance on **new groups**, which is the deployment question. Duplicated or near-duplicated rows are the degenerate case: deduplicate before splitting, or the duplicates act as one group split across folds.
+
+**Imbalanced labels.** With rare positives, an unshaped random fold can contain few or none of them, making per-fold metrics such as recall (<Ref lesson="classification-metrics" />) undefined or violently noisy. *Stratified* k-fold assigns folds preserving the class ratio, and is the default recommendation for classification since Kohavi (1995); Exercise 7 computes how badly plain random folds fail at 1% prevalence.
+
+<KeyFact>
+Random folds assume exchangeable rows. Time order, shared groups, duplicates, and rare classes each violate the assumption, and each has its dedicated splitter: forward chaining, group k-fold, deduplication, stratification.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+Interview question: why is $k = 5$ or $10$ preferred over LOOCV? Give the complete answer (bias, variance, and cost) and state explicitly which property of the *estimator of test error* each argument concerns, in the vocabulary of the bias–variance decomposition.
+
+<Solution>
+Frame it at the meta-level: $\mathrm{CV}_k$ is an estimator of a number (expected test error), so it has its own bias and variance.
+
+**Bias.** Each fold's fit trains on $n(1 - 1/k)$ points; models trained on less data err more, so $\mathrm{CV}_k$ is biased pessimistic for the final all-$n$ model. The bias is largest at small $k$ and nearly zero for LOOCV, which trains on $n - 1$ points. Advantage LOOCV.
+
+**Variance.** LOOCV's $n$ training sets pairwise share $n - 2$ points, so the $n$ fitted models are nearly identical and their errors strongly positively correlated. The mean of correlated terms keeps a variance floor of order $\rho\sigma^2$ (the same correlated-average formula that limits bagging), so averaging $n$ of them buys little stability; at $k = 5$–$10$ the fold fits are more distinct and the estimate fluctuates less across datasets. Advantage small $k$, with the honest footnote that this account is the textbook one and is contested (Bengio and Grandvalet, 2004, proved no unbiased variance estimator for CV exists).
+
+**Cost.** LOOCV needs $n$ refits (except least squares, where the leverage shortcut makes it one fit); $k$-fold needs $k$.
+
+$k = 5$ or $10$ is the accepted compromise: a small, known pessimistic bias bought for lower variance and a 5–10× compute budget, per Kohavi's 1995 study recommending stratified 10-fold.
+</Solution>
+</Exercise>
+
+<Exercise>
+The bootstrap set piece: derive the probability that observation $z_i$ appears in a bootstrap sample of size $n$; evaluate it at $n = 10$; state the limit; and explain what the complement has to do with random forests.
+
+<Solution>
+One draw is uniform over $n$ points, so it misses $z_i$ with probability $1 - 1/n$. The $n$ draws are independent, so all miss with probability $(1 - 1/n)^n$, and
+
+$$
+\Pr(z_i \in Z^{*}) = 1 - \left(1 - \tfrac{1}{n}\right)^{\!n}.
+$$
+
+At $n = 10$: $1 - 0.9^{10} = 1 - 0.3487 = 0.651$. As $n \to \infty$, $(1 - 1/n)^n \to e^{-1}$, so the probability tends to $1 - 1/e \approx 0.632$.
+
+The complement, $\approx 36.8\%$, is the out-of-bag set: every tree in a bagged ensemble is trained on a bootstrap sample that omits about a third of the data, and predicting each point using only the trees that never saw it gives the OOB error: a test-set-quality estimate with no held-out data.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compute the LOOCV MSE for the least-squares line through $(0, 2), (1, 1), (2, 3)$ using the leverage shortcut, then verify by performing the three leave-one-out refits directly.
+
+<Solution>
+Full fit: $\bar{x} = 1$, $\bar{y} = 2$, $\sum_j (x_j - \bar{x})^2 = 2$, slope $= \tfrac{1}{2}$, intercept $= \tfrac{3}{2}$: $\hat{y} = \tfrac{3}{2} + \tfrac{1}{2}x$. Fitted values $(1.5, 2, 2.5)$, residuals $e = (0.5, -1, 0.5)$.
+
+Leverages: $h_i = \tfrac{1}{3} + (x_i - 1)^2/2 = \bigl(\tfrac{5}{6}, \tfrac{1}{3}, \tfrac{5}{6}\bigr)$.
+
+Shortcut terms $\bigl(e_i/(1 - h_i)\bigr)^2$: $(0.5 / \tfrac{1}{6})^2 = 9$; $(-1 / \tfrac{2}{3})^2 = 2.25$; $9$. So $\mathrm{CV}_{(3)} = (9 + 2.25 + 9)/3 = 6.75$.
+
+Direct refits: omit point 1, line through $(1,1), (2,3)$ is $\hat{y} = -1 + 2x$; at $x = 0$: $(2 - (-1))^2 = 9$. Omit point 2, line through $(0,2), (2,3)$ is $\hat{y} = 2 + \tfrac{1}{2}x$; at $x = 1$: $(1 - 2.5)^2 = 2.25$. Omit point 3, line through $(0,2), (1,1)$ is $\hat{y} = 2 - x$; at $x = 2$: $(3 - 0)^2 = 9$. Same terms, $\mathrm{CV}_{(3)} = 6.75$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: you tuned 50 hyperparameter configurations by 5-fold CV and report the winning configuration's CV score as the model's expected error. What is wrong, roughly how large is the effect, and what do you do instead? As the quantitative core, prove that for $m$ independent scores uniform on $[0,1]$, $\mathbb{E}[\min] = 1/(m+1)$.
+
+<Solution>
+The reported number is the minimum of 50 noisy estimates, and a minimum of noisy estimates is biased low: the winner won partly by having lucky folds, and its score keeps the luck. The *choice* of configuration is fine to ship; the *score* is not a valid error estimate.
+
+The toy quantification: for $\hat{e}_1, \dots, \hat{e}_m$ i.i.d. uniform on $[0,1]$,
+
+$$
+\Pr(\min > t) = (1 - t)^m
+\;\Longrightarrow\;
+\mathbb{E}[\min] = \int_0^1 \Pr(\min > t)\, dt = \int_0^1 (1 - t)^m dt = \frac{1}{m+1}.
+$$
+
+At $m = 50$: $\mathbb{E}[\min] = 1/51 \approx 0.02$, against a true error of $0.5$ for every candidate. More realistically, with approximately Gaussian score noise of SD $\sigma$, the minimum over 50 candidates of equal quality sits about $2.25\sigma$ below the truth (the expected maximum of 50 standard normals is $\approx 2.25$): with fold-level SEs of a few percent, the reported score can flatter by several points.
+
+The fix: separate selection from assessment. Keep a final test set the tuning never touched and score the winner there once; or, when data is too scarce, run nested CV and report the outer-loop average, which estimates the whole tuning procedure honestly.
+</Solution>
+</Exercise>
+
+<Exercise>
+ESL's wrong-way CV, as an interview question: 50 samples in two equal classes, 5,000 predictors independent of the labels. A colleague screens the 100 predictors most correlated with the class labels using all 50 samples, then runs 5-fold CV on a classifier over those 100 predictors. What error rate will the CV report, what is the truth, why does it happen, and what is the fix?
+
+<Solution>
+Truth: the predictors are independent of the labels, so every classifier has true error $50\%$. Reported: far below; ESL's simulation of exactly this protocol averaged about $3\%$ CV error.
+
+Why: with 5,000 candidate predictors and only 50 points, some sample correlations reach $\approx 0.3$ by pure chance, and the screen selects precisely those. The screening step used *all* labels, including those of each future held-out fold, so by scoring time the fold's labels have already shaped the feature set: the fold is not fresh data, and the chance correlations that won the screen persist within it.
+
+Fix: move the screening inside the fold loop: for each fold, select the top 100 predictors using the four training folds only, fit, and score on the untouched fold; the estimate returns to an honest $\approx 50\%$. In general every data-dependent step (screening, scaling, imputation, target encoding, resampling) belongs inside the loop, i.e., in the pipeline being cross-validated. The one exception: an unsupervised step that never reads labels may run once outside.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the validation split for two scenarios, and state what goes wrong with plain shuffled k-fold in each: (a) monthly sales forecasting from three years of history; (b) churn prediction where each customer contributes many monthly rows.
+
+<Solution>
+**(a)** Forward chaining. Order by time, never shuffle. Fold 1: train on months 1–24, validate on month 25 (or the next quarter); fold 2: train on 1–25, validate on 26; roll the origin forward and average, optionally per forecast horizon. If features are rolling aggregates (e.g., trailing 3-month averages), leave an embargo gap of the window length between train and validation so no feature straddles the boundary. Shuffled k-fold would train on months after the validation month: the model learns from the future of the points it is scored on, and autocorrelation makes the estimate strongly optimistic while the deployed model, which cannot see its own future, underdelivers.
+
+**(b)** Group k-fold on customer id: all of a customer's rows on one side of every split. With shuffled rows, the same customer appears in both train and validation folds; the model partly memorizes customer-level signal (their baseline usage, their plan) and gets graded on reproducing it, inflating CV relative to performance on genuinely new customers, which is what deployment serves. Exact-duplicate rows are the degenerate case of the same failure and should be removed before splitting. If churn is rare, stratify the group folds by label as well.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review from <Ref lesson="classification-metrics" />: a dataset has 500 transactions of which 5 are fraud (1%). A colleague runs unstratified 5-fold CV and averages per-fold recall. Approximating each positive's fold assignment as independent and uniform over the 5 folds, compute (a) the probability that a given fold contains no positives, and (b) the probability that at least one fold contains none. Explain what each event does to the recall average, and give the fix.
+
+<Solution>
+(a) A given positive lands outside a given fold with probability $4/5$; with 5 positives, $\Pr(\text{fold has none}) \approx (4/5)^5 = 0.328$. (The exact hypergeometric value, $\binom{495}{100}/\binom{500}{100} \approx 0.325$, confirms the approximation.)
+
+(b) The only assignment in which *no* fold is empty puts exactly one positive in each fold: probability $5!/5^5 = 120/3125 \approx 0.038$. So with probability $\approx 0.96$, at least one fold has no positives.
+
+Consequences: recall $= TP/(TP + FN)$ is $0/0$ on a fold with no positives: undefined, or silently coerced to 0 or 1 by the toolkit. Folds with one or two positives quantize recall to $\{0, \tfrac{1}{2}, 1\}$, so the per-fold average is dominated by assignment noise rather than the model.
+
+Fix: stratified k-fold, which preserves the 1% rate per fold (here, exactly one positive each); this has been the default recommendation for classification since Kohavi (1995). With 5 positives total, additionally pool the confusion-matrix counts across folds and compute one recall from the pooled $TP$ and $FN$, rather than averaging five one-observation estimates; and report a PR-based metric rather than accuracy, per the imbalance logic of the metrics chapter.
+</Solution>
+</Exercise>
+
+<Exercise>
+Ridge regression is tuned by 5-fold CV over $\lambda \in \{0.01, 0.1, 1, 10\}$, giving mean CV MSEs $10.10,\ 9.80,\ 9.90,\ 10.90$ with standard errors $0.40,\ 0.35,\ 0.30,\ 0.30$. Apply the one-standard-error rule: which $\lambda$ is selected, and why is it not the argmin?
+
+<Solution>
+The minimum is $9.80$ at $\lambda = 0.1$, with SE $0.35$; the one-SE threshold is $9.80 + 0.35 = 10.15$. Models within the band: $\lambda = 0.1$ ($9.80$), $\lambda = 1$ ($9.90$), and $\lambda = 0.01$ ($10.10$); $\lambda = 10$ ($10.90$) is out. Among those, the most parsimonious — for ridge, the most regularized, i.e., largest $\lambda$ — is $\boldsymbol{\lambda = 1}$.
+
+Rationale: the estimator's own noise is $\approx 0.3$–$0.4$, so the $0.10$ gap between $\lambda = 0.1$ and $\lambda = 1$ is not evidence of a real difference; the curve is flat at the bottom, as CV curves typically are. When the scores tie within noise, the more regularized model is preferred for its lower variance — the same reasoning ISLP applies on the Credit data, where a CV curve flat from 3 to 11 features leads to the 3-feature model.
+</Solution>
+</Exercise>
+
+<References>
+1. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — ch. 5: validation-set approach, LOOCV and Eq. (5.2), k-fold, the bias–variance argument for k = 5/10, and the bootstrap with the portfolio example; §6.1.3: the one-standard-error rule on the Credit data; Exercise 5.4.2 is the 0.632 derivation. https://www.statlearning.com
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.10–7.12: what CV estimates, the right and wrong way to cross-validate (the 5,000-predictor set piece), and bootstrap error estimation. https://hastie.su.domains/ElemStatLearn/
+3. Y. S. Abu-Mostafa, M. Magdon-Ismail, H.-T. Lin, *Learning From Data*, AMLBook, 2012 — §4.3 and Caltech CS156 Lecture 13: validation, the optimistic bias of selection, K = N/5, and validation versus regularization. https://work.caltech.edu/telecourse
+4. R. Kohavi, "A Study of Cross-Validation and Bootstrap for Accuracy Estimation and Model Selection," *IJCAI*, 1995 — the empirical case for stratified 10-fold CV as the default. https://ai.stanford.edu/~ronnyk/accEst.pdf
+5. Y. Bengio, Y. Grandvalet, "No Unbiased Estimator of the Variance of K-Fold Cross-Validation," *JMLR* 5, 2004 — the theoretical footnote to the k-choice folklore. https://www.jmlr.org/papers/v5/grandvalet04a.html
+6. S. Varma, R. Simon, "Bias in error estimation when using cross-validation for model selection," *BMC Bioinformatics* 7:91, 2006 — nested CV measured against tuned-CV optimism on small data. https://doi.org/10.1186/1471-2105-7-91
+7. B. Efron, R. Tibshirani, *An Introduction to the Bootstrap*, Chapman & Hall, 1993 — the standard reference for bootstrap standard errors and confidence intervals.
+8. B. Efron, R. Tibshirani, "Improvements on Cross-Validation: The .632+ Bootstrap Method," *JASA* 92(438), 1997 — bootstrap estimates of prediction error. https://doi.org/10.2307/2965703
+9. R. J. Hyndman, G. Athanasopoulos, *Forecasting: Principles and Practice*, 3rd ed., OTexts — §5.10: time series cross-validation on a rolling forecasting origin. https://otexts.com/fpp3/tscv.html
+10. N. Singh, K. Huo, *Ace the Data Science Interview*, 2021 — ch. 6–7: the interview phrasings of the k-choice, nested-CV, and time-series-split questions.
+11. C. Huyen, *Introduction to Machine Learning Interviews*, self-published web book — §7.1: evaluation-protocol questions. https://huyenchip.com/ml-interviews-book/
+</References>

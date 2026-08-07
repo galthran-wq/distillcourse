@@ -1,0 +1,671 @@
+A stack and a queue expose the same three operations — insert, remove, peek
+— but differ in which element removal returns: the most recently inserted,
+or the least recently inserted. The
+<Ref lesson="arrays-and-linked-lists">previous lesson</Ref> priced the full
+Sequence interface and left scoreboard v1 with no row uniformly fast: the
+array loses its front cells to shifting, the lists lose `get(i)` to the
+walk. This lesson restricts that interface to the two ends of the sequence
+and prices the restriction. The payoff is total: every operation that
+survives it can be served in $\Theta(1)$, on either of the previous
+lesson's structures, once one indexing trick clears the array's front
+cells. The route: the two disciplines as removal rules, the stack on an
+array and on a linked list, the call stack every program already runs on,
+Dijkstra's two-stack expression evaluator, the circular buffer, a
+selection guide, and a queue built out of two stacks.
+
+## Two disciplines: the removal rule is the whole specification
+
+The previous lesson separated interface from implementation; the stack and
+the queue are interfaces, and smaller ones than the Sequence. Drop every
+operation that takes an index: no `get(i)`, no `insert(i, x)`, no
+`search(v)`. What remains is insert, remove, and *peek* (read the element
+remove would return, without removing it), and since remove no longer
+names a position, the interface itself must say which element comes back.
+That single clause is the entire specification.
+
+<Definition title="stack">
+A **stack** is the collection with insert, remove, and peek in which
+remove returns the **most recently inserted** element: last in, first out
+(*LIFO*). Its insert and remove are conventionally called `push` and
+`pop`. Removing from an empty stack is an error called *underflow*.
+</Definition>
+
+<Definition title="queue">
+A **queue** is the collection with insert, remove, and peek in which
+remove returns the **least recently inserted** element: first in, first
+out (*FIFO*). Insert (`enqueue`) adds at the *back*; remove (`dequeue`)
+takes from the *front*, where the oldest element waits. Dequeueing an
+empty queue underflows the same way.
+</Definition>
+
+<Figure
+  src="./figures/stack-vs-queue.svg"
+  alt="The same four inserts a, b, c, d fed to a stack and to a queue; the stack's removal arrow takes d from the top, the queue's removal arrow takes a from the front"
+  caption="Same inserts, same contents: the removal rule is the only difference, and it decides everything."
+/>
+
+The names are older than the formalism: a stack behaves like a
+spring-loaded pile of cafeteria plates, where the plate added last is the
+only one reachable, and a queue behaves like the line at a register, where
+service order is arrival order. The consequence worth keeping is
+directional: a stack **reverses** what passes through it, a queue
+**preserves** arrival order.
+
+Both definitions say nothing about memory. LIFO and FIFO are disciplines,
+not layouts: the rest of this lesson implements each on the array and on
+the linked list of the previous lesson, and every implementation prices at
+$\Theta(1)$ per operation. One relative completes the family and is spent
+in one sentence: the *deque* (double-ended queue) allows insert and remove
+at both ends, and the doubly linked list with a sentinel already
+implements it wholesale.
+
+<KeyFact>
+Narrowing an interface is a price-cutting move: the fewer questions a
+structure must answer, the cheaper each answer can be. The same trade
+recurs later at full scale: the
+<Ref lesson="binary-heaps-and-priority-queues">binary heap</Ref> gives up
+search entirely to keep one element, the minimum, permanently cheap.
+</KeyFact>
+
+## Stacks: a top index or a head splice
+
+The stack's two implementations need nothing the previous lesson has not
+already built. On an array, both stack operations live at the back, the
+array's cheap end: keep a single counter $t$, the number of elements,
+which is also the index of the first free slot.
+
+```text
+Push(S, x):                        Pop(S):
+  if t = capacity: error "overflow"    if t = 0: error "underflow"
+  S[t] ← x                             t ← t − 1
+  t ← t + 1                            return S[t]
+```
+
+Each operation is one bounds check, one memory access, and one counter
+update: $\Theta(1)$, with no shifting anywhere, because nothing is ever
+inserted or removed below the top. A popped element's bytes stay in the
+array, but the stack no longer contains it; $t$ alone says where the stack
+ends. *Overflow*, push onto a full array, is the previous lesson's
+capacity wall wearing a new name, and it survives this lesson untouched.
+
+<Example title="six operations on an array stack">
+Start empty with capacity 6 and run
+`push 4, push 1, push 3, pop, push 8, pop`. The counter $t$ moves
+$0 \to 1 \to 2 \to 3 \to 2 \to 3 \to 2$:
+
+| operation | array contents (slots $0..t-1$) | $t$ | returns |
+|---|---|---|---|
+| push 4 | 4 | 1 | |
+| push 1 | 4, 1 | 2 | |
+| push 3 | 4, 1, 3 | 3 | |
+| pop | 4, 1 | 2 | 3 |
+| push 8 | 4, 1, 8 | 3 | |
+| pop | 4, 1 | 2 | 8 |
+
+The two pops return 3 and then 8, each the newest element at its moment,
+and neither pop moves any data: slot 2 is simply reused.
+</Example>
+
+### The linked stack: push is the head splice
+
+On a linked list, both operations live at the head. Push is exactly the
+`InsertFront` splice of the
+<Ref lesson="arrays-and-linked-lists">previous lesson</Ref>: allocate a
+node, aim its `next` at the current head, retarget `head`, in that order.
+Pop reads `head.value` and retargets `head` to `head.next`. Both are
+$\Theta(1)$ in the worst case with no capacity limit at all; the price is
+the constant-factor overhead already measured there, roughly 40 bytes per
+node against 8 per array slot, plus a pointer hop per access. The tail end
+of the list is never touched, so a plain singly linked list with one
+`head` pointer suffices.
+
+## The call stack: recursion's hidden data structure
+
+One stack is running in every program whether or not the programmer
+declared it. When a function is called, the runtime pushes a *frame*
+holding the call's local variables and its return address; when the
+function returns, its frame is popped and control resumes at the address
+underneath. The discipline is LIFO by the structure of nesting itself:
+the function entered most recently is the one that finishes first,
+because every caller is paused until its callee returns.
+
+<Figure
+  src="./figures/call-stack.svg"
+  alt="The call stack during fact(5): six frames stacked from main up to fact(1), each paused waiting on the one above, with the stack limit marked as a dashed line above"
+  caption="fact(5) in flight: five nested frames, each paused on the one above it. Recursion depth is stack depth."
+/>
+
+Recursion makes the structure visible by making it deep. A recursive
+`fact(n)` holds $n$ frames at its deepest moment, so recursion depth is
+memory: $\Theta(n)$ of it for a linear recursion. The capacity wall is
+real and has a familiar error message. A thread on desktop Linux gets 8 MB
+of stack by default, which frames of some tens of bytes exhaust after a
+depth on the order of $10^5$; Python does not even wait for the memory to
+run out and raises `RecursionError` at a default depth of 1,000. A
+recursive walk down a million-node linked list overflows where the
+equivalent loop runs in constant stack space, which is why list
+traversals in production code iterate.
+
+The conversion runs in the other direction too: any recursive procedure
+can be rewritten without recursion by managing an explicit stack of
+pending work, since the call stack is the only thing the recursion was
+using. The graph module cashes this in directly: depth-first search is
+specified recursively and run, at scale, on an explicit stack
+(<Ref lesson="depth-first-search-and-topological-sort">depth-first search
+and topological sort</Ref>).
+
+<KeyFact>
+An algorithm that recurses $n$ deep is an algorithm using $\Theta(n)$
+stack memory — with one exception and one caveat. The exception:
+a compiler that performs *tail-call elimination* reuses a single frame,
+but only when the recursive call is the function's last act with no work
+pending after it, which `n * fact(n-1)` fails (the multiplication
+waits). The caveat: the explicit-stack rewrite does not delete the
+stack, it relocates it to the heap, trading the fixed thread limit for
+the machine's full memory.
+</KeyFact>
+
+## A first algorithm from two stacks: Dijkstra's evaluator
+
+Everything so far prices the structures themselves; the first return on
+the investment is an algorithm built from them. The task: read an
+arithmetic expression left to right, one token at a time, and produce its
+value. The expression is *fully parenthesized*: every operator sits inside
+its own parentheses with exactly two operands, as in
+`( 1 + ( ( 2 + 3 ) * ( 4 * 5 ) ) )`.
+[The two-stack algorithm](https://algs4.cs.princeton.edu/13stacks/) is
+due to E. W. Dijkstra, who devised it around 1960 while building one of
+the first ALGOL 60 compilers; his shortest-path algorithm anchors the
+<Ref lesson="shortest-paths-dijkstra">weighted-graph module</Ref> of this
+course. It keeps a *value stack* and an *operator stack* and applies four
+rules, one per kind of token:
+
+- a **value**: push it on the value stack;
+- an **operator** (`+`, `*`): push it on the operator stack;
+- a **left parenthesis**: ignore it;
+- a **right parenthesis**: pop one operator, pop two values, apply the
+  operator to them, and push the result on the value stack.
+
+<Example title="evaluating ( 1 + ( ( 2 + 3 ) * ( 4 * 5 ) ) )">
+Stacks written bottom to top, one row per token:
+
+| token | value stack | operator stack | action |
+|---|---|---|---|
+| `(` | | | ignored |
+| `1` | 1 | | push value |
+| `+` | 1 | + | push operator |
+| `(` `(` | 1 | + | ignored |
+| `2` | 1, 2 | + | push value |
+| `+` | 1, 2 | +, + | push operator |
+| `3` | 1, 2, 3 | +, + | push value |
+| `)` | 1, 5 | + | pop +, pop 3 and 2, push $2+3=5$ |
+| `*` | 1, 5 | +, * | push operator |
+| `(` | 1, 5 | +, * | ignored |
+| `4` | 1, 5, 4 | +, * | push value |
+| `*` | 1, 5, 4 | +, *, * | push operator |
+| `5` | 1, 5, 4, 5 | +, *, * | push value |
+| `)` | 1, 5, 20 | +, * | pop *, pop 5 and 4, push $4 \cdot 5=20$ |
+| `)` | 1, 100 | + | pop *, pop 20 and 5, push $5 \cdot 20=100$ |
+| `)` | 101 | | pop +, pop 100 and 1, push $1+100=101$ |
+
+The input is exhausted and the value stack holds exactly one number,
+**101**: the value of the expression.
+</Example>
+
+<FigureSequence
+  name="eval"
+  alt="Six frames of the two-stack evaluation of (1+((2+3)*(4*5))): tokens are consumed along the top while the value stack and operator stack grow and collapse below, ending with 101 alone"
+  caption="The two-stack evaluator at its six milestones: each right parenthesis collapses one operator and two values into one value."
+/>
+
+<Task>
+Before advancing each frame, predict which operator the next `)` will pop
+and the value it will push. The four reductions must produce 5, 20, 100,
+101 in that order; frame 6 ends with 101 alone on the board.
+</Task>
+
+### Correctness: every ) sees exactly its own operands
+
+The correctness argument is one observation. When a `)` arrives, the top
+of the operator stack is the operator written between the two values on
+top of the value stack, and those values are its fully evaluated
+operands, because everything inside the matching parentheses has already
+been reduced. The algorithm therefore behaves as if the parenthesized
+group had been a single value token all along: the input above evaluates
+as `( 1 + ( 5 * 20 ) )`, then `( 1 + 100 )`, then `101`. The discipline
+is forced by nesting: the subexpression opened last is completed first,
+so the operands an operator needs are always the most recently produced
+values and the operator a `)` completes is always the most recently
+deferred one. Nesting is LIFO; a queue in either role would pair an
+operator with operands from a different subexpression.
+
+Two boundaries mark the scope. The evaluator as stated requires full
+parenthesization: with parentheses omitted, the operator rule must
+compare precedences before pushing, an extension (Dijkstra's shunting
+yard) this course does not need. And small as it is, the program is a
+complete *interpreter*, a machine that executes a language, which is not
+a toy architecture: the Java Virtual Machine and PostScript printers both
+execute arithmetic exactly this way, as pushes and pops on an operand
+stack.
+
+<Aside>
+Dijkstra's algorithm computes the same value if every operator is written
+*after* its two operands: `1 2 3 + 4 5 * * +`. In that order the
+parentheses are redundant and can all be dropped, and the notation that
+results is *postfix*, or
+[reverse Polish notation](https://en.wikipedia.org/wiki/Reverse_Polish_notation),
+descended from the parenthesis-free logic notation of Jan Łukasiewicz, a
+Polish logician working in the 1920s. Postfix needs only one of the two
+stacks; the exercise below derives why, and JVM bytecode is precisely
+compiled postfix.
+</Aside>
+
+Bracket matching is the evaluator's `)` rule with the arithmetic deleted,
+and it makes the paired problem.
+
+<Exercise>
+A checker for balanced brackets over `( ) [ ] { }` scans the input once:
+push each opening bracket; on each closing bracket, pop and check that
+the popped opener is its partner; accept if the input ends with an empty
+stack. (a) Trace the checker on `( [ ] { [ ] } )` and on `( [ ) ]`,
+showing the stack at each step. (b) There are exactly three ways an input
+can be rejected; name each and the moment the checker catches it. Write
+both traces before opening the solution.
+
+<Solution>
+Strategy hint: only brackets that are *open and not yet closed* are on
+the stack, newest on top.
+
+(a) `( [ ] { [ ] } )`: push `(`; push `[` (stack `( [`); read `]`, pop
+`[`, match; push `{` (stack `( {`); push `[` (stack `( { [`); read `]`,
+pop `[`, match; read `}`, pop `{`, match; read `)`, pop `(`, match; end,
+stack empty: **accepted**.
+
+`( [ ) ]`: push `(`; push `[` (stack `( [`); read `)`, pop `[` — but
+`[`'s partner is `]`, not `)`: **rejected** at the third token.
+
+(b) The three failures: a *mismatched pair*, caught when the popped
+opener is not the closer's partner (the trace above); a *closer with
+nothing open*, as in `) (`, caught as stack underflow on the pop; and
+*unclosed openers*, as in `( (`, caught by the final emptiness check.
+The transferable move: nesting is LIFO, so the innermost open bracket is
+always the one on top, exactly as the innermost subexpression's operator
+was in the evaluator.
+</Solution>
+</Exercise>
+
+## Queues on an array: the circular buffer
+
+On a linked list the queue was finished before this lesson began: keep
+the `tail` pointer of the previous lesson, enqueue by splicing after
+`tail` ($\Theta(1)$), dequeue at the head with the same two lines as the
+linked stack's pop. Only the insertion end differs between the linked
+stack and the linked queue. The array is the problem. If the front must
+stay at slot 0, every dequeue shifts the $n-1$ survivors left: the
+$\Theta(n)$ front cells that made the array lose scoreboard v1's front
+columns.
+
+The repair moves the front instead of the data. Keep a *head index* $j$
+and a count $n$: the queue occupies slots $j$ through $j+n-1$, dequeue
+returns $a[j]$ and just increments $j$, enqueue writes into slot $j+n$.
+No element ever moves. On an unbounded array this is already correct and
+$\Theta(1)$, but the occupied window crawls rightward forever: the slots
+behind $j$ are dead, and the structure hits the capacity wall after a
+fixed total number of *enqueues*, however many dequeues freed space
+behind the front.
+
+### The wraparound: slot (j + i) mod capacity
+
+Modular arithmetic reclaims the dead slots by bending the array into a
+ring: the element $i$ positions behind the front lives in slot
+$(j + i) \bmod \text{capacity}$, so indices past the last slot wrap
+around to slot 0. Concretely, with capacity 5, $j = 2$, and $n = 3$, the
+queue occupies slots 2, 3, 4 and the next enqueue lands in
+$(2 + 3) \bmod 5 = 0$: the slot a dequeue freed earlier.
+
+<FigureSequence
+  name="ring"
+  alt="Three frames of a capacity-5 circular buffer: four enqueues fill slots 0 to 3; two dequeues advance the head to slot 2; two more enqueues place e in slot 4 and wrap f around into slot 0"
+  caption="A capacity-5 circular buffer under 8 operations: the head advances, and the enqueue index wraps past the boundary by mod-5 arithmetic."
+/>
+
+<Task>
+Compute the landing slot of each enqueue before advancing the frames:
+after the two dequeues, `e` must land in $(2+2) \bmod 5 = 4$ and `f` in
+$(2+3) \bmod 5 = 0$, across the boundary.
+</Task>
+
+```text
+Enqueue(Q, x):                          Dequeue(Q):
+  if n = capacity: error "overflow"       if n = 0: error "underflow"
+  Q[(j + n) mod capacity] ← x             x ← Q[j]
+  n ← n + 1                               j ← (j + 1) mod capacity
+                                          n ← n − 1
+                                          return x
+```
+
+Each operation is one modular reduction, one memory access, and two
+counter updates: $\Theta(1)$, and the data never moves again. One design
+detail is load-bearing: this version stores the count $n$ explicitly. The
+common alternative keeps a head index and a tail index and no count, and
+pays for it with an ambiguity at the boundary that an exercise below
+makes precise: head equal to tail then means either empty or full, and
+the standard repair caps the queue at capacity − 1 elements.
+
+<Figure
+  src="./figures/scoreboard-v2.svg"
+  alt="Scoreboard v2: push, pop, enqueue, dequeue costs for the pinned-front array, the circular buffer, and the linked list with head and tail; the circular buffer's dequeue cell is the repaired Θ(1)"
+  caption="Scoreboard v2: the restricted interface, fully priced. Every cell of the circular buffer and the linked list is Θ(1); the pinned-front array keeps its Θ(n) dequeue, and only the ‡ capacity wall survives the repair."
+/>
+
+<KeyFact>
+The circular buffer clears the array's last $\Theta(n)$ cell on the
+restricted interface by moving the front instead of the data. What no
+indexing trick removes is the ‡ footnote carried over from scoreboard v1:
+a full array still cannot grow, and pricing the reallocation honestly is
+the whole subject of
+<Ref lesson="dynamic-arrays-and-amortized-analysis">the next lesson</Ref>.
+</KeyFact>
+
+<Exercise>
+A circular buffer has capacity 8, head $j = 5$, and count $n = 6$. (a)
+List the occupied slots in queue order and name the slot holding the
+front element. (b) Compute the landing slots of the next two enqueues.
+(c) Independently of (b), give $(j, n)$ after two dequeues from the
+starting state. Do the arithmetic before opening.
+
+<Solution>
+(a) The element $i$ positions behind the front sits in
+$(5 + i) \bmod 8$ for $i = 0, \ldots, 5$: slots
+$5, 6, 7, 0, 1, 2$, in that order. The front is in slot 5.
+
+(b) Enqueues land at $(j+n) \bmod 8$: first $(5 + 6) \bmod 8 = 3$, then
+$(5 + 7) \bmod 8 = 4$. After both, $n = 8$: the buffer is full, and a
+third enqueue overflows.
+
+(c) Each dequeue advances $j$ by one mod 8 and decrements $n$:
+$(5, 6) \to (6, 5) \to (7, 4)$. The transferable move: every question
+about a circular buffer reduces to the one formula
+$(j + i) \bmod \text{capacity}$, evaluated for the right $i$.
+</Solution>
+</Exercise>
+
+## Selection: the discipline mirrors the workload
+
+With every implementation cell at $\Theta(1)$, choosing between stack and
+queue is never about speed; it is about which element the workload needs
+back first, and real workloads split cleanly along that line. The stack
+serves the ones where the newest item is the relevant one: an undo
+history pops the latest edit first; bracket and syntax checking closes
+the innermost construct first, as worked above; backtracking search
+abandons the most recent choice first. The queue serves the ones where
+age or fairness rules: task scheduling serves requests in arrival order,
+and a buffer between a producer and a consumer must release data in the
+order it came.
+
+The two traversals of the graph module are the clean pair. Both maintain
+a collection of discovered-but-unexplored nodes around the identical
+loop; <Ref lesson="breadth-first-search">breadth-first search</Ref> holds
+it in a queue and consequently visits nodes in order of distance from
+the source, while
+<Ref lesson="depth-first-search-and-topological-sort">depth-first
+search</Ref> holds it in a stack and consequently dives along one branch
+before trying the next.
+
+<KeyFact>
+BFS and DFS are the same loop around a different removal rule, and the
+pattern has a third instance: replace the frontier's container with a
+min-priority queue keyed on tentative distance and the identical loop
+becomes Dijkstra's algorithm for
+<Ref lesson="shortest-paths-dijkstra">shortest paths in weighted
+graphs</Ref>. Choosing the container is choosing the exploration order,
+before a single line of the loop changes.
+</KeyFact>
+
+## A queue from two stacks
+
+The disciplines are opposites in a precise sense: a stack reverses the
+order of what passes through it, a queue preserves it. Opposition is
+convertibility, because two reversals compose to none. Keep two stacks,
+an *inbox* and an *outbox*. Enqueue pushes onto the inbox. Dequeue pops
+the outbox; if the outbox is empty, first pop every element off the inbox
+and push each onto the outbox, then pop. The flip puts the inbox's bottom
+element, the oldest one held, on the outbox's top, so elements leave in
+insertion order: FIFO from two LIFOs.
+
+<Figure
+  src="./figures/two-stack-queue.svg"
+  alt="A queue built from an inbox stack and an outbox stack: enqueue pushes the inbox, an empty outbox is refilled by popping the whole inbox onto it, dequeue pops the outbox; one element's four moves are numbered"
+  caption="Two reversals compose to none: every element is pushed and popped exactly twice, whatever the operation order."
+/>
+
+The price looks wrong at first sight. A single dequeue that triggers a
+flip of $k$ elements costs $2k + 1$ stack operations, so the worst-case
+cost per operation is $\Theta(n)$: on paper, no better than shifting the
+array. The accounting over a whole run says otherwise. Every element is
+pushed onto the inbox once, popped off it once, pushed onto the outbox
+once, and popped off it once: exactly four stack operations per element,
+ever, no matter how enqueues and dequeues interleave, because a flipped
+element is never flipped back. A sequence of $m$ operations therefore
+costs at most four moves per element it touches, under $4m$ in total,
+and the *average* cost per operation is a constant even though individual
+operations are not. Turning that averaging into a formal per-operation
+guarantee, and naming what "amortized $O(1)$" may and may not promise, is
+the next lesson's subject; the last exercise below runs the count on a
+concrete sequence.
+
+What stands at the end of this lesson: LIFO and FIFO as one-clause
+restrictions of the Sequence interface; the stack served by a top index
+or a head splice, the queue by a tail-and-head list or a circular buffer,
+every cell at $\Theta(1)$; the call stack as the stack every recursion
+already uses; and one construction, the two-stack queue, whose price is
+stated but not yet formally justified.
+<Ref lesson="dynamic-arrays-and-amortized-analysis">The next lesson</Ref>
+supplies the missing tool, amortized analysis, and uses it to knock down
+the ‡ capacity wall itself. One member of the family is deliberately
+absent: the third natural removal rule, *remove the smallest*, defines
+the priority queue, and no fixed-end trick serves it; it waits for the
+<Ref lesson="binary-heaps-and-priority-queues">binary heap</Ref>.
+
+## Exercises
+
+<Exercise>
+Feed the operation sequence
+`insert a, insert b, remove, insert c, insert d, remove, remove` to (a) a
+stack and (b) a queue, both initially empty. For each, list the values
+the three removes return, in order, and the element left inside at the
+end. (c) Characterize exactly the operation sequences on which a stack
+and a queue return identical outputs.
+
+<Solution>
+(a) Stack: push a, push b, pop → **b**; push c, push d, pop → **d**;
+pop → **c**. Returns b, d, c; **a** remains.
+
+(b) Queue: enqueue a, b; dequeue → **a**; enqueue c, d; dequeue → **b**;
+dequeue → **c**. Returns a, b, c; **d** remains.
+
+(c) The outputs agree exactly when, at every remove, the newest and the
+oldest resident coincide, i.e. when the structure holds exactly one
+element at every remove. (With distinct values this is also necessary:
+two or more residents make the stack return the newer and the queue the
+older.) Sequences that never let the population reach two at a removal,
+such as strictly alternating insert/remove, are the ones on which the two
+disciplines are indistinguishable from outside.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson evaluated `( 1 + ( ( 2 + 3 ) * ( 4 * 5 ) ) )` with two stacks.
+(a) Evaluate its postfix form `1 2 3 + 4 5 * * +` using a *single* value
+stack and two rules: a value is pushed; an operator pops two values,
+applies, and pushes the result. Show the stack after every token. (b)
+Explain, from the trace, why the operator stack of the infix algorithm
+has no work left to do in postfix. (c) Name what plays the role of the
+infix algorithm's `)` token.
+
+<Solution>
+(a)
+
+| token | stack after |
+|---|---|
+| `1` | 1 |
+| `2` | 1, 2 |
+| `3` | 1, 2, 3 |
+| `+` | 1, 5 |
+| `4` | 1, 5, 4 |
+| `5` | 1, 5, 4, 5 |
+| `*` | 1, 5, 20 |
+| `*` | 1, 100 |
+| `+` | 101 |
+
+Result **101**, the same value.
+
+(b) In postfix, an operator arrives only after both of its operands, so
+at the moment it is read its operands are already the top two values: it
+can execute immediately and never needs to be stored. The infix operator
+stack existed solely to hold operators whose right operand had not
+arrived yet; postfix eliminates the waiting, hence the stack.
+
+(c) The operator token itself. In infix, `)` is the signal "this
+operator's operands are now complete"; postfix moves the operator to
+that position, so the signal and the operator are the same token, which
+is also why the parentheses become redundant. This is the execution
+model of JVM bytecode and PostScript: compiling infix arithmetic means
+emitting its postfix.
+</Solution>
+</Exercise>
+
+<Exercise>
+A widely used circular-buffer variant stores no count: only a head index
+$h$ (slot of the front element) and a tail index $t$ (slot of the next
+insert), each advanced mod the capacity, with "empty" tested as $h = t$.
+(a) On a capacity-4 buffer starting at $h = t = 0$, run four enqueues
+and show that the final state is indistinguishable from the empty one.
+(b) State precisely what information $h$ and $t$ carry about the number
+of elements $n$, and why the ambiguity is exactly between the two values
+it is. (c) Give the two standard repairs and what each costs.
+
+<Solution>
+(a) Each enqueue writes at $t$ and advances it: $t$ moves
+$0 \to 1 \to 2 \to 3 \to 0$ while $h$ stays 0. After four enqueues,
+$h = t = 0$ with all four slots full — the same $(h, t)$ as the empty
+buffer. The emptiness test $h = t$ now reports an occupied buffer empty,
+and a further enqueue would silently overwrite the front.
+
+(b) By construction $t \equiv h + n \pmod{4}$, so the pair determines
+only $n \bmod 4$, i.e. $n$'s remainder, not $n$. All states with
+$n \in \{0, 4\}$ share $h = t$; the ambiguity is exactly empty versus
+full because those are the only two values in range $0 \le n \le 4$ that
+are congruent mod 4.
+
+(c) Repair one: store $n$ explicitly, as the lesson's version does; one
+extra counter, and full is $n = \text{capacity}$. Repair two: never let
+$n$ reach capacity — declare the buffer full when advancing $t$ would
+make it equal $h$, so a capacity-$c$ array holds at most $c - 1$
+elements; one slot of storage sacrificed, no counter. The transferable
+move: modular arithmetic preserves remainders and destroys magnitudes,
+so any two states differing by a full lap are indistinguishable unless
+extra state breaks the tie.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute or repair this claim: "a singly linked list with head and tail
+pointers is symmetric, so enqueueing at the head and dequeueing at the
+tail implements the same queue as the orientation used in the lesson."
+State what the reversed orientation costs per operation and why, name
+the cheapest change to the structure that rescues it, and give the cost
+of that change.
+
+<Solution>
+The claim's outputs are right and its prices are wrong. Both orientations
+produce FIFO behavior, but dequeueing at the tail is delete-back, and the
+<Ref lesson="arrays-and-linked-lists">previous lesson</Ref> established
+the asymmetry that breaks it: removing the tail node requires retargeting
+the `next` field of the tail's *predecessor*, and a singly linked node
+stores no route backward, so reaching that predecessor is a $\Theta(n)$
+walk from the head — on every dequeue. Enqueue-at-head is a $\Theta(1)$
+splice, but the pair prices at $\Theta(n)$ per dequeue against
+$\Theta(1) + \Theta(1)$ for the lesson's orientation (enqueue at the
+tail, dequeue at the head). The general rule: on a singly linked list,
+the head end supports insert and remove, the tail end (with a tail
+pointer) insert only, so the removal end of any discipline must sit at
+the head. The cheapest rescue is the previous lesson's `prev` pointer:
+a doubly linked list makes both orientations $\Theta(1)$, at one extra
+machine word per node and one extra write per update.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two stacks must share one array $A[0..n-1]$ so that neither overflows
+until the two together hold $n$ elements, with $\Theta(1)$ push and pop
+for both (CLRS exercise 10.1-3). (a) Design the layout and the four
+operations. (b) Show why the obvious alternative, splitting the array
+into two fixed halves, fails the specification. (c) Name the invariant
+that makes your design correct.
+
+<Solution>
+(a) Grow the stacks toward each other from opposite ends. Stack $L$
+occupies slots $0..t_L - 1$ and grows rightward: push writes $A[t_L]$
+and increments $t_L$; pop decrements and reads. Stack $R$ occupies slots
+$t_R + 1..n-1$ and grows leftward: push writes $A[t_R]$ and decrements
+$t_R$; pop increments and reads. Initialize $t_L = 0$, $t_R = n - 1$.
+Every operation is one index update and one access: $\Theta(1)$.
+
+(b) Fixed halves give each stack capacity $n/2$, so a workload pushing
+$n/2 + 1$ elements onto one stack and none onto the other overflows with
+nearly half the array empty, violating "neither overflows until the two
+together hold $n$".
+
+(c) The invariant: $t_L \le t_R + 1$, with the unused region being
+exactly the slots $t_L..t_R$. Overflow is declared only when
+$t_L = t_R + 1$, i.e. the free region is empty, which happens exactly
+when the stacks together hold $n$ elements. The transferable move: two
+structures that grow toward each other share one capacity with zero
+waste; process address spaces have laid out the heap and the call stack
+this way for the same reason.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the two-stack queue on the sequence
+`enqueue a, b, c; dequeue; dequeue; enqueue d, e; dequeue; dequeue;
+dequeue` (ten operations). (a) Trace both stacks, and price every
+operation in single pushes and pops. (b) Total the moves and compare
+against four per element. (c) The worst single operation in your trace
+costs 7 moves; state the bound your totals suggest for *any* sequence of
+$m$ operations starting empty, and why no interleaving breaks it.
+
+<Solution>
+(a) Enqueue a, b, c: three pushes onto the inbox (1 move each); inbox
+holds a, b, c bottom-to-top. First dequeue: outbox empty, so flip —
+pop c/b/a, push each (6 moves) — then pop **a** (1): cost **7**; outbox
+now holds c, b. Second dequeue: pop **b** (1). Enqueue d, e: 1 move
+each; inbox d, e. Third dequeue: outbox still holds c, pop **c** (1).
+Fourth dequeue: outbox empty, flip e/d (4 moves), pop **d** (1): cost
+**5**. Fifth dequeue: pop **e** (1). Output order a, b, c, d, e: FIFO,
+as required.
+
+(b) Total: $3 + 7 + 1 + 2 + 1 + 5 + 1 = 20$ moves for 5 elements —
+exactly $4$ per element: each was pushed twice and popped twice.
+
+(c) For any $m$ operations starting empty: each element ever enqueued
+makes at most 4 moves (inbox push, inbox pop, outbox push, outbox pop),
+and no element is flipped twice because flipped elements sit in the
+outbox until dequeued. With at most $m$ enqueues, total work is under
+$4m$: the *average* per operation is below 4 moves even though single
+dequeues cost $\Theta(n)$. You have just run the aggregate method of
+amortized analysis — bound the total over any sequence, divide by the
+number of operations — one lesson early:
+<Ref lesson="dynamic-arrays-and-amortized-analysis">dynamic arrays and
+amortized analysis</Ref> defines it and uses the same argument to price
+the dynamic array's resizes at amortized $O(1)$.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §10.1.3: array stacks and queues, underflow/overflow, and the wraparound queue (Figs. 10.2–10.3); Exercise 10.1-3 is the shared-array pair worked in the exercises.
+2. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §1.3: linked and array implementations of both structures, Dijkstra's two-stack evaluator with the (1+((2+3)*(4*5))) trace, the postfix observations, and the applications list. Companion site: https://algs4.cs.princeton.edu/13stacks/
+3. P. Morin, *Open Data Structures*, 2013 — §1.2.1: Queue, Stack, and Deque as restricted interfaces and the removal-discipline framing; §2.3: the ArrayQueue and its modular-index arithmetic. Free online: https://opendatastructures.org/
+4. E. Demaine, J. Ku, J. Solomon, *MIT 6.006 Introduction to Algorithms*, Spring 2020, Lecture 2 notes — the interface-versus-implementation frame and the operations table this module's scoreboard continues. https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/
+</References>

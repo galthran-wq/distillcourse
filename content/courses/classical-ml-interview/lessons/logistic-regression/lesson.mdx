@@ -1,0 +1,404 @@
+Logistic regression models the log-odds as a linear function; maximum likelihood then yields a convex loss whose gradient has exactly the least-squares form (y − p)x. This chapter derives that gradient in full and gives the three-part answer to "why cross-entropy and not squared error". The route: the sigmoid from the log-odds, the Bernoulli likelihood and the gradient derivation, the case against squared error, fitting by gradient ascent and Newton/IRLS, the separable-data pathology and its regularization fix, coefficients as odds ratios, and the softmax extension.
+
+## The model: a linear score for the log-odds
+
+Despite the name, logistic regression is a **classifier**: it is called regression because it fits a real-valued function, the probability of the positive class, with regression machinery.
+
+The naive alternative fails first. Coding a binary label as $y \in \{0, 1\}$ and running least squares from <Ref lesson="ols" /> produces a line, and a line leaves $[0, 1]$: on the [ISLP](https://www.statlearning.com/) `Default` data (10,000 credit-card holders, label = defaulted or not), the linear fit predicts *negative* default probabilities for low balances and would exceed 1 for large enough ones. A probability model needs an output pinned to $(0, 1)$.
+
+### Odds and log-odds: mapping (0, 1) to the real line
+
+The repair is to transform the probability, not clip the line. For $p = 0.8$, the *odds* are $p/(1-p) = 0.8/0.2 = 4$ ("4 to 1"), and the *log-odds* (logit) are $\ln 4 \approx 1.386$. Tabulating:
+
+| $p$ | odds $p/(1-p)$ | log-odds |
+| --- | --- | --- |
+| 0.1 | 1/9 | $-2.197$ |
+| 0.5 | 1 | 0 |
+| 0.9 | 9 | $+2.197$ |
+
+Odds live in $(0, \infty)$; the log stretches them over all of $\mathbb R$, symmetrically around $p = \tfrac12$. A quantity that ranges over the whole real line is exactly what a linear function can model. Setting the log-odds equal to a linear score $z = w^\top x$ (with a constant 1 appended to $x$ so $w$ carries the intercept) and solving for $p$:
+
+$$
+\ln\frac{p}{1-p} = z
+\;\Longrightarrow\; \frac{p}{1-p} = e^{z}
+\;\Longrightarrow\; p = e^{z}(1 - p)
+\;\Longrightarrow\; p = \frac{e^{z}}{1 + e^{z}} = \frac{1}{1 + e^{-z}} .
+$$
+
+<Definition title="logistic regression">
+The *logistic (sigmoid) function* is $\sigma(z) = 1/(1 + e^{-z})$. **Logistic regression** models a binary label as
+
+$$
+p(y = 1 \mid x; w) = \sigma(w^\top x),
+$$
+
+equivalently: the log-odds of $y = 1$ are linear in $x$. The parameters $w$ are fit by maximum likelihood.
+</Definition>
+
+<Figure
+  src="./figures/sigmoid.svg"
+  alt="Left: the log-odds z as a straight line in x with z = 0 marked. Right: the sigmoid curve p = sigma(z) rising from 0 to 1 with the point z = 0, p = one half marked as the decision boundary"
+  caption="One model on two scales: linear log-odds on the left is a sigmoid probability on the right; z = 0 maps to p = ½."
+/>
+
+### The decision boundary is linear
+
+Classifying by the more probable label means predicting $\hat y = 1$ when $p \ge \tfrac12$. Since $\sigma$ is strictly increasing with $\sigma(0) = \tfrac12$,
+
+$$
+\sigma(w^\top x) \ge \tfrac12 \iff w^\top x \ge 0 :
+$$
+
+the boundary is the hyperplane $w^\top x = 0$, linear in $x$ even though $\sigma$ is not. More generally $p$ depends on $x$ only through the scalar $w^\top x$, so every equal-probability set is a hyperplane parallel to the boundary; the model outputs a graded probability, not just a side.
+
+<Figure
+  src="./figures/boundary.svg"
+  alt="Two-class 2D scatter with the linear decision boundary and the parallel dashed probability contours p = 0.1 and p = 0.9"
+  caption="Probability contours of a fitted 2D model: parallel lines. Distance from the boundary, through σ, is confidence."
+/>
+
+<Remark title="the discriminative member of the family">
+Logistic regression models $p(y \mid x)$ directly and assumes nothing about how $x$ is distributed. [Weinberger's CS4780 note](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote06.html) introduces it as the discriminative counterpart of naive Bayes: the generative route (fit class-conditional Gaussians, apply Bayes' rule) produces the same sigmoid-of-linear form but different parameter values, and with $M$ features it estimates $M(M+5)/2 + 1$ parameters where logistic regression estimates $M$ ([Bishop, PRML §4.3.2](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf)). The trade-off is the subject of <Ref lesson="lda-gda" />.
+</Remark>
+
+<KeyFact>
+Logistic regression is the statement "the log-odds are linear": $p = \sigma(w^\top x)$, the decision boundary is the hyperplane $w^\top x = 0$, and probability contours are hyperplanes parallel to it.
+</KeyFact>
+
+## Maximum likelihood: the Bernoulli likelihood becomes cross-entropy
+
+The fit follows the two-step recipe of <Ref lesson="mle-map" />: write the log-likelihood, maximize it. Each label is a Bernoulli draw with success probability $p_i = \sigma(w^\top x_i)$, so for independent examples
+
+$$
+L(w) = \prod_{i=1}^n p_i^{\,y_i} (1 - p_i)^{1 - y_i},
+\qquad
+\ell(w) = \sum_{i=1}^n \bigl[ y_i \log p_i + (1 - y_i) \log(1 - p_i) \bigr].
+$$
+
+<Definition title="cross-entropy loss">
+The **cross-entropy (log) loss** of a predicted probability $p$ against a label $y \in \{0,1\}$ is
+
+$$
+L(y, p) = -\bigl[ y \log p + (1 - y)\log(1 - p) \bigr],
+$$
+
+the negative Bernoulli log-likelihood of one example. Minimizing average cross-entropy and maximizing the likelihood are the same problem.
+</Definition>
+
+The loss reads case by case: for $y = 1$ it is $-\log p$, the model's surprise at a positive; for $y = 0$ it is $-\log(1-p)$. A confident wrong prediction ($p \to 0$ while $y = 1$) is punished without bound.
+
+### The derivative of the sigmoid
+
+The gradient computation runs through one identity, and interviewers ask for it on its own. Differentiate $\sigma(z) = (1 + e^{-z})^{-1}$:
+
+$$
+\sigma'(z) = \frac{e^{-z}}{(1 + e^{-z})^2}
+= \frac{1}{1 + e^{-z}} \cdot \frac{e^{-z}}{1 + e^{-z}}
+= \sigma(z)\bigl(1 - \sigma(z)\bigr),
+$$
+
+using $e^{-z}/(1 + e^{-z}) = 1 - \sigma(z)$. The derivative is the function times its complement: largest at $z = 0$ (value $\tfrac14$), decaying to 0 in both tails. Exercise 2 drills this and its companions.
+
+### The gradient: error times input
+
+<Theorem title="gradient of the log-likelihood">
+For $\ell(w)$ as above with $p_i = \sigma(w^\top x_i)$,
+
+$$
+\nabla \ell(w) = \sum_{i=1}^n \bigl(y_i - p_i\bigr)\, x_i .
+$$
+
+<Proof>
+It suffices to differentiate one term; write $p = \sigma(z)$, $z = w^\top x$. Chain rule through $p$, then $z$:
+
+$$
+\frac{\partial}{\partial w}\bigl[ y \log p + (1-y)\log(1-p) \bigr]
+= \left( \frac{y}{p} - \frac{1-y}{1-p} \right) \cdot \frac{\partial p}{\partial z} \cdot \frac{\partial z}{\partial w}.
+$$
+
+The middle factor is the sigmoid identity, $\partial p/\partial z = \sigma'(z) = p(1-p)$, and $\partial z / \partial w = x$. Multiply out:
+
+$$
+\left( \frac{y}{p} - \frac{1-y}{1-p} \right) p(1-p)
+= y(1-p) - (1-y)p
+= y - yp - p + yp
+= y - p .
+$$
+
+The $p(1-p)$ factor cancels both denominators exactly, leaving $(y - p)\,x$ per example; summing gives the claim.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="LogisticGradientSteps"
+  alt="Four frames building the logistic-regression gradient: the Bernoulli likelihood of one example, its logarithm, the three chain-rule factors with the sigmoid identity highlighted, and the boxed result (y minus p) times x"
+  caption="The set-piece derivation, one move per frame. The cancellation in frame 4 is what makes the result clean."
+/>
+
+<Task>
+Step through the four frames, then reproduce the derivation on paper without them: likelihood, log, the three chain-rule factors, the cancellation. The whole derivation is five lines; Exercise 1 asks for it cold.
+</Task>
+
+<Remark title="the same form as least squares">
+The stochastic ascent update $w \leftarrow w + \eta\,(y_i - h(x_i))\,x_i$ is *identical in form* to the LMS update for linear regression; only the hypothesis changed, from $h(x) = w^\top x$ to $h(x) = \sigma(w^\top x)$. The [CS229 notes](https://cs229.stanford.edu/main_notes.pdf) (§2.1) flag this and note it is not a coincidence: both models are generalized linear models with canonical links, the unifying recipe of the optional <Ref lesson="glm" /> chapter.
+</Remark>
+
+<Example title="one gradient-ascent step, with numbers">
+Two 1D examples with intercept, so $\tilde x = (1, x)$: $(x_1, y_1) = (2, 1)$ and $(x_2, y_2) = (-1, 0)$. Start at $w = (0, 0)$, so $z_i = 0$ and $p_i = 0.5$ for both.
+
+Per-example gradients $(y_i - p_i)\,\tilde x_i$:
+
+$$
+(1 - 0.5)(1, 2) = (0.5,\ 1.0), \qquad (0 - 0.5)(1, -1) = (-0.5,\ 0.5).
+$$
+
+Sum: $\nabla \ell = (0,\ 1.5)$. One ascent step with $\eta = 0.1$: $w = (0,\ 0.15)$.
+
+Check that the likelihood improved. New scores: $z_1 = 0.3$, $z_2 = -0.15$; new probabilities $p_1 = \sigma(0.3) = 0.574$, $p_2 = \sigma(-0.15) = 0.463$. Negative log-likelihood: before, $2 \times 0.693 = 1.386$; after, $-\ln 0.574 - \ln(1 - 0.463) = 0.554 + 0.621 = 1.176$. The step moved both predictions toward their labels.
+</Example>
+
+<KeyFact>
+Bernoulli likelihood plus the identity σ′ = σ(1−σ) gives ∇ℓ = Σ (yᵢ − pᵢ)xᵢ: prediction error times input, the same form as least squares with a different hypothesis.
+</KeyFact>
+
+## Why not squared error: the three-part answer
+
+The interview question "why cross-entropy instead of MSE for classification" has three independent answers; give all three.
+
+### Convexity
+
+The negative log-likelihood is **convex** in $w$: the per-example loss rewrites as $-yz + \log(1 + e^{z})$, a linear term plus softplus, and softplus has second derivative $\sigma(z)(1-\sigma(z)) > 0$. This is the argument worked in Exercise 7 of <Ref lesson="gradient-descent" />, where the logistic loss sits in the convexity ledger; by the local-equals-global theorem there, any descent scheme that converges has found the global MLE. Squared error on a sigmoid, $\bigl(y - \sigma(w^\top x)\bigr)^2$, is **not convex** in $w$: composing the convex square with the non-convex $\sigma$ destroys the property, and its second derivative in $z$ changes sign (Exercise 3). Gradient descent on it can stall in flat regions with no global guarantee.
+
+### Vanishing gradients when confidently wrong
+
+For a single example with $y = 1$, differentiate both losses with respect to the score $z$. Cross-entropy: $\partial L / \partial z = p - 1$, which approaches $-1$ as $z \to -\infty$: the more wrong the model, the closer the slope is to its maximum size. Squared error: $\partial L / \partial z = -2(1-p)^2 p$, which approaches $0$ as $z \to -\infty$, because the factor $\sigma'(z) = p(1-p)$ dies in the tail. At $z = -4$ (the model assigns the true class probability $0.018$), the slopes are $-0.98$ against $-0.03$: a 30-fold difference exactly where learning is most needed. Cross-entropy trains on its worst mistakes; squared error barely feels them.
+
+<Figure
+  name="CeVsMseLoss"
+  alt="Loss against the score z for a positive example: the cross-entropy curve grows steeply and almost linearly for negative z while the squared-error curve flattens toward 1, with the confidently-wrong region shaded and both slopes at z = -4 annotated"
+  caption="One positive example. In the shaded confidently-wrong region cross-entropy keeps slope ≈ −1 while squared error saturates: gradients vanish exactly where the model is most wrong."
+/>
+
+### Calibration
+
+Cross-entropy is the negative log-likelihood, so minimizing it is maximum likelihood for the Bernoulli model: the fitted $p_i$ are probability estimates, usable for expected-cost decisions and threshold tuning. Log-loss is a *proper scoring rule*: its expected value is minimized by reporting the true conditional probability. Squared error on probabilities (the Brier score) is also proper, so this argument alone does not disqualify it; the decisive failures are the two above. Metrics and calibration curves get their own treatment in <Ref lesson="classification-metrics" />.
+
+<KeyFact>
+Three reasons cross-entropy beats squared error on a sigmoid: the NLL is convex in w while squared error is not; its gradient stays large when the model is confidently wrong while squared error's vanishes; and it is the exact Bernoulli MLE, so the outputs are probability estimates.
+</KeyFact>
+
+## Fitting: gradient ascent always works, Newton works fast at small d
+
+Setting $\nabla \ell = 0$ gives $\sum_i (y_i - \sigma(w^\top x_i))\,x_i = 0$, a transcendental system with **no closed-form solution**; logistic regression is the standard example of a model that must be fit iteratively (<Ref lesson="gradient-descent" />). Batch ascent steps along $\nabla \ell$; SGD uses the per-example form $(y_i - p_i)x_i$. Convexity guarantees either converges to the global optimum with a suitable step size.
+
+The classical solver is Newton's method. In matrix form, with $X$ the $n \times d$ design matrix, $p$ the vector of predictions, and $S = \operatorname{diag}\bigl(p_i(1 - p_i)\bigr)$, the NLL has gradient and Hessian
+
+$$
+\nabla J = X^\top (p - y), \qquad H = X^\top S X,
+$$
+
+and the Newton update is
+
+$$
+w \leftarrow w - (X^\top S X)^{-1} X^\top (p - y).
+$$
+
+At $d$ in the hundreds the $O(d^3)$ solve is trivial, and quadratic convergence typically reaches the optimum in well under ten iterations. Two practical notes from [Murphy's PML ch. 10](https://probml.github.io/pml-book/book1.html): standardize features first (the penalty and the conditioning both care, per <Ref lesson="gradient-descent" />), and add an L2 penalty by default, which the next section motivates independently.
+
+<Aside>
+The Newton update rearranges into *iteratively reweighted least squares* (IRLS). Define the working response $\zeta = Xw - S^{-1}(p - y)$; then the update above is algebraically
+
+$$
+w \leftarrow (X^\top S X)^{-1} X^\top S\, \zeta,
+$$
+
+a weighted least-squares solve in which example $i$ carries weight $p_i(1 - p_i)$: uncertain examples (near $p = \tfrac12$) weigh most, confidently classified ones least. Each Newton iteration is one weighted OLS problem with recomputed weights, hence the name ([Bishop, PRML §4.3.3](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf)). This is what `statsmodels` and R's `glm` run.
+</Aside>
+
+## Separable data: the MLE does not exist
+
+Perfect training data breaks the fit. Suppose some $w_0$ strictly separates the classes: $w_0^\top x_i > 0$ whenever $y_i = 1$ and $w_0^\top x_i < 0$ whenever $y_i = 0$.
+
+<Theorem title="divergence under separability">
+If the training data are strictly linearly separable, $\ell(w)$ has no finite maximizer: $\sup_w \ell(w) = 0$ is approached but never attained, and the maximizing sequence has $\lVert w \rVert \to \infty$.
+
+<Proof>
+Consider $w = c\,w_0$ and let $c \to \infty$. Each score $c\,w_0^\top x_i$ diverges to $+\infty$ on positives and $-\infty$ on negatives, so every $p_i \to y_i$ and every likelihood factor $\to 1$: $\ell(c\,w_0) \to 0$, monotonically increasing in $c$ (each factor is increasing in $c$). But $\ell(w) < 0$ for every finite $w$, since each factor is strictly below 1. The supremum is not attained, and scaling any separator up always improves the likelihood, so the optimizer runs to infinity.
+</Proof>
+</Theorem>
+
+In practice: the solver reports huge coefficients, convergence warnings, and fitted probabilities of exactly 0 and 1. With small $n$ or large $d$, perfect separation is common, not exotic. Gradient descent on separable data grows $\lVert w \rVert$ like $\log t$ while the *direction* $w/\lVert w \rVert$ converges to the maximum-margin separator ([Soudry et al., 2018](https://jmlr.org/papers/v19/18-188.html)), the object <Ref lesson="svm-max-margin" /> constructs deliberately.
+
+<Figure
+  src="./figures/separable.svg"
+  alt="Norm of the weight vector against gradient-ascent iterations on separable data: without a penalty the norm grows without bound while the likelihood approaches 1; with an L2 penalty the norm levels off at a finite value"
+  caption="Separable data. Unpenalized: ‖w‖ grows without bound (likelihood → 1, never reached). An L2 penalty caps the norm at a finite optimum."
+/>
+
+The fix is **regularization**. Maximizing $\ell(w) - \lambda \lVert w \rVert^2$ adds a term that decreases without bound as $\lVert w \rVert$ grows, so the penalized objective has a finite, unique maximizer (it is strictly concave). In the language of <Ref lesson="mle-map" /> this is MAP estimation with a Gaussian prior on $w$; a Laplace prior gives L1-regularized logistic regression, which sparsifies coefficients exactly as in <Ref lesson="ridge-lasso" /> ([ESL §4.4.4](https://hastie.su.domains/ElemStatLearn/)). An alternative with statistical rather than Bayesian motivation is Firth's penalized likelihood ([Firth, 1993](https://doi.org/10.1093/biomet/80.1.27)), which keeps estimates finite under separation by penalizing with the Fisher information.
+
+<KeyFact>
+On linearly separable data the logistic MLE is at infinity: scaling any separator up monotonically increases the likelihood toward 1. An L2 penalty (a Gaussian prior) restores a finite unique optimum, which is why regularized logistic regression is the default.
+</KeyFact>
+
+## Reading coefficients: e^w is an odds ratio
+
+Because the model is linear in log-odds, adding one unit to feature $x_j$ adds $w_j$ to the log-odds, hence **multiplies the odds by $e^{w_j}$**, regardless of the values of the other features. This multiplicative reading is the entire interpretive toolkit.
+
+The `Default` data make it concrete. The single-predictor fit of ISLP ch. 4 is $\hat\beta_0 = -10.6513$, $\hat\beta_1 = 0.0055$ per dollar of balance. Per \$100 of balance the odds of default multiply by $e^{0.55} \approx 1.73$. In probabilities: at balance \$1,000 the model gives $p = \sigma(-10.6513 + 5.5) = 0.00576$; at \$2,000, $p = \sigma(0.3487) = 0.586$. Same coefficient, wildly different probability jumps: probability effects depend on where you start, odds effects do not.
+
+<Figure
+  name="OddsRatioCard"
+  alt="Coefficient card for the three-predictor Default model: balance +0.57 per hundred dollars giving odds ratio 1.77, income +0.003 per thousand dollars giving 1.00, student yes minus 0.65 giving 0.52, each with a one-line reading"
+  caption="The multiple-regression coefficients of the Default model (ISLP Table 4.3) translated to odds ratios."
+/>
+
+Two subtleties the card's footer compresses. First, coefficients are **log-odds effects, not probability effects**: $\partial p / \partial x_j = w_j\, p(1-p)$, so the probability impact of a unit change is largest at $p = \tfrac12$ and vanishes near 0 and 1 (Exercise 5). Second, coefficients are *ceteris paribus* and can flip sign when correlated predictors enter: in the `Default` data the student indicator has coefficient $+0.4049$ alone but $-0.6468$ in the multiple model. Students default more overall because they carry higher balances; at fixed balance they default less. This confounding example is ISLP's, and it is a standard interview probe on interpreting coefficients.
+
+<Remark title="class imbalance moves the intercept, not the slopes">
+Under a correctly specified model, re-sampling or re-weighting the classes by a factor $r$ shifts every log-odds by the constant $\ln r$: only the intercept changes, the slopes and the boundary orientation are unaffected. Choosing the decision threshold (equivalently, un-shifting the intercept) is a metrics-and-costs question, treated in <Ref lesson="classification-metrics" />.
+</Remark>
+
+## More than two classes: softmax and cross-entropy
+
+The multiclass extension keeps every structure. With $K$ classes, give each class a weight vector $w_k$ and pass the $K$ scores through the *softmax*:
+
+$$
+p(y = k \mid x) = \frac{e^{w_k^\top x}}{\sum_{j=1}^K e^{w_j^\top x}},
+$$
+
+positive numbers summing to 1. The loss is again the negative log-likelihood, $-\log p(y \mid x)$, the multiclass cross-entropy, and it is again convex. The gradient generalizes $(y - p)x$ verbatim: for class $k$,
+
+$$
+\nabla_{w_k} \bigl[-\log p(y \mid x)\bigr] = \bigl(p_k - \mathbf 1\{y = k\}\bigr)\, x,
+$$
+
+the probability vector minus the one-hot label, times the input ([Murphy, PML §10.3](https://probml.github.io/pml-book/book1.html)). For $K = 2$ the softmax collapses to the sigmoid with $w = w_1 - w_0$, recovering everything above. Pairwise class boundaries remain linear.
+
+## Exercises
+
+<Exercise>
+The set piece: derive the gradient of the logistic-regression log-likelihood from scratch. Define the model, write the likelihood of $n$ labeled examples, take the log, and differentiate with every chain-rule step shown.
+
+<Solution>
+Model: $p_i = \sigma(w^\top x_i)$ with $\sigma(z) = 1/(1+e^{-z})$, labels $y_i \in \{0,1\}$ independent Bernoulli.
+
+Likelihood and log-likelihood:
+
+$$
+L(w) = \prod_{i=1}^n p_i^{y_i}(1-p_i)^{1-y_i},
+\qquad
+\ell(w) = \sum_i y_i \log p_i + (1-y_i)\log(1-p_i).
+$$
+
+One term, chain rule through $p$ and $z = w^\top x$:
+
+$$
+\frac{\partial}{\partial w} = \left(\frac{y}{p} - \frac{1-y}{1-p}\right)\cdot \sigma'(z) \cdot x .
+$$
+
+Sigmoid identity: $\sigma'(z) = \sigma(z)(1-\sigma(z)) = p(1-p)$. Substitute and cancel:
+
+$$
+\left(\frac{y}{p} - \frac{1-y}{1-p}\right) p(1-p) = y(1-p) - (1-y)p = y - p .
+$$
+
+Hence $\nabla \ell(w) = \sum_i (y_i - p_i)\,x_i$. Ascent update: $w \leftarrow w + \eta \sum_i (y_i - p_i)x_i$; the update is error times input, the LMS form with hypothesis $\sigma(w^\top x)$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Three sigmoid identities interviewers expect on demand. Prove: (a) $\sigma'(z) = \sigma(z)(1 - \sigma(z))$; (b) $1 - \sigma(z) = \sigma(-z)$; (c) $\frac{d}{dz}\log\sigma(z) = 1 - \sigma(z)$.
+
+<Solution>
+(a) $\sigma(z) = (1+e^{-z})^{-1}$, so
+
+$$
+\sigma'(z) = -(1+e^{-z})^{-2}\cdot(-e^{-z}) = \frac{e^{-z}}{(1+e^{-z})^2}
+= \underbrace{\frac{1}{1+e^{-z}}}_{\sigma(z)} \cdot \underbrace{\frac{e^{-z}}{1+e^{-z}}}_{1-\sigma(z)} .
+$$
+
+(b) $1 - \sigma(z) = \dfrac{1+e^{-z}-1}{1+e^{-z}} = \dfrac{e^{-z}}{1+e^{-z}}$; multiply numerator and denominator by $e^{z}$: $\dfrac{1}{e^{z}+1} = \sigma(-z)$.
+
+(c) $\frac{d}{dz}\log\sigma(z) = \sigma'(z)/\sigma(z) = \sigma(z)(1-\sigma(z))/\sigma(z) = 1-\sigma(z)$. By the same computation with (b), $\frac{d}{dz}\log(1-\sigma(z)) = -\sigma(z)$; these two are exactly the derivatives used in the gradient theorem.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "why cross-entropy instead of MSE for classification?" Give the full three-part answer. For the gradient part, compute both slopes at $z = -4$ for a positive example; for the convexity part, show that $g(z) = (1 - \sigma(z))^2$ is not convex by evaluating the sign of $g''$ in the two tails.
+
+<Solution>
+**Convexity.** The logistic NLL per example is $-yz + \log(1+e^z)$: linear plus softplus, and softplus has $f''(z) = \sigma(z)(1-\sigma(z)) > 0$, so the NLL is convex in $z$ and, composed with the affine $z = w^\top x$, convex in $w$; descent methods reach the global MLE. For squared error, $g(z) = (1-\sigma)^2$ has $g'(z) = -2(1-\sigma)\sigma(1-\sigma) = -2\sigma(1-\sigma)^2$. As $z \to -\infty$, $g' \to 0^-$ and $g \to 1$ from below with $g$ decreasing ever more slowly: the curve flattens, so it is concave there (numerically, $g''(-3) \approx -0.08 < 0$), while near $z \to +\infty$, $g \to 0$ flattening from above, convex ($g'' > 0$). A function whose second derivative changes sign is not convex, so squared error on a sigmoid is non-convex in $w$: no global guarantee.
+
+**Vanishing gradient.** For $y = 1$: cross-entropy slope $\partial L/\partial z = p - 1$; at $z = -4$, $p = \sigma(-4) = 0.018$, slope $= -0.982$. Squared-error slope $= -2\sigma(1-\sigma)^2 = -2(0.018)(0.982)^2 = -0.035$. The confidently wrong example drives CE at nearly full strength and MSE at 3% of it: MSE stalls exactly on the worst mistakes.
+
+**Calibration.** CE is the exact Bernoulli negative log-likelihood, so minimizing it is MLE and the outputs are probability estimates; log-loss is a proper scoring rule, minimized in expectation by the true conditional probability.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "what happens when you run logistic regression on linearly separable data?" State the pathology, prove it in three lines, and explain what an L2 penalty changes, including the MAP interpretation from <Ref lesson="mle-map" />.
+
+<Solution>
+Pathology: the MLE does not exist; the optimizer diverges, $\lVert \hat w \rVert \to \infty$, and software reports huge coefficients and probabilities of exactly 0/1.
+
+Proof: let $w_0$ strictly separate, and scale $w = c\,w_0$. As $c \to \infty$, each score $c\,w_0^\top x_i \to \pm\infty$ with the correct sign, so each $p_i \to y_i$ and every likelihood factor increases monotonically toward 1. Hence $\ell(c\,w_0) \uparrow 0$, but $\ell(w) < 0$ for every finite $w$: the supremum is unattained and lies at infinite norm.
+
+L2 fix: maximize $\ell(w) - \lambda\lVert w\rVert^2$. The penalty tends to $-\infty$ as $\lVert w \rVert \to \infty$ while $\ell \le 0$ is bounded above, so the objective is coercive; it is also strictly concave (the NLL is convex, $\lambda\lVert w\rVert^2$ strictly convex), so a finite unique maximizer exists. MAP reading: by the mle-map bridge, subtracting $\lambda\lVert w\rVert^2$ is adding a Gaussian log-prior on $w$; regularized logistic regression is MAP with prior $w \sim \mathcal N(0, \tau^2 I)$, $\lambda = 1/(2\tau^2)$. (Firth's penalized likelihood is the standard non-Bayesian repair.)
+</Solution>
+</Exercise>
+
+<Exercise>
+A fitted default model has coefficient $0.7$ on the feature `balance` (in some unit). (a) Interpret the coefficient. (b) Compute the change in predicted probability per unit of balance for a customer at $p = 0.5$ and one at $p = 0.1$, and explain why the two differ.
+
+<Solution>
+(a) Each unit of `balance` adds $0.7$ to the log-odds of default, i.e. multiplies the odds by $e^{0.7} \approx 2.01$: one unit of balance roughly doubles the odds, at any balance level and any values of the other features.
+
+(b) The probability response is $\partial p/\partial x_j = w_j\,p(1-p)$. At $p = 0.5$: $0.7 \times 0.25 = 0.175$ per unit. At $p = 0.1$: $0.7 \times 0.09 = 0.063$ per unit. The odds effect is constant but the probability effect is not: the sigmoid is steepest at $p = \tfrac12$ and flat in the tails, so the same log-odds shift moves a mid-range customer's probability almost three times as much. Reporting "0.7 means +0.7 probability" or any constant probability effect is the standard wrong answer.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove that the logistic-regression decision boundary is linear: (a) for the threshold $p = \tfrac12$; (b) for an arbitrary threshold $\tau \in (0,1)$, which arises when misclassification costs are asymmetric.
+
+<Solution>
+(a) Predict $\hat y = 1$ iff $\sigma(w^\top x) \ge \tfrac12$. $\sigma$ is strictly increasing and $\sigma(0) = \tfrac12$, so applying $\sigma^{-1}$ preserves the inequality: $w^\top x \ge 0$. The boundary $\{x : w^\top x = 0\}$ is a hyperplane.
+
+(b) $\sigma(w^\top x) \ge \tau \iff w^\top x \ge \sigma^{-1}(\tau) = \ln\frac{\tau}{1-\tau}$. The boundary is $w^\top x = \operatorname{logit}(\tau)$: the same hyperplane translated, still linear. Changing the threshold slides the boundary parallel to itself (the intercept absorbs $\operatorname{logit}(\tau)$); it never tilts it. This is also why the imbalance remark holds: intercept shifts move the boundary without reorienting it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "logistic regression gives a linear boundary; how would you get a nonlinear one?" Give the feature-map construction, and exhibit an explicit map that produces a circular boundary $x_1^2 + x_2^2 = r^2$ in the original 2D space.
+
+<Solution>
+Logistic regression is linear in its *features*, not in the raw inputs: replace $x$ by $\phi(x)$ and fit $p = \sigma(w^\top \phi(x))$. The boundary $w^\top \phi(x) = 0$ is linear in $\phi$-space but generally curved in $x$-space; everything in the chapter (likelihood, gradient, convexity in $w$) survives unchanged because the model is still linear in $w$.
+
+Circle: take $\phi(x) = (1,\ x_1^2,\ x_2^2)$ and $w = (-r^2,\ 1,\ 1)$. Then $w^\top\phi(x) = x_1^2 + x_2^2 - r^2$, so the boundary is exactly the circle of radius $r$, with $p > \tfrac12$ outside and $p < \tfrac12$ inside (negate $w$ to flip). Adding cross terms ($x_1 x_2$) and linear terms gives general conics; polynomial maps of higher degree give richer boundaries at the price of dimension. Doing this implicitly, without ever building $\phi$, is the kernel trick of <Ref lesson="svm-dual-kernels" />.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="gradient-descent" />: certify convexity with the second-order test. Show that the Hessian of the logistic NLL $J(w) = -\sum_i [y_i \log p_i + (1-y_i)\log(1-p_i)]$ is $H = X^\top S X$ with $S = \operatorname{diag}(p_i(1-p_i))$, and that it is positive semidefinite. What does this buy, and which matrix does Newton's method invert here?
+
+<Solution>
+From the gradient theorem, $\nabla J(w) = \sum_i (p_i - y_i)x_i$ (sign flipped: $J = -\ell$). Differentiate again: $y_i$ is constant and $\partial p_i/\partial w = p_i(1-p_i)\,x_i$ by the sigmoid identity plus chain rule, so
+
+$$
+H = \nabla^2 J(w) = \sum_i p_i(1-p_i)\, x_i x_i^\top = X^\top S X .
+$$
+
+PSD: for any $v$, $v^\top H v = \sum_i p_i(1-p_i)\,(x_i^\top v)^2 \ge 0$, since every $p_i(1-p_i) \in (0, \tfrac14]$. By the second-order test of the gradient-descent chapter, $J$ is convex, so any stationary point is the global minimum and descent methods cannot be trapped. Newton's method inverts exactly this $H = X^\top S X$ each iteration (the IRLS weighted least-squares solve); at small $d$ the $O(d^3)$ cost is negligible and convergence is quadratic.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §2.1: the sigmoid, the σ′ identity, the Bernoulli likelihood and gradient, and the "identical in form to LMS" remark this chapter mirrors. https://cs229.stanford.edu/main_notes.pdf
+2. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §4.3.2: logistic regression and the parameter-count comparison with generative Gaussians; §4.3.3: Newton's method as IRLS. https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — ch. 10: MLE and its non-existence under separation (§10.2.3), MAP / L2-regularized logistic regression (§10.2.7), multinomial logistic regression (§10.3). https://probml.github.io/pml-book/book1.html
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — ch. 4: why not linear regression on 0/1, odds and log-odds, the Default-data coefficients, and the student/balance confounding example. https://www.statlearning.com/
+5. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §4.4: logistic regression, §4.4.4: L1-regularized logistic regression; §4.5: separating hyperplanes. https://hastie.su.domains/ElemStatLearn/
+6. K. Q. Weinberger, "Lecture 6: Logistic Regression," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — logistic regression as the discriminative counterpart of naive Bayes. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote06.html
+7. D. Firth, "Bias Reduction of Maximum Likelihood Estimates," *Biometrika*, 80(1), 1993 — penalized likelihood keeping estimates finite under separation.
+8. D. Soudry, E. Hoffer, M. S. Nacson, S. Gunasekar, N. Srebro, "The Implicit Bias of Gradient Descent on Separable Data," *JMLR*, 19(70), 2018 — ‖w‖ grows logarithmically while the direction converges to the max-margin separator. https://jmlr.org/papers/v19/18-188.html
+</References>

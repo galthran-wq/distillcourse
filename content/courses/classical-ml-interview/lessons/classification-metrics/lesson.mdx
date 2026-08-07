@@ -1,0 +1,439 @@
+Accuracy fails on exactly the problems that matter — a 99.9%-accurate rare-disease screen can be useless — so classifier evaluation is a menu of metrics, each correct for a different question. This chapter builds that menu from a single object, the confusion matrix, and computes every quantity on one running 1,000-case example. The route: the base-rate failure of accuracy, the confusion matrix and its derived rates, the threshold sweep that turns a score into ROC and precision–recall curves, AUC as a ranking probability, proper scoring rules and calibration, and a decision table mapping the task to the metric.
+
+## Accuracy against the base rate
+
+[Bishop's PRML §1.5](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf) opens decision theory with a cancer-screening problem: roughly 1 person in 1,000 has the disease. A "classifier" that outputs *healthy* for every X-ray scores
+
+$$
+\text{accuracy} = \frac{TP + TN}{n} = \frac{999}{1000} = 99.9\%
+$$
+
+while detecting zero cases. The number is high because the *prevalence*, the fraction of positives in the population, is low, not because the model does anything.
+
+<KeyFact>
+The baseline for accuracy is the majority-class rate, not 50%: at prevalence $\pi$, predicting the majority class scores $\max(\pi, 1-\pi)$ before any learning happens. Accuracy is informative only when classes are roughly balanced and both error types cost the same.
+</KeyFact>
+
+The running example for the whole chapter: a fraud model scores 1,000 card transactions, of which 100 are fraudulent and 900 legitimate (1:9 imbalance). At threshold 0.5 it flags 170 transactions; 80 of those are genuine fraud, and 20 frauds slip through. Its accuracy is $(80 + 810)/1000 = 0.89$, *below* the 0.90 of a model that passes everything, yet it recovers 80% of all fraud. Accuracy ranks the useful model behind the useless one because it weights the 900 legitimate cases nine times as heavily as the 100 frauds and prices a missed fraud equal to a needless review. Evaluating this model requires quantities that separate the two classes and the two error types.
+
+## The confusion matrix: four counts, and every metric is a ratio of them
+
+<Definition title="confusion matrix">
+For a binary classifier and a labeled sample, the **confusion matrix** is the $2 \times 2$ table counting each (prediction, truth) combination: true positives $TP$, false positives $FP$, false negatives $FN$, true negatives $TN$. Every threshold-based classification metric is a ratio of sums of these four cells.
+</Definition>
+
+For the fraud model at threshold 0.5:
+
+| | fraud (100) | legitimate (900) |
+| --- | --- | --- |
+| **flagged** (170) | $TP = 80$ | $FP = 90$ |
+| **passed** (830) | $FN = 20$ | $TN = 810$ |
+
+Two families of rates come from normalizing this table in the two possible directions, and the distinction between them carries the rest of the chapter. **Truth-conditioned rates** divide by a class total (a column above): they answer "given the case *is* fraud, what does the model do". **Prediction-conditioned rates** divide by a prediction total (a row): they answer "given the model *flagged* it, what is it".
+
+<Example title="all eight rates on the running example">
+Truth-conditioned, dividing by the 100 frauds or the 900 legitimates:
+
+$$
+TPR = \frac{TP}{TP + FN} = \frac{80}{100} = 0.80, \qquad
+FNR = \frac{FN}{TP + FN} = \frac{20}{100} = 0.20,
+$$
+
+$$
+FPR = \frac{FP}{FP + TN} = \frac{90}{900} = 0.10, \qquad
+TNR = \frac{TN}{FP + TN} = \frac{810}{900} = 0.90.
+$$
+
+Prediction-conditioned, dividing by the 170 flags or the 830 passes:
+
+$$
+PPV = \frac{TP}{TP + FP} = \frac{80}{170} = 0.47, \qquad
+FDR = \frac{FP}{TP + FP} = \frac{90}{170} = 0.53,
+$$
+
+$$
+NPV = \frac{TN}{TN + FN} = \frac{810}{830} = 0.976, \qquad
+FOR = \frac{FN}{TN + FN} = \frac{20}{830} = 0.024.
+$$
+
+Read for the fraud team: the model catches 80% of fraud ($TPR$), bothers 10% of legitimate customers ($FPR$), and among its flags barely half are real ($PPV = 0.47$): every second alert is a false alarm even though the model is genuinely good.
+</Example>
+
+{/* fig ConfusionMatrixMaster: the master confusion matrix as one graphic. Center: 2×2 count grid, truth as columns (fraud 100 | legitimate 900), prediction as rows (flagged 170 | passed 830); cells TP = 80 (amber), FP = 90, FN = 20, TN = 810. Below each truth column, its truth-conditioned rates as a small stack with KaTeX: fraud column → TPR = TP/(TP+FN) = 0.80 with synonym stack "recall = sensitivity = hit rate" (amber), FNR = 0.20 "miss rate"; legitimate column → FPR = FP/(FP+TN) = 0.10 "fall-out = 1 − specificity" (blue), TNR = 0.90 "specificity". To the right of each prediction row, its prediction-conditioned rates: flagged row → PPV = TP/(TP+FP) = 0.47 "precision", FDR = 0.53; passed row → NPV = TN/(TN+FN) = 0.976, FOR = 0.024. Thin label-lines from each rate to the cells it divides. Bottom band: accuracy = (TP+TN)/n = 0.89. Color roles: amber = the positive/fraud subject (TP cell, TPR, PPV labels), blue = FPR; everything else currentColor. Inspiration: Murphy PML Tables 5.3–5.5 collapsed into one graphic. */}
+<Figure
+  name="ConfusionMatrixMaster"
+  alt="The 2 by 2 confusion matrix of the running fraud example with all eight derived rates placed at their row and column margins, each with its synonym stack"
+  caption="The master object: four counts, eight rates. Truth-conditioned rates sit under the truth columns, prediction-conditioned rates beside the prediction rows."
+/>
+
+Interviews assume fluency in the synonyms; the same eight numbers travel under different names in medicine, information retrieval, and ML:
+
+| rate | formula | value here | also called |
+| --- | --- | --- | --- |
+| $TPR$ | $TP/(TP{+}FN)$ | 0.80 | recall, sensitivity, hit rate |
+| $FNR$ | $FN/(TP{+}FN)$ | 0.20 | miss rate |
+| $FPR$ | $FP/(FP{+}TN)$ | 0.10 | fall-out, $1-$ specificity |
+| $TNR$ | $TN/(FP{+}TN)$ | 0.90 | specificity |
+| $PPV$ | $TP/(TP{+}FP)$ | 0.47 | precision |
+| $FDR$ | $FP/(TP{+}FP)$ | 0.53 | false discovery rate |
+| $NPV$ | $TN/(TN{+}FN)$ | 0.976 | negative predictive value |
+| $FOR$ | $FN/(TN{+}FN)$ | 0.024 | false omission rate |
+
+<KeyFact>
+Truth-conditioned rates ($TPR$, $FPR$, sensitivity, specificity) do not change when the class mix changes, because each is computed within one class. Prediction-conditioned rates (precision, $NPV$) mix the classes in their denominator, so they move with prevalence. This one fact is the entire ROC-versus-PR debate below.
+</KeyFact>
+
+<Remark title="multiclass: micro vs macro averaging">
+With $K$ classes, each class $k$ gets one-vs-rest counts $TP_k, FP_k, FN_k$. **Macro** averaging computes the metric per class and averages the results, $\text{macro-}F_1 = \tfrac1K \sum_k F_1^{(k)}$, weighting rare classes equally with common ones. **Micro** averaging pools the counts first, $\text{micro-}P = \sum_k TP_k \big/ \sum_k (TP_k + FP_k)$, weighting every example equally; for single-label classification micro-$F_1$ equals plain accuracy. Report macro when minority-class performance matters; micro hides it.
+</Remark>
+
+## The threshold sweep: one score, a whole curve of matrices
+
+A confusion matrix is not a property of a model alone. Logistic regression (<Ref lesson="logistic-regression" />) and every scoring classifier output a number $s(x) \in [0,1]$, and a hard decision requires a threshold $t$: flag when $s(x) \ge t$. Each choice of $t$ produces a different confusion matrix from the same model. The fraud model's scores, binned:
+
+| score bin | $0$–$.3$ | $.3$–$.5$ | $.5$–$.7$ | $.7$–$.9$ | $.9$–$1$ |
+| --- | --- | --- | --- | --- | --- |
+| fraud (100) | 7 | 13 | 25 | 40 | 15 |
+| legitimate (900) | 640 | 170 | 70 | 18 | 2 |
+
+Sweeping the threshold across the four bin edges and totaling the counts to the right of each:
+
+| $t$ | $TP$ | $FP$ | $TPR$ | $FPR$ | precision |
+| --- | --- | --- | --- | --- | --- |
+| 0.3 | 93 | 260 | 0.93 | 0.289 | 0.26 |
+| 0.5 | 80 | 90 | 0.80 | 0.100 | 0.47 |
+| 0.7 | 55 | 20 | 0.55 | 0.022 | 0.73 |
+| 0.9 | 15 | 2 | 0.15 | 0.002 | 0.88 |
+
+Lowering $t$ buys recall with false alarms; raising it buys precision with misses. No threshold improves both directions at once: the trade-off is the model's score overlap, and the threshold only picks a point on it.
+
+<FigureSequence
+  name="threshold-walk"
+  alt="Four frames: two class-score histograms with a threshold line sweeping right through positions 0.3, 0.5, 0.7, 0.9; each frame shows the induced confusion matrix, TPR, FPR, and precision, and adds one point to a growing ROC inset"
+  caption="The threshold walk: each stop induces one confusion matrix and plants one (FPR, TPR) point on the ROC."
+/>
+
+<Task>
+Step through the four frames and track two numbers: from $t = 0.3$ to $t = 0.9$, $TPR$ falls $0.93 \to 0.15$ while precision rises $0.26 \to 0.88$. Verify the $t = 0.7$ frame from the bin table by hand: $TP = 40 + 15 = 55$, $FP = 18 + 2 = 20$.
+</Task>
+
+### ROC: the sweep drawn as one curve
+
+<Definition title="ROC curve and AUC">
+The **ROC curve** (receiver operating characteristic) of a scoring classifier is the set of points $(FPR(t),\, TPR(t))$ traced as the threshold $t$ sweeps from high to low. The **AUC** is the area under this curve.
+</Definition>
+
+The curve runs from $(0,0)$ (flag nothing) to $(1,1)$ (flag everything). A model that scores randomly has $TPR = FPR$ at every threshold: the diagonal, with AUC 0.5. Better models bow toward the top-left corner; a perfect ranker reaches $(0,1)$ and AUC 1. The *equal error rate* (EER) is the point where $FPR = FNR$, a standard single-number summary in biometrics.
+
+<Figure
+  src="./figures/roc-curves.svg"
+  alt="ROC axes with three curves: a good classifier with AUC 0.91, a mediocre one with AUC 0.70, and the chance diagonal at AUC 0.5, with the equal error rate marked on the good curve"
+  caption="Three classifiers as ROC curves. AUC 0.91 means a randomly drawn positive outranks a randomly drawn negative 91% of the time."
+/>
+
+AUC has an exact probabilistic meaning that interviewers ask for in one sentence; it is a *ranking* quality, independent of any threshold:
+
+<Theorem title="AUC is the probability of correct pairwise ranking">
+Let $S^+$ be the score of a positive example drawn at random and $S^-$ that of an independent random negative, with continuous score distributions. Then
+
+$$
+\mathrm{AUC} = \Pr\bigl(S^+ > S^-\bigr).
+$$
+
+<Proof>
+Write $F(t) = \Pr(S^- \ge t) = FPR(t)$ and $T(t) = \Pr(S^+ \ge t) = TPR(t)$, and let $f^-$ be the density of $S^-$. The area under the curve is $\int_0^1 TPR \, d(FPR)$; substituting the threshold parameterization, $dF = -f^-(t)\,dt$ and the sweep from $t = +\infty$ down to $-\infty$ gives
+
+$$
+\mathrm{AUC} = \int_{-\infty}^{\infty} T(t)\, f^-(t)\, dt
+= \int_{-\infty}^{\infty} \Pr(S^+ > t)\, f^-(t)\, dt
+= \Pr(S^+ > S^-),
+$$
+
+the last step conditioning on $S^- = t$ and integrating over its density.
+</Proof>
+</Theorem>
+
+For finite samples the same quantity is the fraction of *concordant* positive–negative pairs (ties counted half), which is the normalized [Wilcoxon–Mann–Whitney statistic](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test); Exercise 3 computes an AUC this way. The one-sentence answer to "interpret AUC = 0.85": pick a random positive and a random negative, and the model scores the positive higher 85% of the time.
+
+<KeyFact>
+AUC is threshold-free and built entirely from truth-conditioned rates, so it measures ranking quality and is invariant to class imbalance. Both properties are also its weakness: AUC says nothing about where a usable threshold is, or whether one exists.
+</KeyFact>
+
+## Precision–recall: the curve that feels prevalence
+
+Plotting the sweep's prediction-conditioned pair instead, precision against recall from the same table, gives the **PR curve**. Its baseline is not the ROC diagonal: a classifier that flags at random gets precision equal to the prevalence $\pi$ at every recall, so for the fraud data the floor is $0.1$, and for a 1:1000 problem it is $0.001$. High ground on a PR plot means beating the base rate, not beating a coin.
+
+The two curves respond very differently to imbalance, and the confusion-matrix arithmetic explains it exactly.
+
+<Example title="one classifier, two prevalences">
+A classifier holds $TPR = 0.80$ and $FPR = 0.10$ at its operating threshold: truth-conditioned rates, fixed properties of the score distributions.
+
+**Balanced, 1,000 positives / 1,000 negatives:** $TP = 800$, $FP = 100$,
+
+$$
+\text{precision} = \frac{800}{800 + 100} = 0.89.
+$$
+
+**Imbalanced 1:100, 1,000 positives / 100,000 negatives:** $TP = 800$ still, but the same $FPR$ of 10% now applies to 100,000 negatives, so $FP = 10{,}000$:
+
+$$
+\text{precision} = \frac{800}{800 + 10{,}000} = 0.074.
+$$
+
+The ROC point $(0.10,\ 0.80)$ has not moved. The alert queue went from 9-in-10 real to 1-in-14 real, because the $FP$ term in precision's denominator scales with the negative population while $TP$ does not.
+</Example>
+
+<Figure
+  src="./figures/imbalance-stress.svg"
+  alt="Four panels: ROC curves at 1 to 1 and 1 to 100 prevalence are identical, while the PR curves below them collapse from near the top of the plot to near the prevalence floor, with TP and FP counts annotated at the operating point"
+  caption="The imbalance stress test. Same classifier, same ROC; the PR curve collapses because FP grows 100× while TP stands still."
+/>
+
+<KeyFact>
+Under heavy imbalance a good-looking ROC and an unusable alert queue coexist: ROC-AUC is imbalance-invariant by construction, and PR is imbalance-sensitive by construction. Report PR (or precision at the deployment threshold) whenever positives are rare and the flags get acted on.
+</KeyFact>
+
+<Demo
+  name="ThresholdMetricsExplorer"
+  caption="Two score histograms with a draggable threshold; live confusion matrix, precision, recall, F₁, and the current point on ROC and PR curves."
+/>
+
+<Task>
+Drag the threshold across the balanced preset and watch which panel moves: every metric changes, but the ROC and PR points slide along fixed curves. Then switch to the 1:100 preset: the ROC curve barely changes while the PR curve drops toward the prevalence floor; precision at your threshold should fall roughly tenfold.
+</Task>
+
+### F-scores: why the mean is harmonic
+
+A single number combining precision and recall must not let one component hide the other. The arithmetic mean fails this: a model with $P = 0.9,\ R = 0.1$ (flags almost nothing; what it flags is right) averages to $0.5$, the same as a balanced $P = R = 0.5$ model. The harmonic mean does not:
+
+$$
+F_1 = \frac{2}{\frac1P + \frac1R} = \frac{2PR}{P + R}
+= \frac{2 \cdot 0.9 \cdot 0.1}{0.9 + 0.1} = 0.18.
+$$
+
+<Definition title="F-beta score">
+For $\beta > 0$,
+
+$$
+F_\beta = \frac{(1+\beta^2)\, P R}{\beta^2 P + R},
+$$
+
+the weighted harmonic mean of precision and recall in which recall carries $\beta$ times the weight of precision. $F_1$ ($\beta = 1$) weights them equally; $F_2$ favors recall (screening), $F_{0.5}$ favors precision (spam filtering).
+</Definition>
+
+The harmonic mean sits near the *minimum* of its arguments: its level curves hug the axes, so improving the weaker of $P$ and $R$ is the only efficient way to raise $F_1$. Equivalently $F_1 = 2TP / (2TP + FP + FN)$: the errors $FP$ and $FN$ enter symmetrically, and $TN$ does not enter at all — $F_1$ is blind to true negatives, appropriate exactly when the negative class is a vast, uninteresting background. For the fraud model at $t = 0.5$: $F_1 = 2(0.47)(0.80)/1.27 = 0.59$.
+
+<Figure
+  src="./figures/f-geometry.svg"
+  alt="Level curves of the arithmetic mean, straight parallel lines, and of the harmonic mean, curves hugging the axes, over the precision-recall square, with the point (0.9, 0.1) scoring 0.50 on one and 0.18 on the other"
+  caption="Same point, two means: arithmetic level lines reward either component, harmonic level curves demand both."
+/>
+
+The threshold-free summary of a PR curve is *average precision* (AP): $\mathrm{AP} = \sum_n (R_n - R_{n-1}) P_n$, the PR analogue of AUC, standard in retrieval and detection.
+
+## Proper scoring rules: grading the probabilities themselves
+
+Everything so far grades hard decisions or rankings. When the probabilities are consumed downstream (expected-cost decisions, triage queues, bids), the numbers themselves must be right, and that is a separate property from ranking well.
+
+Two standard losses grade a predicted probability $p$ against an outcome $y \in \{0,1\}$. The **log-loss** is the cross-entropy of <Ref lesson="logistic-regression" />, $-[y \log p + (1-y)\log(1-p)]$: the model's surprise at the outcome, unbounded as a confident prediction goes wrong. The **Brier score** is the squared error on probabilities, $(p - y)^2$, bounded by 1. Both are *proper scoring rules*: their expected value is minimized by reporting the true conditional probability, so a model cannot improve its grade by hedging or exaggerating. Accuracy at a fixed threshold is not proper: reporting 0.51 and 0.99 grade identically.
+
+<Definition title="calibration">
+A model is **calibrated** if, among cases assigned probability $p$, the positive fraction is $p$, for every $p$. A *reliability diagram* estimates this: bin the predictions, and plot each bin's observed positive frequency against its mean predicted probability. A calibrated model tracks the diagonal.
+</Definition>
+
+<Example title="the fraud model is overconfident, and recalibration fixes it">
+Group the running example's 1,000 predictions by score bin and compare each bin's nominal score with its observed fraud rate:
+
+| bin | $n$ | predicted (center) | observed fraud rate |
+| --- | --- | --- | --- |
+| $0$–$.3$ | 647 | 0.15 | $7/647 = 0.011$ |
+| $.3$–$.5$ | 183 | 0.40 | $13/183 = 0.071$ |
+| $.5$–$.7$ | 95 | 0.60 | $25/95 = 0.263$ |
+| $.7$–$.9$ | 58 | 0.80 | $40/58 = 0.690$ |
+| $.9$–$1$ | 17 | 0.95 | $15/17 = 0.882$ |
+
+Every bin's observed rate falls short of its predicted rate: the model is **overconfident**. Its Brier score, treating each prediction as its bin center, averages $f(1-p)^2 + (1-f)p^2$ over bins; the $.3$–$.5$ bin alone contributes $0.071 \times 0.36 + 0.929 \times 0.16 = 0.174$ per case, and the weighted total is $0.095$.
+
+Remapping each score to its bin's observed rate (0.40 becomes 0.071, and so on) is a monotone map: the ranking, the ROC curve, and the AUC are untouched. The Brier score drops to $0.052$ and the log-loss from $0.34$ to $0.18$ nats per case. Discrimination unchanged, probabilities repaired.
+</Example>
+
+<Figure
+  src="./figures/reliability.svg"
+  alt="Reliability diagram for the fraud model: the raw five-bin curve sags below the diagonal with Brier 0.095, and the recalibrated curve sits on the diagonal with Brier 0.052"
+  caption="The fraud model's reliability diagram. Raw scores promise 0.40 and deliver 0.07; recalibration moves every bin to the diagonal without touching the ranking."
+/>
+
+That remapping is calibration in practice. *Platt scaling* fits a one-dimensional logistic regression from the raw score to the label on held-out data ([Platt, 1999](https://home.cs.colorado.edu/~mozer/Teaching/syllabi/6622/papers/Platt1999.pdf)); *isotonic regression* fits an arbitrary monotone step function, more flexible but needing more data ([Niculescu-Mizil & Caruana, 2005](https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf) benchmark both across learners). Either runs on validation predictions, never on training data.
+
+<KeyFact>
+Discrimination and calibration are orthogonal: any monotone transform of the scores preserves AUC exactly while changing log-loss and Brier arbitrarily. A model can rank with AUC 0.95 and output junk probabilities; a mediocre ranker can be perfectly calibrated. Grade the axis the application consumes.
+</KeyFact>
+
+<Remark title="log-loss explodes; clip">
+One prediction of $p = 10^{-9}$ on an actual positive contributes $\approx 20.7$ nats: hundreds of correct predictions cannot buy it back, which is the proper-rule penalty for claiming near-certainty. Evaluation code clips predictions into $[\varepsilon, 1-\varepsilon]$ (scikit-learn historically used $\varepsilon = 10^{-15}$) so a single hard zero does not return an infinite loss.
+</Remark>
+
+## Choosing the metric and the threshold
+
+### The threshold comes from costs, not from 0.5
+
+With calibrated probabilities the optimal threshold is a two-line computation, not a convention. Flagging a case with fraud probability $p$ incurs expected cost $(1-p)\,c_{FP}$ (a needless review); passing it incurs $p\,c_{FN}$ (an expected missed fraud). Flag when the first is smaller:
+
+$$
+(1-p)\,c_{FP} < p\,c_{FN}
+\quad\Longleftrightarrow\quad
+p > \frac{c_{FP}}{c_{FP} + c_{FN}} = p^*.
+$$
+
+If a missed fraud costs $9\times$ a review, $p^* = 1/(1+9) = 0.1$: flag anything above 10%. The default $t = 0.5$ silently asserts $c_{FP} = c_{FN}$ ([Murphy, PML §5.1.2.2](https://probml.github.io/pml-book/book1.html)). The rule presumes calibration — applied to overconfident raw scores it misfires, which Exercise 4 quantifies on the running example. A related lever is the **reject option**: abstain and escalate to a human whenever $\max(p, 1-p)$ falls below a confidence bar, trading coverage for error rate (Bishop §1.5.3; IBM's Watson buzzed on *Jeopardy!* only when its confidence cleared a threshold).
+
+### The decision table
+
+| situation | metric to report |
+| --- | --- |
+| balanced classes, symmetric costs | accuracy (with a majority-class baseline stated) |
+| rare positives, flags get acted on | PR curve; recall at a fixed precision (or precision at fixed alert budget) |
+| output is a ranking or triage queue | ROC-AUC; concordance |
+| probabilities consumed downstream | log-loss or Brier, plus a reliability diagram |
+| explicit, known error costs | expected cost at the threshold $p^* = c_{FP}/(c_{FP}+c_{FN})$ |
+
+The interview form of the answer is always the same two steps: name the question the deployment actually asks, then name the metric that scores exactly that question, and state what the naive metric would hide.
+
+<Remark title="resampling breaks the 0.5 threshold">
+Training on data rebalanced by under- or over-sampling shifts the model's learned base rate, so its probabilities are calibrated to the synthetic prevalence, not the real one: thresholding the raw output at 0.5, or feeding it to the cost rule, is then incoherent. Recalibrate on unresampled validation data or correct the prior shift analytically; the mechanics are in <Ref lesson="imbalance-leakage" />.
+</Remark>
+
+## Exercises
+
+<Exercise>
+A model's test-set confusion matrix has $TP = 30$, $FN = 20$, $FP = 5$, $TN = 40$. Compute accuracy, precision, recall, $F_1$, $TPR$, and $FPR$ by hand.
+
+<Solution>
+Totals: $n = 95$; positives $TP + FN = 50$; negatives $FP + TN = 45$; flagged $TP + FP = 35$.
+
+$$
+\text{accuracy} = \frac{30 + 40}{95} = \frac{70}{95} \approx 0.737, \qquad
+\text{precision} = \frac{30}{35} \approx 0.857,
+$$
+
+$$
+\text{recall} = TPR = \frac{30}{50} = 0.600, \qquad
+FPR = \frac{5}{45} \approx 0.111.
+$$
+
+$$
+F_1 = \frac{2 \cdot 0.857 \cdot 0.600}{0.857 + 0.600} = \frac{1.029}{1.457} \approx 0.706.
+$$
+
+Sanity checks: precision > recall is consistent with few flags ($35$) against many positives ($50$); accuracy $0.737$ beats the majority-class baseline $\max(50, 45)/95 = 0.526$, so unlike the chapter's fraud example this model also clears the accuracy bar.
+</Solution>
+</Exercise>
+
+<Exercise>
+A classifier has precision $0.9$ and recall $0.1$. Compute $F_1$ and the arithmetic mean of the two, and state what the gap between them tells you about the classifier.
+
+<Solution>
+$$
+F_1 = \frac{2 \cdot 0.9 \cdot 0.1}{0.9 + 0.1} = \frac{0.18}{1.0} = 0.18,
+\qquad \text{arithmetic mean} = \frac{0.9 + 0.1}{2} = 0.5.
+$$
+
+The harmonic mean sits near the smaller component; the arithmetic mean near the middle. $F_1 = 0.18$ says the classifier is close to useless as a detector: it flags a tiny, precise sliver and misses 90% of positives. The arithmetic 0.5 would score it equal to a balanced $P = R = 0.5$ model, hiding exactly that failure — which is why $F$-scores use the harmonic mean: a single weak component sinks the score, and only improving the weaker side raises it efficiently.
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Three positives score $\{0.8,\ 0.6,\ 0.55\}$ and three negatives score $\{0.7,\ 0.4,\ 0.3\}$. Compute the AUC by counting pairs. (b) Interpret "AUC = 0.85" in one sentence.
+
+<Solution>
+(a) AUC is the fraction of the $3 \times 3 = 9$ positive–negative pairs the model ranks correctly. Check each positive against each negative: $0.8$ beats $0.7, 0.4, 0.3$: 3 pairs; $0.6$ beats $0.4, 0.3$ but loses to $0.7$: 2 pairs; $0.55$ beats $0.4, 0.3$ and loses to $0.7$: 2 pairs. Concordant: $3 + 2 + 2 = 7$, no ties, so
+
+$$
+\mathrm{AUC} = \frac{7}{9} \approx 0.78.
+$$
+
+(b) Draw one positive and one negative at random; with probability $0.85$ the model scores the positive higher. Nothing more: no statement about accuracy, precision, or any threshold.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the running fraud example, a false positive costs one unit (review) and a false negative four (missed fraud). (a) Derive the optimal threshold $p^*$ on calibrated probabilities. (b) Using the chapter's sweep table, compute the total cost at $t = 0.3, 0.5, 0.7, 0.9$ and pick the best. (c) Reconcile (a) and (b) using the reliability table.
+
+<Solution>
+(a) Flag iff $(1-p)\,c_{FP} < p\,c_{FN}$, i.e. $p > c_{FP}/(c_{FP}+c_{FN}) = 1/(1+4) = 0.2$.
+
+(b) Cost $= FP \cdot 1 + FN \cdot 4$ from the sweep table:
+$t = 0.3$: $260 + 4(7) = 288$; $t = 0.5$: $90 + 4(20) = 170$; $t = 0.7$: $20 + 4(45) = 200$; $t = 0.9$: $2 + 4(85) = 342$. Best available threshold: $0.5$.
+
+(c) Rule (a) says flag from $p = 0.2$ up, which the raw score scale reads as "flag the $.3$–$.5$ bin too" — yet (b) shows that bin adds cost ($288 > 170$). The reliability table resolves it: the $.3$–$.5$ bin's *actual* fraud rate is $0.071$, far below its nominal scores, so its true calibrated probability sits under $p^* = 0.2$ and it should indeed be passed. Applied to calibrated probabilities, the rule flags the bins with observed rates $\{0.263, 0.690, 0.882\} > 0.2$ — exactly the score range $\ge 0.5$, and agrees with the counting. The cost rule is only as good as the calibration under it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "You are building fraud detection where 0.1% of transactions are fraudulent. Which metrics do you evaluate on, and why are accuracy and ROC-AUC alone insufficient?" Give the full reasoned answer.
+
+<Solution>
+**Why not accuracy:** at $\pi = 0.001$, predicting "legitimate" for everything scores 99.9%. Accuracy measures distance from a baseline that is already at ceiling; any reported accuracy is uninterpretable without the base rate.
+
+**Why not ROC-AUC alone:** AUC is built from $TPR$ and $FPR$, both truth-conditioned and therefore invariant to the 1:1000 imbalance. With $10^6$ transactions (1,000 frauds), an excellent-sounding operating point of $TPR = 0.8$, $FPR = 0.01$ still yields $FP \approx 10{,}000$ against $TP = 800$: precision $\approx 0.074$, thirteen false alarms per real fraud. The ROC plot never displays this, because $FP$ is divided by 999,000 negatives; the alert queue feels the raw count.
+
+**What to use:** the PR curve, whose baseline is $\pi = 0.001$ and whose precision axis is the alert queue's hit rate; operationally, recall at the precision the review team can tolerate, or precision at the alert budget (top-$k$). If costs are quantifiable, expected cost with $c_{FN} \gg c_{FP}$ and the threshold $p^* = c_{FP}/(c_{FP}+c_{FN})$; that requires calibrated probabilities, so add log-loss and a reliability diagram, recalibrating after any training-set resampling. ROC-AUC can still be tracked as a threshold-free ranking measure for model comparison; it is insufficient, not wrong.
+</Solution>
+</Exercise>
+
+<Exercise>
+Model A has the better ROC-AUC; model B the better log-loss. Which ships? State the decision rule and the caveat that can reverse a naive reading of the log-loss gap.
+
+<Solution>
+The consumer of the output decides. If the product uses a ranking or a fixed alert budget (review queue, top-$k$ triage), ranking quality is what matters: ship A, since AUC is exactly pairwise ranking accuracy and log-loss is irrelevant to order. If downstream logic consumes the probabilities themselves (expected-cost thresholds, pricing, chained models), honest probabilities matter: B's better log-loss says its probabilities are closer to the truth, favoring B.
+
+The caveat: log-loss mixes discrimination with calibration, and calibration is cheap to fix. A monotone recalibration (Platt or isotonic on validation data) leaves AUC unchanged while potentially improving log-loss dramatically. So before concluding B wins on probabilities, recalibrate both and re-score: if A-recalibrated beats B on log-loss too, A ships in both scenarios — its ranking was better all along and its probabilities were merely mislabeled.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the evaluation for a cancer screen at prevalence $1/1000$, sensitivity $0.90$, specificity $0.99$. (a) Compute the probability that a flagged patient actually has cancer (this is Bayes' rule, as used for the class posterior in <Ref lesson="naive-bayes" />). (b) State which metrics you would report and why accuracy is not among them.
+
+<Solution>
+(a) With $\pi = 0.001$, $P(\text{flag} \mid \text{cancer}) = 0.90$, $P(\text{flag} \mid \text{healthy}) = 1 - 0.99 = 0.01$:
+
+$$
+P(\text{cancer} \mid \text{flag})
+= \frac{0.90 \times 0.001}{0.90 \times 0.001 + 0.01 \times 0.999}
+= \frac{0.0009}{0.0009 + 0.00999} \approx 0.083.
+$$
+
+This is precision computed by Bayes' rule instead of by counting: identical quantity, and it shows precision's prevalence dependence in closed form: the second denominator term carries the factor $1 - \pi = 0.999$. Even an excellent screen delivers 11 false alarms per true case at this base rate.
+
+(b) Report sensitivity (a missed cancer is the catastrophic error), specificity, and $PPV \approx 0.083$ with the prevalence stated, plus the PR view if a score threshold is tunable; use calibrated risk estimates so the follow-up decision can be cost-based, and structure deployment as a two-stage screen (high-sensitivity first stage, high-specificity confirmatory test on the 8.3%-precision flags). Accuracy is excluded: the all-healthy classifier scores 99.9%, so accuracy differences in the fourth decimal place carry all the information and none of the clinical meaning.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of the cross-entropy loss from <Ref lesson="logistic-regression" />: a model makes four predictions $(y, p)$: $(1, 0.9)$, $(0, 0.2)$, $(1, 0.6)$, $(0, 0.99)$. Compute the mean log-loss (nats) and the mean Brier score, identify which prediction dominates each total, and connect the difference to the clipping remark.
+
+<Solution>
+Per-example log-loss $-[y\ln p + (1-y)\ln(1-p)]$:
+
+$$
+-\ln 0.9 = 0.105, \quad -\ln 0.8 = 0.223, \quad -\ln 0.6 = 0.511, \quad -\ln 0.01 = 4.605,
+$$
+
+mean $= 5.444/4 = 1.361$. Brier $(p - y)^2$: $0.01,\ 0.04,\ 0.16,\ 0.9801$; mean $= 1.1901/4 = 0.298$.
+
+The confidently wrong fourth prediction ($p = 0.99$ on a negative) contributes $4.605/5.444 = 85\%$ of the log-loss but is capped at $0.98 \le 1$ under Brier: log-loss punishes misplaced certainty without bound (the model's cross-entropy "surprise" at an event it called near-impossible), Brier boundedly. Pushed to $p = 1 - 10^{-15}$, the same mistake alone drives mean log-loss past $8.6$ nats and at exactly $p = 1$ it is infinite — which is why evaluation code clips predictions away from 0 and 1 before taking logs.
+</Solution>
+</Exercise>
+
+<References>
+1. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §5.1.2: cost-sensitive decisions and the optimal threshold; §5.1.3: ROC, AUC, EER, and the confusion-matrix normalization tables; §5.1.4: precision–recall, F-scores, and the class-imbalance contrast between ROC and PR. https://probml.github.io/pml-book/book1.html
+2. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.5: decision theory, the cancer-screening base-rate example, loss matrices, and the reject option. https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf
+3. T. Fawcett, "An Introduction to ROC Analysis," *Pattern Recognition Letters*, 27(8), 2006 — the standard ROC tutorial: curve construction, AUC as ranking probability, class-skew invariance. https://doi.org/10.1016/j.patrec.2005.10.010
+4. J. Davis, M. Goadrich, "The Relationship Between Precision-Recall and ROC Curves," *ICML*, 2006 — dominance correspondence between the two curve spaces and why PR is the more informative view under heavy imbalance.
+5. G. W. Brier, "Verification of Forecasts Expressed in Terms of Probability," *Monthly Weather Review*, 78(1), 1950 — the original probability score.
+6. J. Platt, "Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods," in *Advances in Large Margin Classifiers*, MIT Press, 1999 — sigmoid (Platt) scaling.
+7. A. Niculescu-Mizil, R. Caruana, "Predicting Good Probabilities with Supervised Learning," *ICML*, 2005 — reliability diagrams and Platt vs isotonic calibration across model families.
+8. C. Huyen, *Introduction to Machine Learning Interviews*, self-published web book — ch. 7-style metric hand computations of the kind in Exercise 1. https://huyenchip.com/ml-interviews-book/
+9. N. Singh, K. Huo, *Ace the Data Science Interview*, 2021 — ch. 7: metric-selection interview questions, including fraud detection with rare positives.
+10. J. Starmer, "ROC and AUC, Clearly Explained!," StatQuest (YouTube), 2019 — the threshold-walk presentation of ROC construction that the figure sequence follows.
+</References>

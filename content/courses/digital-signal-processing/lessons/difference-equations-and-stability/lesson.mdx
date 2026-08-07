@@ -1,0 +1,527 @@
+Feedback gives a discrete-time system memory and economy, but its recurrence can hide a mode that grows beyond the displayed record.
+
+<Ref lesson="impulse-response-and-convolution">Impulse Response and Convolution</Ref> ended with the feedback rule $y[n]=x[n]+1.2y[n-1]$ — the microphone beside its own loudspeaker, a fraction of each output returning to the input with gain $1.2$. From initial rest and a unit impulse it produced $1,1.2,1.44,\ldots$: one compact instruction generated an indefinitely long tail. That calculation is the seam into this lesson. We will make the stored state explicit, separate response caused by initial conditions from response forced by the input, connect a recurrence back to its impulse response, and decide stability from the entire tail rather than a finite display.
+
+The route: compute a recurrence sample by sample, extract its homogeneous modes, recover its zero-state convolution, prove the BIBO criterion, and stress-test finite-trace evidence with a resonator.
+
+## A recurrence starts with stored state
+
+### Initial rest removes one source of output
+
+The previous lesson assumed initial rest when it measured an impulse response. Retrieve what that assumption bought us before changing it.
+
+<Exercise>
+For $y[n]=1.2y[n-1]+x[n]$ and $x[n]=\delta[n]$, compute $y[0],y[1],y[2]$ first with $y[-1]=0$ and then with $y[-1]=1$. Which output is the impulse response, and why does convolution with that impulse response not give the other output by itself?
+
+<Solution>
+With initial rest,
+
+$$
+y[0]=1,\qquad y[1]=1.2,\qquad y[2]=1.44.
+$$
+
+This is the beginning of the causal impulse response $h[n]=1.2^n u[n]$. With $y[-1]=1$,
+
+$$
+y[0]=2.2,\qquad y[1]=2.64,\qquad y[2]=3.168.
+$$
+
+The difference between the two records is $1.2,1.44,1.728$, the response of the stored initial value when the input is zero. Convolution with $h$ gives the zero-state response; the nonzero initial state contributes a separate zero-input response.
+</Solution>
+</Exercise>
+
+### Zero-input and zero-state parts add
+
+Now use a decaying coefficient. Let
+
+$$
+y[n]=0.5y[n-1]+x[n],\qquad y[-1]=1,\qquad x[n]=\delta[n].
+$$
+
+The recurrence is an instruction whose right side must use the *old* stored output before that state is updated:
+
+| $n$ | $x[n]$ | old $y[n-1]$ | new $y[n]$ |
+|---:|---:|---:|---:|
+| 0 | 1 | 1 | $1.5$ |
+| 1 | 0 | 1.5 | $0.75$ |
+| 2 | 0 | 0.75 | $0.375$ |
+| 3 | 0 | 0.375 | $0.1875$ |
+
+The same numbers split into two simpler computations. Initial rest with the impulse gives the zero-state response $1,0.5,0.25,0.125,\ldots$. Zero input with $y[-1]=1$ gives the zero-input response $0.5,0.25,0.125,0.0625,\ldots$. Their sum is the displayed total response. Linearity permits this split; it does not permit us to omit either cause.
+
+<Example title="separate state from input before iterating">
+For the first-order rule $y[n]=ay[n-1]+x[n]$ with $y[-1]=s$, the two contributions for $n\ge 0$ are
+
+$$
+y_{\mathrm{zi}}[n]=s a^{n+1},
+\qquad
+y_{\mathrm{zs}}[n]=\sum_{m=0}^{n}a^{n-m}x[m].
+$$
+
+Thus $y[n]=y_{\mathrm{zi}}[n]+y_{\mathrm{zs}}[n]$. The subscripts mean zero-input and zero-state, respectively. Setting one cause to zero is a method of analysis, not a claim that the cause never exists.
+</Example>
+
+<Exercise>
+Use $y[n]=0.5y[n-1]+x[n]$, $y[-1]=2$, and $x[n]=\delta[n]$. Compute $y[0]$ through $y[4]$ directly, then split the result into zero-input and zero-state parts.
+
+<Solution>
+Direct iteration gives
+
+$$
+y[0:4]=[2,1,0.5,0.25,0.125].
+$$
+
+The zero-state impulse response over these indices is
+
+$$
+y_{\mathrm{zs}}[0:4]=[1,0.5,0.25,0.125,0.0625].
+$$
+
+The initial value contributes
+
+$$
+y_{\mathrm{zi}}[0:4]=[1,0.5,0.25,0.125,0.0625],
+$$
+
+because $y_{\mathrm{zi}}[n]=2(0.5)^{n+1}$. Adding the two rows produces the direct result. Their equality here is a numerical coincidence caused by $y[-1]=2$ and the unit impulse; the two contributions have different causes.
+</Solution>
+</Exercise>
+
+### Each feedback traversal exposes one delayed term
+
+<Task>
+Track the single new delayed term revealed in each frame. Before advancing, write the next term in the tail and identify which old output must be read before the new output is written into state.
+</Task>
+
+<FigureSequence
+  name="feedback-tail-unroll"
+  alt="Four frames unroll the first-order feedback rule y[n]=a y[n-1]+x[n] into delayed feedforward terms with gains 1, a, a squared, and a cubed while showing the old state read before each write."
+  caption="Each traversal of the delay-and-gain loop adds one sample of the infinite tail h[n]=a^n u[n]."
+/>
+
+### A difference equation requires declared memory
+
+<Definition title="linear constant-coefficient difference equation">
+A **difference equation** relates the present output to present or past input samples and past output samples. A causal linear constant-coefficient form is
+
+$$
+y[n]=-{\sum}_{k=1}^{N}a_k y[n-k]+{\sum}_{k=0}^{M}b_k x[n-k].
+$$
+
+To compute it forward, one must also supply $N$ consecutive earlier output values, or impose initial rest. The coefficients do not change with $n$.
+</Definition>
+
+### Second order makes read-before-write visible
+
+The canonical first-order example has one stored output. For a fully specified second-order case, take $f_s=1000$ samples/s, a requested oscillation $f_0=180$ Hz, and therefore $f_0/f_s=0.180$ cycles/sample and $\omega_0=0.36\pi$ radians/sample. Choose radius $r=0.970$ and the normalized all-pole numerator $1$:
+
+$$
+y[n]=x[n]+2r\cos(\omega_0)y[n-1]-r^2y[n-2].
+$$
+
+Here the implementation sign convention is $y[n]=x[n]+a_1y[n-1]+a_2y[n-2]$, so
+
+$$
+a_1=2r\cos(\omega_0)\approx0.8260118,\qquad a_2=-r^2=-0.9409.
+$$
+
+Equivalently, moving feedback terms to the left produces coefficient pattern $[1,-a_1,-a_2]=[1,-2r\cos(\omega_0),r^2]$. With $x[n]=\delta[n]$ and initial rest $y[-1]=y[-2]=0$, the first five outputs are approximately
+
+$$
+[1, 0.8260118, -0.2586045, -0.9908049, -0.5750956].
+$$
+
+A state-update table should carry both old outputs, compute the new one, and only then shift $y[n-1]$ into the $y[n-2]$ slot.
+
+There are useful boundaries to the definition. If every $a_k=0$, the equation is feedforward and needs no output state; an FIR filter is still a difference-equation system. In contrast, $y[n]=y[n+1]+x[n]$ asks for a future output and is not a causal forward recurrence. And $y[n]=y[n-1]^2+x[n]$ is recursive but not linear. Which word in the definition excludes each near-miss?
+
+<Figure
+  name="ResonatorStateLedger"
+  alt="A five-row ledger steps an initially resting second-order resonator through a unit impulse, showing each old state pair, computed output, and shifted new state pair."
+  caption="Each sample reads both old outputs before shifting the newly computed output into state."
+/>
+
+## Homogeneous modes reveal what feedback remembers
+
+### One characteristic root produces one geometric mode
+
+Set the input to zero. The remaining **homogeneous equation** describes what the stored state does on its own. For the first-order recurrence,
+
+$$
+y_h[n]=a y_h[n-1],
+$$
+
+so every homogeneous response is $C a^n$. The initial condition determines $C$; the coefficient $a$ determines whether the mode decays, persists, oscillates in sign, or grows.
+
+The same idea scales to order $N$. Substitute a trial mode $y_h[n]=r^n$ into the homogeneous part of
+
+$$
+y[n]+a_1y[n-1]+\cdots+a_Ny[n-N]=0.
+$$
+
+After dividing by the common power, the allowed values of $r$ satisfy
+
+$$
+r^N+a_1r^{N-1}+\cdots+a_N=0.
+$$
+
+Each root supplies a mode. Distinct roots give weighted geometric sequences $C_i r_i^n$. A root repeated twice contributes both $r^n$ and $nr^n$; the polynomial factor matters near a boundary even though $n(0.5)^n$ still decays.
+
+### Complex roots separate envelope from oscillation
+
+For real coefficients, complex roots occur as a conjugate pair
+
+$$
+r=\rho e^{\pm j\omega_0}.
+$$
+
+Their real response has the form
+
+$$
+\rho^n\left(A\cos(\omega_0n)+B\sin(\omega_0n)\right).
+$$
+
+The radius $\rho$ controls the envelope and the angle $\omega_0$ controls the oscillation rate. These characteristic roots are often called **poles**. That pole-mode vocabulary is enough here: we do not need a transform or a transfer function to read decay and oscillation from the recurrence.
+
+<Figure
+  name="PoleModePairings"
+  alt="Three paired pole plots and discrete modes show a real pole at 0.70 decaying, conjugate poles of radius 0.97 producing a damped oscillation, and conjugate poles of radius 1.02 producing a growing oscillation at the same angle."
+  caption="Pole angle fixes oscillation rate; pole radius decides whether the mode decays or grows."
+/>
+
+<KeyFact>
+Initial conditions choose the amplitudes of homogeneous modes; they do not move the roots. An exact initial state may assign zero amplitude to a growing mode, but that special trajectory does not erase the mode from the recurrence.
+</KeyFact>
+
+### Initial state chooses amplitudes while input supplies forcing
+
+The **forced response** is a response attributable to the nonzero input; a particular solution is one way to describe it. For an LTI system started from rest, the forced response is precisely the zero-state response. The complete response is
+
+$$
+\text{complete} = \text{zero-input} + \text{zero-state}.
+$$
+
+Calling the complete response “the forced response” when the state was not reset silently loses the first term.
+
+## Initial rest turns the recurrence into an impulse response
+
+### An impulse exposes the recursive tail
+
+Return to
+
+$$
+y[n]=ay[n-1]+x[n]
+$$
+
+and impose initial rest. With $x[n]=\delta[n]$, recursive substitution gives
+
+$$
+h[0]=1,\quad h[1]=a,\quad h[2]=a^2,\quad\ldots,
+$$
+
+or
+
+$$
+h[n]=a^n u[n].
+$$
+
+The feedback loop is computationally economical: one delay and one multiplication generate an impulse response of unbounded duration. Unrolling the recurrence for a general input gives
+
+$$
+y[n]=x[n]+ax[n-1]+a^2x[n-2]+\cdots
+     ={\sum}_{m=0}^{\infty}a^m x[n-m].
+$$
+
+This is convolution with $h[m]=a^m u[m]$. It is the same assembly rule as in the prerequisite lesson, now generated by feedback instead of stored as a finite list of taps.
+
+### Convolution predicts the initial-rest response
+
+<Aside title="Initial conditions are not optional">
+The equation and the input do not uniquely specify an output until the auxiliary conditions are supplied. “Find the impulse response” conventionally means the output to an impulse from initial rest. If a device begins with nonzero memory, measure or calculate its zero-input response as well.
+</Aside>
+
+## BIBO stability asks about every bounded input
+
+### Stability fixes both the input bound and the initial state
+
+A decaying free response is intuitively reassuring, but input-output stability has a precise quantifier.
+
+<Definition title="bounded-input, bounded-output stability">
+Fix the initial-rest input-output system of a causal LTI recurrence. It is **BIBO stable** if every bounded input—every $x$ for which some finite $B_x$ satisfies $|x[n]|\le B_x$ for all $n$—produces an output bounded over all $n$.
+</Definition>
+
+The impulse response now supplies an exact criterion rather than a suggestive trace.
+
+### The proof aligns a bounded input with every impulse-response term
+
+The goal is both directions of the theorem under its stated hypotheses: causal $h$, an initial-rest LTI convolution map, and real- or complex-valued sequences. The proof is direct. First the triangle inequality turns a finite absolute sum into a uniform output bound; then a phase-aligned bounded input turns a divergent absolute sum into an unbounded output value.
+
+<Theorem title="absolute summability characterizes causal BIBO stability">
+For a causal discrete-time LTI input-output system started from rest, BIBO stability holds if and only if its causal impulse response is absolutely summable:
+
+$$
+{\sum}_{k=0}^{\infty}|h[k]|<\infty.
+$$
+
+<Proof>
+Suppose ${\sum}_{k=0}^{\infty}|h[k]|=S_h<\infty$ and $|x[n]|\le B_x$. Causality and convolution give
+
+$$
+|y[n]|
+\le {\sum}_{k=0}^{\infty}|h[k]|\,|x[n-k]|
+\le B_x S_h.
+$$
+
+The same finite bound holds at every output index, which proves sufficiency. Conversely, suppose ${\sum}_{k=0}^{\infty}|h[k]|$ diverges. Choose the bounded input
+
+$$
+x[-k]=
+\begin{cases}
+\overline{h[k]}/|h[k]|, & h[k]\ne0,\\
+0, & h[k]=0,
+\end{cases}
+\qquad k\ge0,
+$$
+
+and set the remaining input samples to zero. Its magnitude never exceeds $1$. At $n=0$, every convolution term is nonnegative real:
+
+$$
+y[0]={\sum}_{k=0}^{\infty}h[k]x[-k]
+={\sum}_{k=0}^{\infty}|h[k]|.
+$$
+
+The divergent sum makes the output undefined as a finite value and therefore not bounded. This proves necessity. For real $h$, the phase choice reduces to the sign of $h[k]$.
+</Proof>
+</Theorem>
+
+The proof has one controlling idea: the triangle inequality gives the safe bound, and a phase-matched input shows that no cancellation can rescue a divergent absolute sum.
+
+This is **absolute summability**, not merely $h[n]\to0$, not merely boundedness of each impulse-response sample, and not cancellation in an ordinary signed sum.
+
+### Decay and bounded samples are weaker tests
+
+<Example title="three tails separated by the absolute sum">
+For $h[n]=(0.5)^n u[n]$,
+
+$$
+{\sum}_{n=0}^{\infty}|h[n]|={\sum}_{n=0}^{\infty}(0.5)^n=2,
+$$
+
+so the system is BIBO stable. For $h[n]=u[n]$, every individual sample equals $1$, but the absolute sum diverges. A bounded step input applied to the accumulator $y[n]=y[n-1]+x[n]$ produces $y[n]=n+1$, which is unbounded. A bounded impulse response is therefore a near-miss, not the criterion.
+
+The subtler near-miss
+
+$$
+h[n]=\frac{u[n]}{n+1}
+$$
+
+does satisfy $h[n]\to0$, yet ${\sum}_{n=0}^{\infty}|h[n]|$ is the divergent harmonic series. Decay is necessary for absolute summability but is not sufficient for it.
+</Example>
+
+### Pole radius specializes the theorem for finite-order recurrences
+
+For the first-order causal system, $h[n]=a^n u[n]$, so
+
+$$
+{\sum}_{n=0}^{\infty}|a|^n<\infty
+\quad\Longleftrightarrow\quad
+|a|<1.
+$$
+
+At $a=1$, the homogeneous mode is bounded but does not decay, and the step input accumulates without bound. At $a=-1$, the impulse response alternates without decaying; a matching alternating bounded input makes the convolution grow. For $|a|>1$, even the bounded unit impulse exposes an unbounded output.
+
+For a causal finite-order recurrence with no hidden cancellation, the same pole intuition extends: every mode contributing to $h$ must have radius below one. But BIBO stability is an input-output claim about $h$. A recurrence realization can contain an unobservable or exactly canceled internal growing mode even while its external impulse response is summable; that implementation is not internally safe merely because the reduced input-output description is BIBO stable.
+
+## A finite trace cannot certify an infinite-time claim
+
+### Nearby finite prefixes can have different infinite tails
+
+Consider three geometric envelopes on one shared vertical scale: $0.999^n$, $1^n$, and $1.001^n$. At $n=99$ they are about $0.906$, $1$, and $1.104$. The 100-sample prefixes are visually close and each is a bounded finite set, yet only the first has an absolutely summable infinite tail. “The plotted samples are bounded” is true of every finite numerical record, including a prefix of a divergent sequence.
+
+<Figure
+  src="./figures/finite-trace-stability.svg"
+  alt="On one shared scale, 100-sample geometric envelopes with radii 0.999, 1, and 1.001 start at 1 and end near 0.906, 1, and 1.104, although only the 0.999-radius infinite tail is absolutely summable."
+  caption="All finite prefixes are bounded; only the radius-below-one mode has an absolutely summable infinite tail."
+/>
+
+### Settling turns asymptotic decay into an integer gate
+
+For a stable mode with radius $0<\rho<1$, a useful engineering estimate asks when its envelope falls to a fraction $\varepsilon$ of its starting value:
+
+$$
+\rho^{n_\varepsilon}=\varepsilon
+\qquad\Longrightarrow\qquad
+n_\varepsilon=\frac{\ln\varepsilon}{\ln\rho}.
+$$
+
+At the $1\%$ threshold, $\varepsilon=0.01$. Define settling as the first integer
+
+$$
+N_{1\%}=\left\lceil\frac{\ln(0.01)}{\ln\rho}\right\rceil
+$$
+
+for $0<\rho<1$, and as “never” for $\rho\ge1$. Radius $0.98$ has continuous estimate $227.95$ and first integer $228$, so it satisfies $\rho\le0.98$ but fails the strict requirement $N_{1\%}<200$. Because that means $N_{1\%}\le199$, the joint radius threshold is
+
+$$
+\rho\le0.01^{1/199}\approx0.977124.
+$$
+
+On a radius control with step $0.001$, $0.977$ is therefore the largest passing setting.
+
+### Radius and angle create a tunable resonator
+
+A second-order resonator makes radius and angle independently visible. The lab uses the same declared contract as the state table: $f_s=1000$ samples/s, requested $f_0=180$ Hz ($0.180$ cycles/sample), normalized numerator $1$, $x[n]=\delta[n]$, and $y[-1]=y[-2]=0$:
+
+$$
+y[n]=2\rho\cos(\omega_0)y[n-1]-\rho^2y[n-2]+x[n].
+$$
+
+Its conjugate modes have radius $\rho$ and angle $\omega_0=2\pi f_0/f_s$. Tune the angle for the requested oscillation, then use the radius—not a short visual impression—to enforce decay and settling time. For this numerator and initial rest,
+
+$$
+h[n]=\rho^n\frac{\sin((n+1)\omega_0)}{\sin\omega_0}u[n],
+$$
+
+with the recurrence itself used for sample-by-sample computation.
+
+<Task>
+Before interacting, predict whether $\rho=0.980$ passes both the radius and integer $1\%$-settling gates. Calculate $N_{1\%}$. Then tune $f_0$ to $0.180$ cycles/sample with relative frequency error below $1\%$, $\rho\le0.980$, and $N_{1\%}<200$. Finally select the $f_0=0.180$, $\rho=1.002$ trap. Its first 100 impulse-response samples have maximum magnitude about $1.326$; state only that this displayed prefix is bounded. Extend the *same* recurrence state to 1000 samples, where the maximum is about $8.005$, and use the outside-unit-circle radius—not autoscaling—to reject the BIBO claim.
+</Task>
+
+<Demo
+  name="FeedbackStabilityLab"
+  caption="Tune the pole pair to 0.180 cycles/sample under the radius and settling limits, then test the 100-sample stability claim by extending the trace."
+/>
+
+### Finite arithmetic changes the implementation, not the theorem
+
+Real implementations add two final cautions. Resetting state between blocks changes the computation and can create a boundary transient. Finite-word arithmetic can move effective coefficients, overflow, or produce limit cycles; clipping may keep displayed values finite only by making the implementation nonlinear. Those effects deserve tests, but none changes the mathematical BIBO criterion for the stated LTI recurrence.
+
+State updates, homogeneous modes, the initial-rest impulse response, and its absolute sum now provide one complete recurrence analysis. Perching-Glider System Identification next applies that analysis to fitted recurrences, then judges them on held-out flight measurements and the time structure of their residuals.
+
+## Exercises
+
+<Exercise>
+Classify the modes in four cases: (a) a simple root $r=0.5$; (b) a repeated root $r=0.5$; (c) a root $r=0$; and (d) a root $r=-1$. For each, distinguish decay of the homogeneous response, boundedness of the mode, and absolute summability of a causal impulse-response term with that form.
+
+<Solution>
+(a) The mode $0.5^n$ decays, is bounded, and is absolutely summable because its absolute geometric sum is $2$.
+
+(b) A double root contributes $(C_1+C_2n)0.5^n$. Both $0.5^n$ and $n0.5^n$ decay and are absolutely summable; the polynomial factor slows the transient but does not defeat exponential decay.
+
+(c) A zero root contributes only an immediate finite-duration effect in a causal recurrence: after the necessary starting convention, $0^n$ is zero for positive $n$. A corresponding impulse-response term is bounded and absolutely summable.
+
+(d) The mode $(-1)^n$ is bounded but does not decay. Its absolute value is $1$ at every index, so the causal term $(-1)^n u[n]$ is not absolutely summable and is not BIBO stable. This case separates bounded homogeneous motion from the stronger BIBO requirement.
+</Solution>
+</Exercise>
+
+<Exercise>
+A report says, “The impulse response stayed between $1$ and $1.105$ for its first 100 samples, so the system is stable.” Give a causal first-order counterexample that grows slowly enough to match the report, and identify the bounded input that already disproves BIBO stability.
+
+<Solution>
+Take
+
+$$
+y[n]=1.001y[n-1]+x[n]
+$$
+
+from initial rest. Its impulse response is $h[n]=1.001^n u[n]$, and $h[99]\approx1.104$. Thus every one of the first 100 samples lies in the stated interval. Yet $h[n]\to\infty$, so its absolute sum diverges. The unit impulse is itself a bounded input, and its output is this unbounded $h$; therefore the system is not BIBO stable. A finite record can refute stability if it already violates a required bound, but it cannot certify the infinite-time condition merely by remaining finite.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the initially resting system $y[n]=ay[n-1]+x[n]$, derive its causal impulse response, its BIBO-stability condition, and the first integer index at which its envelope is no greater than a fraction $\varepsilon$ of its initial value. Evaluate the $1\%$ result for $a=0.97$.
+
+<Solution>
+With $x[n]=\delta[n]$, iteration gives
+
+$$
+h[n]=a^n u[n].
+$$
+
+Its absolute sum is geometric, so it is finite exactly when $|a|<1$. For $0<|a|<1$, solve $|a|^n\le\varepsilon$:
+
+$$
+n\ge\frac{\ln\varepsilon}{\ln|a|},
+\qquad
+n_{\text{first}}=\left\lceil\frac{\ln\varepsilon}{\ln|a|}\right\rceil.
+$$
+
+For $a=0.97$ and $\varepsilon=0.01$, the real-valued estimate is about $151.2$ samples, so the first integer index meeting the threshold is $152$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Let $x[0:5]=[1,0,-1,2,0,0]$ and let $y[n]=0.8y[n-1]+x[n]$ with $y[-1]=1$. Compute $y[0:5]$ recursively. Then compute the zero-state response by convolution with $h[n]=0.8^n u[n]$, add the zero-input response, and explain the error in using convolution alone.
+
+<Solution>
+Direct recursion gives
+
+$$
+y[0:5]=[1.8,1.44,0.152,2.1216,1.69728,1.357824].
+$$
+
+Convolution from initial rest gives
+
+$$
+y_{\mathrm{zs}}[0:5]=[1,0.8,-0.36,1.712,1.3696,1.09568].
+$$
+
+The initial state contributes
+
+$$
+y_{\mathrm{zi}}[0:5]=[0.8,0.64,0.512,0.4096,0.32768,0.262144].
+$$
+
+Their samplewise sum equals the recursive result. Convolution with the initial-rest impulse response accounts only for the input-driven, zero-state part; using it alone silently replaces the specified $y[-1]=1$ by zero.
+</Solution>
+</Exercise>
+
+<Exercise>
+An output-only record is
+
+$$
+y[0:6]=[1,0.8,0.7,0.65,0.625,0.58,0.50].
+$$
+
+Reserve $n=5,6$ for validation. On $n=0,\ldots,4$, fit (A) $\hat y[n]=a\,y[n-1]$ by least squares — choose the $a$ that minimizes the summed squared prediction error $\sum_n(y[n]-\hat y[n])^2$ — and (B) $\hat y[n]=a_1y[n-1]+a_2y[n-2]$ by solving the exact training relations. Evaluate both with one-step predictions on the held-out samples, using measured earlier outputs. Which model should advance, and what should you inspect besides one error number? This exercise prepares <Ref lesson="perching-glider-system-identification">Perching-Glider System Identification</Ref>.
+
+<Solution>
+For model A, using training pairs through $n=4$,
+
+$$
+a=\frac{{\sum}_{n=1}^{4}y[n]y[n-1]}{{\sum}_{n=1}^{4}y[n-1]^2}
+=\frac{2.22125}{2.5525}\approx0.87023.
+$$
+
+For model B, the equations at $n=2,3$ are
+
+$$
+0.7=0.8a_1+a_2,\qquad
+0.65=0.7a_1+0.8a_2,
+$$
+
+which give $a_1=1.5$ and $a_2=-0.5$; the $n=4$ training sample also fits exactly.
+
+On the held-out samples, model A predicts approximately
+
+$$
+\hat y_A[5]=0.5439,\qquad \hat y_A[6]=0.5047,
+$$
+
+with residuals $0.0361$ and $-0.0047$. Model B predicts
+
+$$
+\hat y_B[5]=0.6125,\qquad \hat y_B[6]=0.5575,
+$$
+
+with residuals $-0.0325$ and $-0.0575$. Their held-out RMSE values are about $0.0258$ and $0.0467$, so the simpler model A should advance despite model B's exact training fit. Also inspect the residuals in time: persistent sign, trend, oscillation, input correlation, or regime-dependent bursts can expose omitted dynamics that a single aggregate error hides.
+</Solution>
+</Exercise>
+
+<References>
+1. Alan V. Oppenheim and Ronald W. Schafer, *Discrete-Time Signal Processing*, 2nd ed., ch. 2, §§2.4–2.5 — LTI stability, difference equations, auxiliary conditions, homogeneous solutions, and initial rest.
+2. A. V. Oppenheim and A. S. Willsky, MIT OpenCourseWare 6.003, Sessions 2–3 — cyclic signal paths, fundamental modes, and pole geometry. https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/
+3. Sophocles J. Orfanidis, *Introduction to Signal Processing*, 2nd ed., ch. 3, §§3.4–3.5 and ch. 6, §6.3.2 — recursive IIR equations, absolute summability, and the effective settling-time estimate. https://www.ece.rutgers.edu/~orfanidi/intro2sp/
+4. Richard G. Lyons, *Understanding Digital Signal Processing*, 3rd ed., ch. 6, §§6.1–6.5 — feedback implementations and radius-angle intuition for discrete-time poles.
+</References>

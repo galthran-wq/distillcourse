@@ -1,0 +1,350 @@
+Expected prediction error at a point splits exactly into three terms — irreducible noise, squared bias, and variance — and every modeling choice in classical machine learning trades one term against another. This chapter derives that identity in full, since reproducing it is the single most common whiteboard request in ML interviews, and then turns it into a diagnostic tool. The route: the setup that makes bias and variance well defined, a numeric decomposition done by hand, the general proof, the meaning of each term, the U-shaped test-error curve that defines overfitting, and the learning-curve diagnosis with its remedies.
+
+## The quantity: error of a procedure, not of one fit
+
+The data model is standard. Pairs $(x, y)$ are drawn from a distribution $P$ with
+
+$$
+y = f(x) + \varepsilon, \qquad \mathbb{E}[\varepsilon] = 0, \qquad \operatorname{Var}(\varepsilon) = \sigma^2,
+$$
+
+where $f$ is the unknown target function and $\varepsilon$ is label noise, independent of everything else. A learning algorithm receives a training set $D$ of $n$ such pairs and returns a fitted model $\hat{f}_D$. Two independent sources of randomness are now in play: the **draw of $D$**, which determines the fitted model, and the **noise $\varepsilon$** in the test label itself.
+
+<Definition title="expected test error at a point">
+Fix a test input $x_0$. The *expected test error* (generalization error) of the learning procedure at $x_0$ is
+
+$$
+\operatorname{Err}(x_0) = \mathbb{E}_{D,\,\varepsilon}\!\left[\left(y - \hat{f}_D(x_0)\right)^2\right],
+$$
+
+the average squared error over fresh training sets $D$ and a fresh noisy label $y = f(x_0) + \varepsilon$.
+</Definition>
+
+The expectation over $D$ is the part candidates misstate. $\operatorname{Err}(x_0)$ does not score one trained model; it scores the **procedure**: retrain on a fresh sample, predict at $x_0$, repeat, average. The average prediction across retrainings gets its own symbol,
+
+$$
+\bar{f}(x_0) = \mathbb{E}_D\!\left[\hat{f}_D(x_0)\right],
+$$
+
+the prediction of a hypothetical ensemble trained on infinitely many independent datasets.
+
+The retraining experiment is concrete. Draw ten noisy samples of $f(x) = \sin(\pi x)$, fit a polynomial, repeat ten times:
+
+<Figure
+  src="./figures/sheaf.svg"
+  alt="Two panels of ten refitted curves on fresh samples: degree-1 lines form a tight sheaf whose blue average misses the sine target; degree-9 curves form a wild sheaf whose average tracks it"
+  caption="Ten refits on fresh 10-point samples. Left: lines barely move but their average misses f. Right: degree-9 fits swing wildly around an average close to f."
+/>
+
+The spread of each sheaf around its own blue mean is the procedure's variance at each $x$; the gap between the blue mean and the dashed target is its bias. The two panels fail in opposite ways, and the decomposition below prices both failures in the same currency.
+
+<KeyFact>
+Bias and variance are properties of a training procedure averaged over datasets, not of one fitted model. Every expectation in this chapter that carries a subscript $D$ is an average over retrainings.
+</KeyFact>
+
+## A decomposition by hand: two predictors at one point
+
+Before the general proof, the identity on numbers small enough to enumerate.
+
+<Example title="jumpy versus stable">
+At a fixed $x_0$ let $f(x_0) = 4$, with label noise $\varepsilon = \pm 1$ equally likely, so $y \in \{3, 5\}$ and $\sigma^2 = \mathbb{E}[\varepsilon^2] = 1$.
+
+**Procedure A (unbiased, jumpy).** The training draw pushes the fit to $\hat{f}_D(x_0) = 3$ or $5$, each with probability $\tfrac12$. All four $(y, \hat{f})$ combinations are equally likely, so
+
+$$
+\operatorname{Err}_A(x_0) = \tfrac14\left[(3-3)^2 + (3-5)^2 + (5-3)^2 + (5-5)^2\right] = \tfrac14(0+4+4+0) = 2.
+$$
+
+Bookkeeping: $\bar{f}(x_0) = \tfrac12(3+5) = 4$, so the bias is $4 - 4 = 0$; the variance is $\mathbb{E}_D[(\hat{f} - 4)^2] = 1$. Noise + bias² + variance $= 1 + 0 + 1 = 2$. The terms match the direct computation.
+
+**Procedure B (biased, stable).** Always predict $4.5$, regardless of $D$. Then $y - 4.5 = \varepsilon - 0.5$ and
+
+$$
+\operatorname{Err}_B(x_0) = \mathbb{E}\left[(\varepsilon - 0.5)^2\right] = \sigma^2 + 0.25 = 1.25.
+$$
+
+Bookkeeping: bias $= 4.5 - 4 = 0.5$, variance $= 0$. Noise + bias² + variance $= 1 + 0.25 + 0 = 1.25$.
+</Example>
+
+The biased procedure wins: $1.25 < 2$. A half-unit of systematic error costs less than a full unit of variance, because only the **sum** of the three terms is the score. "Trade-off" is in this sense a misnomer: nothing forces an even exchange, and a good regularizer buys a large variance reduction for a small bias² payment.
+
+## The decomposition: noise + bias² + variance
+
+The general statement prices every procedure the way the example priced two.
+
+<Definition title="bias and variance at a point">
+For a procedure with average prediction $\bar{f}(x_0) = \mathbb{E}_D[\hat{f}_D(x_0)]$,
+
+$$
+\operatorname{Bias}(x_0) = \bar{f}(x_0) - f(x_0),
+\qquad
+\operatorname{Var}(x_0) = \mathbb{E}_D\!\left[\left(\hat{f}_D(x_0) - \bar{f}(x_0)\right)^2\right].
+$$
+</Definition>
+
+<Theorem title="bias–variance decomposition">
+Under the model $y = f(x_0) + \varepsilon$ with $\mathbb{E}[\varepsilon] = 0$, $\operatorname{Var}(\varepsilon) = \sigma^2$, and $\varepsilon$ independent of $D$,
+
+$$
+\operatorname{Err}(x_0) = \underbrace{\sigma^2}_{\text{noise}} \;+\; \underbrace{\left(f(x_0) - \bar{f}(x_0)\right)^2}_{\text{bias}^2} \;+\; \underbrace{\mathbb{E}_D\!\left[\left(\hat{f}_D(x_0) - \bar{f}(x_0)\right)^2\right]}_{\text{variance}}.
+$$
+
+<Proof>
+Abbreviate $f = f(x_0)$, $\hat{f} = \hat{f}_D(x_0)$, $\bar{f} = \bar{f}(x_0)$; all expectations run over $D$ and $\varepsilon$. Substitute $y = f + \varepsilon$, then add and subtract $\bar{f}$ inside the square:
+
+$$
+y - \hat{f} = (f - \bar{f}) + (\bar{f} - \hat{f}) + \varepsilon .
+$$
+
+Expanding $(a + b + c)^2$ with $a = f - \bar{f}$, $b = \bar{f} - \hat{f}$, $c = \varepsilon$, and noting $2ac + 2bc = 2c(a+b)$:
+
+$$
+\mathbb{E}\!\left[(y - \hat{f})^2\right]
+= (f - \bar{f})^2
++ \mathbb{E}_D\!\left[(\bar{f} - \hat{f})^2\right]
++ \mathbb{E}[\varepsilon^2]
++ 2(f - \bar{f})\,\mathbb{E}_D[\bar{f} - \hat{f}]
++ 2\,\mathbb{E}\!\left[(f - \hat{f})\,\varepsilon\right].
+$$
+
+The first square needs no expectation: $f - \bar{f}$ is a fixed number once $x_0$ is fixed. Both cross terms vanish:
+
+- $\mathbb{E}_D[\bar{f} - \hat{f}] = \bar{f} - \mathbb{E}_D[\hat{f}] = \bar{f} - \bar{f} = 0$, since $\bar{f}$ is by definition the mean of $\hat{f}$ over $D$;
+- $\mathbb{E}[(f - \hat{f})\,\varepsilon] = \mathbb{E}_D[f - \hat{f}]\cdot\mathbb{E}[\varepsilon] = 0$, since $\varepsilon$ is independent of $D$ and $\mathbb{E}[\varepsilon] = 0$.
+
+Finally $\mathbb{E}[\varepsilon^2] = \operatorname{Var}(\varepsilon) = \sigma^2$ because $\mathbb{E}[\varepsilon] = 0$. The three surviving terms are the claim. 
+</Proof>
+</Theorem>
+
+The whole argument is one trick: insert a term and its negative, expand, and let independence and the definition of a mean kill both cross terms. The sequence below stages the algebra one move at a time; [Weinberger's CS4780 lecture note](https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote12.html) runs the same derivation in its interview-canonical form.
+
+<FigureSequence
+  name="proof"
+  alt="Four frames of staged algebra: the error with y expanded, the inserted average prediction with color-coded groups, the two cross terms struck out with reasons, and the surviving noise, bias-squared, and variance terms named"
+  caption="The proof in four moves: substitute, insert −f̄ + f̄, kill both cross terms, name the survivors."
+/>
+
+<Task>
+Step through the four frames, then close them and reproduce the derivation on paper, including the one-line reason each cross term is zero. Check your algebra against the proof above; this exact reproduction is the deliverable interviewers ask for.
+</Task>
+
+<Remark title="squared loss only">
+The identity is exact for squared loss and does not carry over to 0/1 classification loss: with $\operatorname{sign}$-valued predictions the cross terms no longer vanish, and variance can even help or hurt depending on whether the average prediction is right. Several inequivalent 0/1-loss decompositions exist (Domingos, ICML 2000, unifies them); if an interviewer asks about classification, say the squared-loss result is exact and the classification version is a heuristic.
+</Remark>
+
+<KeyFact>
+The decomposition is an identity, not an approximation: for squared loss, expected test error equals noise + bias² + variance exactly, and each term is nonnegative.
+</KeyFact>
+
+## Reading the terms: the dartboard
+
+Each term blames a different actor. **Noise** $\sigma^2$ is a property of the problem: the label itself jitters, so even the oracle predictor $\hat{f} = f$ scores $\sigma^2$. No model choice touches this floor. **Bias** measures the systematic miss of the averaged procedure: the model class cannot represent $f$ near $x_0$, or the fitting method will not reach it. **Variance** measures sensitivity to the draw of $D$: how far a single retraining lands from the procedure's own average.
+
+<Figure
+  src="./figures/dartboard.svg"
+  alt="Four dartboards in a two-by-two grid: rows low and high bias, columns low and high variance; amber shot clusters are tight or spread, centered or offset from the blue bullseye"
+  caption="The standard picture: each throw is one retraining. Bias is where the cluster centers; variance is how much it spreads."
+/>
+
+The corners of the grid are worth naming because interviewers probe them as degenerate cases. A **constant predictor** $\hat{f} \equiv c$ ignores $D$ entirely: zero variance, bias $c - f(x_0)$, error $\sigma^2 + (f(x_0) - c)^2$. An **interpolator** that passes through every training point has training error zero and bias near zero at the sampled points, but its predictions swing with every noise realization: the error is almost all variance. Both corners are consistent with the identity; neither is good.
+
+## Flexibility: bias falls, variance rises
+
+A single knob generates the whole picture: model flexibility. On one 10-point sample of $\sin(\pi x)$, fit polynomials of degree 1, 3, and 9 (the running example of the [CS229 notes](https://cs229.stanford.edu/main_notes.pdf), §8.1):
+
+<Figure
+  src="./figures/polyfits.svg"
+  alt="Three panels fitting the same ten noisy points with polynomials of degree 1, 3, and 9, with train and test MSE under each; degree 9 interpolates the points and explodes between them"
+  caption="One sample, three capacities. Degree 9 drives train MSE to zero and test MSE to 175: it fits the noise, and interpolation explodes near the interval's edges."
+/>
+
+The degree-1 line cannot bend into the sine: large bias, small variance. Degree 9 threads every point, noise included: near-zero bias, enormous variance (its test MSE is dominated by the wild oscillations the sheaf figure showed). Degree 3 balances the two. Averaged over everything, the pattern is universal: as flexibility grows, **bias² falls, variance rises, and their sum is U-shaped**: the canonical curve of [ISLP §2.2.2](https://www.statlearning.com) (Fig. 2.12).
+
+<Figure
+  src="./figures/ucurve.svg"
+  alt="Bias squared falling, variance rising, flat noise floor, their U-shaped sum, and a monotonically falling dashed green training error, plotted against model flexibility"
+  caption="Test error is the sum of the three terms and turns back up; training error keeps falling and says nothing about the right-hand half."
+/>
+
+Training error tracks none of this: more flexibility always fits the sample at hand better, so the green curve falls monotonically toward zero while true error turns back up. That divergence is the definition worth stating precisely.
+
+<Definition title="overfitting and underfitting">
+A model **overfits** when it fits noise in the training sample: its training error keeps decreasing while its generalization error increases; this is the regime right of the U-curve's minimum, where the error is dominated by variance. It **underfits** in the regime left of the minimum, where the error is dominated by bias².
+</Definition>
+
+<Demo
+  name="BiasVarianceExplorer"
+  caption="Polynomial fits to noisy samples of a fixed target: degree slider, train/test error traces, and a resample button that redraws the training set."
+/>
+
+<Task>
+Set degree 9 and press resample several times: the fit jumps with every draw: that jitter is variance. Set degree 0: resampling barely moves the fit, but it misses the target everywhere; that standing gap is bias. Then find the degree where the test-error trace bottoms out and check that the training-error trace gives no warning at all.
+</Task>
+
+### Match capacity to the data, not to the target
+
+Flexibility is priced against the sample size, not against the target's complexity. The cleanest demonstration is the sine toy from [Caltech's Learning From Data, Lecture 8](https://work.caltech.edu/telecourse):
+
+<Example title="two points, constants beat lines">
+Target $f(x) = \sin(\pi x)$ on $[-1, 1]$, training sets of $n = 2$ noiseless points. Model $\mathcal{H}_0$ fits a constant; $\mathcal{H}_1$ fits a line through both points. Averaged over test $x$ and training draws, the lecture's measured values are
+
+$$
+\mathcal{H}_0:\ \ \text{bias}^2 = 0.50,\ \ \text{var} = 0.25
+\qquad
+\mathcal{H}_1:\ \ \text{bias}^2 = 0.21,\ \ \text{var} = 1.69 .
+$$
+
+Expected test error is the sum: $0.75$ for constants against $1.90$ for lines. The line class contains far better approximations to the sine, and loses anyway: two points cannot pin down a line, so the variance term swamps the bias saving. Exercise 4 derives the $\mathcal{H}_0$ numbers from scratch.
+</Example>
+
+<Aside>
+Double descent. The U-curve is the classical picture, and modern practice violates its right edge: for heavily overparameterized models, test error can fall *again* past the interpolation threshold, where the model fits the training data exactly and capacity keeps growing ([Belkin et al., PNAS 2019](https://arxiv.org/abs/1812.11118); CS229 notes §8.2). The decomposition itself does not fail (it is an identity); the resolution is that flexibility and parameter count are not the same axis: among interpolating models, extra capacity can select smoother fits with lower variance. For interviews: overfitting means fitting noise, not "too many parameters," and double descent is the standard counterexample to the conflation.
+</Aside>
+
+## Diagnosis: learning curves decide the remedy
+
+Neither bias nor variance is directly observable, but two measurable numbers proxy them: the **training error**, whose height above the desired error indicates bias, and the **train–validation gap**, which indicates variance. Plotting both against training-set size separates the regimes:
+
+<Figure
+  src="./figures/learning-curves.svg"
+  alt="Two panels of training and test error versus training set size: high-bias curves converge at a high plateau; high-variance curves keep a persistent gap with test error still falling"
+  caption="Learning curves as the diagnostic. Converged-and-high means bias: collecting more data moves nothing. A persistent gap means variance: more data is still buying error reduction."
+/>
+
+More data shrinks variance only. As $n$ grows, both curves approach the same plateau at bias² + noise; if that plateau already sits above the target, no amount of additional data helps and the model class itself must change. The gap, conversely, closes with data, which is why "get more data" is the first-listed variance remedy and a useless bias remedy.
+
+| symptom | diagnosis | remedies, in rough order of cost |
+| --- | --- | --- |
+| training error high, validation error close above it | high bias (underfitting) | bigger or more flexible model class; more or better features; reduce regularization; train longer |
+| training error low, validation error far above it | high variance (overfitting) | more training data; add or increase regularization; average models (ensembles); fewer features or a simpler model |
+
+<Remark title="the interview answer skeleton">
+Most "my model does X, what now?" questions compress to three moves: name the term that is inflated, cite the observable that proves it (training error vs. the gap), and list the matching remedy column in order of cost. The exercises rehearse the pattern on the canonical variants.
+</Remark>
+
+<KeyFact>
+Training error far above the desired error is a bias problem; a large train–validation gap is a variance problem. The two observables select the remedy column, and more data only ever fixes the second.
+</KeyFact>
+
+## One trade-off, many knobs
+
+Every regularization and capacity control in this course is a dial on the same three terms; the later chapters supply the mechanics, and the decomposition supplies the reading.
+
+- **$k$ in $k$-NN.** For a $k$-nearest-neighbor fit, [ESL §7.3](https://hastie.su.domains/ElemStatLearn/) (Eq. 7.10) gives the decomposition in closed form: $\operatorname{Err}(x_0) = \sigma^2 + \left[f(x_0) - \tfrac1k \sum_{\ell=1}^{k} f(x_{(\ell)})\right]^2 + \tfrac{\sigma^2}{k}$. Variance falls as $\sigma^2/k$; bias grows as the $k$-th neighbor gets farther away; <Ref lesson="knn-curse" /> works the dial.
+- **Parameters in linear regression.** For a $p$-parameter least-squares fit the variance term averages $p\,\sigma^2/n$ over the training inputs (ESL Eq. 7.12): each added feature costs $\sigma^2/n$ of variance; assumptions and guarantees are in <Ref lesson="ols" />.
+- **$\lambda$ in ridge and lasso.** Shrinking coefficients toward zero adds bias and cuts variance; tuning $\lambda$ walks the U-curve from right to left (<Ref lesson="ridge-lasso" />).
+- **Tree depth.** Each additional split level multiplies the leaf count, driving bias down and variance up (<Ref lesson="decision-trees" />).
+- **Averaging.** Bagging attacks variance directly by averaging retrained models, at essentially no bias cost; <Ref lesson="bagging-random-forests" /> quantifies the floor set by tree correlation.
+- **Choice of $k$ in cross-validation.** Even the measurement of test error trades bias against variance in the number of folds (<Ref lesson="cross-validation-bootstrap" />).
+
+## Exercises
+
+<Exercise>
+The set piece: state the data model and assumptions, define $\bar{f}(x_0)$, and derive the bias–variance decomposition of $\mathbb{E}_{D,\varepsilon}[(y - \hat{f}_D(x_0))^2]$, justifying every vanishing term. Do it on paper before opening the solution.
+
+<Solution>
+Model: $y = f(x_0) + \varepsilon$, $\mathbb{E}[\varepsilon] = 0$, $\operatorname{Var}(\varepsilon) = \sigma^2$, $\varepsilon$ independent of the training set $D$; define $\bar{f} = \mathbb{E}_D[\hat{f}_D(x_0)]$ and abbreviate $f = f(x_0)$, $\hat{f} = \hat{f}_D(x_0)$.
+
+Write $y - \hat{f} = (f - \bar{f}) + (\bar{f} - \hat{f}) + \varepsilon$ and expand the square; the two $\varepsilon$ cross products combine into one term:
+
+$$
+\mathbb{E}\big[(y-\hat{f})^2\big] = (f-\bar{f})^2 + \mathbb{E}_D\big[(\bar{f}-\hat{f})^2\big] + \mathbb{E}[\varepsilon^2] + 2(f-\bar{f})\,\mathbb{E}_D[\bar{f}-\hat{f}] + 2\,\mathbb{E}\big[(f-\hat{f})\varepsilon\big].
+$$
+
+Cross term 1: $\mathbb{E}_D[\bar{f}-\hat{f}] = \bar{f}-\bar{f} = 0$ because $\bar{f}$ is defined as the mean of $\hat{f}$ over $D$. Cross term 2: $\varepsilon$ is independent of $D$, so the expectation factorizes as $\mathbb{E}_D[f-\hat{f}]\cdot\mathbb{E}[\varepsilon] = 0$. With $\mathbb{E}[\varepsilon^2] = \sigma^2$,
+
+$$
+\operatorname{Err}(x_0) = \sigma^2 + \big(f(x_0)-\bar{f}(x_0)\big)^2 + \mathbb{E}_D\big[(\hat{f}_D(x_0)-\bar{f}(x_0))^2\big],
+$$
+
+which is noise + bias² + variance.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: your classifier reaches 5% training error and 25% validation error, while the product needs roughly 10%. Diagnose the failure and list what you would try, in order.
+
+<Solution>
+The training error (5%) is already below the target (10%), so bias is not the binding problem; the 20-point train–validation gap is the signature of **high variance**: the model fits patterns of the particular training sample that do not generalize.
+
+In order of cost: (1) more training data, since the gap is exactly what data shrinks; (2) add or strengthen regularization (weight penalty, early stopping, pruning, dropout, whichever the model admits); (3) reduce capacity: fewer features or a simpler model class, accepting a small rise in training error; (4) average several models (bagging-style ensembling). Making the model bigger is the one standard move that is wrong here: it grows the inflated term. If training error were 25% with validation at 27%, the diagnosis would flip to high bias and the remedy list would invert.
+</Solution>
+</Exercise>
+
+<Exercise>
+Give an estimator with exactly zero variance. Compute its bias and its expected test error at $x_0$ using the decomposition, and state which term the choice of the constant controls.
+
+<Solution>
+The constant predictor $\hat{f}_D \equiv c$ ignores the training data, so retraining never changes it: $\bar{f}(x_0) = c$ and $\operatorname{Var}(x_0) = \mathbb{E}_D[(c - c)^2] = 0$. Its bias is $c - f(x_0)$, and the decomposition gives
+
+$$
+\operatorname{Err}(x_0) = \sigma^2 + \big(f(x_0) - c\big)^2 + 0.
+$$
+
+The constant controls only the bias² term, minimized at $c = f(x_0)$, a value unknowable in practice: that is why the zero-variance corner is not a strategy. The Example in the chapter shows the corner can still win against an unbiased but jumpy competitor when the variance it avoids exceeds the bias² it pays.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the sine-toy numbers for constants. Target $f(x) = \sin(\pi x)$ with $x$ uniform on $[-1,1]$, no label noise; the training set is two independent points $(x_1, y_1), (x_2, y_2)$, and $\mathcal{H}_0$ fits the least-squares constant. Compute the average hypothesis $\bar{g}$, the bias² $\mathbb{E}_x[(\bar{g}(x) - f(x))^2]$, and the variance $\mathbb{E}_x\,\mathbb{E}_D[(g_D(x) - \bar{g}(x))^2]$, and compare the total with the lines value $1.90$.
+
+<Solution>
+The least-squares constant through two points is the mean: $g_D(x) = b = \tfrac12(y_1 + y_2)$.
+
+**Average hypothesis.** $\mathbb{E}[\sin(\pi x_i)] = \tfrac12\int_{-1}^{1} \sin(\pi x)\,dx = 0$ by odd symmetry, so $\bar{g}(x) = \mathbb{E}_D[b] = 0$: the average of all fitted constants is the zero function.
+
+**Bias².** $\mathbb{E}_x[(0 - \sin\pi x)^2] = \tfrac12\int_{-1}^{1}\sin^2(\pi x)\,dx = \tfrac12$, using $\int_{-1}^1 \sin^2 = 1$.
+
+**Variance.** $b$ does not depend on the test $x$, so the variance is $\mathbb{E}_D[b^2] = \tfrac14\,\mathbb{E}[(y_1 + y_2)^2] = \tfrac14\big(\mathbb{E}[y_1^2] + \mathbb{E}[y_2^2] + 2\,\mathbb{E}[y_1]\mathbb{E}[y_2]\big) = \tfrac14\big(\tfrac12 + \tfrac12 + 0\big) = \tfrac14$, the cross term factorizing by independence of the two draws.
+
+Total for $\mathcal{H}_0$: $0.50 + 0.25 = 0.75$, against $0.21 + 1.69 = 1.90$ for lines. Constants beat lines on two points: capacity must be matched to the data resources, not to the target's complexity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: does collecting more training data reduce bias? Answer for a fixed parametric model class, then state the nonparametric caveat.
+
+<Solution>
+For a fixed parametric class (say, degree-3 polynomials), no. Bias is the systematic gap between the class's average fit and $f$; with more data the fitted parameters concentrate around their large-sample values, so **variance shrinks** while the bias floor stays. On a learning curve, both errors flatten onto the plateau at bias² + noise; if that plateau is above the target, more data is wasted effort and the model class must change.
+
+Caveat: for procedures whose effective flexibility depends on $n$, bias does move with data. In the ESL $k$-NN decomposition, the bias term $[f(x_0) - \tfrac1k\sum f(x_{(\ell)})]^2$ depends on how far the $k$ nearest neighbors sit; with more data they sit closer, so at fixed $k$ the bias falls as $n$ grows. The clean interview answer distinguishes the two cases.
+</Solution>
+</Exercise>
+
+<Exercise>
+Is a 1-nearest-neighbor classifier high-bias or high-variance? Justify using its training error and the effect of resampling the training set.
+
+<Solution>
+High-variance. 1-NN predicts each training point's own label, so its training error is exactly zero: no systematic inability to fit, hence low bias. But the prediction at a test point is a single training label, and resampling $D$ swaps that neighbor, often across the class boundary near noisy points, so the fitted decision boundary jumps from draw to draw: large variance, the memorizing corner of the dartboard. Growing $k$ averages more neighbors, shrinking variance (the $\sigma^2/k$ term) while pulling in farther neighbors and growing bias; $k$ is the flexibility dial run in reverse, treated fully in the k-NN chapter.
+</Solution>
+</Exercise>
+
+<Exercise>
+Shrinkage beats unbiasedness. From $n$ i.i.d. observations $y_i = \mu + \varepsilon_i$ with $\operatorname{Var}(\varepsilon_i) = \sigma^2$, compare the sample mean $\bar{y}$ with the shrunk estimator $\hat{\mu}_\alpha = \alpha\,\bar{y}$ for $\alpha \in [0,1]$. Compute the bias, variance, and MSE of $\hat{\mu}_\alpha$, and find the $\alpha$ minimizing the MSE.
+
+<Solution>
+$\mathbb{E}[\bar{y}] = \mu$ and $\operatorname{Var}(\bar{y}) = \sigma^2/n$. Hence $\mathbb{E}[\hat{\mu}_\alpha] = \alpha\mu$, giving bias $(\alpha - 1)\mu$ and variance $\alpha^2\sigma^2/n$. The decomposition (no noise term: the target $\mu$ is a fixed number) gives
+
+$$
+\operatorname{MSE}(\alpha) = (1-\alpha)^2\mu^2 + \alpha^2\,\frac{\sigma^2}{n}.
+$$
+
+Setting the derivative to zero: $-2(1-\alpha)\mu^2 + 2\alpha\sigma^2/n = 0$, so
+
+$$
+\alpha^{*} = \frac{\mu^2}{\mu^2 + \sigma^2/n} < 1 ,
+$$
+
+and the second derivative $2\mu^2 + 2\sigma^2/n > 0$ confirms a minimum. Some shrinkage below the unbiased $\alpha = 1$ always helps: the first bit of bias is second-order cheap while the variance saving is first-order. This is the one-parameter prototype of ridge regression's bias-for-variance purchase in <Ref lesson="ridge-lasso" />.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Q. Weinberger, "Lecture 12: Bias-Variance Tradeoff," CS4780 Machine Learning for Intelligent Systems, Cornell University, 2018 — the decomposition proof this chapter mirrors, plus the dartboard and learning-curve diagnosis. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote12.html
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.3 (Eqs. 7.9–7.14): the decomposition with the k-NN and linear-regression special cases. https://hastie.su.domains/ElemStatLearn/
+3. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §2.2.2, Eq. (2.7) and Figs. 2.9–2.12: the flexibility U-curve. https://www.statlearning.com
+4. Y. S. Abu-Mostafa, M. Magdon-Ismail, H.-T. Lin, *Learning From Data*, AMLBook, 2012 — §2.3.1 and Caltech CS156 Lecture 8: the average-hypothesis view and the sine toy. https://work.caltech.edu/telecourse
+5. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford University, 2023 — §8.1–8.2: the polynomial running example and double descent. https://cs229.stanford.edu/main_notes.pdf
+6. M. Belkin, D. Hsu, S. Ma, S. Mandal, "Reconciling modern machine-learning practice and the classical bias–variance trade-off," *PNAS* 116(32), 2019 — double descent. https://arxiv.org/abs/1812.11118
+7. P. Domingos, "A Unified Bias-Variance Decomposition and its Applications," ICML 2000 — decomposition variants beyond squared loss.
+</References>

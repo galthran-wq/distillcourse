@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "status": "precommitted_before_validation_outcomes",
+  "lesson": "perching-glider-system-identification",
+  "dataset_id": "ntnu-skywalker-x8-system-identification-v1",
+  "dataset_doi": "https://doi.org/10.18710/U4TLYV",
+  "dataset_version": "1.0",
+  "protocol_scope": "Introductory, fixed low-order prediction study of elevator input to measured pitch rate in ordinary Skywalker X8 longitudinal system-identification maneuvers. It is not a perching, stall, lift/drag, actuator-delay-identification, or invariant-aircraft-model study.",
+  "validation_outcomes_accessed": false,
+  "validation_guard": "Only dataset metadata, file identities, checksums, schema, units, sample rate, creator-designated split, and documented caveats were used to author this protocol. Do not open validation signal arrays, calculate validation summaries, or change any rule below until the training fit and analysis code are frozen and checksummed.",
+  "prerequisite_fit": {
+    "available": [
+      "sample index, sampling interval, and physical-unit contracts",
+      "causal first- and second-order difference equations",
+      "initial-state and maneuver-boundary resets",
+      "least-squares fitting of a recurrence",
+      "one-step held-out prediction and RMSE",
+      "second-order characteristic roots and the strict unit-circle stability rule"
+    ],
+    "excluded": "Do not use transfer functions or z-transform notation; those appear later in the course. Derive the root equation directly by substituting q_h[n]=r^n into the homogeneous recurrence."
+  },
+  "signals": {
+    "input": {
+      "csv_position_1_based": 2,
+      "name": "elevator",
+      "symbol": "u[n]",
+      "unit": "rad",
+      "meaning": "recorded elevator deflection/control input"
+    },
+    "output": {
+      "csv_position_1_based": 9,
+      "name": "IMU_angvel_q",
+      "symbol": "q[n]",
+      "unit": "rad/s",
+      "meaning": "body-frame IMU pitch angular velocity"
+    },
+    "time": {
+      "csv_position_1_based": 1,
+      "name": "t",
+      "unit": "s",
+      "sample_rate_hz": 40,
+      "nominal_sample_interval_s": 0.025,
+      "index_rule": "Within each file, CSV row 1 is n=0 at t=0 and the last row is included. Every maneuver starts a new index and state history."
+    }
+  },
+  "files": {
+    "training": [
+      {
+        "path": "interoperability_files/training/longitudinal_3211_1.csv",
+        "md5": "655edda35560ca299dac545ff7835dab"
+      },
+      {
+        "path": "interoperability_files/training/longitudinal_3211_2.csv",
+        "md5": "caca49f8743caf59cc26bf756c914554"
+      },
+      {
+        "path": "interoperability_files/training/longitudinal_3211_3.csv",
+        "md5": "f7fe10687cd6dac07a0d0387150fac9e"
+      },
+      {
+        "path": "interoperability_files/training/longitudinal_3211_4.csv",
+        "md5": "52bff9a02a5df53b0f4a5b41625ff47f"
+      },
+      {
+        "path": "interoperability_files/training/longitudinal_doublet_1.csv",
+        "md5": "9e9b1bd40bec64a96a30cfe44bf385c3"
+      },
+      {
+        "path": "interoperability_files/training/longitudinal_doublet_2.csv",
+        "md5": "03ad563a6e491674c2b763b99a0ee63e"
+      },
+      {
+        "path": "interoperability_files/training/longitudinal_doublet_3.csv",
+        "md5": "01f4a2fe2fa98937a090c79e117aba3e"
+      }
+    ],
+    "validation": [
+      {
+        "path": "interoperability_files/validation/longitudinal_3211_5.csv",
+        "md5": "0d87838dc9de2e75e7a8db8beca0d3c8"
+      },
+      {
+        "path": "interoperability_files/validation/longitudinal_doublet_4.csv",
+        "md5": "2920b5241fef83408fb1e48955372f2f"
+      }
+    ],
+    "order": "Process each list in the order written and preserve row order. Never concatenate records before constructing lags."
+  },
+  "preprocessing": {
+    "header_assignment": "The CSVs have no header. Assign the version-1.0 README's exact 41-column order, then select only t, elevator, and IMU_angvel_q.",
+    "numeric_type": "IEEE-754 float64",
+    "integrity_checks": [
+      "Verify each file MD5 before analysis.",
+      "Require exactly 41 finite numeric fields per row; do not impute, interpolate, or bridge an invalid row.",
+      "Require t[0]=0 and every within-file increment to equal 0.025 s within absolute tolerance 1e-9 s.",
+      "If an integrity check fails, stop and report the file and row; do not silently exclude it."
+    ],
+    "transform": "Use raw elevator in rad and raw IMU_angvel_q in rad/s. Apply no centering, scaling, detrending, filtering, smoothing, resampling, clipping, outlier removal, or file-specific trim correction. The fitted intercept absorbs one pooled offset.",
+    "selection": "No window, excitation segment, or row may be selected after viewing validation behavior. All valid rows are used subject only to the two-lag boundary rule."
+  },
+  "model": {
+    "name": "fixed introductory pitch-rate ARX(2,1,1)",
+    "order": {
+      "na_output_lags": 2,
+      "nb_input_terms": 1,
+      "nk_input_delay_samples": 1
+    },
+    "delay_samples": 1,
+    "nominal_delay_s": 0.025,
+    "equation": "q_hat[n]=c+a1 q[n-1]+a2 q[n-2]+b1 u[n-1]",
+    "coefficient_units": {
+      "a1": "1",
+      "a2": "1",
+      "b1": "1/s",
+      "c": "rad/s"
+    },
+    "intercept": true,
+    "delay_interpretation": "The one-sample delay is a frozen discrete modeling convention, not an estimate of actuator latency. It must not be changed after validation is opened or converted into a physical delay claim because the source commands were manually synchronized.",
+    "fit_rows": "For each training file of length L, form rows n=2,...,L-1 only. Never use q or u from another file as a lag.",
+    "design_row": "[q[n-1], q[n-2], u[n-1], 1]",
+    "target": "q[n]",
+    "fit": "Stack the valid design rows from all seven training files in the declared file order and solve unweighted ordinary least squares in float64 with numpy.linalg.lstsq(X,y,rcond=None). Do not regularize, constrain roots, refit by maneuver, or select order/delay from validation.",
+    "frozen_outputs_before_validation": [
+      "analysis script/notebook checksum",
+      "the four fitted coefficients [a1,a2,b1,c]",
+      "the three baseline coefficients [a01,a02,c0]",
+      "training-file checksums and row counts",
+      "all formulas, plotting ranges, and decision rules in this protocol"
+    ]
+  },
+  "baseline": {
+    "name": "matched-order input-free AR(2)",
+    "equation": "q_hat_0[n]=c0+a01 q[n-1]+a02 q[n-2]",
+    "purpose": "Tests whether adding recorded elevator improves prediction beyond pitch-rate memory at the same output order; it replaces the inapplicable flat-plate baseline.",
+    "fit": "Fit by unweighted float64 ordinary least squares on exactly the same seven files and n=2,...,L-1 rows, using design row [q[n-1],q[n-2],1] and numpy.linalg.lstsq(...,rcond=None)."
+  },
+  "maneuver_boundary_and_prediction_rules": {
+    "reset": "Treat all nine files as independent maneuvers. Clear every lag and recursive state at each file boundary.",
+    "one_step": "In each validation file, for n=2,...,L-1 use measured q[n-1] and q[n-2]. ARX also uses recorded u[n-1]. Compute e_1[n]=q[n]-q_hat_1[n]. Apply the identical measured-output convention to the AR(2) baseline.",
+    "free_run": "At each validation-file boundary initialize both recurrences with the two measured seeds q_tilde[0]=q[0] and q_tilde[1]=q[1]. For n=2,...,L-1, recursively feed each model its own two previous predictions. ARX continues to use recorded u[n-1]; AR(2) is input-free. Compute e_f[n]=q[n]-q_tilde[n].",
+    "scored_indices": "Score n=2,...,L-1 for both modes and both models so all comparisons use identical target samples. The two measured seeds are disclosed but not scored.",
+    "no_cross_file_pooling": "Residuals may be collected after per-file prediction, but recurrence state and ACF pairs never cross a maneuver boundary."
+  },
+  "validation_metrics": {
+    "metrics_count": 4,
+    "metric_families": [
+      "one-step RMSE",
+      "one-step NRMSE",
+      "free-run RMSE",
+      "free-run NRMSE"
+    ],
+    "rmse": "For a file with M=L-2 scored samples, RMSE=sqrt(sum(e[n]^2)/M), in rad/s.",
+    "nrmse": "NRMSE=RMSE/s_q, where s_q=sqrt(sum((q[n]-mean(q_scored))^2)/M) over that same validation file and n=2,...,L-1. It is unitless. If s_q=0, report NRMSE undefined rather than substituting a constant.",
+    "per_file": "Report all four metrics for ARX(2,1,1) and AR(2) separately for longitudinal_3211_5.csv and longitudinal_doublet_4.csv, together with M.",
+    "aggregate": "For every metric/model pair, report the arithmetic mean of the two per-file values as the primary equal-maneuver macro aggregate. Do not form one long synthetic trajectory. A sample-pooled RMSE may be shown only as a labeled secondary value and may not replace the macro result.",
+    "effect_size": "For each mode, report 100*(1-macro_NRMSE_ARX/macro_NRMSE_AR2) percent. Positive means improvement; zero or negative means no improvement. Do not round before calculating the ratio.",
+    "rounding": "Calculate in float64 and display RMSE to four significant figures, NRMSE to three decimals, and percent changes to one decimal; retain full-precision machine-readable results."
+  },
+  "residual_diagnostics": {
+    "residual_sign": "measured minus predicted, e[n]=q[n]-q_hat[n]",
+    "which_residual": "Use one-step ARX residuals for the model-structure ACF. Free-run errors are plotted in time but are not given a whiteness interpretation because recursive accumulation itself induces structure.",
+    "lags_samples": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+    "lag_span_s": "0.025 to 0.5 s",
+    "acf_estimator": "For each validation file separately, subtract that file's scored-residual mean and compute rho[k]=sum_{i=k}^{M-1} r[i]r[i-k]/sum_{i=0}^{M-1} r[i]^2, where r=e-mean(e). Do not create pairs across files. If the denominator is zero, report ACF undefined.",
+    "aggregate": "Report both per-file ACF sequences and their equal-file arithmetic mean at each lag.",
+    "reference_band": "Plot the descriptive approximate band +/-1.96/sqrt(M) per file. Because lags are correlated and twenty comparisons are made, crossings are diagnostic flags, not a formal proof of non-whiteness.",
+    "interpretation": "Runs, oscillation, command-aligned bursts, mean bias, or material ACF indicate omitted dynamics, disturbance, timing error, or sensor correlation. A quieter ACF does not prove the physical model true."
+  },
+  "stability_check": {
+    "derivation": "Set intercept and input to zero, substitute q_h[n]=r^n into q_h[n]=a1 q_h[n-1]+a2 q_h[n-2], and solve r^2-a1 r-a2=0.",
+    "roots": "r_1,r_2=(a1 +/- sqrt(a1^2+4a2))/2, evaluated with complex arithmetic when needed.",
+    "rule": "The fitted recurrence passes the model-stability check only if max(|r_1|,|r_2|)<1. Report both roots and magnitudes before validation metrics. Do not alter or stabilize coefficients after seeing validation.",
+    "scope": "This tests the homogeneous modes of the fitted discrete recurrence only. It does not establish stability of the aircraft, flight controller, sensor chain, or experiment."
+  },
+  "precommitted_decision_rule": {
+    "primary_claim": "The recorded elevator supplies useful held-out predictive information beyond matched-order pitch-rate memory.",
+    "success": "Call the primary claim supported only if the ARX recurrence has strictly lower RMSE and NRMSE than AR(2) in both one-step and free-run modes on each of the two validation maneuvers, both macro NRMSE effect sizes are positive, and both ARX characteristic roots lie strictly inside the unit circle. Report the actual effect sizes; this protocol promises no minimum improvement and no successful outcome.",
+    "partial_local_only": "If ARX improves both files in one-step prediction but not both files in free run, conclude only that elevator helps the local update rule; accumulated low-order dynamics are not supported.",
+    "maneuver_dependent": "If the sign of improvement differs between the 3211 and doublet files, report excitation-family dependence and do not pool it into a general success claim even if the macro average improves.",
+    "not_supported": "If macro one-step NRMSE fails to improve, either file worsens in both modes, or a root has magnitude >=1, report that this fixed low-order ARX hypothesis is not supported under the precommitted test. Preserve the result; do not tune order, delay, filtering, or windows on these validation files.",
+    "adequacy_modifier": "Even after metric success, if residual mean/trace or any lag-1-through-20 ACF shows clear structure, phrase the conclusion as 'predictively better but structurally incomplete,' not 'validated aircraft model.'",
+    "next_iteration": "Any revised order, delay, preprocessing, wind input, or actuator model is a new hypothesis requiring new untouched flights; the two current validation files cannot be reused as a fresh test set."
+  },
+  "known_idealization_limits": [
+    "The campaign documents strong north-west wind with a significant vertical component; an elevator-only recurrence omits this measured disturbance and must not be presented as an invariant aircraft model.",
+    "STIM300 IMU, GPS/propulsion, and SBC commands were manually synchronized and resampled to 40 Hz. The fixed one-sample input lag can absorb alignment error and must not be interpreted as a measured actuator delay.",
+    "The output is an IMU gyro measurement, so correlated sensor error can appear in both the target and delayed-output regressors and can bias ordinary least squares.",
+    "The input-free baseline and ARX model both omit throttle, airspeed, attitude, lateral coupling, saturation, and nonlinear operating-regime changes.",
+    "The creator-designated validation files are separate 3211 and doublet maneuvers, not a contiguous final 20 percent block and not documented perching or stall records."
+  ],
+  "time_budget_minutes": {
+    "total_target": "35-38",
+    "schema_units_and_split": 5,
+    "build_fixed_ARX_and_AR_baseline_design_rows": 7,
+    "fit_training_only_and_check_characteristic_roots": 6,
+    "run_frozen_one_step_and_free_run_validation": 7,
+    "calculate_four_metric_families_and_lag_1_to_20_ACF": 7,
+    "apply_decision_rule_and_write_caveats": 5
+  },
+  "inputs_read": [
+    "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/perching-glider-system-identification/dataset-scout.json",
+    "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/perching-glider-system-identification/evidence-preflight.json",
+    "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/perching-glider-system-identification/asset-preflight.json",
+    "content/courses/digital-signal-processing/research/perching-glider-system-identification.md",
+    "content/courses/digital-signal-processing/course.yaml",
+    "content/courses/digital-signal-processing/concepts.yaml",
+    "content/courses/digital-signal-processing/lessons/impulse-response-and-convolution/lesson.mdx",
+    "content/courses/digital-signal-processing/lessons/difference-equations-and-stability/lesson.mdx"
+  ]
+}

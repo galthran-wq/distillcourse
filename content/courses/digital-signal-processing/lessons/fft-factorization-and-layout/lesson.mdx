@@ -1,0 +1,557 @@
+Repeated roots of unity let a DFT be decomposed into short transforms without changing the coefficients it computes. <Ref lesson="dft-bins-symmetry-and-scaling">DFT Bins, Symmetry, and Scaling</Ref> fixed the coefficient contract and ended by reusing two four-point transforms to produce one eight-point result. The unresolved step is to turn that identity into a complete machine schedule whose arithmetic, storage order, and scale can all be audited.
+
+This lesson makes that step in five parts: complete one eight-point factorization, recurse it into butterflies, expose the order and scale contracts created by in-place storage, extend the construction to mixed radices, and choose between a full transform and selected coefficient sums from the outputs actually required.
+
+## One inherited split supplies two outputs at once
+
+The prerequisite already split one eight-point sum into even and odd four-point sums; the first task is to recover that coefficient contract before turning the identity into an algorithm.
+
+<Task>
+Work closed-book. (1) Write the course's forward and inverse $N$-point DFT, including signs, scale, and index ranges. (2) For $N=8$, define the even and odd four-point transforms and state the two formulas that share $W_8^kO[k]$. (3) State natural output order and raw forward scale. (4) State which convolution results from multiplying two $N$-point DFT arrays, and the padding condition that recovers finite linear convolution.
+
+Proceed when (1) and (2) are correct and at least one of (3) or (4) is correct.
+</Task>
+
+<Aside title="Retrieval answers">
+The course pair is
+
+$$
+X[k]=\sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/N},\qquad
+x[n]=\frac1N\sum_{k=0}^{N-1}X[k]e^{+j2\pi kn/N},
+$$
+
+with both index ranges $0,\ldots,N-1$. Writing $W_N=e^{-j2\pi/N}$,
+
+$$
+E[k]=\sum_{m=0}^{3}x[2m]W_4^{km},\qquad
+O[k]=\sum_{m=0}^{3}x[2m+1]W_4^{km},
+$$
+
+and, for $k=0,1,2,3$,
+
+$$
+X[k]=E[k]+W_8^kO[k],\qquad
+X[k+4]=E[k]-W_8^kO[k].
+$$
+
+Natural order places $X[k]$ at array index $k$. Raw forward scale means that analysis has no $1/N$ factor; the inverse has total scale $1/N$. Coefficient multiplication followed by the inverse gives $N$-point circular convolution. Padding finite lengths $L_x,L_h$ to $N\ge L_x+L_h-1$ prevents wrap and recovers their allocated linear convolution.
+</Aside>
+
+### The eight-point computation keeps the same coefficients
+
+Take the concrete record
+
+$$
+x=[1,2,3,4,0,0,0,0].
+$$
+
+Its even-index and odd-index records are $[1,3,0,0]$ and $[2,4,0,0]$. Their raw four-point DFTs are
+
+$$
+E=[4,\ 1-3j,\ -2,\ 1+3j],
+$$
+
+$$
+O=[6,\ 2-4j,\ -2,\ 2+4j].
+$$
+
+The product $W_8^kO[k]$ is formed once for each $k=0,1,2,3$. The same product enters a sum and a difference, so it supplies two output coefficients. For example,
+
+$$
+W_8^1O[1]
+=\frac{1-j}{\sqrt2}(2-4j)
+=-\sqrt2-3\sqrt2j.
+$$
+
+It therefore yields
+
+$$
+X[1]=(1-3j)+(-\sqrt2-3\sqrt2j)
+=-0.414213562373-j7.242640687119,
+$$
+
+and
+
+$$
+X[5]=(1-3j)-(-\sqrt2-3\sqrt2j)
+=2.414213562373+j1.242640687119.
+$$
+
+The complete natural-order result is
+
+$$
+\begin{aligned}
+X=[&10,\ -0.414213562373-j7.242640687119,\ -2+j2,\\
+   &2.414213562373-j1.242640687119,\ -2,\\
+   &2.414213562373+j1.242640687119,\ -2-j2,\\
+   &-0.414213562373+j7.242640687119].
+\end{aligned}
+$$
+
+A direct evaluation of all eight DFT sums returns the same array, with relative $L^2$ error about $3.4\times10^{-16}$ in double precision. The difference is the evaluation schedule, not the mathematical transform.
+
+<FigureSequence name="fft-even-odd-factorization" alt="Four fixed-layout frames replace a dense eight-point DFT with even and odd four-point transforms, recurse to four two-point transforms, and finish as three radix-two butterfly stages with twelve twiddle slots instead of sixty-four direct product slots." caption="Factorization reuses partial transforms; it does not change the DFT being computed." />
+
+<Task>
+Step through the sequence and stop after each frame to identify the exact subtransform whose result is reused. At the last frame, verify that the output labels remain $X[0],\ldots,X[7]$ in natural order even though the source indices enter in a different order.
+</Task>
+
+<Definition title="fast Fourier transform">
+An **FFT** is a factorized algorithm for evaluating the declared DFT by reusing shorter transforms. For suitable lengths its arithmetic grows in order $N\log N$ rather than $N^2$. It does not define a different set of coefficients.
+</Definition>
+
+The canonical example is the even/odd split above. A different valid case has $x[2m+1]=0$, so $O[k]=0$ and $X[k]=X[k+4]=E[k]$. At the degenerate boundary $N=1$, the transform is already short and has no factorization stage. Merely permuting a direct DFT array is a near-miss: it changes representation but reuses no shorter transform. A proposed example qualifies as an FFT only if its shorter results feed multiple outputs of the same declared DFT.
+
+<Example title="a zero odd branch still supplies paired outputs">
+For $x=[1,0,2,0,3,0,4,0]$, the odd branch vanishes and the even branch is the four-point DFT of $[1,2,3,4]$:
+
+$$
+E=[10,-2+2j,-2,-2-2j],\qquad O=[0,0,0,0].
+$$
+
+The combine gives
+
+$$
+X=[10,-2+2j,-2,-2-2j,10,-2+2j,-2,-2-2j].
+$$
+
+The repeated half is not a symmetry assumption. It follows from the zero odd-index samples and the two exact combine formulas.
+</Example>
+
+<Exercise>
+For $x=[0,1,0,2,0,3,0,4]$, compute $E$, $O$, and all eight $X[k]$ using the same split. Explain the sign relating $X[k+4]$ to $X[k]$.
+
+A genuine attempt writes the two length-four branch inputs and at least one $k$/$k+4$ output pair before opening the solution. First hint: determine which branch is identically zero, then reuse the already computed DFT of $[1,2,3,4]$.
+
+<Solution>
+Here $E=0$ and $O$ is the four-point DFT of $[1,2,3,4]$:
+
+$$
+O=[10,-2+2j,-2,-2-2j].
+$$
+
+Therefore
+
+$$
+X[k]=W_8^kO[k],\qquad X[k+4]=-W_8^kO[k],
+$$
+
+for $k=0,1,2,3$. Thus
+
+$$
+\begin{aligned}
+X=[&10,\ 2\sqrt2j,\ 2j,\ 2\sqrt2j,\\
+   &-10,\ -2\sqrt2j,\ -2j,\ -2\sqrt2j].
+\end{aligned}
+$$
+
+The minus sign comes from $W_8^{k+4}=-W_8^k$. A one-sample delay from the even-only example also multiplies each coefficient by $W_8^k$, which provides an independent check on the result.
+</Solution>
+</Exercise>
+
+<KeyFact>
+An FFT implementation is correct only when a direct DFT and the factored schedule agree after the implementation's declared permutation and scale are restored. A small numerical residual measures floating-point evaluation, not a change of transform.
+</KeyFact>
+
+One split removes repeated work once. Applying the same split at every shorter transform is what changes the arithmetic growth law.
+
+## Recursive butterflies replace quadratic repetition with staged reuse
+
+The inherited split becomes an efficient complete transform only when every even and odd subtransform is itself split until two-point sums and differences remain.
+
+### One local update carries the recursive graph
+
+At one combine, let $a$ be an upper partial-transform value and $b$ the paired lower value. Form
+
+$$
+t=Wb,\qquad u=a+t,\qquad v=a-t.
+$$
+
+This local dataflow is a *radix-2 butterfly*. Under the simplified ledger used in this section, it consumes one complex twiddle-multiplication slot and two complex additions. Trivial twiddles such as $W=1$ still occupy a slot in the structural count, even when code replaces them with copies or sign changes.
+
+<Example title="one butterfly and one safe overwrite">
+Take $a=3+2j$, $b=1-j$, and $W=W_8^1=(1-j)/\sqrt2$. Then
+
+$$
+t=\frac{1-j}{\sqrt2}(1-j)=-\sqrt2j,
+$$
+
+so
+
+$$
+u=3+j(2-\sqrt2),\qquad v=3+j(2+\sqrt2).
+$$
+
+An in-place implementation must read both old values before either array cell is overwritten. The safe order is read $a,b$; compute $t,u,v$; write $u,v$.
+</Example>
+
+<Figure name="FftButterflyLedger" alt="A radix-two butterfly reads a equals three plus two j and b equals one minus j, multiplies b once by W eight to the first, then writes paired outputs three plus zero point five eight six j and three plus three point four one four j only after both inputs have been read." caption="One shared twiddle product feeds a sum and a difference; safe in-place code preserves both old inputs until those outputs are formed." />
+
+<Exercise>
+Use $a=2-j$, $b=1+j$, and $W=W_4^1=-j$. Compute $t,u,v$, then write a safe in-place update schedule. State the fault if the program stores $u$ over $a$ before computing $v$ from the old $a$.
+
+A genuine attempt contains one saved twiddle product and names the last moment at which both old input cells are still available. First hint: expand $t=Wb$ before forming either sum or difference.
+
+<Solution>
+
+$$
+t=(-j)(1+j)=1-j,\qquad u=(2-j)+(1-j)=3-2j,\qquad v=(2-j)-(1-j)=1.
+$$
+
+The safe schedule saves both old cells, computes all three temporaries, and only then writes $3-2j$ and $1$. If $u$ overwrites $a$ first and the lower output is evaluated as `a-t`, the program uses the new $a=u$ and returns $u-t=a$, not $v=a-t$. The arithmetic graph is valid; the destructive schedule is not.
+</Solution>
+</Exercise>
+
+### The recurrence fixes the structural count
+
+Now generalize the concrete split. Let $N=2^m$. One $N$-point transform invokes two transforms of length $N/2$ and then performs $N/2$ butterflies. If $M(N)$ counts twiddle-multiplication slots and $A(N)$ counts complex additions, then
+
+$$
+M(N)=2M(N/2)+N/2,\qquad M(1)=0,
+$$
+
+$$
+A(N)=2A(N/2)+N,\qquad A(1)=0.
+$$
+
+At every recursion depth the subproblems contain $N/2$ butterflies in total. There are $m=\log_2N$ depths, so
+
+$$
+M(N)=\frac N2\log_2N,\qquad A(N)=N\log_2N.
+$$
+
+Direct evaluation uses $N$ product slots for each of $N$ outputs and $N-1$ additions within each sum:
+
+$$
+M_{\mathrm{direct}}(N)=N^2,\qquad
+A_{\mathrm{direct}}(N)=N(N-1).
+$$
+
+For $N=8$, the direct ledger is $64$ product slots and $56$ additions. The three-stage radix-2 ledger is $12$ twiddle slots and $24$ additions. The headline comparison $12$ versus $64$ compares product slots only; $12$ is not the FFT's total operation count.
+
+<Theorem title="radix-2 FFT arithmetic growth">
+For $N=2^m$ with $m\in\mathbb Z_{\ge 0}$, under the simplified butterfly ledger above, a complete radix-2 factorization evaluates the course DFT with $(N/2)\log_2N$ complex twiddle-multiplication slots and $N\log_2N$ complex additions.
+
+The proof is a level-counting argument: count butterflies at one recursion depth, show that the count is independent of depth, then multiply by the number of depths and by the two additions per butterfly.
+
+<Proof>
+At depth $d$, there are $2^d$ subtransforms of length $N/2^d$. Each subtransform has half as many butterflies as its length, so the depth contains
+
+$$
+2^d\frac{N/2^d}{2}=\frac N2
+$$
+
+butterflies. Exactly $m$ depths reduce length $N$ to length one. Multiplying $N/2$ butterflies per depth by $m=\log_2N$ gives the twiddle count. Each butterfly has two complex additions, which doubles that result. The base case has no arithmetic.
+</Proof>
+</Theorem>
+
+Proof check: if a proposed schedule has fewer than $\log_2N$ depths while every stage only combines pairs, it cannot propagate one input's contribution to all $N$ outputs; the missing depth identifies the failed premise in the count.
+
+<Figure name="FftCostGrowth" alt="A log-scale ledger compares N squared direct complex-product slots with one-half N log two N radix-two twiddle slots at powers of two from eight through one thousand twenty-four, while a separate empty runtime strip says to measure the machine-dependent crossover." caption="Structural operation counts predict different growth; they do not supply a universal wall-clock crossover." />
+
+The arithmetic graph is now correct and cheaper. Mapping it onto one overwritten array introduces an order that the algebraic DFT formula did not display.
+
+## In-place storage makes order and scale observable
+
+Recursive butterflies specify values and dependencies, but a machine interface must also specify which source occupies each cell and where the transform's total normalization is applied.
+
+### Bit reversal is a storage permutation
+
+For the eight-point decimation-in-time schedule, write each natural index in three bits and reverse those bits:
+
+| source index $n$ | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| binary | 000 | 001 | 010 | 011 | 100 | 101 | 110 | 111 |
+| destination address $p$ | 0 | 4 | 2 | 6 | 1 | 5 | 3 | 7 |
+
+Thus the iterative input array for the running example is
+
+$$
+[x[0],x[4],x[2],x[6],x[1],x[5],x[3],x[7]]=[1,0,3,0,2,0,4,0].
+$$
+
+The three in-place stages produce
+
+$$
+\begin{aligned}
+\text{length 2: }&[1,1,3,3,2,2,4,4],\\
+\text{length 4: }&[4,1-3j,-2,1+3j,6,2-4j,-2,2+4j],\\
+\text{length 8: }&[X[0],X[1],\ldots,X[7]].
+\end{aligned}
+$$
+
+The final row is in natural spectral order. The bit-reversed row described where source samples were stored before the stages; it was not a relabeling of frequency.
+
+A standard decimation-in-frequency graph can make the opposite interface choice: natural-order input and bit-reversed output. Transposed or autosorted variants can move or distribute the permutation. The algorithm name alone therefore does not settle the endpoint contract.
+
+| schedule | declared input | declared output | overwrite obligation |
+|:--|:--|:--|:--|
+| iterative radix-2 DIT used here | bit-reversed samples | natural $X[k]$ | read both butterfly inputs before writing |
+| standard in-place radix-2 DIF | natural samples | bit-reversed coefficients | restore natural order before compare or plot |
+
+<Figure name="FftMemoryOrderLedger" alt="Aligned cell rows show natural order zero through seven, three-bit reversal zero four two six one five three seven, and a twelve-cell mixed-radix three-by-four layout whose destination addresses contain source indices zero three six nine one four seven ten two five eight eleven." caption="Reversed layouts are explicit storage permutations; restore natural k order before plotting or comparing spectra." />
+
+### Scaling belongs to the same interface
+
+The inherited forward DFT is unscaled. Some libraries scale the forward transform by $1/N$; some scale neither direction; some distribute inverse factors across stages. A distributed inverse is compatible with the course pair only when the product of all stage scale factors is $1/N$.
+
+For the running record, the correct raw DC value is $X[0]=10$. A forward-scaled array instead begins at $10/8=1.25$. Comparing $X/8$ with the required raw array gives relative error
+
+$$
+\frac{\|X/8-X\|_2}{\max(\|X\|_2,\mathrm{Number.EPSILON})}=0.875.
+$$
+
+Leaving a bit-reversed coefficient array in storage order gives relative error about $0.791$ for the same record. Both arrays may contain internally consistent complex values. Both fail the declared API because the first violates scale and the second associates values with the wrong $k$ positions.
+
+<Definition title="FFT output contract">
+An FFT result is ready for a consumer only after five clauses are declared and satisfied: transform direction and exponent sign; total scale; coefficient order; transform length and index range; and the numerical error rule used against a reference.
+</Definition>
+
+The canonical valid output is the natural-order raw array computed above. A valid alternative is an explicitly bit-reversed internal array followed by an inverse permutation. At $N=1$, natural and reversed order coincide and the raw forward scale is still one. A near-miss is an array containing the right multiset of values but no mapping from address to $k$. A learner-generated contract must let another implementation reproduce both the values and their positions.
+
+<KeyFact>
+Permutation and normalization are not cosmetic post-processing. If the consumer reads array address $p$ as bin $k=p$, the wrong permutation changes the claimed frequency; if it expects raw coefficients, an unannounced $1/N$ changes every amplitude and energy calculation.
+</KeyFact>
+
+Bit reversal is one radix-2 layout. The reusable algebra requires nontrivial factors, not binary digits.
+
+## Composite lengths factor without being powers of two
+
+The binary schedule exposes the principle cleanly, but the same DFT identity works whenever $N$ is written as a product of declared radices.
+
+### One composite split contains two short-transform dimensions
+
+Let $N=RM$, write the time index as $n=Rm+s$ with $0\le m<M$ and $0\le s<R$, and write the output index as $k=q+Mp$ with $0\le q<M$ and $0\le p<R$. Substitution into the DFT gives
+
+$$
+\begin{aligned}
+X[q+Mp]
+&=\sum_{s=0}^{R-1}\sum_{m=0}^{M-1}
+x[Rm+s]W_N^{(q+Mp)(Rm+s)}\\
+&=\sum_{s=0}^{R-1}W_N^{qs}W_R^{ps}
+\left(\sum_{m=0}^{M-1}x[Rm+s]W_M^{qm}\right).
+\end{aligned}
+$$
+
+The inner parentheses are $R$ transforms of length $M$. The outer sums are $M$ transforms of length $R$, with the cross-factor $W_N^{qs}$ between them. For $R=2$ and $M=4$, the two values of $p$ supply the plus and minus combines of the first section.
+
+<Theorem title="one Cooley-Tukey composite factorization">
+If $N=RM$ with positive integers $R,M>1$, the $N$-point DFT can be evaluated as $R$ length-$M$ DFTs, $N$ cross-factor multiplications, and $M$ length-$R$ DFTs, followed by the declared mapping from the pair $(q,p)$ to natural output index $q+Mp$.
+
+The proof is an algebraic regrouping: substitute the mixed-radix indices, split the twiddle exponent into three factors, then group the $m$ sum inside the $s$ sum and read the pair $(q,p)$ back as one natural output index.
+
+<Proof>
+After substituting $n=Rm+s$ and $k=q+Mp$, the exponent separates because
+
+$$
+W_N^{(q+Mp)(Rm+s)}=W_M^{qm}W_N^{qs}W_R^{ps};
+$$
+
+the remaining factor $W_N^{MpRm}=e^{-j2\pi pm}=1$. Regrouping first by $m$ and then by $s$ produces the stated shorter transforms without dropping or approximating a term.
+</Proof>
+</Theorem>
+
+Proof check: the decisive cancellation is $W_N^{MpRm}=1$. If $N\ne RM$, that factor need not be one, so the two shorter-transform interpretation no longer follows from this regrouping.
+
+### A 960-point plan crosses a declared budget
+
+Factor
+
+$$
+960=4\cdot4\cdot4\cdot3\cdot5.
+$$
+
+For this mixed-radix example, use the historical ledger from Cooley and Tukey's 1965 algorithm: for a factor list $r_1,\ldots,r_s$, it records
+
+$$
+T=N\sum_{i=1}^{s}r_i
+$$
+
+complex multiply-add units. This unit is not the radix-2 twiddle/addition ledger of the preceding section and the two counts must not be added or equated.
+
+The factor list $[4,4,4,3,5]$ has sum $20$, so
+
+$$
+T_{\mathrm{factored}}=960(20)=19{,}200.
+$$
+
+Direct evaluation has $960^2=921{,}600$ terms under the same historical comparison, a ratio of $48$. An eightfold target permits at most
+
+$$
+\frac{921{,}600}{8}=115{,}200
+$$
+
+units, so the plan clears the boundary by a wide margin.
+
+The factor order remains part of the implementation even when this simple sum is unchanged. It determines mixed-digit permutations, intermediate strides, and which arrays are contiguous. The historical normalized factor cost $r/\log_2r$ is about $1.89$ for radix $3$ and $2$ for radices $2$ and $4$, only about a six-percent abstract advantage. That margin is small enough for regular addressing or vector width to decide the measured winner.
+
+For prime $N$, this particular nontrivial Cooley-Tukey split stops because neither $R$ nor $M$ can exceed one while remaining smaller than $N$. That statement does not prove that no fast prime-length algorithm exists.
+
+<Task>
+In the lab, first replace the invalid power-of-two-only factor list with a factorization whose product is $960$. Cross the eightfold historical-work target $T\le115{,}200$. Then restore natural output order and raw forward scale until a deterministic $N=30$ direct check and selected $N=960$ direct checks pass the displayed relative-error tolerances.
+</Task>
+
+<Demo name="FftBudgetLab" caption="Factor 960, cross the eight-times work target, then restore the ordering and scaling contracts until both direct checks pass." />
+
+<KeyFact>
+Radix 2 is one FFT construction, not the definition of FFT. Composite factors create reuse; the factor sequence also creates a storage schedule whose permutation and stride costs must be measured on the target machine.
+</KeyFact>
+
+A smaller arithmetic count establishes reuse. It does not by itself decide whether the system should compute every coefficient.
+
+## The requested outputs determine the useful computation
+
+The mixed-radix budget reduces a declared operation count, while the engineering choice still depends on transform length, repeated use, memory traffic, and how many frequency coordinates the consumer requests.
+
+### A full transform and selected sums answer different requests
+
+If a consumer requests $K$ declared DFT coefficients, evaluating only their defining sums uses
+
+$$
+KN\ \text{complex-product slots},\qquad K(N-1)\ \text{complex additions}.
+$$
+
+This cost grows linearly in $K$. A complete radix-2 FFT of length $N$ uses the earlier full-transform ledger regardless of whether the consumer reads one output or all $N$ outputs.
+
+For one four-point record, direct evaluation uses $16$ product slots and $12$ additions. The simplified radix-2 ledger has $4$ twiddle slots and $8$ additions, but setup, permutation, and library-call overhead can dominate a single transform. Arithmetic count alone does not establish which call is faster.
+
+For $1000$ transforms of length $1024$, each direct full DFT uses $1{,}048{,}576$ product slots, while each radix-2 FFT uses $5120$ twiddle slots and $10{,}240$ additions. Repeated execution also permits reuse of the twiddle table and plan. The structural gap is then large enough to justify an FFT implementation before timing, while timing still determines the actual throughput.
+
+When only a few fixed coordinates are required, direct selected sums can avoid unused outputs and avoid a final full-array permutation. A full FFT may still win through optimized vector code, batching, or a favorable supported length. The comparison must therefore publish two ledgers:
+
+| question | full transform | selected sums |
+|:--|:--|:--|
+| arithmetic | all stages for all outputs | $K$ correlations |
+| buffering | complete transform workspace or in-place array | input plus $K$ accumulators |
+| order | restore or declare full-array permutation | bind each accumulator directly to its requested coordinate |
+| repeated use | reuse plan and twiddles | reuse $K$ oscillator recurrences or weights |
+| validation | compare every coefficient or a declared subset | compare the same $K$ coefficients |
+
+### Verification closes the algorithm-to-interface gap
+
+A comparison against a direct reference is meaningful only after both paths share the same sign, scale, order, and transform length. For arrays $Y$ and $X$ under that common contract, use
+
+$$
+\varepsilon_{\mathrm{rel}}
+=\frac{\|Y-X\|_2}{\max(\|X\|_2,\mathrm{Number.EPSILON})}.
+$$
+
+The denominator keeps the zero-reference case defined at machine scale. A coefficient-subset test must compare identical $k$ values, not the nearest bins from transforms of different lengths. If zero padding changes $N$, it changes the sampled frequency grid even though it does not change the acquired samples.
+
+The arithmetic algorithm also leaves the prerequisite's circular-boundary contract untouched. Multiplying two length-$N$ FFT arrays and applying the declared inverse still produces $N$-point circular convolution. Factorization cannot supply the missing padding required for linear convolution.
+
+<KeyFact>
+Choose the computation from the output set and the interface, then benchmark it. A trustworthy report names the implementation, machine, warmup, batch size, timer, seed, coefficient contract, and error threshold; its measured crossover is local to those conditions.
+</KeyFact>
+
+The lesson has established exact radix-2 and mixed-radix evaluation, separate arithmetic ledgers, safe overwrite rules, and explicit order and scale checks. <Ref lesson="phone-channel-dtmf-receiver">Phone-Channel DTMF Receiver</Ref> next decides which finite frequency evidence is sufficient under offset, twist, channel response, thresholds, and latency.
+
+## Exercises
+
+<Exercise>
+Draw the radix-2 DIT schedule for $N=8$. List the input order, count twiddle slots and complex additions, and verify all coefficients of $x=[1,2,3,4,0,0,0,0]$ against a direct raw DFT below $10^{-12}$ relative $L^2$ error.
+
+<Solution>
+Three-bit reversal gives input order $[0,4,2,6,1,5,3,7]$. The explicit address-pair schedule is
+
+| stage | butterflies and twiddles |
+|---|---|
+| length 2 | $(0,1):W_2^0$, $(2,3):W_2^0$, $(4,5):W_2^0$, $(6,7):W_2^0$ |
+| length 4 | $(0,2):W_4^0$, $(1,3):W_4^1$, $(4,6):W_4^0$, $(5,7):W_4^1$ |
+| length 8 | $(0,4):W_8^0$, $(1,5):W_8^1$, $(2,6):W_8^2$, $(3,7):W_8^3$ |
+
+There are three stages and four butterflies per stage, hence $12$ twiddle slots and $24$ complex additions. The natural-order output is
+
+$$
+\begin{aligned}
+[&10,\ -0.414213562373-j7.242640687119,\ -2+j2,\\
+&2.414213562373-j1.242640687119,\ -2,\\
+&2.414213562373+j1.242640687119,\ -2-j2,\\
+&-0.414213562373+j7.242640687119].
+\end{aligned}
+$$
+
+For the check, evaluate $X_{\mathrm{direct}}[k]=\sum_{n=0}^{7}x[n]e^{-j2\pi kn/8}$ independently at every $k=0,\ldots,7$, place those values in the same natural order, and compute the declared relative $L^2$ error against the schedule output. This gives about $3.4\times10^{-16}$ in double precision, below the threshold. The counts keep twiddle slots and additions separate.
+</Solution>
+</Exercise>
+
+<Exercise>
+Audit three boundaries of the displayed Cooley-Tukey construction: $N=1$, $N=64=4\cdot4\cdot4$, and prime $N=31$. State what the construction does in each case, and refute the inference that the prime case admits no fast transform.
+
+<Solution>
+At $N=1$, $X[0]=x[0]$ and there are zero factorization stages. For $N=64$, repeated factors are ordinary valid stages; the factor list $[4,4,4]$ recursively replaces one length-64 transform with shorter radix-4 transforms. Equal factors do not have to be merged or made distinct.
+
+At $N=31$, no split $N=RM$ has $1<R,M<N$, so the particular composite factorization derived here stops. The invalid inference treats failure of one hypothesis as impossibility of every algorithm. Prime-length methods can embed or reformulate the computation; this lesson makes no cost claim for them. The valid conclusion is only that the displayed nontrivial Cooley-Tukey factor tree has no first split.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim "the FFT changes the mathematical DFT result." For the running $N=8$ record, diagnose (a) the correct coefficient values stored in bit-reversed order and (b) the natural-order array $X/8$. Restore each array to the course contract, verify equality with the direct DFT, and name the violated clause.
+
+<Solution>
+Case (a) has the correct multiset but maps address $p$ to the wrong coefficient. Apply the inverse bit-reversal permutation, which is the same permutation for three-bit reversal, to restore $X[k]$ at address $k$. The fault violated coefficient order.
+
+Case (b) has correct positions but forward scale $1/8$. Multiply every value by $8$ to restore the course's raw forward DFT. The fault violated total scale. After those repairs, both arrays equal the direct DFT to floating-point roundoff. Their original relative errors, about $0.791$ and $0.875$, diagnose interface mismatches rather than alternate mathematical transforms. This relies on the sign, scale, and natural-order contract established in the prerequisite.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design a benchmark comparing a direct DFT with one library FFT over powers of two and composite non-powers of two. Freeze the protocol and acceptance criteria before running it. Report what would justify a crossover claim.
+
+<Solution>
+A reproducible protocol names the library and version, CPU or accelerator, numeric type, thread count, input storage, and compiler settings. It selects lengths before measurement, including short powers of two and composite non-powers of two. It fixes a pseudorandom seed, warmup count, timed batch size, number of repetitions, and a monotonic high-resolution timer. Planning and allocation are either excluded from both paths or included in both.
+
+Before timing, both outputs are translated to the same exponent sign, raw forward scale, and natural order. For each length, require a declared maximum or relative coefficient error, for example relative $L^2$ error below $10^{-10}$ against the direct result. Report medians and dispersion rather than one run.
+
+A crossover claim is justified only for the first tested length region in which the chosen FFT implementation is consistently faster under this protocol while passing the numerical threshold. It is a result for that implementation, machine, batch, and length family, not a universal constant implied by $N\log N$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Choose a direct DFT or radix-2 FFT for (a) one four-point full transform and (b) $1000$ full transforms of length $1024$. Begin by naming the kind of decision and the cues that control it. Give comparable operation ledgers, storage and order requirements, and a seeded coefficient check.
+
+<Solution>
+This is an implementation-strategy decision, not a numerical-accuracy decision: both methods target the same DFT. The controlling cues are length, repetition, setup reuse, layout, and measured overhead.
+
+For one $N=4$ transform, direct work is $16$ complex-product slots and $12$ additions. The simplified radix-2 ledger is $4$ twiddle slots and $8$ additions. Either is defensible; direct code is short and may avoid planning and permutation overhead, so measurement decides.
+
+For each $N=1024$ transform, direct work is $1{,}048{,}576$ product slots and $1{,}047{,}552$ additions. Radix 2 uses $5120$ twiddle slots and $10{,}240$ additions. Across $1000$ records, multiply each ledger by $1000$; the FFT can also reuse one plan and twiddle table, so it is the justified starting choice.
+
+The direct path needs input plus a natural-order output. The in-place FFT needs its declared permutation and safe overwrite schedule; restore natural order before comparison.
+
+For a reproducible coefficient check, set the 32-bit state to `0x13579bdf`, update it before every draw by $s\leftarrow(1664525s+1013904223)\bmod 2^{32}$, put $u=s/2^{32}$, and form each complex sample from two consecutive values as $(2u-1)+j(2u'-1)$. The first two samples are $-0.3065271741+j0.3277038825$ and $-0.2228882667-j0.6199391470$. With the same raw negative-sign convention and natural output order, direct evaluation versus radix-2 gives relative $L^2$ errors $2.260\times10^{-16}$ at $N=4$ and $1.631\times10^{-13}$ at $N=1024$ in double precision. Both pass the predeclared $10^{-10}$ threshold; the second value also checks that the reusable long-transform plan computes coefficients rather than only satisfying a cost ledger.
+</Solution>
+</Exercise>
+
+<Exercise>
+A 205-sample frame will supply only eight fixed row and column frequency coordinates. Compare direct evaluation of those eight sums with a full radix-2 transform of the frame zero-padded to $N=256$. Produce arithmetic, latency, buffering, scale, and order ledgers, and specify how both paths can compute the same eight complex values below $10^{-10}$ without designing a detector.
+
+<Solution>
+First declare eight indices $k_1,\ldots,k_8$ on the 256-point grid. The selected direct path evaluates
+
+$$
+X_{256}[k_i]=\sum_{n=0}^{204}x[n]e^{-j2\pi k_i n/256},
+$$
+
+so it uses $8(205)=1640$ product slots and $8(204)=1632$ additions, stores the 205 samples and eight accumulators, and can emit each requested value as soon as the frame is complete.
+
+The full path buffers 256 values, appends 51 zeros, and computes all 256 coefficients. Its simplified radix-2 ledger is
+
+$$
+\frac{256}{2}\log_2 256=1024
+$$
+
+twiddle slots and $256\log_2 256=2048$ additions. It then restores or declares natural output order and reads the same eight indices. The count comparison does not combine products and additions into one unnamed number; measured latency includes padding, planning, permutation, and memory traffic.
+
+Both paths use the negative exponent and raw forward scale. A seeded test compares precisely the same eight $X_{256}[k_i]$ values and requires relative $L^2$ error below $10^{-10}$. Choosing $205$-point bin labels for one path would not be a valid check because padding changes the grid.
+
+These coefficients are frequency evidence only. <Ref lesson="phone-channel-dtmf-receiver">Phone-Channel DTMF Receiver</Ref> turns row and column evidence into decisions under frequency offset, twist, channel response, thresholds, and finite latency.
+</Solution>
+</Exercise>
+
+<References>
+1. James W. Cooley and John W. Tukey, "An Algorithm for the Machine Calculation of Complex Fourier Series," *Mathematics of Computation* 19(90), 1965, pp. 297–301, equations (3)–(22) — composite factorization, the historical multiply-add ledger, staged in-place computation, and index reversal. [AMS article PDF](https://www.ams.org/journals/mcom/1965-19-090/S0025-5718-1965-0178586-1/S0025-5718-1965-0178586-1.pdf)
+2. Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, *Discrete-Time Signal Processing*, 2nd ed., Chapter 9, especially §§9.1, 9.3–9.5, and 9.7 — radix-2 and composite FFT decompositions, flow graphs, operation counts, permutations, and implementation considerations.
+3. Dennis Freeman, *Signals and Systems, MIT 6.003*, Fall 2011, Session 18, slides 17–32 — the even/odd DFT decomposition, recursive flow graph, and $N\log_2N$ count. [MIT OCW course page](https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/)
+4. Alan V. Oppenheim, *Discrete-Time Signal Processing, MIT 6.341*, Lecture 19, pp. 1–4 — direct and factored costs, radix-2 DIT/DIF recurrences, butterfly counts, transposed flow graphs, bit reversal, and in-place layout. [MIT OCW course page](https://ocw.mit.edu/courses/6-341-discrete-time-signal-processing-fall-2005/)
+</References>

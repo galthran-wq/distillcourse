@@ -1,0 +1,313 @@
+A numeric sample array becomes a signal only when its index, units, sample period, and acquisition assumptions are stated.
+
+Those declarations form a contract between stored numbers and physical claims, and the contract is not clerical bookkeeping. An audio buffer replayed under the wrong declared rate plays at the wrong speed and the wrong pitch while every stored number is unchanged — a failure most engineers have heard without naming its cause. This lesson builds the contract for one eight-sample microphone record, computes that playback artifact exactly, and then tests which conclusions survive when a contract field is removed or changed. The same discipline will carry through the course: before an operation can be trusted, its input sequence has to say what its indices and values mean.
+
+The route: separate integer index from physical time, compute what changing only the declared rate does to duration and frequency, calibrate integer codes into amplitude units, distinguish a finite record from an infinite sequence, and leave every between-sample curve explicitly unclaimed unless a reconstruction rule licenses it.
+
+## Eight numbers need more than eight values
+
+Start with the literal buffer
+
+$$
+c = [0, 1, 0, -1, 0, 1, 0, -1].
+$$
+
+The entries alone support arithmetic: there are eight of them, their maximum is $1$, and their sum is $0$. They do not say whether the measurements came from a microphone or a motor, whether adjacent entries are one microsecond or one day apart, whether $1$ means one volt or one converter code, or whether any values exist outside the stored range.
+
+A plotted pattern can reveal a period in samples, but its frequency in hertz remains unknown until the sample period is supplied. The array is the value layer of the record, not the whole measurement.
+
+<Figure
+  src="./figures/microphone-samples.svg"
+  alt="A possible continuous microphone trace sampled at eight instants, beside the eight resulting unconnected discrete samples with the gaps marked as not represented by x[n]."
+  caption="The samples retain values at eight instants; they do not retain the path between them."
+/>
+
+<Definition title="discrete-time sequence">
+A **discrete-time sequence** $x$ is a rule that assigns a value $x[n]$ to each integer index $n$ in a declared domain $D \subseteq \mathbb{Z}$. The index $n$ is dimensionless. Physical units, sample spacing, and the meaning of values are metadata attached to the sequence, not properties recoverable from the brackets alone.
+</Definition>
+
+The eight values above are the canonical finite case: $D=\{0,1,\ldots,7\}$ and $c[n]$ is the entry at position $n$. A structurally different example is a line-scan camera row $r[n]$ indexed by pixel position rather than time; it is still a sequence because its domain is integer-valued. The empty domain and a one-element domain are valid boundary cases, although they support few measurements.
+
+A continuous microphone voltage $x_c(t)$ is a near miss, not a discrete-time sequence: its independent variable ranges over real time rather than a declared integer set. Conversely, an irregularly timed list may be stored as $x[n]$, but one common sample period cannot describe its timestamps. Construct one valid sequence and one near miss from your own work; the deciding clause is whether every represented value is addressed by an integer index in the declared domain.
+
+### The record contract has four layers
+
+For a uniformly sampled microphone buffer, a minimal contract records:
+
+- **Index:** $n=0,1,\ldots,N-1$, including where the first stored sample sits in a longer stream.
+- **Time:** a start time $t_0$ and sampling period $T_s$, so sample $n$ occurred at $t_n=t_0+nT_s$.
+- **Amplitude:** the stored representation $c[n]$ and a calibration that maps it to a physical value such as volts or pascals.
+- **Acquisition:** enough conditions to bound the claim, including input filtering, clock quality, converter range, clipping status, and any reconstruction rule.
+
+The contract need not prove that the acquisition was perfect. It must prevent a calculation from silently assuming facts that were never recorded.
+
+<Figure
+  src="./figures/sample-ledger.svg"
+  alt="A five-field ledger separates integer index n, physical time, converter code, calibrated voltage, and acquisition metadata, then corrects the invalid axis label n in milliseconds."
+  caption="Index, time, code, calibration, and acquisition are separate fields in the record contract."
+/>
+
+## Index becomes time only through the sampling period
+
+The first missing field is the scale on the horizontal axis. Suppose the buffer begins at $t_0=0$ and was acquired at
+
+$$
+f_s=8\ \text{kHz}=8000\ \text{samples/s}.
+$$
+
+Adjacent samples are then $1/8000$ second apart. Index $n=12$ is still the pure integer $12$; its physical time is
+
+$$
+t_{12}=12T_s=12\left(\frac{1}{8000}\ \text{s}\right)
+=1.5\ \text{ms}.
+$$
+
+Writing an axis as “$n$ (ms)” mixes the dimensionless index with its calibrated coordinate. Correct labels are either “sample index $n$” or “time $t=nT_s$ (ms).” This distinction looks clerical until two records with different rates have to be aligned.
+
+<Definition title="sampling period">
+For a uniformly sampled sequence, the **sampling period** $T_s>0$ is the physical interval between adjacent sample instants. The **sampling rate** is its reciprocal,
+
+$$
+f_s=\frac{1}{T_s},
+$$
+
+with units of samples per second, conventionally written hertz when the context is unambiguous.
+</Definition>
+
+At $8$ kHz, the canonical value is $T_s=125\ \mu\text{s}$. A structurally different case is a temperature logger at $0.2$ samples/s, for which $T_s=5$ s. A one-sample record is a boundary case: its acquisition configuration may declare $T_s$, but no pair of values inside that record can verify the spacing.
+
+Timestamps $[0,1.0,2.1,3.0]$ ms are a near miss for a single $T_s$: the adjacent differences are unequal, violating uniform spacing. Store those timestamps explicitly or resample under a declared method; do not replace them by an average interval and call the result exact. Name one uniformly sampled device you use and one irregular event log; which clause decides whether $f_s=1/T_s$ describes each dataset?
+
+<KeyFact>
+Samples with the same index are simultaneous only when their start times and sampling periods make $t_{0,x}+nT_{s,x}=t_{0,y}+nT_{s,y}$; equal indices alone cannot align unlike-rate records.
+</KeyFact>
+
+## One array can describe six times the physical frequency
+
+The time contract changes physical conclusions even when no stored number changes. Interpret the running array as two observed repetitions of the four-sample pattern $[0,1,0,-1]$.
+
+<Example title="the same eight codes at 8 kHz and 48 kHz">
+At $f_s=8$ kHz,
+
+$$
+T_s=\frac{1}{8000}\ \text{s}=0.125\ \text{ms}.
+$$
+
+The first sample is at $0$ and the last is at
+
+$$
+(N-1)T_s=7(0.125\ \text{ms})=0.875\ \text{ms}.
+$$
+
+This is the **sample-span**, from first sample instant to last. If the buffer represents eight consecutive sample intervals, its half-open record interval is $NT_s=1.000$ ms. Those two quantities differ by one $T_s$, so “duration” should say which convention it uses.
+
+The pattern repeats every four samples. If it is modeled as a continuing sinusoid, its cycle rate is
+
+$$
+f_0=\frac{f_s}{4}=2\ \text{kHz}.
+$$
+
+Now attach the identical array to a $48$ kHz acquisition. Then $T_s=20.833\ \mu\text{s}$, the sample-span is
+
+$$
+7T_s=145.833\ \mu\text{s}\approx0.146\ \text{ms},
+$$
+
+the half-open record interval is $166.667\ \mu\text{s}$, and the same four-sample pattern corresponds to $12$ kHz under the same sinusoidal model. Rate increased by six, so every physical time shrank by six and the modeled physical frequency grew by six.
+</Example>
+
+<Figure
+  src="./figures/same-codes-two-rates.svg"
+  alt="The same eight sample codes shown at 8 and 48 kilohertz: the higher rate shortens the sample-span from 0.875 to about 0.146 milliseconds and raises the modeled tone from 2 to 12 kilohertz."
+  caption="Changing only the sample rate multiplies modeled physical frequency by six and divides sample-span by six."
+/>
+
+Replayed as audio, this difference is not subtle. A playback stage declared at $48$ kHz consumes stored samples six times faster than an $8$ kHz acquisition produced them: a one-second voice record finishes in $167$ ms, and every modeled frequency lands six times higher. The artifact has a standard small case. Audio transferred between $44.1$ kHz and $48$ kHz equipment without resampling plays every frequency a factor $48/44.1=1.088$ too high — about a semitone and a half sharp — and runs $8.2\%$ short. Nothing in the file is corrupted; one declared field changed, and the whole physical interpretation moved with it.
+
+<Exercise>
+A plot of codes $[200,100,-100,-200]$ acquired at $f_s=16$ kHz labels its horizontal axis “$n$ (ms)” and its vertical axis “volts.” The calibration is $2\ \text{mV/code}$ with zero offset. Repair both labels and tabulate the final sample's index, time, code, and voltage. Write those four entries before opening the solution.
+
+<Solution>
+Use “sample index $n$” on the horizontal axis if the ticks are $0,1,2,3$, or replace the ticks by $t=nT_s$ in milliseconds. Since $T_s=1/16000$ s $=0.0625$ ms, the final sample at $n=3$ occurred at $0.1875$ ms.
+
+The vertical values shown are codes, so either label the original axis “integer code $c[n]$” or calibrate every value and label it “microphone voltage $x[n]$ (V).” The final code $-200$ maps to
+$(-200)(2\ \text{mV/code})=-400$ mV $=-0.400$ V. The final row is therefore $(n,t,c,x)=(3,0.1875\ \text{ms},-200,-0.400\ \text{V})$.
+
+The transferable move is to repair coordinates independently: $T_s$ calibrates the horizontal axis, while volts per code calibrates the vertical axis.
+</Solution>
+</Exercise>
+
+## Codes become amplitudes only through calibration
+
+The previous repair used a second contract that cannot be inferred from the array. An analog-to-digital converter measures the input voltage at each sample instant and stores the nearest of its finitely many levels as an integer, called a **code**. The opening buffer $c=[0,1,0,-1,\ldots]$ can now be read precisely: its entries are codes — integers the converter wrote — not voltages. Digital processing operates on codes; physical claims need volts; calibration is the declared map between the two.
+
+The simplest map is linear and needs two declared numbers. $c_0$ names the code that represents zero input. $q$ states how many physical units one code step is worth. Then
+
+$$
+x[n]=(c[n]-c_0)q.
+$$
+
+If $q=1$ mV/code and $c_0=0$, code $512$ means $0.512$ V. With $c_0=2048$, the same code means $(512-2048)$ mV $=-1.536$ V. And the same input recorded through a preamplifier at twice the gain halves $q$: identical stored codes, half the claimed voltage. In every case the stored numbers did not change; the representation contract did, and the physical claim moved with it.
+
+<Figure
+  src="./figures/adc-chain.svg"
+  alt="A microphone voltage passes through an antialias filter, sampler, quantizer, and integer-code buffer; a separate calibration maps unsaturated codes to voltage, while clipping is marked as irreversible."
+  caption="Sampling and quantization create codes; calibration assigns volts, but it cannot undo clipping."
+/>
+
+Codes and volts are therefore not interchangeable examples of “amplitude.” A code is a symbol in a representation. Voltage is a physical estimate obtained after calibration. Sound pressure in pascals needs another microphone-sensitivity calibration, and that calibration may depend on frequency, gain setting, and temperature.
+
+The acquisition chain also sets boundaries. An array alone omits the analog filter bandwidth, clock error and jitter, converter range, clipping events, quantizer rule, and sensor calibration. This lesson records those omissions rather than deriving their effects. Later analyses may idealize some of them, but the contract must say which idealization was made.
+
+<Remark title="a plausible value can still be invalid">
+If a signed converter saturates at code $32767$, a stored run of $32767$ values does not establish a constant physical voltage. It may mean the input was constant, or that a larger changing input was clipped to the same maximum code. Calibration converts an unsaturated code; it does not reconstruct overload.
+</Remark>
+
+## A finite record declares neither extension nor interpolation
+
+The contract now supplies index, time, and amplitude. Two domain assumptions still remain open: what lies beyond the record and what lies between its sample instants.
+
+For the running record, the literal claim is
+
+$$
+c[n]=[0,1,0,-1,0,1,0,-1],\qquad n\in\{0,1,\ldots,7\}.
+$$
+
+It does not define $c[-1]$ or $c[8]$. Repeating the array periodically, padding it with zeros, holding the endpoint, reflecting it, or reading neighboring samples from a longer stream are different extensions. Each creates a different sequence outside the recorded domain.
+
+The repeated four-sample pattern makes periodic extension tempting. It is still a near miss: two observed repetitions do not logically imply a third. A finite record may be evidence for a periodic model, but the model must be stated and checked; it is not created by the closing bracket.
+
+The same restriction applies between samples. [Schaedler's interactive sampling visualization](https://jackschaedler.github.io/circles-sines-signals/) makes the ambiguity checkable by drawing competing continuous paths through shared sample dots. Straight lines, steps, splines, and bandlimited reconstruction curves can all pass through the same markers. The discrete sequence contains none of them.
+
+<KeyFact>
+A bandlimited curve is licensed as a signal claim only when the acquisition declares uniform sampling, an anti-alias band below half the sample rate, and the reconstruction rule; without that contract, a joining line is only a plotting aid.
+</KeyFact>
+
+This does not ban connected plots. A connected line can guide the eye through a dense noisy record; a zero-order hold can describe a particular D/A output; a bandlimited curve can assert a reconstruction under explicit acquisition conditions. The error is allowing the graphic to make that assertion silently.
+
+### A contract audit precedes every operation
+
+Before adding, shifting, comparing, or plotting measured sequences, check five questions:
+
+1. Do the integer domains and start indices align?
+2. Do the sample periods and clock references align?
+3. Do the amplitudes have compatible physical units and calibrations?
+4. Is behavior outside each finite record declared?
+5. Does the display assert anything between sample instants, and if so, what licenses it?
+
+Only after those questions close can a system operation have one reproducible meaning. The next lesson will decompose a sequence into simple indexed pieces and ask how a system responds to each one; the decomposition is useful precisely because the index and boundary conventions are already fixed.
+
+## Exercises
+
+<Exercise>
+A four-sample microphone record has integer codes $[0,512,-512,1024]$, $f_s=8\ \text{kHz}$, zero offset, and calibration $1\ \text{mV/code}$. Tabulate $n$, $nT_s$ in milliseconds, code, and amplitude in volts. Check the last row explicitly and distinguish the two vertical quantities.
+
+<Solution>
+$T_s=1/8000$ s $=0.125$ ms. Multiplying each index by $T_s$ and each code by $0.001$ V/code gives:
+
+| $n$ | $nT_s$ (ms) | code $c[n]$ | amplitude $x[n]$ (V) |
+|---:|---:|---:|---:|
+| 0 | 0.000 | 0 | 0.000 |
+| 1 | 0.125 | 512 | 0.512 |
+| 2 | 0.250 | -512 | -0.512 |
+| 3 | 0.375 | 1024 | 1.024 |
+
+The last row is at $3(0.125)=0.375$ ms. The code column contains dimensionless integer labels from the converter representation; the voltage column is the calibrated physical estimate. The transferable move is to carry units through each axis mapping rather than attaching them after arithmetic.
+</Solution>
+</Exercise>
+
+<Exercise>
+Analyze three boundaries: an empty record, a one-sample record $[a]$, and an $N$-sample constant record $[a,a,\ldots,a]$ with $N\ge2$. For each, state whether the mean, sum-of-squares energy, sample-span, and a nonzero physical frequency claim are defined. Separate what the array establishes from what an acquisition contract could add.
+
+<Solution>
+For the empty record, the mean is undefined because it would divide by zero. The empty sum of squares is conventionally $0$, and a buffer interval can be called $0$, but there are no sample instants and therefore no measured sample-span. No frequency claim is supported.
+
+For $[a]$, the mean is $a$, the sum-of-squares is $|a|^2$, and the sample-span is $(1-1)T_s=0$ if $T_s$ is declared. The one value cannot verify $T_s$ or support a nonzero frequency. A device configuration may supply a rate, but the record itself contains no adjacent pair.
+
+For the constant record, the mean is $a$, the sum-of-squares is $N|a|^2$, and the sample-span is $(N-1)T_s$. The samples show no change at their instants. They do not prove that the continuous input was constant between instants or that the sequence remains constant outside the finite domain, so a physical-frequency conclusion still needs a model. The boundary move is to ask whether a formula is defined separately from whether its result licenses a physical claim.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim “the straight line connecting sample dots is part of the discrete signal.” Use samples $x[0]=0$, $x[1]=1$, and $x[2]=0$ taken at $t=nT_s$. Construct two continuous functions that agree at all three sample instants but disagree between them, and name the missing contract field.
+
+<Solution>
+Let $x_A(t)$ be the piecewise-linear curve through $(0,0)$, $(T_s,1)$, and $(2T_s,0)$. Define
+
+$$
+x_B(t)=x_A(t)+\frac12\sin\!\left(\frac{2\pi t}{T_s}\right).
+$$
+
+At every sample instant $t=nT_s$, the added sine is $\sin(2\pi n)=0$. Thus $x_A(nT_s)=x_B(nT_s)$ for $n=0,1,2$, while between the instants the two curves differ by as much as $1/2$.
+
+The missing field is a reconstruction or between-sample model. The samples determine neither candidate. The transferable move is to produce a nonzero function that vanishes at every sample instant; adding it preserves all stored samples while changing the unobserved path.
+</Solution>
+</Exercise>
+
+<Exercise>
+Let a fixed $N$-sample calibrated-voltage array $x[n]$ be assigned first to rate $f_1$ and then to rate $f_2$. Derive how its sample-span, half-open record interval, discrete energy $E_d=\sum_{n=0}^{N-1}|x[n]|^2$, physical energy estimate $E_R=(T_s/R)\sum_n|x[n]|^2$ for a voltage across resistance $R$, and average power $P_R=E_R/(NT_s)$ change. State the units of each result.
+
+<Solution>
+At rate $f_i$, $T_i=1/f_i$. The sample-span is $(N-1)/f_i$ seconds and the half-open record interval is $N/f_i$ seconds, so both time quantities scale by $f_1/f_2$ when the rate changes from $f_1$ to $f_2$.
+
+$E_d$ is unchanged because neither the values nor the number of terms changes. Its units are V$^2$ under this definition; calling it joules would be incorrect. The physical approximation
+
+$$
+E_R=\frac{1}{Rf_i}\sum_n|x[n]|^2
+$$
+
+has units V$^2$s/$\Omega$ = J and scales by $f_1/f_2$. Average power is
+
+$$
+P_R=\frac{E_R}{NT_i}=\frac{1}{NR}\sum_n|x[n]|^2,
+$$
+
+so it is unchanged and has units watts. The transferable move is to expose the $T_s$ factor: sums over samples and approximations to integrals do not carry the same dimensions.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the same measured samples, choose a stem plot or a bandlimited interpolated curve for each task: (a) report only the acquired sample values; (b) assert a reconstructed microphone waveform. Produce both labeled plots and write the one-line acquisition assumption that makes the curve defensible. Name the cue that changes the choice.
+
+<Solution>
+**Possible answer for (a).** Use a stem plot with horizontal axis “sample index $n$” or “sample time $nT_s$ (s)” and vertical axis carrying the calibrated unit, for example “microphone voltage $x[n]$ (V).” Show no connecting curve. This plot claims only the measured values.
+
+**Possible answer for (b).** Use a continuous curve labeled $\hat{x}_c(t)$, not $x[n]$, with time in seconds and amplitude in volts. Mark the sample points on the curve so the reader can distinguish data from reconstruction. One sufficient declaration is: “The analog input was filtered to a stated band strictly below $f_s/2$, sampled uniformly without clipping under the ideal-clock model, and the displayed curve is the specified bandlimited reconstruction.”
+
+The cue is whether between-sample behavior is licensed. Latency or visual smoothness does not decide the representation; the claim being made and the acquisition assumptions do.
+</Solution>
+</Exercise>
+
+<Exercise>
+A voice memo recorded on one device and played on another sounds noticeably sharp — a listener with a tuner reports every tone raised by a factor close to $1.09$ — and a passage timed at $60.0$ s on the recorder finishes in about $55.1$ s. No sample values were altered in transfer. Diagnose the contract fault: name the field that changed, recover both plausible declared rates from the two measurements, verify the ratios agree, and state what repairs playback without touching the stored samples.
+
+<Solution>
+The fault is the declared sampling rate: playback consumed the same samples under a different $T_s$ than acquisition. Both measurements estimate the same ratio. The pitch factor gives $f_{s,\text{play}}/f_{s,\text{rec}}\approx1.09$, and the duration gives $60.0/55.1\approx1.089$. The standard rate pair with this ratio is $48/44.1=1.0884$: the memo was recorded at $44.1$ kHz and replayed under a $48$ kHz declaration.
+
+The check is consistency: playing $N$ samples at rate $f_{s,\text{play}}$ takes $N/f_{s,\text{play}}$ seconds, so duration scales by $44.1/48=0.919$, which matches $55.1/60.0=0.918$ to measurement precision, while every modeled frequency scales by the reciprocal factor.
+
+The repair is a declaration, not an edit: attach the correct $f_s=44.1$ kHz to the file, or resample it under a declared method to a sequence whose contract matches the playback device. The samples were never corrupted; the transferable move is to treat speed and pitch errors of a common factor as evidence about the time field of the record contract.
+</Solution>
+</Exercise>
+
+<Exercise>
+Define $\delta[n-k]$ to be $1$ at $n=k$ and $0$ at every other integer. Decompose the four-sample record $x=[2,-1,0,3]$, defined on $n=0,1,2,3$ and zero outside that domain, into weighted shifted impulses. Then state what a system would need to reveal for this decomposition to predict its output.
+
+<Solution>
+Each impulse selects one integer location, so
+
+$$
+x[n]=2\delta[n]-\delta[n-1]+0\delta[n-2]+3\delta[n-3]
+=2\delta[n]-\delta[n-1]+3\delta[n-3].
+$$
+
+To predict the output by propagating these pieces, the system must reveal its response to a unit impulse and obey rules that let scaled, shifted responses be assembled. <Ref lesson="impulse-response-and-convolution">Impulse Response and Convolution</Ref> names those rules linearity and time invariance, then names the assembly operation convolution. The transferable move is to represent an arbitrary sequence as indexed elementary contributions before asking what a system does to the whole.
+</Solution>
+</Exercise>
+
+<References>
+1. Richard G. Lyons, *Understanding Digital Signal Processing*, 3rd ed. — ch. 1, especially §§1.1–1.3, introduces integer-indexed sequences, sample plots, and the dependence of physical frequency on sample period. https://www.pearson.com/en-us/subject-catalog/p/understanding-digital-signal-processing/P200000000443?view=educator
+2. Sophocles J. Orfanidis, *Introduction to Signal Processing*, 2nd ed., 2023 — ch. 1, §§1.1–1.7, separates sampling, reconstruction, and physical-frequency units; ch. 2, §§2.1–2.4, treats quantizer levels and converter codes. https://www.ece.rutgers.edu/~orfanidi/intro2sp/
+3. Steven W. Smith, *The Scientist and Engineer's Guide to Digital Signal Processing* — chs. 2–4 distinguish sample number from physical axes, describe A/D conversion, and treat sampled data as literal arrays in software. https://www.dspguide.com/
+4. Jack Schaedler, *Seeing Circles, Sines, and Signals* — lessons 2–4 use coordinated continuous paths and discrete markers to show that samples do not specify between-sample behavior. https://jackschaedler.github.io/circles-sines-signals/
+</References>

@@ -1,0 +1,384 @@
+One recipe — an exponential-family response with a linear natural parameter — generates linear regression, logistic regression, and Poisson regression from the same three assumptions. This chapter rewrites the Bernoulli, Gaussian, and Poisson distributions into the exponential-family form, states the three GLM assumptions, turns the crank to recover all three models (the sigmoid is derived, not chosen), proves that the canonical-link gradient is always $(y - \hat y)x$, and closes with deviance and an insurance case where the likelihood-matched loss, not MSE, identifies the calibrated model. The chapter is off the core path: link functions and Poisson regression are asked in statistics-heavy data-science loops and in insurance, pricing, and ads domains, rarely in ML-engineering loops.
+
+## One failure, two symptoms: least squares on the wrong response
+
+<Ref lesson="logistic-regression" /> opened with the linear-probability failure: least squares on a $0/1$ label fits a line, and a line leaves $[0, 1]$, predicting negative probabilities at one end of the feature range. Counts fail the same way. Fit OLS to a count response (claims per policy, store visits per day) and part of the fitted line sits below zero, a value no count can take.
+
+The second symptom is quieter. The Gauss–Markov guarantees of <Ref lesson="ols" /> assume constant error variance (homoscedasticity, the assumption audited in <Ref lesson="regression-diagnostics" />). Count data violate it structurally: the spread of a count grows with its mean, so a fit that treats a predicted 0.1 and a predicted 30 as equally noisy is misweighting its own residuals.
+
+<Figure
+  src="./figures/flaw.svg"
+  alt="Two panels: on binary data the least-squares line exits the interval from 0 to 1 while a sigmoid stays inside; on count data the least-squares line goes negative and ignores the growing spread while an exponential mean curve stays positive"
+  caption="Two responses, one flaw: the straight line models a Gaussian response, but the data are Bernoulli (left) and count-valued (right)."
+/>
+
+Both symptoms have one cause. Least squares is maximum likelihood under i.i.d. Gaussian noise (<Ref lesson="ols" />), and a Gaussian puts mass on all of $\mathbb{R}$ with fixed variance. A binary label is Bernoulli; a count is closer to Poisson. The fix is not to clip the line's output but to **swap the response distribution** and re-derive the model. We need: a family of distributions broad enough to contain Bernoulli, Gaussian, and Poisson, written in one common algebraic form so that the model, the prediction rule, and the gradient are derived once. How: the exponential family, plus three assumptions that attach a linear predictor to it.
+
+<KeyFact>
+Escaping $[0,1]$, negative counts, and misweighted residuals are one failure: the wrong response distribution. GLMs fix the distribution instead of patching the outputs.
+</KeyFact>
+
+## The exponential family: the form behind Bernoulli, Gaussian, and Poisson
+
+### Bernoulli, rearranged: the logit appears by itself
+
+Concrete before general. Take the Bernoulli pmf with success probability $\varphi$ and force everything into a single exponential:
+
+$$
+p(y; \varphi) = \varphi^{\,y} (1-\varphi)^{1-y}
+= \exp\bigl( y \log \varphi + (1-y) \log(1-\varphi) \bigr)
+= \exp\Bigl( \underbrace{\log\tfrac{\varphi}{1-\varphi}}_{\text{coefficient of } y} \cdot\, y \;+\; \log(1-\varphi) \Bigr),
+$$
+
+grouping the terms by their dependence on $y$. The coefficient multiplying $y$ is $\log \frac{\varphi}{1-\varphi}$: the **log-odds** of <Ref lesson="logistic-regression" />, produced by algebra alone. Setting $\eta = \log\frac{\varphi}{1-\varphi}$ and solving gives $\varphi = 1/(1+e^{-\eta}) = \sigma(\eta)$, and the leftover term becomes $\log(1-\varphi) = -\log(1+e^{\eta})$.
+
+{/* fig BernoulliExpFamSteps: FigureSequence, 3 frames, house formula-dissection style (inspiration CS229 ch. 3). Shared layout: one large KaTeX line centered, short color-bound labels above/below with thin leader lines. Frame 1: the pmf $p(y;\varphi)=\varphi^{y}(1-\varphi)^{1-y}$ in currentColor, with the two cases spelled underneath ("y=1 gives φ", "y=0 gives 1−φ", muted). Frame 2: the exp/log rewrite $\exp\!\big(\log\tfrac{\varphi}{1-\varphi}\cdot y+\log(1-\varphi)\big)$ with terms regrouped and color-bound to roles: $\log\tfrac{\varphi}{1-\varphi}$ amber with label "natural parameter η", $y$ blue with label "sufficient statistic T(y)=y", $\log(1-\varphi)$ green with label "−a(η), log-partition"; b(y)=1 noted muted at the side. Frame 3: keep frame 2 dimmed above; below, amber box around $\eta=\log\tfrac{\varphi}{1-\varphi}$ and an inversion arrow to $\varphi=\tfrac{1}{1+e^{-\eta}}=\sigma(\eta)$, with one-line label "the logit is the natural parameter; the sigmoid is its inverse". */}
+<FigureSequence
+  name="BernoulliExpFamSteps"
+  alt="Three frames rewriting the Bernoulli pmf into exponential-family form: the pmf, the regrouped exponential with natural parameter, sufficient statistic and log-partition color-bound, and the boxed logit inverted into the sigmoid"
+  caption="The Bernoulli forced into exponential-family shape: the logit is not imposed: it is the coefficient the algebra puts in front of y."
+/>
+
+<Task>
+Step through the three frames, then redo the regrouping on paper from $\varphi^y(1-\varphi)^{1-y}$ without looking: exponentiate the log, collect the terms multiplying $y$, and check that the collected coefficient is exactly $\log\frac{\varphi}{1-\varphi}$.
+</Task>
+
+### The definition, and two more members
+
+<Definition title="exponential family">
+A family of distributions over $y$ is an **exponential family** if its pmf or density can be written
+
+$$
+p(y; \eta) = b(y)\, \exp\bigl( \eta^\top T(y) - a(\eta) \bigr),
+$$
+
+where $\eta$ is the *natural parameter*, $T(y)$ is the *sufficient statistic*, $a(\eta)$ is the *log-partition function* (it normalizes the distribution: $e^{a(\eta)} = \int b(y)e^{\eta^\top T(y)}\,dy$), and $b(y)$ is the *base measure*. A choice of $T$, $a$, $b$ fixes a family; varying $\eta$ sweeps its members.
+</Definition>
+
+Every distribution in this chapter has $T(y) = y$; the general $T$ matters for multi-parameter members and for the multinomial (the Aside below), and is otherwise out of scope here. The Bernoulli computation above reads off $b(y) = 1$, $T(y) = y$, $\eta = \log\frac{\varphi}{1-\varphi}$, $a(\eta) = \log(1+e^{\eta})$.
+
+<Example title="Gaussian with unit variance">
+Fix $\sigma^2 = 1$ (the variance does not affect the fitted $\theta$; the [CS229 notes](https://cs229.stanford.edu/main_notes.pdf), ch. 3, make the same simplification, and general $\sigma^2$ enters as a dispersion parameter). Expand the square and group by dependence on $y$:
+
+$$
+p(y; \mu) = \frac{1}{\sqrt{2\pi}} \exp\Bigl( -\tfrac{1}{2}(y-\mu)^2 \Bigr)
+= \underbrace{\frac{1}{\sqrt{2\pi}} e^{-y^2/2}}_{b(y)} \cdot \exp\Bigl( \underbrace{\mu}_{\eta}\, y - \underbrace{\tfrac{\mu^2}{2}}_{a(\eta)} \Bigr).
+$$
+
+Read off: $\eta = \mu$ (the natural parameter is the mean itself), $T(y) = y$, $a(\eta) = \eta^2/2$, $b(y) = e^{-y^2/2}/\sqrt{2\pi}$.
+</Example>
+
+<Example title="Poisson">
+For a count $y \in \{0, 1, 2, \dots\}$ with rate $\lambda$:
+
+$$
+p(y; \lambda) = \frac{e^{-\lambda} \lambda^y}{y!}
+= \underbrace{\frac{1}{y!}}_{b(y)} \exp\bigl( y \log\lambda - \lambda \bigr),
+$$
+
+so $\eta = \log \lambda$, $T(y) = y$, and $a(\eta) = \lambda = e^{\eta}$. The natural parameter is the **log of the rate**: the log link of Poisson regression, again produced by the algebra rather than assumed.
+</Example>
+
+### Moments from the log-partition: mean = a′(η), variance = a″(η)
+
+<Theorem title="derivatives of the log-partition">
+For an exponential family with $T(y) = y$,
+
+$$
+\mathbb{E}[y] = a'(\eta), \qquad \operatorname{Var}[y] = a''(\eta).
+$$
+
+<Proof>
+By definition of $a$, $e^{a(\eta)} = \int b(y)\, e^{\eta y}\, dy$ (a sum in the discrete case). Differentiate both sides in $\eta$: $a'(\eta)\, e^{a(\eta)} = \int y\, b(y)\, e^{\eta y}\, dy$, and dividing by $e^{a(\eta)}$ gives $a'(\eta) = \int y\, p(y;\eta)\, dy = \mathbb{E}[y]$. Differentiating once more, $a''(\eta) = \mathbb{E}[y^2] - \mathbb{E}[y]^2 = \operatorname{Var}[y]$; the log-partition is the cumulant generating function in $\eta$ ([Murphy, PML §3.4](https://probml.github.io/pml-book/book1.html)).
+</Proof>
+</Theorem>
+
+The checks take one line each. Bernoulli: $a'(\eta) = e^{\eta}/(1+e^{\eta}) = \sigma(\eta) = \varphi$, the mean, and $a'' = \sigma(\eta)(1-\sigma(\eta)) = \varphi(1-\varphi)$, the variance. Poisson: $a' = a'' = e^{\eta} = \lambda$, so mean and variance are **forced equal**, a fact that returns below as the overdispersion caveat. Gaussian: $a' = \eta = \mu$, $a'' = 1$.
+
+<KeyFact>
+Writing a distribution in exponential-family form makes its canonical link visible (the natural parameter: logit for Bernoulli, log for Poisson, identity for Gaussian) and makes its moments mechanical: mean $= a'(\eta)$, variance $= a''(\eta)$.
+</KeyFact>
+
+<Aside>
+The general $T(y)$ in one paragraph. A multinomial label over $K$ classes enters the family with $T(y)$ the one-hot indicator vector and $\eta \in \mathbb{R}^{K-1}$ the log-odds against a reference class; running the GLM construction below on it yields exactly softmax regression, the multiclass model quoted at the end of <Ref lesson="logistic-regression" />. The CS229 notes (ch. 3) carry out this derivation in full. Multi-parameter members (Gaussian with unknown variance, gamma) use vector $\eta$ and vector $T$; the mean/variance theorem generalizes to gradients and Hessians of $a$.
+</Aside>
+
+## The three GLM assumptions: one recipe, three models
+
+<Definition title="generalized linear model">
+A **generalized linear model** for a response $y$ given features $x \in \mathbb{R}^d$ makes three assumptions:
+
+1. $y \mid x; \theta \sim \text{ExponentialFamily}(\eta)$: the response follows an exponential-family distribution;
+2. the prediction is the conditional mean: $h(x) = \mathbb{E}[T(y) \mid x]$, which is $\mathbb{E}[y \mid x]$ here since $T(y) = y$;
+3. the natural parameter is linear in the features: $\eta = \theta^\top x$.
+
+Assumption 3 is a modeling choice, the "linear" in the name; assumptions 1–2 turn that one linear score into a full predictive distribution.
+</Definition>
+
+{/* fig GlmAssemblyLine: single Figure, component tier. Layout: left column stacks the three assumption boxes (neutral panels, numbered badges 1–3): "1 · $y\mid x \sim$ ExpFam$(\eta)$", "2 · predict $h(x)=\mathbb{E}[y\mid x]$", "3 · $\eta=\theta^\top x$" (KaTeX). A fan arrow (relates-to style) feeds a central "choose the family" selector; three straight data-flow arrows exit right to three stamped output badges: "Gaussian → linear regression, $h(x)=\theta^\top x$" labeled "identity link", "Bernoulli → logistic regression, $h(x)=\sigma(\theta^\top x)$" labeled "logit link", "Poisson → Poisson regression, $h(x)=e^{\theta^\top x}$" labeled "log link". Amber = the h(x) formulas (the subject); blue = the link-name tags; assumption boxes currentColor. One idea: one recipe, three models. */}
+<Figure
+  name="GlmAssemblyLine"
+  alt="Three assumption boxes (exponential-family response, predict the conditional mean, linear natural parameter) feeding one construction that outputs linear regression, logistic regression, and Poisson regression with their identity, logit, and log links"
+  caption="The GLM recipe: fix the three assumptions, choose the response family, and the named model is a consequence."
+/>
+
+Turning the crank is now substitution. **Gaussian response:** $h(x) = \mathbb{E}[y\mid x] = \mu = \eta = \theta^\top x$, which is linear regression, with the identity connecting mean and natural parameter. **Bernoulli response:** $h(x) = \varphi = \sigma(\eta) = \sigma(\theta^\top x)$, which is logistic regression. The sigmoid is not selected from the menu of $[0,1]$-valued squashing functions; it is **derived** as the inverse of the Bernoulli's own natural parameter, which is the sharpest available answer to "why the sigmoid" (Exercise 2). **Poisson response:** $h(x) = \lambda = e^{\theta^\top x}$, which is Poisson regression: the rate is positive by construction, and this is the model the CS229 notes motivate with a store-visits count problem.
+
+<Example title="reading a log-link coefficient">
+A store-visits Poisson model is fitted with $\log \lambda = \theta^\top x$: intercept $2.0$, weekend indicator $0.35$, rain indicator $-0.20$. Predictions multiply rather than add. Weekday, dry: $\lambda = e^{2.0} \approx 7.39$ visits. Weekend, dry: $\lambda = e^{2.35} = 7.39 \times e^{0.35} \approx 7.39 \times 1.42 \approx 10.5$: the weekend coefficient is a **42% rate increase** at any baseline. Weekend, rain: $10.5 \times e^{-0.20} \approx 10.5 \times 0.82 \approx 8.6$. Under a log link, each unit of feature $j$ multiplies the rate by $e^{\theta_j}$: the count-model analogue of the odds-ratio reading in <Ref lesson="logistic-regression" />, and a different sentence than the additive reading of a linear coefficient.
+</Example>
+
+<KeyFact>
+The sigmoid and the exponential are theorems of the GLM construction, not choices: predict the mean of an exponential-family response whose natural parameter is $\theta^\top x$, and $\sigma(\theta^\top x)$, $e^{\theta^\top x}$, $\theta^\top x$ fall out for Bernoulli, Poisson, Gaussian.
+</KeyFact>
+
+## Canonical links: why the gradient is always (y − ŷ)x
+
+### The link-function menu
+
+<Definition title="link function">
+In a GLM, the **link function** $g$ maps the mean to the linear predictor, $g(\mu) = \theta^\top x$; its inverse $g^{-1}$ is the *response function* mapping the score to the mean. The **canonical link** is $g = (a')^{-1}$, the choice that makes the linear predictor equal the natural parameter $\eta$: identity for Gaussian, logit for Bernoulli, log for Poisson.
+</Definition>
+
+<Figure
+  src="./figures/links.svg"
+  alt="Three panels plotting the canonical response functions: the identity line for the Gaussian with mean ranging over all reals, the sigmoid for the Bernoulli with mean in the unit interval, and the exponential for the Poisson with positive mean"
+  caption="The three canonical response functions g⁻¹ mapping the score η to the mean, with the attainable mean range marked in blue: each response lands exactly in its distribution's legal range."
+/>
+
+The canonical link is a **choice with consequences, not a law**. Any strictly monotone $g$ mapping the mean's range onto $\mathbb{R}$ defines a valid GLM: probit regression uses $g^{-1} = \Phi$, the Gaussian cdf, and fits binary data nearly indistinguishably from logit ([Bishop, PRML §4.3.6](https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf)). What the canonical choice buys is the theorem below: a likelihood whose gradient has one clean form.
+
+### One derivation covers all three
+
+Under the canonical link, $\eta_i = \theta^\top x_i$, and the log-likelihood of $n$ independent observations is
+
+$$
+\ell(\theta) = \sum_{i=1}^n \log p(y_i; \eta_i)
+= \sum_{i=1}^n \bigl[ y_i\, \theta^\top x_i - a(\theta^\top x_i) + \log b(y_i) \bigr].
+$$
+
+<Theorem title="the uniform GLM gradient">
+For any canonical-link GLM with $T(y) = y$,
+
+$$
+\nabla_\theta\, \ell(\theta) = \sum_{i=1}^n \bigl( y_i - \hat y_i \bigr)\, x_i,
+\qquad \hat y_i = h(x_i) = a'(\theta^\top x_i).
+$$
+
+<Proof>
+Differentiate term by term. The first summand is linear in $\theta$ with gradient $y_i x_i$; the second has gradient $a'(\theta^\top x_i)\, x_i$ by the chain rule; the third is constant in $\theta$. By the moments theorem, $a'(\theta^\top x_i) = \mathbb{E}[y \mid x_i] = \hat y_i$, giving $\nabla \ell = \sum_i (y_i - \hat y_i) x_i$. The Hessian is $-\sum_i a''(\theta^\top x_i)\, x_i x_i^\top \preceq 0$ since $a'' = \operatorname{Var}[y] \ge 0$: the log-likelihood is concave, so gradient methods reach the global MLE.
+</Proof>
+</Theorem>
+
+One derivation, three familiar results. Gaussian: $\sum_i (y_i - \theta^\top x_i)x_i = 0$ at the optimum is the normal equations of <Ref lesson="ols" /> (Exercise 8 closes this loop). Bernoulli: $\sum_i (y_i - \sigma(\theta^\top x_i))x_i$ is the gradient proved by chain rule and cancellation in <Ref lesson="logistic-regression" />; the cancellation there is this theorem in disguise. Poisson: $\sum_i (y_i - e^{\theta^\top x_i})x_i$, which Exercise 4 derives directly. The SGD update $\theta \leftarrow \theta + \alpha\,(y_i - h(x_i))\,x_i$ is therefore *the same line of code* for all three models; only $h$ changes.
+
+{/* fig UniformGradientCard: single Figure, component tier. Layout: one large centered KaTeX formula $\nabla_\theta \ell = \sum_i (y_i - \hat y_i)\,x_i$ with $\hat y_i$ in amber; an underbrace under $\hat y_i$ drops to a three-row table, each row a model badge (blue tag: "linear", "logistic", "Poisson") next to its amber substitution: $\theta^\top x_i$, $\sigma(\theta^\top x_i)$, $e^{\theta^\top x_i}$, and a muted right column naming the link (identity / logit / log). One idea: one formula, three models — only the prediction changes. */}
+<Figure
+  name="UniformGradientCard"
+  alt="The gradient formula error times input annotated three times, with the prediction expanded as a linear score for linear regression, a sigmoid for logistic regression, and an exponential for Poisson regression"
+  caption="One gradient, three models: (y − ŷ)x with ŷ = θᵀx, σ(θᵀx), or exp(θᵀx)."
+/>
+
+<KeyFact>
+Under the canonical link the score is always $\sum_i (y_i - \hat y_i)x_i$: the "error times input" gradients of OLS and logistic regression are two instances of one theorem, and Poisson regression is the third.
+</KeyFact>
+
+## Deviance: the GLM loss, and the insurance verdict
+
+### From RSS to deviance
+
+Comparing count models needs a loss, and squared error is the wrong default: it is the Gaussian's matched loss, not the Poisson's. The likelihood-matched quantity is the *deviance*.
+
+<Definition title="deviance">
+The **deviance** of predictions $\hat y_1, \dots, \hat y_n$ under a GLM is twice the log-likelihood gap to the *saturated model*, the one that fits each observation perfectly ($\mu_i = y_i$):
+
+$$
+D = 2 \sum_{i=1}^n \bigl[ \log p(y_i; \mu_i = y_i) - \log p(y_i; \mu_i = \hat y_i) \bigr] \;\ge\; 0.
+$$
+
+Minimizing deviance is maximizing likelihood; lower held-out deviance means higher held-out log-likelihood.
+</Definition>
+
+For the unit-variance Gaussian, $\log p(y; \mu) = -\tfrac12 (y - \mu)^2 + \text{const}$, so $D = \sum_i (y_i - \hat y_i)^2$: **deviance generalizes RSS**, and comparing models by deviance is the GLM extension of comparing them by squared error. For the Poisson the same computation gives
+
+$$
+D = 2 \sum_{i=1}^n \Bigl[ y_i \log\tfrac{y_i}{\hat y_i} - y_i + \hat y_i \Bigr]
+$$
+
+(with $y \log y = 0$ at $y = 0$). This is the "mean Poisson deviance" reported by scikit-learn, and the training objective behind the `poisson` losses in scikit-learn, XGBoost, and LightGBM.
+
+### 678,000 policies, 94% zeros: MSE picks the wrong model
+
+[Murphy's PML §12.5](https://probml.github.io/pml-book/book1.html) runs the comparison on the French motor third-party liability data (the dataset of a [scikit-learn worked example](https://scikit-learn.org/stable/auto_examples/linear_model/plot_poisson_regression_non_normal_loss.html)): about 678,000 policies, response = number of claims filed, and roughly **94% of policies have zero claims**. Two models are fitted: ridge regression on the raw counts (<Ref lesson="ridge-lasso" />) and a Poisson GLM with log link.
+
+On held-out data the MSE and MAE columns are nearly tied and mildly favor ridge: with 94% zeros, a model that predicts close to zero everywhere scores well on symmetric per-row errors, so these metrics barely see the rare policies where risk lives. The Poisson deviance and the calibration plot invert the verdict. Binning test policies by predicted risk and comparing predicted with observed claim frequency per bin, the ridge model underestimates the risky tail (its predictions were never generated by a count model of the data) while the Poisson curve tracks the observed frequencies. The totals make it concrete: summing predictions over the test set, ridge expects **10,693** claims, the Poisson GLM **11,930**, and the true count is **11,935**.
+
+{/* fig PoissonCalibrationVerdict: single Figure, component tier; recreate the IDEA of Murphy PML Fig 12.2 schematically, never copy the drawing. Layout: left, a calibration panel — x axis "predicted claim frequency (binned by risk)", y axis "observed claim frequency", dashed diagonal = perfect calibration; blue polyline (ridge) hugging low values and sagging below the diagonal in the high-risk bins, amber polyline (Poisson GLM) tracking the diagonal; color-matched legend under the graphic. Right, a tally column titled "total claims, test set": three rows "ridge 10,693" (blue), "Poisson GLM 11,930" (amber), "actual 11,935" (bold, currentColor), with the Poisson and actual rows visually adjacent to show the near-match. One idea: the likelihood-matched loss finds the calibrated model. */}
+<Figure
+  name="PoissonCalibrationVerdict"
+  alt="Schematic calibration plot where the ridge curve undershoots observed claim frequencies at high risk while the Poisson curve follows the diagonal, next to a tally showing ridge predicting 10,693 total claims and the Poisson model 11,930 against a true 11,935"
+  caption="The insurance verdict (after Murphy, PML Fig. 12.2, schematic): MSE cannot distinguish the models; calibration and totals can."
+/>
+
+<Task>
+Read the tally: compute the relative error of each model's total. Ridge misses by $1{,}242/11{,}935 \approx 10\%$ of all claims; the Poisson model misses by $5/11{,}935 \approx 0.04\%$. An insurer pricing from the ridge model would under-reserve by a tenth.
+</Task>
+
+The punchline is **metric choice, not model magic**: the Poisson model wins because the evaluation was switched to a loss that respects the response distribution, the same proper-scoring discipline that <Ref lesson="classification-metrics" /> applies to classifiers. Judged by MSE alone, the miscalibrated model looked fine.
+
+### Exposure, overdispersion, and where this is asked
+
+Two production details complete the interview answer. **Exposure:** policies are observed for different durations $e_i$ (policy-years); model the expected count as $\mathbb{E}[y_i] = e_i \cdot e^{\theta^\top x_i}$, i.e. add $\log e_i$ to the linear predictor as an *offset* with coefficient fixed at 1, so $\theta$ models the rate per unit of exposure. **Overdispersion:** the Poisson forces $\operatorname{Var}[y] = \mathbb{E}[y]$ (that is $a'' = a' = e^\eta$ from the moments theorem), and real counts are routinely more spread than that. The point predictions stay sensible, but standard errors and likelihood-based comparisons become overconfident. The standard fixes are quasi-Poisson (scale the variance by a fitted dispersion factor) or the *negative binomial*, a gamma-mixed Poisson with $\operatorname{Var}[y] = \mu + \alpha\mu^2$ ([McCullagh & Nelder, ch. 6](https://doi.org/10.1201/9780203753736)); Exercise 6 drills the one-liner.
+
+<Remark title="where GLMs appear in interviews">
+Insurance and pricing loops treat GLMs as the industry-standard model class (frequency × severity models are Poisson and gamma GLMs). Ads and marketplace roles ask Poisson or negative-binomial regression for click, order, and session counts. A/B-testing questions about count metrics ("sessions per user moved; how do you model it?") expect the log-link-plus-offset vocabulary. Outside these domains, the usual depth is "what is a link function" and the sigmoid-derivation story of this chapter.
+</Remark>
+
+<KeyFact>
+MSE and MAE, dominated by the 94% of zero-claim rows, mildly preferred the ridge model; deviance and calibration preferred the Poisson GLM, whose predicted claim total missed the truth by 5 in 11,935 where ridge missed by 1,242.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+The set piece, cold: show that the Bernoulli distribution is an exponential family. Read off $b$, $T$, $\eta$, $a$, state the canonical link, and invert it to obtain the canonical response function.
+
+<Solution>
+Start from the pmf and move everything into an exponential:
+
+$$
+p(y; \varphi) = \varphi^y (1-\varphi)^{1-y}
+= \exp\bigl( y\log\varphi + (1-y)\log(1-\varphi) \bigr)
+= \exp\Bigl( \log\tfrac{\varphi}{1-\varphi}\cdot y + \log(1-\varphi) \Bigr).
+$$
+
+Matching $b(y)\exp(\eta T(y) - a(\eta))$: $b(y) = 1$, $T(y) = y$, $\eta = \log\frac{\varphi}{1-\varphi}$, and $a(\eta) = -\log(1-\varphi)$. To express $a$ in $\eta$: from $\eta = \log\frac{\varphi}{1-\varphi}$, $e^\eta = \frac{\varphi}{1-\varphi}$, so $\varphi = \frac{e^\eta}{1+e^\eta} = \sigma(\eta)$ and $1 - \varphi = \frac{1}{1+e^\eta}$, giving $a(\eta) = \log(1+e^\eta)$ (the softplus).
+
+Canonical link: the map from mean to natural parameter, $g(\varphi) = \log\frac{\varphi}{1-\varphi}$, the logit. Canonical response function: its inverse, $\varphi = \sigma(\eta) = 1/(1+e^{-\eta})$, the sigmoid. Check via the moments theorem: $a'(\eta) = e^\eta/(1+e^\eta) = \sigma(\eta) = \varphi = \mathbb{E}[y]$, and $a''(\eta) = \sigma(\eta)(1-\sigma(\eta)) = \varphi(1-\varphi) = \operatorname{Var}[y]$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "why does logistic regression use the sigmoid?" Give the GLM answer, and state precisely what it adds over "we need something that squashes scores into $[0,1]$".
+
+<Solution>
+The squashing answer is incomplete because infinitely many strictly increasing maps onto $(0,1)$ would do: the probit $\Phi(z)$, $\tfrac12(1+\tanh z)$, a clipped line. The GLM answer singles the sigmoid out: assume (1) $y \mid x$ is Bernoulli, (2) predict $\mathbb{E}[y \mid x]$, (3) the natural parameter is linear, $\eta = \theta^\top x$. Writing the Bernoulli in exponential-family form shows its natural parameter is the log-odds $\log\frac{\varphi}{1-\varphi}$, so assumption 3 says the log-odds are linear, and inverting gives the mean $\varphi = \sigma(\theta^\top x)$. The sigmoid is the inverse of the Bernoulli's own natural parameter, derived rather than chosen.
+
+What the canonical choice buys, beyond consistency with the likelihood: the log-likelihood is concave with the uniform gradient $\sum_i (y_i - \hat y_i)x_i$, and the fitted outputs are the Bernoulli MLE probabilities (the calibration argument of the logistic-regression chapter). Probit regression is a legitimate non-canonical alternative with nearly identical fits; it just loses this algebra.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "you must predict claim counts per policy; policies are observed for different lengths of time. Which model, which loss, and why not OLS or ridge?"
+
+<Solution>
+Model: Poisson regression, a GLM with $y_i \mid x_i \sim \text{Poisson}(\lambda_i)$ and log link, $\log \lambda_i = \log e_i + \theta^\top x_i$, where $\log e_i$ is the fixed-coefficient offset for exposure $e_i$ (policy-years), so $\theta$ models the claim *rate* per policy-year.
+
+Loss: the Poisson negative log-likelihood, equivalently the Poisson deviance $2\sum_i [y_i \log(y_i/\hat y_i) - y_i + \hat y_i]$, at training time and as the held-out comparison metric.
+
+Why not OLS/ridge: (1) a linear model predicts negative counts for part of the feature space; (2) it assumes constant variance while count variance grows with the mean, misweighting residuals; (3) with heavily zero-inflated data, MSE/MAE evaluation is dominated by the zeros and cannot distinguish a calibrated rate model from one that undershoots the risky tail. In the Murphy §12.5 French-motor case, ridge and the Poisson GLM were near-tied on MSE while the predicted claim totals were 10,693 (ridge) versus 11,930 (Poisson) against a true 11,935. If the counts are overdispersed, upgrade to negative binomial (Exercise 6).
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the Poisson regression gradient directly from the likelihood, without invoking the uniform-gradient theorem, and write the SGD update.
+
+<Solution>
+Model: $p(y;\lambda) = e^{-\lambda}\lambda^y / y!$ with $\lambda_i = e^{\theta^\top x_i}$. Log-likelihood of $n$ observations:
+
+$$
+\ell(\theta) = \sum_{i=1}^n \bigl[ y_i \log \lambda_i - \lambda_i - \log y_i! \bigr]
+= \sum_{i=1}^n \bigl[ y_i\, \theta^\top x_i - e^{\theta^\top x_i} - \log y_i! \bigr].
+$$
+
+Differentiate: the first term gives $y_i x_i$; the second, by the chain rule, $e^{\theta^\top x_i} x_i$; the third is constant. Hence
+
+$$
+\nabla_\theta \ell = \sum_{i=1}^n \bigl( y_i - e^{\theta^\top x_i} \bigr) x_i ,
+$$
+
+which is $(y - \hat y)x$ with $\hat y = e^{\theta^\top x}$: the uniform form, re-derived by hand. SGD ascent update: $\theta \leftarrow \theta + \alpha\,(y_i - e^{\theta^\top x_i})\,x_i$. The Hessian is $-\sum_i e^{\theta^\top x_i} x_i x_i^\top \preceq 0$, so the likelihood is concave and any stationary point is the global MLE.
+</Solution>
+</Exercise>
+
+<Exercise>
+Define deviance. Show that for the unit-variance Gaussian it reduces to the residual sum of squares, and explain why deviance is preferred to MSE for evaluating a rate model on zero-inflated counts.
+
+<Solution>
+Deviance: $D = 2\sum_i [\log p(y_i;\mu_i{=}y_i) - \log p(y_i;\mu_i{=}\hat y_i)]$, twice the log-likelihood gap to the saturated model; minimizing it is maximizing likelihood.
+
+Gaussian, $\sigma^2 = 1$: $\log p(y;\mu) = -\tfrac12(y-\mu)^2 - \tfrac12\log 2\pi$. The saturated term has $(y_i - y_i)^2 = 0$, so $D = 2\sum_i [0 + \tfrac12 (y_i - \hat y_i)^2] = \sum_i (y_i-\hat y_i)^2 = \text{RSS}$: deviance is the GLM generalization of RSS, and MSE is exactly the Gaussian's deviance per row.
+
+Why deviance for rates: using MSE presumes the Gaussian case: symmetric errors, constant variance. On counts that are 90%+ zeros, per-row squared errors are dominated by the zero rows, so a model that undershoots the rare high-risk rows scores nearly as well as a calibrated one (the insurance case: near-tied MSE, 10% versus 0.04% error in total claims). The Poisson deviance $2\sum_i[y_i\log(y_i/\hat y_i) - y_i + \hat y_i]$ scores each row against the count likelihood (asymmetric, mean-dependent), so systematic under-prediction of high-rate rows is charged at its true cost. Numerically: $y = 3$, $\hat y = 1$ contributes $2(3\log 3 - 2) \approx 2.59$; $\hat y = 3$ contributes $0$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Interview question: "your claim counts have variance about five times the mean. What breaks in your Poisson model, and what do you use instead?"
+
+<Solution>
+The Poisson's exponential-family algebra forces $\operatorname{Var}[y] = a''(\eta) = e^\eta = a'(\eta) = \mathbb{E}[y]$: variance equals mean, no free parameter to loosen it. Variance $\approx 5\times$ mean is overdispersion: the model's likelihood understates the data's spread. Consequences: the fitted rates (the mean model) remain consistent, but standard errors are too small, confidence intervals and significance tests are overconfident, and likelihood/deviance comparisons are distorted.
+
+Fixes, in one line each. **Quasi-Poisson:** keep the mean model, estimate a dispersion factor $\hat\phi \approx 5$ (Pearson $\chi^2/\text{df}$) and inflate standard errors by $\sqrt{\hat\phi}$. **Negative binomial:** a gamma-mixed Poisson with $\operatorname{Var}[y] = \mu + \alpha\mu^2$, a genuine likelihood that can be compared and used for prediction intervals; or robust (sandwich) standard errors on the Poisson fit.
+</Solution>
+</Exercise>
+
+<Exercise>
+CS229-style: the geometric distribution $p(y; \varphi) = (1-\varphi)^{y-1}\varphi$ for $y \in \{1, 2, 3, \dots\}$ models the number of trials to the first success. (a) Show it is an exponential family and identify $b$, $T$, $\eta$, $a$. (b) Derive the canonical response function of its GLM. (c) Write the gradient of the log-likelihood.
+
+<Solution>
+(a) Exponentiate the log:
+
+$$
+p(y;\varphi) = \exp\bigl( (y-1)\log(1-\varphi) + \log\varphi \bigr)
+= \exp\Bigl( y \log(1-\varphi) + \log\tfrac{\varphi}{1-\varphi} \Bigr).
+$$
+
+So $b(y) = 1$, $T(y) = y$, $\eta = \log(1-\varphi)$ (hence $\varphi = 1 - e^\eta$, valid for $\eta < 0$), and $a(\eta) = -\log\frac{\varphi}{1-\varphi} = \log\frac{1-\varphi}{\varphi} = \log\frac{e^\eta}{1-e^\eta} = \eta - \log(1 - e^\eta)$.
+
+(b) The canonical response is $a'(\eta)$:
+
+$$
+a'(\eta) = 1 + \frac{e^\eta}{1-e^\eta} = \frac{1}{1-e^\eta} = \frac{1}{\varphi},
+$$
+
+which is the geometric mean $\mathbb{E}[y] = 1/\varphi$, as it must be. The GLM predicts $h(x) = 1/(1 - e^{\theta^\top x})$.
+
+(c) By the uniform-gradient theorem (or by differentiating $\sum_i [y_i \theta^\top x_i - a(\theta^\top x_i)]$ directly): $\nabla_\theta \ell = \sum_i \bigl( y_i - \tfrac{1}{1 - e^{\theta^\top x_i}} \bigr) x_i$: error times input once more.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review of <Ref lesson="mle-map" /> and <Ref lesson="ols" />: run the GLM crank on the Gaussian and show it reproduces least squares end to end. State where each step of the two-step MLE recipe happens, and recover the normal equations from the uniform gradient.
+
+<Solution>
+Assumptions: $y \mid x \sim \mathcal N(\mu, 1)$ with $\mu = \eta = \theta^\top x$ (identity canonical link), predict $h(x) = \mathbb{E}[y\mid x] = \theta^\top x$.
+
+Recipe step 1 is writing the log-likelihood:
+
+$$
+\ell(\theta) = \sum_{i=1}^n \log \tfrac{1}{\sqrt{2\pi}} e^{-\frac{(y_i - \theta^\top x_i)^2}{2}}
+= -\tfrac12 \sum_{i=1}^n (y_i - \theta^\top x_i)^2 + \text{const},
+$$
+
+so maximizing the likelihood is minimizing RSS: least squares is the Gaussian GLM's MLE, the fact stated in the ols chapter from the mle-map bridge.
+
+Recipe step 2 is setting the derivative to zero. The uniform gradient with $\hat y_i = \theta^\top x_i$ gives
+
+$$
+\nabla \ell = \sum_{i=1}^n (y_i - \theta^\top x_i)\, x_i = X^\top(y - X\theta) = 0
+\;\Longleftrightarrow\; X^\top X\,\theta = X^\top y,
+$$
+
+the normal equations, with solution $\hat\theta = (X^\top X)^{-1}X^\top y$ when $X^\top X$ is invertible. Every ingredient of the ols chapter (Gaussian noise, RSS, normal equations) is the $a(\eta) = \eta^2/2$ row of the GLM table.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — ch. 3: the exponential family, the Bernoulli and Gaussian rewrites, the three GLM assumptions, and the derivations of least squares, logistic regression, and Poisson regression this chapter follows. https://cs229.stanford.edu/main_notes.pdf
+2. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — ch. 12: GLMs, with linear/binomial/Poisson examples (§12.2) and the insurance-claims worked example with the calibration plot and claim totals (§12.5); §3.4: exponential-family properties, including the log-partition/cumulant facts. https://probml.github.io/pml-book/book1.html
+3. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §4.3.6: canonical link functions and the (y − ŷ)x form of the gradient. https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf
+4. J. A. Nelder, R. W. M. Wedderburn, "Generalized Linear Models," *Journal of the Royal Statistical Society, Series A*, 135(3), 1972 — the paper that unified these models and introduced the framework. https://doi.org/10.2307/2344614
+5. P. McCullagh, J. A. Nelder, *Generalized Linear Models*, 2nd ed., Chapman & Hall, 1989 — the standard monograph; ch. 2: the GLM components and deviance; ch. 6: overdispersion and negative binomial models.
+6. scikit-learn documentation, "Poisson regression and non-normal loss" — the French motor third-party liability example (ridge vs Poisson, deviance and calibration) that Murphy §12.5 builds on. https://scikit-learn.org/stable/auto_examples/linear_model/plot_poisson_regression_non_normal_loss.html
+</References>

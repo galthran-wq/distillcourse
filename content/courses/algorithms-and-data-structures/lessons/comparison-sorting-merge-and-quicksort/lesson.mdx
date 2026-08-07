@@ -1,0 +1,1112 @@
+Merge sort and quicksort both sort by divide-and-conquer — split,
+recursively sort the pieces, combine — but merge sort does the work while
+combining and quicksort does it while splitting, a difference that gives
+one a guaranteed O(n log n) and the other an O(n^2) worst case. The
+analysis module priced both outcomes in advance:
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson</Ref> solved $T(n) = 2T(n/2) + \Theta(n) = \Theta(n \lg n)$ and its
+subtractive neighbor $T(n) = T(n-1) + \Theta(n) = \Theta(n^2)$, and left
+two debts: the $\Theta(n)$ merge procedure taken on faith, and the
+algorithm whose pivot decides which of the two recurrences it obeys. The
+structures module priced *storing* data under full order, heap order, and
+no order; what it never did is put data into order. This lesson opens the
+sorting module by paying both debts and naming the course's first design
+paradigm.
+
+## Divide-and-conquer: one template, two placements of the work
+
+The running example for the whole module is one 8-element array:
+
+$$
+A = [\,5,\ 2,\ 7,\ 1,\ 6,\ 3,\ 8,\ 4\,].
+$$
+
+Both algorithms treat it the same way at the top level: cut it into two
+pieces, sort each piece by a recursive call, and assemble a sorted whole.
+They differ in **where the ordering happens**. Merge sort cuts blindly at
+the middle (position 4, whatever the values are), so after the recursion
+it holds two sorted halves that still have to be interleaved: all the
+ordering work sits in the *combine* step. Quicksort cuts by value: it
+spends a linear pass arranging small elements left and large elements
+right *before* recursing, so when the recursion returns there is nothing
+left to do: all the ordering work sits in the *divide* step.
+
+<Figure
+  src="./figures/dnc-template.svg"
+  alt="Three-stage template of divide, conquer, combine, instantiated twice: merge sort with a trivial divide and a Θ(n) merge combine, quicksort with a Θ(n) partition divide and a trivial combine"
+  caption="One template, two instantiations: the Θ(n) pass per level is the same; only its position differs."
+/>
+
+<Definition title="divide-and-conquer">
+An algorithm follows the **divide-and-conquer** paradigm if it solves a
+problem by three steps: **divide** the input into smaller instances of
+the same problem, **conquer** each instance by recursion (solving
+constant-size instances directly), and **combine** the sub-solutions into
+a solution for the whole. The instances must be disjoint: each element of
+the input belongs to exactly one of them.
+</Definition>
+
+Four instances fix the boundary of the definition.
+
+- **The canonical case.** Merge sort: divide at the midpoint, conquer two
+  halves, combine by merging.
+- **A different surface.** Quicksort: the divide step (partitioning) is
+  where the work lives, and the combine step is empty. Same template,
+  opposite weight distribution.
+- **The degenerate case.** The halving search proved correct in
+  <Ref lesson="loop-invariants-and-correctness">the invariants
+  lesson</Ref>: one subproblem instead of two, and both the divide (one
+  comparison) and the combine (nothing) are trivial. The template covers
+  it with $a = 1$.
+- **The near miss.** Recursive Fibonacci divides $F(n)$ into $F(n-1)$ and
+  $F(n-2)$: smaller instances of the same problem, but not disjoint
+  ones, since $F(n-2)$ is recomputed inside $F(n-1)$. Overlap is the clause
+  that fails, the recursion tree blows up exponentially, and repairing
+  exactly this failure is the subject of
+  <Ref lesson="dynamic-programming-i-one-dimensional">dynamic
+  programming</Ref>.
+
+To place your own case, ask which clause decides it: smaller instances
+of the *same* problem, and *disjoint* ones.
+
+One more property is shared by everything in this lesson and the next.
+Both sorts read keys through one operation only: compare two of them.
+
+<Definition title="comparison sort">
+A **comparison sort** is a sorting algorithm that obtains information
+about its input only through pairwise comparisons ($\le$) between
+elements, never by inspecting the values themselves.
+</Definition>
+
+Merge sort and quicksort are comparison sorts; so is the insertion sort
+of <Ref lesson="loop-invariants-and-correctness">the invariants
+lesson</Ref>. The definition matters because it has teeth: the next
+lesson proves that *no* comparison sort can guarantee fewer than
+$\Omega(n \lg n)$ comparisons, and the lesson after that beats
+$n \lg n$ only by violating the definition's hypothesis.
+
+## Merge sort: the ordering work happens in the combine
+
+Merge sort is the oldest algorithm in this course: John von Neumann
+proposed it in 1945 as one of the first programs for the stored-program
+EDVAC. The recursion was already written down in
+<Ref lesson="recurrences-and-master-theorem">the recurrences lesson</Ref>;
+what was priced there as "an $\Theta(n)$ combine step" is delivered here.
+
+```text
+MergeSort(A[1..n]):
+  if n ≤ 1  return
+  m ← ⌊n/2⌋
+  MergeSort(A[1..m])
+  MergeSort(A[m+1..n])
+  Merge(A[1..n], m)
+```
+
+### The merge: a two-finger walk
+
+After the two recursive calls return, $A[1..m]$ and $A[m+1..n]$ are each
+sorted. On the running example the final merge receives
+$[\,1, 2, 5, 7\,]$ and $[\,3, 4, 6, 8\,]$. The smallest element of the
+whole array must be the front element of one of the two halves, so one
+comparison finds it; removing it exposes a new front, and the same
+argument repeats. Two fingers walk left to right, one per half, and the
+smaller fingered element moves to the output.
+
+<FigureSequence
+  name="merge-walk"
+  alt="Two sorted halves 1 2 5 7 and 3 4 6 8 with pointers i and j; each frame compares the two fingered elements, copies the smaller into the next output slot, and advances that finger; in the final frame the left half is empty and 8 is copied without a comparison"
+  caption="The two-finger walk: one comparison per output element until a half empties, then the rest is copied free."
+/>
+
+<Task>
+Step the frames and predict, before each one, which finger advances. Then
+count the comparisons and check the total against the $n - 1$ bound.
+</Task>
+
+```text
+Merge(A[1..n], m):                ▷ A[1..m] and A[m+1..n] each sorted
+  i ← 1;  j ← m+1
+  for k ← 1 to n
+    if j > n                      ▷ right half exhausted
+      B[k] ← A[i];  i ← i+1
+    else if i > m                 ▷ left half exhausted
+      B[k] ← A[j];  j ← j+1
+    else if A[i] ≤ A[j]           ▷ a tie goes to the left half
+      B[k] ← A[i];  i ← i+1
+    else
+      B[k] ← A[j];  j ← j+1
+  copy B[1..n] into A[1..n]
+```
+
+Every iteration writes exactly one element of $B$ and performs at most
+one comparison, so `Merge` costs $\Theta(n)$ time and $n - 1$ comparisons
+at worst: the $\Theta(n)$ driving function asserted by the recurrence,
+now earned. The buffer $B$ is the procedure's other signature: the walk
+reads from two moving positions and writes to a third, and doing that
+inside one array would overwrite unread elements. Merge sort on arrays
+needs $\Theta(n)$ auxiliary space.
+
+### Correctness: the invariant of the walk
+
+The claim that the walk works is a loop-invariant proof with exactly the
+three obligations of
+<Ref lesson="loop-invariants-and-correctness">the invariants lesson</Ref>.
+
+<Theorem title="merge invariant (CLRS §2.3.3)">
+At the start of the iteration with counter $k$: $B[1..k-1]$ holds, in
+sorted order, the $k-1$ smallest elements of $A[1..n]$, and $A[i..m]$,
+$A[j..n]$ hold exactly the elements not yet placed. Consequently `Merge`
+leaves $A[1..n]$ sorted, holding the same collection of values.
+
+<Proof>
+**Initialization.** Before $k = 1$: $B$ is empty, $i = 1$, $j = m+1$,
+and no element has been placed. All three clauses hold vacuously.
+
+**Maintenance.** Suppose the invariant holds at $k$. The halves are
+sorted, so $A[i]$ is the smallest unplaced element of the left half and
+$A[j]$ of the right (when either exists). The four-way test copies the
+smaller of the two (or the only available one) into $B[k]$; that
+element is the smallest unplaced element overall. It is $\ge$ every
+element of $B[1..k-1]$, since those are the $k-1$ smallest, so appending
+it keeps $B$ sorted and makes $B[1..k]$ the $k$ smallest. Advancing the
+matching finger restores the "not yet placed" clause for $k+1$.
+
+**Termination.** The loop runs exactly $n$ times. At $k = n+1$ the
+invariant says $B[1..n]$ holds all $n$ elements in sorted order, and the
+copy-back transfers them into $A$. Both clauses of sorting's
+postcondition (same collection, nondecreasing order) follow. $\blacksquare$
+</Proof>
+</Theorem>
+
+Because the test
+is $A[i] \le A[j]$, an element of the left half is copied *before* an
+equal element of the right half, so equal keys leave the merge in the
+order they entered: a property named *stability* and examined in its own
+section below. Written with $<$ instead of $\le$, the procedure still
+sorts and the property silently dies.
+
+### The whole sort on eight elements
+
+<Example title="merge sort of the running example, comparisons counted">
+`MergeSort` on $A = [\,5, 2, 7, 1, 6, 3, 8, 4\,]$ splits down to
+singletons, then merges back up three levels.
+
+**Singletons to pairs.** $[5][2] \to [2\,5]$, $[7][1] \to [1\,7]$,
+$[6][3] \to [3\,6]$, $[8][4] \to [4\,8]$: one comparison per merge,
+**4 comparisons**.
+
+**Pairs to halves.** $[2\,5] + [1\,7]$: compare $2\,{:}\,1$, $2\,{:}\,7$,
+$5\,{:}\,7$, then copy $7$: three comparisons, giving $[1\,2\,5\,7]$.
+$[3\,6] + [4\,8]$: compare $3\,{:}\,4$, $6\,{:}\,4$, $6\,{:}\,8$, copy
+$8$: three more, giving $[3\,4\,6\,8]$. **6 comparisons**.
+
+**Halves to whole.** $[1\,2\,5\,7] + [3\,4\,6\,8]$ is the two-finger
+walk of the figure sequence: **7 comparisons**, output
+$[1\,2\,3\,4\,5\,6\,7\,8]$.
+
+Total: $4 + 6 + 7 = 17$ comparisons. This input is in fact a worst case:
+every merge ran both of its halves to the last element, and the
+worst-case comparison count for $n$ a power of two is
+$n \lg n - n + 1 = 24 - 8 + 1 = 17$.
+</Example>
+
+<Figure
+  src="./figures/msort-tree-8.svg"
+  alt="Merge sort's three merge levels on the running example with per-level comparison counts 4, 6, and 7, totaling 17, against the bound n lg n = 24"
+  caption="The recursion tree of the recurrences lesson, now with real data: three levels, per-level cost ≤ n − 1 comparisons, total 17."
+/>
+
+The cost statement needs no new analysis. Counting both recursive calls
+and the merge, $T(n) = 2T(n/2) + \Theta(n)$; the watershed is
+$n^{\log_2 2} = n$, the driving function matches it, and case 2 of the
+<Ref lesson="recurrences-and-master-theorem">Master theorem</Ref> gives
+$T(n) = \Theta(n \lg n)$: the balanced tree shape, $\lg n$ levels of
+$cn$ each. Nothing in that computation looked at the input's order, so
+the bound is unconditional: sorted, reverse-sorted, adversarial, random,
+all $\Theta(n \lg n)$.
+
+<KeyFact>
+Merge sort's $\Theta(n \lg n)$ is a property of the split, not of the
+data: no input order can degrade it. What the guarantee costs is the
+$\Theta(n)$ buffer and a full copy of the data through it at every
+level, the exact costs quicksort exists to avoid.
+</KeyFact>
+
+<Exercise>
+Before computing: state whether merge sort should find reverse-sorted
+input $[\,8, 7, 6, 5, 4, 3, 2, 1\,]$ harder or easier than the running
+example's 17 comparisons. Then count exactly, level by level, and do the
+same for sorted input $[\,1, 2, \ldots, 8\,]$.
+
+<Solution>
+Strategy hint: in a merge, comparisons stop the moment one half
+empties; ask, at each merge, how early that happens.
+
+**Reverse-sorted.** Pairs: $[8][7] \to [7\,8]$ etc., 4 comparisons.
+Halves: $[7\,8] + [5\,6]$: compare $7\,{:}\,5$, $7\,{:}\,6$, and the
+right half is empty: 2 comparisons; likewise $[3\,4] + [1\,2]$: 2.
+Whole: $[5\,6\,7\,8] + [1\,2\,3\,4]$: compare $5\,{:}\,1$, $5\,{:}\,2$,
+$5\,{:}\,3$, $5\,{:}\,4$, right half empty: 4. Total
+$4 + 4 + 4 = \mathbf{12}$.
+
+**Sorted.** Symmetric: every merge exhausts its left half as fast as
+possible: $4 + 4 + 4 = 12$ again.
+
+Both extremes are *best* cases ($\tfrac{n}{2}\lg n = 12$ comparisons),
+and the shuffled running example was the worst case at 17. The intuition
+"orderly input is easy, disordered input is hard" holds, but the entire
+span from easiest to hardest is $12$ to $17$, inside the same
+$\Theta(n \lg n)$: for merge sort the input's order moves only the
+constant. Keep the number 12 in hand: quicksort is about to behave very
+differently on these same two inputs.
+</Solution>
+</Exercise>
+
+## Quicksort: the ordering work happens in the divide
+
+Merge sort pays for its guarantee with the buffer and the copying.
+[Tony Hoare's quicksort](https://dl.acm.org/doi/10.1145/366622.366644)
+(1961)
+inverts the template to avoid both: order first, then recurse, and let
+the combine step vanish.
+
+The divide step is called *partitioning*: choose one element $x$ as the
+*pivot*, then rearrange the array in place so that everything $\le x$
+comes first, then $x$ itself, then everything $> x$. The pivot lands in
+its **final sorted position** (it is never touched again), and the two
+sides can be sorted independently, in place, with nothing to combine.
+
+```text
+QuickSort(A[p..r]):
+  if p < r
+    q ← Partition(A[p..r])
+    QuickSort(A[p..q−1])
+    QuickSort(A[q+1..r])
+
+Partition(A[p..r]):               ▷ pivot x = A[r]
+  x ← A[r];  i ← p−1
+  for j ← p to r−1
+    if A[j] ≤ x
+      i ← i+1
+      swap A[i] ↔ A[j]
+  swap A[i+1] ↔ A[r]              ▷ pivot into its final slot
+  return i+1
+```
+
+This partition scheme is Nico Lomuto's, and it is taught here for its
+one-line invariant. Hoare's original two-pointer scheme (indices
+scanning inward from both ends, exchanging out-of-place pairs) does
+fewer swaps and is what libraries descend from, but its off-by-one
+analysis is famously delicate; nothing later in the course needs it.
+
+### The partition invariant: four regions
+
+One index $j$ scans the array; one index $i$ marks the right edge of the
+low region. Between them the scan maintains four regions, and the claim
+that it does is again a loop invariant.
+
+<Theorem title="partition invariant (CLRS §7.1)">
+At the start of each iteration of the `for` loop, for every index $k$ of
+$A[p..r]$: if $p \le k \le i$ then $A[k] \le x$ (the low region); if
+$i{+}1 \le k \le j{-}1$ then $A[k] > x$ (the high region); if $k = r$
+then $A[k] = x$. Consequently `Partition` returns an index $q$ with
+$A[p..q{-}1] \le A[q] = x < A[q{+}1..r]$, in $\Theta(n)$ time with
+$n - 1$ comparisons for a subarray of $n$ elements.
+
+<Proof>
+**Initialization.** $i = p-1$ and $j = p$: both the low and high regions
+are empty ranges, and $A[r] = x$ by the assignment. All clauses hold.
+
+**Maintenance.** Case $A[j] > x$: only $j$ advances, which appends
+$A[j]$ to the high region, where it belongs. Case $A[j] \le x$: $i$
+advances onto the first element of the high region, the swap sends that
+$>x$ element to position $j$ and brings the $\le x$ element into
+position $i$; the low region grows by one correct element, the high
+region shifts right by one, and advancing $j$ restores the frame.
+(If the high region was empty, the swap exchanges $A[j]$ with itself.)
+
+**Termination.** The loop ends with $j = r$: every element except the
+pivot is in the low or high region. The final swap moves the pivot
+between them, to position $i+1$, and every element left of it is
+$\le x$, every element right of it is $> x$. Each of the $n-1$ loop
+iterations does one comparison and $O(1)$ work: $\Theta(n)$. $\blacksquare$
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="lomuto"
+  alt="Nine frames of Lomuto partition on 5 2 7 1 6 3 8 4 with pivot 4: each frame scans one element, growing the low or high region, with one swap per admitted low element; the final frame places the pivot between the regions"
+  caption="Partition of the running example, pivot 4: one scanned element per frame, one swap per admitted low element, pivot placed last."
+/>
+
+<Task>
+Before stepping each frame, name which of the two maintenance cases the
+next scanned element triggers, and predict the swap; the scan should end
+at 7 comparisons and 3 swaps before the final pivot swap.
+</Task>
+
+### The whole sort on the same eight elements
+
+<Example title="quicksort of the running example, comparisons counted">
+Every call is listed with its subarray, its pivot (the last element),
+the subarray after partitioning, the returned index, and the
+comparisons spent.
+
+| call on | pivot | after partition | $q$ | comparisons |
+|---|---|---|---|---|
+| $[5\,2\,7\,1\,6\,3\,8\,4]$ | 4 | $[2\,1\,3\,\mathbf{4}\,6\,7\,8\,5]$ | 4 | 7 |
+| $[2\,1\,3]$ | 3 | $[2\,1\,\mathbf{3}]$ | 3 | 2 |
+| $[2\,1]$ | 1 | $[\mathbf{1}\,2]$ | 1 | 1 |
+| $[6\,7\,8\,5]$ | 5 | $[\mathbf{5}\,7\,8\,6]$ | 5 | 3 |
+| $[7\,8\,6]$ | 6 | $[\mathbf{6}\,8\,7]$ | 6 | 2 |
+| $[8\,7]$ | 7 | $[\mathbf{7}\,8]$ | 7 | 1 |
+
+Total: $7 + 2 + 1 + 3 + 2 + 1 = 16$ comparisons, output
+$[1\,2\,3\,4\,5\,6\,7\,8]$, and no element ever left the array.
+
+The first pivot, 4, happened to be the
+exact median: a perfect split, the best case. Every later call drew an
+extreme pivot, with worst-case splits of $(2, 0)$, $(0, 1)$, $(0, 3)$,
+$(0, 2)$, $(0, 1)$. The mixture still finished in 16
+comparisons, one *below* merge sort's 17 on the identical input. A
+constant fraction of decent splits is enough to keep the total near
+$n \lg n$; only *consistently* terrible pivots are dangerous, and the
+next section shows the input that supplies them.
+</Example>
+
+<Exercise>
+Run `Partition` once on $[\,2, 8, 7, 1, 3, 5, 6, 4\,]$ (pivot 4).
+Write your predicted final array and returned index before tracing;
+then trace, reporting the array after each swap and the total number of
+swaps.
+
+<Solution>
+Strategy hint: track only $i$ and the swaps; elements $> 4$ never move
+until a low element arrives to displace them.
+
+$x = 4$, $i = 0$. $j=1$: $2 \le 4$, $i=1$, swap $A[1] \leftrightarrow
+A[1]$ (self), giving $[2\,8\,7\,1\,3\,5\,6\,4]$. $j=2$: $8 > 4$. $j=3$:
+$7 > 4$. $j=4$: $1 \le 4$, $i=2$, swap $A[2] \leftrightarrow A[4]$,
+giving $[2\,1\,7\,8\,3\,5\,6\,4]$. $j=5$: $3 \le 4$, $i=3$, swap
+$A[3] \leftrightarrow A[5]$, giving $[2\,1\,3\,8\,7\,5\,6\,4]$. $j=6$:
+$5 > 4$. $j=7$: $6 > 4$. Final swap $A[4] \leftrightarrow A[8]$:
+$$
+[\,2,\ 1,\ 3,\ \mathbf{4},\ 7,\ 5,\ 6,\ 8\,], \qquad q = 4.
+$$
+Four swaps (one a self-swap), 7 comparisons, and the two sides
+$[2\,1\,3]$ and $[7\,5\,6]$ are ready for their recursive calls. This is
+the array of CLRS Figure 7.1, so the trace can be checked frame by frame
+against the textbook.
+</Solution>
+</Exercise>
+
+## The pivot decides the recurrence: n log n against n²
+
+Partition costs $\Theta(n)$ whatever happens; what the pivot controls is
+the *sizes* of the two recursive calls, and through them, which
+recurrence the algorithm obeys.
+
+**A median pivot every time.** Both sides have size about $n/2$:
+$T(n) = 2T(n/2) + \Theta(n)$, merge sort's recurrence, $\Theta(n \lg n)$
+by the same Master-theorem computation.
+
+**An extreme pivot every time.** One side has size $n-1$, the other is
+empty: $T(n) = T(n-1) + \Theta(n)$, the subtractive shape
+<Ref lesson="recurrences-and-master-theorem">the recurrences lesson</Ref>
+excluded from the Master theorem and solved by direct summation. The
+"tree" is a path; carrying the sum with the comparison counts:
+
+$$
+(n-1) + (n-2) + \cdots + 1 = \frac{n(n-1)}{2} = \Theta(n^2).
+$$
+
+At $n = 8$ that is $28$ comparisons, against merge sort's worst case of
+$17$; at $n = 10^6$ it is the difference between about $2 \times 10^7$
+comparisons and $5 \times 10^{11}$: on the
+<Ref lesson="asymptotic-notation">wall-clock ladder</Ref>, the gap
+between a blink and minutes.
+
+<Figure
+  src="./figures/split-trees.svg"
+  alt="Two recursion trees side by side: a balanced tree of depth lg n with per-level cost n totaling order n log n, and a left spine of depth n with costs n, n minus 1, and so on, totaling order n squared"
+  caption="The two recurrences as trees: balanced splits give lg n levels of cn; repeated extreme splits give a spine whose level costs form an arithmetic series."
+/>
+
+### Which inputs supply the bad pivots
+
+It is commonly said, and false as stated, that **quicksort is an
+$O(n \log n)$ algorithm**. The claim fails on the most innocent input
+there is. Feed `QuickSort` an already-sorted array with the last-element
+pivot: the pivot is the maximum, every other element goes to the low
+region, and the split is $(n-1, 0)$. Worse, the surviving subarray
+$A[1..n-1]$ is *still sorted*, so the same extreme split happens again,
+and again, all the way down: sorted input drives exactly the
+$T(n) = T(n-1) + \Theta(n) = \Theta(n^2)$ recurrence, with $28$
+comparisons on $[\,1, 2, \ldots, 8\,]$ where merge sort spent $12$. A
+reverse-sorted array does the same with the roles of the regions
+swapped, and a first-element pivot fails on the same two inputs.
+
+The correct statement splits the quantifier: quicksort's **worst case is
+$\Theta(n^2)$**, and its $\Theta(n \lg n)$ behavior is a statement about
+*typical* pivots, made precise in the next section. The distinction is
+not pedantry, because sorted and nearly-sorted arrays are not adversarial
+exotica: they are what a log file, an export from an indexed table, or a
+re-sorted report actually looks like. A production version of exactly
+this failure (a Unix `qsort` grinding for hours on structured input)
+opens the last section of this lesson.
+
+<KeyFact>
+Quicksort's quadratic case is triggered by *sorted input* under a
+fixed-end pivot: the commonest structured input in practice, not a
+pathological one. Any fixed, deterministic pivot rule has some input
+family that replays the extreme split all the way down (an exercise
+below constructs one for smarter rules than the fixed end).
+</KeyFact>
+
+### A constant-fraction split is enough
+
+The escape hatch is that the split does not need to be even: it needs
+only to be a *constant fraction*. A pivot that always lands somewhere in
+the middle half of the sorted order (rank between $n/4$ and $3n/4$)
+yields at worst $T(n) = T(n/4) + T(3n/4) + \Theta(n)$: the lopsided-tree
+shape solved in
+<Ref lesson="recurrences-and-master-theorem">the recurrences lesson</Ref>
+for the $1/3$–$2/3$ split. Complete levels still total $cn$, the depth is
+$\log_{4/3} n = \Theta(\lg n)$, and the answer is $\Theta(n \lg n)$ with
+a larger constant (an exercise below carries the computation). Even a
+9-to-1 split every single time stays $\Theta(n \lg n)$. Bad splits cost
+the algorithm only when they recur at *every* level, which is precisely
+what a fixed pivot rule on its bad input arranges, and what a random one
+makes vanishingly unlikely.
+
+<Task>
+In the demo, load the sorted preset and run both algorithms with the
+fixed-end pivot: quicksort's comparison counter should land on
+$n(n-1)/2 = 45$ for $n = 10$ while merge sort stays under 25. Then build
+a 10-element input of your own that pushes quicksort to the same 45, and
+confirm merge sort's count on it barely moves.
+</Task>
+
+<Demo
+  name="SortRaceComparator"
+  caption="Merge sort and quicksort stepped side by side on one input, with comparison and swap counters. Presets: random, sorted, reverse-sorted."
+/>
+
+## Randomized pivots: an expected guarantee for every input
+
+The worst case cannot be legislated away (some pivot sequence is always
+bad), but *which inputs* trigger it can be. Replace the fixed rule by a
+coin flip: choose the pivot uniformly at random from the subarray, swap
+it into the last slot, and run `Partition` unchanged. Now the split
+sizes depend on the algorithm's own random choices, not on the input,
+and no input an adversary submits is bad *in advance*.
+
+The reason this works is the constant-fraction argument just made. A
+uniformly random pivot lands in the middle half of its subarray with
+probability exactly $1/2$, since half of all ranks lie between $n/4$ and
+$3n/4$. A middle-half pivot shrinks the larger side to at most $3/4$ of
+the subarray, and a subarray can shrink by $3/4$ only
+$\log_{4/3} n$ times before reaching size 1. So on any root-to-leaf path
+of the recursion, the expected number of levels is about twice
+$\log_{4/3} n$ (one useful split per two tries), which is
+$\Theta(\lg n)$, and each level of the recursion costs $\Theta(n)$
+across all its subarrays. That is the shape of the argument; the exact
+statement is the following theorem, which the starred section below
+proves with a counting argument that also delivers the constant.
+
+<Theorem title="expected time of randomized quicksort (CLRS Theorem 7.4)">
+On any input of $n$ distinct elements, quicksort with uniformly random
+pivots runs in $O(n \lg n)$ expected time.
+</Theorem>
+
+The hypothesis "distinct" is doing real work; an exercise below pushes
+on it. The constant is exact as well: the expected number of
+comparisons is $2n \ln n + O(n) \approx 1.39\,n \lg n$.
+Randomized quicksort therefore expects about **39% more comparisons**
+than merge sort's worst case, and still wins wall-clock races on
+arrays, because it moves far less data: no buffer, no copy-back, and
+sequential scans that read memory in the pattern
+<Ref lesson="arrays-and-linked-lists">the cache rewards</Ref>. An
+equivalent implementation, used by Sedgewick's library code, shuffles
+the whole array once up front and then runs the fixed-rule version: one
+random pass buys the same distribution over splits.
+
+<KeyFact>
+Randomization changes what the quantifier ranges over. Deterministic
+quicksort has bad *inputs*: sorted arrays force $\Theta(n^2)$ every
+run. Randomized quicksort has only bad *coin flips*: for every input,
+the expected cost is about $1.39\,n\lg n$ comparisons, and the quadratic
+outcome survives only as a lottery loss, not as a case the workload can
+keep hitting.
+</KeyFact>
+
+<Aside>
+The guarantee is only as good as the coins. In the late 1990s the online
+card room Planet Poker published its shuffling algorithm as evidence of
+fairness: a swap-based shuffle seeded with the milliseconds since
+midnight from a 32-bit generator. A day has 86.4 million milliseconds,
+so at most 86.4 million of the $52! \approx 8 \times 10^{67}$ orderings
+could ever be dealt, and researchers who synchronized their clock with
+the server's could, after seeing five cards, identify the seed and read
+off every card yet to be dealt, live. The moral transfers to sorting
+verbatim: a "random" pivot drawn from a predictable generator hands the
+adversary back the deterministic algorithm, the same failure mode as the
+seeded hash functions of <Ref lesson="hash-tables">the hash-table
+lesson's</Ref> flooding attack. Expected-case guarantees consume real
+unpredictability.
+</Aside>
+
+## ★ Expected comparisons, counted pair by pair
+
+The middle-half argument bounds the *depth* of the recursion, but it
+neither proves the theorem nor produces the $1.39$. Counting a
+different way — pair by pair instead of level by level — does both, and
+needs two probability facts, each one sentence long.
+
+An *indicator variable* for an event is the random variable equal to
+$1$ when the event happens and $0$ when it does not; its expectation
+equals the event's probability, since
+$\mathrm{E}[X] = 1 \cdot \Pr[\text{event}] + 0 \cdot \Pr[\text{not}]$.
+*Linearity of expectation* says
+$\mathrm{E}[X + Y] = \mathrm{E}[X] + \mathrm{E}[Y]$ for any random
+variables, dependent or not — the accounting
+<Ref lesson="hash-tables">the hash-table lesson</Ref> used to price an
+expected chain length. Together they turn "the expected number of events
+that happen" into "the sum of the events' probabilities."
+
+### Which pairs get compared
+
+Write the input's values in increasing order as
+$z_1 < z_2 < \cdots < z_n$ — the theorem's distinctness hypothesis at
+work. Two structural facts pin down where comparisons can occur. Every
+comparison quicksort makes is between the current call's pivot and
+another element of its subarray: the scan tests $A[j] \le x$ and
+nothing else. And once a call returns, its pivot sits in its final
+position and is never compared again. So each pair $z_i, z_j$ is
+compared at most once in the whole run, and the total comparison count
+is the random variable
+
+$$
+X = \sum_{i=1}^{n-1} \sum_{j=i+1}^{n} X_{ij},
+\qquad X_{ij} = \text{indicator of "} z_i \text{ is ever compared to } z_j\text{"}.
+$$
+
+Linearity turns $\mathrm{E}[X]$ into a sum of $\binom{n}{2}$
+probabilities, one per pair, however entangled the pairs are.
+
+The probabilities differ wildly by pair. Adjacent ranks are *always*
+compared: no key lies strictly between $z_4$ and $z_5$, so no pivot can
+ever send them to different subarrays — they stay together until one of
+them becomes a pivot and is compared to the other. The extremes $z_1$
+and $z_n$ are almost never compared: that requires the run's very first
+pivot to be the minimum or the maximum, probability $2/n$. The general
+rule interpolates between these two cases.
+
+<Figure
+  src="./figures/pair-compare.svg"
+  alt="The keys 3, 4, 5, 6 shown as one block with 3 and 6 highlighted; choosing 3 or 6 as the block's first pivot compares the pair, while choosing 4 or 5 separates 3 and 6 into different subarrays forever"
+  caption="Keys 3 and 6 of the running example travel together with 4 and 5 until one of the four is first drawn as a pivot: two of the four equally likely draws compare the pair, the other two separate it for good."
+/>
+
+<Theorem title="comparison probability (CLRS §7.4.2)">
+For $i < j$, randomized quicksort compares $z_i$ and $z_j$ with
+probability exactly $\dfrac{2}{j - i + 1}$.
+
+<Proof>
+Consider the set $Z_{ij} = \{z_i, z_{i+1}, \ldots, z_j\}$ of
+$j - i + 1$ consecutive ranks. A pivot smaller than $z_i$ or larger
+than $z_j$ sends all of $Z_{ij}$ into the same recursive call, so the
+set travels through the recursion intact until some call first draws
+its pivot *from* $Z_{ij}$ — which must eventually happen, since
+recursion stops only at subarrays of size at most one. At that first
+moment the pivot is uniform over its subarray, and conditioned on
+falling in $Z_{ij}$ it is uniform over the set's $j - i + 1$ elements.
+If the draw is $z_i$ or $z_j$ — $2$ of the $j - i + 1$ equally likely
+outcomes — the pivot is compared against every element of its subarray,
+the other end of the pair included: the pair is compared. If the draw
+is any interior element $z_k$ with $i < k < j$, the partition sends
+$z_i$ to the low side and $z_j$ to the high side, and no later
+comparison can involve both. Hence
+$\Pr[X_{ij} = 1] = 2/(j - i + 1)$. $\blacksquare$
+</Proof>
+</Theorem>
+
+<Example title="the expected count at n = 8">
+Group the pairs by their rank gap $g = j - i$: there are $8 - g$ pairs
+at gap $g$, each compared with probability $2/(g+1)$. So
+
+$$
+\mathrm{E}[X] = \sum_{g=1}^{7} (8 - g)\,\frac{2}{g+1}
+= 2\left(\tfrac{7}{2} + \tfrac{6}{3} + \tfrac{5}{4} + \tfrac{4}{5}
+       + \tfrac{3}{6} + \tfrac{2}{7} + \tfrac{1}{8}\right)
+\approx 16.9.
+$$
+
+Randomized quicksort on 8 distinct keys expects about $16.9$
+comparisons — just under merge sort's worst case of $17$, and the
+running example's deterministic trace, at $16$, ran a shade luckier
+than average.
+</Example>
+
+### The harmonic sum
+
+The same grouping at general $n$, using $n - g = (n+1) - (g+1)$,
+collapses to a closed form:
+
+$$
+\mathrm{E}[X] = \sum_{g=1}^{n-1} (n - g)\,\frac{2}{g+1}
+= 2(n+1)\sum_{g=1}^{n-1}\frac{1}{g+1} - 2(n-1)
+= 2(n+1)H_n - 4n,
+$$
+
+where $H_n = 1 + \tfrac12 + \cdots + \tfrac1n$ is the $n$-th *harmonic
+number* (at $n = 8$: $2 \cdot 9 \cdot H_8 - 32 \approx 16.9$, matching
+the example). Comparing the sum with the area under the curve $1/x$
+gives $\ln n < H_n \le \ln n + 1$, so
+
+$$
+\mathrm{E}[X] = 2n \ln n + O(n)
+= (2\ln 2)\, n \lg n + O(n) \approx 1.39\, n \lg n:
+$$
+
+the constant quoted in the section above, now computed rather than
+imported. Theorem 7.4 follows: each `Partition` call does constant work
+per comparison plus constant overhead, and the whole run makes $O(n)$
+calls (each call retires one pivot), so the expected running time is
+$O(n + \mathrm{E}[X]) = O(n \lg n)$ on every input of distinct keys.
+
+<KeyFact>
+Nothing about the input entered the count except distinctness: every
+input order has the same expected cost, $2(n+1)H_n - 4n \approx
+1.39\,n\lg n$ comparisons. The $n \lg n$ shape is no artifact of this
+analysis — the next lesson proves no comparison sort can guarantee
+fewer than $\lg(n!) \approx n \lg n$ comparisons.
+</KeyFact>
+
+## In place against stable: the standing trade
+
+With both algorithms priced, the remaining differences are two
+properties that recur through the rest of the module, each possessed by
+exactly one of the pair.
+
+**Space.** Quicksort sorts *in place*: partitioning swaps elements
+inside the array, and beyond the recursion stack the algorithm needs
+$O(1)$ extra memory. The stack itself is $\Theta(\lg n)$ expected depth
+with random pivots, and even its $\Theta(n)$ worst case is avoidable:
+recurse into the smaller side first and loop on the larger, and the
+stack never exceeds $\Theta(\lg n)$. Merge sort on arrays is not in
+place: the merge's $\Theta(n)$ buffer is structural, not an
+implementation wart (in-place merging exists but is slow and intricate
+enough that no mainstream library uses it).
+
+<Definition title="stable sort">
+A sorting algorithm is **stable** if elements with equal keys appear in
+the output in the same relative order they held in the input.
+</Definition>
+
+**Stability.** Merge sort is stable, provided the merge takes from the
+left half on ties, which is exactly what the $\le$ in the pseudocode
+arranges, and the only place stability is decided. Quicksort is not:
+partition swaps elements across long distances (in the running
+example's partition, the swap at $j = 6$ carried $7$ from position 3 to
+position 6 in one move), and with equal keys the same long jumps
+reorder them.
+Stability matters whenever data is sorted more than once: sort
+transaction records
+by time, then stably by city, and each city's block keeps its internal
+time order: the second sort refines the first instead of scrambling it.
+An unstable second sort destroys the first's work, an error an exercise
+below diagnoses in a "simplified" merge.
+
+**Duplicate keys.** On an array of $n$ *equal*
+elements, Lomuto partition produces the extreme split every time
+(every element passes $A[j] \le x$), so the run costs $\Theta(n^2)$,
+and randomization cannot help, since all pivot choices are identical.
+The repair is *three-way partitioning* (Dijkstra's Dutch-national-flag
+scheme): maintain three regions, less, equal, and greater, and recurse
+only on the outer two. Equal keys collect in the middle band, are never
+recursed on, and an all-equal array finishes in one $\Theta(n)$ pass.
+Sort keys drawn from few distinct values (ages, statuses, zip codes) are
+common enough that production quicksorts carry this refinement, as the
+next section records.
+
+| | merge sort | quicksort (randomized) |
+|---|---|---|
+| comparisons | $\le n\lg n$, every input | $\approx 1.39\,n \lg n$ expected; $\Theta(n^2)$ worst |
+| extra space | $\Theta(n)$ buffer | $\Theta(\lg n)$ stack |
+| stable | yes, via left-first ties | no |
+| data movement | copies all $n$ per level | swaps, in place |
+
+## Engineering a library sort
+
+Given the table, one would expect the guaranteed algorithm to be every
+library's default. The record shows the opposite: system sorts for
+primitive arrays have centered on quicksort for fifty years, and the
+history of one of them shows both why and what it costs to make the
+choice safe.
+
+### The organ-pipe incident: the worst case in production
+
+In the summer of 1991, Allan Wilks and Rick Becker at AT&T Bell Labs ran
+a `qsort` job that should have taken minutes; it burned hours of CPU
+before they killed it, and by their reconstruction it "would have gone on
+for weeks." The cause, reported in Bentley and McIlroy's
+["Engineering a Sort Function"](https://onlinelibrary.wiley.com/doi/10.1002/spe.4380231105)
+(1993): the Seventh Edition Unix `qsort` their system inherited took
+$n^2$ comparisons on *organ-pipe* arrays, patterns like
+$1, 2, \ldots, n, n, \ldots, 2, 1$ that rise and fall like pipes on an
+organ, exactly the structured near-sortedness this lesson's worst-case
+section predicts. Shopping for a replacement, Bentley and McIlroy found
+that the 1983 BSD `qsort` went quadratic on arrays of random zeros and
+ones (the duplicate-keys failure), and that among a dozen Unix
+libraries, *every* `qsort` in circulation could be driven quadratic.
+
+Their replacement is the direct sum of this lesson's repairs: an
+estimated-median pivot (median of three elements, or on large arrays
+the "ninther", a median of three such medians), three-way partitioning
+for duplicate keys, and insertion sort below a small cutoff, the same
+base-case tuning read on Timsort in
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson</Ref>. The result ran about twice as fast as the sorts it
+replaced and became the model C library `qsort`. One caveat survived it:
+a deterministic pivot rule, however clever, still has quadratic inputs,
+and McIlroy himself later published a program that manufactures them
+against any such `qsort`. The categorical fix is different: *introsort*
+(Musser, 1997), the algorithm inside C++ `std::sort`, runs quicksort
+while counting recursion depth and, if the depth ever exceeds $2\lg n$
+(the signature of repeated bad splits), switches to a different in-place
+$\Theta(n \lg n)$ algorithm: *heapsort*, the subject of
+<Ref lesson="heapsort-and-the-sorting-lower-bound">the next
+lesson</Ref>.
+
+### Dual-pivot quicksort: the current incumbent
+
+The engineering has not stopped. In September 2009 Vladimir Yaroslavskiy
+posted to the development mailing list of OpenJDK (the open-source
+implementation of Java, whose library changes are reviewed in public) a
+quicksort with *two* pivots: one linear scan splits the subarray into
+keys below $p_1$, keys between the two pivots, and keys above $p_2$,
+and three recursive calls replace two. His benchmarks beat the JDK's
+incumbent Bentley–McIlroy implementation; the maintainers tested and
+tuned the code in the same public thread, and six weeks after the first
+message the replacement shipped. Every `Arrays.sort` on a primitive
+array since Java 7 runs Yaroslavskiy's algorithm.
+
+<Figure
+  src="./figures/dualpivot-regions.svg"
+  alt="An array after dual-pivot partitioning: a low region of keys below the first pivot, the first pivot, a middle region of keys between the pivots, the second pivot, and a high region of keys above the second pivot, with recursive calls marked under the three regions"
+  caption="Dual-pivot partition: one Θ(n) scan around two pivots leaves three parts; each part is sorted by a recursive call, and both pivots are already in final position."
+/>
+
+The same Java release draws the lesson's final line for it. For arrays
+of *objects*, `Arrays.sort` does not use quicksort at all: it uses
+Timsort, the adaptive merge sort already priced in
+<Ref lesson="recurrences-and-master-theorem">the recurrences
+lesson</Ref>, because the API promises a stable sort for objects, and no
+quicksort variant can keep that promise. For primitives, two equal
+`int`s are indistinguishable, stability is unobservable, and the faster
+in-place unstable algorithm wins. The in-place/stable trade of the
+previous section is not a textbook abstraction; it is the documented
+reason one method dispatches to two different algorithms.
+
+What is established: divide-and-conquer named, with the work in the
+combine (merge sort) or the divide (quicksort); merge, with its loop
+invariant, costing $\Theta(n)$ time and $n-1$ comparisons; merge sort at
+$\Theta(n \lg n)$ on every input, stable, with a $\Theta(n)$ buffer;
+Lomuto partition, with its four-region invariant; quicksort at
+$\Theta(n^2)$ in the worst case (reached on sorted input under fixed
+pivots) and $O(n \lg n)$ expected, about $1.39\,n\lg n$ comparisons,
+under random pivots; and the trades that make real libraries carry both
+families. Both algorithms hover at $n \lg n$ comparisons, and neither
+this lesson nor any amount of pivot engineering gets below it.
+<Ref lesson="heapsort-and-the-sorting-lower-bound">The next lesson</Ref>
+proves that no comparison sort can, by counting decision-tree leaves
+(an argument one exercise below walks to the doorstep), and adds
+heapsort, the in-place worst-case-$\Theta(n \lg n)$ sort that introsort
+falls back on. The partition procedure itself returns in
+<Ref lesson="binary-search-and-order-statistics">quickselect</Ref>,
+which recurses into only one side.
+
+## Exercises
+
+<Exercise>
+The letters of `SORTABLE`, that is $[\,S, O, R, T, A, B, L, E\,]$, are sorted
+in alphabetical order by both algorithms. (a) For merge sort: give the
+two sorted halves just before the final merge, then count that merge's
+comparisons and the whole run's total. (b) For quicksort with the
+last-element pivot: give the array after the first partition, the
+pivot's final index, and the sizes of the two recursive calls.
+
+<Solution>
+**(a)** The halves $[S\,O\,R\,T]$ and $[A\,B\,L\,E]$ sort to
+$[O\,R\,S\,T]$ and $[A\,B\,E\,L]$. Left half: $[S][O] \to [O\,S]$ (1),
+$[R][T] \to [R\,T]$ (1), merge with comparisons $O{:}R$, $S{:}R$,
+$S{:}T$ (3) $\to [O\,R\,S\,T]$. Right half: $[A][B] \to [A\,B]$ (1),
+$[L][E] \to [E\,L]$ (1), merge with $A{:}E$, $B{:}E$ (2, left empties)
+$\to [A\,B\,E\,L]$. Final merge: $O{:}A$, $O{:}B$, $O{:}E$, $O{:}L$
+(4 comparisons, right half empties), then $O\,R\,S\,T$ copied free:
+$[A\,B\,E\,L\,O\,R\,S\,T]$. Totals: level sums $4 + 5 + 4 = 13$
+comparisons, between the best case 12 and worst case 17, as a partly
+ordered input should be.
+
+**(b)** Pivot $x = E$, $i = 0$. Only $A$ (at $j=5$) and $B$ (at $j=6$)
+pass the $\le E$ test. $j=5$ swaps $A[1]{=}S$ with $A[5]{=}A$:
+$[A\,O\,R\,T\,S\,B\,L\,E]$; $j=6$ swaps $A[2]{=}O$ with $A[6]{=}B$:
+$[A\,B\,R\,T\,S\,O\,L\,E]$. The final swap puts the pivot at
+position 3:
+$$
+[\,A,\ B,\ \mathbf{E},\ T,\ S,\ O,\ L,\ R\,], \qquad q = 3,
+$$
+with recursive calls of sizes 2 and 5: a $(2,5)$ split from a pivot
+drawn near the low end of the alphabet, neither balanced nor extreme.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push on the boundary the expected-time theorem excludes: an array of $n$
+*equal* keys. (a) Determine the split Lomuto partition produces and the
+resulting total running time, with or without random pivots. (b) Name
+the hypothesis of the theorem (CLRS 7.4) that this input violates.
+(c) Explain why three-way partitioning finishes this input in
+$\Theta(n)$, and state the general cost claim it restores when keys
+repeat.
+
+<Solution>
+**(a)** Every scanned element satisfies $A[j] \le x$, so $i$ advances
+every iteration and ends at $r - 1$: the pivot "returns" to the last
+position and the split is $(n-1,\ 0)$, the extreme split, on *every*
+call, giving $T(n) = T(n-1) + \Theta(n) = \Theta(n^2)$. Randomizing the
+pivot changes nothing: all choices are the same key, so the coin flip
+buys no information. This is the one worst case randomization cannot
+dissolve.
+
+**(b)** Distinctness. The theorem quantifies over inputs of $n$
+*distinct* elements; equal keys void it, and this exercise is why the
+hypothesis is stated rather than decorative.
+
+**(c)** Three-way partition grows a middle "equal" band; on an all-equal
+array the first call's band swallows everything, both outer recursions
+are empty, and the run is one $\Theta(n)$ pass. In general the equal
+band of every pivot is excluded from all further recursion, so the cost
+becomes $O(n \lg d)$-flavored, with $d$ the number of *distinct* keys
+doing the work rather than $n$; on few-valued data (ages, flags, zip
+codes), closer to linear than to $n \lg n$. The move to remember: when a
+theorem's hypothesis names a property (distinctness), the property is a
+boundary, and workloads that cross it need the variant algorithm.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Choosing the *middle* element $A[\lfloor (p+r)/2
+\rfloor]$ as the pivot fixes quicksort: sorted input now splits
+perfectly, so the worst case becomes $\Theta(n \log n)$, and
+median-of-three (first, middle, last) is safer still." Identify the
+faulty step, and show the conclusion is false for both rules.
+
+<Solution>
+The faulty step is a quantifier swap. "Sorted input splits perfectly" is
+true, but the worst case is a maximum over *all* inputs; repairing one
+input family only moves the maximum elsewhere.
+
+**Middle element.** Read the rule as: swap $A[\lfloor (p+r)/2 \rfloor]$
+into the last slot, then run `Partition` unchanged — the same convention
+the lesson used for random pivots. The rule inspects one fixed position,
+so an adversary controls what it sees at every level; concretely, the
+7-element array
+$$
+[\,2,\ 4,\ 6,\ 7,\ 1,\ 5,\ 3\,]
+$$
+puts the maximum of every surviving subarray exactly where the rule
+looks. The first call's middle slot (the 4th of 7) holds $7$, the
+maximum, so every scanned element passes the $\le 7$ test, the split is
+$(6, 0)$ — and since a maximum pivot makes every scan swap a self-swap,
+the surviving prefix keeps its order: $[2, 4, 6, 3, 1, 5]$ (the $3$
+arrived in the middle-to-last swap). The pattern replays:
+$[2, 4, 6, 3, 1, 5]$ has its maximum $6$ in the middle slot (position
+3), split $(5, 0)$, leaving $[2, 4, 5, 3, 1]$; then $5$ at position 3,
+split $(4, 0)$, leaving $[2, 4, 1, 3]$; then $4$ at position 2, split
+$(3, 0)$, leaving $[2, 3, 1]$; then $3$ at position 2, split $(2, 0)$,
+leaving $[2, 1]$; then $2$ at position 1, split $(1, 0)$. Six extreme
+splits, $6 + 5 + 4 + 3 + 2 + 1 = 21 = n(n-1)/2$ comparisons: the
+recurrence is $T(n) = T(n-1) + \Theta(n) = \Theta(n^2)$, on an input
+that is nowhere near sorted. (The array is found by unwinding: list the
+surviving prefixes from short to long and write each new maximum into
+the slot the rule will inspect next.)
+
+**Median of three.** The pivot can still be the
+second-smallest element of its subarray (the three sampled positions can
+hold, say, the smallest, second-smallest, and largest values), so splits
+of $(1, n-3)$ can recur: $T(n) = T(n-2) + \Theta(n) = \Theta(n^2)$.
+Both constructions are systematized by M. D. McIlroy's "A Killer
+Adversary for Quicksort" (*Software—Practice and Experience*, 1999),
+which manufactures a quadratic input against *any* quicksort whose pivot
+choices are deterministic functions of the comparisons it has made.
+What deterministic sampling cannot do, the depth switch (introsort) or
+the coin flip (randomization) can: the first caps the damage at
+$2 \lg n$ levels, the second makes the bad sequence an event with
+probability vanishing in $n$ rather than an input the workload can
+resubmit.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson claimed that a pivot always landing in the middle half keeps
+quicksort at $\Theta(n \lg n)$. Prove it: solve
+$T(n) \le T(n/4) + T(3n/4) + cn$ by the recursion-tree argument, giving
+the level totals, the depth, the resulting upper bound with its
+constant, and the matching lower bound.
+
+<Solution>
+This is the lopsided tree of the recurrences lesson with the $1/3$–$2/3$
+split replaced by $1/4$–$3/4$. **Level totals:** as long as a level is
+complete, its subarrays partition the input, so the sizes on any level
+sum to at most $n$ and the level costs at most $cn$. **Depth:** the
+slowest-shrinking path multiplies sizes by $3/4$ per level and reaches
+size 1 after $\log_{4/3} n$ levels; the fastest, by $1/4$, after
+$\log_4 n$ levels. **Upper bound:** at most $cn$ per level times
+$\log_{4/3} n$ levels:
+$$
+T(n) \le cn \log_{4/3} n = \frac{c}{\lg (4/3)}\, n \lg n
+\approx 2.41\, c\, n \lg n = O(n \lg n).
+$$
+**Lower bound:** the top $\log_4 n$ levels are complete and cost
+exactly $cn$ each (every element is in some subarray), so
+$T(n) \ge cn \log_4 n = \Omega(n \lg n)$. Hence
+$T(n) = \Theta(n \lg n)$: the imbalance moved the constant from
+$1$ (perfect splits) to at most $\approx 2.41$, and the class not at
+all. The transferable move is the one the recurrences lesson taught:
+any split into constant fractions gives complete levels of total $cn$
+and $\Theta(\lg n)$ depth, so only the constant depends on the
+fractions.
+</Solution>
+</Exercise>
+
+<Exercise>
+Merge sort is also the sorting algorithm of choice for *linked lists*,
+and the reasons revisit
+<Ref lesson="arrays-and-linked-lists">the arrays-and-lists trade</Ref>.
+For a singly linked list: (a) explain how to merge two sorted lists by
+pointer splicing, and give the time and extra-space costs; (b) explain
+what replaces `MergeSort`'s $O(1)$ index computation $m = \lfloor n/2
+\rfloor$ for the split, and why the extra cost does not change the
+total; (c) judge which of quicksort's advantages over merge sort
+survive on a linked list.
+
+<Solution>
+**(a)** Walk the two lists with one pointer each; at each step, unlink
+the node with the smaller head key (taking the *left* list's node on
+ties, for stability) and append it to the output list's tail. Every
+node is examined and relinked once: $\Theta(n)$ time and $\Theta(1)$
+extra space, because nodes are *relinked*, not copied. The $\Theta(n)$
+buffer that merge sort needs on arrays was the cost of moving values
+between fixed cells; a list's values never move, only its pointers do.
+
+**(b)** A list has no index arithmetic, so the midpoint is found by
+walking: either advance two pointers, one by one node and one by two
+(the slow pointer stops at the middle), or count length once at the
+start. Either way the split costs $\Theta(n)$ instead of $O(1)$, but
+the merge at the same level already costs $\Theta(n)$, so the driving
+function stays $\Theta(n)$ and the recurrence, and its
+$\Theta(n \lg n)$ solution, are unchanged.
+
+**(c)** Essentially none. In-place: merge sort on lists is already
+$\Theta(1)$-extra-space, so quicksort's headline advantage is void.
+Cache-friendly scans: a list is pointer-chased memory, so neither
+algorithm gets the array's locality, and partition's swap-based inner
+loop has no cheap equivalent on singly linked nodes. What survives is
+nothing quicksort needs credit for, which is why C++
+`std::list::sort`, the standard's dedicated list sort, is specified
+stable and implemented as a splice-based merge sort.
+The decision procedure is the lesson's trade table evaluated against
+the structure's costs, exactly as the arrays-and-lists scoreboard
+prescribed.
+</Solution>
+</Exercise>
+
+<Exercise>
+A teammate "simplifies" the merge's third test from $A[i] \le A[j]$ to
+$A[i] < A[j]$, reasoning that skipping ties saves nothing but changes
+nothing. Every sortedness test still passes. Diagnose the property that
+was lost, demonstrate the loss on the two sorted halves
+$[(1,\mathrm{L_1}),\,(2,\mathrm{L_2})]$ and
+$[(1,\mathrm{R_1}),\,(2,\mathrm{R_2})]$ (records sorted by numeric key,
+tags recording original positions), and name a workload where the
+change produces observably wrong output.
+
+<Solution>
+With $<$, a tie now fails the test and the *right* half's element is
+copied first: the merge is no longer left-first on equal keys, and
+**stability** is lost, invisibly to any test that checks only key
+order. On the given halves: the correct merge ($\le$) compares
+$1_{\mathrm{L_1}} \le 1_{\mathrm{R_1}}$, takes $\mathrm{L_1}$, and
+produces $\mathrm{L_1}, \mathrm{R_1}, \mathrm{L_2}, \mathrm{R_2}$:
+every equal pair in input order (left half preceded right in the
+input). The modified merge compares $1_{\mathrm{L_1}} <
+1_{\mathrm{R_1}}$, which is false, takes $\mathrm{R_1}$ first, and
+produces $\mathrm{R_1}, \mathrm{L_1}, \mathrm{R_2}, \mathrm{L_2}$:
+both equal pairs reversed.
+
+Observable workload: any two-pass sort. Sort records by timestamp, then
+sort by city with the modified merge: within each city, the timestamp
+order is scrambled, so a report that assumes "grouped by city, ordered
+by time within" is silently wrong. This is exactly the property the
+Java library buys by dispatching object sorts to a stable merge sort;
+with the broken merge, that API promise is false while every
+single-sort test stays green. Diagnosis one line: the bug is not in
+what the code computes (a sorted array) but in *which* sorted array,
+and only equal-key data can witness it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Measure how close to unbeatable 17 is. (a) Argue that merge sort's
+worst case
+on $n = 8$ is exactly $4 + 6 + 7 = 17$ comparisons, and check it
+against $n \lg n - n + 1$. (b) A comparison sort's run is determined by
+the sequence of yes/no answers to its comparisons: explain why two
+different input orderings must produce two different answer sequences.
+(c) Count: $8! = 40320$ orderings, and a run of $k$ comparisons has at
+most $2^k$ possible answer sequences. Derive the smallest $k$ not ruled
+out, compare it with $\lg(8!) \approx 15.3$ and with merge sort's 17.
+
+<Solution>
+**(a)** Each merge of two runs of total length $\ell$ costs at most
+$\ell - 1$ comparisons: four 2-way merges cost $4 \times 1$, two 4-way
+merges $2 \times 3$, one 8-way merge $7$, total $17$; the running
+example showed the maximum is attained. And
+$n \lg n - n + 1 = 24 - 8 + 1 = 17$.
+
+**(b)** A comparison sort's every action is dictated by the answers so
+far: which elements it compares next, and where it finally puts
+everything, are functions of the answer sequence alone (that is all a
+comparison sort ever learns). If two different orderings produced the
+same answer sequence, the algorithm would apply the same final
+rearrangement to both; a rearrangement that sorts one ordering leaves
+the other unsorted, so the algorithm would be wrong on one of them.
+
+**(c)** Distinct orderings need distinct answer sequences, so a correct
+algorithm making at most $k$ comparisons on every input needs
+$2^k \ge 40320$. Since $2^{15} = 32768 < 40320 \le 65536 = 2^{16}$,
+every comparison sort has some 8-element input forcing at least
+$\mathbf{16}$ comparisons. The information-theoretic floor is
+$\lg(8!) \approx 15.3$, rounded up to 16; merge sort's 17 sits one
+comparison above the floor, and no cleverness can get below 16. This
+counting argument (runs as leaves of a binary tree of answers, with
+$n!$ leaves forcing depth $\lg(n!) = \Omega(n \lg n)$) is precisely the
+decision-tree lower bound that
+<Ref lesson="heapsort-and-the-sorting-lower-bound">the next lesson</Ref>
+states and proves for all $n$.
+</Solution>
+</Exercise>
+
+<References>
+1. T. H. Cormen, C. E. Leiserson, R. L. Rivest, C. Stein, *Introduction to Algorithms*, 4th ed., MIT Press, 2022 — §2.3: merge sort, the merge procedure and its loop invariant (Fig. 2.3); §7.1: Lomuto partition and the four-region invariant (Figs. 7.1–7.2); §7.2: worst-case, best-case, and the 9-to-1 and alternating-splits intuitions (Figs. 7.4–7.5); §7.3: the randomized version; §7.4: Theorem 7.4 and the indicator-variable analysis of §7.4.2, which the starred section follows.
+2. J. Erickson, *Algorithms*, 2019 — §1.4–1.5: mergesort and quicksort with correctness by induction, the Lomuto partition, and the good-versus-worst pivot recursion trees (Figs. 1.10–1.11) this lesson's split figure recreates. Free online: https://jeffe.cs.illinois.edu/teaching/algorithms/
+3. R. Sedgewick, K. Wayne, *Algorithms*, 4th ed., Addison-Wesley, 2011 — §2.2: mergesort and its practical improvements; §2.3: quicksort, shuffle-then-sort, the $\sim 2N \ln N$ comparison analysis, and three-way partitioning for duplicate keys. Companion lecture slides (algs4.cs.princeton.edu): the organ-pipe and Planet Poker war stories and the dual-pivot paper trail.
+4. P. Morin, *Open Data Structures*, 2013 — §11.1.1–11.1.2: compact statements and proofs, including Theorem 11.1 (merge sort's $n \log n$ comparisons) and Theorem 11.3 (randomized quicksort's $2n \ln n + O(n)$ expected comparisons, equal keys allowed). Free online: https://opendatastructures.org/
+5. C. A. R. Hoare, "Algorithm 64: Quicksort," *Communications of the ACM* 4(7), 1961, p. 321 — the original publication; the companion Algorithm 63 is the partition procedure.
+6. J. L. Bentley, M. D. McIlroy, "Engineering a Sort Function," *Software—Practice and Experience* 23(11), 1993, pp. 1249–1265 — the organ-pipe incident, the survey of quadratic Unix qsorts, and the engineered replacement (ninther pivot, three-way partition, insertion-sort cutoff).
+7. M. D. McIlroy, "A Killer Adversary for Quicksort," *Software—Practice and Experience* 29(4), 1999, pp. 341–344 — the constructive proof that any deterministic-pivot quicksort has quadratic inputs.
+8. D. R. Musser, "Introspective Sorting and Selection Algorithms," *Software—Practice and Experience* 27(8), 1997, pp. 983–993 — introsort: quicksort with a $2\lg n$ depth limit and heapsort fallback, the algorithm inside C++ std::sort.
+9. V. Yaroslavskiy, "Replacement of Quicksort in java.util.Arrays with new Dual-Pivot Quicksort," OpenJDK core-libs-dev mailing list, September 2009 — http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-September/002630.html; the implementing changeset is OpenJDK b05abb410c52 (29 October 2009).
+</References>

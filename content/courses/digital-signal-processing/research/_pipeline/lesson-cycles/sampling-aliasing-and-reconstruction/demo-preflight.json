@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "status": "ready",
+  "lesson": "sampling-aliasing-and-reconstruction",
+  "component": "AliasThresholdLab",
+  "planned_loc": 198,
+  "dependency_count": 0,
+  "d1_objective": "The learner moves the sampling lattice across an occupied band, sees an in-band alias candidate enter or leave while both continuous candidates retain identical sample dots, finds the first phase-safe rate with a practical guard, and constructs the Nyquist-phase counterexample that defeats equality.",
+  "sources": {
+    "agents": "AGENTS.md",
+    "demo_skill": ".claude/skills/demo-builder/SKILL.md and checklist",
+    "pedagogy_and_component_contracts": "docs/pedagogy.md:D1-D5 and docs/components.md",
+    "course_spec": "content/courses/digital-signal-processing/course.yaml:sampling-aliasing-and-reconstruction",
+    "final_brief": "content/courses/digital-signal-processing/research/sampling-aliasing-and-reconstruction.md",
+    "design_contract": "content/courses/digital-signal-processing/research/_pipeline/design/pedagogy-proposal.json:D01-alias-threshold",
+    "ui_and_registry": [
+      "components/ui/Panel.tsx",
+      "components/ui/PresetGroup.tsx",
+      "components/ui/Slider.tsx",
+      "components/ui/Readout.tsx",
+      "components/ui/TargetList.tsx",
+      "components/demos/index.ts",
+      "components/mdx/DemoHost.tsx"
+    ],
+    "next_local_guides": [
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md",
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/01-app/02-guides/lazy-loading.md",
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md",
+      "/home/ubuntu/distillcourse/node_modules/next/dist/docs/03-architecture/accessibility.md"
+    ],
+    "lesson_status": "No lesson.mdx exists at preflight time. The lesson author must place the two-stage threshold-then-boundary task beside the embed without changing this numerical contract."
+  },
+  "targets": {
+    "component_file": "components/demos/digital-signal-processing/AliasThresholdLab.tsx",
+    "registry_file": "components/demos/index.ts",
+    "registry_entry": "AliasThresholdLab: () => import(\"./digital-signal-processing/AliasThresholdLab\"),",
+    "lesson_embed_owned_by_lesson_author": "<Demo name=\"AliasThresholdLab\" caption=\"Find the lowest guarded rate that passes every supplied tone, then return to equality and choose the phase that makes a nonzero tone disappear from the samples.\" />",
+    "preflight_mutations": [
+      "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/sampling-aliasing-and-reconstruction/demo-preflight.json"
+    ]
+  },
+  "implementation_contract": {
+    "export": "default function AliasThresholdLab() with no required props",
+    "client_boundary": "Put use client before imports. Store only sample rate and edge-tone phase with useState; keep deterministic signal math and SVG geometry in the same module, with no effects or browser APIs.",
+    "lazy_loading": "Add only the explicit registry import promise. DemoHost already creates React.lazy components at module scope and owns Suspense; do not add next/dynamic, ssr:false, another Suspense layer, or a variable import path.",
+    "kit": "Panel outer container; two labelled PresetGroups; two Sliders; one TargetList; one Readout. No UI primitive changes are required.",
+    "styling": "Existing Tailwind theme classes and currentColor for axes/text; house amber #e2903a and blue #4c8dd6 plus solid/dashed and filled/hollow cues. No chart package, stylesheet, global CSS, or hard-coded light background.",
+    "network_or_async": false,
+    "dependencies": 0,
+    "component_loc_limit": 200
+  },
+  "signal_and_math": {
+    "declared_band": "Real continuous-time input is known a priori to be bandlimited to |f|<=B, B=4.0 kHz. This prior is essential: samples alone never exclude higher-frequency aliases.",
+    "supplied_mixture": "x(t)=cos(2pi*0.7k*t+20deg)+0.75cos(2pi*1.8k*t-35deg)+0.50cos(2pi*3.1k*t+45deg)+0.35cos(2pi*4.0k*t+phi). Frequencies are kHz, t is ms, and phi is the live edge-tone phase.",
+    "universal_test_bank": "Test each frequency separately at phases 0, 45, and 90 degrees. Per-tone normalization prevents the 0.35 edge component from being hidden by larger lower-frequency components.",
+    "sampling": "T_s=1/f_s ms and x[n]=x(n/f_s). The sample-rate control uses 6.00<=f_s<=10.00 kHz on a 0.25 kHz grid.",
+    "alias_map": "For a tone f, choose signed residue q=f-round(f/f_s)f_s in [-f_s/2,f_s/2], apparent frequency f_a=|q|, and apparent phase phi_a=phi when q>=0 and -phi when q<0.",
+    "sample_equivalent_pair": "For the 4 kHz edge tone and f_s>=4 kHz, x_A(t)=cos(2pi*4t+phi) and x_B(t)=cos(2pi*(f_s-4)t-phi). At t=n/f_s, x_B=cos(2pi*n-2pi*4n/f_s-phi)=x_A for every integer n. Candidate B is admissible only when f_s-4<=B; otherwise the declared bandlimit excludes it.",
+    "ideal_reconstruction_model": "For f<f_s/2, ideal bandlimited reconstruction returns the original tone. For f>f_s/2 it returns the mapped baseband alias. At f=f_s/2, the samples are (-1)^n cos(phi), so the sine quadrature is unobservable; the canonical sample-only reconstruction is cos(phi)cos(2pi*f*t). This is an ideal identifiability test, not a finite-filter simulation.",
+    "error_metric": "For each test tone, compute E=||x_hat-x||_2/max(||x||_2,Number.EPSILON) on M=512 deterministic times t_m=20m/M ms, then E_dB=20log10(E). Display exact-zero results at a -120 dB floor only; compare the unfloored E against 10^-3, equivalent to strictly below -60 dB.",
+    "guard": "Required Nyquist clearance is G=f_s/2-B>=0.50 kHz. This reserves a 0.50 kHz analog transition interval between the occupied edge and Nyquist; it is separate from the ideal reconstruction-error test.",
+    "pass_rule": "PASS iff every frequency/phase case has E<10^-3, every supplied tone is strictly below f_s/2, and G>=0.50 kHz. On the 0.25 kHz rate grid the unique lowest passing setting is f_s=9.00 kHz.",
+    "equality_falsification": "At f_s=8.00 kHz and phi=90 degrees, x_A and x_B are opposite nonzero 4 kHz sinusoids between sample instants, yet both sample to zero. Mark FALSIFIED when the equality rate is selected, sample-pair maximum mismatch is below 1e-12, and their continuous normalized separation exceeds 10^-3. Equality is therefore not a phase-independent reconstruction guarantee.",
+    "scope_guards": [
+      "The -60 dB score is deterministic numerical evidence for the supplied finite test bank, while the replica/nonoverlap argument supplies the theorem-level condition.",
+      "The guard represents room for an analog anti-alias transition and does not claim a realizable filter has been designed.",
+      "No digital filter is offered after an in-band collision because identical samples contain no label identifying which analog candidate generated them."
+    ]
+  },
+  "state_and_interaction": {
+    "stored_state_only": [
+      "sampleRateKhz, initialized to 8.00",
+      "edgePhaseDeg, initialized to 90"
+    ],
+    "derived_only": [
+      "Nyquist frequency, guard clearance, alias mappings, test-bank errors and overall pass",
+      "sample-equivalent edge candidate frequency, sample mismatch, continuous separation and falsification status",
+      "active preset indices or null, waveform points, sample dots, and spectral-lane geometry"
+    ],
+    "initial_state": "Nyquist equality at 8.00 kHz with phi=90 degrees: the 4 kHz input is nonzero between samples but every sample is zero, the canonical reconstruction error is 0 dB, guard is 0 kHz, and the falsification target is visibly met. The demo is alive before interaction.",
+    "rate_presets": [
+      { "label": "Aliased 7.50", "f_s_khz": 7.5, "role": "4.0 kHz folds to 3.5 kHz" },
+      { "label": "Nyquist 8.00", "f_s_khz": 8.0, "role": "phase-dependent equality failure" },
+      { "label": "No guard 8.50", "f_s_khz": 8.5, "role": "ideal recovery passes but 0.25 kHz clearance fails" },
+      { "label": "Guard pass 9.00", "f_s_khz": 9.0, "role": "lowest rate with 0.50 kHz clearance" }
+    ],
+    "phase_presets": [
+      { "label": "Cosine 0deg", "phase_deg": 0, "role": "equality happens to preserve this quadrature" },
+      { "label": "Oblique 45deg", "phase_deg": 45, "role": "partial loss at equality" },
+      { "label": "Sine null 90deg", "phase_deg": 90, "role": "maximal equality failure and exact zero samples" }
+    ],
+    "controls": [
+      "Rate PresetGroup plus sample-rate Slider min 6, max 10, step 0.25 kHz; preset highlight clears after an unmatched rate.",
+      "Boundary-phase PresetGroup plus edge-phase Slider min 0, max 90, step 1 degree; preset highlight clears after an unmatched phase."
+    ],
+    "guided_task": [
+      "Raise or lower f_s and find the smallest setting for which the per-tone -60 dB suite and the 0.50 kHz guard both pass; TargetList recognizes 9.00 kHz.",
+      "Select Nyquist 8.00 and Sine null 90deg. Confirm that both continuous candidates hit the same all-zero dots while separating between samples; TargetList and Readout report FALSIFIED.",
+      "Return to Guard pass 9.00. Candidate B moves to 5.00 kHz, outside the declared 0-4 kHz input band; the visual names the bandlimit and analog anti-alias assumption that makes reconstruction defensible."
+    ],
+    "feedback_budget": "At most 12 test cases times 512 points plus two short SVG curves are recomputed synchronously per input, comfortably below 200 ms without memoization, effects, workers, FFTs, or network access."
+  },
+  "readouts_and_visual": {
+    "targets": [
+      "Lowest guarded rate: current worst E_dB, Nyquist clearance, and required f_s=9.00 kHz.",
+      "Break equality with phase: maximum sample mismatch and between-sample normalized separation."
+    ],
+    "readout_fields": [
+      "f_s, f_s/2, B=4.00 kHz, and clearance G",
+      "apparent frequencies for 0.7, 1.8, 3.1, and 4.0 kHz",
+      "worst per-tone reconstruction error in dB and the frequency/phase case producing it",
+      "edge candidate f_B=f_s-4, whether it lies inside the declared band, sample mismatch, PASS/FALSIFIED/Not yet status",
+      "explicit message that post-sampling digital filtering cannot choose between identical records"
+    ],
+    "frequency_chart": "Responsive SVG spectral lane with labelled 0, B=4 kHz, f_s/2, B+0.5 kHz required clearance, and the adjacent-replica edge f_s-B. Use overlap/touch/guard-pass text and hatched or outlined regions rather than color alone.",
+    "waveform_chart": "Responsive SVG over 0-1 ms showing solid x_A, dashed x_B, and one shared set of filled sample dots. Label both analog frequencies/phases directly. At 8 kHz/90deg the curves are opposite and all dots lie at zero; at 9 kHz the dashed 5 kHz candidate remains sample-equivalent but is marked outside the admitted band.",
+    "mobile": "Controls and charts stack at 360 px; preset buttons wrap; both SVGs use fluid width and mobile-safe viewBoxes with at least 12-unit labels and no horizontal scroll.",
+    "theme_and_non_color": "Axes/text use currentColor and opacity; source/candidate use solid versus dashed strokes and direct labels; pass/fail appears as text and TargetList marks as well as color. Verify light and dark."
+  },
+  "accessibility": {
+    "keyboard_touch": "PresetGroup supplies native >=44 px buttons and Slider supplies native 44 px range inputs. Tab, Enter/Space, and arrow keys complete both tasks; no drag-only or pointer-only action.",
+    "aria": "Wrap each preset group in a named role=group; give sliders aria-valuetext with kHz/degrees. TargetList and Readout announce live results politely. Each SVG has role=img and a dynamic aria-label naming rates, candidate frequencies, sample equality, guard, error, and status.",
+    "motion": "No animation or timer; geometry updates immediately, so reduced-motion users lose no information.",
+    "contrast": "All conclusions have numeric/text and line-style cues; amber/blue never carry meaning alone."
+  },
+  "deterministic_checks": [
+    "For every integer n and all allowed f_s and phi, the edge pair samples agree algebraically; numerical maximum mismatch over the displayed samples must stay below 1e-12.",
+    "At f_s=8.00 kHz and phi=90deg, all edge samples have magnitude below 1e-12, x_A and x_B are opposite, their normalized separation is 2, and 20log10(2)=6.020599913279624 dB; falsification is true.",
+    "At f_s=8.00 kHz and phi=0deg, the two equality candidates coincide and the current boundary error floors at -120 dB, but the universal bank's 90deg case is 0 dB, so equality still fails the phase-safe suite.",
+    "At f_s=7.50 kHz the 4.0 kHz edge maps to 3.5 kHz with negated phase; on the 20 ms grid the equal-energy integer-cycle tones are orthogonal, giving E=sqrt(2) and 3.010299956639812 dB for phi=90deg.",
+    "At f_s=8.25 kHz every supplied tone is strictly below Nyquist and the ideal test error floors at -120 dB, but G=0.125 kHz, so pass is false.",
+    "At f_s=8.50 kHz the ideal test still passes but G=0.25 kHz, so the No guard preset fails.",
+    "At f_s=9.00 kHz, f_s/2=4.50 kHz, G=0.50 kHz, the edge image is 5.00 kHz outside the declared band, all ideal test errors are zero before display flooring, and PASS is true.",
+    "At f_s=8.75 kHz, G=0.375 kHz and pass is false; therefore 9.00 kHz is the lowest passing value on the exact 0.25 kHz grid.",
+    "Threshold comparisons are E<1e-3 and G>=0.50; exactly -60 dB fails, exactly 0.50 kHz clearance passes, and f=f_s/2 always fails the strict interior test.",
+    "Every slider endpoint produces finite frequencies, phases, samples, errors, and SVG coordinates. Exact zero uses a display floor only and never log10(0) in status logic."
+  ],
+  "loc_plan": {
+    "limit": 200,
+    "planned": 198,
+    "budget": {
+      "imports_constants_presets": 24,
+      "alias_reconstruction_error_helpers": 42,
+      "state_and_derived_status": 30,
+      "kit_controls_targets_readout": 45,
+      "two_responsive_svg_charts": 57
+    },
+    "strategy": "Use compact module constants, one tone/error helper, mapped fixed arrays, and exactly two state values. Do not implement an FFT, filter designer, audio path, effect, reducer, extra runtime file, CSS file, or dependency."
+  },
+  "validation_and_preview": [
+    "Run a deterministic TypeScript/Node harness for all identities, phase cases, strict thresholds, floors, and slider-grid boundary assertions above.",
+    "Confirm use client is first, default export has no required props, imports are only React and @/components/ui, and the component is <=200 physical lines.",
+    "Run npx tsc --noEmit and npx eslint components/demos/digital-signal-processing/AliasThresholdLab.tsx components/demos/index.ts.",
+    "After lesson.mdx exists, run npm run validate -- digital-signal-processing sampling-aliasing-and-reconstruction.",
+    "In npm run dev inspect desktop and 360 px in light/dark; keyboard-run all presets and slider endpoints; verify active preset clearing, 8.00/90deg falsification, 9.00 kHz first pass, readable axes, no clipping/scroll, no stale announcements, and no hydration warning."
+  ],
+  "checklist_expectation": {
+    "D1": "PASS: the learner searches a moving nonoverlap/guard boundary and constructs two different continuous candidates with identical samples.",
+    "D2": "PASS: fixed-size synchronous math and SVG updates, no async or network.",
+    "D3": "PASS: initial equality/sine-null state already displays the failure; four rate and three phase presets anchor the task.",
+    "D4": "PASS: first-rate PASS and equality FALSIFIED are separate, exact recognizable outcomes.",
+    "D5": "PASS by plan: one 198-line default-exported client component, existing UI only, zero dependencies, native controls, responsive theme-safe visuals.",
+    "honest_ranges": "PASS: all bounds are finite; bandlimit, ideal reconstruction, phase suite, numeric window, display floor, and practical guard are explicit.",
+    "registration": "Planned explicit lazy registry entry; no next/dynamic or ssr:false."
+  },
+  "blockers": []
+}

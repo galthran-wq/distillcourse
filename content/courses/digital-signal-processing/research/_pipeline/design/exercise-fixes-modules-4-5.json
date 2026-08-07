@@ -1,0 +1,212 @@
+{
+  "z-transform-poles-zeros-and-roc": {
+    "warm_up": {
+      "prompt": "For X(z)=1/(1-0.5z^-1), fill a table for n=-3,...,3 under ROC |z|>0.5 and under ROC |z|<0.5. Mark the support, causality, and whether the unit circle is included.",
+      "check": "The exterior case is (0.5)^n u[n] with samples 0,0,0,1,0.5,0.25,0.125; the interior case is -(0.5)^n u[-n-1] with samples -8,-4,-2,0,0,0,0. Only the exterior ROC contains the unit circle. Deliver a two-row sample/ROC table."
+    },
+    "strategy_choice": {
+      "prompt": "Evaluate a 4096-point response for a real conjugate pole pair at radius 0.980 and angle 0.30pi and a nearly cancelling zero pair at radius 0.979 and the same angle. Choose an evaluation form for (A) a float32 embedded preview with a benign, well-separated design and (B) an accuracy audit of this near-cancelled design.",
+      "methods": [
+        "expanded numerator/denominator polynomials evaluated directly",
+        "factored pole-zero or second-order-section evaluation"
+      ],
+      "cue": "Coefficient expansion is compact when roots are well separated; near cancellation and high-Q roots make conditioning, not the ideal algebra, decisive.",
+      "check": "Submit the chosen form for each case plus a float32-versus-float64 peak-magnitude-error table and a pole-zero plot that identifies the near-cancelled pair."
+    }
+  },
+  "fir-filter-design-and-verification": {
+    "warm_up": {
+      "prompt": "Form a 7-tap rectangular-window lowpass with cutoff pi/2 and symmetry center n=3. Compute h[n]=sin((pi/2)(n-3))/(pi(n-3)), using the limiting value at n=3, then normalize for unity DC gain.",
+      "check": "Before normalization the taps are [-1/(3pi),0,1/pi,1/2,1/pi,0,-1/(3pi)]. Deliver the before/after coefficient table, verify h[n]=h[6-n], report group delay 3 samples, and check that the normalized tap sum is 1 to numerical precision."
+    },
+    "strategy_choice": {
+      "prompt": "At 48 kHz, design a linear-phase lowpass with passband through 8 kHz, stopband from 10 kHz, passband ripple at most 0.01, and stopband attenuation at least 60 dB. Choose a method for (A) a design that must fit the smallest feasible tap budget and (B) a design whose order estimate and monotone tuning must remain easy to explain and reproduce.",
+      "methods": [
+        "Kaiser-windowed sinc",
+        "Parks-McClellan equiripple design"
+      ],
+      "cue": "Worst-case minimax efficiency favors equiripple; transparent transition-width/attenuation tuning and a reliable first order estimate favor Kaiser.",
+      "check": "Submit both tap counts, delay, and a dense-grid table of worst passband and stopband extrema; the selected design must satisfy the mask between design-grid samples."
+    }
+  },
+  "iir-filter-design-and-bilinear-mapping": {
+    "warm_up": {
+      "prompt": "With fs=8 kHz and desired digital edge omega_p=0.2pi, compute the bilinear prewarp Omega_p=2fs tan(omega_p/2). Map the first-order analog pole s=-Omega_p with z=(1+s/(2fs))/(1-s/(2fs)).",
+      "check": "Omega_p is about 5198.7 rad/s and the pole maps to z about 0.5095, inside the unit circle. Map Omega_p back with omega=2 atan(Omega_p/(2fs)) and verify 0.2pi. Deliver a four-line numeric mapping ledger."
+    },
+    "strategy_choice": {
+      "prompt": "At 48 kHz, meet a 6 kHz passband, 8 kHz stopband, 1 dB passband allowance, and 60 dB stopband attenuation. Choose a prototype for (A) a battery-powered detector that prioritizes the fewest sections and accepts ripple and ringing and (B) a waveform monitor that prioritizes a flat passband and controlled transients over order.",
+      "methods": [
+        "Butterworth lowpass",
+        "elliptic lowpass"
+      ],
+      "cue": "The decisive cue is whether passband/stopband ripple and high-Q settling are acceptable in exchange for lower order.",
+      "check": "Submit order, maximum pole radius, passband ripple, stopband peak, 1% step-settling time, and group-delay spread for both; identify the first metric that rules out each rejected method."
+    }
+  },
+  "fast-convolution-and-streaming-blocks": {
+    "warm_up": {
+      "prompt": "Filter x=[1,2,3,4] by h=[1,-1,2] using one 8-point FFT block. State the minimum alias-free transform length, identify the two tail samples that would wrap in a 4-point circular convolution, and perform the overlap-add placement.",
+      "check": "The minimum length is 6 and the linear-convolution result is [1,1,3,5,2,8]. Deliver the padded vectors, one block-output row, and a samplewise equality check against direct convolution."
+    },
+    "strategy_choice": {
+      "prompt": "A 48 kHz stream uses a 1024-tap FIR and 2048-point FFTs. Choose a block method for (A) independent 256-sample packets that may end and flush separately and (B) one continuous stream with fixed-size input buffers and no desire to add overlapping output tails.",
+      "methods": [
+        "overlap-add",
+        "overlap-save"
+      ],
+      "cue": "Packet ownership and tail flushing favor overlap-add; continuous fixed buffers and an in-place valid-output window favor overlap-save.",
+      "check": "Submit one buffer timeline per case with zero padding or input overlap, valid/discarded ranges, startup latency, memory, and maximum seam error against direct convolution below 1e-10."
+    }
+  },
+  "finite-word-realizations": {
+    "warm_up": {
+      "prompt": "Run the zero-input recurrence y[n]=Q(0.5y[n-1]) with y[-1]=1/8, quantization step q=1/8, and ties rounded away from zero. Tabulate n=0,...,5 beside the unquantized decay.",
+      "check": "Every quantized state remains 1/8 because 1/16 rounds back to 1/8, while the ideal state halves each sample. Deliver the two state traces and label the nonzero fixed point as a limit cycle."
+    },
+    "strategy_choice": {
+      "prompt": "Implement the same eighth-order high-Q elliptic filter in Q1.15 with a 32-bit accumulator. Choose a realization for (A) a benign low-Q design where minimizing state and coefficient loads dominates and (B) the supplied design, whose float32 pole radii exceed 0.98 and whose internal peak must stay below 0.9 full scale.",
+      "methods": [
+        "single high-order direct form",
+        "scaled and ordered cascade of second-order sections"
+      ],
+      "cue": "Pole sensitivity and internal-state range, not transfer-function equality, decide when sectioning and ordering are necessary.",
+      "check": "Submit quantized poles, maximum internal state, dense-response error, overflow count, and a 2048-sample zero-input limit-cycle test for both realizations."
+    }
+  },
+  "minimum-phase-and-allpass-structures": {
+    "warm_up": {
+      "prompt": "Reflect the zero of h1=[1,-2] through the unit circle to form the scaled minimum-phase sequence h2=[2,-1]. Evaluate both magnitudes at omega=0, pi/2, and pi, and compute normalized cumulative energy after the first and second taps.",
+      "check": "The magnitude samples match at 1, sqrt(5), and 3. The first-tap cumulative-energy fractions are 1/5 for h1 and 4/5 for h2, both ending at 1. Deliver a magnitude table and two-point energy curves."
+    },
+    "strategy_choice": {
+      "prompt": "Convert a measured 255-tap FIR magnitude response to a minimum-phase realization. Choose a construction for (A) a short polynomial whose roots are accurately separated and must match magnitude algebraically and (B) the 255-tap response, which has clustered near-unit-circle roots and only a dense sampled magnitude is trusted.",
+      "methods": [
+        "explicit zero finding and reciprocal-conjugate root reflection",
+        "real-cepstrum minimum-phase reconstruction from log magnitude"
+      ],
+      "cue": "Exact root control favors reflection for well-conditioned short filters; long clustered polynomials favor cepstral construction but require a magnitude floor and adequate FFT grid.",
+      "check": "Submit maximum magnitude mismatch, median group delay, first-25%-energy arrival index, and either a root-conditioning report or cepstral grid/floor convergence plot."
+    }
+  },
+  "ecg-cleanup-under-morphology-constraints": {
+    "warm_up": {
+      "prompt": "At fs=360 Hz, place a conjugate zero pair at 60 Hz. Compute the real notch numerator 1-2cos(2pi60/fs)z^-1+z^-2 and evaluate its response at DC and 60 Hz.",
+      "check": "Because cos(pi/3)=1/2, the numerator is [1,-1,1]. Its DC gain is 1 and its 60 Hz response is zero to numerical precision. Deliver the coefficient line, zero locations, and the two response values."
+    },
+    "strategy_choice": {
+      "prompt": "Clean a 360 Hz ECG while providing at least 30 dB rejection at 60 Hz and less than 5% QRS peak change. Choose a cascade for (A) a wearable with less than 10 ms algorithmic delay and (B) an offline morphology study where constant delay may be removed by alignment but waveform shape must be preserved.",
+      "methods": [
+        "low-order IIR highpass/notch/lowpass cascade",
+        "linear-phase FIR cascade executed by block convolution"
+      ],
+      "cue": "Hard real-time delay and compute favor IIR; phase linearity and alignable constant delay favor FIR, provided ringing and edge handling pass.",
+      "check": "Submit 60 Hz attenuation, baseline suppression, aligned QRS peak/width error, group delay, impulse ringing, block-seam error, and quantized maximum pole radius for both."
+    }
+  },
+  "decimation-interpolation-and-antialiasing": {
+    "warm_up": {
+      "prompt": "Let x[n]=cos(0.2pi n)+0.5cos(0.7pi n) and downsample by 2. Map each signed frequency into [-pi,pi) after omega_out=2omega_in, and identify which component needs prefiltering.",
+      "check": "The 0.2pi tone maps to 0.4pi; the 0.7pi tone maps to 1.4pi, equivalent to -0.6pi (the same real cosine as +0.6pi), so it is folded. Deliver an input/output frequency table and a two-replica spectrum sketch."
+    },
+    "strategy_choice": {
+      "prompt": "Decimate 96 kHz data to 12 kHz while preserving 0-5 kHz and reaching 80 dB rejection by 6 kHz. Choose an architecture for (A) the lowest multiplies per final sample and (B) the shortest end-to-end group delay under the same mask.",
+      "methods": [
+        "one anti-alias filter followed by decimation by 8",
+        "three staged filters with decimation by 2 at each stage"
+      ],
+      "cue": "Later stages run more slowly and often reduce work, but their individual transition widths and accumulated delay—not factor count alone—decide the winner.",
+      "check": "Submit a per-stage rate/passband/stopband ledger, multiplies per final sample, total input-sample delay, and a dense alias test for both architectures."
+    }
+  },
+  "polyphase-rational-conversion": {
+    "warm_up": {
+      "prompt": "For L/M=3/2, h=[1,2,3,4,5,6], and x=[1,2], partition h into three interpolation phases, then compute the retained output once by expand-filter-decimate and once by the phase schedule.",
+      "check": "The phases are [1,4], [2,5], and [3,6]; retaining even high-rate indices gives [1,3,9,8,12]. Deliver the phase table, fired-phase timeline, and samplewise equality check."
+    },
+    "strategy_choice": {
+      "prompt": "Implement 48 kHz to 44.1 kHz conversion with L/M=147/160 and one shared prototype. Choose a scheduler for (A) a source-driven callback that receives exactly 480 new samples at a time and (B) a sink-driven audio device that requests 441 outputs while its clock may drift by +/-50 ppm.",
+      "methods": [
+        "input-driven polyphase scheduler that emits outputs as source samples arrive",
+        "output-driven phase-accumulator scheduler that pulls the exact source support for each requested output"
+      ],
+      "cue": "The clock that owns the callback and the required bound on FIFO growth decide the schedule; both must realize the same polyphase convolution.",
+      "check": "Submit the first 20 phase indices, consumed/produced counts, maximum FIFO occupancy under the drift test, multiply count, and output error below 1e-10 against the direct reference."
+    }
+  },
+  "perfect-reconstruction-filter-banks": {
+    "warm_up": {
+      "prompt": "Apply the normalized Haar analysis pair to x=[3,1,0,4], using a=(x_even+x_odd)/sqrt(2) and d=(x_even-x_odd)/sqrt(2), then synthesize the four samples.",
+      "check": "The analysis coefficients are a=[2sqrt(2),2sqrt(2)] and d=[sqrt(2),-2sqrt(2)], and synthesis recovers [3,1,0,4]. Deliver the analysis/synthesis table and maximum reconstruction error."
+    },
+    "strategy_choice": {
+      "prompt": "Select a two-channel PR bank for (A) transform coding where coefficient energy and quantization-noise gain must be easy to bound and (B) waveform/image processing where symmetric analysis and synthesis impulse responses and constant alignment are required. Use the supplied orthonormal and biorthogonal coefficient tables.",
+      "methods": [
+        "orthonormal paraunitary PR bank",
+        "linear-phase biorthogonal PR bank"
+      ],
+      "cue": "Energy preservation and equal analysis/synthesis roles favor paraunitary structure; exact linear phase can require a biorthogonal analysis/synthesis pair.",
+      "check": "Submit the polyphase-product residual from a scaled delay, analysis/synthesis delay, energy ratio, and reconstruction error before and after one coefficient is quantized in each bank."
+    }
+  },
+  "wavelet-and-paraunitary-banks": {
+    "warm_up": {
+      "prompt": "Apply two normalized Haar levels to x=[3,1,0,4]: first split both adjacent pairs, then recurse only on the two lowpass coefficients. List the final coefficient ordering and compare input and coefficient energy.",
+      "check": "One valid ordering is [4,0,sqrt(2),-2sqrt(2)] for the level-2 low/high followed by level-1 details; both energies equal 26. Deliver the two-level tree and energy ledger."
+    },
+    "strategy_choice": {
+      "prompt": "Analyze a 1 s, 48 kHz signal containing a steady 4 kHz tone and one 2 ms click. Choose a bank for (A) measuring fixed-width neighboring tones and (B) locating the click while retaining octave-scale context.",
+      "methods": [
+        "uniform cosine-modulated/DFT paraunitary bank",
+        "dyadic orthonormal wavelet tree"
+      ],
+      "cue": "Uniform absolute bandwidth favors the modulated bank; scale-dependent time-frequency localization favors the dyadic tree.",
+      "check": "Submit each tiling map, reconstruction error, energy ratio, measured tone-bin width, and click time spread; state the metric that changes the choice."
+    }
+  },
+  "analytic-signals-and-quadrature": {
+    "warm_up": {
+      "prompt": "For n=0,...,7, start with x[n]=cos(pi n/4), form its ideal analytic sequence z[n]=exp(j pi n/4), and mix by exp(j pi n/2). Tabulate x, quadrature, z, and the mixed sequence.",
+      "check": "The analytic sequence occupies DFT bin +1 only and the mixed sequence occupies bin +3 only; a real cosine mixer would also create the difference image. Deliver the eight-row table and an 8-point DFT support check."
+    },
+    "strategy_choice": {
+      "prompt": "Create an analytic 48 kHz audio stream over 0.5-18 kHz. Choose a method for (A) a live path capped at 5 ms algorithmic latency and (B) an offline image-rejection measurement targeting at least 90 dB with block boundaries under your control.",
+      "methods": [
+        "129-tap FIR Hilbert transformer with a matched 64-sample real-path delay",
+        "1024-sample overlap-processed FFT analytic construction by suppressing negative-frequency bins"
+      ],
+      "cue": "Fixed short streaming delay favors the FIR pair; broadband frequency-bin control can favor the FFT method if window, overlap, and seam latency are acceptable.",
+      "check": "Submit image-rejection ratio versus frequency, real/Hilbert delay mismatch, algorithmic latency, operation count, and maximum block-seam error for both."
+    }
+  },
+  "quantization-dither-and-subband-allocation": {
+    "warm_up": {
+      "prompt": "Quantize x=[0.10,0.30,0.90,1.10] with a saturating 3-bit midrise quantizer over [-1,1), step q=0.25, and reproduction levels ending at +/-0.875. Record output and error for every sample.",
+      "check": "The outputs are [0.125,0.375,0.875,0.875] and errors are [0.025,0.075,-0.025,-0.225]. The first three are granular errors; 1.10 overloads. Deliver the code/output/error table and compare q^2/12 with the granular-only sample MSE, without applying the model to the overload sample."
+    },
+    "strategy_choice": {
+      "prompt": "Allocate 16 bits across four critically sampled subbands with measured variances [16,4,1,1] and equal perceptual weights. Choose a policy for (A) this stationary unequal-variance segment and (B) an unpredictable transient segment whose band variances may swap before side information can be sent.",
+      "methods": [
+        "equal allocation [4,4,4,4]",
+        "variance-matched integer allocation such as [6,4,3,3] after solving and rounding the continuous optimum"
+      ],
+      "cue": "Stable unequal variances reward adaptive allocation; rapidly changing or unreported statistics make equal allocation more robust to overload and signaling delay.",
+      "check": "Submit the 16-bit ledger, predicted q^2/12 noise per band, measured total MSE and overload count on both segments, and side-information cost if the adaptive allocation changes."
+    }
+  },
+  "streaming-audio-resampling-and-subband-link": {
+    "warm_up": {
+      "prompt": "Close a miniature link ledger: 48 kHz input is converted by 147/160 to 44.1 kHz; each packet holds 441 output samples (10 ms); payload is 96 kb/s; each packet adds a 16-byte header; stage delays are 8, 12, 10, and 12 ms for resampling, analysis, packetization, and synthesis.",
+      "check": "The output rate is 44.1 kHz, header overhead is 12.8 kb/s, wire rate is 108.8 kb/s, and listed latency totals 42 ms. Deliver one row per stage with rate, bits, delay, and cumulative totals, and flag each against the 96 kb/s payload and 100 ms latency definitions."
+    },
+    "strategy_choice": {
+      "prompt": "Choose a block/packet architecture for the same 48-to-44.1 kHz link: (A) an interactive monitor requiring less than 50 ms total latency under 5 ms network jitter and (B) a power-limited playback link allowing 100 ms latency but requiring the lowest FFT and header work per second.",
+      "methods": [
+        "10 ms packets with 512-point overlap-save blocks",
+        "20 ms packets with 1024-point overlap-save blocks"
+      ],
+      "cue": "Packet duration simultaneously changes buffering latency, header rate, FFT efficiency, and jitter tolerance; no component metric decides alone.",
+      "check": "Submit complete rate/latency/operation ledgers for both, including header overhead and valid OLS samples, plus seam error, alias level, EVM, and the first end-to-end threshold failed by the rejected architecture."
+    }
+  }
+}

@@ -1,0 +1,364 @@
+{
+  "schema_version": 1,
+  "status": "complete_needs_revision",
+  "verdict": "FAIL",
+  "blocker_count": 3,
+  "lesson": "windows-leakage-and-resolution",
+  "audited_file": "content/courses/digital-signal-processing/lessons/windows-leakage-and-resolution/lesson.mdx",
+  "audit_scope": "Independent read-only course-qa audit of every displayed formula, window coefficient convention, lobe/table value, finite-N versus asymptotic claim, coherent-gain/scalloping/ENBW calibration, weak-tone demo metric and frozen study cell, exercise solution, and References locator against local full source texts/summaries plus independent direct-DTFT computation.",
+  "inputs": [
+    ".claude/skills/course-qa/SKILL.md",
+    ".claude/skills/course-qa/rubric.md",
+    "docs/playbook-math.md",
+    "content/courses/digital-signal-processing/research/windows-leakage-and-resolution.md",
+    "content/courses/digital-signal-processing/research/notation-ledger.yaml",
+    "content/courses/digital-signal-processing/research/_pipeline/summaries/harris-windows.json",
+    "content/courses/digital-signal-processing/research/_pipeline/summaries/jos-sasp.json",
+    "content/courses/digital-signal-processing/research/_pipeline/summaries/oppenheim-schafer.json",
+    "content/courses/digital-signal-processing/research/_pipeline/reads/mit6341-s1.json",
+    "content/courses/digital-signal-processing/research/_pipeline/reads/mit6341-s2.json",
+    "content/courses/digital-signal-processing/research/texts/harris.txt",
+    "content/courses/digital-signal-processing/research/texts/jos-s1.txt",
+    "content/courses/digital-signal-processing/research/texts/oppenheim-s1.txt",
+    "content/courses/digital-signal-processing/research/texts/oppenheim-s2.txt",
+    "content/courses/digital-signal-processing/research/texts/mit6341-s1.txt",
+    "content/courses/digital-signal-processing/research/texts/mit6341-s2.txt",
+    "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/windows-leakage-and-resolution/weak-tone-study.mjs",
+    "components/demos/digital-signal-processing/WeakToneWindowLab.tsx",
+    "components/figures/digital-signal-processing/WindowCalibrationLedger.tsx",
+    "components/figures/digital-signal-processing/WindowShapeSpectrumPair.tsx",
+    "components/figures/digital-signal-processing/WindowTradeoffMap.tsx"
+  ],
+  "validation_context": {
+    "command": "npm run validate -- digital-signal-processing windows-leakage-and-resolution",
+    "result": "PASS",
+    "errors": 0,
+    "warnings": 0,
+    "note": "Mechanical validation does not detect the three numerical/convention blockers below."
+  },
+  "priority_findings": [
+    {
+      "id": "B01_SCALLOPING_SIGN_IN_DEMO",
+      "status": "FAIL",
+      "lesson_lines": "209-218, 323",
+      "implementation_lines": "components/demos/digital-signal-processing/WeakToneWindowLab.tsx:7-12, 101-103",
+      "finding": "The lesson explicitly defines scalloping loss as the positive quantity -20 log10(|W(e^{j pi/N})|/|W(1)|), but the demo stores every scalloping value with a negative sign and renders it directly. The metric cards therefore display Rectangular -3.92 dB, Hann -1.42 dB, Hamming -1.75 dB, and Blackman-Harris -0.83 dB as 'scalloping', contradicting the lesson's positive-loss convention. Store/render positive 3.92, 1.42, 1.75, and 0.826 dB, or relabel the values as signed response attenuation rather than loss."
+    },
+    {
+      "id": "B02_FINITE_N_FRAME_MISSING",
+      "status": "FAIL",
+      "lesson_lines": "123-132, 207-220",
+      "implementation_lines": "components/demos/digital-signal-processing/WeakToneWindowLab.tsx:7-12, 94-103; components/figures/digital-signal-processing/WindowTradeoffMap.tsx:20-78",
+      "finding": "The lobe/scalloping table and the static demo/tradeoff metrics do not declare the N at which their direct-DTFT values were evaluated or label them as large-N reference values. These metrics are not exactly N-invariant. The issue is exposed by the lesson's own finite-N=4 Hann audit: its exact half-bin ratio is (2+sqrt(2))/4 and its loss is 1.375386 dB (correctly rendered as 1.38 dB in WindowCalibrationLedger), whereas the table/prose reference is 1.4236 dB. The interactive demo also keeps one N=128-like PSL/scalloping ledger while its acquired-N control moves through 64, 128, and 256. Declare a fixed reference N/large-N convention and explicitly distinguish the finite N=4 value, or recompute displayed metrics for the selected N."
+    },
+    {
+      "id": "B03_N64_HAMMING_PSL",
+      "status": "FAIL",
+      "lesson_lines": "129, 134, 359",
+      "implementation_lines": "components/figures/digital-signal-processing/WindowShapeSpectrumPair.tsx:4, 9, 71",
+      "finding": "WindowShapeSpectrumPair freezes periodic coefficients at N=64 but labels the Hamming peak sidelobe as approximately -42.7 dB. Dense direct-DTFT maximization for the declared N=64 formula gives -42.4493 dB, which rounds to -42.45 dB or -42.4 dB, not -42.7 dB. The component's generated spectrum curve uses N=64 and is sound; its annotation imports the large-N/conventional Hamming number. Either change the N=64 label or explicitly separate the table's large-N reference from the finite-N figure."
+    }
+  ],
+  "targeted_wording_checks": [
+    {
+      "id": "W01_HANN_ENDPOINT_DERIVATIVE",
+      "status": "PASS",
+      "lesson_lines": "138, 357",
+      "check": "For the continuous periodic-Hann envelope h(t)=0.5-0.5 cos(2 pi t/N) on the analytic aperture 0<=t<=N, h(0)=h(N)=0 and h'(0)=h'(N)=0; the zero extension first mismatches in the second derivative, giving the familiar 1/omega^3 or about 18 dB/octave distant envelope. Harris local text lines 754-756 states that Hann and its first derivative are continuous and places the discontinuity in the second derivative."
+    },
+    {
+      "id": "W02_SIX_DB_RESOLUTION",
+      "status": "PASS",
+      "lesson_lines": "132, 337-349",
+      "check": "Harris local text lines 548-575 explicitly distinguishes the usual 3 dB measure from coherent DFT resolution: each equal-strength kernel must be below 0.5 amplitude at the midpoint, so crossover must occur beyond the 6.0 dB points. The solution correctly treats equality as the boundary at which a central dip can begin and correctly refuses to substitute null-to-null width."
+    },
+    {
+      "id": "W03_FINITE_N4_SCALLOPING",
+      "status": "PASS_IN_FIGURE_FAIL_IN_FRAME",
+      "lesson_lines": "152-175, 207-220",
+      "check": "The N=4 vector, coherent sum 2, gain 0.5, raw coefficient 2, -6.02 dB N-only amplitude bias, and calibrated amplitude 1 are correct. WindowCalibrationLedger also correctly gives half-bin ratio (2+sqrt(2))/4=0.853553 and L_s=1.38 dB. The remaining defect is B02: prose/table 1.42 dB is not marked as a different-N/large-N reference."
+    }
+  ],
+  "independent_numeric_reproduction": {
+    "method": "Direct complex summation of each declared periodic coefficient vector on a dense frequency grid, with local maximization outside the first-null interval; no FFT interpolation was used for the reported finite-N checks.",
+    "periodic_hann_half_bin": [
+      { "N": 4, "ratio": 0.8535533905932737, "loss_db": 1.3753861631621744 },
+      { "N": 8, "loss_db": 1.4209429238 },
+      { "N": 16, "loss_db": 1.4234599377 },
+      { "N": 64, "loss_db": 1.4236221777 },
+      { "N": 128, "loss_db": 1.4236227690 }
+    ],
+    "periodic_N64_metrics": [
+      { "window": "rectangular", "null_to_null_bins": 2, "peak_sidelobe_db": -13.254321, "scalloping_loss_db": 3.921525 },
+      { "window": "Hann", "null_to_null_bins": 4, "peak_sidelobe_db": -31.467394, "scalloping_loss_db": 1.423622 },
+      { "window": "Hamming", "null_to_null_bins": 4, "peak_sidelobe_db": -42.449262, "scalloping_loss_db": 1.751597 },
+      { "window": "four-term Blackman-Harris", "null_to_null_bins": 8, "peak_sidelobe_db": -92.014338, "scalloping_loss_db": 0.825572 }
+    ],
+    "N128_hamming_peak_sidelobe_db": -42.617896,
+    "interpretation": "The table/demo Hamming number near -42.62 is consistent with N=128 and the conventional large-N value approaches about -42.7; it is not the exact N=64 value named by WindowShapeSpectrumPair."
+  },
+  "formula_and_convention_checks": [
+    {
+      "id": "F01_DFT_AND_PADDING",
+      "status": "PASS",
+      "lesson_lines": "12-18",
+      "check": "Raw forward DFT sign, no forward scale, index limits, padding spacing 2pi/L, and the claim that padding leaves the acquired finite-record DTFT unchanged all match the course convention."
+    },
+    {
+      "id": "F02_OFF_BIN_APERTURE",
+      "status": "PASS",
+      "lesson_lines": "23-33",
+      "check": "exp(j2pi(1.5/8)n), 0<=n<8, advances 1.5 cycles over the eight-sample half-open aperture and does not join continuously under period-8 extension."
+    },
+    {
+      "id": "F03_WINDOW_DEFINITION_AND_SHIFT",
+      "status": "PASS",
+      "lesson_lines": "35-55",
+      "check": "x_w[n]=x[n]w[n] on finite support and the modulation identity X_w(e^{j omega})=W(e^{j(omega-omega_0)}) are exact under the declared DTFT sign."
+    },
+    {
+      "id": "F04_MULTIPLICATION_CONVOLUTION_THEOREM",
+      "status": "PASS",
+      "lesson_lines": "57-89",
+      "check": "The periodic convolution has the required 1/(2pi), integration limits over one period, correct argument W(e^{j(omega-theta)}), and a valid finite-sum/integral interchange."
+    },
+    {
+      "id": "F05_LEAKAGE_AND_INTEGER_BIN_BOUNDARY",
+      "status": "PASS",
+      "lesson_lines": "91-99",
+      "check": "Leakage is correctly separated from aliasing. A rectangular bin-centered complex sinusoid samples the shifted Dirichlet kernel at zeros in all other DFT bins even though the continuous finite-record DTFT has inter-bin sidelobes."
+    },
+    {
+      "id": "F06_PERIODIC_COEFFICIENTS",
+      "status": "PASS",
+      "lesson_lines": "103-117",
+      "check": "Rectangular, denominator-N Hann, 0.54/0.46 Hamming, and 0.35875/0.48829/0.14128/0.01168 minimum four-term Blackman-Harris formulas and signs are correct. The N versus N-1 library warning is correct."
+    },
+    {
+      "id": "F07_METRIC_DEFINITIONS",
+      "status": "PASS",
+      "lesson_lines": "119-132",
+      "check": "Normalization by |W(1)|=sum w, current-record bin units, first-null null-to-null width, and PSL as the maximum magnitude outside that interval are correct; 3 dB, 6 dB, and null-to-null bandwidths are correctly kept distinct. B02 concerns the missing finite-N frame for values, not these definitions."
+    },
+    {
+      "id": "F08_TABLE_WIDTHS",
+      "status": "PASS",
+      "lesson_lines": "125-130",
+      "check": "For the declared periodic cosine sums and nondegenerate N, the exact first-null pairs are +/-1, +/-2, +/-2, and +/-4 current-record bins, hence widths 2, 4, 4, and 8."
+    },
+    {
+      "id": "F09_TABLE_GAINS_ENBW",
+      "status": "PASS",
+      "lesson_lines": "125-130, 177-183, 251-267",
+      "check": "Periodic coherent gains 1, 0.5, 0.54, and 0.35875 and ENBW values 1, 1.5, 1.362826, and 2.004353 follow from cosine orthogonality and the displayed definition."
+    },
+    {
+      "id": "F10_TABLE_PSL_FALLOFF_SCALLOPING",
+      "status": "PASS_ONLY_AS_REFERENCE_VALUES",
+      "lesson_lines": "125-140",
+      "check": "The listed conventional/large-N values Rect -13.26/6 dB-oct/3.92, Hann -31.47/18 dB-oct/1.42, Hamming about -42.7/6 dB-oct/1.75, and four-term BH about -92/0.826 are standard and supported by direct evaluation/source tables. They require the missing finite-N/asymptotic label in B02 and cannot be copied unchanged into the explicitly N=64 Hamming annotation in B03."
+    },
+    {
+      "id": "F11_COHERENT_GAIN_EXAMPLE",
+      "status": "PASS",
+      "lesson_lines": "152-183",
+      "check": "For N=4 periodic Hann, w=[0,0.5,1,0.5], C_w=2, G_c=0.5, matching raw complex-tone coefficient 2, N-only report 0.5=-6.0206 dB, and correction by C_w are all exact. The one-sided real interior-bin factor two and DC/Nyquist exception are correct."
+    },
+    {
+      "id": "F12_SHORT_WINDOW_EXAMPLE",
+      "status": "PASS",
+      "lesson_lines": "185-204",
+      "check": "For v=[0,1,1,0], C_v=2, G_c=0.5, matching complex coefficient 2, corrected amplitude one, and 2|V_v[1]|/C_v for a real interior-bin cosine are correct."
+    },
+    {
+      "id": "F13_SCALLOPING_DEFINITION",
+      "status": "PASS",
+      "lesson_lines": "207-224",
+      "check": "Offsets +/-pi/N are the half-bin samples and the leading minus sign correctly makes attenuation a positive loss. B01 is the demo's opposite sign; B02 is the value frame."
+    },
+    {
+      "id": "F14_WHITE_NOISE_POWER",
+      "status": "PASS",
+      "lesson_lines": "226-249",
+      "check": "For uncorrelated zero-mean white samples, cross terms vanish and E{|Q_w[k]|^2}=sigma^2 sum w^2. Coherent calibration produces sigma^2 sum w^2/(sum w)^2=(sigma^2/N)B_e."
+    },
+    {
+      "id": "F15_ENBW_DEFINITION_AND_BOUNDARIES",
+      "status": "PASS",
+      "lesson_lines": "249-274",
+      "check": "B_e=N sum w^2/(sum w)^2 bins and B_e f_s/N hertz are correct; N=4 Hann gives 1.5, a nonzero scaled rectangle gives 1, and zero coherent sum is inadmissible for this tone-calibrated definition."
+    },
+    {
+      "id": "F16_WEAK_TONE_SIGNAL",
+      "status": "PASS",
+      "lesson_lines": "279-287",
+      "check": "The analytic signal has strong amplitude 1 at q=20.5, weak amplitude 0.01=-40 dB at q=26, separation 5.5 original bins, and fixed physical frequencies referenced to N0=128 as N changes."
+    },
+    {
+      "id": "F17_WEAK_TONE_METRIC",
+      "status": "PASS",
+      "lesson_lines": "288-302",
+      "check": "The exact-sum grid 25.5<=q<=26.5 in 1/64 steps has 65 points. L is a strong-only neighborhood maximum, P_phi a full-signal neighborhood maximum, M_phi=20 log10(P_phi/L), phases are 2pi m/16, and pass means the unrounded minimum is at least 3.000 dB."
+    },
+    {
+      "id": "F18_WEAK_TONE_INTERPRETATION",
+      "status": "PASS",
+      "lesson_lines": "306-330",
+      "check": "At fixed physical separation, 5.5 original bins becomes 2.75 current N=64 bins and 5.5 current N=128 bins. The rectangle and short-BH counterexamples correctly show that neither narrowest lobe nor lowest headline PSL is a universal choice."
+    },
+    {
+      "id": "F19_ZERO_PADDING_EXERCISE",
+      "status": "PASS",
+      "lesson_lines": "416-431",
+      "check": "For N=64, L=64 spacing is 1 original bin with maximum nearest-grid error 1/2 and actual estimate 10/error 0.3. For L=1024 spacing is 1/16, maximum error 1/32, nearest point 10.3125, and actual error 0.0125. Padding leaves the acquired samples and continuous windowed spectrum unchanged. The quoted 1.42 dB is appropriate for N=64 Hann (1.423622 dB)."
+    }
+  ],
+  "weak_tone_study_audit": {
+    "status": "PASS",
+    "execution_command": "node content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/windows-leakage-and-resolution/weak-tone-study.mjs",
+    "contract_match": "The executable study uses the lesson's exact periodic weights, fixed physical q coordinates, 65-point neighborhood, normalization by sum w, 16 deterministic phases, and >=3 dB decision.",
+    "lesson_selected_rows": [
+      { "N": 128, "window": "Rectangular", "lesson": [-24.71, -1.62, "fail"], "reproduced": [-24.71, -1.619, "fail"], "status": "PASS" },
+      { "N": 128, "window": "Hann", "lesson": [-53.94, 12.55, "pass"], "reproduced": [-53.937, 12.546, "pass"], "status": "PASS" },
+      { "N": 128, "window": "Hamming", "lesson": [-43.18, 1.43, "fail"], "reproduced": [-43.179, 1.428, "fail"], "status": "PASS" },
+      { "N": 64, "window": "four-term Blackman-Harris", "lesson": [-23.13, -1.31, "fail"], "reproduced": [-23.133, -1.311, "fail"], "status": "PASS" },
+      { "N": 128, "window": "four-term Blackman-Harris", "lesson": [-99.17, 59.16, "pass"], "reproduced": [-99.165, 59.158, "pass"], "status": "PASS" },
+      { "N": 256, "window": "Hamming", "lesson": [-47.39, 7.66, "pass"], "reproduced": [-47.393, 7.66, "pass"], "status": "PASS" }
+    ],
+    "demo_checks": [
+      {
+        "status": "PASS",
+        "check": "All 12 STUDY cells, worst phases, and pass/fail decisions match fresh execution to the stored precision; no case is close enough to 3 dB for stored rounding to change a verdict."
+      },
+      {
+        "status": "PASS",
+        "check": "phaseMetric recomputes the declared 65 grid points and the selected phase correctly; the plotted spectrum uses the same analytic signal and coherent-sum normalization."
+      },
+      {
+        "status": "FAIL",
+        "check": "The demo's scalloping cards use the wrong sign; see B01."
+      },
+      {
+        "status": "FAIL",
+        "check": "The demo's headline PSL/scalloping values remain static while N changes and do not identify their N=128-like reference frame; see B02."
+      }
+    ]
+  },
+  "exercise_answer_checks": [
+    {
+      "id": "E01_SHORT_COHERENT_WINDOW",
+      "status": "PASS",
+      "prompt_lines": "185-186",
+      "solution_lines": "188-204",
+      "check": "All requested complex-tone and one-sided real-cosine calibration steps are present and correct."
+    },
+    {
+      "id": "E02_BOUNDARY_AND_6DB",
+      "status": "PASS",
+      "prompt_lines": "337-338",
+      "solution_lines": "340-350",
+      "check": "Bin center, half bin, identical-frequency phasor addition/cancellation, and the coherent 6 dB crossover boundary are correctly distinguished."
+    },
+    {
+      "id": "E03_HANN_VS_HAMMING",
+      "status": "PASS_WITH_FRAME_DEPENDENCY",
+      "prompt_lines": "353-354",
+      "solution_lines": "356-362",
+      "check": "Endpoint values, derivative/rolloff logic, first-sidelobe cancellation, and task-dependent use cases are correct. The -42.7 dB Hamming number is valid only as the conventional/large-N reference covered by B02, not as the N=64 value in B03."
+    },
+    {
+      "id": "E04_UNSEEN_WINDOW",
+      "status": "PASS",
+      "prompt_lines": "365-366",
+      "solution_lines": "368-400",
+      "check": "For [1,2,2,1], C=6, G_c=1.5, sum squares=10, B_e=10/9, raw complex coefficient 6, calibrated amplitude 1, post-calibration noise 5 sigma^2/18, rectangular reference sigma^2/4, ratio 10/9, and 0.458 dB penalty are all correct."
+    },
+    {
+      "id": "E05_WINDOW_STRATEGY",
+      "status": "PASS",
+      "prompt_lines": "403-404",
+      "solution_lines": "406-413",
+      "check": "The two-bin equal-tone and -40 dB weak-tone choices are explicitly provisional, use the correct limiting evidence, and include measured checks capable of overturning each choice."
+    },
+    {
+      "id": "E06_ZERO_PADDING_FORWARD",
+      "status": "PASS",
+      "prompt_lines": "416-423",
+      "solution_lines": "425-431",
+      "check": "All spacings, bounds, nearest coordinates, actual errors, invariant window properties, and the resolution/interpolation distinction are correct. This is the sole forward exercise and contains the sole forward Ref."
+    }
+  ],
+  "source_attribution_checks": [
+    {
+      "id": "S01_HARRIS",
+      "status": "PASS",
+      "lesson_lines": "132, 138, 183, 435",
+      "locator": "Harris (1978), sections III-IV, Table I, section VI; local full text lines 540-575, 738-756, 952-1012 and later section-VI experiment.",
+      "check": "The source supports scalloping, coherent gain, ENBW, peak sidelobes versus falloff, Hann first-derivative continuity/18 dB per octave, Hamming discontinuity/6 dB per octave, minimum four-term BH about -92 dB, coherent 6 dB resolution, and unequal-tone window behavior."
+    },
+    {
+      "id": "S02_JOS",
+      "status": "PASS",
+      "lesson_lines": "436",
+      "locator": "Smith, Spectral Audio Signal Processing, Chapter 3 and sections 5.4-5.5; local full text jos-s1 and summary chapter map.",
+      "check": "Chapter 3 contains rectangular/generalized-Hamming/Blackman-Harris construction, lobe tradeoffs, endpoint rolloff, and zero-padding examples. Section 5.4 treats windowed sinusoids as shifted/scaled window transforms and section 5.5 treats main-lobe definitions and resolution of shifted kernels. The pointer is real and claim-precise."
+    },
+    {
+      "id": "S03_OPPENHEIM",
+      "status": "PASS",
+      "lesson_lines": "437",
+      "locator": "Oppenheim, Schafer, Buck, Discrete-Time Signal Processing, 2nd ed., Chapter 10, sections 10.1-10.2; local shards and summary.",
+      "check": "The cited sections support the finite-data spectral-analysis chain, multiplication/window convolution, leakage and resolution tradeoffs, calibration context, and zero-padding as denser samples rather than longer-data resolution."
+    },
+    {
+      "id": "S04_MIT6341",
+      "status": "PASS",
+      "lesson_lines": "438",
+      "locator": "MIT 6.341 Fall 2005, Lecture 17 pp.1-3 and Problem Set 9 Problems 9.1-9.5; local mit6341-s1/s2 texts and reads.",
+      "check": "The lecture and assignment contain finite-record convolution/windowing, main-lobe/sidelobe tradeoffs, DFT-grid/picket-fence behavior, and zero padding versus resolution. The OCW pointer and problem ranges are real."
+    }
+  ],
+  "course_qa_targeted_scores": [
+    {
+      "rubric": "M1 numeric statements carry a frame",
+      "status": "FAIL",
+      "evidence": "The table and reusable demo/tradeoff metrics omit finite N or a large-N label; see B02 and B03. The weak-tone study numbers themselves are fully framed."
+    },
+    {
+      "rubric": "M2 keeper numbers remain visible",
+      "status": "PASS",
+      "evidence": "The weak-tone signal, neighborhood, phase denominator, 3 dB criterion, selected results, and counterexamples remain together."
+    },
+    {
+      "rubric": "E4 every solution shows the full path",
+      "status": "PASS",
+      "evidence": "Every exercise solution exposes its governing metric, computation, boundary interpretation, and transferable decision rule."
+    },
+    {
+      "rubric": "X1 at most one mechanical closing exercise",
+      "status": "PASS",
+      "evidence": "Only the unseen-window calculation is predominantly mechanical; the other closing tasks require boundary analysis, refutation, strategy, or forward diagnosis."
+    },
+    {
+      "rubric": "X2 at least two higher-order exercise types",
+      "status": "PASS",
+      "evidence": "The set includes boundary probes, refutation, task-qualified strategy with overturning checks, and a forward zero-padding diagnosis."
+    },
+    {
+      "rubric": "X3 exactly one forward exercise",
+      "status": "PASS",
+      "evidence": "Only the last exercise points to peak-estimation-and-zero-padding."
+    },
+    {
+      "rubric": "L8 real relevant chapter-precise references",
+      "status": "PASS",
+      "evidence": "All four entries were matched to local full texts/summaries at the stated chapters, sections, pages, and problem ranges."
+    }
+  ],
+  "repair_acceptance_checks": [
+    "The demo renders scalloping loss with a positive sign everywhere the lesson calls it a loss.",
+    "The table, demo, and tradeoff map declare one finite reference N or explicitly identify conventional/large-N values; the finite N=4 Hann 1.375386 dB inset remains distinct.",
+    "The explicitly N=64 WindowShapeSpectrumPair Hamming PSL label reads approximately -42.45 dB (or a recomputed equivalent), not -42.7 dB.",
+    "Re-run the validator and weak-tone study; all six selected study rows and all pass/fail decisions must remain unchanged."
+  ]
+}

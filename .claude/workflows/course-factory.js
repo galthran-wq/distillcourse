@@ -87,8 +87,8 @@ const SCOPE_SCHEMA = {
   type: 'object',
   required: ['access', 'where', 'shards'],
   properties: {
-    access: { type: 'string', description: 'full | toc-only | summary-based' },
-    where: { type: 'string', description: 'best reading location found: URL(s), archive.org id, mirror — enough that a reader needs no re-hunting' },
+    access: { type: 'string', description: 'full | toc-only | summary-based | not-found' },
+    where: { type: 'string', description: 'best reading location found: URL(s), archive.org id, mirror — enough that a reader needs no re-hunting; for not-found, what you tried' },
     shards: {
       type: 'array',
       description: '1 entry = no split; 2-4 entries only for big fully-accessible sources, split on chapter boundaries',
@@ -149,12 +149,19 @@ const at = root
   ? `Repo root for ALL file reads and writes: ${root} (a git worktree). Use absolute paths under it; never touch any other checkout of this repo.\n\n`
   : ''
 
+// Optional human design intent (format, audience, angle) — binding for both
+// canon selection and structure synthesis when the course is not a plain
+// "teach subject X" (e.g. interview prep, a workshop, an exam crammer).
+const brief = argv.brief
+  ? `\n\nCourse design intent from the human (binding — shape source choice and structure around it): ${argv.brief}`
+  : ''
+
 if (phaseArg === 'structure') {
   const topic = argv.topic ?? slug
 
   phase('Canon')
   const canon = await agent(
-    `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials. Return via structured output; put verified URLs where you have them.`,
+    `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials, but NEVER omit a canonical source just because you found no accessible copy — include it anyway; inaccessible sources are reported to the human, who can obtain copies from the publishers. Return via structured output; put verified URLs where you have them.${brief}`,
     { label: 'canon-scout', model: 'sonnet', schema: CANON_SCHEMA },
   )
   const sources = canon.sources.slice(0, 20)
@@ -168,17 +175,25 @@ if (phaseArg === 'structure') {
   // range; a merger folds shard summaries back into one per-source summary
   // (same shape, so synthesis downstream is unchanged). pipeline(): each
   // source flows scope -> read -> merge without waiting for the others.
+  // Access is tracked per source so that anything short of a full read is
+  // REPORTED to the human at the end, never silently omitted — the human can
+  // obtain missing books from the publishers and re-run the read for them.
+  const accessLog = []
   const capNote = `Capture directory for image candidates: content/courses/${slug}/research/images/ — create it if missing, and prefix every id with a short source tag so the swarm's ids never collide. Texts cache for the raw material you fetch (PDFs, extracted text, flattened chapters — each with its .meta.yaml sidecar, per your briefing): content/courses/${slug}/research/texts/ — create it if missing; lesson writers will read from it instead of re-fetching.`
   const summaries = (
     await pipeline(
       sources,
       (s) =>
         agent(
-          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Find where it can actually be read, fetch its table of contents, and decide the split. Shard ONLY when the full text is accessible AND the source is big (roughly 350+ pages or 25+ chapters): 2-4 shards along chapter boundaries, balanced by page count. Otherwise return a single shard covering everything. Report access honestly (full | toc-only | summary-based) and pass on the best reading location you found so readers do not re-hunt.`,
+          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Find where it can actually be read, fetch its table of contents, and decide the split. Shard ONLY when the full text is accessible AND the source is big (roughly 350+ pages or 25+ chapters): 2-4 shards along chapter boundaries, balanced by page count. Otherwise return a single shard covering everything. Report access honestly (full | toc-only | summary-based | not-found) and pass on the best reading location you found so readers do not re-hunt. If you cannot find the source at all, do NOT invent a location and do NOT quietly settle for second-hand descriptions of it — return access "not-found" with \`where\` describing what you tried; the human will obtain a copy from the publisher.`,
           { label: `scope: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SCOPE_SCHEMA },
-        ),
+        ).then((scope) => {
+          accessLog.push({ title: s.title, access: scope ? scope.access : 'scope-failed', where: scope ? scope.where : '' })
+          return scope
+        }),
       (scope, s) =>
         scope &&
+        scope.access !== 'not-found' &&
         parallel(
           scope.shards.map((shard, i) => () =>
             agent(
@@ -200,11 +215,13 @@ if (phaseArg === 'structure') {
   ).filter(Boolean)
   log(`read: ${summaries.length}/${sources.length} sources summarized`)
   if (summaries.length === 0) throw new Error('no source could be read — aborting before synthesis')
+  const degraded = accessLog.filter((a) => a.access !== 'full')
+  if (degraded.length) log(`ATTENTION — sources NOT fully read (report to the human, never silently omit; they can obtain copies from the publishers): ${degraded.map((d) => `"${d.title}" [${d.access}]`).join('; ')}`)
 
   phase('Synthesize')
   const synthesis = await agent(
     [
-      `${at}You are the course architect for the course "${topic}" (slug: ${slug}) in this repo. Read docs/pedagogy.md (C rules AND L2/L10/L15/L16, E6/E7, D1 — they constrain what you plan), docs/content-model.md, docs/playbook-core.md, the domain overlay (docs/playbook-math.md for a mathematical subject, docs/playbook-history.md for a historical one), docs/voita-playbook.md (lesson skeleton, framework-first + flaw-driven sequencing, density norms), and the example .claude/skills/course-architect/examples/course.yaml.`,
+      `${at}You are the course architect for the course "${topic}" (slug: ${slug}) in this repo. Read docs/pedagogy.md (C rules AND L2/L10/L15/L16, E6/E7, D1 — they constrain what you plan), docs/content-model.md, docs/playbook-core.md, the domain overlay (docs/playbook-math.md for a mathematical subject, docs/playbook-history.md for a historical one), docs/voita-playbook.md (lesson skeleton, framework-first + flaw-driven sequencing, density norms), and the example .claude/skills/course-architect/examples/course.yaml.${brief}`,
       `Source summaries from the reading swarm (JSON): ${JSON.stringify(summaries)}`,
       `Produce, in content/courses/${slug}/:`,
       `1. course.yaml — outcomes first (Bloom), then modules/lessons per the pedagogy rules (no lesson-count cap — scope follows the material; no padding or micro-slicing, every lesson has one substantive goal) (easy openers, acyclic prerequisites, spiral reinforces, technical noun-phrase titles, declarative openings, demo specs only where the concept is dynamic AND the reader can DO something in it per D1 — sliders on a curve the lesson already plots do not qualify). Mark advanced off-path chapters \`type: extra\` — the core path must survive skipping them; no non-extra lesson may list one as a prerequisite (lint: extra-prereq). Include intro, course-level prerequisites, key_results, sources.`,
@@ -215,7 +232,7 @@ if (phaseArg === 'structure') {
       `1f. Math in metadata (docs/content-model.md): tagline, goal, outcome and key_result text are typeset with KaTeX — write inline LaTeX between single dollars ($\\sum_i 2^{-l_i} \\le 1$), never ASCII mangling like "2^-li <= 1" or "sigma^2". Short and inline only.`,
       `1e. SLUG CONTINUITY — this course already exists and has drafted lessons. Read the current content/courses/${slug}/course.yaml FIRST. Where your new plan keeps a lesson whose subject matches an existing one, REUSE its exact slug and keep \`status: drafted\` plus any \`key_image\` (its prose will be revised later against the new plan; the brief must say what has to change). Only genuinely new or re-scoped lessons are added with \`status: planned\`. Never rename a drafted slug. In your final message, list explicitly: kept slugs, new slugs, and any existing lesson your plan drops (with the reason) — dropping requires the human's decision, so leave dropped lessons in place and flag them instead of deleting.`,
       `2. concepts.yaml — skeleton registry for every introduced concept.`,
-      `3. research/sources.yaml — the canon list with URLs, access notes, and one-line roles.`,
+      `3. research/sources.yaml — the canon list with URLs, access notes, and one-line roles.${degraded.length ? ` Sources the swarm could NOT fully read (JSON): ${JSON.stringify(degraded)} — record each with its access status, and flag them prominently in your final message: the human will obtain full copies from the publishers, so the research can be re-run for them later.` : ''}`,
       `4. research/images.yaml — the index of the captured image pool: every image_candidate the readers surfaced, deduplicated, each with its \`id\`, \`capture\` path under research/images/, what it shows, source, exact location, URL/PDF pointer, licence as stated, and quality note. The files are already on disk — nobody re-reads the source later. Delete captures you drop as duplicates so the pool and the index agree.`,
       `5. research/<lesson-slug>.md for EVERY lesson — the resumable brief: which source chapters/sections to consult (from the chapter maps), the key points the lesson must cover, and any pitfalls. Mine the reader summaries' figures and gems: name the concrete worked examples and set pieces (with source pointers) the lesson should recreate — do not let them evaporate between reading and writing. Include a FIGURE PLAN section: 4-8 planned visuals for the lesson, each tagged \`draw:\` or \`source:\`. \`draw:\` (the default, most of them) — one line on what it shows, whether it is a single <Figure> or a <FigureSequence> step-through (processes/algorithms should be sequences), and which source figure inspired the idea (recreate ideas, never copy drawings — docs/figures.md). \`source:\` — a real artefact from research/images.yaml that a redrawing would falsify (photograph, apparatus, scan of the original statement, published plot of measured data): give the images.yaml id (its capture is already on disk), the file stem to save the finished crop under, what the reader must be able to see in it, and placement (centered, or float left/right beside the prose). How many \`source:\` entries a lesson earns depends on the subject: for a technical course 1-2 is plenty, because the house voice is drawn figures; for a subject whose artefacts ARE the material (history, art, biology, medicine — photographs, documents, maps, specimens) sourced images can carry half the visuals. Never source what a clean drawing would explain better, and never pad a lesson with decoration. These briefs are what lesson-writer agents will be grounded in later — make them specific.`,
       `5a. Every brief also carries an EXERCISE PLAN (pedagogy E6/E7 + the domain overlay's difficulty floor): 4-8 planned exercises, each one line, and the plan must clear the floor — at most one mechanical warm-up, and at least two of {boundary probe at the degenerate case; plausible false claim to refute; derivation the lesson skipped (corollary, reverse direction, second proof, tight case); research-shaped task (reproduce a number from the source, estimate from real data, design the distinguishing experiment)}. Exactly one exercise is marked FORWARD (E7): it lands the reader on the doorstep of a later lesson's result — computing the object that lesson will name, or hitting the wall its mechanism removes — and the plan says which lesson it reaches. Plugging numbers into the formula just displayed is not an exercise; if the plan reads like a drill sheet, rewrite it.`,
@@ -224,7 +241,7 @@ if (phaseArg === 'structure') {
     ].join('\n\n'),
     { label: 'synthesize-structure' },
   )
-  return { phase: 'structure', sources: sources.length, read: summaries.length, synthesis }
+  return { phase: 'structure', sources: sources.length, read: summaries.length, not_fully_read: degraded, synthesis }
 }
 
 if (phaseArg === 'lessons') {
