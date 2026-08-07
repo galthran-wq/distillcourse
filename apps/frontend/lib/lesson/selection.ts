@@ -15,8 +15,7 @@ export interface Passage {
 }
 
 /** Nothing is selected: no range, a bare caret, or whitespace alone. */
-export function selectionEmpty(): boolean {
-  const selection = window.getSelection();
+export function selectionEmpty(selection: Selection | null): boolean {
   return (
     selection === null ||
     selection.rangeCount === 0 ||
@@ -32,7 +31,7 @@ export function selectionEmpty(): boolean {
  */
 export function selectedPassage(course: string, lesson: string): Passage | null {
   const selection = window.getSelection();
-  if (selection === null || selectionEmpty()) return null;
+  if (selection === null || selectionEmpty(selection)) return null;
   const text = selection.toString().replace(/\s+/g, " ").trim();
 
   const range = selection.getRangeAt(0);

@@ -16,6 +16,17 @@ export interface LessonPosition {
 const position = createStore<LessonPosition | null>(null);
 
 export function setPosition(next: LessonPosition): void {
+  // Measured on every scroll event, so most calls carry the position the store
+  // already holds; writing it anyway would re-render every consumer at the
+  // frame rate of the scroll.
+  const current = position.get();
+  if (
+    current?.course === next.course &&
+    current.lesson === next.lesson &&
+    current.anchor === next.anchor
+  ) {
+    return;
+  }
   position.set(next);
 }
 
@@ -54,7 +65,7 @@ export function anchorUnder(
   // Over the last screenful the line slides down to the foot of the viewport:
   // there is no scrolling left to bring the closing section up to a quarter
   // down, and it is on screen and being read all the same.
-  const line = height - Math.min(below, height * (1 - READING_LINE));
+  const line = Math.max(height * READING_LINE, height - below);
   let current: string | null = headings[0]?.id ?? null;
   for (const heading of headings) {
     if (heading.top > line) break;

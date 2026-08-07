@@ -21,14 +21,19 @@ export default function LessonPosition({ course, lesson, headings }: Props) {
 
   useEffect(() => {
     const order = ids === "" ? [] : ids.split(" ");
+    // Looked up once: the ids are what the effect is keyed on, so the elements
+    // they name do not change under it, and a scroll handler has no business
+    // walking the document.
+    const found = order.flatMap((id) => {
+      const heading = document.getElementById(id);
+      return heading === null ? [] : [{ id, heading }];
+    });
 
     const measure = (): void => {
-      const tops = order.flatMap((id) => {
-        const heading = document.getElementById(id);
-        return heading === null
-          ? []
-          : [{ id, top: heading.getBoundingClientRect().top }];
-      });
+      const tops = found.map(({ id, heading }) => ({
+        id,
+        top: heading.getBoundingClientRect().top,
+      }));
       const below =
         document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
       setPosition({
@@ -41,10 +46,17 @@ export default function LessonPosition({ course, lesson, headings }: Props) {
     measure();
     window.addEventListener("scroll", measure, { passive: true });
     window.addEventListener("resize", measure);
+    // Not every move of a heading is a scroll or a resize: an image settling,
+    // a figure hydrating or a details block opening shifts the page under a
+    // reader who has not touched it, and leaves the store naming a section
+    // they are no longer in.
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
 
     return () => {
       window.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
+      observer.disconnect();
       clearPosition(course, lesson);
     };
   }, [course, lesson, ids]);

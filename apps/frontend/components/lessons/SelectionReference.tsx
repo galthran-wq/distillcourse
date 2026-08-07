@@ -30,7 +30,7 @@ export default function SelectionReference({
     // whether it does so before or after the pointerup read above is the
     // browser's business; the collapse itself only ever fires this.
     const withdraw = (): void => {
-      if (selectionEmpty()) setPassage(null);
+      if (selectionEmpty(window.getSelection())) setPassage(null);
     };
     document.addEventListener("pointerup", update);
     document.addEventListener("keyup", update);

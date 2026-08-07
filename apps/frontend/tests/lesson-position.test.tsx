@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import LessonPosition from "@/components/LessonPosition";
 import {
   anchorUnder,
   clearPosition,
   currentLocator,
   setPosition,
+  useLessonPosition,
   type HeadingTop,
 } from "@/lib/lesson/position";
 import { mounted } from "./utils/dom";
@@ -53,8 +54,7 @@ describe("the reader's position", () => {
 });
 
 const VIEWPORT = 900;
-// Four sections of a lesson, as they measure when the reader is at the top of
-// it: the first is under the opening prose, the rest are below the fold.
+// Heading tops in document order, named s1…sN.
 function page(...tops: number[]): HeadingTop[] {
   return tops.map((top, index) => ({ id: `s${index + 1}`, top }));
 }
@@ -90,7 +90,31 @@ describe("the section on screen", () => {
   });
 });
 
-const { host, render } = mounted();
+const { render } = mounted();
+
+// jsdom has no ResizeObserver and the spy makes one: enough of it to mount,
+// and to let a test move the page the way nothing else here can.
+const observing = new Set<ResizeObserverCallback>();
+class TestResize implements ResizeObserver {
+  constructor(private readonly callback: ResizeObserverCallback) {}
+  observe(): void {
+    observing.add(this.callback);
+  }
+  unobserve(): void {
+    observing.delete(this.callback);
+  }
+  disconnect(): void {
+    observing.delete(this.callback);
+  }
+}
+globalThis.ResizeObserver = TestResize;
+
+/** The page changing height under a reader who has not touched it. */
+function reflow(): void {
+  act(() => {
+    for (const callback of observing) callback([], new TestResize(() => {}));
+  });
+}
 
 // jsdom lays nothing out, so the headings are told where they are.
 function layout(tops: Record<string, number>, below: number): void {
@@ -114,9 +138,44 @@ function spy(...headings: string[]): void {
 }
 
 describe("the spy on a lesson page", () => {
+  // The headings live in a container of their own: the React host `mounted`
+  // appended is in the body too, and writing the fixture to `body.innerHTML`
+  // would detach it.
+  const page = document.createElement("main");
+
   beforeEach(() => {
-    document.body.innerHTML = `<h2 id="a"></h2><h2 id="b"></h2><h2 id="c"></h2>`;
+    page.innerHTML = `<h2 id="a"></h2><h2 id="b"></h2><h2 id="c"></h2>`;
+    document.body.prepend(page);
     window.innerHeight = VIEWPORT;
+  });
+
+  afterEach(() => page.remove());
+
+  it("leaves its readers alone while the reader stays in one section", () => {
+    let renders = 0;
+    function Reader() {
+      useLessonPosition();
+      renders += 1;
+      return null;
+    }
+    layout({ a: -2900, b: -800, c: 1600 }, 3000);
+    act(() =>
+      render(
+        <>
+          <LessonPosition course="info-theory" lesson="entropy" headings={["a", "b"]} />
+          <Reader />
+        </>,
+      ),
+    );
+    const settled = renders;
+
+    // A scroll within the section: measured every time, worth telling the ToC
+    // and the chat widget about none of them.
+    layout({ a: -3400, b: -1300, c: 1100 }, 2500);
+    act(() => window.dispatchEvent(new Event("scroll")));
+
+    expect(currentLocator()).toBe("lesson:info-theory/entropy#b");
+    expect(renders).toBe(settled);
   });
 
   it("reports where the reader is now, not where a band last saw them", () => {
@@ -132,12 +191,30 @@ describe("the spy on a lesson page", () => {
     expect(currentLocator()).toBe("lesson:info-theory/entropy#b");
   });
 
+  it("follows the page moving under a reader who has not scrolled", () => {
+    layout({ a: 500, b: 2600, c: 5000 }, 6000);
+    spy("a", "b", "c");
+    expect(currentLocator()).toBe("lesson:info-theory/entropy#a");
+
+    // A figure above the fold settles into its full height: no scroll, no
+    // resize, and the reader is in a different section than a moment ago.
+    layout({ a: -2900, b: -800, c: 1600 }, 3000);
+    reflow();
+
+    expect(currentLocator()).toBe("lesson:info-theory/entropy#b");
+  });
+
   it("stops reporting once the reader leaves the lesson", () => {
     layout({ a: 500, b: 2600, c: 5000 }, 6000);
     spy("a");
     act(() => render(<></>));
 
     expect(currentLocator()).toBeNull();
-    expect(host().innerHTML).toBe("");
+    // A listener or an observer left behind would measure the page the reader
+    // has left and put its position back.
+    act(() => window.dispatchEvent(new Event("scroll")));
+    reflow();
+
+    expect(currentLocator()).toBeNull();
   });
 });
