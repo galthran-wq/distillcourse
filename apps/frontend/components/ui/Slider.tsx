@@ -40,8 +40,7 @@ export function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={ariaLabel ?? label}
         aria-valuetext={ariaValueText}
-        className="mt-1 block h-11 w-full"
-        style={{ accentColor: "var(--accent)" }}
+        className="range-accent mt-1 block h-11 w-full"
       />
     </label>
   );

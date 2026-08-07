@@ -1,0 +1,730 @@
+The DFT samples one period of a finite record’s spectrum and therefore inherits both periodic indexing and implementation conventions.
+
+<Ref lesson="sampling-aliasing-and-reconstruction">Sampling, Aliasing, and Reconstruction</Ref> ended with eight harmonic correlations for one finite record. <Ref lesson="dtft-and-frequency-response">DTFT and Frequency Response</Ref> established the continuous, two-pi-periodic function on which those eight values lie. This lesson turns those values into a complete finite coordinate system by fixing its transform pair, frequency labels, real-input symmetry, numerical scale, and circular boundary rule.
+
+The route has six parts: declare the transform, attach units to its bins, exploit real symmetry without losing information, audit scale, distinguish circular from linear convolution, and separate denser spectral sampling from longer observation.
+
+## Eight correlations become one declared transform
+
+The eight coefficients inherited from the preceding lesson can support further computation only after their sign, index range, and inverse are fixed.
+
+<Task>
+Work closed-book before reading the answers. (1) Write the DTFT of a finite $x[n]$ with the course analysis sign and state its periodicity. (2) State the conjugacy rule for a real sequence and the consequence at $0$ and $\pi$. (3) State what zero padding changes and what it leaves unchanged. (4) Recall the two nonzero correlations of $x[n]=\cos(2\pi(2/8)n)$ for $0\le n<8$.
+</Task>
+
+<Aside title="Retrieval answers">
+The DTFT is $X(e^{j\omega})=\sum_n x[n]e^{-j\omega n}$ and is $2\pi$-periodic. For real $x[n]$, $X(e^{-j\omega})=X^*(e^{j\omega})$; values at the self-conjugate frequencies $0$ and $\pi$ are real when nonzero, and phase is undefined at a zero. Zero padding appends stored zeros and evaluates the same finite-record DTFT on a denser grid; it adds no acquired data. The eight correlations are $X[2]=X[6]=4$, with every other coefficient zero.
+</Aside>
+
+### The previous correlation list is a transform pair
+
+For the inherited record,
+
+$$
+x[n]=\cos\!\left(2\pi\frac{2}{8}n\right),\qquad 0\le n<8,
+$$
+
+the eight correlations form
+
+$$
+[X[0],\ldots,X[7]]=[0,0,4,0,0,0,4,0].
+$$
+
+Each entry is a coordinate against one complex basis sequence. The coefficient at $k=2$ measures the $+2$ direction around the frequency circle; $k=6\equiv-2\pmod 8$ measures its conjugate direction. Their sum reconstructs the real cosine.
+
+<Definition title="N-point discrete Fourier transform">
+For a declared record $x[n]$ on the half-open index set $n=0,\ldots,N-1$, the course uses the transform pair
+
+$$
+X[k]=\sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/N},
+\qquad k=0,\ldots,N-1,
+$$
+
+$$
+x[n]=\frac1N\sum_{k=0}^{N-1}X[k]e^{+j2\pi kn/N},
+\qquad n=0,\ldots,N-1.
+$$
+
+Equivalently, with $W_N=e^{-j2\pi/N}$, the forward kernel is $W_N^{kn}$ and the inverse kernel is its conjugate, scaled by $1/N$.
+</Definition>
+
+The canonical example is the eight-point cosine above. A structurally different valid example is a unit impulse $x[n]=\delta[n]$, whose every coefficient equals $1$. The degenerate case $N=1$ gives the single pair $X[0]=x[0]$. A list of four samples paired with five coefficients is a near-miss: it violates the requirement that one $N$ governs both index sets. A valid example of your own must declare $N$, all $N$ sample indices, and the same $N$ output indices.
+
+### Roots of unity make the coordinates invertible
+
+The inverse is not a convention chosen independently of the forward sum. Its factor follows from the orthogonality of the $N$ basis sequences.
+
+<Theorem title="roots-of-unity orthogonality and DFT inversion">
+For a positive integer $N$ and integers $k$ and $\ell$,
+
+$$
+\sum_{n=0}^{N-1}e^{j2\pi(k-\ell)n/N}
+=
+\begin{cases}
+N,&k\equiv\ell\pmod N,\\
+0,&k\not\equiv\ell\pmod N.
+\end{cases}
+$$
+
+Consequently, the stated inverse recovers every $N$-sample record exactly.
+
+<Proof>
+The proof is direct. First evaluate the finite geometric sum; then substitute the forward transform into the proposed inverse; finally use orthogonality to retain only the term whose time index matches $n$.
+
+If $k\not\equiv\ell\pmod N$, the ratio $r=e^{j2\pi(k-\ell)/N}$ satisfies $r^N=1$ but $r\ne1$, so
+
+$$
+\sum_{n=0}^{N-1}r^n=\frac{1-r^N}{1-r}=0.
+$$
+
+If $k\equiv\ell$, every term is $1$ and the sum is $N$. Now substitute the forward sum into the inverse:
+
+$$
+\begin{aligned}
+\frac1N\sum_{k=0}^{N-1}X[k]e^{j2\pi kn/N}
+&=\frac1N\sum_{m=0}^{N-1}x[m]
+  \sum_{k=0}^{N-1}e^{j2\pi k(n-m)/N}\\
+&=\frac1N\sum_{m=0}^{N-1}x[m]N\,\delta_{nm}=x[n].
+\end{aligned}
+$$
+</Proof>
+</Theorem>
+
+The proof also identifies $X[k]$ as an inner product. With $v_k[n]=e^{j2\pi kn/N}$,
+
+$$
+X[k]=\langle x,v_k\rangle
+=\sum_{n=0}^{N-1}x[n]v_k^*[n].
+$$
+
+The DFT is therefore a bank of $N$ exact complex correlations, not a list restricted to sinusoids that generated the data.
+
+<Figure name="DftBasisCorrelations" alt="A four-cell input vector is multiplied by four rows of the complex DFT basis; the highlighted k equals one row computes one times one plus zero times minus j plus minus one times minus one plus zero times j, giving X of one equal to two." caption="Each DFT coefficient is one correlation with a complete complex basis row." />
+
+<Example title="one four-point coordinate audit">
+For $x=[1,0,-1,0]$ and $N=4$, $W_4=-j$. The four basis rows give
+
+$$
+\begin{aligned}
+X[0]&=1+0-1+0=0,\\
+X[1]&=1+0(-j)+(-1)(-1)+0(j)=2,\\
+X[2]&=1+0(-1)+(-1)(1)+0(-1)=0,\\
+X[3]&=1+0(j)+(-1)(-1)+0(-j)=2.
+\end{aligned}
+$$
+
+Substitution into the inverse returns $[1,0,-1,0]$. For example,
+
+$$
+x[2]=\frac14\left(2e^{j2\pi(1)(2)/4}+2e^{j2\pi(3)(2)/4}\right)
+=\frac14(-2-2)=-1.
+$$
+</Example>
+
+<Exercise>
+Apply the same row-correlation method to $x=[1,0,1,0]$. Write all four coefficients and verify $x[1]$ by the inverse before opening the solution.
+
+<Solution>
+The strategy is to reuse the same four basis rows and change only the third input from $-1$ to $+1$.
+
+$$
+\begin{aligned}
+X[0]&=1+1=2,\\
+X[1]&=1+(1)(-1)=0,\\
+X[2]&=1+(1)(1)=2,\\
+X[3]&=1+(1)(-1)=0.
+\end{aligned}
+$$
+
+Thus $X=[2,0,2,0]$. The inverse check at $n=1$ is
+
+$$
+x[1]=\frac14\left(2+2e^{j\pi}\right)=\frac14(2-2)=0.
+$$
+</Solution>
+</Exercise>
+
+<KeyFact>
+The DFT represents the declared $N$ samples exactly, even when an off-bin component spreads across all $N$ coordinates; exact representation does not imply sparse physical interpretation.
+</KeyFact>
+
+The transform now has an exact inverse, but coefficient index $k$ still has neither a hertz value nor a unique plotting position.
+
+## A bin acquires hertz only from N and the sample rate
+
+The coefficient index becomes a frequency coordinate only after the record length and acquisition rate bind it to a normalized and physical axis.
+
+### One index has three useful labels
+
+Take $N=8$ samples acquired at $f_s=8$ kHz. Adjacent DFT coordinates are separated by
+
+$$
+\Delta\omega=\frac{2\pi}{N}=\frac\pi4\ \text{rad/sample},
+\qquad
+\Delta f=\frac{f_s}{N}=1\ \text{kHz}.
+$$
+
+The unshifted array labels are
+
+| $k$ | $0$ | $1$ | $2$ | $3$ | $4$ | $5$ | $6$ | $7$ |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| $\omega_k=2\pi k/N$ | $0$ | $\pi/4$ | $\pi/2$ | $3\pi/4$ | $\pi$ | $5\pi/4$ | $3\pi/2$ | $7\pi/4$ |
+| unsigned $f_k$ (kHz) | $0$ | $1$ | $2$ | $3$ | $4$ | $5$ | $6$ | $7$ |
+| signed $\widetilde f_k$ (kHz) | $0$ | $+1$ | $+2$ | $+3$ | $-4$ | $-3$ | $-2$ | $-1$ |
+
+The last row uses the declared half-open interval $[-f_s/2,f_s/2)$. Define
+
+$$
+\kappa(k)=
+\begin{cases}
+k,&k<N/2,\\
+k-N,&k\ge N/2,
+\end{cases}
+\qquad
+\widetilde f_k=\kappa(k)\frac{f_s}{N}.
+$$
+
+For odd $N$, the same inequalities retain $k=0,\ldots,(N-1)/2$ as nonnegative and wrap the remaining indices negative. For even $N$, $k=N/2$ is the single Nyquist coordinate. This course labels that endpoint $-f_s/2$ in signed displays; a $+f_s/2$ label is equivalent, but one plot must not show both.
+
+High array indices therefore do not mean high positive physical frequencies. They often store negative-frequency directions in an unshifted array. An `fftshift` display merely reorders the same coefficients so negative labels appear first; it changes neither values nor normalization.
+
+### The record contains N samples but spans two related time quantities
+
+The declared samples lie at $0,T_s,\ldots,(N-1)T_s$, so the distance from first to last sample is $(N-1)T_s$. The periodized coordinate model repeats after $NT_s$, and its bin spacing is $1/(NT_s)=f_s/N$. Calling both quantities the record duration hides an endpoint convention. This lesson uses **acquisition aperture** $NT_s$ for the denominator that sets DFT spacing and states the first-to-last span separately when it matters.
+
+The DFT samples the finite-record DTFT at these normalized coordinates. If
+
+$$
+X_r(e^{j\omega})=\sum_{n=0}^{N-1}x[n]e^{-j\omega n},
+$$
+
+then direct substitution gives
+
+$$
+X[k]=X_r(e^{j\omega})\big|_{\omega=2\pi k/N}.
+$$
+
+<Figure src="./figures/dtft-dft-bin-samples.svg" alt="The magnitude DTFT of an eight-sample alternating record is a continuous periodic curve, while eight equally spaced DFT stems sample it and leave only bin four at magnitude eight." caption="The DFT does not replace the DTFT curve; it samples one period at N declared coordinates." />
+
+<Exercise>
+A six-point record is sampled at $f_s=12$ kHz. Without computing a DFT, list the unshifted bin frequencies and the signed labels on $[-6,6)$ kHz. State whether a Nyquist singleton exists and identify it.
+
+<Solution>
+The strategy is to compute the spacing first: $\Delta f=f_s/N=12/6=2$ kHz. Unshifted labels are
+
+$$
+[0,2,4,6,8,10]\ \text{kHz}.
+$$
+
+Using $\kappa(k)=k$ for $k<3$ and $k-6$ for $k\ge3$ gives
+
+$$
+[0,+2,+4,-6,-4,-2]\ \text{kHz}.
+$$
+
+Because $N=6$ is even, $k=N/2=3$ is the one self-conjugate Nyquist bin. The half-open convention labels it $-6$ kHz and does not duplicate it at $+6$ kHz.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Always publish a DFT axis with four declarations: $N$, $f_s$, array order, and the Nyquist endpoint convention; a bare bin index is not a physical frequency.
+</KeyFact>
+
+Once signed locations are explicit, the paired values of a real record require an exact symmetry rule rather than a plotting shortcut.
+
+## Real records halve storage, not the transform
+
+The negative-frequency half is redundant for real input, but redundancy does not erase its meaning or authorize one universal factor-of-two rule.
+
+### Conjugacy determines the paired half
+
+For real $x[n]$, conjugating the forward sum gives
+
+$$
+\begin{aligned}
+X^*[k]
+&=\sum_{n=0}^{N-1}x[n]e^{+j2\pi kn/N}\\
+&=\sum_{n=0}^{N-1}x[n]e^{-j2\pi(N-k)n/N}
+=X[(N-k)\bmod N].
+\end{aligned}
+$$
+
+Thus $X[0]$ is real. When $N$ is even, $X[N/2]$ is also real because it is its own conjugate partner. An odd-length DFT has no Nyquist bin: its highest positive and negative bins remain a conjugate pair.
+
+For $N=8$ and
+
+$$
+x[n]=\cos\!\left(2\pi\frac{1}{8}n\right),
+$$
+
+the raw DFT is
+
+$$
+X=[0,4,0,0,0,0,0,4].
+$$
+
+The coefficients at $+1$ and $-1$ kHz are both required by the ordinary inverse. Each represents a complex exponential of amplitude $1/2$; together they produce a real cosine of peak amplitude $1$.
+
+### Storage and amplitude reporting solve different problems
+
+A real-input transform may store only the independent complex coefficients $X[0],\ldots,X[\lfloor N/2\rfloor]$ and reconstruct the rest by conjugacy. That is a logical half-spectrum, not a universal memory layout. A packed API may return complex values, interleave real scalars, omit known endpoint imaginary parts, or require the original odd length during inversion.
+
+A *one-sided peak-amplitude spectrum* is a different object. Under the course's raw forward DFT, define
+
+$$
+A[0]=\frac{|X[0]|}{N},
+$$
+
+and, when $N$ is even,
+
+$$
+A[N/2]=\frac{|X[N/2]|}{N}.
+$$
+
+Every retained paired interior bin uses
+
+$$
+A[k]=\frac{2|X[k]|}{N}.
+$$
+
+For the eight-point cosine, $A[1]=2(4)/8=1$. DC and the even-$N$ Nyquist bin are not doubled because each is already its own partner. For odd $N$, every retained bin from $1$ through $(N-1)/2$ has a distinct negative-frequency partner and receives the interior factor.
+
+<Figure name="RealDftConventionLedger" alt="An eight-sample real cosine produces conjugate coefficients of four at bins one and seven; aligned rows map the full two-sided coefficients to signed hertz, a logical packed-real output, a one-sided amplitude of one, and four declared scaling conventions." caption="The same DFT numbers mean different plotted amplitudes and layouts only after the convention is declared." />
+
+<Example title="phase-sensitive data versus an amplitude report">
+Let
+
+$$
+x[n]=\cos\!\left(2\pi\frac n8+\frac\pi3\right).
+$$
+
+The raw coefficients are
+
+$$
+X[1]=4e^{j\pi/3},\qquad X[7]=4e^{-j\pi/3}.
+$$
+
+The ordinary inverse needs the conjugate pair, or a packed complex representation from which the pair is restored. A one-sided amplitude report instead gives $A[1]=1$ and discards the phase $\pi/3$. It correctly reports tone amplitude but cannot recover the record's alignment.
+</Example>
+
+<Exercise>
+For $x[n]=2+3\cos(2\pi(2/8)n-\pi/4)+(-1)^n$, write its nonzero raw eight-point DFT coefficients and its one-sided peak-amplitude entries. Mark every coefficient that must not be doubled.
+
+<Solution>
+The strategy is to transform the three terms separately and add them. The constant $2$ gives $X[0]=2N=16$. The cosine of peak amplitude $3$ gives
+
+$$
+X[2]=\frac{3N}{2}e^{-j\pi/4}=12e^{-j\pi/4},
+\qquad
+X[6]=12e^{+j\pi/4}.
+$$
+
+The alternating term is the Nyquist basis and gives $X[4]=8$. All other coefficients vanish. The one-sided peak-amplitude entries are
+
+$$
+A[0]=\frac{16}{8}=2,
+\qquad
+A[2]=\frac{2(12)}8=3,
+\qquad
+A[4]=\frac88=1.
+$$
+
+DC at $k=0$ and Nyquist at $k=4$ are singletons and are not doubled. Only the paired interior cosine coefficient receives the factor of two.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Use a complex half-spectrum for reversible real-input storage and a doubled interior magnitude spectrum for peak-amplitude reporting; one cannot be substituted for the other without restoring phase and endpoint rules.
+</KeyFact>
+
+Symmetry fixes relationships among bins, but it does not fix numerical scale. Two correct transform pairs may still differ by $N$ or $\sqrt N$.
+
+## Scaling is an interface contract
+
+The coefficient magnitude is interpretable only together with the forward and inverse scale factors that define the transform pair.
+
+### One alternating record exposes every factor
+
+For $N=8$ and $x[n]=(-1)^n=e^{j\pi n}$, the analysis basis at $k=4$ is the matching rotation. Hence
+
+$$
+X[4]=\sum_{n=0}^{7}1=8,
+\qquad X[k]=0\quad(k\ne4).
+$$
+
+The course inverse returns
+
+$$
+x[n]=\frac18X[4]e^{j2\pi(4)n/8}=(-1)^n.
+$$
+
+A unitary transform places $1/\sqrt N$ in both directions, so it reports $X_u[4]=8/\sqrt8=\sqrt8$. A forward-scaled transform places $1/N$ in analysis and no factor in synthesis, so it reports $X_f[4]=1$. All three pairs reconstruct the same samples.
+
+Let the forward transform carry scale $\alpha$ and the inverse carry scale $\beta$. Exact inversion requires
+
+$$
+\alpha\beta N=1.
+$$
+
+The course choice is $\alpha=1$, $\beta=1/N$. The unitary choice is $\alpha=\beta=1/\sqrt N$. Moving the full factor to the forward transform gives $\alpha=1/N$, $\beta=1$. A library that leaves both directions unscaled requires an explicit external factor $1/N$ for a round trip.
+
+The frequently quoted $N/2$ factor belongs only to the raw magnitude of a bin-centered real sinusoid away from DC and Nyquist: a cosine of peak amplitude $A$ gives two raw magnitudes $AN/2$. It is not an inverse-transform scale.
+
+### Parseval carries the same scale choice
+
+<Theorem title="Parseval identity for the course DFT pair">
+For the unscaled forward transform and $1/N$ inverse,
+
+$$
+\sum_{n=0}^{N-1}|x[n]|^2
+=\frac1N\sum_{k=0}^{N-1}|X[k]|^2.
+$$
+
+<Proof>
+Insert the inverse expressions for $x[n]$ and $x^*[n]$. Expanding their product gives a double sum over $k$ and $\ell$ multiplied by
+$\sum_n e^{j2\pi(k-\ell)n/N}$. Roots-of-unity orthogonality removes every $k\ne\ell$ cross term and supplies a factor $N$ to the remaining terms. The two inverse factors contribute $1/N^2$, leaving $1/N$.
+</Proof>
+</Theorem>
+
+The alternating record checks both sides: its time energy is $8$, while its only raw spectral value has energy $|8|^2$, and $(1/8)64=8$. Under unitary scaling the spectral energy is directly $|\sqrt8|^2=8$.
+
+<KeyFact>
+A transform result is not fully specified by an array: publish the analysis sign, forward scale, inverse scale, and bin order before comparing amplitudes, energies, or round trips.
+</KeyFact>
+
+With sign, order, and scale fixed, coefficient multiplication has an exact time-domain meaning. Its boundary rule is the remaining distinction.
+
+## DFT multiplication wraps the convolution
+
+The continuous DTFT theorem maps linear convolution to multiplication, but an $N$-point inverse maps a product back onto an $N$-sample circle.
+
+### The smallest useful example exposes the wrap
+
+Take $x=[1,2]$ and $h=[1,-1]$. Zero-extended linear convolution from <Ref lesson="impulse-response-and-convolution">Impulse Response and Convolution</Ref> is
+
+$$
+x*h=[1,1,-2].
+$$
+
+If both records are treated as length two, index $2$ is congruent to index $0$ modulo $2$. The tail $-2$ wraps onto the first value, giving the two-point result
+
+$$
+[-1,1].
+$$
+
+<Definition title="N-point circular convolution">
+For two $N$-sample arrays, their **circular convolution** is
+
+$$
+(x\mathbin{\circledast_N}h)[n]
+=\sum_{m=0}^{N-1}x[m]h[(n-m)\bmod N],
+\qquad n=0,\ldots,N-1.
+$$
+</Definition>
+
+The example above is canonical. A structurally different valid case is $x\circledast_N\delta=x$ on the same modulo-$N$ index set. At the boundary $N=1$, circular convolution is ordinary scalar multiplication. The near-miss $[1,1,-2]$ for two length-two arrays omits the modulo clause and is linear, not circular, convolution. For a learner-generated case, the deciding clause is whether out-of-range indices are zero-extended or reduced modulo $N$.
+
+<Theorem title="DFT multiplication gives circular convolution">
+Under the course transform pair, if $Y[k]=X[k]H[k]$, then
+
+$$
+y[n]=(x\mathbin{\circledast_N}h)[n].
+$$
+
+<Proof>
+Start with the circular sum and transform it. For each fixed $m$, the change of variable $r=(n-m)\bmod N$ permutes the complete set $0,\ldots,N-1$:
+
+$$
+\begin{aligned}
+Y[k]
+&=\sum_{n=0}^{N-1}\sum_{m=0}^{N-1}
+x[m]h[(n-m)\bmod N]e^{-j2\pi kn/N}\\
+&=\sum_{m=0}^{N-1}x[m]e^{-j2\pi km/N}
+  \sum_{r=0}^{N-1}h[r]e^{-j2\pi kr/N}\\
+&=X[k]H[k].
+\end{aligned}
+$$
+
+Inversion gives the stated circular sequence.
+</Proof>
+</Theorem>
+
+### Zero padding makes the desired boundary fit
+
+If $x$ and $h$ have declared lengths $L_x$ and $L_h$, their allocated linear-convolution length is $L_x+L_h-1$. Padding both to any
+
+$$
+N\ge L_x+L_h-1
+$$
+
+prevents nonzero terms of the linear result from overlapping after periodization. For the running example, padding to $N=3$ gives DFT multiplication followed by the exact linear output $[1,1,-2]$.
+
+<Example title="one tail wrapped and then protected">
+Let $x=[1,2,3]$ and $h=[1,1]$. Linear convolution is
+
+$$
+[1,3,5,3].
+$$
+
+A three-point circular result wraps the tail $3$ onto index $0$:
+
+$$
+x\mathbin{\circledast_3}h=[4,3,5].
+$$
+
+Padding both arrays to $N=4=L_x+L_h-1$ gives the four-point circular result $[1,3,5,3]$, exactly equal to the linear convolution.
+</Example>
+
+<Exercise>
+For $x=[2,-1]$ and $h=[1,3,2]$, compute the linear convolution. Then compute the three-point circular result by wrapping the linear tail, and state the smallest DFT length that reproduces the linear result exactly.
+
+<Solution>
+The strategy is to compute the full linear output first, then reduce its indices modulo the proposed circular length.
+
+$$
+\begin{aligned}
+y[0]&=2(1)=2,\\
+y[1]&=2(3)+(-1)(1)=5,\\
+y[2]&=2(2)+(-1)(3)=1,\\
+y[3]&=(-1)(2)=-2.
+\end{aligned}
+$$
+
+Thus $x*h=[2,5,1,-2]$. With $N=3$, the tail at index $3$ wraps to index $0$, so
+
+$$
+x\mathbin{\circledast_3}h=[2+(-2),5,1]=[0,5,1].
+$$
+
+The linear output has allocated length $L_x+L_h-1=2+3-1=4$, so the smallest alias-free DFT length is $N=4$.
+</Solution>
+</Exercise>
+
+<KeyFact>
+For $x=[1,2]$ and $h=[1,-1]$, the boundary contract changes the exact output: $N=2$ periodic indexing gives $[-1,1]$, while padding to the linear-output length $N=3$ preserves $[1,1,-2]$. The consequence is operational: coefficient multiplication is trustworthy only after the transform length and intended boundary model are declared.
+</KeyFact>
+
+Padding can prevent time-domain wrap, but padding used only to request more spectral coordinates solves a different problem and cannot lengthen the observation.
+
+## More plotted bins do not add observation
+
+The final distinction separates changes to the evaluation grid from changes to the acquired record, while leaving the DFT coefficients themselves ready for faster computation.
+
+### Padding can refine a coordinate estimate without resolving a pair
+
+For $N$ acquired samples, appending zeros to a transform length $L>N$ produces
+
+$$
+X_L[k]=\sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/L}.
+$$
+
+The nonzero data and their finite-record DTFT are unchanged. Only the sample locations move from spacing $f_s/N$ to $f_s/L$. This denser grid can place a sampled coordinate closer to a peak of the same continuous curve. It cannot narrow that curve's record-limited response or separate components already merged by the short observation.
+
+The lab freezes that distinction at $f_s=1024$ samples/s. A $173$ Hz cosine observed for $N=64$ samples has original spacing $16$ Hz. With no padding, the largest displayed coordinate is $176$ Hz, an error of $3/16=0.1875$ original bins. Padding by $Q=4$ gives $L=256$, places the largest coordinate at $172$ Hz, and reduces the error to $1/16=0.0625$ original bins. The estimate improves because the curve is sampled more densely.
+
+The two-tone test uses
+
+$$
+x[n]=\cos\!\left(2\pi\frac{170}{1024}n\right)
++0.8\cos\!\left(2\pi\frac{180}{1024}n+\phi\right).
+$$
+
+With $N=64$ and $L=1024$, the grid is already $1$ Hz, yet the candidate peaks do not remain near both true frequencies when $\phi$ changes from $0^\circ$ to $90^\circ$. With $N=256$ acquired samples and the same $L=1024$, the grid remains $1$ Hz while both phase tests produce peaks at $170$ and $180$ Hz. The constructed result is specific to this rectangular record, amplitude ratio, separation, and phase test; it is not a universal two-tone threshold.
+
+<Task>
+Use the four presets in order. Increase only padding from the coarse $173$ Hz tone until the location error is below $0.1$ original bins. Then compare the padded pair at $N=64,L=1024$ with the longer pair at $N=256,L=1024$ and verify that the display grid remains $1$ Hz while only the longer acquired record passes both phase tests.
+</Task>
+
+<Demo name="PaddingVsDataLab" caption="Use padding to refine one peak estimate, then hold the 1 hertz display grid fixed and determine how much acquired duration makes two phase-stable peaks appear." />
+
+<Figure name="PaddingDurationResolution" alt="Three aligned spectra use the same 1024 sample-per-second two-tone signal: a 64-sample DFT is coarse, padding those same 64 samples to 1024 points adds dense samples to the same broad response, and acquiring 256 samples before transforming 1024 points narrows the response and stabilizes separate peaks near 170 and 180 hertz." caption="Padding samples the same finite-record spectrum more densely; more acquired data changes the spectrum's resolving width." />
+
+<KeyFact>
+Hold acquired $N$ and samples fixed to test interpolation; hold transform length $L$ and plotted grid fixed to test observation duration. Without that control, a smooth plot can be mistaken for new evidence.
+</KeyFact>
+
+The coefficient contract is now complete: indices are half-open, frequency units are declared, analysis uses the negative sign, the forward scale is one, the inverse scale is $1/N$, real symmetry has singleton endpoint rules, and DFT multiplication uses circular boundaries. <Ref lesson="fft-factorization-and-layout">FFT Factorization and Machine Layout</Ref> next exploits repeated roots of unity to compute exactly these coefficients with fewer operations while making storage order and scaling explicit implementation contracts.
+
+## Exercises
+
+<Exercise>
+Compute the unscaled four-point DFT of $x=[1,0,-1,0]$ at $f_s=8$ kHz. Tabulate $k$, signed frequency, and complex $X[k]$; verify conjugate symmetry; then recover all four samples with the $1/N$ inverse.
+
+<Solution>
+The four basis correlations give $X=[0,2,0,2]$. Under the half-open signed convention,
+
+| $k$ | signed frequency (kHz) | $X[k]$ |
+|---:|---:|:---:|
+| 0 | $0$ | $0$ |
+| 1 | $+2$ | $2$ |
+| 2 | $-4$ | $0$ |
+| 3 | $-2$ | $2$ |
+
+The real coefficients obey $X[3]=X^*[1]$; DC and Nyquist are real. Inversion gives
+
+$$
+x[n]=\frac14\left(2e^{j2\pi n/4}+2e^{j2\pi(3)n/4}\right).
+$$
+
+At $n=0,1,2,3$, this evaluates to $1,0,-1,0$. The transfer is to declare the frequency axis and scale before interpreting an otherwise correct coefficient list.
+</Solution>
+</Exercise>
+
+<Exercise>
+Audit the boundaries of a one-sided amplitude report under the course DFT convention: (a) $N=1$ and $x=[C]$; (b) arbitrary $N$ and $x[n]=C$; (c) even $N$ and $x[n]=A(-1)^n$; (d) odd $N$ with the truncated alternating values $(-1)^n$. State which bins are singletons and which magnitudes may be doubled.
+
+<Solution>
+(a) For $N=1$, $X[0]=C$. DC is the only bin and is not doubled.
+
+(b) For a constant record, roots-of-unity orthogonality gives $X[0]=NC$ and $X[k]=0$ for $k\ne0$. The one-sided DC amplitude is $|X[0]|/N=|C|$ without doubling.
+
+(c) For even $N$, $(-1)^n=e^{j\pi n}$ is exactly the $k=N/2$ basis. Hence $X[N/2]=NA$ and every other bin vanishes. Nyquist is self-conjugate and its amplitude is $|X[N/2]|/N=|A|$, without doubling.
+
+(d) For odd $N$, no integer bin equals $\pi$ radians/sample and there is no Nyquist singleton. The truncated alternating record generally has several nonzero coefficients arranged in conjugate pairs. In its one-sided report, DC remains a singleton and every retained $k=1,\ldots,(N-1)/2$ has a distinct partner, so its magnitude receives the interior factor of two. The deciding boundary is whether $N/2$ is an integer bin.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim “the DFT output is nonzero only at sinusoids physically present in the signal.” Use the finite record
+
+$$
+x[n]=\cos\!\left(2\pi\frac{1.5}{8}n\right),\qquad 0\le n<8.
+$$
+
+Give enough computed coefficients to break the claim, identify the prerequisite concept that explains the spreading, and state the correct replacement model.
+
+<Solution>
+The sequence contains one real sinusoidal frequency, but its frequency is halfway between DFT bins. Direct evaluation gives, to six decimals,
+
+$$
+\begin{aligned}
+X[0]&=1,\\
+X[1]&=1+j2.179580,\\
+X[2]&=1-j2.613126,\\
+X[3]&=1-j0.648847,\\
+X[4]&=1,
+\end{aligned}
+$$
+
+with $X[5]=X^*[3]$, $X[6]=X^*[2]$, and $X[7]=X^*[1]$. Every bin is nonzero, so the claim is false.
+
+<Ref lesson="dtft-and-frequency-response">DTFT and Frequency Response</Ref> established that a finite record has a continuous DTFT. The eight DFT coefficients sample that continuous function at eight coordinates. Gating the sinusoid to eight samples creates a finite-record spectrum that is nonzero away from the generating frequency, so the correct model is coordinate sampling of a windowed record, not a detector that lists only physical components.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive Parseval's identity for a general scaled DFT pair
+
+$$
+X_\alpha[k]=\alpha\sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/N},
+$$
+
+where the inverse scale $\beta$ satisfies $\alpha\beta N=1$. Express time energy in terms of $X_\alpha$, then verify the course case on $x=[1,0,-1,0]$.
+
+<Solution>
+Let $X[k]$ denote the course's unscaled coefficient. Then $X_\alpha[k]=\alpha X[k]$, so $X[k]=X_\alpha[k]/\alpha$. Course Parseval gives
+
+$$
+\sum_n|x[n]|^2
+=\frac1N\sum_k\left|\frac{X_\alpha[k]}{\alpha}\right|^2
+=\frac{1}{N|\alpha|^2}\sum_k|X_\alpha[k]|^2.
+$$
+
+For the course case, $\alpha=1$ and $X=[0,2,0,2]$. Therefore
+
+$$
+\sum_n|x[n]|^2=1^2+(-1)^2=2,
+$$
+
+and
+
+$$
+\frac14\sum_k|X[k]|^2=\frac14(4+4)=2.
+$$
+
+For the unitary case $|\alpha|=1/\sqrt N$, the Parseval prefactor becomes one and energy is equal on the two sides without an additional factor.
+</Solution>
+</Exercise>
+
+<Exercise>
+A real $1$ kHz cosine of peak amplitude $1$ is sampled at $8$ kHz for $N=8$. Choose the representation needed for (a) phase-sensitive reconstruction and (b) reporting tone amplitude. Produce both representations, apply the correct factor-of-two rule, and verify the inverse. State why an amplitude-only one-sided plot cannot serve task (a).
+
+<Solution>
+The samples are $x[n]=\cos(2\pi n/8)$. Their raw two-sided DFT is
+
+$$
+X[1]=4,\qquad X[7]=4,
+$$
+
+with every other coefficient zero. Phase-sensitive reconstruction uses this full complex representation, or a packed complex half-spectrum that preserves $X[1]$ and reconstructs $X[7]=X^*[1]$. The ordinary inverse is
+
+$$
+\begin{aligned}
+x[n]
+&=\frac18\left(4e^{j2\pi n/8}+4e^{-j2\pi n/8}\right)\\
+&=\cos(2\pi n/8).
+\end{aligned}
+$$
+
+For amplitude reporting, retain the positive bin and compute
+
+$$
+A[1]=\frac{2|X[1]|}{N}=\frac{2(4)}8=1.
+$$
+
+The factor of two combines the magnitudes of the conjugate interior pair. DC and an even-$N$ Nyquist coefficient would not be doubled. An amplitude-only plot has removed the complex phase; many shifted cosines share the same magnitude, so it cannot recover sample alignment.
+</Solution>
+</Exercise>
+
+<Exercise>
+For $N=8$, split
+
+$$
+X[k]=\sum_{n=0}^{7}x[n]W_8^{kn}
+$$
+
+into sums over even and odd $n$. Identify two four-point transforms that are reused, derive formulas for $X[k]$ and $X[k+4]$ for $k=0,1,2,3$, and state which repeated products no longer need separate evaluation.
+
+<Solution>
+Write even indices as $n=2r$ and odd indices as $n=2r+1$:
+
+$$
+\begin{aligned}
+X[k]
+&=\sum_{r=0}^{3}x[2r]W_8^{k(2r)}
++\sum_{r=0}^{3}x[2r+1]W_8^{k(2r+1)}\\
+&=\sum_{r=0}^{3}x[2r]W_4^{kr}
++W_8^k\sum_{r=0}^{3}x[2r+1]W_4^{kr}.
+\end{aligned}
+$$
+
+Define the two four-point transforms
+
+$$
+E[k]=\sum_{r=0}^{3}x[2r]W_4^{kr},
+\qquad
+O[k]=\sum_{r=0}^{3}x[2r+1]W_4^{kr}.
+$$
+
+Then, for $k=0,1,2,3$,
+
+$$
+X[k]=E[k]+W_8^kO[k].
+$$
+
+Because $W_8^{k+4}=-W_8^k$ and $E,O$ are four-periodic in $k$,
+
+$$
+X[k+4]=E[k]-W_8^kO[k].
+$$
+
+The same $E[k]$, $O[k]$, and twiddle product $W_8^kO[k]$ therefore supply two outputs; computing the second half from fresh eight-term correlations would repeat them. <Ref lesson="fft-factorization-and-layout">FFT Factorization and Machine Layout</Ref> formalizes this reuse recursively as the radix-two FFT while preserving exactly the DFT coefficients defined here.
+</Solution>
+</Exercise>
+
+<References>
+1. Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, *Discrete-Time Signal Processing*, 2nd ed., §§8.4–8.7, Problem 8.57, and §§10.1–10.2 — DFT sampling and inversion, finite-sequence periodicity, real symmetry, circular convolution, Parseval scaling, physical frequency, and zero padding.
+2. Richard G. Lyons, *Understanding Digital Signal Processing*, 3rd ed., §§3.1–3.2, 3.4–3.5, 3.7–3.8, 3.11, and 3.14 — correlation interpretation, bin labels, real-input symmetry, amplitude scaling, leakage, inversion, and zero-padding limits.
+3. Dennis Freeman, *Signals and Systems, MIT 6.003*, Fall 2011, Sessions 17–18, slides 45–53 and 16–32 respectively — finite discrete Fourier-series bases, roots-of-unity orthogonality, matrix inversion, and the even/odd factorization; its analysis-normalized coefficients correspond to $X[k]/N$ under this lesson's convention. https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/
+4. Jack Schaedler, *Seeing Circles, Sines, and Signals*, Lessons 15, 21–25, and 28 — DFT notation, quadrature correlations, an eight-point audit, bin structure, record length, zero padding, and implementation-layout cautions. https://jackschaedler.github.io/circles-sines-signals/
+</References>

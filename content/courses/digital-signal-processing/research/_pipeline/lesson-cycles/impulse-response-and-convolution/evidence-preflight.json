@@ -1,0 +1,282 @@
+{
+  "status": "complete_with_spec_issues",
+  "lesson": "impulse-response-and-convolution",
+  "brief_path": "content/courses/digital-signal-processing/research/impulse-response-and-convolution.md",
+  "prerequisite_path": "content/courses/digital-signal-processing/lessons/sampled-sequences/lesson.mdx",
+  "checks_count": 15,
+  "source_count": 5,
+  "issues_found": 7,
+  "checked_equations_and_outputs": [
+    {
+      "id": "canonical_linear_convolution",
+      "inputs": {
+        "x": [1, 2],
+        "x_indices": [0, 1],
+        "h": [1, -1],
+        "h_indices": [0, 1],
+        "extension": "zero outside each declared finite support"
+      },
+      "equation": "y[n] = sum_m x[m] h[n-m]",
+      "overlap_sums": [
+        "y[0] = 1(1) = 1",
+        "y[1] = 2(1) + 1(-1) = 1",
+        "y[2] = 2(-1) = -2"
+      ],
+      "expected": [1, 1, -2],
+      "output_indices": [0, 1, 2],
+      "result": "verified"
+    },
+    {
+      "id": "planned_warmup_linear_convolution",
+      "inputs": {
+        "x": [1, 2, -1],
+        "x_indices": [0, 1, 2],
+        "h": [1, 0.5],
+        "h_indices": [0, 1],
+        "extension": "zero outside each declared finite support"
+      },
+      "overlap_sums": [
+        "y[0] = 1(1) = 1",
+        "y[1] = 2(1) + 1(0.5) = 2.5",
+        "y[2] = -1(1) + 2(0.5) = 0",
+        "y[3] = -1(0.5) = -0.5"
+      ],
+      "expected": [1, 2.5, 0, -0.5],
+      "output_indices": [0, 1, 2, 3],
+      "result": "verified"
+    },
+    {
+      "id": "planned_periodic_buffer_comparison",
+      "definition": "For N=3, y_c[n] = sum_{m=0}^{2} x[m] h[(n-m) mod 3], with h padded to [1,0.5,0].",
+      "expected_linear": [1, 2.5, 0, -0.5],
+      "expected_circular_3": [0.5, 2.5, 0],
+      "wrapped_term": "The linear tail y[3]=-0.5 wraps onto y_c[0], changing 1 to 0.5.",
+      "nonperiodic_echo_choice": "zero-padded linear convolution",
+      "result": "verified"
+    },
+    {
+      "id": "three_tap_symbolic_gate",
+      "definition": "For x=[1,2,-1] and a contiguous three-tap h=[a,b,c], both starting at 0, y=[a, 2a+b, -a+2b+c, -b+2c, -c] on n=0..4.",
+      "sparse_echo_form": "For dry/early/late delays 0<d1<d2, h[n]=a delta[n]+b delta[n-d1]+c delta[n-d2] and y[n]=a x[n]+b x[n-d1]+c x[n-d2]. Delay d samples is 1000d/f_s milliseconds.",
+      "result": "formula verified; intended numeric case cannot be checked because the brief supplies no three coefficients, delay indices, or sample rate"
+    },
+    {
+      "id": "finite_support_bounds",
+      "rule": "If x has declared indices n_x0..n_x1 and h has n_h0..n_h1, linear convolution is zero outside n_x0+n_h0 .. n_x1+n_h1. For nonzero endpoint coefficients this is exact support and length L_x+L_h-1; cancellation or zero endpoints can shrink actual support.",
+      "canonical_application": "0..1 convolved with 0..1 gives 0..2, length 3.",
+      "warmup_application": "0..2 convolved with 0..1 gives 0..3, length 4.",
+      "result": "verified"
+    },
+    {
+      "id": "impulse_decomposition_to_convolution",
+      "steps": [
+        "x[n] = sum_m x[m] delta[n-m]",
+        "linearity gives T{x}[n] = sum_m x[m] T{delta[n-m]}[n]",
+        "time invariance and h[n]=T{delta[n]} give T{delta[n-m]}[n]=h[n-m]",
+        "therefore y[n]=sum_m x[m]h[n-m]"
+      ],
+      "scope": "Exact without convergence concerns for finite-support sequences; infinite sums require the system/domain assumptions that license the expansion and interchange.",
+      "result": "verified"
+    },
+    {
+      "id": "linearity_and_time_invariance_are_separate",
+      "linear_not_time_invariant": "T{x}[n]=n x[n] obeys superposition, but T{x[n-n0]}=n x[n-n0] differs from T{x}[n-n0]=(n-n0)x[n-n0].",
+      "time_invariant_not_linear": "T{x}[n]=x[n]^2 commutes with shifts, but T{a x}=a^2 x^2 is not a T{x} in general.",
+      "result": "verified"
+    },
+    {
+      "id": "identity_and_annihilator_boundaries",
+      "cases": [
+        "x*delta=x under the same index origin",
+        "x*[a]=a x for a one-tap kernel at index 0",
+        "x*0=0",
+        "delta*h=h"
+      ],
+      "near_miss": "A length-one kernel [1] at index d is a delay, not the identity at the original indices.",
+      "result": "verified"
+    },
+    {
+      "id": "finite_buffer_boundary_contract",
+      "required_fields": [
+        "input and kernel start indices",
+        "outside-record extension: zero, periodic, reflected, held, or longer-stream state",
+        "linear versus N-point circular output",
+        "full output, same-length crop, valid-only crop, and any latency alignment",
+        "state initialization and final-tail flush for streaming"
+      ],
+      "prerequisite_alignment": "The prerequisite lesson explicitly states that a finite record declares neither periodic extension nor zero padding; this lesson must choose rather than infer an extension.",
+      "result": "verified"
+    },
+    {
+      "id": "constant_probe_identifiability",
+      "candidate_kernels": {
+        "h_A": [1, 0, 0],
+        "h_B": [0, 1, 0]
+      },
+      "steady_or_periodic_constant_probe": "For x[n]=1, both have tap sum 1 and produce y[n]=1; a period-3 constant record gives [1,1,1] for both. The observation matrix has rank 1.",
+      "finite_zero_padded_constant_probe": "For x=[1,1,1], full linear outputs are [1,1,1,0,0] and [0,1,1,1,0], so edge transients distinguish the kernels. In general y[0]=h0, y[1]=h0+h1, y[2]=h0+h1+h2 recovers a causal three-tap kernel.",
+      "result": "the planned refutation is valid only after declaring periodic/steady-state observation or cropping away edge transients"
+    },
+    {
+      "id": "held_out_probe_falsification",
+      "sufficient_probe": "A unit impulse returns h directly, so it distinguishes h_A from h_B.",
+      "general_condition": "For a finite L-tap identification, the stacked convolution/design matrix of the observed probes must have column rank L. A second input is evidence only to the extent that it adds independent excitation.",
+      "claim_limit": "Passing one held-out input supports the model on that input; it does not by itself prove global LTI behavior or uniqueness under noise/model mismatch.",
+      "result": "verified with stated rank condition"
+    },
+    {
+      "id": "demo_numeric_acceptance",
+      "tap_test": "max_i |h_hat[i]-h[i]| <= 0.01",
+      "recommended_output_test": "||y_hat-y||_2 / ||y||_2 < 0.01, with an explicit rule for ||y||_2=0",
+      "result": "tap threshold is testable; normalized output error is under-specified in the course demo spec"
+    },
+    {
+      "id": "notation_contract",
+      "lesson_rule": "Use T{x}, h[n], x*h, and local dummy m in sum_m x[m]h[n-m]. Preserve n as sample index and delta[n] as the unit impulse.",
+      "source_translation": "Translate source dummy k to m so later DFT-bin k and decimation M remain unambiguous.",
+      "result": "notation ledger and brief agree; course.yaml and concepts.yaml still display k"
+    },
+    {
+      "id": "prerequisite_contract",
+      "inherited": [
+        "n is a dimensionless integer index",
+        "physical time requires t0 and T_s",
+        "finite records do not imply periodic extension",
+        "values outside a finite domain are undefined until an extension is declared",
+        "between-sample behavior is not part of x[n]"
+      ],
+      "lesson_specific_consequence": "Echo delays must be labeled in samples first and in milliseconds only after f_s or T_s is declared.",
+      "result": "verified"
+    },
+    {
+      "id": "chapter_section_provenance",
+      "result": "verified against local merged summaries and text caches, with corrections listed in issues"
+    }
+  ],
+  "near_miss_and_boundary_cases": [
+    {
+      "case": "same finite values, different extension",
+      "distinction": "[1,2,-1] zero-padded with [1,0.5] gives [1,2.5,0,-0.5], while period-3 circular convolution gives [0.5,2.5,0]."
+    },
+    {
+      "case": "three output samples versus three taps",
+      "distinction": "[1,2]*[1,-1] has a three-sample output but a two-tap kernel; output length is not tap count."
+    },
+    {
+      "case": "constant input non-identifiability",
+      "distinction": "True for an eternal/periodic constant or steady-state-only observation; false for a full finite zero-padded record whose edge transients are retained."
+    },
+    {
+      "case": "single passed property test",
+      "distinction": "A scaling example cannot establish time invariance, and a shift example cannot establish linearity; either property can fail independently."
+    },
+    {
+      "case": "one-tap identity",
+      "distinction": "[1] at index 0 is identity; the same coefficient attached to index d is a delay."
+    },
+    {
+      "case": "support formula",
+      "distinction": "L_x+L_h-1 is the allocated linear-convolution length for declared finite arrays, but mathematical nonzero support may be shorter if endpoints are zero or cancel."
+    }
+  ],
+  "sources": [
+    {
+      "id": "oppenheim-schafer",
+      "title": "Discrete-Time Signal Processing, Second Edition",
+      "precise_locations": [
+        "Chapter 2 §2.1.1, PDF pp. 36-41 (printed pp. 11-16): weighted shifted-unit-sample decomposition",
+        "Chapter 2 §§2.2.2-2.2.3, PDF pp. 43-46 (printed pp. 18-21): linearity and time invariance",
+        "Chapter 2 §2.3, PDF pp. 47-53 (printed pp. 22-28): impulse response and convolution sum",
+        "Chapter 2 §2.4, PDF pp. 53-59 (printed pp. 28-34): convolution properties"
+      ],
+      "local_summary": "content/courses/digital-signal-processing/research/_pipeline/summaries/oppenheim-schafer.json",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/oppenheim-s1.txt"
+    },
+    {
+      "id": "lyons",
+      "title": "Understanding Digital Signal Processing, Third Edition",
+      "precise_locations": [
+        "Chapter 1 §§1.4-1.6, PDF pp. 35-41: separate LTI tests",
+        "Chapter 1 §§1.7-1.8, PDF pp. 41-43: impulse response and convolution characterization",
+        "Chapter 5 §§5.1-5.2, PDF pp. 168-181: FIR convolution and coefficient/impulse-response identity",
+        "Chapter 5 §5.9, PDF pp. 206-216: flip-and-slide convolution and P+Q-1 length"
+      ],
+      "local_summary": "content/courses/digital-signal-processing/research/_pipeline/summaries/lyons.json",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/lyons-s1.txt"
+    },
+    {
+      "id": "mit-6003",
+      "title": "Signals and Systems, MIT 6.003, Fall 2011",
+      "precise_locations": [
+        "Session 8 slides 15-21: linearity, time invariance, and superposition",
+        "Session 8 slides 21-48: discrete- and continuous-time convolution construction",
+        "Problem Set 5 Problems 1-3 and solutions: worked convolution and repeated-pole responses"
+      ],
+      "local_summary": "content/courses/digital-signal-processing/research/_pipeline/summaries/mit-6003.json",
+      "local_caches": [
+        "content/courses/digital-signal-processing/research/texts/mit6003-s1.txt",
+        "content/courses/digital-signal-processing/research/texts/mit6003-s2.txt"
+      ]
+    },
+    {
+      "id": "smith-dsp-guide",
+      "title": "The Scientist and Engineer's Guide to Digital Signal Processing",
+      "precise_locations": [
+        "Chapter 5, Requirements for Linearity through Superposition: linearity, shift invariance, and decomposition",
+        "Chapter 6, The Delta Function and Impulse Response through The Output-Side Algorithm, Eq. 6-1 and Fig. 6-10: impulse response, two convolution views, N+M-1 length, and zero boundary samples",
+        "Chapter 7, Common Impulse Responses and Mathematical Properties: delta identity, delays, echoes, and convolution algebra"
+      ],
+      "local_summary": "content/courses/digital-signal-processing/research/_pipeline/summaries/smith-dsp-guide.json",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/smithguide-s1.txt"
+    },
+    {
+      "id": "orfanidis",
+      "title": "Introduction to Signal Processing, Second Edition",
+      "precise_locations": [
+        "Chapter 3 §§3.2-3.3, physical PDF pp. 123-130 (printed pp. 100-107): LTI tests, impulse response, and convolution",
+        "Chapter 4 §§4.1.1-4.1.6, physical PDF pp. 145-158 (printed pp. 122-135): direct, tabular, LTI, Toeplitz, and flip-and-slide forms",
+        "Chapter 4 §4.1.7, physical PDF pp. 158-161 (printed pp. 135-138): finite-record transients",
+        "Chapter 4 §§4.3.2-4.3.4, physical PDF pp. 178-188 (printed pp. 155-165): tapped delay lines, sample-update order, and circular buffers"
+      ],
+      "local_summary": "content/courses/digital-signal-processing/research/_pipeline/summaries/orfanidis.json",
+      "local_cache": "content/courses/digital-signal-processing/research/texts/orfanidis-s1.txt"
+    }
+  ],
+  "issues": [
+    {
+      "id": "missing_numeric_three_tap_case",
+      "severity": "blocking_for_exact_three_tap_verification",
+      "detail": "course.yaml promises one three-tap hand convolution and the brief calls for a three-tap echo, but every specified numeric hand example uses h=[1,-1] or h=[1,0.5], both two-tap kernels. The exercise-fix packet also calls h=[1,-1] the same three-tap kernel. No three coefficients, sparse delay indices, or sample rate are supplied."
+    },
+    {
+      "id": "constant_probe_boundary_qualification",
+      "severity": "substantive",
+      "detail": "The claim that one constant input cannot uniquely identify a kernel is not true for the full output of a finite zero-padded causal experiment, whose startup edge equations can recover the taps. State periodic/eternal constant input, steady-state-only scoring, circular convolution, or an explicit crop that removes edge transients."
+    },
+    {
+      "id": "demo_identification_metric_under_specified",
+      "severity": "substantive",
+      "detail": "Normalized output error has no declared norm or zero-output rule, and second-input validation has no excitation/rank requirement. Define the metric and use an impulse or another probe whose stacked convolution matrix has rank three."
+    },
+    {
+      "id": "mit_provenance_mismatch",
+      "severity": "citation",
+      "detail": "The brief routes LTI tests, impulse responses, and convolution to MIT 6.003 Sessions 1-3 and Problem Sets 1-2. The local course corpus places the relevant first treatment in Session 8 slides 15-48 and the worked convolution set in Problem Set 5; Sessions 1-3 instead emphasize abstraction, difference equations, feedback, and modes."
+    },
+    {
+      "id": "oppenheim_impulse_decomposition_pointer_incomplete",
+      "severity": "citation",
+      "detail": "Oppenheim Chapter 2 §§2.2-2.4 support system tests and the LTI convolution derivation, but the standalone identity x[n]=sum_m x[m]delta[n-m] is introduced in §2.1.1. Add §2.1.1 when citing every-sequence impulse decomposition."
+    },
+    {
+      "id": "orfanidis_range_overbroad",
+      "severity": "citation",
+      "detail": "The brief cites Orfanidis Chapter 4 §§4.1-4.4 for methods, but §4.4 is the problem set. Exact method provenance is §§4.1.1-4.1.10 and §§4.3.1-4.3.4; the LTI derivation itself is Chapter 3 §§3.2-3.3."
+    },
+    {
+      "id": "convolution_dummy_inconsistent",
+      "severity": "notation",
+      "detail": "The notation ledger and brief require dummy m, while course.yaml and concepts.yaml display sum_k x[k]h[n-k]. The lesson should use m and treat the schema forms as expressions requiring notation translation, not as the production notation."
+    }
+  ]
+}

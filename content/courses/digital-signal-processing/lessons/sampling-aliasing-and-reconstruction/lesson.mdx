@@ -1,0 +1,469 @@
+Sampling multiplies a continuous signal by an impulse train, which replicates its spectrum and makes overlap irreversible.
+
+<Ref lesson="dtft-and-frequency-response">DTFT and Frequency Response</Ref> established a two-pi-periodic discrete-frequency axis and ended by deriving the sampled-spectrum replica sum. This lesson supplies the acquisition contract behind that sum: how hertz map to radians/sample, when replicas remain separable, and why filtering after overlap cannot identify their analog origins. The route runs from two sinusoids with identical samples to the sampling theorem, its equality boundary, and realizable anti-alias and reconstruction stages.
+
+## One sample grid gives many analog frequencies the same identity
+
+The periodic frequency axis becomes an acquisition ambiguity as soon as the sampling period is fixed.
+
+### A 700 Hz cosine becomes a 300 Hz cosine
+
+<Example title="two analog tones, one sequence">
+Sample the two continuous-time signals
+
+$$
+x_1(t)=\cos(2\pi\,300t),
+\qquad
+x_2(t)=\cos(2\pi\,700t)
+$$
+
+at $f_s=1000$ samples/s, so $T_s=1$ ms. Their samples are
+
+$$
+\begin{aligned}
+x_1[n]&=\cos(0.6\pi n),\\
+x_2[n]&=\cos(1.4\pi n)
+       =\cos(2\pi n-0.6\pi n)
+       =\cos(0.6\pi n).
+\end{aligned}
+$$
+
+Both produce the exact sequence
+
+$$
+[1,-0.309,-0.809,0.809,0.309,-1,\ldots].
+$$
+
+The 300 Hz complex mode maps to $+0.6\pi$ radians/sample, while the 700 Hz mode maps to $1.4\pi\equiv-0.6\pi$ radians/sample. A real cosine contains both conjugate directions, so reversing the direction leaves the real samples unchanged.
+</Example>
+
+{/* fig SampleEquivalentSinusoids: two continuous cosine curves at 300 Hz and 700 Hz over 0 to 5 ms, sharing the same six sample dots at 1 ms spacing; lower strip maps +300 Hz to +0.6 pi and +700 Hz to -0.6 pi on the discrete-frequency circle; exact sample values 1, -0.309, -0.809, 0.809, 0.309, -1; amber 700 Hz curve, blue 300 Hz curve, black shared dots; KaTeX labels */}
+<Figure name="SampleEquivalentSinusoids" alt="Continuous 300 hertz and 700 hertz cosines pass through the same sample dots at a 1000 sample-per-second grid, while their complex directions map to plus and minus 0.6 pi radians per sample." caption="At 1000 samples per second, the 700 hertz and 300 hertz cosines are indistinguishable from their samples." />
+
+### Hertz become periodic radians per sample
+
+<Definition title="sampling">
+For a continuous-time signal $x_c(t)$ and sampling period $T_s$, **sampling** forms the discrete sequence
+
+$$
+x[n]=x_c(nT_s),
+\qquad
+f_s=\frac1{T_s}.
+$$
+
+The index $n$ is dimensionless, $nT_s$ is time in seconds, and $f_s$ is measured in samples/second.
+</Definition>
+
+An analog frequency $f$ hertz maps to the discrete frequency
+
+$$
+\omega=2\pi\frac{f}{f_s}
+\quad\text{radians/sample},
+$$
+
+with all values modulo $2\pi$. Consequently, $f$, $f+kf_s$, and, for real cosines, $-f+kf_s$ belong to the same sample-equivalence family for integer $k$.
+
+<Definition title="aliasing">
+**Aliasing** is the indistinguishability that occurs when distinct continuous-time frequencies or spectral regions map to the same discrete frequency. For a real sinusoid, its apparent baseband frequency can be written
+
+$$
+f_a=\min_{k\in\mathbb Z}|f-kf_s|,
+\qquad 0\le f_a\le\frac{f_s}{2},
+$$
+
+while the sign of $f-kf_s$ records the complex-frequency direction.
+</Definition>
+
+<KeyFact>
+A sample array contains no hertz scale by itself: changing the declared $T_s$ changes every analog-frequency interpretation without changing a single stored number.
+</KeyFact>
+
+## Impulse sampling replicates the complete spectrum
+
+The sinusoid collision is one line-spectrum case of a complete transform relation.
+
+### A 400 Hz band either fits or overlaps
+
+Suppose $X_c(j\Omega)$ is zero outside $|f|\le400$ Hz. Sampling at $f_s=1000$ samples/s places copies of that spectrum at $0$ and at every integer multiple of $1000$ Hz. The central support $[-400,400]$ and its right neighbor $[600,1400]$ leave a 200 Hz gap. At $f_s=700$ samples/s, the right neighbor becomes $[300,1100]$ and overlaps the central copy on $[300,400]$.
+
+The copies arise by representing ideal sampling as multiplication by the period-$T_s$ impulse train
+
+$$
+p(t)=\sum_{n=-\infty}^{\infty}\delta(t-nT_s),
+\qquad
+x_s(t)=x_c(t)p(t).
+$$
+
+<Theorem title="spectrum of ideal impulse sampling">
+Let $x_c(t)$ have continuous-time Fourier transform $X_c(j\Omega)$, and let $\Omega_s=2\pi/T_s$. The impulse-sampled signal has spectrum
+
+$$
+X_s(j\Omega)
+=\frac1{T_s}\sum_{k=-\infty}^{\infty}
+X_c\!\left(j(\Omega-k\Omega_s)\right).
+$$
+
+The goal is to turn time-domain multiplication into a frequency-domain replica sum. The direct derivation uses the transform of the impulse train, applies the multiplication-convolution rule with its $1/(2\pi)$ scale, and evaluates convolution with each shifted impulse.
+
+<Proof>
+The impulse train transform is
+
+$$
+P(j\Omega)=\frac{2\pi}{T_s}
+\sum_{k=-\infty}^{\infty}\delta(\Omega-k\Omega_s).
+$$
+
+Therefore
+
+$$
+\begin{aligned}
+X_s(j\Omega)
+&=\frac1{2\pi}X_c(j\Omega)*P(j\Omega)\\
+&=\frac1{T_s}\sum_{k=-\infty}^{\infty}
+X_c\!\left(j(\Omega-k\Omega_s)\right).
+\end{aligned}
+$$
+
+Each impulse shifts one copy of $X_c$, and the factor $1/T_s$ scales every copy equally.
+</Proof>
+</Theorem>
+
+### The DTFT is the normalized replica sum
+
+Because
+
+$$
+X_s(j\Omega)=\sum_n x[n]e^{-j\Omega nT_s}
+=X(e^{j\omega})\big|_{\omega=\Omega T_s},
+$$
+
+the continuous hertz axis and the periodic DTFT axis are related by
+
+$$
+X(e^{j\omega})
+=\frac1{T_s}\sum_{k=-\infty}^{\infty}
+X_c\!\left(j\frac{\omega-2\pi k}{T_s}\right).
+$$
+
+The units matter: $\Omega$ is radians/second, $\omega$ is radians/sample, and $f=\Omega/(2\pi)$ is hertz.
+
+<Task>
+In the sequence, track the support interval nearest $+f_s$. First place the central copy, then add its two neighbors, then reduce $f_s$ until only the two approaching edges change and the overlap region appears.
+</Task>
+
+{/* fig replica-overlap: 4-frame sequence on identical hertz axes; frame 1 central triangular spectrum support [-B,B]; frame 2 add copies centered at +/-fs with 1/Ts scale; frame 3 reduce fs while copies remain separated and label guard fs-2B; frame 4 reduce below 2B and shade the summed overlap red; one delta per frame, blue central copy, amber neighbors, exact labels -fs, -B, B, fs */}
+<FigureSequence name="replica-overlap" alt="Four fixed-axis frames add neighboring sampled-spectrum replicas and then reduce their spacing until the copies overlap." caption="Sampling periodizes the analog spectrum; aliasing begins when neighboring supports cease to be disjoint." />
+
+<KeyFact>
+The factor $1/T_s$ changes spectral amplitude but not the overlap decision; replica spacing $f_s$ and occupied support determine whether information remains separable.
+</KeyFact>
+
+## Nonoverlap permits reconstruction, with a strict universal margin
+
+The replica formula makes reconstruction a selection problem: one copy can be recovered only while no other copy contributes inside it.
+
+### Equality can erase a Nyquist-frequency sinusoid
+
+Before stating a safe condition, sample a tone exactly at $f_s/2$:
+
+$$
+x_c(t)=A\cos(\pi f_s t+\phi).
+$$
+
+At the sample instants,
+
+$$
+x[n]=A\cos(\pi n+\phi)=A(-1)^n\cos\phi.
+$$
+
+For $\phi=0$, the samples alternate $+A,-A$. For $\phi=\pi/2$, every sample is zero. The equality case $f_s=2B$ therefore does not guarantee recovery for every endpoint component and phase: the positive- and negative-frequency endpoint lines collapse onto the same discrete point and may add or cancel.
+
+<Theorem title="bandlimited reconstruction under a strict sampling margin">
+Let the known sampling period be $T_s$. Assume $x_c(t)$ has a suitable ordinary or $L^2$ Fourier-transform interpretation, $X_c(j\Omega)=0$ for $|\Omega|>\Omega_B$, and the complete exact uniform sequence $x[n]=x_c(nT_s)$ is available for every integer $n$. If
+
+$$
+\Omega_s=\frac{2\pi}{T_s}>2\Omega_B
+\qquad\text{or equivalently}\qquad
+f_s>2B.
+$$
+
+then the spectral replicas are disjoint, $x_c(t)$ is uniquely determined within this declared bandlimited signal class, and an ideal reconstruction band containing $[-\Omega_B,\Omega_B]$ but no neighboring replica recovers it exactly.
+
+The proof is direct. The strict inequality creates a nonempty gap between the central copy and its neighbors; an ideal filter selects and rescales only the central copy; inverse transformation gives the original signal.
+
+<Proof>
+The central sampled-spectrum copy occupies $[-\Omega_B,\Omega_B]$. Its nearest right neighbor begins at $\Omega_s-\Omega_B$, which exceeds $\Omega_B$ precisely when $\Omega_s>2\Omega_B$; the left side is symmetric. Choose an ideal reconstruction response with gain $T_s$ over the central support and zero before either neighbor. Multiplication by this response cancels the $1/T_s$ sampling scale and leaves exactly $X_c(j\Omega)$. Fourier inversion then returns $x_c(t)$.
+
+With the convenient cutoff $\pi/T_s$ and
+
+$$
+\operatorname{sinc}(u)=\frac{\sin(\pi u)}{\pi u},
+\qquad \operatorname{sinc}(0)=1,
+$$
+
+the inverse transform yields the interpolation formula
+
+$$
+x_c(t)=\sum_{n=-\infty}^{\infty}
+x[n]\operatorname{sinc}\!\left(\frac{t-nT_s}{T_s}\right).
+$$
+
+The sinc argument is dimensionless because both $t$ and $nT_s$ are seconds. Each interpolation kernel has unit value at its own sample, while the continuous-time impulse-train reconstruction filter has frequency-domain gain $T_s$ to cancel the replicas' $1/T_s$ scale.
+</Proof>
+</Theorem>
+
+### Shifted sinc kernels supply the between-sample values
+
+Each shifted sinc equals one at its own sample time and zero at every other sample time. The weighted sum therefore passes through every sample, while bandlimiting, not the interpolation points alone, makes that particular curve the unique admissible reconstruction.
+
+<Task>
+Advance from one kernel to five kernels and compare the running sum at the marked sample instants and halfway between them. The sample values are fixed immediately; the between-sample shape converges as distant sinc tails are included.
+</Task>
+
+{/* fig sinc-reconstruction: 4-frame sequence with fixed axes and five sample stems; frame 1 one shifted sinc weighted by x[0], frame 2 add neighbor x[1], frame 3 add x[-1], frame 4 add remaining two and show the final bandlimited curve; every frame retains prior kernels, individual kernels thin amber/blue, sum black, exact zeros at other sample instants */}
+<FigureSequence name="sinc-reconstruction" alt="Four frames add weighted shifted sinc kernels whose running sum passes through five fixed sample values and approaches one bandlimited curve." caption="Ideal reconstruction assigns every between-sample value through the infinite sinc sum, not through straight-line connection." />
+
+<KeyFact>
+The strict guard $f_s-2B>0$ is both an endpoint safeguard and a filter transition budget; the equality case leaves no frequency interval in which a realizable response can roll off.
+</KeyFact>
+
+## Overlap destroys provenance before digital processing begins
+
+The reconstruction theorem supplies uniqueness only inside its declared bandlimited class; without that restriction, the sampler is many-to-one.
+
+### Identical samples force identical digital outputs
+
+The 300 Hz and 700 Hz cosines already prove irreversibility. They produce the same $x[n]$, so every deterministic digital system receives the same input and must produce the same output for both. A digital lowpass may remove the shared discrete component, but it cannot keep the 300 Hz origin while rejecting the 700 Hz origin because the origin is not encoded in the samples.
+
+This argument extends from tones to overlapped spectral regions. Inside an overlap, the sampled spectrum contains a sum of contributions shifted from different analog bands. One equation supplies only their sum; infinitely many source pairs produce it. Later processing can impose a model or use a second measurement channel, but no single-channel digital filter can invert the acquisition map from the samples alone.
+
+### Finite records add evidence limits, not recovery information
+
+A record of $N$ samples is weaker still. It cannot establish that the analog input was bandlimited, stationary, or zero outside the observed interval. Even an infinite uniform sequence is unchanged if the continuous signal is replaced by
+
+$$
+\widetilde x_c(t)=x_c(t)+a\sin(2\pi f_s t),
+$$
+
+because the added term is zero at every $t=nT_s$. A finite record also has a windowed spectrum whose spreading belongs to finite observation; that later leakage effect must not be mistaken for analog aliasing created before the record existed.
+
+The lab tests ordinary lowpass reconstruction for the full real signal class known a priori to satisfy $|f|\le B=4.0$ kHz, not sparse-tone identification below the sampling theorem's rate. Its displayed mixture is
+
+$$
+\begin{aligned}
+x_c(t)={}&\cos(2\pi\,0.7t+20^\circ)
++0.75\cos(2\pi\,1.8t-35^\circ)\\
+&+0.50\cos(2\pi\,3.1t+45^\circ)
++0.35\cos(2\pi\,4.0t+\phi),
+\end{aligned}
+$$
+
+where frequency is in kilohertz and $t$ is in milliseconds. The universal check tests each of the four frequencies separately at phases $0^\circ$, $45^\circ$, and $90^\circ$, so the smaller edge component cannot be hidden by the larger low-frequency components.
+
+Candidate sample rates run from $6.00$ to $10.00$ kHz on a $0.25$ kHz grid. Ideal sample-only reconstruction retains a tone strictly below $f_s/2$, maps a tone above $f_s/2$ to its baseband alias, and at equality reconstructs only the observable cosine projection $\cos\phi\cos(2\pi ft)$. Reference and reconstruction are evaluated without delay alignment at the same $M=512$ times $t_m=20m/M$ ms using
+
+$$
+E=\frac{\lVert \widehat x-x\rVert_2}
+{\max(\lVert x\rVert_2,\varepsilon_{\mathrm{mach}})},
+\qquad
+E_{\rm dB}=20\log_{10}E.
+$$
+
+Here $\varepsilon_{\mathrm{mach}}$ is JavaScript's `Number.EPSILON`.
+
+Exact zero is floored at $-120$ dB for display only. Passing requires the unfloored $E<10^{-3}$ for every tone-phase case, every tone strictly inside Nyquist, and clearance $f_s/2-B\ge0.50$ kHz. The finite grid makes $9.00$ kHz the unique lowest passing rate; over a continuous choice, rates merely approach the unsafe $8$ kHz equality and no smallest strict rate exists.
+
+<Task>
+Find the lowest rate whose per-tone test is strictly below minus 60 decibels and whose Nyquist clearance is at least $0.50$ kHz. Then select $f_s=8.00$ kHz and $\phi=90^\circ$ to make the nonzero 4 kHz edge tone disappear from every sample, before returning to the guarded passing rate.
+</Task>
+
+<Demo name="AliasThresholdLab" caption="Find the lowest guarded rate that passes every supplied tone, then return to equality and choose the phase that makes a nonzero tone disappear from the samples." />
+
+<KeyFact>
+Anti-alias filtering is an acquisition operation: after two analog contributions have become one discrete component, a digital filter has no frequency, phase, or magnitude label that reveals which contribution to remove.
+</KeyFact>
+
+## Practical filters spend the nonoverlap margin
+
+The ideal theorem ends at exact impulse samples and a brick-wall interpolator — a response flat across the kept band and exactly zero beyond it; an engineering chain must allocate its spectral gap before and after conversion.
+
+### The anti-alias filter precedes the sampler
+
+Suppose a sensor must preserve content through $1.6$ kHz and contains interference confined to $2.6$–$3.4$ kHz, with negligible energy elsewhere. At $f_s=4$ kHz, the first folding boundary is $2$ kHz, and a $2.6$ kHz interferer appears at $|2.6-4|=1.4$ kHz, inside the desired band. An analog lowpass placed before the sampler can limit passband ripple to $0.1$ dB through $1.6$ kHz and provide at least $60$ dB attenuation from $2.6$ kHz upward, spending the 1.0 kHz interval as its transition band.
+
+Raising the rate to $8$ kHz moves the folding boundary to $4$ kHz, so the declared $2.6$–$3.4$ kHz interference remains distinct and can be removed digitally. Under the frozen support assumption, either change prevents overlap; without that upper bound, raising the rate alone would not guarantee protection because higher analog bands could still fold into $0$–$1.6$ kHz. A higher rate moves the aliases; it does not make an unlimited analog spectrum bandlimited.
+
+Real anti-alias filters therefore require a passband edge, a stopband edge, and an attenuation target. Their transition width, phase, delay, and component tolerances are part of the acquisition specification. Sampling-clock jitter adds a separate time error that especially affects high-frequency components; neither the ideal impulse train nor a later digital lowpass models it away.
+
+### Reconstruction filters suppress images and hold droop
+
+Ideal impulse reconstruction followed by a gain-$T_s$ brick-wall filter produces the sinc sum. A practical digital-to-analog converter commonly holds each value for one sample period. This zero-order hold has magnitude
+
+$$
+|H_{\rm ZOH}(j\Omega)|
+=T_s\left|\frac{\sin(\Omega T_s/2)}{\Omega T_s/2}\right|,
+$$
+
+so it introduces sinc-shaped passband droop and leaves attenuated images around multiples of $f_s$. An analog reconstruction lowpass suppresses those images; a preceding digital response may compensate part of the droop if its noise and headroom costs are acceptable. Finite filters replace the theorem's exact cutoff with ripple, transition width, delay, and residual images.
+
+{/* fig IdealVsHoldReconstruction: paired signal chains with identical input samples; left impulse DAC plus ideal gain-Ts brick-wall response yielding flat baseband and removed images; right zero-order hold staircase with sinc droop, half-sample phase factor, residual images, and analog reconstruction lowpass; exact axes at 0, fs/2, fs; amber hold response, blue ideal response, noncolor solid/dashed cues; KaTeX labels */}
+<Figure name="IdealVsHoldReconstruction" alt="Paired reconstruction chains compare an ideal impulse converter and brick-wall lowpass with a zero-order hold whose sinc droop and residual images require analog filtering." caption="Practical reconstruction suppresses spectral images and budgets hold droop, transition width, and delay rather than implementing an infinite sinc exactly." />
+
+<KeyFact>
+One gap serves two filters: the analog anti-alias response must finish attenuating before folding, and the reconstruction response must reject the first image without damaging the retained band.
+</KeyFact>
+
+The lesson has now established sampling as spectral replication, the hertz-to-radians/sample map, strict nonoverlap as a phase-independent reconstruction condition, the irreversibility of overlap, and the separate jobs of analog anti-alias and reconstruction filters. **DFT Bins, Symmetry, and Scaling** next replaces the infinite sample sequence by a finite record and computes a declared set of frequency coordinates.
+
+## Exercises
+
+<Exercise>
+<Ref lesson="dtft-and-frequency-response">DTFT and Frequency Response</Ref> established that discrete frequency is modulo $2\pi$. Sample
+
+$$
+x_c(t)=\cos(2\pi\,900t)+0.5\cos(2\pi\,3100t)
+$$
+
+at $f_s=4$ kHz. Map both components into $[0,2]$ kHz, preserve their complex-frequency directions, simplify $x[n]$, and describe the three nearest spectral replicas on a hertz-labeled axis.
+
+<Solution>
+The 900 Hz component maps to
+
+$$
+\omega_1=2\pi\frac{900}{4000}=0.45\pi.
+$$
+
+The 3100 Hz component maps to
+
+$$
+\omega_2=2\pi\frac{3100}{4000}=1.55\pi
+\equiv-0.45\pi\pmod{2\pi}.
+$$
+
+Thus both real cosines appear at $900$ Hz in the baseband, but the positive-frequency line at $3100$ Hz folds to the negative discrete direction. Since cosine is even,
+
+$$
+x[n]=\cos(0.45\pi n)+0.5\cos(-0.45\pi n)
+=1.5\cos(0.45\pi n).
+$$
+
+The original continuous spectrum has lines at $\pm900$ Hz with cosine coefficient $1/2$ and at $\pm3100$ Hz with coefficient $1/4$. Impulse sampling copies this four-line pattern with scale $1/T_s$ and centers it at $-4$ kHz, $0$, and $+4$ kHz. On the central baseband, the $+900$ line receives contributions from the original $+900$ line and the shifted $-3100+4000$ line; the $-900$ line receives the conjugate pair. That addition is the alias.
+</Solution>
+</Exercise>
+
+<Exercise>
+Let $x_c(t)=A\cos(2\pi(f_s/2)t+\phi)$. Compute its samples for $\phi=0$ and $\phi=\pi/2$. Refute the claim that $f_s=2B$ guarantees unique recovery of every signal whose highest line is $B$.
+
+<Solution>
+At $t=n/f_s$,
+
+$$
+x[n]=A\cos(\pi n+\phi)=A(-1)^n\cos\phi.
+$$
+
+For $\phi=0$, $x[n]=A(-1)^n$, so the amplitude is visible as an alternating sequence. For $\phi=\pi/2$, $\cos\phi=0$ and every sample is zero, exactly the sequence produced by the zero signal. The claim is therefore false without endpoint and phase restrictions. At equality, the positive- and negative-frequency lines at $\pm f_s/2$ map to the same discrete frequency and can cancel; the strict condition $f_s>2B$ supplies a phase-independent guarantee and a nonzero transition guard.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim “sampling faster than a bandpass signal's nominal center frequency prevents aliasing.” Use a real bandpass input occupying $2$–$8$ kHz, centered at $5$ kHz, and a sample rate of $6$ kHz. Give two frequencies inside the stated band that become indistinguishable.
+
+<Solution>
+The sample rate $6$ kHz is indeed greater than the nominal center $5$ kHz, but the occupied edges, not the center alone, decide overlap. Choose tones at $2.5$ and $3.5$ kHz. At the sample instants,
+
+$$
+\cos\!\left(2\pi\frac{3500}{6000}n\right)
+=\cos\!\left(2\pi n-2\pi\frac{2500}{6000}n\right)
+=\cos\!\left(2\pi\frac{2500}{6000}n\right).
+$$
+
+The two analog tones give the same real sequence. Spectrally, the positive interval $[2,8]$ kHz and shifted copies of its negative-frequency partner overlap after periodization by $6$ kHz. Some narrower bandpass signals admit sample rates below twice their highest frequency, but those rates must satisfy a replica-placement condition for both band edges; comparison with the center frequency is not such a condition.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive a signed baseband representative $f_b$ for an analog frequency $f$ by choosing the nearest integer multiple of $f_s$. Then report the signed representative, real-sinusoid apparent frequency, and phase-direction rule for $f=1.3$, $5.3$, and $10.7$ kHz when $f_s=4$ kHz. Use the half-open interval $[-f_s/2,f_s/2)$ and state how its Nyquist tie is handled.
+
+<Solution>
+For nonnegative $f$, the declared half-open rule is
+
+$$
+k^*=\left\lfloor\frac{f}{f_s}+\frac12\right\rfloor,
+\qquad
+f_b=f-k^*f_s\in[-f_s/2,f_s/2).
+$$
+
+Then $f_a=|f_b|$ is the apparent frequency of a real sinusoid. For the three inputs,
+
+$$
+\begin{array}{c|c|c|c}
+f\ (\text{kHz}) & k^* & f_b\ (\text{kHz}) & f_a\ (\text{kHz})\\ \hline
+1.3 & 0 & +1.3 & 1.3\\
+5.3 & 1 & +1.3 & 1.3\\
+10.7 & 3 & -1.3 & 1.3
+\end{array}
+$$
+
+For a real cosine $A\cos(2\pi ft+\phi)$, a positive $f_b$ retains phase $\phi$, while a negative $f_b$ may be reported at $|f_b|$ with phase $-\phi$. Thus the first two cases have the $+1.3$ kHz direction and the third has the $-1.3$ kHz direction, although all have the same apparent real frequency. At an exact tie, such as $f=2$ kHz, the floor formula retains $-f_s/2$; the endpoints are the same discrete frequency, and this reporting convention does not remove the phase-dependent equality failure.
+</Solution>
+</Exercise>
+
+<Exercise>
+A sensor has desired content through $1.6$ kHz, interference confined to $2.6$–$3.4$ kHz, and negligible energy elsewhere. Compare two proposed changes: raise $f_s$ from $4$ to $8$ kHz with no other front-end change, or keep $f_s=4$ kHz and add an analog lowpass with at most $0.1$ dB ripple through $1.6$ kHz and at least $60$ dB attenuation from $2.6$ kHz upward. Produce a replica argument and a passband/stopband mask, then state which proposal prevents overlap and what assumption makes the rate-only choice valid.
+
+<Solution>
+At $f_s=4$ kHz, a component at $2.6$ kHz folds to
+
+$$
+|2.6-4|=1.4\ \text{kHz},
+$$
+
+inside the desired $0$–$1.6$ kHz band. The unfiltered $4$ kHz proposal therefore fails. An analog lowpass can specify a passband through $1.6$ kHz, a transition over the known empty interval, and the required stopband attenuation from $2.6$ kHz upward. Its filtered replicas then contain negligible interference before they are summed by sampling.
+
+At $f_s=8$ kHz, the first folding boundary moves to $4$ kHz. The complete declared interference band $2.6$–$3.4$ kHz remains distinct from the desired band and can be digitally removed before any later rate reduction. The rate-only choice is valid because the problem explicitly freezes all significant analog energy below $4$ kHz; without that support bound, energy at $6.4$ kHz, for example, would alias to $|6.4-8|=1.6$ kHz.
+
+Both proposals prevent overlap under the frozen support. The analog-filter proposal uses the mask $-0.1\ \text{dB}\le20\log_{10}|H_{aa}(f)|\le0.1\ \text{dB}$ through $1.6$ kHz and $20\log_{10}|H_{aa}(f)|\le-60$ dB from $2.6$ kHz upward. The $8$ kHz proposal spends twice the sample throughput and relies on the stated front-end support; the $4$ kHz proposal spends an analog transition filter. The adjustable resource decides between them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take the eight samples
+
+$$
+x[n]=\cos\!\left(2\pi\frac{2}{8}n\right),
+\qquad n=0,\ldots,7,
+$$
+
+and compute their eight unscaled correlations
+
+$$
+X[k]=\sum_{n=0}^{7}x[n]e^{-j2\pi kn/8},
+\qquad k=0,\ldots,7.
+$$
+
+Identify the two nonzero entries and explain why a real cosine requires both.
+
+<Solution>
+Euler's identity gives
+
+$$
+x[n]=\frac12e^{j2\pi(2)n/8}+\frac12e^{-j2\pi(2)n/8}.
+$$
+
+Correlation with the $k=2$ analysis phasor makes the first exponential constant, so its eight terms sum to $8/2=4$; the other exponential completes an integer number of nonzero rotations and sums to zero. Thus $X[2]=4$. The negative-frequency component is indexed modulo eight at $k=8-2=6$, giving $X[6]=4$ by the symmetric argument. Every other correlation sums roots of unity to zero:
+
+$$
+[X[0],\ldots,X[7]]=[0,0,4,0,0,0,4,0].
+$$
+
+The two coefficients are the conjugate frequency directions whose sum is real. These eight declared correlations are the **discrete Fourier transform** of the record; <Ref lesson="dft-bins-symmetry-and-scaling">DFT Bins, Symmetry, and Scaling</Ref> next fixes their indexing, physical hertz labels, normalization, symmetry, and circular interpretation.
+</Solution>
+</Exercise>
+
+<References>
+1. Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, *Discrete-Time Signal Processing*, 2nd ed., §§4.1–4.5, §4.8.1, and §4.8.4 — impulse-train sampling, replicated spectra, sinusoidal aliases, ideal sinc reconstruction, practical prefiltering, and zero-order-hold reconstruction.
+2. Dennis Freeman, *Signals and Systems, MIT 6.003*, Fall 2011, Session 21, slides 14–47 — impulse sampling, replica overlap, the strict sampling-rate condition, alias folding, and anti-alias filtering before acquisition. https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/
+3. Brad Osgood, *The Fourier Transform and Its Applications*, ch. 5, especially §§5.5–5.9 — impulse-comb sampling, sinc interpolation, sampling-rate margins, aliasing, and the phase-sensitive endpoint case. https://see.stanford.edu/materials/lsoftaee261/book-fall-07.pdf
+4. Richard G. Lyons, *Understanding Digital Signal Processing*, 3rd ed., §§2.1–2.5 — sinusoidal ambiguity, lowpass and bandpass spectral replication, folding, analog anti-alias filtering, and sample-rate selection.
+5. Sophocles J. Orfanidis, *Introduction to Signal Processing*, 2nd ed., §§1.3–1.6 — the sampling theorem, signed alias mapping, Poisson spectral replication, ideal sinc interpolation, zero-order hold, droop compensation, and analog postfiltering. https://www.ece.rutgers.edu/~orfanidi/intro2sp/
+</References>

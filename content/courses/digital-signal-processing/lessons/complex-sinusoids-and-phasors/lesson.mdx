@@ -1,0 +1,403 @@
+A complex exponential packages sinusoidal rotation into one mode whose magnitude and angle can be propagated algebraically.
+
+<Ref lesson="perching-glider-system-identification">Longitudinal System Identification from Skywalker X8 UAV Flight Tests</Ref> closed the time-domain module with the fitted homogeneous roots $0.8710731\pm j0.2640202$. Their radius said decay, but their angle was left as a handoff: we now need a representation that carries decay and rotation without expanding a second-order recurrence sample by sample.
+
+Start with the root in the upper half-plane. Rectangular-to-polar conversion gives
+
+$$
+\rho=\sqrt{0.8710731^2+0.2640202^2}=0.9102060,
+\qquad
+\omega_0=\operatorname{atan2}(0.2640202,0.8710731)=0.2942962\ \text{rad/sample}.
+$$
+
+One multiplication by that root shrinks a complex value by $0.9102060$ and rotates it counterclockwise by $0.2942962$ rad. Repeating the multiplication produces
+
+| $n$ | $\operatorname{Re}\{r^n\}$ | $\operatorname{Im}\{r^n\}$ | $\lvert r^n\rvert$ | angle before wrapping |
+|---:|---:|---:|---:|---:|
+| 0 | 1.0000000 | 0.0000000 | 1.0000000 | 0.0000000 |
+| 1 | 0.8710731 | 0.2640202 | 0.9102060 | 0.2942962 |
+| 2 | 0.6890617 | 0.4599618 | 0.8284750 | 0.5885925 |
+| 3 | 0.4787839 | 0.5825865 | 0.7540829 | 0.8828887 |
+
+The table is already a damped rotation. The rest of the lesson names its coordinates, establishes which parameter choices describe the same discrete sequence, and shows why a real sinusoid needs both directions of rotation.
+
+## One multiplication advances a phasor
+
+### A four-sample orbit before the general form
+
+Set decay aside for a moment and predict the next value after $1,j,-1$. Multiplication by $j=e^{j\pi/2}$ makes one quarter-turn per sample, so
+
+$$
+e^{j\pi n/2}=1,\ j,\ -1,\ -j,\ 1,\ldots
+\qquad (n=0,1,2,3,4,\ldots).
+$$
+
+The real projection is $1,0,-1,0,\ldots$; the imaginary projection is $0,1,0,-1,\ldots$. Either projection vanishes at alternate indices, while the complex magnitude remains one at every index.
+
+<Figure src="./figures/phasor-projections.svg" alt="A unit phasor advances counterclockwise through four quarter-turn positions while separate cosine and sine stem plots show the synchronized samples 1, 0, -1, 0 and 0, 1, 0, -1." caption="The phasor never vanishes: a zero in one projection is carried by its quadrature partner." />
+
+<Definition title="complex exponential">
+A discrete-time **complex exponential** or rotating phasor is
+
+$$
+z[n]=A e^{j(\omega n+\phi)},\qquad n\in\mathbb Z,
+$$
+
+with $A\ge 0$ its magnitude, $\phi$ its angle at $n=0$, and $\omega$ its angle increment in radians/sample. The canonical unit example is $e^{j\pi n/2}$. A damped rotation $A\rho^n e^{j(\omega n+\phi)}$ is a related mode, not a constant-magnitude phasor. At the boundary $A=0$, every sample is zero and phase is undefined. A real cosine alone is a projection of this object, not a second name for the full complex sequence.
+</Definition>
+
+Magnitude, phase, and frequency do different jobs. $A$ sets the circle radius, $\phi$ rotates the entire orbit before sampling begins, and $\omega$ advances the angle per integer step. With engineering $j$, positive $\omega$ means counterclockwise rotation. A negative amplitude is redundant because $-A e^{j\theta}=A e^{j(\theta+\pi)}$, so the $A\ge0$ convention keeps magnitude distinct from phase. Throughout this lesson, displayed phase uses the canonical interval $(-\pi,\pi]$; $-\pi$ is displayed as $+\pi$.
+
+<KeyFact>
+For $A>0$, the update is $z[n+1]=e^{j\omega}z[n]$: magnitude stays $A$, phase advances by $\omega$ radians/sample, and the initial phase is understood modulo $2\pi$.
+</KeyFact>
+
+## Euler's identity exposes the two quadrature coordinates
+
+### Euler turns one rotation into two real streams
+
+The rotating update is compact because Euler's identity converts polar motion into rectangular components:
+
+$$
+e^{j\theta}=\cos\theta+j\sin\theta.
+$$
+
+Therefore
+
+$$
+z[n]
+=A\cos(\omega n+\phi)
++jA\sin(\omega n+\phi).
+$$
+
+The real, or *in-phase*, coordinate and imaginary, or *quadrature*, coordinate are separated by one quarter-cycle. “Quadrature” here means a $90^\circ$ coordinate relationship, not that either coordinate is intrinsically imaginary hardware. Two real number streams can store or carry the pair.
+
+<Figure name="PhasorCoordinateLedger" alt="The complex number one plus j is decomposed into an amber horizontal coordinate I equals one, a blue vertical coordinate Q equals one, magnitude square root of two, and phase pi over four, beside matching rectangular and polar formulas." caption="Rectangular coordinates are convenient for addition; magnitude and angle are convenient for repeated rotation." />
+
+### Rectangular and polar forms fail differently at zero
+
+For example, $z=1+j$ has rectangular coordinates $(1,1)$ and polar coordinates
+
+$$
+|z|=\sqrt2,
+\qquad
+\arg z=\operatorname{atan2}(1,1)=\frac{\pi}{4}.
+$$
+
+Use `atan2(imaginary, real)`, not the one-argument arctangent: $(-1,-1)$ has the same ratio but lies at $-3\pi/4$ under the principal convention. Software may instead report $5\pi/4$; those angles differ by $2\pi$ and identify the same point. At $z=0$, `atan2(0,0)` may return a placeholder value, but the mathematical phase is undefined.
+
+<Aside title="From hertz to radians/sample">
+Dimensional angular frequency is $\Omega=2\pi f$ radians/second. Sampling every $T_s$ seconds produces the discrete angle increment
+
+$$
+\omega=\Omega T_s=2\pi\frac{f}{f_s}\ \text{rad/sample}.
+$$
+
+Thus $1$ kHz sampled at $8$ kHz gives $\omega=\pi/4$ rad/sample, or $1/8$ cycle/sample. A bare $\omega$ does not retain the sample rate: converting it back to hertz requires the declared $f_s$.
+</Aside>
+
+<KeyFact>
+Rotation redistributes value between the two coordinates while preserving $\sqrt{I^2+Q^2}$. Therefore any amplitude detector that keeps only $I$ or only $Q$ must have a phase-dependent blind spot.
+</KeyFact>
+
+## A real sinusoid is a conjugate pair
+
+### Conjugation cancels the imaginary coordinate
+
+The two coordinates explain a single complex phasor; a real-valued sequence imposes another constraint. Conjugating Euler's identity gives $e^{-j\theta}=\cos\theta-j\sin\theta$. Adding the two directions cancels their imaginary coordinates:
+
+$$
+\cos\theta=\frac12e^{j\theta}+\frac12e^{-j\theta}.
+$$
+
+Consequently
+
+$$
+A\cos(\omega n+\phi)
+=\frac{A}{2}e^{j\phi}e^{j\omega n}
++\frac{A}{2}e^{-j\phi}e^{-j\omega n}.
+$$
+
+The positive- and negative-frequency coefficients have equal magnitude and conjugate phase. One rotating component alone is complex; the conjugate partner is what makes every sum sample real.
+
+<Task>
+Follow the three frames and predict the imaginary part before advancing: first keep only the counterclockwise component, then add its clockwise conjugate, then inspect their sum. Explain why changing $\phi$ cannot break the final cancellation.
+</Task>
+
+<FigureSequence name="conjugate-pair-assembly" alt="Three frames reveal a positive-frequency half-amplitude phasor, its equal conjugate negative-frequency partner, and their real sum after opposite imaginary coordinates cancel." caption="A real cosine is assembled by two equal conjugate phasors rotating in opposite directions." />
+
+### The engineering phasor is twice one conjugate coefficient
+
+This representation has a normalization choice worth naming. The **engineering phasor** is $P=Ae^{j\phi}$, so $x[n]=\operatorname{Re}\{Pe^{j\omega n}\}$. In the two-sided expansion, the positive-frequency coefficient is $C_+=P/2$ and the negative-frequency coefficient is $C_-=P^*/2=C_+^*$. The phasor $P$ and coefficient $C_+$ are not the same amplitude convention; confusing them creates the common factor-of-two error in spectral software.
+
+There is also a directional ambiguity in the real projection:
+
+$$
+\cos(-\omega n+\phi)=\cos(\omega n-\phi).
+$$
+
+The full complex sequence distinguishes clockwise from counterclockwise motion; a real cosine by itself does not. That boundary is why real-signal frequency representations later appear in conjugate pairs.
+
+<KeyFact>
+At $\omega=0$ and $\omega=\pi$ modulo $2\pi$, positive and negative frequency are the same discrete sequence. The two-member conjugate pair then collapses to one self-conjugate component, and a real signal requires its coefficient to be real.
+</KeyFact>
+
+## Integer sampling wraps the frequency axis
+
+The phase parameter was already periodic modulo $2\pi$. Integer sample indices make the frequency parameter periodic too. For any integer $k$,
+
+$$
+e^{j(\omega+2\pi k)n}
+=e^{j\omega n}e^{j2\pi kn}
+=e^{j\omega n}.
+$$
+
+Thus $\omega$, $\omega+2\pi$, and $\omega-4\pi$ generate exactly the same complex sequence. The canonical interval $(-\pi,\pi]$ chooses one representative; it does not make the other labels physically different sequences.
+
+This is a sequence-equivalence result, sometimes called a discrete-frequency alias relation. It does **not** yet claim that an analog waveform can be reconstructed from samples. The later <Ref lesson="sampling-aliasing-and-reconstruction">Sampling, Aliasing, and Reconstruction</Ref> lesson will add continuous-time spectra, sample-rate constraints, and the irreversible overlap boundary.
+
+### Frequency periodicity is not time periodicity
+
+Every complex exponential is periodic as a function of its frequency label, but not every one is periodic in sample index. A positive integer $N$ is a period only if
+
+$$
+e^{j\omega(n+N)}=e^{j\omega n}
+\quad\Longleftrightarrow\quad
+\omega N=2\pi m
+$$
+
+for some integer $m$. Therefore $e^{j\omega n}$ is time-periodic exactly when $\omega/(2\pi)$ is rational. If $\omega/(2\pi)=p/N$ in lowest terms, its fundamental period is $N$. The sequence $e^{j\pi n/2}$ has period four; $e^{j\sqrt2 n}$ has no integer period.
+
+DC and Nyquist are special for a real projection. At $\omega=0$, $A\cos(\omega n+\phi)=A\cos\phi$ is constant. At $\omega=\pi$, it is $A\cos\phi(-1)^n$. The sampled sine coordinate vanishes in both cases, so a real-only record cannot separately identify $A$ and $\phi$. A full nonzero complex phasor retains both coordinates. Zero magnitude is stricter: phase is undefined even for the complex representation.
+
+Modulo $2\pi$, DC and Nyquist are also their own negative-frequency partners. The usual pair of two distinct counter-rotating components therefore collapses to one self-conjugate boundary component, whose real-signal coefficient must itself be real.
+
+<KeyFact>
+Frequency error is circular: estimates just below $-\pi$ and at $+\pi$ are near neighbors, not nearly $2\pi$ apart. Compare their wrapped difference before judging an estimator or controller.
+</KeyFact>
+
+## Quadrature measurement prevents a phase null
+
+### Orthogonal references recover signed coordinates
+
+Away from those self-conjugate boundaries, both quadrature coordinates can be measured independently. Make the measurement contract exact: the lab uses the noise-free record
+
+$$
+x[n]=\cos(0.3\pi n+\phi),\qquad n=0,\ldots,19.
+$$
+
+Thus $A=1$, $\omega_0=0.3\pi$ rad/sample $=0.15$ cycle/sample, and the $N=20$ samples contain exactly three cycles. On this non-DC, non-Nyquist interval, cosine and sine are orthogonal, each squared reference sums to $N/2$, and the negative-exponent analysis convention gives
+
+$$
+I=\frac{2}{N}\sum_{n=0}^{N-1}x[n]\cos(\omega_0n)=\cos\phi,
+\qquad
+Q=-\frac{2}{N}\sum_{n=0}^{N-1}x[n]\sin(\omega_0n)=\sin\phi.
+$$
+
+A sine-only detector uses $\hat A_{\rm sine}=|Q|$. It happens to report one at $\phi=90^\circ$, but it reports zero at $0^\circ$ and $\pm180^\circ$ even though the true amplitude remains one. The I/Q estimate instead uses $P=I+jQ$, $\hat A_{IQ}=\operatorname{hypot}(I,Q)$, and $\hat\phi=\operatorname{atan2}(Q,I)$ mapped to $(-180^\circ,180^\circ]$.
+
+### One-axis failure becomes a deterministic falsification
+
+<Task>
+Start in **Sine only** at the nondegenerate $37^\circ$ preset, then find the **Sine null $0^\circ$** preset where $|Q|<10^{-12}$ and relative amplitude error exceeds $99\%$; label that outcome **FALSIFIED**, not “tone absent.” Switch to **I/Q pair** without changing the samples. Pass only if relative amplitude error is strictly below $1\%$ and circular phase error is strictly below $2^\circ$ at every point of the deterministic $-180^\circ$ to $180^\circ$ sweep in $0.25^\circ$ steps. Seeded phase trials use the same fixed record; no noise or off-frequency case is implied.
+</Task>
+
+<Demo name="QuadratureDetectorLab" caption="Find a phase that nulls the sine-only detector, then switch to I/Q and verify amplitude and wrapped phase over the full phase sweep." />
+
+The benchmark fixes $A=1$, so phase is always scoreable for the I/Q pair. In general, phase must not be scored when recovered magnitude is zero. Circular error wraps $\hat\phi-\phi$ into $(-180^\circ,180^\circ]$ before taking its absolute value; ordinary subtraction would report a false error near $360^\circ$ at the branch cut. A recursive phase accumulator likewise should wrap deliberately rather than grow until finite precision erodes its increment.
+
+<KeyFact>
+The exact I/Q magnitude is guaranteed by this record's orthogonal integer-cycle interval, not by the two formulas alone. For an off-frequency tone or arbitrary finite window, the reference columns can mix and raw $\operatorname{hypot}(I,Q)$ need not equal amplitude.
+</KeyFact>
+
+## Decay changes the radius, not the rotation rule
+
+### Conjugate roots turn one complex mode into a real transient
+
+Return now to the X8 root $r=\rho e^{j\omega_0}$. Integer powers separate its two effects:
+
+$$
+r^n=(\rho e^{j\omega_0})^n=\rho^n e^{j\omega_0n}.
+$$
+
+The factor $\rho^n$ is a radial envelope; $e^{j\omega_0n}$ is the rotation. A conjugate root supplies the opposite rotation. Combining the two with conjugate coefficients produces a real homogeneous mode
+
+$$
+q_h[n]=A\rho^n\cos(\omega_0n+\phi).
+$$
+
+For the fitted X8 pair, $\rho=0.9102060$ and $\omega_0=0.2942962$ rad/sample. At the nominal $40$ samples/s, that angle is $0.0468387$ cycle/sample or $1.87355$ Hz. These numbers describe the fitted recurrence's homogeneous mode, not a claim that the aircraft contains an isolated physical oscillator at exactly $1.87355$ Hz.
+
+This bridge needs no transform variable. It only rewrites the recurrence roots already computed in <Ref lesson="difference-equations-and-stability">Difference Equations and Stability</Ref>. Pole-zero geometry, regions of convergence, and the z-transform remain for their own lesson.
+
+We have now established how amplitude sets radius, phase sets the initial angle, and discrete frequency sets the wrapped per-sample rotation, including the zero-magnitude, DC, Nyquist, and modulo-$2\pi$ boundaries. **DTFT and Frequency Response** next asks how an LTI system assigns one exact complex multiplier to each such mode and generalizes those multipliers across the frequency axis.
+
+## Exercises
+
+<Exercise>
+For $x[n]=2\cos(\pi n/3+\pi/4)$, write both the complex phasor whose real projection is $x[n]$ and the positive-frequency term in the two-sided conjugate expansion. Compute $x[0]$ through $x[5]$, show $x[6]=x[0]$, and label amplitude, phase, and discrete frequency with units.
+
+<Solution>
+The engineering phasor is $P=2e^{j\pi/4}$, so its rotating sequence is
+
+$$
+z[n]=2e^{j(\pi n/3+\pi/4)},\qquad x[n]=\operatorname{Re}\{z[n]\}.
+$$
+
+In the two-sided representation, the positive-frequency coefficient is $C_+=e^{j\pi/4}=P/2$ and $C_-=C_+^*$. Thus
+
+$$
+x[n]=e^{j\pi/4}e^{j\pi n/3}+e^{-j\pi/4}e^{-j\pi n/3}.
+$$
+
+The samples, rounded to six decimals, are
+
+$$
+[1.414214,-0.517638,-1.931852,-1.414214,0.517638,1.931852].
+$$
+
+Because adding six to $n$ adds $2\pi$ to the angle, $x[6]=2\cos(2\pi+\pi/4)=\sqrt2=x[0]$. The amplitude is $2$, phase is $\pi/4$ rad modulo $2\pi$, and discrete frequency is $\pi/3$ rad/sample, or $1/6$ cycle/sample.
+</Solution>
+</Exercise>
+
+<Exercise>
+Probe four boundaries for $x[n]=A\cos(\omega n+\phi)$ and its associated complex phasor: $A=0$, $\omega=0$, $\omega=\pi$, and replacing $\phi$ by $\phi+2\pi$. State exactly which parameters are not identifiable from the real samples and which conclusion changes if both complex coordinates are observed.
+
+<Solution>
+At $A=0$, both the real sequence and complex phasor are identically zero. Phase and frequency cannot be inferred; phase is mathematically undefined.
+
+At $\omega=0$, the real sequence is the constant $A\cos\phi$, so real samples do not separate $A$ from $\phi$. At $\omega=\pi$, it is $A\cos\phi(-1)^n$ because $\sin(\pi n)=0$; again the real samples identify only the product $A\cos\phi$. With both complex coordinates and $A>0$, $Ae^{j\phi}$ at DC or $Ae^{j\phi}(-1)^n$ at Nyquist retains magnitude and phase modulo $2\pi$.
+
+Finally, $\phi$ and $\phi+2\pi$ always describe the same samples, real or complex. A software branch chooses a representative angle, not a new signal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim “changing phase changes a tone's energy over an integer number of periods.” State the interval condition under which the refutation works and identify the DC, Nyquist, and truncated-record exceptions.
+
+<Solution>
+An eternal nonzero sinusoid is a power signal with infinite total energy, so the claim must mean energy over a declared finite interval. For $x[n]=A\cos(2\pi pn/N+\phi)$ over $n=0,\ldots,N-1$,
+
+$$
+\sum_{n=0}^{N-1}x[n]^2
+=\frac{A^2N}{2}
++\frac{A^2}{2}\sum_{n=0}^{N-1}\cos(4\pi pn/N+2\phi).
+$$
+
+If the interval contains a whole period and $2p\not\equiv0\pmod N$, the second sum is zero, leaving $A^2N/2$, independent of phase. The same holds over any integer number of such complete periods.
+
+At DC or Nyquist, $2p\equiv0\pmod N$ and the real samples reduce to $A\cos\phi$ times a constant or alternating sign, so their energy can depend on phase. A truncated interval that does not complete the cancellation can also have phase-dependent measured energy. The claim is therefore false only with its nondegenerate-frequency and compatible-interval conditions stated.
+</Solution>
+</Exercise>
+
+<Exercise>
+Starting from Euler's identity, derive the conjugate-pair representation of
+
+$$
+x[n]=a\cos(\omega n)+b\sin(\omega n).
+$$
+
+Name the engineering phasor $P$ and recover the equivalent $A\cos(\omega n+\phi)$ parameters. Then, for an orthogonal integer-cycle interval at a non-DC, non-Nyquist frequency, relate $P$ to the normalized analysis projections $I=(2/N)\sum x[n]\cos(\omega n)$ and $Q=-(2/N)\sum x[n]\sin(\omega n)$. Include the zero-amplitude boundary.
+
+<Solution>
+Using
+
+$$
+\cos\theta=\frac{e^{j\theta}+e^{-j\theta}}2,
+\qquad
+\sin\theta=\frac{e^{j\theta}-e^{-j\theta}}{2j},
+$$
+
+gives
+
+$$
+x[n]
+=\frac{a-jb}{2}e^{j\omega n}
++\frac{a+jb}{2}e^{-j\omega n}.
+$$
+
+The coefficients are conjugates because $a$ and $b$ are real. The engineering phasor is $P=a-jb$; the two-sided coefficients are $P/2$ and $P^*/2$. Expanding $A\cos(\omega n+\phi)$ gives $a=A\cos\phi$ and $b=-A\sin\phi$. Therefore
+
+$$
+A=\sqrt{a^2+b^2},
+\qquad
+\phi=\operatorname{atan2}(-b,a)\pmod{2\pi}.
+$$
+
+On the declared orthogonal interval, the normalized projections give $I=a$ and $Q=-b$, so $P=I+jQ$, $A=\operatorname{hypot}(I,Q)$, and $\phi=\operatorname{atan2}(Q,I)$. If both coordinates are zero, then $A=0$ and no phase is defined. Without the interval, normalization, frequency-boundary, and sign conventions, those projection equalities need not hold.
+</Solution>
+</Exercise>
+
+<Exercise>
+Combine $2\cos(\pi n/4)$ and $2\sin(\pi n/4)$ using rectangular I/Q components. Convert the result to one polar phasor, use it to predict $x[37]$, and verify that value against direct trigonometric evaluation to within $10^{-12}$. Explain why the two representations suit different steps.
+
+<Solution>
+For $\theta=\pi n/4$,
+
+$$
+x[n]=2\cos\theta+2\sin\theta
+=\operatorname{Re}\{(2-j2)e^{j\theta}\}.
+$$
+
+Rectangular coordinates make addition immediate. The coefficient has magnitude $2\sqrt2$ and phase $-\pi/4$, so
+
+$$
+x[n]=2\sqrt2\cos\left(\frac{\pi n}{4}-\frac{\pi}{4}\right).
+$$
+
+At $n=37$, the phasor angle is $9\pi$, hence $x[37]=-2\sqrt2$. Directly, $37\pi/4=9\pi+\pi/4$, so
+
+$$
+2\cos(37\pi/4)+2\sin(37\pi/4)=-2\sqrt2.
+$$
+
+The exact forms agree, so their numerical difference is zero apart from floating-point roundoff and is below $10^{-12}$. Rectangular I/Q is best for component addition; polar form exposes one amplitude and supports a long-index rotation without separately carrying two sums.
+</Solution>
+</Exercise>
+
+<Exercise>
+<Ref lesson="impulse-response-and-convolution">Impulse Response and Convolution</Ref> established that an LTI output is the convolution of its input with $h[n]$. Retrieve that representation and specialize it to a causal impulse response with $h[0]=h_0$, $h[1]=h_1$, $h[2]=h_2$, and zero elsewhere. Then pass the eternal input $x[n]=e^{j\omega n}$, defined for every integer $n$, through the resulting three-tap FIR and factor the output into the same exponential times one complex number. What do the magnitude and angle of that number do to the input mode? Finally, state what changes if $u[n]e^{j\omega n}$ instead starts at $n=0$ from initial rest. This is the single forward handoff.
+
+<Solution>
+The earlier convolution result is
+
+$$
+y[n]=\sum_m x[m]h[n-m].
+$$
+
+Only $h[0]$, $h[1]$, and $h[2]$ are nonzero, so changing variables to the tap index gives
+
+$$
+y[n]=h_0x[n]+h_1x[n-1]+h_2x[n-2].
+$$
+
+Substituting the eternal complex exponential gives
+
+$$
+\begin{aligned}
+y[n]
+&=h_0e^{j\omega n}+h_1e^{j\omega(n-1)}+h_2e^{j\omega(n-2)}\\
+&=e^{j\omega n}\left(h_0+h_1e^{-j\omega}+h_2e^{-j2\omega}\right).
+\end{aligned}
+$$
+
+Define
+
+$$
+H(e^{j\omega})=h_0+h_1e^{-j\omega}+h_2e^{-j2\omega}.
+$$
+
+The output retains the same discrete frequency. $|H(e^{j\omega})|$ scales its amplitude and $\arg H(e^{j\omega})$ shifts its phase. The next lesson, <Ref lesson="dtft-and-frequency-response">DTFT and Frequency Response</Ref>, names this complex multiplier the frequency response and generalizes the finite three-tap sum to an LTI impulse response.
+
+For a causal start from rest, the first two outputs have only partial overlap: $y[0]=h_0$ and $y[1]=e^{j\omega}(h_0+h_1e^{-j\omega})$. The full three-tap factor applies from $n\ge2$. The eternal-input qualification is what makes the eigenfunction statement exact at every index.
+
+<Figure name="ComplexModeEigenfunction" alt="An eternal complex exponential enters a three-tap LTI filter and exits at the same discrete frequency multiplied by H of e to the j omega, whose magnitude supplies gain and whose angle supplies phase shift." caption="An eternal complex mode survives an LTI system unchanged in frequency; one complex multiplier records gain and phase shift." />
+</Solution>
+</Exercise>
+
+<References>
+1. Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, *Discrete-Time Signal Processing*, 2nd ed., §§2.1.1, 2.6.1, and 2.8 — discrete-time complex exponentials, frequency equivalence modulo $2\pi$, periodicity, LTI eigenfunctions, and conjugate symmetry.
+2. Richard G. Lyons, *Understanding Digital Signal Processing*, 3rd ed., Appendix A and §§8.2–8.5 — rectangular and polar complex notation, Euler identities, conjugate phasors, and quadrature signals.
+3. Dennis Freeman and MIT OpenCourseWare, *Signals and Systems, MIT 6.003*, Fall 2011, Sessions 17–18 — discrete-time frequency periodicity, roots of unity, conjugate symmetry, and complex Fourier modes. https://ocw.mit.edu/courses/6-003-signals-and-systems-fall-2011/
+4. Jack Schaedler, *Seeing Circles, Sines, and Signals*, Lessons 7–12, 16–17, 19–21, 23, and 27 — phasor projections, radians, frequency-equivalence families, Euler's formula, one-axis detector nulls, conjugate boundary cases, and same-frequency addition. https://jackschaedler.github.io/circles-sines-signals/
+</References>

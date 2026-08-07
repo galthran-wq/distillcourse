@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "status": "ready_feasible_with_frozen_contract_precision",
+  "lesson": "correlation-psd-and-welch",
+  "component": "WelchTradeoffLab",
+  "scope": "Research/demo preflight only; no course, lesson, component, registry, or UI-kit edits.",
+  "model_gate": "The user explicitly waived the lesson-factory Fable-only gate; all other lesson-factory and demo-builder constraints remain in force.",
+  "grounding": [
+    ".claude/skills/lesson-factory/SKILL.md and .claude/skills/demo-builder/SKILL.md, read in full",
+    "docs/playbook-math.md, docs/components.md, docs/pedagogy.md, demo checklist/example",
+    "research/correlation-psd-and-welch.md and relevant source-summary results from Stoica-Moses chs. 1-2, J. O. Smith ch. 6, Oppenheim-Schafer ch. 10/App. A, and Harris IV.A-C"
+  ],
+  "study": {
+    "file": "welch-study.mjs",
+    "run": "node content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/correlation-psd-and-welch/welch-study.mjs",
+    "dependencies": ["node:assert/strict"],
+    "runtime_randomness": false,
+    "seed": "0x5eedc0de",
+    "prng": "mulberry32 uniforms, cached Box-Muller normals",
+    "trials": 96,
+    "failure": "Any changed frozen number or violated scientific invariant exits nonzero; success prints one JSON report."
+  },
+  "frozen_contract": {
+    "record": "N=16384, n=0,...,N-1; normalized frequency in cycles/sample; two-sided PSD per (cycles/sample)",
+    "noise": "circular complex white Gaussian CN(0,1): independent real and imaginary N(0,1/2); this makes the one-bin periodogram exponential and avoids DC/Nyquist exceptions",
+    "raw_probe": "rectangular full-record periodogram at f=0.25 for prefix lengths 256,1024,4096,16384",
+    "welch_probe": "periodic Hann w[n]=0.5-0.5 cos(2*pi*n/M), calibration f=0.3125, M in {32,64,128,512,2048,4096}, overlap in {0,0.5,0.75} where declared",
+    "tones": "x[n]=0.5 exp(j2*pi*0.18n)+0.5 exp(j2*pi*0.22n)+v[n]; separation=0.04; the resolution curve is the exact mean over all legal frame starts plus the unit noise floor",
+    "resolution_rule": "PASS iff two distinct local maxima are each within 0.01 cycles/sample of the true tones and the intervening valley is at least 1 dB below the lower peak; dense grid step=1/8192",
+    "cv_rule": "sample standard deviation divided by sample mean across the same 96 seeded trials; Welch target PASS iff CV<0.30"
+  },
+  "formulas_and_scales": {
+    "wss_pair": "r_xx[l]=E{x[n+l]x*[n]}, S_xx(f)=sum_l r_xx[l] exp(-j2*pi*f*l), integral_-0.5^0.5 S_xx(f)df=r_xx[0]",
+    "periodogram": "P_N(f)=|sum_{n=0}^{N-1}x[n]exp(-j2*pi*f*n)|^2/N",
+    "welch_frame": "P_m(f)=|sum_{n=0}^{M-1}w[n]x[mH+n]exp(-j2*pi*f*n)|^2/U, U=sum_n w[n]^2",
+    "welch_average": "P_W(f)=K^-1 sum_m P_m(f), K=floor((N-M)/H)+1",
+    "cv": "CV=s_sample/mean_sample; for independent circular-Gaussian periodograms CV approximately 1/sqrt(K)",
+    "overlap": "rho_h=sum_n w[n]w[n+hH]/U; K_eff=K^2/[K+2 sum_{h>=1}(K-h)|rho_h|^2]; predicted CV=1/sqrt(K_eff)",
+    "hann_resolution": "ENBW=1.5/M cycles/sample; first-null-to-first-null width=4/M cycles/sample. These are declared scales, not a universal two-tone theorem."
+  },
+  "expected_numbers": {
+    "raw_periodogram": [
+      {"N": 256, "mean": 0.931794, "cv": 0.843520},
+      {"N": 1024, "mean": 0.967322, "cv": 0.812286},
+      {"N": 4096, "mean": 1.067061, "cv": 0.869418},
+      {"N": 16384, "mean": 0.871399, "cv": 1.061033}
+    ],
+    "welch_50_percent": [
+      {"M": 32, "K": 1023, "K_eff": 969.207759, "cv": 0.034780, "enbw": 0.046875, "tone_result": "MERGED"},
+      {"M": 64, "K": 511, "K_eff": 484.155130, "cv": 0.045648, "enbw": 0.023438, "tone_peaks": [0.180039, 0.219956], "valley_db": 6.013752, "tone_result": "SEPARATED"},
+      {"M": 128, "K": 255, "K_eff": 241.628819, "cv": 0.060471, "enbw": 0.011719, "tone_result": "SEPARATED"},
+      {"M": 2048, "K": 15, "K_eff": 14.260563, "cv": 0.267121, "enbw": 0.000732, "tone_result": "SEPARATED"},
+      {"M": 4096, "K": 7, "K_eff": 6.681818, "cv": 0.402942, "enbw": 0.000366, "tone_result": "SEPARATED"}
+    ],
+    "overlap_M512": [
+      {"overlap": 0, "K": 32, "rho_1": 0, "K_eff": 32, "predicted_cv": 0.176777, "empirical_cv": 0.178210},
+      {"overlap": 0.5, "K": 63, "rho_1": 0.166667, "K_eff": 59.734114, "predicted_cv": 0.129386, "empirical_cv": 0.140159},
+      {"overlap": 0.75, "K": 125, "rho_1": 0.659155, "K_eff": 65.213007, "predicted_cv": 0.123832, "empirical_cv": 0.126204}
+    ]
+  },
+  "course_spec_reconciliation": {
+    "verdict": "FEASIBLE",
+    "exact_reading": "With the frozen measurement rules above, M=64,128,2048 at 50% overlap all separate the 0.04-spaced tones and have empirical CV<0.30 over 96 seeded trials.",
+    "frontier": "M=32 meets CV but merges the tones; M=4096 separates them but misses CV. The useful target is therefore genuinely two-sided, not a guaranteed win.",
+    "required_precision_repair": "The current prose spec omits signal type/amplitude, PSD scaling, window convention, overlap choices, the bin at which CV is measured, and an operational definition of tone separation. Preserve the prose target but implement exactly the frozen_contract fields; otherwise PASS/FAIL is not reproducible.",
+    "recommended_success_preset": "M=2048, periodic Hann, 50% overlap: resolved and CV=0.267121, close enough to both boundaries to make the tradeoff visible."
+  },
+  "demo_contract": {
+    "d1": "PASS: changing segment length and overlap makes peak separation, spectral width, nominal/effective averages, and seeded CV cross independent boundaries that a single static spectrum cannot expose.",
+    "initial_state": "Balanced edge: M=2048, Hann, 50% overlap; both target lamps pass, CV=0.267121, K=15, K_eff=14.260563.",
+    "presets": [
+      {"label": "Short blur", "state": "M=32, overlap=50%", "visible_result": "CV 0.034780 PASS; one merged tone peak FAIL"},
+      {"label": "Balanced edge", "state": "M=2048, overlap=50%", "visible_result": "CV 0.267121 PASS; separated PASS"},
+      {"label": "Long jitter", "state": "M=4096, overlap=50%", "visible_result": "separated PASS; CV 0.402942 FAIL"},
+      {"label": "Overlap trap", "state": "M=512, overlap=75%", "visible_result": "125 nominal averages but only 65.213 effective"}
+    ],
+    "controls": [
+      "PresetGroup for the four states; activeIndex=null after manual departure",
+      "indexed Slider for M={32,64,128,256,512,1024,2048,4096}",
+      "kit Button choices for overlap={0,50,75}% and a Reset Button",
+      "no seed/trial slider, Math.random, timer, network, worker, or new dependency; replay the frozen 96-trial table"
+    ],
+    "readouts": [
+      "M, hop H, nominal K, adjacent rho_1, K_eff, predicted CV, seeded empirical CV",
+      "Hann ENBW and null-to-null width in cycles/sample",
+      "tone peak locations, valley depth, SEPARATED/MERGED",
+      "two persistent target lamps: CV<0.30 and tone separation; combined PASS only when both pass"
+    ],
+    "visual": "Responsive SVG with mean PSD over f=0.14..0.26, truth markers at 0.18/0.22, detected peaks/valley, and a second compact nominal-K versus K_eff bar. Use labels/dashes as well as color and currentColor for text.",
+    "guided_task": "Start at Short blur; increase only M until the tones separate, then continue until CV fails. Return to a simultaneous pass and compare 0/50/75% overlap without mistaking frames for independent evidence.",
+    "accessibility_and_budget": "Panel/Slider/Button/PresetGroup/Readout only; native keyboard controls and >=44px targets; text equivalent to SVG; 360px-safe; frozen lookups update synchronously well under 200ms."
+  },
+  "acceptance": [
+    "Executable reproduces every frozen CV within 5e-7 and M=64 valley depth within 5e-7, using exactly 96 trials.",
+    "Every raw N has 0.75<CV<1.25 and N=16384 CV exceeds 0.8 times N=256 CV.",
+    "Welch M=128 has CV<0.30; M=4096 has CV>0.30.",
+    "M=32 is merged; M=64 is separated; halving 64 to 32 exactly doubles Hann ENBW.",
+    "For each Welch row, empirical CV differs from overlap-corrected prediction by <0.09.",
+    "At M=512, overlapped K_eff<K; 75% overlap raises nominal K by >3.8x versus 0% but K_eff by <2.2x.",
+    "Demo D1-D5 pass, all presets match raw unrounded lookup values, and manual keyboard/light-dark/360px checks pass."
+  ],
+  "boundaries": [
+    "The PSD-autocorrelation pair requires a WSS model; a finite sample average is not the ensemble expectation.",
+    "Complex analytic noise is deliberate. Real data have conjugate symmetry and special DC/Nyquist degrees of freedom, so their exact CV constants differ.",
+    "The overlap K_eff formula is exact here for circular-Gaussian one-bin powers under the declared window/frame model; it is not a universal independence correction for arbitrary signals.",
+    "CV is calibrated in a noise-only band at f=0.3125; deterministic tone bins can have much lower relative variability and must not be used to claim broadband estimator stability.",
+    "The 1 dB/tolerance peak rule is a declared demo criterion, not a universal Rayleigh limit. Unequal tones, other phases/windows, colored noise, or nonstationarity can change resolvability.",
+    "Rounded display values never decide PASS/FAIL; all assertions use full double-precision values."
+  ]
+}

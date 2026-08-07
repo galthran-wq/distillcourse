@@ -1,0 +1,409 @@
+Random power is an ensemble property, so one finite periodogram must be treated as an estimator rather than a deterministic transform result.
+
+<Ref lesson="peak-estimation-and-zero-padding">Peak Estimation and Zero-Padding Limits</Ref> ended with 50 equally configured white-noise records whose squared magnitude at one fixed bin had coefficient of variation $1.143870026$. Padding sampled each record's finite transform more densely but did not average the records. This lesson replaces that unstable ordinate with an auditable estimate of a stationary process's power spectral density: the target, normalization, bias, variance, resolution, and dependence are all declared before the curve is judged. The course's finite-record argument therefore moves from deterministic spectral coordinates to random spectral evidence.
+
+<Task>
+Without reopening the preceding derivations, retrieve four facts. Distinguish acquired length $N$ from FFT length $L$ and state which can change resolving evidence. Name the window measurement that controls close-tone separation and the measurement that calibrates white-noise power. State the forward-transform sign. Finally compute $0.024899643/0.021767896$ and explain what that ratio says about padding.
+
+<Solution>
+$N$ and the analysis window set the acquired aperture; with fixed data, $L$ changes only transform coordinates. Main-lobe width controls separation, while equivalent noise bandwidth and the squared window sum calibrate noise power. The forward transform uses $e^{-j\omega n}$. The ratio is $1.143870026$, so realization-to-realization scatter remained as large as the mean even after dense zero-padded evaluation.
+</Solution>
+</Task>
+
+## One record is a realization, not an ensemble
+
+The unresolved variability first requires a change in what the sample array represents. A *random process* $x[n]$ is a probability model for a family of random variables indexed by integer sample number. A *realization* is one complete sequence drawn from that model. The 50 arrays in the preceding experiment were 50 realizations from one declared process; none of the individual arrays was the process itself.
+
+### Stationarity is a model condition
+
+At a fixed index $n$, the population mean is $\mu_x[n]=\mathbb{E}\{x[n]\}$. At indices separated by lag $\ell$, their second-order relation is $\mathbb{E}\{x[n+\ell]x^*[n]\}$. Here $^*$ denotes complex conjugation and $\mathbb{E}\{\cdot\}$ averages across the population of possible realizations, not across the samples stored in one file.
+
+<Definition title="wide-sense stationary process">
+A process is **wide-sense stationary**, abbreviated WSS, when its mean is constant,
+
+$$
+\mathbb{E}\{x[n]\}=\mu_x,
+$$
+
+and its second-order product depends on the lag but not on the absolute time,
+
+$$
+r_{xx}[\ell]=\mathbb{E}\{x[n+\ell]x^*[n]\}.
+$$
+</Definition>
+
+The definition is deliberately weaker than requiring every joint probability distribution to remain unchanged under a shift. It is sufficient for the second-order power quantities used here. Core formulas assume zero mean or a known mean has been removed. Otherwise a nonzero mean contributes a spectral line at zero frequency. Removing a sample mean is not algebraically neutral: it introduces additional finite-record bias and must appear in a measurement ledger.
+
+Two boundary examples prevent stationarity from becoming a synonym for “noisy-looking.” Let $x[n]=A$ for every $n$, where $A$ is one zero-mean random variable with finite variance. The process is WSS because $r_{xx}[\ell]=\mathbb{E}\{|A|^2\}$ for every lag, although any realization is a constant line. A deterministic impulse at one fixed index is not WSS: its squared value depends on absolute time. A flat transform magnitude does not convert that impulse into white noise.
+
+<Task>
+Construct one WSS process whose realizations look unlike white noise and one near-miss that violates exactly one WSS clause. Name whether constant mean or lag-only second-order dependence decides each case.
+</Task>
+
+### A time average needs an additional premise
+
+A finite record can form sample averages, but WSS alone does not make them equal to population expectations. For the constant random process, an arbitrarily long realization reveals only one value of $A$; it does not reveal the ensemble distribution of $A$. Ergodicity or an appropriate mixing condition is the extra modeling bridge that permits long time averages to approach ensemble moments. The estimators below use that bridge as an assumption, not as a consequence of a smooth spectrum.
+
+<KeyFact>
+Stationarity says that the target moments do not depend on absolute time. It does not certify that one record contains enough independent evidence to estimate those moments accurately.
+</KeyFact>
+
+The target quantity must therefore be defined at the process level before a finite transform can be evaluated as evidence.
+
+## Autocorrelation and PSD describe the same stationary power
+
+Once the process target is fixed, lag products provide a route from stationary power to frequency. Begin with zero-mean, unit-variance white noise. Its samples are uncorrelated at nonzero lag, so
+
+$$
+r_{xx}[\ell]=\delta[\ell].
+$$
+
+The frequency representation is consequently flat. By contrast, the constant random process has the same correlation value at every lag and concentrates its power at zero frequency. The distinction comes from correlation structure, not from whether one realization appears irregular.
+
+### The population transform pair fixes scaling and units
+
+<Definition title="power spectral density">
+For a WSS process with an admissible autocorrelation sequence, its two-sided **power spectral density** is
+
+$$
+S_{xx}(e^{j\omega})
+=\sum_{\ell=-\infty}^{\infty}r_{xx}[\ell]e^{-j\omega\ell},
+\qquad -\pi\le\omega<\pi,
+$$
+
+with inverse
+
+$$
+r_{xx}[\ell]
+=\frac{1}{2\pi}\int_{-\pi}^{\pi}
+S_{xx}(e^{j\omega})e^{j\omega\ell}\,d\omega.
+$$
+
+Its values are average power per normalized angular-frequency measure, and
+$r_{xx}[0]=(1/2\pi)\int_{-\pi}^{\pi}S_{xx}(e^{j\omega})\,d\omega$.
+</Definition>
+
+Under this convention, unit-variance white noise has $S_{xx}(e^{j\omega})=1$. The conjugate symmetry $r_{xx}[-\ell]=r_{xx}^*[\ell]$ makes the PSD real and nonnegative. In normalized frequency $f=\omega/(2\pi)$ cycles/sample, the same pair uses $e^{-j2\pi f\ell}$ and integrates over $-1/2\le f<1/2$ without the factor $1/(2\pi)$. Every numerical result below uses that cycles/sample convention.
+
+<Task>
+Propose one nonnegative two-sided PSD whose integral is one and one near-miss with a negative frequency band. Transform or reason back to lag zero, and state which PSD clause rejects the near-miss.
+</Task>
+
+{/* fig correlation-to-psd: four fixed-layout frames; aligned record and lagged copy, N products at lag zero, N-1 products at lag one with N denominator, mirrored estimated lags transformed to an estimated spectrum; keep population r and S visually distinct from hatted estimators */}
+<FigureSequence name="correlation-to-psd" alt="Four fixed-layout frames align a sample record with lagged copies, average the available products into estimated autocorrelation values, and transform the lag sequence into an estimated spectrum." caption="Lag products turn one realization into an autocorrelation estimate; transforming that estimate does not remove its estimator status." />
+
+<Task>
+Before advancing to the lag-one frame, predict the number of surviving products. In the final frame, identify which symbols are population quantities and which carry hats because they were computed from one finite record.
+</Task>
+
+### A finite lag average remains an estimate
+
+For a record $x[0],\ldots,x[N-1]$, adopt the biased finite estimate
+
+$$
+\widehat r_b[\ell]
+=\frac{1}{N}\sum_{n=0}^{N-1-\ell}x[n+\ell]x^*[n],
+\qquad 0\le\ell<N,
+$$
+
+mirror it by $\widehat r_b[-\ell]=\widehat r_b^*[\ell]$, and set it to zero outside the available lags. “Biased” names the fixed denominator $N$: at large lags fewer products survive, yet the divisor does not shrink. Dividing by $N-\ell$ gives an unbiased alternative for suitable WSS data, but its high-lag variance grows and its transformed estimate need not remain nonnegative.
+
+For a rectangular record, the DTFT of $\widehat r_b[\ell]$ is exactly the periodogram
+
+$$
+\widehat I_N(f)=\frac{1}{N}
+\left|\sum_{n=0}^{N-1}x[n]e^{-j2\pi fn}\right|^2.
+$$
+
+This is an equality between two finite-record estimators. It is not an equality between one realization and the ensemble PSD.
+
+<Example title="four alternating samples">
+For $x=[1,-1,1,-1]$, the lag-zero product sum is $4$, so $\widehat r_b[0]=1$. Three negative products survive at lag one, giving $\widehat r_b[1]=-3/4$. The remaining positive-lag values are $1/2$ and $-1/4$. The alternating pattern should therefore concentrate the finite estimate near $f=1/2$, or $\omega=\pi$.
+</Example>
+
+<Exercise>
+For $x=[1,-1,1,-1]$, compute the biased autocorrelation estimates at lags zero through three with denominator $N=4$, mirror the positive lags, and evaluate their finite Fourier sum at $\omega=0$ and $\omega=\pi$.
+
+<Solution>
+Keeping the denominator four at every lag gives
+
+$$
+\widehat r_b[0]=1,
+\quad \widehat r_b[1]=-\frac34,
+\quad \widehat r_b[2]=\frac12,
+\quad \widehat r_b[3]=-\frac14.
+$$
+
+The record is real, so the negative lags mirror these values. Therefore
+
+$$
+\widehat S(0)
+=1+2\left(-\frac34+\frac12-\frac14\right)=0,
+$$
+
+and
+
+$$
+\widehat S(\pi)
+=1+2\left[\left(-\frac34\right)(-1)
++\frac12+\left(-\frac14\right)(-1)\right]=4.
+$$
+
+The finite estimate places the alternating record's power at $\omega=\pi$. It does not prove that a population process generating the record has that PSD.
+</Solution>
+</Exercise>
+
+Autocorrelation has now supplied a computable spectral estimate while preserving the population-versus-sample distinction. The remaining question is whether more samples make that single estimate reliable.
+
+## A longer raw periodogram does not become stable
+
+The exact correlogram identity does not give the raw periodogram small error. Under finite observation, the expected periodogram is the true PSD smoothed by a window-power kernel. A longer rectangular record narrows that kernel, so bias can decrease at a continuous interior frequency. Its pointwise variance follows a different limit.
+
+### Bias and variance answer different questions
+
+For an estimator $\widehat S(f)$ of $S(f)$,
+
+$$
+\operatorname{bias}(f)=\mathbb{E}\{\widehat S(f)\}-S(f),
+$$
+
+$$
+\operatorname{var}(f)
+=\mathbb{E}\!\left\{
+\left|\widehat S(f)-\mathbb{E}\{\widehat S(f)\}\right|^2
+\right\},
+$$
+
+and
+
+$$
+\operatorname{MSE}(f)=\operatorname{var}(f)+|\operatorname{bias}(f)|^2.
+$$
+
+A *consistent estimator* has error that vanishes as the available data grow. Decreasing bias alone is insufficient because variance may remain nonzero.
+
+{/* fig PeriodogramVarianceEnvelope: responsive two-panel fixed-scale seeded white-noise periodograms for short and long records; many thin realizations, one amber realization, blue ensemble target, fixed-frequency mean/SD/CV slices; KaTeX footer shows bias down while variance stays order one */}
+<Figure name="PeriodogramVarianceEnvelope" alt="Short and long white-noise periodograms have different frequency detail but retain a similarly broad distribution of power at one fixed frequency." caption="A narrower expectation kernel does not make a raw white-noise periodogram ordinate concentrate around its mean." />
+
+For circular complex Gaussian white noise, a normalized periodogram ordinate is exponentially distributed. Its mean is the PSD value $S$, its variance is $S^2$, and its coefficient of variation is therefore one. The estimator can become nearly unbiased while the relative scatter stays of order one.
+
+For $T$ seeded trials with powers $P_t$, the empirical coefficient of variation in this lesson is
+
+$$
+\overline P=\frac1T\sum_{t=1}^{T}P_t,
+\qquad
+s^2=\frac{1}{T-1}\sum_{t=1}^{T}(P_t-\overline P)^2,
+\qquad
+\operatorname{CV}=\frac{s}{\overline P}.
+$$
+
+The $T-1$ denominator makes every reported empirical CV a sample statistic rather than a population identity.
+
+The frozen study makes this distinction executable. It generates 96 circular complex unit-variance white-noise records with seed `0x5eedc0de`, evaluates the rectangular periodogram at $f=0.25$, and uses prefix lengths $N=256,1024,4096,16384$. The measured CVs are respectively $0.843520$, $0.812286$, $0.869418$, and $1.061033$. The last record is 64 times longer than the first, yet its pointwise CV has not collapsed.
+
+<KeyFact>
+Asymptotic unbiasedness is not consistency. For a raw Gaussian-white-noise periodogram ordinate, the standard deviation remains approximately as large as the mean even when a longer record narrows spectral leakage.
+</KeyFact>
+
+This failure differs from the interpolation limit in the preceding lesson. Padding changes neither the underlying random evidence nor the deterministic window kernel. Increasing $N$ narrows the deterministic kernel but still leaves one unaveraged random squared magnitude. A stable PSD estimate needs an operation that reduces variance.
+
+## Welch averaging buys stability with shorter, correlated frames
+
+Variance falls when several spectral estimates contribute to one reported value. Welch's method creates those estimates by dividing one stationary record into segments, applying an <Ref lesson="windows-leakage-and-resolution">analysis window whose main-lobe width and noise normalization are declared</Ref>, forming a modified periodogram for each segment, and averaging the results.
+
+### The estimator ledger fixes every scale
+
+Let the complete record contain $N_{\text{total}}$ samples. Use segment length $M$, hop $H$, FFT length $L\ge M$, and starts $mH$ for
+
+$$
+K=1+\left\lfloor\frac{N_{\text{total}}-M}{H}\right\rfloor
+$$
+
+complete segments. With periodic window $w[n]$ and window energy
+
+$$
+U=\sum_{n=0}^{M-1}|w[n]|^2,
+$$
+
+the frame transform and its two-sided cycles/sample periodogram are
+
+$$
+X_m[k]=\sum_{n=0}^{M-1}w[n]x[n+mH]e^{-j2\pi kn/L},
+\qquad
+P_m[k]=\frac{|X_m[k]|^2}{U}.
+$$
+
+The Welch estimate is the arithmetic average
+
+$$
+\widehat S_W[k]=\frac1K\sum_{m=0}^{K-1}P_m[k].
+$$
+
+The divisor is $U$, not the coherent sum $\sum_nw[n]$ used to calibrate deterministic tone amplitude. For density per hertz, divide each squared transform by $f_sU$. For a real signal's one-sided per-hertz PSD, double only positive interior bins and leave DC and even-$L$ Nyquist undoubled. No one-sided folding applies to complex or I/Q data. A PSD in decibels uses $10\log_{10}(S/S_{\mathrm{ref}})$ because PSD is a power quantity.
+
+{/* fig WelchAveragingPipeline: left-to-right record, length-M periodic-window frames with hop H, normalized squared transforms, arithmetic average, final PSD; second row contrasts disjoint frames with 50-percent overlap and labels reused samples as correlated evidence; numbered badges bind pipeline to formula */}
+<Figure name="WelchAveragingPipeline" alt="Welch estimation windows several segments, squares and normalizes each transform, and averages them; overlapping segments visibly reuse samples and therefore are correlated." caption="Welch averaging reduces variance by combining segment estimates, while segment length fixes the resolution kernel." />
+
+If $K=16$ segment periodograms were independent exponential ordinates with the same mean, their average would have CV approximately $1/\sqrt{16}=0.25$. This is the variance reduction that one raw transform lacks. It is purchased with segment length $M$: the segment window, not $N_{\text{total}}$, now determines main-lobe width. Increasing $L$ can densify the displayed curve but cannot reverse that resolution cost.
+
+### Overlap adds frames faster than evidence
+
+Overlap means adjacent segments reuse samples. Their normalized window inner product at hop $H$ is
+
+$$
+\rho_h=
+\frac{\displaystyle\sum_{n=0}^{M-1-hH}w[n+hH]w^*[n]}{U},
+\qquad 0\le hH<M,
+$$
+
+and $\rho_h=0$ when the shifted windows do not overlap. The conjugate is immaterial for the study's real Hann window but keeps the inner product valid for a complex analysis window.
+
+For the study's circular Gaussian one-bin powers, an independent-equivalent count is
+
+$$
+K_{\mathrm{eff}}
+=\frac{K^2}{K+2\sum_{h\ge1}(K-h)|\rho_h|^2},
+\qquad
+\operatorname{CV}_{\mathrm{pred}}=\frac{1}{\sqrt{K_{\mathrm{eff}}}}.
+$$
+
+This correction is exact only under the declared model. It is a useful diagnostic, not a universal formula for every signal or frequency. Empirical trial variability remains the acceptance measurement.
+
+For $N_{\text{total}}=16384$, periodic Hann, and $M=512$, the frozen dependence audit is:
+
+| overlap | hop $H$ | nominal $K$ | $K_{\mathrm{eff}}$ | measured CV |
+|---:|---:|---:|---:|---:|
+| 0% | 512 | 32 | 32.000000 | 0.178210 |
+| 50% | 256 | 63 | 59.734114 | 0.140159 |
+| 75% | 128 | 125 | 65.213007 | 0.126204 |
+
+At 75-percent overlap the nominal count is almost four times the nonoverlap count, but the effective count only slightly exceeds twice the independent count. Most of the additional frames recycle evidence already present.
+
+<KeyFact>
+Report overlap with its hop, nominal frame count, and a dependence audit. “$K$ frames” does not mean “$K$ independent averages” when frames share samples.
+</KeyFact>
+
+Welch estimation therefore trades three quantities together: segment width governs spectral resolution, averaging governs variability, and overlap governs how efficiently one record supplies correlated estimates.
+
+## A PSD estimate passes only a joint resolution-and-variability test
+
+The tradeoff becomes actionable only after the spectral claim supplies acceptance thresholds. Its resolution branch evaluates the exact frame-start mean for two analytic tones of amplitude $0.5$ at $0.18$ and $0.22$ cycles/sample plus a unit noise floor; their separation is $0.04$ cycles/sample. Separately, its variability branch generates $T=96$ pure circular complex unit-variance Gaussian-noise records with seed `0x5eedc0de` and measures sample CV at $f=0.3125$. Both branches use $N_{\text{total}}=16384$ and a periodic Hann window, but only the variability branch is a Monte Carlo trial set.
+
+### Smoothness and sharpness can fail separately
+
+A tone-separation verdict requires two distinct local maxima, each within $0.01$ cycles/sample of truth, with an intervening valley at least $1$ dB below the lower peak. ENBW and null-to-null width are diagnostic scales, not substitutes for this peak-and-valley test. The rule is declared only for this equal-tone experiment. CV must be strictly below $0.30$, and rounded display values never decide either verdict.
+
+<Figure src="./figures/welch-resolution-variance.svg" alt="Welch settings form a resolution-variance frontier; only middle settings both separate tones 0.04 cycles per sample apart and keep empirical coefficient of variation below 0.30." caption="The estimator passes only where the segment kernel separates the tones and seeded trial variability stays below the declared limit." />
+
+<Task>
+Classify the two extreme settings before using the demo. A periodic Hann segment with $M=32$ has ENBW $1.5/M=0.046875$ cycles/sample and null-to-null width $4/M=0.125$ cycles/sample. A segment with $M=4096$ has seven 50-percent-overlapped frames. Predict which setting fails separation and which fails CV, then require one setting to pass both tests.
+</Task>
+
+The short setting produces $1023$ nominal frames and CV $0.034780$, but its exact mean curve has only one qualifying peak and therefore merges the tones. At $M=64$, the qualifying peaks are $0.180039$ and $0.219956$ cycles/sample with a $6.013752$ dB valley, so the exact rule passes. The long $M=4096$ setting also separates them, with the same rounded peak locations and a $28.166839$ dB valley, but seven nominal frames give empirical CV $0.402942$. Neither the smoothest nor the sharpest curve is sufficient. A middle setting with $M=2048$, hop $1024$, and 15 nominal frames separates the tones and reaches CV $0.267121$. Its overlap-corrected count is $14.260563$, making it close to the variability boundary rather than an effortless pass.
+
+<Demo name="WelchTradeoffLab" caption="Choose segment length and overlap, then accept a configuration only when its tone-separation and seeded-variability verdicts both pass." />
+
+Use the **Short blur** preset first and increase only $M$ until separate peaks appear. Continue until the CV target fails. Return to a simultaneous pass, then compare zero, 50-percent, and 75-percent overlap at $M=512$. Read nominal $K$ beside $K_{\mathrm{eff}}$ and measured CV; do not infer independent evidence from the number of frames.
+
+An auditable stationary PSD report records the process model and mean treatment; record length; segment length; window coefficients and endpoint convention; hop and overlap; FFT length; $U$ normalization; one- or two-sided units; trial seed and count; the frequency where variability is measured; the sample-CV formula; and the resolution rule. It also states model mismatch: a stationary average can hide a change that occurs within the record.
+
+The estimator audit is now complete. Autocorrelation defines stationary power at the process level; the raw periodogram can lose bias without losing order-one variance; Welch averaging reduces that variance by spending segment resolution; and overlap supplies correlated rather than independent evidence. The next lesson retains segment order because a changing signal makes time location part of the claim.
+
+## Exercises
+
+<Exercise>
+Classify zero-mean white noise, a deterministic impulse sequence, the constant random process $x[n]=A$, and a length-$N$ record queried at $|\ell|\ge N$. For each, state whether a WSS population autocorrelation and PSD are defined, whether a finite lag estimate is computable, and what the boundary teaches.
+
+<Solution>
+Zero-mean white noise is WSS with $r[\ell]=\sigma^2\delta[\ell]$ and flat two-sided PSD $\sigma^2$ under the angular convention. A finite realization gives lag estimates but not exact population values.
+
+A deterministic impulse fixed at one time is not WSS because its mean or squared value depends on absolute index. A deterministic finite correlation can still be computed, but its flat transform magnitude is not the PSD of stationary white noise.
+
+For $x[n]=A$ with finite $\mathbb{E}|A|^2$, the process is WSS and $r[\ell]=\mathbb{E}|A|^2$ for every lag. Its generalized periodic PSD is a zero-frequency line of weight $2\pi\mathbb{E}|A|^2$, not a flat density. One realization does not reveal the distribution of $A$.
+
+At $|\ell|\ge N$, no sample pairs overlap. The biased finite convention can return zero by declared zero extension. The unbiased denominator $N-|\ell|$ reaches zero at $|\ell|=N$ and is undefined. Missing products provide no population-lag evidence.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim “the periodogram is consistent because its expected value approaches the PSD as $N$ grows.” Separate bias, variance, and mean-square error, then give the Gaussian-white-noise counterexample.
+
+<Solution>
+Consistency requires estimation error to vanish, not only its expectation. Since
+
+$$
+\operatorname{MSE}=\operatorname{var}+|\operatorname{bias}|^2,
+$$
+
+both contributions must vanish for mean-square consistency. At an interior continuity point, a longer finite window can narrow the expectation kernel and make raw-periodogram bias tend toward zero. For Gaussian white noise, however, a normalized interior ordinate is approximately exponential: its mean is $S$, its variance is $S^2$, and its CV is one. Thus variance and MSE remain nonzero while bias shrinks. The failed inference substitutes “asymptotically unbiased” for “consistent.” Averaging or smoothing independent evidence is the missing operation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce a raw periodogram and a $K=16$ independent-periodogram average at one interior white-noise frequency over 50 outer trials. Freeze the generator, record length, periodic Hann coefficients, transform scale, and frequency. Report both sample CVs with fixed-seed 95-percent bootstrap intervals and interpret agreement with the ideal predictions.
+
+<Solution>
+Freeze circular $\mathcal{CN}(0,1)$ records at length $M=256$, periodic Hann $w[n]=0.5-0.5\cos(2\pi n/M)$, $U=96$, and $f=0.25$ cycles/sample. Use Mulberry32 seed `0x16a11ce`; cached Box–Muller normals divided by $\sqrt2$ form each real and imaginary component. Within each outer trial, generate 16 independent records and compute
+
+$$
+P_i=\frac{\left|\sum_{n=0}^{255}w[n]x_i[n]e^{-j2\pi(0.25)n}\right|^2}{96}.
+$$
+
+Store $P_1$ as the raw result and $(1/16)\sum_iP_i$ as the averaged result. Across 50 outer trials, the frozen output is
+
+| estimator | sample mean | sample CV | fixed-seed bootstrap 95% interval for CV |
+|---|---:|---:|---:|
+| one raw periodogram | 1.383506958 | 1.059174456 | $[0.871138071,\ 1.233857774]$ |
+| average of 16 | 1.024077785 | 0.284891804 | $[0.226048384,\ 0.335027394]$ |
+
+The bootstrap uses seed `0xb0057a9`, $B=10000$ paired resamples of the 50 trial indices, and percentile array index $\lfloor(B-1)p\rfloor$ at $p=0.025$ and $0.975$. The first interval contains the population prediction $1$ and the second contains $1/\sqrt{16}=0.25$. Finite-trial CV is biased and noisy, so agreement means coverage at this audit resolution, not equality to the predictions. The transferable check is to freeze independence, normalization, and the resampling convention before comparing variance laws.
+</Solution>
+</Exercise>
+
+<Exercise>
+For a stationary 16,384-sample record with tones $0.04$ cycles/sample apart in white noise, choose between one full-record periodogram and a Welch estimate. Predeclare segment length, periodic window, overlap, exact FFT length, predicted resolution, and a 50-trial CV check. Explain which cues decide the design.
+
+<Solution>
+The claim has two independent requirements. Separation depends on the segment window's exact mean curve, while stability depends on averaging. Choose periodic Hann $M=512$, hop $H=256$ for 50-percent overlap, and exactly $L=8192$. The diagnostic null-to-null width is $4/M=0.0078125$ cycles/sample, below the $0.04$ separation, but the declared peak-and-valley rule still decides the result. The displayed periodogram uses the $L=8192$ FFT; the acceptance audit separately evaluates the exact frame-mean DTFT on $f_i=0.14+i/8192$. That audit has qualifying peaks at $0.180039$ and $0.219956$ cycles/sample, maximum location error $0.000044$ cycles/sample, and a $19.358973$ dB valley. Resolution therefore passes.
+
+The nominal frame count is
+
+$$
+K=1+\left\lfloor\frac{16384-512}{256}\right\rfloor=63,
+$$
+
+and $U=\sum_nw^2[n]=192$. Because overlap correlates adjacent estimates, $1/\sqrt{63}$ is only an independence shortcut, not the accepted CV result. Freeze 50 pure $\mathcal{CN}(0,1)$ calibration records with Mulberry32/Box–Muller seed `0x50c0ffee` and probe $f=0.3125$ cycles/sample. Their Welch estimates have mean $0.997564799$, sample standard deviation $0.123584776$, and sample CV $0.123886464<0.30$. The tone-resolution branch and noise-only variability branch therefore both pass.
+
+A full-record periodogram has a much narrower resolution kernel, but its one-ordinate CV remains near one; that is why it is rejected for the joint claim. A very short Welch segment reverses the failure by lowering CV while merging the tones. Padding beyond $M$ changes only evaluation coordinates, as established in <Ref lesson="peak-estimation-and-zero-padding">Peak Estimation and Zero-Padding Limits</Ref>. The transferable cue is to test resolution and variability independently under one declared normalization.
+</Solution>
+</Exercise>
+
+<Exercise>
+Generate $N=4096$ complex samples with a $0.5e^{j2\pi(0.18)n}$ tone throughout and a $0.5e^{j2\pi(0.22)n}$ tone beginning at $n_0=2048$. Add stationary $\mathcal{CN}(0,0.01)$ noise using Mulberry32/Box–Muller seed `0x57f70006`. Use periodic Hann $M=256$, hop $H=64$, and $L=6400$, so $0.22$ cycles/sample is bin $1408$. Retain the 61 normalized frame powers at that bin, declare a crossing at $P_m>0.1$, then average the same powers. Locate the onset interval and identify exactly what the average discards.
+
+<Solution>
+The frame count is $1+\lfloor(4096-256)/64\rfloor=61$, and the periodic-Hann energy is $U=96$. For each start $mH$, compute
+
+$$
+P_m[1408]
+=\frac{1}{96}\left|\sum_{n=0}^{255}w[n]x[n+mH]e^{-j2\pi(1408)n/6400}\right|^2.
+$$
+
+Frame $m=28$ ends at sample $2047$ and has power $0.008114660$, below threshold. Frame $m=29$ starts at $1856$, ends at $2111$, and has power $0.314630273$, the first crossing. A below-threshold Hann-weighted frame does not prove that no onset occurred near its tapered endpoint. Without a calibrated detection-delay model, the threshold trace therefore localizes the event only to the first-crossing frame's support,
+
+$$
+n_0\in[1856,2111].
+$$
+
+The frozen simulation ground truth $n_0=2048$ lies inside this interval and is used to score the detector; it was declared by the generator, not inferred from the threshold trace. The 256-sample support bounds this localization and the 64-sample hop determines how often a new bound is tested. FFT padding cannot shrink either limit.
+
+Averaging all 61 powers gives $20.874196421$. That scalar retains the overall second-tone power but deletes the association between each power and its frame start, so it cannot recover the crossing or the interval. Keeping the ordered spectra creates the object developed in <Ref lesson="stft-spectrograms-and-reconstruction">STFT, Spectrograms, and Reconstruction</Ref>; no reconstruction condition follows from the present averaging argument. The transferable move is to preserve the index whenever the claim concerns change time rather than stationary average power.
+</Solution>
+</Exercise>
+
+<References>
+1. Petre Stoica and Randolph Moses, *Spectral Analysis of Signals*, Chapter 1, §§1.3–1.5, and Chapter 2, §§2.2–2.7 — WSS autocorrelation and PSD, correlogram-periodogram equivalence, periodogram inconsistency, and averaged estimators. https://user.it.uu.se/~pst23965/ref.html
+2. Alan V. Oppenheim, Ronald W. Schafer, and John R. Buck, *Discrete-Time Signal Processing*, 2nd ed., Chapter 10, §§10.6–10.7, and Appendix A, §§A.1–A.4 — random processes, periodogram statistics, and variance reduction by averaging.
+3. Julius O. Smith III, *Spectral Audio Signal Processing*, Chapter 6, §§6.4–6.13 — sample versus population autocorrelation, periodogram variability, and Welch averaging. https://ccrma.stanford.edu/~jos/sasp/
+4. Fredric J. Harris, “On the Use of Windows for Harmonic Analysis with the Discrete Fourier Transform,” *Proceedings of the IEEE* 66(1), 1978, §IV.A–C — noise-power bandwidth and overlap correlation.
+</References>

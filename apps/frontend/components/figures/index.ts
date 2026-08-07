@@ -1,5 +1,31 @@
 import type { ComponentType } from "react";
 import W2vOneStep from "./examples/W2vOneStep";
+import ConvolutionThreeViews from "./digital-signal-processing/ConvolutionThreeViews";
+import PoleModePairings from "./digital-signal-processing/PoleModePairings";
+import ResonatorStateLedger from "./digital-signal-processing/ResonatorStateLedger";
+import X8ValidationDiagnostics from "./digital-signal-processing/X8ValidationDiagnostics";
+import X8IdentificationPipeline from "./digital-signal-processing/X8IdentificationPipeline";
+import PhasorCoordinateLedger from "./digital-signal-processing/PhasorCoordinateLedger";
+import ComplexModeEigenfunction from "./digital-signal-processing/ComplexModeEigenfunction";
+import ConvolutionMultiplicationBridge from "./digital-signal-processing/ConvolutionMultiplicationBridge";
+import GroupDelayPackets from "./digital-signal-processing/GroupDelayPackets";
+import DftBasisCorrelations from "./digital-signal-processing/DftBasisCorrelations";
+import RealDftConventionLedger from "./digital-signal-processing/RealDftConventionLedger";
+import PaddingDurationResolution from "./digital-signal-processing/PaddingDurationResolution";
+import FftButterflyLedger from "./digital-signal-processing/FftButterflyLedger";
+import FftCostGrowth from "./digital-signal-processing/FftCostGrowth";
+import FftMemoryOrderLedger from "./digital-signal-processing/FftMemoryOrderLedger";
+import DtmfFeatureTimingPipeline from "./digital-signal-processing/DtmfFeatureTimingPipeline";
+import DtmfCoordinateComparison from "./digital-signal-processing/DtmfCoordinateComparison";
+import DtmfCoordinateCostLatencyLedger from "./digital-signal-processing/DtmfCoordinateCostLatencyLedger";
+import WindowShapeSpectrumPair from "./digital-signal-processing/WindowShapeSpectrumPair";
+import WindowCalibrationLedger from "./digital-signal-processing/WindowCalibrationLedger";
+import WindowTradeoffMap from "./digital-signal-processing/WindowTradeoffMap";
+import PeakParabolaFit from "./digital-signal-processing/PeakParabolaFit";
+import PhaseFalseResolution from "./digital-signal-processing/PhaseFalseResolution";
+import LocalizationResolutionLedger from "./digital-signal-processing/LocalizationResolutionLedger";
+import PeriodogramVarianceEnvelope from "./digital-signal-processing/PeriodogramVarianceEnvelope";
+import WelchAveragingPipeline from "./digital-signal-processing/WelchAveragingPipeline";
 import CodeTreeCorrespondence from "./information-theory/CodeTreeCorrespondence";
 import NonPrefixAmbiguity from "./information-theory/NonPrefixAmbiguity";
 import TwoCodesOneSource from "./information-theory/TwoCodesOneSource";
@@ -139,6 +165,32 @@ export interface RegisteredFigure {
  */
 export const figures: Record<string, RegisteredFigure> = {
   W2vOneStep: { component: W2vOneStep },
+  ConvolutionThreeViews: { component: ConvolutionThreeViews },
+  PoleModePairings: { component: PoleModePairings },
+  ResonatorStateLedger: { component: ResonatorStateLedger },
+  X8ValidationDiagnostics: { component: X8ValidationDiagnostics },
+  X8IdentificationPipeline: { component: X8IdentificationPipeline },
+  PhasorCoordinateLedger: { component: PhasorCoordinateLedger },
+  ComplexModeEigenfunction: { component: ComplexModeEigenfunction },
+  ConvolutionMultiplicationBridge: { component: ConvolutionMultiplicationBridge },
+  GroupDelayPackets: { component: GroupDelayPackets },
+  DftBasisCorrelations: { component: DftBasisCorrelations },
+  RealDftConventionLedger: { component: RealDftConventionLedger },
+  PaddingDurationResolution: { component: PaddingDurationResolution },
+  FftButterflyLedger: { component: FftButterflyLedger },
+  FftCostGrowth: { component: FftCostGrowth },
+  FftMemoryOrderLedger: { component: FftMemoryOrderLedger },
+  DtmfFeatureTimingPipeline: { component: DtmfFeatureTimingPipeline },
+  DtmfCoordinateComparison: { component: DtmfCoordinateComparison },
+  DtmfCoordinateCostLatencyLedger: { component: DtmfCoordinateCostLatencyLedger },
+  WindowShapeSpectrumPair: { component: WindowShapeSpectrumPair },
+  WindowCalibrationLedger: { component: WindowCalibrationLedger },
+  WindowTradeoffMap: { component: WindowTradeoffMap },
+  PeakParabolaFit: { component: PeakParabolaFit },
+  PhaseFalseResolution: { component: PhaseFalseResolution },
+  LocalizationResolutionLedger: { component: LocalizationResolutionLedger },
+  PeriodogramVarianceEnvelope: { component: PeriodogramVarianceEnvelope },
+  WelchAveragingPipeline: { component: WelchAveragingPipeline },
   CodeTreeCorrespondence: { component: CodeTreeCorrespondence },
   NonPrefixAmbiguity: { component: NonPrefixAmbiguity },
   TwoCodesOneSource: { component: TwoCodesOneSource },

@@ -1,0 +1,171 @@
+{
+  "lesson": "impulse-response-and-convolution",
+  "component": "EchoKernelLab",
+  "d1_objective": "The learner sees a wrong three-tap kernel reproduce a constant-input observation exactly, then sees an impulse probe separate the taps and make a validated convolution fit possible.",
+  "targets": {
+    "component_file": "components/demos/digital-signal-processing/EchoKernelLab.tsx",
+    "registry_file": "components/demos/index.ts",
+    "registry_entry": "EchoKernelLab: () => import(\"./digital-signal-processing/EchoKernelLab\"),",
+    "lesson_embed_owned_by_lesson_author": "<Demo name=\"EchoKernelLab\" caption=\"Tune the candidate echo kernel on the constant observation, then switch to the impulse probe and validate it.\" />",
+    "course_spec_source": "content/courses/digital-signal-processing/course.yaml:197",
+    "preflight_mutations": [
+      "content/courses/digital-signal-processing/research/_pipeline/lesson-cycles/impulse-response-and-convolution/demo-preflight.json"
+    ]
+  },
+  "implementation_contract": {
+    "export": "default function EchoKernelLab() with no required props",
+    "client_boundary": "Put \"use client\" before imports because the island owns useState and input handlers; keep all constants and pure convolution/error helpers in the same client module.",
+    "lazy_loading": "Use the existing explicit registry import promise; DemoHost already constructs React.lazy loaders once at module scope and supplies Suspense, so add no next/dynamic wrapper and do not disable SSR.",
+    "styling": "Use existing Tailwind theme utilities and currentColor SVG text/strokes; add no CSS file or global style. Use the house amber #e2903a for observed output and blue #4c8dd6 for the candidate, distinguished by solid versus dashed/hollow marks as well as color.",
+    "dependencies": 0,
+    "network_or_async": false
+  },
+  "data_and_state": {
+    "sample_count": 8,
+    "truth": {
+      "kernel": [0.7, 0.25, 0.1],
+      "tap_labels": ["dry h[0]", "early echo h[1]", "late echo h[2]"],
+      "sum": 1.05
+    },
+    "state": {
+      "candidate_kernel": "number[3] initialized from the Same sum, wrong taps preset",
+      "selected_input": "\"constant\" | \"impulse\", initialized to \"constant\""
+    },
+    "derived_only": [
+      "active input index",
+      "active kernel-preset index or null",
+      "observed and candidate output arrays",
+      "selected-input normalized error",
+      "impulse validation error",
+      "maximum absolute tap error",
+      "pass verdict"
+    ],
+    "convolution": "For n=0..7, y[n] = sum(m=0..2, h[m] x[n-m]). The constant sequence returns 1 for every integer index (steady-state, no startup edge); the impulse returns 1 only at index 0 and 0 otherwise. This states the extension/boundary convention instead of silently treating the displayed record as periodic.",
+    "inputs": [
+      {
+        "id": "constant",
+        "label": "Constant input",
+        "definition": "x_const[n] = 1 for every integer n",
+        "display": [1, 1, 1, 1, 1, 1, 1, 1],
+        "observed_output": [1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05],
+        "teaching_role": "Falsification under the declared observation: an eternal constant input with steady-state-only scoring reveals only h[0]+h[1]+h[2], so distinct kernels with sum 1.05 are observationally identical. A retained startup edge from a finite zero-padded probe would instead expose partial sums and may identify the taps."
+      },
+      {
+        "id": "impulse",
+        "label": "Impulse probe",
+        "definition": "x_imp[n] = 1 at n=0 and 0 otherwise",
+        "display": [1, 0, 0, 0, 0, 0, 0, 0],
+        "observed_output": [0.7, 0.25, 0.1, 0, 0, 0, 0, 0],
+        "teaching_role": "Validation: the first three output equations have an identity convolution design matrix of rank three, exposing the three impulse-response taps directly and uniquely within the model."
+      }
+    ],
+    "normalized_error": {
+      "name": "normalized L2 output error",
+      "formula": "E(yHat,y) = sqrt(sum_n (yHat[n]-y[n])^2) / max(sqrt(sum_n y[n]^2), Number.EPSILON)",
+      "zero_output_rule": "If both target and prediction have zero L2 norm, define E=0. If the target norm is zero and the prediction norm is nonzero, return a failing nonfinite/infinite sentinel or otherwise force fail; never let the epsilon guard turn that case into a pass.",
+      "display": "100*E with two decimal places and a percent sign",
+      "pass_source": "Always compute the pass error on the impulse probe, even while the constant-input view is selected; also display the currently selected input's error."
+    },
+    "pass_rule": {
+      "tap_tolerance": "every abs(candidate[m]-truth[m]) <= 0.01 + 1e-9",
+      "output_tolerance": "impulse normalized L2 error < 0.01",
+      "boolean": "tapClose && impulseError < 0.01",
+      "recognizable_moment": "Readout changes to PASS and states both maximum tap error and impulse validation error; the two output traces coincide within the stated tolerance."
+    }
+  },
+  "interaction": {
+    "initial_state": {
+      "input": "constant",
+      "candidate_kernel": [0.9, 0.05, 0.1],
+      "visible_result": "Observed and candidate outputs overlap at 1.05 with 0.00% selected error, while the status says tap mismatch and explains that the constant input identifies only the sum. This is nonblank and teaches the counterexample before any action."
+    },
+    "input_control": "A PresetGroup with Constant input and Impulse probe, wrapped in a role=group region labelled Identification input.",
+    "kernel_presets": [
+      {
+        "label": "Same sum, wrong taps",
+        "kernel": [0.9, 0.05, 0.1],
+        "expected_constant_error_percent": 0,
+        "expected_impulse_error_percent": 37.712,
+        "expected_pass": false
+      },
+      {
+        "label": "Close, error high",
+        "kernel": [0.695, 0.255, 0.105],
+        "expected_constant_error_percent": 0.476,
+        "expected_impulse_error_percent": 1.155,
+        "expected_pass": false
+      },
+      {
+        "label": "Threshold pass",
+        "kernel": [0.695, 0.255, 0.1],
+        "expected_constant_error_percent": 0,
+        "expected_impulse_error_percent": 0.943,
+        "expected_pass": true
+      },
+      {
+        "label": "Exact kernel",
+        "kernel": [0.7, 0.25, 0.1],
+        "expected_constant_error_percent": 0,
+        "expected_impulse_error_percent": 0,
+        "expected_pass": true
+      }
+    ],
+    "tap_controls": [
+      "Slider dry h[0], min 0, max 1, step 0.005",
+      "Slider early echo h[1], min -0.25, max 0.5, step 0.005",
+      "Slider late echo h[2], min -0.25, max 0.3, step 0.005"
+    ],
+    "preset_behavior": "Use a second PresetGroup for candidate kernels; compute activeIndex from all three live values with a 1e-9 comparison and return null after manual tuning.",
+    "feedback": "All convolution, errors, active states, SVG geometry, and status text derive synchronously during render; eight samples and three taps require no memoization, effect, transition, network request, or delayed animation."
+  },
+  "visual": {
+    "container": "Panel",
+    "controls": "Two PresetGroups, three Sliders with display values, and one Readout; no hand-rolled buttons, sliders, or live regions.",
+    "chart": "One dependency-free responsive SVG (viewBox 0 0 480 270, className w-full) with two stacked discrete stem panels: input x[n] above and output y[n] below. Draw observed output as solid amber stems/filled dots and candidate output as dashed blue stems/hollow dots; include in-SVG n axes, numeric y bounds/ticks, panel labels, and a text legend. Derive a shared safe output scale from both traces with fixed padding and a nonzero minimum span so all allowed slider extremes remain finite and visible.",
+    "responsive_layout": "Stack all content by default; use a one-column grid for sliders and sm:grid-cols-3 above the breakpoint. Let preset buttons wrap. Keep the SVG fluid with no fixed CSS width or horizontal scrolling at 360px.",
+    "theme": "Axes and labels use currentColor with opacity; semantic text uses text-accent/text-faint and existing theme tokens. Verify light and dark backgrounds."
+  },
+  "accessibility": {
+    "keyboard": "PresetGroup supplies native buttons and Slider supplies native range inputs, so Tab, Enter/Space, and arrow-key adjustment work without custom handlers.",
+    "touch": "Existing Button min-h-11 and Slider h-11 provide at least 44px targets; controls remain separated and wrap on narrow screens.",
+    "aria": "Wrap each PresetGroup in a labelled role=group; give each Slider a specific ariaLabel and ariaValueText including the coefficient; use Readout's aria-live=polite for selected error and pass status. Give the SVG role=img and a concise dynamic aria-label naming the selected input, observed array, candidate array, and normalized error.",
+    "non_color_cues": "Solid/filled observed marks, dashed/hollow candidate marks, explicit legend text, and PASS/not yet labels make color unnecessary."
+  },
+  "loc_plan": {
+    "limit": 200,
+    "planned": 188,
+    "budget": {
+      "imports_types_constants_vectors": 34,
+      "convolution_error_and_geometry_helpers": 42,
+      "state_derived_values_and_handlers": 34,
+      "kit_controls_and_readout": 38,
+      "responsive_svg": 40
+    },
+    "strategy": "Keep all fixed vectors and presets as compact module constants; use one three-tap convolution helper, one norm helper, and mapped SVG marks. Store only candidate taps and selected input. Do not add a chart library, reducer, effect, extracted runtime component, CSS module, or utility file."
+  },
+  "deterministic_checks": [
+    "Truth convolved with the constant input is eight copies of 1.05.",
+    "[0.90,0.05,0.10] convolved with the constant input is also eight copies of 1.05, so selected error is 0 while maximum tap error is 0.20 and pass is false.",
+    "Truth convolved with the impulse is [0.70,0.25,0.10,0,0,0,0,0].",
+    "The same-sum wrong kernel has impulse error sqrt(0.20^2+(-0.20)^2)/0.75 = 0.377124, so it fails.",
+    "The close preset differs by 0.005 on all taps but has impulse error sqrt(3*0.005^2)/0.75 = 0.011547, proving the tap test alone does not pass.",
+    "The threshold preset differs by 0.005 on two taps and has impulse error sqrt(2*0.005^2)/0.75 = 0.009428, so both gates pass.",
+    "The exact preset produces zero error and passes; every slider endpoint still produces eight finite samples and a finite percentage."
+  ],
+  "validation_and_preview": [
+    "Confirm the component is a default-exported client component, imports only React and @/components/ui, and remains at or below 200 physical lines.",
+    "Run npx tsc --noEmit.",
+    "Run npx eslint components/demos/digital-signal-processing/EchoKernelLab.tsx components/demos/index.ts.",
+    "Run npm run validate -- digital-signal-processing impulse-response-and-convolution after the lesson file exists.",
+    "Run npm run preview -- digital-signal-processing impulse-response-and-convolution for static lesson light/dark layout; expect the preview command to show a demo placeholder because it deliberately does not hydrate client islands.",
+    "Run npm run dev and inspect /courses/digital-signal-processing/lessons/impulse-response-and-convolution at desktop and 360px in light and dark themes.",
+    "By hand: keyboard-select every preset/input, arrow each slider at both bounds, verify active preset clears after tuning, reproduce all deterministic percentages, confirm constant zero-error does not pass, confirm Threshold pass does pass, and check that live text and SVG labels neither clip nor rely on color."
+  ],
+  "checklist_expectation": {
+    "D1": "PASS by the dynamic constant-versus-impulse discrepancy.",
+    "D2": "PASS with synchronous 8-by-3 arithmetic.",
+    "D3": "PASS with the live same-sum counterexample and four named kernel presets.",
+    "D4": "PASS because the learner can falsify uniqueness, switch probes, tune, and receive a two-gate PASS verdict.",
+    "D5": "PASS with one client file, existing UI imports, zero dependencies, and planned 188 LOC."
+  }
+}

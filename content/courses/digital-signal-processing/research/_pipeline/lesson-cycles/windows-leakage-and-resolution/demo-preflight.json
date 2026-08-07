@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "status": "d1_pass_implementation_blocked_pending_contract_repair",
+  "lesson": "windows-leakage-and-resolution",
+  "component": "WeakToneWindowLab",
+  "scope": "Demo preflight only. This task does not build the component or edit course.yaml, lesson.mdx, registries, UI primitives, or research briefs.",
+  "sources_read": [
+    ".claude/skills/demo-builder/SKILL.md",
+    ".claude/skills/demo-builder/checklists/demo-checklist.md",
+    ".claude/skills/demo-builder/examples/ExampleDemo.tsx",
+    "docs/pedagogy.md: D1-D5",
+    "docs/components.md",
+    "node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md",
+    "node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md",
+    "node_modules/next/dist/docs/01-app/02-guides/lazy-loading.md",
+    "node_modules/next/dist/docs/03-architecture/accessibility.md",
+    "content/courses/digital-signal-processing/course.yaml",
+    "content/courses/digital-signal-processing/research/windows-leakage-and-resolution.md",
+    "content/courses/digital-signal-processing/research/notation-ledger.yaml"
+  ],
+  "source_state": {
+    "course_demo_component": "WeakToneWindowLab",
+    "course_demo_spec": "Detect a -40 dB tone 5.5 original bins from a stronger tone by choosing window and record length before relative phase is randomized. Pass only when the weak peak remains at least 3 dB above local leakage for every tested phase; rectangular-window failure falsifies narrowest-is-best.",
+    "lesson_status": "planned",
+    "lesson_mdx_exists": false,
+    "research_brief_status": "planned",
+    "authority_note": "The course spec fixes the learning target but not enough arithmetic conventions to produce one reproducible verdict. The executable repair below is a proposal and must be adopted by an authorized authoring step before implementation."
+  },
+  "d1": {
+    "verdict": "PASS",
+    "sentence": "The learner changes window and acquired record length and watches the worst-phase weak-tone margin cross a fixed 3 dB boundary, including a rectangular-window failure and a short low-sidelobe-window failure that jointly falsify narrowest-is-best and universally-lowest-sidelobe heuristics.",
+    "why_not_static": "A static comparison can show one spectrum, but it cannot make the learner commit to a window-duration pair, audit the same pair over a phase grid, locate the worst phase, and discover that both sidelobe height and main-lobe width can control the result.",
+    "goal_alignment": "The interaction reports main-lobe width, peak sidelobe, coherent gain, scalloping loss, ENBW, local leakage, and the all-phase decision, directly serving the lesson goal of evaluating rather than visually preferring windows.",
+    "honesty_boundary": "This is a normalized, noiseless, two-complex-tone finite-record study. It demonstrates one local detection criterion; it is not a universal detector, probability-of-detection study, real-signal periodogram, or claim that one window is globally best."
+  },
+  "implementation_gate": {
+    "verdict": "BLOCKED_PENDING_AUTHORIZED_CONTRACT_REPAIR",
+    "blocker_count": 6,
+    "blockers": [
+      {
+        "id": "signal_definition_missing",
+        "ambiguity": "The spec does not say real cosine versus complex exponential, strong-tone coordinate, absolute phase, sampling rate, noise rule, or amplitude-versus-power meaning of -40 dB.",
+        "consequence": "Real and complex signals have different image leakage, and different strong-tone offsets can reverse a window verdict.",
+        "repair": "Adopt proposed_executable_contract.signal exactly, including a complex strong line of amplitude 1, complex weak line of amplitude 0.01, no noise, and fixed normalized frequencies."
+      },
+      {
+        "id": "window_conventions_missing",
+        "ambiguity": "Window names, coefficient sets, and symmetric-versus-periodic endpoint conventions are absent.",
+        "consequence": "Hann/Blackman-Harris values, coherent gain, null width, and leakage differ across conventions.",
+        "repair": "Adopt the four periodic, denominator-N definitions and coefficients frozen below."
+      },
+      {
+        "id": "original_bin_and_record_options_missing",
+        "ambiguity": "The phrase '5.5 original bins' does not identify the reference length, and no legal record lengths are specified.",
+        "consequence": "Changing N can either change physical separation or only the coordinate label; the demo cannot know which experiment it is performing.",
+        "repair": "Freeze N0=128, keep physical frequencies fixed at q/128 cycles/sample, and allow N in [64,128,256]."
+      },
+      {
+        "id": "phase_randomization_conflicts_with_determinism",
+        "ambiguity": "Neither the phase distribution nor the number of tests is stated, while runtime randomization conflicts with reproducible SSR and stable target completion.",
+        "consequence": "Two learners can receive different verdicts and server/client markup can diverge if Math.random enters initialization.",
+        "repair": "Replace randomization with the exhaustive deterministic 16-phase grid 0 through 337.5 degrees in 22.5-degree steps; call it a withheld test grid, not random data."
+      },
+      {
+        "id": "local_leakage_and_peak_undefined",
+        "ambiguity": "The spec does not define the weak neighborhood, spectral evaluation grid, whether leakage is strong-only or total-spectrum background, how the weak peak is selected, dB normalization, or the inclusive 3 dB comparison.",
+        "consequence": "Exact-frequency, FFT-bin, neighborhood-maximum, and pointwise-envelope metrics give different margins, especially when a record makes the line bin-centered.",
+        "repair": "Adopt the normalized exact-DTFT neighborhood-maximum metric below and decide on raw values with margin >=3.000 dB; rounding is display-only."
+      },
+      {
+        "id": "guided_task_absent",
+        "ambiguity": "No lesson.mdx exists, so D4 cannot verify that the learner is asked to make a choice before the result, use the same preset names, or interpret the success criterion correctly.",
+        "consequence": "A technically correct widget could become an unguided sandbox or disclose the answer before the prediction.",
+        "repair": "Author the three frozen guided tasks below before the Demo embed, then authorize component and registry work separately."
+      }
+    ],
+    "not_blockers": [
+      "No network, audio, file upload, worker, timer, random number, or new dependency is required.",
+      "Panel, PresetGroup, Button, Slider, Readout, and TargetList are sufficient.",
+      "The finite study is small enough for synchronous client computation or frozen lookup tables."
+    ]
+  },
+  "proposed_executable_contract": {
+    "coordinate_system": {
+      "reference_record_samples_N0": 128,
+      "sample_index": "n=0,...,N-1",
+      "normalized_frequency_unit": "cycles/sample",
+      "original_bin_coordinate": "q=N0*f; one original bin is 1/128 cycles/sample",
+      "record_lengths_samples": [64, 128, 256],
+      "record_length_rule": "Changing N changes acquired duration only. Sampling rate and the two physical normalized frequencies remain fixed; it does not reinterpret q as a bin index of the new record.",
+      "fft_length": null,
+      "spectral_evaluator": "Exact DTFT sums at declared q values; never call the plotted samples FFT bins."
+    },
+    "signal": {
+      "type": "analytic complex two-tone sequence",
+      "formula": "x_phi[n]=exp(j*2*pi*(20.5/128)*n)+0.01*exp(j*(2*pi*(26/128)*n+phi))",
+      "strong_amplitude": 1.0,
+      "strong_original_bin_q": 20.5,
+      "strong_phase_rad": 0.0,
+      "weak_amplitude": 0.01,
+      "weak_level_db_amplitude": -40.0,
+      "weak_original_bin_q": 26.0,
+      "separation_original_bins": 5.5,
+      "noise": "none",
+      "image_component": "none; complex tones intentionally isolate positive-frequency window leakage",
+      "calibration_note": "-40 dB means 20*log10(0.01/1), not a power-ratio ambiguity."
+    },
+    "windows": [
+      {
+        "label": "Rectangular",
+        "formula": "w[n]=1",
+        "periodic_denominator": null,
+        "coherent_gain": 1.0,
+        "enbw_bins": 1.0,
+        "null_to_null_main_lobe_bins": 2.0,
+        "scalloping_loss_db": -3.92218,
+        "peak_sidelobe_db": -13.25968
+      },
+      {
+        "label": "Hann",
+        "formula": "w[n]=0.5-0.5*cos(2*pi*n/N)",
+        "periodic_denominator": "N",
+        "coherent_gain": 0.5,
+        "enbw_bins": 1.5,
+        "null_to_null_main_lobe_bins": 4.0,
+        "scalloping_loss_db": -1.42362,
+        "peak_sidelobe_db": -31.46731
+      },
+      {
+        "label": "Hamming",
+        "formula": "w[n]=0.54-0.46*cos(2*pi*n/N)",
+        "periodic_denominator": "N",
+        "coherent_gain": 0.54,
+        "enbw_bins": 1.362826,
+        "null_to_null_main_lobe_bins": 4.0,
+        "scalloping_loss_db": -1.75147,
+        "peak_sidelobe_db": -42.6179
+      },
+      {
+        "label": "4-term Blackman-Harris",
+        "formula": "w[n]=0.35875-0.48829*cos(2*pi*n/N)+0.14128*cos(4*pi*n/N)-0.01168*cos(6*pi*n/N)",
+        "periodic_denominator": "N",
+        "coefficients": [0.35875, 0.48829, 0.14128, 0.01168],
+        "coherent_gain": 0.35875,
+        "enbw_bins": 2.004353,
+        "null_to_null_main_lobe_bins": 8.0,
+        "scalloping_loss_db": -0.82557,
+        "peak_sidelobe_db": -92.01373
+      }
+    ],
+    "window_metric_definitions": {
+      "coherent_gain": "CG=(1/N)*sum_n w[n]",
+      "enbw_bins": "ENBW=N*sum_n w[n]^2/(sum_n w[n])^2",
+      "scalloping_loss_db": "20*log10(|W at one-half current-record bin offset|/sum_n w[n])",
+      "main_lobe_width": "distance in current-record DFT-bin units between the first exact nulls surrounding zero",
+      "peak_sidelobe_db": "maximum 20*log10(|W|/sum w) outside the first-null interval through Nyquist; expected values above use a dense deterministic grid and are display references, not the local detector metric",
+      "normalization_guard": "CG corrects a bin-centered line amplitude; ENBW and sidelobe numbers must not be conflated with the local weak-tone margin."
+    },
+    "phase_grid": {
+      "count": 16,
+      "formula": "phi_m=2*pi*m/16, m=0,...,15",
+      "degrees": [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5],
+      "semantics": "The learner chooses window and N before revealing the all-phase audit. No runtime randomization is used. A phase slider may inspect the 16 cases, but the verdict is always their minimum margin."
+    },
+    "local_leakage_metric": {
+      "weak_neighborhood_original_bins": "q in [25.5,26.5]",
+      "evaluation_grid": "G={25.5+r/64 | r=0,...,64}; 65 points including both endpoints",
+      "normalized_full_spectrum": "Z_phi(q)=(1/sum w)*sum_{n=0}^{N-1} w[n]*x_phi[n]*exp(-j*2*pi*(q/128)*n)",
+      "normalized_strong_only_spectrum": "S(q)=(1/sum w)*sum_{n=0}^{N-1} w[n]*exp(j*2*pi*(20.5/128)*n)*exp(-j*2*pi*(q/128)*n)",
+      "local_leakage": "L=max_{q in G}|S(q)|",
+      "observed_weak_neighborhood_peak": "P_phi=max_{q in G}|Z_phi(q)|",
+      "phase_margin_db": "M_phi=20*log10(P_phi/L)",
+      "worst_phase_margin_db": "M_min=min_m M_phi_m",
+      "pass_rule": "PASS iff M_min >= 3.000 dB using unrounded double-precision values",
+      "display_rounding": "Show leakage relative to the strong line and margins to 2 decimals; rounding never controls PASS/FAIL.",
+      "plot_floor_db": -120,
+      "reason_for_neighborhood_max": "It prevents an exact null at q=26 from making a bin-centered long-record case look infinitely clean while adjacent local leakage still masks the feature."
+    }
+  },
+  "proposed_state_and_controls": {
+    "stored_state": [
+      "windowIndex: integer 0 through 3",
+      "recordIndex: integer 0 through 2 mapping to N=[64,128,256]",
+      "phaseIndex: integer 0 through 15 for inspection",
+      "auditRevealed: boolean",
+      "latchedTargets: three booleans"
+    ],
+    "derived_only": [
+      "active preset index, null when the manual state matches none",
+      "current-phase local peak and margin",
+      "strong-only local leakage",
+      "16 phase margins, worst phase, all-phase PASS/FAIL",
+      "CG, ENBW, main-lobe, scalloping, and peak-sidelobe readouts"
+    ],
+    "initial_state": "Rectangular trap: Rectangular, N=128, phase 0 degrees, audit already revealed. It visibly fails with worst margin -1.62 dB although its main lobe is the narrowest, so the first screenshot is nondegenerate and falsifies narrowest-is-best.",
+    "controls": [
+      "PresetGroup with exactly four labels frozen below.",
+      "Four kit Button choices for window, mutually exclusive and carrying aria-pressed.",
+      "One indexed Slider for N with positions 64, 128, 256 samples and aria-valuetext including samples.",
+      "One indexed Slider for phase with 16 positions and aria-valuetext in degrees; it changes the inspected spectrum but never weakens the all-phase verdict.",
+      "One kit Button labeled Audit all 16 phases; no random API, timer, or animation.",
+      "Reset restores the initial Rectangular trap state and clears latched task progress."
+    ],
+    "choice_before_reveal": "Changing window or N sets auditRevealed=false while leaving the current spectrum visible; Audit all 16 phases reveals the deterministic worst-case decision. Named presets may load their documented state and reveal immediately for narrative replay.",
+    "feedback_budget": "At most 3 record lengths x 4 windows x 16 phases x 65 neighborhood points x 256 samples if exhaustively recomputed, below 3.2 million short complex accumulations; prefer a frozen 12-cell audit table plus one current-phase curve. All feedback remains synchronous with no transition."
+  },
+  "presets": [
+    {
+      "label": "Rectangular trap",
+      "window": "Rectangular",
+      "N": 128,
+      "local_leakage_db": -24.71,
+      "worst_phase_margin_db": -1.619,
+      "worst_phase_deg": 90,
+      "verdict": "FAIL",
+      "teaching_role": "Initial counterexample: the 2-bin main lobe is narrowest, but local sidelobe leakage hides the -40 dB neighbor."
+    },
+    {
+      "label": "Hann clears",
+      "window": "Hann",
+      "N": 128,
+      "local_leakage_db": -53.937,
+      "worst_phase_margin_db": 12.546,
+      "worst_phase_deg": 270,
+      "verdict": "PASS",
+      "teaching_role": "At the same duration, a wider main lobe purchases enough local leakage suppression to clear every tested phase."
+    },
+    {
+      "label": "Short BH trap",
+      "window": "4-term Blackman-Harris",
+      "N": 64,
+      "local_leakage_db": -23.133,
+      "worst_phase_margin_db": -1.311,
+      "worst_phase_deg": 45,
+      "verdict": "FAIL",
+      "teaching_role": "Excellent far sidelobes do not help when the short record places the weak line in the broad main-lobe neighborhood."
+    },
+    {
+      "label": "Longer Hamming",
+      "window": "Hamming",
+      "N": 256,
+      "local_leakage_db": -47.393,
+      "worst_phase_margin_db": 7.66,
+      "worst_phase_deg": 90,
+      "verdict": "PASS",
+      "teaching_role": "Increasing acquired duration changes the physical separation in current-record bin units and moves the same local window from N=128 failure to N=256 pass."
+    }
+  ],
+  "numeric_study_plan": {
+    "matrix_dimensions": "4 periodic windows x 3 record lengths x 16 phases x 65 local frequency points",
+    "expected_cells": [
+      {"N": 64, "window": "Rectangular", "leakage_db": -17.88, "minimum_margin_db": -0.629, "verdict": "FAIL"},
+      {"N": 64, "window": "Hann", "leakage_db": -32.305, "minimum_margin_db": -4.379, "verdict": "FAIL"},
+      {"N": 64, "window": "Hamming", "leakage_db": -50.489, "minimum_margin_db": 10.057, "verdict": "PASS"},
+      {"N": 64, "window": "4-term Blackman-Harris", "leakage_db": -23.133, "minimum_margin_db": -1.311, "verdict": "FAIL"},
+      {"N": 128, "window": "Rectangular", "leakage_db": -24.71, "minimum_margin_db": -1.619, "verdict": "FAIL"},
+      {"N": 128, "window": "Hann", "leakage_db": -53.937, "minimum_margin_db": 12.546, "verdict": "PASS"},
+      {"N": 128, "window": "Hamming", "leakage_db": -43.179, "minimum_margin_db": 1.428, "verdict": "FAIL"},
+      {"N": 128, "window": "4-term Blackman-Harris", "leakage_db": -99.165, "minimum_margin_db": 59.158, "verdict": "PASS"},
+      {"N": 256, "window": "Rectangular", "leakage_db": -30.343, "minimum_margin_db": -0.071, "verdict": "FAIL"},
+      {"N": 256, "window": "Hann", "leakage_db": -71.099, "minimum_margin_db": 31.099, "verdict": "PASS"},
+      {"N": 256, "window": "Hamming", "leakage_db": -47.393, "minimum_margin_db": 7.66, "verdict": "PASS"},
+      {"N": 256, "window": "4-term Blackman-Harris", "leakage_db": -99.186, "minimum_margin_db": 59.186, "verdict": "PASS"}
+    ],
+    "required_invariants": [
+      "Exactly 12 finite cells and 192 phase verdicts are produced; no NaN or Infinity enters a calculation or SVG coordinate.",
+      "Rectangular N=128 fails while Hann N=128 passes.",
+      "Hamming changes from 1.428 dB FAIL at N=128 to 7.660 dB PASS at N=256.",
+      "Four-term Blackman-Harris changes from -1.311 dB FAIL at N=64 to 59.158 dB PASS at N=128.",
+      "Every decision uses unrounded margin >=3.000 dB; no displayed rounded value is fed back into the decision.",
+      "CG and ENBW equal their frozen analytic values for every N under the periodic definitions.",
+      "The exact-DTFT evaluation grid remains in original-bin coordinates when N changes; no zero-padding or FFT length control exists."
+    ],
+    "independent_reference_check": "Before component work, reproduce the 12 rows in a small standalone deterministic script using direct complex sums, then freeze them as fixtures or assert the client calculations against them.",
+    "tolerance": "Reference-table comparisons: absolute 0.005 dB for reported leakage/margin and 0.000005 for CG/ENBW; PASS/FAIL must match exactly."
+  },
+  "guided_tasks_to_author": [
+    "Start with Rectangular trap. Predict that the narrowest main lobe will win, reveal all 16 phases, and record the -1.62 dB worst margin and FAIL; this is the explicit falsification moment.",
+    "Hold N=128 and compare Hann, Hamming, and four-term Blackman-Harris. Find a pair that passes, then explain the decision using local leakage rather than only the headline peak-sidelobe number; Hamming remains a 1.43 dB near-failure under the frozen local metric.",
+    "Load Short BH trap, then increase N from 64 to 128 without moving either physical tone. Make the broad-main-lobe failure become PASS and state that acquired duration, not a denser FFT display, changed the evidence."
+  ],
+  "visual_contract": {
+    "primary_plot": "One SVG in original-bin q coordinates covering at least q=19 through 27. Show the normalized strong-only leakage trace, full two-tone trace for the inspected phase, vertical strong/weak frequency markers, the q=[25.5,26.5] local bracket, the local leakage level, and the observed neighborhood peak. Do not imply an FFT grid.",
+    "decision_readout": "Readout states current phase margin, worst phase and minimum margin, literal PASS/FAIL, and the inclusive >=3 dB rule.",
+    "metric_cards": "Compact cards show current-record main-lobe width, peak sidelobe, CG, scalloping loss, and ENBW with units. Local leakage is visually separated because it depends on N and the fixed neighbor coordinate.",
+    "tradeoff_message": "Always name both the cost and benefit: taper can lower sidelobes while widening the main lobe and changing CG/ENBW; longer N changes physical evidence.",
+    "no_probability_language": "Sixteen deterministic phases support an all-tested-phase claim only, not a probability, confidence, or random-channel claim."
+  },
+  "responsive_accessibility_ssr_audit": {
+    "mobile_312_360": [
+      "Stack controls, SVG, decision, metrics, and targets in one column; do not render the 12-cell matrix as a horizontally scrolling table.",
+      "Use SVG viewBox plus w-full and keep axis labels inside the viewBox; no fixed-width plot or tooltip required for essential values.",
+      "Permit the four long window labels to wrap in PresetGroup/Button controls without shrinking targets below 44 px.",
+      "Show at most five metric cards in a 2-column mobile grid with text wrapping; keep PASS/FAIL and margin above the fold where practical."
+    ],
+    "accessibility": [
+      "All controls use existing native kit Button, PresetGroup, and Slider primitives; button and slider hit areas are at least 44 px.",
+      "The indexed N and phase sliders provide aria-valuetext; phase values are announced in degrees.",
+      "Readout and TargetList announce audit changes politely; avoid announcing every SVG point.",
+      "The SVG has role=img and a dynamic aria-label summarizing window, N, phase, leakage, margin, and verdict.",
+      "Colors use theme tokens/currentColor and every line/status has a text label or dash style; PASS/FAIL is never color-only.",
+      "No hover-only tooltip, drag-only gesture, motion, sound, or auto-cycling phase."
+    ],
+    "ssr_client_stability": [
+      "The component must begin with use client and default-export a no-required-props component; any props must be serializable.",
+      "Initial state is literal and all arithmetic is pure; do not use Math.random, Date, performance, window, canvas measurement, locale-dependent formatting, effects, or browser-only APIs during render.",
+      "Client components are prerendered by default in the local Next version, so server and first-client HTML must use the same frozen matrix and explicit decimal formatting.",
+      "Keep lazy registration as a static import string in components/demos/index.ts at the later authorized integration stage.",
+      "No ssr:false escape hatch is necessary or desirable."
+    ],
+    "implementation_size_risk": "MODERATE: a plot, five metrics, three controls, four presets, and target state can exceed the approximately 200-line demo limit if formulas and the full 12-cell matrix are verbose. Keep the component to one compact data table and pure helpers, reuse UI primitives, and omit nonessential tooltips/animations."
+  },
+  "acceptance_after_repair": [
+    "An authorized course/lesson edit adopts the signal, window, coordinate, phase, local metric, presets, and guided tasks without silently substituting a different detector.",
+    "Exactly four named presets and the manual window/N controls reproduce the frozen 12-cell matrix.",
+    "Initial Rectangular trap visibly fails and falsifies narrowest-is-best before free exploration.",
+    "The all-phase verdict cannot be made to pass by selecting a favorable phase; phase is inspection-only.",
+    "Window headline metrics and target-specific local leakage remain distinct.",
+    "No FFT length or zero-padding control enters this lesson; that boundary remains owned by peak-estimation-and-zero-padding.",
+    "One default-exported client file stays near 200 physical lines, imports only components/ui, adds no dependency/network/audio/randomness, and responds synchronously.",
+    "At build time run the numeric fixture check, repeated SSR render equality, npx tsc --noEmit, scoped eslint, course validation, and manual light/dark keyboard checks at 312 and 360 px."
+  ],
+  "checklist_expectation": {
+    "D1": "PASS: the learner can falsify two plausible one-metric window rules and cross a measurable all-phase threshold.",
+    "D2": "PASS by repaired plan: bounded direct sums or frozen lookups update synchronously with no network or async path.",
+    "D3": "PASS by repaired plan: Rectangular trap is an alive failure and four named presets anchor two different failure mechanisms.",
+    "D4": "BLOCKED: no lesson draft yet contains the frozen guided tasks or prediction-before-reveal sequence.",
+    "D5": "PASS by plan but moderate size risk: existing kit, no dependency, no randomness, responsive SVG/cards, and a one-file target near 200 lines."
+  }
+}
