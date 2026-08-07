@@ -69,7 +69,14 @@ async def retitle(
     row rather than written with it; there is no turn of its own to hang a row
     on, and an invented one would be a message the next run reads.
     """
-    if chat.kind != "web" or chat.titled_at is None:
+    if chat.kind != "web":
+        return
+    # The chat was loaded before the run began and this session does not expire
+    # what it holds on commit, so the stamp on it is minutes old by here. A
+    # stamp older than the naming it describes buys a completion for a name
+    # that is already current.
+    await repo.session.refresh(chat)
+    if chat.titled_at is None:
         return
     # Counted rather than read: only about one run in four goes on to want the
     # rows, and a chat far past its last compaction is a lot of jsonb to load
@@ -87,6 +94,8 @@ async def retitle(
         instructions=module("title.md"),
         usage=usage,
     )
-    if title := named.output.strip():
-        await repo.set_title(chat, title)
+    # Stamped whatever came back. A pass that wrote nothing keeps the old name,
+    # but it has run: without the stamp the count that triggered it stands, and
+    # every following run pays for another one that says nothing again.
+    await repo.set_title(chat, named.output.strip() or None)
     await repo.set_usage(chat, run_id, usage_row(usage))

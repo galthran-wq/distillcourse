@@ -200,6 +200,7 @@ async def _open_run(
     user_messages: Sequence[ModelMessage],
     medium: Medium,
     role: Role,
+    prompt: str,
 ) -> list[ModelMessage]:
     if not await repo.claim_run(chat, run_id):
         raise RunBusy
@@ -210,11 +211,7 @@ async def _open_run(
         await repo.add_messages(chat, user_messages, role=role, run_id=run_id)
         # A chat is named after the learner's first question, never after a
         # prompt the platform wrote for itself.
-        if (
-            role == "user"
-            and chat.title is None
-            and (prompt := _prompt_text(user_messages))
-        ):
+        if role == "user" and chat.title is None and prompt:
             await repo.set_title(chat, prompt)
     except Exception:
         # Nothing is in flight, so the chat must not stay claimed until the
@@ -331,7 +328,7 @@ async def run(
         await check_cost_ceiling(repo.session)
     run_id = uuid.uuid4()
     user_message = ModelRequest(parts=[UserPromptPart(content=prompt)])
-    history = await _open_run(repo, chat, run_id, [user_message], medium, role)
+    history = await _open_run(repo, chat, run_id, [user_message], medium, role, prompt)
     deps = HarnessDeps(repo=repo, chat=chat, outbox=outbox)
     try:
         result = await tutor.run(
@@ -469,9 +466,13 @@ async def start_stream(
     # message just submitted is taken from the request.
     adapter.run_input.messages = adapter.run_input.messages[-1:]
     user_messages = adapter.sanitize_messages(adapter.messages)
+    # Read before the fence goes on: `_prefix` writes into the same part, and a
+    # chat named after that is a chat named after the passage the learner
+    # attached rather than after what they asked about it.
+    prompt = _prompt_text(user_messages)
     if quotes is not None:
         _prefix(user_messages, quotes)
-    history = await _open_run(repo, chat, run_id, user_messages, "web", "user")
+    history = await _open_run(repo, chat, run_id, user_messages, "web", "user", prompt)
     queue: asyncio.Queue[BaseChunk | None] = asyncio.Queue()
     task = asyncio.create_task(
         _drain(

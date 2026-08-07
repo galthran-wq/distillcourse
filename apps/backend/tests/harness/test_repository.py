@@ -64,6 +64,41 @@ async def test_errored_rows_stay_out_of_the_context(
     assert [row.error for row in await repo.rows(chat)] == ["openrouter said no"]
 
 
+async def test_a_title_is_cut_at_a_locator_boundary(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """A name is the question that started the chat, and the panel's header and
+    the rail read the `[[locator]]`s in it back as the places they name. One
+    section anchor is longer than the whole allowance, so a plain slice would
+    leave half a locator behind — which nothing resolves, and which is then
+    shown raw until the chat is named again."""
+    await repo.set_title(
+        chat, "what was traded at [[lesson:us-history/indigenous-america#cahokia]]?"
+    )
+    assert chat.title == "what was traded at"
+
+    # One that fits is kept whole, brackets and all; only the words after it go.
+    await repo.set_title(
+        chat, "[[lesson:us-history/indigenous-america]] what was traded here?"
+    )
+    assert chat.title == "[[lesson:us-history/indigenous-america]] what was traded her"
+
+
+async def test_a_stamp_without_a_name_keeps_the_name(
+    repo: HarnessRepository, chat: Chat
+) -> None:
+    """What a naming pass that came back with nothing writes: it has still run,
+    and the stamp is what stops the next run from buying the same silence."""
+    await repo.set_title(chat, "what is entropy?")
+    stamped = chat.titled_at
+
+    await repo.set_title(chat, None)
+
+    assert chat.title == "what is entropy?"
+    assert stamped is not None and chat.titled_at is not None
+    assert chat.titled_at >= stamped
+
+
 async def test_only_one_run_holds_a_chat(repo: HarnessRepository, chat: Chat) -> None:
     assert await repo.claim_run(chat, uuid.uuid4()) is True
     assert await repo.claim_run(chat, uuid.uuid4()) is False

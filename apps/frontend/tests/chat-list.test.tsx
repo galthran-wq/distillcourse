@@ -129,4 +129,14 @@ describe("a chat named after a question that points somewhere", () => {
 
     expect(rows()[0][0]).toBe("[[lesson:us-history/withdrawn]] and then?");
   });
+
+  it("leaves a half-written one as the text it is too", () => {
+    // A name is cut to 60 characters server-side, and one section anchor is
+    // longer than that on its own. The backend drops a locator its cut would
+    // leave unterminated; this is the rail holding to the same thing — half a
+    // locator is text, never half a substitution.
+    named("what was traded at [[lesson:us-history/indigenous-ame");
+
+    expect(rows()[0][0]).toBe("what was traded at [[lesson:us-history/indigenous-ame");
+  });
 });

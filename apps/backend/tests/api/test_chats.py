@@ -394,6 +394,31 @@ async def test_more_passages_than_the_cap_keeps_the_newest(
     assert "passage 11" not in asked
 
 
+async def test_a_chat_is_named_after_the_question_and_not_the_passage(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """The fence goes into the same part as the question, above it. A name read
+    off the stored message would be the block — `<untrusted source=…` and the
+    opening of a passage the learner only pointed at."""
+    repo = HarnessRepository(session, user.id)
+    chat = await repo.create_chat(kind="web")
+    body = submission(chat.id) | {
+        "quotes": [
+            {
+                "text": "entropy is the average surprisal",
+                "locator": "lesson:information-theory/entropy#average",
+            }
+        ]
+    }
+
+    with tutor.override(model=TestModel(custom_output_text="no"), tools=[]):
+        await signed_in.post(f"/api/v1/chats/{chat.id}/stream", json=body)
+        await settled()
+
+    await session.refresh(chat)
+    assert chat.title == "what is entropy?"
+
+
 async def test_a_question_with_no_passages_carries_no_fence(
     signed_in: AsyncClient, session: AsyncSession, user: User
 ) -> None:

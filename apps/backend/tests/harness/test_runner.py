@@ -447,6 +447,36 @@ async def test_the_telegram_thread_is_never_renamed(
     assert thread.title == "what is entropy?"
 
 
+async def test_a_naming_pass_that_says_nothing_is_still_a_naming(
+    session_factory: async_sessionmaker[AsyncSession],
+    repo: HarnessRepository,
+    chat: Chat,
+) -> None:
+    """The chat keeps the name it had, and the run after it pays for nothing:
+    the stamp moves whatever came back. Left where it was, the count that
+    triggered this pass would still stand and every following run would buy the
+    same silence again."""
+    named_by: list[str] = []
+    await named(repo, chat, "what is entropy?")
+    await moved_on(repo, chat, settings.TITLE_REFRESH_MESSAGES - TURN_ROWS)
+
+    # Whitespace rather than nothing at all: an empty completion is a model
+    # behaviour the library retries, and this is the pass returning a name that
+    # is no name.
+    with (
+        tutor.override(model=TestModel(custom_output_text="a mean"), tools=[]),
+        namer.override(model=counting("   ", named_by)),
+    ):
+        await answered(session_factory, repo, chat)
+        await repo.session.refresh(chat)
+        assert named_by == ["   "]
+        assert chat.title == "what is entropy?"
+
+        await answered(session_factory, repo, chat, "and mutual information?")
+
+    assert named_by == ["   "]
+
+
 async def test_a_rename_is_billed_to_the_run_it_follows(
     session_factory: async_sessionmaker[AsyncSession],
     repo: HarnessRepository,

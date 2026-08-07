@@ -19,6 +19,22 @@ Marker = Literal["clear", "compact"]
 TITLE_LENGTH = 60
 
 
+def _cut(title: str) -> str:
+    """A title at its length, cut at a locator boundary.
+
+    A name is the question that started the chat, brackets and all, and the
+    panel's header and the rail read those back as the places they name. One
+    section anchor is longer than the whole allowance, so a plain slice can
+    leave `[[lesson:course/lesson#the-ground-flo` behind — which nothing
+    resolves, and which is then shown raw until the chat is named again.
+    """
+    cut = title[:TITLE_LENGTH]
+    opened = cut.rfind("[[")
+    if opened > cut.rfind("]]"):
+        cut = cut[:opened]
+    return cut.rstrip()
+
+
 def _projection(messages: Sequence[ModelMessage]) -> list[dict[str, Any]]:
     return [
         ui.model_dump(mode="json", by_alias=True)
@@ -65,9 +81,15 @@ class HarnessRepository:
         out of step with what it is a maximum of. `ix_messages_chat_id_created_at`
         is what keeps it off the heap. A chat nobody has spoken in has only its
         creation to be dated and ordered by.
+
+        The join is inside the subquery as well as outside it: grouped over the
+        whole table, this reads every message on the instance to date one
+        learner's handful of chats.
         """
         last = (
             select(Message.chat_id, func.max(Message.created_at).label("at"))
+            .join(Chat, Chat.id == Message.chat_id)
+            .where(Chat.user_id == self.user_id)
             .group_by(Message.chat_id)
             .subquery()
         )
@@ -153,8 +175,13 @@ class HarnessRepository:
         )
         await self.session.commit()
 
-    async def set_title(self, chat: Chat, title: str) -> None:
-        chat.title = title[:TITLE_LENGTH]
+    async def set_title(self, chat: Chat, title: str | None) -> None:
+        """Name the chat and stamp when it was named. `None` stamps without
+        renaming: a naming pass that came back with nothing has still run, and
+        leaving the stamp where it was makes every following run pay for
+        another one."""
+        if title is not None:
+            chat.title = _cut(title)
         # What "since the title was set" is counted from, and it is counted
         # against `Message.created_at` — which the database stamps. Read from
         # the same clock rather than this process's: skew between the two would
