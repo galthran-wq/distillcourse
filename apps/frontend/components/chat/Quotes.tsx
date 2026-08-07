@@ -26,11 +26,13 @@ function opening(text: string): string {
 }
 
 /**
- * The row a message's passages sit in, above the question in the composer and
+ * The row a message's chips sit in, above the question in the composer and
  * above it again in the bubble it was sent as — the same row in both places,
- * so a reference does not move when the message goes. It is also what a
- * preview opens against: a chip that wrapped onto a second row would otherwise
- * open its own preview off the side of a panel that cannot scroll to it.
+ * so a reference does not move when the message goes. The passages it quotes
+ * take one; the places it points at (`components/chat/Mentions`) take another.
+ * It is also what a preview opens against: a chip that wrapped onto a second
+ * row would otherwise open its own preview off the side of a panel that cannot
+ * scroll to it.
  */
 export function QuoteRow({ children }: { children: ReactNode }) {
   return <div className="relative mb-2 flex flex-wrap gap-1.5">{children}</div>;

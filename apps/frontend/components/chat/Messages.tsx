@@ -35,7 +35,8 @@ function Question({ text, attached }: { text: string; attached: Quote[] }) {
           ))}
         </QuoteRow>
       )}
-      <Markdown text={question.text} />
+      {/* The places it pointed at are chips, as they were in the composer. */}
+      <Markdown text={question.text} chips />
     </>
   );
 }

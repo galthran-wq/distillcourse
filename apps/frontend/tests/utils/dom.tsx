@@ -44,6 +44,19 @@ export function mounted(tag = "div"): Mounted {
 }
 
 /**
+ * jsdom has no ResizeObserver, and the tutor's composer watches its own width
+ * to know how many rows the draft wraps into. Nothing in a test changes that
+ * width, so observing is all this has to do.
+ */
+export function stubResizeObserver(): void {
+  globalThis.ResizeObserver = class implements ResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
+
+/**
  * The reader typing, given as the whole value the field ends up holding.
  *
  * React dedupes a change event against the value it last saw, and that tracker

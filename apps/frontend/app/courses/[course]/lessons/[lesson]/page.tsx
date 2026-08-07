@@ -2,13 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ViewTransition } from "react";
-import { evaluate } from "@mdx-js/mdx";
-import * as runtime from "react/jsx-runtime";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeSlug from "rehype-slug";
-import rehypePrettyCode from "rehype-pretty-code";
 import type { MDXComponents } from "mdx/types";
 import DemoHost from "@/components/mdx/DemoHost";
 import LessonTelemetry from "@/components/LessonTelemetry";
@@ -39,9 +32,9 @@ import {
   Theorem,
 } from "@/components/mdx/Blocks";
 import { lessonKey } from "@/lib/content/locator";
+import { compileLesson } from "@/lib/content/render";
 import { getCourses, getLessonView } from "@/lib/content/site";
 import { isReadable } from "@/lib/content/visibility";
-import { rehypeCollectToc, type TocEntry } from "@/lib/content/toc";
 
 interface Params {
   course: string;
@@ -141,17 +134,7 @@ export default async function LessonPage({
 
   // The ToC is collected during the same render pass that assigns heading
   // ids (rehype-slug), so ToC anchors can never desync from the page.
-  const toc: TocEntry[] = [];
-  const { default: MDXContent } = await evaluate(entry.mdx as string, {
-    ...runtime,
-    remarkPlugins: [remarkGfm, remarkMath],
-    rehypePlugins: [
-      rehypeSlug,
-      [rehypeCollectToc, { out: toc }],
-      rehypeKatex,
-      [rehypePrettyCode, { theme: "github-dark-default" }],
-    ],
-  } as Parameters<typeof evaluate>[1]);
+  const { Content: MDXContent, toc } = await compileLesson(entry.mdx as string);
 
   return (
     <div className="lesson-grid mx-auto w-full max-w-7xl px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_230px] lg:gap-14">

@@ -12,6 +12,7 @@ import { panelVars, usePanelDragging, usePanelFit } from "@/lib/chat/panel-box";
 import { resumeSession, useSession } from "@/lib/chat/session";
 import { collapsePanel, togglePanel, usePanel, usePanelBox } from "@/lib/chat/stored";
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
+import { SectionsProvider, useLoadedSections } from "@/lib/content/sections";
 import { useExitDelay } from "@/lib/ui/exit";
 
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {
@@ -29,6 +30,10 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const section = useRef<HTMLElement>(null);
   const [unreachable, setUnreachable] = useState(false);
   const open = panel !== "closed";
+  // Where every lesson's sections are, for the `@`-autocomplete and for the
+  // chips a message's references are drawn as. Fetched once the panel has been
+  // opened: it rides on no page, and most readers open no panel.
+  const sections = useLoadedSections(open);
   // `.chat-panel` shrinks back into its launcher over one `--motion-base`.
   const onScreen = useExitDelay(open, MOTION_BASE_MS);
   // Only an open conversation is worth the screen. It is also the only state
@@ -64,64 +69,66 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   }, [expanded]);
 
   return (
-    <LessonsProvider value={lessons}>
-      {expanded && (
-        // Not a control: the header's collapse button is the one that can be
-        // reached and named, and a full-viewport button carrying the same name
-        // would be a second one in the tab order with nothing to show for it.
-        // Escape does what clicking here does, for everyone who cannot.
-        <div
-          aria-hidden
-          onClick={collapsePanel}
-          className="fixed inset-0 z-40 bg-scrim transition-opacity duration-(--motion-base) starting:opacity-0"
-        />
-      )}
-      {onScreen && (
-        <section
-          ref={section}
-          aria-label="Tutor"
-          // Expanded it covers the page, which is what a dialog is; docked it
-          // sits beside the page and is just a region of it.
-          role={expanded ? "dialog" : undefined}
-          aria-modal={expanded || undefined}
-          // Which box `.chat-panel` puts it in — and, docked, where in that
-          // shape's rule the reader has put it.
-          data-shape={shape}
-          style={shape === "docked" ? panelVars(box) : undefined}
-          className={`chat-panel flex flex-col rounded-md border border-line bg-paper shadow-popover ${
-            expanded ? "z-50 max-sm:rounded-none" : "z-40"
-          } ${open ? "" : "is-closing"} ${dragging ? "is-dragging" : ""}`}
-        >
-          {shape === "docked" && <PanelGrips panel={section} />}
-          {auth.status === "anonymous" ? (
-            <p className="p-4 text-sm text-soft">
-              The tutor answers about the lesson you are reading.{" "}
-              <Link href="/login" className="text-accent hover:underline">
-                Sign in
-              </Link>{" "}
-              to ask it something.
-            </p>
-          ) : session !== null ? (
-            <ChatPanel session={session} panel={section} expanded={expanded} />
-          ) : (
-            <p className="p-4 text-sm text-faint">
-              {unreachable ? "the tutor is unreachable" : "opening…"}
-            </p>
-          )}
-        </section>
-      )}
-      {!expanded && (
-        <Button
-          variant={open ? "outline" : "solid"}
-          size="pill"
-          onClick={togglePanel}
-          aria-expanded={open}
-          className="fixed right-6 bottom-6 z-40 shadow-card"
-        >
-          <ChatIcon />
-          Tutor
-        </Button>
-      )}
-    </LessonsProvider>
+    <SectionsProvider value={sections}>
+      <LessonsProvider value={lessons}>
+        {expanded && (
+          // Not a control: the header's collapse button is the one that can be
+          // reached and named, and a full-viewport button carrying the same name
+          // would be a second one in the tab order with nothing to show for it.
+          // Escape does what clicking here does, for everyone who cannot.
+          <div
+            aria-hidden
+            onClick={collapsePanel}
+            className="fixed inset-0 z-40 bg-scrim transition-opacity duration-(--motion-base) starting:opacity-0"
+          />
+        )}
+        {onScreen && (
+          <section
+            ref={section}
+            aria-label="Tutor"
+            // Expanded it covers the page, which is what a dialog is; docked it
+            // sits beside the page and is just a region of it.
+            role={expanded ? "dialog" : undefined}
+            aria-modal={expanded || undefined}
+            // Which box `.chat-panel` puts it in — and, docked, where in that
+            // shape's rule the reader has put it.
+            data-shape={shape}
+            style={shape === "docked" ? panelVars(box) : undefined}
+            className={`chat-panel flex flex-col rounded-md border border-line bg-paper shadow-popover ${
+              expanded ? "z-50 max-sm:rounded-none" : "z-40"
+            } ${open ? "" : "is-closing"} ${dragging ? "is-dragging" : ""}`}
+          >
+            {shape === "docked" && <PanelGrips panel={section} />}
+            {auth.status === "anonymous" ? (
+              <p className="p-4 text-sm text-soft">
+                The tutor answers about the lesson you are reading.{" "}
+                <Link href="/login" className="text-accent hover:underline">
+                  Sign in
+                </Link>{" "}
+                to ask it something.
+              </p>
+            ) : session !== null ? (
+              <ChatPanel session={session} panel={section} expanded={expanded} />
+            ) : (
+              <p className="p-4 text-sm text-faint">
+                {unreachable ? "the tutor is unreachable" : "opening…"}
+              </p>
+            )}
+          </section>
+        )}
+        {!expanded && (
+          <Button
+            variant={open ? "outline" : "solid"}
+            size="pill"
+            onClick={togglePanel}
+            aria-expanded={open}
+            className="fixed right-6 bottom-6 z-40 shadow-card"
+          >
+            <ChatIcon />
+            Tutor
+          </Button>
+        )}
+      </LessonsProvider>
+    </SectionsProvider>
   );
 }

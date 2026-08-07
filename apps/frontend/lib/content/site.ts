@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadCourse, listCourseDirs, type LoadedCourse, type LoadedLesson } from "./load";
 import { lessonKey } from "./locator";
+import { lessonToc } from "./render";
+import type { TocEntry } from "./toc";
 import { isReadable } from "./visibility";
 
 // content/ lives at the repo ROOT (it is the human curation surface, shared
@@ -69,6 +71,31 @@ export function getLessonLinks(): Record<string, LessonLink> {
     }
   }
   return links;
+}
+
+/** Every readable lesson's sections, keyed by its `lesson:` locator. */
+export type LessonSections = Record<string, TocEntry[]>;
+
+/**
+ * Where the sections of every lesson are, for the `@`-autocomplete in the
+ * tutor's composer: it offers `course → lesson → section`, and the section it
+ * offers has to be a place the page actually has. That is why this is the
+ * lesson's own table of contents, off the pipeline the page is compiled with
+ * (`./render`) rather than off a parser of its own.
+ *
+ * Served as one build-time file (`app/content/sections/route.ts`) instead of
+ * riding on every page: it is ten times the lesson set and only the composer
+ * ever reads it.
+ */
+export async function getLessonSections(): Promise<LessonSections> {
+  const sections: LessonSections = {};
+  for (const course of getCourses()) {
+    for (const entry of course.lessons.filter(isReadable)) {
+      const key = lessonKey(course.course.slug, entry.lesson.slug);
+      sections[key] = await lessonToc(entry.mdx as string);
+    }
+  }
+  return sections;
 }
 
 export interface LessonView {
