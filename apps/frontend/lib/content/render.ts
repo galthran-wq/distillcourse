@@ -49,7 +49,16 @@ export async function compileLesson(
     rehypePlugins: [
       ...collect(toc),
       rehypeKatex,
-      [rehypePrettyCode, { theme: "github-dark-default" }],
+      // Both palettes are emitted as --shiki-* variables on every token and
+      // globals.css picks one per theme; the block's own surface is ours
+      // (--panel), not the highlighter's.
+      [
+        rehypePrettyCode,
+        {
+          theme: { light: "github-light", dark: "github-dark-default" },
+          keepBackground: false,
+        },
+      ],
     ],
   } as Parameters<typeof evaluate>[1]);
   return { Content, toc };
