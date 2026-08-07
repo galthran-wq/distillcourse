@@ -56,14 +56,28 @@ class HarnessRepository:
         )
         return chat
 
-    async def list_chats(self) -> Sequence[Chat]:
-        return (
-            await self.session.scalars(
-                select(Chat)
-                .where(Chat.user_id == self.user_id)
-                .order_by(Chat.created_at.desc())
-            )
-        ).all()
+    async def list_chats(self) -> list[tuple[Chat, datetime | None]]:
+        """Every chat of this learner with the moment it was last written in,
+        most recently used first.
+
+        The date is a maximum over the chat's own messages rather than a column
+        kept on it: the listing is the only reader, and a maximum cannot fall
+        out of step with what it is a maximum of. `ix_messages_chat_id_created_at`
+        is what keeps it off the heap. A chat nobody has spoken in has only its
+        creation to be dated and ordered by.
+        """
+        last = (
+            select(Message.chat_id, func.max(Message.created_at).label("at"))
+            .group_by(Message.chat_id)
+            .subquery()
+        )
+        rows = await self.session.execute(
+            select(Chat, last.c.at)
+            .outerjoin(last, last.c.chat_id == Chat.id)
+            .where(Chat.user_id == self.user_id)
+            .order_by(func.coalesce(last.c.at, Chat.created_at).desc())
+        )
+        return list(rows.tuples().all())
 
     async def set_model(self, chat: Chat, model: str) -> None:
         chat.model = model
@@ -148,21 +162,40 @@ class HarnessRepository:
         chat.titled_at = await self.session.scalar(select(func.now()))
         await self.session.commit()
 
-    async def last_message_at(self) -> dict[uuid.UUID, datetime]:
-        """When each of this learner's chats was last written in.
+    async def set_usage(
+        self, chat: Chat, run_id: uuid.UUID, usage: dict[str, Any]
+    ) -> None:
+        """Rewrite what a run cost, on the row `add_messages` hung it on.
 
-        A max over the rows themselves rather than a column kept on the chat:
-        the listing is the only reader, and a maximum cannot fall out of step
-        with what it is a maximum of. `ix_messages_chat_id_created_at` is what
-        keeps it off the heap.
+        For a spend that is only known after the turn was stored — the naming
+        pass, which runs once the learner's stream is closed and has no row of
+        its own to be recorded on.
         """
-        rows = await self.session.execute(
-            select(Message.chat_id, func.max(Message.created_at))
-            .join(Chat, Chat.id == Message.chat_id)
-            .where(Chat.user_id == self.user_id)
-            .group_by(Message.chat_id)
+        await self.session.execute(
+            update(Message)
+            .where(
+                Message.chat_id == chat.id,
+                Message.run_id == run_id,
+                Message.usage.is_not(None),
+            )
+            .values(usage=usage)
         )
-        return dict(rows.tuples().all())
+        await self.session.commit()
+
+    async def messages_since(self, chat: Chat, moment: datetime) -> int:
+        """How many of a chat's messages were stored after a moment, counted
+        without reading them: the rows carry jsonb, and the caller wants a
+        number."""
+        total = await self.session.scalar(
+            select(func.count())
+            .select_from(Message)
+            .where(
+                Message.chat_id == chat.id,
+                Message.created_at > moment,
+                Message.error.is_(None),
+            )
+        )
+        return int(total or 0)
 
     async def rows(self, chat: Chat) -> Sequence[Message]:
         return (

@@ -27,20 +27,9 @@ class ChatSummary(BaseModel):
     model: str
     title: str | None
     created_at: datetime
-
-
-class ChatListing(ChatSummary):
-    """A chat as the rail lists it.
-
-    The date is the listing's alone: it is a maximum over the chat's messages,
-    and the listing is the one place a set of chats is compared. A summary
-    handed back by `create` or `patch` is one chat with nothing to compare it
-    to, and must not advertise a field it would always answer null for.
-    """
-
-    # When the chat was last written in — null for one nobody has said
-    # anything in yet.
-    last_message_at: datetime | None
+    # When the chat was last written in — null for one nobody has said anything
+    # in yet, which a chat this API has only just created never has.
+    last_message_at: datetime | None = None
 
 
 class NewChat(BaseModel):
@@ -141,21 +130,14 @@ async def models() -> list[ChatModel]:
 
 
 @router.get("")
-async def index(repo: RepositoryDep) -> list[ChatListing]:
-    last = await repo.last_message_at()
-    listing = [
-        ChatListing(
-            **ChatSummary.model_validate(chat).model_dump(),
-            last_message_at=last.get(chat.id),
-        )
-        for chat in await repo.list_chats()
+async def index(repo: RepositoryDep) -> list[ChatSummary]:
+    """The reader's chats, most recently spoken in first — a column of dates
+    that does not descend is one nobody can read down. It is also the order
+    the panel resumes from when the chat it had is gone."""
+    return [
+        ChatSummary.model_validate(chat).model_copy(update={"last_message_at": last})
+        for chat, last in await repo.list_chats()
     ]
-    # By the date the rail shows, not by creation: a chat opened yesterday and
-    # used a minute ago belongs above one opened this morning and abandoned,
-    # and a column of dates that does not descend is one nobody can read down.
-    # A chat nobody has spoken in has only its creation to be placed by.
-    listing.sort(key=lambda chat: chat.last_message_at or chat.created_at, reverse=True)
-    return listing
 
 
 @router.post("")

@@ -3,7 +3,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ChatMenu from "@/components/chat/ChatMenu";
 import Composer from "@/components/chat/Composer";
-import type { ChatListing, ChatModel, ChatSummary } from "@/lib/chat/api";
+import type { ChatModel, ChatSummary } from "@/lib/chat/api";
 import { setDraft } from "@/lib/chat/stored";
 import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
@@ -255,9 +255,10 @@ const SUMMARY: ChatSummary = {
   model: "moonshotai/kimi-k3",
   title: "Entropy",
   created_at: "2026-08-01T09:00:00Z",
+  last_message_at: null,
 };
 
-const CHATS: ChatListing[] = [{ ...SUMMARY, last_message_at: null }];
+const CHATS: ChatSummary[] = [SUMMARY];
 
 const MODELS: ChatModel[] = [
   { openrouter_id: "moonshotai/kimi-k3", display_name: "Kimi K3", context_window: 200000 },

@@ -176,12 +176,11 @@ which never sees `base.md` and is loaded by `module()` rather than `assemble()`.
 
 A web chat is named from the learner's first question and named again by
 `harness/title.py` once `TITLE_REFRESH_MESSAGES` more have gone by: one short
-completion on a toolless agent, over the tail of the conversation, fenced as
-untrusted like any other text the platform did not write. Like a compaction it
-is the platform's own bookkeeping — exempt from the daily message cap, billed
-to the instance by being added to the usage of the run it follows. The
-Telegram thread is never renamed: it is one eternal conversation and no rail
-lists it.
+completion on a toolless agent, over the tail of the conversation, run after
+the client's stream has closed rather than on the learner's reply path. It is
+the platform's own bookkeeping: no daily-cap spend, and billed to the instance
+through the usage row of the run it follows. The Telegram thread is never
+renamed.
 
 Every tool is a barrier (`sequential=True`): the tool calls of one model
 response run as concurrent tasks, and all of them drive the run's single

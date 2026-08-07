@@ -7,15 +7,7 @@ export interface ChatSummary {
   model: string;
   title: string | null;
   created_at: string;
-}
-
-/**
- * A chat as the listing returns it. The date is a maximum over the chat's
- * messages and only the listing computes it — a summary handed back by
- * `createChat` or `setChatModel` is one chat with nothing to compare it to.
- */
-export interface ChatListing extends ChatSummary {
-  /** Null for a chat nobody has said anything in yet. */
+  /** When the chat was last written in; null for one nobody has spoken in. */
   last_message_at: string | null;
 }
 
@@ -30,8 +22,8 @@ export interface ChatModel {
  * threads are left out: the widget cannot render an eternal thread it does not
  * own.
  */
-export async function webChats(): Promise<ChatListing[]> {
-  const chats = await call<ChatListing[]>("/chats");
+export async function webChats(): Promise<ChatSummary[]> {
+  const chats = await call<ChatSummary[]>("/chats");
   return chats.filter((chat) => chat.kind === "web");
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChatListing } from "@/lib/chat/api";
+import type { ChatSummary } from "@/lib/chat/api";
 import { plain } from "@/lib/chat/references";
 import { useLessons } from "@/lib/content/links";
 import { useSections } from "@/lib/content/sections";
@@ -8,7 +8,7 @@ import { ago } from "@/lib/day";
 import { MENU_ROW_CLASS } from "@/components/ui/styles";
 
 interface Props {
-  chats: ChatListing[];
+  chats: ChatSummary[];
   current: string;
   /**
    * The row look. In the menu these rows sit among the command and model rows
@@ -22,7 +22,7 @@ interface Props {
    * they find it; the menu is a switcher and has no width for a second column.
    */
   dated?: boolean;
-  onSelect: (chat: ChatListing) => void;
+  onSelect: (chat: ChatSummary) => void;
 }
 
 // The rail's row: a name that takes what is left and a date that keeps its own
