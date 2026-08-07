@@ -285,12 +285,31 @@ describe("the drag itself", () => {
     browser({ width: 1024, height: 768 });
     const panel = docked();
 
+    press(startPanelDrag, panel, "left", 500, 400);
+    panel.handle.dispatchEvent(
+      new PointerEvent("pointermove", { clientX: 700, clientY: 400 }),
+    );
+    panel.handle.dispatchEvent(new PointerEvent("pointerup"));
+
+    // Narrowed from the box on screen — not from the stored one, which is
+    // wider than this window and would leave the panel 24px off it.
+    expect(panelBox()).toEqual({ right: 24, bottom: 80, width: 776, height: 664 });
+  });
+
+  it("leaves the stored box alone when the press never moved", async () => {
+    const { panelBox, setPanelBox, startPanelDrag } = await load();
+    const wide = { right: 900, bottom: 400, width: 1000, height: 700 };
+    setPanelBox(wide);
+    browser({ width: 1024, height: 768 });
+    const panel = docked();
+
     press(startPanelDrag, panel, "move", 500, 500);
     panel.handle.dispatchEvent(new PointerEvent("pointerup"));
 
-    // The fitted box, moved by nothing — not the stored one, which would have
-    // put the panel most of the way off this window.
-    expect(panelBox()).toEqual({ right: 24, bottom: 80, width: 976, height: 664 });
+    // A click on the header is not a drag: what it would otherwise store is
+    // this window's fit, spending the box dragged out on a wider screen.
+    expect(panelBox()).toEqual(wide);
+    expect(entry()).toMatchObject(wide);
   });
 
   it("ignores every button but the first", async () => {

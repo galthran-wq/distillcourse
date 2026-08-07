@@ -200,8 +200,10 @@ export function startPanelDrag(
   const startX = press.clientX;
   const startY = press.clientY;
   let box = from;
+  let moved = false;
 
   const drag = (at: PointerEvent): void => {
+    moved = true;
     box = draggedBox(from, grip, at.clientX - startX, at.clientY - startY, view);
     for (const [name, value] of Object.entries(panelVars(box)))
       panel.style.setProperty(name, String(value));
@@ -211,7 +213,12 @@ export function startPanelDrag(
     handle.removeEventListener("pointerup", drop);
     handle.removeEventListener("pointercancel", drop);
     dragging.set(false);
-    setPanelBox(box);
+    // A press that never moved is a click on the header, and the box it would
+    // write is `from` — this window's fit rather than a decision the reader
+    // made. Storing that is exactly what `usePanelFit` refuses to do: it would
+    // spend the box dragged out on a wide screen the first time the panel is
+    // touched on a small one, and nothing puts it back.
+    if (moved) setPanelBox(box);
   };
   // The pointer is captured, so the listeners belong on the handle: a drag that
   // leaves the panel, or the window, still arrives here.
