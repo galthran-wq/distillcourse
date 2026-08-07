@@ -8,6 +8,16 @@ export type PanelState = "closed" | "docked" | "expanded";
 export type StoredChat = {
   /** A `PanelState`; the store can only hold it as a string. */
   panel: string;
+  /**
+   * The box the reader dragged the docked panel to, in CSS pixels — the two
+   * offsets from the corner it is anchored in, and its size. The defaults are
+   * `.chat-panel`'s own, written out in `globals.css`; the rules the reader
+   * may drag them within are `lib/chat/panel-box`'s.
+   */
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
   /** The chat the reader had open, "" for none. It may since have been deleted. */
   chatId: string;
   /** The message they were in the middle of writing. */
@@ -18,11 +28,18 @@ export type StoredChat = {
   owner: string;
 };
 
+/** Where the docked panel sits and how big it is, in CSS pixels. */
+export type PanelBox = Pick<StoredChat, "right" | "bottom" | "width" | "height">;
+
 // What the widget needs to come back the way the reader left it, in one entry
-// so that the five are written and read as one state. Private, like every other
+// so that all of it is written and read as one state. Private, like every other
 // store here: what the entry is called and how it is shaped stops at this file.
 const stored = createPersistedStore<StoredChat>("distillcourse.chat", {
   panel: "closed",
+  right: 24,
+  bottom: 80,
+  width: 384,
+  height: 512,
   chatId: "",
   draft: "",
   quotes: "",
@@ -64,6 +81,32 @@ export function toggleExpanded(): void {
 
 export function collapsePanel(): void {
   stored.set({ panel: "docked" });
+}
+
+// The box below is the browser's rather than the reader's, like the panel state
+// it sits beside: it is where this window has room for the panel, and signing
+// out does not take it away.
+
+export function usePanelBox(): PanelBox {
+  return {
+    right: stored.use("right"),
+    bottom: stored.use("bottom"),
+    width: stored.use("width"),
+    height: stored.use("height"),
+  };
+}
+
+export function panelBox(): PanelBox {
+  const { right, bottom, width, height } = stored.get();
+  return { right, bottom, width, height };
+}
+
+/** A box that changes nothing is dropped here: every write is a write to storage. */
+export function setPanelBox(box: PanelBox): void {
+  const current = panelBox();
+  const same = (edge: keyof PanelBox): boolean => box[edge] === current[edge];
+  if (same("right") && same("bottom") && same("width") && same("height")) return;
+  stored.set(box);
 }
 
 /** The message being written, kept here so a reload does not lose it. */

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui";
 import { listModels, webChats, type ChatListing, type ChatModel } from "@/lib/chat/api";
 import { parseCommand } from "@/lib/chat/commands";
+import { startPanelDrag } from "@/lib/chat/panel-box";
 import { restoreQuotes, type Quote } from "@/lib/chat/quote";
 import {
   adoptSummary,
@@ -112,7 +113,20 @@ export default function ChatPanel({ session, expanded }: Props) {
     <>
       <header
         ref={header}
-        className="relative flex items-center gap-0.5 border-b border-line px-2 py-1.5"
+        // Docked, the header is also what the panel is dragged around the page
+        // by — but the buttons in it are pressed rather than dragged, and
+        // expanded there is nowhere to drag it to.
+        onPointerDown={
+          expanded
+            ? undefined
+            : (press) => {
+                if ((press.target as HTMLElement).closest("button") === null)
+                  startPanelDrag(press, "move");
+              }
+        }
+        className={`relative flex items-center gap-0.5 border-b border-line px-2 py-1.5 ${
+          expanded ? "" : "cursor-grab active:cursor-grabbing"
+        }`}
       >
         <p className="min-w-0 flex-1 truncate px-2 text-sm">
           {session.summary.title ?? "New chat"}

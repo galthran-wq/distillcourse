@@ -10,8 +10,12 @@ const READER: User = {
   timezone: "UTC",
 };
 
+/** The box `.chat-panel` is drawn in until the reader drags it somewhere else. */
+const BOX = { right: 24, bottom: 80, width: 384, height: 512 };
+
 const LEFT_BY_U1: StoredChat = {
   panel: "docked",
+  ...BOX,
   chatId: "c1",
   draft: "half a question",
   // The passages that half a question is about: one unsent message with it.
@@ -47,6 +51,7 @@ describe("what the widget remembers", () => {
 
     expect(entry()).toEqual({
       panel: "docked",
+      ...BOX,
       chatId: "c1",
       draft: "why is this true?",
       quotes: "",
@@ -78,6 +83,7 @@ describe("what the widget remembers", () => {
     // the fields it shares with this version survive.
     expect(entry()).toEqual({
       panel: "docked",
+      ...BOX,
       chatId: "c1",
       draft: "",
       quotes: "",
@@ -117,6 +123,7 @@ describe("what the widget remembers", () => {
     // panel sits is not theirs to inherit or lose.
     expect(entry()).toEqual({
       panel: "docked",
+      ...BOX,
       chatId: "",
       draft: "",
       quotes: "",
@@ -134,6 +141,7 @@ describe("what the widget remembers", () => {
 
     expect(entry()).toEqual({
       panel: "docked",
+      ...BOX,
       chatId: "",
       draft: "",
       quotes: "",
