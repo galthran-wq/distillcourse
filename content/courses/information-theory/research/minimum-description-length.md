@@ -1,126 +1,159 @@
 # Research brief: minimum-description-length (Minimum description length)
 
-status: planned
-module: applications
+status: drafted (kept slug — revise, do not rewrite)
+module: principles
 type: core
 goal: Apply two-part code lengths to select a model that neither underfits nor overfits.
+est_minutes: 36
 
-Restructure note: `kolmogorov-complexity` is now a prerequisite lesson. Practical
-(computable) MDL is the approximation of the uncomputable ideal — a two-part
-Kolmogorov code — so open by recalling that ceiling in one sentence with a
-`<Ref lesson="kolmogorov-complexity"/>` rather than re-motivating it from
-scratch.
+## ARC
+
+- **Inherits:** the uncomputable ideal (`kolmogorov-complexity`), the
+  model/compressor equivalence (`compression-is-prediction`), and the Kraft
+  budget (`kraft-inequality`) which is what licenses reading a code length as a
+  probability.
+- **Spine step:** step 10, *Bits traded for fidelity and for models* — "…and
+  charging a model for its own description turns model selection into the same
+  compression problem."
+- **Contributes:** model selection with no held-out set and no significance
+  test, and the resolution of the debt left open by
+  `language-models-as-compressors`.
+- **Hands off to:** `information-bottleneck` and, thematically, back to the
+  whole course: description length is what every objective here has been.
 
 ## Sources to consult
 
-- **Grünwald 2004, "A Tutorial Introduction to the MDL Principle"**
-  (arXiv:math/0406077) — the primary source.
-  - **Ch. 1, §1.2** — regularity = compressibility; the three bit-sequences
-    example (periodic / random / biased) and the polynomial curve-fitting
-    example (their fig. 1.1).
-  - **Ch. 1, §1.3-1.4** — the Crude Two-Part MDL Principle box: minimize
-    `L(H) + L(D|H)`; why crude `L(H)` is arbitrary and refined MDL exists.
-  - **Ch. 2, §2.2** — the Kraft / codelength-probability correspondence
-    (`L = -log P` both ways) — recap territory, reuse from
-    source-coding-theorem-lite rather than re-teach.
-  - **Ch. 2, §2.4** — crude MDL worked on Markov chains / Bernoulli (Ex 2.8:
-    `L(k,θ) + L(D|k,θ) = 2 log k + 1 + k log(n+1) - log P(D|k,θ)`), and the
-    refinement to `O(1/√n)` parameter precision giving the `(k/2) log n` form.
-  - **Ch. 2, §2.6** — refined MDL / NML and the complexity expansion
-    `COMP_n ≈ (k/2) log(n/2π) + log ∫√|I(θ)| dθ`: STATE only, do not derive.
-  - **Ch. 2, §2.9.2 and §2.10** — MDL ≠ BIC; failure modes under
-    misspecification. For the honesty paragraph.
-- MacKay, **ch. 28 "Model Comparison and Occam's Razor"** — the Bayesian dual:
-  `P(x) = 2^{-L(x)}` makes MDL ≈ Bayesian model comparison; the Occam-factor
-  picture.
-- **Delétang et al. 2023, §3.3 "Optimal Model-Dataset Size Tradeoff"** — the
-  parameter-adjusted (two-part) compression rate of Transformers; U-shaped
-  adjusted-rate curves (their fig. 2): optimal model size grows with dataset
-  size. The modern payoff.
-- Cover & Thomas, **§14.13** (MDL under Kolmogorov complexity) — one-line
-  pointer only.
+- **Grünwald 2004** (primary) — ch. 1 for the crude two-part principle with the
+  three-bit-sequences and polynomial examples; §2.2 the Kraft/code-length
+  correspondence restated; **§2.4** crude MDL worked on Markov and Bernoulli
+  models, giving the `(k/2) log n` parameter cost; §2.6 refined MDL and NML
+  (state only); §2.9-2.10 the MDL-versus-BIC correction and the honest failure
+  modes; §1.2.1 and §2.9.4 the tie to Kolmogorov complexity.
+- MacKay, **ch. 28** — Bayesian model comparison, the Occam factor, and §28.3's
+  demonstration that the two-part message length `L(H) + L(D|H)` is formally
+  `-log P(H|D)`. Also **§28.1's** `-1, 3, 7, 11` sequence puzzle: "add 4" versus
+  a cubic that also fits all four points, with odds of about 40 million to one
+  in favour of the simple rule computed entirely from Occam factors. That is the
+  best single worked example in the literature for this lesson.
+- Cover & Thomas, **§14.12-14.13** — the Kolmogorov sufficient statistic and the
+  structure function, i.e. the ideal two-part code MDL approximates.
+- Delétang et al. §3.3 — the parameter-adjusted compression rate, which is the
+  concrete modern instance.
 
 ## Key points the lesson must cover
 
-1. **Regularity = compressibility** (concrete opener): three 24-bit strings —
-   all zeros, a fair-coin string, a biased-coin string — and the length of the
-   shortest description of each. Structure is what a short description
-   exploits.
-2. **Fit measured in bits**: `L(D|H) = -log2 P(D|H)` — the code-probability
-   correspondence from the coding module applied to a *model*: a hypothesis
-   that assigns the data high probability encodes it cheaply. Recap, not
-   re-proof (link source-coding-theorem-lite).
-3. **The two-part principle**: pick H minimizing `L(H) + L(D|H)`. The richest
-   model always wins on `L(D|H)` alone (overfitting = maximum likelihood run
-   amok); the `L(H)` term is the principled brake. Worked example with actual
-   numbers: Bernoulli vs higher-order Markov chains on a binary string
-   (Grünwald Ex 2.8 style), or polynomial degrees on a small dataset —
-   compute both terms per candidate and exhibit the U-shape.
-4. **The (k/2) log2 n parameter cost**: a k-parameter model's parameters are
-   worth encoding only to precision `1/√n` (finer precision buys no fit), so
-   `L(H) ≈ (k/2) log2 n` — the penalty grows with data size but slower than
-   the fit term. Derivation at the heuristic level Grünwald §2.4 gives; state
-   that refined MDL (NML) makes this exact and adds the Fisher-information
-   term.
-5. **Overfitting/underfitting asymmetry** (Grünwald §1.6 box): underfit models
-   pay in `L(D|H)` forever; overfit models pay a bounded `L(H)` premium —
-   and preferring the simpler model at small n is a *strategy* that works
-   even when the true source is complex (the increasing-degree example).
-6. **The modern payoff** (Delétang §3.3): charge a trained network its own
-   parameter bits and the "adjusted compression rate" becomes U-shaped in
-   model size — bigger is better only when the dataset amortizes the model;
-   an MDL correction the raw training loss omits. Connect to the
-   model-transmission caveat from compression-is-prediction.
+1. **The problem.** Fitting a richer model always reduces residual error, so
+   "fit the data" cannot select a model. Something must charge for complexity.
+   Open on the `-1, 3, 7, 11` puzzle before any formalism.
+2. **The two-part code.** Send the hypothesis, then the data given the
+   hypothesis: `L(H) + L(D|H)`. Both terms are in bits, and `L(D|H) = -log2
+   P(D|H)` by the code-probability correspondence — which is Kraft, cited.
+3. **The trade-off is U-shaped.** Work a polynomial-fit example numerically:
+   `L(D|H)` falling, `L(H)` rising, the total with a visible minimum. Report the
+   selected degree.
+4. **The parameter cost.** Encoding `k` parameters to the precision the data
+   supports costs about `(k/2) log2 n` bits. Derive the shape of the argument:
+   precision beyond `1/√n` is not supported by the data, so each parameter needs
+   about `(1/2) log2 n` bits. This connects MDL to BIC and should be stated.
+5. **It is not a heuristic.** `L(H) + L(D|H) = -log2 P(H) - log2 P(D|H) = -log2
+   P(H,D)`, so minimizing description length is maximizing posterior
+   probability. State the equivalence and its condition (the code for `H` is a
+   prior).
+6. **Ideal versus practical.** The ideal two-part code uses `K`, and is
+   uncomputable. Practical MDL replaces `K` with a code from a chosen family.
+   The choice of family is where the modelling assumptions live, and it is not
+   eliminable. Say this plainly — it is MDL's honest limitation.
+7. **The modern instance.** Charge a neural model for its parameters. Report the
+   adjusted compression rate and the reversal it produces, and note that the
+   `(k/2) log2 n` term is what makes the accounting less brutal than counting
+   full float precision.
 
 ## Pitfalls / subtleties to flag
 
-- **Crude two-part L(H) is arbitrary** — different hypothesis encodings give
-  different answers; refined MDL (one-part universal codes, NML) repairs this.
-  State the limitation honestly; this lesson teaches the crude version because
-  it is computable by hand.
-- **MDL ≠ BIC**: the `(k/2) log n` form matches BIC only for fixed k as
-  n → ∞ (Grünwald §2.9.2); do not present MDL as "BIC with extra steps".
-- The hypothesis code must be **fixed before seeing the data** — an
-  n-dependent or data-dependent code smuggles the data into L(H) and collapses
-  to maximum likelihood (Grünwald §2.4.2).
-- MDL selects among the *candidates offered*; under misspecification (no
-  candidate near the truth) it can behave badly (Grünwald §2.10.2) — one
-  honest sentence.
-- Two-part coding here is **lossless coding of the data given the model** —
-  distinct from lossy compression; do not conflate with rate-distortion.
-- MDL is not a metaphysical Occam claim ("the world is simple"); it is a
-  worst-case-regret coding strategy (Grünwald §1.5-1.6). Keep the register
-  factual.
+- MDL depends on the code chosen for hypotheses. Different codes give different
+  answers, and "the shortest description" is only defined relative to a
+  description language — the same caveat that `kolmogorov-complexity`
+  established, inherited here.
+- Crude two-part MDL is not the state of the art; refined MDL (NML) removes some
+  of the arbitrariness. State it, do not derive it.
+- MDL is not the same as cross-validation and does not always agree with it.
+- The `(k/2) log2 n` cost is asymptotic and assumes regularity conditions that
+  fail for singular models — neural networks among them. Flag this before the
+  modern instance, or the modern instance overclaims.
+- Minimizing description length is maximizing a posterior only when the code for
+  `H` corresponds to a genuine prior.
 
 ## FIGURE PLAN
 
-1. **single `<Figure>` (component)** — three bit-strings with their shortest
-   descriptions and description lengths tallied ("repeat 0 ×24" ≪ 24 bits;
-   fair-coin string ≈ incompressible; biased string in between via its
-   `-log2 P` cost). One idea: structure = short description. Inspiration:
-   Grünwald §1.2.
-2. **`<FigureSequence>` (3-4 frames)** — polynomial fits to one fixed scatter:
-   frame per candidate degree (0, 2, high/interpolating), each frame showing
-   the curve plus a two-bar tally `L(H)` / `L(D|H)`; the interpolating frame's
-   L(H) bar dwarfs its zero fit cost. Delta = one candidate per frame.
-   Inspiration: Grünwald fig. 1.1 (recreate).
-3. **single `<Figure>` (component)** — the U-curve: total `L(H)+L(D|H)` vs
-   model complexity k, its two components as thin lines, minimum marked "the
-   MDL choice". Static twin of the TwoPartCode demo. One idea: the sum turns
-   over.
-4. **single `<Figure>` (component)** — the message diagram: a literal two-part
-   bitstream `[ model bits | data-given-model bits ]` for two candidate
-   models of the same data, total lengths compared. One idea: model selection
-   = shortest total message. Inspiration: two-part-code definition, Grünwald
-   §1.3 box.
-5. **single `<Figure>` (component)** — the precision argument: a parameter
-   axis with coarse vs fine grids; finer grid costs `log2` (grid size) bits
-   while the fit gain flattens below spacing `1/√n`; annotate the resulting
-   `(k/2) log2 n`. One idea: encode parameters only as finely as the data can
-   see. Inspiration: Grünwald §2.4.2.
-6. **single `<Figure>` (component)** — adjusted compression rate vs model size
-   for two dataset sizes: two U-curves whose minima sit at different model
-   sizes; raw (unadjusted) rate shown falling monotonically for contrast.
-   One idea: charging the model its bits moves the optimum with the dataset.
-   Inspiration: Delétang fig. 2 (recreate schematically, no copied data
-   points).
+1. `draw:` **single `<Figure>`** — the sequence puzzle: `-1, 3, 7, 11` with two
+   continuations drawn (the "add 4" line and a cubic through all four points),
+   and the two description lengths tallied. One idea: both explain the data, one
+   costs less to say.
+2. `draw:` **single `<Figure>`** — the two-part message as a literal bitstream:
+   a shaded block for `L(H)` followed by a block for `L(D|H)`, for three
+   candidate models, drawn to scale. One idea: model selection is comparing
+   message lengths.
+3. `draw:` **`<FigureSequence>` (4 frames)** — the U-curve built: frame 1
+   `L(D|H)` falling with degree; frame 2 `L(H)` rising; frame 3 the sum; frame 4
+   the minimum marked with the selected degree. Binds the TwoPartCode demo.
+4. `draw:` **single `<Figure>`** — the precision argument: a parameter's
+   likelihood peak with width `1/√n`, and the bits needed to name a point within
+   that width, annotated as `(1/2) log2 n`. One idea: the data decides how
+   precisely you may quote a parameter.
+5. `draw:` **asymmetric-price.svg** (exists) — keep, placed where the asymmetry
+   between the two terms is argued.
+6. `draw:` **single `<Figure>`** — the modern instance: total description length
+   against corpus size for a large model with and without its parameter cost
+   charged, and gzip's line, with the crossover marked. Deliberately the same
+   figure family as `language-models-as-compressors` figure 6, now with the
+   `(k/2) log2 n` accounting rather than raw float precision. One idea: the debt
+   from the previous module, paid.
+
+No `source:` entry.
+
+## EXERCISE PLAN
+
+1. *(warm-up)* For a polynomial fit with `k` coefficients on `n = 100` points,
+   compute the parameter cost `(k/2) log2 n` for `k = 1, 3, 10` and report the
+   totals given supplied residual costs.
+2. **Boundary probe.** Take `n → ∞` with `k` fixed, and then `k` growing like
+   `n`. State what the two-part total does in each case and which regime the
+   `(k/2) log2 n` approximation is valid in.
+3. **Claim to refute.** "MDL is just Occam's razor with extra steps, so it has
+   no more justification than a preference for simplicity." Refute by exhibiting
+   the equivalence to posterior maximization and naming the condition it
+   requires.
+4. **Claim to refute, second kind.** "A model with more parameters always has a
+   longer description, so MDL always prefers the smaller model." Give a case
+   where the richer model wins, and quantify the crossover.
+5. **Derivation the lesson skipped.** Derive the `(1/2) log2 n` per-parameter
+   cost from the observation that the likelihood is flat to within `1/√n`. State
+   the regularity assumption you used and name a model class that violates it.
+6. **Research-shaped.** Reproduce MacKay's sequence-puzzle odds: set up the two
+   hypotheses for `-1, 3, 7, 11`, choose explicit codes for each, and compute
+   the odds ratio. Report your number and compare with the published ~4 × 10^7,
+   stating which coding choice your answer is most sensitive to.
+7. **FORWARD (E7).** You want a compressed representation that keeps only what
+   is needed to predict a label, and you have no distortion measure to hand.
+   Write down a two-part-like objective in which the "cost" is the bits kept
+   from the input and the "fit" is measured against the label. Reaches
+   `information-bottleneck` — the solution names `I(X;T) - β I(T;Y)` and
+   `<Ref>`s it.
+
+## REVISION (kept slug)
+
+**Gain**
+- ARC paragraph and the explicit payment of the debt left by
+  `language-models-as-compressors` (a new lesson that did not exist when this
+  draft was written). The closing must state that the ranking reversal there is
+  resolved by the `(k/2) log2 n` accounting here.
+- Figures 1, 2, 4, 6 above. Only `asymmetric-price.svg` exists today.
+- MacKay's sequence puzzle with the computed odds, currently absent.
+- The singular-model caveat before the neural instance, currently absent and
+  necessary — `(k/2) log2 n` does not apply to neural networks without
+  qualification.
+- Depth toward 36 minutes.
+
+**Lose**
+- Any presentation of MDL as a free lunch that removes modelling choices.
+- Callouts restating the two-part formula (L15).

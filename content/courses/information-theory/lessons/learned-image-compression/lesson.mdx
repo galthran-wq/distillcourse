@@ -1,0 +1,1092 @@
+A learned image codec trains an encoder, a quantizer, an entropy model and a
+decoder against the single objective rate plus lambda times distortion, which
+is the rate-distortion Lagrangian with neural networks standing in for the
+test channel.
+
+Every part of that objective is already established. Rate is a
+cross-entropy, and coding with the wrong distribution costs exactly a
+divergence (<Ref lesson="kl-divergence"/>); an arithmetic coder turns any
+distribution into a bitstream at within two bits of the ideal
+(<Ref lesson="arithmetic-coding"/>); giving up exact reconstruction turns the
+coding floor into a curve $R(D)$ whose Lagrangian form is $R + \lambda D$
+(<Ref lesson="rate-distortion"/>); and the last two lessons asked what to keep
+rather than how to spend, but could only bound the quantity they wanted
+(<Ref lesson="information-bottleneck"/>, <Ref lesson="infonce"/>). What stands
+open is whether the whole construction runs as one system. This lesson takes
+one apart: a codec in which every named quantity of this course is a term in a
+single differentiable loss.
+
+The route: the four stages of transform coding and where JPEG already has
+them, the rate term as a cross-entropy, the trick that makes rounding
+differentiable, the identity that makes an autoencoder's variational bound
+equal to $R + \lambda D$, the side channel that prices the latents, the
+measured cost of that side channel, and what the choice of distortion measure
+does to the pictures.
+
+## Four stages, and JPEG already has all four
+
+Lossy image compression is older than any of the machinery in this course, and
+its architecture has not changed. Start with the version that shipped in 1992.
+
+### JPEG on one 8×8 block
+
+A JPEG encoder cuts the image into blocks of $8 \times 8$ pixels and treats
+each one separately. It applies a fixed linear map, the discrete cosine
+transform, turning the 64 intensities into 64 coefficients that describe the
+block as a sum of 64 fixed patterns, from flat to finely striped. It divides
+each coefficient by an entry of a fixed table of 64 divisors, small for the
+coarse patterns and several times larger for the fine ones, and rounds the
+result to an integer. Most of the fine-pattern coefficients round to zero. The
+surviving integers are read out in a fixed order and entropy coded with
+Huffman tables (<Ref lesson="huffman-by-hand"/>). The decoder undoes each step
+in reverse and gets an image back that is not the original.
+
+Four things happened, in this order: a transform, a quantizer, an entropy
+code, an inverse transform. That sequence is called *transform coding*, and
+every lossy image and video codec in use is an instance of it.
+
+### The same four boxes, all of them trained
+
+The learned codec keeps the sequence and replaces the contents of every box.
+
+<Definition title="nonlinear transform coding">
+A lossy code in which an **analysis transform** $g_a$ maps the image $x$ to a
+*latent representation* $y = g_a(x; \phi)$, a quantizer rounds $y$ to integers
+$\hat y$, an entropy coder writes $\hat y$ to a bitstream under a probability
+model, and a **synthesis transform** $g_s$ maps $\hat y$ back to a
+reconstruction $\hat x = g_s(\hat y; \theta)$. The transforms are
+parameterised nonlinear functions and $\phi, \theta$ are trained.
+</Definition>
+
+In the codec this lesson reads, $g_a$ is four convolutions each halving the
+image in both directions, interleaved with a normalising nonlinearity, and
+$g_s$ is its mirror image with upsampling convolutions. Sixteenfold
+downsampling in each direction leaves one latent position per 256 pixels, and
+in the lower-rate configurations the transform emits 192 channels at each
+position, so a $768 \times 512$ photograph becomes
+$48 \times 32 \times 192 = 294{,}912$ integers, exactly $0.75$ coefficients
+per pixel. The file's entire job is to convey those integers.
+
+<Figure
+  src="./figures/jpeg-vs-learned.svg"
+  alt="Two aligned rows of four boxes each: JPEG's fixed 8x8 DCT, quantization table, block-factorized Huffman tables and inverse DCT above; the learned codec's strided convolutions, integer rounding, learned density and upsampling convolutions below"
+  caption="Same four stages, different provenance for the numbers inside them: a standards committee, or gradient descent on one loss."
+/>
+
+The difference is not that the learned transform is nonlinear, though it is.
+It is that all four stages are fitted against the same objective. JPEG's
+transform was chosen before its quantization table, and both before its
+Huffman tables; nothing in the design lets a decision in one stage be paid for
+by a saving in another. Here the analysis transform is free to produce latents
+that are awkward to reconstruct if they are cheap to encode, because the same
+gradient reaches both.
+
+<KeyFact>
+JPEG's entropy model is factorised into fixed groups of 64 coefficients, one
+group per block, and that factorisation is a design decision no image can
+override. Every rate saving in this lesson comes from letting the
+factorisation depend on the image.
+</KeyFact>
+
+## The rate term is a cross-entropy
+
+Of the four trained stages, only the third decides how large the file is. The
+transforms and the quantizer settle which integers get written; the length of
+the bitstream is then fixed by the probability model the encoder and decoder
+agree on, because an arithmetic coder reaches the expected code length of
+whatever distribution it is handed and no better
+(<Ref lesson="arithmetic-coding"/>). File size is decided before the coder
+runs. Call that model the *entropy model* $p_{\hat y}$, and call the
+distribution the latents actually follow the *marginal* $m$. The two are
+different objects: $m$ is whatever the analysis transform produces on real
+photographs, and nobody knows it; $p_{\hat y}$ is a parametric density that
+gets fitted.
+
+The rate is then the cross-entropy of one against the other:
+
+$$
+R = \mathbb{E}_{\hat y \sim m}\bigl[-\log_2 p_{\hat y}(\hat y)\bigr]
+  = H(m) + D\bigl(m \,\|\, p_{\hat y}\bigr) \quad \text{bits.}
+$$
+
+Nothing here is new. It is the identity of <Ref lesson="cross-entropy-loss"/>,
+with the classifier's predicted label distribution replaced by a density over
+integer latents, in the same units. The consequence is the one
+<Ref lesson="kl-divergence"/> established: the entropy model's error is not a
+figure of merit reported at the end of training, it is bytes on disk.
+
+<Example title="what a mediocre entropy model costs">
+Take one latent channel whose quantised values are mostly zero. Suppose the
+true marginal is
+
+$$
+m = \{\,0: 0.60,\ \pm 1: 0.15 \text{ each},\ \pm 2: 0.05 \text{ each}\,\},
+$$
+
+and the entropy model, fitted a little too wide, is
+$p = \{\,0: 0.40,\ \pm 1: 0.20,\ \pm 2: 0.10\,\}$.
+
+The ideal cost is
+$H(m) = 0.6(0.737) + 0.3(2.737) + 0.1(4.322) = 1.695$ bits per coefficient.
+The actual cost is
+$H(m, p) = 0.6(1.322) + 0.3(2.322) + 0.1(3.322) = 1.822$ bits.
+
+The gap is $D(m \,\|\, p) = 1.822 - 1.695 = 0.126$ bits per coefficient. At
+$0.75$ coefficients per pixel that is $0.095$ bits per pixel of file paid for
+nothing: on a $768 \times 512$ photograph, about $4.7$ kilobytes.
+</Example>
+
+<Figure
+  src="./figures/rate-cross-entropy.svg"
+  alt="Bars of code length for five quantized latent values, the entropy model's lengths beside the ideal lengths, with the gap at each value shaded and the weighted total giving 0.126 bits per coefficient"
+  caption="The entropy model is too pessimistic at zero and too generous in the tails; weighted by how often each value occurs, the mismatch is 0.126 bits per coefficient."
+/>
+
+<Exercise>
+Refit the entropy model in the other direction: $p' = \{\,0: 0.80,\
+\pm 1: 0.08,\ \pm 2: 0.02\,\}$, against the same marginal $m$. Compute
+$D(m \,\|\, p')$, compare it with the $0.126$ bits of the example, and state
+which kind of mis-specification is the expensive one and why. Write down the
+per-symbol log-ratios before opening the solution.
+
+<Solution>
+**Strategy.** The lengths change but $H(m)$ does not, so the divergence is the
+new cross-entropy minus the same $1.695$ bits.
+
+The model's lengths are $-\log_2 0.80 = 0.322$, $-\log_2 0.08 = 3.644$ and
+$-\log_2 0.02 = 5.644$ bits. So
+
+$$
+H(m, p') = 0.6(0.322) + 0.3(3.644) + 0.1(5.644) = 1.851 \text{ bits},
+$$
+
+and $D(m \,\|\, p') = 1.851 - 1.695 = 0.156$ bits per coefficient, against
+$0.126$ for the too-wide model. In bits per pixel: $0.117$ against $0.095$.
+
+**Which direction is expensive.** The too-wide model is wrong everywhere by a
+bounded amount: it overcharges the common value by $0.59$ bits and refunds
+$0.42$ and $1.00$ bits in the tails, and its total mistake stays under a fifth
+of a bit. The too-narrow model concentrates its mass on the value that is
+already cheap and starves the tails, and a starved tail is charged
+$\log_2 (1/p')$, which grows without bound as $p'$ falls. Halving $p'(\pm 2)$
+again to $0.01$ would add another $0.1$ bits per coefficient on its own. This
+is the asymmetry of <Ref lesson="kl-divergence"/> in its operational form: an
+entropy model may be vague at no great cost and may not be confidently wrong.
+</Solution>
+</Exercise>
+
+<KeyFact>
+$R$ is an expectation under a distribution nobody has. The number reported
+during training is $\mathbb{E}[-\log_2 p_{\hat y}]$ estimated on training
+images; on a photograph from elsewhere the real file is larger, by exactly the
+divergence between that photograph's latent statistics and the model, and that
+divergence is never measured.
+</KeyFact>
+
+## Rounding has no gradient: the noise relaxation
+
+The objective is $L = R + \lambda D$, and both terms are computed downstream of
+the quantizer. That is fatal for training as stated: rounding is a step
+function, its derivative is zero almost everywhere and undefined at the steps,
+so no gradient reaches the analysis transform's parameters $\phi$. The
+encoder would never learn anything.
+
+The repair is to replace the quantizer during training with a perturbation of
+comparable size that has a usable derivative. Rounding
+to the nearest integer perturbs a value by an amount in $(-\tfrac12,
+\tfrac12)$. So during training the codec adds a sample of exactly that:
+
+$$
+\tilde y_i = y_i + u_i, \qquad u_i \sim \mathcal{U}\bigl(-\tfrac12,
+\tfrac12\bigr),
+$$
+
+independently per coefficient, and uses $\tilde y$ everywhere $\hat y$ would
+appear. The perturbation does not depend on $y$, so $\partial \tilde y /
+\partial y = 1$ and gradients pass straight through.
+
+### One density serves both regimes
+
+The substitution buys a second property that matters more than the gradient.
+Under the relaxation the entropy model is a continuous density
+$p_{\tilde y}$, and it is deliberately built as a base density $p^{*}$
+convolved with a uniform of unit width. Evaluate that convolution at an
+integer $k$ and what comes out is the base density's mass on
+$[k - \tfrac12, k + \tfrac12]$, which is precisely the probability that
+rounding produces $k$:
+
+$$
+p_{\hat y}(k) = p_{\tilde y}(k)
+= \int_{k - 1/2}^{k + 1/2} p^{*}(t)\,\mathrm{d}t .
+$$
+
+The trained continuous model therefore *is* the deployed discrete model, read
+at the integers. No separate probability table is fitted for the shipped
+coder, and no mismatch is introduced between what was optimised and what the
+arithmetic coder is handed.
+
+<Figure
+  src="./figures/noise-pmf.svg"
+  alt="A dashed Gaussian, its convolution with a unit-width uniform drawn in amber, and probability bars at each integer whose tops lie exactly on the amber curve; two slabs of Gaussian mass are marked, the filled one between minus one half and plus one half with area 0.383 and the dashed one between one half and three halves with area 0.242, each equal to the bar height at that integer"
+  caption="Each slab's area is the probability of one quantised value and the height of the amber curve at that integer — 0.383 at k = 0, 0.242 at k = 1: the relaxed density evaluated at integers is the quantizer's distribution."
+/>
+
+<Task>
+Check the identity on the figure at $k = 1$: the amber curve's height there and
+the area of the dashed slab — the $k = 0$ construction shifted one bin right —
+are both $0.242$. Then state what breaks if the entropy model is fitted as a
+bare Gaussian instead of a Gaussian convolved with a uniform: name the numbers
+the arithmetic coder would then be handed at the integers, and the property of
+a probability mass function they would fail.
+</Task>
+
+The relaxation is a real departure and the paper treats it as one. Training
+minimises the loss of a codec that adds noise; deployment runs a codec that
+rounds. The two agree on the entropy model by construction, and they do not
+agree on the reconstruction: rounding is a worse perturbation than noise for
+some latents and better for others, and nothing guarantees the trained optimum
+is the deployed optimum.
+
+<Aside>
+The rate under the relaxation is a *differential* cross-entropy, an integral
+against a density, while the deployed rate is a discrete one, a sum against a
+probability mass function. These are not the same kind of object; a
+differential entropy can be negative and has no interpretation as a count of
+bits. They agree here because the noise is exactly one quantisation bin wide,
+which makes the density piecewise close to constant over each bin, and the
+predecessor paper verified the agreement empirically rather than proving it.
+For a latent whose scale is much smaller than the bin, the approximation is
+poor in both directions, which is one reason the trained models keep their
+latents at scales comparable with 1.
+</Aside>
+
+## One objective, two derivations
+
+Two literatures wrote down this loss independently and they are the same
+expression. <Ref lesson="rate-distortion"/> reached
+$R + \lambda D$ by taking the convex curve $R(D)$ and replacing its hard
+fidelity budget with a price: each point of the curve solves an unconstrained
+minimisation with $\lambda = -R'(D)$. Variational autoencoders reached it from
+Bayes' rule, with no compression in view. The two meet exactly.
+
+### The variational route
+
+A variational autoencoder posits a generative model $p(x \mid z) p(z)$ and an
+approximate inference model $q(z \mid x)$, and fits $q$ by pushing it toward
+the true posterior. Kingma and Welling's first equation is the decomposition
+that makes this tractable:
+$\log p(x) = D\bigl(q(z\mid x) \,\|\, p(z \mid x)\bigr) + \mathcal{L}$, where
+$\mathcal{L}$ is the evidence lower bound; since $\log p(x)$ does not involve
+the fitted parameters, minimising the divergence to the posterior is
+maximising $\mathcal{L}$. Their third equation splits $\mathcal{L}$ into a
+reconstruction term and a divergence from the approximate posterior to the
+prior.
+
+Now make the codec's three choices: $q$ is the uniform noise, the prior is the
+entropy model, and the likelihood is Gaussian around the decoder's output.
+
+<Theorem title="the variational bound is the Lagrangian (Ballé et al. 2018, eq. 3)">
+Let $y = g_a(x; \phi)$, let $q(\tilde y \mid x) = \prod_i
+\mathcal{U}\bigl(\tilde y_i \mid y_i - \tfrac12,\, y_i + \tfrac12\bigr)$, let
+the prior be a density $p_{\tilde y}$, and let the likelihood be
+$p(x \mid \tilde y) = \mathcal{N}\bigl(x \mid g_s(\tilde y; \theta),\,
+(2\lambda)^{-1} I\bigr)$. Then
+
+$$
+\mathbb{E}_{x \sim p_x}\, D\bigl(q(\tilde y \mid x) \,\|\,
+p(\tilde y \mid x)\bigr)
+\;=\; \underbrace{\mathbb{E}_{\tilde y \sim m}\bigl[-\log p_{\tilde y}(\tilde
+y)\bigr]}_{R}
+\;+\; \lambda \underbrace{\mathbb{E}\bigl[\lVert x - \tilde x
+\rVert^2\bigr]}_{D}
+\;+\; \text{const},
+$$
+
+where $m(\tilde y) = \mathbb{E}_{x}\, q(\tilde y \mid x)$ is the marginal of
+the latents, $\tilde x = g_s(\tilde y; \theta)$, and the constant involves
+neither $\phi$ nor $\theta$. Units are nats; dividing throughout by $\ln 2$
+puts $R$ in bits.
+
+<Proof>
+Four steps: expand the divergence with Bayes' rule, kill the encoder's own
+term, identify the likelihood term as squared error, identify the prior term
+as the rate.
+
+**Step 1, expand.** Bayes' rule gives $p(\tilde y \mid x) =
+p(x \mid \tilde y)\, p_{\tilde y}(\tilde y) / p_x(x)$, so
+
+$$
+D\bigl(q \,\|\, p(\cdot \mid x)\bigr)
+= \mathbb{E}_{\tilde y \sim q}\bigl[\log q(\tilde y \mid x)
+- \log p(x \mid \tilde y) - \log p_{\tilde y}(\tilde y)\bigr]
++ \log p_x(x).
+$$
+
+Averaging over $x$ makes the last term $\mathbb{E}_x[\log p_x(x)]$, a property
+of the source alone. That is the constant.
+
+**Step 2, the encoder term is zero.** $q(\tilde y \mid x)$ is a product of
+uniform densities of width exactly $1$, so its value is $1$ everywhere on its
+support and $\log q = 0$ there. Hence $\mathbb{E}_{q}[\log q] = 0$, exactly
+and not approximately. This is the step that the choice of unit-width noise
+buys, and it is why the objective has two terms rather than three.
+
+**Step 3, the likelihood term.** For
+$\mathcal{N}\bigl(x \mid \tilde x, (2\lambda)^{-1} I\bigr)$ in $d$ dimensions,
+
+$$
+-\log p(x \mid \tilde y) = \lambda \lVert x - \tilde x \rVert^2
++ \tfrac{d}{2}\log \tfrac{\pi}{\lambda},
+$$
+
+whose second term is fixed once $\lambda$ is. So the middle term contributes
+$\lambda$ times the expected squared error, up to a constant.
+
+**Step 4, the prior term.** Averaging $\mathbb{E}_{\tilde y \sim q(\cdot \mid
+x)}\bigl[-\log p_{\tilde y}(\tilde y)\bigr]$ over $x \sim p_x$ replaces the
+per-image conditional by its mixture, which is the definition of $m$. The
+result is $\mathbb{E}_{\tilde y \sim m}[-\log p_{\tilde y}(\tilde y)]$, the
+cross-entropy of the entropy model against the true latent distribution: the
+rate.
+
+Collecting steps 2 to 4 gives $0 + \lambda D + R$ plus constants.
+</Proof>
+</Theorem>
+
+{/* fig CodecIdentity: FigureSequence, 4 frames, component tier (KaTeX
+    required throughout; this is the lesson's central identity and every
+    frame is an equation). Identical layout in all four frames: a title
+    line at the top, one centred display equation, a one-line gloss
+    underneath in muted text. Frame 1 — title "variational autoencoder
+    (Kingma & Welling 2014, eq. 3), negated": $-\mathcal{L} =
+    \mathbb{E}_{q}\bigl[-\log p(x \mid z)\bigr] + D\bigl(q(z \mid x)
+    \,\|\, p(z)\bigr)$; gloss "minimising this is minimising the
+    divergence to the true posterior". Frame 2 — same equation, same
+    position, now with underbraces: the first term braced
+    "reconstruction" in blue, the second braced "KL to the prior" in
+    amber; gloss "two terms, no compression in sight". Frame 3 — title
+    "rate-distortion (this course, rate-distortion lesson)": $L = R +
+    \lambda D$ with $R$ in amber and $\lambda D$ in blue, underbraced
+    "expected code length" and "expected fidelity loss"; gloss
+    "$\lambda = -R'(D)$ selects the point on the curve". Frame 4 — the
+    two written on top of each other, aligned term for term: top line
+    the VAE form, bottom line $= \;R\; + \;\lambda D$, with vertical
+    dotted connectors binding the amber KL term to $R$ and the blue
+    reconstruction term to $\lambda D$. Two small annotations on the
+    connectors: on the amber one "because $\mathbb{E}_q[\log q] = 0$ for
+    unit-width uniform noise"; on the blue one "because the likelihood
+    is $\mathcal{N}(x \mid \tilde x, (2\lambda)^{-1}I)$". Color roles:
+    amber = the rate term wherever it appears, blue = the distortion
+    term wherever it appears, currentColor = structure. One idea: two
+    literatures, one objective, and the two assumptions that identify
+    them. */}
+<FigureSequence
+  name="CodecIdentity"
+  alt="Four frames: the negated evidence lower bound, its two terms named, the rate-distortion Lagrangian, and the two written on top of each other with the KL-to-prior term bound to the rate and the reconstruction term bound to lambda times distortion"
+  caption="Two literatures, one objective: the KL to the prior is the rate, and the reconstruction term is λ times the distortion."
+/>
+
+<Task>
+Step through the frames. Frame 4 prints one hypothesis on each connector:
+unit-width noise on the amber one, a Gaussian likelihood on the blue. For each,
+name the step of the proof above that stops holding when the hypothesis is
+dropped, and say what the corresponding term of the objective becomes instead.
+The exercises do the algebra.
+</Task>
+
+### The rate the codec pays, against the rate the theory allows
+
+Nothing in the theorem says the codec attains $R(D)$. It says the loss is the
+Lagrangian. The gap has three named parts, and each is non-negative.
+
+The encoder is deterministic, so $\hat y$ is a function of $x$ and
+$I(X; \hat Y) = H(\hat Y)$; the file the coder writes is longer than that by
+the entropy model's mismatch. The reconstruction is a function of $\hat y$, so
+the data-processing inequality (<Ref lesson="data-processing-inequality"/>)
+gives $I(X; \hat X) \le I(X; \hat Y)$. And $R(D)$ is the minimum of
+$I(X;\hat X)$ over *all* conditional distributions meeting the distortion
+budget, of which this codec's is one. Chaining these:
+
+$$
+R \;=\; \underbrace{R(D)}_{\text{the limit}}
+\;+\; \underbrace{I(X;\hat X) - R(D)}_{\text{transform and quantizer}}
+\;+\; \underbrace{H(\hat Y) - I(X;\hat X)}_{\text{bits the decoder cannot use}}
+\;+\; \underbrace{D(m \,\|\, p_{\hat y})}_{\text{entropy model}} .
+$$
+
+<KeyFact>
+Every engineering decision in a learned codec attacks one of those three
+gaps and none of them attacks $R(D)$. Better transforms shrink the first,
+better architectures the second, better entropy models the third; the limit
+itself is fixed by the source and the distortion measure before any network
+exists.
+</KeyFact>
+
+The correspondence with <Ref lesson="information-bottleneck"/> is now exact
+rather than suggestive. That lesson derived a trainable loss consisting of a
+decoder's cross-entropy plus a divergence from the encoder's output
+distribution to a reference marginal, and observed that setting the target
+equal to the input itself turns it into a variational autoencoder's objective.
+This codec is that special case with a price attached: the target is the image,
+and $\lambda$ is the multiplier that the bottleneck called $\beta$.
+
+## The hyperprior: leftover structure has a price
+
+A factorised entropy model treats every latent coefficient as independent of
+every other. That is a modelling choice, and $R = H(m) + D(m \,\|\, p_{\hat
+y})$ says what a wrong choice costs. The question is whether it is wrong.
+
+### The structure is visible
+
+It is wrong, and the failure is spatial. Rendering the latents of a trained
+factorised-prior model as an image leaves the scene readable: large responses
+cluster along edges and inside textured regions, near-zero responses
+elsewhere. A factorised model cannot represent that: it assigns each
+coefficient the same distribution wherever it sits, so it must be too wide in
+the flat regions and too narrow at the edges, and it pays on both.
+
+<Figure
+  src="./figures/balle-latents-whitened.png"
+  alt="Four tall panels side by side. First: a colour photograph of a white lighthouse behind a picket fence under a cloudy sky, from the Kodak test set. Second: the learned latents rendered as a grey image — the sky region is a flat featureless grey, while the lighthouse tower and the fence-and-grass region below it show as clumps of bright and dark blocks, so the shape of the scene is still readable. Third: the standard deviations predicted by the hyperprior, an almost-black field in which the lighthouse, the roofline and the ground edge glow bright — the map is large exactly where the second panel had structure. Fourth: the latents divided elementwise by those standard deviations, a uniform salt-and-pepper field of the same texture from top to bottom in which the lighthouse can no longer be made out."
+  caption="The factorised prior's blind spot, photographed. In the second panel the latents still carry the scene: flat where the sky is, busy along the tower and the fence. A prior that gives every coefficient the same distribution cannot know that. The third panel is what the hyperprior predicts — one standard deviation per element, large exactly where the structure was. Divide by it and the fourth panel is left: the same noise everywhere, the picture gone. What the hyperprior costs in side information it buys back as a marginal the factorised model was mismatched against."
+/>
+
+### JPEG's fixed blocks, HEVC's transmitted partition
+
+Conventional codecs solved this problem decades ago and gave the solution a
+name. JPEG factorises its entropy model into fixed groups of 64 coefficients,
+one per $8 \times 8$ block, and cannot change that for any image. HEVC, the
+video standard behind the still-image format BPG, partitions each frame into
+blocks of *variable* size, sends the partition to the decoder before the
+coefficients, and then codes the coefficients under a model chosen by that
+partition. The extra bits describing the partition are called **side
+information**, and the trade is explicit: they are worth sending if they save
+more than they cost.
+
+The hyperprior is that trade, learned. A second analysis transform $h_a$ reads
+the latents $y$ and produces a second, much smaller latent $z$; $z$ is
+quantised, entropy coded under its own factorised model, and written to the
+file first. A second synthesis transform $h_s$ turns the decoded $\hat z$ into
+a field of scales $\hat\sigma$, one per coefficient of $\hat y$, and the
+entropy model for $\hat y$ becomes a zero-mean Gaussian of standard deviation
+$\hat\sigma_i$ at coefficient $i$, convolved with the unit uniform as before.
+The decoder reads $\hat z$, computes $\hat\sigma$, and only then has the
+probabilities it needs to decode $\hat y$.
+
+<Figure
+  src="./figures/codec-pipeline.svg"
+  alt="A pipeline: image into the analysis transform, quantizer, arithmetic encoder, bitstream, arithmetic decoder and synthesis transform; above it the hyperprior branch takes the latents into a second transform, quantizer and coder, and its output scales feed both arithmetic coders; each stage labelled with the course result it implements"
+  caption="The codec is this course's contents page: a test channel, a fidelity price, an entropy model, an arithmetic coder, and a side channel that prices the rest."
+/>
+
+The scales are not a refinement of the reconstruction. They change no pixel.
+They change only the code lengths, and through them the file size.
+
+<Remark title="a hyperprior is a side channel, not a belief">
+The word "prior" is misleading here. In Bayesian usage a prior is a
+distribution fixed before the data arrive; this one is computed *from* the
+image being compressed and transmitted alongside it. Its content is the
+sentence "for this photograph, the coefficient at this position has roughly
+this magnitude", and its cost is charged to the same budget as the latents.
+The name comes from the variational formalism, in which $\hat z$ sits above
+$\hat y$ in the generative model, and not from any epistemic claim.
+</Remark>
+
+The model of $\hat z$ is itself fully factorised, so the same mismatch
+reappears one level up, on a quantity a few per cent the size of the one below
+it. Nothing in the construction is a solution in principle; it is a hierarchy
+that is one level deeper than the previous one.
+
+## The measurement: under four per cent of the file
+
+Side information is only a good trade if it is cheap, and the paper measures
+how cheap.
+
+### What the side channel costs
+
+On the 24 photographs of the Kodak test set, with the hyperprior model trained
+for squared error, the bits spent on $\hat z$ grow with the total rate and
+stay small in absolute terms throughout: about $0.008$ bits per pixel when the
+file is $0.2$ bits per pixel in total, and about $0.025$ bits per pixel when
+the file is $1.7$. As a fraction the side channel is dearest where the file is
+smallest, and it never exceeds four per cent of it.
+
+<Figure
+  src="./figures/side-info-budget.svg"
+  alt="Three horizontal bars for total rates of 0.2, 0.9 and 1.7 bits per pixel, each with a thin amber sliver at its head marking the side information at 0.008, 0.020 and 0.025 bits per pixel, annotated with the fractions four, 2.2 and 1.5 per cent"
+  caption="At every operating point the side information is a sliver: four per cent of the file at the low-rate end, and less at every rate above it."
+/>
+
+### What it buys
+
+That sliver is what separates the model from its predecessor, and the
+separation is measured on the same 24 photographs — each model trained twice,
+once against squared error and once against MS-SSIM, and plotted against BPG
+(the still-image encapsulation of the HEVC video standard), JPEG and three
+earlier learned codecs. The top panel reports distortion as peak
+signal-to-noise ratio, a logarithmic restatement of mean squared error, so
+$1$ dB at equal rate is a factor of $1.26$ in squared error.
+
+<Figure
+  src="./figures/rd-curves-kodak.png"
+  alt="Two stacked plots of distortion against bits per pixel, aggregated over the Kodak set. Top, PSNR in decibels: an orange BPG curve highest, the blue hyperprior curve just beneath it and converging with it above one bit per pixel, the magenta factorized-prior curve roughly one and a half decibels lower, then a dark green and a cyan learned codec, and grey JPEG lowest; two further blue and magenta curves, the models trained for MS-SSIM, run far below all of them. Bottom, MS-SSIM in decibels: the blue and magenta MS-SSIM-trained curves are highest, then green Rippel (2017), then the same two models trained for squared error, then orange BPG, with grey JPEG lowest."
+  caption="The measurement, both metrics, same 24 photographs. Top: under PSNR the hyperprior (blue squares) rides just under BPG and about one and a half decibels above the factorised prior (magenta squares). Bottom: under MS-SSIM the learned models sit above every conventional codec and BPG and JPEG fall to the bottom."
+/>
+
+Under squared error the hyperprior comes close enough to BPG to change the
+shape of the argument: about a quarter of a decibel under it at $1$ bit per
+pixel, with the factorised prior more than a decibel further down. Read the
+top panel at matched quality rather than matched rate and that margin is a
+rate — the hyperprior reaches the factorised model's $1$-bpp quality at about
+$0.8$ bpp. Two tenths of a bit per pixel of file, bought with the two
+hundredths the side channel costs at that rate: a return near ten to one, and
+the only thing that changed between the two models is the entropy model.
+
+The bottom panel measures the same reconstructions with MS-SSIM, a perceptual
+index $d$ between $0$ and $1$ that the plot converts to decibels as
+$-10\log_{10}(1 - d)$ so differences near the top of its range stay visible.
+It reverses the ranking. The models trained on that index sit above every
+conventional codec; the factorised one matches Rippel and Bourdev's 2017
+codec, then the best published result on the index and a considerably more
+complex system, and the hyperprior is above it at every rate. JPEG and BPG,
+both built around squared error, fall to the bottom. The two panels order the
+same codecs differently, and the next section takes that apart.
+
+<KeyFact>
+Those bits carry nothing about the image: $\hat z$ is computed from $\hat y$,
+so it says only what the latents already say. They pay because the entropy
+model is restricted, and only for that reason. Against an unrestricted joint
+model over the latents, transmitting $\hat z$ first and coding $\hat y$
+conditionally would cost exactly what coding $\hat y$ directly costs — no
+saving and no loss.
+</KeyFact>
+
+## The distortion measure decides which details survive
+
+Every number so far was reported against a distortion measure that somebody
+chose. <Ref lesson="rate-distortion"/> flagged the choice as an unresolved
+input to the theory and left it abstract. Here it is concrete, because a
+codec trained under one measure and a codec trained under another produce
+visibly different photographs at the same file size.
+
+The comparison is a single frame of a propeller aircraft over grass,
+compressed twice by the same architecture. The model trained on MS-SSIM, an
+index built to track human contrast perception, produces $0.1864$ bits per
+pixel at PSNR $27.99$ dB and MS-SSIM $0.9803$. The model trained on squared
+error produces $0.1932$ bits per pixel at PSNR $32.26$ dB and MS-SSIM
+$0.9713$. The rates differ by under four per cent. Each metric prefers the
+model trained on it, by $4.3$ dB on PSNR and by $1.6$ dB when the MS-SSIM
+values are put on the same logarithmic scale.
+
+<Figure
+  src="./figures/artifacts-msssim.png"
+  alt="A silver P-51 propeller aircraft parked on grass, reconstructed by the hyperprior codec trained with an MS-SSIM loss at 0.1864 bits per pixel: the grass in front of the wheels keeps a fine blade-by-blade texture, while the nose-art lettering on the fuselage has dissolved into an unreadable dark smear."
+  caption="Trained on MS-SSIM, 0.1864 bpp: the grass keeps its texture, the lettering on the fuselage smears into an unreadable mark."
+/>
+
+<Figure
+  src="./figures/artifacts-mse.png"
+  alt="The same propeller aircraft parked on grass, reconstructed by the model trained with squared error at 0.1932 bits per pixel; the SIX SHOOTER lettering on the fuselage is legible and the grass is smoothed into flat patches."
+  caption="Squared error, 0.1932 bpp: the fuselage lettering survives, the grass collapses into patches."
+/>
+
+The difference is not overall sharpness. It is where the detail went. MS-SSIM
+attenuates error in high-contrast regions and boosts it in low-contrast ones,
+because that is how human contrast sensitivity behaves. Trained on it, the
+codec spends bits on the grass and takes them from the lettering on the
+fuselage. Trained on squared error, it does the reverse. Both photographs cost
+the same to store, and the text is readable in only one of them.
+
+### The claim to reject
+
+A distortion number ranks reconstructions only with respect to the measure it
+was computed with. The reading in circulation is different: that the
+MS-SSIM-trained model, having a PSNR $4.3$ dB below its sibling, is the worse
+codec.
+
+That does not follow, and the reason is structural rather than a matter of
+degree. The two models were given different objectives and each attained its
+own; comparing them on one objective measures which model was told to optimise
+that objective, and the answer is known in advance from the training
+configuration. The comparison has no information in it.
+
+What the numbers do support is narrower. Each model is better than the other
+*under its own measure*, at essentially equal rate, so neither measure is a
+proxy for the other and the pair of them does not determine a ranking. The
+question "which codec is better" is a question about which errors a viewer
+minds, and that is settled by human rating experiments, not by either index.
+The paper's own conclusion is that no single metric should be used to compare
+methods, and its evidence is the photograph: the metric that scores higher
+deleted the text.
+
+<KeyFact>
+Neither PSNR nor MS-SSIM models image semantics, so both are indifferent to
+whether the destroyed detail was a blade of grass or a word. A distortion
+measure is a specification of what may be thrown away, written before the
+codec exists, and every reconstruction is an obedient answer to it.
+</KeyFact>
+
+## What the objective never charges
+
+Three departures from the idealisation have been named: the trained codec is
+not the deployed one, the entropy model is factorised at every level, and the
+distortion measure is stipulated. Two more are accounting failures rather than
+approximations, and both were raised earlier in the course.
+
+### The decoder is free
+
+The rate reported is the length of the bitstream. It excludes the synthesis
+transform, its trained weights, and the hyperprior's decoder, all of which the
+receiver must already have. That is defensible for a codec shipped once and
+used on millions of images, and it is exactly the accounting question
+<Ref lesson="minimum-description-length"/> made precise: a two-part code pays
+$L(H) + L(D \mid H)$, and a headline rate that reports only $L(D \mid H)$ is
+comparing a model plus data against data alone. The same omission reversed a
+ranking in <Ref lesson="language-models-as-compressors"/>, where charging a
+language model its own parameter bits moved it below general-purpose
+compressors on a single file. Here the network is fixed and small against any
+realistic image corpus, so the adjustment is real but does not change the
+verdict; a codec trained per image would be a different case entirely.
+
+<Figure
+  src="./figures/decoder-amortised.svg"
+  alt="A log-log plot of bits per image against the number of images coded with the same decoder. A blue dashed horizontal line marks the reported rate at ten to the fifth bits per image. An amber curve, the weights amortised plus that rate, starts near 1.6 times ten to the eighth at one image, falls steeply, passes through twice the reported rate at about 1,600 images, and settles onto the dashed line beyond about 160,000."
+  caption="Assuming a ten-million-weight decoder at 16 bits a weight and a 0.19 bpp photograph, the omitted term is a per-image cost that shrinks as 1/N: it doubles the bill up to a few thousand images and is negligible past a hundred thousand."
+/>
+
+### R(D) is a limit for a source that does not exist here
+
+The rate-distortion function is defined for a known distribution and attained
+in the limit of long blocks. Neither condition holds. There is no distribution
+of natural images, only a training set scraped from the web and a test set of
+24 photographs, so $R(D)$ for this problem is not a number anybody can write
+down; and the codec operates on one finite image at a time, with a transform
+whose receptive field is bounded. The Lagrangian is being minimised over a
+parametric family against an empirical average. Its optimum is a point on some
+curve; whether that curve is near $R(D)$ is unknown and unmeasurable.
+
+The paper reports that end-to-end optimisation does not produce independent
+latents. One would expect it to: a transform free to choose its own
+representation, trained under a factorised prior, has every incentive to
+factorise what it emits, which would make the entropy model's assumption
+harmless. Significant dependencies between neighbouring latent elements remain
+anyway, and the authors attribute this to the objective: as $\lambda$ grows
+the rate term
+matters less relative to distortion, so the pressure toward a factorised
+representation weakens. Rate-distortion optimality does not imply an
+independent representation, which is why there is work left for a hyperprior
+to do.
+
+<KeyFact>
+Both failures are in the accounting, not in the codec. The decoder's own bits
+are omitted from a quantity that is otherwise a two-part code, and the limit
+the objective is named after is undefined for the source it is trained on. A
+reported rate-distortion point is therefore a measurement of one system, not a
+distance from an optimum.
+</KeyFact>
+
+## ★ What came next
+
+This codec is the paper that made the structure legible, not the state of the
+art. Its immediate successor kept the hyperprior and added an autoregressive
+context model: an entropy model for each latent conditioned on the latents
+already decoded around it, in raster order, which is a second attack on the
+same factorisation. Combining the two made it the first learned method to beat
+BPG on both PSNR and MS-SSIM, with bitstreams about $8.4\%$ smaller than
+BPG's. The cost is that decoding becomes serial, one coefficient at a time,
+which is why the split between what a context model buys and what it costs in
+latency has occupied the field since. None of that changes the objective; all
+of it is a better $p_{\hat y}$.
+
+## The chain, end to end
+
+What is established: a learned codec is transform coding with all four stages
+trained against $L = R + \lambda D$; its rate term is a cross-entropy, so the
+entropy model's error is file size and nothing else; that objective is exactly
+an autoencoder's variational bound under two stated assumptions about the
+noise and the likelihood; a hyperprior transmits per-coefficient scales for
+under four per cent of the file and prices every other bit with
+them; and the distortion measure chosen before training decides which details
+survive it. Read the loss backwards and it is this course.
+
+A probability distribution gives every outcome a surprisal $-\log_2 p$
+(<Ref lesson="what-is-surprise"/>), and averaging surprisal over a source
+gives its entropy (<Ref lesson="entropy-as-average-surprise"/>). Codeword
+lengths spend a budget of fixed size, which turns entropy from a description
+of uncertainty into the exact floor on expected length
+(<Ref lesson="kraft-inequality"/>, <Ref lesson="source-coding-theorem-lite"/>).
+An arithmetic coder spends fractional bits, so any probability model whatsoever
+becomes a file of the length that model predicts
+(<Ref lesson="arithmetic-coding"/>). Using the wrong model costs a divergence
+(<Ref lesson="kl-divergence"/>), which is the same quantity as a classifier's
+loss above its floor (<Ref lesson="cross-entropy-loss"/>). Dropping the demand
+for exact reconstruction turns the floor into the curve $R(D)$, and pricing
+the fidelity budget instead of fixing it gives $R + \lambda D$
+(<Ref lesson="rate-distortion"/>).
+
+That expression is the codec's training loss. $R$ is a cross-entropy in bits,
+$D$ is an expectation of a chosen distortion, $\lambda$ is the negated slope of
+a curve nobody can compute, and the whole thing is minimised by gradient
+descent because rounding was replaced with noise. Every symbol in it was
+defined in this course, and the system is what happens when all of them are
+differentiable at once.
+
+## Exercises
+
+<Exercise>
+A codec compresses a $768 \times 512$ photograph to $0.19$ bits per pixel at a
+PSNR of $32.3$ dB. Compute the compressed file size in kilobytes and the
+compression ratio against the same image stored as uncompressed 24-bit RGB.
+Then say what the PSNR figure does and does not let you conclude about a
+second codec that reaches $0.19$ bpp at $31.0$ dB.
+
+<Solution>
+The image has $768 \times 512 = 393{,}216$ pixels, so the file holds
+$0.19 \times 393{,}216 = 74{,}711$ bits, which is $9{,}339$ bytes: about
+$9.3$ kilobytes.
+
+Uncompressed 24-bit RGB is $3$ bytes per pixel, or $1{,}179{,}648$ bytes,
+about $1.18$ megabytes. The ratio is $1{,}179{,}648 / 9{,}339 = 126$, which is
+also $24 / 0.19$: bits per pixel divided into bits per pixel, so the pixel
+count cancels and only the two rates matter.
+
+**On the second codec.** At equal rate, $31.0$ dB against $32.3$ dB means a
+mean squared error larger by a factor of $10^{1.3/10} = 1.35$. That is a
+statement about squared error and nothing else. If the second codec was
+trained or tuned against a perceptual measure, the comparison reproduces its
+objective rather than its quality, exactly as in the MS-SSIM and squared-error
+pair above.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the price to both ends of its range. In $L = R + \lambda D$, describe the
+codec produced by $\lambda \to 0$ and the codec produced by
+$\lambda \to \infty$. For the first, state what the trained analysis transform
+converges to and what the decoder emits. For the second, explain why the rate
+does not converge to a finite value even though the quantizer's step size is
+fixed at $1$.
+
+<Solution>
+**$\lambda \to 0$: rate only.** The distortion term vanishes from the
+objective, so the minimiser is any configuration with $R = 0$. A rate of zero
+means the entropy model assigns probability $1$ to a single value of $\hat y$,
+which forces the analysis transform to map every image into the same
+quantisation bin: it converges to a constant function, and its output carries
+no information about $x$. The decoder then emits one fixed image for every
+input, and the best fixed image under squared error is the mean image of the
+training distribution. This is the zero-rate end of the $R(D)$ curve
+(<Ref lesson="rate-distortion"/>), where $D$ equals the source's variance.
+
+**$\lambda \to \infty$: distortion only.** The quantizer always rounds to the
+nearest integer, so it would seem the finest achievable reconstruction is
+fixed. It is not, because the analysis transform's scale is free. Multiplying
+$g_a$ by $c$ and $g_s$ by $1/c$ leaves the reconstruction unchanged in the
+absence of quantisation and makes the rounding error $1/c$ times as large
+after it: the effective step size in image space is $1/c$, and $c$ is a
+trainable gain. As $\lambda$ grows, training raises $c$, distortion falls
+toward zero and the latents spread over more and more integers, so their
+entropy and the rate both diverge. Distortion buys rate at the standard
+exchange rate: doubling $c$ costs about one bit per coefficient and quarters
+the squared error, which is the $6$ dB per bit rule of
+<Ref lesson="rate-distortion"/>.
+
+**The transferable move.** $\lambda$ has units of bits per unit of distortion,
+so a codec with a fixed quantiser step and a free transform gain has exactly
+one degree of freedom, and $\lambda$ sets it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Redo the theorem's proof under two changed hypotheses, one at a time. Write
+$n$ for the number of latent coefficients and $d$ for the number of image
+pixels.
+
+**(a) Noise of the wrong width.** Keep every hypothesis except the noise: let
+$q(\tilde y \mid x) = \prod_i \mathcal{U}\bigl(\tilde y_i \mid y_i - \tfrac
+w2,\, y_i + \tfrac w2\bigr)$ for a fixed $w \neq 1$. Recompute Step 2 and write
+the loss Steps 1–4 now produce. Then substitute $\tilde y' = \tilde y / w$ and
+show the extra term is exactly what that rescaling produces — so state what $w$
+is a reparameterisation of, and what the deployed codec, whose quantizer still
+rounds to the nearest integer, is handed at the integers.
+
+**(b) A likelihood that is not Gaussian.** Replace the likelihood with a
+Laplacian, $p(x \mid \tilde y) = \prod_{j=1}^{d} \tfrac{1}{2b} \exp\bigl(-\lvert
+x_j - \tilde x_j \rvert / b\bigr)$. Redo Step 3 and state what the multiplier
+multiplies now.
+
+<Solution>
+**(a) Step 2 with width $w$.** Each factor of $q$ is a uniform density of
+height $1/w$ on its support, so $\log q = -n \log w$ there and
+$\mathbb{E}_q[\log q] = -n \log w$ — a constant, but not zero. Steps 1, 3 and 4
+are untouched, so the loss is
+
+$$
+L_w = R_w + \lambda D - n \log w + \text{const}, \qquad
+R_w = \mathbb{E}_{\tilde y \sim m}\bigl[-\log p_{\tilde y}(\tilde y)\bigr].
+$$
+
+**What the extra term is.** Put $\tilde y' = \tilde y / w$, whose noise is
+unit-width by construction. Coefficient by coefficient the densities are
+related by $p_{\tilde y_i}(\tilde y_i) = w^{-1} p_{\tilde y_i'}(\tilde y_i')$,
+so $-\log p_{\tilde y_i} = \log w - \log p_{\tilde y_i'}$, and summing over the
+$n$ coefficients gives $R_w = n \log w + R'$ with $R'$ the rate of the rescaled
+system. The $-n \log w$ in the loss cancels that term exactly. Taking
+$g_s'(\tilde y') = g_s(w \tilde y')$ leaves the reconstruction and $D$
+unchanged. So training with width $w$ and transform $g_a$ is the same
+optimisation as training with unit width and transform $g_a / w$: $w$ is not a
+new hypothesis but the encoder's gain under another name, and the trained
+optimum is unchanged.
+
+**What it costs at deployment.** The shipped quantizer still rounds to the
+nearest integer, step $1$. Under width $w$ the trained prior evaluated at an
+integer $k$ is the base density's mass on $[k - \tfrac w2, k + \tfrac w2]$,
+which is not $P[\hat y = k]$; those numbers sum to $w$ over the integers rather
+than to $1$, so they are not a distribution the arithmetic coder can use. The
+relaxation matches the deployment only when the noise width equals the
+quantizer step, and Step 2's exact zero is that same fact written in algebra.
+
+**(b) Step 3 with a Laplacian.** Taking logs,
+
+$$
+-\log p(x \mid \tilde y) = \frac{1}{b} \lVert x - \tilde x \rVert_1
++ d \log 2b,
+$$
+
+whose second term is fixed once $b$ is. Steps 1, 2 and 4 do not involve the
+likelihood, so with $\lambda = 1/b$ the objective is
+$R + \lambda\, \mathbb{E}\bigl[\lVert x - \tilde x \rVert_1\bigr]$ plus
+constants: the same Lagrangian, with $\lambda$ now pricing mean *absolute*
+error.
+
+**The transferable move.** Any likelihood of the form $p(x \mid \tilde y)
+\propto \exp\bigl(-\lambda\, \rho(x, \tilde x)\bigr)$ with a normaliser that
+does not depend on $\phi$ or $\theta$ gives $R + \lambda \mathbb{E}[\rho]$.
+Choosing the distortion measure and choosing the likelihood are the same act,
+which is why the choice cannot be postponed to evaluation time —
+the point the section on metrics makes with photographs.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim. "The codec minimises rate plus $\lambda$ times distortion,
+which is the Lagrangian form of $R(D)$, so a converged model achieves $R(D)$
+for natural images." Give three distinct reasons the conclusion does not
+follow: one about the source, one about the training relaxation, and one about
+the entropy model. For each, say whether it makes the codec's rate too high,
+its distortion too high, or the comparison undefined.
+
+<Solution>
+**The source.** $R(D)$ is defined relative to a known distribution $p_X$ and
+attained asymptotically in blocklength. There is no known distribution of
+natural images; there is a scrape of about a million web photographs used for
+training and 24 photographs used for testing. So $R(D)$ for this problem is
+not a computable quantity, and the claim compares the codec against a number
+that does not exist. **Comparison undefined.**
+
+**The relaxation.** Training minimises the loss of a system that adds uniform
+noise; the shipped system rounds. The trained parameters are optimal for the
+relaxed objective, and there is no theorem placing them at the optimum of the
+deployed one. **Both terms possibly too high**, since the mismatch can move
+either the rate or the distortion.
+
+**The entropy model.** The rate paid is the cross-entropy
+$H(m) + D(m \,\|\, p_{\hat y})$, and the divergence is zero only if the model
+equals the true latent marginal. It does not: the model is factorised
+conditional on the scales, while the latents retain dependencies, and the
+hyperprior's own model is factorised outright. **Rate too high**, by exactly
+the divergence.
+
+A fourth reason is available from the section on the three gaps: even with a
+perfect entropy model, the family of conditionals realisable as "round the
+output of this convolutional network" is a strict subfamily of the
+conditionals over which $R(D)$ minimises, so $I(X;\hat X)$ exceeds $R(D)$
+before any modelling error is counted.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim too. "The MS-SSIM-trained model scores $27.99$ dB PSNR
+against the squared-error model's $32.26$ dB at essentially the same rate, so
+it is the worse codec." State what the comparison actually measures, then
+design the experiment that would settle which codec is better, naming what its
+outcome would have to look like to count as a decision.
+
+<Solution>
+**What it measures.** It measures which of the two models was trained on
+squared error. PSNR is a monotone function of mean squared error, and one
+model minimised that quantity while the other minimised a different one; the
+ranking is a restatement of the training configuration. The reverse
+comparison is equally uninformative: on MS-SSIM the ordering flips, by
+$1.6$ dB on the same logarithmic scale.
+
+**What would settle it.** A forced-choice human rating study. Take a set of
+photographs unseen by both models, compress each with both codecs at matched
+rates, and show observers the pairs in random order and random left-right
+position, asking which reconstruction they prefer. Report the preference rate
+with a confidence interval, and stratify by image content: the two codecs
+disagree most on images containing text and fine low-contrast texture, so an
+aggregate that mixes those with portraits will average the effect away.
+
+**What counts as a decision.** A preference rate whose interval excludes
+$50\%$ across content strata. If one codec wins on textured scenes and loses
+on scenes containing text, that is not a tie: it is the finding that the two
+distortion measures encode different and both incomplete accounts of what a
+viewer minds, which is what the reconstructions already show.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the accounting the lesson asserted. Write $\hat y$ for the latents and
+$\hat z = h_a(\hat y)$ for the hyperprior's latent, so $\hat z$ is a
+deterministic function of $\hat y$. (a) Show that with an *unrestricted*
+entropy model, transmitting $\hat z$ first and coding $\hat y$ conditionally
+costs exactly as much as coding $\hat y$ directly, so the side channel cannot
+help. (b) With *factorised* entropy models on both, write the saving and the
+cost as information quantities and explain how the saving can exceed the cost
+by a large factor even though part (a) says it cannot in the unrestricted
+case.
+
+<Solution>
+**(a) Unrestricted models.** The two-stage scheme costs
+$H(\hat Z) + H(\hat Y \mid \hat Z)$ bits, which is $H(\hat Y, \hat Z)$ by the
+chain rule (<Ref lesson="joint-and-conditional-entropy"/>). Since
+$\hat Z = h_a(\hat Y)$, knowing $\hat Y$ determines $\hat Z$, so
+$H(\hat Z \mid \hat Y) = 0$ and $H(\hat Y, \hat Z) = H(\hat Y)$. The two-stage
+cost equals the direct cost exactly. Side information computed from the data
+is free and useless when the entropy model is unrestricted, which is why the
+hyperprior is not a statement about information at all.
+
+**(b) Factorised models.** With a factorised model the direct cost is
+$\sum_i H(\hat Y_i)$, not $H(\hat Y)$, and the conditional cost is
+$\sum_i H(\hat Y_i \mid \hat Z)$. So
+
+$$
+\text{saving} = \sum_i \bigl[H(\hat Y_i) - H(\hat Y_i \mid \hat Z)\bigr]
+= \sum_i I(\hat Y_i ; \hat Z),
+\qquad
+\text{cost} = H(\hat Z).
+$$
+
+The saving is a sum of $n$ marginal mutual informations, one per coefficient,
+and the cost is a single entropy. Part (a) bounds only the *joint* quantity:
+$I(\hat Y; \hat Z) = H(\hat Z)$, and $\sum_i I(\hat Y_i; \hat Z)$ can exceed
+$I(\hat Y;\hat Z)$ without limit, because the same side bits are counted once
+in every coefficient they help.
+
+Break-even is a unit conversion: the cost is quoted per pixel and the saving
+accrues per coefficient. Near $1$ bit per pixel the side channel
+costs about $0.02$ bits per pixel, which at $0.75$ coefficients per pixel is
+$0.027$ bits per coefficient; the hyperprior pays only if the average marginal
+saving $I(\hat Y_i ; \hat Z)$ exceeds that. The measured curves say it does by
+about a factor of ten: at matched distortion the scales buy some $0.2$ bits
+per pixel there, or $0.27$ bits per coefficient.
+
+**The transferable move.** Sums of marginal mutual informations are not
+bounded by the joint one. That inequality is the entire economic case for side
+information in every codec that uses it, and it exists only because the
+entropy models are restricted.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the metric disagreement on your own files. Take three photographs
+with different content (one with printed text in the frame, one with fine
+low-contrast texture such as foliage, one portrait). Encode each with JPEG at
+three quality settings and with a modern codec (WebP or AVIF) at file sizes
+matched to within five per cent. Measure PSNR and MS-SSIM for every
+reconstruction and plot both rate-distortion curves. Report where the two
+metrics rank the codecs differently, and show one crop at $200\%$ where the
+disagreement is visible to the eye.
+
+<Solution>
+**Possible outcomes and how to read them.** Expect the modern codec to win on
+both metrics at low rates, where JPEG's $8 \times 8$ blocking is severe, and
+the margin to shrink above roughly $1$ bit per pixel. The interesting region
+is where the curves cross or run close: there, small changes in the encoder's
+internal decisions move one metric and not the other.
+
+**Where disagreement concentrates.** On the text image, a codec that smooths
+aggressively can gain MS-SSIM while losing PSNR, because MS-SSIM discounts
+error in the high-contrast region where the glyph edges are. On the foliage
+image the effect runs the other way: preserving texture is cheap in MS-SSIM
+terms and expensive in squared error, so a codec tuned for structural
+similarity keeps grain that a squared-error codec averages out. The portrait
+usually shows the smallest disagreement, which is itself the result worth
+reporting: metric choice matters where content is either high-contrast and
+semantic or low-contrast and stochastic.
+
+**What counts as agreement with the lesson.** Two curves that cross, or that
+rank two encoders oppositely at some matched rate, on at least one of the
+three images. If both metrics agree everywhere, the rates chosen were too far
+apart or the codecs too dissimilar; narrow the rate range and re-run. Report
+the crop with both metric values printed under it, since the claim being
+tested is that the numbers and the picture can disagree.
+</Solution>
+</Exercise>
+
+<Exercise>
+Close the account. (a) A codec's entropy model $p_{\hat y}$ is fitted once and
+shipped. You encode a set of images whose quantised latents follow an
+empirical distribution $\hat m$ different from the one the model was fitted
+on. Write down the extra bits per image the mismatch costs, in the notation of
+the divergence module, given $n$ coefficients per image. (b) Name, for each of
+the three symbols in $L = R + \lambda D$, the single lesson of this course
+that defined it. (c) The rate ignores the decoder's own weights. Write the
+honest total for a set of $N$ images and say at what $N$ the omission stops
+mattering.
+
+<Solution>
+**(a)** Coding data distributed as $\hat m$ with a code built for $p_{\hat y}$
+costs $H(\hat m, p_{\hat y}) = H(\hat m) + D(\hat m \,\|\, p_{\hat y})$ bits
+per coefficient (<Ref lesson="kl-divergence"/>, <Ref lesson="cross-entropy-loss"/>).
+The excess over the best code for these images is the divergence alone, so the
+extra cost is
+
+$$
+n \, D\bigl(\hat m \,\|\, p_{\hat y}\bigr) \text{ bits per image.}
+$$
+
+With $n = 294{,}912$ and a divergence of $0.01$ bits per coefficient, that is
+about $2{,}949$ bits, or $369$ bytes per image: small, and paid on every image
+forever. The arithmetic coder does not soften it; it delivers this length to
+within two bits of the total (<Ref lesson="arithmetic-coding"/>).
+
+**(b)** $R$ is an expected code length under a model, defined as a
+cross-entropy in <Ref lesson="cross-entropy-loss"/> and priced against the
+truth in <Ref lesson="kl-divergence"/>; $D$ is the expected distortion of
+<Ref lesson="rate-distortion"/>, which is also where $\lambda$ was introduced,
+as the negated slope $-R'(D)$ of the rate-distortion curve.
+
+**(c)** The honest total for $N$ images is a two-part code
+(<Ref lesson="minimum-description-length"/>):
+
+$$
+L_{\text{total}} = \underbrace{L(\text{decoder weights})}_{\text{once}}
++ \sum_{j=1}^{N} \bigl[R_j + L(\hat z_j)\bigr],
+$$
+
+and the per-image average carries $L(\text{weights}) / N$. A codec of this
+size has on the order of ten million weights; at $16$ bits each that is over
+$10^8$ bits, against a compressed photograph of roughly $10^5$ bits, so the
+amortised cost falls below one per cent of a file only past about
+$N = 10^5$ images. Below that
+the shipped codec is not cheaper than a general-purpose one, which is the
+finding that reversed the ranking in
+<Ref lesson="language-models-as-compressors"/>. The course ends on the open
+version of that question: a codec whose decoder is retrained per image or per
+corpus is a model selection problem, and the criterion is the total length,
+not the rate.
+</Solution>
+</Exercise>
+
+<References>
+1. J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston, "Variational Image Compression with a Scale Hyperprior," ICLR 2018 (arXiv:1802.01436) — §1 for the JPEG/HEVC side-information analogy, §2 for the rate-as-cross-entropy identity (eqs. 1–2), the uniform-noise relaxation and the derivation of eq. 3 used as this lesson's theorem, §3 for the hyperprior (eqs. 7–10), §4.1 for the architecture and eq. 11, §4.2 for the Kodak results, the MS-SSIM/squared-error artifact comparison and the side-information measurement. https://arxiv.org/abs/1802.01436
+2. J. Ballé, V. Laparra, E. P. Simoncelli, "End-to-end Optimized Image Compression," ICLR 2017 (arXiv:1611.01704) — the predecessor: the factorized-prior codec measured against the hyperprior throughout §4.2 above. §3 states the objective $R + \lambda D$ and the additive-uniform-noise relaxation, with eq. 10 the identity $p_{\tilde y}(n) = P_q(n)$ this lesson draws at the integers; §3.1 casts the result as a variational autoencoder; §4, figure 4, is the empirical check — relaxed against quantized rate and distortion over 2,169 training images — that the 2018 paper cites in place of a proof. https://arxiv.org/abs/1611.01704
+3. D. P. Kingma, M. Welling, "Auto-Encoding Variational Bayes," ICLR 2014 (arXiv:1312.6114) — eq. 1 decomposes $\log p(x)$ into a divergence to the true posterior plus the evidence lower bound; eq. 3 splits the bound into a reconstruction term and a divergence to the prior. Appendix B gives the closed-form Gaussian case. https://arxiv.org/abs/1312.6114
+4. D. Minnen, J. Ballé, G. Toderici, "Joint Autoregressive and Hierarchical Priors for Learned Image Compression," NeurIPS 2018 (arXiv:1809.02736) — the successor model: an autoregressive context model on top of the hyperprior, reported at $8.4\%$ smaller bitstreams than BPG and the first learned codec ahead of BPG on both PSNR and MS-SSIM. https://arxiv.org/abs/1809.02736
+5. O. Rippel, L. Bourdev, "Real-Time Adaptive Image Compression," ICML 2017, *Proceedings of Machine Learning Research* 70, pp. 2922–2930 (arXiv:1705.05823) — the MS-SSIM state of the art the factorized-prior model matches and the hyperprior model passes in the curves read above; a multiscale architecture with an adversarial loss and a context-adaptive entropy coder. https://arxiv.org/abs/1705.05823
+6. V. K. Goyal, "Theoretical Foundations of Transform Coding," *IEEE Signal Processing Magazine* 18(5), 2001 — the transform-coding framework the learned codec instantiates, including why a decorrelating transform followed by scalar quantisation is near-optimal for Gaussian sources.
+7. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 10 for the rate-distortion function, its convexity and the Lagrangian form used here.
+8. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441, 2016) — §23.2 for the definition of the fundamental limit $R(D)$ (Definition 23.1) and the general converse (Theorem 23.2, $\log M \ge \min I(X;\hat X)$ over conditionals meeting the distortion budget), which is the chain this lesson's three-gap decomposition runs; §24.2 for Shannon's theorem identifying $R(D)$ with the information rate-distortion function for a memoryless source — both of them statements about a known distribution, which is why the codec cannot be claimed to attain either. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
+</References>

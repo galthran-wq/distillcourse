@@ -56,7 +56,12 @@ unusable, say so and draw it instead.
      `apps/frontend/.preview/`; also check `--dark` once near the end. Not yet registered
      (e.g. parallel builds where index.ts is off-limits)? Render by path:
      `npm run figure -- apps/frontend/components/figures/<course>/<Name>.tsx [frame]`.
-   - raw SVG: `rsvg-convert -w 1200 -b white <file> -o /tmp/…png`, Read it.
+   - raw SVG: `npm run figure -- <path/to/figure.svg> [--dark]`, then Read
+     the PNG in `apps/frontend/.preview/`. This path uses librsvg, not a
+     browser: it rasterizes in ~0.1s and injects the theme's text colour so
+     `currentColor` resolves. Never screenshot a page just to look at one
+     SVG — a headless browser costs seconds and hundreds of megabytes for
+     the same pixels.
    List the defects you SEE (clipped labels, collisions, broken TeX shown
    as red source, spacing, misaligned arrows) and fix them. Repeat until a
    pass finds zero defects. Never conclude from the code that it "should"

@@ -1,0 +1,1107 @@
+gzip, PNG and HTTP content-encoding all carry the same format, DEFLATE, and
+every field in its specification is a decision about the theorems of this
+module.
+
+The module has built the parts separately: a budget that decides which sets of
+codeword lengths exist at all (<Ref lesson="kraft-inequality"/>), a merge rule
+that finds the shortest integer lengths for a known distribution
+(<Ref lesson="huffman-by-hand"/>), a coder that escapes integer lengths
+altogether (<Ref lesson="arithmetic-coding"/>), and a parser that needs no
+distribution at all (<Ref lesson="dictionary-coding"/>). What stands open is
+the assembly. The previous lesson priced every pointer at a fixed field width
+and recorded that no deployed format does that. This lesson reads two formats
+that do not, field by field, and marks each point where the specification
+departs from the idealisation its theorem was proved under.
+
+The route: the pipeline and the three containers that carry it; canonical
+codes as the Kraft inequality turned into a wire format; the two alphabets and
+the raw bits that finish them; the three block types and the header cost that
+chooses between them; the bit-packing asymmetry; the guaranteed worst case;
+and the four things Zstandard changed.
+
+## DEFLATE is this module, wired together
+
+<Task>
+Closed book, before reading on. State the Kraft budget condition on a set of
+codeword lengths; state how far Huffman's expected length can exceed the
+entropy; and state what LZ77 emits when it finds no match. The three answers
+are $\sum_i 2^{-\ell_i} \le 1$, strictly less than one bit per symbol, and a
+literal byte. Every one of them appears as a field in the next section.
+</Task>
+
+DEFLATE, specified in [RFC 1951](https://www.rfc-editor.org/rfc/rfc1951) in
+1996 and unchanged since, is a two-stage pipeline. The first stage is LZ77
+matching over a 32 KB window: the input becomes a stream of *literals* (bytes
+that no back-reference covered) and *matches*, each a length and a backward
+distance. The second stage entropy-codes that stream with two Huffman codes,
+one for literals and lengths together, one for distances. Neither stage is new
+here. What is new is that the two are interleaved in a single bitstream, block
+by block, with the code tables shipped in front of the data they describe.
+
+{/* fig DeflatePipeline: the format as this module's parts, wired in series.
+   Left to right, four boxes joined by straight data-flow arrows: (1)
+   "input bytes" — a short byte strip; (2) "LZ77 matcher, 32 KB window" —
+   amber, the subject; (3) two stacked outputs from it, "literals + lengths,
+   286 symbols" and "distances, 30 symbols", each drawn as a small token
+   strip; (4) two Huffman coder boxes in blue, one per stream, merging into
+   (5) "one bitstream" — a single bit strip. UNDER each stage, in muted type,
+   the lesson that owns it: under (2) "dictionary-coding", under (4)
+   "huffman-by-hand + kraft-inequality", and under the whole right half
+   "this lesson: how they share one bitstream". A tally line at the bottom,
+   from the measured 112 KB block: "5,374 literals at 7.1 bits · 8,776
+   matches at 18.9 bits · 644 bits of table = 25,568 bytes". Colors: amber
+   = the matcher and its two streams, blue = the entropy stage, currentColor
+   everything else. One idea: the format is the module's parts in series. */}
+<Figure
+  name="DeflatePipeline"
+  alt="DEFLATE as a left-to-right pipeline: input bytes into an LZ77 matcher, out to a literal/length stream and a distance stream, each into a Huffman coder, merging into one bitstream, with the lesson that owns each stage named underneath"
+  caption="Every stage was built earlier in this module. The format is the wiring, and the wiring is where the theory gets bent."
+/>
+
+### Three containers, one format
+
+A raw DEFLATE stream has no header, no length, and no checksum, so it never
+travels alone. Three wrappers carry it, and the name `gzip` belongs to only
+one of them. The `gzip` file format
+([RFC 1952](https://www.rfc-editor.org/rfc/rfc1952)) adds an 18-byte frame: a
+10-byte header holding a magic number, the method, flags and a timestamp, and
+an 8-byte trailer holding a CRC-32 of the original data and its length. The
+zlib format ([RFC 1950](https://www.rfc-editor.org/rfc/rfc1950)) adds 6 bytes
+instead: a 2-byte header and a 4-byte Adler-32 trailer. PNG image data is
+zlib-wrapped DEFLATE, and HTTP `Content-Encoding: gzip` is the RFC 1952
+wrapper. All three carry byte-identical DEFLATE inside.
+
+**The measurement that anchors the rest of this lesson.** Take the 112,425
+bytes of RFC 8878's own text and run `gzip -9`. The output is 25,586 bytes:
+18 bytes of gzip frame and one 25,568-byte DEFLATE block. Inside it the matcher
+emitted 5,374 literals and 8,776 matches; each literal cost 7.13 bits on
+average and each match 18.87 bits, while a match retired 12.2 input bytes.
+The two code tables that make those numbers decodable cost 644 bits, which is
+80 bytes, or 0.3% of the output.
+
+<KeyFact>
+A match costs 18.9 bits and retires 97.6 bits of input. Price that same parse
+in fixed-width fields — one flag bit, then either an 8-bit literal or the
+15-bit distance and 8-bit length of <Ref lesson="dictionary-coding"/>, whose
+31-bit triple is those two fields plus a bundled trailing literal — and it
+occupies 32,374 bytes. The Huffman stage brings it to 25,568: the entropy
+stage cuts the LZ77 representation to **four fifths** of its fixed-field size,
+which is 8% of the 87 KB the file lost in total. The parse accounts for the
+other 92%, which is why the entire difference between `gzip -1` and `gzip -9`
+later in this lesson is a difference of parses inside an unchanged format.
+</KeyFact>
+
+## Canonical codes: the Kraft inequality used as a wire format
+
+The decoder cannot use a Huffman code it has not been given, and the obvious
+way to give it one is to transmit the tree. DEFLATE transmits no tree. It
+transmits the list of codeword *lengths*, one small integer per symbol, and
+the decoder rebuilds the codewords from the lengths alone. That works because
+of two extra rules the format imposes on top of Huffman's, and those two rules
+plus the Kraft inequality leave exactly one possible code.
+
+### The two extra rules: consecutive values, shorter codes first
+
+The rules, quoted from RFC 1951 §3.2.2: all codes of a given bit length have
+lexicographically consecutive values, in the same order as the symbols they
+represent; and shorter codes lexicographically precede longer codes.
+
+<Example title="the RFC's own four-symbol code">
+The specification first shows an arbitrary Huffman code for `ABCD` with
+lengths $(2,1,3,3)$, in which $A = 00$, $B = 1$, $C = 011$, $D = 010$. Those
+codewords satisfy Huffman's condition and violate both extra rules: the
+length-3 codes are not in symbol order, and the length-1 code $1$ does not
+precede the length-2 code $00$.
+
+Recoded under the rules, the same lengths give
+$$
+B = 0, \qquad A = 10, \qquad C = 110, \qquad D = 111 .
+$$
+Reading left to right, $0$ precedes $10$, which precedes both length-3 codes,
+and $110$ and $111$ are consecutive in symbol order. The expected length is
+unchanged, because the lengths are unchanged. The header now needs to carry
+only $(2,1,3,3)$.
+</Example>
+
+### From lengths to codewords in three steps
+
+The construction that turns lengths into codewords is three steps: count how
+many codes have each length; compute the first codeword of each length; then
+hand out consecutive values in symbol order. Step 2 is one line, and it is
+where the Kraft budget appears:
+
+$$
+c_1 = 0, \qquad c_{b+1} = 2\,(c_b + n_b),
+$$
+
+with $n_b$ the number of codewords of length $b$ and $c_b$ the numeric value
+of the first codeword of length $b$, read as a $b$-bit integer.
+
+<FigureSequence
+  name="canonical"
+  alt="Four frames building the codewords for the alphabet A to H from the length list 3,3,3,3,3,2,4,4: the lengths, the count per length, the first code of each length, then the assigned codewords"
+  caption="The RFC's worked example. Watch that nothing enters after frame 1 except arithmetic on the counts: the lengths are the whole input."
+/>
+
+<Definition title="canonical prefix code">
+A prefix code is **canonical** when, for every bit length $b$, its
+length-$b$ codewords take consecutive numeric values in the order of the
+symbols they represent, and every length-$b$ codeword, padded on the right
+with zeros, precedes every longer codeword. Given a length list satisfying
+the Kraft inequality, these conditions determine every codeword.
+</Definition>
+
+### The boundary: four cases and one theorem
+
+The construction is defined for any list of positive integers, but it returns
+a usable code for only some of them. Four length lists mark where the boundary
+runs.
+
+- **Canonical.** The RFC's `ABCDEFGH` with lengths $(3,3,3,3,3,2,4,4)$, which
+  the sequence above builds. Its Kraft sum is
+  $5 \cdot 2^{-3} + 2^{-2} + 2 \cdot 2^{-4} = 1$, spent exactly.
+- **Structurally different.** DEFLATE's own fixed literal/length code, whose
+  288 lengths are $8, 9, 7, 8$ repeated over four ranges of symbols. It is
+  canonical for the same reason, and its Kraft sum
+  $144 \cdot 2^{-8} + 112 \cdot 2^{-9} + 24 \cdot 2^{-7} + 8 \cdot 2^{-8}$
+  is again exactly $1$.
+- **Degenerate.** An alphabet with one used symbol. The RFC requires it be
+  given a length of $1$ rather than $0$, leaving one unused codeword, because
+  a code of length zero cannot be read off a bitstream.
+- **Near miss.** A length list violating Kraft, such as $(1,2,2,2)$ from
+  <Ref lesson="kraft-inequality"/>, whose budget sums to
+  $2^{-1} + 3 \cdot 2^{-2} = 1.25$. The construction still runs: $c_1 = 0$
+  and $c_2 = 2(c_1 + n_1) = 2$, so the three length-2 codewords take the
+  values $2, 3, 4$, and the last of them needs three bits to write. That
+  overflow is the condition $c_b + n_b \le 2^b$ failing at $b = 2$, where
+  $2 + 3 = 5 > 4$.
+
+<Theorem title="the construction succeeds exactly when Kraft holds">
+Let $n_b$ be the number of codewords of length $b$, for $b = 1, \ldots, B$,
+and let $c_b$ be given by the recursion above. The assignment produces a valid
+prefix code if and only if
+$\sum_{b=1}^{B} n_b\, 2^{-b} \le 1$.
+
+<Proof>
+The plan: solve the recursion in closed form, read the overflow condition off
+it, then check prefix-freeness.
+
+**Step 1, unroll.** Claim $c_b = 2^{b} \sum_{j < b} n_j 2^{-j}$. At $b = 1$
+the sum is empty and $c_1 = 0$. If the claim holds at $b$, then
+$$
+c_{b+1} = 2(c_b + n_b)
+= 2\Bigl(2^{b}\!\!\sum_{j<b} n_j 2^{-j} + n_b\Bigr)
+= 2^{b+1} \sum_{j \le b} n_j 2^{-j},
+$$
+which is the claim at $b+1$.
+
+**Step 2, the overflow condition.** The codewords of length $b$ are the
+integers $c_b, \ldots, c_b + n_b - 1$, each written in exactly $b$ bits, so
+the assignment is legal at length $b$ precisely when
+$c_b + n_b \le 2^{b}$. Dividing by $2^b$ and using Step 1, that condition is
+$$
+\sum_{j \le b} n_j\, 2^{-j} \le 1 .
+$$
+Requiring it at every $b$ is requiring every partial sum of the Kraft sum to
+be at most one, which for non-negative terms is the same as requiring the
+whole sum to be at most one.
+
+**Step 3, prefix-freeness.** Take $b < b'$ and a codeword $u$ of length $b$.
+Its numeric value is at most $c_b + n_b - 1$, so the $b$-bit prefix of any
+length-$b'$ codeword, which is that codeword shifted right by $b' - b$, is at
+least $\lfloor c_{b'} / 2^{b'-b} \rfloor \ge c_b + n_b > u$ by Step 1. No
+longer codeword begins with $u$.
+</Proof>
+</Theorem>
+
+<Task>
+Two comprehension checks. Take the near-miss list $(1,2,2,2)$ and say what a
+decoder would read where the overflowing codeword should be: the value $4$
+truncated to two bits is `00`, whose first bit is already the complete
+codeword `0`, so the decoder stops after one bit and the rest of the stream
+is misaligned. Then apply the theorem to the fixed literal/length code above:
+its Kraft sum is exactly $1$, so $c_b + n_b = 2^b$ at the final length,
+meaning the last codeword is all ones. Confirm this against the RFC's table,
+which ends at `111111111`.
+</Task>
+
+<KeyFact>
+Because the lengths determine the codewords, a canonical code also decodes
+without a tree: comparing the next $b$ bits against the interval
+$[c_b, c_b + n_b)$ decides the length, and the symbol follows by subtraction.
+This is why every production decoder uses table lookup rather than pointer
+chasing, and it is a property Huffman's algorithm alone does not supply.
+</KeyFact>
+
+<Exercise>
+Run the construction on the length list $(4, 2, 3, 3, 4, 2, 4, 4)$ for the
+symbols `ABCDEFGH`. Report the count per length, the first codeword of each
+length, and the eight codewords, and verify the Kraft sum. Write the counts
+down before reading the solution.
+
+<Solution>
+**Counts.** Length 2: symbols `B` and `F`, so $n_2 = 2$. Length 3: `C` and
+`D`, so $n_3 = 2$. Length 4: `A`, `E`, `G`, `H`, so $n_4 = 4$. And
+$n_1 = 0$.
+
+**First codewords.** $c_1 = 0$. Then $c_2 = 2(c_1 + n_1) = 0$, so the first
+length-2 code is `00`. Then $c_3 = 2(c_2 + n_2) = 2(0+2) = 4$, which in three
+bits is `100`. Then $c_4 = 2(c_3 + n_3) = 2(4+2) = 12$, which in four bits is
+`1100`.
+
+**Assignment**, in symbol order within each length:
+
+| symbol | length | codeword |
+| --- | --- | --- |
+| B | 2 | `00` |
+| F | 2 | `01` |
+| C | 3 | `100` |
+| D | 3 | `101` |
+| A | 4 | `1100` |
+| E | 4 | `1101` |
+| G | 4 | `1110` |
+| H | 4 | `1111` |
+
+**Kraft.** $2 \cdot \tfrac14 + 2 \cdot \tfrac18 + 4 \cdot \tfrac1{16} =
+0.5 + 0.25 + 0.25 = 1$. The budget is spent exactly, and correspondingly
+$c_4 + n_4 = 12 + 4 = 16 = 2^4$: the last codeword is all ones.
+
+The transferable move: the counts alone fix the starting values, so the only
+thing symbol identity decides is which consecutive value each symbol gets.
+</Solution>
+</Exercise>
+
+## Two alphabets, and the raw bits that finish them
+
+The matcher emits two kinds of thing, and a decoder reading a bitstream has to
+know which it is looking at before it can read it. DEFLATE solves that by
+merging literals and match lengths into **one** alphabet of 286 symbols:
+values 0 to 255 are literal bytes, 256 is end-of-block, and 257 to 285 are
+length codes. One Huffman decode therefore answers both questions at once,
+"byte or match" and "which one". Distances live in a second alphabet of 30
+symbols, read only after a length code has already been seen.
+
+### Extra bits: the code names a range, raw bits name the value
+
+Twenty-nine length codes cannot name 256 distinct lengths, and thirty distance
+codes cannot name 32,768 distinct distances. Each code therefore names a
+*range*, and a fixed number of raw bits follows the codeword to pick a value
+inside it. From the RFC's normative tables:
+
+| length code | extra bits | lengths | distance code | extra bits | distances |
+| --- | --- | --- | --- | --- | --- |
+| 257 | 0 | 3 | 0 | 0 | 1 |
+| 265 | 1 | 11, 12 | 4 | 1 | 5, 6 |
+| 269 | 2 | 19–22 | 12 | 5 | 65–96 |
+| 277 | 4 | 67–82 | 19 | 8 | 769–1024 |
+| 284 | 5 | 227–257 | 29 | 13 | 24577–32768 |
+| 285 | 0 | 258 | | | |
+
+<Example title="coding one match">
+A match of length 100 at distance 1000. Length 100 falls in the range 99 to
+114, which is code 279 with 4 extra bits; the residue is $100 - 99 = 1$, sent
+as `0001`. Distance 1000 falls in 769 to 1024, which is code 19 with 8 extra
+bits; the residue is $1000 - 769 = 231$, sent as `11100111`.
+
+The whole match is four elements: the Huffman codeword for 279, four raw bits,
+the Huffman codeword for 19, eight raw bits. In the measured 112 KB block those
+two codewords are 7 and 5 bits long, so the match costs 24 bits and retires
+800.
+</Example>
+
+<Figure
+  src="./figures/extra-bits.svg"
+  alt="A distance of 1000 split into a Huffman codeword naming the range 769 to 1024 and eight raw bits naming 231 within it, above a bar chart of extra bits per distance code showing the ranges doubling every two codes"
+  caption="Coarse then fine: the code prices the range, the raw bits price the position inside it."
+/>
+
+### Why the raw bits are an honest price
+
+This is the fractional-bit problem of <Ref lesson="arithmetic-coding"/>
+handled by bucketing rather than by intervals, and the bucketing is chosen to
+make the raw bits honest. Spending $k$ raw bits on a residue is optimal
+exactly when the residue is uniform over the $2^k$ values in the bucket. The
+distance distribution in real data is roughly proportional to $1/d$, under
+which every octave carries the same mass and the density within one bucket
+varies by the ratio of its endpoints. For code 19 that ratio is
+$1024/769 = 1.33$, worth $\log_2 1.33 = 0.4$ bits: the residue is flat to
+within half a bit, so the raw field is almost exactly the right price.
+
+<KeyFact>
+Measured over the 8,776 matches of the 112 KB block, a distance costs 4.3 bits
+of Huffman code and 9.3 raw bits. Two thirds of the distance budget is
+therefore spent on bits the format declines to model at all, which is a
+deliberate choice: those bits are close to incompressible, and modelling them
+would cost more table than it saved.
+</KeyFact>
+
+### The longest codeword in the block is end-of-block
+
+The merged alphabet has one further consequence, visible in the measurement.
+Symbol 256, end-of-block, occurs exactly once per block. Huffman's algorithm
+is optimal, so it gives the rarest symbol the longest codeword: in the
+measured block, end-of-block is 14 bits, the longest codeword in an alphabet
+whose commonest symbol, the space character, gets 6.
+
+<Exercise>
+A decoder has just read a literal/length codeword that resolves to symbol 269,
+then the four bits `0101`, then a distance codeword resolving to symbol 12,
+then five bits `01100`. Read the two ranges off the table above.
+Report the match, and say how many bits of the input the decoder just
+consumed beyond the two Huffman codewords.
+
+<Solution>
+Code 269 carries 2 extra bits, so only the first two bits of `0101` belong to
+it: `01` is the value 1, giving length $19 + 1 = 20$. The remaining `01`
+belongs to whatever follows and is not part of this length field.
+
+Code 12 carries 5 extra bits: `01100` is the value 12, giving distance
+$65 + 12 = 77$.
+
+The match is 20 bytes copied from 77 bytes back. Beyond the two codewords the
+decoder consumed $2 + 5 = 7$ raw bits.
+
+The trap in the question is the extra-bit count: the field width is a property
+of the code, not of the bits that happen to follow, which is why the decoder
+must consult the table before it knows how much to read. The same discipline
+governs the distance field, and a decoder that guesses a width desynchronises
+the whole stream from that point on.
+</Solution>
+</Exercise>
+
+## Three block types: the header cost decides
+
+Statistics are gathered per block, not per file, and the encoder chooses both
+where blocks end and how each one is coded. Three codings are available, and
+the choice among them is an argument the theory of this module does not make,
+because the theory prices the data and ignores the cost of transmitting the
+model.
+
+- **Stored** (`BTYPE=00`): no compression. The encoder skips to a byte
+  boundary, writes a 2-byte length and its one's complement, and copies the
+  bytes.
+- **Fixed Huffman** (`BTYPE=01`): the two code tables are constants written
+  into the specification, so the block carries no table at all.
+- **Dynamic Huffman** (`BTYPE=10`): the encoder measures the block's own
+  symbol frequencies, builds two codes, and ships them in front of the data.
+
+Dynamic tables always fit the data at least as well as fixed ones, and they
+cost a few hundred bits to send. The crossover is therefore not a matter of
+taste but of arithmetic, and it can be measured.
+
+<Figure
+  src="./figures/block-cost.svg"
+  alt="Bits per input byte against block size on a log axis for three ways of coding the same LZ77 parse of English text: stored flat at 8, fixed tables and dynamic tables both falling, crossing at 236 bytes"
+  caption="Below 236 bytes the fitted code does not save enough to pay for its own description; above it, the saving grows and the header does not."
+/>
+
+### The crossover sits at 236 bytes
+
+Compressing prefixes of RFC 8878's text with `gzip -9` and costing the same
+LZ77 parse three ways locates the crossover exactly. At a 64-byte block the
+fitted code saves 173 bits of data over the fixed tables while its own
+description would cost about 260, so `gzip` emits a fixed block. At 236 bytes
+the header is 376 bits and the saving 379, and `gzip` switches to dynamic on
+that byte and stays there for every longer prefix. From there the gap only
+widens: at 112 KB the header has grown to 644 bits while the saving has
+reached 30,560.
+
+<KeyFact>
+The dynamic header barely grows. From a 64-byte block to a 112,425-byte one
+the input grew by a factor of 1,800 and the coded data by a factor of 990,
+while the tables describing that data went from about 260 bits to 644 — a
+factor of 2.5. That asymmetry, not any property of Huffman coding, is what
+makes per-block statistics affordable and short blocks expensive.
+</KeyFact>
+
+Where the statistics change, the encoder starts a new block. Concatenating
+60,000 bytes of English with 60,000 uniformly random bytes and running
+`gzip -9` produces three blocks: one dynamic block covering 63,675 bytes, then
+two stored blocks covering the rest. The dynamic block runs 3,675 bytes past
+the seam and then ends after exactly 12,288 literals-and-matches. Moving the
+seam moves the boundary, but every early boundary measured here lands on a
+multiple of 4,096 symbols, which is the interval at which `gzip` reconsiders
+whether the block is still worth compressing. On a 1.33 MB corpus of ordinary
+prose the same encoder emits nine blocks, all dynamic, each covering about
+170 KB, with headers between 596 and 875 bits. Nothing in RFC 1951 requires or
+forbids any of those choices.
+
+## Everything before the data is the model
+
+The dynamic block's header is a description of a description of a
+description, and each level is justified by the same budget argument that
+chose the block type. Read in order, a dynamic block begins with three bits of
+block header, then three small counts, then a code, then two code-length
+sequences coded with that code, and only then the data.
+
+<Figure
+  src="./figures/block-layout.svg"
+  alt="The fields of one dynamic DEFLATE block in order: BFINAL, BTYPE, HLIT, HDIST, HCLEN, the code-length code, the run-length coded code lengths, then the compressed data, with the model measured at 644 bits against 25,487 bytes of data"
+  caption="A 112 KB block of text: 80 bytes of model in front of 25,487 bytes of data."
+/>
+
+`HLIT`, `HDIST` and `HCLEN` are 5, 5 and 4 bits, and they hold the number of
+literal/length codes minus 257, the number of distance codes minus 1, and the
+number of code-length codes minus 4. They exist to truncate the sequences that
+follow: an alphabet whose high symbols are unused need not have their zero
+lengths transmitted.
+
+### The code lengths are themselves compressed
+
+The two code-length sequences, 286 values and 30 values in the measured block,
+are runs of small integers with long stretches of zero, since most byte values
+never occur. DEFLATE codes them with a third alphabet of 19 symbols: 0 to 15
+are literal lengths, 16 repeats the previous length 3 to 6 times, 17 emits 3
+to 10 zeros, and 18 emits 11 to 138 zeros. Symbols 16, 17 and 18 carry 2, 3
+and 7 raw bits respectively. That sequence is then Huffman-coded in turn, and
+that third code's own lengths are sent raw, 3 bits each.
+
+The recursion has to stop, and it stops with a permutation. The 19 code-length
+symbols are sent not in numerical order but in the order
+
+```
+16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15
+```
+
+which puts the repeat codes and the middling lengths first and the extreme
+lengths last. `HCLEN` then truncates the tail. In the measured block `HCLEN`
+was 17, so the last two entries of the permutation, the lengths for code
+lengths 1 and 15, were never sent: an alphabet of 119 used symbols has no
+1-bit and no 15-bit codeword, and the format saved six bits by knowing that
+in advance.
+
+<KeyFact>
+Three levels of code, each justified by the same comparison: send the model
+only while the model is cheaper than what it saves. The permutation is the
+last level, where the saving is six bits and there is nothing left to compress
+it with, so the specification hard-codes an ordering instead.
+</KeyFact>
+
+## Bit packing: two orders in the same byte
+
+Everything above is a sequence of elements of various bit widths, and turning
+that into bytes needs one more rule. RFC 1951 §3.1.1 gives three. Elements
+fill a byte from its least-significant bit upward. Elements other than Huffman
+codes go in least-significant bit of the element first. Huffman codes go in
+most-significant bit of the code first.
+
+<Figure
+  src="./figures/bit-packing.svg"
+  alt="One byte drawn twice: a five-bit HLIT value packed least-significant-bit first reads back unchanged, and a four-bit Huffman codeword packed most-significant-bit first reads back reversed"
+  caption="Both fill the byte from bit 0 upward; they differ in which end of the element goes in first, so a codeword appears reversed and a field does not."
+/>
+
+### Each convention is the natural one on its own side
+
+Nothing in the theory predicts the asymmetry, and nothing forbids it. It comes
+from the two decoders. A fixed-width field is a little-endian integer, and
+accumulating it as `value |= bit << k` is what a machine does naturally.
+A prefix code must be walked from the root, and the root bit is the code's
+first bit, so the decoder accumulates it as `code = (code << 1) | bit`. Each
+convention is the natural one on its own side; DEFLATE simply uses both, in
+the same byte, without a marker.
+
+### The signature of getting it wrong
+
+This is the single most common defect in from-scratch implementations, and it
+has a characteristic signature: `BFINAL`, `BTYPE`, `HLIT`, `HDIST` and `HCLEN`
+all read correctly, the stored-block `LEN` and `NLEN` check out, and the first
+thing that fails is the code-length code, which decodes to symbols above 18 or
+runs off the end of the sequence.
+
+## The worst case is a specification clause
+
+RFC 1951 opens by conceding the counting bound. Its §1.1 states that "a simple
+counting argument shows that no lossless compression algorithm can compress
+every possible input data set", and then commits to a number: the worst-case
+expansion is 5 bytes per 32 KB block, a size increase of 0.015% for large
+data sets. The stored block is what converts the concession into a guarantee.
+
+### Five bytes, accounted field by field
+
+Those 5 bytes are the stored-block header, and they are exactly accounted:
+3 bits of `BFINAL` and `BTYPE`, up to 5 bits of padding to reach a byte
+boundary, then `LEN` and `NLEN` at 2 bytes each. An encoder that can always
+fall back to stored blocks can never do worse than one header per block, and
+$5/32768 = 0.015\%$.
+
+<Figure
+  src="./figures/stored-worst-case.svg"
+  alt="100,000 uniformly random bytes compressed by gzip to 100,038 bytes: four stored blocks each preceded by a five-byte header, plus eighteen bytes of gzip framing"
+  caption="The bound realised: four block headers and one gzip frame, 38 bytes of expansion on 100,000."
+/>
+
+Running `gzip -9` on 100,000 uniformly random bytes produces 100,038 bytes in
+four stored blocks of about 32 KB each. The 38 bytes of expansion are 4 block
+headers of 5 bytes and the 18-byte gzip frame, and no byte of it is
+avoidable: the counting argument of <Ref lesson="dictionary-coding"/> shows
+that fewer than one file in 500 can be shrunk by even ten bits, and uniform
+random bytes are drawn from the majority that cannot be shrunk at all.
+
+<KeyFact>
+Every format since has copied the escape hatch. Zstandard's `Raw_Block` is the
+same device with a 3-byte block header on blocks capped at 128 KB, and
+RFC 8878 §3.1.1.2 recommends sending one whenever the compressed block would
+come out larger than the input it replaces.
+</KeyFact>
+
+## Zstandard: four changes, each with a price
+
+[RFC 8878](https://www.rfc-editor.org/rfc/rfc8878) specifies Zstandard,
+published in 2021 and designed twenty-five years after DEFLATE with the same
+pipeline and four substantive changes. On the same 112,425-byte text,
+`zstd -19` produces 23,215 bytes against `gzip -9`'s 25,586, a 9% improvement
+that comes from all four together.
+
+### The window stops being a constant
+
+DEFLATE's 32 KB window is written into the format. Zstandard sends a window
+size in the frame header as an exponent and a 3-bit mantissa, so
+`Window_Size` ranges from 1 KB to $2^{41} + 7 \cdot 2^{38}$ bytes, which is
+3.75 TB. The decoder reads it before allocating, which is the point: the
+parameter is a memory contract, not a compression setting.
+
+### Sequences are coded with a state machine, not a prefix code
+
+Zstandard keeps Huffman coding for literals and replaces it, for the three
+sequence alphabets, with *FSE*, a finite-state entropy coder based on
+asymmetric numeral systems.
+
+<Definition title="asymmetric numeral systems">
+An **asymmetric numeral system** coder carries a single integer state. Coding
+a symbol replaces the state by a larger value determined by a table indexed on
+the current state, emitting only the bits that overflow a fixed range. Symbol
+$s$ costs about $\log_2(1/p(s))$ bits on average, including fractions, because
+the state itself carries the leftover fraction of a bit between symbols.
+</Definition>
+
+The construction is not derived here; the reference is
+[Duda's 2014 paper](https://arxiv.org/pdf/1311.2540), which RFC 8878 cites as
+the source of the method. What matters for this module is which assumption it
+steps outside. <Ref lesson="huffman-by-hand"/> proved Huffman optimal
+among codes assigning a whole number of bits to each symbol, with an
+expected length in $[H, H+1)$; the gap is worst when one symbol is nearly
+certain. Zstandard's match-length alphabet is exactly that case, since short
+matches dominate. FSE spends fractional bits and reaches
+arithmetic-coding efficiency, while decoding by a table lookup per symbol
+rather than the multiply-and-renormalise loop of
+<Ref lesson="arithmetic-coding"/>.
+
+The tables are described in the block header on a normalized scale of
+$2^{\text{Accuracy\_Log}}$ states, and the specification fixes how states are
+spread across the table: a stride of `(tableSize >> 1) + (tableSize >> 3) + 3`,
+taken modulo the table size. Any spread that visits every cell would decode
+correctly; this one is chosen to interleave symbols so that adjacent states
+rarely repeat a symbol.
+
+### The last Huffman weight is inferred, not sent
+
+Zstandard describes its literal Huffman code by *weights* rather than lengths,
+with `Number_of_Bits = Max_Number_of_Bits + 1 - Weight`, and it omits the last
+symbol's weight entirely. The decoder recovers it by completing the Kraft sum.
+
+<Example title="RFC 8878 §4.2.1, six symbols">
+The weights transmitted are $4, 3, 2, 0, 1$ for literals 0 to 4, and literal 5
+is known to be present. Summing $2^{w-1}$ over the non-zero weights gives
+$8 + 4 + 2 + 1 = 15$. The next power of two is 16, so the tree depth is
+$\text{Max\_Number\_of\_Bits} = 4$ and the missing weight is $16 - 15 = 1$.
+
+In Kraft terms, $\sum_i 2^{-\ell_i} = 15/16$ before the last symbol, and a
+complete code must reach exactly $1$, so the last codeword has length
+$4$ and there was never any freedom about it. Sending it would have cost bits
+to transmit something already determined.
+</Example>
+
+### The three most recent offsets get their own codes
+
+Offset values 1, 2 and 3 do not mean distances 1, 2 and 3. They mean "the most
+recently used offset", "the second most recent" and "the third", held in a
+three-slot cache that starts at $(1, 4, 8)$ and reorders after every sequence.
+A distance already in the cache is named by a one-digit code with no raw bits
+at all.
+
+<FigureSequence
+  name="repeat-offsets"
+  alt="Three frames tracing zstd's three-slot recent-offset cache over three sequences: a new offset enters the front, a repeat costs no raw bits and reorders nothing, and a second new offset pushes the slots back"
+  caption="The trace of RFC 8878 Table 18. Watch the middle frame: the same distance the second time costs zero raw bits."
+/>
+
+<Task>
+Step through the three frames and read off the raw-bit tally: 10 bits for a
+first use of distance 1111, then 0 for the repeat, then 11 for a new distance
+2222. Then state what the tally would have been under DEFLATE, where every
+distance is priced the same way regardless of history: 10, 10, 11.
+</Task>
+
+The i.i.d.-source model of this module has no way to express what the cache
+exploits. A source whose distances are drawn independently from a fixed
+distribution gains nothing from remembering the last three; the cache pays
+only because successive matches in real data repeat offsets, which is a
+statement about $p(d_{t} \mid d_{t-1}, d_{t-2}, d_{t-3})$ and not about
+$p(d)$. On ordinary English prose the effect is small: parsing `gzip -9`'s
+own match stream, 3.3% of distances repeat one of the previous three. On
+machine-generated log lines it is 11.2%, and a hit saves roughly 11 bits, so
+the cache is worth about 1.2 bits per sequence there and 0.4 on prose. Both
+figures understate it, because a zstd encoder can prefer a slightly shorter
+match at a cached offset, and the gzip parse measured here had no reason to.
+
+### Trained dictionaries buy a past the payload never had
+
+<Figure
+  src="./figures/dictionary-cold-start.svg"
+  alt="Average compressed size of a 178-byte JSON record: 178.1 bytes raw, 159.1 with zstd alone, 61.8 with an 8 KB trained dictionary"
+  caption="A pointer needs something to point at. On a 178-byte payload the dictionary is the only available history."
+/>
+
+<Ref lesson="dictionary-coding"/> established that universality is asymptotic
+and that short inputs pay the cost of an empty window. Zstandard's dictionary
+format attacks that directly: a dictionary is a blob of content, prefixed with
+entropy tables and three starting offsets, that both sides load as if it were
+already-decoded output. Compressing 200 held-out 178-byte JSON records one at
+a time, `zstd -19` alone reaches 159.1 bytes per record, an 11% saving. With
+an 8 KB dictionary trained on 1,000 different records of the same shape, the
+same coder reaches 61.8 bytes, a 65% saving. Nothing about the coder changed.
+What changed is that the window was no longer empty when the first byte
+arrived.
+
+## What the specification does not constrain
+
+Every field so far has been a requirement on the decoder. RFC 1951 is explicit
+that its §4, the section describing hash chains and lazy matching, "is not
+part of the definition of the specification per se, and a compressor need not
+follow it in order to be compliant". The encoder may pick any block
+boundaries, any match-finding strategy, and any of the three block types that
+decodes to the right bytes.
+
+That freedom is where compression levels live, and it is regularly misread.
+The claim to reject is that `gzip -9` uses a stronger algorithm than `gzip -1`,
+or produces a format that an older decoder might not read. It does not. The
+levels differ only in how long the encoder searches: `-1` inserts fewer
+strings into the hash chains and accepts the first adequate match, while `-9`
+walks longer chains and defers a match by one byte to see whether a longer one
+starts there, which RFC 1951 §4 calls lazy matching. The output of every level
+is the same three block types with the same canonical codes, read by the same
+decoder.
+
+<Figure
+  src="./figures/level-parse.svg"
+  alt="gzip -1 and gzip -9 on the same file: 3,841 literals and 13,030 matches averaging 8.3 bytes against 5,374 literals and 8,776 matches averaging 12.2 bytes, giving 31,748 and 25,586 bytes"
+  caption="The level knob moves the parse, not the format: fewer and longer matches, one dynamic block either way."
+/>
+
+The measurement settles it. On the 112 KB text both levels emit exactly one
+dynamic block with 286 literal/length codes and 30 distance codes. `gzip -1`
+found 13,030 matches averaging 8.3 bytes and `gzip -9` found 8,776 averaging
+12.2, and the 6,162-byte difference in output is entirely the difference
+between those two parses. The consequence is practical: because the encoder
+is unconstrained, two implementations of `gzip` will produce different bytes
+for the same input, and a build system that compares compressed artifacts for
+equality is comparing encoder versions.
+
+### Compressing two things together is a measurement
+
+Compressed length is a function of the data, which makes it an observable. If
+an attacker can choose part of a message that is compressed together with a
+secret, the output length reports how well the two matched: a guess that
+coincides with the secret produces a match, and the match is shorter than the
+literals it replaces. RFC 8878 §8 states the rule that follows, that one
+should never compress a message that must remain secret together with a
+message generated by a third party, and cites the CRIME attack against
+TLS-level compression as the demonstration. This is not a flaw in either
+format. It is <Ref lesson="compression-is-prediction"/> arriving early: a
+compressor is a model, and its output length is that model's score on the
+data.
+
+## What the two specifications settle
+
+Read as a whole, the two RFCs answer the assembly question this module left
+open. DEFLATE is LZ77 feeding two canonical Huffman codes, described per
+block; the canonical rule is the Kraft inequality used as a wire format, so a
+header carries lengths rather than trees; the extra-bit fields are the
+fractional-bit problem solved by bucketing; the choice among three block types
+is a header-cost argument the coding theorems do not make; and the 5-byte
+stored-block header is the counting bound written as a specification clause.
+Zstandard changes four things, and each one steps outside a stated assumption
+rather than improving on a theorem.
+
+Every quantity in this module has been a property of one stream: its entropy,
+its codeword lengths, its parse. What is not established is what one stream
+says about another. The next module takes that up, beginning with
+<Ref lesson="mutual-information"/>, which measures how much observing one
+variable cuts the uncertainty in a second — the quantity a compression oracle
+leaks, and the quantity <Ref lesson="channel-capacity"/> later maximises to
+price a noisy channel. Two modules on, <Ref lesson="kl-divergence"/> returns to
+the entropy coder and prices what it costs to code with the wrong
+distribution, and <Ref lesson="compression-is-prediction"/> turns that price
+into a claim about trained models: a compressor's output size is its model's
+loss.
+
+## Exercises
+
+<Exercise>
+A DEFLATE block is to hold 32,768 bytes of uniformly random data. State which
+block type an encoder should choose and compute the total output size for
+each of the three. Derive the 5-byte figure from the stored-block layout, and
+convert it to the percentage RFC 1951 quotes. Then state what guarantee the
+format would still be able to make if the stored block type did not exist.
+
+<Solution>
+**Stored.** The header is 3 bits of `BFINAL` and `BTYPE`, then padding to the
+next byte boundary, then `LEN` and `NLEN` at 2 bytes each. Worst case the
+3 bits sit at the start of a byte and 5 bits of padding follow, giving
+$3 + 5 + 16 + 16 = 40$ bits, exactly 5 bytes. Total output
+$32{,}768 + 5 = 32{,}773$ bytes. As a fraction of the block,
+$5 / 32768 = 0.0153\%$, the 0.015% of §1.1.
+
+**Dynamic.** Uniform random bytes make all 256 literals equiprobable, so the
+optimal code gives every one an 8-bit codeword and the data costs
+$8 \times 32{,}768 = 262{,}144$ bits, exactly the input. The header still has
+to describe 286 lengths, which run-length coding compresses to roughly 200
+bits. Total about $32{,}793$ bytes, some 20 bytes worse than stored.
+
+**Fixed.** The fixed table spends 8 bits on literals 0 to 143 and 9 on 144 to
+255, an average of $(144 \cdot 8 + 112 \cdot 9)/256 = 8.4375$ bits per byte.
+Total $3 + 8.4375 \times 32{,}768 + 7 \approx 276{,}490$ bits, about
+$34{,}561$ bytes: an expansion of 5.5%, and the worst of the three.
+
+**Order:** stored, then dynamic, then fixed. The reason fixed loses is that
+its table is a bet on text, and this block is not text.
+
+**Without stored blocks.** The format could still compress, but it could no
+longer bound the damage. A dynamic block's guarantee depends on the code the
+encoder builds, and a Huffman code over 286 symbols may assign codewords of up
+to 15 bits; an input crafted to give a few byte values very low frequency
+forces exactly that, and the block expands by an amount that depends on the
+histogram rather than on a constant. The stored block is what makes the
+worst case a property of the format instead of a property of the encoder.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim. *"Huffman coding is optimal, and DEFLATE uses Huffman
+coding, so DEFLATE's entropy stage cannot be improved."* Identify two distinct
+improvements Zstandard makes, and for each name the assumption of Huffman's
+optimality theorem that it steps outside. Then say which of the two is worth
+more on a stream of match lengths, and why.
+
+<Solution>
+**What the theorem actually says.** <Ref lesson="huffman-by-hand"/> proves
+that the merge rule minimises $\sum_i p_i \ell_i$ over all prefix codes with
+integer codeword lengths, for a fixed, known, per-symbol distribution
+$p$. Three assumptions are load-bearing: integer lengths, independence of
+symbols, and a distribution given in advance.
+
+**Improvement 1: fractional lengths.** FSE, Zstandard's finite-state entropy
+coder, drops the integer-length assumption. Huffman's expected length lies in
+$[H, H+1)$ and the excess is worst when one symbol carries most of the
+probability, because that symbol cannot be given less than one whole bit
+however probable it is. FSE spends $\log_2(1/p)$ including fractions by
+carrying the leftover between symbols in its state.
+
+**Improvement 2: conditioning on history.** The recent-offset cache drops the
+independence assumption. Huffman optimality is a statement about a single
+fixed distribution over the offset alphabet; the cache codes offsets under a
+different distribution depending on which three offsets were used most
+recently, which no single Huffman code over the offset alphabet can express.
+Trained dictionaries relax the same assumption from the other end, supplying
+statistics before the first symbol.
+
+**Which matters more for match lengths.** The first. Match lengths are
+strongly peaked: length 3 and 4 dominate, and a symbol with probability near
+$0.5$ or above is exactly where Huffman's one-bit ceiling binds hardest. The
+offset cache is irrelevant here, since it prices offsets, not lengths. The
+general rule: the integer-length loss is large when the distribution is
+skewed, and the independence loss is large when the stream is correlated.
+</Solution>
+</Exercise>
+
+<Exercise>
+Error diagnosis. A from-scratch DEFLATE decoder reads `BFINAL`, `BTYPE`,
+`HLIT`, `HDIST` and `HCLEN` correctly, and decodes stored blocks perfectly,
+including `LEN` and `NLEN`. On the first dynamic block it fails: the
+code-length code yields symbols greater than 18, or the code-length sequence
+runs past `HLIT + HDIST + 258` values. The bit-reading routine is a single
+function used for every field. Name the defect, give the one-line fix, and
+explain why stored blocks were unaffected.
+
+<Solution>
+**The defect.** The single bit-reading routine accumulates every element the
+same way, as a little-endian integer:
+`value |= next_bit() << k` for increasing $k$. That is correct for
+fixed-width fields and wrong for Huffman codewords. RFC 1951 §3.1.1 packs
+Huffman codes most-significant bit of the code first, so the first bit taken
+from the stream is the codeword's leading bit.
+
+**The fix.** Decode prefix codes with a separate accumulation:
+
+```
+code = 0
+for len in 1 .. MAX_BITS:
+    code = (code << 1) | next_bit()
+    if (len, code) is in the table: return its symbol
+```
+
+The bits still come out of the byte from bit 0 upward. What changes is that
+each new bit is appended at the bottom of the growing codeword rather than
+placed at a higher position.
+
+**Why stored blocks survived.** A stored block contains no Huffman code at
+all: after the 3 header bits the decoder aligns to a byte boundary and reads
+`LEN` and `NLEN` as 16-bit little-endian integers, which the buggy routine
+handles correctly. `HLIT`, `HDIST` and `HCLEN` are fixed-width fields too, and
+so are the 3-bit code-length-code lengths, which is why the first thing to
+fail is the use of that code rather than its transmission.
+
+**The diagnostic signature to remember.** Symmetric codewords such as `0`,
+`00` and `1111` decode correctly under the bug and asymmetric ones do not, so
+the failure is intermittent and looks like data corruption. Any decoder that
+reads the header and dies on the first literal should be suspected of this
+before anything else.
+</Solution>
+</Exercise>
+
+<Exercise>
+A derivation the lesson skipped, in two parts. (a) Show that the two canonical
+rules plus the code lengths determine the codewords uniquely, so no
+information is lost by sending lengths alone. (b) Compare header costs for the
+286-symbol literal/length alphabet: a naive encoding that ships the tree
+shape, a plain list of code lengths, and DEFLATE's run-length coded list.
+Use the measured block, where 119 of the 286 symbols are used and lengths run
+from 4 to 14.
+
+<Solution>
+**(a) Uniqueness.** Let $n_b$ be the number of symbols with length $b$; the
+length list determines every $n_b$. Argue by induction on $b$ that the first
+codeword $c_b$ of each length is forced.
+
+The shortest length $b_{\min}$ must start at $c_{b_{\min}} = 0$: if it started
+higher, every codeword of that length could be decreased by one without
+violating either rule, and the rules say nothing that would forbid the smaller
+assignment, so the assignment would not be determined. Fixing the convention
+that the code begins at zero, suppose $c_b$ is fixed. Rule one says the
+length-$b$ codewords are the consecutive values
+$c_b, \ldots, c_b + n_b - 1$, so the largest is determined. Rule two says
+every length-$b$ codeword, padded on the right with zeros, precedes every
+length-$(b+1)$ codeword; the tightest such value is the successor of
+$(c_b + n_b - 1)$ padded with one zero, which is $2(c_b + n_b)$. Any larger
+starting value would waste code space and any smaller one would violate rule
+two, so $c_{b+1} = 2(c_b + n_b)$. Rule one then fixes the assignment within
+the length, since symbol order is known. Every codeword is therefore a
+function of the length list alone.
+
+**(b) Header costs.**
+
+*Naive tree.* A binary tree with 286 leaves has 285 internal nodes. Writing
+one bit per node in a depth-first walk to say "leaf or internal", plus 9 bits
+per leaf to name its symbol out of 286, costs
+$571 + 286 \times 9 = 3{,}145$ bits, or 393 bytes for this alphabet alone.
+
+*Plain length list.* One 4-bit length per symbol, since lengths never exceed
+15: $286 \times 4 = 1{,}144$ bits, 143 bytes. Adding the distance alphabet's
+30 lengths gives $316 \times 4 = 1{,}264$ bits.
+
+*DEFLATE's encoding.* The measured block spent 576 bits on both sequences
+together, plus 51 bits for the code-length code and 17 bits of counts: 644
+bits, 80 bytes. Most of the saving comes from the 167 unused literal symbols,
+whose zero lengths collapse into a handful of symbol-18 runs.
+
+**The ratio.** 3,145 bits for the tree, 1,264 for the plain list, 644 for the
+compressed list. Each step is roughly a factor of two, and each is the same
+argument applied one level up: send the description only while the
+description is cheaper than what it buys.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. A source emits bytes with entropy $H = 2.0$ bits per symbol and
+uses 64 distinct byte values, all below 144. Assume no matches, so every
+symbol is a literal, and take the dynamic header at 400 bits. (a) Compute the
+stored, fixed and dynamic costs for a 1 KB block and for a 64 KB block, and
+name the winner in each case. (b) Find the block size at which dynamic
+overtakes fixed. (c) The measured crossover on English text was 236 bytes, far
+above your answer to (b). Explain the gap.
+
+<Solution>
+**(a) The three costs.**
+
+| | 1 KB (1,024 symbols) | 64 KB (65,536 symbols) |
+| --- | --- | --- |
+| stored | $40 + 8 \times 1024 = 8{,}232$ bits | $40 + 8 \times 65536 = 524{,}328$ bits |
+| fixed | $8 \times 1024 = 8{,}192$ bits | $524{,}288$ bits |
+| dynamic | $400 + 2 \times 1024 = 2{,}448$ bits | $400 + 131{,}072 = 131{,}472$ bits |
+
+Dynamic wins at both sizes, by a factor of 3.3 and of 4.0. The fixed table
+charges 8 bits for every literal below 144 whatever its probability, so it
+cannot express a 2-bit-per-symbol source at all; stored is worse still by the
+40-bit header.
+
+**(b) The crossover.** Dynamic beats fixed when
+$400 + 2n < 8n$, that is $n > 400/6 \approx 67$ symbols. From 67 bytes on,
+the fitted code has already repaid its own description.
+
+**(c) Why English crosses at 236 and not at 67.** Both reasons live in the
+denominator, and one of them is a trap in how the saving gets quoted.
+
+First, the assumed gap is far too wide. This exercise gives the fitted code
+2.0 bits per symbol against the fixed table's 8.0, a saving of 6 bits per
+symbol. On English text at a 256-byte block the two codings land at 4.61 and
+4.71 *total* bits per input byte — but that 0.10 is the margin left over
+*after* the header has been paid, not the saving that pays for it. Gross, the
+fitted code saves 409 bits of data over the fixed tables on those 256 bytes,
+which is 1.60 bits per input byte, and the 385-bit header eats all but 0.10 of
+it. Putting the gross figure into part (b)'s formula gives
+$376 / 1.61 \approx 234$ bytes against the 236 measured in the body: a factor
+of 3.5 above this exercise's 67, and the whole factor is the denominator.
+
+Second, the header is not constant at small $n$. Costing a 64-byte block as
+dynamic gives about 260 bits, not 400, because fewer symbols occur and the
+zero runs collapse further. That pulls the crossover down while the smaller
+per-byte saving pushes it up, and on English the second effect wins.
+
+**The transferable move:** a header repays itself at a block size of about
+(header bits) / (**gross** bits saved per symbol). Quoting the saving net of
+the header, as the 4.61-against-4.71 comparison does, makes the crossover look
+almost free when it is nothing of the kind.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped, in two parts. Take a text file of at least 1 MB, compress it
+with `gzip -1`, `gzip -9` and `zstd -19` recording sizes and elapsed times,
+and write or obtain a tool that walks the DEFLATE bitstream.
+
+**(a) What ends a block?** For the `gzip -9` output, report the number of
+literals plus matches in every block, not just the bytes each block covers.
+Then build two inputs whose statistics change partway through — 60 KB of
+prose followed by 60 KB of uniform random bytes, and the same two halves in
+the opposite order — and report the boundaries and block types for each.
+State the rule your measurements support, and say which part of it is in
+RFC 1951.
+
+**(b) Test the crossover model on your own file.** Find the smallest prefix of
+it for which `gzip -9` emits a dynamic rather than a fixed block. Cost that
+prefix's parse both ways, and check the prediction (header bits) divided by
+(gross bits saved per input byte) against the prefix length you observed.
+
+<Solution>
+**Measured on a 1,333,811-byte corpus of English prose**, with `gzip 1.12`
+and `zstd 1.5.5`, times averaged over five runs:
+
+| coder | output | bits per byte | time |
+| --- | --- | --- | --- |
+| `gzip -1` | 558,411 | 3.35 | 0.022 s |
+| `gzip -6` | 465,638 | 2.79 | 0.072 s |
+| `gzip -9` | 463,907 | 2.78 | 0.098 s |
+| `zstd -19` | 373,742 | 2.24 | 0.536 s |
+
+**What a walker has to do.** Read 1 bit of `BFINAL` and 2 of `BTYPE`; for
+`BTYPE = 0` align and read `LEN`; for `BTYPE = 2` read `HLIT`, `HDIST`,
+`HCLEN`, then the code-length code, then decode the two length sequences, then
+decode symbols until 256. Remember that Huffman codewords are packed
+most-significant bit first while every other field is least-significant bit
+first.
+
+**(a) The count is in symbols, not bytes.** On a file whose statistics do not
+change, every non-final block held exactly 32,767 literals-and-matches. On
+854,903 bytes of a typeset textbook the first two blocks reached that count
+after 278,634 and 351,765 input bytes and the last took the remaining 224,504.
+`gzip` closes a block when its symbol buffer fills, and how many bytes that
+buffer covers depends on how much each symbol retires, which is why the byte
+size of a block varies by a quarter across one homogeneous file.
+
+The heterogeneous inputs add the second half of the rule. Prose then random
+gives one dynamic block over 63,675 bytes — 12,288 symbols, well short of the
+buffer — then two stored blocks of about 32 KB. Random then prose gives a
+stored block of 32,781 bytes, then a full 32,767-symbol dynamic block, then
+the remainder. Moving the seam moves the first boundary, but every early
+boundary lands on a multiple of 4,096 symbols, so the encoder is re-deciding
+at a fixed symbol interval rather than at the seam itself. None of this is in
+RFC 1951: the buffer size, the checkpoint interval and the decision rule are
+all encoder-side, and §4 says so.
+
+**(b) The model predicts the crossover to within a byte or two.** On RFC 8878's
+text `gzip -9` emits fixed blocks up to 235 bytes and dynamic from 236 on. At
+236 the dynamic header is 376 bits and the fitted code saves 379 bits of data
+over the fixed tables, or 1.61 bits per input byte, so the model predicts
+$376/1.61 \approx 234$. Two other files, same procedure: RFC 1951's own text
+crosses at 228, where the header is 337 bits against a gross saving of 1.49
+bits per byte, predicting 227; a typeset textbook, whose long runs of spaces
+the fixed table codes badly, crosses at 69, with a 244-bit header against 3.58
+bits per byte, predicting 68. The crossover moves by a factor of 3.4 across
+those three files and the header moves by less than 1.6, so the denominator is
+doing all the work — the same conclusion the mixed-review exercise above
+reaches by setting a 6-bit-per-symbol saving against English's 1.6.
+
+**What counts as agreement.** Your absolute sizes will differ with the text,
+but the ratios should not: `-9` should land within a few percent of `-6`,
+`-1` should cost 15 to 25% more output for a quarter of the time, and
+`zstd -19` should beat `gzip -9` by 10 to 20% on prose at five to ten times
+the compression time. Decompression times should be within a factor of two of
+each other for all of them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take the LZ77 match stream from a file of your choice, extract the sequence of
+match distances in order, and compute two things: the empirical distribution
+over the 30 DEFLATE distance codes, with its entropy, and the fraction of
+matches whose distance equals one of the three immediately preceding
+distances. Use both to estimate the bits per sequence a three-slot recent
+offset cache would save, and say what kind of model the cache is.
+
+<Solution>
+**The distribution.** On a 112,425-byte English text, `gzip -9` produced 8,776
+matches. The distance-code distribution has entropy $4.34$ bits, and the codes
+carry $9.34$ raw extra bits on average, so a distance costs $13.68$ bits.
+Compare a flat 15-bit distance field: the two-level code saves only 1.3 bits,
+which is the honest measure of how much structure the code captures.
+
+**The repeat rate.** Simulating a three-slot cache over that distance
+sequence, 3.3% of distances hit one of the three most recent. Repeating a
+single distance immediately is rarer still, 1.2%. On 143,816 bytes of
+machine-generated log lines the three-slot rate rises to 11.2%.
+
+**The saving.** A hit is coded as offset value 1, 2 or 3, which is offset code
+0 or 1 with at most one raw bit, against a typical $13.7$ bits for an explicit
+distance: about 11 bits saved per hit, once the FSE-coded offset code is
+counted. At 11.2% that is $0.112 \times 11 \approx 1.2$ bits per sequence; at
+3.3% it is $0.4$ bits. Against a sequence cost of 25 to 30 bits, the cache is
+worth a few percent on structured data and almost nothing on prose.
+
+**Both numbers understate it.** The distance stream here came from an encoder
+with no reason to prefer a cached offset. A zstd encoder scores candidate
+matches with the cache in its cost function and will take a slightly shorter
+match at a cached offset when that is cheaper overall, so the realised hit
+rate is higher than any post-hoc measurement on a gzip parse.
+
+**What the cache is.** A context model. The plain distance code spends bits
+according to $p(d)$; the cache spends them according to
+$p(d \mid d_{t-1}, d_{t-2}, d_{t-3})$, and it pays exactly because those two
+distributions differ. That is the same identity that makes a better predictor
+a better compressor, developed in
+<Ref lesson="compression-is-prediction"/>: the number of bits a scheme spends
+is the surprisal its model assigns, so any conditioning that lowers the
+surprisal lowers the file size by the same amount.
+</Solution>
+</Exercise>
+
+<References>
+1. L. P. Deutsch, "DEFLATE Compressed Data Format Specification version 1.3," RFC 1951, IETF, May 1996 — §1.1 the counting-argument concession and the 5-bytes-per-32-KB worst case; §2 the two-stage overview and the 32 KB / 258-byte limits; §3.1.1 the three bit-packing rules; §3.2.2 the two canonical rules, the three-step construction and the `ABCDEFGH` example with lengths (3,3,3,3,3,2,4,4); §3.2.3 the master decode loop; §3.2.4 the stored block; §3.2.5 the merged 286-symbol alphabet and the two extra-bit tables; §3.2.6 the fixed code lengths; §3.2.7 HLIT/HDIST/HCLEN, the 16/17/18 repeat codes and the scrambled permutation; §4 hash chains and lazy matching, declared not part of the format. https://www.rfc-editor.org/rfc/rfc1951
+2. Y. Collet, M. Kucherawy, Ed., "Zstandard Compression and the application/zstd Media Type," RFC 8878, IETF, February 2021 — §3.1.1.1.2 the window-size formula and its 1 KB to 3.75 TB range; §3.1.1.2 the three block types, the 3-byte block header and the 128 KB block cap, with the recommendation to send a `Raw_Block` when compression would expand; §3.1.1.3 the literals and sequences sections; §3.1.1.3.2.1.1 the offset formula and the repeat codes; §3.1.1.5 and Table 18 the three-slot cache trace used above; §4.1.1 the FSE table description and the state-spreading stride; §4.2.1 Huffman by weights with the inferred last weight and its six-symbol example; §5 the dictionary format; §8 the compression-side-channel rule and the CRIME citation. https://www.rfc-editor.org/rfc/rfc8878
+3. P. Deutsch, "GZIP file format specification version 4.3," RFC 1952, IETF, May 1996 — §2.2–2.3 the 10-byte member header and the 8-byte CRC-32 and ISIZE trailer that make up the 18 bytes measured here. https://www.rfc-editor.org/rfc/rfc1952
+4. P. Deutsch, J-L. Gailly, "ZLIB Compressed Data Format Specification version 3.3," RFC 1950, IETF, May 1996 — §2.2 the 2-byte CMF/FLG header and the 4-byte Adler-32 trailer that make up the 6-byte wrapper PNG image data carries. https://www.rfc-editor.org/rfc/rfc1950
+5. E. S. Schwartz, B. Kallick, "Generating a canonical prefix encoding," *Communications of the ACM*, 7(3), March 1964, pp. 166–169 — the canonical construction thirty-two years before RFC 1951 adopted it, and the reference RFC 1951 §5 cites for it.
+6. D. Hirschberg, D. Lelewer, "Efficient decoding of prefix codes," *Communications of the ACM*, 33(4), April 1990, pp. 449–459 — the table-driven decoding that canonical ordering makes possible, and the second reference RFC 1951 §5 gives for its code construction.
+7. L. L. Larmore, D. S. Hirschberg, "A fast algorithm for optimal length-limited Huffman codes," *Journal of the ACM*, 37(3), July 1990, pp. 464–473 — the package-merge algorithm, which solves the problem RFC 1951 §3.2.1 raises and does not answer: how to build an optimal code when no codeword may exceed 15 bits. https://doi.org/10.1145/79147.79150
+8. J. Duda, "Asymmetric numeral systems: entropy coding combining speed of Huffman coding with compression rate of arithmetic coding," January 2014 — the construction behind Zstandard's FSE stage, cited as [ANS] by RFC 8878 §9.2. https://arxiv.org/pdf/1311.2540
+9. D. A. Huffman, "A Method for the Construction of Minimum-Redundancy Codes," *Proceedings of the I.R.E.*, 40(9), 1952, pp. 1098–1101 — the optimality result whose three assumptions this lesson tests against a shipped format; cited by RFC 1951 §5 as reference [1].
+
+Measurements reported in this lesson were made with `gzip 1.12` and
+`zstd 1.5.5`. Unless stated otherwise the input is the 112,425-byte plain text
+of RFC 8878; the block census and timings use a 1,333,811-byte corpus of
+English prose; the block-boundary experiments concatenate prefixes of that RFC
+text with uniformly random bytes; the second and third crossover measurements
+use the 36,944-byte plain text of RFC 1951 and an 854,903-byte typeset
+textbook; and the dictionary experiment uses 1,200 synthetic JSON records
+averaging 178 bytes.
+</References>

@@ -1,20 +1,48 @@
 Among all distributions consistent with known expectation constraints,
 exactly one maximizes entropy, and it has exponential form; choosing any
-other distribution assumes information you do not have. This lesson derives
-that distribution. The route: an underdetermined inference problem (the
-Brandeis dice), the exponential solution found numerically, the general
-theorem proved with Gibbs' inequality from <Ref lesson="kl-divergence"/>,
-and the two best-known instances of the solution, the Boltzmann
-distribution of statistical mechanics and the softmax layer of machine
-learning.
+other distribution assumes information you do not have.
+
+Until now entropy has been a measurement. Surprisal, code length, divergence
+and capacity are all readings taken off a distribution somebody handed over,
+and even <Ref lesson="kolmogorov-complexity">the shortest-program
+length</Ref>, which dispensed with distributions altogether, was reconciled
+at the end by showing that its average equals the entropy of one. This
+lesson runs the machinery backwards. The distribution is now the unknown, a
+handful of average values is all that is given, and entropy stops being a
+measurement and becomes an objective function whose maximizer *is* the
+answer. That inversion is the organising move of this module, and the
+physical price of the bits it selects is the subject of
+<Ref lesson="thermodynamics-of-information"/>.
+
+The route: an underdetermined inference problem with a documented history
+(Jaynes' Brandeis dice), its solution found numerically, the general theorem
+proved in three lines with Gibbs' inequality, the catalogue of families the
+theorem generates, two independent checks on the answer, and the two
+best-known instances of it.
 
 ## One constraint, infinitely many distributions
 
-A six-sided die is tossed a great many times and the results average
-$4.5$, not the $3.5$ of a fair die. The task: assign probabilities
-$p_1, \dots, p_6$ to the faces using this fact and nothing else. This is
-the *Brandeis dice problem*, the running example of
-[Jaynes' 1962 Brandeis lectures](https://bayes.wustl.edu/etj/articles/brandeis.pdf).
+A die is tossed a great many times and the results average $4.5$, not the
+$3.5$ of a fair die. The task: assign probabilities $p_1, \dots, p_6$ to the
+faces using this fact and nothing else. This is the *Brandeis dice problem*,
+stated in almost these words at the opening of the
+[1962 Brandeis summer-school lectures](https://bayes.wustl.edu/etj/articles/brandeis.pdf)
+of E. T. Jaynes, the physicist who spent the previous decade arguing that
+statistical mechanics is a form of inference. It is not a problem about
+dice: it is the smallest case of assigning a distribution when the evidence
+is a handful of averages.
+
+<Task>
+Before reading on, recall three facts this lesson runs on. (a) The largest
+entropy any distribution over six outcomes can have, and which distribution
+attains it. (b) What $D(p \,\|\, q) \ge 0$ says about the cost of coding
+$p$'s output with a code built for $q$. (c) The condition under which
+$D(p \,\|\, q) = 0$. The answers are $\log_2 6 = 2.585$ bits at the uniform
+distribution (<Ref lesson="entropy-as-average-surprise"/>); the wrong code
+never costs less than the right one, and the excess is $D$
+(<Ref lesson="kl-divergence"/>); and equality holds only at $p = q$. That
+is the entire toolkit needed below.
+</Task>
 
 The evidence supplies two equations for six unknowns:
 
@@ -22,81 +50,99 @@ $$
 \sum_{i=1}^{6} p_i = 1, \qquad \sum_{i=1}^{6} i\, p_i = 4.5 .
 $$
 
-Four degrees of freedom remain, so infinitely many pmfs fit the data.
-Three of them, with their entropies from
-<Ref lesson="entropy-as-average-surprise"/>:
+Four degrees of freedom remain, so infinitely many probability mass
+functions fit the data. Three of the candidates Jaynes draws, in his order
+of increasing reasonableness, together with the answer this lesson derives,
+and their entropies from
+<Ref lesson="entropy-as-average-surprise">the entropy lesson</Ref>:
 
-| candidate $(p_1, \dots, p_6)$ | mean | $H$ (bits) |
+| candidate $(p_1, \dots, p_6)$ | how it was chosen | $H$ (bits) |
 | --- | --- | --- |
-| $(0, 0, .25, 0, .75, 0)$ | $4.5$ | $0.811$ |
-| $(0, 0, 0, .5, .5, 0)$ | $4.5$ | $1.000$ |
-| $(0, 0, .25, .25, .25, .25)$ | $4.5$ | $2.000$ |
+| $(0, 0, 0, .5, .5, 0)$ | put the mass on the two faces straddling $4.5$ | $1.000$ |
+| $(0, 0, .25, .25, .25, .25)$ | spread it over the faces above the fair mean | $2.000$ |
+| $p_n = (12n - 7)/210$ | a straight ramp: equal steps between neighbours | $2.302$ |
+| $(.054, .079, .114, .165, .240, .347)$ | the answer derived below | $2.328$ |
 
-Every candidate satisfies the constraints; every candidate also **asserts
-more** than the constraints contain. The first declares faces 1, 2, 4, and
-6 impossible, an impossibility claim nowhere in the evidence. The second
-rules out four faces on the strength of a single average. Even the third
-zeroes two faces the data never excluded.
+Every candidate satisfies both constraints. Every candidate except the last
+also **asserts more** than the constraints contain. The first declares four
+faces impossible on the strength of a single average. The second still rules
+out faces 1 and 2, which the data never excluded. The third assigns every
+face positive probability and looks unimpeachable, and it is the one worth
+dwelling on, because its plausibility rests on a smoothness criterion that
+has no solution at all once the target mean exceeds $4.67$.
+
+### Smoothness is not a criterion
+
+The third candidate is the unique assignment whose successive differences
+$p_{n+1} - p_n$ are constant, and smoothness of that kind has a hard
+ceiling. A straight ramp through the origin, $p_n = c\,(n-1)$, is the
+steepest admissible line, since any steeper one drives $p_1$ negative, and
+its mean is
+
+$$
+\sum_{n=1}^{6} n \cdot \frac{n-1}{15} = \frac{70}{15} = 4.67 .
+$$
+
+So no straight-line assignment reaches a mean of $4.7$. Had the die averaged
+$4.7$ instead of $4.5$, the whole family of candidates would have been
+empty, while the reasoning that produced it would have been unchanged. A
+criterion that runs out of solutions at an arbitrary point in the data range
+is not a criterion.
 
 ### The principle: keep all the uncertainty the data does not remove
 
-Entropy ranks the candidates by exactly the property at stake: $H(p)$
-measures the uncertainty a distribution admits, so the candidate with
-maximal $H$ is the one that concedes the most ignorance while honoring the
-data. Adopting any lower-entropy candidate narrows the possibilities
-further than the constraints justify.
+Entropy ranks the candidates by exactly the property at stake. $H(p)$
+measures the uncertainty a distribution admits, so the feasible distribution
+with the largest $H$ is the one that concedes the most ignorance while
+honouring the data. Adopting any lower-entropy candidate narrows the
+possibilities further than the constraints justify, and the gap in the table
+measures by how much.
 
 <Definition title="maximum entropy principle">
 Given constraints on a distribution $p$ (normalization plus known
-expectation values), the **maximum entropy principle** adopts the
-distribution
+expectation values), the **maximum entropy principle** adopts
 $$
-p^\ast = \argmax_{p\ \text{satisfying the constraints}} H(p),
+p^\ast = \operatorname*{arg\,max}_{p\ \text{satisfying the constraints}} H(p),
 $$
 the entropy maximizer over the *feasible set* of all distributions
 consistent with the constraints.
 </Definition>
 
-<Remark title="Jaynes' formulation">
-[Jaynes (1957)](https://bayes.wustl.edu/etj/articles/theory.1.pdf),
-§2: the maximum-entropy distribution "is the least biased estimate
-possible on the given information; i.e., it is maximally noncommittal
-with regard to missing information." The principle does not manufacture
-knowledge; it refuses to pretend to knowledge that is absent.
-</Remark>
+Geometrically the feasible set is flat. Normalization confines every
+candidate to the simplex of probability vectors; each expectation constraint
+$\sum_x p(x) f(x) = \alpha$ is linear in $p$, so it cuts that simplex with a
+hyperplane. What is left is a convex slice, and entropy is a strictly
+concave function on it, which is why the maximizer is a single point rather
+than a face.
 
-{/* fig FeasibleSetSimplex: constraints leave a set, entropy picks a point.
-   A schematic 2-simplex (triangle) representing all pmfs over 3 outcomes,
-   drawn in currentColor with vertices labeled with KaTeX point masses
-   $(1,0,0)$, $(0,1,0)$, $(0,0,1)$. Inside it: nested closed contours
-   (entropy level sets) around the center, currentColor at low opacity,
-   with the center dot labeled "uniform: $H$ max" and an arrow-note
-   "$H$ increases inward". A blue straight chord cutting the triangle,
-   labeled "constraint $\langle f \rangle = \alpha$: a hyperplane"; the
-   blue segment inside the simplex glossed "feasible set". The amber point
-   where the innermost contour touching the chord is tangent to it, marked
-   $p^\ast$ and labeled "max-entropy point: highest contour that meets the
-   constraint". Colors: blue = the constraint/feasible set, amber = the
-   solution point (+ the tangent contour highlighted amber). One idea:
-   constraints select a set, entropy selects one point of it. */}
 <Figure
-  name="FeasibleSetSimplex"
-  alt="The simplex of all pmfs with entropy level sets around the uniform center; a constraint hyperplane cuts the simplex, and the maximum-entropy distribution sits where the highest entropy contour touches the constraint"
-  caption="Constraints select a set of distributions; entropy selects one point of it."
+  src="./figures/simplex.svg"
+  alt="The triangle of all distributions over three outcomes with entropy level sets drawn as rings around the uniform centre; a straight constraint line cuts the triangle, and the maximum-entropy distribution sits where the highest ring touches that line"
+  caption="Constraints select a slice; entropy selects the one point of it that the highest level set reaches."
 />
 
+Jaynes states the claim more narrowly than the principle is usually
+reported. The maximum-entropy distribution, in his words,
+"is uniquely determined as the one which is maximally
+noncommittal with regard to missing information", and it "assigns positive
+weight to every situation that is not absolutely excluded by the given
+information". Neither sentence claims the distribution is true.
+
 <KeyFact>
-Expectation constraints select a set of distributions; entropy selects one
-point of it: the unique member that assumes nothing beyond the
-constraints.
+The definition is silent about what "assumes least" means in absolute terms.
+Entropy measures spread against an implicit reference, the uniform
+distribution, which exists because the alphabet is finite; on a continuum
+there is no uniform reference and the phrase "maximum entropy" changes
+meaning under a change of variable. That failure and its repair arrive when
+continuous examples do.
 </KeyFact>
 
 ## Solving the dice: tilt exponentially, then tune
 
-The maximization runs over a four-parameter set, but the search collapses
-to one dimension. The theorem of the next section states that the
-maximizer is **exponential** in the constrained quantity; the constrained
-quantity here is the face value $f(i) = i$, so the solution has the form
+The maximization runs over a four-parameter set, but the search collapses to
+one dimension. The theorem of the next section states that the maximizer is
+**exponential** in the constrained quantity. The constrained quantity here
+is the face value $f(i) = i$, so the solution has the form
 
 $$
 p_i = \frac{e^{-\lambda i}}{Z(\lambda)}, \qquad
@@ -105,13 +151,17 @@ $$
 
 with a single unknown $\lambda$. Writing $x = e^{-\lambda}$ gives
 $p_i \propto x^i$: successive faces carry probabilities in a fixed ratio
-$x$, a geometric ladder. One knob remains, and one constraint remains to
-set it.
+$x$, a geometric ladder. The divisor $Z(\lambda)$, the *partition function*,
+is whatever number makes the six values sum to one, so it carries no freedom
+of its own. One knob remains, and one constraint remains to set it.
 
 ### Tuning the knob
 
-The mean $\sum_i i\,p_i$ increases monotonically in $x$, so the equation
-"mean $= 4.5$" has exactly one solution.
+The mean $\sum_i i\,p_i$ increases monotonically in $x$, from $1$ as
+$x \to 0$ to $6$ as $x \to \infty$, so the equation "mean $= 4.5$" has
+exactly one solution, and so does the same equation for any target strictly
+between $1$ and $6$. The linear family's ceiling of $4.67$ has no analogue
+here.
 
 <Example title="the Brandeis dice, solved">
 **$x = 1$:** the ladder is flat, $p_i = \tfrac16$, mean $3.5$. Too low.
@@ -121,8 +171,8 @@ $p = (.101, .121, .145, .174, .209, .251)$ and mean
 $\sum_i i\,p_i = 4.02$. Still too low.
 
 **Solving numerically** (bisection on $x$): the mean hits $4.5$ at
-$x = 1.4493$, i.e. $\lambda = -\ln 1.4493 = -0.371$. Then
-$Z(\lambda) = 26.66$ and
+$x = 1.4493$, that is $\lambda = -\ln 1.4493 = -0.371$. Then
+$Z(\lambda) = 26.664$ and
 
 $$
 p^\ast = (.054,\ .079,\ .114,\ .165,\ .240,\ .347).
@@ -131,8 +181,8 @@ $$
 **Checks.** Mean: $\sum_i i\,p^\ast_i = 0.054 + 0.158 + 0.343 + 0.662 +
 1.199 + 2.085 = 4.50$. Entropy:
 $H(p^\ast) = -\sum_i p^\ast_i \log_2 p^\ast_i = 2.328$ bits, below the
-unconstrained maximum $\log_2 6 = 2.585$ but above every candidate in the
-table: $0.811$, $1.000$, and $2.000$ all fall short.
+unconstrained ceiling $\log_2 6 = 2.585$ and above every candidate in the
+table.
 </Example>
 
 <FigureSequence
@@ -141,13 +191,43 @@ table: $0.811$, $1.000$, and $2.000$ all fall short.
   caption="One step per frame: state the constraint, restrict to the exponential family, tune the one knob. Watch the mean marker close in on the 4.5 target."
 />
 
-No face is assigned zero probability: the exponential form is strictly
-positive, so the solution never rules out an outcome the data left
-possible. The tilt direction follows the sign of $\lambda$: a target mean
-above $3.5$ needs $\lambda < 0$ (ladder rising), below $3.5$ needs
-$\lambda > 0$ (ladder falling), and a target of exactly $3.5$ gives
-$\lambda = 0$, recovering the uniform distribution. A constraint the
-uniform prior already satisfies costs no entropy at all.
+<Exercise>
+A four-sided die, faces $\{1,2,3,4\}$, is known only to average $3.0$. Find
+the maximum-entropy distribution, its multiplier $\lambda$, and its entropy,
+and say how far the entropy falls below the unconstrained ceiling. Write
+down the two constraint equations before opening the solution.
+
+<Solution>
+The constrained quantity is again $f(i) = i$, so $p_i \propto x^i$ with
+$x = e^{-\lambda}$, and the two equations are $\sum_i p_i = 1$ and
+$\sum_i i\,p_i = 3.0$.
+
+Tune $x$ upward from $1$ (which gives the fair mean $2.5$). At $x = 1.5$:
+$Z = 1.5 + 2.25 + 3.375 + 5.0625 = 12.1875$ and the mean is
+$(1.5 + 4.5 + 10.125 + 20.25)/12.1875 = 2.985$, just short. Bisection lands
+at $x = 1.5214$, so $\lambda = -\ln 1.5214 = -0.420$, and
+
+$$
+Z = 12.715, \qquad p^\ast = (.120,\ .182,\ .277,\ .421).
+$$
+
+Check the mean: $0.120 + 0.364 + 0.831 + 1.684 = 3.00$. Entropy:
+$H(p^\ast) = 1.852$ bits against the ceiling $\log_2 4 = 2$ bits, so the
+constraint costs $0.148$ bits.
+
+The transferable move: with one constraint the six-way (or four-way) search
+is always a one-dimensional root-find, because the exponential form has one
+free parameter per constraint and no more.
+</Solution>
+</Exercise>
+
+No face is assigned zero probability, since the exponential form is strictly
+positive; the solution never rules out an outcome the data left possible.
+The tilt direction follows the sign of $\lambda$: a target mean above $3.5$
+needs $\lambda < 0$ and a rising ladder, below $3.5$ needs $\lambda > 0$ and
+a falling one, and a target of exactly $3.5$ gives $\lambda = 0$, recovering
+the uniform distribution. A constraint the uniform distribution already
+satisfies costs no entropy at all.
 
 {/* fig LambdaTiltDial: the multiplier trades entropy for the constraint.
    Three small six-bar dice pmfs side by side, all amber bars on identical
@@ -175,24 +255,23 @@ uniform prior already satisfies costs no entropy at all.
 />
 
 <Task>
-Set the target mean to $3.5$ and check $\lambda = 0$, $H = 2.585$ bits:
-the constraint is inert. Then load the Jaynes preset ($4.5$) and verify
-$\lambda \approx -0.371$, $H \approx 2.33$ bits. Finish at mean $2$: the
-readouts should land near $\lambda \approx 0.63$ and $H \approx 1.97$
-bits, a harder constraint buying less entropy.
+Two settings to find, then a check. Raise the target mean until face 6
+carries more than half of the probability on its own, and record the mean at
+which its bar label reaches $0.50$ and the entropy there. Then drive the mean
+back down until the entropy readout returns to that same value, and check two
+things about the setting you land on: that its mean is $7$ minus the first
+one, and that its bar chart is the first one read right to left — the
+relabelling $i \mapsto 7-i$ acting on the problem. Finally load the mean-2
+preset and check the readouts against $\lambda \approx 0.630$ and
+$H \approx 1.973$ bits.
 </Task>
-
-<KeyFact>
-One multiplier per constraint: restricting to the exponential family turns
-a search over all feasible distributions into solving one equation for one
-$\lambda$, and the constraint value determines $\lambda$ uniquely.
-</KeyFact>
 
 ## The general theorem: exponential in the constrained quantities
 
 The dice used one constraint function, $f(i) = i$. The general statement
-allows any finite list. Throughout, exponentials are base $e$ and
-entropies are reported in bits; changing base rescales $\lambda$ by
+allows any finite list of them, and the proof is no harder for $m$
+constraints than for one. Throughout, exponentials are base $e$ and
+entropies are reported in bits; changing base rescales every $\lambda$ by
 $\ln 2$ and nothing else.
 
 <Definition title="feasible set">
@@ -205,7 +284,8 @@ $$
 </Definition>
 
 The claimed maximizer generalizes the dice solution: one multiplier
-$\lambda_r$ per constraint, all sitting in one exponent.
+$\lambda_r$ per constraint function, all sitting in one exponent, and one
+partition function normalizing the result.
 
 {/* fig MaxEntFormula: the formula dissected (playbook rule 7). The
    equation, large and centered in KaTeX:
@@ -220,27 +300,29 @@ $\lambda_r$ per constraint, all sitting in one exponent.
    -\partial \ln Z / \partial \lambda_r$". Colors: amber = multipliers
    (the tunable subject), blue = constraint functions; at most these two
    hues plus currentColor. One idea: every piece of the formula is either
-   a constraint, its multiplier, or bookkeeping. */}
+   a constraint, its multiplier, or the normalization. */}
 <Figure
   name="MaxEntFormula"
   alt="The maximum-entropy formula with labels above each symbol: the constrained quantities in the exponent, one tunable multiplier per constraint, and the partition function normalizing the whole expression"
-  caption="The solution dissected: constrained quantities, their multipliers, and the partition function."
+  caption="Every symbol is a constrained quantity, its multiplier, or the normalizer: the family's whole freedom is one multiplier per constraint."
 />
 
-<Theorem title="maximum entropy under expectation constraints">
+<Theorem title="maximum entropy under expectation constraints (Cover & Thomas 12.1.1)">
 Suppose $\lambda_1, \dots, \lambda_m$ can be chosen so that
 $$
 q(x) = \frac{e^{-\sum_{r} \lambda_r f_r(x)}}{Z(\lambda)},
 \qquad
 Z(\lambda) = \sum_{x \in \mathcal{X}} e^{-\sum_{r} \lambda_r f_r(x)},
 $$
-lies in the feasible set. Then $q$ uniquely maximizes $H$ over the
-feasible set: $H(p) \le H(q)$ for every feasible $p$, with equality only
-at $p = q$.
+lies in the feasible set. Then $q$ uniquely maximizes $H$ over the feasible
+set: $H(p) \le H(q)$ for every feasible $p$, with equality only at $p = q$.
 
 <Proof>
-Let $p$ be any feasible pmf. Insert $q$ into the entropy and split the
-logarithm:
+Direct, in three moves: split the entropy against $q$, drop the divergence
+term, then show what is left is the same number for every feasible $p$.
+
+**Split.** Let $p$ be any feasible pmf. Insert $q$ into the entropy and
+split the logarithm:
 
 $$
 H(p) = -\sum_x p(x) \log_2 p(x)
@@ -248,16 +330,17 @@ H(p) = -\sum_x p(x) \log_2 p(x)
      = -D(p \,\|\, q) - \sum_x p(x) \log_2 q(x).
 $$
 
-By the information inequality of <Ref lesson="kl-divergence"/>,
+**Drop.** By the information inequality of <Ref lesson="kl-divergence"/>,
 $D(p\,\|\,q) \ge 0$, so
 
 $$
 H(p) \;\le\; -\sum_x p(x) \log_2 q(x).
 $$
 
-The right side is where the exponential form pays: $\log_2 q(x) =
-\bigl(-\sum_r \lambda_r f_r(x) - \ln Z(\lambda)\bigr)/\ln 2$ is a linear
-combination of the constrained functions plus a constant, so
+**Evaluate.** Taking the logarithm of $q$ turns its exponent into a sum,
+$\log_2 q(x) = \bigl(-\sum_r \lambda_r f_r(x) - \ln Z(\lambda)\bigr)/\ln 2$,
+which is a linear combination of the constrained functions plus a constant.
+Hence
 
 $$
 -\sum_x p(x) \log_2 q(x)
@@ -266,20 +349,20 @@ $$
 $$
 
 a number that depends on $p$ only through the constrained expectations
-$\alpha_r$, hence the same for every feasible $p$. In particular $q$ is
-itself feasible, so this number equals $-\sum_x q(x) \log_2 q(x) = H(q)$.
-Therefore $H(p) \le H(q)$, with equality exactly when
-$D(p\,\|\,q) = 0$, i.e. $p = q$.
+$\alpha_r$, hence the same for every feasible $p$. The distribution $q$ is
+itself feasible by hypothesis, so evaluating at $p = q$ identifies that
+number as $-\sum_x q(x) \log_2 q(x) = H(q)$. Therefore $H(p) \le H(q)$, with
+equality exactly when $D(p\,\|\,q) = 0$, that is when $p = q$.
 </Proof>
 </Theorem>
 
-The proof is [Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)'
-Theorem 12.1.1, and it is Gibbs' inequality doing the work one more time:
-the same $D \ge 0$ that priced wrong-code overhead and floored the coding
-cost now certifies a maximizer, with no calculus required. The one
-structural fact used is that $\log_2 q$ is **linear in the constraints**,
-which pins the bound $-\sum p \log_2 q$ to a single value across the
-whole feasible set.
+Calculus locates stationary points and then owes a second-order argument;
+the divergence term is non-negative with a known equality case, so one
+inequality delivers optimality and uniqueness together. The one structural
+fact used is that $\log_2 q$ is **linear in the
+constrained functions**, which pins the bound $-\sum p \log_2 q$ to a single
+value across the whole feasible set. Any other functional form would leave
+that bound varying with $p$, and the argument would collapse.
 
 <FigureSequence
   name="gibbs"
@@ -288,17 +371,24 @@ whole feasible set.
 />
 
 <Task>
-Step through the three frames, then verify frame 3's arithmetic by hand:
-with $-\log_2 q_i = 4.737 - 0.535\,i$ (that is, $\log_2 Z = 4.737$ and
-$\lambda/\ln 2 = -0.535$), the bound evaluates to
+Step through the three frames, then answer two questions about the proof
+before checking them against the text. Which step would fail if $q$ were
+Gaussian in $i$ rather than exponential, and which step used the assumption
+that $q$ itself satisfies the constraints? Answers: the third, because
+$\log_2 q$ would then be quadratic in $i$ and the bound would depend on
+$\sum_i i^2 p_i$, which the constraints do not fix; and the third again,
+where $p = q$ is substituted to name the constant. Now verify frame 3's
+arithmetic by hand: with $-\log_2 q_i = 4.737 - 0.535\,i$ (that is,
+$\log_2 Z = 4.737$ and $\lambda/\ln 2 = -0.535$), the bound evaluates to
 $4.737 - 0.535 \times 4.5 = 2.33$ bits for every pmf with mean $4.5$.
 </Task>
 
-### Tuning the multipliers: the partition function does the bookkeeping
+### Tuning the multipliers: the constraint equations are derivatives of $\ln Z$
 
-For the dice, one bisection found $\lambda$. In general the *partition
-function* $Z(\lambda)$ organizes the tuning: differentiating $\ln Z$ with
-respect to $\lambda_r$ brings down $-f_r$ inside the sum, giving
+For the dice, one bisection found $\lambda$. In general the partition
+function organizes the tuning. Differentiating $\ln Z$ with respect to
+$\lambda_r$ brings down a factor of $-f_r$ inside the sum and divides by
+$Z$, which is exactly an expectation under $q$:
 
 $$
 \langle f_r \rangle
@@ -306,61 +396,240 @@ $$
 = -\frac{\partial \ln Z}{\partial \lambda_r},
 $$
 
-so the $m$ constraint equations $\langle f_r \rangle = \alpha_r$ are the
-$m$ equations $-\partial \ln Z / \partial \lambda_r = \alpha_r$ in the
-$m$ multipliers ([Jaynes 1957](https://bayes.wustl.edu/etj/articles/theory.1.pdf),
-eqs. 2-6 to 2-9). Dice check: at $\lambda = -0.371$,
-$\ln Z = \ln 26.66 = 3.283$, and the numerical derivative gives
-$-\partial \ln Z/\partial\lambda = 4.500$, the constrained mean.
+so the $m$ constraint equations $\langle f_r \rangle = \alpha_r$ become $m$
+equations $-\partial \ln Z / \partial \lambda_r = \alpha_r$ in the $m$
+unknown multipliers. For $m > 1$ these are solved numerically; there is no
+closed form in general, and the multipliers are not free parameters that may
+be set to taste. Dice check: at $\lambda = -0.371$, $\ln Z = \ln 26.664 =
+3.2833$, and the central difference
+$-[\ln Z(\lambda + 0.01) - \ln Z(\lambda - 0.01)]/0.02 = 4.4999$ recovers
+the constrained mean to four figures.
 
-<Aside>
-Higher derivatives of $\ln Z$ generate higher moments:
-$\partial^2 \ln Z / \partial \lambda_r^2 = \operatorname{Var}(f_r)$,
-which is Jaynes' variance formula and, in the statistical-mechanics
-reading below, the heat capacity. The historical derivation of the
-exponential form is also worth knowing: introduce *Lagrange multipliers*
-$\lambda_0, \lambda_1, \dots, \lambda_m$ for the constraints and set the
-gradient of $-\sum p \ln p - \lambda_0 \sum p - \sum_r \lambda_r \sum p f_r$
-to zero; stationarity in each $p(x)$ gives
-$\ln p(x) = -1 - \lambda_0 - \sum_r \lambda_r f_r(x)$, the exponential
-form. The multiplier route finds the stationary point; the Gibbs route
-above is what proves it is the global maximum, and it needs neither
-calculus of variations nor second-order conditions.
-</Aside>
-
-<Remark title="when the machinery can fail">
-The constraints must be mutually satisfiable over the alphabet: no pmf on
-$\{1, \dots, 6\}$ has mean $7$, and an empty feasible set has no
-maximizer. Separately, for some constraint sets on infinite alphabets the
-supremum of $H$ is not attained by any distribution (Cover & Thomas
-§12.3 exhibit such anomalous cases); both situations are out of scope
-here.
+<Remark title="when the machinery has nothing to return">
+The theorem needs two hypotheses. First, the constraints must be mutually
+satisfiable over the alphabet: no pmf on $\{1, \dots, 6\}$ has mean $7$, and
+an empty feasible set has no maximizer. Second, some $\lambda$ must actually
+place $q$ inside the feasible set. On a finite alphabet this holds whenever
+the target lies strictly inside the range of achievable values, and fails at
+the endpoints, where the maximizer is a point mass that no finite $\lambda$
+produces. On infinite alphabets the failure can be worse: for some
+constraint sets the supremum of $H$ is finite but attained by no
+distribution at all (Cover & Thomas §12.3 constructs one).
 </Remark>
 
-With no constraints at all ($m = 0$), the theorem's $q$ is
-$e^{0}/Z = 1/|\mathcal{X}|$, the uniform distribution: the range theorem
-$H \le \log_2 n$ of <Ref lesson="entropy-as-average-surprise"/> is the
-constraint-free special case of maximum entropy.
+With no constraints at all ($m = 0$) the theorem's $q$ is
+$e^{0}/Z = 1/|\mathcal{X}|$, the uniform distribution, and the conclusion
+$H(p) \le \log_2 n$ is the range theorem of
+<Ref lesson="entropy-as-average-surprise">the entropy lesson</Ref>, which
+bounded entropy above by $\log_2 n$ with equality only at the uniform
+distribution. That theorem is the constraint-free special case of this one.
 
 <KeyFact>
-The maximum-entropy distribution under expectation constraints is
-exponential in the constrained quantities,
-$p^\ast(x) = e^{-\sum_r \lambda_r f_r(x)} / Z(\lambda)$, and Gibbs'
-inequality proves no feasible distribution beats it: the entropy any
-other choice loses is exactly $D(p \,\|\, p^\ast)$.
+The proof prices the alternatives as well as ranking them: for any feasible
+$p$, $H(p) = H(p^\ast) - D(p \,\|\, p^\ast)$, so the entropy a wrong choice
+gives up is exactly the divergence that <Ref lesson="kl-divergence"/> showed
+is the price of coding with the wrong model. Choosing badly here and coding
+badly there are the same arithmetic.
+</KeyFact>
+
+## Which constraint picks which family
+
+The theorem was proved for an arbitrary list of constraint functions, and
+each list returns a distribution that already has a name. The exponent is
+always linear in what is constrained, so the constrained functions decide
+the family and their values decide which member of it; the table below is
+five applications of the one theorem, not five separate results.
+
+<Figure
+  src="./figures/families.svg"
+  alt="A five-row table pairing what is constrained with the resulting maximum-entropy family and a sketch of its shape: nothing gives the uniform, a mean gives the geometric on the non-negative integers or the exponential on the half-line, a mean and variance give the Gaussian, and a constrained mean of log x gives a power law"
+  caption="Five applications of one theorem: the exponent is linear in whatever is constrained, and the support decides the rest."
+/>
+
+<Example title="mean 2 on the non-negative integers">
+Constrain $f(k) = k$ on $\{0, 1, 2, \dots\}$ with $\langle k \rangle = 2$.
+The solution is $q_k \propto e^{-\lambda k} = \theta^k$ with
+$\theta = e^{-\lambda}$, and normalization needs $\theta < 1$, giving the
+geometric distribution $q_k = (1-\theta)\theta^k$.
+
+Tune $\theta$ to the mean: $\sum_k k\,q_k = \theta/(1-\theta) = 2$ gives
+$\theta = 2/3$, so $\lambda = \ln\tfrac32 = 0.405$ and
+$q_k = \tfrac13 (\tfrac23)^k$.
+
+Entropy, computed from the surprisal directly:
+$-\log_2 q_k = \log_2 3 + k \log_2 \tfrac32$, so
+$$
+H = \mathbb{E}[-\log_2 q_K]
+= \log_2 3 + \langle k \rangle \log_2 \tfrac32
+= 1.585 + 2 \times 0.585 = 2.755 \text{ bits},
+$$
+and no distribution on $\{0,1,2,\dots\}$ with mean $2$ has larger entropy.
+The alphabet is infinite, so the existence caveat applies, but here the
+maximizer exists and the entropy is finite.
+</Example>
+
+The continuous rows of the table are the ones that need care, and the care
+is not about the algebra. On $\mathbb{R}$ the object being maximized is the
+*differential entropy* $h(f) = -\int f \ln f$, not the entropy of this
+course. Under a variance constraint the maximizer is the Gaussian, proved in
+[Shannon's §20 as property 5](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf)
+and again by the Gibbs route in the exercises below; under a mean constraint
+on $[0,\infty)$ it is the
+exponential density $f(x) = \tfrac1\mu e^{-x/\mu}$; under a mean constraint
+on all of $\mathbb{R}$ there is no maximizer, because Gaussians of growing
+variance push $h$ up without bound while keeping the mean fixed.
+
+<Remark title="on a continuum, maximum entropy is minimum divergence">
+Differential entropy is not invariant under a change of variable. Substitute
+$y = g(x)$ and $h$ changes by $\mathbb{E}[\ln |g'(x)|]$, so a density that
+maximizes $h$ in the coordinate $x$ generally does not maximize $h$ in the
+coordinate $\log x$ or $1/x$. "The maximum-entropy density" is therefore
+underdetermined until a coordinate is named, and naming a coordinate is
+smuggling in exactly the kind of assumption the principle was meant to
+avoid.
+
+The invariant repair is to state a reference density $m$ and minimize
+$D(f \,\|\, m)$ over the feasible set instead. That quantity does not change
+under a change of variable, because the Jacobian cancels between $f$ and
+$m$. On a finite alphabet with $m$ uniform the two statements coincide:
+$H(p) = \log_2 n - D(p \,\|\, u)$, so maximizing $H$ and minimizing
+$D(p \,\|\, u)$ are the same instruction. The finite case hides the choice
+of $m$ rather than avoiding it, and every continuous application of maximum
+entropy in the literature has a reference measure in it, stated or not.
+</Remark>
+
+<KeyFact>
+Changing $\alpha_r$ moves along a family; changing $f_r$ changes the family.
+Fitting a max-entropy model to data is therefore two decisions, not one, and
+only the second is a modelling choice with content: which functions to
+constrain.
+</KeyFact>
+
+## The maximum-entropy distribution is also the most numerous
+
+Everything so far has justified $p^\ast$ by what it refrains from assuming,
+which is an argument about the state of knowledge and not about dice.
+There is a second, entirely different justification, and it was Boltzmann's:
+under one added assumption the entropy maximizer is the composition that the
+most arrangements produce.
+
+Throw $n$ dice at once and record only how many show each face, a vector
+$(n_1, \dots, n_6)$ summing to $n$. Call that the *macrostate*; the full
+record of which die showed what is the *microstate*. The number of
+microstates realizing a given macrostate is the multinomial coefficient
+$\binom{n}{n_1,\dots,n_6}$, and Stirling's approximation turns its logarithm
+into $n$ times an entropy:
+
+$$
+\frac{1}{n}\log_2 \binom{n}{n_1, \dots, n_6}
+\;\longrightarrow\; H\!\left(\frac{n_1}{n}, \dots, \frac{n_6}{n}\right).
+$$
+
+Maximizing the count subject to $\sum_i i\,n_i = n\alpha$ is therefore, up
+to the approximation, maximizing $H$ subject to $\sum_i i\,p_i = \alpha$,
+which is the problem already solved. The most numerous macrostate is
+$(n p_1^\ast, \dots, n p_6^\ast)$.
+
+<Figure
+  src="./figures/macrostates.svg"
+  alt="Three face-count vectors for 60 dice totalling 270 spots, each with the number of arrangements that realize it: the two hand-picked compositions give about 10^17 and 10^14 arrangements, the maximum-entropy counts give 10^38"
+  caption="One constraint, three compositions that satisfy it, twenty-one and twenty-four decades between the modal composition and the two hand-picked ones."
+/>
+
+Sixty dice showing $270$ spots in total, the finite version of the Brandeis
+constraint, admit $28{,}862$ macrostates. Exact enumeration picks out
+$(3, 5, 7, 10, 14, 21)$ as the one realized by the most arrangements, and
+$60\,p^\ast = (3.26, 4.73, 6.85, 9.93, 14.39, 20.85)$ rounds to precisely
+those six integers. Two hand-picked compositions meeting the same
+270-spot total — an even split between 4s and 5s, $(0,0,0,30,30,0)$, which
+is the opening table's first candidate scaled up, and fifteen 3s with
+forty-five 5s, $(0,0,15,0,45,0)$ — are realized in $10^{17.1}$ and
+$10^{13.7}$ arrangements against $10^{38.2}$: a shortfall of twenty-one and
+twenty-four decades on a problem with only sixty dice. The drop is that
+steep only away from $p^\ast$. Compositions adjacent to the modal one are
+almost as numerous — $(3,5,6,11,15,20)$ reaches $10^{38.10}$, five
+hundredths of a decade below the maximum — so the arrangements pile up on a
+neighbourhood of $p^\ast$ rather than on a single vector.
+
+The counting statement is stronger than "most probable". As $n$ grows, the
+macrostates within any fixed distance of $p^\ast$ carry not merely the
+largest share of the probability but a share approaching one, conditional on
+the constraint holding (Cover & Thomas §12.2 states this, and proves it in
+ch. 11 by the same typicality machinery that
+<Ref lesson="source-coding-theorem-lite">the source coding theorem</Ref>
+runs on). At $n = 60$ the concentration is already visible in the ratios
+above; at $n = 10^{23}$ it is absolute.
+
+<KeyFact>
+The counting argument buys its conclusion with an assumption the inference
+argument never makes: that all microstates are equally likely. Where that
+holds, $p^\ast$ is a statement about what the world does; where it does not,
+$p^\ast$ is only a statement about what the evidence supports. Physics
+usually asserts the first and gets the second thrown in.
+</KeyFact>
+
+## A prediction that can be checked: the exponential atmosphere
+
+Both justifications so far are internal. The principle also makes a
+prediction about a measurable profile, and the prediction is sharp enough to
+be wrong.
+
+Take the height $h$ of an air molecule above the ground as the random
+variable, and take as the single constraint the mean potential energy
+$\langle mgh \rangle$, which is fixed once the gas has a temperature. The
+constrained function is $f(h) = mgh$ on the support $[0, \infty)$, so the
+maximum-entropy density is exponential in height,
+
+$$
+f(h) = \frac{1}{H_s} e^{-h/H_s},
+\qquad
+H_s = \frac{kT}{mg},
+$$
+
+with the multiplier $\lambda = 1/kT$ fixed by the temperature, and $H_s$ the
+scale height, the altitude over which density falls by a factor of $e$. For
+air at $T = 250$ K, a representative temperature for the first 30 km, the
+mean molecular mass gives $H_s = 7.3$ km. Nothing here is fitted to the
+atmosphere: one thermometer reading and two constants produce the number.
+
+<Figure
+  src="./figures/atmosphere.svg"
+  alt="Air density plotted logarithmically against altitude from 0 to 30 km: the maximum-entropy prediction is a straight line of scale height 7.3 km, and the U.S. Standard Atmosphere densities lie close to it, slightly above between 5 and 15 km"
+  caption="The line is the prediction, the points are the standard atmosphere; the bow between 5 and 15 km is the single-temperature assumption failing."
+/>
+
+Measured against the U.S. Standard Atmosphere, a mid-latitude annual-mean
+profile assembled from rocket and satellite soundings, air density falls
+from $1.225$ to $0.0184$ kg/m³ between sea level and 30 km, a factor of
+$66$. The unfitted exponential reproduces that fall to within a quarter
+everywhere: it is $24\%$ low at 10 km, exact at 25 km, $10\%$ high at 30 km.
+
+The residual is a systematic bow rather than scatter, and its source is
+identifiable. The model assumed one temperature, and the real atmosphere
+runs from 288 K at the surface to 217 K in the lower stratosphere. Layer by
+layer the observed density falls by one factor of $e$ per $9.2$ km over
+0–10 km, per $6.5$ km over 10–20 km, and per $6.3$ km over 20–30 km, while a
+single $\lambda$ can only produce one rate.
+
+<KeyFact>
+The prediction under test is not that the atmosphere maximizes entropy. It
+is that a system with a fixed mean potential energy and nothing else pinned
+has an exponential height profile, so agreement is evidence that the
+constraint list is complete, and the informative part of the plot is the
+disagreement below 10 km, where temperature varies most.
 </KeyFact>
 
 ## Boltzmann and softmax: one solution, two vocabularies
 
 The exponential solution predates its information-theoretic derivation by
-some eighty years in physics, and postdates it by a few decades in
-machine learning. Both are the theorem with one constraint list.
+some eighty years in physics and postdates it by a few decades in machine
+learning. Both are this theorem with one constraint.
 
 ### Physics: the energy constraint
 
-Take $\mathcal{X}$ to be the microstates $i$ of a physical system, each
-with energy $E_i$, and impose one constraint: the mean energy is a known
-value $U$. The theorem returns
+Take $\mathcal{X}$ to be the microstates $i$ of a physical system, each with
+energy $E_i$, and impose one constraint: the mean energy is a known value
+$U$. The theorem returns
 
 $$
 p_i = \frac{e^{-\beta E_i}}{Z(\beta)}, \qquad
@@ -370,20 +639,20 @@ $$
 with a single multiplier $\beta$ tuned so
 $\langle E \rangle = -\partial \ln Z / \partial \beta = U$. This is the
 *Boltzmann distribution*, and physics names the multiplier: $\beta = 1/kT$,
-inverse temperature. High temperature means a weak multiplier and a
-near-uniform spread over microstates; low temperature concentrates the
-distribution on the low-energy states.
+inverse temperature, where $k = 1.38 \times 10^{-23}$ J/K is Boltzmann's
+constant. High temperature means a weak multiplier and a near-uniform spread
+over microstates; low temperature concentrates the distribution on the
+low-energy states.
 
-[Jaynes' 1957 paper](https://bayes.wustl.edu/etj/articles/theory.1.pdf)
-(§3) turns this observation into a program: equilibrium statistical
-mechanics *is* maximum-entropy inference with an energy constraint, and
-the standard machinery (partition function identities, thermodynamic
-derivatives) follows from the inference, not from any dynamical
-assumption such as ergodicity. Whether this founds statistical mechanics
-is Jaynes' claim, and remains his to defend; what is theorem is that the
-energy constraint alone forces the Boltzmann form. The physical price of
-these bits is the subject of
-<Ref lesson="thermodynamics-of-information"/>.
+Jaynes' 1957 paper turns the observation into a programme. Equilibrium
+statistical mechanics, on his account, *is* maximum-entropy inference under
+an energy constraint, and the standard machinery follows from the inference
+rather than from any dynamical assumption such as ergodicity: identify
+$\lambda_1$ with $1/kT$ and the free energy with $-kT \ln Z$, and the
+thermodynamic relations drop out of the partition-function identities
+already proved. Whether that founds statistical mechanics remains his claim
+to defend. What is theorem is narrower and not in dispute: an energy
+constraint alone forces the Boltzmann form.
 
 ### Machine learning: the softmax layer
 
@@ -394,18 +663,11 @@ $$
 p_i = \frac{e^{z_i / T}}{\sum_{j} e^{z_j / T}},
 $$
 
-the *softmax* with temperature $T$ (training uses $T = 1$). Matching
-symbols against the theorem: the constraint function is the negative
-logit, $f(i) = -z_i$, and the multiplier is $1/T$. Softmax is the
-maximum-entropy distribution whose expected logit is pinned; temperature
-rescales the multiplier exactly as it does for Boltzmann. The
-identification is standard in NLP, where
-[Berger, Della Pietra & Della Pietra (1996)](https://aclanthology.org/J96-1002/)
-built classifiers by imposing feature-expectation constraints and derived
-the exponential (log-linear) model as the unique maximum-entropy
-solution; training the weights is tuning the multipliers so the model's
-feature expectations match the data's, and the loss minimized is the
-cross-entropy of <Ref lesson="cross-entropy-loss"/>.
+the *softmax* with temperature $T$, which is set to $1$ during training and
+varied at inference. Matching symbols against the theorem: the constraint
+function is the negative logit, $f(i) = -z_i$, and the multiplier is $1/T$.
+Softmax is the maximum-entropy distribution whose expected logit is pinned,
+and temperature rescales the multiplier exactly as it does for Boltzmann.
 
 {/* fig BoltzmannSoftmax: one solution, two fields (playbook rule 8: two
    near-identical panels). Center: the shared skeleton, large KaTeX
@@ -427,6 +689,16 @@ cross-entropy of <Ref lesson="cross-entropy-loss"/>.
   caption="One maximum-entropy solution, two vocabularies: energies are negative logits, and temperature is the inverse multiplier in both."
 />
 
+The identification is algebraic. Softmax entered neural networks as a
+convenient differentiable normalizer, not as the solution of a constrained
+maximization, and nothing above licenses the claim that it was derived this
+way. Models *were* built from the constraint side, though, and in the same
+decade: Berger, Della Pietra and Della Pietra's maximum-entropy approach to
+natural language processing imposed feature-expectation constraints
+$\langle f_r \rangle_{\text{model}} = \langle f_r \rangle_{\text{data}}$ and
+obtained the log-linear model as the unique maximum-entropy solution, so
+that training the weights *is* tuning the multipliers.
+
 ### Temperature in numbers
 
 <Example title="softmax at two temperatures">
@@ -440,249 +712,550 @@ $p = (0.659,\ 0.242,\ 0.099)$. Entropy: $H = 1.222$ bits.
 $e^{0.05} = 1.051$; normalizer $Z = 5.418$; distribution
 $p = (0.502,\ 0.304,\ 0.194)$. Entropy: $H = 1.481$ bits.
 
-Doubling $T$ halves the multiplier: the constraint bites half as hard,
+Doubling $T$ halves the multiplier, so the constraint bites half as hard,
 the distribution moves toward uniform, and the entropy climbs toward the
-three-outcome ceiling $\log_2 3 = 1.585$ bits. As $T \to \infty$ the
-output is uniform regardless of the logits; as $T \to 0$ all mass
-collapses onto the largest logit.
+three-outcome ceiling $\log_2 3 = 1.585$ bits. As $T \to \infty$ the output
+is uniform regardless of the logits; as $T \to 0$ all mass collapses onto
+the largest logit.
 </Example>
 
+<Exercise>
+Logits $z = (3.0,\ 1.0,\ 1.0)$. Predict, before computing, whether the
+entropy at $T = 0.5$ is above or below the entropy at $T = 1$, and by
+roughly how much. Then compute both distributions and both entropies, and
+state the value $H$ approaches as $T \to 0$.
+
+<Solution>
+Prediction: lowering $T$ doubles the multiplier, sharpening the
+distribution, so $H$ must fall. The gap should be large, because at $T = 1$
+the leading logit is already $2$ nats clear of the others and halving $T$
+turns that into $4$.
+
+$T = 1$: exponentials $e^{3} = 20.086$, $e^{1} = 2.718$, $e^{1} = 2.718$;
+$Z = 25.522$; $p = (0.787,\ 0.107,\ 0.107)$. Entropy
+$H = 0.787 \times 0.345 + 2 \times 0.107 \times 3.226 = 0.960$ bits.
+
+$T = 0.5$: exponentials $e^{6} = 403.43$, $e^{2} = 7.389$, $e^{2} = 7.389$;
+$Z = 418.21$; $p = (0.965,\ 0.018,\ 0.018)$. Entropy
+$H = 0.965 \times 0.052 + 2 \times 0.018 \times 5.819 = 0.256$ bits.
+
+So the entropy falls by $0.70$ bits, in the predicted direction and by a
+large amount. As $T \to 0$ the multiplier diverges, all mass moves to the
+single largest logit, and $H \to 0$. This is the same limit the die reaches
+as its constrained mean approaches $6$: the exponential family degenerates
+to a point mass at the extreme of the constrained quantity.
+</Solution>
+</Exercise>
+
 <KeyFact>
-The Boltzmann distribution and the softmax layer are the same
-maximum-entropy solution: an expectation constraint on energy in physics
-vocabulary, on logits in ML vocabulary, with temperature as the inverse
-multiplier in both.
+Temperature scaling at inference, the standard trick for calibrating a
+classifier's confidence, is a change of multiplier and nothing else. It
+moves the output's entropy along the same curve the die's $\lambda$ traced,
+and it cannot change which logit is largest, so it alters confidence without
+altering any prediction.
 </KeyFact>
+
+## ★ Maximum entropy is maximum likelihood in the exponential family
+
+Two procedures that sound unrelated turn out to have the same fixed point,
+and the identity explains why max-entropy models are fitted with ordinary
+likelihood code.
+
+Fix the constraint functions $f_1, \dots, f_m$ and consider the parametric
+family $P(x \mid w) = \tfrac{1}{Z(w)}\exp\bigl(\sum_r w_r f_r(x)\bigr)$,
+with the weights $w$ unknown. Given data $x^{(1)}, \dots, x^{(N)}$, setting
+the derivative of the log likelihood with respect to $w_r$ to zero gives the
+stationarity condition
+
+$$
+\sum_x P(x \mid w_{\text{ML}}) f_r(x) = \frac1N \sum_n f_r\bigl(x^{(n)}\bigr),
+$$
+
+that is: each function's average under the fitted model equals its average
+in the data. But that is precisely the constraint the maximum-entropy
+problem imposes, with $\alpha_r$ set to the empirical average. Maximum
+likelihood in the exponential family and maximum entropy under matched
+empirical constraints are two descriptions of one set of equations, solved
+for the same $w = -\lambda$.
+
+The consequence is practical. Nobody implements a maximum-entropy fit by
+maximizing entropy; they run gradient ascent on a log likelihood, which is
+gradient descent on the cross-entropy loss of
+<Ref lesson="cross-entropy-loss"/>, and read off the multipliers at
+convergence.
+
+<Aside>
+The historical derivation of the exponential form, for completeness.
+Introduce Lagrange multipliers $\lambda_0, \lambda_1, \dots, \lambda_m$ for
+normalization and the $m$ constraints, and set the gradient of
+$-\sum_x p \ln p - \lambda_0 \sum_x p - \sum_r \lambda_r \sum_x p f_r$ to
+zero. Stationarity in each $p(x)$ separately gives
+$\ln p(x) = -1 - \lambda_0 - \sum_r \lambda_r f_r(x)$, which is the
+exponential form, with $\lambda_0$ absorbed into $\ln Z$. This is the route
+Jaynes takes in §2 of the 1957 paper and Cover & Thomas call "Approach 1".
+It finds a stationary point and owes a second-variation argument that the
+Gibbs route never incurs.
+
+Higher derivatives of $\ln Z$ generate higher moments:
+$\partial^2 \ln Z / \partial \lambda_r^2 = \operatorname{Var}(f_r)$, which
+for the Brandeis die evaluates to $2.298$ and in the statistical-mechanics
+reading is the heat capacity.
+</Aside>
 
 ## A method of reasoning, and its limits
 
-Jaynes' own assessment
-([1957](https://bayes.wustl.edu/etj/articles/theory.1.pdf),
-§6) is the right frame: maximum entropy is "a method of reasoning", not a
-law of physics. It converts exactly the stated constraints into a
-distribution, adding nothing; the output is a description of the state of
-knowledge encoded in the constraints, not a claim about long-run
-frequencies. Whether such subjective probabilities also match observed
-frequencies is a further question Jaynes treats separately (§4) and this
-course leaves aside.
+The principle has now been justified three ways: it assumes least, it counts
+most, and in one case it predicts a measured profile. None of those makes it
+a law, and its author was explicit that it is not one.
 
-Two operational consequences follow. First, the output is only as good as
-the constraints fed in: a max-ent die built from the mean alone will be
-revised, not patched, when a second moment arrives, by adding the
-constraint and re-solving. Second, constraints are never free: adding one
-shrinks the feasible set, so the achievable maximum entropy can only
-decrease, exactly as the dice dropped from $2.585$ to $2.328$ bits when
-the mean was pinned.
+Jaynes' position is that maximum entropy is a rule of inference whose output
+is a description of a state of knowledge, and that its relation to physics
+is empirical rather than definitional. In the Brandeis lectures he insists
+that information entropy and experimental thermodynamic entropy "are
+entirely different concepts", and that the job is "to deduce whatever
+relations we can from known mathematical and physical facts" rather than to
+postulate any. The 1957 sequel states the falsification condition directly:
+maximum-entropy inference "can never lead us astray, for any quantity which
+it is incapable of predicting will betray that fact by yielding a broad
+probability distribution", and if the class of phenomena it predicts ever
+differs from the class of experimentally reproducible ones, "that fact would
+demonstrate the existence of new laws of physics, not presently known". A
+disagreement is a report about the constraint list, not a refutation of the
+arithmetic. That is what makes the atmosphere a confirmation and not a
+proof.
 
-### The continuous counterpart, with a caveat
+### The standing objection
 
-<Remark title="the Gaussian as a maximum-entropy distribution">
-Among probability densities on $\mathbb{R}$ with fixed variance
-$\sigma^2$, the Gaussian maximizes the *differential entropy*
-$h(f) = -\int f \ln f$; the result is property 5 of
-[Shannon's 1948 paper](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf),
-§20. The solution is again exponential in the constrained quantity: the
-constraint is on $x^2$, and $e^{-\lambda x^2}$ normalized is the
-Gaussian. The caveat: differential entropy is not the discrete entropy of
-this course. It can be negative, and its value changes under a change of
-coordinates (Shannon, §20), so the discrete statements proved above do
-not transfer silently; the continuous theory is out of this course's
-scope.
-</Remark>
+The principle is not uncontested where it is used as a general inference
+rule. MacKay, raising this exact die problem with a mean of $2.5$, rejects
+it: maximum entropy "can give silly answers", the correct way to solve an
+inference problem is Bayes' theorem, and he does not advocate it for
+assigning priors either. The disagreement is real and it is narrow. Nobody
+disputes the theorem or any of the arithmetic above. What is disputed is
+whether
+"the constraints are all I know" is ever an honest description of a state of
+knowledge, given that the mean of a die was itself estimated from data that
+a likelihood could have used in full.
+
+Two operational consequences hold regardless of which side of that argument
+a reader lands on. First, the output is only as good as the constraint list:
+a max-entropy die built from the mean alone is revised, not patched, when a
+second moment arrives, by adding the constraint and re-solving. Second,
+constraints are never free. Adding one shrinks the feasible set, so the
+achievable maximum entropy can only fall, exactly as the die dropped from
+$2.585$ to $2.328$ bits when the mean was pinned.
 
 <KeyFact>
-Maximum entropy turns exactly the stated constraints into a distribution,
-and nothing else: its output is only as good as the constraints fed in,
-and every added constraint can only lower the achievable entropy.
+Maximum entropy converts a constraint list into a distribution and does
+nothing else. It cannot detect that a constraint is missing; only a
+comparison against data can, and the signature is a systematic residual of
+the kind the atmosphere shows below 10 km.
 </KeyFact>
+
+What is established: among the distributions consistent with given
+expectation constraints there is exactly one entropy maximizer; it is
+exponential in the constrained quantities, normalized by a partition
+function whose logarithmic derivatives return the constrained averages; and
+every other feasible distribution falls short by exactly its divergence from
+that maximizer. What is not established is any price for the choice. The
+Boltzmann distribution arrived here as an inference and its multiplier was
+identified with $1/kT$ by matching formulas, which leaves open whether the
+bits so counted have physical consequences.
+<Ref lesson="thermodynamics-of-information">The next lesson</Ref> settles
+that by erasing one bit and measuring the heat.
 
 ## Exercises
 
 <Exercise>
-Verify the candidate table of the first section: for
-$p = (0, 0, 0, .5, .5, 0)$ and $p = (0, 0, .25, .25, .25, .25)$, compute
-the mean and the entropy, and confirm both entropies fall below the
-maximum-entropy value $2.328$ bits.
+The Brandeis die is measured a second time, and the average of the *squared*
+face value comes out at $\langle i^2 \rangle = 24.0$ while the mean stays at
+$4.5$. The body's one-constraint solution has $\langle i^2 \rangle = 22.55$,
+so the new number is not implied by the old one. Answer two questions before
+computing anything: can the geometric ladder $p_i \propto x^i$ be re-tuned to
+satisfy both constraints, and can the multipliers still be found by bisection?
+Then solve for the maximum-entropy distribution under both constraints,
+report $\lambda_1$, $\lambda_2$ and $H$, and say what the second constraint
+costs and what it changes.
 
 <Solution>
-First candidate: mean $= 4 \cdot 0.5 + 5 \cdot 0.5 = 4.5$. Entropy: two
-equal outcomes, $H = -2 \cdot 0.5 \log_2 0.5 = 1.000$ bit.
+**Re-tuning fails.** The exponent is linear in whatever is constrained, so
+with $f_1(i) = i$ and $f_2(i) = i^2$ the solution is
+$p_i \propto e^{-\lambda_1 i - \lambda_2 i^2}$, whose logarithm is quadratic
+in $i$. The geometric ladder is the special case $\lambda_2 = 0$, and once
+its mean is pinned at $4.5$ that case forces $\langle i^2 \rangle = 22.55$.
+The second measurement is precisely the information a one-knob family cannot
+carry.
 
-Second candidate: mean
-$= 0.25(3 + 4 + 5 + 6) = 0.25 \cdot 18 = 4.5$. Entropy: four equal
-outcomes, $H = \log_2 4 = 2.000$ bits.
+**Bisection fails.** The two constraint equations are coupled: changing
+$\lambda_2$ moves the mean as well as the second moment, so neither equation
+is a monotone function of one unknown on its own. What replaces bisection is
+Newton's method on the pair, with Jacobian
+$\partial \langle f_r \rangle / \partial \lambda_s = -\operatorname{Cov}_q(f_r, f_s)$,
+the matrix version of the
+$\partial^2 \ln Z/\partial \lambda^2 = \operatorname{Var}(f)$ identity. That
+matrix is also why the $m$-dimensional solve is well behaved: a covariance
+matrix is positive definite, so $\ln Z$ is convex in $\lambda$ and the root
+is unique.
 
-Both are feasible, and $1.000 < 2.328$ and $2.000 < 2.328$ as the theorem
-requires: each zeroed face is an assumption the constraints do not
-contain, and it costs entropy.
-</Solution>
-</Exercise>
-
-<Exercise>
-For the exponential form $q_i = e^{-\lambda i}/Z$, show that the ratio of
-successive probabilities $q_{i+1}/q_i$ is a constant, independent of $i$.
-Then estimate that constant and $\lambda$ from the printed Brandeis
-solution $p^\ast = (.054, .079, .114, .165, .240, .347)$ using the last
-two entries.
-
-<Solution>
-Ratio: $q_{i+1}/q_i = e^{-\lambda(i+1)}/e^{-\lambda i} = e^{-\lambda}$,
-with no $i$ dependence: exponential in $i$ means geometric ratios.
-
-Estimate: $p^\ast_6 / p^\ast_5 = 0.347/0.240 = 1.446$ (the rounded values
-carry the last-digit error; the exact ratio is $1.449$). Then
-$\lambda = -\ln 1.449 \approx -0.371$, matching the tuned value. Any
-neighboring pair gives the same estimate, e.g.
-$0.240/0.165 = 1.455 \approx 1.449$: constancy of the ratio is a quick
-test of exponential form.
-</Solution>
-</Exercise>
-
-<Exercise>
-Apply the theorem with no constraints ($m = 0$) to a distribution over
-$n$ outcomes, and state which earlier result this recovers.
-
-<Solution>
-With $m = 0$ the exponent is empty: $q(x) = e^{0}/Z = 1/Z$, and
-normalization forces $Z = n$, so $q$ is uniform. The theorem then says
-$H(p) \le H(q) = \log_2 n$ for every pmf $p$, with equality only at the
-uniform distribution: the upper half of the range theorem of the entropy
-lesson, re-derived. The proof specializes to
-$H(p) = \log_2 n - D(p\,\|\,\text{uniform})$, so the entropy deficit from
-the ceiling is exactly a KL divergence.
-</Solution>
-</Exercise>
-
-<Exercise>
-Find the maximum-entropy distribution on $\{0, 1\}$ subject to
-$\mathbb{E}[X] = 0.3$, and the multiplier $\lambda$ that realizes it in
-the form $q(x) = e^{-\lambda x}/Z$. State what is special about the
-feasible set here.
-
-<Solution>
-On a two-point alphabet, normalization and the mean pin the distribution
-completely: $p(1) = 0.3$, $p(0) = 0.7$. The feasible set is a single
-point, so the maximization is trivial and maximum entropy adds nothing.
-
-The exponential form still represents it:
-$q(1)/q(0) = e^{-\lambda} = 0.3/0.7 = 3/7$, so
-$\lambda = \ln(7/3) \approx 0.847$. Check:
-$q(1) = e^{-0.847}/(1 + e^{-0.847}) = 0.429/1.429 = 0.3$. The principle
-has content only when the constraints leave freedom; here every feasible
-distribution is the solution.
-</Solution>
-</Exercise>
-
-<Exercise>
-Find the maximum-entropy distribution on the non-negative integers
-$\{0, 1, 2, \dots\}$ subject to mean $2$, and compute its entropy in
-bits.
-
-<Solution>
-The constrained quantity is $f(k) = k$, so the solution is
-$q_k \propto e^{-\lambda k} = \theta^k$ with $\theta = e^{-\lambda} \in
-(0,1)$: a geometric distribution $q_k = (1-\theta)\theta^k$.
-
-Tune $\theta$ to the mean: $\sum_k k\,q_k = \theta/(1-\theta) = 2$ gives
-$\theta = 2/3$ (and $\lambda = \ln \tfrac{3}{2} \approx 0.405$), so
-$q_k = \tfrac13 \left(\tfrac23\right)^k$.
-
-Entropy: $-\log_2 q_k = -\log_2 \tfrac13 - k \log_2 \tfrac23$, so
+**The solve.** Start from the one-constraint answer, $\lambda_1 = -0.371$ and
+$\lambda_2 = 0$, where the mean is already right and the second moment is
+short by $1.45$. The covariance matrix of $(i, i^2)$ there is
 $$
-H = \mathbb{E}[-\log_2 q_K]
-= \log_2 3 + \mathbb{E}[K] \log_2 \tfrac32
-= 1.585 + 2 \times 0.585 = 2.755 \text{ bits.}
+\operatorname{Cov} =
+\begin{pmatrix} 2.30 & 17.92 \\ 17.92 & 144.71 \end{pmatrix},
 $$
-No distribution on $\{0, 1, \dots\}$ with mean $2$ has larger entropy.
-(This is Cover & Thomas' example 12.2.4; on a countable alphabet the
-existence caveat applies, but here the geometric maximizer exists.)
+and four Newton steps converge to
+$$
+\lambda_1 = 1.688, \qquad \lambda_2 = -0.274, \qquad Z = 1.495,
+$$
+$$
+p^\ast = (.163,\ .069,\ .050,\ .063,\ .137,\ .519).
+$$
+Checks: mean $0.163 + 0.137 + 0.150 + 0.252 + 0.687 + 3.112 = 4.50$; second
+moment $0.163 + 0.274 + 0.449 + 1.007 + 3.433 + 18.675 = 24.0$. Entropy
+$H = 2.042$ bits.
+
+**The cost, and the change.** Entropy falls from $2.328$ bits under the mean
+alone to $2.042$, so the second constraint costs $0.285$ bits, and the two
+together sit $0.543$ bits below the uniform ceiling — which is
+$D(p^\ast \| u)$. The shape changed as well: $\lambda_2 < 0$ makes the
+exponent convex in $i$, so the distribution is U-shaped, $.519$ on face 6 and
+$.163$ on face 1 with a trough of $.050$ at face 3. No monotone ladder
+produces that: adding a constraint function moved the answer to a different
+family, not to another member of the same one.
+
+**Where it would break.** At mean $4.5$ the achievable second moments run
+from $20.5$ (all the mass on faces 4 and 5) to $25.5$ (mass $0.3$ and $0.7$
+on faces 1 and 6). At either endpoint the feasible set collapses to that one
+distribution, which has zero-probability faces and so is reached by no finite
+$(\lambda_1, \lambda_2)$.
+
+The transferable move: one multiplier per constraint, and the dimension of
+the root-find is the number of constraints, not the size of the alphabet.
 </Solution>
 </Exercise>
 
 <Exercise>
-A system has two states with energies $E_0 = 0$ and $E_1 = \varepsilon$,
-at temperature $T$ with $\varepsilon = kT \ln 3$. Compute the Boltzmann
-distribution and its entropy, and give the limiting distributions as
-$T \to 0$ and $T \to \infty$ at fixed $\varepsilon$.
+Push the die to the edge. As the constrained mean $\mu$ approaches $6$,
+report what happens to $x = e^{-\lambda}$, to the distribution, and to the
+entropy, giving the leading behaviour of $H$ in terms of
+$\varepsilon = 6 - \mu$. Then state which hypothesis of the theorem fails at
+$\mu = 6$ exactly, and what the feasible set looks like there.
 
 <Solution>
-With $\beta = 1/kT$, the Boltzmann weights are $e^{-\beta E_0} = 1$ and
-$e^{-\beta E_1} = e^{-\varepsilon/kT} = e^{-\ln 3} = \tfrac13$. So
-$Z = 1 + \tfrac13 = \tfrac43$ and
+**The tilt runs away.** Numerically: $\mu = 5.5$ gives $x = 2.965$ and
+$\lambda = -1.087$; $\mu = 5.9$ gives $x = 11.000$ and $\lambda = -2.398$;
+$\mu = 5.99$ gives $x = 101.000$ and $\lambda = -4.615$. The pattern is
+$x \approx 1 + 1/\varepsilon$, which is asymptotic, not exact: it is good to
+four figures once $\varepsilon \le 0.1$ but overshoots by $1.2\%$ at
+$\varepsilon = 0.5$, where the lower faces still carry enough mass
+($p_1 + p_2 + p_3 = 0.037$) to matter. Hence
+$\lambda \approx \ln \varepsilon \to -\infty$, and it diverges only
+logarithmically. It is the multiplier that runs away, not the probabilities;
+$\ln Z \approx -6\lambda$ grows in step and keeps every $p_i$ in $[0,1]$.
+
+**The distribution collapses onto face 6.** Since $p_i \propto x^i$, the
+ratio $p_5/p_6 = 1/x \approx \varepsilon$, and every lower face is smaller
+still by another factor of $x$. To leading order the distribution is a
+two-point one: $p_6 \approx 1 - \varepsilon$, $p_5 \approx \varepsilon$, and
+the rest $O(\varepsilon^2)$.
+
+**Entropy.** Hence $H \approx H_b(\varepsilon)$, the binary entropy, whose
+leading term is $\varepsilon \log_2(1/\varepsilon)$. Check: at
+$\varepsilon = 0.1$ the exact value is $0.483$ bits against
+$H_b(0.1) = 0.469$; at $\varepsilon = 0.01$ it is $0.0809$ against
+$H_b(0.01) = 0.0808$. So $H \to 0$, but slowly, and not linearly.
+
+**What fails at $\mu = 6$.** The hypothesis that some finite
+$\lambda_1, \dots, \lambda_m$ places $q$ inside the feasible set. At
+$\mu = 6$ the feasible set is the single point $(0,0,0,0,0,1)$, because six
+is the maximum of $f(i) = i$ and only a point mass at the maximum attains
+it. That point mass has a zero probability, which no distribution of the
+form $e^{-\lambda i}/Z$ with finite $\lambda$ has. The conclusion still
+holds trivially, since a one-point feasible set has a unique maximizer, but
+it is not delivered by the theorem: it is the limit of the theorem's answers
+rather than one of them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim, then rescue as much of it as survives. "The
+maximum-entropy distribution is the most likely one." State precisely the
+two different claims being conflated; give the sense in which the sixty-dice
+computation makes the statement nearly true; and name the assumption under
+which it becomes true, together with a case where that assumption is
+obviously false.
+
+<Solution>
+**The two claims.** The first is about a distribution: "$p^\ast$ is the
+distribution most likely to be the true one." The second is about
+compositions: "among the face counts consistent with the constraint, the one
+closest to $n p^\ast$ is realized by the most microstates." The claim as
+stated is the first; what the mathematics delivers is the second.
+
+**Why the first is false.** "Most likely to be the true one" requires a
+probability distribution over candidate distributions, that is a prior, and
+maximum entropy supplies none. Two constraint lists that describe the same
+state of knowledge but name different functions produce different $p^\ast$,
+which no likelihood ranking could do. And in the Brandeis problem the die
+either is or is not loaded in a particular way; the evidence given is
+compatible with every candidate in the opening table, and nothing in the
+derivation makes one of them a better estimate of the physical die's bias.
+
+**The sense in which it is nearly true.** With $n = 60$ dice and 270 spots,
+the entropy-maximizing counts $(3,5,7,10,14,21)$ are realized in $10^{38.2}$
+arrangements against $10^{17.1}$ for the half-4s-half-5s composition. If all
+arrangements are equally likely, the maximum-entropy macrostate is the modal
+one, outnumbering that composition by twenty-one orders of magnitude (though
+only by a factor of $1.1$ against its immediate neighbours), and as $n$ grows the
+macrostates near $p^\ast$ carry a conditional probability tending to $1$.
+For a large system, "nearly all arrangements look like $p^\ast$" is an
+accurate statement.
+
+**The assumption, and where it fails.** The rescue needs all microstates to
+be equally likely. That is a real physical hypothesis, not a triviality, and
+it is exactly what the counting argument assumes and the inference argument
+does not. It is obviously false for a physically loaded die, whose faces are
+not exchangeable, and equally false for English text: the letter counts of a
+page of English are nowhere near the entropy-maximizing composition, because
+the strings are not drawn uniformly from those with the given counts
+(<Ref lesson="entropy-of-english"/>). Where microstates are not
+equiprobable, $p^\ast$ remains the honest summary of the evidence and stops
+being a prediction about frequencies.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson stated the Gaussian result and did not prove it. Prove it by the
+Gibbs route rather than by variational calculus: among densities on
+$\mathbb{R}$ with $\mathbb{E}[X] = 0$ and $\mathbb{E}[X^2] = \sigma^2$, show
+that the Gaussian $\varphi$ of variance $\sigma^2$ maximizes the
+differential entropy $h(f) = -\int f \ln f$. Then state what the maximizer
+becomes if the support is restricted to $[0, \infty)$ with only the mean
+constrained, and why the two answers differ.
+
+<Solution>
+**Setup.** Let $g$ be any density on $\mathbb{R}$ with the two moments
+above, and let
+$\varphi(x) = (2\pi\sigma^2)^{-1/2} e^{-x^2/2\sigma^2}$. The relative
+entropy between densities is
+$D(g\,\|\,\varphi) = \int g \ln (g/\varphi) \ge 0$, with equality only if
+$g = \varphi$ almost everywhere; this is the same inequality as in the
+discrete case.
+
+**Split and drop.** Exactly as in the theorem,
+$$
+h(g) = -\int g \ln g = -D(g \,\|\, \varphi) - \int g \ln \varphi
+\;\le\; -\int g \ln \varphi .
+$$
+
+**Evaluate.** The point of the Gaussian is that $\ln \varphi$ is a
+polynomial in the constrained quantities:
+$\ln \varphi(x) = -\tfrac12 \ln(2\pi\sigma^2) - x^2/2\sigma^2$. Therefore
+$$
+-\int g \ln \varphi
+= \tfrac12 \ln(2\pi\sigma^2) + \frac{\mathbb{E}_g[X^2]}{2\sigma^2}
+= \tfrac12 \ln(2\pi\sigma^2) + \tfrac12
+= \tfrac12 \ln(2\pi e \sigma^2),
+$$
+using $\mathbb{E}_g[X^2] = \sigma^2$, which is where the constraint enters.
+The right-hand side does not depend on $g$, and substituting $g = \varphi$
+shows it equals $h(\varphi)$. Hence $h(g) \le h(\varphi)$, with equality
+only at $g = \varphi$. Numerically $h(\varphi) = \tfrac12\log_2(2\pi e
+\sigma^2) = 2.047$ bits at $\sigma = 1$.
+
+**On the half-line.** With support $[0,\infty)$ and only
+$\mathbb{E}[X] = \mu$ constrained, the exponent must be linear in $x$, and
+the maximizer is $f(x) = \tfrac1\mu e^{-x/\mu}$. The same three moves
+work verbatim with $\ln f$ linear rather than quadratic.
+
+**Why they differ.** The family is set by which function is constrained and
+on what support, not by any general preference for bell shapes. A quadratic
+constraint gives a quadratic exponent and a Gaussian; a linear constraint
+gives a linear exponent and an exponential density; and on $[0,\infty)$ a
+zero-mean Gaussian is not even admissible. Note also that both statements
+are about differential entropy and are therefore coordinate-dependent: they
+say the maximizer in the coordinate $x$, with Lebesgue measure as the
+reference.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove the identity used but not derived in the text: for the exponential
+family $q(x) = e^{-\sum_r \lambda_r f_r(x)}/Z(\lambda)$,
+$$
+-\frac{\partial \ln Z}{\partial \lambda_r} = \mathbb{E}_q[f_r].
+$$
+Then verify it numerically on the Brandeis die at $\lambda = -0.371$ using
+$\ln Z(-0.361) = 3.2384$ and $\ln Z(-0.381) = 3.3284$, and say what the
+second derivative $\partial^2 \ln Z/\partial\lambda_r^2$ computes.
+
+<Solution>
+**Derivation.** Write $S(x) = \sum_r \lambda_r f_r(x)$, so
+$Z = \sum_x e^{-S(x)}$. Differentiating term by term,
+$$
+\frac{\partial Z}{\partial \lambda_r}
+= \sum_x \frac{\partial}{\partial \lambda_r} e^{-S(x)}
+= -\sum_x f_r(x)\, e^{-S(x)} .
+$$
+Divide by $Z$, which is the chain rule for the logarithm:
+$$
+\frac{\partial \ln Z}{\partial \lambda_r}
+= \frac{1}{Z}\frac{\partial Z}{\partial \lambda_r}
+= -\sum_x f_r(x) \frac{e^{-S(x)}}{Z}
+= -\sum_x f_r(x) q(x)
+= -\mathbb{E}_q[f_r].
+$$
+The whole content is that dividing by $Z$ converts the weights $e^{-S(x)}$
+into the probabilities $q(x)$.
+
+**Numerical check.** The central difference at spacing $h = 0.01$ is
+$$
+-\frac{\ln Z(-0.361) - \ln Z(-0.381)}{0.02}
+= -\frac{3.2384 - 3.3284}{0.02} = 4.500 ,
+$$
+which is the constrained mean, as required.
+
+**The second derivative.** Differentiating once more gives
+$\partial^2 \ln Z/\partial \lambda_r^2 = \mathbb{E}_q[f_r^2] -
+\mathbb{E}_q[f_r]^2 = \operatorname{Var}_q(f_r)$. For the Brandeis die,
+$\mathbb{E}[i^2] = 22.548$ and $\mathbb{E}[i]^2 = 20.25$, so the variance is
+$2.298$. Because a variance is non-negative, $\ln Z$ is convex in every
+$\lambda_r$, which is the reason the constraint equation
+$-\partial \ln Z/\partial \lambda_r = \alpha_r$ has at most one solution: a
+convex function has a monotone derivative. That is the structural fact
+behind the "tune one knob" step of the dice calculation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that $H(p) = \log_2 n - D(p \,\|\, u)$ for any pmf $p$ on an alphabet
+of size $n$, where $u$ is uniform. Evaluate $D(p^\ast \| u)$ for the
+Brandeis solution and interpret the number in bits-per-toss terms. Then say
+what the identity implies about which of the two phrases, "maximum entropy"
+and "minimum divergence from uniform", is the more portable instruction.
+
+<Solution>
+**The identity.** Expand the divergence against $u_i = 1/n$:
+$$
+D(p \,\|\, u) = \sum_i p_i \log_2 \frac{p_i}{1/n}
+= \sum_i p_i \log_2 p_i + \log_2 n \sum_i p_i
+= \log_2 n - H(p),
+$$
+using $\sum_i p_i = 1$ in the last step. Rearranging gives the claim.
+
+**The number.** For the Brandeis solution,
+$D(p^\ast \| u) = 2.585 - 2.328 = 0.257$ bits. Read as a coding cost
+(<Ref lesson="kl-divergence"/>): a code built for a fair die, applied to
+this loaded one, wastes $0.257$ bits per toss. Equivalently, the mean
+constraint carries $0.257$ bits of information about the die, since that is
+the entropy it removed.
+
+**Which phrase is portable.** "Minimum divergence from uniform" is, because
+it names its reference. The identity shows the two instructions coincide
+whenever a uniform distribution exists, which is to say on a finite
+alphabet. On a continuum no uniform density exists, "maximum entropy" is
+coordinate-dependent, and only the divergence form survives, with $u$
+replaced by a reference density that must be stated. The transferable move:
+whenever an objective is written as an entropy, look for the measure it is
+an entropy with respect to.
+</Solution>
+</Exercise>
+
+<Exercise>
+Fit a maximum-entropy model to real data. Take any numeric column of at
+least 500 values you have to hand (file sizes, response times, a sensor log,
+one column of a public dataset), impose the two constraints
+$\langle x \rangle$ and $\langle x^2 \rangle$ at their empirical values,
+report the fitted multipliers $\lambda_1, \lambda_2$, and overlay the fitted
+density on a histogram of the data. State in advance what agreement would
+look like, and what shape of discrepancy would tell you a constraint is
+missing rather than that maximum entropy is the wrong tool.
+
+<Solution>
+**What the fit is.** Two constraints with $f_1(x) = x$ and $f_2(x) = x^2$
+give an exponent quadratic in $x$, so the family is Gaussian and no
+numerical root-finding is needed: matching the two moments gives
+$\hat\mu = \langle x \rangle$ and $\hat\sigma^2 = \langle x^2 \rangle -
+\langle x \rangle^2$. Reading the multipliers off
+$-\lambda_1 x - \lambda_2 x^2 = -(x-\hat\mu)^2/2\hat\sigma^2 + \text{const}$
+gives $\lambda_2 = 1/2\hat\sigma^2$ and
+$\lambda_1 = -\hat\mu/\hat\sigma^2$. Reporting them, rather than $\hat\mu$
+and $\hat\sigma$, is the exercise: they are the quantities that generalize
+when a third constraint is added.
+
+**What agreement looks like.** State it before plotting. With $N$ samples in
+a bin of expected count $c$, sampling noise alone moves the bar by about
+$\sqrt{c}$, so agreement means the histogram tracks the curve within roughly
+$\pm\sqrt{c}$ per bin, with residuals of alternating sign across the range.
+A quantile-quantile plot is the sharper version of the same check.
+
+**Discrepancy that indicates a missing constraint.** A *systematic* residual
+with a shape: one tail consistently above the curve and the other below
+(skew, which the constraint list cannot represent because a quadratic
+exponent is symmetric, and which is fixed by adding $\langle x^3 \rangle$);
+both tails above and the centre below (excess kurtosis, calling for a
+heavier-tailed family, which on $[1,\infty)$ means constraining
+$\langle \log x \rangle$ instead and obtaining a power law); or two humps
+(the sample is a mixture, and no single-exponential-family fit will do). All
+three are the atmosphere's systematic bow in another guise.
+
+**Discrepancy that indicts the method instead.** Residuals with no structure
+but far larger than $\sqrt{c}$ point at the data, not the model: dependent
+samples, a drifting source, or a quantized measurement. Maximum entropy
+assumes the constraint values are known; if they are estimates from a small
+or non-stationary sample, the fitted density inherits that uncertainty and
+the whole apparatus is answering a question that was not asked.
+</Solution>
+</Exercise>
+
+<Exercise>
+A system has two microstates with energies $E_0 = 0$ and $E_1 = \varepsilon$
+and a fixed average energy. (a) Write the maximum-entropy distribution and
+identify the multiplier in physical units. (b) Take
+$\varepsilon = kT \ln 3$ and compute the distribution and its entropy in
+bits. (c) The system is now forced into the state $0$ with certainty, by
+whatever means. Compute the change in Shannon entropy, convert it to
+thermodynamic entropy using $S = k \ln 2$ per bit, and give the heat that
+must leave the system at $T = 300$ K if its energy is unchanged.
+
+<Solution>
+**(a)** One constraint, $f(i) = E_i$, so
+$p_i = e^{-\beta E_i}/Z$ with $Z = 1 + e^{-\beta\varepsilon}$ and $\beta$
+tuned to the average energy. Physics names the multiplier $\beta = 1/kT$.
+
+**(b)** With $\varepsilon = kT\ln 3$, the weights are $e^{0} = 1$ and
+$e^{-\ln 3} = \tfrac13$, so $Z = \tfrac43$ and
 $$
 p_0 = \frac{1}{4/3} = \frac34, \qquad p_1 = \frac{1/3}{4/3} = \frac14 .
 $$
-Entropy: $H = -\tfrac34 \log_2 \tfrac34 - \tfrac14 \log_2 \tfrac14 =
-0.811$ bits.
+Entropy: $H = -\tfrac34\log_2\tfrac34 - \tfrac14\log_2\tfrac14 = 0.811$
+bits.
 
-$T \to 0$: $\beta \to \infty$, $e^{-\beta\varepsilon} \to 0$, so
-$p \to (1, 0)$: all mass on the ground state, $H \to 0$. $T \to \infty$:
-$\beta \to 0$, both weights tend to $1$, so $p \to (\tfrac12, \tfrac12)$
-and $H \to 1$ bit: an infinitely weak multiplier leaves the uniform
-maximum-entropy distribution.
-</Solution>
-</Exercise>
+**(c)** Afterwards the distribution is $(1,0)$ with $H = 0$, so the Shannon
+entropy falls by $0.811$ bits. In thermodynamic units that is
+$\Delta S = -0.811 \times k \ln 2 = -0.811 \times 9.57\times10^{-24}
+= -7.76 \times 10^{-24}$ J/K. Entropy that leaves a system has to appear
+somewhere, and at fixed energy it leaves as heat: $Q = T|\Delta S| =
+300 \times 7.76\times10^{-24} = 2.33\times10^{-21}$ J.
 
-<Exercise>
-Logits $z = (1.5,\ 0.5,\ -0.5)$. Compute the softmax distribution and its
-entropy at $T = 1$, then show that adding a constant $c$ to every logit
-leaves the softmax unchanged, and connect that invariance to the
-partition function.
-
-<Solution>
-$T = 1$: exponentials $e^{1.5} = 4.482$, $e^{0.5} = 1.649$,
-$e^{-0.5} = 0.607$; $Z = 6.737$;
-$p = (0.665,\ 0.245,\ 0.090)$. Entropy:
-$H = -(0.665 \log_2 0.665 + 0.245 \log_2 0.245 + 0.090 \log_2 0.090)
-= 0.391 + 0.497 + 0.313 = 1.201$ bits.
-
-Shift invariance: replacing $z_i$ by $z_i + c$ multiplies every
-exponential by $e^{c/T}$, so
-$$
-\frac{e^{(z_i + c)/T}}{\sum_j e^{(z_j + c)/T}}
-= \frac{e^{c/T}\, e^{z_i/T}}{e^{c/T} \sum_j e^{z_j/T}}
-= \frac{e^{z_i/T}}{\sum_j e^{z_j/T}} .
-$$
-The normalizer absorbs the shift: $Z$ is multiplied by $e^{c/T}$ and the
-ratio is untouched. In multiplier language, $c$ shifts the constraint
-function by a constant, which changes only the bookkeeping term
-$\ln Z$, never the distribution; only logit differences carry
-information. (These logits are $z = (2.0, 1.0, 0.0)$ shifted by $-0.5$;
-the worked example's logits $(2.0, 1.0, 0.1)$ differ in the third entry,
-which is why its $p = (0.659, 0.242, 0.099)$ is close but not equal.)
-</Solution>
-</Exercise>
-
-<Exercise>
-Show that for any pmf $p$ on $\{1, \dots, 6\}$,
-$H(p) = \log_2 6 - D(p \,\|\, u)$ where $u$ is the uniform distribution,
-and evaluate $D(p^\ast \|\, u)$ for the Brandeis solution
-($H(p^\ast) = 2.328$ bits). Interpret the number.
-
-<Solution>
-Expand the divergence against the uniform $u_i = \tfrac16$:
-$$
-D(p \,\|\, u) = \sum_i p_i \log_2 \frac{p_i}{1/6}
-= \sum_i p_i \log_2 p_i + \log_2 6 \sum_i p_i
-= \log_2 6 - H(p),
-$$
-which rearranges to the claim. For the Brandeis solution:
-$D(p^\ast \|\, u) = 2.585 - 2.328 = 0.257$ bits.
-
-Interpretation: $0.257$ bits is the entropy the mean-$4.5$ constraint
-removed, measured as the coding overhead of the tilted die relative to a
-code built for a fair one. The constraint's information content and the
-KL divergence from the unconstrained maximizer are the same number, and
-the identity also shows that maximizing $H$ over a feasible set is
-minimizing $D(p \,\|\, u)$ over it: maximum entropy is minimum divergence
-from uniform.
+For the fully symmetric case, a two-state system at $p = (\tfrac12,
+\tfrac12)$ driven to a known state, the same arithmetic gives exactly one
+bit and $Q = kT\ln 2 = 2.87\times10^{-21}$ J at $300$ K. That number is
+Landauer's bound, the minimum heat dissipated when one bit is erased, and it
+is the subject of <Ref lesson="thermodynamics-of-information"/>: the
+identification $\beta = 1/kT$ made in this lesson by matching formulas turns
+out to have a measurable consequence in joules.
 </Solution>
 </Exercise>
 
 <References>
-1. E. T. Jaynes, "Information Theory and Statistical Mechanics," *Physical Review*, 106(4), 1957 — §2 states the principle and derives the multiplier solution and partition-function identities (eqs. 2-1 to 2-15); §3 recovers the Boltzmann distribution from the energy constraint; §6 frames maximum entropy as a method of reasoning; Appendix A gives the axiomatic uniqueness of $H$. https://bayes.wustl.edu/etj/articles/theory.1.pdf
-2. E. T. Jaynes, "Information Theory and Statistical Mechanics" (Brandeis Summer Institute lectures, 1962), in *Statistical Physics 3*, K. W. Ford (ed.), W. A. Benjamin, 1963 — the source of the Brandeis dice problem with the mean-4.5 constraint.
-3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 12: Theorem 12.1.1 proves the exponential form via $D(p\|q) \ge 0$; §12.2 works the uniform, geometric, and Gaussian examples; §12.3 exhibits the anomalous cases with no maximizer.
-4. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — §20: differential entropy, its coordinate dependence, and the Gaussian as the fixed-variance maximizer (property 5).
-5. A. L. Berger, S. A. Della Pietra, V. J. Della Pietra, "A Maximum Entropy Approach to Natural Language Processing," *Computational Linguistics*, 22(1), 1996 — maximum-entropy classifiers under feature-expectation constraints, deriving the exponential (log-linear, softmax) model form. https://aclanthology.org/J96-1002/
+1. E. T. Jaynes, "Information Theory and Statistical Mechanics," *Physical Review*, 106(4), 620–630, 1957 — §2 states the principle, derives the multiplier solution $p_i = \exp(-\lambda_0 - \sum_r \lambda_r f_r(x_i))$ and the partition-function identities (eqs. 2-1 to 2-14); §3 recovers the Boltzmann distribution from an energy constraint and identifies $\lambda_1 = 1/kT$ and $F = -kT\ln Z$. https://bayes.wustl.edu/etj/articles/theory.1.pdf
+2. E. T. Jaynes, "Information Theory and Statistical Mechanics. II," *Physical Review*, 108(2), 171–190, 1957 — §6 (p. 172) answers the objection that irreversibility is "merely a loss of human information", states the falsification condition quoted above, and concludes that the rules "become a methodology for a very general type of scientific reasoning". https://www.imsc.res.in/~sitabhra/teaching/asm17/Jaynes_PhysRev_108_171.pdf
+3. E. T. Jaynes, "Information Theory and Statistical Mechanics" (Brandeis Summer Institute lectures, 1962), in *Statistical Physics 3*, K. W. Ford (ed.), W. A. Benjamin, 1963, pp. 181–218 — §1 poses the dice problem with mean 4.5 and walks the candidate assignments of Figs. 1–6, including the linear ramp and its ceiling at $70/15$; §2 gives the general formalism; p. 187 separates information entropy from thermodynamic entropy. https://bayes.wustl.edu/etj/articles/brandeis.pdf
+4. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 12: Theorem 12.1.1 proves the exponential form via $D(p\|q) \ge 0$; Example 12.2.3 is Boltzmann's dice and the macrostate-counting argument; Example 12.2.5 is the exponential atmosphere; §12.3 constructs a constraint set whose entropy supremum is attained by no distribution.
+5. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §22.5 exercise 22.12 derives the maximum-likelihood moment-matching condition for exponential-family models and exercise 22.13 identifies it with maximum entropy, with MacKay's dissent on using maxent for inference in the accompanying note; ch. 23 catalogues which constraint yields which distribution. Free online: https://www.inference.org.uk/mackay/itila/
+6. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — §20: differential entropy, its dependence on the coordinate system, and property 5, the Gaussian as the fixed-variance maximizer. https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf
+7. A. L. Berger, S. A. Della Pietra, V. J. Della Pietra, "A Maximum Entropy Approach to Natural Language Processing," *Computational Linguistics*, 22(1), 1996 — §4 derives the log-linear model as the unique maximum-entropy solution under feature-expectation constraints and gives the duality with maximum likelihood. https://aclanthology.org/J96-1002/
+8. *U.S. Standard Atmosphere, 1976*, NOAA/NASA/USAF, NASA-TM-X-74335 — Table 1: geometric altitude against temperature and density, the source of the measured profile plotted above. https://ntrs.nasa.gov/citations/19770009539
 </References>

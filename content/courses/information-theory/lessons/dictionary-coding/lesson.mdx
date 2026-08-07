@@ -1,0 +1,976 @@
+Every code so far required the source distribution in advance; Lempel-Ziv
+coding replaces the distribution with the text already seen, and still
+converges to the entropy rate of any stationary ergodic source.
+
+The coding module has reached a coder that spends fewer than
+$-\log_2 p(x) + 2$ bits on a message of model probability $p(x)$, taking the
+model as a table of cumulative frequencies and asking nothing else of it
+(<Ref lesson="arithmetic-coding"/>). Two assumptions rode in with that
+table: that a model exists before the first symbol is read, and that
+counting symbols is the way to build one. This lesson removes both. It
+builds two coders that read a file with no probabilities attached, shows
+that their pointers are already code lengths of the right size, and fixes
+what *universal* does and does not promise.
+
+The route: why a measured frequency table is the wrong object to ship; the
+sliding window of LZ77, parsed frame by frame; the phrase dictionary of
+LZ78; the recurrence argument that prices a pointer at the surprisal of what
+it points to; the counting argument that bounds the phrase code; and the
+measured gap between the asymptotic promise and what `gzip` does to a
+100 KB file.
+
+## A file arrives with no distribution attached
+
+<Task>
+Closed book. Write down three things before reading on: what the arithmetic
+coder of <Ref lesson="arithmetic-coding"/> requires from a model at each
+symbol, the entropy rate of printed English measured in
+<Ref lesson="entropy-of-english"/>, and the per-letter figure that letter
+frequencies alone give. The first answer is one table of cumulative
+frequencies per symbol; the next two paragraphs confirm the others.
+</Task>
+
+The coder is neutral and the model is not, so all the compression lives in
+the model. That leaves the practical question of where a model comes from
+when a file is handed over with no annotation. Three answers are available
+without any of Ziv and Lempel's machinery, and none of them reaches the
+structure that makes a file of English compressible.
+
+**Ship a measured table.** Count the symbols, transmit the counts, then
+code. The counts are overhead: 256 byte frequencies at 16 bits each is 512
+bytes of header, which a 2 KB file cannot afford. Worse, the header prices
+only what the table can express.
+
+**Count in context instead.** A table of letter frequencies charges $4.03$
+bits per letter for English while the source itself carries about one
+(<Ref lesson="entropy-of-english"/>), so three bits per letter are lost to
+the model's ignorance of context. Recovering them means conditioning on the
+previous $r$ letters, and over a 27-symbol alphabet that is $27^r$ contexts:
+$19{,}683$ at $r = 3$ and $531{,}441$ at $r = 4$. The number of samples
+needed to estimate a distribution over $r$-blocks grows the same way, so the
+learn-then-compress route slows down exactly where the information is.
+
+**Count while coding.** The third answer is the adaptive model already built
+in <Ref lesson="arithmetic-coding"/>: the coder consults the model through a
+single interface, one cumulative frequency table per symbol, so the model
+may update itself from the symbols already sent and the decoder, holding
+those same symbols, updates identically. Nothing is transmitted and
+no sample of the source is needed in advance, which disposes of the header
+entirely. It does not dispose of the context problem. An adaptive counter of
+single characters still charges about $4.03$ bits per letter, and an
+adaptive counter over $r$-letter contexts still has $27^r$ cells to fill
+from the one file it is given, so the sample-size explosion above survives
+the switch from measuring to adapting.
+
+From that diagnosis one would expect the fix to be a better estimator —
+smoothing, priors, mixing over orders. Ziv and Lempel's answer estimates no
+probability at all. It replaces the distribution with an index into the text
+that has already been decoded, and the accounting works out anyway.
+
+<KeyFact>
+The decoder already holds every symbol emitted so far, so anything expressed
+as a reference backwards into that text is free to transmit. A compression
+scheme built only from such references never sends a model, never sends a
+header, and never has to decide what statistic was worth counting.
+</KeyFact>
+
+## LZ77: a pointer into what has already been sent
+
+The 1977 scheme makes the past text itself the dictionary. Fix a window
+length $W$; at each position, search the previous $W$ symbols for the
+longest run that matches the text starting here, and emit its distance back
+and its length in place of the symbols themselves.
+
+<Example title="parsing ABBABBABBBAABABA with a four-symbol window">
+Take $W = 4$, the string `ABBABBABBBAABABA`, and an empty window at the
+start. Positions are numbered from 1.
+
+**Position 1.** Nothing has been seen. Emit the literal `A`.
+
+**Position 2.** The window holds `A`; `B` does not occur in it. Emit the
+literal `B`.
+
+**Position 3.** The window holds `AB`. The symbol `B` occurs one back, and
+the match stops there because position 4 is `A` while the symbol after the
+match is `B`. Emit distance 1, length 1.
+
+**Position 4.** The window holds `ABB`, and the search may start as far back
+as position 1. Matching from position 1 gives
+`A`, `B`, `B`, `A`, `B`, `B` against positions 4 to 9: six symbols. Emit
+distance 3, length 6.
+
+**Position 10.** The window holds positions 6 to 9, `BABB`. The best match
+starts at position 6 and covers `BA`. Emit distance 4, length 2.
+
+**Position 12.** `A` occurs one back. Emit distance 1, length 1.
+
+**Position 13.** Matching from position 10 gives `BA`. Emit distance 3,
+length 2.
+
+**Position 15.** Matching from position 13 gives `BA`, and the string ends.
+Emit distance 2, length 2.
+
+The whole parse is `A`, `B`, `B`, `ABBABB`, `BA`, `A`, `BA`, `BA` — eight
+phrases for sixteen symbols, of which one phrase carries six.
+</Example>
+
+<FigureSequence
+  name="lz77-parse"
+  alt="Seven frames parsing ABBABBABBBAABABA with a four-symbol LZ77 window: each frame marks the window, arcs the current longest match from its earlier position to the cells being written, and appends the emitted phrase to the list below"
+  caption="One step per frame; the first frame emits both opening literals, so seven frames cover eight phrases. Watch frame 3: the match is six symbols long but starts only three back, so the copy reads cells it is in the middle of writing."
+/>
+
+<Definition title="LZ77 parse">
+Fix a window length $W$ and a string $x_1 x_2 \ldots x_n$. Suppose the
+string has been parsed up to position $i - 1$. Let $k$ be the largest
+integer for which some $j$ with $i - 1 - W \le j \le i - 1$ satisfies
+$x_{j+l} = x_{i+l}$ for all $0 \le l < k$. If $k \ge 1$, the next phrase is
+$x_i \ldots x_{i+k-1}$, transmitted as the pair $(d, \ell) = (i - j, k)$ of
+*distance* and *length*; if $k = 0$, the next phrase is the single symbol
+$x_i$, transmitted as a literal. A flag distinguishes the two cases.
+</Definition>
+
+Nothing in the definition asks what the symbols mean or how often they
+occur. The decoder maintains the same window, reads $(d, \ell)$, and copies
+$\ell$ symbols from $d$ positions back — which is why no dictionary is ever
+transmitted.
+
+<Exercise>
+Parse `AAABAAABAAAB` with $W = 8$ and an empty initial window, reporting the
+phrase list and the emitted literals and pairs. Then state the total number
+of phrases and compare it against the twelve symbols of the input.
+
+<Solution>
+**Position 1.** Empty window. Literal `A`.
+
+**Position 2.** `A` occurs one back. The match extends: positions 2 and 3
+are both `A`, and the source run at position 1 keeps supplying `A` because
+the copy overlaps itself. Position 4 is `B`, which stops it. Distance 1,
+length 2, covering positions 2 and 3.
+
+**Position 4.** `B` does not occur in the window. Literal `B`.
+
+**Position 5.** The window holds `AAAB`. Matching from position 1 gives
+`A`,`A`,`A`,`B`,`A`,`A`,`A`,`B` against positions 5 to 12: the match runs to
+the end of the string, length 8. Distance 4, length 8.
+
+Phrase list: `A`, `AA`, `B`, `AAABAAAB`. Four phrases for twelve symbols,
+and the last one carries eight of them.
+
+The transferable move: the parse gets cheaper as the string gets longer, not
+because the symbols change but because the window fills with material worth
+pointing at.
+</Solution>
+</Exercise>
+
+### The overlapping copy: run-length encoding falls out
+
+Frame 3 of the sequence emitted length 6 at distance 3, and length exceeding
+distance is not an error. The decoder copies one symbol at a time, so by the
+time it needs the fourth symbol of the match it has already written the
+first, and reads its own output.
+
+<Figure
+  src="./figures/overlap-copy.svg"
+  alt="A byte array containing X and Y followed by a copy instruction of distance 2 and length 5; a read pointer two cells behind a write pointer produces X, Y, X, Y, X one cell at a time"
+  caption="Distance 2, length 5, over the two bytes X Y: the read pointer never catches the write pointer, and a two-byte pattern is stamped out five times over."
+/>
+
+A run of $\ell$ identical bytes therefore costs one literal plus one pair
+with distance 1, whatever $\ell$ is. Run-length encoding is not a separate
+feature of the format; it is the degenerate case of a match.
+
+### The codeword budget: why short matches are rejected
+
+A pair is only worth emitting if it is shorter than the symbols it replaces.
+In the 1977 scheme that comparison is plain arithmetic on field widths,
+because every codeword has the same shape: a distance, a length, and one
+trailing literal, each at a width fixed in advance. Price that triple at the
+scale a modern format works at: a window of 32 KB and a match capped at 258
+bytes, which are the limits
+[DEFLATE](https://www.rfc-editor.org/rfc/rfc1951) sets. A distance in
+$1 \ldots 32768$ needs $\log_2 32768 = 15$ bits, a length in
+$3 \ldots 258$ needs $8$ bits, and a literal byte needs $8$: thirty-one bits
+a phrase, whatever the phrase covers.
+
+<Figure
+  src="./figures/triple-budget.svg"
+  alt="Three labelled bit fields — distance 15 bits, length 8 bits, literal 8 bits — totalling 31 bits, drawn above a bar of four 8-bit literal bytes totalling 32 bits"
+  caption="Thirty-one bits of fixed-width triple against thirty-two bits of literals: at these field widths a match of three is the shortest one that pays."
+/>
+
+The triple carries its trailing literal, so a match of length $\ell$ retires
+$\ell + 1$ bytes. At $\ell = 2$ that is $24$ bits of input against the
+triple's $31$: a loss. At $\ell = 3$ it is $32$ against $31$: a win, by a
+single bit. Under fixed-width fields a match of **two symbols or fewer** can
+never pay for its own pointer, which is the accounting the demo below
+charges and the reason every sliding-window format sets some floor on match
+length.
+
+<Remark>
+DEFLATE's floor is 3, and it is a fact about the format rather than about
+this margin: the shortest length its length codes can name is 3 (RFC 1951
+§3.2.5). Its own arithmetic is different, because it fixes no field width.
+A match carries no trailing literal, and lengths and distances are Huffman
+symbols with extra bits, so under the format's fixed tables a length-3 match
+at a distance of at most 4 costs $7 + 5 = 12$ bits against the $24$ that
+three literal bytes of text cost: a factor of two, not one bit in thirty-two.
+The rule survives the change of coding; the margin that motivates it does not.
+<Ref lesson="deflate-and-zstd"/> prices the real code lengths.
+</Remark>
+
+The 1977 paper writes the fixed-width budget in general form. With buffer
+length $n$ and maximum phrase length $L_s$, every codeword occupies
+
+$$
+L_c = 1 + \lceil \log (n - L_s) \rceil + \lceil \log L_s \rceil
+$$
+
+symbols of the source alphabet — the pointer, the length, and the one
+trailing literal, with no flag bit needed anywhere in the stream.
+The paper's worked illustration takes a ternary alphabet, $L_s = 9$ and
+$n = 18$, giving $L_c = 1 + 2 + 2 = 5$ ternary digits per phrase. Since no
+phrase exceeds $L_s$ symbols and the analysis shows the parse produces at
+most $(n - L_s)/(L_s - 1)$ phrases, the compression ratio is bounded by
+$L_c / (L_s - 1) = 5/8$ for that setting.
+
+<Demo
+  name="LZ77Window"
+  caption="Sliding-window LZ77 over text you type: the window, the current match, and the emitted triples with a running bit count."
+/>
+
+<Task>
+Three targets before the argument for universality. Build a 200-character
+input that the coder shrinks by more than ten times, and note how many
+phrases it used. Then build one it expands, and read off the expansion in
+bits. Then find the shortest input of any kind — eight characters or fewer —
+whose output is no larger than its input, and say what such an input has to
+look like.
+</Task>
+
+## LZ78: a dictionary built one phrase at a time
+
+The window of LZ77 forgets. A pattern that recurs every 50 KB is invisible
+to a 32 KB window, and lengthening the window lengthens every distance
+field. The 1978 scheme drops the window and keeps an explicit dictionary
+instead: each phrase entered into it stays available forever, addressed by
+an index rather than by a distance.
+
+<Example title="incremental parsing of ABBABBABBBAABABAA">
+Start with a dictionary holding only the empty phrase at index 0. At each
+step, read forward until the string just read is not already in the
+dictionary; that string is the new phrase, and it is added at the next free
+index.
+
+| step | phrase | longest known prefix | emitted pair | new index |
+| --- | --- | --- | --- | --- |
+| 1 | `A` | empty (0) | (0, `A`) | 1 |
+| 2 | `B` | empty (0) | (0, `B`) | 2 |
+| 3 | `BA` | `B` (2) | (2, `A`) | 3 |
+| 4 | `BB` | `B` (2) | (2, `B`) | 4 |
+| 5 | `AB` | `A` (1) | (1, `B`) | 5 |
+| 6 | `BBA` | `BB` (4) | (4, `A`) | 6 |
+| 7 | `ABA` | `AB` (5) | (5, `A`) | 7 |
+| 8 | `BAA` | `BA` (3) | (3, `A`) | 8 |
+
+Every phrase is one symbol longer than a phrase already in the dictionary,
+because the parser stopped as soon as the string became new. That is what
+makes the (index, symbol) pair sufficient: the index names the prefix, the
+symbol names the one extra character.
+
+**Bounds check.** Seventeen symbols were consumed and eight phrases emitted.
+With eight entries the index needs $3$ bits and the symbol needs $1$ bit
+over a two-letter alphabet, so the encoding occupies $8 \times 4 = 32$ bits
+against a $17$-bit input. On a string this short the scheme nearly doubles
+the file.
+</Example>
+
+<FigureSequence
+  name="lz78-trie"
+  alt="Seven frames growing the LZ78 dictionary as a tree over ABBABBABBBAABABAA, each frame adding one phrase as a node one edge below an existing node, with the emitted index-and-symbol pairs listed beside it"
+  caption="Each new phrase hangs one edge below a node that already exists. Watch that no frame ever adds a node without a parent."
+/>
+
+<Definition title="incremental parsing">
+A parsing of $x_1 x_2 \ldots x_n$ into phrases is *incremental* if all
+phrases are distinct and every phrase, with its last symbol deleted, equals
+an earlier phrase or the empty string. The LZ78 parse takes each phrase to
+be the shortest prefix of the remaining input that is not already a phrase,
+which makes the parsing incremental by construction, and codes phrase $j$ as
+the pair $(\pi(j), a)$ where $\pi(j)$ is the index of its prefix and $a$ its
+last symbol.
+</Definition>
+
+<Aside>
+Sending an uncompressed symbol with every phrase wastes the symbol's worth
+of bits. Welch's 1984 variant, LZW, removes it: the dictionary is
+pre-loaded with every single symbol of the alphabet, the extension character
+of one phrase is treated as the first character of the next, and the output
+is a bare stream of indices. LZW is what `compress` and the GIF format use.
+It is a variant of LZ78, not of LZ77, and the two families differ in their
+data structures as much as in their output: LZ77 keeps a buffer of raw text
+and addresses it by distance, LZ78 keeps a trie of phrases and addresses it
+by index.
+</Aside>
+
+<Exercise>
+Parse the binary string `011010001101` by incremental parsing, reporting the
+phrase list, the (index, symbol) pairs, and the number of bits the encoding
+occupies if every index is sent at a fixed width wide enough for the final
+dictionary.
+
+<Solution>
+Dictionary index 0 is the empty phrase.
+
+| step | phrase | prefix index | pair | new index |
+| --- | --- | --- | --- | --- |
+| 1 | `0` | 0 | (0, `0`) | 1 |
+| 2 | `1` | 0 | (0, `1`) | 2 |
+| 3 | `10` | 2 | (2, `0`) | 3 |
+| 4 | `100` | 3 | (3, `0`) | 4 |
+| 5 | `01` | 1 | (1, `1`) | 5 |
+| 6 | `101` | 3 | (3, `1`) | 6 |
+
+Consumed: $1 + 1 + 2 + 3 + 2 + 3 = 12$ symbols, matching the input length.
+
+Six phrases, so indices run from 0 to 6 and a fixed width of $3$ bits
+covers them; each pair is $3 + 1 = 4$ bits, giving $24$ bits for a $12$-bit
+input.
+
+The encoding is twice the input, and that is the expected outcome at this
+length: the dictionary is being built, not used. The bill only turns
+favourable once phrases grow long enough that one index replaces many
+symbols, which is what the counting argument below makes precise.
+</Solution>
+</Exercise>
+
+## The pointer is already the right length
+
+Neither scheme computes a probability, yet both are claimed to reach the
+entropy rate. The reconciliation for LZ77 is a single fact about stationary
+sources: how long you wait for a string to recur is the reciprocal of how
+probable it is, so the distance field is a surprisal in disguise.
+
+<Figure
+  src="./figures/recurrence.svg"
+  alt="A long sequence with the occurrences of one substring marked; the gaps between marks average 1/q, and the pointer field beneath is labelled log(1/q) bits"
+  caption="A substring of probability q recurs every 1/q positions on average, so naming the last occurrence costs about log₂(1/q) bits — its surprisal."
+/>
+
+<Theorem title="Kac's lemma">
+Let $\ldots, X_{-1}, X_0, X_1, \ldots$ be a stationary ergodic process on a
+finite alphabet, and let $L = \inf\{t > 0 : X_{-t} = X_0\}$ be the distance
+back to the previous occurrence of the current symbol. For any $u$ with
+$P[X_0 = u] > 0$,
+$$
+\mathbb{E}[L \mid X_0 = u] = \frac{1}{P[X_0 = u]} .
+$$
+
+<Proof>
+The plan: rewrite the conditional expectation as a tail sum, shift each term
+forward by stationarity, and recognise the result as the probability of a
+shift-invariant event that ergodicity forces to $1$.
+
+**Step 1, tail sum.** Writing $q = P[X_0 = u]$,
+$$
+\mathbb{E}[L \mid X_0 = u]
+= \sum_{t \ge 1} P[L \ge t \mid X_0 = u]
+= \frac{1}{q} \sum_{t \ge 1} P[X_{-t+1} \ne u, \ldots, X_{-1} \ne u,\, X_0 = u].
+$$
+
+**Step 2, shift.** Stationarity moves each event forward by $t - 1$ steps
+without changing its probability, so the $t$-th term equals
+$P[X_0 \ne u, \ldots, X_{t-2} \ne u,\, X_{t-1} = u]$: the event that the
+first occurrence of $u$ at or after time $0$ happens at time $t - 1$.
+
+**Step 3, disjointness.** Those events are disjoint over $t$, and their
+union is $\{\exists\, t \ge 0 : X_t = u\}$. Hence the sum equals
+$P[\exists\, t \ge 0 : X_t = u]$.
+
+**Step 4, ergodicity.** By stationarity $P[\exists\, t \ge k : X_t = u]$
+does not depend on $k$, so it equals $P[\exists\, t \in \mathbb{Z} : X_t = u]$.
+That event is shift-invariant, so ergodicity gives it probability $0$ or
+$1$; it is not $0$, because $q > 0$. The sum is therefore $1$ and the
+expectation is $1/q$.
+</Proof>
+</Theorem>
+
+Applying the lemma to the process of $n$-blocks $Y_t = (X_t, \ldots,
+X_{t+n-1})$ turns it into a statement about strings: the expected distance
+back to the previous occurrence of the particular block $x_0^{n-1}$ is
+$1 / p(x_0^{n-1})$. A coder that transmits only that distance therefore
+transmits a number whose logarithm is, on average, the block's surprisal.
+
+<Theorem title="recurrence coding reaches the entropy rate">
+Let $\{X_i\}$ be stationary and ergodic with entropy rate $H$, and suppose
+encoder and decoder both know the infinite past $\ldots, X_{-2}, X_{-1}$.
+Let $R_n$ be the distance back to the last occurrence of the block
+$X_0^{n-1}$, and let the codeword for the block be a prefix code for the
+integer $R_n$ of length $\log_2 R_n + 2 \log_2 \log_2 R_n + O(1)$. Then the
+expected length per symbol tends to $H$.
+
+<Proof>
+Both directions are needed: the code cannot beat $H$, and it does not lose
+to it.
+
+**Lower bound.** The block is recovered exactly from $R_n$ and the past, so
+the code is a lossless prefix code for $X_0^{n-1}$ given the past, and
+<Ref lesson="source-coding-theorem-lite"/> gives
+$\mathbb{E}[\ell] \ge H(X_0^{n-1} \mid X_{-\infty}^{-1}) = nH$.
+
+**Upper bound, main term.** Condition on the block and apply Jensen's
+inequality to the concave function $\log_2$:
+$$
+\frac{1}{n}\mathbb{E}[\log_2 R_n]
+= \frac{1}{n}\sum_{x} p(x)\, \mathbb{E}[\log_2 R_n \mid x]
+\le \frac{1}{n}\sum_{x} p(x) \log_2 \mathbb{E}[R_n \mid x] .
+$$
+Kac's lemma replaces $\mathbb{E}[R_n \mid x]$ by $1/p(x)$, so the right-hand
+side is $\tfrac{1}{n}\sum_x p(x)\log_2 \tfrac{1}{p(x)} = \tfrac{1}{n}
+H(X_0^{n-1})$, which decreases to $H$.
+
+**Upper bound, correction term.** Jensen again gives
+$\tfrac{1}{n}\mathbb{E}[\log_2\log_2 R_n] \le \tfrac{1}{n}\log_2
+\mathbb{E}[\log_2 R_n] \le \tfrac{1}{n}\log_2 H(X_0^{n-1})$. For large $n$
+the bracket is below $n(H + \varepsilon)$, so the term is at most
+$\tfrac{1}{n}(\log_2 n + \log_2(H+\varepsilon)) \to 0$. The $O(1)$ term
+divided by $n$ vanishes likewise.
+</Proof>
+</Theorem>
+
+<Task>
+Two comprehension checks on the proof. Name the step that would fail for a
+source whose statistics drift with position, and say which hypothesis it
+uses. Then explain why Jensen's inequality points the way it does here:
+$\log_2$ is concave, so $\mathbb{E}[\log_2 R] \le \log_2 \mathbb{E}[R]$, and
+the bound would be useless in the other direction because Kac's lemma
+controls $\mathbb{E}[R]$ and nothing else.
+</Task>
+
+<KeyFact>
+The theorem prices the *idealised* scheme, in which both parties hold the
+infinite past. At an entropy rate of half a bit, a 200-bit block recurs on
+average once in $2^{100}$ positions, so no real window ever contains it. The
+finite-window result is a separate theorem, proved by Wyner and Ziv in 1994,
+and it is what licenses `gzip` rather than this argument.
+</KeyFact>
+
+## Counting phrases, and the string that saturates the count
+
+The recurrence argument does not transfer to LZ78, whose codewords are
+dictionary indices rather than distances. Its optimality rests on a counting
+fact instead: a string cannot be cut into many distinct pieces, because
+there are not enough short distinct pieces to cut it into.
+
+Let $c(n)$ be the number of phrases an incremental parse produces. Each
+phrase costs an index and a symbol, so the encoding occupies about
+$c(n)\,[\log_2 c(n) + \log_2 \alpha]$ bits over an alphabet of size
+$\alpha$, and the whole question is how fast $c(n)$ can grow.
+
+<Example title="the most phrases a binary string of length n can have">
+Phrases are distinct, so a parse maximises their number by using the
+shortest ones available: both strings of length 1, then all four of length
+2, then all eight of length 3, and so on. Using every distinct string of
+length at most $k$ consumes
+$$
+n_k = \sum_{j=1}^{k} j\,2^j = (k-1)2^{k+1} + 2
+$$
+symbols and produces $\sum_{j=1}^{k} 2^j = 2^{k+1} - 2$ phrases.
+
+At $k = 3$: $n_3 = 2 \cdot 16 + 2 = 34$ symbols in $2^4 - 2 = 14$ phrases.
+At $k = 10$: $18{,}434$ symbols in $2046$ phrases. The phrase count grows
+like $n / \log_2 n$, not like $n$, because the phrases must lengthen as the
+short ones are used up.
+</Example>
+
+<Theorem title="phrase count of a distinct parse (Cover &amp; Thomas 13.5.3)">
+The number of phrases in any parse of a binary string of length $n$ into
+distinct pieces satisfies
+$$
+c(n) \le \frac{n}{(1 - \epsilon_n)\log_2 n},
+\qquad
+\epsilon_n = \min\left\{1, \tfrac{\log_2(\log_2 n) + 4}{\log_2 n}\right\}
+\to 0 .
+$$
+</Theorem>
+
+Two consequences follow at once. The per-symbol cost
+$c(n)[\log_2 c(n) + \log_2 \alpha] / n$ stays bounded no matter what the
+string is, so the scheme cannot blow up on adversarial input; and the term
+$c(n)\log_2 \alpha / n$ vanishes like $1/\log_2 n$, so asymptotically the
+entire rate is carried by $c(n)\log_2 c(n)/n$. Ziv's inequality bounds that
+quantity by the $k$-th order entropy of the string for every $k$, and
+letting $k$ grow gives the entropy rate.
+
+<Aside>
+Ziv's inequality is the step that converts counting into probability. For
+any distinct parsing of $x_1 \ldots x_n$ into $c$ phrases and any $k$-th
+order Markov measure, $\log_2 Q(x_1 \ldots x_n \mid \text{state}) \le
+-c \log_2 c + c\,(\text{terms in } k)$: a string with many distinct phrases
+cannot have high probability under any low-order model. Combined with the
+ergodic theorem it yields $\limsup c(n)\log_2 c(n)/n \le H$ almost surely.
+The proof is a grouping argument over phrases sharing a state, and the
+inequality holds for every distinct parsing, not only the LZ78 one.
+</Aside>
+
+### The string that attains the bound
+
+The extremal case of the counting lemma is not an artefact. Let $u(k)$ be
+the concatenation, in lexicographic order, of all $2^k$ binary words of
+length $k$, and let $u = u(1)u(2)u(3)\ldots$ be those blocks run together.
+Its first $34$ symbols are $u(1)u(2)u(3)$, which the incremental parse cuts
+into exactly the fourteen phrases
+
+$$
+0,\;1,\;00,\;01,\;10,\;11,\;000,\;001,\;010,\;011,\;100,\;101,\;110,\;111 .
+$$
+
+Those are precisely the shortest distinct pieces of the previous example, so
+$u$ saturates the count. The 1978 paper's converse runs the phrase count the
+other way: the *compressibility* of a sequence, meaning the best ratio any
+finite-state encoder can reach on it, is bounded **below** by
+$\limsup c(n)\log_2 c(n) / (n \log_2 \alpha)$. On $u$ that quantity is
+$$
+\frac{(2^{k+1}-2)\log_2 (2^{k+1}-2)}{(k-1)2^{k+1}+2}
+= 1.57 \;(k=3), \quad 1.22 \;(k=10), \quad 1.11 \;(k=20),
+$$
+decreasing to $1$. A ratio can never exceed $1$, so the compressibility of
+$u$ is exactly $1$: no finite-state encoder compresses it at all.
+
+<KeyFact>
+$u$ has a two-sentence description and is incompressible. Compressibility is
+not the same property as simplicity of description, and the gap between them
+is the subject of <Ref lesson="kolmogorov-complexity"/>, where a shortest
+*program* rather than a shortest finite-state encoding sets the limit.
+</KeyFact>
+
+## Universality is a limit, and it is approached from above
+
+Every result so far is asymptotic, and asymptotic results say nothing about
+a file. Measured on real inputs, the two schemes expand short files, lose to
+model-based coders on some long ones, and reach their promised rate only on
+material with the kind of repetition their pointers can address.
+
+**Short files expand.** `gzip` on an empty file produces 20 bytes: a 10-byte
+[gzip header](https://www.rfc-editor.org/rfc/rfc1952), an 8-byte trailer
+holding a CRC-32 and the original length, and 2 bytes for the empty DEFLATE
+stream. On 1,000 uniformly random bytes it produces 1,023 — the 18 bytes of
+framing plus a 5-byte stored-block header, the format's guaranteed worst
+case, since DEFLATE may abandon compression and store a block verbatim
+behind a 5-byte header covering up to 65,535 bytes. On 1,000 copies of one
+byte it produces 29, a ratio of 34 to 1.
+
+<Figure
+  src="./figures/ratio-vs-length.svg"
+  alt="Compressed size divided by input size plotted against input length on a log axis: the Lempel-Ziv curve starts above 1, crosses 1 near a hundred bytes, and flattens towards the entropy rate; a model-based coder is a flat line slightly above the rate"
+  caption="A coder given the source distribution is flat from the first byte; the universal coder starts above 1 and comes down to the same line, which is what asymptotic optimality means."
+/>
+
+### The claim that gzip should reach one bit per letter
+
+The theorems say the compression ratio converges to the entropy rate for any
+stationary ergodic source, and <Ref lesson="entropy-of-english"/> measured
+the entropy rate of English at about one bit per letter. The apparent
+conclusion is that `gzip` on an English file should approach one bit per
+character, or about 12% of an 8-bit encoding.
+
+It does not, and the failure is not a matter of a few percent. On the
+20,942-byte source file of MacKay's own chapter on stream codes, `gzip`
+produces 8,177 bytes, 39% of the input, which is $3.12$ bits per character —
+three times the entropy rate. Two distinct things are wrong with the
+inference.
+
+<Figure
+  src="./figures/coders-on-one-file.svg"
+  alt="Horizontal bars for four coders on the same 20,942-byte text file: a Laplace-model arithmetic coder at 62%, gzip at 39%, bzip2 at 36%, ppmz at 32%, with a dashed line at 12.5% marking one bit per character"
+  caption="No coder in the table comes within a factor of two of the entropy rate, and gzip is not even the best of them."
+/>
+
+**The convergence is logarithmic, and still not the main term.** The
+redundancy of a Lempel-Ziv code, meaning the amount by which its expected
+rate exceeds $H$, is known for both families: order $1/\log_2 n$ for LZ78
+and its variants, order $\log_2\log_2 n / \log_2 n$ for the sliding-window
+schemes `gzip` belongs to, with $n$ the length of the input. At
+$n = 20{,}942$ that second ratio is $3.8/14.4 = 0.27$, so the error term the
+theory admits is a quarter-sized effect at this length, against a measured
+gap of a factor of three. What accounts for the rest is the hypothesis
+behind the theorem rather than its speed: a pointer is priced at the
+recurrence time of the block it names, and after 20 KB most of the blocks
+English typically produces have not recurred once. MacKay states the
+boundary directly — the timescale on which universal performance is reached
+"may, for many sources, be unfeasibly long, because the number of typical
+substrings that need memorizing may be enormous".
+
+**The window sees repetitions, not statistics.** LZ77 profits from a
+repeated substring and from nothing else. English text is redundant mostly
+in a way that a pointer cannot address: the letter after `q` is almost
+certainly `u`, which a context model prices at a hundredth of a bit instead
+of the $5.2$ bits that letter frequencies charge, and which is worth nothing
+at all to a matcher unless the surrounding string has occurred before.
+
+**A source with statistics and no repeats defeats it outright.** Take a file
+of $10^6$ characters, each one `0` with probability $0.99$ and `1` with
+probability $0.01$, drawn independently. An ideal coder spends $H_2(0.01)$
+bits per character, about 10,100 bytes; the Laplace-model arithmetic coder
+reaches 14,143; `gzip` reaches 20,646, twice the ideal and the worst result
+in MacKay's comparison. Universality is a statement about the limit, and at
+any finite length a coder that models the source directly can beat a coder
+that only matches strings.
+
+<Figure
+  float="right"
+  width="s"
+  src="./figures/window-crossing.svg"
+  alt="Two pairs of bars: a 20 KB file and its doubling compress to 6,687 and 6,959 bytes; a 100 KB file and its doubling compress to 30,701 and 60,451 bytes"
+  caption="The same compressor and the same data. Doubling costs nothing when the repeat fits in the 32 KB window, and costs a full second copy when it does not."
+/>
+
+### The window is the sharpest boundary
+
+The finiteness of the window is measurable in one experiment. Take a
+100,892-byte English text and compress it: `gzip -6` gives 30,701 bytes.
+Concatenate the file with itself and compress again: 60,451 bytes, almost
+exactly twice. The second copy is a perfect repetition of the first, and
+`gzip` cannot see it, because the two copies are 100 KB apart and the window
+is 32 KB. Cut the file to 20,000 bytes first and the same experiment gives
+6,687 bytes and then 6,959: the second copy now costs 272 bytes, a ratio of
+74 to 1 against the first copy's 3 to 1. `zstd -19`, whose window is
+megabytes wide, compresses the 100 KB file to 28,599 bytes and its doubling
+to 28,617 — the second copy is free.
+
+<KeyFact>
+Nothing about the source changed between those two experiments, and nothing
+about the algorithm changed either. What changed was whether the redundancy
+fell inside the window, which is why every deployed format publishes its
+window size as a headline parameter (<Ref lesson="deflate-and-zstd"/>).
+</KeyFact>
+
+## What Lempel-Ziv replaces, and what it does not
+
+The scheme replaces the model, not the coder. LZ77 converts a byte stream
+into a stream of literals, distances and lengths; those symbols have
+strongly non-uniform frequencies of their own, short distances and length-3
+matches dominating, and they are still worth entropy-coding. DEFLATE does
+exactly that, feeding the LZ77 output into two canonical Huffman codes
+(<Ref lesson="huffman-by-hand"/>), and Zstandard feeds it into a finite-state
+entropy coder that reaches arithmetic-coding efficiency at table-lookup
+speed.
+
+<Aside>
+Ziv and Lempel name the weakness of their own scheme in the paper's
+introduction: susceptibility to error propagation. A single corrupted bit
+changes a distance or a length, which changes the reconstructed text, which
+changes every later match that points into the corrupted region; the damage
+does not decay. Formats therefore wrap the stream in framing and a
+checksum rather than trying to make the code itself robust. The 8-byte
+`gzip` trailer is a CRC-32 of the uncompressed data and its length, which
+detects the corruption without repairing it — repair is the business of the
+channel module.
+</Aside>
+
+What is now established: a compressor can attain the entropy rate of a
+source it was never told anything about, by pointing at text it has already
+transmitted; the pointer's length is the surprisal of what it points to, by
+Kac's lemma for LZ77 and by a phrase count for LZ78; and the convergence is
+asymptotic, logarithmic, and bounded in practice by a finite window. What is
+not established is how the pointers are packed into bits. Every field in
+this lesson was priced at a fixed width, and no deployed format does that.
+<Ref lesson="deflate-and-zstd"/> reads two of them field by field, and
+<Ref lesson="language-models-as-compressors"/> uses `gzip` as the baseline
+against which a trained predictor is measured.
+
+## Exercises
+
+<Exercise>
+Parse `AABABBBABAABABBB` by LZ78 incremental parsing. Report the phrase list
+and the emitted (index, symbol) pairs, and state the compressed size in bits
+if each index is sent at the fixed width the final dictionary requires.
+
+<Solution>
+Index 0 is the empty phrase.
+
+| step | phrase | prefix index | pair | new index |
+| --- | --- | --- | --- | --- |
+| 1 | `A` | 0 | (0, `A`) | 1 |
+| 2 | `AB` | 1 | (1, `B`) | 2 |
+| 3 | `ABB` | 2 | (2, `B`) | 3 |
+| 4 | `B` | 0 | (0, `B`) | 4 |
+| 5 | `ABA` | 2 | (2, `A`) | 5 |
+| 6 | `ABAB` | 5 | (5, `B`) | 6 |
+| 7 | `BB` | 4 | (4, `B`) | 7 |
+
+Lengths sum to $1+2+3+1+3+4+2 = 16$, matching the input.
+
+Seven phrases, so indices run to 7 and need $3$ bits; each pair is
+$3 + 1 = 4$ bits, giving $28$ bits against a $16$-bit input.
+
+Note the shape of the parse: phrases 2, 3, 5 and 6 form a chain, each
+extending the previous by one symbol, which is what the trie picture shows
+as a single deepening path.
+</Solution>
+</Exercise>
+
+<Exercise>
+A boundary probe at both extremes. Compress 1,000 identical bytes with
+`gzip`, then 1,000 bytes drawn uniformly at random, and report both sizes
+and both ratios. Identify which case exceeds the input length, by how much,
+and account for every byte of the excess. Predict the two sizes before you
+run the commands.
+
+<Solution>
+With `gzip 1.12` and the `-n` flag, so that no filename or timestamp is
+stored:
+
+- 1,000 identical bytes compress to **29 bytes**, a ratio of about 34 to 1.
+  The whole file is one literal followed by one match of length 999 at
+  distance 1, which is the overlapping copy, plus the Huffman tables DEFLATE
+  emits for the block.
+- 1,000 uniform random bytes compress to **1,023 bytes**, a ratio of
+  $0.978$ to 1: an expansion of 23 bytes.
+
+The excess accounts exactly. The `gzip` framing is 18 bytes: a 10-byte
+header (magic number, compression method, flags, timestamp, extra flags, OS)
+and an 8-byte trailer (CRC-32 and the input length modulo $2^{32}$). The
+remaining 5 bytes are the header of a DEFLATE stored block: 3 bits of block
+type padded to a byte boundary, then LEN and NLEN at 2 bytes each.
+
+The random case is the format's worst case rather than an accident. Random
+bytes contain no repeated substring worth pointing at and their byte
+frequencies are flat, so both stages of DEFLATE fail, and the encoder falls
+back to storing the block verbatim. No compressor can do better on this
+input: the counting argument in the last exercise shows that most files are
+incompressible, and uniform random bytes are drawn from exactly that
+majority.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim: *"Lempel-Ziv compression attains the entropy rate, and
+English has an entropy rate of about one bit per letter, so `gzip` on an
+English text file will produce about one bit per character."* Measure what
+`gzip` actually achieves on a text file of at least 100 KB, convert it to
+bits per character, and give two distinct reasons for the gap — one about
+the asymptotics, one about what LZ77's window can see. Then say which of the
+coders in this module you would reach for if the file were 2 KB of English,
+and which if it were 2 MB of log lines, without naming the mechanism first.
+
+<Solution>
+**The measurement.** On a 100,892-byte English text, `gzip -6` gives 30,701
+bytes, which is $30{,}701 \times 8 / 100{,}892 = 2.43$ bits per character.
+On MacKay's 20,942-byte chapter source the published figure is 8,177 bytes,
+or $3.12$ bits per character. Both are two to three times the entropy rate,
+and the direction of the gap is always the same.
+
+**Reason one: the asymptotics have barely started.** The redundancy of a
+sliding-window code falls like $\log_2\log_2 n / \log_2 n$, which at
+$n = 10^5$ is $0.24$, a quarter-sized correction against a measured gap of a
+factor of two and a half. The larger part is the hypothesis under which the
+theorem prices a pointer: that the block being coded has occurred before,
+within reach. A source of entropy rate $1$ bit per character produces about
+$2^{100}$ distinct 100-character strings, so at $10^5$ characters almost
+every long block in the file is being seen for the first time and can only
+be sent as literals.
+
+**Reason two: the window addresses repeats, not statistics.** The one bit
+per letter measured by the guessing game comes from a human predictor using
+grammar, spelling and meaning. LZ77 has access to none of that. It profits
+only from literal repetition of substrings that occurred within the last
+32 KB, which in ordinary prose means common words and phrases, not the
+letter-level structure that makes English predictable.
+
+**The strategy question.** For 2 KB of English, a coder that spends
+fractional bits under a small adaptive model wins: at that length a
+dictionary has no time to fill and the framing is a measurable fraction of
+the output (<Ref lesson="arithmetic-coding"/>). For 2 MB of log lines,
+matching wins outright: log files repeat whole templates, and one pair of
+integers replaces a hundred bytes at a stroke. The cue that decides is
+whether the redundancy is in the symbol statistics or in repeated literal
+substrings.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the accounting the lesson only quoted. Show that if a string of
+length $n$ over an alphabet of size $\alpha$ parses into $c$ distinct
+phrases then the encoded length is about $c\,(\log_2 c + \log_2 \alpha)$
+bits, and state what has to be true of $c/n$ for that to be competitive with
+$nH$. Then use the counting bound $c \le n/((1-\epsilon_n)\log_2 n)$ to
+check that the condition holds for every string.
+
+<Solution>
+**The length.** Each phrase is transmitted as a pair: an index into the
+dictionary of phrases already created, and one extension symbol. With $c$
+phrases the index needs $\lceil \log_2 c \rceil$ bits at fixed width, and
+the symbol needs $\lceil \log_2 \alpha \rceil$ bits. Summing over phrases
+gives $c\,(\log_2 c + \log_2 \alpha)$ bits up to the two ceilings, which
+contribute at most $2c$ bits in total.
+
+**The condition.** Per source symbol the cost is
+$$
+\frac{c \log_2 c}{n} + \frac{c \log_2 \alpha}{n} ,
+$$
+and this is competitive with $H$ only if the second term vanishes, that is
+if $c/n \to 0$. The first term is then the whole rate, and the requirement
+is $c\log_2 c/n \to H$.
+
+**The check.** The counting bound gives $c/n \le 1/((1-\epsilon_n)\log_2 n)$,
+which tends to $0$ for every string, at speed $1/\log_2 n$. So the symbol
+field is always asymptotically free, and the phrase-count term always
+governs. This is also why the scheme cannot be sabotaged: no input makes
+$c/n$ stay bounded away from zero, so no input makes the extension symbols
+dominate.
+
+**Where it is tight.** The sequence $u$ of the lesson attains
+$c\log_2 c/n \to 1$, so on that string the encoded length matches the input
+length in the limit and the bound cannot be improved.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson asserted three things about the 1978 paper's sequence
+$u = u(1)u(2)u(3)\ldots$, where $u(k)$ lists all $2^k$ binary words of length
+$k$ in lexicographic order, and proved none of them. Show that the
+incremental parse of the prefix $u(1)\ldots u(k)$ cuts it exactly at the word
+boundaries, so that it produces $c_k = 2^{k+1} - 2$ phrases over
+$n_k = (k-1)2^{k+1} + 2$ symbols. Then show that $c_k \log_2 c_k / n_k$
+exceeds $1$ for every $k \ge 2$ while converging to $1$, and say which of
+those two facts a compressor meets on a file.
+
+<Solution>
+**The parse cuts at word boundaries.** Induct on $j$, with the hypothesis
+that after $u(1)\ldots u(j-1)$ the dictionary holds exactly the binary words
+of length $\le j - 1$. For $j = 1$ the parse of `01` takes `0` then `1`,
+leaving both words of length 1. Now read $u(j)$, and let $w$ be the next word
+in it. Every proper prefix of $w$ has length $\le j - 1$ and so is already a
+phrase, which forbids the parser stopping early; and $w$ itself is not a
+phrase, since the dictionary holds only shorter words and the length-$j$
+words that precede $w$ lexicographically. The shortest prefix of the
+remainder that is not already a phrase is therefore $w$ exactly. After
+$u(j)$ the dictionary holds every word of length $\le j$, which closes the
+induction.
+
+**The two counts.** Every word of length $j \le k$ becomes one phrase, so
+$c_k = \sum_{j=1}^{k} 2^j = 2^{k+1} - 2$. For the length, put
+$S = \sum_{j=1}^{k} j2^j$ and subtract:
+$$
+2S - S = \sum_{i=2}^{k+1} (i-1)2^i - \sum_{i=1}^{k} i\,2^i
+= k\,2^{k+1} - \sum_{i=2}^{k} 2^i - 2 = (k-1)2^{k+1} + 2 = n_k .
+$$
+
+**The ratio exceeds 1.** Write $m = 2^{k+1}$, so $c_k = m - 2$ and
+$n_k = (k-1)m + 2$. For $k \ge 2$ we have $m \ge 8$, hence $m - 2 > m/2$ and
+$\log_2 c_k > k$. Then
+$$
+c_k \log_2 c_k > k(m-2) = km - 2k \ge km - m + 2 = n_k ,
+$$
+the second inequality being $m \ge 2k + 2$, that is $2^k \ge k+1$, true for
+every $k \ge 1$. So the phrase code emits strictly more bits than the prefix
+contains, at every finite $k$.
+
+**And converges to 1.** In the other direction $c_k < m$ and
+$\log_2 c_k < k+1$, while $n_k > (k-1)m$, so
+$$
+1 < \frac{c_k \log_2 c_k}{n_k} < \frac{k+1}{k-1} \to 1 .
+$$
+The upper bound is what the lesson's decreasing values approach: at $k = 10$
+it gives $11/9 = 1.22$ against the true $1.221$.
+
+**Which fact a compressor meets.** The limit is the theorem; the strict
+inequality is the file. Every prefix of $u$ comes out longer than it went in,
+and the best any finite-state encoder can promise in the limit is to break
+even, which is what $\rho(u) = 1$ says.
+</Solution>
+</Exercise>
+
+<Exercise>
+A measurement with a prediction attached. Take a text file of about 100 KB.
+Compress it with `gzip`, with `gzip -1`, and with `zstd -19`, and record all
+three sizes. Then concatenate the file with itself, repeat, and record the
+three sizes again. Before running the second half, predict which sizes
+roughly double and which do not. Explain the outcome in terms of one
+parameter.
+
+<Solution>
+On a 100,892-byte English text:
+
+| input | `gzip -1` | `gzip -6` | `zstd -19` |
+| --- | --- | --- | --- |
+| the file | 36,447 | 30,701 | 28,599 |
+| the file twice | — | 60,451 | 28,617 |
+
+The `gzip` output roughly doubles; the `zstd` output does not move. The
+parameter is the window. DEFLATE's window is 32,768 bytes, so when the
+second copy begins, the matching text is 100 KB behind and has fallen out of
+the window; the encoder compresses it from scratch. `zstd -19` uses a window
+of several megabytes, so the entire second copy is expressed as a small
+number of long matches and costs 18 bytes.
+
+**The control.** Truncate the file to 20,000 bytes and repeat: 6,687 bytes
+for one copy and 6,959 for two. The repeat now fits inside 32 KB, and
+`gzip` behaves like `zstd` did. The compressor did not change; the relation
+between the repeat distance and the window did.
+
+**What would count as agreement.** Your absolute sizes will differ with the
+text — 2.2 to 3.3 bits per character is the usual range for English prose —
+but the two ratios should not. The doubled-file size divided by the
+single-file size should land near $2$ for `gzip` on a file well over 32 KB
+and near $1$ for `zstd -19`, and the crossover should occur when the file
+length passes the window size.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compress a file, then compress the compressed file, and report both sizes.
+Now prove that the outcome was not bad luck. Count the strings: show that no
+lossless compressor can shrink every input, and estimate what fraction of
+all 1 KB files any compressor can shrink by at least 10 bits.
+
+<Solution>
+**The measurement.** Compressing a `.gz` file again always makes it larger,
+typically by 20 to 30 bytes: the second pass finds no exploitable repetition
+in an already-compressed stream and pays the framing plus a stored-block
+header.
+
+**The counting argument.** A lossless compressor is an injective map from
+binary strings to binary strings. There are $2^n$ strings of length exactly
+$n$, and only $2^n - 1$ strings of length strictly less than $n$
+($1 + 2 + 4 + \cdots + 2^{n-1}$). Injectivity therefore forbids mapping all
+$2^n$ inputs to shorter outputs: at least one string of each length must not
+shrink. Compression is a redistribution, not a creation — every input made
+shorter forces another input to be made longer.
+
+**The fraction.** Fix $k$ and ask how many strings of length $n$ can be
+mapped to outputs of length at most $n - k$. The number of available output
+strings is $2^{n-k+1} - 1 < 2^{n-k+1}$, so by injectivity at most that many
+inputs can be shrunk by $k$ bits or more, a fraction below
+$2^{n-k+1}/2^{n} = 2^{-k+1}$. With $k = 10$ the fraction is below
+$2^{-9} = 1/512$: fewer than one 1 KB file in 500 can be shrunk by even ten
+bits, whatever the compressor. The bound does not depend on $n$, so it holds
+for 1 KB files and for 1 GB files alike.
+
+**Where this goes.** The argument used no probabilities and no algorithm,
+only injectivity and a count of strings, which makes it a bound on every
+possible compressor rather than on any particular one. It is the same
+counting bound that fixes the incompressibility of most strings in
+<Ref lesson="kolmogorov-complexity"/>, where the shortest program printing a
+string replaces the shortest output of a fixed compressor and the same
+$2^{-k+1}$ fraction reappears.
+</Solution>
+</Exercise>
+
+<References>
+1. J. Ziv, A. Lempel, "A Universal Algorithm for Sequential Data Compression," *IEEE Transactions on Information Theory*, IT-23(3), May 1977, pp. 337–343 — §I states the copying idea and names error propagation as the scheme's drawback; §II gives the reproducible-extension definition, the micro-example $S = 00101011$ with pointer $p = 2$, the fixed codeword length $L_c = 1 + \lceil \log(n - L_s)\rceil + \lceil \log L_s \rceil$, and the ternary worked example at $L_s = 9$, $n = 18$; §III-C proves the bound $\rho \le L_c/(L_s - 1)$ and Theorem 2 the universality claim. https://courses.cs.duke.edu/spring03/cps296.5/papers/ziv_lempel_1977_universal_algorithm.pdf
+2. J. Ziv, A. Lempel, "Compression of Individual Sequences via Variable-Rate Coding," *IEEE Transactions on Information Theory*, IT-24(5), September 1978, pp. 530–536 — §II defines incremental parsing at eq. (12) and the integer encoding of a phrase; eq. (8) gives the parse of $u(1)u(2)u(3)$ used above, and the paragraph before it derives $\rho(u) = 1$; Theorem 3 identifies compressibility with $H(x)$ and Theorem 4 gives $\Pr[\rho(x) = H] = 1$ for an ergodic source of entropy $H$. https://www.philippe-fournier-viger.com/spmf/lz78.pdf
+3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §13.4.1 gives the sliding-window algorithm in the Storer–Szymanski form and the parse of `ABBABBABBBAABABA` at $W = 4$ used here; §13.4.2 the LZ78 parse and its pairs; §13.5.1 Kac's lemma (Lemma 13.5.2) and the recurrence-time theorem; §13.5.2 the phrase-count bound (Lemma 13.5.3) and Ziv's inequality (Lemma 13.5.5).
+4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441, Spring 2016) — §9.6 states the three observations behind Lempel-Ziv, proves Kac's lemma in five lines by stationarity and ergodicity, and gives the Jensen argument reproduced above as Theorem 9.1; §9.5 explains why estimating an $r$-block distribution needs a sample exponential in $r$. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
+5. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §6.4 gives the basic dictionary algorithm with the worked encoding of `1011010100010` and the remark on the unfeasibly long timescale quoted above; §6.5 Table 6.6 reports the 20,942-byte text file at 8,177 bytes for `gzip` against 12,974 for a Laplace-model arithmetic coder, and Table 6.7 the $10^6$-character 99/1 file at 20,646 bytes for `gzip` against 14,143 and an ideal 10,100. Free online: https://www.inference.org.uk/mackay/itila/
+6. L. P. Deutsch, "DEFLATE Compressed Data Format Specification version 1.3," RFC 1951, IETF, 1996 — §3.2.4 specifies the stored block and its 5-byte header with the 65,535-byte LEN limit; §3.2.5 gives the length codes (3 to 258) and distance codes (1 to 32,768) whose widths are totalled above. https://www.rfc-editor.org/rfc/rfc1951
+7. P. Deutsch, "GZIP file format specification version 4.3," RFC 1952, IETF, 1996 — §2.2 and §2.3 fix the 10-byte member header and the 8-byte trailer (CRC-32 and ISIZE) that make up the 18 bytes of framing measured above. https://www.rfc-editor.org/rfc/rfc1952
+8. A. D. Wyner, J. Ziv, "The Sliding Window Lempel-Ziv Algorithm Is Asymptotically Optimal," *Proceedings of the IEEE*, 82(6), June 1994, pp. 872–877 — the finite-window result asserted above, which the idealised infinite-past theorem of this lesson does not cover.
+9. T. A. Welch, "A Technique for High-Performance Data Compression," *IEEE Computer*, 17(6), 1984, pp. 8–19 — the LZ78 variant that preloads the dictionary with the alphabet and emits indices only, used by `compress` and GIF.
+10. S. R. Kosaraju, G. Manzini, "Compression of Low Entropy Strings with Lempel–Ziv Algorithms," *SIAM Journal on Computing*, 29(3), 2000, pp. 893–911 — §1 collects the redundancy rates quoted above: $O(1/\log n)$ for LZ78 and many of its variants, $O(\log\log n/\log n)$ for two variants of LZ77 (the underlying analyses are Louchard &amp; Szpankowski 1997 and Savari 1997, 1998). The body of the paper drops the ergodic-source assumption and bounds both schemes against the empirical entropy of each individual string instead. https://epubs.siam.org/doi/10.1137/S0097539797331105
+
+Measurements reported in this lesson were made with `gzip 1.12` and
+`zstd 1.5.5` on the files described in place; the published figures are
+MacKay's Tables 6.6 and 6.7.
+</References>

@@ -1,61 +1,125 @@
 Lossy compression trades bits for fidelity, and the rate-distortion function
 R(D) = min I(X;X-hat) subject to expected distortion at most D is the fewest
-bits per symbol that buy reconstruction within tolerance D. This lesson
-prices two crude schemes on a fair-bit stream, defines distortion measures
-and the rate-distortion function, pins down the function's endpoints and
-shape, computes it exactly for a Bernoulli source under Hamming distortion,
-states the Gaussian squared-error result, and closes where the theory runs
-in practice today: neural codecs trained to minimize $R + \lambda D$.
+bits per symbol that buy reconstruction within tolerance D.
 
-## Two crude schemes: lossy coding priced on a fair-bit stream
+The course has priced exact description twice. Entropy is the floor on
+lossless bits per symbol (<Ref lesson="source-coding-theorem-lite"/>), and
+capacity is the ceiling on reliable bits per channel use
+(<Ref lesson="channel-capacity"/>); both are mutual informations attached to
+a fixed distribution. Neither limit governs a photograph or an audio stream,
+which are never reconstructed exactly and never need to be. This lesson drops
+exactness, replaces it with a numerical fidelity budget, and finds that the
+resulting limit is again a mutual information, minimised over channels
+rather than maximised over inputs.
 
-A source emits fair, independent bits. The lossless price is settled:
-$H(X) = 1$ bit per symbol, the floor of
-<Ref lesson="source-coding-theorem-lite"/>, met here by copying the stream.
-Now fix a budget of half a bit per symbol. Perfect reconstruction is
-impossible below the floor; the open quantity is how much error the budget
-forces.
+The route: a 100-bit game whose optimum beats the obvious scheme by more than
+a factor of two, the definition of a distortion measure and of $R(D)$, the
+two classical closed forms, the covering geometry that explains the game, and
+the gap between the curve and a quantizer anyone can build.
 
-Two schemes bracket the problem:
+## The Hamming game: 100 bits written down in 50
 
-- **Send nothing** (rate 0). The decoder outputs all zeros. Each source bit
-  disagrees with its reconstruction with probability $\tfrac12$: half the
-  stream is wrong.
-- **Send every other bit** (rate $\tfrac12$). Odd positions arrive exactly;
-  even positions are guessed, each wrong with probability $\tfrac12$.
-  Average error fraction:
-  $\tfrac12 \cdot 0 + \tfrac12 \cdot \tfrac12 = \tfrac14$.
+Before any theory, the trade can be posed as a concrete problem with a
+checkable answer.
 
-Rate one-half buys a 25% error fraction this way. The theory of this lesson
-puts the true optimum at rate one-half near **11% errors**, and section 4
-computes it; the schemes that approach it code long blocks jointly instead
-of deciding bit by bit.
+<Task>
+Closed book, from the prerequisites. (1) State the entropy of one fair,
+independent bit and the fewest bits per symbol any lossless code for that
+source can average. (2) Write $I(X;Y)$ as a difference of entropies. (3) For
+a Markov chain $X \to W \to \hat X$, state the inequality the data-processing
+result of <Ref lesson="data-processing-inequality"/> puts on
+$I(X; \hat X)$. Then open the fold and check.
+</Task>
 
-### Distortion: the error metric is part of the problem statement
+<Aside>
+(1) $H(X) = 1$ bit; the source coding theorem
+(<Ref lesson="source-coding-theorem-lite"/>) puts the floor for lossless
+coding at exactly $H(X) = 1$ bit per symbol, met by copying the stream.
+(2) $I(X;Y) = H(X) - H(X \mid Y) = H(Y) - H(Y \mid X)$, the drop in
+uncertainty about either variable on observing the other
+(<Ref lesson="mutual-information"/>). (3)
+$I(X; \hat X) \le I(X; W)$: nothing computed from $W$ knows more about $X$
+than $W$ does.
+</Aside>
 
-Counting "wrong bits" silently chose an error metric. The general theory
-takes that choice as an explicit input.
+**The game.** One hundred fair, independent bits are shown to you. You may
+write anything you like on a slip of paper that holds at most 50 bits. The
+slip is then all you have: from it you must guess all 100 original bits, and
+your score is the fraction you get wrong. Decide on a scheme and write down
+the error fraction it achieves before reading on.
+
+Two schemes bracket the answer. Writing nothing gives a decoder that outputs
+all zeros and is wrong on half the bits. Copying 50 of the bits exactly and
+guessing the other 50 is wrong on half of the guessed half: an error fraction
+of $\tfrac12 \cdot 0 + \tfrac12 \cdot \tfrac12 = \tfrac14$. The second scheme
+is the one most readers write down, and 25% is not the optimum. The best slip
+is wrong on **11%** of the bits: exactly 11% in the long-block limit that
+$R(D)$ describes, and a shade above it for a single block of 100.
+
+<Figure
+  src="./figures/hamming-game-tally.svg"
+  alt="Two ten-by-ten grids of 100 bits: the store-half-and-guess scheme with 25 amber squares marking wrong bits, and the optimal 50-bit description with 11 amber squares, both under the same half-bit-per-symbol budget"
+  caption="Same 50-bit budget, two schemes: storing half the bits and guessing the rest is wrong on 25 bits; the long-block optimum is wrong on 11, a count a single 100-bit block approaches but does not reach."
+/>
+
+The gap is not a coding trick applied bit by bit. The naive scheme decides
+each bit's fate separately, stored or guessed, and any scheme that treats
+the bits one at a time is stuck at 25%. The optimum describes all 100 bits
+with one joint description, and joint description is strictly stronger even
+though the bits are independent and the score treats them all alike.
+
+<KeyFact>
+The gap is a property of block length rather than of effort: at $n = 1$
+nothing beats 25%, at $n = 100$ a real code lands near but not on 11%, and
+only the long-block limit reaches it. Deciding one bit at a time pins the
+reconstruction points to a rectangular grid, and grid cells waste more of
+their volume in their corners the more dimensions they have.
+</KeyFact>
+
+## The distortion measure is chosen, not discovered
+
+Scoring the game by the fraction of wrong bits was a choice, made silently.
+The general theory refuses to make it silently: the error metric is an input
+to the problem, supplied before any rate can be computed.
 
 <Definition title="distortion measure">
 A **distortion measure** on a source alphabet $\mathcal{X}$ and a
 reconstruction alphabet $\hat{\mathcal{X}}$ is a function
-$d : \mathcal{X} \times \hat{\mathcal{X}} \to [0, \infty)$. For blocks,
-distortion is averaged per symbol:
-$d(x^n, \hat x^n) = \tfrac1n \sum_{i=1}^n d(x_i, \hat x_i)$. The two
-standard instances:
-
-- **Hamming distortion** for discrete alphabets:
-  $d(x, \hat x) = 1$ if $x \ne \hat x$, else $0$. Its average is the
-  fraction of misreconstructed symbols.
-- **Squared error** for real alphabets: $d(x, \hat x) = (x - \hat x)^2$.
-  Its average is the mean squared error of the reconstruction.
+$d : \mathcal{X} \times \hat{\mathcal{X}} \to [0, \infty)$. For blocks it is
+averaged per symbol,
+$d(x^n, \hat x^n) = \tfrac1n \sum_{i=1}^n d(x_i, \hat x_i)$, and the measure
+is *bounded* when $\max_{x, \hat x} d(x, \hat x) < \infty$.
 </Definition>
 
-Both crude schemes above are points in a plane: coordinates
-$(D, R)$, distortion paid against rate spent. Send-nothing sits at
-$(\tfrac12, 0)$, send-every-other-bit at $(\tfrac14, \tfrac12)$. The
-subject of this lesson is the exact boundary between the $(D, R)$ pairs
-some code achieves and the pairs none does.
+Four instances fix what the definition admits.
+
+- **The canonical case.** *Hamming distortion* on a discrete alphabet:
+  $d(x, \hat x) = 1$ if $x \ne \hat x$ and $0$ otherwise. Its average is the
+  fraction of misreconstructed symbols, the game's score.
+- **A different surface, the same structure.** *Squared error* on the reals:
+  $d(x, \hat x) = (x - \hat x)^2$, averaging to the mean squared error. The
+  alphabets are infinite and the values unbounded, but the object is the same
+  two-argument function.
+- **A degenerate but admissible case.** $d \equiv 0$ is a distortion measure.
+  Every reconstruction meets every budget, so $R(D) = 0$ for all $D \ge 0$:
+  the definition covers the case in which nothing is required and returns
+  the right answer.
+- **The near miss.** The log-loss "distortion"
+  $d(x, \hat x) = -\log_2 \hat x(x)$, with $\hat x$ a distribution over
+  $\mathcal{X}$, breaks exactly one clause — the codomain. It takes the value
+  $+\infty$ wherever the reconstruction assigns probability zero to the symbol
+  that occurred, and $+\infty$ is not a member of $[0, \infty)$. Restricted to
+  reconstructions that give every symbol positive probability it is
+  admissible, and still unbounded. Boundedness is the hypothesis the
+  achievability theorem below needs: with $\max d$ infinite, one atypical
+  block can carry arbitrarily large distortion and the block average stops
+  concentrating.
+
+Nothing in the definition ranks these. Squared error is used on images and
+audio because it is quadratic, differentiable, and makes the Gaussian case
+solvable in closed form, not because two images at equal mean squared error
+look equally good; they routinely do not. Every number this lesson computes
+is a statement about the measure that was fed in.
 
 {/* fig RdPlane: the rate-distortion plane for the fair-bit source. Axes:
     horizontal D (Hamming distortion, 0 to 0.5), vertical R (bits per
@@ -66,7 +130,7 @@ some code achieves and the pairs none does.
     Marked points: an amber dot on the curve at (0, 1) labeled
     "$R(0) = H(X) = 1$: lossless corner"; an amber dot at (0.5, 0) labeled
     "guessing is free"; a blue dot ABOVE the curve at (0.25, 0.5) labeled
-    "send every other bit"; a small amber point on the curve at
+    "store half, guess half"; a small amber point on the curve at
     (0.11, 0.5) labeled "optimum at the same rate"; a thin dashed
     horizontal guide at R = 0.5 connecting the blue dot to the curve
     point, annotated "same rate, 25% vs 11% errors". Color roles: amber =
@@ -76,37 +140,47 @@ some code achieves and the pairs none does.
     ch. 10 / Ballé fig. 2 (recreate, do not copy). */}
 <Figure
   name="RdPlane"
-  alt="The rate-distortion plane for a fair-bit source: the convex frontier R(D) = 1 − H(D) with the achievable region shaded above it, the lossless corner at (0,1), the free-guessing corner at (0.5, 0), and the naive send-every-other-bit scheme sitting above the curve at (0.25, 0.5)"
+  alt="The rate-distortion plane for a fair-bit source: the convex frontier R(D) = 1 − H(D) with the achievable region shaded above it, the lossless corner at (0,1), the free-guessing corner at (0.5, 0), and the naive store-half-and-guess scheme sitting above the curve at (0.25, 0.5)"
   caption="The frontier for fair bits: achievable (rate, distortion) pairs lie on or above the curve. The naive rate-½ scheme pays 25% errors; the frontier pays 11% at the same rate."
 />
 
+With a measure fixed, every scheme becomes a point $(D, R)$ in a plane:
+distortion paid against rate spent. Writing nothing sits at
+$(\tfrac12, 0)$, store-half-and-guess at $(\tfrac14, \tfrac12)$, the optimum
+at $(0.11, \tfrac12)$. The subject of the rest of this lesson is the exact
+boundary between the pairs some code attains and the pairs none does.
+
 <KeyFact>
-Lossy compression is a two-number problem: every scheme is a point
-$(D, R)$, and the rate-distortion function is the exact lower boundary of
-the achievable region.
+The distortion measure is the one ingredient the theory never derives.
+Changing it moves the whole curve, so a rate quoted without its measure is
+not a number; and it is exactly this hand-picked ingredient that
+<Ref lesson="information-bottleneck"/> removes by deriving the effective
+measure from a target variable instead.
 </KeyFact>
 
-## The rate-distortion function: the least information compatible with the budget
+## R(D): the least information the budget allows
 
-### Reconstruction is a channel from the source
+The frontier has to be computed from the source and the measure alone,
+without enumerating codes. The route is to look at what any code does to a
+single symbol.
 
-Whatever machinery sits between source and reconstruction, encoder, bit
-stream, decoder, its end-to-end effect on single symbols is a conditional
-distribution $p(\hat x \mid x)$: for each source symbol, the probabilities
-of the reconstructions it may become. This conditional distribution is
-called the *test channel*. The direction matters: $\hat X$ is **computed
-from** $X$, so $X \to \hat X$ is a processing step, not a generative model
-of the source, and the data-processing inequality of
-<Ref lesson="data-processing-inequality"/> applies to everything
-downstream of $X$.
+### Every scheme is a channel from source to reconstruction
 
-The rate this channel needs is measured by the mutual information
-$I(X; \hat X)$ of <Ref lesson="mutual-information"/>: the compressed file
-is a bottleneck between $X$ and $\hat X$, and a file of $R$ bits per
-symbol cannot carry more than $R$ bits of information about the source
-into the reconstruction (the converse below makes this exact). Minimizing
-rate therefore means choosing the test channel that satisfies the
-distortion budget with the **least** mutual information.
+Whatever machinery sits between source and reconstruction (encoder,
+bitstream, decoder), its end-to-end effect on one symbol is a conditional
+distribution $p(\hat x \mid x)$: for each source symbol, the probabilities of
+the reconstructions it may become. That conditional distribution is called a
+*test channel*. It is not hardware and not a model of the source; it is the
+bookkeeping device in which the bound is stated.
+
+The rate such a channel needs is measured by the mutual information
+$I(X; \hat X)$ of <Ref lesson="mutual-information"/>, the bits one variable
+carries about the other. The compressed file is a bottleneck between $X$ and
+$\hat X$: the reconstruction is computed from the file, the file is computed
+from the source, and the data-processing inequality
+(<Ref lesson="data-processing-inequality"/>) caps $I(X;\hat X)$ by the file's
+own size. Minimising rate therefore means finding the test channel that meets
+the distortion budget while letting the **least** information through.
 
 <Definition title="rate-distortion function">
 For a source $X \sim p(x)$ and a distortion measure $d$, the
@@ -114,9 +188,11 @@ For a source $X \sim p(x)$ and a distortion measure $d$, the
 $$
 R(D) \;=\; \min_{p(\hat x \mid x)\,:\; \mathbb{E}[d(X, \hat X)] \le D}\; I(X; \hat X),
 $$
-the minimum taken over all test channels whose expected distortion,
+the minimum over all test channels whose expected distortion,
 $\mathbb{E}[d] = \sum_{x, \hat x} p(x)\, p(\hat x \mid x)\, d(x, \hat x)$,
-stays within the budget $D$.
+stays within $D$. On a finite alphabet the admissible channels form a
+compact set and $I$ is continuous on it, so the minimum is attained and the
+word "min" is literal.
 </Definition>
 
 {/* fig RdObjective: the objective dissected in place (playbook rule 7:
@@ -136,77 +212,114 @@ stays within the budget $D$.
 <Figure
   name="RdObjective"
   alt="The rate-distortion objective annotated term by term: minimize mutual information I(X;X̂) over test channels p(x̂|x) subject to expected distortion at most D, with a small X to test channel to X̂ pipeline underneath"
-  caption="The objective dissected: search over test channels, pay rate in mutual information, obey the distortion budget."
+  caption="The rate is a minimum, not an evaluation: the free variable is the test channel, and only the distortion budget stops the minimisation at the channel that ignores the source and costs zero bits."
 />
 
-### The theorem: the minimum is achievable and tight
+### The theorem: the single-symbol minimum governs long blocks
 
-The definition is a formula about single-symbol distributions. Shannon's
-theorem, [1948](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf)
-(Part V, Theorem 21) with the discrete case completed in his 1959 paper,
-gives it operational force.
+The definition is an optimisation over distributions on one symbol. What
+makes it a compression limit is that it also governs blocks of any length.
 
-<Theorem title="rate-distortion theorem">
+<Theorem title="rate-distortion theorem (Shannon 1959)">
 For an i.i.d. source $X \sim p(x)$ and a bounded distortion measure $d$,
-$R(D)$ is the boundary of achievability: for every $\varepsilon > 0$
-there exist block codes of rate $R(D) + \varepsilon$ whose expected
-distortion is at most $D + \varepsilon$ for all sufficiently large block
-length, and no sequence of codes with rate below $R(D)$ meets the budget
-$D$.
+$R(D)$ is the boundary of achievability: for every $\varepsilon > 0$ there
+exist block codes of rate $R(D) + \varepsilon$ whose expected distortion is
+at most $D + \varepsilon$ for all sufficiently large block lengths, and no
+sequence of codes of rate below $R(D)$ meets the budget $D$.
 
 <Proof>
-Sketch; the full argument is Cover & Thomas §10.4 (converse) and §10.5
-(achievability).
+Sketch in both directions; the details are Cover & Thomas §10.4 and §10.5.
 
 **Converse.** A rate-$R$ code compresses $X^n$ into an index
-$W \in \{1, \dots, 2^{nR}\}$ and reconstructs $\hat X^n$ from $W$ alone,
-so $X^n \to W \to \hat X^n$ is a Markov chain. The data-processing
-inequality (<Ref lesson="data-processing-inequality"/>) and the entropy
-bound on $W$ give
-$I(X^n; \hat X^n) \le I(X^n; W) \le H(W) \le nR$. For an i.i.d. source
-the block information single-letterizes,
-$I(X^n; \hat X^n) \ge \sum_{i=1}^n I(X_i; \hat X_i)$, each term is at
-least $R(\mathbb{E}[d(X_i, \hat X_i)])$ by the definition of $R$ as a
-minimum, and convexity of $R(D)$ (next section) pulls the average
-through: $nR \ge n\,R\bigl(\mathbb{E}[d(X^n, \hat X^n)]\bigr)$. A code
-meeting budget $D$ therefore spends at least $R(D)$.
+$W \in \lbrace 1, \dots, 2^{nR} \rbrace$ and reconstructs $\hat X^n$ from $W$
+alone, so $X^n \to W \to \hat X^n$ is a Markov chain. Data processing and the
+entropy bound on $W$ give
+$I(X^n; \hat X^n) \le I(X^n; W) \le H(W) \le nR$. For an i.i.d. source the
+block information splits into single letters,
+$I(X^n; \hat X^n) \ge \sum_{i=1}^n I(X_i; \hat X_i)$; each term is at least
+$R(\mathbb{E}[d(X_i, \hat X_i)])$ because $R$ is defined as a minimum over
+exactly those channels; and convexity (next subsection) pulls the average
+through, giving $nR \ge n\,R(\mathbb{E}[d(X^n, \hat X^n)])$. A code meeting
+budget $D$ therefore spends at least $R(D)$.
 
-**Achievability.** Fix the minimizing test channel and draw a codebook of
-$2^{n(R(D) + \varepsilon)}$ reconstruction words i.i.d. from the induced
-marginal $p(\hat x)$. For a typical source block, with high probability
-at least one codeword is jointly typical with it, and joint typicality
-forces per-symbol distortion near $\mathbb{E}[d] \le D$. Encoding
-transmits the index of that codeword. The calculation that
-$2^{nI(X;\hat X)}$ codewords suffice is the covering counterpart of the
-random-coding argument sketched for
-<Ref lesson="noisy-channel-coding"/>.
+**Achievability.** Fix the minimising test channel and draw a codebook of
+$2^{n(R(D) + \varepsilon)}$ reconstruction words independently from the
+induced marginal $p(\hat x)$. With high probability a typical source block is
+jointly typical with at least one codeword, and joint typicality forces the
+per-symbol distortion between them to sit near $\mathbb{E}[d] \le D$; the
+encoder transmits that codeword's index. Boundedness of $d$ is what keeps the
+rare failure events from dominating the expected distortion. The count of
+codewords needed is the covering argument of the geometry section below.
 </Proof>
 </Theorem>
 
-The theorem is a statement about limits, not about any particular
-quantizer: $R(D)$ is approached by coding long blocks jointly, and every
-practical one-shot scheme sits strictly above the curve, as the
-send-every-other-bit point did.
+### Endpoints and shape
+
+Three structural facts hold for every source before any specific curve is
+computed, and they are what make the picture a curve rather than a scatter of
+points.
+
+<Theorem title="shape of R(D)">
+Let $d$ satisfy $d(x, \hat x) = 0$ exactly when $\hat x = x$, on a common
+alphabet. Then:
+
+1. $R(0) = H(X)$: the zero-tolerance corner is lossless source coding.
+2. $R(D)$ is non-increasing, and $R(D) = 0$ exactly when
+   $D \ge D_{\max} = \min_{\hat x} \mathbb{E}[d(X, \hat x)]$, the distortion
+   of the best constant reconstruction.
+3. $R(D)$ is convex on $[0, D_{\max}]$.
+
+<Proof>
+**(1)** Budget $D = 0$ forces $P(X \ne \hat X) = 0$, so
+$I(X; \hat X) = I(X; X) = H(X)$.
+
+**(2)** Enlarging $D$ only enlarges the set of admissible channels, so the
+minimum cannot rise. If $D \ge D_{\max}$, the constant channel
+$\hat X \equiv \arg\min_{\hat x} \mathbb{E}[d(X, \hat x)]$ meets the budget
+with $I = 0$. If $D < D_{\max}$, zero rate is out of reach: $I(X;\hat X) = 0$
+makes $\hat X$ independent of $X$, and then
+$\mathbb{E}[d] = \sum_{\hat x} p(\hat x)\, \mathbb{E}[d(X, \hat x)] \ge
+D_{\max} > D$.
+
+**(3)** Let $q_1, q_2$ attain $R(D_1), R(D_2)$. The blended channel
+$q_\lambda = \lambda q_1 + (1 - \lambda) q_2$ has expected distortion exactly
+$\lambda D_1 + (1-\lambda) D_2$, since $\mathbb{E}[d]$ is linear in the
+channel, and mutual information is convex in $p(\hat x \mid x)$ at fixed
+$p(x)$ (Cover & Thomas Theorem 2.7.4), so
+$I_{q_\lambda} \le \lambda R(D_1) + (1 - \lambda) R(D_2)$. The minimum at the
+blended budget is no larger.
+</Proof>
+</Theorem>
+
+Convexity does two jobs in this lesson: the converse above averaged its
+single-letter bounds with it, and the closing section reads the curve's slope
+as a price because of it. Operationally it says that time-sharing
+two codes never beats the curve, because the time-shared point is a convex
+combination of two points already on or above it.
 
 <KeyFact>
-$R(D) = \min I(X; \hat X)$ subject to $\mathbb{E}[d] \le D$ is the exact
-price of fidelity: achievable in the block-length limit, unbeatable by
-any code.
+Every ingredient of the definition is read off the marginal $p(x)$, so this
+$R(D)$ is the limit for an **i.i.d.** source and for nothing else. A source
+with memory (the pixels of a photograph, the samples of speech) has a
+strictly lower limit, because the dependence between symbols is describable
+too; the marginal curve is then an upper bound the source beats. That is what
+a transform is for: it converts a dependent source into coefficients close
+enough to independent that the marginal curve describes them.
 </KeyFact>
 
-### Capacity's mirror image: the same quantity, the opposite extreme
+## Capacity's mirror: max over inputs, min over channels
 
-<Ref lesson="channel-capacity"/> defined
-$C = \max_{p(x)} I(X;Y)$: the channel is fixed and the input distribution
-is tuned to push the **most** information through. Rate-distortion flips
-every role: the source $p(x)$ is fixed and the channel
-$p(\hat x \mid x)$ is tuned to let the **least** information through
-while staying within the distortion budget. Communication maximizes
-mutual information; compression minimizes it. The two problems are dual,
-and one algorithm, Blahut–Arimoto, alternates the same two updates to
-compute either function numerically
-([Blahut 1972](https://doi.org/10.1109/TIT.1972.1054855); treatment in
-[Polyanskiy & Wu](https://people.lids.mit.edu/yp/homepage/data/itlectures_v5.pdf)).
+Both limits in this course are now the same functional of the same pair of
+variables, $I$ of a source and its counterpart; they differ in which argument
+is fixed and in the direction the optimisation runs.
+
+<Ref lesson="channel-capacity"/> defined $C = \max_{p(x)} I(X;Y)$: the
+channel $p(y \mid x)$ is given by physics and the input distribution is the
+free variable, tuned to push the most information through. Rate-distortion
+exchanges both roles. The source $p(x)$ is given and the channel
+$p(\hat x \mid x)$ is the free variable, tuned to let the least information
+through subject to the fidelity budget. Communication maximises mutual
+information over inputs; compression minimises it over channels.
 
 {/* fig CapacityVsRateDistortion: two near-identical panels side by side
     (playbook rule 8), joined by a bold two-headed arrow labeled "same
@@ -231,68 +344,28 @@ compute either function numerically
   caption="One quantity, two extremes: communication tunes the input to maximize I; compression tunes the channel to minimize it."
 />
 
-## Endpoints and shape: from H(X) to zero, convex in between
+The symmetry is not merely notational. Mutual information is concave in the
+input at a fixed channel and convex in the channel at a fixed input, so
+capacity is a concave maximisation and $R(D)$ a convex minimisation: both are
+well-posed convex programs with no local traps, and the same alternating
+algorithm, [Blahut–Arimoto](https://doi.org/10.1109/TIT.1972.1054855),
+alternating between the channel and a marginal, computes either one
+numerically for a source or channel with no closed form.
 
-Three structural facts hold for every source, before any specific curve
-is computed.
+Each problem also needs its constraint for the answer to be finite and
+non-trivial. Without the noise in $p(y \mid x)$, capacity would be the
+alphabet's full $\log_2 |\mathcal{X}|$; without the distortion budget,
+$R(D)$ would be zero, attained by the channel that ignores the source. The
+budget is what stops the minimisation at a positive value, which is why
+$R(D)$ is a curve and $C$ is a number.
 
-<Theorem title="shape of R(D)">
-For Hamming distortion (and any $d$ with $d(x, \hat x) = 0$ exactly when
-$\hat x = x$, on a common alphabet):
+## Bernoulli under Hamming: R(D) = H(p) − H(D)
 
-1. $R(0) = H(X)$: the zero-tolerance corner is lossless source coding.
-2. $R(D)$ is non-increasing in $D$, and $R(D) = 0$ exactly when
-   $D \ge D_{\max} = \min_{\hat x} \mathbb{E}[d(X, \hat x)]$, the
-   distortion of the best constant guess.
-3. $R(D)$ is convex on $[0, D_{\max}]$.
+The mirror explains what kind of object $R(D)$ is; the game asked for a
+number. For a biased-bit source under Hamming distortion the minimisation has
+an exact solution, and it is the first of the two classical closed forms.
 
-<Proof>
-**(1)** Budget $D = 0$ forces $P(X \ne \hat X) = 0$, so
-$I(X; \hat X) = I(X; X) = H(X)$
-(<Ref lesson="mutual-information"/>, self-information).
-
-**(2)** A larger $D$ only enlarges the set of admissible test channels,
-so the minimum cannot rise. If $D \ge D_{\max}$, the constant channel
-$\hat X \equiv \arg\min_{\hat x} \mathbb{E}[d(X, \hat x)]$ meets the
-budget with $I = 0$. If $D < D_{\max}$, zero rate is out of reach:
-$I(X; \hat X) = 0$ makes $\hat X$ independent of $X$, and then
-$\mathbb{E}[d] = \sum_{\hat x} p(\hat x)\, \mathbb{E}[d(X, \hat x)] \ge
-D_{\max} > D$, violating the budget.
-
-**(3)** Let channels $q_1, q_2$ attain $R(D_1), R(D_2)$. The blended
-channel $q_\lambda = \lambda q_1 + (1 - \lambda) q_2$ has expected
-distortion exactly $\lambda D_1 + (1-\lambda) D_2$, since
-$\mathbb{E}[d]$ is linear in the channel, and mutual information is
-convex in $p(\hat x \mid x)$ for fixed $p(x)$ (Cover & Thomas Theorem
-2.7.4), so
-$I_{q_\lambda} \le \lambda R(D_1) + (1 - \lambda) R(D_2)$. The minimum
-at the blended budget is no larger. This is Lemma 10.4.1 of Cover &
-Thomas; exercise 5 reaches the same conclusion operationally, by
-time-sharing two codes.
-</Proof>
-</Theorem>
-
-The curve therefore always runs from the lossless corner
-$(0, H(X))$ down to $(D_{\max}, 0)$, decreasing and convex, exactly the
-shape shaded in the first figure. The next two sections fill in the only
-two cases with standard closed forms.
-
-<KeyFact>
-$R(D)$ interpolates between the two prices already known: the source
-coding theorem at $D = 0$ and free majority-guessing at
-$D = D_{\max}$, convexly in between.
-</KeyFact>
-
-## Bernoulli(p) under Hamming distortion: R(D) = H(p) − H(D)
-
-### The closed form
-
-For a biased-bit source the minimization has an exact solution, one of
-the two classical closed forms
-([Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
-§10.3.1).
-
-<Theorem title="Bernoulli rate-distortion function">
+<Theorem title="Bernoulli rate-distortion function (Cover & Thomas 10.3.1)">
 For $X \sim \text{Bernoulli}(p)$ under Hamming distortion,
 $$
 R(D) =
@@ -301,49 +374,67 @@ H(p) - H(D), & 0 \le D \le \min(p,\, 1-p), \\[2pt]
 0, & D \ge \min(p,\, 1-p),
 \end{cases}
 $$
-where $H(\cdot)$ is the binary entropy function of
+with $H(\cdot)$ the binary entropy function of
 <Ref lesson="entropy-as-average-surprise"/>.
 
 <Proof>
 Take $p \le \tfrac12$ (relabel otherwise), so $\min(p, 1-p) = p$ and
-$D \le p \le \tfrac12$.
+$D \le p \le \tfrac12$. The plan is a lower bound on every admissible
+channel, then one channel that attains it.
 
 **Converse: no admissible channel beats $H(p) - H(D)$.** Let
-$p(\hat x \mid x)$ satisfy $P(X \ne \hat X) = \mathbb{E}[d] \le D$.
-Write the error indicator $Z = X \oplus \hat X$ (XOR). Given $\hat X$,
-knowing $Z$ is knowing $X$, so
-$H(X \mid \hat X) = H(Z \mid \hat X) \le H(Z)$: conditioning cannot
-raise entropy
-(<Ref lesson="joint-and-conditional-entropy"/>). $Z$ is a binary
-variable with $P(Z = 1) \le D \le \tfrac12$, and the binary entropy
-function increases on $[0, \tfrac12]$, so $H(Z) \le H(D)$. Chaining:
+$p(\hat x \mid x)$ satisfy $P(X \ne \hat X) = \mathbb{E}[d] \le D$. Write the
+error indicator $Z = X \oplus \hat X$. The pair $(X, \hat X)$ determines
+$(Z, \hat X)$ and conversely, so $H(X \mid \hat X) = H(Z \mid \hat X)$;
+conditioning cannot raise entropy
+(<Ref lesson="joint-and-conditional-entropy"/>), so
+$H(Z \mid \hat X) \le H(Z)$. The variable $Z$ is binary with
+$P(Z = 1) \le D \le \tfrac12$, and $H$ increases on $[0, \tfrac12]$, so
+$H(Z) \le H(D)$. Chaining:
 $$
 I(X; \hat X) = H(X) - H(X \mid \hat X)
 \;\ge\; H(p) - H(Z) \;\ge\; H(p) - H(D).
 $$
+Both inequalities are equalities exactly when $Z$ is independent of $\hat X$
+and $Z \sim \text{Bernoulli}(D)$, which is the recipe for the construction.
 
-**Achievability: one channel meets the bound.** Build the joint
-distribution backwards. Let $\hat X \sim \text{Bernoulli}(\pi)$ with
-$\pi = \tfrac{p - D}{1 - 2D}$, and let $X = \hat X \oplus Z$ with
-$Z \sim \text{Bernoulli}(D)$ independent of $\hat X$: the
-reconstruction passes through a binary symmetric channel with crossover
-$D$ to produce the source. The marginal checks out:
-$P(X = 1) = \pi(1 - D) + (1 - \pi) D = D + \pi(1 - 2D) = p$. The
-distortion is $P(X \ne \hat X) = P(Z = 1) = D$, on budget. The rate:
+**Achievability: one channel meets the bound.** Build the joint distribution
+backwards from the reconstruction. Let
+$\hat X \sim \text{Bernoulli}(q)$ with $q = \tfrac{p - D}{1 - 2D}$, and let
+$X = \hat X \oplus Z$ with $Z \sim \text{Bernoulli}(D)$ independent of
+$\hat X$. The marginal checks out:
+$P(X = 1) = q(1 - D) + (1 - q) D = D + q(1 - 2D) = p$. The distortion is
+$P(X \ne \hat X) = P(Z = 1) = D$, on budget. And given $\hat X$, the only
+remaining uncertainty in $X$ is the independent flip, so
+$H(X \mid \hat X) = H(D)$ and
 $$
-I(X; \hat X) = H(X) - H(X \mid \hat X) = H(p) - H(D),
+I(X; \hat X) = H(X) - H(X \mid \hat X) = H(p) - H(D).
 $$
-since given $\hat X$ the only remaining uncertainty in $X$ is the
-independent flip $Z$. For $D \le p \le \tfrac12$ the parameter $\pi$
-lies in $[0, 1]$, so the construction is a valid distribution, and the
-converse bound is attained.
+For $D \le p \le \tfrac12$ the parameter $q$ lies in $[0, \tfrac12]$, so the
+construction is a valid distribution and the converse bound is attained.
 </Proof>
 </Theorem>
 
-The formula reads as an information ledger: $H(p)$ bits describe the
-source exactly; a tolerated error pattern of rate $D$ carries $H(D)$
-bits; the encoder must pay only the **difference**. The sequence below
-assembles the curve for $p = 0.3$.
+The construction runs against the reader's expectation and against the data
+flow: one would expect the reconstruction to be the source plus quantisation
+noise. The optimal test channel is the reverse. The **source** is the
+reconstruction plus an independent flip, and the reconstruction is *less*
+random than the source: $q < p$ for $p < \tfrac12$, so the optimal
+reconstruction is more biased toward the majority symbol than the source is.
+An optimal lossy coder does not scatter its output around the source; it
+pulls it toward the middle of the distribution.
+
+<Figure
+  src="./figures/binary-test-channel.svg"
+  alt="A channel diagram drawn backwards: a reconstruction X-hat distributed Bernoulli of q equal to (p minus D) over (1 minus 2D), XORed with an independent noise Z distributed Bernoulli of D, producing the source X distributed Bernoulli of p, with the distortion D and the rate H(p) minus H(D) written beneath"
+  caption="The optimal test channel for the binary case, drawn backwards: the source is the reconstruction plus an independent Bernoulli(D) flip."
+/>
+
+The formula reads as a ledger. Describing the source exactly costs $H(p)$
+bits; the error pattern the decoder is permitted to get wrong carries $H(D)$
+bits of its own; the encoder pays only the difference. The refund is exact
+only because the errors may be placed where the code finds them cheap, which
+is again the joint-description effect of the opening game.
 
 <FigureSequence
   name="bernoulli-curve"
@@ -352,84 +443,123 @@ assembles the curve for $p = 0.3$.
 />
 
 <Task>
-Step through the three frames and check the arithmetic at $D = 0.1$:
-frame 1 puts the corner at $H(0.3) \approx 0.881$ bits, frame 2 subtracts
-$H(0.1) \approx 0.469$, and frame 3's curve accordingly passes through
-$R(0.1) \approx 0.412$ before hitting zero at $D = p = 0.3$.
+Step through the three frames and check the subtraction they print at
+$D = 0.1$: frame 1 marks the corner $H(0.3) \approx 0.881$ bits, frame 2
+labels the arrow it subtracts there, $H(0.1) \approx 0.469$, and frame 3 marks
+the resulting point $R(0.1) = 0.881 - 0.469 = 0.412$ on the curve before it
+reaches zero at $D = p = 0.3$. Confirm the second arrow the same way at
+$D = 0.2$.
 </Task>
 
-The flat tail is exact, not approximate. Once $D \ge \min(p, 1-p)$, the
-constant guess "always output the majority symbol" errs on a
-$\min(p, 1-p)$ fraction of symbols and costs **zero** bits; tolerating
-that much error makes compression free.
-
-### Worked: the fair source, and the opener's gap closed
+### The game, settled
 
 <Example title="fair bits at rate one-half">
-For $p = \tfrac12$: $R(D) = 1 - H(D)$ on $[0, \tfrac12]$.
+For $p = \tfrac12$ the curve is $R(D) = 1 - H(D)$ on $[0, \tfrac12]$.
 
-**Rate one-half.** Solve $1 - H(D) = 0.5$: $H(D) = 0.5$, so
-$D \approx 0.110$, since
-$H(0.11) = 0.11 \cdot 3.184 + 0.89 \cdot 0.168 \approx 0.500$. The
-optimum at the crude scheme's rate misreconstructs **11%** of bits, not
-25%.
+**The 50-bit slip.** One hundred bits into 50 is a rate of
+$R = \tfrac12$ bit per symbol. Solve $1 - H(D) = \tfrac12$, i.e.
+$H(D) = \tfrac12$. Since
+$H(0.11) = 0.11 \log_2 \tfrac{1}{0.11} + 0.89 \log_2 \tfrac{1}{0.89}
+= 0.350 + 0.150 = 0.500$, the answer is $D \approx 0.11$: at this rate the
+frontier permits **11 errors per 100 bits**, against the naive scheme's 25.
 
-**The crude scheme's distortion, priced.** At $D = 0.25$ the curve gives
-$R = 1 - H(0.25) = 1 - 0.811 = 0.189$ bits. The error fraction the naive
-scheme bought with $0.5$ bits is available for $0.189$: the naive scheme
-overspends by a factor of $2.6$.
+**The naive scheme, priced the other way.** At $D = \tfrac14$ the curve gives
+$R = 1 - H(0.25) = 1 - 0.811 = 0.189$ bits per symbol. The error rate the
+naive scheme bought with 50 bits is available for 19: it overspends by a
+factor of $2.6$.
 
-**Bounds check.** $R(0) = 1 - H(0) = 1 = H(X)$, the lossless rate; and
-$R(0.5) = 1 - H(0.5) = 0$, the free all-zeros guess.
+**Bounds check.** $R(0) = 1 - H(0) = 1 = H(X)$, the lossless rate, and
+$R(\tfrac12) = 1 - H(\tfrac12) = 0$, the free all-zeros guess.
 </Example>
 
-<Example title="a biased source">
-For $p = 0.25$: $H(0.25) = 0.811$ bits, so $R(D) = 0.811 - H(D)$ on
-$[0, 0.25]$.
+<Example title="a biased sensor">
+A sensor emits $X \sim \text{Bernoulli}(0.25)$, so $H(0.25) = 0.811$ bits and
+$R(D) = 0.811 - H(D)$ on $[0, 0.25]$.
 
-At $D = 0.1$:
-$R = 0.811 - 0.469 = 0.342$ bits per symbol, a $58\%$ saving over the
-lossless $0.811$ in exchange for errors on one symbol in ten.
-
-The curve ends at $D_{\max} = \min(0.25, 0.75) = 0.25$: always guessing
-$0$ errs exactly on the $25\%$ of symbols that are $1$, at zero rate.
+At $D = 0.1$: $R = 0.811 - 0.469 = 0.342$ bits per symbol, a 58% saving
+against lossless coding, in exchange for errors on one symbol in ten. The
+curve ends at $D_{\max} = \min(0.25, 0.75) = 0.25$, where always guessing $0$
+errs exactly on the 25% of symbols that are $1$, at zero rate:
 $R(0.25) = 0.811 - H(0.25) = 0$, consistent.
+
+The optimal reconstruction at $D = 0.1$ has
+$q = \tfrac{0.25 - 0.1}{1 - 0.2} = 0.1875$, noticeably more biased toward $0$
+than the source.
 </Example>
+
+<Exercise>
+The optimal fair-source test channel at $D = 0.25$ has the joint table
+$P(X{=}0, \hat X{=}0) = P(X{=}1, \hat X{=}1) = \tfrac38$ and
+$P(X{=}0, \hat X{=}1) = P(X{=}1, \hat X{=}0) = \tfrac18$. Using the recipes
+of <Ref lesson="mutual-information"/> (marginals from row and column sums,
+conditional entropy as a probability-weighted average of column entropies),
+compute $\mathbb{E}[d]$ and $I(X;\hat X)$ from the table alone, then check
+both against the closed form. Write the two marginals down before opening the
+solution.
+
+<Solution>
+**Distortion.** The off-diagonal mass is $\tfrac18 + \tfrac18 = \tfrac14$, so
+$\mathbb{E}[d] = 0.25$: on budget with equality.
+
+**Marginals.** Every row and column sums to $\tfrac12$, so
+$H(X) = H(\hat X) = 1$ bit.
+
+**Conditional entropy.** Given $\hat X = 0$ (probability $\tfrac12$), the
+column $(\tfrac38, \tfrac18)$ renormalises to $(\tfrac34, \tfrac14)$, with
+entropy $H(0.25) = 0.811$ bits; the $\hat X = 1$ column is its mirror image
+and gives the same value. The average is $H(X \mid \hat X) = 0.811$ bits.
+
+**Mutual information.** $I(X;\hat X) = 1 - 0.811 = 0.189$ bits.
+
+**Check.** $R(0.25) = 1 - H(0.25) = 0.189$: the table attains the minimum, so
+this is an optimal test channel. It is the construction of the proof at
+$q = \tfrac12$, $D = \tfrac14$, written as a joint table. The transferable
+move is that a test channel is verified, never trusted: compute its
+distortion and its mutual information from the joint table and compare with
+the closed form.
+</Solution>
+</Exercise>
 
 <KeyFact>
-$R(D) = H(p) - H(D)$ up to $D = \min(p, 1-p)$, then exactly zero:
-tolerated errors refund their own entropy, and once the budget covers the
-minority symbol, the majority guess compresses for free.
+The flat tail is exact, not asymptotic: from $D = \min(p, 1-p)$ onward,
+always emitting the majority symbol costs zero bits and meets the budget. Any
+codec whose target quality is worse than "guess the most common value" should
+be sending nothing at all, and the same condition is what makes $R(D)$ hit
+zero at finite $D$ for discrete sources — and never for continuous ones.
 </KeyFact>
 
-## The Gaussian source under squared error: R(D) = ½ log₂(σ²/D)
+## The Gaussian source: half a log, and 6 dB per bit
 
-The second classical closed form is continuous. It is stated here, not
-derived: it is this course's one use of *differential entropy* beyond the
-remark in <Ref lesson="max-entropy-principle"/>, and the derivation
-(Cover & Thomas §10.3.2) runs the Bernoulli converse's pattern with
+The second closed form is continuous, and it is the one every quantizer
+designer uses. Its derivation follows the binary proof line for line, with
 differential entropies in place of discrete ones.
 
-<Theorem title="Gaussian rate-distortion function">
+<Theorem title="Gaussian rate-distortion function (Cover & Thomas 10.3.2)">
 For $X \sim \mathcal{N}(0, \sigma^2)$ under squared-error distortion,
 $$
 R(D) =
 \begin{cases}
 \tfrac12 \log_2 \dfrac{\sigma^2}{D}, & 0 < D \le \sigma^2, \\[4pt]
-0, & D \ge \sigma^2.
+0, & D \ge \sigma^2,
 \end{cases}
 $$
+attained by the test channel $X = \hat X + Z$ with
+$\hat X \sim \mathcal{N}(0, \sigma^2 - D)$ and $Z \sim \mathcal{N}(0, D)$
+independent.
 </Theorem>
 
-Two flags on the statement. First, discrete intuitions do not transfer
-silently: differential entropy can be negative and changes under a change
-of coordinates, but $R(D)$ is a **difference** of differential entropies,
-and the coordinate-dependent terms cancel, so the rate is well-defined.
-Second, the endpoints behave like the discrete case at one end only:
-$D_{\max} = \sigma^2$ is the squared error of the best constant guess
-$\hat X = \mathbb{E}[X] = 0$, but as $D \to 0$ the rate grows without
-bound, because a continuous value needs infinitely many bits to
-reconstruct exactly.
+The test channel repeats the binary lesson in continuous form: the
+reconstruction carries variance $\sigma^2 - D$, strictly less than the
+source's, and the source is the reconstruction plus independent noise. An
+optimal lossy coder shrinks.
+
+Two flags on the statement. Differential entropy is not a bit count (it can
+be negative and it changes under a change of coordinates), but $R(D)$ is a
+*difference* of differential entropies and the coordinate-dependent terms
+cancel, so the rate is a genuine bit count. And the endpoints behave like the
+discrete case at one end only: $D_{\max} = \sigma^2$ is the squared error of
+the best constant guess $\hat X = \mathbb{E}[X] = 0$, but as $D \to 0$ the
+rate grows without bound.
 
 {/* fig GaussianRdCurve: the Gaussian curve R(D) = ½ log₂(σ²/D) for
     σ² = 1, plotted over D ∈ (0, 1.1]. Axes: horizontal D (0 to 1.1 with
@@ -451,81 +581,226 @@ reconstruct exactly.
   caption="The Gaussian curve for σ² = 1: R = ½ log₂(1/D). Each extra bit divides the mean squared error by 4 — the 6 dB per bit rule."
 />
 
-Inverting the formula gives the working form $D(R) = \sigma^2 \cdot
-4^{-R}$: each additional bit divides the mean squared error by $4$,
-halving the root-mean-square error, a drop of $6.02$ dB. Audio engineers
-know this as the **6 dB per bit** rule for quantizer resolution. At
-$\sigma^2 = 1$: one bit per sample leaves $D = 0.25$, two bits leave
-$0.0625$, eight bits leave $1.5 \times 10^{-5}$.
+Inverting the formula gives the working form $D(R) = \sigma^2 \cdot 4^{-R}$.
+Each extra bit per sample divides the mean squared error by $4$ and so halves
+the root-mean-square error, a drop of $10 \log_{10} 4 = 6.02$ decibels. This
+is the **6 dB per bit** rule, and it is why a 16-bit audio format is quoted at
+about $96$ dB of signal-to-noise ratio: $16 \times 6.02 = 96.3$. It also
+prices any proposed saving in advance: dropping one bit per sample from a
+pipeline costs a factor of four in mean squared error, wherever the pipeline
+started.
 
 <Demo
   name="RateDistortionCurve"
-  caption="Both closed forms live: the Bernoulli curve R(D) = H(p) − H(D) traced by a distortion slider, with a toggle to the Gaussian curve ½ log₂(σ²/D). Presets: fair source, biased source, near-lossless vs. coarse."
+  caption="Propose a scheme and the converse rules on it: every (D, R) pair below the curve is rejected with the bits it is short by, and the shaded region above the curve is the whole set of schemes that exist. Presets: fair source, biased source, near-lossless, coarse."
 />
 
 <Task>
-Load the *fair source* preset and drag $D$ to $0.11$: the rate readout
-should land at $0.50$ bits, the worked example's number. On the *biased
-source* preset ($p = 0.25$), verify the endpoints $R \to 0.811$ as
-$D \to 0$ and $R = 0$ from $D = 0.25$ on. Then toggle to the Gaussian
-curve with $\sigma^2 = 1$ and read the rate at $D = 0.25$ and
-$D = 0.0625$: the readouts should differ by exactly one bit.
+Beat the curve, on the *fair source* preset. The demo opens holding the naive
+scheme at $(D, R) = (0.25, 0.50)$. Keep the rate at $0.50$ and drag the
+distortion down until the verdict flips: report the smallest $D$ still
+accepted, and what the readout says about every $D$ below it. Then try to buy
+$D = 0.05$ for the same half a bit, and on the *biased source* preset
+($p = 0.25$) find the distortion from which the demo accepts a rate of zero.
+Finally, switch to the Gaussian curve and land an accepted scheme between
+$R(D)$ and the dashed line $0.254$ bit above it, the margin the next section
+prices.
 </Task>
 
-<Aside>
-The closed form has a geometric reading, the covering picture of
-Polyanskiy & Wu's lecture notes. A typical length-$n$ Gaussian block lies
-near a sphere of radius $\sqrt{n \sigma^2}$; a reconstruction word covers,
-within squared error $D$ per symbol, a ball of radius $\sqrt{nD}$. A
-codebook meeting budget $D$ must cover the source sphere with such balls,
-and volumes in $n$ dimensions scale as radius$^n$, so the codebook needs
-on the order of
-$\bigl(\sqrt{n\sigma^2} / \sqrt{nD}\bigr)^n = (\sigma^2 / D)^{n/2}$
-words: exactly $2^{n \cdot \frac12 \log_2(\sigma^2 / D)}$, the theorem's
-rate. Compression is sphere covering, where channel coding
-(<Ref lesson="noisy-channel-coding"/>) was sphere packing.
-</Aside>
-
 <KeyFact>
-$R(D) = \tfrac12 \log_2(\sigma^2 / D)$ for the Gaussian source: rate buys
-error on a log scale, one bit per halving of RMS error, with no finite
-rate reaching $D = 0$.
+No finite rate reaches $D = 0$ for a continuous source, so the lossless
+corner that anchors every discrete curve simply does not exist here.
+Real-valued data is lossy from the first sample onward, and any claim of
+"lossless" audio or image coding is a claim about an already-quantized
+integer source, not about the underlying signal.
 </KeyFact>
 
-## The trade-off made trainable: neural codecs minimize R + λD
+## Covering, not packing: the geometry behind the 11%
 
-### The Lagrangian reading of the curve
+Both closed forms were reached by algebra, and neither explains why
+describing 100 bits jointly beats describing them one at a time. The counting
+argument behind achievability does.
 
-Because $R(D)$ is convex and decreasing, its constrained definition has
-an unconstrained twin: every point of the curve minimizes
+Fix a block length $n$. The source blocks that matter are the typical ones
+(<Ref lesson="source-coding-theorem-lite"/>, where a long block was shown to
+concentrate on about $2^{nH(X)}$ sequences of near-average surprisal). Each
+reconstruction word $\hat x^n$ in the codebook accounts for the source blocks
+jointly typical with it, of which there are about $2^{nH(X \mid \hat X)}$.
+Covering the whole typical set therefore needs about
+$$
+\frac{2^{nH(X)}}{2^{nH(X \mid \hat X)}} = 2^{n I(X; \hat X)}
+$$
+codewords, which is $2^{nR}$ at $R = I(X;\hat X)$: the definition of $R(D)$
+is a count of balls needed to cover a set.
+
+<Figure
+  src="./figures/packing-vs-covering.svg"
+  alt="Two panels: channel coding packs disjoint noise balls inside an output space, lossy coding covers a typical set with overlapping distortion balls, both counts equal to two to the n I"
+  caption="The dual geometries: channel coding packs disjoint balls (as many as fit), lossy coding covers with overlapping balls (as few as suffice). Both counts are 2^(nI)."
+/>
+
+The channel problem of <Ref lesson="noisy-channel-coding"/> counts the same
+way in the opposite direction. There, each codeword's noise ball must stay
+*disjoint* from the others so the decoder never confuses two messages, and
+the number that fits is about
+$2^{nH(Y)} / 2^{nH(Y \mid X)} = 2^{nI(X;Y)}$. Packing wants that number as
+large as possible, hence $\max I$; covering wants it as small as possible,
+hence $\min I$. One exponent, two directions.
+
+This is also the answer to the game. A scheme that decides each bit
+separately places its reconstruction points on the corners of a rectangular
+grid, and a grid's cells are a poor shape for covering: at fixed cell volume
+they reach further into the corners than a ball would, which is wasted
+distortion. Working in $n$ dimensions at once lets the code choose ball-like
+cells and lets concentration discard the atypical blocks entirely; neither
+saving is available one bit at a time.
+
+<KeyFact>
+Every gap between a limit and a shipped codec in this course is a
+finite-blocklength gap of this kind: the exponent $I(X;\hat X)$ is exact, and
+the only negotiable quantity is $n$.
+</KeyFact>
+
+## What a real quantizer gives up
+
+The theory says to cover a high-dimensional typical set. Shipped systems
+usually quantize one sample at a time, and the distance between the two is
+measurable.
+
+### Lloyd's algorithm: alternate two conditions
+
+A scalar quantizer with $N$ reconstruction points is fixed by two things: the
+points $c_1, \dots, c_N$ and the cells assigned to them. Two conditions are
+necessary at any optimum, and each is easy to enforce given the other. Every
+source value must map to its **nearest** reconstruction point, which makes
+the cells the intervals between midpoints; and each point must be the
+**centroid** $\mathbb{E}[X \mid X \in \text{cell}]$ of its own cell, since
+the mean minimises squared error over a set. Lloyd's algorithm enforces them
+alternately until neither moves.
+
+<FigureSequence
+  name="lloyd"
+  alt="Three frames of Lloyd's algorithm on a one-dimensional bimodal density over a labelled x axis: initial points at −2.4, −0.8, 0.8 and 2.4 with midpoint cell boundaries, points moved to the centroids of their cells, then boundaries moved to the new midpoints"
+  caption="Lloyd's algorithm: move the points to their cells' centroids, move the boundaries to the points' midpoints, repeat until neither moves."
+/>
+
+<Task>
+Track the leftmost point across the three frames, reading its value off the
+amber flag under the axis and the first cell boundary off the blue label above
+its dashed line. It starts at $x = -2.4$, where the density is nearly zero,
+and moves to $-1.91$, the centroid of the cell $(-\infty, -1.6)$ — toward the
+mass. Then confirm that frame 3 changes only the boundaries: the first moves
+from $-1.6$ to $-1.40$, the midpoint of the two points now at $-1.91$ and
+$-0.89$, which you can locate against the axis ticks. Each step lowers the
+mean squared error, and neither step alone reaches a fixed point.
+</Task>
+
+Each step can only reduce the expected squared error, so the algorithm
+converges, and its fixed points are exactly the *centroidal* tessellations:
+partitions in which every cell's centroid is its own reconstruction point.
+Convergence is not optimality: centroidal tessellations are not unique, and
+the algorithm can settle on one that is not the best. For a log-concave
+density the fixed point is unique, which covers the Gaussian; even there, the
+optimal points are not known in closed form beyond $N = 3$.
+
+### The high-rate rule and the size of the gap
+
+At high rates the optimal quantizer's design is describable even when its
+points are not. Writing $\lambda(x)$ for the density of reconstruction points
+and treating cells as short, the cell around $x$ has width about
+$1/(N\lambda(x))$ and contributes a squared error of about one twelfth of
+that width squared, giving
+$$
+D \;\approx\; \frac{1}{12 N^2} \int \frac{p(x)}{\lambda(x)^2}\,dx .
+$$
+Minimising over $\lambda$ by Hölder's inequality puts the optimal point
+density at $\lambda^\ast \propto p^{1/3}$ — the **Panter–Dite** rule: spend
+reconstruction points in proportion to the cube root of the source density,
+which is considerably flatter than the density itself. Substituting back for
+a Gaussian source gives
+$$
+D_{\text{scalar}}(R) \;\approx\; \frac{\sqrt{3}\,\pi}{2}\, \sigma^2 4^{-R}
+\;=\; 2.72\,\sigma^2 4^{-R},
+$$
+against the theoretical $\sigma^2 4^{-R}$. The best possible fixed-rate
+scalar quantizer is therefore $10\log_{10} 2.72 = 4.35$ dB above the curve,
+which at 6 dB per bit is $0.72$ bit per sample thrown away.
+
+Most of that loss is recoverable without leaving one dimension. A **uniform**
+scalar quantizer whose output is then entropy-coded, the classical
+transform-codec design, lands within $\tfrac12 \log_2 \tfrac{2\pi e}{12}
+= 0.254$ bit per sample of $R(D)$ for *any* source at high rate, and no
+vector quantizer of any dimension can beat it by more than that. The
+remaining quarter-bit is the price of cubical cells rather than the best
+space-filling shape.
+
+<KeyFact>
+Two numbers bound the whole practical field: fixed-rate scalar quantization
+of a Gaussian wastes $0.72$ bit per sample, and entropy-coded uniform scalar
+quantization wastes at most $0.254$ bit per sample against $R(D)$ on any
+source. The entire payoff of vector quantization, lattice codes and learned
+transforms is confined to that quarter of a bit — which is why real codecs
+spend their effort on the transform and the entropy model, not on the
+quantizer.
+</KeyFact>
+
+## ★ Reverse water-filling for parallel Gaussian sources
+
+Real signals are not one Gaussian but many, of unequal variance: the
+coefficients of a transform, the bands of a filter bank. For $m$ independent
+Gaussians with variances $\sigma_1^2, \dots, \sigma_m^2$ under summed squared
+error, the optimum allocates a common water level $\theta$ and sets
+$D_i = \min(\theta, \sigma_i^2)$ with $\sum_i D_i = D$, giving
+$$
+R(D) = \sum_{i \,:\, \sigma_i^2 > \theta} \tfrac12 \log_2
+\frac{\sigma_i^2}{\theta} .
+$$
+Every component quieter than the water level is not coded at all: its
+reconstruction is the constant $0$ and it contributes its whole variance to
+the distortion budget, while every louder component is coded down to exactly
+$\theta$. Equalising the *residual* distortion rather than the rate is what
+makes it "reverse" water-filling, against the water-filling that equalises
+power in parallel Gaussian channels.
+
+The rule is visible in any transform codec's quantization table: high-frequency
+coefficients with small variance are quantized to zero wholesale, which is one
+long run of zeros in the bitstream, and the bits go to the low-frequency
+coefficients that carry the variance. The core path continues without this
+section.
+
+## The budget as a price: R + λD
+
+The curve has been treated as a constraint so far: a budget $D$, a resulting
+rate. Every system that implements it treats it as a price instead, and
+convexity is what makes the two descriptions interchangeable.
+
+Because $R(D)$ is convex and decreasing, each point of the curve is the
+solution of an unconstrained problem: minimise
 $$
 R + \lambda D
 $$
-for some multiplier $\lambda \ge 0$, namely the negative slope of the
-curve at that point, and sweeping $\lambda$ from large to small walks the
-solution from the low-distortion corner toward the zero-rate tail. This
-is the same constraint-to-multiplier trade seen for
-<Ref lesson="max-entropy-principle"/>: a hard budget becomes a price.
+over all schemes, where $\lambda = -R'(D) \ge 0$ is the negated slope at that
+point. Sweeping $\lambda$ from large to small walks the solution from the
+low-distortion end toward the zero-rate tail; the hard budget has become a
+Lagrange multiplier, the same trade made in
+<Ref lesson="max-entropy-principle"/> when a constrained expectation became a
+tilt parameter.
 
-### The objective, implemented with networks
+<Example title="reading the multiplier off the Gaussian curve">
+For $\sigma^2 = 1$, $R(D) = -\tfrac12 \log_2 D$, so
+$R'(D) = -\tfrac{1}{2D \ln 2}$ and
+$\lambda = \tfrac{1}{2D\ln 2}$.
 
-[Ballé, Laparra & Simoncelli (2017)](https://arxiv.org/abs/1611.01704)
-train image codecs on exactly this objective. An encoder network maps the
-image $x$ to a latent vector, which is **quantized** by rounding and
-entropy-coded; a decoder network maps the quantized latent $\hat y$ back
-to a reconstruction $\hat x$. The loss is
-$$
-\mathcal{L} \;=\;
-\underbrace{\mathbb{E}\bigl[-\log_2 p(\hat y)\bigr]}_{\text{rate } R}
-\;+\; \lambda\,
-\underbrace{\mathbb{E}\bigl[d(x, \hat x)\bigr]}_{\text{distortion } D},
-$$
-where the rate term is the cross-entropy of the quantized latent under a
-learned prior $p(\hat y)$, which by
-<Ref lesson="compression-is-prediction"/> is the achievable size of the
-entropy-coded bitstream. One trained model realizes one point of the
-codec's rate-distortion curve; retraining across a grid of $\lambda$
-values sweeps it, exactly as the multiplier sweeps the theoretical curve.
+At $D = 0.25$ (rate 1 bit): $\lambda = 1/(2 \cdot 0.25 \cdot 0.693) = 2.89$
+bits per unit of squared error. At $D = 0.0625$ (rate 2 bits):
+$\lambda = 11.5$. Quadrupling the price of distortion moved the operating
+point by exactly one bit — the same 6 dB per bit rule, read through the
+multiplier.
+
+A codec exposes $\lambda$, not $D$: the encoder decides each local choice by
+comparing the bits it costs against $\lambda$ times the distortion it saves,
+which requires no knowledge of the rate the file will eventually reach.
+</Example>
 
 {/* fig NeuralCodecLoop: the learned compression pipeline, simplified
     from Ballé et al. fig. 1 (recreate, do not copy). Left-to-right data
@@ -550,234 +825,347 @@ values sweeps it, exactly as the multiplier sweeps the theoretical curve.
   caption="A neural codec is the rate-distortion objective made trainable: networks as encoder and decoder, entropy-coded latent as the rate, λ selecting the point on the curve."
 />
 
-Rounding has zero gradient almost everywhere, so the objective as stated
-cannot be trained directly. The paper's fix is a **uniform-noise
-relaxation**: during training, rounding is replaced by adding noise drawn
-uniformly from $(-\tfrac12, \tfrac12)$, which matches the marginal
-statistics of quantization error, makes both terms differentiable, and
-is dropped at test time in favor of true rounding plus arithmetic coding.
+A learned image codec is this Lagrangian with the test channel replaced by
+trained networks: an encoder produces a latent, rounding quantizes it, a
+learned prior supplies the rate as a cross-entropy (achievable file size, by
+<Ref lesson="compression-is-prediction"/>), and a decoder reconstructs. One
+trained model realises one point of the curve, and a grid of $\lambda$ values
+sweeps it. <Ref lesson="learned-image-compression"/> takes that construction
+apart, including the trick that makes a rounding operation differentiable.
 
-<Aside>
-Ballé et al. §3.1 push the correspondence further: the uniform-noise
-relaxation of $R + \lambda D$ coincides, term for term, with the negative
-evidence lower bound of a variational autoencoder whose approximate
-posterior is uniform, the rate term matching the KL term of the ELBO
-(<Ref lesson="kl-divergence"/>) and the distortion term matching the
-log-likelihood under a Gaussian observation model. Training a codec and
-training a VAE at fixed $\lambda$ are the same optimization; generative
-modeling and lossy compression meet at this objective.
-</Aside>
-
-One assumption has run silently through the whole lesson: someone chose
-$d$. Hamming and squared error are declarations about which differences
-matter, and a codec optimized against squared error will spend bits on
-imperceptible pixel deviations while discarding structure a human
-notices. When no hand-picked distortion measure is defensible, the
-constraint itself can be replaced: keep not "low $d$" but "information
-about a target variable", trading $I(X;T)$ against $I(T;Y)$. That
-objective is the information bottleneck of
-[Tishby, Pereira & Bialek](https://arxiv.org/abs/physics/0004057), and
-<Ref lesson="information-bottleneck"/> develops it as rate-distortion
-with the distortion measure derived rather than assumed.
-
-<KeyFact>
-$\min R + \lambda D$ is rate-distortion theory as a loss function:
-neural codecs train it end to end, $\lambda$ picks the operating point,
-and the one hand-picked ingredient left, the distortion measure, is what
-the information bottleneck later removes.
-</KeyFact>
+What is established: a fidelity budget converts the coding limit into a
+convex curve $R(D) = \min I(X;\hat X)$; the curve runs from $H(X)$ at zero
+distortion to zero at $D_{\max}$; it equals $H(p) - H(D)$ for a Bernoulli
+source under Hamming distortion and $\tfrac12\log_2(\sigma^2/D)$ for a
+Gaussian under squared error; it is attained by covering the typical set with
+distortion balls, the dual of the packing that gives capacity; and real
+quantizers sit above it by a gap measured in fractions of a bit. What is not
+established is where the distortion measure comes from. It was supplied by
+hand, and the two lessons that consume this one attack the question from
+opposite ends: <Ref lesson="learned-image-compression"/> implements
+$R + \lambda D$ with a chosen $d$ and shows what the choice does to the
+pictures, while <Ref lesson="information-bottleneck"/> discards $d$ and keeps
+information about a target variable instead. The immediate next step is
+<Ref lesson="minimum-description-length"/>, which applies the same accounting
+to a model rather than to a signal: a hypothesis is charged for its own
+description, and model selection becomes compression.
 
 ## Exercises
 
 <Exercise>
-For the fair-bit source, compute $R(D)$ at $D = 0.02$, $D = 0.05$, and
-$D = 0.25$, using
-$H(0.02) \approx 0.141$ and $H(0.05) \approx 0.286$. State what fraction
-of the lossless rate each tolerance saves, and where the savings grow
-fastest.
+Three requests arrive in the same morning. For each, first name the problem
+and the words that decide it — an information to be minimised, an information
+to be maximised, or a quantity that does not exist — and only then produce a
+number. Useful values: $H(0.05) = 0.286$, $H(0.1) = 0.469$, $H(0.3) = 0.881$.
+
+(a) A telemetry channel reports $\text{Bernoulli}(0.3)$ status bits, and the
+customer states that errors on 40% of them are acceptable. What is the fewest
+bits per symbol, and what does the encoder send?
+
+(b) A vibration sensor produces a $\mathcal{N}(0, 4)$ signal in volts, and the
+safety case requires the mean squared reconstruction error to be zero. What
+rate does that demand, and what would you tell the safety engineer?
+
+(c) A radio link flips each transmitted bit independently with probability
+$0.1$, and you are free to choose how often you send $0$ against $1$. How many
+bits per channel use can it carry reliably?
 
 <Solution>
-$R(D) = 1 - H(D)$ for the fair source.
+**(a) A rate-distortion minimisation, and the cue is that the tolerance
+exceeds $D_{\max}$.** The source is given, the fidelity budget is given, and
+the free object is the test channel. Here
+$D_{\max} = \min(0.3, 0.7) = 0.3$ and the customer allows $0.4 > 0.3$, so
+$R = 0$: the encoder sends nothing at all and the decoder prints $0$ forever,
+wrong on 30% of symbols, inside the budget with room to spare. Sanity check on
+the same curve at a budget that binds: $R(0.05) = 0.881 - 0.286 = 0.595$ bits
+per symbol.
 
-$R(0.02) = 1 - 0.141 = 0.859$ bits: a $14.1\%$ saving.
-$R(0.05) = 1 - 0.286 = 0.714$ bits: a $28.6\%$ saving.
-$R(0.25) = 1 - 0.811 = 0.189$ bits: an $81.1\%$ saving.
+**(b) The same minimisation, at the one place where the continuous curve has
+no value.** The cue is a real-valued source with $D \to 0$:
+$R(D) = \tfrac12\log_2(4/D)$ grows without bound, so no finite rate delivers
+zero mean squared error and $R(0)$ does not exist. What to tell the engineer:
+name a tolerance and the rate follows, with $D = 1\ \text{V}^2$ costing
+$\tfrac12\log_2 4 = 1$ bit per sample and $D = 0.25$ costing
+$\tfrac12\log_2 16 = 2$ bits, a factor of four in error per bit. The
+alternative is to quantize the signal to integers first, which replaces the
+continuous source by a discrete one whose $R(0) = H(X)$ is finite.
 
-The saving at tolerance $D$ is exactly $H(D)$, and the binary entropy
-function is steepest near $0$ (its slope $\log_2 \tfrac{1-D}{D}$ grows
-without bound as $D \to 0$): the first percent of tolerated error buys
-more rate than any later percent. Raising the tolerance from $2\%$ to
-$5\%$ (hardly a visible change in fidelity) doubles the saving.
+**(c) A capacity maximisation, not a rate-distortion problem.** The cue is
+which distribution is fixed: the flip probability is imposed by the physics of
+the link and the input distribution is the free variable, which is the
+mirror image of (a) and (b). The objective is
+$C = \max_{p(x)} I(X;Y)$, and for a binary symmetric channel with flip
+probability $f$ the maximum is at the uniform input and equals $1 - H(f)$
+(<Ref lesson="channel-capacity"/>), here
+$1 - H(0.1) = 1 - 0.469 = 0.531$ bits per use. No distortion budget appears
+anywhere in the question, and no fidelity measure was named; that absence is
+the reliable signal.
+
+**The one question that sorts all three:** which distribution is handed to you
+and which one are you choosing? Source fixed, channel free, budget binding —
+minimise. Channel fixed, input free — maximise. And before computing either,
+check the endpoints: $D \ge D_{\max}$ makes the answer zero, $D = 0$ on a
+continuous source makes it infinite.
 </Solution>
 </Exercise>
 
 <Exercise>
-A sensor emits $X \sim \text{Bernoulli}(0.1)$. Compute $R(0)$,
-$D_{\max}$, and $R(0.05)$, using $H(0.1) \approx 0.469$ and
-$H(0.05) \approx 0.286$. Name the zero-rate scheme that attains
-$D_{\max}$.
+Evaluate both curves at their two extremes. For $\text{Bernoulli}(p)$ under
+Hamming distortion and for $\mathcal{N}(0,\sigma^2)$ under squared error,
+report $R(0)$ and $D_{\max}$, and state which hypothesis of the definition
+makes $R(0)$ finite in the discrete case and infinite in the continuous one.
+Then say what breaks if the reconstruction alphabet omits one source symbol.
 
 <Solution>
-$R(0) = H(0.1) \approx 0.469$ bits: the lossless rate of the 90/10
+**Discrete.** $R(0) = H(p)$ bits: with $D = 0$ the only admissible channel is
+the identity, whose mutual information is $I(X;X) = H(X)$. $D_{\max} =
+\min(p, 1-p)$, the error rate of the majority guess.
+
+**Continuous.** $R(0) = \lim_{D \to 0} \tfrac12\log_2(\sigma^2/D) = \infty$.
+$D_{\max} = \sigma^2$, the squared error of the constant $\hat X = 0$.
+
+**Which hypothesis decides.** $R(0) = I(X;X)$ in both cases; the difference is
+that $I(X;X)$ equals $H(X)$, a finite number of bits, only when $X$ is
+discrete. A continuous variable is a draw from an uncountable set, and naming
+it exactly is not a finite description at all — differential entropy is not a
+bit count, and the substitute $\tfrac12\log_2(\sigma^2/D)$ diverges. The
+hypothesis doing the work is the discreteness of the alphabet, the same one
+the source coding theorem needed.
+
+**A missing reconstruction symbol.** If some $x_0$ with $p(x_0) > 0$ has no
+equal in $\hat{\mathcal{X}}$, then $d(x_0, \hat x) > 0$ for every
+reconstruction and $\mathbb{E}[d] \ge p(x_0)\min_{\hat x} d(x_0, \hat x) > 0$
+for every channel: the budget $D = 0$ is infeasible and $R(0)$ is undefined
+rather than infinite. The clause "$d(x,\hat x) = 0$ exactly when
+$\hat x = x$, on a common alphabet" in the shape theorem is what excludes
+this, and it is the reason a quantizer's reconstruction levels must include
+the source values if zero distortion is ever to be claimed.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim, which is often stated as a rule of thumb: "halving the rate
+roughly doubles the distortion." Test it against both closed forms, report
+one regime where it is approximately right and two where it fails badly, and
+name the property of each curve that decides the outcome.
+
+<Solution>
+**Where it holds.** Fair bits, $R = 1 - H(D)$. At $R = 0.5$ the distortion is
+$D = 0.11$. Halving to $R = 0.25$ needs $H(D) = 0.75$, giving $D = 0.215$.
+The claim is right to within 2% here — a coincidence of the mid-range of the
+binary entropy function, not a law.
+
+**First failure: the Gaussian at any rate.** $D = \sigma^2 4^{-R}$, so
+halving the rate multiplies the distortion by $4^{R/2}$, a factor that
+depends on where you started. From $R = 8$ to $R = 4$ the distortion grows by
+$4^4 = 256$-fold, not twofold. The claim fails because the Gaussian curve is
+logarithmic in $D$: equal rate *differences*, not ratios, correspond to fixed
+distortion factors.
+
+**Second failure: the binary source near its tail.** From $R = 0.05$
+($D = 0.371$) to $R = 0.025$ the required $H(D) = 0.975$ gives $D = 0.407$, a
+factor of $1.1$. Here the distortion cannot double, because $D$ is a
+probability bounded by $D_{\max} = \tfrac12$ and the curve flattens onto it.
+
+**The deciding property.** The rule of thumb assumes $\log D$ is linear in
+$R$ with slope $-1$ per halving. The Gaussian has $\log D$ linear in $R$ with
+slope $-2$ per bit, so the multiplier compounds; the Bernoulli curve is not
+log-linear at all and is clamped at $D_{\max}$. A rate-distortion rule of
+thumb that does not name the source and the measure is not a rule.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the rate-distortion function of a source uniform on $m$ symbols under
+Hamming distortion. Show that
+$R(D) = \log_2 m - H(D) - D\log_2(m-1)$ for $0 \le D \le 1 - \tfrac1m$, in
+both directions: bound $H(X \mid \hat X)$ above using the error indicator,
+and exhibit a test channel attaining the bound. Then check the result against
+$m = 2$ and at $D = D_{\max}$. Write down the error indicator before opening
+the solution.
+
+<Solution>
+**Converse.** Let $E$ be the indicator of the event $X \ne \hat X$, so
+$P(E = 1) = \mathbb{E}[d] \le D$. Expand $H(X, E \mid \hat X)$ two ways. Since
+$E$ is a function of $(X, \hat X)$,
+$$
+H(X \mid \hat X) = H(X, E \mid \hat X) = H(E \mid \hat X) + H(X \mid E, \hat X).
+$$
+The first term is at most $H(P(E{=}1))$. In the second, $E = 0$ leaves no
+uncertainty at all, and $E = 1$ leaves $X$ among the $m-1$ symbols other than
+$\hat X$, worth at most $\log_2(m-1)$ bits. Hence
+$H(X \mid \hat X) \le H(P(E{=}1)) + P(E{=}1)\log_2(m-1)$. That statement is
+Fano's inequality in its general form, and the two lines above are its entire
+proof, so nothing outside this lesson is needed. The right-hand side
+increases in $P(E{=}1)$ on $[0, 1 - \tfrac1m]$, since its derivative
+$\log_2\frac{(m-1)(1-D)}{D}$ is positive exactly there, so it is at most
+$H(D) + D\log_2(m-1)$. Therefore
+$$
+I(X;\hat X) = \log_2 m - H(X \mid \hat X) \ge \log_2 m - H(D) - D\log_2(m-1).
+$$
+
+**Achievability.** Let $\hat X$ be uniform on the $m$ symbols and let the
+channel from $\hat X$ to $X$ keep the symbol with probability $1 - D$ and
+otherwise replace it by one of the other $m-1$ symbols uniformly. By
+symmetry the induced marginal of $X$ is uniform, as required, and the
+distortion is exactly $D$. Given $\hat X$, the uncertainty in $X$ is the
+choice "same or different" ($H(D)$ bits) plus, when different, a uniform pick
+among $m-1$ symbols ($D\log_2(m-1)$ bits). So
+$H(X \mid \hat X) = H(D) + D\log_2(m-1)$ and the bound is attained.
+
+**Checks.** At $m = 2$: $\log_2 2 - H(D) - D\log_2 1 = 1 - H(D)$, the fair
+binary curve. At $D = D_{\max} = 1 - \tfrac1m$, expanding
+$H(1 - \tfrac1m) = \tfrac1m\log_2 m + (1 - \tfrac1m)\log_2\tfrac{m}{m-1}$
+gives $R = \log_2 m - \log_2 m = 0$, and $1 - \tfrac1m$ is indeed the error
+rate of a constant guess against a uniform source.
+
+The transferable move: every Hamming-distortion converse in this lesson is
+Fano's inequality with the error probability renamed as a distortion.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the Gaussian rate-distortion function and then convert it into the
+engineers' rule. (a) Show $I(X;\hat X) \ge \tfrac12\log_2(\sigma^2/D)$ for
+every $\hat X$ with $\mathbb{E}[(X - \hat X)^2] \le D$. Two facts are all you
+need, both quoted here: the differential entropy of a Gaussian is
+$h(X) = \tfrac12\log_2(2\pi e\sigma^2)$, and every real random variable $U$
+obeys $h(U) \le \tfrac12\log_2(2\pi e\,\mathbb{E}[U^2])$, with equality only
+when $U$ is Gaussian with mean zero, the maximum-entropy property proved in
+<Ref lesson="max-entropy-principle"/>. (b) Verify that the stated test
+channel attains it. (c) Convert "one extra bit" into decibels explicitly, and
+report the rate needed for a 40 dB signal-to-noise ratio.
+
+<Solution>
+**(a) The bound.** Write $I(X;\hat X) = h(X) - h(X \mid \hat X)$. Since
+conditioning cannot increase differential entropy and subtracting a function
+of the conditioning variable does not change it,
+$$
+h(X \mid \hat X) = h(X - \hat X \mid \hat X) \le h(X - \hat X).
+$$
+The variable $X - \hat X$ has second moment at most $D$, so its variance is
+at most $D$, and among all densities of variance at most $D$ the Gaussian has
+the largest differential entropy: $h(X - \hat X) \le \tfrac12\log_2(2\pi e D)$.
+Hence
+$$
+I(X;\hat X) \ge \tfrac12\log_2(2\pi e\sigma^2) - \tfrac12\log_2(2\pi e D)
+= \tfrac12\log_2\frac{\sigma^2}{D}.
+$$
+The $2\pi e$ factors cancel, which is why the coordinate-dependence of
+differential entropy does no harm.
+
+**(b) Attainment.** Take $\hat X \sim \mathcal{N}(0, \sigma^2 - D)$ and
+$Z \sim \mathcal{N}(0, D)$ independent, with $X = \hat X + Z$. Then $X$ is
+Gaussian with variance $(\sigma^2 - D) + D = \sigma^2$, as required, and
+$\mathbb{E}[(X - \hat X)^2] = \mathbb{E}[Z^2] = D$: on budget. Given
+$\hat X$, the residual is exactly $Z$, so
+$h(X \mid \hat X) = \tfrac12\log_2(2\pi e D)$ and both inequalities in (a)
+are equalities. The construction needs $D \le \sigma^2$ for the variance
+$\sigma^2 - D$ to be non-negative — which is precisely the range in which
+$R(D) > 0$.
+
+**(c) Decibels.** $D(R) = \sigma^2 4^{-R}$, so the signal-to-noise ratio is
+$\sigma^2/D = 4^R$ and, in decibels,
+$10\log_{10} 4^R = R \cdot 10\log_{10} 4 = 6.02\,R$. One extra bit buys
+$6.02$ dB; conversely $40$ dB requires $R = 40/6.02 = 6.6$ bits per sample,
+which a fixed-rate scalar quantizer would not deliver until about $7.4$ bits
+because of the $0.72$-bit scalar penalty.
+</Solution>
+</Exercise>
+
+<Exercise>
+A measurement, on a real image. Take any grayscale photograph and quantize
+its pixel values uniformly to $1, 2, 3$ and $4$ bits per pixel — that is,
+replace each value by the centre of one of $2^b$ equal intervals covering
+$[0, 255]$ — and measure the mean squared error at each rate. Plot rate
+against $10\log_{10}(\sigma^2/D)$, where $\sigma^2$ is the variance of the
+image's pixel values. Report the slope, compare it against the 6 dB per bit
+prediction, state where your points sit relative to
+$R(D) = \tfrac12\log_2(\sigma^2/D)$, and give one reason for the gap. State
+in advance what would count as agreement.
+
+<Solution>
+**What to predict before running it.** For a uniform quantizer of step
+$\Delta = 256/2^b$ whose cells are short enough that the density is roughly
+flat inside them, the error is uniform on $(-\Delta/2, \Delta/2)$ and
+$D \approx \Delta^2/12 = 5461 \cdot 4^{-b}$. So $D$ should fall by a factor
+of four per bit, and the plotted signal-to-noise ratio should rise by
+$6.02$ dB per bit.
+
+**What counts as agreement.** A fitted slope within a few tenths of a
+decibel of $6.02$ over the $2 \to 4$ bit range. The $1$-bit point will sit
+well below the line and should: at two levels the flat-within-a-cell
+assumption fails completely, which is the high-rate condition of the
+approximation failing, not a measurement error.
+
+**Where the points sit.** Above the curve, always. With a typical natural
+image variance around $\sigma^2 \approx 3000$ (a standard deviation near
+$55$), $R(D)$ would allow $D = 3000 \cdot 4^{-4} \approx 12$ at 4 bits, while
+uniform quantization gives $5461 \cdot 4^{-4} \approx 21$: about $2.5$ dB, or
+$0.4$ bit, of loss.
+
+**One reason for the gap** (any of these is a complete answer). The
+quantizer is scalar and fixed-rate, which costs up to $0.72$ bit by the
+Panter–Dite calculation, and it spends levels uniformly over $[0,255]$ rather
+than in proportion to $p^{1/3}$, wasting levels on empty parts of the
+histogram. A deeper reason, worth noticing: neighbouring pixels are strongly
+correlated, so the i.i.d. Gaussian $R(D)$ computed from the marginal variance
+is not the right bound for an image at all — the true rate-distortion
+function of the image source is far lower, which is why a real codec
+transforms before it quantizes and beats this comparison in both directions.
+</Solution>
+</Exercise>
+
+<Exercise>
+You must compress images so that a downstream classifier still identifies the
+object in them, and the bit budget is tight enough that visible degradation
+is certain. Squared error is a poor proxy for this goal: it charges equally
+for a change in a texture nobody classifies on and for a change in the shape
+that decides the label. Write down what you would actually want the
+compressed representation $T$ to preserve, express it as a quantity involving
+the label $Y$, and state what the optimisation becomes when your quantity
+replaces $\mathbb{E}[d(X,\hat X)] \le D$ in the definition of $R(D)$.
+
+<Solution>
+**What to preserve.** Not the pixels but the label information: the
+representation should be free to discard anything about $X$ that does not
+change what $Y$ is. The natural quantity is the mutual information between
+the representation and the label, $I(T;Y)$, in bits — the same functional
+used throughout this course, now pointed at the target rather than at the
 source.
 
-$D_{\max} = \min(0.1, 0.9) = 0.1$: the constant guess $\hat X \equiv 0$
-(the majority symbol) errs exactly when $X = 1$, a $10\%$ error
-fraction, at zero rate. Hence $R(D) = 0$ for $D \ge 0.1$.
+**The objective.** Keep the rate term $I(X;T)$ as the thing to minimise, and
+replace the distortion constraint by a floor on preserved label information:
+$$
+\min_{p(t \mid x)\,:\; I(T;Y)\, \ge\, I_0} \; I(X;T),
+$$
+or, in the Lagrangian form this lesson's closing section derived,
+$\min\, I(X;T) - \beta\,I(T;Y)$. It is the rate-distortion problem with one
+substitution: an externally supplied $d$ is gone, and its role is played by a
+second mutual information.
 
-$R(0.05) = H(0.1) - H(0.05) \approx 0.469 - 0.286 = 0.183$ bits.
-Tolerating errors on one symbol in twenty cuts the rate to $39\%$ of
-lossless; the whole curve lives below half a bit.
-</Solution>
-</Exercise>
+**Two facts that follow immediately.** The data-processing inequality
+(<Ref lesson="data-processing-inequality"/>) caps $I(T;Y)$ at $I(X;Y)$, so
+the achievable region has a hard ceiling no encoder can cross; and the
+effective distortion measure is no longer chosen but *derived* — it turns out
+to be a KL divergence between conditional label distributions, so two inputs
+are "close" exactly when they imply the same beliefs about $Y$.
 
-<Exercise>
-A Gaussian source has $\sigma^2 = 16$. Compute the rate for budgets
-$D = 1$ and $D = 0.25$, the budget reachable at $8$ bits per sample, and
-the number of additional bits needed to halve the RMS error from any
-operating point.
-
-<Solution>
-$R(1) = \tfrac12 \log_2 16 = 2$ bits per sample.
-$R(0.25) = \tfrac12 \log_2 64 = 3$ bits per sample.
-
-At $8$ bits: $D = \sigma^2 \cdot 4^{-8} = 16 / 65536 \approx 2.4 \times
-10^{-4}$.
-
-Halving RMS error quarters the squared error, and
-$R(D/4) - R(D) = \tfrac12 \log_2 4 = 1$: exactly **one extra bit**,
-from any starting point, the 6 dB per bit rule. Consistency check
-between the first two answers: $D$ fell by a factor $4$ and the rate
-rose by one bit.
-</Solution>
-</Exercise>
-
-<Exercise>
-Verify the achievability construction for the fair source. Let
-$\hat X \sim \text{Bernoulli}(\tfrac12)$, let
-$Z \sim \text{Bernoulli}(D)$ independent of $\hat X$ with
-$D \le \tfrac12$, and set $X = \hat X \oplus Z$. Show that $X$ is a fair
-bit, that the expected Hamming distortion is $D$, and that
-$I(X; \hat X) = 1 - H(D)$.
-
-<Solution>
-**Marginal.** $P(X = 1) = P(\hat X = 1)P(Z = 0) + P(\hat X = 0)P(Z = 1)
-= \tfrac12(1 - D) + \tfrac12 D = \tfrac12$: fair, as required
-($\pi = \tfrac{p - D}{1 - 2D} = \tfrac12$ at $p = \tfrac12$).
-
-**Distortion.** $X \ne \hat X$ exactly when $Z = 1$:
-$\mathbb{E}[d] = P(Z = 1) = D$, meeting the budget with equality.
-
-**Rate.** $I(X; \hat X) = H(X) - H(X \mid \hat X)$. The marginal gives
-$H(X) = 1$. Given $\hat X = \hat x$, the source is
-$X = \hat x \oplus Z$ with $Z$ independent of $\hat X$, so the
-conditional distribution of $X$ is a $D$-flip of a known value:
-$H(X \mid \hat X = \hat x) = H(D)$ for both values, hence
-$H(X \mid \hat X) = H(D)$ and $I(X; \hat X) = 1 - H(D) = R(D)$. The
-channel achieves the curve, matching the converse bound.
-</Solution>
-</Exercise>
-
-<Exercise>
-Prove that the achievable region is convex by time-sharing, without any
-information quantities: given a code achieving $(D_1, R_1)$ and a code
-achieving $(D_2, R_2)$, construct, for each $\lambda \in [0, 1]$, a
-scheme achieving $\bigl(\lambda D_1 + (1-\lambda) D_2,\; \lambda R_1 +
-(1-\lambda) R_2\bigr)$. Conclude that $R(D)$, the region's lower
-boundary, is convex.
-
-<Solution>
-Split the source stream into blocks and apply code 1 to a fraction
-$\lambda$ of them and code 2 to the rest (a fixed, position-based split,
-so the decoder knows which code to apply where; no signaling bits are
-needed in the limit).
-
-**Rate.** Bits are spent at $R_1$ on a $\lambda$ fraction of symbols and
-$R_2$ on the rest: $\lambda R_1 + (1 - \lambda) R_2$ bits per symbol
-overall.
-
-**Distortion.** Per-symbol distortion averages the same way:
-$\lambda D_1 + (1 - \lambda) D_2$.
-
-Every convex combination of achievable points is therefore achievable.
-A region closed under convex combinations has a convex lower boundary:
-if $R(D)$ ever bulged above a chord, time-sharing the chord's endpoint
-codes would achieve points below the function, contradicting the
-converse. Hence $R\bigl(\lambda D_1 + (1-\lambda) D_2\bigr) \le
-\lambda R(D_1) + (1 - \lambda) R(D_2)$.
-</Solution>
-</Exercise>
-
-<Exercise>
-The optimal fair-source test channel at $D = 0.25$ has the joint table
-$P(X{=}0, \hat X{=}0) = P(X{=}1, \hat X{=}1) = \tfrac38$ and
-$P(X{=}0, \hat X{=}1) = P(X{=}1, \hat X{=}0) = \tfrac18$. Using the
-recipes of <Ref lesson="mutual-information"/> (marginals from row and
-column sums, conditional entropy as an average of column entropies),
-compute $\mathbb{E}[d]$ and $I(X; \hat X)$ from the table, and check the
-result against the Bernoulli formula.
-
-<Solution>
-**Distortion.** The off-diagonal mass is
-$\tfrac18 + \tfrac18 = \tfrac14$: $\mathbb{E}[d] = 0.25$, on budget.
-
-**Marginals.** Row and column sums all equal $\tfrac12$:
-$H(X) = H(\hat X) = 1$ bit.
-
-**Conditional entropy.** Given $\hat X = 0$ (probability $\tfrac12$),
-the column $(\tfrac38, \tfrac18)$ renormalizes to
-$(\tfrac34, \tfrac14)$, entropy $H(0.25) \approx 0.811$ bits; the
-$\hat X = 1$ column gives the mirror image, the same entropy. So
-$H(X \mid \hat X) = 0.811$ bits.
-
-**Mutual information.**
-$I(X; \hat X) = H(X) - H(X \mid \hat X) = 1 - 0.811 = 0.189$ bits.
-
-**Check.** $R(0.25) = 1 - H(0.25) = 0.189$ bits: the table attains the
-minimum, so it is an optimal test channel. (It is the exercise-4
-construction at $D = 0.25$, written as a joint table.)
-</Solution>
-</Exercise>
-
-<Exercise>
-Prove in general that $R(D) = 0$ for $D \ge D_{\max} =
-\min_{\hat x} \mathbb{E}[d(X, \hat x)]$ and that $R(D) > 0$ for
-$D < D_{\max}$, and evaluate $D_{\max}$ for (a) $X \sim
-\text{Bernoulli}(p)$ under Hamming distortion and (b) $X \sim
-\mathcal{N}(\mu, \sigma^2)$ under squared error.
-
-<Solution>
-**Zero rate suffices for $D \ge D_{\max}$.** Let $\hat x^\ast$ attain
-the minimum in $D_{\max}$. The constant channel
-$\hat X \equiv \hat x^\ast$ has $I(X; \hat X) = 0$ (a constant is
-independent of everything) and expected distortion $D_{\max} \le D$: an
-admissible channel with zero information, so the minimum is $0$.
-
-**Zero rate fails for $D < D_{\max}$.** $I(X; \hat X) = 0$ forces
-independence (<Ref lesson="mutual-information"/>, nonnegativity's
-equality case). Under independence,
-$\mathbb{E}[d] = \sum_{\hat x} p(\hat x)\,\mathbb{E}[d(X, \hat x)]$, an
-average of terms each at least $D_{\max}$, so
-$\mathbb{E}[d] \ge D_{\max} > D$: no zero-information channel meets the
-budget, hence $R(D) > 0$.
-
-**(a)** The constant $\hat x$ errs with probability $p$ (choosing
-$\hat x = 0$) or $1 - p$ (choosing $\hat x = 1$); the better choice is
-the majority symbol: $D_{\max} = \min(p, 1-p)$.
-
-**(b)** For a constant $c$,
-$\mathbb{E}[(X - c)^2] = \sigma^2 + (\mu - c)^2$, minimized at
-$c = \mu$: $D_{\max} = \sigma^2$, attained by always outputting the
-mean.
+This objective is the information bottleneck, and
+<Ref lesson="information-bottleneck"/> develops it, including the derivation
+of that KL distortion and what the $\beta$ sweep traces out.
 </Solution>
 </Exercise>
 
 <References>
-1. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — Part V, §§27–29: fidelity criteria as averaged pairwise distortion, the rate $R_1 = \min I$ under a fidelity bound (Theorem 21), and the Gaussian/RMS closed form.
+1. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — Part V, §§27–29: fidelity criteria as averaged pairwise distortion, the rate $R_1 = \min I$ under a fidelity bound (Theorem 21), and the Gaussian/RMS closed form. https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf
 2. C. E. Shannon, "Coding Theorems for a Discrete Source with a Fidelity Criterion," *IRE National Convention Record*, Part 4, 1959 — the complete discrete rate-distortion theorem, achievability and converse.
-3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 10: §10.2 definitions, §10.3.1 the Bernoulli/Hamming form, §10.3.2 the Gaussian/squared-error form, Lemma 10.4.1 convexity, §10.4 converse, §10.5 achievability.
-4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441 / UIUC ECE 563), 2016 — chs. 23–25: the rate-distortion definitions, the two closed forms (§25.1), the sphere-covering picture, and the Blahut–Arimoto algorithm. https://people.lids.mit.edu/yp/homepage/data/itlectures_v5.pdf
-5. R. E. Blahut, "Computation of Channel Capacity and Rate-Distortion Functions," *IEEE Transactions on Information Theory*, 18(4), 1972 — the alternating-minimization algorithm computing $C$ and $R(D)$, the duality made computational.
-6. J. Ballé, V. Laparra, E. P. Simoncelli, "End-to-end Optimized Image Compression," ICLR 2017 — learned image codecs trained on $R + \lambda D$, the uniform-noise relaxation of quantization, and (§3.1) the equivalence of the relaxed objective with a variational autoencoder loss. https://arxiv.org/abs/1611.01704
-7. N. Tishby, F. C. Pereira, W. Bialek, "The Information Bottleneck Method," *Proc. 37th Allerton Conference*, 1999 — §1: the bottleneck objective introduced as rate-distortion with the hand-picked distortion measure replaced by relevant information. https://arxiv.org/abs/physics/0004057
+3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — ch. 10: §10.1 quantization, §10.2 definitions, §10.3.1 the Bernoulli/Hamming form, §10.3.2 the Gaussian/squared-error form, §10.3.3 reverse water-filling for parallel Gaussians, Lemma 10.4.1 convexity, §10.4 converse, §10.5 achievability.
+4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441 / UIUC ECE 563), 2016 — §23.1 scalar quantization, Lloyd's algorithm and its non-uniqueness, and the Panter–Dite high-rate rule; §23.2 the 100-bit Hamming game and the 0.254-bit space-filling bound; §25.1 the closed forms, with a second converse proof by divergence. https://people.lids.mit.edu/yp/homepage/data/itlectures_v5.pdf
+5. T. Weissman, I. Ochoa, K. Tatwawadi, *EE376A Information Theory lecture notes*, Stanford, 2016 — ch. 8: §8.2 the explicit test channels $U = V \oplus Z$ and $U = V + Z$ for the two closed forms, §8.3 the direct part, §8.5 the covering count $2^{nI}$ against the channel-coding packing count.
+6. R. E. Blahut, "Computation of Channel Capacity and Rate-Distortion Functions," *IEEE Transactions on Information Theory*, 18(4), 1972 — the alternating-minimization algorithm that computes both $C$ and $R(D)$ numerically when no closed form exists. https://doi.org/10.1109/TIT.1972.1054855
+7. S. P. Lloyd, "Least Squares Quantization in PCM," *IEEE Transactions on Information Theory*, 28(2), 1982 (Bell Labs memorandum, 1957) — the nearest-neighbour and centroid conditions and the alternating algorithm drawn in this lesson. https://doi.org/10.1109/TIT.1982.1056489
+8. P. F. Panter, W. Dite, "Quantization Distortion in Pulse-Count Modulation with Nonuniform Spacing of Levels," *Proceedings of the IRE*, 39(1), 1951 — the high-rate approximation whose optimum places points in proportion to $p^{1/3}$.
+9. J. Ballé, V. Laparra, E. P. Simoncelli, "End-to-end Optimized Image Compression," ICLR 2017 — §2 trains a codec on $R + \lambda D$ with a learned entropy model, the construction taken apart in the learned-image-compression lesson. https://arxiv.org/abs/1611.01704
+10. N. Tishby, F. C. Pereira, W. Bialek, "The Information Bottleneck Method," *Proc. 37th Allerton Conference*, 1999 — §1 poses the bottleneck as rate-distortion with the hand-picked distortion measure replaced by relevant information. https://arxiv.org/abs/physics/0004057
 </References>

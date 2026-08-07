@@ -94,10 +94,9 @@ async function main(): Promise<void> {
     createElement(MDXContent as never, { components } as never),
   ).replaceAll('src="/course-assets/', `src="file://${appRoot}/public/course-assets/`);
 
-  const katex = readFileSync(
-    join(appRoot, "node_modules/katex/dist/katex.min.css"),
-    "utf8",
-  );
+  // Resolved through node, not assumed at the app root: a git worktree has
+  // no node_modules of its own and resolution walks up to the main checkout.
+  const katex = readFileSync(require.resolve("katex/dist/katex.min.css"), "utf8");
   const previewDir = join(appRoot, ".preview");
   mkdirSync(previewDir, { recursive: true });
 
@@ -127,16 +126,23 @@ async function main(): Promise<void> {
       if (!shoot) continue;
       const png = join(previewDir, `${lesson}-${suffix}.png`);
       try {
-        execFileSync(chromePath(), [
-          "--headless=new",
-          "--disable-gpu",
-          "--no-sandbox",
-          "--hide-scrollbars",
-          "--allow-file-access-from-files",
-          `--window-size=1100,${height}`,
-          `--screenshot=${png}`,
-          `file://${htmlPath}`,
-        ]);
+        execFileSync(
+          chromePath(),
+          [
+            "--headless=new",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--no-zygote",
+            "--hide-scrollbars",
+            "--allow-file-access-from-files",
+            `--window-size=1100,${height}`,
+            `--screenshot=${png}`,
+            `file://${htmlPath}`,
+          ],
+          // Kill a hung render instead of leaving orphaned chrome processes
+          // behind — a few dozen of them exhaust this box's memory.
+          { timeout: 120_000, killSignal: "SIGKILL" },
+        );
         // Trim the empty page below the content so the PNG is readable.
         try {
           execFileSync("convert", [png, "-trim", "+repage", "-bordercolor", "none", "-border", "24", png]);

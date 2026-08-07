@@ -1,108 +1,176 @@
 # Research brief: noisy-channel-coding (The noisy-channel coding theorem)
 
-status: planned
+status: drafted (kept slug — revise, do not rewrite)
 module: channels
 type: core
 goal: Explain why capacity is the exact threshold between reliable and unreliable communication.
+est_minutes: 40
 
-New lesson. The headline theorem of the field: capacity is not a soft trade-off
-but a sharp threshold. Below C, error can be driven to zero; above C, error is
-bounded away from zero. This is the "explain-level" lesson — state the theorem,
-sketch achievability (random coding + joint typicality) and the converse (Fano),
-and ground it with the Hamming (7,4) code as a concrete finite construction.
+## ARC
+
+- **Inherits:** `C = max I(X;Y)` (`channel-capacity`), the typical set
+  (`source-coding-theorem-lite`), Fano's inequality (`fano-inequality`) and the
+  data-processing inequality.
+- **Spine step:** step 6, *The second limit* — "…gives a rate that is achievable
+  and above which reliable communication is impossible."
+- **Contributes:** the operational meaning of mutual information, and the
+  course's second hard limit. Also the fact that the proof is non-constructive,
+  which is the entire premise of the next two lessons.
+- **Hands off to:** `hamming-codes` (an explicit code, and what it cannot do)
+  and `deployed-codes` (how long it took to reach the promise).
 
 ## Sources to consult
 
-- Shannon 1948, **Part II, §13 "The Fundamental Theorem for a Discrete Channel
-  with Noise"** (Theorem 11, the coding theorem and converse; random-coding
-  argument), **§14** (redundancy already in the source helps), **§17** (the
-  Hamming (7,4) single-error-correcting code reaching capacity blockwise).
-- Cover & Thomas, **§7.5-7.7** — definitions of a code/rate, jointly typical
-  sequences, the channel coding theorem (Theorem 7.7.1) via random coding;
-  **§7.9 "Fano's Inequality and the Converse"**; **§7.11 "Hamming Codes"**.
-- MacKay, **ch. 9-10** — §9.6-9.7 statement and intuitive typical-set preview,
-  ch. 10 the full random-coding + joint-typicality proof and the converse; ch. 1
-  introduces the (7,4) Hamming code and repetition codes as a first taste.
-- Polyanskiy & Wu, **ch. 14-16** (achievability bounds, Fano converse), **ch. 20
-  §20.3** (dispersion — why the threshold is sharp at finite blocklength).
-- Arıkan 2009 (arXiv:0807.3917) — one-sentence modern payoff: explicit
-  capacity-achieving polar codes exist (the 5G lineage). Attribute the 5G
-  framing to later work, not to Arıkan's paper.
+- Cover & Thomas, **§7.5-7.7** (definitions, jointly typical sequences,
+  the theorem and its random-coding proof), **§7.9-7.10** (the Fano converse and
+  the equality condition), **§7.12** (feedback does not increase capacity),
+  **§7.13** (source-channel separation).
+- MacKay, **ch. 9 §9.6-9.7** (statement and the extended-channel preview) and
+  **ch. 10** (the full three-part statement, joint typicality, random coding
+  with expurgation, and the `R(p_b) = C/(1-H_2(p_b))` curve for coding with
+  allowed errors). MacKay's baby-weighing analogy for why the average over
+  random codebooks suffices is the clearest available statement of the proof's
+  central trick.
+- Shannon 1948 Part II, **§13, Theorem 11** and the fan diagram (fig. 10) — the
+  original argument.
+- Weissman (EE376A), **§5.5-5.8** — the joint AEP, the direct theorem and the
+  Fano converse at an elementary level.
+- Polyanskiy & Wu, **ch. 16** (the theorem via one-shot achievability bounds)
+  and **§20.3** (dispersion — the finite-blocklength correction). Dispersion is
+  what makes the threshold picture honest at finite `n`.
 
 ## Key points the lesson must cover
 
-1. **Setup**: a rate-R blocklength-n code maps `2^{nR}` messages to length-n
-   inputs; decode the noisy output; error = wrong message. The question is which
-   rates R admit codes with error → 0 as n → ∞.
-2. **The theorem** (statement): for a discrete memoryless channel of capacity C,
-   every rate `R < C` is achievable (codes exist with error → 0) and no rate
-   `R > C` is (error bounded away from 0). Capacity is the threshold.
-3. **Achievability, sketched** (framework-first, then the trick): a single code
-   is hard to analyze; average over **random codebooks**. Encode `2^{nR}`
-   messages as random length-n inputs; decode by **joint typicality** (pick the
-   message whose codeword is jointly typical with the output). The typical set
-   has `~2^{nH}` members; a wrong codeword is jointly typical only with
-   probability `~2^{-nI(X;Y)}`, and with `2^{nR}` competitors the union bound
-   gives error → 0 when `R < I(X;Y)`, maximized at C. State, do not fully prove.
-4. **Converse, via Fano**: Fano's inequality `H(W|Ŵ) ≤ 1 + Pe·log(2^{nR})`
-   bounds how much the decoder can still not know when it errs; combined with
-   `I(W;Ŵ) ≤ nC` (data-processing along the code → channel → decoder chain) it
-   forces `Pe` bounded below once `R > C`. Introduce Fano here; lean on the
-   data-processing inequality from the prior lesson for `I(W;Ŵ) ≤ nC`.
-5. **A concrete code**: the **Hamming (7,4)** code — 4 data bits, 3 parity bits,
-   corrects any single-bit error; rate 4/7 ≈ 0.571. Show the parity-check idea
-   and that it beats naive repetition at the same rate. Note it is one point, not
-   the theorem.
-6. **What the theorem does and does not give**: it proves good codes *exist*
-   (non-constructively) but the random-coding proof yields no usable code; modern
-   explicit capacity-achieving codes (LDPC, turbo, polar/Arıkan) close that gap.
-   One paragraph, precise.
+1. **The flaw first.** Repetition coding drives error down only by driving rate
+   to zero: at `p = 0.1`, reaching `p_b = 10^{-15}` needs about 60 repetitions.
+   The natural conclusion — reliability costs all your rate — is wrong, and the
+   theorem says exactly how wrong. This is the lesson's reversal seam and it
+   must open the chapter.
+2. **The setup**: an `(n, M)` code, rate `R = (log2 M)/n`, block error
+   probability, and what "achievable" means (a sequence of codes with vanishing
+   error).
+3. **Joint typicality**: `(x^n, y^n)` pairs whose empirical behaviour matches the
+   joint. The counts: about `2^{nH(X)}` typical inputs, `2^{nH(Y)}` typical
+   outputs, `2^{nH(X,Y)}` typical pairs, so an independent pair is jointly
+   typical with probability about `2^{-nI(X;Y)}`.
+4. **Achievability**, sketched honestly: draw `2^{nR}` codewords independently
+   from `p(x)`; decode to the unique codeword jointly typical with the received
+   word. The error probability averaged over codebooks vanishes when
+   `R < I(X;Y)`; therefore some codebook is at least that good. Name the two
+   moves that carry the proof — averaging over random codebooks, and
+   expurgation to convert average error into maximal error.
+5. **The converse**, now short because Fano is already available: Fano bounds
+   `H(W | Ŵ)`, the data-processing inequality bounds `I(W; Ŵ) ≤ nC`, and the
+   two together force `R ≤ C` if error vanishes. Three lines.
+6. **Non-constructiveness.** The proof exhibits no code, and a random codebook
+   of `2^{nR}` entries is unusable (storage and decoding both exponential). Say
+   this plainly; it is why the next two lessons exist and why 45 years passed
+   before practice caught up.
+7. **Finite blocklength.** The threshold is sharp only as `n → ∞`. At finite `n`
+   the achievable rate is about `C - sqrt(V/n) Q^{-1}(ε)`; state the shape, not
+   the derivation, and use it to explain why the demo's curve softens at small
+   `n`.
+8. **Feedback and separation**, one paragraph each: feedback does not raise `C`
+   for a memoryless channel but can simplify coding enormously (the erasure
+   channel with feedback achieves capacity with zero error by simply
+   retransmitting); and separate source and channel coding is asymptotically
+   optimal, which is why compression and error correction are different chapters
+   of this course and different layers of a real stack.
 
 ## Pitfalls / subtleties to flag
 
-- **Sharp threshold, not a trade-off**: below C error vanishes, above C it does
-  not. The `<KeyFact>`. Resist "higher rate = more error" gradualism.
-- The random-coding proof shows **existence in expectation**: if the average code
-  is good, some code is at least as good. It names no code.
-- **Blocklength → ∞** is essential; at finite n there is a soft transition
-  (dispersion). Say the theorem is asymptotic; the demo shows the cliff
-  sharpening with n.
-- Fano bounds error from **below** in the converse; it is not a construction.
-- The Hamming code is a single finite code at a fixed rate, corrects one error
-  per block — it does not "achieve capacity" except in Shannon's specific
-  blockwise-channel sense (§17). Do not overclaim.
-- Capacity is per channel use; comparing to a source's entropy rate (source-
-  channel separation) is a further result — one-sentence pointer, out of scope.
+- "Arbitrarily small error" is not zero error. Zero-error capacity is a
+  different and generally smaller quantity.
+- The theorem is about a sequence of codes with growing `n`. Nothing is promised
+  at any particular blocklength.
+- Random coding proves existence; expurgation upgrades average to maximal error.
+  Do not present the average-error result as the final statement.
+- Above capacity the error does not merely rise — it tends to 1. Say so.
+- Separation is asymptotic and fails for some multi-user settings; one clause of
+  hedging, no more.
 
 ## FIGURE PLAN
 
-1. **single `<Figure>` (component)** — the coding pipeline: message W →
-   encoder → length-n channel input → noisy channel → output → decoder → Ŵ, with
-   rate `R = (log #messages)/n` labeled. One idea: coding spreads a message over
-   many channel uses. Inspiration: MacKay ch. 9.1 big-picture diagram.
-2. **single `<Figure>` (component)** — the threshold: achievable error vs rate,
-   a curve pinned near 0 for `R < C` and rising to a floor for `R > C`, the wall
-   at C marked. Static twin of the ChannelCodingThreshold demo. One idea: C is a
-   cliff. Inspiration: Cover & Thomas coding-theorem region / Polyanskiy §20.
-3. **`<FigureSequence>` (3-4 frames)** — joint-typicality decoding: frame 1 the
-   received y; frame 2 the true codeword sitting in y's jointly-typical shell;
-   frames 3-4 random wrong codewords, almost all outside the shell, one rare
-   collision — union-bounded away as n grows. One idea: only the true codeword is
-   jointly typical. Inspiration: MacKay ch. 10 typicality picture (recreate).
-4. **single `<Figure>` (component)** — the converse, schematic: the chain
-   `W → X^n → Y^n → Ŵ` with `I(W;Ŵ) ≤ nC` (data-processing) over it and Fano's
-   `Pe` bound underneath, meeting at "`R > C` ⇒ `Pe` cannot vanish". One idea:
-   capacity cannot be crossed. Inspiration: Cover & Thomas §7.9.
-5. **single `<Figure>` (component)** — Hamming (7,4): the 4 data bits, 3 parity
-   bits, and the three overlapping parity circles (the classic Venn), with a
-   single flipped bit localized by which parities fail. One idea: three checks
-   pinpoint one error. Inspiration: MacKay ch. 1 / Cover & Thomas §7.11
-   (recreate the Venn, do not copy).
-6. **single `<Figure>` (component)** — random-vs-repetition at rate 4/7: a tally
-   comparing repetition-code error to the Hamming code's on a BSC, payoff
-   "structure beats brute redundancy". One idea: how you add redundancy matters.
-   Inspiration: MacKay ch. 1 error-vs-rate curves.
-7. **`<FigureSequence>` (3 frames)** — the cliff sharpening: error-vs-rate for
-   n = 10, 100, 1000, the transition around C steepening each frame toward a
-   step. One idea: the sharp threshold is the n → ∞ limit. Inspiration:
-   finite-blocklength/dispersion (Polyanskiy ch. 20).
+1. `draw:` **single `<Figure>`** — repetition codes on the rate-versus-error
+   plane: points for `n = 1, 3, 5, …, 61` marching toward zero error and zero
+   rate, with the capacity line `C = 0.53` drawn vertically and empty space
+   between. One idea: the obvious method never reaches the line.
+2. `draw:` **`<FigureSequence>` (4 frames)** — the joint typicality count: frame
+   1 the typical input set; frame 2 the typical output set; frame 3 the jointly
+   typical pairs as a sparse grid; frame 4 the count `2^{-nI}` annotated. One
+   delta per frame. Inspiration: Shannon's fig. 10 fan diagram and MacKay's
+   jointly-typical cartoon, recreated.
+3. `draw:` **single `<Figure>`** — the decoding picture: codewords as points
+   with disjoint "noise balls" of radius set by `H(Y|X)`, packed inside the
+   typical output space; the count of balls that fit is `2^{nC}`. One idea:
+   capacity is a packing number.
+4. `draw:` **`<FigureSequence>` (3 frames)** — the converse: frame 1 the chain
+   `W → X^n → Y^n → Ŵ`; frame 2 Fano bounding `H(W|Ŵ)`; frame 3 data processing
+   bounding `I(W;Ŵ) ≤ nC`, with the two combined. Reuses the Fano figure
+   language deliberately.
+5. `draw:` **single `<Figure>`** — the threshold with finite-blocklength
+   softening: achievable rate against `n` for fixed error, approaching `C` from
+   below like `C - sqrt(V/n)Q^{-1}(ε)`. One idea: the cliff is a limit, and at
+   `n = 100` it is a slope.
+6. `source:` **amathematica-theorem11-fig9-page22** → save as
+   `figures/shannon-1948-theorem11.png`, centered, at the point the theorem is
+   stated. The reader must be able to read both branches of Shannon's own
+   wording (`H ≤ C` and `H > C`) and see his attainable-region diagram. The
+   if/then structure is precisely what paraphrase loses.
+7. `source:` **informationt-s1-dilbert-repetition** → save as
+   `figures/mackay-repetition-demo.png`, float right beside the repetition-code
+   opening. The reader must be able to see the same real image before and after
+   R3 decoding at 10% noise, with visible residual errors. A synthetic noise
+   pattern would be an assertion; this is a run.
+
+Two sourced images, both earning their place: one is the original theorem
+statement, one is a real decoded artefact.
+
+## EXERCISE PLAN
+
+1. *(warm-up)* For a BSC with `p = 0.1`, compute the block error probability of
+   the length-3 and length-5 repetition codes and the rate of each.
+2. **Boundary probe.** What does the theorem say for a channel with `C = 0`?
+   State the achievable rates, and then explain what the converse gives you for
+   `R > 0` at `C = 0`, being precise about "error tends to 1" versus "error is
+   large".
+3. **Claim to refute.** "Since the theorem is proved with random codebooks, a
+   randomly chosen code will work in practice." Give two independent reasons
+   this fails, one about decoding cost and one about what averaging over
+   codebooks actually establishes.
+4. **Derivation the lesson skipped.** Complete the converse yourself: from
+   Fano's inequality and the data-processing inequality, derive
+   `R ≤ C/(1 - P_e) + 1/n` and take the limit. State where each inequality
+   enters.
+5. **Derivation, the other side.** Show that the probability that a randomly
+   chosen codeword is jointly typical with an unrelated received word is about
+   `2^{-nI(X;Y)}`, and use a union bound over `2^{nR} - 1` competitors to
+   identify the exact condition `R < I(X;Y)`.
+6. **Research-shaped.** Simulate a BSC at `p = 0.1` with a random code of
+   blocklength 12 and rate 1/2 (32 codewords), using nearest-neighbour decoding.
+   Report the measured block error rate over 10^4 trials, and compare against
+   the finite-blocklength prediction at `n = 12`. State what agreement means
+   given `C = 0.53`.
+7. **FORWARD (E7).** Design, by hand, a code of blocklength 7 carrying 4 message
+   bits that corrects any single bit error. Report your parity equations, or
+   report where the attempt fails and what constraint blocked it. Reaches
+   `hamming-codes` — the solution gives the (7,4) construction and `<Ref>`s it.
+
+## REVISION (kept slug)
+
+**Gain**
+- ARC paragraph; and the converse rewritten to *use* `fano-inequality` as a
+  prerequisite rather than deriving Fano inline. The current draft introduces
+  Fano here; that concept has moved and this lesson now reinforces it.
+- The repetition-code opening as an explicit reversal seam, with the 60-fold
+  number.
+- Figures 1, 3, 4, 5 and both sourced images.
+- The finite-blocklength paragraph, which the current draft lacks and which the
+  ChannelCodingThreshold demo needs in order not to mislead.
+- Feedback and source-channel separation, one paragraph each.
+- Depth toward 40 minutes — the course's longest lesson, appropriately.
+
+**Lose**
+- The inline Fano derivation (moved).
+- Any implication that the theorem provides a code.
+- Callouts restating "R < C is achievable" (L15).

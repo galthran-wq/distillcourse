@@ -8,7 +8,7 @@
  * fix -> repeat.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -27,6 +27,32 @@ let component: ComponentType<{ frame?: number }>;
 if (target !== undefined && target in figures) {
   name = target;
   component = figures[target].component;
+} else if (target !== undefined && /\.svg$/.test(target)) {
+  // Raw-SVG mode: no browser at all. librsvg rasterizes a house-style SVG in
+  // ~0.1s and ~25 MB, against seconds and hundreds of megabytes for headless
+  // chrome — and chrome's only job here was turning vectors into pixels the
+  // reviewer can look at. `currentColor` has no meaning outside a document,
+  // so the theme's text colour is injected on the root element.
+  const svgPath = resolve(target);
+  const src = readFileSync(svgPath, "utf8");
+  const ink = dark ? "#e9e9e7" : "#131312";
+  const paper = dark ? "#131312" : "#fdfdfc";
+  const themed = src.replace(/<svg\b/, `<svg style="color:${ink}"`);
+  const outDir = join(appRoot, ".preview");
+  mkdirSync(outDir, { recursive: true });
+  const tmp = join(outDir, `.themed-${basename(svgPath)}`);
+  const png = join(
+    outDir,
+    `${basename(svgPath).replace(/\.svg$/, "")}${dark ? "-dark" : ""}.png`,
+  );
+  writeFileSync(tmp, themed);
+  execFileSync(
+    "rsvg-convert",
+    ["-w", "1200", "-b", paper, tmp, "-o", png],
+    { timeout: 30_000, killSignal: "SIGKILL" },
+  );
+  console.log(png);
+  process.exit(0);
 } else if (target !== undefined && /\.tsx?$/.test(target)) {
   // Path mode: render a not-yet-registered figure straight from its module.
   // Used when figures are built in parallel and registration is a single
@@ -51,7 +77,12 @@ if (target !== undefined && target in figures) {
 const frame = frameArg !== undefined ? Number(frameArg) : undefined;
 const markup = renderToStaticMarkup(createElement(component, { frame }));
 
-const katexCss = join(appRoot, "node_modules/katex/dist/katex.min.css");
+// Resolve through node's own lookup rather than assuming node_modules sits at
+// the app root: a git worktree has none, and node walks up to the main
+// checkout's. Guessing the path silently produced a dead <link>, KaTeX's CSS
+// never loaded, `.katex-mathml` was left visible, and every formula rendered
+// twice — a defect of the harness that reviewers saw as a defect of the figure.
+const katexCss = require.resolve("katex/dist/katex.min.css");
 const tokens = dark
   ? "--paper:#131312;--panel:#1d1d1b;--ink:#eaeae6;--line:#34342f;"
   : "--paper:#fdfdfc;--panel:#f4f4f1;--ink:#191918;--line:#d9d9d3;";
@@ -75,16 +106,24 @@ const out = join(
   previewDir,
   `${name}${frame !== undefined ? `-f${frame}` : ""}${dark ? "-dark" : ""}.png`,
 );
-execFileSync("google-chrome", [
-  "--headless=new",
-  "--disable-gpu",
-  "--no-sandbox",
-  "--hide-scrollbars",
-  "--force-device-scale-factor=2",
-  "--window-size=900,1400",
-  `--screenshot=${out}`,
-  `file://${htmlPath}`,
-]);
+execFileSync(
+  "google-chrome",
+  [
+    "--headless=new",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--no-zygote",
+    "--hide-scrollbars",
+    "--force-device-scale-factor=2",
+    "--window-size=900,1400",
+    `--screenshot=${out}`,
+    `file://${htmlPath}`,
+  ],
+  // A hung renderer used to linger until the box ran out of memory: kill it
+  // outright rather than leaving orphans behind. --no-zygote keeps chrome
+  // from forking a process tree that outlives the parent.
+  { timeout: 90_000, killSignal: "SIGKILL" },
+);
 
 // Trim the empty page area around the figure, keep a small margin.
 const paper = dark ? "#131312" : "#fdfdfc";

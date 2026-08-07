@@ -1,0 +1,846 @@
+A trained language model reports its loss in nats per token, an arithmetic
+coder converts that into a file size, and the resulting compression rates beat
+the general-purpose compressors on data the model was never trained on.
+
+The course's seventh move prices a wrong model, and this lesson is where the
+price gets weighed rather than derived. <Ref lesson="compression-is-prediction"/>
+proved the two constructions — a model plus an arithmetic coder is a lossless
+compressor whose output is the model's log-loss plus two bits, and every
+compressor carries an implied model — and <Ref lesson="kolmogorov-complexity"/>
+put an uncomputable floor underneath them, leaving every measured rate an upper
+bound on the shortest program. Neither number came off a real system, and
+neither was quoted in a unit a language model actually reports. This lesson
+fixes the unit, runs the construction on a trained network against gzip, PNG
+and FLAC, and then charges the network for its own description, which reverses
+the ranking.
+
+The route: the conversion from nats per token to bits per byte and the
+comparison it makes possible, the pipeline as it is actually wired, the
+measured rates on text, images and audio, what the gzip baseline costs and
+buys, the parameter charge and the corpus size at which it is paid off, and
+what the resulting number is and is not evidence for.
+
+## The unit problem: nats per token is not a compression rate
+
+The construction to be measured, from
+<Ref lesson="compression-is-prediction"/>, takes a model that quotes a
+distribution over the next *symbol*. A language model quotes a distribution
+over the next *token*, and a token is not a byte: it is a variable-length
+piece of text drawn from a vocabulary the model's designers chose. Two models
+with different vocabularies report losses on different alphabets, so their
+numbers are not on the same axis.
+
+Start with one model and one file. A model reports an average loss of $2.08$
+nats per token on a held-out text file, and its tokenizer turns that file into
+one token for every $4.0$ bytes on average.
+
+<Example title="one model, converted">
+**Step 1, change the log base.** A nat is a surprisal in base $e$ and a bit is
+a surprisal in base 2, so dividing by $\ln 2 = 0.6931$ converts:
+$$
+\frac{2.08 \text{ nats/token}}{0.6931} = 3.00 \text{ bits/token}.
+$$
+
+**Step 2, change the denominator.** Each token covers $4.0$ bytes of the file,
+so the $3.00$ bits are spread over four bytes:
+$$
+\frac{3.00 \text{ bits/token}}{4.0 \text{ bytes/token}} = 0.75 \text{ bits per byte}.
+$$
+
+**Step 3, read off the file size.** A raw byte occupies $8$ bits, so the
+compression rate is $0.75 / 8 = 9.4\%$, and a $10$ MB file compresses to
+$0.75 \times 10^{7}$ bits $= 937{,}500$ bytes, just under $0.94$ MB.
+</Example>
+
+{/* fig BitsPerByteConversion: the conversion equation dissected in place.
+   Centered display equation, in KaTeX:
+   b = (L_tok / ln 2) * (1 / tau), rendered as
+   \text{bits per byte} = \frac{L_{\text{tok}}}{\ln 2}\cdot\frac{1}{\tau}.
+   THREE short labels above, each with a thin leader line onto the exact
+   symbol it names: over L_tok, amber, "cross-entropy the model reports,
+   nats per token"; over ln 2, currentColor muted, "base change: nats to
+   bits"; over tau, blue, "bytes per token, a property of the TOKENIZER, not
+   the model". BELOW the equation, the same equation again with the worked
+   instance plugged in, same three colors on the same three slots:
+   \text{0.75} = \frac{2.08}{0.6931}\cdot\frac{1}{4.0}, and under that one
+   muted line: "= 3.00 bits/token = 0.75 bits/byte = 9.4% of raw size".
+   Colors: amber = the model's contribution, blue = the tokenizer's
+   contribution, currentColor = the constant. One idea: two of the three
+   factors belong to different parts of the system. */}
+<Figure
+  name="BitsPerByteConversion"
+  alt="The bits-per-byte formula with labels arrowed onto each factor: the model's nats per token, the base change by ln 2, and the tokenizer's bytes per token, with the worked instance plugged in underneath"
+  caption="Two factors, two owners: the loss belongs to the model, the bytes-per-token belongs to the tokenizer. Only their product is comparable across systems."
+/>
+
+<Definition title="bits per byte">
+The **bits per byte** of a model on a stream is its cross-entropy on that
+stream divided by the stream's length in bytes:
+$$
+b \;=\; \frac{L_{\text{tok}}}{\tau \ln 2},
+$$
+where $L_{\text{tok}}$ is the average loss in nats per token and $\tau$ is the
+average number of bytes per token. The compression rate $r = b/8$ is the same
+quantity expressed as a fraction of the raw file.
+</Definition>
+
+Three units are in circulation and they are not interchangeable. **Bits per
+token** depends on the vocabulary and is comparable only within one tokenizer.
+**Bits per character** depends on the alphabet: the per-letter figures of
+<Ref lesson="entropy-of-english"/> are quoted over a 27-symbol alphabet of
+letters plus space, and they say nothing about a byte stream containing markup,
+digits and punctuation. **Bits per byte** is fixed by the file on disk and by
+nothing else, which is why it is the one that travels.
+
+### The ranking can invert under the conversion
+
+The conversion is not a formality that leaves the ordering alone. Because the
+two factors are owned by different components, a model with a worse loss per
+token can write a smaller file.
+
+<Example title="two models, opposite rankings">
+Both models are evaluated on the same 1 MB text file.
+
+**Model A** uses a byte-level tokenizer: $\tau = 1.0$ byte per token, and it
+reports $0.90$ nats per token. Converting,
+$0.90/0.6931 = 1.30$ bits per token, and since a token is a byte, $1.30$ bits
+per byte.
+
+**Model B** uses a subword tokenizer with $\tau = 4.0$ bytes per token, and it
+reports $3.20$ nats per token, three and a half times A's loss. Converting,
+$3.20/0.6931 = 4.62$ bits per token, spread over four bytes:
+$4.62/4.0 = 1.15$ bits per byte.
+
+On the 1 MB file, A emits $162{,}300$ bytes and B emits $144{,}300$ bytes. B
+loses the comparison on every leaderboard that reports loss per token and wins
+the only comparison that produces a file.
+</Example>
+
+{/* fig TokenizerRankingFlip: two near-identical panels joined by a bold
+   arrow, one changed quantity highlighted (voita figure rule 8).
+   Both panels show the SAME sentence of text, drawn as a byte strip of 20
+   small cells. LEFT panel titled "model A — byte tokenizer": the strip is
+   segmented into 20 one-cell tokens (thin dividers), with "0.90 nats/token"
+   in amber beneath, and a tally box "1.30 bits/byte". RIGHT panel titled
+   "model B — subword tokenizer": the SAME strip segmented into 5 four-cell
+   tokens (thick dividers), with "3.20 nats/token" in amber beneath and a
+   tally box "1.15 bits/byte". Between the two tally boxes a bold arrow
+   labelled in blue "same text, same file, ordering reversed". At the bottom
+   a two-row tally: "by nats/token: A wins (0.90 < 3.20)" and "by
+   bits/byte: B wins (1.15 < 1.30)", the second row in blue and bold. The
+   ONLY visual difference between the panels is the token segmentation.
+   One idea: the unit decides the winner. */}
+<Figure
+  name="TokenizerRankingFlip"
+  alt="Two panels showing the same byte strip segmented into twenty byte tokens and into five subword tokens, with the loss per token favouring the first model and the bits per byte favouring the second"
+  caption="The same text under two tokenizers. Ranking by loss per token and ranking by file size disagree, and only one of them is a statement about compression."
+/>
+
+<Exercise>
+A model reports $1.8$ nats per token on a corpus for which its tokenizer
+averages $3.6$ bytes per token. Compute its bits per byte, its compression
+rate as a percentage of raw size, and the compressed size of a $10$ MB file.
+Then state which of the three inputs you would have to re-measure if the same
+model were run with a different tokenizer.
+
+<Solution>
+Bits per token: $1.8/\ln 2 = 1.8/0.6931 = 2.597$ bits.
+
+Bits per byte: $2.597/3.6 = 0.721$ bits per byte.
+
+Compression rate: $0.721/8 = 9.0\%$ of raw size.
+
+Compressed size of $10$ MB $= 10^{7}$ bytes: $0.721 \times 10^{7} = 7.21
+\times 10^{6}$ bits $= 901{,}000$ bytes, about $0.90$ MB.
+
+Both of the first two inputs move. Changing the tokenizer changes $\tau$
+directly, and it changes $L_{\text{tok}}$ as well, because the model is now
+predicting a different alphabet: a coarser vocabulary means fewer, harder
+predictions. Only $\ln 2$ is fixed. This is why the conversion cannot be done
+once and reused: a reported loss is meaningful only alongside the tokenizer
+that produced it.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Every loss reported per token is a compression rate multiplied by an unstated
+constant. Two systems can be compared only after both constants are divided
+out, and the parameter-charged comparison of the last section changes the
+ranking a second time, for a different reason.
+</KeyFact>
+
+## ★ Tokenization is a pre-code, and it does not always help
+
+A tokenizer is itself a lossless code: it maps byte strings to token strings
+invertibly, which is exactly what a dictionary code of
+<Ref lesson="dictionary-coding"/> does, with a vocabulary learned once from a
+corpus instead of grown while reading. So the model-plus-tokenizer stack is a
+two-stage compressor whose first stage is fixed.
+
+That framing predicts that the two stages should trade off exactly: whatever
+redundancy the tokenizer removes is redundancy the model no longer gets credit
+for removing, leaving bits per byte unchanged. Transformers trained on
+`enwik8`, the first hundred million bytes of a 2006 English Wikipedia XML dump,
+and evaluated on `enwik9`, the first billion bytes of the same dump, show the
+trade going both ways depending on model size. The tokenizers compared below
+are built by *byte-pair encoding* (BPE), which merges the most frequent
+adjacent pair of symbols repeatedly until the vocabulary reaches its target
+size, so a 20K vocabulary commits to longer fixed segments than a 1K one.
+
+| tokenizer | 200K params | 6.4M params | 38M params |
+| --- | --- | --- | --- |
+| ASCII (no tokenization) | $22.9\%$ | $13.6\%$ | $6.4\%$ |
+| BPE, 1K vocabulary | $25.4\%$ | $14.8\%$ | $6.9\%$ |
+| BPE, 20K vocabulary | $19.3\%$ | $16.4\%$ | $9.0\%$ |
+
+For the 200K-parameter model the coarse 20K vocabulary is worth $3.6$
+percentage points: the tokenizer does compression the model is too small to
+do. For the 38M-parameter model the same vocabulary costs $2.6$ points: the
+model would have done better itself, and the tokenizer has thrown away
+structure by committing to fixed segments. The stage that helps a weak
+predictor hurts a strong one, which is the general shape of every pre-code
+placed in front of a learned model.
+
+## The pipeline, applied: where the bits actually come from
+
+The conversion says what number to expect. Producing a file requires the
+construction of <Ref lesson="compression-is-prediction"/> wired up: at each
+step the model emits a distribution over the next token, the arithmetic coder
+of <Ref lesson="arithmetic-coding"/> narrows its interval by that token's
+probability, and the final interval is named in binary.
+
+{/* fig ModelCoderPipeline: deliberately mirrors DeflatePipeline from
+   deflate-and-zstd so the reader sees the same architecture with the model
+   swapped. Left to right, boxes joined by straight data-flow arrows:
+   (1) "input bytes" — a short byte strip; (2) "tokenizer, 32K vocabulary" in
+   blue, output drawn as a shorter strip of wider token cells; (3)
+   "transformer, fixed 2048-byte context" in amber (the subject), output
+   drawn as a small bar chart of next-token probabilities; (4) "arithmetic
+   coder" in blue, output a single bit strip labelled "one bitstream per
+   2048-byte chunk". UNDER each stage, in muted type, the lesson that owns
+   it: under (2) "dictionary-coding (a code, learned once)", under (3)
+   "cross-entropy-loss + compression-is-prediction", under (4)
+   "arithmetic-coding", and under the whole figure "this lesson: the units
+   that make the stages add up". A tally line at the bottom: "cost = sum of
+   -log2 q(token) + 2 bits per chunk". Colors: amber = the model, blue = the
+   two fixed codes, currentColor everything else. One idea: the same
+   two-stage architecture as DEFLATE, with the statistical model replaced. */}
+<Figure
+  name="ModelCoderPipeline"
+  alt="A left-to-right pipeline: input bytes into a tokenizer, into a transformer with a fixed context window, into an arithmetic coder, out to one bitstream per chunk, with the lesson that owns each stage named underneath"
+  caption="The DEFLATE architecture with the statistical stage replaced. Every box was built earlier in the course; the wiring is what this lesson measures."
+/>
+
+Three departures from the idealisation appear in the wiring itself, and all
+three move the number.
+
+**The context is finite, so the stream is chunked.** A transformer conditions
+on a fixed window, not on unbounded history, so a 1 GB corpus cannot be fed to
+it as one sequence. The measurements below chunk every dataset into
+independent 2048-byte pieces and code each piece from a cold start. The
+entropy rate of <Ref lesson="entropy-of-english"/> conditions on everything
+that came before; a chunked model conditions on at most 2047 bytes and pays
+the early bytes of every chunk at close to its unconditional rate.
+
+**The two-bit overhead is per chunk, not per file.** The bound proved in
+<Ref lesson="compression-is-prediction"/> costs two bits per coded message, and
+chunking creates half a million messages.
+
+<Example title="what the chunking actually costs">
+A 1 GB corpus at 2048 bytes per chunk is $10^{9}/2048 = 488{,}281$ chunks. At
+two bits each the coder overhead totals $976{,}562$ bits, about $122$ kilobytes,
+or $0.012\%$ of the raw size. Against a measured rate of $8.3\%$ this is the
+fourth decimal place: the theorem's overhead is not where chunking hurts.
+
+Where it hurts is prediction. Each chunk restarts the model with an empty
+context, so the structure the model inferred from the previous 2048 bytes is
+discarded 488,281 times.
+</Example>
+
+**Bytes are pre-mangled to fit the model's input alphabet.** The models
+evaluated below accept only the ASCII range, so image and audio bytes are
+halved to land in $[0,127]$, and the discarded low bit of every byte is
+appended raw to the compressed output. That is one incompressible bit per byte,
+$12.5\%$ of the raw size, added to every image and audio rate before the model
+contributes anything.
+
+<KeyFact>
+Of the $48.0\%$ the largest model scores on image data below, $12.5$ points are
+those discarded low bits shipped verbatim. The model is modelling only the top
+seven bits of each pixel, which occupy $87.5$ points of the raw size, and it
+squeezes them into the remaining $35.5$: a rate of $41\%$ on the part it
+actually sees.
+</KeyFact>
+
+<Exercise>
+A model has memorised the test set exactly: at every step it assigns
+probability $1$ to the token that actually occurs. Compute its bits per byte
+and the compressed size of a 1 GB text corpus under the chunked protocol above.
+Then state what the arithmetic coder's overhead contributes, and why the same
+model would still report about $12.5\%$ on the image corpus.
+
+<Solution>
+**Bits per byte: zero.** Each token contributes $-\log_2 q = -\log_2 1 = 0$
+bits, so the summed surprisal over the corpus is $0$ and $b = 0$.
+
+**The coder's contribution: an upper bound of two bits per chunk, and in this
+case essentially nothing.** The theorem of
+<Ref lesson="compression-is-prediction"/> gives
+$\ell \le -\log_2 q(x_{1:n}) + 2$ per coded message, so over $488{,}281$ chunks
+the file is at most $976{,}562$ bits $= 122$ kilobytes, a rate of $0.012\%$.
+That is a bound, not a value. An interval that never narrows is still $[0,1)$,
+and a decoder holding the same model regenerates each chunk from its length
+alone, so what actually has to be sent is the framing: the chunk count and
+length, a few bytes for the whole corpus.
+
+**Why images do not go to zero.** The protocol appends the discarded low bit of
+every byte raw, and no model touches those bits. They are $12.5\%$ of the raw
+size whatever the model does, so a perfectly memorising model reports about
+$12.5\%$ on ImageNet and about $0\%$ on `enwik9`.
+
+**What the boundary case shows.** The compression rate has no floor above zero,
+so it cannot distinguish a model that predicts from one that has stored the
+answer. Nothing in the protocol detects the difference, which is the extreme
+version of the train/test confound the last section takes up.
+</Solution>
+</Exercise>
+
+## The measurement: 0.66 bits per byte on text, and below PNG on images
+
+With the units fixed and the pipeline wired, the measurement is a table. The
+numbers below are from [Delétang et al. (2024)](https://arxiv.org/abs/2309.10668),
+who ran Chinchilla and Llama 2 — transformer language models of up to 70
+billion parameters, trained on internet text and books — and small
+purpose-trained transformers against gzip, LZMA2 (the dictionary coder behind
+`xz` and 7-Zip, whose match window is effectively unbounded), PNG and FLAC on
+three 1 GB corpora: `enwik9`, the first billion bytes of a 2006 English
+Wikipedia XML dump; grayscale ImageNet patches flattened to 2048-byte strips;
+and LibriSpeech audio at one byte per sample.
+
+<Figure
+  src="./figures/rates-by-modality.svg"
+  alt="Grouped bars of compression rate for gzip, the domain specialist, and Chinchilla 70B on text, image and audio, with the model lowest in all three groups"
+  caption="Compression rate on three 1 GB corpora, all compressors given the same 2048-byte chunks. The model is lowest in every column, including the two modalities it was never trained on."
+/>
+
+Every bar in the figure is the matched-chunk protocol: the classical
+compressors were cut into the same 2048-byte pieces the model is limited to.
+Under it the largest model reaches $8.3\%$ of raw size on text, which is $0.66$
+bits per byte, against $48.1\%$ for gzip and $50.0\%$ for LZMA2; $48.0\%$ on
+images, against gzip's $68.6\%$ and PNG's $61.7\%$; and $21.0\%$ on audio,
+against gzip's $38.5\%$ and FLAC's $30.3\%$.
+
+Given whole files instead of chunks, gzip and PNG do considerably better, and
+those are the harder numbers for the model: gzip compresses `enwik9` to
+$32.3\%$, or $2.58$ bits per byte, and PNG the image stream to $58.5\%$. FLAC
+gains nothing from the longer input and is marginally worse at $30.9\%$. The
+model is below both specialists under either protocol. The full-context
+$32.3\%$ is the gzip rate the rest of this lesson compares against, and what the
+chunked protocol costs gzip to reach $48.1\%$ is the next section's subject.
+Neither images nor audio appeared in the model's training mix, which was
+internet text and books.
+
+The interesting claim is not that a bigger model predicts text better. It is
+that the ranking on images and audio survives at all. A compressor is a bet on
+a distribution, and PNG and FLAC bet on the distributions their designers
+encoded: PNG on the smoothness of neighbouring pixels, FLAC on the
+autocorrelation of a waveform. The model bets on nothing in particular and
+infers the structure of each 2048-byte chunk while reading it. That is enough
+to beat both specialists, so the result is evidence about the generality of
+the predictor rather than about images or audio.
+
+<KeyFact>
+Every compressor in the table scores at or above $100\%$ on uniformly random
+bytes: the largest model reaches $100.8\%$, FLAC $107.2\%$. This is the
+counting argument of <Ref lesson="kolmogorov-complexity"/> showing up as a
+column in an experimental table, and no amount of model scale moves it.
+</KeyFact>
+
+### The image number is a statement about a serialisation
+
+The $48.0\%$ is not a rate for "ImageNet". It is a rate for one specific byte
+stream: $32 \times 64$ grayscale patches, flattened row by row into 2048-byte
+sequences. Flattening breaks the two-dimensional adjacency that image codecs
+are built on, so the last pixel of one row sits next to the first pixel of the
+next. PNG's filters predict each pixel from the one above as well as the one
+to the left, and a flattened, chunked stream costs PNG the vertical half of
+that: its rate on the same chunked patches is $61.7\%$ rather than the $58.5\%$
+it manages with full-image context. Serialisation order is part of the
+measurement, and a different flattening would produce different numbers for
+every row of the table.
+
+<Aside>
+The paper's abstract and its Table 1 disagree, and the table is the one to
+quote. The abstract states $43.4\%$ on ImageNet and $16.4\%$ on LibriSpeech
+against PNG's $58.5\%$ and FLAC's $30.3\%$; Table 1 of the same published
+version reports $48.0\%$ and $21.0\%$ for the 2048-byte-chunk setting that the
+rest of the paper describes. The abstract's figures appear to have carried
+over from an earlier draft. The lesson quotes Table 1 throughout, and the
+qualitative claim is unaffected: the model is below both specialists under
+either set of numbers.
+</Aside>
+
+## The baseline: what gzip costs and what it buys
+
+gzip is the reference point in the measurement above, and two properties of it
+that the table does not state set the terms of the comparison.
+
+Its model is the LZ77 matcher of <Ref lesson="dictionary-coding"/> over a
+32 KB window feeding canonical Huffman codes, specified in
+[RFC 1951](https://www.rfc-editor.org/rfc/rfc1951). The first property is
+context. Its window is sixteen times the
+chunk the models are given, so the matched-chunk protocol takes context away
+from gzip and gives none back: gzip's rate on `enwik9` rises from $32.3\%$ to
+$48.1\%$ when the input is chunked at 2048 bytes, and PNG's worsens from
+$42.9\%$ to $80.6\%$. A comparison run only at 2048 bytes flatters the model by
+roughly sixteen percentage points against gzip.
+
+<Figure
+  src="./figures/chunking-penalty.svg"
+  alt="Paired bars for gzip, LZMA2 and PNG on enwik9 showing the compression rate rising when the input is chunked into 2048-byte pieces"
+  caption="What the matched-chunk protocol costs the classical compressors on enwik9. LZMA2, whose context is effectively unbounded, loses the largest multiple of its rate; PNG loses the largest absolute margin, 37.7 points."
+/>
+
+The second property is cost, and it runs the other way. gzip's decoder is a few
+kilobytes of code holding a 32 KB window, and it spends a bounded number of
+table lookups per byte at both ends. The model's decoder is $140$ GB of
+parameters that both ends of the link must already hold, and it evaluates every
+one of them once per token produced. No published comparison reports
+compression rate at matched compute, because the two systems do not overlap on
+that axis at any setting.
+
+The trade is not new, and the classical field measured it directly. The two
+files that scored gzip in <Ref lesson="compression-is-prediction"/> — a 20 KB
+chapter of LaTeX source, where gzip reached $39\%$, and a million-character
+sparse binary file, where it reached $2.1\%$ — were also timed by
+[MacKay](https://www.inference.org.uk/itprnn/book.pdf) (§6.5), and the timings
+are what this section needs from that benchmark. gzip took $0.10$ seconds on the
+text and $0.22$ on the sparse file. `ppmz`, a context-mixing coder of the same
+era, beat it on both, reaching $32\%$ and $1.04\%$, but its run on the sparse
+file took $533$ seconds: half the file for 2,400 times the time.
+The pre-neural state of the art was already a compressor nobody deployed, for
+exactly the reason the models are not deployed now.
+
+<KeyFact>
+Rate and cost are two axes and every published comparison reports one of them.
+A rate quoted without the resident model size and the per-byte compute is a
+half-measurement, which is the same complaint the parameter charge below makes
+in units of bits.
+</KeyFact>
+
+## The reversal: charging the model for itself
+
+Every rate so far treats the model as free, available to encoder and decoder
+alike. That is legitimate when the model genuinely is shared, and it is a
+different measurement from the one a codec makes.
+
+The counting argument makes the distinction unavoidable. A decoder that does
+not already hold the model cannot invert the code, so the model's description
+is part of the message, and the total is the two-part length
+$L(\text{model}) + L(\text{data} \mid \text{model})$ that
+<Ref lesson="kolmogorov-complexity"/> derived as the computable shadow of
+$K(x)$. Charging each of 70 billion parameters two bytes, the float16 width at
+which quantisation does not measurably degrade the predictions, the model's
+half is $140$ GB.
+
+<FigureSequence
+  name="parameter-charge"
+  alt="Three frames of stacked bars comparing gzip and a 70B-parameter model as a fraction of corpus size: model excluded, model charged on a 1 GB corpus, and model charged on a 1 TB corpus"
+  caption="The same two compressors, three accounting choices. The ranking flips when the parameters are charged and flips back when the corpus is large enough to amortise them."
+/>
+
+<Task>
+Step through the three frames watching the model's stacked total against gzip's
+flat $32.3\%$. The blue parameter block is the same $140$ GB in frames 2 and 3,
+but frame 2 prints it as $140$ times the corpus and frame 3 as $14\%$ of it,
+while the amber data term reads $8.3\%$ in both. That one term carries the
+model's total from $14{,}008.3\%$ down to $22.3\%$, which is below gzip's
+$32.3\%$. Nothing about either compressor changed between the two frames.
+</Task>
+
+<Theorem title="the crossover corpus size">
+Let a model of $P$ parameters stored at $\beta$ bits each compress at $b_m$
+bits per byte, and let a reference compressor with negligible description
+compress at $b_g$ bits per byte, with $b_m < b_g$. The two-part description of
+an $N$-byte corpus is shorter under the model exactly when
+$$
+N \;>\; N^{*} \;=\; \frac{P\beta}{\,b_g - b_m\,}.
+$$
+
+<Proof>
+The model's total is $P\beta + N b_m$ bits and the reference's is $N b_g$ bits.
+The model wins when $P\beta + N b_m < N b_g$, that is when
+$P\beta < N (b_g - b_m)$. Dividing by the positive quantity $b_g - b_m$ gives
+the claim. The hypothesis $b_m < b_g$ is exactly what makes the division
+preserve the inequality; if the model's rate were the larger one, no corpus
+size would rescue it.
+</Proof>
+</Theorem>
+
+The rate gap is a saving per byte and the parameters are a fixed debt, so the
+crossover is the debt divided by the saving. For the largest model against
+gzip: $P\beta = 140$ GB, $b_g - b_m = 2.58 - 0.66 = 1.92$ bits per byte, or
+$0.24$ bytes saved per byte, giving $N^{*} = 140/0.24 = 583$ GB. Against
+LZMA2, whose $23.0\%$ leaves a saving of only $0.147$ bytes per byte, the
+crossover is $952$ GB.
+
+<Figure
+  src="./figures/crossover.svg"
+  alt="Two lines of total description length against corpus size: gzip through the origin with slope 0.323, the model starting at 140 GB with slope 0.083, crossing near 580 GB"
+  caption="Total bits sent, against corpus size. The model's line starts 140 GB in the air, and the shallower slope takes until about 580 GB to pay that back."
+/>
+
+<KeyFact>
+The corpus the rates were measured on is 1 GB, which is 0.2% of the crossover.
+The published headline and the deployable claim are separated by a factor of
+nearly six hundred in corpus size, and the paper reports both columns for
+exactly that reason.
+</KeyFact>
+
+### The refutation: "the model beats PNG" is not a claim about codecs
+
+The correct statement is narrow. The $48.0\%$ figure is the log-loss of a model
+that both encoder and decoder already hold, converted into bits; as the size of
+a file that a recipient could actually open, the same experiment reports
+$14{,}048.0\%$.
+
+The misreading is that a 70B-parameter model is therefore a better image
+compressor than PNG. It is not, and the reason is not that neural compression
+fails: it is that the comparison silently changed which description is being
+measured. PNG's description is a few kilobytes of decoder; the model's is
+$140$ GB that has to exist at the far end before the first bit of the file
+means anything. Compare like with like — both on the same 2048-byte chunks,
+both charged for everything the recipient needs — and PNG's $61.7\%$ wins on a
+1 GB corpus by a factor of $228$.
+
+The replacement model is the two columns the paper prints side by side. The
+**raw rate** measures the predictor: how well does this model model this data.
+The **adjusted rate** measures a codec: how many bits does a recipient who has
+nothing need. Both are honest; they answer different questions, and the two
+columns diverge by four orders of magnitude at the top of the table and not at
+all at the bottom.
+
+| compressor | description shipped | raw rate | adjusted rate |
+| --- | --- | --- | --- |
+| gzip, full context | a few KB | $32.3\%$ | $32.3\%$ |
+| Transformer 3.2M | $6.4$ MB | $17.0\%$ | $17.7\%$ |
+| Chinchilla 1B | $2$ GB | $11.3\%$ | $211.3\%$ |
+| Chinchilla 70B | $140$ GB | $8.3\%$ | $14{,}008.3\%$ |
+
+Every neural row is measured on `enwik9` in 2048-byte chunks; gzip's row is the
+full-context number, the harder of its two.
+
+The discriminating case is the small transformer, and it shows the distinction
+is about proportion rather than about neural networks. A 3.2M-parameter model
+trained on `enwik8` occupies $6.4$ MB, which is $0.64\%$ of a 1 GB corpus. Its
+raw rate on `enwik9` is $17.0\%$ and its adjusted rate is $17.7\%$, still far
+below gzip's $32.3\%$. A neural compressor that pays for its own weights and
+still beats gzip exists; it is three thousand times smaller than the one in the
+headline. The same accounting run across model sizes gives every corpus an
+optimal model size, beyond which the adjusted rate rises again.
+
+The two-part length used here is stipulated rather than derived: two bytes per
+parameter is a storage convention, not a bound.
+<Ref lesson="minimum-description-length"/> replaces it with the number of bits
+a parameter's precision is actually worth given $n$ observations, which lowers
+the charge and moves every crossover in this section.
+
+## What the rate is evidence for, and what it is not
+
+<Ref lesson="compression-is-prediction"/> argued that a compression ratio is a
+model-quality measurement with no free parameters: no metric choice, no
+threshold, and held out by construction, since the decoder must reproduce the
+file exactly. Both halves of that argument need qualifying once the model is a
+network trained on an undisclosed web crawl.
+
+**The held-out property is now an assumption about the training set.** Nothing
+in the protocol enforces it. `enwik9` is a March 2006 Wikipedia dump, and the
+model's training mix is described as internet text including Wikipedia. A model
+that has seen a passage before assigns it high probability for a reason that is
+not generalisation, and the confound inflates precisely the quantity being
+reported. There is no published measurement of the overlap for these models and
+corpora, so the honest position is that the text column carries an unquantified
+contamination risk and the image and audio columns do not.
+
+**The rate is dominated by the easy majority of bytes.** It is an average over
+every byte in the corpus, and most bytes of any real stream are cheap.
+
+<Example title="how much a hard-case improvement moves the number">
+Suppose $99\%$ of a corpus costs a model $0.60$ bits per byte and the remaining
+$1\%$, the genuinely hard material, costs $8.0$ bits per byte. The reported
+rate is
+$$
+0.99 \times 0.60 + 0.01 \times 8.0 = 0.594 + 0.08 = 0.674 \text{ bits per byte.}
+$$
+Now halve the cost of the hard $1\%$, from $8.0$ to $4.0$ bits, leaving the
+rest untouched. The reported rate becomes $0.594 + 0.04 = 0.634$ bits per byte,
+a change of $6\%$. A model twice as good where the difficulty lives moves the
+headline by four hundredths of a bit.
+</Example>
+
+That asymmetry is why compression rate ranks models reliably and diagnoses them
+poorly. It cannot be gamed, because the decoder checks it; it also cannot
+distinguish a model that has learned the hard cases from one that has become
+slightly more fluent on the easy ones. Treating "compresses better" as a
+general capability law extrapolates past what the measurement resolves.
+
+What is established: a model's loss becomes a compression rate through
+$b = L_{\text{tok}}/(\tau \ln 2)$, without which losses across tokenizers are
+not comparable; the model-plus-coder construction of this module runs on a
+trained network and reaches $0.66$ bits per byte on text and rates below PNG
+and FLAC on modalities the model never saw; the classical baselines lose
+context to the matched-chunk protocol and win on every cost axis by margins
+nothing interpolates; and charging the model its own $140$ GB reverses the ranking until the
+corpus passes about $580$ GB. What is not established is the right way to
+charge a model for itself. Two bytes per parameter was stipulated here.
+<Ref lesson="minimum-description-length"/> derives the charge instead, from the
+precision the data can support, and makes the resulting total the criterion for
+choosing a model at all.
+
+## Exercises
+
+<Exercise>
+Break this claim. "Model A reports a lower loss than model B on the same
+corpus, so model A is the better compressor of it." Model B is a subword model
+with $\tau_B = 4.0$ bytes per token reporting $3.20$ nats per token. Find the
+full range of losses a byte-level model A could report that would make the
+claim false, verify one value in that range by computing both file sizes on a
+1 MB corpus, and state the condition under which the claim is safe.
+
+<Solution>
+**The range.** Convert B: $b_B = 3.20/(4.0 \times 0.6931) = 1.154$ bits per
+byte. A byte-level tokenizer has $\tau_A = 1.0$, so $b_A = L_A/0.6931$.
+
+The claim is false exactly when A reports the lower loss and writes the larger
+file, which is two inequalities at once:
+$$
+L_A < 3.20 \quad\text{(A looks better)},
+\qquad
+\frac{L_A}{0.6931} > 1.154 \quad\text{(A's file is larger)}.
+$$
+The second gives $L_A > 1.154 \times 0.6931 = 0.800$ nats per token. So the
+claim fails for every $L_A$ in $(0.800,\ 3.20)$ nats per token, which is most of
+the range a real byte-level model occupies. It holds only for $L_A < 0.800$,
+where A genuinely is the better compressor.
+
+**A verification at $L_A = 0.90$.** $b_A = 0.90/0.6931 = 1.30$ bits per byte.
+On $10^{6}$ bytes A emits $1.30 \times 10^{6}$ bits $= 162{,}300$ bytes and B
+emits $1.154 \times 10^{6}$ bits $= 144{,}300$ bytes. A's loss is $3.6$ times
+smaller and A's file is $12\%$ larger.
+
+**Why it fails.** A loss per token is an average over a number of predictions
+the tokenizer fixes. B answers a quarter as many questions, each covering four
+bytes, so the two averages have different denominators and comparing them
+compares the tokenizers as much as the models.
+
+**When the claim is safe.** When both models share a tokenizer. Then $\tau$ is
+a common positive factor, dividing by it cannot reorder the two values, and
+lower loss does mean smaller file.
+</Solution>
+</Exercise>
+
+<Exercise>
+Every compressor in the measurement scores at or above $100\%$ on a 1 GB file
+of uniformly random bytes: the largest model $100.8\%$, gzip $100.1\%$, FLAC
+$107.2\%$. Explain why $100\%$ is a floor no compressor can go below on such a
+file, name the result that establishes it, and account for the $0.8$ points of
+excess in the model's case. Then state what a reported rate of $97\%$ on random
+data would imply.
+
+<Solution>
+**The floor.** Uniformly random bytes have no structure to exploit: each byte
+carries exactly $8$ bits of surprisal under the true distribution, so the
+source entropy is $8$ bits per byte and the source coding theorem of
+<Ref lesson="source-coding-theorem-lite"/> forbids any lossless code from
+averaging less. The sharper statement is the counting argument of
+<Ref lesson="kolmogorov-complexity"/>: since a lossless code is injective, at
+most $2^{-k}$ of all strings can shrink by $k$ bits, so a compressor that
+shortens one file must lengthen another, and on a file drawn uniformly it
+almost surely lengthens.
+
+**The excess.** Three terms, all above the floor. The arithmetic coder spends
+up to two bits per chunk, $0.012\%$ over 488,281 chunks. The model's
+conditional distribution over the 128-symbol alphabet is not exactly uniform,
+and any deviation from the true distribution costs the divergence
+$D(p\,\|\,q)$ of <Ref lesson="cross-entropy-loss"/>, which is strictly positive
+unless the model is exactly right. And the discarded low bit of every byte is
+appended raw: that accounts for $12.5\%$ of the raw size exactly, offering
+neither saving nor loss on data with no structure in it. The total excess,
+$0.8\%$, is small because a large model's near-uniform prediction on
+unpredictable data is close to correct.
+
+**A rate of 97%.** It would mean the data was not uniformly random, or the
+accounting excluded something the decoder needs. Those are the only two
+options: the alternative is a violation of the counting argument, which is a
+theorem about finite sets and does not have exceptions.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim, which is a different failure from the first one. "The model
+compresses `enwik9` to $8.3\%$ and gzip only to $32.3\%$, so the model has
+learned four times as much about English as gzip has." Name the two accounting
+decisions that must be fixed before the two numbers are on the same axis, give
+the direction each one moves the comparison, and state what remains of the
+claim afterwards.
+
+<Solution>
+**Decision one: is the model's description charged?** gzip's rate includes
+everything a recipient needs, since the decoder is a few kilobytes of code
+shipped with every operating system. The model's $8.3\%$ excludes $140$ GB of
+parameters. Charged, the same experiment reports $14{,}008.3\%$. This moves the
+comparison enormously in gzip's favour and reverses it outright at 1 GB. The
+model's rate only becomes the smaller total above about $580$ GB of corpus.
+
+**Decision two: how much context does each side get?** The measurement chunks
+the corpus into 2048-byte pieces because the transformer cannot hold more.
+gzip's window is 32 KB, sixteen times larger, so chunking takes context away
+from gzip and none from the model: gzip's rate worsens from $32.3\%$ to
+$48.1\%$ under the protocol the model is measured on. Comparing the model's chunked $8.3\%$
+against gzip's unchunked $32.3\%$, as above, is the version that favours gzip;
+the matched-protocol comparison is $8.3\%$ against $48.1\%$ and favours the
+model.
+
+**What survives.** With the model treated as shared infrastructure and both
+sides chunked identically, the model predicts `enwik9` far better than gzip
+does, and that is a statement about predictive quality. It is not a statement
+about total description length, and "four times as much" is not a meaningful
+quantity in either reading: the rates are bits per byte, and their ratio is not
+an amount of knowledge. There is also an unquantified confound, since `enwik9`
+is a Wikipedia dump and the model's training mix included Wikipedia.
+</Solution>
+</Exercise>
+
+<Exercise>
+The crossover formula $N^{*} = P\beta/(b_g - b_m)$ was derived for one model.
+Apply it to a second, then use the result to predict a number already printed
+in the measurement. Take Chinchilla 1B: $P = 10^{9}$ parameters at
+$\beta = 16$ bits, raw rate $11.3\%$, against gzip at $32.3\%$ with full
+context. (a) Compute $N^{*}$. (b) Predict the adjusted rate this model must
+report on the 1 GB corpus, and check it against the value in the measurement,
+$211.3\%$. (c) The crossover for the 70B model was $583$ GB and for this one it
+is much smaller, although the smaller model compresses worse. Explain why
+shrinking the model helps more than its worse rate hurts, and state the corpus
+size at which that stops being true.
+
+<Solution>
+**(a)** The model's description is $10^{9} \times 16$ bits $= 2 \times 10^{9}$
+bytes $= 2$ GB. The rate gap in bytes saved per byte is
+$0.323 - 0.113 = 0.210$. So
+$$
+N^{*} = \frac{2 \text{ GB}}{0.210} = 9.5 \text{ GB.}
+$$
+
+**(b)** On a 1 GB corpus the parameter block is $2$ GB against $1$ GB of data,
+which is $200\%$ of the corpus. Adding the data term gives
+$200 + 11.3 = 211.3\%$, matching the reported value exactly. The check confirms
+both the storage convention (two bytes per parameter) and that the adjusted
+rate is nothing but the raw rate plus the parameter block expressed as a
+fraction of the corpus.
+
+**(c)** Both terms shrink going from 70B to 1B, by wildly different factors.
+The debt shrinks by a factor of 70, from $140$ GB to $2$ GB; the saving shrinks
+by a factor of only $0.24/0.21 = 1.14$, from $0.24$ to $0.21$ bytes saved per
+byte. The debt is a fixed cost and the saving a per-byte one, so at small $N$
+the debt dominates and the smaller model wins on total length.
+
+It stops being true when the accumulated rate difference between the two models
+exceeds the difference in their descriptions. The 70B model saves
+$0.113 - 0.083 = 0.030$ bytes per byte over the 1B model and costs $138$ GB
+more, so it takes over at $N = 138/0.030 = 4.6$ TB. Below that the smaller
+model is the shorter total description; above it the larger one is. The general
+statement is that every corpus size has an optimal model size, and it is what
+makes a scaling law a statement about a test set rather than about a model
+family.
+</Solution>
+</Exercise>
+
+<Exercise>
+The charge of $\beta = 16$ bits per parameter is a storage convention, not a
+requirement: a parameter only needs to be specified to the precision the data
+can distinguish. Estimate that precision for a model with $k$ parameters fitted
+to $n$ observations, then recompute the 70B crossover under your estimate, and
+state which assumption the estimate depends on.
+
+<Solution>
+**The estimate.** A parameter estimated from $n$ observations has a standard
+error shrinking like $1/\sqrt{n}$, so specifying it far below that error
+transmits digits the data cannot support and specifying it far above loses fit.
+Encoding each parameter to a precision of order $1/\sqrt{n}$ over a range of
+order 1 costs about $\tfrac{1}{2}\log_2 n$ bits, so $k$ parameters cost about
+$\tfrac{k}{2}\log_2 n$ bits in total.
+
+**Recomputing.** Take $n = 10^{9}$, the corpus in bytes, so
+$\tfrac{1}{2}\log_2 10^{9} = \tfrac{1}{2}(29.9) = 15.0$ bits per parameter.
+That is $15$ bits against the $16$ stipulated: for a corpus of this size the
+convention is already near the estimate, and the crossover moves from $583$ GB
+to $547$ GB. The estimate only bites when $n$ is small: at $n = 10^{6}$ it
+gives $10$ bits per parameter and a crossover of $364$ GB.
+
+**The assumption the estimate depends on.** The $\sqrt{n}$ rate assumes the parameters are
+identifiable and each is pinned down by the data independently. A 70B-parameter
+network fitted to $10^{9}$ bytes has far more parameters than observations, so
+most directions in parameter space are not pinned down at all and the true
+description cost is much lower than $\tfrac{k}{2}\log_2 n$. The estimate is an
+upper bound whose hypothesis fails exactly in the regime the measurement is in.
+
+**Where this lands.** The $\tfrac{k}{2}\log_2 n$ charge is the parameter cost
+of the two-part code, derived rather than stipulated in
+<Ref lesson="minimum-description-length"/>, which also handles the
+over-parameterised case by charging the model class rather than counting
+coefficients. That lesson turns the crossover arithmetic done here into a rule
+for choosing a model.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the first half of the measurement on a machine you have. Take any
+language model small enough to run, and a held-out text file of at least
+1 MB that the model's training set plausibly excludes. (a) Compute the model's
+average loss on the file and record the tokenizer's total token count, so you
+have both $L_{\text{tok}}$ and $\tau$. (b) Convert to bits per byte and
+multiply out to a predicted compressed size in bytes. (c) Compress the same
+file with gzip and with zstd and record both sizes. (d) Report the three sizes
+and state what agreement within $2\%$ between your prediction and an actual
+arithmetic-coded output would demonstrate, and what a $20\%$ disagreement would
+indicate.
+
+<Solution>
+**Possible answers; the numbers depend on the model.**
+
+**(a) and (b).** Sum the per-token negative log-likelihoods over the file
+rather than averaging per batch, since batches of unequal length bias a mean of
+means. If the framework reports natural log, $L_{\text{tok}}$ is in nats. Set
+$\tau = (\text{file bytes})/(\text{token count})$ and compute
+$b = L_{\text{tok}}/(\tau \ln 2)$; the predicted size is $b N / 8$ bytes for an
+$N$-byte file. A small modern model on English prose typically lands between
+$0.8$ and $1.5$ bits per byte, so expect $10$ to $19\%$ of raw size.
+
+**(c).** gzip at default level reaches roughly $30$ to $40\%$ on English prose
+and zstd at a high level roughly $25$ to $30\%$. If your predicted size is not
+below both, either the model is very small or the file is not the kind of text
+it was trained on; both are informative results and should be reported as such.
+
+**(d).** Agreement within $2\%$ would demonstrate that the coder is not the
+bottleneck: the theorem bounds the output at the summed surprisal plus two
+bits, so a coded file materially larger than the prediction means an
+implementation loss (finite precision, a per-chunk restart, a header) rather
+than a modelling loss. It is a check on the pipeline, not on the model.
+
+A $20\%$ disagreement points at the accounting rather than at the theory. The
+usual causes, in order of frequency: the loss was averaged over padded
+positions; the first token of each context was scored although the model was
+never asked to predict it; the file was chunked and the per-chunk restarts were
+not counted; or the tokenizer's byte count was taken from the decoded text
+rather than from the original file, which changes $\tau$ under any lossy
+normalisation.
+</Solution>
+</Exercise>
+
+<References>
+1. G. Delétang, A. Ruoss, P.-A. Duquenne, E. Catt, T. Genewein, C. Mattern, J. Grau-Moya, L. K. Wenliang, M. Aitchison, L. Orseau, M. Hutter, J. Veness, "Language Modeling Is Compression," ICLR 2024 — §2 for the coding distribution and eq. (2) identifying cross-entropy with expected code length; §3.1 for the datasets and the 2048-byte chunking protocol; Table 1 for every raw and adjusted rate quoted here (the abstract's 43.4% and 16.4% disagree with it, see the aside); §3.3 and Fig. 2 for the model-size/dataset-size trade-off; §3.6 and Table 2 for the tokenizer comparison; Appendix B.1 for the byte-to-ASCII mapping whose discarded low bit is appended raw. https://arxiv.org/abs/2309.10668
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §6.5, Tables 6.6 and 6.7, for the pre-neural benchmark of gzip, `compress`, `bzip2` and `ppmz` on a text file and a sparse file, with the compression times that make the cost axis visible. Free online: https://www.inference.org.uk/mackay/itila/
+3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §6.4 "The Entropy of English" and §6.6 for the gambling estimate of it, the target the text column of the measurement is descending toward; §14.3 for the two-part description that the adjusted rate instantiates.
+4. L. P. Deutsch, "DEFLATE Compressed Data Format Specification version 1.3," RFC 1951, IETF, 1996 — §2 for the 32 KB window that fixes gzip's context in the comparison. https://www.rfc-editor.org/rfc/rfc1951
+5. L. Blier, Y. Ollivier, "The Description Length of Deep Learning Models," NeurIPS 2018 — the prequential alternative to the two-part code used here: charge the training procedure rather than the parameters, which gives over-parameterised networks a much shorter description. https://arxiv.org/abs/1802.07044
+</References>

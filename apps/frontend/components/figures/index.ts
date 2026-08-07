@@ -72,18 +72,22 @@ import RdObjective from "./information-theory/RdObjective";
 import CapacityVsRateDistortion from "./information-theory/CapacityVsRateDistortion";
 import GaussianRdCurve from "./information-theory/GaussianRdCurve";
 import NeuralCodecLoop from "./information-theory/NeuralCodecLoop";
+import CodecIdentity from "./information-theory/CodecIdentity";
 import ThreeStringsThreeCodes from "./information-theory/ThreeStringsThreeCodes";
 import TwoPartMessage from "./information-theory/TwoPartMessage";
 import PolyFitTally from "./information-theory/PolyFitTally";
 import MarkovUCurve from "./information-theory/MarkovUCurve";
 import ParameterPrecision from "./information-theory/ParameterPrecision";
 import AdjustedRateUCurves from "./information-theory/AdjustedRateUCurves";
+import OccamFactorSplit from "./information-theory/OccamFactorSplit";
+import RegularVsSingular from "./information-theory/RegularVsSingular";
 import IbVsRd from "./information-theory/IbVsRd";
 import IbObjective from "./information-theory/IbObjective";
 import IbToyMerges from "./information-theory/IbToyMerges";
 import IbPlane from "./information-theory/IbPlane";
 import IbGibbsEncoder from "./information-theory/IbGibbsEncoder";
 import IbBetaExtremes from "./information-theory/IbBetaExtremes";
+import VibVsVae from "./information-theory/VibVsVae";
 import ContrastiveLineup from "./information-theory/ContrastiveLineup";
 import InfonceDerivation from "./information-theory/InfonceDerivation";
 import CertifiedBitsBudget from "./information-theory/CertifiedBitsBudget";
@@ -100,6 +104,18 @@ import UnitsBridge from "./information-theory/UnitsBridge";
 import LandauerErasure from "./information-theory/LandauerErasure";
 import FeedbackSecondLaw from "./information-theory/FeedbackSecondLaw";
 import TwoPhysicsFaces from "./information-theory/TwoPhysicsFaces";
+import GroupingTree from "./information-theory/GroupingTree";
+import CapacityPacking from "./information-theory/CapacityPacking";
+import LossVsGradient from "./information-theory/LossVsGradient";
+import AdaptiveCoderStep from "./information-theory/AdaptiveCoderStep";
+import UkSeparation from "./information-theory/UkSeparation";
+import SzilardFreeEnergy from "./information-theory/SzilardFreeEnergy";
+import DeflatePipeline from "./information-theory/DeflatePipeline";
+import FanoTwoExpansions from "./information-theory/FanoTwoExpansions";
+import FanoLeCamReduction from "./information-theory/FanoLeCamReduction";
+import BitsPerByteConversion from "./information-theory/BitsPerByteConversion";
+import TokenizerRankingFlip from "./information-theory/TokenizerRankingFlip";
+import ModelCoderPipeline from "./information-theory/ModelCoderPipeline";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -195,18 +211,22 @@ export const figures: Record<string, RegisteredFigure> = {
   CapacityVsRateDistortion: { component: CapacityVsRateDistortion },
   GaussianRdCurve: { component: GaussianRdCurve },
   NeuralCodecLoop: { component: NeuralCodecLoop },
+  CodecIdentity: { component: CodecIdentity, frames: 4 },
   ThreeStringsThreeCodes: { component: ThreeStringsThreeCodes },
   TwoPartMessage: { component: TwoPartMessage },
   PolyFitTally: { component: PolyFitTally, frames: 4 },
   MarkovUCurve: { component: MarkovUCurve },
   ParameterPrecision: { component: ParameterPrecision },
   AdjustedRateUCurves: { component: AdjustedRateUCurves },
+  OccamFactorSplit: { component: OccamFactorSplit },
+  RegularVsSingular: { component: RegularVsSingular },
   IbVsRd: { component: IbVsRd },
   IbObjective: { component: IbObjective },
   IbToyMerges: { component: IbToyMerges, frames: 4 },
   IbPlane: { component: IbPlane },
   IbGibbsEncoder: { component: IbGibbsEncoder },
   IbBetaExtremes: { component: IbBetaExtremes },
+  VibVsVae: { component: VibVsVae },
   ContrastiveLineup: { component: ContrastiveLineup },
   InfonceDerivation: { component: InfonceDerivation, frames: 4 },
   CertifiedBitsBudget: { component: CertifiedBitsBudget },
@@ -223,4 +243,16 @@ export const figures: Record<string, RegisteredFigure> = {
   LandauerErasure: { component: LandauerErasure },
   FeedbackSecondLaw: { component: FeedbackSecondLaw },
   TwoPhysicsFaces: { component: TwoPhysicsFaces },
+  GroupingTree: { component: GroupingTree },
+  CapacityPacking: { component: CapacityPacking },
+  LossVsGradient: { component: LossVsGradient },
+  AdaptiveCoderStep: { component: AdaptiveCoderStep, frames: 4 },
+  UkSeparation: { component: UkSeparation },
+  SzilardFreeEnergy: { component: SzilardFreeEnergy },
+  DeflatePipeline: { component: DeflatePipeline },
+  FanoTwoExpansions: { component: FanoTwoExpansions, frames: 4 },
+  FanoLeCamReduction: { component: FanoLeCamReduction },
+  BitsPerByteConversion: { component: BitsPerByteConversion },
+  TokenizerRankingFlip: { component: TokenizerRankingFlip },
+  ModelCoderPipeline: { component: ModelCoderPipeline },
 };

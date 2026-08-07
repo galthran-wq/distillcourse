@@ -7,7 +7,10 @@ import { ACCENT, SUPPORT, labelMuted } from "../palette";
  * (playbook rule 7: short labels above the equation, thin arrows onto the
  * exact symbols).
  *
- *   p(t|x) = [ p(t) / Z(x,β) ] · exp( −β · D( p(y|x) ‖ p(y|t) ) )
+ *   p(t|x) = [ p(t) / Z(x,β) ] · 2^( −β · D( p(y|x) ‖ p(y|t) ) )
+ *
+ * Base 2, not e: the lesson measures D in bits throughout, and the two forms
+ * are numerically different.
  *
  * Four tags:
  *   p(t)      (currentColor)        — "cluster prior"
@@ -19,8 +22,7 @@ import { ACCENT, SUPPORT, labelMuted } from "../palette";
  * Below: a concrete two-row instance for symbol a of the toy source. a
  * predicts Y as (1,0); joining t_ab (fields near-certain, D=0.193 bits) is
  * cheap and preferred (amber, ✓), joining t_ad (a fair coin, D=1 bit) is
- * costly (blue). The exponential weights favor the cluster that predicts Y
- * the way a does.
+ * costly (blue). At β = 4 the two weights differ by 2^(4(1 − 0.193)) ≈ 9.
  *
  * One idea: the distortion is a KL, derived not chosen. Amber = the emergent
  * KL distortion and the preferred assignment (the subject); blue = the costly
@@ -98,13 +100,13 @@ function Arrow({
 }
 
 // ── arrow targets onto the exact symbols (tuned against the render) ──
-const PT_T = { x: 236, y: 108 }; // p(t) numerator
-const Z_T = { x: 236, y: 150 }; // Z(x,β) denominator
-const BETA_T = { x: 356, y: 118 }; // −β inside exp
-const KL_T = { x: 560, y: 118 }; // the KL divergence term
+const PT_T = { x: 322, y: 103 }; // p(t) numerator
+const Z_T = { x: 326, y: 150 }; // Z(x,β) denominator
+const BETA_T = { x: 401, y: 98 }; // −β in the exponent
+const KL_T = { x: 505, y: 100 }; // the KL divergence term
 
 // only the KL term carries a role color; the rest stays structural currentColor
-const EQ_TEX = String.raw`p(t \mid x)\;=\;\frac{p(t)}{Z(x,\beta)}\,\exp\!\Bigl(-\beta\,\textcolor{${ACCENT}}{D\bigl(p(y \mid x)\,\big\|\,p(y \mid t)\bigr)}\Bigr)`;
+const EQ_TEX = String.raw`p(t \mid x)\;=\;\frac{p(t)}{Z(x,\beta)}\;2^{-\beta\,\textcolor{${ACCENT}}{D\left(p(y \mid x)\,\|\,p(y \mid t)\right)}}`;
 
 // ── concrete instance geometry ──
 const BAR_W = 118;
@@ -156,31 +158,32 @@ export default function IbGibbsEncoder() {
       <div style={{ position: "relative", width: W, height: H1 }}>
         <svg width={W} height={H1} viewBox={`0 0 ${W} ${H1}`} aria-hidden="true">
           {/* "cluster prior" → p(t) numerator */}
-          <Arrow x1={196} y1={56} x2={PT_T.x} y2={PT_T.y} op={0.6} />
+          <Arrow x1={216} y1={56} x2={PT_T.x} y2={PT_T.y} op={0.6} />
           {/* "price of a relevant bit" → −β */}
-          <Arrow x1={356} y1={56} x2={BETA_T.x} y2={BETA_T.y} op={0.7} />
+          <Arrow x1={390} y1={56} x2={BETA_T.x} y2={BETA_T.y} op={0.7} />
           {/* "the emergent distortion…" → the KL term (amber) */}
-          <Arrow x1={560} y1={56} x2={KL_T.x} y2={KL_T.y} color={ACCENT} op={0.9} />
+          <Arrow x1={560} y1={64} x2={KL_T.x} y2={KL_T.y} color={ACCENT} op={0.9} />
           {/* "normalizer over t" → Z(x,β) denominator, from below */}
-          <Arrow x1={196} y1={196} x2={Z_T.x} y2={Z_T.y} op={0.45} />
+          <Arrow x1={230} y1={196} x2={Z_T.x} y2={Z_T.y} op={0.45} />
         </svg>
 
         {/* top tags */}
-        <Lbl x={196} y={24} anchor="c" style={{ textAlign: "center", lineHeight: 1.2, maxWidth: 160 }}>
+        <Lbl x={216} y={24} anchor="c" style={{ textAlign: "center", lineHeight: 1.2, maxWidth: 160 }}>
           <div style={{ fontWeight: 600 }}>cluster prior</div>
         </Lbl>
-        <Lbl x={356} y={24} anchor="c" style={{ textAlign: "center", lineHeight: 1.2, maxWidth: 150 }}>
+        <Lbl x={390} y={20} anchor="c" style={{ textAlign: "center", lineHeight: 1.2, maxWidth: 130 }}>
           <div style={{ fontWeight: 600 }}>price of a</div>
           <div style={{ fontWeight: 600 }}>relevant bit</div>
         </Lbl>
         <Lbl
-          x={560}
-          y={12}
+          x={568}
+          y={8}
           anchor="c"
-          style={{ textAlign: "center", lineHeight: 1.2, color: ACCENT, maxWidth: 300 }}
+          style={{ textAlign: "center", lineHeight: 1.2, color: ACCENT, whiteSpace: "nowrap" }}
         >
           <div style={{ fontWeight: 600 }}>the emergent distortion:</div>
-          <div style={{ fontWeight: 600 }}>how differently x and cluster t predict Y</div>
+          <div style={{ fontWeight: 600 }}>how differently x and cluster t</div>
+          <div style={{ fontWeight: 600 }}>predict Y</div>
         </Lbl>
 
         {/* the equation, KL role-color bound inside the TeX */}
@@ -190,7 +193,7 @@ export default function IbGibbsEncoder() {
 
         {/* bottom tag */}
         <Lbl
-          x={196}
+          x={230}
           y={200}
           anchor="c"
           style={{ ...labelMuted, textAlign: "center", fontSize: 12.5, maxWidth: 160 }}
@@ -262,10 +265,11 @@ export default function IbGibbsEncoder() {
           <M tex={String.raw`a`} size={11} />&rsquo;s, the smaller <M tex={String.raw`D`} size={11} />
         </div>
         <div style={{ fontSize: 13, marginTop: 10, lineHeight: 1.4, maxWidth: 640 }}>
-          the exponential weights{" "}
-          <M tex={String.raw`e^{-\beta \textcolor{${ACCENT}}{D}}`} size={13} /> favor the cluster
-          that predicts <M tex={String.raw`Y`} size={13} /> the way{" "}
-          <M tex={String.raw`a`} size={13} /> does.
+          the weights <M tex={String.raw`2^{-\beta \textcolor{${ACCENT}}{D}}`} size={13} /> favor the
+          cluster that predicts <M tex={String.raw`Y`} size={13} /> the way{" "}
+          <M tex={String.raw`a`} size={13} /> does: at{" "}
+          <M tex={String.raw`\beta = 4`} size={13} /> they differ by{" "}
+          <M tex={String.raw`2^{4(1 - 0.193)} \approx 9`} size={13} />.
         </div>
       </div>
     </div>

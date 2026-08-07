@@ -14,3 +14,7 @@ export { Readout } from "./Readout";
 export { Input } from "./Input";
 export { TextArea } from "./TextArea";
 export { Switch } from "./Switch";
+export { TargetList } from "./TargetList";
+export type { Target } from "./TargetList";
+export { BitsBar } from "./BitsBar";
+export type { BitsRow } from "./BitsBar";

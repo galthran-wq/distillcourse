@@ -1,0 +1,1063 @@
+The coding theorem proves that good codes exist without exhibiting one; the
+Hamming (7,4) code is an explicit rate-4/7 code that corrects any single
+error, and its limits show what the existence proof was actually promising.
+
+The course's channel argument has fixed a boundary and left the interior
+empty. <Ref lesson="channel-capacity"/> computed the number
+$C = \max_{p(x)} I(X;Y)$, and <Ref lesson="noisy-channel-coding"/> proved
+that every rate below it is achievable and no rate above it is, by averaging
+over codebooks too large to store and never naming one. What stands open is
+what a code that can be written down looks like, and how far it falls short
+of the frontier. This lesson builds the oldest such code, decodes it with a
+table of eight rows, and then measures it against capacity. The measurement
+is the payload: it identifies the quantity that coding theory optimized for
+four decades and shows that the theorem never asked for it.
+
+The route: the three-circle construction and the parity-check matrix behind
+it; syndrome decoding and the linearity that makes it a lookup; minimum
+distance 3 and the choice it forces between correcting and detecting; the
+code's measured error rate on a binary symmetric channel against what
+capacity permits there; and the asymptotic result that a decoder tied to the
+minimum distance gives up half the noise Shannon allows.
+
+<Task>
+Closed-book, before reading on. State (a) the capacity of a binary symmetric
+channel whose crossover probability is $f$; (b) the rate of a block code
+carrying $M$ messages on $n$ channel uses; (c) the error floor the converse
+imposes on a code of rate $R > C$; (d) what object the achievability proof
+exhibits. Answers: $C = 1 - H_2(f)$
+(<Ref lesson="channel-capacity"/>); $R = \log_2 M / n$ bits per use;
+$P_e \ge 1 - C/R$ asymptotically; and nothing — it averages over random
+codebooks and concludes that some member of the average is at least average
+(<Ref lesson="noisy-channel-coding"/>). All four are used below.
+</Task>
+
+## Three checks over four bits: the code as a null space
+
+The counting that closes <Ref lesson="noisy-channel-coding"/> fixed the shape
+of the answer before any code existed. A decoder that must tell "no error"
+apart from a flip in each of seven positions needs eight distinct verdicts,
+and three binary parity checks produce exactly $2^3 = 8$ patterns of
+pass and fail. The budget matches with nothing to spare, and the
+construction below spends it.
+
+Write the transmitted block as $\mathbf{c} = c_1 c_2 \ldots c_7$. Its first
+four bits carry the message, $c_i = s_i$ for $i \le 4$, and its last three
+are parity bits computed from them by addition modulo 2, written $\oplus$:
+
+$$
+c_5 = c_1 \oplus c_2 \oplus c_3, \qquad
+c_6 = c_2 \oplus c_3 \oplus c_4, \qquad
+c_7 = c_1 \oplus c_3 \oplus c_4 .
+$$
+
+Seven bits carry four, so the rate is $4/7 \approx 0.571$ bits per channel
+use. Each parity bit is chosen to make one group of four bits contain an
+even number of ones. Drawing the three groups as three overlapping circles
+makes the choice visible: the message bits sit in the overlaps, each parity
+bit sits alone in its own circle, and setting it is the only freedom left.
+
+<FigureSequence
+  name="circle-build"
+  alt="Four frames building the Hamming (7,4) codeword for message 1011: the four message bits placed in the overlaps of three circles, then each parity bit set in turn so that its circle contains an even number of ones"
+  caption="Encoding 1011: each parity bit is the one value that makes its circle even, and the block that results is 1011001."
+/>
+
+<Task>
+Step through the four frames and check the last one by eye: count the ones in
+each circle of the finished picture. The top circle holds
+$1,0,1,0$, the lower-right holds $0,1,1,0$, the lower-left holds $1,1,1,1$.
+All three counts are even, which is the only property the encoder had to
+achieve.
+</Task>
+
+<Example title="encoding s = 1011">
+With $c_1 = 1$, $c_2 = 0$, $c_3 = 1$, $c_4 = 1$:
+
+$$
+c_5 = 1 \oplus 0 \oplus 1 = 0, \qquad
+c_6 = 0 \oplus 1 \oplus 1 = 0, \qquad
+c_7 = 1 \oplus 1 \oplus 1 = 1 ,
+$$
+
+so $\mathbf{c} = 1011001$. Running the same three equations over all
+$2^4 = 16$ messages gives 16 codewords out of the $2^7 = 128$ seven-bit
+words. The other 112 words are not codewords, and every one of them will
+turn out to be one flip away from exactly one that is.
+</Example>
+
+<Exercise>
+Encode $s = 0110$ by the three parity equations, and check your answer by
+counting the ones in each of the three circles. Then state, without
+enumerating, why exactly one seven-bit block starts with $0110$.
+
+<Solution>
+$c_5 = 0 \oplus 1 \oplus 1 = 0$, $c_6 = 1 \oplus 1 \oplus 0 = 0$,
+$c_7 = 0 \oplus 1 \oplus 0 = 1$, so $\mathbf{c} = 0110001$.
+
+Circle check: the top circle holds $c_1 c_2 c_3 c_5 = 0,1,1,0$, two ones;
+the lower-right holds $c_2 c_3 c_4 c_6 = 1,1,0,0$, two ones; the lower-left
+holds $c_1 c_3 c_4 c_7 = 0,1,0,1$, two ones. All even.
+
+Exactly one codeword starts with $0110$ because the three parity equations
+are functions of the message bits alone: once $s$ is fixed there is no
+freedom left. The map $s \mapsto \mathbf{c}$ is therefore injective, and the
+16 codewords have 16 distinct four-bit prefixes, one per message. A code
+whose first $k$ bits are the message is called **systematic**, and it is
+what makes reading the message off a corrected block a matter of truncation
+rather than a table lookup.
+</Solution>
+</Exercise>
+
+### The same object as a matrix
+
+The three equations are linear over the two-element field, so the whole code
+is a linear-algebra object. Moving each parity bit to the left-hand side
+turns "the parity of this group is even" into "this sum is zero", and the
+three constraints become one matrix equation.
+
+<Figure
+  src="./figures/parity-matrix.svg"
+  alt="The 3 by 7 parity-check matrix H with its rows coloured to match the three circles, its first four columns marked as the message positions and its last three as the parity positions, and its seven columns identified as the seven non-zero 3-bit patterns"
+  caption="The picture and the matrix are the same object: row k of H lists the seven bits, marking those inside circle k."
+/>
+
+<Definition title="linear block code, parity-check matrix">
+A **linear block code** of blocklength $n$ and dimension $k$ over
+$\mathbb{F}_2$ is the null space of a matrix
+$H \in \mathbb{F}_2^{(n-k) \times n}$:
+$$
+\mathcal{C} = \lbrace \mathbf{c} \in \mathbb{F}_2^{\,n} :
+H\mathbf{c} = \mathbf{0} \rbrace ,
+$$
+with all arithmetic modulo 2. $H$ is the **parity-check matrix**; each of its
+rows is one parity constraint. The code holds $2^k$ codewords and has rate
+$R = k/n$.
+</Definition>
+
+The Hamming (7,4) code is the case $n = 7$, $k = 4$, with
+
+$$
+H = \begin{pmatrix}
+1 & 1 & 1 & 0 & 1 & 0 & 0 \\
+0 & 1 & 1 & 1 & 0 & 1 & 0 \\
+1 & 0 & 1 & 1 & 0 & 0 & 1
+\end{pmatrix} .
+$$
+
+Four instances fix what the definition covers.
+
+- **The canonical case.** The code above: $n = 7$, $k = 4$, 16 codewords,
+  three checks.
+- **A different surface, same structure.** The repetition code $R_3$ of
+  <Ref lesson="noisy-channel-coding"/>, which sends each bit three times: its
+  codewords $000$ and $111$ are the null space of
+  $\bigl(\begin{smallmatrix} 1 & 1 & 0 \\ 1 & 0 & 1
+  \end{smallmatrix}\bigr)$. A repetition code is a linear code, and nothing
+  in the definition rewards cleverness.
+- **The degenerate case.** The empty matrix, $n - k = 0$: no constraints,
+  every word a codeword, rate 1 and no protection.
+- **The near miss.** The set $\lbrace 0000000, 1111111, 1010101 \rbrace$,
+  which fails exactly one clause: it is not closed under addition, since
+  $1111111 \oplus 1010101 = 0101010$ is not in the set. It is therefore the
+  null space of no matrix, and none of what follows applies to it.
+
+<Remark title="H is not entropy here">
+This lesson reuses $H$ for the parity-check matrix. Entropy keeps its own
+notation, $H(X)$ and $H_2(f)$, always with an argument. The two never appear
+in the same expression, and the matrix is always written without one.
+</Remark>
+
+Verifying that the codewords really are the null space takes one
+substitution. Row 1 of $H$ applied to $\mathbf{c}$ gives
+$c_1 \oplus c_2 \oplus c_3 \oplus c_5$, which by construction is
+$c_1 \oplus c_2 \oplus c_3 \oplus (c_1 \oplus c_2 \oplus c_3) = 0$, since
+every term appears twice. Rows 2 and 3 go the same way. The 16 codewords
+therefore satisfy $H\mathbf{c} = \mathbf{0}$, and a dimension count closes
+the argument: $H$ has rank 3, so its null space has dimension $7 - 3 = 4$ and
+contains exactly $2^4 = 16$ vectors, which are the ones already listed.
+
+<KeyFact>
+Every error-correcting code in the rest of this module is specified the same
+way, by a parity-check matrix. What separates the (7,4) code from the codes
+that come within a fraction of a decibel of capacity is not the algebra: it
+is that their $H$ is *sparse*, with a bounded number of ones per row however
+large $n$ grows, which is what makes an iterative decoder possible
+(<Ref lesson="deployed-codes"/>).
+</KeyFact>
+
+## Syndrome decoding: the failed checks name the flipped bit
+
+The null-space picture tells the receiver whether a word is a codeword and
+nothing more; what to do with the 112 words that are not is a separate
+question. On a binary symmetric channel with $f < \tfrac{1}{2}$, fewer flips
+are more likely than more, so the optimal decoder returns the codeword
+nearest the received word in Hamming distance. Comparing against all 16
+codewords does that at $n = 7$. It does not scale: a rate-$1/2$ code at
+$n = 1000$ has
+$2^{500}$ codewords, and the search is the reason
+<Ref lesson="noisy-channel-coding"/> could promise codes without offering
+usable ones. Linearity removes the search here entirely.
+
+Write the received word as $\mathbf{r} = \mathbf{c} \oplus \mathbf{e}$, where
+$\mathbf{e}$ is the **error pattern**: a 1 in every position the channel
+flipped. The decoder's raw material is the vector of parity checks evaluated
+on $\mathbf{r}$.
+
+<Definition title="syndrome">
+The **syndrome** of a received word $\mathbf{r}$ is
+$\mathbf{z} = H\mathbf{r} \in \mathbb{F}_2^{\,n-k}$: one bit per parity
+check, zero where the check passes and one where it fails.
+</Definition>
+
+<Theorem title="syndrome decoding of the (7,4) code">
+For any transmitted codeword $\mathbf{c}$ and any error pattern
+$\mathbf{e}$, the syndrome of $\mathbf{r} = \mathbf{c} \oplus \mathbf{e}$
+satisfies $\mathbf{z} = H\mathbf{e}$: it depends on the error alone. If
+$\mathbf{e}$ is zero then $\mathbf{z} = \mathbf{0}$; if $\mathbf{e}$ has a
+single 1, in position $j$, then $\mathbf{z}$ is the $j$-th column of $H$, and
+the seven columns are distinct and non-zero, so $j$ is recoverable from
+$\mathbf{z}$.
+
+<Proof>
+The plan: distribute $H$ over the sum, kill the codeword term, then read the
+remaining product.
+
+**Independence of the message.** Matrix multiplication over
+$\mathbb{F}_2$ is linear, so
+$$
+\mathbf{z} = H(\mathbf{c} \oplus \mathbf{e})
+= H\mathbf{c} \oplus H\mathbf{e} = \mathbf{0} \oplus H\mathbf{e}
+= H\mathbf{e},
+$$
+using $H\mathbf{c} = \mathbf{0}$, which holds for every codeword by the
+definition of the code. Which of the 16 messages was sent has now dropped out
+of the problem.
+
+**Single errors.** If $\mathbf{e} = \mathbf{e}_j$, the vector with a 1 in
+position $j$ and zeros elsewhere, then $H\mathbf{e}_j$ selects column $j$ of
+$H$.
+
+**Distinctness.** The seven columns of $H$ are $(1,0,1)$, $(1,1,0)$,
+$(1,1,1)$, $(0,1,1)$, $(1,0,0)$, $(0,1,0)$, $(0,0,1)$. There are exactly
+seven non-zero vectors in $\mathbb{F}_2^3$ and these are all of them, each
+occurring once. So $j \mapsto H\mathbf{e}_j$ is a bijection from the seven
+positions onto the seven non-zero syndromes, and inverting it recovers $j$.
+</Proof>
+</Theorem>
+
+The theorem converts decoding into a lookup with eight rows, one per
+syndrome value.
+
+| syndrome $\mathbf{z}$ | 000 | 001 | 010 | 011 | 100 | 101 | 110 | 111 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| flip position | none | 7 | 6 | 4 | 5 | 1 | 2 | 3 |
+
+<FigureSequence
+  name="syndrome-decode"
+  alt="Three frames decoding the received word 1111001: the word written into the three circles, then the two violated checks shown dashed with the syndrome 110 read off and matched to column 2 of H, then bit 2 flipped back and every check satisfied"
+  caption="One flip, three checks: the pattern of failures is a three-bit number, and that number is the position to flip."
+/>
+
+<Task>
+Step through the three frames and watch which circles go dashed. Two are
+dashed in frame 2 and one is not: find by eye the single bit that lies inside
+both dashed circles and outside the solid one, and check that the table above
+sends the syndrome 110 to that same position before you advance to frame 3.
+</Task>
+
+<Example title="decoding r = 1111001">
+The three checks on $\mathbf{r} = 1111001$ read
+$$
+z_1 = 1 \oplus 1 \oplus 1 \oplus 0 = 1, \quad
+z_2 = 1 \oplus 1 \oplus 1 \oplus 0 = 1, \quad
+z_3 = 1 \oplus 1 \oplus 1 \oplus 1 = 0 ,
+$$
+so $\mathbf{z} = (1,1,0)$, the second column of $H$. Flipping bit 2 gives
+$1011001$, whose first four bits are the message $1011$. The codeword list
+was never consulted: nine additions and a table of eight rows replaced the
+search that defines the optimal decoder.
+</Example>
+
+<Exercise>
+Decode $\mathbf{r} = 1010101$. Compute the three checks, name the syndrome,
+give the corrected block and the four message bits. Then state how many
+additions the whole decode cost, and compare with the cost of scoring
+$\mathbf{r}$ against all 16 codewords.
+
+<Solution>
+$z_1 = r_1 \oplus r_2 \oplus r_3 \oplus r_5 = 1 \oplus 0 \oplus 1 \oplus 1
+= 1$;
+$z_2 = r_2 \oplus r_3 \oplus r_4 \oplus r_6 = 0 \oplus 1 \oplus 0 \oplus 0
+= 1$;
+$z_3 = r_1 \oplus r_3 \oplus r_4 \oplus r_7 = 1 \oplus 1 \oplus 0 \oplus 1
+= 1$.
+
+So $\mathbf{z} = (1,1,1)$, the third column of $H$. Flipping bit 3 gives
+$1000101$, and the message is $1000$.
+
+**Cost.** Each check sums four bits, so the syndrome costs 9 additions, and
+the table lookup and single flip cost nothing that scales. Scoring against
+all 16 codewords costs $16 \times 7 = 112$ comparisons plus a minimum.
+The ratio is unimpressive at $n = 7$; the point is how the two grow. The
+syndrome cost is $O(n(n-k))$ and the exhaustive cost is $O(n 2^k)$, so at
+$n = 1000$ and $k = 500$ the first is a million operations and the second is
+$2^{500}$.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Restricting attention to linear codes costs nothing in optimality. The
+syndrome is a sufficient statistic: the maximum-likelihood decoder of any
+linear code on an additive-noise channel is a function of $\mathbf{z}$ alone
+and never needs $\mathbf{r}$ itself. What linearity does not make cheap is
+the second step — recovering the most likely error pattern from a syndrome is
+NP-hard for linear codes in general, and the eight-row table works here only
+because $H$ has three rows. Every family in <Ref lesson="deployed-codes"/> is
+a null space chosen for a parity-check matrix that keeps that step tractable
+at blocklengths in the thousands.
+</KeyFact>
+
+## Minimum distance 3: correct one error or detect two, never both
+
+The decoder just built acts on every non-zero syndrome, flipping the bit the
+syndrome names. The question it never asks is whether a single flip is the
+right explanation of what it sees. Answering that requires the geometry of
+the codeword set.
+
+<Definition title="Hamming distance, weight, minimum distance">
+The **Hamming distance** $d(\mathbf{u},\mathbf{v})$ between two blocks of
+equal length is the number of positions in which they differ. The **weight**
+$w(\mathbf{u})$ is $d(\mathbf{u}, \mathbf{0})$, the number of ones. The
+**minimum distance** of a code is
+$d_{\min} = \min_{\mathbf{u} \ne \mathbf{v}} d(\mathbf{u},\mathbf{v})$ over
+distinct codewords.
+</Definition>
+
+For a linear code the minimum distance is the minimum weight of a non-zero
+codeword: $d(\mathbf{u},\mathbf{v}) = w(\mathbf{u} \oplus \mathbf{v})$, and
+$\mathbf{u} \oplus \mathbf{v}$ ranges over all non-zero codewords as the
+pair ranges over distinct codewords. Counting the 16 codewords of the (7,4)
+code by weight gives one of weight 0, seven of weight 3, seven of weight 4,
+and one of weight 7. So $d_{\min} = 3$. That list of counts is the code's
+*weight enumerator*, written $A(w)$ for the number of codewords of weight
+$w$: here $A(0) = 1$, $A(3) = A(4) = 7$, $A(7) = 1$, and every other $A(w)$
+is zero. The minimum distance is a single number read off that list, the
+smallest $w > 0$ with $A(w) > 0$; the failure rate of a code on a
+probabilistic channel depends on the whole of it, which is the argument this
+lesson closes with.
+
+Distance 3 is exactly what the decoder needs. If at most one bit flips, the
+received word is at distance at most 1 from the codeword sent and at
+distance at least 2 from every other, so the nearest codeword is the right
+one. That is the guarantee the code is sold on, and it is where the
+guarantee stops.
+
+### The double error is not detected, it is miscorrected
+
+A distance-3 code supports two different guarantees, and a decoder can be
+built to deliver either one. Set to correct, it repairs every single error.
+Set to detect, it reports "something is wrong" whenever one or two bits flip
+and repairs nothing. One decoder delivers one of the two, never **both**.
+
+The claim that it delivers both is common enough to be built into how the
+code is described: distance 3 is glossed as correcting one error *and*
+detecting two, and readers carry away that the (7,4) code is safe against any
+two-bit error. It is not. The label that does mean both, SEC-DED
+(single-error-correcting, double-error-detecting), is reserved for codes of
+distance 4, and what stands in the way at distance 3 is the budget that
+opened this lesson. Three checks produce eight syndromes; a decoder that corrects every single error has
+already committed seven of them to "flip position $j$" and the eighth to "no
+error". No syndrome value is left over to mean "two errors happened". When
+two bits flip, the syndrome is the sum of two columns of $H$, which is
+non-zero and is therefore itself the column of some third position, and the
+decoder flips that third bit.
+
+The replacement picture is a partition. The decoder cuts all 128 seven-bit
+words into 16 groups of 8, one group per codeword, and answers every
+received word with the codeword of its group. Nothing in that scheme has a
+place to put the answer "I decline". A double error moves the received word
+out of the sent codeword's group and into another one, and the decoder
+answers confidently and wrongly.
+
+Step through the three frames below and watch which position the decoder
+touches in the last one: it is neither of the two the channel flipped in the
+first.
+
+<FigureSequence
+  name="double-error"
+  alt="Three frames showing a double error: the codeword 1011001 with positions 3 and 7 flipped, the resulting syndrome 110 which is the same one a single flip of bit 2 produces, and the decoder's output 1101000, a valid codeword three flips from the one sent"
+  caption="Two flips in, three errors out: the syndrome names a bit that was never touched, and the result is a perfectly legal codeword."
+/>
+
+<Demo
+  name="HammingSyndrome"
+  caption="Flip bits in a codeword and watch the syndrome decoder respond; presets: clean codeword, one error, two errors."
+/>
+
+<Task>
+Load the *one error* preset, flip any single bit, and confirm the decoder
+returns the original block. Then flip a second bit and find a two-bit pattern
+whose decoded output differs from the transmitted codeword in three
+positions; every two-bit pattern does this, and there are
+$\binom{7}{2} = 21$ of them. Report how many of the 21 leave the four
+message bits intact: none, because the miscorrection always lands on a
+codeword at distance 3, and the code protects all seven positions equally.
+</Task>
+
+<KeyFact>
+Every machine with error-correcting memory pays for the second guarantee in
+check bits: server DRAM ships a (72,64) code of minimum distance 4, spending
+8 check bits on 64 data bits where 7 would have sufficed for correction
+alone. The eighth bit buys nothing except the right to refuse.
+</KeyFact>
+
+### Perfect: the balls tile the space exactly
+
+The partition described above has a property that is rare enough to be worth
+naming. Around each codeword put the ball of words at distance at most 1: the
+codeword itself plus the 7 words reachable by one flip, 8 words in all. The
+balls are disjoint, because a word within distance 1 of two codewords would
+put those codewords within distance 2 of each other, contradicting
+$d_{\min} = 3$. And $16 \times 8 = 128 = 2^7$, so they use up the space with
+nothing left over.
+
+<Figure
+  src="./figures/sphere-packing.svg"
+  alt="Sixteen hexagonal cells tiling a region labelled as all 128 seven-bit words, each cell carrying one codeword at its centre, with a callout showing that one cell holds one codeword plus the seven words one flip away"
+  caption="Perfect means no gaps: the 16 radius-1 balls of the (7,4) code use all 128 words and leave none uncovered."
+/>
+
+A code whose balls of some fixed radius tile the space this way is called
+**perfect**: no received word is ever ambiguous and no redundancy is wasted.
+That would be an ideal answer to Shannon's problem, and it is available
+almost nowhere. Binary perfect codes have been classified, and the list is
+three entries long; every other code leaves gaps between its balls, and in
+high dimensions the gaps take up nearly all of the space. Perfection is
+therefore a property of a few small coincidences, not a design target, which
+is the first sign that the geometry of guaranteed correction is not the same
+subject as reliable communication.
+
+<Aside>
+The complete list of non-trivial binary perfect codes: the Hamming codes,
+one per blocklength $n = 2^m - 1$, correcting one error; the repetition codes
+of odd blocklength; and one code of blocklength 23 carrying $2^{12}$
+codewords and correcting three errors, the binary Golay code. Nothing else
+qualifies, because perfection needs a ball size that is exactly a power of
+two, and only three families supply one: $1 + \binom{7}{1} = 2^3$ here;
+$\sum_{i \le t} \binom{2t+1}{i} = 2^{2t}$ for the repetition code of length
+$2t + 1$, where the ball of radius $t$ is half the space by symmetry; and
+$1 + \binom{23}{1} + \binom{23}{2} + \binom{23}{3} = 2^{11}$ for Golay's
+radius-3 balls. Those three identities are the whole supply.
+</Aside>
+
+## Rate 4/7 against the channel: what the code actually delivers
+
+Guarantees say nothing about how often a code fails on a real channel. Put
+the (7,4) code on the binary symmetric channel of
+<Ref lesson="channel-capacity"/>, which flips each transmitted bit
+independently with probability $f$, and the failure rate is a computation.
+
+A block decodes wrongly exactly when two or more of its seven bits flip,
+since one or fewer is repaired and two or more is miscorrected. So
+
+$$
+p_B = 1 - (1-f)^7 - 7f(1-f)^6 \;=\; 21 f^2 + O(f^3),
+$$
+
+the leading term being the $\binom{7}{2} = 21$ ways two bits can flip.
+
+<Example title="the code at f = 0.1">
+At $f = 0.1$: $p_B = 1 - 0.478 - 0.372 = 0.150$. Roughly one block in seven
+is decoded to the wrong codeword.
+
+Bit error is lower than block error, because a wrong block corrupts three of
+its seven bits rather than all of them. When the noise has weight 2 the
+decoder adds a third flip, and the decoded block differs from the
+transmitted one in exactly 3 places, so the fraction of bits in error is
+$\tfrac{3}{7}$ of the block error rate to leading order. Summing the exact
+distribution over all noise patterns gives a decoded bit error rate of
+$0.067$ at $f = 0.1$.
+
+So seven channel uses per four message bits buys a drop from 10% to 6.7% in
+per-bit error. That is a factor of 1.5, at a cost of 43% of the rate.
+</Example>
+
+<Figure
+  src="./figures/mackay-hamming-demo.png"
+  alt="Four bitmap panels of the same cartoon in a row, labelled s, t, r and s-hat and joined by arrows marked ENCODER, CHANNEL f = 10% and DECODER; the source panel is clean, the encoded panel carries an extra braced block of parity bits beneath it, the received panel is heavily speckled with noise, and the decoded panel is clean again except for scattered residual black dots"
+  caption="Ten thousand source bits through the (7,4) Hamming code on a 10% channel: the decoder repairs most of the damage, but the last panel is still visibly speckled — about 7% of decoded bits are still wrong."
+/>
+
+The speckle that survives decoding in that run is the 6.7%. It is worth
+being precise about what has gone wrong, because two quite different
+diagnoses are available and only one of them is a criticism of the code.
+
+**Above capacity at $f = 0.1$.** The channel's capacity there is
+$C = 1 - H_2(0.1) = 0.531$ bits per use, and the code's rate is
+$4/7 = 0.571$. The code is running *above* capacity. The converse of
+<Ref lesson="noisy-channel-coding"/> then forbids reliability for the rate
+itself: no family of rate-$0.571$ codes on this channel can push block error
+below $1 - C/R = 1 - 0.531/0.571 = 0.070$ as the blocklength grows, however
+the codes are built and however they are decoded. That floor is a statement
+about long codes and does not bind at $n = 7$, where the finite-blocklength
+form of the bound subtracts $1/(nR) = 0.25$ and returns nothing. The measured
+$0.150$ is set by the code's own structure: perfectness leaves the decoder no
+spare answers, so it fails on every noise pattern of weight 2 or more and on
+no other, and $p_B$ is exactly the probability of two or more flips. What
+capacity contributes is the verdict that no redesign at this rate would have
+driven that number toward zero.
+
+**Below capacity at $f = 0.05$.** Drop the noise and the verdict changes.
+Capacity rises to $1 - H_2(0.05) = 0.714$, comfortably above $0.571$, so the
+coding theorem now asserts that codes of rate $0.571$ exist, at some
+blocklength, with block error as small as one likes. The (7,4) code delivers $p_B = 0.044$ and a decoded
+bit error of $0.019$: better than the uncoded $0.05$ by a factor of 2.6, and
+nowhere near zero. Here the shortfall is the code's own.
+
+<KeyFact>
+Distinguishing the two diagnoses takes capacity and nothing else. Minimum
+distance is the same number, 3, at both noise levels, and it cannot say that
+the first case is impossible for every code while the second is merely
+unsolved by this one.
+</KeyFact>
+
+## ★ Berlekamp's bats: collisions happen away from the minimum distance
+
+Both failure rates above were computed from the noise distribution, not from
+$d_{\min}$, and the reason the two answers differ is worth isolating.
+
+In terms of the weight enumerator $A(w)$ counted for the (7,4) code above,
+the block error probability on a binary symmetric channel obeys the union
+bound
+
+$$
+P(\text{block error}) \;\le\; \sum_{w > 0} A(w)\, \beta(f)^{\,w},
+\qquad \beta(f) = 2\sqrt{f(1-f)} ,
+$$
+
+where $\beta(f)^w$ is roughly the chance of confusing two codewords at
+distance $w$. The bound is loose at moderate $f$, because it charges
+separately for confusions that happen together, but its shape carries the
+argument: every weight contributes, weighted by how many codewords sit at
+that weight.
+
+Berlekamp's picture of the same fact is a blind bat in a cave. The bat flies
+about the cave's centre, which is the transmitted codeword, and its typical
+distance from the centre is set by the noise level. The cave's walls are
+stalactites pointing inward, one for each rival codeword, each reaching in as
+far as the boundary between the home codeword and that rival — so a rival at
+distance $w$ has its tip at $w/2$ from the centre, and the stalactites at the
+minimum distance are the longest. A decoding error is a collision.
+
+The cave's shape is the weight enumerator drawn to scale. Take a typical
+linear code of rate $1/2$ and blocklength 100 — the code obtained by filling
+the 50 rows of $H$ with fair coin flips, for which each non-zero word is a
+codeword with probability $2^{-50}$, so the expected number of codewords of
+weight $w$ is $A(w) = \binom{100}{w} 2^{-50}$. Those counts put its minimum
+distance at 12, with about one rival sitting there; at weight 20 there are
+$4.8 \times 10^5$ rivals, and at weight 30, $2.6 \times 10^{10}$. The deepest
+tips are the rarest, by ten orders of magnitude.
+
+<Figure
+  src="./figures/bat-cave.svg"
+  alt="A circular cave in cross-section with inward-pointing stalactites of three depths, one codeword dot at the centre, and two dashed circles marking the bat's typical distance from the centre at f = 0.04 and f = 0.10; the stalactite families are labelled with the number of rival codewords at weights 12, 20 and 30 for a typical rate-1/2 code of blocklength 100"
+  caption="The two dashed circles are the bat at 4 and at 10 typical flips: the first clears every tip, the second reaches the tips belonging to half a million weight-20 rivals."
+/>
+
+At $f = 0.04$ the bat's typical displacement is 4 flips, short of the
+weight-12 tips at distance 6, so collisions are rare and the ones that happen
+are with the longest stalactites. There $d_{\min}$ is the relevant number. At
+$f = 0.10$ the displacement is 10 flips, out at the tips of the weight-20
+rivals, and those outnumber the minimum-distance rival by five orders of
+magnitude, so they supply essentially all of the collisions. At higher noise
+still the collision rate has nothing to do with the distance from the centre
+to the nearest tip at all. Codes are operated in the second and third
+regimes, not the first.
+
+## Bounded-distance decoding forfeits half the noise Shannon allows
+
+The (7,4) decoder repairs at most one error because distance 3 guarantees no
+more, and generalizing that policy is what much of practical coding theory
+did between 1950 and 1993: search for the largest distance available at a
+given size, then decode only inside the radius it guarantees. The policy has
+a name and an exactly computable price.
+
+<Definition title="bounded-distance decoder">
+A **bounded-distance decoder** for a code of minimum distance $d$ returns the
+nearest codeword to $\mathbf{r}$ when that codeword lies within
+$t = \lfloor (d-1)/2 \rfloor$, and otherwise returns a failure message. It
+attempts nothing beyond the radius its code's distance guarantees.
+</Definition>
+
+The price follows from what distances are available. For a random linear code
+of rate $R$ and blocklength $n$, the expected number of codewords of weight
+$w$ is about $2^{n[H_2(w/n) - (1-R)]}$, which is below 1 for small $w$ and
+above 1 beyond the crossover. The minimum distance therefore concentrates at
+the **Gilbert–Varshamov distance** $d_{\mathrm{GV}}$, defined by
+
+$$
+H_2(d_{\mathrm{GV}}/n) = 1 - R ,
+$$
+
+and the Gilbert–Varshamov conjecture, widely believed, says that no code of
+rate $R$ has a minimum distance significantly larger. A bounded-distance
+decoder using such a code survives noise up to
+$f_{\mathrm{bd}} = \tfrac{1}{2} d_{\mathrm{GV}}/n$, that is
+$H_2(2 f_{\mathrm{bd}}) = 1 - R$. Shannon's tolerable noise at the same rate
+solves $H_2(f) = 1 - R$. Comparing the two equations gives
+
+$$
+f_{\mathrm{bd}} = f/2 .
+$$
+
+<Figure
+  src="./figures/distance-gap.svg"
+  alt="Rate against binary-symmetric-channel noise level: the capacity curve one minus binary entropy of f, and below it the Gilbert-Varshamov curve one minus binary entropy of two f, with the rate 4/7 line marked and the two noise levels 0.044 and 0.088 it meets"
+  caption="At rate 4/7 Shannon allows 8.8% noise and a bounded-distance decoder allows 4.4%: the gap is a factor of two at every rate."
+/>
+
+The statement is asymptotic and about families of long codes; the (7,4) code
+is far too short for the Gilbert–Varshamov distance to describe it, and its
+own guaranteed fraction, one error in seven, is larger than either number on
+the plot. What the plot describes is the policy, not the instance. A designer
+who chooses codes by their distance and decodes only inside the guaranteed
+radius is choosing, at every rate, to operate at half the noise level the
+channel would have supported.
+
+### Bad distance, good codes
+
+If minimum distance were the right figure of merit, a family whose relative
+distance $d/n$ went to zero could not be any good. Such families exist and
+are good, and one of them is built from the code in this lesson.
+
+Concatenate Hamming codes: encode with the $(3,1)$ code, encode the result
+with the $(7,4)$ code, encode that with the $(15,11)$ code, and so on up the
+family $(2^m - 1,\, 2^m - 1 - m)$. Stage $m$ multiplies the rate by
+$(2^m - 1 - m)/(2^m - 1)$, a factor that approaches 1 as $m$ grows. It
+multiplies the minimum distance by 3, since every constituent code has
+distance 3, and the blocklength by $2^m - 1$, which grows without bound. The
+two products therefore go different ways.
+
+<Figure
+  src="./figures/concatenation-limits.svg"
+  alt="Log-scale plot against concatenation stage m = 2 to 6 of two series: the cumulative rate, falling from 0.33 and flattening onto a dashed asymptote at 0.093, and the relative distance d over n, falling from 1 to about 0.0004, with the blocklength and distance at each stage tabulated under the axis"
+  caption="Five stages of concatenated Hamming codes: the rate settles at a positive limit while the relative distance falls by more than three orders of magnitude."
+/>
+
+By the fifth stage the code is 615,195 bits long and its relative distance is
+below one in two thousand, while its rate is still above $0.10$ and heading
+for a positive limit rather than zero. A random linear code of that rate has
+relative distance about $0.31$, eight hundred times larger. Yet the
+concatenated family drives its bit error rate to zero at fixed positive rate
+on a channel with $f = 0.0588$, which is exactly the property the coding
+theorem is about.
+
+<Aside>
+The construction is impractical for reasons that have nothing to do with
+distance. The blocklength runs away from every other quantity, so the fifth
+stage already needs a block of 615,195 bits to carry 65,000 message bits, and
+decoding one constituent code at a time throws away information the outer
+stages could have used. Its value is as a counterexample, not as a design.
+</Aside>
+
+Distance is not useless, and the resolution is a question about the error
+model. Under an **adversarial** model, where an opponent chooses which $t$
+bits to flip, $t = \lfloor (d-1)/2 \rfloor$ is exactly the right number and
+minimum distance is exactly the right quantity: it is a worst case, and worst
+cases are what guarantees are made of. Under a **probabilistic** channel,
+where the noise is drawn independently and the figure of interest is an
+average failure rate, the relevant quantity is the probability mass of the
+error patterns the decoder gets wrong. That mass depends on the code's whole
+weight enumerator — how many codewords sit at each weight, not only at the
+smallest — and on how far past $t$ the decoder is willing to go. Naming the
+model decides which quantity to optimize, and the noisy-channel coding
+theorem is a statement about the second model.
+
+What is established: an explicit rate-$4/7$ code, decodable by a table with
+eight rows; the exact sense in which distance 3 buys correction of one error
+or detection of two but not both; the code's measured performance on a
+binary symmetric channel, which is forbidden from being good at $f = 0.1$
+and merely weak at $f = 0.05$; and the asymptotic result that decoding no
+further than the guaranteed radius costs a factor of two in tolerable noise.
+What is not established is how to close the gap. Codes that do close it
+abandon algebraic decoding entirely, and are decoded by iterative message
+passing on a sparse parity-check graph.
+<Ref lesson="deployed-codes"/> measures how close the codes actually flown
+and standardized come to capacity, and what each family trades for its
+remaining gap.
+
+## Exercises
+
+<Exercise>
+Work the (7,4) code at $f = 0.05$ on a binary symmetric channel.
+
+(a) Compute the block error probability exactly, and compare it with the
+leading-order expression $21f^2$; account for the direction of the
+discrepancy.
+
+(b) Compute the channel's capacity.
+
+(c) State which of the two diagnoses in the lesson's fourth section applies,
+and what the noisy-channel coding theorem does and does not assert about
+codes of rate $4/7$ at this noise level.
+
+<Solution>
+**(a)** $(1-f)^7 = 0.95^7 = 0.6983$ and $7f(1-f)^6 = 7(0.05)(0.7351) =
+0.2573$, so
+$$
+p_B = 1 - 0.6983 - 0.2573 = 0.0444 .
+$$
+The leading-order value is $21(0.05)^2 = 0.0525$, high by 18%. The gap comes
+from the factor the leading term discards. The exact weight-2 contribution is
+$21 f^2 (1-f)^5 = 21(0.0025)(0.7738) = 0.0406$, so the missing $(1-f)^5$
+costs $0.0119$, while the weight-3 and weight-4 terms add back only $0.0036$
+and $0.0002$. Leading-order expressions in $f$ overshoot here, and they
+overshoot more as $f$ rises.
+
+**(b)** $H_2(0.05) = 0.05\log_2 20 + 0.95\log_2(1/0.95) = 0.2161 + 0.0703 =
+0.2864$, so $C = 1 - 0.2864 = 0.7136$ bits per use.
+
+**(c)** $R = 4/7 = 0.571 < 0.714 = C$, so the code is below capacity: the
+second diagnosis. The theorem asserts that there exist block codes of rate
+$0.571$ on this channel whose block error tends to zero as the blocklength
+grows, so the 4.4% is a property of this particular short code and not a
+limit. What the theorem does not assert is anything about $n = 7$: its
+guarantee is asymptotic, and at packet-sized blocklengths the achievable
+rate falls well short of $C$ (<Ref lesson="noisy-channel-coding"/>). The
+transferable move: before blaming a code, check whether its rate is on the
+legal side of capacity for the channel it is running on.
+</Solution>
+</Exercise>
+
+<Exercise>
+Find a received word whose syndrome is zero but which is not the codeword
+that was transmitted. State the smallest number of bit flips that produces
+one, count how many such error patterns exist, and say what the count implies
+about the decoder's ability to report a problem.
+
+<Solution>
+**The condition.** The syndrome is $\mathbf{z} = H\mathbf{e}$, so
+$\mathbf{z} = \mathbf{0}$ exactly when $\mathbf{e}$ is itself a codeword. The
+received word is then $\mathbf{c} \oplus \mathbf{e}$, another codeword, and
+the decoder passes it through untouched.
+
+**The smallest one.** The lightest non-zero codeword has weight
+$d_{\min} = 3$, so three flips are needed. Concretely, $1011001$ received as
+$1011001 \oplus 1000101 = 0011100$ has all three checks satisfied, and
+$0011100$ is the codeword for message $0011$. Three flips have converted one
+legal message into another with no evidence left behind.
+
+**The count.** There are 15 non-zero codewords: seven of weight 3, seven of
+weight 4 and one of weight 7. So exactly 15 of the $2^7 - 1 = 127$ non-zero
+error patterns are undetectable, about 12%.
+
+**What it implies.** No decoder for this code, however built, can flag those
+15 patterns, because the received word it is handed is indistinguishable from
+a clean transmission of a different message. Detection failure is a property
+of the code, not of the decoding rule; miscorrection of the double errors of
+the previous section is a property of the rule. On a binary symmetric channel
+at $f = 0.1$ the undetectable patterns carry probability $7 f^3 (1-f)^4 +
+7 f^4 (1-f)^3 + f^7 \approx 0.0051$, so about one block in 200 fails
+silently, out of the 15% that fail at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim. "The (7,4) code has minimum distance 3, so it corrects any
+one error and detects any two: a two-bit error will never pass as valid
+data."
+
+(a) Transmit the codeword $0110001$ built in this lesson's first exercise and
+flip positions 1 and 4. Give the received word, the syndrome, the decoder's
+output and the message it reports, and its distance from what was sent. (The
+double-error figure works a different pattern; this one must be computed.)
+
+(b) Compare your received word with the one decoded in the worked example of
+the syndrome section, and say what the comparison shows about what the
+decoder can possibly know.
+
+(c) Prove the general condition for keeping both guarantees: if
+$d_{\min} \ge 2t + s + 1$, some decoder corrects every pattern of up to $t$
+errors and flags every pattern of up to $t + s$, and the bound cannot be
+lowered. Then evaluate it at $t = s = 1$ and count the syndrome values the
+two jobs need.
+
+<Solution>
+**(a)** The error pattern is $\mathbf{e} = 1001000$, so
+$\mathbf{r} = 0110001 \oplus 1001000 = 1111001$. The syndrome is the sum of
+columns 1 and 4 of $H$: $(1,0,1) \oplus (0,1,1) = (1,1,0)$, which is column
+2. The decoder flips bit 2 and outputs $1011001$, a genuine codeword whose
+message reads $1011$. It differs from the transmitted $0110001$ in positions
+1, 2 and 4: two flips have become three errors and one confident wrong
+answer, with every parity check passing.
+
+**(b)** The received word is the same $1111001$ the worked example decoded,
+where it arose from a single flip of $1011001$. Both histories are real and
+the decoder sees only the word. $1011001$ is one flip away and $0110001$ is
+two, so the decoder answers with the nearer one, which is the best any
+decoder can do on a channel with $f < \tfrac{1}{2}$. The failure is not a
+defect of the decoding rule; it is that the code places two codewords three
+apart, and a weight-2 error crosses the midpoint.
+
+**(c)** Suppose $d_{\min} \ge 2t + s + 1$ and at most $t + s$ errors occur, so
+$d(\mathbf{r}, \mathbf{c}) \le t + s$ for the transmitted $\mathbf{c}$. If
+$\mathbf{r}$ were within distance $t$ of some other codeword $\mathbf{c}'$,
+the triangle inequality would give
+$d(\mathbf{c}, \mathbf{c}') \le (t + s) + t = 2t + s < d_{\min}$, which is
+impossible. So $\mathbf{r}$ lies inside the radius-$t$ ball of $\mathbf{c}$
+and nothing else, or inside no radius-$t$ ball at all: correct within $t$,
+flag beyond it. The bound is tight, since two codewords exactly $2t + s$
+apart admit a word at distance $t$ from one and $t + s$ from the other.
+
+At $t = s = 1$ this reads $d_{\min} \ge 4$, which the (7,4) code misses by
+one. The syndrome count says the same thing from the other side: locating a
+single flip needs 7 values, "clean" needs 1, and "two errors, refusing"
+needs 1 more, so 9 values in all and therefore at least
+$\lceil \log_2 9 \rceil = 4$ check bits. Appending the overall parity bit
+$c_8 = c_1 \oplus \cdots \oplus c_7$ supplies the fourth and gives the (8,4)
+extended Hamming code, at a rate of $4/8$. The transferable move: a
+guarantee costs syndrome values, and syndrome values are bought with check
+bits.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson established $d_{\min} = 3$ by listing the codeword weights. Prove
+it instead from the columns of $H$, without enumerating codewords: show that
+no non-zero codeword has weight 1 or 2 and that one has weight 3. Then state
+the general rule connecting the minimum distance of a linear code to linear
+dependence among the columns of its parity-check matrix, and use the rule to
+say what minimum distance a parity-check matrix must have to guarantee
+correction of two errors.
+
+<Solution>
+**Setup.** A vector $\mathbf{v}$ of weight $w$ with ones in positions
+$j_1, \ldots, j_w$ satisfies $H\mathbf{v} = \mathbf{h}_{j_1} \oplus \cdots
+\oplus \mathbf{h}_{j_w}$, where $\mathbf{h}_j$ is column $j$. So
+$\mathbf{v}$ is a codeword exactly when those $w$ columns sum to zero, which
+over $\mathbb{F}_2$ is the same as being linearly dependent.
+
+**No weight 1.** A weight-1 codeword would need a single column equal to
+zero. All seven columns of $H$ are non-zero.
+
+**No weight 2.** A weight-2 codeword would need $\mathbf{h}_i =
+\mathbf{h}_j$ for $i \ne j$. The seven columns are the seven distinct
+non-zero vectors of $\mathbb{F}_2^3$, so no two are equal.
+
+**A weight 3 exists.** $\mathbf{h}_1 \oplus \mathbf{h}_5 \oplus \mathbf{h}_7
+= (1,0,1) \oplus (1,0,0) \oplus (0,0,1) = (0,0,0)$, so $1000101$ is a
+codeword, and it has weight 3.
+
+**The general rule.** The minimum distance of a linear code equals the
+smallest number of columns of $H$ that are linearly dependent. Equivalently,
+$d_{\min} \ge d$ exactly when every set of $d - 1$ columns is linearly
+independent.
+
+**Correcting two errors.** Correction of $t$ errors needs
+$d_{\min} \ge 2t + 1$, so two errors need $d_{\min} \ge 5$, so every set of
+4 columns of $H$ must be linearly independent. With only 3 rows that is
+impossible beyond $n = 3$, since any 4 vectors in $\mathbb{F}_2^3$ are
+dependent: a double-error-correcting code of blocklength 7 needs more check
+bits, and the count of syndromes says how many. It must distinguish
+$1 + 7 + 21 = 29$ error patterns, so it needs at least
+$\lceil \log_2 29 \rceil = 5$ check bits, leaving $k \le 2$ and a rate of at
+most $2/7$. The transferable move: the column view converts distance questions
+into questions about linear independence, where they are easy.
+</Solution>
+</Exercise>
+
+<Exercise>
+Verify perfectness by counting, then rule out the obvious improvement.
+
+(a) Count the words within Hamming distance 1 of a given codeword, argue that
+the 16 such balls are disjoint, and show the total is exactly $2^7$.
+
+(b) Show that no binary code of blocklength 7 with 16 codewords can have
+minimum distance 4, linear or not. (Hint: delete a coordinate and count.)
+
+<Solution>
+**(a)** A ball of radius 1 around a codeword contains the codeword itself
+plus the $\binom{7}{1} = 7$ words obtained by flipping one bit, so
+$1 + 7 = 8$ words.
+
+They are disjoint. If a word $\mathbf{x}$ lay within distance 1 of two
+distinct codewords $\mathbf{u}, \mathbf{v}$, the triangle inequality for
+Hamming distance would give $d(\mathbf{u},\mathbf{v}) \le
+d(\mathbf{u},\mathbf{x}) + d(\mathbf{x},\mathbf{v}) \le 2$, contradicting
+$d_{\min} = 3$.
+
+Sixteen disjoint balls of 8 words hold $16 \times 8 = 128$ words, and the
+whole space holds $2^7 = 128$. So the balls partition the space and every
+seven-bit word is within one flip of exactly one codeword: the code is
+perfect.
+
+**(b)** Suppose a code $\mathcal{C}$ of blocklength 7 with $M = 16$ codewords
+had $d_{\min} = 4$. Delete the last coordinate from every codeword. Two
+codewords that differed in at least 4 positions still differ in at least 3
+after one position is removed, so the shortened code has blocklength 6, still
+16 distinct codewords, and minimum distance at least 3.
+
+Now apply the same ball count to the shortened code. Distance at least 3
+makes its radius-1 balls disjoint, each holding $1 + 6 = 7$ words, and they
+must fit inside $2^6 = 64$ words. That requires $16 \times 7 = 112 \le 64$,
+which is false. So no such code exists.
+
+The argument used nothing about linearity, so it rules out clever
+non-linear constructions as well. Eight is in fact the largest number of
+codewords a blocklength-7 binary code with $d_{\min} = 4$ can have, and eight
+are easy to exhibit: take the codewords of the (8,4) extended Hamming code
+whose last bit is 0 and delete that bit. Since the last bit is the overall
+parity, those are the even-weight codewords of the (7,4) code, of weights 0
+and 4, so the result is a length-7 code with 8 codewords and $d_{\min} = 4$.
+Sixteen codewords at distance 4 need the eighth position. The transferable move: shortening a
+code by one coordinate costs at most one unit of distance, which turns a
+bound at one blocklength into a bound at the next.
+</Solution>
+</Exercise>
+
+<Exercise>
+Measure the code rather than bounding it. Simulate the (7,4) code on a binary
+symmetric channel: draw a random message, encode, flip each bit
+independently with probability $f$, decode by syndrome, and score the four
+message bits. Report the decoded bit error rate at $f = 0.01$, $0.05$ and
+$0.1$ against the uncoded rate $f$. Then find the noise level above which
+coding makes matters worse, and compare it with the noise levels the
+lesson's last figure marks at rate $4/7$. State what would count as
+agreement.
+
+<Solution>
+**What to expect.** Averaging the decoded weight over all $2^7$ noise
+patterns (the exact calculation the simulation approximates) gives
+
+| $f$ | uncoded $p_b$ | coded $p_b$ | ratio |
+| --- | --- | --- | --- |
+| 0.01 | 0.010 | 0.00087 | 11.5 |
+| 0.05 | 0.050 | 0.0194 | 2.6 |
+| 0.10 | 0.100 | 0.0669 | 1.5 |
+
+The leading-order prediction $p_b \approx 9f^2$ gives $0.0009$, $0.0225$ and
+$0.09$: accurate at $f = 0.01$ and increasingly optimistic beyond it, for the
+same reason $21f^2$ overshot the block error.
+
+**Where coding stops helping.** Setting the coded rate equal to $f$ and
+solving numerically gives a crossover just above $f = 0.21$: at $f = 0.21$
+the coded rate is $0.2096$, marginally better than uncoded, and at $f = 0.22$
+it is $0.2228$, marginally worse. The leading-order estimate $9f^2 = f$
+predicts $f = 1/9 = 0.111$, which is far too pessimistic because $9f^2$ is
+itself far too pessimistic at that noise level.
+
+**Against the figure.** At rate $4/7$ the figure marks $f = 0.088$ as
+Shannon's limit and $f = 0.044$ as the bounded-distance limit. The (7,4)
+code's own crossover, $0.21$, is above both, which is not a contradiction and
+not an achievement: at $f = 0.21$ the code delivers a 21% bit error rate, so
+"better than uncoded" is being measured in a regime where neither option
+communicates anything. The two figures on the plot are asymptotic statements
+about families of long codes, and a blocklength-7 code is not in their scope.
+The comparison worth making is at the capacity crossing, $f = 0.0876$, which
+the figure rounds to 0.088: just below it, $C > 4/7$ and long codes of rate
+$4/7$ with vanishing error exist, and this code delivers a decoded bit error
+rate of $0.053$. Just above it no such family exists at all. The (7,4) code
+notices nothing as the channel passes through that point.
+
+**What counts as agreement.** With $10^6$ blocks the standard error on the
+measured bit error rate at $f = 0.05$ is about $\sqrt{p(1-p)/(4 \times
+10^6)} \approx 7 \times 10^{-5}$, so a measurement outside $0.019 \pm 0.0003$
+indicates a bug rather than noise. The commonest bug is scoring all seven
+decoded bits instead of the four message bits; because the code protects all
+seven positions equally, that version measures the same number, and a
+discrepancy between the two is itself evidence of an error in the syndrome
+table.
+</Solution>
+</Exercise>
+
+<Exercise>
+Concatenate the code with itself and watch a figure of merit collapse. Encode
+a message with the (7,4) code, then encode each of the seven output bits as
+one message bit of an outer code, and so on.
+
+(a) For $C$ rounds of self-concatenation, give the blocklength, the rate, the
+minimum distance and the relative distance $d/n$; evaluate at
+$C = 1, 2, 3, 4$.
+
+(b) The section's figure tabulates the mixed family that uses
+$(2^m - 1,\, 2^m - 1 - m)$ at stage $m$ for $m = 2, 3, \ldots, M$, and asserts
+two limits without proving either. Prove them: that the rate stays bounded
+away from zero as $M \to \infty$, and that $d/n \to 0$.
+
+(c) Both families in (a) and (b) have $d/n \to 0$, and only one of them is
+good in the coding theorem's sense. Name the property that separates them,
+and state what follows for relative distance as a figure of merit.
+
+<Solution>
+**(a)** Each round multiplies blocklength by 7, message length by 4, and
+minimum distance by 3, since two distinct inner codewords differ in at least
+3 positions and each differing position becomes an outer codeword differing
+in at least 3 places.
+
+| $C$ | $n$ | $k$ | rate | $d$ | $d/n$ |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 7 | 4 | 0.571 | 3 | 0.429 |
+| 2 | 49 | 16 | 0.327 | 9 | 0.184 |
+| 3 | 343 | 64 | 0.187 | 27 | 0.079 |
+| 4 | 2401 | 256 | 0.107 | 81 | 0.034 |
+
+Rate $(4/7)^C$ and relative distance $(3/7)^C$ both tend to zero, so this
+family witnesses nothing: like the repetition codes of
+<Ref lesson="noisy-channel-coding"/>, its reliability is bought by giving the
+rate away.
+
+**(b)** Write the rate after stages $2$ through $M$ as
+$R_M = \prod_{m=2}^{M} \bigl(1 - x_m\bigr)$ with
+$x_m = m/(2^m - 1)$.
+
+*The rate stays positive.* First, $\sum_m x_m$ converges: $2^m - 1 \ge
+2^{m-1}$, so $x_m \le 2m/2^m$, and $\sum_{m \ge 1} 2m \, 2^{-m} = 4$. Second,
+for $0 \le x \le \tfrac{1}{2}$ one has $\ln(1-x) \ge -2x$, and $x_m \le
+x_3 = 3/7 < \tfrac{1}{2}$ for every $m \ge 3$. Pulling out the first factor,
+$$
+R_M = \tfrac{1}{3} \prod_{m=3}^{M} (1 - x_m)
+\;\ge\; \tfrac{1}{3}\exp\Bigl(-2\sum_{m \ge 3} x_m\Bigr) ,
+$$
+and $\sum_{m \ge 3} x_m < 1.1$, so $R_M \ge \tfrac{1}{3}e^{-2.2} > 0.036$ for
+every $M$. The sequence is decreasing and bounded below, so it converges to a
+positive limit, numerically $0.093$.
+
+*The relative distance vanishes.* After the same stages $d = 3^{M-1}$ and
+$n = \prod_{m=2}^{M}(2^m - 1) \ge \prod_{m=2}^{M} 2^{m-1} =
+2^{M(M-1)/2}$. So
+$$
+\frac{d}{n} \le \frac{3^{M-1}}{2^{M(M-1)/2}} ,
+$$
+whose numerator grows exponentially in $M$ and whose denominator grows
+exponentially in $M^2$. The ratio tends to 0, and the figure's numbers are
+that collapse in its first five terms.
+
+**(c)** The separating property is the rate, not the distance. In (a) the
+rate $(4/7)^C$ tends to zero, so reliability is bought by giving the channel
+away, exactly as the repetition codes of
+<Ref lesson="noisy-channel-coding"/> do; a family like that witnesses nothing,
+because the coding theorem is about positive rates. In (b) the rate stays
+above $0.09$ and the bit error still tends to zero, which is precisely what
+the theorem calls a good family. Since (b) is good and its relative distance
+tends to zero, no theorem can make relative distance necessary for goodness:
+it is a sufficient condition for guaranteed correction and a figure of merit
+for nothing else.
+
+This is the last step before the constructions that matter. Every code family
+that comes within a fraction of a decibel of capacity is chosen for the
+behaviour of its decoder far outside the guaranteed radius, not for its
+distance; <Ref lesson="deployed-codes"/> takes up which families those are
+and how the gap to capacity was finally closed.
+</Solution>
+</Exercise>
+
+<References>
+1. R. W. Hamming, "Error Detecting and Error Correcting Codes," *Bell System Technical Journal*, 29(2), April 1950, pp. 147–160 — the original construction: minimum distance introduced as the design criterion, the geometric argument for correcting $t$ errors at distance $2t+1$, and the single-error-correcting codes of which the (7,4) code is the three-check case. https://archive.org/details/bstj29-2-147
+2. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — §17 gives the (7,4) code, credited to Hamming, as an exact match to the channel that corrupts at most one symbol in every seven, where it attains capacity $C = 4/7$ exactly; §13 is the coding theorem this lesson measures it against. https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf
+3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §1.2 builds the code from the three circles, gives the generator and parity-check matrices and the eight-row decoding table, and runs it on a 10,000-bit image at $f = 0.1$; ch. 13 supplies the critique used here: §13.2 bounded-distance decoders, §13.3 the classification of perfect codes, §13.5 the Gilbert–Varshamov distance and $f_{\mathrm{bd}} = f/2$, §13.6 the bats, §13.7 concatenated Hamming codes, §13.9 the union bound on the weight enumerator. Free online: https://www.inference.org.uk/mackay/itila/
+4. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §7.11 defines the same code by the parity-check matrix whose columns are the seven non-zero binary triples, lists the 16 codewords as its null space, and derives $H\mathbf{r} = H\mathbf{e}_i$ as the decoding rule; it also states the generalization to $n = 2^l - 1$.
+5. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441 / UIUC ECE 563), 2016 — §16.1 states linear codes and syndrome decoding for a general additive-noise channel, and proves that the syndrome is a sufficient statistic, so maximum-likelihood decoding of any linear code is a function of the syndrome alone. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
+6. E. R. Berlekamp, R. J. McEliece, H. C. A. van Tilborg, "On the Inherent Intractability of Certain Coding Problems," *IEEE Transactions on Information Theory*, IT-24(3), May 1978, pp. 384–386 — the general decoding problem for linear codes (given $H$ and a syndrome, find the lightest error pattern that produces it) is NP-complete, as is finding the weights of a linear code; the eight-row table of this lesson is a small-$H$ accident, not a general method. https://doi.org/10.1109/TIT.1978.1055873
+7. M. Y. Hsiao, "A Class of Optimal Minimum Odd-weight-column SEC-DED Codes," *IBM Journal of Research and Development*, 14(4), 1970, pp. 395–401 — the distance-4 codes used in error-correcting memory, including the (72,64) code cited above, and the argument for why the extra check bit is worth its rate. https://people.eecs.berkeley.edu/~culler/cs252-s02/papers/hsiao70.pdf
+</References>

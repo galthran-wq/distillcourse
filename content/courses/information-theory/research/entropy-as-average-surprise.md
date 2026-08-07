@@ -1,116 +1,135 @@
 # Research brief: entropy-as-average-surprise (Entropy)
 
-status: retrofit
+status: drafted (kept slug — revise, do not rewrite)
 module: foundations
+type: core
 goal: Compute the entropy of a discrete distribution as expected surprisal.
+est_minutes: 30
 
-Drafted before the dossier. This brief records what the draft covers and what a
-density-upgrade revision should add.
+## ARC
+
+- **Inherits:** `-log2 p` as the information in one event, and the additivity
+  argument that forced it (`what-is-surprise`).
+- **Spine step:** step 1, *Information has a size* — "…averaging that quantity
+  over a source defines entropy."
+- **Contributes:** `H(X) = E[-log2 p(X)]`, its range, and the binary entropy
+  function, which is the single most reused curve in the course (BSC capacity,
+  rate-distortion of a Bernoulli source, MDL parameter costs all call it).
+- **Hands off to:** `joint-and-conditional-entropy` (two variables) and, through
+  the coding module, to the claim that `H` is a floor on code length rather than
+  a summary statistic.
 
 ## Sources to consult
 
-- Shannon 1948, Part I, **§6** — defines `H = -Σ p_i log p_i`, states the
-  extremal properties (max at uniform, min at certainty), and **fig. 7** is the
-  binary entropy curve for two outcomes. Primary anchor for the range result.
-- Cover & Thomas, **§2.1** (definition; the binary entropy function `H(p)`,
-  their fig. 2.1) and **Theorem 2.6.4** (`H(X) ≤ log|X|`, via Jensen). The draft
-  already cites Theorem 2.6.4 correctly.
-- MacKay, **ch. 2, §2.4-2.5** — entropy of an ensemble, the binary entropy
-  function; **ch. 2 (§2.1 monogram table)** for the English single-letter
-  distribution giving `H ≈ 4.11 bits/char` over the 27-symbol alphabet. The
-  draft cites "MacKay, ch. 2" for this — keep; confirmed the monogram estimate
-  lives in ch. 2.
+- Shannon 1948, Part I, **§6** — the definition, the extremal properties, and
+  **fig. 7**, the binary entropy curve.
+- Cover & Thomas, **§2.1** (definition, binary entropy function) and
+  **Theorem 2.6.4** (`H(X) ≤ log|X|` via Jensen).
+- MacKay, **ch. 2 §2.4-2.5** — entropy of an ensemble; **ch. 2 §2.1** for the
+  English monogram table giving `H ≈ 4.11` bits/char over 27 symbols.
+- Weissman (EE376A), **ch. 2 §2.1** — Jensen primer and the `H ≤ log|X|`
+  derivation at an elementary level; useful for pacing.
 
-## Key points the lesson must cover (already in the draft)
+## Key points the lesson must cover
 
-1. Entropy = **probability-weighted average of surprisal**, not the unweighted
-   average (weather example: 1.5 bits vs. the misleading 1.67).
-2. Definition `H(X) = -Σ p(x) log2 p(x) = E[-log2 p(X)]`, with the convention
-   `0 log2 0 = 0` (justified by the limit).
-3. **Relabeling invariance**: H depends only on the multiset of probabilities.
-4. **Range theorem**: `0 ≤ H ≤ log2 n`; zero iff a point mass, `log2 n` iff
-   uniform. Lower bound termwise; upper bound by Jensen on the concave log.
-5. The **binary entropy function** `H(p) = -p log2 p - (1-p) log2(1-p)`:
-   endpoints 0, max 1 bit at p=1/2, symmetry `H(p)=H(1-p)`, vertical slope at
-   the endpoints (`H'(p) = log2((1-p)/p)`).
-6. Entropies of common sources: fair die `log2 6 ≈ 2.585`, uniform byte 8 bits,
-   shuffled deck `log2 52! ≈ 225.6` bits; English monograms `≈ 4.11` vs. the
-   uniform ceiling `log2 27 ≈ 4.75`.
-7. Operational preview (Remark): H is the floor on expected bits / yes-no
-   questions per draw — sets up the coding module.
-
-## What a density-upgrade revision should add
-
-- The chapter is long (~2600 words) with **2 figures**; add 4-6 small visuals
-  (FIGURE PLAN). This is the primary gap.
-- A `<KeyFact>` on the range result ("entropy is maximal exactly when you know
-  least — the uniform distribution").
-- The three-step worked-example pattern (surprisal -> weight -> sum) recurs four
-  times in prose; render it once as a small labeled figure so later instances
-  can point back rather than repeat.
-- A `<Task>` on the EntropyExplorer demo: the draft's demo caption already
-  states the task ("make H=0, then rebuild the 2-bit maximum") — promote it to a
-  green `<Task>` callout.
+1. Entropy is the **probability-weighted** average of surprisal, not the plain
+   average of the surprisal values. The weather example (1.5 bits, versus the
+   misleading unweighted 1.67) makes the distinction concrete.
+2. `H(X) = -Σ p(x) log2 p(x) = E[-log2 p(X)]`, with `0 log2 0 = 0` justified by
+   the limit.
+3. **Relabelling invariance**: `H` depends only on the multiset of
+   probabilities.
+4. **Range theorem** `0 ≤ H ≤ log2 n`: lower bound termwise, upper bound by
+   Jensen on the concave log, with the equality condition (uniform on the
+   support) stated precisely.
+5. The **binary entropy function** `H(p)`: endpoints 0, maximum 1 bit at
+   `p = 1/2`, symmetry, and the vertical tangent at the ends
+   (`H'(p) = log2((1-p)/p)`), with `H(0.99) ≈ 0.081` as the anchor.
+6. Reference values: fair die `log2 6 ≈ 2.585`; uniform byte 8; shuffled deck
+   `log2 52! ≈ 225.6`; English monograms `≈ 4.11` against the ceiling
+   `log2 27 ≈ 4.75`.
+7. Operational preview: `H` will turn out to be a floor on bits per draw, not a
+   convenient average. Stated as a fact to be proved, with a `<Ref>` forward.
 
 ## Pitfalls / subtleties to flag
 
-- The upper-bound proof uses **Jensen on `E[log 1/p(X)]`** and equality forces
-  uniform-on-support; the draft states the strict-concavity equality condition
-  correctly — preserve it, QA checks equality conditions.
+- Jensen's equality condition forces uniform **on the support**; a distribution
+  with zero-probability symbols attains `log2 k` for `k` = support size, not
+  `log2 n`.
 - `0 log2 0 = 0` is a convention with a limit justification, not a definition of
   `log 0`.
-- The monogram `4.11` bits is context-free; the entropy *rate* of English is far
-  lower (~1 bit) — flag the distinction and forward-reference
-  `entropy-of-english`. Draft already does this.
-- Nats vs. bits is the same unit choice as surprisal; do not re-derive, link
-  back to `what-is-surprise`.
+- The 4.11-bit monogram figure is not the entropy of English; the rate is far
+  lower. Flag and forward-reference `entropy-of-english`.
+- Entropy is not a measure of "information in a message" — it is a property of
+  the distribution. A specific long message can be atypical.
 
 ## FIGURE PLAN
 
-1. **weighted-average.svg** (exists, single `<Figure>`) — weather outcomes,
-   surprisal bars weighted by probability into `H = 1.5`. Keep.
-2. **binary-entropy.svg** (exists, single `<Figure>`) — the `H(p)` inverted-U,
-   max 1 bit, 90/10 point marked. Keep; this is Shannon's fig. 7 recreated.
-3. **NEW, `<FigureSequence>` (3 frames)** — the three-step entropy computation on
-   `{1/2,1/4,1/8,1/8}`: frame 1 the four probabilities, frame 2 each mapped to
-   its surprisal, frame 3 weighted and summed to 1.75. One delta per frame.
-   Inspiration: the draft's own step-numbered worked example.
-4. **NEW, `<FigureSequence>` (3-4 frames)** — "concentrating mass lowers
-   entropy": start uniform over 4 (H=2), slide mass onto one outcome across
-   frames, H readout drops each frame; last frame is the point mass (H=0).
-   Binds the EntropyExplorer demo. Inspiration: Cover & Thomas's concavity
-   discussion.
-5. **NEW, single `<Figure>` (component)** — endpoint-steepness of `H(p)`: a
-   zoom-in near p=1 with the tangent going vertical, annotating
-   `H(0.99) ≈ 0.081` — "one percent off certainty already buys 0.08 bits".
-   One idea: the derivative blows up at the ends.
-6. **NEW, single `<Figure>` (component)** — the `log2 n` ceiling as a staircase:
-   coin (1), 4-outcome (2), byte (8), each uniform bar touching its ceiling, a
-   non-uniform bar sitting below. Inspiration: the "range of entropy" heading.
+1. `draw:` **weighted-average.svg** (exists) — weather outcomes, surprisal bars
+   weighted into `H = 1.5`.
+2. `draw:` **binary-entropy.svg** (exists) — the `H(p)` inverted U with the
+   90/10 point marked. This is Shannon's fig. 7 recreated.
+3. `draw:` **entropy-steps-1..3.svg** (exists, `<FigureSequence>`) — the
+   three-step computation on `{1/2, 1/4, 1/8, 1/8}` ending at 1.75.
+4. `draw:` **concentration-1..4.svg** (exists, `<FigureSequence>`) — mass
+   sliding from uniform onto one outcome, `H` dropping 2.00 → 0.
+5. `draw:` **binary-entropy-zoom.svg** (exists) — the endpoint zoom with the
+   tangent going vertical, annotated `H(0.99) ≈ 0.081`.
+6. `draw:` **ceiling.svg** (exists) — the `log2 n` staircase, uniform bars
+   touching their ceilings, a non-uniform bar below.
+7. `draw:` **NEW, single `<Figure>`** — "same entropy, different shape": three
+   visibly different 4-outcome distributions all with `H = 1.50` bits, tallied
+   side by side. One idea: `H` is a projection, not a fingerprint. This is the
+   figure the EntropyExplorer target needs, and it pre-empts the commonest
+   misreading. Inspiration: the relabelling-invariance property, made visual.
 
-## Revision round 2 — QA findings (2026-07-24, post-restructure)
+No `source:` entry. Everything here is a curve or a tally; a scan would add
+nothing a drawing does not.
 
-Independent course-qa (opus): **ready=false — light revision, not a
-rewrite**. 12 rubric PASS; the only WEAK is L6 visual density: FIGURE PLAN
-items #4 and #5 remain unbuilt. Required, in priority order:
+## EXERCISE PLAN
 
-1. Build FIGURE PLAN #4 — `<FigureSequence>` "concentrating mass lowers
-   entropy": uniform-over-4 morphing to a point mass over 3-4 frames, H
-   readout dropping each frame (2.00 -> ... -> 0). Place it in "The
-   extremes: certainty and even spread" (also breaks that section's
-   3-paragraph prose run). Raw-SVG tier like the existing entropy-steps-N.
-2. Build FIGURE PLAN #5 — single `<Figure>`: zoom of the binary-entropy
-   curve near p=1, tangent going vertical, annotated H(0.99) ~ 0.081 bits.
-   Anchors "Steep at the ends, flat in the middle" (currently prose-only).
-3. Verify from the demo source that EntropyExplorer starts on a
-   non-degenerate distribution (D3) and the Task path (H=0 then rebuild
-   2.00 bits) is achievable; note the check in the report.
+1. *(warm-up)* Compute `H` for a fair die, a loaded die given as a table, and a
+   two-outcome source at `p = 0.9`. Report all three in bits and order them.
+2. **Boundary probe.** A distribution over 8 symbols has three of them at
+   probability zero. Compute the maximum entropy it can attain and identify
+   which clause of the Jensen equality condition produces that answer rather
+   than `log2 8`.
+3. **Claim to refute.** "Adding an outcome to a distribution always increases
+   its entropy, because there is more to be uncertain about." Give a
+   counterexample with numbers and name the step that fails.
+4. **Derivation the lesson skipped.** Prove the grouping property: if two
+   outcomes of probability `p1, p2` are merged into one of probability
+   `p1 + p2`, entropy drops by exactly `(p1+p2) H(p1/(p1+p2))`. Then use it to
+   recompute the `{1/2, 1/4, 1/8, 1/8}` example in two stages.
+5. **Research-shaped.** Estimate the entropy of the letter distribution of a
+   text you choose, then estimate the entropy of the *word-length* distribution
+   of the same text. Report both, state which is larger, and say what a
+   difference of half a bit would and would not tell you about the text.
+6. **FORWARD (E7).** For `{A: 1/2, B: 1/4, C: 1/8, D: 1/8}`, assign each symbol
+   a codeword of length `-log2 p`, write out the four lengths, and check that
+   `Σ 2^{-length}` equals exactly 1. Report the value and note that it is not a
+   coincidence. Reaches `kraft-inequality` — the solution names the budget and
+   `<Ref>`s it.
 
-Nice-to-have (apply if cheap):
-- Operational `<Remark>`: replace generic "the coding lessons that follow"
-  with `<Ref lesson="prefix-codes">` and `<Ref lesson="source-coding-theorem-lite">`.
-- One clause noting the operational claim is formalized via the typical set
-  in source-coding-theorem-lite (precise forward hook).
+## REVISION (kept slug)
 
-All round-1 pitfalls verified handled (Jensen equality condition, 0 log 0
-convention, monogram-vs-rate distinction) — do not touch those passages.
+**Gain**
+- The ARC paragraph after the opening (spine step 1, what stands open).
+- Figure 7 above ("same entropy, different shape") — the one genuinely missing
+  visual, and the anchor for the new EntropyExplorer target.
+- The grouping property as a worked `<Example>` in the body (it is exercise
+  material now, but it is also the cleanest route to Huffman's correctness two
+  modules on).
+- Depth toward 30 minutes: the equality condition of Jensen worked on an
+  explicit zero-probability case, and the `log2 52!` computation carried out
+  rather than quoted.
+- Exercise set rebuilt against the floor above.
+
+**Lose**
+- The `<KeyFact>` restating the range theorem one paragraph after proving it —
+  L15 names this exact callout as the tautology-in-a-box example. Either add the
+  support condition to it or cut it.
+- Any repetition of the three-step computation pattern in prose after
+  entropy-steps-*.svg carries it (L9a).
+- Generic forward pointers ("the coding lessons that follow") — replace with
+  `<Ref lesson="prefix-codes">` and `<Ref lesson="source-coding-theorem-lite">`.

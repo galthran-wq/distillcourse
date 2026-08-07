@@ -1,0 +1,996 @@
+Between 1948 and 1993 the gap between the best deployed codes and the Shannon
+limit stayed above two decibels; sparse-graph codes closed most of it, and the
+record of that closure is the clearest available test of what the coding
+theorem promised.
+
+This module has built a boundary and then found the interior hard to occupy.
+<Ref lesson="channel-capacity"/> computed capacity as a maximization over input
+distributions, <Ref lesson="noisy-channel-coding"/> proved it a sharp threshold
+by averaging over codebooks it never wrote down, and
+<Ref lesson="hamming-codes"/> showed that the quantity classical coding spent
+forty years optimizing, minimum distance, is not the quantity that decides how
+much noise a code survives. What stands open is whether anything that shipped
+ever kept the promise. This lesson reads the measured record: the codes that
+flew, where each sits against the best any code of its length could do, and
+what the delay was made of.
+
+The route: the axis on which codes can honestly be compared; the concatenated
+codes flown to Jupiter and Saturn and the two decibels they gave away; the 1993
+turbo construction and the decoder that was its real content; low-density
+parity-check codes and their message-passing decoder; the density-evolution
+threshold that predicts where that decoder works; polar codes; the $-1.6$ dB
+floor beneath every scheme; and the one place where minimum distance comes back.
+
+<Task>
+Closed-book, before reading on. State (a) the capacity of a binary symmetric
+channel with crossover probability $f = 0.11$; (b) why the codebook the
+achievability proof produces cannot be decoded by searching it; (c) the
+correction the finite-blocklength result subtracts from $nC$; (d) which
+quantity the previous lesson deprecated, and in which error model it is still
+exactly right. Answers: $C = 1 - H_2(0.11) = 0.500$ bits per use
+(<Ref lesson="channel-capacity"/>); a rate-$R$ code of blocklength $n$ has
+$2^{nR}$ codewords, so scoring them all costs time exponential in $n$
+(<Ref lesson="noisy-channel-coding"/>); $\sqrt{nV}\,Q^{-1}(\varepsilon)$, with
+$V$ the channel dispersion; minimum distance, which remains the right figure of
+merit against an adversary who picks which bits to flip
+(<Ref lesson="hamming-codes"/>). All four are used below.
+</Task>
+
+## The scoreboard: normalized rate, not distance from capacity
+
+Comparing two codes needs a number, and the obvious one is unfair. A code that
+carries 400 bits in 1000 uses of a channel of capacity $0.5$ appears to waste a
+fifth of the channel. It does not. The finite-blocklength form of the converse
+in <Ref lesson="noisy-channel-coding"/> forbids every code of that length from
+doing much better, so most of the shortfall belongs to the blocklength, not to
+the designer.
+
+The size of that shortfall is computable. For the binary erasure channel with
+erasure probability $e = 1/2$, capacity is $C = 1 - e = 0.5$ bits per use, so
+$n = 500$ uses look worth $250$ bits.
+
+<Example title="what 500 uses of a half-erased channel are actually worth">
+The normal approximation of <Ref lesson="noisy-channel-coding"/> gives the
+largest codebook $M^*(n,\varepsilon)$ that admits a decoder with block error
+probability at most $\varepsilon$:
+
+$$
+\log_2 M^*(n, \varepsilon) \approx nC - \sqrt{nV}\, Q^{-1}(\varepsilon),
+$$
+
+where $V$ is the channel dispersion, the variance of the information density,
+and $Q^{-1}$ inverts the standard normal tail. For the erasure channel
+$V = e(1-e) = 0.25$ bits squared per use. At $n = 500$ and
+$\varepsilon = 10^{-3}$,
+
+$$
+\sqrt{nV} = \sqrt{125} = 11.2, \qquad Q^{-1}(10^{-3}) = 3.09,
+$$
+
+so the correction is $11.2 \times 3.09 = 34.5$ bits and the benchmark is
+$250 - 34.5 = 215.5$ bits. Exact upper and lower bounds on the same quantity,
+computed without the approximation, bracket it between $213$ and $217$.
+
+A code carrying $215$ bits in those $500$ uses is therefore not $14\%$ below
+capacity in any sense a designer could act on. It is at the limit.
+</Example>
+
+Dividing an achieved rate by that benchmark, rather than by $nC$, scores a code
+against what its own blocklength permits.
+
+<Definition title="normalized rate">
+A code carrying $k$ message bits in $n$ uses of a channel, measured at block
+error probability $\varepsilon$, has **normalized rate**
+
+$$
+R_{\mathrm{norm}} = \frac{k}{\log_2 M^*(n, \varepsilon)} ,
+$$
+
+the fraction of the finite-blocklength benchmark it achieves. The denominator
+depends on the channel, the blocklength and the error probability, and on
+nothing about the code.
+</Definition>
+
+<Figure
+  src="./figures/benchmark-axis.svg"
+  alt="Rate against blocklength on a log axis: a flat capacity line at 0.5, the finite-blocklength benchmark curving up towards it, and one code marked at rate 0.400 and blocklength 1000 with its raw gap to capacity and its much smaller gap to the benchmark"
+  caption="Two denominators for the same code: 0.80 of capacity, 0.98 of what a blocklength of 1000 allows."
+/>
+
+Every point on the published comparisons is taken at $\varepsilon = 10^{-4}$, and
+the signal-to-noise ratio is the one at which the code in question actually
+reaches that error probability, read off its own measured waterfall curve.
+Neither convention is optional: the denominator is undefined until
+$\varepsilon$ is fixed, and reading the signal-to-noise ratio off the code's own
+curve is what stops a code being scored on a channel it never ran on. With both
+fixed, codes of different rates on different channels land on one axis.
+
+<KeyFact>
+Normalized rate fixes the ceiling as well as the axis: no code scores above 1,
+so a family whose score stops rising with blocklength has stopped being the
+thing worth improving.
+</KeyFact>
+
+<Exercise>
+Repeat the worked example on a binary symmetric channel with crossover
+probability $f = 0.11$, blocklength $n = 1000$ and $\varepsilon = 10^{-3}$. The
+dispersion of the binary symmetric channel is
+$V = f(1-f)\log_2^2\!\big((1-f)/f\big)$. Compute the benchmark, then the
+normalized rate of a code carrying $400$ message bits, and compare that score
+with the code's rate as a fraction of capacity. Write down both fractions
+before opening the solution.
+
+<Solution>
+**Capacity.** $H_2(0.11) = 0.11\log_2(1/0.11) + 0.89\log_2(1/0.89) = 0.3503 +
+0.1496 = 0.4999$, so $C = 0.500$ bits per use and $nC = 500$ bits.
+
+**Dispersion.** $\log_2(0.89/0.11) = \log_2 8.091 = 3.016$, so
+$V = 0.11 \times 0.89 \times 3.016^2 = 0.0979 \times 9.099 = 0.891$ bits
+squared per use.
+
+**Benchmark.** $\sqrt{nV} = \sqrt{891} = 29.8$ and $Q^{-1}(10^{-3}) = 3.09$, so
+the correction is $92.2$ bits and
+$\log_2 M^*(1000, 10^{-3}) \approx 500 - 92 = 408$ bits.
+
+**The two fractions.** Against capacity the code scores $400/500 = 0.80$;
+against the benchmark it scores $400/408 = 0.98$. The first number says a fifth
+of the channel is being thrown away and the second says the code is within two
+percent of everything its blocklength permits. Only the second is a statement
+about the code. The transferable move: before calling a gap a design failure,
+subtract the part of it the converse imposes at that blocklength.
+</Solution>
+</Exercise>
+
+## What flew: concatenation, interleaving, and two decibels
+
+With the axis fixed, the deployed codes can be read against the theory. The
+architecture is the same on all of them: Voyager, launched in 1977 towards
+Jupiter and beyond; Galileo, which reached Jupiter in 1995; Mars Pathfinder,
+which landed in 1997; and Cassini, at Saturn from 2004. Each carries a
+Reed–Solomon block code on the outside, an interleaver, and a convolutional code
+on the inside.
+
+### An inner code against noise, an outer code against bursts
+
+A *convolutional code* has no block boundary. Message bits enter a shift
+register one at a time, and on every tick the encoder emits two bits, each the
+modulo-2 sum of a fixed subset of the register's contents; the stream in and the
+stream out never stop. Constraint length 7 names the window: an output bit
+depends on the current input and the six before it, which leaves the encoder
+$2^6 = 64$ internal states.
+
+Those 64 states, unrolled over time into a graph whose edges are the permitted
+state transitions, form the code's *trellis*, and every possible transmitted
+stream is one path through it. Decoding is therefore a shortest-path problem
+rather than a search over codewords, and the Viterbi algorithm solves it in one
+sweep: at each tick it keeps, for each of the 64 states, only the single most
+likely way of arriving there.
+
+A *Reed–Solomon code* counts errors in eight-bit symbols rather than in bits.
+The encoder cuts the stream into bytes, takes 223 of them as one block, and
+appends 32 more computed from them, making the 255-symbol codeword written
+`RS(255,223)`. The decoder repairs any 16 of those 255 symbols whatever went
+wrong inside them, so a symbol with one wrong bit and a symbol with eight wrong
+bits cost the same out of the budget of sixteen. That indifference is what the
+pairing is built on. The two codes together run at an overall rate of $0.437$
+bits per channel use.
+
+<Figure
+  src="./figures/concatenation.svg"
+  alt="A pipeline of encoder blocks — message, Reed-Solomon outer encoder, interleaver, convolutional inner encoder, channel — and the mirrored decode chain below it, with two strips showing a burst of three consecutive corrupted symbols in transmitted order landing in three different codewords after de-interleaving"
+  caption="Interleaving is what lets the outer decoder treat the inner decoder's bursts as isolated errors."
+/>
+
+The order of the two codes is forced by how the inner decoder fails. When noise
+pushes the Viterbi decoder onto a wrong path through the trellis it stays there
+for a while, so its output errors arrive in bursts several constraint lengths
+long, which is several consecutive eight-bit symbols. A few such bursts close
+together would exceed the outer code's budget of 16 symbols. Interleaving to
+depth $I$ writes the outer codewords into rows and transmits down the columns,
+so a burst of consecutive transmitted symbols lands one symbol into each of $I$
+different codewords. The Deep Space Network, NASA's array of ground antennas for
+spacecraft beyond Earth orbit, supports depths from 1 to 8, which sets the block
+a receiver must buffer before it can decode anything: 1,784 bits at depth 1, and
+14,272 bits at depth 8. Interleaving buys the independence assumption and pays
+for it in latency.
+
+### Two decibels, priced in metres of antenna
+
+The whole system is a bet that the concatenation of two decoders, neither of
+them optimal for the composite code, comes close enough to the limit. The
+measured answer is that it does not come very close.
+
+<Figure
+  src="./figures/dsn-code-comparison.png"
+  alt="Log-log plot of bit error rate against E_b/N_0 in dB, from 1e-1 down to 1e-6 and from -1 to 11 dB, with six labelled curves: uncoded, (255,223) Reed-Solomon only, (k=7, r=1/2) convolutional, the concatenated convolutional and RS(255,223) code at interleave depth I = 5, a turbo code at r=1/2 with 8920-bit blocks, and a near-vertical line marking the AWGN channel capacity for r=1/2 binary input just above 0 dB; at a bit error rate of 1e-6 the curves reach the axis at roughly 10.5, 6.4, 5.0, 2.4 and 1.0 dB while the capacity line stands at 0.2 dB"
+  caption="The operator's own scoreboard. Reaching a bit error rate of $10^{-6}$ costs the uncoded link about 10.5 dB and the flown concatenation about 2.4 dB, while the capacity of the rate-$1/2$ binary-input Gaussian channel sits at 0.2 dB."
+/>
+
+On that comparison the capacity of the rate-$1/2$ binary-input Gaussian channel
+stands at about $0.2$ dB of energy per bit. Reaching a bit error rate of
+$10^{-6}$ costs the uncoded link about $10.5$ dB, the Reed–Solomon code alone
+about $6.4$ dB, the convolutional code alone about $5.0$ dB, and the
+concatenated pair about $2.4$ dB. The best thing anyone flew was therefore
+about **2.2 dB** short of that line.
+
+That line is the operator's convention, not the flown system's own rate. It is
+drawn at rate $1/2$, the inner convolutional code's rate, whereas the
+concatenation including the Reed–Solomon outer code runs at $0.437$, where the
+binary-input limit is $-0.09$ dB and the gap is $2.5$ dB. Both readings are
+above two decibels, and $2.2$ dB is the one used throughout this lesson, because
+every later code is quoted against the same rate-$1/2$ line.
+
+A decibel is not an abstraction on a spacecraft. Received power scales with the
+gain of the transmitting dish, and a parabolic dish's gain scales as the square
+of its diameter, so $2.2$ dB is a factor of $1.66$ in radiated power or a
+factor of $\sqrt{1.66} = 1.29$ in diameter. Voyager's high-gain antenna is
+3.7 m across; closing the same gap with aluminium rather than with coding would
+have meant carrying an extra metre of dish on a vehicle whose mass budget was
+the binding constraint on everything else it did.
+
+### Where the flown codes sit on the scoreboard
+
+The same verdict appears on the normalized-rate axis, where the deep-space codes
+sit together. Voyager reads about $0.685$, Cassini and Pathfinder about $0.69$,
+and Galileo's high-gain code between $0.69$ and $0.72$: these systems used a
+little over two thirds of what their own blocklengths allowed.
+
+<Figure
+  src="./figures/normalized-rates.png"
+  alt="Log-x plot of normalized rate against blocklength for code families over an AWGN channel at word-error rate 1e-4. Voyager sits flat near 0.685, Galileo HGA climbs from 0.687 to 0.713, Cassini/Pathfinder sits at 0.691 and Galileo LGA at 0.789 — all in a low band. Above them the turbo, ME-LDPC and Polar+CRC curves run from about 0.815 at n=500 up to 0.918 by n=20000, separated from the deep-space cluster by roughly 0.15 in normalized rate. Reed-Solomon with soft-decision decoding dips to 0.51 at n=500, well below everything else."
+  caption="Two separated bands: what NASA flew, and what came after. The distance between them is the 1993 discontinuity, drawn to scale."
+/>
+
+One point stands above the rest, and it is the one that was pushed hardest.
+Galileo's high-gain antenna failed to unfurl in April 1991, eighteen months into
+the cruise to Jupiter, and the mission was re-planned around the low-gain
+antenna and its far weaker link. The rate-$1/4$ code carrying that link was built
+at the Jet Propulsion Laboratory around a constraint-length-15 convolutional
+inner code and a larger Reed–Solomon outer code, and it could be decoded only by
+a room of purpose-built hardware; in 1992 it was the best code of its rate anyone
+knew. It reads about $0.79$, and the sparse-graph codes of the next decade reach
+about $0.92$ at the same blocklength.
+
+<KeyFact>
+The deep-space cluster is not where the coding theorem said codes would be. It
+is where codes that could be **decoded** were. Every code in this section is
+decoded by an algorithm whose cost is set by the code's algebraic structure,
+and every one of them stops improving where that cost becomes unaffordable.
+</KeyFact>
+
+## 1993: the decoder was the news
+
+Forty years of searching for algebraic structure would suggest that the step
+past two decibels came from a new kind of code. It did not. The constituent
+codes of the construction reported in 1993 were ordinary convolutional codes,
+already flying. What was new was how they were decoded.
+
+A turbo code takes two convolutional encoders with feedback. The first sees the
+message bits in order; the second sees them permuted by a fixed pseudo-random
+interleaver. The transmitted block is the message followed by both streams of
+parity bits, which gives rate $1/3$; deleting a fixed pattern of parity bits,
+called puncturing, raises it to $1/2$ where that rate is wanted. Nothing in that
+description is difficult, and nothing in it is obviously good: the interleaver is
+drawn at random when the code is designed and then kept forever.
+
+### Two decoders, arguing
+
+Each constituent decoder runs the
+forward–backward algorithm on its own trellis, a two-pass dynamic program that
+sweeps the trellis once in each direction and returns, for every message bit, a
+posterior probability given the channel and that decoder's parity stream. It
+then hands those probabilities to the other decoder, which treats them as
+priors and repeats the computation on the permuted order. The two decoders
+exchange beliefs until they agree. The Deep Space Network's implementation runs
+ten such exchanges by default and as few as six at high data rates, stopping
+early when the most probable paths in the two trellises become consistent.
+
+<FigureSequence
+  name="turbo-exchange"
+  alt="Four frames on one layout: three boxes of channel evidence at the top feeding two decoder boxes joined by an interleaver box on the upper return path and its inverse on the lower one, with two strips of eight bits below showing each trellis's most probable path; frame 2 activates decoder 1 and fills the first strip, frame 3 activates decoder 2 and fills the second strip with two positions disagreeing, frame 4 shows the two strips identical after ten exchanges"
+  caption="The turbo exchange: probabilities out of one trellis become priors for the other, permuted on the way there and unpermuted on the way back."
+/>
+
+<Task>
+Step through the four frames and watch the two path strips at the bottom. In
+frame 3 they disagree in two positions; by frame 4 both are the same word and
+the decoder stops. Then check frame 1: the same message bits feed both decoders,
+so the two streams of probabilities being exchanged are not built from disjoint
+evidence.
+</Task>
+
+That procedure has no proof behind it. The exchanged messages are treated as
+independent pieces of evidence and they are not independent, because both
+trellises constrain the same message bits; convergence is not guaranteed and
+the fixed point, when there is one, is not the maximum-likelihood codeword.
+What can be said is what was measured: the codes standardized from that
+construction reach a bit error rate of $10^{-6}$ within about **0.8 dB** of the
+limit, where the concatenated system needed $2.2$ dB. Both figures are read off
+the same plot against the same rate-$1/2$ binary-input line, and the turbo code
+really does run at rate $1/2$, so its $0.8$ dB is a gap at its own rate. On the normalized-rate
+scoreboard the turbo families sit between $0.82$ and $0.91$ against the
+deep-space cluster's $0.69$.
+
+<Remark title="what the 1.4 dB was made of">
+Both systems are concatenations of two codes joined by an interleaver, and both
+decode one constituent code at a time. The difference is that the classical
+receiver passes hard symbol decisions from the inner decoder to the outer one,
+once, and the turbo receiver passes probabilities in both directions,
+repeatedly. Information that the first architecture discards at the boundary
+between its two decoders is exactly what the second one circulates.
+</Remark>
+
+## Sparse graphs: Gallager's codes and the decoder that revived them
+
+Iterative decoding is more general than the turbo construction, and the general
+version had been published thirty years earlier and ignored. Gallager's 1963
+codes are linear block codes, specified as in <Ref lesson="hamming-codes"/> by a
+parity-check matrix $H$, with one additional requirement: $H$ is *sparse*, with
+a bounded number of ones per row and per column however large the blocklength
+grows.
+
+Sparsity is not an algebraic property. It is a property of the decoder's
+workload. Draw a node for each of the $n$ transmitted bits, a node for each of
+the $n - k$ parity checks, and an edge for each 1 in $H$; the graph is
+bipartite, and a bounded number of ones per row and column means a bounded
+number of edges per node. A regular $(3,6)$ code puts every bit in 3 checks and
+every check on 6 bits, which forces $(n-k)/n = 3/6$ and a rate of $1/2$.
+
+### Sum–product decoding: local messages, no codewords
+
+The decoder passes probabilities along the edges of that graph in two
+alternating half-steps. Each bit tells each of its checks what it believes about
+itself, computed from the channel and from every check except the one it is
+addressing. Each check tells
+each of its bits what value would make its own sum even, given what its other
+bits just said. Every bit then multiplies its channel likelihood by the messages
+from all its checks, takes a hard decision, and the decoder halts the moment
+those decisions satisfy every check.
+
+<FigureSequence
+  name="sum-product"
+  alt="Four frames on a bipartite graph of six bit nodes and three check nodes: the received bit probabilities with two checks failing, then messages travelling from bits up to a check, then messages returning from checks down to bits, then the updated belief that flips the wrong bit and satisfies every check"
+  caption="One round of sum–product decoding on a six-bit code: the two failing checks outvote the channel on the one bit they disagree about."
+/>
+
+<Task>
+Step through the four frames and watch only $x_3$. In frame 1 the channel puts
+it at $P(1) = 0.94$. In frame 3 checks $c_1$ and $c_2$ each return $P(x_3 = 0)
+= 0.84$, because each has three other bits that are almost certainly 0 and a
+sum that must come out even. In frame 4 the product $0.06 \times 0.84^2$ beats
+$0.94 \times 0.16^2$ and the decision flips. Confirm that no step of this
+compared the received word against any codeword.
+</Task>
+
+<Exercise>
+In the same figure, compute what the checks tell $x_1$, which the channel
+reports as 0 with probability $0.94$. Check $c_3$ contains $x_1, x_2, x_5, x_6$
+and check $c_1$ contains $x_1, x_2, x_3, x_4$. Use the difference form of the
+check-to-bit message: writing $\delta q = P(0) - P(1)$ for each incoming bit,
+the outgoing message satisfies $\delta r = \prod \delta q$ over the check's
+other bits, and $P(0) = (1 + \delta r)/2$. Then combine both messages with the
+channel and report $x_1$'s updated belief.
+
+<Solution>
+Every bit other than $x_3$ has $\delta q = 1 - 2(0.06) = 0.88$, and $x_3$ has
+$\delta q = 1 - 2(0.94) = -0.88$.
+
+**From $c_3$.** Its other bits are $x_2, x_5, x_6$, all at $+0.88$, so
+$\delta r = 0.88^3 = 0.681$ and $P(x_1 = 0) = (1 + 0.681)/2 = 0.84$.
+
+**From $c_1$.** Its other bits are $x_2, x_3, x_4$, whose product is
+$0.88 \times (-0.88) \times 0.88 = -0.681$, so $P(x_1 = 0) = (1 - 0.681)/2 =
+0.16$. The failing check tells $x_1$ it is probably a 1: from $c_1$'s point of
+view something in it is wrong, and $x_1$ is a candidate.
+
+**Combining.** $P(0) \propto 0.94 \times 0.84 \times 0.16$ and
+$P(1) \propto 0.06 \times 0.16 \times 0.84$. The two check factors are the same
+pair in both products, so they cancel exactly and the ratio is $0.94 : 0.06$:
+$x_1$'s belief is unchanged at $0.94$.
+
+That cancellation is the mechanism. The satisfied check and the failing check
+disagree about $x_1$ by exactly the same factor, so the evidence is
+uninformative and the algorithm leaves $x_1$ alone. It moves only where the
+disagreement is one-sided, which at this iteration is $x_3$ and nowhere else.
+The transferable move: message passing does not locate errors, it accumulates
+odds, and a bit that two checks disagree about symmetrically receives no
+evidence at all.
+</Solution>
+</Exercise>
+
+### Why the codes waited thirty years
+
+The cost of one iteration is about $6nj$ floating-point multiplications for a
+column weight $j$, so at twenty iterations the work is roughly 800 operations
+per decoded bit, independent of blocklength. That number is the whole history.
+It was out of reach in 1963 and unremarkable by the mid-1990s, when the codes
+were rediscovered and immediately found to be excellent.
+
+The blocklengths matter as much as the arithmetic. Sparse-graph codes are good
+at $n$ in the tens of thousands, not at $n = 7$, so cheap decoding per bit is
+not sufficient on its own: the machine must also hold the whole block.
+
+<Figure
+  src="./figures/ldpc-decoding-run.png"
+  alt="Eight tall bitmap blocks in two rows of four, each showing a Dilbert cartoon in its upper half above a lower half of dense random-looking speckle. The first block, headed RECEIVED and labelled 0, has heavy black speckle scattered all over the cartoon; the blocks labelled 1, 2 and 3 are progressively cleaner, and those labelled 10, 11 and 12 carry only a few stray dots, until the cartoon in block 13 is completely clean. The lower half of every block stays equally mottled throughout. Below the grid, an arrow and the heading DECODED point to a ninth, half-height block containing the recovered cartoon alone."
+  caption="Each block is one whole transmitted vector of a rate-1/2 Gallager code: 10,000 source bits, drawn as a cartoon, stacked above 10,000 parity bits — and every one of the 20,000 is flipped with probability 7.5% on the way. Block 0 is what arrives; the rest are the sum-product decoder's bit-by-bit best guess after 1, 2, 3, 10, 11, 12 and 13 iterations. Watch the speckle over the cartoon thin out: by the thirteenth iteration the guess violates no parity check, the decoder halts, and that decoding is error-free. The lower half of every block stays mottled because the parity bits are pseudorandom by construction — there is no picture in them to recover."
+/>
+
+A published run makes the behaviour concrete. The code is rate $1/2$, built from
+a $10{,}000 \times 20{,}000$ parity-check matrix with three ones per column, so
+10,000 message bits are sent with 10,000 parity bits. The channel flips $7.5\%$
+of them. The decoder halts after the thirteenth iteration, when its hard
+decisions violate no check, and that decoding is error-free; at this noise level
+the decoder fails to find any valid decoding about once in 100,000 blocks. On a
+Gaussian channel the same code communicates reliably at $E_b/N_0 = 1.47$ dB.
+Against the line the deep-space codes were scored on, the rate-$1/2$
+binary-input limit at $0.19$ dB, that is a gap of **1.28 dB**: a plain regular
+Gallager code, no irregular degree profile and no tuning of any kind, sat
+between the flown concatenation's $2.2$ dB and the standardized turbo code's
+$0.8$ dB.
+
+## Density evolution: the threshold is sharp, and computable in advance
+
+That run was taken at one noise level. The level at which the decoder stops
+working is not the edge of a gradual degradation: it is a threshold, sharp in
+the limit of large blocklength, and computable before any code is built.
+
+The technique is to run the decoder not on the real graph but on an infinite
+tree with the same local structure, where the incoming messages at every node
+really are independent, and to track one number per iteration: the average
+uncertainty still carried by a message. On the erasure channel that number is
+the fraction of messages still erased, and the recursion is one line. For a
+$(3,6)$ code, a message leaving a bit is still erased only if the channel erased
+it and both of its other checks failed to determine it, and a check determines a
+bit only if all five of its other bits are known:
+
+$$
+x_{\ell+1} = e\,\big[1 - (1 - x_\ell)^5\big]^2 .
+$$
+
+<Figure
+  src="./figures/density-evolution.svg"
+  alt="Fraction of messages still erased against decoding iteration for six erasure probabilities: curves at 0.30, 0.38 and 0.42 fall to zero in 6, 12 and 31 iterations while curves at 0.44 and 0.48 flatten out at 0.33 and 0.42"
+  caption="Iterating x ← e[1 − (1 − x)⁵]²: below e = 0.4294 every curve reaches zero, above it none does."
+/>
+
+<Task>
+Iterate the recursion yourself for $e = 0.42$ and $e = 0.44$, starting from
+$x_0 = e$, and watch what separates them. At $0.42$ the sequence takes 31 steps
+to fall below $10^{-4}$; at $0.44$ it stops at $0.327$ and stays there forever.
+Then find the threshold to three decimals by bisection: it is the largest $e$
+for which the map $x \mapsto e[1-(1-x)^5]^2$ has no fixed point above zero.
+</Task>
+
+The threshold for this ensemble is $e^* = 0.4294$, against a capacity that
+allows $e = 0.5$ at rate $1/2$. The same analysis on the binary symmetric
+channel gives a threshold crossover probability of $f_{\max} = 0.084$ for
+$(3,6)$ codes, $0.076$ for $(4,8)$ and $0.068$ for $(5,10)$, against a Shannon
+limit of $f = 0.11$ at that rate. Denser graphs are better codes and worse for
+the decoder; the thresholds fall as the columns get heavier, so it is the
+decoder that decides which ensemble is worth building.
+
+<KeyFact>
+Density evolution describes a tree, and a real parity-check graph has cycles, so
+the threshold is a prediction about an idealisation. It is nonetheless the
+design tool that closed the gap: optimizing the degree distribution of an
+*irregular* graph against its predicted threshold produced rate-$1/2$ ensembles
+whose thresholds sit within $0.0045$ dB of the binary-input Gaussian limit.
+</KeyFact>
+
+## Polar codes: capacity with a proof
+
+Every construction so far is justified by measurement. Polar codes are the
+exception, and they arrived last.
+
+The construction combines two copies of a channel into a pair of synthetic
+channels, one better than the original and one worse, and recurses. As the
+recursion deepens the synthetic channels *polarize*: the fraction whose capacity
+approaches 1 tends to the original channel's capacity, and the rest tend to
+capacity 0. Put the message bits on the good synthetic channels, freeze the rest
+to known values, and the resulting code provably achieves capacity on any
+symmetric binary-input channel, with encoding and successive-cancellation
+decoding in $O(n \log n)$ operations. This is the first explicit construction
+for which that sentence is a theorem rather than a report of simulations.
+
+On an erasure channel the recursion is exact arithmetic: one combining step
+turns two uses of a channel with erasure probability $x$ into a synthetic
+channel of erasure probability $2x - x^2$ and one of erasure probability $x^2$.
+One step from $x = 1/2$ therefore produces synthetic channels of capacity $0.25$
+and $0.75$, and every later value is that pair of maps applied again.
+
+<FigureSequence
+  name="polarization"
+  alt="Four frames sharing one layout: at the left a fixed inset of the one-step combining diagram in which u1 passes through an exclusive-or into the first channel use and u2 through the second; at the right the capacities of the synthetic channels, sorted — one bar at 0.5, then two at 0.25 and 0.75, then four at 0.0625, 0.4375, 0.5625 and 0.9375, then a staircase for 1024 synthetic channels with 382 below 0.01 and 382 above 0.99"
+  caption="Erasure channel of capacity 0.5, recursed: the capacities spread towards 0 and 1 while their mean never moves."
+/>
+
+<Task>
+Add the printed capacities in each frame and divide by their number: $0.5$ in
+frame 1, $(0.25 + 0.75)/2$ in frame 2, and the four values of frame 3. All three
+come to $0.5$. The recursion never creates capacity, so the only thing that can
+happen is what frame 4 shows — the same total, redistributed until almost every
+synthetic channel is nearly perfect or nearly useless.
+</Task>
+
+In practice successive cancellation alone is mediocre, and the deployed version
+keeps a list of candidate decodings and picks among them using a *cyclic
+redundancy check*, a short checksum computed over the message and appended to
+it. On the normalized-rate scoreboard that version is the strongest family at
+blocklengths of a few hundred to a few thousand bits, which is precisely the
+regime of a control message rather than a data block. That is where it was
+standardized: in November 2016 the 3GPP working groups, which write the
+mobile-radio specifications, chose polar codes for the 5G New Radio control
+channels and low-density parity-check codes for the data channels, and both were
+frozen into the first release in 2018.
+
+<KeyFact>
+Polar codes are the only family here whose capacity claim is a theorem about the
+code that gets built. The turbo and sparse-graph families are justified by
+measurement plus a threshold computed on a cycle-free tree that their own graphs
+are not. Proof and performance came apart in 1948 and were not put back together
+until 2009, and the reunion changed nothing about which code you would ship at a
+blocklength of $10^5$.
+</KeyFact>
+
+## The floor under every scheme: −1.6 dB per bit
+
+Every comparison so far fixes a rate. One number bounds every scheme at every
+rate, and no choice of code, blocklength or modulation moves it.
+
+Ask for the least energy needed to send $k$ bits reliably over a Gaussian
+channel when there is no constraint at all on how long the transmission may
+take. The answer does not depend on the code.
+
+<Theorem title="minimum energy per bit (Polyanskiy & Wu 19.1)">
+For the additive Gaussian noise channel with noise spectral density $N_0$, the
+minimum energy $E^*(k,\varepsilon)$ needed to send $k$ bits with error
+probability at most $\varepsilon$ satisfies
+
+$$
+\lim_{\varepsilon \to 0} \limsup_{k \to \infty} \frac{E^*(k,\varepsilon)}{k}
+= \frac{N_0}{\log_2 e} .
+$$
+
+Equivalently $(E_b/N_0)_{\min} = 1/\log_2 e = \ln 2 = 0.693$, which expressed in
+decibels is $10\log_{10} 0.693 = -1.59$ dB.
+</Theorem>
+
+The converse is, in outline, a chain the previous lessons already supply:
+Fano's inequality
+bounds $k$ by the mutual information the receiver obtains
+(<Ref lesson="fano-inequality"/>), the data-processing inequality moves that
+bound onto the channel input and output
+(<Ref lesson="data-processing-inequality"/>), the Gaussian capacity formula
+caps each use at $\tfrac{1}{2}\log(1 + 2E_i/N_0)$, and $\log(1+u) \le u\log e$
+turns the sum of logarithms into $E \log e / N_0$. The linearization is tight
+exactly when each use carries vanishing energy, which is why the bound is
+attained only in the limit of unboundedly many, arbitrarily weak channel uses.
+
+The floor is therefore reached only where the spectral efficiency is zero: at
+$-1.59$ dB, bits per channel use tends to zero as the energy per use does. Every
+non-zero rate steps back from it, and the step is exactly the one the
+finite-blocklength correction charges.
+
+{/* img energy-per-bit-blocklength: the published achievability and converse bounds on E*(k,eps)/k in dB against the number of data bits k on a log axis from 1 to 1e8, for three channel models — non-fading AWGN, Rayleigh fading with receiver channel-state information (these two nearly coincident), and Rayleigh fading without it — all bending down towards the −1.59 dB asymptote drawn as a horizontal line, with the horizontal spread at −1.5 dB visible as three orders of magnitude in k; candidate 6441-s3-energy-per-bit-plot — Polyanskiy & Wu, MIT 6.441 notes 2016, PDF p. 206 Figure 19.2, https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf; placement centered */}
+
+The published achievability and converse bounds on $E^*(k,\varepsilon)/k$ price
+the last tenth of a decibel, and the price is set by the channel model rather
+than by the code. A *fading* channel is one whose gain varies with time, as a
+moving radio link's does and a deep-space link's does not; whether the receiver
+is told those gains changes the answer by three orders of magnitude:
+
+| channel model | data bits $k$ needed to reach $-1.5$ dB |
+| --- | --- |
+| non-fading Gaussian | $6 \times 10^4$ |
+| fading, receiver knows the fading coefficients | $6 \times 10^4$ |
+| fading, receiver does not | $\ge 7 \times 10^7$ |
+
+Same target, same theorem, same floor. What the last row costs is not noise but
+ignorance: a receiver that must infer the gains as well as the message needs a
+thousand times more bits to pay for the inference.
+
+<KeyFact>
+"Within a tenth of a decibel of capacity" is not a property of a code. It is a
+property of a code together with a channel model, a rate, a blocklength and an
+error probability, and a published figure that omits any of the four cannot be
+checked against anything.
+</KeyFact>
+
+## Minimum distance comes back as the error floor
+
+<Ref lesson="hamming-codes"/> concluded that minimum distance is the wrong
+figure of merit, and nothing in this lesson has needed it: thresholds are set by
+degree distributions and interleavers, not by weights. That conclusion has a
+sharp boundary, and the deployed codes run straight into it.
+
+Plot the bit error rate of a turbo code against energy per bit and the curve
+falls almost vertically through several decades and then, somewhere below
+$10^{-7}$, flattens. More power stops buying reliability. The flat region is
+called the error floor, and its cause is the weight distribution: a random
+interleaver leaves a handful of low-weight codewords, and once the noise is weak
+enough that the decoder essentially always converges, the residual errors are
+the ones where it converges to one of those near neighbours instead of to the
+transmitted word.
+
+<Figure
+  src="./figures/error-floor.svg"
+  alt="Bit error rate against energy per bit on a log scale: a turbo curve falling steeply and flattening below 10 to the minus 7, and an LDPC curve falling later but continuing to about 10 to the minus 9 before flattening"
+  caption="Two failure regimes: above the knee the decoder does not converge, below it converges to the wrong codeword."
+/>
+
+The two regimes have different physics and therefore different figures of merit.
+Where the decoder fails to converge, the question is whether message passing can
+propagate information through the graph at that noise level, which is the
+threshold. Where it converges wrongly, the question is how close the nearest
+codeword is, which is the minimum distance and the low end of the weight
+enumerator: the same union-bound picture that
+<Ref lesson="hamming-codes"/> used to explain why collisions happen away from
+$d_{\min}$ at high noise now runs the other way, because at very low noise the
+nearest codewords are the only ones that matter.
+
+The distinction is operational, not academic. The recommendation for deep-space
+turbo codes is to spend 16 bits of every codeblock on a cyclic redundancy check
+so the receiver can tell a mis-decoded frame from a good one near the floor. The
+low-density parity-check codes selected for the same missions have floors
+typically two decades lower, and the recommendation drops the check.
+
+<Remark title="the same reversal for Reed–Solomon">
+Reed–Solomon and BCH codes score poorly on the normalized-rate scoreboard, some
+of them below $0.6$, and they are not obsolete. Their guarantee is a worst case
+over error patterns, which is what a bursty or adversarial channel calls for: a
+burst of 17 consecutive corrupted bits lands in at most three of `RS(255,223)`'s
+eight-bit symbols, out of a budget of sixteen, however the bits fall. The
+concatenated Reed–Solomon pair on a compact disc corrects bursts of about 4,000
+bits. Nothing in this lesson bears on that regime, because the whole
+normalized-rate comparison assumes a memoryless channel and an average error
+probability.
+</Remark>
+
+## What actually took forty-five years
+
+The record now supports a verdict. The 1948 theorem promised that codes exist at
+every rate below capacity, and the promise was kept: the codes exist and were
+found. What the theorem never mentioned, and what the whole delay consisted of,
+is that a codebook is only useful if something can decode it in less than
+exponential time. Both winning families answer that and not much else. A turbo
+code and a sparse-graph code are decoded by local operations on a graph, at a
+cost per bit that does not grow with the blocklength, which is exactly the
+property the random codebook of the achievability proof lacks.
+
+<Figure
+  src="./figures/gap-timeline.svg"
+  alt="Gap to the rate-1/2 binary-input capacity in decibels, on a logarithmic axis, against year: 10.3 dB uncoded in 1948, 6.2 for Reed-Solomon alone, 4.8 for convolutional coding, 2.2 for the concatenated code flown on Voyager, 0.8 for the standardized turbo code in 1993, and 0.0045 for an irregular LDPC ensemble threshold in 2001"
+  caption="The gap is a historical quantity, and it collapsed when the decoder changed rather than the algebra."
+/>
+
+Five places where the deployed artifact departs from the idealisation this
+module derived are worth naming together, because each of them is a number
+somewhere above.
+
+- **Blocklength is finite**, so the target is the benchmark
+  $nC - \sqrt{nV}\,Q^{-1}(\varepsilon)$ and not $C$; at $n = 1000$ on a
+  half-capacity channel the correction takes away nearly a fifth of it.
+- **Decoding is approximate inference.** Belief propagation on a graph with
+  cycles has no convergence guarantee, and the evidence that it works is
+  measurement, not theorem.
+- **Error floors exist**, so a curve that theory says should keep falling stops
+  falling, at a level set by low-weight codewords.
+- **Real links are not memoryless.** Interleaving makes them approximately so,
+  at the cost of latency, and it is a wasteful patch: on a channel with 20%
+  bursts of length 100, interleaving away the correlation discards enough
+  structure to cut the achievable rate from $0.79$ to $0.53$.
+- **The theorem prices nothing.** Capacity is a statement about existence and
+  says nothing about the cost of encoding or decoding, which is the only
+  quantity that moved between 1948 and 1993.
+
+What is established: an honest axis for comparing codes; the two-decibel gap of
+the concatenated codes that flew and what it cost in hardware; the iterative
+decoders that closed it and the thresholds that predict where they work; the
+$-1.59$ dB floor under every scheme; and the exact regime in which minimum
+distance still decides. What is not established is anything about a source. Every
+code here was matched to a channel model an engineer wrote down in advance.
+<Ref lesson="kl-divergence">The next lesson</Ref> asks what a code costs when
+the distribution it was built for is the wrong one, and the answer is a single
+quantity that the rest of the course spends its time minimizing.
+
+## Exercises
+
+<Exercise>
+The benchmark $nC - \sqrt{nV}\,Q^{-1}(\varepsilon)$ is a capacity term minus a
+correction. Push the blocklength down until the correction is no longer a
+correction. Work on the binary erasure channel with $e = 1/2$, so $C = 0.5$ and
+$V = 0.25$, at $\varepsilon = 10^{-3}$.
+
+(a) Find the blocklength at which the approximation returns zero bits, and
+evaluate it at $n = 9$.
+
+(b) A two-codeword scheme of length 9 sends either nine zeros or nine ones.
+Compute its block error probability and the number of message bits it carries,
+and compare with (a).
+
+(c) State what normalized rate does as its denominator approaches zero, and give
+the condition on $n$ under which the correction stays a correction.
+
+<Solution>
+**(a)** The benchmark vanishes when $nC = \sqrt{nV}\,Q^{-1}(\varepsilon)$, that
+is $0.5n = 0.5\sqrt{n} \times 3.09$, so $\sqrt{n} = 3.09$ and $n = 9.55$. At
+$n = 9$: $4.5 - \sqrt{2.25} \times 3.09 = 4.5 - 4.64 = -0.14$ bits. A negative
+value is impossible for $\log_2 M^*$, which is at least $0$ for every channel
+and every $\varepsilon$, because the single-codeword code never errs.
+
+**(b)** On an erasure channel nothing is received wrongly, only missingly, so
+the decoder fails only when all nine symbols are erased: probability
+$2^{-9} = 1.95 \times 10^{-3}$, and it then guesses, wrong half the time, for a
+block error probability of $9.8 \times 10^{-4} < 10^{-3}$. Two codewords carry
+one bit, so $\log_2 M^*(9, 10^{-3}) \ge 1$ where the approximation reported
+$-0.14$. The error is not small: it is larger than the quantity being estimated.
+
+**(c)** $R_{\mathrm{norm}} = k / \log_2 M^*$ has a denominator that shrinks to
+zero and then goes negative, so the score first runs off to infinity and then
+changes sign. Nothing about the code changed. The correction as a fraction of
+$nC$ is $\sqrt{V/n}\,Q^{-1}(\varepsilon)/C$, here $3.09/\sqrt{n}$: $69\%$ at
+$n = 20$, $31\%$ at $n = 100$, $14\%$ at $n = 500$ (the worked example above),
+$4.4\%$ at $n = 5000$. The axis is worth reading where that fraction is small,
+which is the regime every code in this lesson lives in — blocklengths in the
+thousands and tens of thousands.
+
+The transferable move: an asymptotic expansion is informative only while its
+correction term is small compared with its leading term. When the two are
+comparable, the expansion has stopped describing the quantity and is describing
+its own error.
+</Solution>
+</Exercise>
+
+<Exercise>
+Work out where the $-1.6$ dB figure comes from by pushing the rate to zero. On a
+Gaussian channel with unconstrained input, capacity is
+$C = \tfrac{1}{2}\log_2(1 + S)$ bits per use, where $S$ is the signal-to-noise
+ratio, and the energy per bit satisfies $E_b/N_0 = S/(2R)$ when the code runs at
+rate $R$ bits per use.
+
+(a) Show that a code operating exactly at capacity requires
+$E_b/N_0 = (2^{2R} - 1)/(2R)$.
+
+(b) Evaluate at $R = 1/2$, $R = 1/4$, and in the limit $R \to 0$. Give all three
+in decibels and identify which one is the $-1.6$ dB figure.
+
+(c) State what "no bandwidth constraint" means physically, and why the answer to
+(b) is not achievable by any system that must deliver bits at a positive rate.
+
+<Solution>
+**(a)** Running at capacity means $R = \tfrac{1}{2}\log_2(1+S)$, so
+$S = 2^{2R} - 1$. Substituting into $E_b/N_0 = S/(2R)$ gives
+$E_b/N_0 = (2^{2R}-1)/(2R)$.
+
+**(b)** At $R = 1/2$: $(2 - 1)/1 = 1$, which is $0.00$ dB. At $R = 1/4$:
+$(2^{1/2} - 1)/(1/2) = 0.414/0.5 = 0.828$, which is $10\log_{10} 0.828 =
+-0.82$ dB. As $R \to 0$, write $2^{2R} = e^{2R\ln 2}$ and expand:
+$(2^{2R}-1)/(2R) \to \ln 2 = 0.693$, which is $-1.59$ dB. The limit is the
+$-1.6$ dB figure, and the other two show the price of insisting on a positive
+rate: half a bit per use costs $1.6$ dB above the floor.
+
+**(c)** The rate in bits per channel use is a spectral efficiency: channel uses
+per second are bounded by bandwidth, so driving $R$ to zero while holding the
+bit rate fixed means using more and more channel uses per bit, that is, more and
+more bandwidth. "No bandwidth constraint" is the statement that this is free.
+Any real system delivers bits at a positive rate in a finite band, so it
+operates at some $R > 0$ and pays at least $(2^{2R}-1)/(2R)$. The floor is
+approached, never occupied.
+
+**Which zero the lesson uses.** These three numbers are limits for an
+*unconstrained* input, where the transmitted symbol may take any real value. The
+deployed codes all send $\pm 1$, and constraining the input to two levels moves
+the limit up: at rate $1/2$ it sits at $0.19$ dB rather than $0.00$ dB, at rate
+$1/4$ at $-0.79$ dB rather than $-0.82$ dB. The constraint is nearly free at low
+rate, where the optimal input is weak enough that a Gaussian and a binary
+alphabet carry almost the same information, and both baselines converge on
+$-1.59$ dB as $R \to 0$. Every gap quoted in this lesson (2.2 dB for the flown
+concatenation, 0.8 dB for turbo, 1.28 dB for the Gallager code) is measured from
+the binary-input value, which is why the same Gallager run is sometimes reported
+as being 1.47 dB from a $0$ dB limit.
+
+The transferable move: an unattainable limit is still useful, because the rate
+at which it is approached is the design curve.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim. "Turbo codes get within half a decibel of capacity, so error
+correction is a solved problem." Give three distinct grounds on which the
+conclusion overstates the premise: one about blocklength, one about the error
+floor, and one about the channel model. Each ground should name a specific
+quantity from this lesson.
+
+<Solution>
+**Blocklength.** "Capacity" in that sentence is $C$, and no code of finite
+length can reach $C$. The standardized turbo codes run at blocklengths of a few
+thousand to a few tens of thousands, and on the normalized-rate scoreboard they
+score $0.82$ to $0.91$, not $1.0$. Between a tenth and a fifth of what their own
+blocklength allows is still unclaimed, and that residue is the code's, not the
+converse's.
+
+**Error floor.** The half-decibel figure is quoted at a bit error rate around
+$10^{-5}$ or $10^{-6}$. Below about $10^{-7}$ randomly interleaved turbo codes
+stop improving, because the residual errors are convergence to low-weight
+neighbours rather than failures to converge. An application needing $10^{-10}$
+gets no help from more power, which is why the deep-space recommendation adds a
+16-bit cyclic redundancy check per codeblock near the floor.
+
+**Channel model.** The figure is for a memoryless additive Gaussian channel with
+binary input. A fading channel with no receiver knowledge of the fading needs
+blocklengths about a thousand times larger to sit the same distance above the
+energy-per-bit floor, and a bursty channel is not memoryless at all. Making it
+approximately memoryless by interleaving throws away the correlation structure:
+on a channel with bursts of length 100 occurring 20% of the time, the true
+capacity is $0.79$ bits per use and interleaving reduces the achievable rate to
+about $0.53$, a factor of $1.6$ surrendered to make the model true.
+
+None of the three grounds disputes the measurement. They dispute the word
+"capacity", the range of error rates, and the channel.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this one too. "<Ref lesson="hamming-codes"/> showed that minimum distance
+does not matter, so a code's weight distribution is irrelevant." Refute it using
+the error floor, then state the regime in which each of the two views is
+correct, and explain why a family with relative distance tending to zero can
+still be good.
+
+<Solution>
+**The refutation.** The error floor of a turbo code is caused by low-weight
+codewords, which is a statement about the low end of the weight enumerator and
+therefore about minimum distance. Two codes with identical thresholds can have
+floors two decades apart, and the operational difference is whether a mission
+must spend a cyclic redundancy check per block. The weight distribution decides
+that.
+
+**The two regimes.** At noise levels near the threshold, decoding fails because
+message passing cannot propagate reliable information through the graph; the
+governing quantity is the degree distribution, and distance is irrelevant. At
+noise levels well below the threshold, the decoder converges almost always, and
+the residual failures are convergences to the nearest wrong codewords; the
+governing quantity is the number and weight of those neighbours. The earlier
+lesson's claim is the first regime, this lesson's caveat is the second, and both
+are statements about where on the waterfall curve you are operating.
+
+**Vanishing relative distance.** Goodness in the coding theorem's sense means
+error probability tending to zero at a fixed positive rate, and a family can
+have that while its minimum distance grows more slowly than its blocklength: the
+concatenated Hamming family of <Ref lesson="hamming-codes"/> keeps a rate above
+$0.09$ with $d/n \to 0$. Distance controls a worst case over error patterns;
+goodness is an average over a probabilistic channel, and the average is
+dominated by typical patterns, not by the worst one. The floor is the one place
+where the two meet, because at very low noise the typical failure and the worst
+case are the same event.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson quoted the density-evolution threshold $f_{\max} = 0.084$ for a
+regular $(3,6)$ code on the binary symmetric channel and asserted that its rate
+is $1/2$, without computing either.
+
+(a) Derive the rate from the degree distribution: every bit lies in 3 checks and
+every check touches 6 bits.
+
+(b) Compute the crossover probability at which the Shannon limit for that rate
+sits, and report the gap to $f_{\max}$ in crossover probability.
+
+(c) Convert both crossover probabilities into decibels of $E_b/N_0$, using the
+fact that a hard-decision binary-input Gaussian channel at rate $R$ has
+$f = Q\big(\sqrt{2R\,E_b/N_0}\big)$, and report the gap in dB.
+
+<Solution>
+**(a)** Count edges twice. Each of the $n$ bits contributes 3 edges and each of
+the $m$ checks contributes 6, so $3n = 6m$ and $m = n/2$. The rate is at least
+$1 - m/n = 1/2$, with equality when $H$ has full rank, which it does for a
+random construction with high probability.
+
+**(b)** The Shannon limit at rate $1/2$ solves $1 - H_2(f) = 1/2$, that is
+$H_2(f) = 0.5$. Since $H_2(0.11) = 0.4999$, the solution is $f = 0.1100$. The
+gap in crossover probability is $0.1100 - 0.084 = 0.026$, so the decoder
+tolerates about $76\%$ of the noise the channel would permit.
+
+**(c)** At $R = 1/2$ the relation is $f = Q(\sqrt{E_b/N_0})$.
+
+For $f = 0.110$: $Q^{-1}(0.110) = 1.2265$, so $E_b/N_0 = 1.2265^2 = 1.504$,
+which is $10\log_{10} 1.504 = 1.77$ dB.
+
+For $f = 0.084$: $Q^{-1}(0.084) = 1.3783$, so $E_b/N_0 = 1.900$, which is
+$2.79$ dB.
+
+The gap is $1.02$ dB. Two things are worth noticing. First, $0.026$ in
+crossover probability and $1.0$ dB in energy are the same statement, and the dB
+version is the one an antenna budget uses. Second, this whole computation
+assumes hard decisions: the receiver has thrown away everything except the sign
+of each sample before decoding, which is itself worth about 2 dB. A sum-product
+decoder given the real-valued samples does considerably better than $2.79$ dB,
+which is why the deployed codes are never run this way.
+</Solution>
+</Exercise>
+
+<Exercise>
+Measure a threshold rather than quoting one. Implement a sum-product decoder for
+a small regular $(3,6)$ code, or a repeat-accumulate code if that is easier to
+build, at a blocklength of a few thousand bits. Run it on a binary symmetric
+channel at five noise levels bracketing $f = 0.084$, cap the iterations at 200,
+and record for each level the fraction of blocks decoded successfully, the
+median iteration count among the successes, and the residual bit error rate.
+Report where the transition sits and state what would count as agreement with
+the predicted threshold.
+
+<Solution>
+**What to expect.** Below the threshold the successful decodings converge in a
+few tens of iterations and the residual bit error rate is zero, not small: the
+stopping rule halts only when every check is satisfied, so a success is exact
+unless the decoder has landed on a different codeword, which at these
+blocklengths is rare. Above the threshold most blocks hit the iteration cap with
+a large fraction of bits still wrong. The median iteration count rises sharply
+as the noise approaches the threshold from below, in the same way the $e = 0.42$
+curve in the lesson's figure takes 31 iterations where $e = 0.30$ takes 6. That
+rise is the most sensitive indicator of the transition, more so than the success
+rate.
+
+**What counts as agreement.** The predicted $0.084$ is an $n \to \infty$
+statement about an ensemble, so a blocklength of a few thousand will not show a
+step function. Expect the success rate to fall from near 1 to near 0 across a
+window of roughly $\pm 0.01$ in $f$, centred a little under $0.084$: finite
+graphs have short cycles and small stopping sets, both of which hurt. Agreement
+means the midpoint of your window lands within about $0.01$ of $0.084$ and moves
+towards it as you increase the blocklength. A midpoint above $0.084$, or a
+transition that does not sharpen with blocklength, indicates a bug: the usual
+one is initializing the check-to-bit messages instead of the bit-to-check
+messages on the first half-iteration, which double-counts the channel evidence
+and makes the decoder look better than it is.
+
+**Sample size.** To distinguish a 90% success rate from a 95% one you need
+several hundred blocks per noise level; the binomial standard error on 300
+blocks at $p = 0.9$ is $1.7$ percentage points.
+</Solution>
+</Exercise>
+
+<Exercise>
+Every code in this module was designed against a channel model that an engineer
+specified in advance: a crossover probability, an erasure rate, a noise spectral
+density. Suppose instead that the channel is clean and the unknown thing is the
+*source*: a stream of symbols whose distribution nobody wrote down. Sketch what
+the design problem becomes, name the quantity a designer would now minimize, and
+say what plays the role that capacity played here.
+
+<Solution>
+**The problem.** With a clean channel there is no noise to correct, so the
+redundancy the encoder adds is pure waste; the job is the opposite one, removing
+redundancy. The encoder is a model $q$ of the source, and the decoder is the same
+model run in reverse, exactly as in
+<Ref lesson="arithmetic-coding">arithmetic coding</Ref>, where a probability
+model and a coder are separate modules.
+
+**The quantity.** A code that assigns length $-\log_2 q(x)$ to symbol $x$ costs,
+on average over a true source $p$, the expected value of $-\log_2 q(X)$. That is
+the cross-entropy of $p$ relative to $q$, and minimizing it over $q$ is exactly
+what fitting a model to data does. It decomposes as $H(p)$ plus a non-negative
+penalty for the mismatch, so the part a designer controls is the penalty.
+
+**What replaces capacity.** $H(p)$, the source entropy, is the floor no model
+can beat, in the same way capacity was the ceiling no code could pass; the
+mismatch penalty is the analogue of the gap this lesson measured, and it is
+zero only when the model is right.
+<Ref lesson="cross-entropy-loss"/> derives the decomposition and
+<Ref lesson="compression-is-prediction"/> shows that the resulting file size is
+a measurement of model quality, which makes a language model's training loss the
+same kind of number as a normalized rate.
+</Solution>
+</Exercise>
+
+<References>
+1. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441 / UIUC ECE 563), 2016 — §19.1 proves the $(E_b/N_0)_{\min} = -1.59$ dB theorem quoted above and Figure 19.2 gives the blocklengths needed to approach it under four channel models; §20.3 states the normal approximation and tabulates the dispersion $V$ for the BSC, BEC and AWGN channels; §20.4 defines normalized rate and Figure 20.1 is the scoreboard of deployed and academic code families used throughout this lesson. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §11.4 defines the very-good/good/bad/practical taxonomy and works the concatenation and interleaving examples, including the burst-channel exercise whose $0.79$ against $0.53$ comparison is quoted here (solution to exercise 11.4, p. 189); §11.5 describes the codes flown on Voyager and Galileo; ch. 47 is the LDPC chapter, with the sum–product algorithm (§47.3), the measured 13-iteration decoding run at $f = 7.5\%$ and its Gaussian-channel companion at $E_b/N_0 = 1.47$ dB (§47.4, fig. 47.7), density evolution and the regular-code thresholds $f_{\max} = 0.084$, $0.076$, $0.068$ (§47.5, table 47.13), and the rate-$1/4$ comparison of eight code families against a Shannon limit of $-0.79$ dB (fig. 47.17). Two baselines are in play in that chapter and this lesson uses the binary-input one throughout: the $-0.79$ dB of fig. 47.17 is the binary-input limit at rate $1/4$ (unconstrained input gives $-0.82$ dB, as the exercise below that pushes the rate to zero computes; at this rate the two agree to $0.02$ dB), whereas the "Shannon limit for codes of rate $1/2$" that fig. 47.7 marks at $x/\sigma = 1$ is the unconstrained one, $0.00$ dB, which sits $0.19$ dB below the binary-input limit quoted here; ch. 48 covers turbo codes, their interleaver and the error floor caused by low-weight codewords (§48.4). Free online: https://www.inference.org.uk/mackay/itila/
+3. DSN Telecommunications Link Design Handbook, module 208 rev. B, *Telemetry Data Decoding* (810-005, JPL D-19379), Jet Propulsion Laboratory, 2013 — the operator's own specification for the codes flown on the Deep Space Network: §2.5.4 the `RS(255,223)` code, §2.5.4.2–2.5.4.3 why Viterbi bursts force interleaving and what interleave depth costs in codeblock size, §2.5.6 the CCSDS turbo codes and the "within approximately 0.8 dB of the theoretical limit at a BER of $10^{-6}$" claim, §2.5.6.2 the ten-iteration decoder, the error floor below $10^{-7}$ and the 16-bit CRC recommended near it, §3.1 the LDPC codes whose floors are "at least two decades below those of Turbo codes", and Figure 14, the BER-against-$E_b/N_0$ comparison of every supported code from which this lesson's 10.5, 6.4, 5.0, 2.4 and 1.0 dB readings are taken. https://deepspace.jpl.nasa.gov/dsndocs/810-005/208/208B.pdf
+4. C. Berrou, A. Glavieux, P. Thitimajshima, "Near Shannon Limit Error-Correcting Coding and Decoding: Turbo-Codes," *Proceedings of the IEEE International Conference on Communications*, Geneva, May 1993, pp. 1064–1070 — the original construction: two recursive systematic convolutional encoders joined by a pseudo-random interleaver, decoded by exchanging soft information between two elementary decoders.
+5. R. G. Gallager, *Low-Density Parity-Check Codes*, MIT Press, 1963 — the sparse parity-check construction, the iterative decoding algorithms, and the Monte Carlo threshold computation that density evolution later made exact. https://web.mit.edu/gallager/www/pages/ldpc.pdf
+6. S.-Y. Chung, G. D. Forney, T. J. Richardson, R. Urbanke, "On the Design of Low-Density Parity-Check Codes within 0.0045 dB of the Shannon Limit," *IEEE Communications Letters*, 5(2), February 2001, pp. 58–60 — the irregular degree distributions optimized against their density-evolution thresholds, and the source of the $0.0045$ dB figure quoted here for the rate-$1/2$ binary-input Gaussian channel.
+7. E. Arıkan, "Channel Polarization: A Method for Constructing Capacity-Achieving Codes for Symmetric Binary-Input Memoryless Channels," *IEEE Transactions on Information Theory*, 55(7), 2009, pp. 3051–3073 — §I states the construction and the $O(n\log n)$ encoding and successive-cancellation decoding; the capacity-achieving claim is proved for the explicit code, not for an ensemble average. https://arxiv.org/abs/0807.3917
+8. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §7.11 for the algebraic-coding background against which the sparse-graph families are the departure, and §7.7 for the random-coding achievability argument whose non-constructiveness this lesson measures.
+</References>

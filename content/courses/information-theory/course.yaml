@@ -1,7 +1,7 @@
 schema_version: 1
 slug: information-theory
 title: Information Theory
-tagline: Surprisal, entropy, the coding and channel limits, and the information-theoretic principles behind modern learning
+tagline: Entropy, source coding, channel capacity, divergence, and the compression and learning systems built on them
 status: in_progress
 audience: >
   Engineers comfortable with logs and probability basics; no prior
@@ -11,40 +11,47 @@ tone: >
   Dry, precise, engineering register. Declarative statements of fact; no
   rhetorical questions, no teasers. Second person only in instructions.
 intro: >
-  Information theory assigns numbers to uncertainty. From a single axiom —
-  information over independent events adds — it derives a measure of the
-  information in one event (surprisal), the average information of a source
-  (entropy), and hard limits that no algorithm or physical device can beat:
-  how few bits a source can be compressed into, and how fast information can
-  cross a noisy channel. The same quantities structure modern machine
-  learning: the cross-entropy loss minimized when training a classifier or a
-  language model is a coding cost, and a better predictive model is, by
-  construction, a better compressor.
+  How few bits does a message need? The question sounds like an engineering
+  question about encoders, and it is not. It has an exact answer that depends
+  on nothing about the hardware, the algorithm, or the programmer — only on
+  the probability distribution the message was drawn from. That number is the
+  entropy, and no lossless compressor has ever beaten it or ever will. The
+  same year the bound was written down, a second one appeared beside it: over
+  a noisy link there is a rate below which errors can be driven to zero and
+  above which they cannot, and that threshold is again a property of a
+  probability distribution, not of the modem.
 
 
-  The course builds the discrete theory in three passes. The classical core:
-  surprisal and entropy; prefix codes, the Kraft inequality, Huffman coding
-  and the source coding theorem; joint and conditional entropy, mutual
-  information, and the data-processing inequality; and the second half of
-  Shannon's theory — channel capacity and the noisy-channel coding theorem,
-  which give mutual information its own operational limit. The machine-learning
-  reinterpretation: KL divergence and cross-entropy as coding costs,
-  compression as prediction, and Kolmogorov complexity as the uncomputable
-  ceiling under both. The optimization principles in current use: maximum
-  entropy (statistical mechanics and softmax), rate-distortion theory (lossy
-  compression and neural codecs), minimum description length (model selection
-  and scaling laws), the information bottleneck, and the InfoNCE bound behind
-  contrastive representation learning. A closing pair applies the same measures
-  outside engineering: the mutual information a neural spike train carries, and
-  the thermodynamic cost of a bit.
+  This course derives both limits and then follows them into the systems that
+  were built to approach them. The derivation is short. An event's information
+  content is fixed by its probability; requiring that independent events add
+  forces the logarithm; averaging gives entropy. Codeword lengths turn out to
+  be a budget of fixed size, which makes entropy a floor on expected length
+  rather than a metaphor for uncertainty. Everything after that is a
+  consequence: coding with the wrong distribution costs exactly a divergence,
+  which is why a classifier's cross-entropy loss is a compressed file size;
+  processing data can only destroy information, which is why no feature
+  extractor knows more about a label than the raw input did; and maximizing
+  information through a noisy channel gives capacity, which is why deep-space
+  probes and 5G radios use the codes they use.
 
 
-  Scope: the treatment is discrete. Differential (continuous) entropy appears
-  only where a named result needs it — the Gaussian channel and the Gaussian
-  rate-distortion function — and is stated without measure-theoretic
-  machinery. Explicit error-correcting code constructions beyond the Hamming
-  (7,4) example, and the full random-coding proof of the channel coding
-  theorem, are out of scope; the theorem is stated with its argument sketched.
+  The systems get read against the theory rather than described. gzip is
+  Lempel-Ziv matching feeding canonical Huffman codes, and the parts of RFC
+  1951 that look arbitrary are where the format trades a fraction of a bit for
+  a decodable bitstream. A language model scored in bits per byte is a
+  compressor, measurably. A learned image codec minimizes rate plus lambda
+  times distortion, which is the rate-distortion Lagrangian with a neural
+  network standing in for the test channel. Each module ends on one of these
+  artifacts and states where it departs from the idealization it was derived
+  under.
+
+
+  Scope: the treatment is discrete. Differential entropy appears only where a
+  named result needs it — the Gaussian channel, the Gaussian rate-distortion
+  function — stated without measure-theoretic machinery. The random-coding
+  proof of the channel coding theorem is sketched, not carried out in full;
+  algebraic coding theory beyond the Hamming (7,4) code is out of scope.
 prerequisites:
   - text: Logarithms and exponents, comfortable manipulation
   - text: "Basic discrete probability: distributions, independence, conditional probability"
@@ -54,20 +61,30 @@ key_results:
     lesson: what-is-surprise
   - text: "Entropy is bounded: 0 <= H(X) <= log2 n, with equality at certainty and at the uniform distribution"
     lesson: entropy-as-average-surprise
-  - text: A set of prefix codeword lengths is achievable iff the Kraft budget sum 2^-li <= 1 holds
+  - text: "Chain rule: H(X,Y) = H(X) + H(Y|X); conditioning reduces entropy on average but not pointwise"
+    lesson: joint-and-conditional-entropy
+  - text: "The entropy rate of printed English is on the order of one bit per letter; roughly 75% of English text is redundancy"
+    lesson: entropy-of-english
+  - text: A set of prefix codeword lengths is achievable iff the Kraft budget sum 2^-li <= 1 holds, and McMillan extends the bound to every uniquely decodable code
     lesson: kraft-inequality
-  - text: "Source coding theorem: no lossless code averages fewer bits per symbol than the entropy"
+  - text: "Source coding theorem: no lossless code averages fewer bits per symbol than the entropy, and block coding closes the one-bit gap"
     lesson: source-coding-theorem-lite
-  - text: "Chain rule: H(X,Y) = H(X) + H(Y|X); mutual information I(X;Y) = H(X) - H(X|Y) is the resulting drop in uncertainty"
+  - text: Arithmetic coding spends fractional bits, reaching within 2 bits of the entropy of the whole message rather than 1 bit per symbol
+    lesson: arithmetic-coding
+  - text: "Lempel-Ziv parsing attains the entropy rate of any stationary ergodic source without being told the source distribution"
+    lesson: dictionary-coding
+  - text: "Mutual information I(X;Y) = H(X) - H(X|Y) is the drop in uncertainty, and equals zero exactly under independence"
     lesson: mutual-information
   - text: "Data-processing inequality: no function of X can increase its information about Y — I(T;Y) <= I(X;Y) for Y -> X -> T"
     lesson: data-processing-inequality
-  - text: "The entropy rate of printed English is on the order of one bit per letter; roughly 75% of English text is redundancy"
-    lesson: entropy-of-english
-  - text: "Channel capacity C = max over inputs of I(X;Y); the binary symmetric channel has C = 1 - H(p)"
+  - text: "Fano's inequality: any decoder's error probability obeys H(X|Y) <= H(Pe) + Pe log(|X|-1), converting leftover conditional entropy into an unavoidable error rate"
+    lesson: fano-inequality
+  - text: "Channel capacity C = max over inputs of I(X;Y); the binary symmetric channel has C = 1 - H(p) and the erasure channel C = 1 - e"
     lesson: channel-capacity
   - text: "Noisy-channel coding theorem: every rate below capacity is achievable with vanishing error, and no rate above it is"
     lesson: noisy-channel-coding
+  - text: "Minimum distance controls guaranteed correction but not achievable rate: bounded-distance decoding gives up half the noise Shannon allows"
+    lesson: hamming-codes
   - text: Cross-entropy decomposes as H(p,q) = H(p) + KL(p||q), so minimizing the loss minimizes model-data divergence
     lesson: cross-entropy-loss
   - text: "A predictive model's cross-entropy on a stream is its achievable compressed size: language-model training is a compression objective"
@@ -80,48 +97,149 @@ key_results:
     lesson: rate-distortion
   - text: "Two-part description length L(H) + L(D|H) turns model selection into compression; the parameter cost grows like (k/2) log2 n"
     lesson: minimum-description-length
-  - text: "Information bottleneck: minimize I(X;T) - beta I(T;Y) to keep the bits of X that inform a target Y and discard the rest"
+  - text: "Information bottleneck: minimize I(X;T) - beta I(T;Y) to keep the bits of X that inform a target Y and discard the rest; the distortion measure emerges as a KL divergence"
     lesson: information-bottleneck
-  - text: "InfoNCE: an N-way contrastive classification loss lower-bounds mutual information, I(X;Y) >= log2 N - L_N"
+  - text: "InfoNCE: an N-way contrastive classification loss lower-bounds mutual information, I(X;Y) >= log2 N - L_N, and cannot certify more than log2 N bits"
     lesson: infonce
   - text: "Landauer's principle: erasing one bit of information dissipates at least kT ln 2 of heat, giving a bit a physical price"
     lesson: thermodynamics-of-information
+spine:
+  - label: "Information has a size"
+    years: "1928–1948"
+    step: >
+      An event's information content is fixed by its probability alone;
+      requiring that independent events add forces the logarithm, and averaging
+      that quantity over a source defines entropy.
+    caption: "A fair coin flip carries exactly one bit; a die roll carries 2.58."
+    lessons: [what-is-surprise, entropy-as-average-surprise]
+  - label: "Context destroys uncertainty"
+    years: "1948–1951"
+    step: >
+      Observing a second variable lowers average uncertainty, so a real
+      source's information is per-symbol entropy given everything before it —
+      not the entropy of its symbol frequencies.
+    caption: "English letters look like 4.1 bits each; in context they carry about one."
+    lessons: [joint-and-conditional-entropy, entropy-of-english]
+  - label: "Entropy is a code length"
+    years: "1948–1952"
+    step: >
+      Codeword lengths spend a budget of fixed size, so entropy is not a
+      metaphor for uncertainty but the exact floor on expected bits per symbol,
+      and a greedy merge attains it to within one bit.
+    caption: "Kraft's budget: a codeword of length L costs 2^-L of a total of one."
+    lessons: [prefix-codes, kraft-inequality, huffman-by-hand, source-coding-theorem-lite]
+  - label: "Dropping the assumptions"
+    years: "1977–2021"
+    step: >
+      The one-bit gap and the known-distribution requirement were assumptions,
+      not necessities: arithmetic coding spends fractional bits, Lempel-Ziv
+      learns the source while reading it, and shipped formats combine both.
+    caption: "gzip is Lempel-Ziv matches fed into canonical Huffman codes, block by block."
+    lessons: [arithmetic-coding, dictionary-coding, deflate-and-zstd]
+  - label: "What one variable says about another"
+    years: "1948–2019"
+    step: >
+      Mutual information measures shared uncertainty; processing can only
+      destroy it, leftover conditional entropy forces a minimum error rate, and
+      estimating any of it from finite samples is where the theory meets its
+      limits.
+    caption: "A 4096-sample estimate of a deep network's I(X;T) mostly measures the bin width."
+    lessons: [mutual-information, data-processing-inequality, fano-inequality, estimating-mutual-information]
+  - label: "The second limit"
+    years: "1948–2020"
+    step: >
+      Noise makes distinct inputs produce overlapping outputs; maximizing
+      mutual information over the input distribution gives a rate that is
+      achievable and above which reliable communication is impossible.
+    caption: "A binary symmetric channel with 11% noise still carries half a bit per use."
+    lessons: [channel-capacity, noisy-channel-coding, hamming-codes, neural-coding, deployed-codes]
+  - label: "The price of a wrong model"
+    years: "1951–2024"
+    step: >
+      Because a code is a bet on a distribution, betting wrong costs exactly a
+      divergence — which makes cross-entropy loss a compressed file size and a
+      trained language model a measurable compressor.
+    caption: "A 70B-parameter model compresses ImageNet patches below PNG."
+    lessons: [kl-divergence, cross-entropy-loss, compression-is-prediction, language-models-as-compressors]
+  - label: "The floor under every model"
+    years: "1964–1965"
+    step: >
+      Beneath every distribution-based bound is one that assumes no
+      distribution at all: the length of the shortest program that prints the
+      string, uncomputable but equal to entropy in expectation.
+    caption: "Fewer than one string in a thousand can be compressed by even ten bits."
+    lessons: [kolmogorov-complexity]
+  - label: "Entropy as a choice rule"
+    years: "1929–1961"
+    step: >
+      Run the machinery backwards and entropy becomes an objective: among
+      distributions consistent with what is known, the entropy-maximizing one
+      assumes nothing further, and in physics that choice carries a measurable
+      energy price.
+    caption: "Maximize entropy at fixed mean energy and the Boltzmann distribution falls out."
+    lessons: [max-entropy-principle, thermodynamics-of-information]
+  - label: "Bits traded for fidelity and for models"
+    years: "1959–1978"
+    step: >
+      Giving up exact reconstruction turns the coding limit into a curve R(D),
+      and charging a model for its own description turns model selection into
+      the same compression problem.
+    caption: "Half a bit per pixel buys 11% error on a fair binary source."
+    lessons: [rate-distortion, minimum-description-length]
+  - label: "Compression aimed at a target"
+    years: "1999–2018"
+    step: >
+      Rate-distortion needs a hand-picked distortion measure; replacing it with
+      mutual information about a target gives the information bottleneck, a
+      contrastive loss bounds that quantity where it cannot be computed, and a
+      learned codec runs the whole construction end to end.
+    caption: "A learned codec spends under 0.03 bits per pixel on the side information that prices the rest."
+    lessons: [information-bottleneck, infonce, learned-image-compression]
 sources:
   - C. E. Shannon, "A Mathematical Theory of Communication," Bell System Technical Journal, 1948
   - C. E. Shannon, "Prediction and Entropy of Printed English," Bell System Technical Journal, 1951
   - T. M. Cover, J. A. Thomas, Elements of Information Theory, 2nd ed., Wiley, 2006
   - D. J. C. MacKay, Information Theory, Inference, and Learning Algorithms, Cambridge University Press, 2003
   - Y. Polyanskiy, Y. Wu, Lecture Notes on Information Theory (MIT 6.441 / UIUC), 2016
+  - T. Weissman, I. Ochoa, K. Tatwawadi, EE376A Information Theory lecture notes, Stanford, 2016
+  - D. A. Huffman, "A Method for the Construction of Minimum-Redundancy Codes," Proceedings of the I.R.E., 1952
+  - J. Ziv, A. Lempel, "A Universal Algorithm for Sequential Data Compression," IEEE Trans. Inf. Theory, 1977
+  - J. Ziv, A. Lempel, "Compression of Individual Sequences via Variable-Rate Coding," IEEE Trans. Inf. Theory, 1978
+  - I. H. Witten, R. M. Neal, J. G. Cleary, "Arithmetic Coding for Data Compression," Communications of the ACM, 1987
+  - L. P. Deutsch, "DEFLATE Compressed Data Format Specification version 1.3," RFC 1951, IETF, 1996
+  - Y. Collet, M. Kucherawy, "Zstandard Compression and the application/zstd Media Type," RFC 8878, IETF, 2021
   - E. T. Jaynes, "Information Theory and Statistical Mechanics," Physical Review 106, 1957
   - P. Grünwald, "A Tutorial Introduction to the Minimum Description Length Principle," in Advances in Minimum Description Length, MIT Press, 2004
   - N. Tishby, F. C. Pereira, W. Bialek, "The Information Bottleneck Method," 1999
+  - Z. Goldfeld, Y. Polyanskiy, "The Information Bottleneck Problem and Its Applications in Machine Learning," IEEE JSAIT, 2020
   - A. van den Oord, Y. Li, O. Vinyals, "Representation Learning with Contrastive Predictive Coding," 2018
   - G. Delétang, A. Ruoss, et al., "Language Modeling Is Compression," ICLR 2024
-  - J. Ballé, V. Laparra, E. P. Simoncelli, "End-to-end Optimized Image Compression," ICLR 2017
+  - J. Ballé, D. Minnen, S. Singh, S. J. Hwang, N. Johnston, "Variational Image Compression with a Scale Hyperprior," ICLR 2018
+  - D. P. Kingma, M. Welling, "Auto-Encoding Variational Bayes," ICLR 2014
   - A. Shen, V. A. Uspensky, N. Vereshchagin, Kolmogorov Complexity and Algorithmic Randomness, AMS, 2017
   - A. Borst, F. E. Theunissen, "Information Theory and Neural Coding," Nature Neuroscience 2, 1999
   - J. M. R. Parrondo, J. M. Horowitz, T. Sagawa, "Thermodynamics of Information," Nature Physics 11, 2015
 outcomes:
   - id: co-quantify
-    text: Compute surprisal and entropy for discrete distributions
+    text: Compute surprisal, entropy, joint and conditional entropy for discrete distributions, and estimate the entropy rate of a real source
     bloom: apply
   - id: co-coding
-    text: Explain why entropy bounds lossless compression and build a Huffman code by hand
+    text: Explain why entropy bounds lossless compression, build Huffman and arithmetic codes by hand, and read a deployed format as an instance of the theory
     bloom: analyze
   - id: co-relate
-    text: Compute conditional entropy and mutual information, and apply the data-processing inequality to bound what one variable reveals about another
+    text: Compute mutual information, apply the data-processing and Fano inequalities, and judge when a mutual-information estimate can be trusted
     bloom: analyze
   - id: co-channel
-    text: Compute the capacity of a discrete channel and explain the noisy-channel coding theorem
-    bloom: analyze
+    text: Compute the capacity of a discrete channel, explain the noisy-channel coding theorem, and evaluate how close a real code family comes to the limit
+    bloom: evaluate
   - id: co-ml
-    text: Analyze cross-entropy loss, KL divergence, and description length as coding costs, connecting ML objectives to compression and its algorithmic limit
+    text: Analyze cross-entropy loss, KL divergence, and description length as coding costs, connecting learning objectives to compression and its algorithmic limit
     bloom: analyze
   - id: co-principles
     text: Analyze the information-theoretic optimization principles used in modern inference and learning — maximum entropy, rate-distortion, minimum description length, the information bottleneck, and contrastive mutual-information bounds
     bloom: analyze
   - id: co-sciences
-    text: Apply mutual information and entropy to quantify systems in the natural sciences — neural codes and the thermodynamic cost of information
+    text: Apply mutual information and entropy to quantify systems outside communications — neural codes and the thermodynamic cost of information
     bloom: apply
 
 modules:
@@ -135,8 +253,9 @@ modules:
         status: drafted
         goal: "Compute the surprisal of an event from its probability"
         opening: "An event's information content is determined by its probability alone: the less probable the event, the more information its occurrence carries."
-        est_minutes: 13
+        est_minutes: 28
         prerequisites: []
+        key_image: figures/curve.svg
         concepts:
           introduces: [surprisal]
           reinforces: []
@@ -144,11 +263,15 @@ modules:
           - Rare events carry more information than common ones
           - Independent surprises should add, which forces a logarithm
           - "surprisal = -log2 p, measured in bits"
+          - "Log base is a unit choice: bits, nats, hartleys"
         demo:
           component: SurprisalSlider
           spec: >
-            Slider for p in (0,1]; live readout of -log2 p with a log-curve
-            plot; preset buttons for coin flip, die roll, certain event.
+            Slider for p in (0,1] with a live -log2 p readout on the curve.
+            The prose sets targets before explaining: find the p worth exactly
+            3 bits, then the p worth exactly 1 bit, then confirm that dividing
+            p by 10 always adds the same 3.32 bits regardless of where you
+            started. Presets: coin flip, die roll, certain event.
 
       - slug: entropy-as-average-surprise
         title: "Entropy"
@@ -156,22 +279,82 @@ modules:
         status: drafted
         goal: "Compute the entropy of a discrete distribution as expected surprisal"
         opening: "Entropy extends surprisal from single events to whole distributions: it is the expected surprisal of one draw."
-        est_minutes: 15
+        est_minutes: 30
         prerequisites: [what-is-surprise]
+        key_image: figures/binary-entropy.svg
         concepts:
           introduces: [entropy]
           reinforces: [surprisal]
         key_ideas:
-          - Entropy is the probability-weighted average of surprisal
-          - Uniform distributions maximize entropy; certainty gives zero
+          - Entropy is the probability-weighted average of surprisal, not the plain average
+          - "Range: 0 <= H <= log2 n, zero only at a point mass, maximal only at uniform"
+          - The binary entropy function is flat at the middle and vertical at the ends
         demo:
           component: EntropyExplorer
           spec: >
-            Draggable bar chart of a 4-outcome distribution (auto-renormalized);
-            live H(X) readout; buttons for uniform / certain / skewed presets.
+            Draggable bar chart of a 4-outcome distribution (auto-renormalized)
+            with a live H readout. Targets stated in prose first: drive H to
+            exactly 0, then rebuild the 2.00-bit maximum, then find a
+            non-uniform distribution with H = 1.50 bits and note that many
+            different shapes hit the same value. Presets: uniform, certain,
+            skewed.
+
+      - slug: joint-and-conditional-entropy
+        title: "Joint and conditional entropy"
+        type: core
+        status: drafted
+        goal: "Compute conditional entropy from a joint distribution table"
+        opening: "Conditional entropy H(Y|X) is the uncertainty remaining in Y once X is observed; the chain rule decomposes joint uncertainty into sequential parts."
+        est_minutes: 32
+        prerequisites: [entropy-as-average-surprise]
+        key_image: figures/area-bars.svg
+        concepts:
+          introduces: [conditional-entropy]
+          reinforces: [entropy, surprisal]
+        key_ideas:
+          - A joint table assigns one probability to each pair of outcomes
+          - "Conditional entropy is an average over the conditioning variable, not a single conditional"
+          - "Chain rule: H(X,Y) = H(X) + H(Y|X) = H(Y) + H(X|Y)"
+          - "Conditioning reduces entropy on average; a particular observation can raise it"
+        demo:
+          component: JointEntropyGrid
+          spec: >
+            2x2 joint-probability grid (sky x rain) with draggable cell masses,
+            auto-renormalized; live readouts of H(rain), H(rain|sky), H(sky,rain).
+            Targets stated before the theory: build a table with H(rain) = 1 bit
+            and H(rain|sky) = 0, then one where H(rain|sky) = H(rain), then find
+            a table where a single row's conditional entropy exceeds H(rain)
+            while the average still does not. Presets: independent, perfectly
+            linked, realistic.
+
+      - slug: entropy-of-english
+        title: "Entropy of English text"
+        type: worked-practice
+        status: drafted
+        goal: "Estimate the entropy rate of English text with Shannon's guessing game"
+        opening: "English text carries roughly one bit of information per letter while ASCII spends eight; the gap is redundancy, and Shannon's guessing game measures it."
+        est_minutes: 35
+        prerequisites: [joint-and-conditional-entropy]
+        key_image: figures/shannon-1951-bounds.png
+        concepts:
+          introduces: [entropy-rate]
+          reinforces: [conditional-entropy, entropy, surprisal]
+        key_ideas:
+          - "Entropy rate is per-symbol entropy given unlimited context, and it is far below the letter-frequency entropy"
+          - Shannon's guessing game converts human next-letter guesses into bounds on the rate
+          - "Redundancy is the gap between the raw encoding width and the rate: about 75% for English"
+          - The game measures the guesser's model of English, so a better predictor tightens the estimate
+        demo: null
+        notes: >-
+          Module application (L16). Reproduces Shannon's 1951 experiment on a
+          short passage: play the guessing game, tally guess ranks, convert to
+          bits per letter, and compare against Shannon's own 0.6-1.3 bits/letter
+          range. Departure from the idealization: finite sample, one guesser,
+          stationarity assumed, alphabet choice changes every number. No demo —
+          the game runs in prose (D1).
 
   - slug: coding
-    title: "Source coding"
+    title: "Lossless source coding"
     outcomes: [co-coding]
     lessons:
       - slug: prefix-codes
@@ -180,21 +363,21 @@ modules:
         status: drafted
         goal: "Construct a prefix code from a decoding strategy and compute its expected length"
         opening: "A yes/no question strategy over a finite outcome set and a binary prefix code are the same object: each outcome sits at a leaf of a decision tree, and its depth is the length of its codeword."
-        est_minutes: 16
+        est_minutes: 30
         prerequisites: [entropy-as-average-surprise]
+        key_image: figures/tree-build-4.svg
         concepts:
           introduces: [prefix-code]
           reinforces: [entropy, surprisal]
         key_ideas:
           - "A question strategy is a binary decision tree: depth = questions asked = codeword length"
           - Prefix-free means outcomes sit at leaves only, so a concatenated stream decodes without separators
-          - "Expected codeword length L = sum of p times length is the cost to minimize; entropy is the floor (proved two lessons on)"
+          - "Expected codeword length L = sum of p times length is the cost to minimize"
           - Good strategies split probability mass near in half, giving likely outcomes short codewords
         demo: null
         notes: >-
-          Re-split from the previous pass's merged prefix-codes lesson: this
-          half owns the tree/code correspondence and expected length; the Kraft
-          inequality is now the next lesson. Build the tree on
+          This lesson owns the tree/code correspondence and expected length; the
+          Kraft inequality is the next lesson. Build the tree on
           {A:.5, B:.25, C:.15, D:.1} via a FigureSequence, not a demo.
 
       - slug: kraft-inequality
@@ -203,24 +386,27 @@ modules:
         status: drafted
         goal: "Apply the Kraft inequality to decide whether a set of codeword lengths is achievable by a prefix code"
         opening: "A codeword of length L claims the fraction 2^-L of a fixed budget of one, and a prefix code exists with a given set of lengths exactly when those fractions sum to at most one — the Kraft inequality."
-        est_minutes: 18
+        est_minutes: 32
         prerequisites: [prefix-codes]
+        key_image: figures/budget-fill-5.svg
         concepts:
           introduces: [kraft-inequality]
           reinforces: [prefix-code, entropy]
         key_ideas:
           - Each codeword of length L claims 2^-L of the tree below it; prefix-free means those subtrees are disjoint
-          - "Necessity: disjoint subtrees force the budget sum 2^-li <= 1"
-          - "Sufficiency: given lengths obeying the budget, assign codewords shortest-first to build the code"
+          - "Necessity and sufficiency are separate arguments: disjointness forces the bound, shortest-first placement attains it"
           - McMillan extends the same bound to every uniquely decodable code, so prefix codes lose nothing
-          - "Equality sum 2^-li = 1 marks a complete code with no wasted nodes"
+          - "Equality marks a complete code with no wasted nodes"
         demo:
           component: CodewordBudget
           spec: >
-            Learner adds/removes codewords of chosen lengths on a binary tree;
-            a budget bar fills by 2^-L per codeword and turns red past 1.
-            Presets: the impossible {1,2,2,2}, the tight {1,2,3,3}, and the
-            question tree for {A:.5, B:.25, C:.15, D:.1}.
+            Learner places codewords of chosen lengths on a binary tree; a
+            budget bar fills by 2^-L per codeword and turns red past 1. Tasks
+            stated before the theorem: fit five codewords into the budget and
+            report the shortest possible longest codeword; then try to build
+            {1,2,2,2} and identify which placement is blocked. Presets: the
+            impossible {1,2,2,2}, the tight {1,2,3,3}, and the question tree
+            for {A:.5, B:.25, C:.15, D:.1}.
 
       - slug: huffman-by-hand
         title: "Huffman coding"
@@ -228,16 +414,22 @@ modules:
         status: drafted
         goal: "Build an optimal prefix code with the Huffman algorithm"
         opening: "The Huffman algorithm builds a minimum-expected-length prefix code by repeatedly merging the two least probable symbols."
-        est_minutes: 18
+        est_minutes: 32
         prerequisites: [kraft-inequality]
+        key_image: figures/huffman-merge-5.svg
         concepts:
           introduces: [huffman-coding]
           reinforces: [prefix-code, kraft-inequality, entropy]
         key_ideas:
-          - Merge the lowest-probability pair, repeat
-          - Expected length lands within 1 bit of entropy
+          - Merge the two least probable symbols, reinsert the composite, repeat
+          - "Optimality by exchange argument: the two rarest symbols may be assumed deepest siblings"
+          - "Expected length lands in [H, H+1), and the gap is the cost of integer lengths"
+          - Ties make the tree non-unique but never change the expected length
         demo: null
-        notes: "Worked example on {A:.5, B:.25, C:.15, D:.1}; learner generates on a fresh distribution."
+        notes: >-
+          Worked example on {A:.5, B:.25, C:.15, D:.1}; learner regenerates on a
+          fresh distribution. Huffman's 1952 paper supplies the original
+          13-message table and the D-ary generalization.
 
       - slug: source-coding-theorem-lite
         title: "The source coding theorem"
@@ -245,70 +437,137 @@ modules:
         status: drafted
         goal: "Explain why no lossless code can average fewer bits per symbol than the entropy"
         opening: "No lossless code achieves fewer expected bits per symbol than the source entropy. This lesson gives the argument."
-        est_minutes: 18
+        est_minutes: 38
         prerequisites: [huffman-by-hand, entropy-as-average-surprise]
+        key_image: figures/block-gap-5.svg
         concepts:
           introduces: [source-coding-theorem, typical-set]
           reinforces: [kraft-inequality, entropy, prefix-code, huffman-coding]
         key_ideas:
-          - Any prefix code implicitly bets on a distribution q with q(x) = 2^-length(x)
-          - Betting on any q other than the true p can only lengthen your average codeword
-          - "A long block of symbols concentrates on ~2^{nH} typical sequences, so nH bits suffice"
-          - Coding blocks of symbols squeezes Huffman's 1-bit overhead toward zero
+          - "Any prefix code implicitly bets on a distribution q with q(x) = 2^-length(x)"
+          - "Expected length decomposes as H(p) plus a non-negative mismatch term, so H is the floor"
+          - "A long block concentrates on about 2^{nH} typical sequences, so nH bits suffice"
+          - Block coding spreads the one-bit overhead over n symbols and drives it to zero
         demo:
           component: BlockCodingGap
           spec: >
-            Slider for block size n (1-8) on a biased coin with adjustable bias;
-            plots best achievable bits per symbol vs. the entropy line, showing
-            the per-symbol gap shrink as n grows. Presets: fair coin, 90/10 coin.
+            Biased coin with adjustable bias; slider for block size n (1-8);
+            plots best achievable bits per symbol against the entropy line.
+            Target stated first: for a 90/10 coin, find the smallest block size
+            that gets within 0.05 bits/symbol of H, then repeat for a 99/1 coin
+            and explain why the answer moves. Presets: fair coin, 90/10 coin.
+
+      - slug: arithmetic-coding
+        title: "Arithmetic coding"
+        type: core
+        status: drafted
+        goal: "Construct an arithmetic code for a message and explain why its overhead is two bits per message rather than one bit per symbol"
+        opening: "A symbol code must spend a whole number of bits on every symbol, which costs up to one bit per symbol however good the model is; arithmetic coding removes the constraint by encoding the entire message as a single subinterval of [0,1)."
+        est_minutes: 36
+        prerequisites: [source-coding-theorem-lite]
+        key_image: figures/interval-narrow-5.svg
+        concepts:
+          introduces: [arithmetic-coding]
+          reinforces: [source-coding-theorem, prefix-code, kraft-inequality, entropy, huffman-coding]
+        key_ideas:
+          - "Huffman's worst case is a near-certain symbol: negligible information, one full bit"
+          - "Each symbol narrows the current interval by its probability, so the final width is the message probability"
+          - "A subinterval of width w needs about -log2 w bits to name, giving total cost within 2 bits of the message surprisal"
+          - "Finite precision forces renormalization and the underflow fix; the model is a separate module from the coder"
+        demo:
+          component: ArithmeticInterval
+          spec: >
+            Fixed 3-symbol model; the reader types a short message and watches
+            the interval narrow, with a live bit count and the Huffman cost for
+            comparison. Task stated before the theory: find a 4-symbol message
+            where arithmetic coding beats Huffman by more than one bit, and a
+            message where the two tie. Presets: the Witten-Neal-Cleary "eaii!"
+            example, a run of the most probable symbol, an alternating message.
+
+      - slug: dictionary-coding
+        title: "Dictionary coding and universal compression"
+        type: core
+        status: drafted
+        key_image: figures/lz77-parse-3.svg
+        goal: "Demonstrate LZ77 and LZ78 parsing on a string and explain why they reach the entropy rate without being given the source distribution"
+        opening: "Every code so far required the source distribution in advance; Lempel-Ziv coding replaces the distribution with the text already seen, and still converges to the entropy rate of any stationary ergodic source."
+        est_minutes: 34
+        prerequisites: [arithmetic-coding, entropy-of-english]
+        concepts:
+          introduces: [lempel-ziv, universal-coding]
+          reinforces: [entropy-rate, source-coding-theorem, arithmetic-coding, conditional-entropy]
+        key_ideas:
+          - "A pointer into recent output plus a match length replaces a probability model"
+          - "LZ77 slides a window over the raw text; LZ78 builds an explicit phrase dictionary"
+          - "The number of distinct phrases in a parse bounds the compression ratio, which is why the scheme is universal"
+          - "Universality is asymptotic: short inputs pay dictionary overhead and can expand"
+        demo:
+          component: LZ77Window
+          spec: >
+            Sliding-window LZ77 over reader-edited text, showing the window,
+            the current match, and the emitted (offset, length, literal)
+            triples with a running bit count. Tasks stated before the theory:
+            construct a 200-character input that LZ77 shrinks by more than 10x,
+            then construct one it expands, and report the shortest input for
+            which it breaks even. Presets: the 1977 paper's ternary example, an
+            English sentence, random bytes.
+
+      - slug: deflate-and-zstd
+        title: "DEFLATE and Zstandard"
+        type: synthesis
+        status: drafted
+        key_image: figures/block-layout.svg
+        goal: "Analyze the DEFLATE and Zstandard bitstream formats as concrete instances of the module's coding results"
+        opening: "gzip, PNG and HTTP content-encoding all carry the same format, DEFLATE, and every field in its specification is a decision about the theorems of this module."
+        est_minutes: 38
+        prerequisites: [huffman-by-hand, arithmetic-coding, dictionary-coding]
+        concepts:
+          introduces: [canonical-code, asymmetric-numeral-systems]
+          reinforces: [huffman-coding, lempel-ziv, kraft-inequality, prefix-code, entropy, universal-coding]
+        key_ideas:
+          - "DEFLATE is LZ77 matching feeding two canonical Huffman codes, described per block"
+          - "Canonical codes transmit lengths only, because Kraft plus an ordering rule determines the codewords"
+          - "Zstandard replaces Huffman on the sequence stream with an ANS coder and adds a recent-offset cache and trained dictionaries"
+          - "Every format guarantees a worst case: DEFLATE expands by at most 5 bytes per 32 KB block"
+        demo: null
+        notes: >-
+          Module application (L16). Artifact: RFC 1951 and RFC 8878, read
+          section by section against Kraft, Huffman optimality, and LZ
+          universality. Departures from the idealization to name: 32 KB window,
+          258-byte match cap, per-block rather than per-file statistics, fixed
+          Huffman tables for short blocks, integer-length codes retained where
+          the theory says arithmetic coding would be tighter, and the
+          bit-packing asymmetry (fields LSB-first, Huffman codes MSB-first).
 
   - slug: shared-information
     title: "Shared information"
     outcomes: [co-relate]
     lessons:
-      - slug: joint-and-conditional-entropy
-        title: "Joint and conditional entropy"
-        type: core
-        status: drafted
-        goal: "Compute conditional entropy from a joint distribution table"
-        opening: "Conditional entropy H(Y|X) is the uncertainty remaining in Y once X is observed; the chain rule decomposes joint uncertainty into sequential parts."
-        est_minutes: 16
-        prerequisites: [entropy-as-average-surprise]
-        concepts:
-          introduces: [conditional-entropy]
-          reinforces: [entropy, surprisal]
-        key_ideas:
-          - A joint table assigns one probability to each pair of outcomes
-          - Conditional entropy is the average leftover uncertainty after observing the other variable
-          - "Chain rule: H(X,Y) = H(X) + H(Y|X)"
-        demo:
-          component: JointEntropyGrid
-          spec: >
-            2x2 joint-probability grid (sky x rain) with draggable cell masses,
-            auto-renormalized; live readouts of H(rain), H(rain|sky), and their
-            difference. Presets: independent, perfectly linked, realistic.
-
       - slug: mutual-information
         title: "Mutual information"
         type: core
         status: drafted
         goal: "Compute the mutual information between two variables as the drop in uncertainty"
         opening: "Mutual information I(X;Y) = H(X) - H(X|Y) quantifies, in bits, how much observing one variable reduces uncertainty about the other."
-        est_minutes: 16
+        est_minutes: 32
         prerequisites: [joint-and-conditional-entropy]
+        key_image: figures/dependence-dial-4.svg
         concepts:
           introduces: [mutual-information]
           reinforces: [conditional-entropy, entropy]
         key_ideas:
-          - "I(X;Y) = H(X) - H(X|Y): the bits one variable removes from the other's uncertainty"
-          - Mutual information is symmetric, and zero exactly when the variables are independent
-          - Correlation can miss dependence; mutual information cannot
+          - "I(X;Y) = H(X) - H(X|Y) = H(X) + H(Y) - H(X,Y): the bits one variable removes from the other's uncertainty"
+          - Mutual information is symmetric and zero exactly under independence
+          - Correlation can miss dependence entirely; mutual information cannot
+          - "The area diagram is a mnemonic, not an identity: the three-variable version can go negative"
         demo:
           component: MutualInfoDial
           spec: >
-            Dependence slider morphs a 2x2 joint distribution from independent
-            to perfectly coupled; stacked-bar view splits H(X) into H(X|Y) and
-            I(X;Y) live. Presets: independent, noisy channel, lockstep.
+            Dependence slider morphs a 2x2 joint from independent to perfectly
+            coupled; a stacked bar splits H(X) into H(X|Y) and I(X;Y). Targets
+            stated first: set the dial so exactly half a bit is shared, then
+            build a joint with zero correlation but non-zero mutual
+            information. Presets: independent, noisy channel, lockstep.
 
       - slug: data-processing-inequality
         title: "The data-processing inequality"
@@ -316,8 +575,9 @@ modules:
         status: drafted
         goal: "Apply the data-processing inequality to bound how much a representation reveals about a target"
         opening: "For any variable T computed from X, no processing can increase information about a third variable Y: if Y, X, T form a Markov chain, then I(T;Y) <= I(X;Y)."
-        est_minutes: 16
+        est_minutes: 32
         prerequisites: [mutual-information]
+        key_image: figures/ratchet-cascade.svg
         concepts:
           introduces: [data-processing-inequality]
           reinforces: [mutual-information, conditional-entropy]
@@ -325,89 +585,211 @@ modules:
           - "For a Markov chain Y -> X -> T, I(T;Y) <= I(X;Y): processing only loses information"
           - The proof expands I(Y;X,T) two ways with the chain rule and kills the Markov term
           - Equality holds exactly when T is a sufficient statistic for Y
-          - "Post-processing cannot manufacture information: a learned feature of X knows no more about Y than X did"
+          - "Post-processing cannot manufacture information, but it can make existing information usable"
         demo: null
         notes: >-
-          Pulled out of the previous pass's information-bottleneck lesson, where
-          it was crammed in as a sub-result. Standalone here so channel coding,
-          rate-distortion, and the bottleneck can all cite it. Static theorem —
-          use figures/FigureSequence, no demo.
+          Static theorem — figures and a FigureSequence, no demo. Must supply
+          the layered-network corollary that the estimating-mutual-information
+          and information-bottleneck lessons both build on.
 
-      - slug: entropy-of-english
-        title: "Entropy of English text"
-        type: worked-practice
+      - slug: fano-inequality
+        title: "Fano's inequality"
+        type: core
         status: drafted
-        goal: "Estimate the entropy of English text with Shannon's guessing game"
-        opening: "English text carries roughly one bit of information per letter while ASCII spends eight; the gap is redundancy, and Shannon's guessing game measures it."
-        est_minutes: 15
-        prerequisites: [joint-and-conditional-entropy, prefix-codes]
+        key_image: figures/region.svg
+        goal: "Derive a lower bound on any decoder's error probability from the conditional entropy that observation leaves behind"
+        opening: "If H(X|Y) bits of uncertainty about X remain after observing Y, then no rule for guessing X from Y — however clever — can have an error probability below the value Fano's inequality fixes."
+        est_minutes: 34
+        prerequisites: [mutual-information, joint-and-conditional-entropy, data-processing-inequality]
         concepts:
-          introduces: [entropy-rate]
-          reinforces: [conditional-entropy, entropy, surprisal]
+          introduces: [fano-inequality]
+          reinforces: [conditional-entropy, mutual-information, entropy, data-processing-inequality]
         key_ideas:
-          - Context slashes uncertainty; the entropy rate is per-symbol entropy given unlimited context
-          - Shannon's game turns human next-letter guesses into an entropy estimate
-          - Redundancy is the gap between raw encoding size and the entropy rate
+          - "H(X|Y) <= H(Pe) + Pe log2(|X|-1): leftover uncertainty forces a minimum error rate"
+          - "The proof introduces a binary error indicator and expands H(E,X|Y) two ways"
+          - "Inverting the bound turns any conditional-entropy statement into an impossibility result"
+          - "The bound is tight: a specific distribution attains it, which is why the coding-theorem converse cannot be improved"
         demo: null
         notes: >-
-          Worked example: play the guessing game on a short sentence, tally
-          guess counts, convert to a bits-per-letter estimate; learner repeats
-          on a fresh sentence. No demo — the guessing game runs in prose (D1).
+          Split out of the previous pass's noisy-channel-coding lesson, where it
+          was compressed into a paragraph. Standalone so that the channel
+          converse, the minimax-risk aside, and the estimating-MI lesson can all
+          cite it. Cover & Thomas Theorem 2.10.1 for the proof; Polyanskiy-Wu
+          §5.3-5.4 for the Fano-LeCam statistical use.
+
+      - slug: estimating-mutual-information
+        title: "Estimating mutual information from samples"
+        type: synthesis
+        status: drafted
+        key_image: figures/bin-sweep.svg
+        goal: "Explain why plug-in mutual-information estimates are biased upward and judge when a reported estimate is meaningful"
+        opening: "Every mutual information in this module was computed from a known joint distribution; estimating one from a finite sample is a different problem, and the naive estimator reports shared information between independent variables."
+        est_minutes: 36
+        prerequisites: [mutual-information, data-processing-inequality]
+        concepts:
+          introduces: [mi-estimation-bias]
+          reinforces: [mutual-information, data-processing-inequality, entropy, conditional-entropy]
+        key_ideas:
+          - "The plug-in estimator is biased upward: independent variables score about (r-1)(c-1)/(2n ln 2) bits"
+          - "Binning a continuous variable makes the answer a function of the bin width, not of the variables"
+          - "In a deterministic network I(X;T) is either infinite or a constant, so the plotted quantity is an estimator artifact"
+          - "What the deep-learning information plane actually tracks is geometric clustering of representations"
+        demo:
+          component: MIEstimatorBias
+          spec: >
+            Sampler for two provably independent variables with sliders for
+            sample size n and bin count. Task stated before the explanation:
+            make the plug-in estimate report more than 0.5 bits of mutual
+            information between variables you know to be independent, then find
+            the sample size at which the estimate falls below 0.05 bits.
+            Presets: coarse bins with many samples, fine bins with few samples,
+            the honest regime.
+        notes: >-
+          Module application (L16). Artifact: the deep-network information-plane
+          controversy — Shwartz-Ziv and Tishby's compression phase, Saxe et
+          al.'s tanh-vs-ReLU rebuttal, Amjad-Geiger vacuousness, and the
+          Goldfeld et al. clustering resolution. Uses the module's DPI layer
+          chain and mutual-information definition; departs from the idealization
+          exactly where a deterministic map makes the quantity undefined.
 
   - slug: channels
     title: "Channels and capacity"
-    outcomes: [co-channel]
+    outcomes: [co-channel, co-sciences]
     lessons:
       - slug: channel-capacity
         title: "Channel capacity"
         type: core
         status: drafted
+        key_image: figures/bsc-vs-bec-curves.svg
         goal: "Compute the capacity of a discrete memoryless channel"
         opening: "A noisy channel is a conditional distribution p(y|x), and its capacity is the largest mutual information any input distribution can push through it: C = max over p(x) of I(X;Y)."
-        est_minutes: 18
+        est_minutes: 34
         prerequisites: [mutual-information]
         concepts:
           introduces: [channel-capacity]
           reinforces: [mutual-information, conditional-entropy, entropy]
         key_ideas:
-          - A discrete channel is a transition table p(y|x); noise is the conditional entropy H(Y|X)
-          - "Capacity is mutual information maximized over the input: C = max_p(x) I(X;Y), in bits per use"
-          - "Binary symmetric channel: C = 1 - H(p), zero at p = 1/2 and one at p = 0"
+          - A discrete channel is a transition table p(y|x); the noise is the conditional entropy H(Y|X)
+          - "Capacity is mutual information maximized over the input: C = max I(X;Y), in bits per use"
+          - "Binary symmetric channel: C = 1 - H(p), zero at p = 1/2 and one at p = 0 or 1"
           - "Binary erasure channel: C = 1 - e, the fraction of symbols that survive"
-          - Capacity is the channel counterpart of entropy — the second of Shannon's two limits
         demo:
           component: ChannelCapacityDial
           spec: >
-            Toggle between a binary symmetric channel and a binary erasure
-            channel; slider for the noise parameter with a live capacity
-            readout, plus an I(X;Y)-vs-input-bias curve for the fixed channel
-            showing the maximum at the uniform input. Presets: noiseless,
-            BSC p=0.1, BSC p=0.5 (zero capacity), BEC e=0.5.
+            Toggle between a binary symmetric and a binary erasure channel;
+            noise slider with a live capacity readout, plus the I(X;Y) curve
+            against input bias for the fixed channel. Targets stated first:
+            find the BSC crossover probability at which capacity is exactly
+            half a bit, then find the two BSC settings that give capacity 1 and
+            explain why both are noiseless. Presets: noiseless, BSC p=0.11,
+            BSC p=0.5, BEC e=0.5.
 
       - slug: noisy-channel-coding
         title: "The noisy-channel coding theorem"
         type: core
         status: drafted
+        key_image: figures/repetition-rate-error.svg
         goal: "Explain why capacity is the exact threshold between reliable and unreliable communication"
         opening: "Reliable communication is possible at every rate below the channel capacity and impossible above it: capacity is a sharp threshold, not a soft trade-off."
-        est_minutes: 20
-        prerequisites: [channel-capacity, data-processing-inequality]
+        est_minutes: 40
+        prerequisites: [channel-capacity, data-processing-inequality, fano-inequality, source-coding-theorem-lite]
         concepts:
-          introduces: [noisy-channel-coding-theorem, fano-inequality]
-          reinforces: [channel-capacity, mutual-information, typical-set, entropy]
+          introduces: [noisy-channel-coding-theorem]
+          reinforces: [channel-capacity, mutual-information, typical-set, entropy, fano-inequality, data-processing-inequality]
         key_ideas:
-          - Redundancy added the right way beats noise; the amount alone does not
-          - "Achievability: random codebooks plus joint-typicality decoding make error vanish for any rate below C"
-          - "Converse: Fano's inequality bounds error below when the rate exceeds C, so capacity cannot be crossed"
-          - "The Hamming (7,4) code is a concrete rate-4/7 single-error-correcting code"
-          - Capacity gives mutual information its operational meaning, mirroring entropy and source coding
+          - "Redundancy alone does not defeat noise; repetition codes trade rate away without ever reaching zero error"
+          - "Achievability: random codebooks and joint-typicality decoding make error vanish for every rate below C"
+          - "Converse: Fano plus the data-processing inequality forbid every rate above C"
+          - "The proof is non-constructive, which is why explicit capacity-approaching codes took fifty years"
         demo:
           component: ChannelCodingThreshold
           spec: >
             Precomputed on a binary symmetric channel: sliders for rate R and
-            blocklength n; a plot of achievable block-error probability against
-            R shows the cliff at C, dropping to 0 for R<C and rising to 1/2 for
-            R>C as n grows. Presets: below capacity, at capacity, above capacity.
+            blocklength n; plots achievable block-error probability against R.
+            Task stated before the theorem: at n = 1000 find the largest rate
+            with block error below 1e-3, then raise n and watch the answer
+            converge on C rather than on 0. Presets: below capacity, at
+            capacity, above capacity.
+
+      - slug: hamming-codes
+        title: "Hamming codes and minimum distance"
+        type: core
+        status: drafted
+        key_image: figures/circle-build-4.svg
+        goal: "Construct the Hamming (7,4) code, decode a received word by syndrome, and explain why minimum distance does not determine how much noise a code can survive"
+        opening: "The coding theorem proves that good codes exist without exhibiting one; the Hamming (7,4) code is an explicit rate-4/7 code that corrects any single error, and its limits show what the existence proof was actually promising."
+        est_minutes: 34
+        prerequisites: [noisy-channel-coding]
+        concepts:
+          introduces: [linear-block-code, minimum-distance]
+          reinforces: [noisy-channel-coding-theorem, channel-capacity, entropy]
+        key_ideas:
+          - "Three parity checks over four message bits; the parity-check matrix defines the code as a null space"
+          - "The syndrome names the flipped bit directly, so decoding is a table lookup"
+          - "Minimum distance 3 guarantees correction of one error and detection of two"
+          - "Bounded-distance decoding gives up half the noise Shannon permits, so distance is the wrong figure of merit"
+        demo:
+          component: HammingSyndrome
+          spec: >
+            A 7-bit codeword shown as three overlapping parity circles; the
+            reader flips bits and the syndrome decoder responds. Task stated
+            before the theory: find a single-bit error the decoder fixes, then
+            find a two-bit error pattern it "corrects" into the wrong codeword,
+            and report how many such patterns exist. Presets: clean codeword,
+            one error, two errors.
+
+      - slug: neural-coding
+        title: "Mutual information of a neural code"
+        type: extra
+        status: drafted
+        key_image: figures/direct-method-4.svg
+        goal: "Estimate the information a neural spike code carries about a stimulus"
+        opening: "A neuron is a noisy channel from stimulus to spike train, and the mutual information I(S;R) = H(R) - H(R|S) measures, in bits, how much its response reveals about what it saw."
+        est_minutes: 30
+        prerequisites: [channel-capacity, mutual-information, estimating-mutual-information]
+        concepts:
+          introduces: [coding-efficiency]
+          reinforces: [mutual-information, channel-capacity, conditional-entropy, mi-estimation-bias]
+        key_ideas:
+          - A stimulus-response table is a channel; the direct method computes I(S;R) = H(R) - H(R|S) from binned spike counts
+          - Recorded single neurons carry on the order of one bit per spike
+          - "Coding efficiency = information transmitted divided by channel capacity"
+          - "Mutual information is defined only relative to a stimulus ensemble, so naturalistic stimuli change the answer"
+        demo: null
+        notes: >-
+          Off-path chapter. Keep it discrete and computable: a small
+          stimulus-response joint, the direct method, bits per spike, coding
+          efficiency against capacity. Reuse the estimator-bias warnings from
+          estimating-mutual-information rather than restating them. Real numbers
+          from Borst and Theunissen Table 2 (fly H1 ~1 bit/spike), cited not
+          invented.
+
+      - slug: deployed-codes
+        title: "Deployed codes and the Shannon limit"
+        type: synthesis
+        status: drafted
+        key_image: figures/gap-timeline.svg
+        goal: "Evaluate how close deployed error-correcting codes come to capacity and what each code family trades for the gap"
+        opening: "Between 1948 and 1993 the gap between the best deployed codes and the Shannon limit stayed above two decibels; sparse-graph codes closed most of it, and the record of that closure is the clearest available test of what the coding theorem promised."
+        est_minutes: 36
+        prerequisites: [hamming-codes, noisy-channel-coding]
+        concepts:
+          introduces: [sparse-graph-codes]
+          reinforces: [noisy-channel-coding-theorem, channel-capacity, linear-block-code, minimum-distance]
+        key_ideas:
+          - "Concatenation and interleaving built the codes flown on Voyager, Galileo and Cassini"
+          - "Turbo and low-density parity-check codes are decoded by iterative belief propagation on a sparse graph, not by algebra"
+          - "Density evolution predicts a sharp noise threshold that sits within a fraction of a decibel of capacity"
+          - "The -1.6 dB energy-per-bit limit bounds every scheme, and finite blocklength costs a measurable fraction of capacity"
+        demo: null
+        notes: >-
+          Module application (L16). Artifact: the published normalized-rate
+          comparison of real code families (Voyager, Galileo, Cassini, turbo,
+          LDPC, polar) against the finite-blocklength benchmark, plus MacKay's
+          LDPC decoding demonstration. Uses capacity, the coding theorem, the
+          converse, and minimum distance. Departures: finite blocklength,
+          decoding complexity, error floors, and the fact that the theorem's
+          random codebooks are undecodable in practice.
 
   - slug: information-in-ml
     title: "Information theory in machine learning"
@@ -419,21 +801,26 @@ modules:
         status: drafted
         goal: "Compute the KL divergence between two distributions as expected extra bits"
         opening: "KL divergence D(p||q) is the expected extra code length paid when data distributed as p is encoded with a code optimized for q."
-        est_minutes: 16
-        prerequisites: [source-coding-theorem-lite]
+        est_minutes: 32
+        prerequisites: [source-coding-theorem-lite, mutual-information]
+        key_image: figures/extra-bits-3.svg
         concepts:
           introduces: [kl-divergence]
-          reinforces: [entropy, surprisal, huffman-coding, source-coding-theorem]
+          reinforces: [entropy, surprisal, source-coding-theorem, mutual-information]
         key_ideas:
           - Coding with the wrong distribution q costs extra bits over coding with the true p
-          - "KL(p||q) is exactly that expected overhead — always >= 0, zero iff p = q"
-          - KL is asymmetric because it matters which distribution is real
+          - "KL(p||q) is exactly that expected overhead: non-negative, and zero only when p = q"
+          - "KL is asymmetric because it matters which distribution generates the data"
+          - "A zero in q where p is positive makes the divergence infinite, which is a real failure mode"
         demo:
           component: KLMismatch
           spec: >
-            Two draggable 4-bar distributions, true p and model q; live readouts
-            of H(p), cross-entropy H(p,q), and their gap KL(p||q). Presets:
-            perfect model, overconfident model, missing-outcome disaster.
+            Two draggable 4-bar distributions, true p and model q, with live
+            H(p), H(p,q) and KL(p||q). Targets stated first: hold H(p) fixed
+            and make KL(p||q) exceed 2 bits, then make KL(p||q) and KL(q||p)
+            differ by more than a factor of three, then drive the cost to
+            infinity. Presets: perfect model, overconfident model,
+            missing-outcome disaster.
 
       - slug: cross-entropy-loss
         title: "Cross-entropy"
@@ -441,20 +828,23 @@ modules:
         status: drafted
         goal: "Explain why minimizing cross-entropy loss drives a model's predictions toward the true label distribution"
         opening: "Cross-entropy decomposes as H(p,q) = H(p) + KL(p||q); minimizing cross-entropy loss minimizes the divergence of the model from the data distribution."
-        est_minutes: 16
+        est_minutes: 32
         prerequisites: [kl-divergence]
+        key_image: figures/four-scenarios.svg
         concepts:
           introduces: [cross-entropy]
           reinforces: [kl-divergence, entropy, surprisal]
         key_ideas:
-          - Log-loss on one example is the surprisal your model assigns to the truth
-          - "Cross-entropy decomposes: H(p,q) = H(p) + KL(p||q)"
-          - Minimizing cross-entropy minimizes KL, since H(p) is out of the model's hands
+          - Log-loss on one example is the surprisal the model assigns to the observed truth
+          - "H(p,q) = H(p) + KL(p||q), and H(p) is outside the model's control"
+          - A confident wrong prediction costs unboundedly many bits, which sets the gradient scale
+          - "The label distribution is usually a point mass, which is why the loss reduces to -log q(y)"
         demo: null
         notes: >-
-          Reuse KLMismatch mentally rather than a new demo; the decomposition is
-          a static identity best carried by a figure (D1). Include the
-          confident-wrong-prediction blowup as a worked example.
+          The decomposition is a static identity carried by a figure (D1); the
+          KLMismatch demo from the previous lesson is referenced, not
+          duplicated. Include the confident-wrong-prediction blowup as a worked
+          example.
 
       - slug: compression-is-prediction
         title: "Compression as prediction"
@@ -462,51 +852,83 @@ modules:
         status: drafted
         goal: "Explain why a better predictive model is exactly a better compressor, and vice versa"
         opening: "A predictive model defines a compressor and a compressor defines a predictive model; cross-entropy on a stream equals achievable compressed size in bits."
-        est_minutes: 18
-        prerequisites: [cross-entropy-loss, entropy-of-english, source-coding-theorem-lite]
+        est_minutes: 34
+        prerequisites: [cross-entropy-loss, arithmetic-coding, entropy-of-english]
+        key_image: figures/kraft-slack.svg
         concepts:
           introduces: []
-          reinforces: [cross-entropy, kl-divergence, source-coding-theorem, entropy-rate, prefix-code, kraft-inequality]
+          reinforces: [cross-entropy, kl-divergence, source-coding-theorem, entropy-rate, arithmetic-coding, kraft-inequality]
         key_ideas:
-          - A predictive model's cross-entropy on a stream is its achievable compressed size in bits
+          - "A model plus an arithmetic coder is a compressor; the compressed size is the summed surprisal"
           - Every compressor implicitly carries a probability model, spending its Kraft budget
-          - The whole course in one line - entropy floors, model mismatch costs KL, prediction pays in bits
+          - "The correspondence is exact in both directions, so compression ratio is a model-quality measurement"
+          - "The equivalence holds per stream, so it prices adaptivity: an online model pays no header"
         demo:
           component: PredictiveCompressor
           spec: >
-            Textarea for learner-typed text; toggle between three models
-            (uniform bytes, letter frequencies, bigram) and watch bits/char and
-            total compressed size respond. Presets: English sentence, repeated
-            character, random keyboard mash. Sandbox culmination per D4.
+            Textarea for reader-typed text; toggle between three models
+            (uniform bytes, letter frequencies, bigram) with live bits/char and
+            total size. Task stated first: find text on which the bigram model
+            loses to the letter-frequency model, then find text on which
+            uniform bytes win. Sandbox culmination per D4. Presets: English
+            sentence, repeated character, random keyboard mash.
 
       - slug: kolmogorov-complexity
         title: "Kolmogorov complexity"
         type: core
         status: drafted
+        key_image: figures/counting-2.svg
         goal: "Explain Kolmogorov complexity as the shortest-program limit under all compression"
         opening: "The Kolmogorov complexity of a string is the length of the shortest program that prints it: the single number under which no compressor, however clever, can push the string."
-        est_minutes: 18
+        est_minutes: 36
         prerequisites: [compression-is-prediction, source-coding-theorem-lite]
         concepts:
           introduces: [kolmogorov-complexity]
-          reinforces: [source-coding-theorem, cross-entropy, entropy]
+          reinforces: [source-coding-theorem, cross-entropy, entropy, universal-coding]
         key_ideas:
-          - "K(x) = length of the shortest program printing x; regularity is exactly compressibility"
+          - "K(x) is the length of the shortest program printing x; regularity is exactly compressibility"
           - The invariance theorem makes K well-defined up to an additive constant across languages
-          - A counting argument shows almost every string is incompressible, so most data has no short description
-          - K is uncomputable — the ideal compressor cannot be run — via Berry's paradox
-          - "Expected K equals entropy for a computable source, and the ideal predictor (Solomonoff) is the compression ceiling under compression-is-prediction"
+          - "A counting argument shows fewer than 2^-k of all strings compress by k bits"
+          - "K is uncomputable, via Berry's paradox, so the ideal compressor cannot be run"
+          - "Expected K equals the entropy rate, which is why entropy was the right average all along"
         demo: null
         notes: >-
-          New lesson. The uncomputable ceiling under compression-is-prediction
-          and the theoretical parent of MDL (ideal MDL = two-part Kolmogorov
-          code). No demo — K is uncomputable; carry it with figures (the
+          No demo — K is uncomputable; carry it with figures (the
           incompressibility count, the invariance additive constant, Berry's
-          paradox).
+          paradox). Must include the "simple description, incompressible string"
+          counterexample from the LZ78 paper.
+
+      - slug: language-models-as-compressors
+        title: "Language models measured in bits per byte"
+        type: synthesis
+        status: drafted
+        key_image: figures/rates-by-modality.svg
+        goal: "Compute a language model's compression rate in bits per byte and account for the gap between it and the model's own description length"
+        opening: "A trained language model reports its loss in nats per token, an arithmetic coder converts that into a file size, and the resulting compression rates beat the general-purpose compressors on data the model was never trained on."
+        est_minutes: 36
+        prerequisites: [compression-is-prediction, kolmogorov-complexity, dictionary-coding]
+        concepts:
+          introduces: [bits-per-byte]
+          reinforces: [cross-entropy, entropy-rate, arithmetic-coding, kolmogorov-complexity, lempel-ziv]
+        key_ideas:
+          - "Bits per byte is the tokenizer-invariant unit: nats per token times tokens per byte divided by ln 2"
+          - "Tokenization is a pre-code, so comparing loss across tokenizers without converting is meaningless"
+          - "A large model compresses images and audio below PNG and FLAC without being trained on them"
+          - "Charging the model its own parameter bits reverses the ranking, which is the two-part code arriving early"
+        demo: null
+        notes: >-
+          Module application (L16). Artifact: Delétang et al., "Language
+          Modeling Is Compression" (ICLR 2024) — reproduce the bits-per-byte
+          conversion and the comparison against gzip. Uses cross-entropy as code
+          length, arithmetic coding, entropy rate, and the Kolmogorov ceiling.
+          Departures: finite context window, tokenizer artifacts, parameter cost
+          excluded from the headline number, and the train/test overlap
+          question. The parameter-adjusted rate hands off to
+          minimum-description-length.
 
   - slug: principles
     title: "Optimization principles in inference and learning"
-    outcomes: [co-principles]
+    outcomes: [co-principles, co-sciences]
     lessons:
       - slug: max-entropy-principle
         title: "The maximum entropy principle"
@@ -514,150 +936,26 @@ modules:
         status: drafted
         goal: "Derive the maximum-entropy distribution under expectation constraints"
         opening: "Among all distributions consistent with known expectation constraints, exactly one maximizes entropy, and it has exponential form; choosing any other distribution assumes information you do not have."
-        est_minutes: 18
+        est_minutes: 36
         prerequisites: [entropy-as-average-surprise, kl-divergence]
+        key_image: figures/brandeis-4.svg
         concepts:
           introduces: [max-entropy-principle]
           reinforces: [entropy, kl-divergence, surprisal]
         key_ideas:
           - Constraints leave many candidate distributions; entropy ranks them by how little extra they assume
-          - "The maximizer is exponential in the constrained quantities: p(x) proportional to exp(-sum of lambda_r f_r(x)), normalized by a partition function"
-          - Gibbs' inequality (D >= 0) proves optimality without calculus of variations
-          - The Boltzmann distribution of statistical mechanics and the softmax layer are instances of the same solution
+          - "The maximizer is exponential in the constrained quantities, normalized by a partition function"
+          - "Gibbs' inequality proves optimality in three lines, without variational calculus"
+          - The Boltzmann distribution and the softmax layer are the same solution under different names
         demo:
           component: MaxEntDice
           spec: >
-            Slider for the target mean of a six-sided die; shows the
-            maximum-entropy distribution tilting exponentially, with live
-            lambda and H readouts. Presets: mean 3.5 (uniform), Jaynes' 4.5
+            Slider for the target mean of a six-sided die, showing the
+            max-entropy distribution tilting exponentially with live lambda and
+            H. Targets stated first: find the mean at which face 6 becomes more
+            likely than face 1, and the mean at which the distribution's entropy
+            falls below 2 bits. Presets: mean 3.5 (uniform), Jaynes' 4.5
             (Brandeis dice), mean 2.
-
-      - slug: rate-distortion
-        title: "Rate-distortion theory"
-        type: core
-        status: drafted
-        goal: "Compute the rate-distortion function of a source under a fidelity constraint"
-        opening: "Lossy compression trades bits for fidelity, and the rate-distortion function R(D) = min I(X;X-hat) subject to expected distortion at most D is the fewest bits per symbol that buy reconstruction within tolerance D."
-        est_minutes: 19
-        prerequisites: [mutual-information, kl-divergence, source-coding-theorem-lite, data-processing-inequality]
-        concepts:
-          introduces: [rate-distortion]
-          reinforces: [mutual-information, kl-divergence, entropy, conditional-entropy]
-        key_ideas:
-          - Perfect reconstruction is unnecessary; a distortion measure d(x,x-hat) sets the tolerance
-          - "R(D) = min over test channels p(x-hat|x) of I(X;X-hat) subject to E[d] <= D — mutual information is the rate"
-          - "Bernoulli(p) source under Hamming distortion: R(D) = H(p) - H(D) for D <= p, then zero"
-          - "Gaussian source under squared error: R(D) = (1/2) log2(sigma^2 / D)"
-          - Neural image codecs minimize rate + lambda*distortion directly, the trade-off made trainable
-        demo:
-          component: RateDistortionCurve
-          spec: >
-            Bernoulli(p) source under Hamming distortion; slider for allowed
-            distortion D traces R(D) = H(p) - H(D) down to zero at D = p, with a
-            toggle to the Gaussian curve (1/2) log2(sigma^2/D). Presets: fair
-            source, biased source, near-lossless vs. coarse.
-
-      - slug: minimum-description-length
-        title: "Minimum description length"
-        type: core
-        status: drafted
-        goal: "Apply two-part code lengths to select a model that neither underfits nor overfits"
-        opening: "Model selection is a compression problem: the best hypothesis for a dataset minimizes the total description length L(H) + L(D|H) — the bits to state the model plus the bits to state the data given the model."
-        est_minutes: 19
-        prerequisites: [source-coding-theorem-lite, compression-is-prediction, kolmogorov-complexity]
-        concepts:
-          introduces: [minimum-description-length]
-          reinforces: [source-coding-theorem, cross-entropy, kraft-inequality, kl-divergence, kolmogorov-complexity]
-        key_ideas:
-          - "L(D|H) = -log2 P(D|H): fit is measured in bits via the code-probability correspondence"
-          - A richer model shortens L(D|H) but lengthens L(H); the total is U-shaped in model complexity
-          - Encoding k parameters to the precision the data supports costs about (k/2) log2 n bits
-          - Practical MDL is the computable approximation of the uncomputable ideal (Kolmogorov) two-part code
-          - Charging a neural model its own parameter bits gives the adjusted compression rate, an MDL reading of scaling laws
-        demo:
-          component: TwoPartCode
-          spec: >
-            Fixed noisy dataset; slider for polynomial degree k; stacked live
-            readout of L(H), L(D|H), and the total, with the U-shaped total
-            curve traced. Presets: underfit (k=0), the sweet spot, an
-            interpolating degree.
-
-      - slug: information-bottleneck
-        title: "The information bottleneck"
-        type: core
-        status: drafted
-        goal: "Analyze the information bottleneck objective as a trade-off between compression and preserved relevant information"
-        opening: "The information bottleneck makes relevant compression precise: choose a stochastic encoder mapping X to T that minimizes I(X;T) - beta I(T;Y), keeping the bits of X that inform the target Y and discarding the rest."
-        est_minutes: 19
-        prerequisites: [rate-distortion, data-processing-inequality, kl-divergence]
-        concepts:
-          introduces: [information-bottleneck]
-          reinforces: [mutual-information, data-processing-inequality, rate-distortion, conditional-entropy, kl-divergence]
-        key_ideas:
-          - Rate-distortion needs a hand-picked distortion function; the bottleneck replaces it with a second mutual information, I(T;Y)
-          - "Minimize I(X;T) - beta I(T;Y): compress X while keeping information about the target Y"
-          - Sweeping beta traces a frontier in the information plane (I(X;T) vs I(T;Y)), capped by the data-processing inequality
-          - "The optimal encoder's effective distortion measure emerges as a KL divergence — derived from the objective, not assumed"
-        demo:
-          component: InformationPlane
-          spec: >
-            Beta slider on a precomputed toy joint (4 input symbols, binary
-            label); a point traces the information-plane frontier with live
-            I(X;T) and I(T;Y) readouts against the I(X;Y) ceiling. Presets:
-            collapse (beta near 0), the knee, copy (beta large).
-
-      - slug: infonce
-        title: "The InfoNCE bound"
-        type: core
-        status: drafted
-        goal: "Derive the InfoNCE lower bound on mutual information from a contrastive classification loss"
-        opening: "A classifier trained to pick the true partner of a context out of N candidates yields a mutual-information estimate: I(X;Y) >= log2 N - L_N, where L_N is the contrastive cross-entropy loss."
-        est_minutes: 17
-        prerequisites: [mutual-information, cross-entropy-loss, information-bottleneck]
-        concepts:
-          introduces: [infonce]
-          reinforces: [mutual-information, cross-entropy, kl-divergence, information-bottleneck]
-        key_ideas:
-          - Joint-table mutual information does not scale to images or audio; a bound computable from samples does
-          - The optimal contrastive classifier recovers the density ratio p(y|x)/p(y), not the distributions themselves
-          - "I(X;Y) >= log2 N - L_N: a low contrastive loss certifies high mutual information"
-          - The bound cannot exceed log2 N, so weak losses with few negatives saturate — more candidates raise the ceiling
-        demo:
-          component: InfoNCESaturation
-          spec: >
-            Sliders for candidate count N and dependence strength on a toy
-            discrete pair; plots the bound log2 N - L_N against the true
-            I(X;Y), showing the bound clip at log2 N. Presets: weak dependence,
-            strong dependence with small N (saturated), strong with large N.
-
-  - slug: natural-sciences
-    title: "Information in the natural sciences"
-    outcomes: [co-sciences]
-    lessons:
-      - slug: neural-coding
-        title: "Mutual information of a neural code"
-        type: extra
-        status: drafted
-        goal: "Estimate the information a neural spike code carries about a stimulus"
-        opening: "A neuron is a noisy channel from stimulus to spike train, and the mutual information I(S;R) = H(R) - H(R|S) measures, in bits, how much its response reveals about what it saw."
-        est_minutes: 17
-        prerequisites: [channel-capacity, mutual-information]
-        concepts:
-          introduces: [coding-efficiency]
-          reinforces: [mutual-information, channel-capacity, conditional-entropy]
-        key_ideas:
-          - A stimulus-response table is a channel; the direct method computes I(S;R) = H(R) - H(R|S) from it
-          - Recorded single neurons carry on the order of one bit per spike
-          - "Coding efficiency = information transmitted / channel capacity: how much of the available channel the code uses"
-          - Naturalistic stimuli raise efficiency; mutual information is only meaningful relative to a stimulus ensemble
-        demo: null
-        notes: >-
-          New worked-application lesson. Keep it discrete and computable: a
-          small stimulus-response joint, the direct method H(R) - H(R|S), bits
-          per spike, and coding efficiency against capacity. Mention the
-          Gaussian-channel bound methods (Borst and Theunissen) but do not
-          derive continuous channel capacity. Real numbers from the review's
-          Table 2 (fly H1, ~1 bit/spike), cited not invented.
 
       - slug: thermodynamics-of-information
         title: "Thermodynamics of information"
@@ -665,21 +963,161 @@ modules:
         status: drafted
         goal: "Explain Landauer's principle and compute the work bound of a Szilard engine"
         opening: "Information has a physical price: Landauer's principle sets the minimum heat dissipated when one bit is erased at kT ln 2, and Szilard's engine shows one bit of information is worth exactly that much extractable work."
-        est_minutes: 18
+        est_minutes: 32
         prerequisites: [entropy-as-average-surprise, mutual-information, max-entropy-principle]
+        key_image: figures/szilard-4.svg
         concepts:
           introduces: [landauer-principle]
           reinforces: [entropy, mutual-information, max-entropy-principle]
         key_ideas:
-          - Shannon entropy and thermodynamic entropy are the same quantity in different units (k ln 2 per bit)
+          - Shannon entropy and thermodynamic entropy are the same quantity in different units
           - "Landauer's principle: erasing one bit dissipates at least kT ln 2 of heat"
           - Szilard's one-molecule engine converts one measured bit into kT ln 2 of work
-          - Maxwell's demon does not violate the second law once the cost of resetting its memory is charged
-          - "The feedback second law W >= Delta F - kT (ln 2) I(X;M) prices measured information in the same mutual-information currency"
+          - Maxwell's demon obeys the second law once the cost of resetting its memory is charged
+          - "The feedback second law prices measured information in mutual-information units"
         demo: null
         notes: >-
-          New lesson closing the entropy concept at the physical level and
-          pairing with max-entropy (the physics face of the theory). The
-          Szilard cycle is a process — use a FigureSequence, not a demo.
-          Landauer kT ln 2, Szilard extraction, demon resolution (Bennett),
-          feedback second law (Sagawa-Ueda) as the mutual-information payoff.
+          Off-path chapter pairing with max-entropy (the physics face of the
+          theory). The Szilard cycle is a process — use a FigureSequence, not a
+          demo. Landauer kT ln 2, Szilard extraction, demon resolution
+          (Bennett), feedback second law (Sagawa-Ueda) as the
+          mutual-information payoff.
+
+      - slug: rate-distortion
+        title: "Rate-distortion theory"
+        type: core
+        status: drafted
+        goal: "Compute the rate-distortion function of a source under a fidelity constraint"
+        opening: "Lossy compression trades bits for fidelity, and the rate-distortion function R(D) = min I(X;X-hat) subject to expected distortion at most D is the fewest bits per symbol that buy reconstruction within tolerance D."
+        est_minutes: 38
+        prerequisites: [mutual-information, kl-divergence, source-coding-theorem-lite, data-processing-inequality]
+        key_image: figures/bernoulli-curve-3.svg
+        concepts:
+          introduces: [rate-distortion]
+          reinforces: [mutual-information, kl-divergence, entropy, conditional-entropy, typical-set]
+        key_ideas:
+          - "A distortion measure d(x,x-hat) replaces the demand for exact reconstruction"
+          - "R(D) = min over test channels of I(X;X-hat) subject to E[d] <= D — the rate is a mutual information"
+          - "Bernoulli(p) under Hamming distortion: R(D) = H(p) - H(D) for D <= p, then zero"
+          - "Gaussian under squared error: R(D) = (1/2) log2(sigma^2/D), the source of the 6 dB per bit rule"
+          - "The achievability argument covers the source sphere rather than packing it, the dual of channel coding"
+        demo:
+          component: RateDistortionCurve
+          spec: >
+            Bernoulli(p) source under Hamming distortion; slider for allowed
+            distortion D tracing R(D) = H(p) - H(D), with a toggle to the
+            Gaussian curve. Targets stated first: find the D at which the rate
+            halves, and the D at which it reaches zero, then check the naive
+            "store half the bits and guess the rest" scheme against the curve.
+            Presets: fair source, biased source, near-lossless vs coarse.
+
+      - slug: minimum-description-length
+        title: "Minimum description length"
+        type: core
+        status: drafted
+        goal: "Apply two-part code lengths to select a model that neither underfits nor overfits"
+        opening: "Model selection is a compression problem: the best hypothesis for a dataset minimizes the total description length L(H) + L(D|H) — the bits to state the model plus the bits to state the data given the model."
+        est_minutes: 36
+        prerequisites: [kolmogorov-complexity, compression-is-prediction, kraft-inequality]
+        key_image: figures/asymmetric-price.svg
+        concepts:
+          introduces: [minimum-description-length]
+          reinforces: [source-coding-theorem, cross-entropy, kraft-inequality, kl-divergence, kolmogorov-complexity, bits-per-byte]
+        key_ideas:
+          - "L(D|H) = -log2 P(D|H): fit is measured in bits through the code-probability correspondence"
+          - A richer model shortens L(D|H) and lengthens L(H); the total is U-shaped in complexity
+          - "Encoding k parameters to the precision the data supports costs about (k/2) log2 n bits"
+          - "Practical MDL is the computable approximation of the uncomputable ideal two-part code"
+          - Charging a neural model its own parameter bits gives an MDL reading of scaling laws
+        demo:
+          component: TwoPartCode
+          spec: >
+            Fixed noisy dataset; slider for polynomial degree k with a stacked
+            live readout of L(H), L(D|H) and the total. Targets stated first:
+            find the degree minimizing the total, then increase the dataset size
+            and find the degree at which the optimum moves, and report the
+            direction. Presets: underfit (k=0), the sweet spot, an
+            interpolating degree.
+
+      - slug: information-bottleneck
+        title: "The information bottleneck"
+        type: core
+        status: drafted
+        key_image: figures/information-plane.svg
+        goal: "Analyze the information bottleneck objective as a trade-off between compression and preserved relevant information"
+        opening: "The information bottleneck makes relevant compression precise: choose a stochastic encoder mapping X to T that minimizes I(X;T) - beta I(T;Y), keeping the bits of X that inform the target Y and discarding the rest."
+        est_minutes: 36
+        prerequisites: [rate-distortion, data-processing-inequality, kl-divergence]
+        concepts:
+          introduces: [information-bottleneck]
+          reinforces: [mutual-information, data-processing-inequality, rate-distortion, conditional-entropy, kl-divergence, mi-estimation-bias]
+        key_ideas:
+          - Rate-distortion needs a hand-picked distortion function; the bottleneck replaces it with a second mutual information
+          - "Minimize I(X;T) - beta I(T;Y): compress X while keeping information about the target Y"
+          - Sweeping beta traces a frontier in the information plane, capped by the data-processing inequality
+          - "The optimal encoder's effective distortion is a KL divergence, derived from the objective rather than assumed"
+          - "The Gaussian case has a closed form and reduces to canonical correlation analysis"
+        demo:
+          component: InformationPlane
+          spec: >
+            Beta slider on a precomputed toy joint (4 input symbols, binary
+            label); a point traces the information-plane frontier with live
+            I(X;T) and I(T;Y) against the I(X;Y) ceiling. Targets stated first:
+            find the beta at which the encoder stops collapsing everything to
+            one symbol, then find the smallest I(X;T) that still keeps 90% of
+            I(X;Y). Presets: collapse, the knee, copy.
+
+      - slug: infonce
+        title: "The InfoNCE bound"
+        type: core
+        status: drafted
+        goal: "Derive the InfoNCE lower bound on mutual information from a contrastive classification loss"
+        opening: "A classifier trained to pick the true partner of a context out of N candidates yields a mutual-information estimate: I(X;Y) >= log2 N - L_N, where L_N is the contrastive cross-entropy loss."
+        est_minutes: 34
+        prerequisites: [mutual-information, cross-entropy-loss, estimating-mutual-information]
+        key_image: figures/batch-ceiling.svg
+        concepts:
+          introduces: [infonce]
+          reinforces: [mutual-information, cross-entropy, kl-divergence, mi-estimation-bias]
+        key_ideas:
+          - Joint-table mutual information does not scale to images or audio; a sample-computable bound does
+          - The optimal contrastive classifier recovers the density ratio, not the distributions themselves
+          - "I(X;Y) >= log2 N - L_N: a low contrastive loss certifies high mutual information"
+          - "The bound cannot exceed log2 N, so a strong representation and a weak one look identical past saturation"
+        demo:
+          component: InfoNCESaturation
+          spec: >
+            Sliders for candidate count N and dependence strength on a toy
+            discrete pair; plots the bound log2 N - L_N against the true
+            I(X;Y). Targets stated first: find the N at which the bound stops
+            improving for a strongly dependent pair, and find a case where
+            doubling N changes the bound by less than 0.05 bits. Presets: weak
+            dependence, strong dependence with small N, strong with large N.
+
+      - slug: learned-image-compression
+        title: "Learned image compression"
+        type: synthesis
+        status: drafted
+        key_image: figures/codec-pipeline.svg
+        goal: "Analyze a learned image codec as a rate-distortion optimization and identify which of the module's results each component implements"
+        opening: "A learned image codec trains an encoder, a quantizer, an entropy model and a decoder against the single objective rate plus lambda times distortion, which is the rate-distortion Lagrangian with neural networks standing in for the test channel."
+        est_minutes: 38
+        prerequisites: [rate-distortion, information-bottleneck, kl-divergence, arithmetic-coding]
+        concepts:
+          introduces: [nonlinear-transform-coding]
+          reinforces: [rate-distortion, kl-divergence, cross-entropy, arithmetic-coding, mutual-information, information-bottleneck]
+        key_ideas:
+          - "The rate term is a cross-entropy between the true code distribution and the entropy model, so rate is measured in the same units as loss"
+          - "Minimizing the variational bound of an autoencoder is algebraically the same as minimizing rate plus lambda times distortion"
+          - "A hyperprior transmits per-coefficient scales as side information, the learned analogue of a codec's block-partition metadata"
+          - "The distortion measure chosen at training time decides which artifacts appear at test time"
+        demo: null
+        notes: >-
+          Module application (L16). Artifact: Ballé et al., "Variational Image
+          Compression with a Scale Hyperprior" (ICLR 2018) plus the VAE
+          derivation it rests on. Uses rate-distortion, KL as the rate term, the
+          arithmetic coder from the coding module, and the bottleneck's
+          compress-while-keeping framing. Departures: quantization replaced by
+          uniform noise during training, a factorized prior over dependent
+          coefficients, MS-SSIM used as a stand-in for perception, and the
+          decoder's own size never charged against the rate.

@@ -1,0 +1,988 @@
+Every mutual information in this module was computed from a known joint
+distribution; estimating one from a finite sample is a different problem, and
+the naive estimator reports shared information between independent variables.
+
+This lesson closes the module on shared information.
+<Ref lesson="mutual-information"/> defined $I(X;Y)$ as the bits one variable
+removes from the other's uncertainty, the
+<Ref lesson="data-processing-inequality">data-processing inequality</Ref>
+put a ceiling over every stage of a pipeline, and
+<Ref lesson="fano-inequality"/> converted the leftover bits into an error
+floor. All three take the joint table as given. In practice nobody is given a
+joint table: there are $n$ rows of data, and the table has to be built from
+them. This lesson establishes what that substitution costs, and then reads one
+published dispute end to end, in which the cost was the entire measurement.
+
+The route: the plug-in estimator and its bias on independent data, the closed
+form of that bias and its correction, the dependence of the whole answer on
+bin width, and the deep-network information plane of 2017 to 2019, where a
+quantity that provably cannot change was plotted changing.
+
+## Independent variables score 0.29 bits
+
+The estimator everyone writes first is the obvious one: build the empirical
+table, then apply the definition to it as though the empirical table were the
+truth.
+
+<Task>
+Answer these from memory before reading on. (1) Write $I(X;Y)$ as a difference
+of entropies, and as a divergence between two distributions on the same
+alphabet. (2) State the largest value $H(X)$ can take when $X$ has $k$
+possible outcomes. (3) State what $I(X;Y) = 0$ says about the joint table.
+</Task>
+
+<Aside>
+(1) $I(X;Y) = H(X) - H(X \mid Y)$, and
+$I(X;Y) = D\bigl(p(x,y) \,\Vert\, p(x)p(y)\bigr)$, the divergence between the
+joint and the product of its marginals
+(<Ref lesson="mutual-information"/>). (2) $H(X) \le \log_2 k$, with equality
+only for the uniform distribution
+(<Ref lesson="entropy-as-average-surprise"/>). (3) That $X$ and $Y$ are
+independent: $p(x,y) = p(x)p(y)$ in every cell.
+</Aside>
+
+### The estimator
+
+<Definition title="plug-in estimator">
+Given $n$ independent draws $(x_1,y_1), \dots, (x_n,y_n)$ sorted into an
+$r \times c$ table of cell counts $n_{ij}$, write
+$\hat{p}_{ij} = n_{ij}/n$ for the empirical joint and $\hat{p}_{i\cdot}$,
+$\hat{p}_{\cdot j}$ for its marginals. The **plug-in estimate** of mutual
+information is
+$$
+\hat{I} \;=\; \sum_{i,j} \hat{p}_{ij}
+\log_2 \frac{\hat{p}_{ij}}{\hat{p}_{i\cdot}\,\hat{p}_{\cdot j}},
+$$
+with cells of count zero contributing nothing. It is also called the
+maximum-likelihood or naive estimator.
+</Definition>
+
+$\hat{I}$ is a mutual information: it is the divergence between the empirical
+joint and the product of the empirical marginals, computed on a genuine
+probability table. Divergence is zero only when the two arguments agree
+exactly, so $\hat{I} = 0$ requires $n_{ij} = n_{i\cdot} n_{\cdot j} / n$ in
+**every** cell at once. Finite samples do not do that.
+
+### What it returns on data with nothing in it
+
+Draw $n = 1000$ pairs $(x, y)$ with both coordinates uniform on $[0,1]$ and
+drawn independently, so the true mutual information is exactly $0$ bits. Bin
+each coordinate into $20$ equal intervals and apply the definition. Averaged
+over $2{,}000$ independent repetitions the estimate is $0.293$ bits, and no
+single repetition in that run came out below $0.22$ bits.
+
+<FigureSequence
+  name="bias-build"
+  alt="Four frames: 200 independent points scattered in the unit square; the same points under a 5 by 5 grid with cell counts; the plug-in sum evaluating to 0.044 bits; the same points under a 20 by 20 grid evaluating to 1.27 bits"
+  caption="Watch the estimate, not the points: the same 200 independent draws score 0.044 bits at 5×5 bins and 1.27 bits at 20×20."
+/>
+
+Nothing about the sampler changed between the last two frames. The data are
+the same 200 points; only the reader's choice of table changed, and the
+reported "shared information" grew by a factor of thirty.
+
+<KeyFact>
+The failure is not noise. A noisy estimator would scatter around the truth;
+this one sits above it with probability essentially one, because the quantity
+it computes is a divergence and divergences are non-negative. Averaging over
+repeated experiments makes it more certain, not more accurate.
+</KeyFact>
+
+## The bias has a closed form: (r−1)(c−1) / (2n ln 2)
+
+The estimate on independent data is not an arbitrary positive number. Its
+expectation is fixed to leading order by the shape of the table and the sample
+size, and by nothing else.
+
+<Theorem title="plug-in bias under independence">
+Let $X$ and $Y$ be independent, taking values in an $r \times c$ table with
+every cell probability strictly positive, and let $\hat{I}_n$ be the plug-in
+estimate from $n$ independent draws. Then
+$$
+\mathbb{E}\bigl[\hat{I}_n\bigr] \;=\;
+\frac{(r-1)(c-1)}{2n \ln 2} \;+\; o\!\left(\tfrac{1}{n}\right)
+\quad \text{bits}.
+$$
+
+<Proof>
+**Step 1, the estimator is a divergence.** By construction
+$\hat{I}_n = D\bigl(\hat{p}_{ij} \,\Vert\, \hat{p}_{i\cdot}\hat{p}_{\cdot j}\bigr)$,
+the divergence of the empirical joint from the product of its own marginals.
+
+**Step 2, expand.** For two distributions that differ by a small amount,
+$D(P \Vert Q) = \frac{1}{2\ln 2}\sum_z \frac{(P(z)-Q(z))^2}{Q(z)} + O(\|P-Q\|^3)$,
+which is the local quadratic behaviour of divergence. Applying it with
+$P = \hat{p}_{ij}$ and $Q = \hat{p}_{i\cdot}\hat{p}_{\cdot j}$,
+$$
+\hat{I}_n \;\approx\; \frac{1}{2n \ln 2}\;
+\underbrace{n \sum_{i,j}
+\frac{\bigl(\hat{p}_{ij} - \hat{p}_{i\cdot}\hat{p}_{\cdot j}\bigr)^2}
+     {\hat{p}_{i\cdot}\hat{p}_{\cdot j}}}_{\textstyle \chi^2}.
+$$
+The braced quantity is Pearson's statistic for the hypothesis of
+independence.
+
+**Step 3, quote the law.** Under independence, Pearson's statistic converges
+in distribution to $\chi^2$ with $(r-1)(c-1)$ degrees of freedom, and the mean
+of that law equals its degrees of freedom. The count is an accounting of free
+parameters: a table on $rc$ cells has $rc - 1$ of them, and fitting the two
+marginals uses $(r-1) + (c-1)$, leaving
+$rc - 1 - (r-1) - (c-1) = (r-1)(c-1)$. Dividing by $2n \ln 2$ converts nats to
+bits and gives the stated expectation.
+</Proof>
+</Theorem>
+
+Three readings of the formula, in order of how often each is needed.
+
+- **The bias falls like $1/n$ and grows like the cell count.** Doubling the
+  sample halves it; doubling the bins per axis roughly quadruples it.
+- **It does not depend on the distribution**, only on the table's shape. That
+  is what makes it a usable correction rather than a warning.
+- **It is a floor on how much data a table needs.** To hold the artefact under
+  $0.01$ bits with a $20 \times 20$ table takes $n \approx 26{,}000$.
+
+<Example title="the headline number, predicted">
+For the experiment of the previous section, $r = c = 20$ and $n = 1000$:
+$$
+\frac{(20-1)(20-1)}{2 \cdot 1000 \cdot \ln 2}
+= \frac{361}{1386.3} = 0.260 \text{ bits}.
+$$
+The simulation returned $0.293$ bits, about $13\%$ higher. The gap is the
+theorem's asymptotics failing, not the theorem failing: $1000$ points spread
+over $400$ cells give an expected count of $2.5$ per cell, and the $\chi^2$
+limit needs expected counts of roughly $5$ or more. Raising the sample to
+$n = 3000$ puts $7.5$ points in each cell, and prediction and simulation land
+at $0.087$ and $0.089$ bits.
+</Example>
+
+<Figure
+  src="./figures/bias-vs-n.svg"
+  alt="Log-log plot of the mean plug-in estimate against sample size for 5 by 5, 10 by 10 and 20 by 20 bins on independent variables, with the (r-1)(c-1)/(2n ln 2) prediction drawn as dashed lines through the simulated points"
+  caption="Independent variables at three table sizes: the artefact tracks (r−1)(c−1)/(2n ln 2) over two decades of sample size."
+/>
+
+<Exercise>
+A $5 \times 5$ table is built from $n = 200$ independent draws of two
+independent variables. Predict the plug-in estimate, then state how large $n$
+must be before the prediction drops below $0.01$ bits, and say which of the
+two answers you should trust less and why.
+
+<Solution>
+**Prediction.** $(5-1)(5-1) = 16$ degrees of freedom, so
+$\hat{I} \approx 16 / (2 \cdot 200 \cdot \ln 2) = 16/277.3 = 0.058$ bits. A
+simulation of this exact setup returns $0.060$ bits: the expected count is
+$200/25 = 8$ per cell, comfortably inside the regime the $\chi^2$ limit needs.
+
+**Sample size.** Solve $16/(2n \ln 2) < 0.01$ for $n$:
+$n > 16/(0.02 \ln 2) = 1154$. Round up to $n \approx 1200$.
+
+**Which to trust less.** The first, marginally. The formula is an asymptotic
+statement in $n$, and $n = 200$ is small; but with $8$ expected counts per
+cell it is already accurate, as the simulation confirms. What deserves
+suspicion is the same formula applied to a table with expected counts below
+about $5$: the $20 \times 20$ table at $n = 1000$ understates the artefact by
+$13\%$, and at $n = 100$, with a quarter of a point per cell, it predicts
+$2.60$ bits against a measured $1.95$ and overshoots by a third. Neither
+direction of error is safe, since the formula is used as a correction and a
+correction is subtracted.
+</Solution>
+</Exercise>
+
+### The Miller–Madow correction removes most of it
+
+The plug-in entropy estimate is biased too, and in the opposite direction:
+$\mathbb{E}[\hat{H}] \approx H - (\hat{m}-1)/(2n \ln 2)$ bits, where $\hat{m}$
+counts the occupied bins. Entropy is *underestimated* because an empirical
+distribution is always more concentrated than the truth; mutual information is
+*overestimated* because it is a divergence. Adding the entropy correction to
+each of the three entropies in
+$\hat{I} = \hat{H}(X) + \hat{H}(Y) - \hat{H}(X,Y)$ gives the standard
+first-order fix.
+
+<Definition title="Miller–Madow corrected estimate">
+With $\hat{m}_{xy}$ occupied cells, $\hat{r}$ occupied rows and $\hat{c}$
+occupied columns,
+$$
+\hat{I}_{\mathrm{MM}} \;=\; \hat{I}
+\;-\; \frac{\hat{m}_{xy} - \hat{r} - \hat{c} + 1}{2n \ln 2} .
+$$
+When every cell is occupied the subtracted term is exactly
+$(r-1)(c-1)/(2n \ln 2)$, cancelling the leading bias.
+</Definition>
+
+On the $n = 1000$, $20 \times 20$ experiment, $367$ of the $400$ cells are
+occupied on average and all rows and columns are, so the correction subtracts
+$0.237$ bits and leaves $\hat{I}_{\mathrm{MM}} = 0.057$ bits. That is a factor
+of five better and still not zero. At $n = 3000$ the residue falls to $0.003$
+bits. The correction removes the leading term of an expansion whose remaining
+terms are $O(1/n^2)$ with coefficients that grow with the table, so it helps
+most exactly where it is least needed.
+
+<Demo
+  name="MIEstimatorBias"
+  caption="Two provably independent variables, sampled. Sliders: sample size and bins per axis."
+/>
+
+<Task>
+Two targets, in order. Make the estimate report more than $0.5$ bits of shared
+information between variables you know to be independent, and record the pair
+$(n, r)$ that did it. Then hold that bin count fixed and raise $n$ until the
+estimate drops below $0.05$ bits; check the sample size you needed against
+$(r-1)^2 / (2 \cdot 0.05 \cdot \ln 2)$.
+</Task>
+
+<KeyFact>
+The correction that always works is the shuffle. Permute the $y$ column
+against the $x$ column and recompute: the shuffled pairs are independent by
+construction, so the estimates they produce are a sample from the estimator's
+own null distribution, whatever the table shape, sample size and cell
+occupancy. A reported $\hat{I}$ means nothing until it is quoted against that
+null, and the practice costs one line of code.
+</KeyFact>
+
+## Shrink the bins and the estimate climbs to log₂ n
+
+Continuous variables have no cells until somebody makes some. The previous
+section priced the choice of table for a fixed alphabet; here the choice of
+table is the entire modelling decision, and the estimate moves through the
+whole range of possible answers as it varies.
+
+Fix one sample of $n = 4096$ pairs, drawn once and never redrawn:
+$x$ uniform on $[0,1]$ and $y = (x + u)/2$ with $u$ an independent uniform
+draw. This pair has an exactly computable mutual information,
+$1/(2\ln 2) = 0.721$ bits. Sweep the bins per axis from $2$ to $1024$ and
+recompute.
+
+<Figure
+  src="./figures/bin-sweep.svg"
+  alt="Plug-in estimate against bins per axis on one fixed sample of 4096 pairs, for a dependent pair and an independent pair; both curves climb from below toward the ceiling log2 4096 = 12 bits and become indistinguishable above 128 bins"
+  caption="One sample, ten answers: past about 128 bins per axis the dependent and independent pairs agree to within a few percent, and both are climbing toward log₂ 4096 = 12 bits."
+/>
+
+### Coarse bins lose the signal, fine bins invent it
+
+Two errors run in opposite directions.
+Coarse bins throw away the distinction the estimate is meant to detect: the
+binned pair is a processed version of the original, so the
+<Ref lesson="data-processing-inequality">data-processing inequality</Ref>
+caps what any bin count can recover, and at $2$ bins per axis the true
+information of the binned pair is only $0.189$ bits. Fine bins add the
+artefact of the previous section, which grows without limit. Between them sits
+a band, here roughly $8$ to $32$ bins per axis, inside which the estimate stays
+within a quarter of the true $0.721$ bits and, at $32$ bins, within $5\%$.
+
+<Example title="the two errors, added up">
+The discretized truth can be computed exactly by integrating the joint density
+over cells; the artefact is $(r-1)^2/(2n\ln 2)$ with $n = 4096$. At $8$ bins
+per axis, the discretized truth is $0.546$ bits and the artefact $0.009$ bits,
+predicting $0.555$; the measurement is $0.556$. At $16$ bins the two terms are
+$0.628$ and $0.040$, predicting $0.668$ against a measured $0.664$. At $64$
+bins the account fails, predicting $0.697 + 0.699 = 1.396$ against a measured
+$1.079$, because one point per cell is far outside the $\chi^2$ regime.
+
+Nothing in this two-term account is available to someone who does not already
+know the answer. Both terms need the true joint distribution: the first to
+integrate, the second to know that the table is well enough filled for the
+formula to hold.
+</Example>
+
+### The ceiling is log₂ n, and the climb to it is slow
+
+The climb has a hard stop, and knowing where it is turns the whole diagnosis
+into arithmetic. With $n$ samples the empirical marginals put mass on at most
+$n$ distinct values each, so
+$\hat{I} \le \min\bigl(\hat{H}(X), \hat{H}(Y)\bigr) \le \log_2 n$ by the
+uniform bound of <Ref lesson="entropy-as-average-surprise"/>. Here that
+ceiling is $\log_2 4096 = 12$ bits. It is attained when no two samples share a
+row or a column: the empirical table is then a perfect matching, the empirical
+$x$ determines the empirical $y$, and the estimate reports the maximum
+regardless of what generated the data.
+
+That condition is far stricter than one sample per cell. At $64$ bins per axis
+the $4096$ cells hold one point each on average, and this sample scores
+$1.089$ bits — under a tenth of the ceiling, because $64$ rows still hold $64$
+points apiece. Emptying the rows is a birthday problem, so the bin count per
+axis has to run past $n^2$: $4096$ bins per axis gives $10.15$ bits,
+$65{,}536$ gives $11.85$, and coming within $0.01$ bits of $12$ takes about a
+million bins per axis. The climb is monotone but slow through the middle of
+the range — doubling this sample's bins from $8$ to $16$ to $32$ moves the
+estimate by under $20\%$ each time — so a local sweep that looks stable is no
+evidence that the bin width is right.
+
+### Nearest neighbours remove the bin width, not the dimension
+
+The grid is not the only way to get a number out of a continuous sample. The
+standard alternative is the
+[$k$-nearest-neighbour estimator of Kraskov, Stögbauer and Grassberger](https://arxiv.org/abs/cond-mat/0305641),
+usually called KSG: for each point take the distance to its $k$-th nearest
+neighbour in the joint space, count how many points lie within that distance
+in the $x$ coordinate alone and in the $y$ coordinate alone, and combine the
+two counts through digamma functions. Resolution is then set locally by the
+data — fine where points are dense, coarse where they are sparse — and the
+only free parameter is the integer $k$, typically $2$ to $6$.
+
+On the pair above it works. Over forty fresh samples of $4096$ points, KSG at
+$k = 4$ returns $0.699$ bits with a standard deviation of $0.017$, against the
+true $0.721$: a residual bias of $-3\%$, with nothing tuned. The plug-in on the
+same forty samples returns $0.55$ bits at $8$ bins per axis, $0.65$ at $16$,
+$0.76$ at $32$ and $1.09$ at $64$ — a spread the reader cannot resolve without
+already knowing the answer.
+
+What the method does not remove is the dimension. Run the same construction
+with $X$ uniform on $[0,1]^d$ and each coordinate of $Y$ the average of the
+matching coordinate of $X$ with fresh noise, so the truth is
+$d/(2 \ln 2)$ bits and grows linearly in $d$. At $n = 4096$ samples throughout,
+KSG recovers $96\%$ of the truth at $d = 1$, $60\%$ at $d = 4$ and $36\%$ at
+$d = 8$: the estimate stalls near $2$ bits while the quantity being estimated
+passes $5$. The sample size needed to keep up is exponential in $d$, and that
+is a property of the problem rather than of this estimator — the same wall
+appears at the end of this lesson as a constant growing like $c^{\,d}$ in the
+error bound of a quite different estimator.
+
+<Figure
+  src="./figures/ksg-dimension.svg"
+  alt="Mutual information in bits against dimension d from 1 to 8: a dashed green line for the true value d/(2 ln 2), rising to 5.8 bits at d = 8, and an amber line for the KSG estimate at k = 4 from 4096 samples, which tracks the truth at d = 1 and then flattens near 2 bits, 3.7 bits short at d = 8"
+  caption="No bin width to choose, and still a wall: with the sample size held at 4096, the k-nearest-neighbour estimate tracks the truth in one dimension and stalls near 2 bits by eight."
+/>
+
+<KeyFact>
+Where the pair is continuous and one variable determines the other exactly,
+the true mutual information is infinite. The runaway estimate is then not a
+failure of the estimator: it is converging on the correct answer, and no bin
+width is the right one. The rest of this lesson examines a published case in
+which exactly that sequence of numbers was read as a measurement of a system.
+</KeyFact>
+
+## The information plane: the 2017 claim
+
+The module's results now get cashed out on a published artefact. Between 2017
+and 2019 a specific claim about how neural networks learn was made,
+challenged, and resolved, entirely through the quantity this module has been
+building. Three of the module's results are load-bearing in what follows: the
+definition of $I(X;Y)$, the layered chain
+$I(X;T_1) \ge \dots \ge I(X;T_L)$ from the
+<Ref lesson="data-processing-inequality">data-processing inequality</Ref>, and
+the entropy bound
+$H \le \log_2 n$ just used as a ceiling.
+
+### The experiment: a seven-layer tanh classifier on 4096 points
+
+The setup is a fully connected classifier with tanh activations and layer
+widths $12$–$10$–$7$–$5$–$4$–$3$–$2$, trained by stochastic gradient descent
+on a synthetic binary classification task with $12$-dimensional inputs and a
+dataset of $n = 2^{12} = 4096$ points. For each hidden layer $T_\ell$ and each
+sampled training epoch, two numbers are computed: the information the layer
+retains about the input, and the information it carries about the label. Each
+layer's pair of numbers traces a curve across training in the plane with
+$I(X;T_\ell)$ on the horizontal axis and $I(T_\ell;Y)$ on the vertical. That
+plane is the *information plane*.
+
+<Figure
+  src="./figures/information-plane-2017.png"
+  alt="Information plane: six thick trajectories, one per hidden layer, coloured from near-black through purple and orange to yellow as training epoch increases. Each starts at the bottom of the plot, climbs steeply and drifts right during the first epochs, then turns at a green dot and runs leftward along the top of the plot for the remaining epochs. Deeper layers finish further left, near 1 and 2 on the horizontal axis; the shallowest finishes near 12. A dense fan of thin grey lines links the trajectories, joining the layers at a common epoch, and a green line links the six turning points. A vertical colorbar on the right, labelled Epochs, runs from 0 at the bottom to 10 to the fourth at the top."
+  caption="The 2017 information plane. One thick curve per hidden layer over 10 000 epochs (colour = epoch); thin lines join the layers at a fixed epoch, and the green marks are where SGD's gradient signal-to-noise ratio drops. Every layer climbs and moves right, then turns at the elbow and runs left for the rest of training. Read the axis labels: the quantities plotted are the binned proxies I(X;Qm[T]) and I(Qm[T];Y), not I(X;T) and I(T;Y)."
+/>
+
+### Every trajectory turns: a fitting phase, then a long compression phase
+
+The curves have an elbow. Early in training both coordinates increase: the
+layer learns about the label, which was expected, and about the input, which
+was not being asked for. Then every trajectory turns and spends the remaining
+epochs moving left, decreasing $I(X;T_\ell)$ while holding $I(T_\ell;Y)$
+roughly constant. The two segments were named the *fitting* and *compression*
+phases, and the second occupies almost all of training.
+
+### The reading: compression explains generalization, and SGD causes compression
+
+The reading offered was that the network sheds information about the input
+that is irrelevant to the label, that this shedding explains why deep networks
+generalize, and that stochastic gradient descent causes it: the compression
+phase was reported to begin at the epoch where the ratio of the gradient's
+mean to its standard deviation drops, dividing training into a directed phase
+and a diffusive one. The layers also sit in the right order, deeper ones
+further left, as the
+data-processing inequality along the chain
+$Y \to X \to T_1 \to \dots \to T_L$ requires.
+
+## The rebuttal: compression tracks the activation function
+
+If compression were a property of learning, changing the nonlinearity should
+not remove it. It does.
+
+### Saturation on both sides, not learning, produces the elbow
+
+<Figure
+  src="./figures/saxe-2018-tanh-relu.png"
+  alt="Four information-plane panels arranged two by two. Both left panels, the tanh networks, show trajectories that rise, bulge rightward, then turn and run leftward for the rest of training. In the right panels, the ReLU networks, the trajectories climb up and to the right without ever turning back; only the leftmost trajectory, the final sigmoidal layer, bends left."
+  caption="Change the nonlinearity and the elbow goes away. Columns: tanh (left) against ReLU (right); rows: the synthetic task (top) against MNIST (bottom). Every tanh layer turns and compresses; every ReLU layer climbs monotonically, and the one curve on the right that bends is the final sigmoidal layer. Axes are the binned estimates $I(X;\mathsf{Q}_m[T_\ell])$ and $I(\mathsf{Q}_m[T_\ell];Y)$, colour running over training epochs."
+/>
+
+Rerunning the same architecture with ReLU units in place of tanh removes the
+compression phase: $I(X;T_\ell)$ increases monotonically in every ReLU layer,
+and only the final sigmoidal layer bends. The same contrast appears on a
+$784$–$1024$–$20$–$20$–$20$–$10$ network trained on MNIST, and on the
+soft-sign against soft-plus pair. The separating property is saturation on
+both sides: activations bounded above and below produce the elbow, activations
+bounded on one side do not.
+
+### Compression is detached from generalization and from gradient noise
+
+Two further claims come apart under the same treatment. Compression was
+detached from generalization in both directions. A deep *linear* network in a
+student–teacher setup, where the generalization error and the information
+terms can both be computed in closed form, generalizes well and shows no
+compression at all; sized to match the number of samples so that it badly
+overfits, its information-plane trajectory does not change. In the other
+direction, the original tanh network retrained on $30\%$ of the data overfits
+substantially and still compresses. And compression was detached from
+stochastic gradients: training the same networks with full-batch gradient
+descent, which has no gradient noise to diffuse on, produces trajectories that
+look the same as the stochastic ones. The high-to-low gradient signal-to-noise
+transition does occur, in every configuration tried, but it occurs
+independently of whether any compression appears. Throughout, the rebuttal
+accepted the published measurements and attacked the interpretation put on
+them.
+
+## The plotted quantity does not depend on the weights
+
+Both papers plot a curve against training epoch and read its shape as a
+statement about the network. For that reading to be available, the quantity
+has to depend on the network's parameters. It does not.
+
+A deterministic network computes $T_\ell = \varphi_\ell(X)$, a fixed function
+of the input for fixed weights. Two cases exhaust the modelling choices, and
+neither leaves anything to measure.
+
+### Continuous input: the quantity is infinite at every layer
+
+<Theorem title="vacuous mutual information in deterministic networks (Amjad &amp; Geiger 2019, Theorem 1)">
+Let $X$ be a $d$-dimensional random variable whose distribution has an
+absolutely continuous component with a density that is continuous on a compact
+subset of $\mathbb{R}^d$, and let the activation function be bi-Lipschitz, or
+continuously differentiable with strictly positive derivative. Then for every
+layer $\ell$ and almost every choice of weight matrices,
+$$
+I(X;T_\ell) = \infty .
+$$
+</Theorem>
+
+The reason is the one from the previous section, applied to a network instead
+of a bin grid, and it is not injectivity. The layers here contract dimension at
+every stage, $12$ inputs to $10$ to $7$ and down to $2$, so no layer map is
+invertible and $T_\ell$ does not determine $X$. What the hypotheses buy is
+weaker and sufficient: the input's absolutely continuous component has positive
+correlation dimension, a bi-Lipschitz or strictly increasing map cannot drive
+that dimension to zero, and so $T_\ell$ stays spread over a continuum instead of
+collapsing onto countably many points, however narrow the layer. Cut the layer's
+range into $k$ cells and record which cell the representation lands in: the
+record $Q_k(T_\ell)$ is a discrete variable, and $H(Q_k(T_\ell))$ grows without
+bound as the cells shrink, at a rate set by that dimension. It is
+also a deterministic function of $X$, so $I(X;Q_k(T_\ell)) = H(Q_k(T_\ell))$,
+and it is a processed version of $T_\ell$, so the
+<Ref lesson="data-processing-inequality">data-processing inequality</Ref> gives
+$I(X;T_\ell) \ge I(X;Q_k(T_\ell)) = H(Q_k(T_\ell))$ for every $k$ at once. That
+puts $I(X;T_\ell)$ above every finite number. Nothing about
+training enters, and $\infty$ does not vary with the weights.
+
+### Input uniform on the dataset: the quantity is 12 bits at every layer
+
+The alternative modelling choice, the one actually used in the experiments,
+makes $X$ uniform on the $n$ points of the dataset. That caps the quantity at
+$H(X) = \log_2 n$ and creates the opposite problem. Here injectivity does hold,
+because the map to be inverted is a map between finite sets: two of the $4096$
+points collide at layer $\ell$ only on a measure-zero set of weight matrices,
+so the $4096$ representations are distinct for almost every weight setting even
+though the layer is two units wide. An injective map is a sufficient statistic
+for every target, the equality case of the
+<Ref lesson="data-processing-inequality">data-processing inequality</Ref>.
+Hence
+$$
+I(X;T_\ell) = H(X) = \log_2 4096 = 12 \text{ bits},
+\qquad I(T_\ell;Y) = I(X;Y),
+$$
+for every layer, every epoch, and every weight setting. The horizontal axis of
+the information plane holds still at $12$ bits for the entire run.
+
+<Figure
+  src="./figures/deterministic-chain.svg"
+  alt="Top row: four layers of a deterministic network, each labelled 12 bits, with the note that the value is log2 4096 at every layer for every weight setting. Bottom row: the same chain with noise added to each layer, and a bar per layer showing strictly decreasing information"
+  caption="The chain is flat until noise is added: injective layers all sit at H(X) = 12 bits, and only the noisy versions move."
+/>
+
+The data-processing inequality is not violated by any of this. It says the
+sequence is non-increasing, and a constant sequence is non-increasing; the
+layered corollary permits a stage to lose nothing, which is exactly what an
+injective stage does. The published ordering of layers from left to right was
+read as the inequality biting, and the inequality was in fact silent.
+
+<KeyFact>
+The correct statement is that the curves are measurements of the measuring
+apparatus. A quantity that is constant in the weights cannot produce a
+trajectory across training; every wiggle in the published plots therefore
+comes from the estimator, and the useful question is what the estimator was
+responding to.
+</KeyFact>
+
+## What the published curves measure: the entropy of a quantizer
+
+The experiments never computed $I(X;T_\ell)$. They computed a quantized proxy,
+and the proxy has a closed form that identifies it exactly.
+
+Let $Q_m[T_\ell]$ cut the layer's bounded range, the hypercube $[-1,1]^{d_\ell}$
+for tanh units, into $m$ equal intervals per coordinate, and replace each
+representation by the cell it falls in. Because $T_\ell$ is a deterministic
+function of $X$, so is $Q_m[T_\ell]$, and for a deterministic function
+$H(Q_m[T_\ell] \mid X) = 0$. Therefore
+$$
+I\bigl(X; Q_m[T_\ell]\bigr)
+= H\bigl(Q_m[T_\ell]\bigr) - H\bigl(Q_m[T_\ell] \mid X\bigr)
+= H\bigl(Q_m[T_\ell]\bigr),
+$$
+computed by counting how many of the $4096$ inputs land in each cell. The
+plotted quantity is an entropy of a histogram of representations, and $m$ is
+chosen by the experimenter: no quantizer exists anywhere in the network being
+studied.
+
+<Figure
+  src="./figures/bin-size-artifact.png"
+  alt="Four side-by-side panels plotting the quantized proxy I(X;Q_m[T_ell]) against training epoch on a log axis from 1 to 10^4, one panel per quantization cell size 0.0001, 0.001, 0.01 and 0.1, with five coloured curves for layers 1 to 5 in each. At cell size 0.0001 all five layers lie flat just above 8 for almost every epoch, layer 5 dropping only at the very end; as the cell size coarsens the deeper layers peel away and develop dips and rises, and at cell size 0.1 layers 3, 4 and 5 start near 0 to 4 and wander across the whole range"
+  caption="Four measurements of one training run, differing only in the experimenter's bin size. At cell size 0.0001 every layer sits flat at the saturation value, about 8.3 nats; the compression elbow appears only as the bins coarsen."
+/>
+
+### Four bin sizes, four different pictures of one training run
+
+Four bin sizes give four qualitatively different pictures of the same training
+run. At the finest setting, cell size $10^{-4}$, every layer sits flat across
+almost all epochs at $\ln(2^{12}) \approx 8.3$ nats, which is $12$ bits: the
+quantizer has become fine enough to separate all $4096$ points, the proxy has
+converged to the true value, and the true value is the constant of the
+previous section. At coarser settings the curves develop the elbow. The
+compression phase appears and disappears as a function of a parameter of the
+measurement.
+
+<Remark title="the proxy does not inherit the inequality">
+The layered ordering that made the published plots look theoretically
+constrained does not survive quantization. The data-processing inequality
+applies to $I(X;T_\ell)$, which is constant; the quantized proxies
+$I(X;Q_m[T_\ell])$ are entropies of separately quantized variables and obey no
+such chain, so a deeper layer scoring higher than a shallower one would
+falsify nothing.
+</Remark>
+
+## The resolution: compression is clustering
+
+The proxy is not measuring mutual information. It is measuring something, it
+moves in a consistent direction late in training, and the identity
+$I(X;Q_m[T_\ell]) = H(Q_m[T_\ell])$ says what.
+
+### The proxy falls exactly when representations concentrate
+
+An entropy of a histogram falls when the histogram concentrates. Uniform
+occupancy over $k$ cells gives the maximum $\log_2 k$
+(<Ref lesson="entropy-as-average-surprise"/>); mass piled into a few cells
+gives much less. So $H(Q_m[T_\ell])$ falls exactly when representations that
+were spread across many cells move into few, which is to say when points in
+the layer's representation space cluster.
+
+<Figure
+  src="./figures/clustering-entropy.svg"
+  alt="Two panels of 128 two-class points under the same 16 by 16 grid: spread points occupy 83 cells and give H = 6.20 bits, clustered points occupy 13 cells and give H = 3.10 bits"
+  caption="The same 128 points, the same grid: pulling same-class points together empties 70 cells and drops the tallied entropy by 3.1 bits."
+/>
+
+### Injected noise makes the quantity well posed, and it agrees with the scatter plots
+
+Confirming that this is what the networks do required making the information
+quantity well posed first. Replacing each layer's output by
+$T_\ell^{(\sigma)} = T_\ell + Z_\ell$ with $Z_\ell$ isotropic Gaussian noise of
+scale $\sigma$, and training the network with the noisy activations rather
+than adding noise only at measurement time, turns the map from input to
+representation into a genuine stochastic channel. Then $I(X;T_\ell^{(\sigma)})$
+is finite, depends on the weights, and is worth estimating. At $\sigma$ of
+order $10^{-2}$ such a network performs like its deterministic counterpart and
+learns closely related representations.
+
+<Figure
+  src="./figures/compression-is-clustering.png"
+  alt="Left: mutual information in nats for five hidden layers against training epoch on a log axis — layers 1 to 3 flat near 8 nats, layer 4 in olive and layer 5 in cyan rising to peaks near epochs 28 and 541 and then falling, layer 5 reaching about 2 nats by epoch 10,000 — with train and test loss plotted below falling from 0.8 to near 0; four grey arrows mark epochs 28, 80, 541 and one near 9,000. Right: four scatter plots of the fifth hidden layer's representation at those four epochs, drawn in a 3-D axis box with grey shadow projections, points coloured orange and blue by class — smeared along one continuous band at epochs 28 and 541, collapsed into a few tight same-class clumps at epoch 80 and at the final epoch."
+  caption="Read the arrows across. Layer 5's information (cyan) is high at epochs 28 and 541, where the two classes lie smeared along a single continuous band, and low at epoch 80 and at the end of training, where the same points have collapsed into a few tight same-class clumps. Train and test loss fall throughout: the information tracks the clustering, not the learning."
+/>
+
+Measured this way, the compression phase is real: $I(X;T_\ell^{(\sigma)})$
+does undergo a long decrease late in training. Set the estimate beside scatter
+plots of the same layer's representations at the marked epochs and the two
+line up. Same-class representations draw together; the noisy channel from
+representation to observation can no longer tell them apart; the mutual
+information falls. The mechanism is geometric, and the information-theoretic
+reading was tracking it through a proxy that happened to be sensitive to the
+same thing.
+
+### The price: risk exponential in the layer's width
+
+The estimator that makes this measurable carries the cost of the whole
+enterprise in its error bound. Exploiting the known law of the injected noise,
+the estimation risk for a layer of width $d_\ell$ satisfies
+$$
+\sup_{P_X} \mathbb{E}\left|\, I(X;T_\ell^{(\sigma)}) - \hat{I} \,\right|
+\;\le\; \frac{8 c^{\,d_\ell} + d_\ell \log\bigl(1 + \sigma^{-2}\bigr)}{4\sqrt{n}},
+$$
+for a constant $c$ independent of the sample and the distribution. The rate in
+$n$ is the usual $n^{-1/2}$; the constant is exponential in the width of the
+layer, and the matching lower bound shows this is not an artefact of the
+method. Estimating a mutual information in high dimension is not merely hard,
+it is provably exponentially expensive in the dimension, which is why every
+experiment in this literature uses layers a handful of units wide.
+
+<KeyFact>
+Refuted: the identification of the plotted curve with $I(X;T)$, and with it
+every inference from the curve's shape to a network shedding input
+information. Survived: that trained classifiers progressively cluster
+same-class representations, at a rate set by the activation function and
+movable in either direction relative to generalization — a real phenomenon
+that had no name before the dispute.
+</KeyFact>
+
+## What to report instead
+
+Three responses are available, and they differ in cost. A better estimator is
+not among them: the rebuttal recomputed its information planes with
+$k$-nearest-neighbour and kernel-density estimators alongside the quantizer,
+and changing estimator addresses the error in the measurement rather than the
+target of it. For a deterministic network the target is infinite under a
+continuous input and constant under the dataset input, and no accuracy makes
+an infinite or constant quantity move with training.
+
+- **Make the quantity well posed.** Injecting noise into the system, not into
+  the measurement, gives a mutual information that is finite,
+  weight-dependent and estimable. The price is that the network being studied
+  is no longer the network being deployed, and the estimator's constant grows
+  exponentially in layer width.
+- **Bound it instead of estimating it.** A lower bound computed from samples
+  sidesteps the density estimation entirely, which is how mutual information
+  is handled in modern representation learning; the construction and its
+  ceiling are the subject of <Ref lesson="infonce">the InfoNCE bound</Ref>.
+- **Report what was computed, under its own name.** $H(Q_m[T])$ at a stated
+  $m$, with the shuffle control beside it, is an honest measurement of
+  clustering. Relabelled $I(X;T)$ it is a claim about a quantity that was
+  never computed.
+
+Established: the plug-in estimator of mutual information is biased upward by
+$(r-1)(c-1)/(2n\ln 2)$ bits, the bias is removable to first order and never
+fully, the answer for continuous variables is a function of the bin width and
+climbs to $\log_2 n$ as bins shrink, and in a deterministic network the
+quantity the information plane plots is a constant that the quantizer, not the
+training, was making move. That closes the module on what one variable says
+about another. <Ref lesson="channel-capacity">The next lesson</Ref> stops
+measuring mutual information and starts maximizing it: over all input
+distributions to a fixed noisy channel, the largest achievable $I(X;Y)$ is
+that channel's capacity.
+
+## Exercises
+
+<Exercise>
+The table below counts $n = 160$ observations of two four-valued variables.
+Compute the plug-in estimate $\hat{I}$ and the Miller–Madow corrected value,
+and report both.
+
+| $n_{ij}$ | $j=1$ | $j=2$ | $j=3$ | $j=4$ |
+| --- | --- | --- | --- | --- |
+| $i=1$ | $20$ | $10$ | $6$ | $4$ |
+| $i=2$ | $10$ | $20$ | $6$ | $4$ |
+| $i=3$ | $5$ | $5$ | $15$ | $15$ |
+| $i=4$ | $5$ | $5$ | $15$ | $15$ |
+
+<Solution>
+**Marginals.** Rows: $40, 40, 40, 40$, so $\hat{p}_{i\cdot} = 1/4$ each and
+$\hat{H}(X) = 2$ bits. Columns: $40, 40, 42, 38$, so
+$\hat{p}_{\cdot j} = 0.25, 0.25, 0.2625, 0.2375$ and
+$\hat{H}(Y) = 1.9991$ bits.
+
+**Joint entropy.** The distinct cell probabilities are $20/160 = 0.125$ (twice),
+$10/160 = 0.0625$ (twice), $6/160 = 0.0375$ (twice), $4/160 = 0.025$ (twice),
+$5/160 = 0.03125$ (four times) and $15/160 = 0.09375$ (four times), and their
+$-p\log_2 p$ contributions are $0.750$, $0.500$, $0.355$, $0.266$, $0.625$ and
+$1.281$ respectively:
+$$
+\hat{H}(X,Y) = 0.750 + 0.500 + 0.355 + 0.266 + 0.625 + 1.281
+= 3.777 \text{ bits}.
+$$
+
+**Plug-in.** $\hat{I} = 2 + 1.9991 - 3.777 = 0.222$ bits.
+
+**Miller–Madow.** All $16$ cells, all $4$ rows and all $4$ columns are
+occupied, so the correction is
+$$
+\frac{16 - 4 - 4 + 1}{2 \cdot 160 \cdot \ln 2} = \frac{9}{221.8}
+= 0.041 \text{ bits},
+$$
+giving $\hat{I}_{\mathrm{MM}} = 0.222 - 0.041 = 0.181$ bits. The correction is
+$18\%$ of the raw value: with $10$ expected counts per cell the table is well
+filled, which is exactly the regime in which the correction is small and
+trustworthy. A table with the same total spread over $30 \times 30$ cells
+would have a correction larger than the estimate.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two independent fair coins are tossed $n = 20$ times and the results tabulated
+in a $2 \times 2$ table. (a) Compute the expected plug-in estimate from the
+bias formula. (b) Now imagine replacing the coins by two continuous variables
+and increasing the number of bins per axis toward $n$. State the value the
+plug-in estimate approaches, and explain why the limit is
+$\min\bigl(\hat{H}(X), \hat{H}(Y)\bigr)$ rather than $0$. Write down what the
+empirical table looks like at that limit before opening the solution.
+
+<Solution>
+**(a)** $(2-1)(2-1) = 1$ degree of freedom, so
+$\hat{I} \approx 1/(2 \cdot 20 \cdot \ln 2) = 0.036$ bits. Small, but the true
+value is $0$ and the estimate is above it with probability one unless the
+table comes out exactly balanced.
+
+**(b)** The estimate approaches $\log_2 20 \approx 4.32$ bits, the largest
+value any estimate from $20$ samples can take.
+
+Once the bins are fine enough that no two of the $20$ samples share an $x$-bin
+or a $y$-bin, the empirical table has exactly one occupied cell in each
+occupied row and each occupied column: a perfect matching. In that table the
+empirical $x$ determines the empirical $y$ with certainty, so
+$\hat{H}(Y \mid X) = 0$ and $\hat{I} = \hat{H}(Y) = \log_2 20$, and by the same
+argument $\hat{I} = \hat{H}(X)$. Independence of the underlying variables plays
+no part: the estimator sees a table, and this table is a bijection.
+
+The reason the limit is not $0$ is that the plug-in estimator has no access to
+anything but the empirical table, and every sample is a distinct pair. To
+report $0$ it would need cells with counts matching the product of the
+marginals, and with one sample per cell there is nothing for the counts to
+agree with. The maximum is $\min(\hat{H}(X), \hat{H}(Y))$ rather than
+$\log_2 n$ in general because a tie in either coordinate merges two rows or
+two columns, and merging can only reduce the entropy of that marginal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim. "In the published information plane, layer $4$ has a lower
+$I(X;T)$ than layer $2$ at every epoch, so the network is discarding
+information about the input as it goes deeper, and the discarded bits are the
+ones irrelevant to the label." State the two separate conditions under which
+this reading is invalid, say what quantity the plotted numbers actually
+describe, and name one measurement that would distinguish the two readings.
+
+<Solution>
+**Condition one: the network is deterministic.** For a deterministic network
+with strictly monotone activations and a discrete input uniform on the
+dataset, every layer map is injective almost surely, so
+$I(X;T_\ell) = H(X) = \log_2 n$ for every $\ell$. The true quantity is equal
+across layers, not decreasing, and it is a constant of the dataset rather than
+a property of the network. For a continuous input the same hypotheses give
+$I(X;T_\ell) = \infty$ at every layer.
+
+**Condition two: the plotted numbers are quantized proxies.** What was
+computed is $I(X;Q_m[T_\ell]) = H(Q_m[T_\ell])$ for a user-chosen bin size
+$m$. The data-processing inequality governs $I(X;T_\ell)$ and says nothing
+about the quantized versions, so the observed ordering across layers is not an
+instance of the theorem and carries no theoretical warrant.
+
+**What the numbers describe.** The entropy of the histogram of the layer's
+representations under the chosen quantizer: a measure of how many cells the
+representations occupy and how evenly. It falls when same-class
+representations cluster.
+
+**The discriminating measurement.** Recompute the entire plot at two bin sizes
+separated by two orders of magnitude. A genuine mutual information is a
+property of the joint distribution and cannot depend on the observer's bin
+size, so agreement between the two plots is what the information reading
+predicts; the published curves instead change shape, and at the finest bin
+size flatten onto $\log_2 n$. A second, sharper test is to compare the
+trajectory of an accurately estimated $I(X;T^{(\sigma)})$ in a network trained
+with intrinsic noise against scatter plots of the same layer's
+representations.
+</Solution>
+</Exercise>
+
+<Exercise>
+Carry out the degeneracy argument the lesson quoted. (a) Prove that for a
+discrete $X$ and an injective map $T = f(X)$, $I(X;T) = H(X)$ exactly,
+independent of $f$. (b) State what changes when $f$ is many-to-one, and give
+the exact expression for the loss. (c) State what changes when $X$ is
+continuous and $f$ is injective and continuous, and say which step of part (a)
+breaks.
+
+<Solution>
+**(a)** $T = f(X)$ is a function of $X$, so $H(T \mid X) = 0$. Injectivity
+gives the reverse: $X = f^{-1}(T)$ is a function of $T$, so $H(X \mid T) = 0$.
+Then
+$$
+I(X;T) = H(X) - H(X \mid T) = H(X) - 0 = H(X),
+$$
+and symmetrically $I(X;T) = H(T)$, so $H(T) = H(X)$ as well. Nothing about $f$
+beyond injectivity entered, so relabelling the outcomes in any invertible way
+leaves the quantity fixed. This is the equality case of the data-processing
+inequality (<Ref lesson="data-processing-inequality"/>): an invertible map is
+a sufficient statistic for every target.
+
+**(b)** With $f$ many-to-one, $H(X \mid T)$ is no longer zero, and
+$$
+I(X;T) = H(X) - H(X \mid T)
+= H(X) - \sum_t p(t)\, H\bigl(X \mid T = t\bigr).
+$$
+Each merged group contributes the entropy of the conditional distribution of
+$X$ inside that group, weighted by the group's probability. A map that merges
+two outcomes of equal probability $q$ loses $2q$ bits when $q$ is the mass of
+each, since the conditional distribution inside the merged symbol is a fair
+coin: the loss is the entropy destroyed, not the number of symbols removed.
+
+**(c)** With $X$ continuous, $H(X)$ is not defined as a finite number; the
+step that breaks is the very first one, since discrete entropy has no
+continuous counterpart with the same properties. The conclusion becomes
+$I(X;T) = \infty$: for each $k$, quantizing $X$ to $k$ levels gives a discrete
+$X_k$ that $T$ still determines, so $I(X;T) \ge I(X_k;T) = H(X_k)$, and
+$H(X_k) \to \infty$ as the quantization refines. The mutual information is
+above every finite bound.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the bin-size artefact yourself. Generate $4096$ samples from any
+two-dimensional distribution you like, push them through a fixed random map
+into two dimensions, and compute $I(X;Q_m[T])$ for four bin widths spanning
+three orders of magnitude. Report all four numbers alongside $\log_2 4096$,
+and state in advance what agreement with the published information-plane
+claim would look like.
+
+<Solution>
+**What to compute.** With $X$ uniform on the $4096$ generated points and $T$
+their images under the fixed map, $Q_m[T]$ is the cell index and
+$I(X;Q_m[T]) = H(Q_m[T])$, computed by tallying how many of the $4096$ points
+fall in each cell and taking $-\sum_k (n_k/4096)\log_2 (n_k/4096)$. No model
+fitting and no density estimation is involved: it is a histogram.
+
+**What to expect.** At the coarsest width, cells wide enough that a handful of
+them hold everything, a value of a few bits. At the finest, every point in its
+own cell, exactly $\log_2 4096 = 12$ bits. In between, a monotone climb. The
+four numbers will span most of the range from $2$ to $12$ bits on the same
+data and the same map.
+
+**What agreement would look like.** The claim under test is that the plotted
+quantity measures $I(X;T)$, a functional of the joint distribution of $X$ and
+$T$. A functional of the joint distribution does not depend on a parameter the
+observer chose, so agreement means the four numbers coincide to within
+estimation noise. They will not. The correct conclusion is not that the
+computation is wrong but that it is a computation of $H(Q_m[T])$, which is a
+perfectly good measurement of how spread out the representations are, at the
+resolution $m$.
+
+**The control to run alongside.** Shuffle the assignment of points to images
+and recompute. Here the shuffle leaves $H(Q_m[T])$ unchanged, since it is a
+function of the multiset of images alone, and that invariance is itself
+informative: a quantity that a shuffle cannot move is not measuring an
+association between two variables.
+</Solution>
+</Exercise>
+
+<Exercise>
+A colleague reports $I(\text{feature};\text{label}) = 0.8$ bits on a dataset
+of $500$ rows, where the feature is categorical with $30$ levels and the label
+is binary, and proposes to drop every other feature on that basis. Decide
+whether to believe the number, showing the calculations that drive the
+decision. Use $H_2(0.031) = 0.20$.
+
+<Solution>
+**Bias check.** The table is $30 \times 2$, so
+$$
+\frac{(30-1)(2-1)}{2 \cdot 500 \cdot \ln 2} = \frac{29}{693.1}
+= 0.042 \text{ bits}.
+$$
+Estimation bias accounts for about $5\%$ of the reported figure, so the number
+is not an artefact of the estimator. The expected count per cell is
+$500/60 = 8.3$, just inside the regime where that formula is reliable; if the
+levels are unbalanced, many cells will be nearly empty and the true bias will
+be larger, but not by a factor of twenty.
+
+**Ceiling check.** $I \le \min(H(\text{feature}), H(\text{label}))$, and the
+label is binary, so $H(\text{label}) \le 1$ bit. A reported $0.8$ bits says
+the feature removes four fifths of all the uncertainty there is.
+
+**Fano check: the accuracy ceiling.** Take the label balanced, so $H(\text{label}) = 1$
+bit and $H(\text{label} \mid \text{feature}) = 1 - 0.8 = 0.2$ bits exactly.
+Fano's inequality for a binary target reads
+$H(\text{label} \mid \text{feature}) \le H_2(P_e)$
+(<Ref lesson="fano-inequality"/>), so $H_2(P_e) \ge 0.20$ and therefore
+$P_e \ge 0.031$. Fano runs in the impossibility direction only: it says no rule
+computed from this feature, lookup table or boosted tree or anything else, beats
+about $97\%$ accuracy. It is the obstacle, not a licence, and it never asserts
+that any rule attains the floor.
+
+**The accuracy floor, from the other side.** A guarantee that accuracy is high has to
+come from a different inequality. For a binary target the majority-label rule
+errs with $P_e \le H(\text{label} \mid \text{feature})/2$ (the Hellman–Raviv
+bound), so $H(\text{label} \mid \text{feature}) \le 0.2$ bits forces
+$P_e \le 0.1$. If the $0.8$ bits are real, predicting the majority label inside
+each of the $30$ levels reaches at least $90\%$ accuracy on the population the
+sample came from. That is a testable consequence, and the interval $90$–$97\%$
+is what the reported number commits the colleague to.
+
+**Decision.** Do not believe it without one further measurement, and the
+measurement is not information-theoretic. Fit the trivial classifier that
+predicts the majority label within each of the $30$ levels, and score it on
+held-out rows. If it lands in the $90$–$97\%$ band, the estimate is real and the
+colleague's proposal is sound. If it lands near chance, the $0.8$ bits is
+memorization of a small sample by a high-cardinality feature, and the shuffle
+control will confirm it: permute the label column and recompute, and compare
+the reported $0.8$ against the distribution of shuffled values.
+</Solution>
+</Exercise>
+
+<Exercise>
+You need $I(X;Y)$ where $X$ is a photograph and $Y$ is its caption.
+(a) Explain why binning is hopeless here, quantitatively. (b) Design a scheme
+that estimates a *lower* bound instead: train a scoring function to pick the
+true caption for an image out of one true and $N-1$ impostor captions, and say
+what a low error rate would certify. (c) Work out the largest bound such a
+scheme could ever produce, and state what happens to a very good
+representation once it exceeds that.
+
+<Solution>
+**(a)** A modest image is $224 \times 224 \times 3$ bytes, so $X$ lives in a
+space of about $150{,}000$ dimensions. Binning each coordinate into even $2$
+cells gives $2^{150000}$ cells, against a dataset of at most $10^9$ images:
+the expected count per cell is zero to hundreds of decimal places, every
+sample occupies its own cell, and the plug-in estimate returns
+$\log_2 n$ exactly, as the boundary exercise above showed. The number would be
+the logarithm of the dataset size and nothing else. The estimator's error
+constant makes the same point in reverse: the risk bound of this lesson grows
+like $c^{\,d}$ in the dimension $d$, so the sample size required is
+exponential in $150{,}000$.
+
+**(b)** Take a batch of $N$ image–caption pairs. For an image $x$, score it
+against all $N$ captions with a learned function $f(x, y)$, and train the
+softmax over those $N$ scores to select the caption that truly accompanied
+$x$. The loss is an ordinary $N$-way cross-entropy
+(<Ref lesson="cross-entropy-loss"/>), computable from samples with no density
+estimation anywhere. Low loss certifies that image and caption share enough
+information to identify each other among $N$ candidates: the shared
+information is at least what is needed to win that discrimination.
+
+**(c)** A classifier choosing among $N$ equiprobable options can carry at most
+$\log_2 N$ bits, since the entropy of the uniform distribution on $N$ labels
+is $\log_2 N$ (<Ref lesson="entropy-as-average-surprise"/>). Even a scheme
+that never errs certifies only that much, so the bound is capped at $\log_2 N$
+and a batch of $256$ certifies at most $8$ bits. Beyond that point a strong
+representation and a merely adequate one produce the same saturated number,
+and the estimate stops distinguishing them. This is the InfoNCE bound
+$I(X;Y) \ge \log_2 N - L_N$, derived and its saturation examined in
+<Ref lesson="infonce">the InfoNCE lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. Z. Goldfeld, Y. Polyanskiy, "The Information Bottleneck Problem and Its Applications in Machine Learning," *IEEE Journal on Selected Areas in Information Theory* 1(1), 2020 — §IV-B3 the vacuousness of $I(X;T)$ in deterministic networks, §IV-B4 the quantized proxy and the identity $I(X;Q_m[T]) = H(Q_m[T])$, §V-A the empirical rebuttal, §V-B bin-size misestimation, §V-C noisy networks, the estimator risk bound, and clustering. The survey this lesson follows. https://arxiv.org/abs/2004.14941
+2. R. Shwartz-Ziv, N. Tishby, "Opening the Black Box of Deep Neural Networks via Information," 2017 — the original information-plane experiment, the 12–10–7–5–4–3–2 architecture, and the fitting/compression reading. https://arxiv.org/abs/1703.00810
+3. A. M. Saxe, Y. Bansal, J. Dapello, M. Advani, A. Kolchinsky, B. D. Tracey, D. D. Cox, "On the Information Bottleneck Theory of Deep Learning," ICLR 2018; extended version *Journal of Statistical Mechanics* 2019(12), 124020 — tanh against ReLU, the linear student–teacher construction separating compression from generalization, and stochastic against full-batch training. https://doi.org/10.1088/1742-5468/ab3985
+4. R. A. Amjad, B. C. Geiger, "Learning Representations for Neural Network-Based Classification Using the Information Bottleneck Principle," *IEEE Transactions on Pattern Analysis and Machine Intelligence*, 2019 — Theorem 1, quoted above: for bi-Lipschitz or strictly monotone activations the IB functional is either infinite or piecewise constant. https://arxiv.org/abs/1802.09766
+5. Z. Goldfeld, E. van den Berg, K. Greenewald, I. Melnyk, N. Nguyen, B. Kingsbury, Y. Polyanskiy, "Estimating Information Flow in Deep Neural Networks," ICML 2019, PMLR 97:2299–2308 — the noisy-network framework, the rate-optimal estimator, and the clustering account of compression. https://arxiv.org/abs/1810.05728
+6. L. Paninski, "Estimation of Entropy and Mutual Information," *Neural Computation* 15(6), 2003, pp. 1191–1253 — the bias expansions used here, the Miller–Madow correction, and the regimes in which each fails; the reference to read before reporting any estimate.
+7. A. Kraskov, H. Stögbauer, P. Grassberger, "Estimating Mutual Information," *Physical Review E* 69(6), 066138, 2004 — the $k$-nearest-neighbour estimators used above in place of binning: §I states both, Eq. (8) being the one simulated here, and §II derives them; §III measures their bias against the sample size and the neighbour count $k$. https://arxiv.org/abs/cond-mat/0305641
+8. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §11.1–11.2, the method of types, for the counting behind the asymptotics of empirical distributions.
+9. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* — §5.4 on Fano, Le Cam and minimax risks, the route from information quantities to lower bounds on estimation error.
+10. M. E. Hellman, J. Raviv, "Probability of Error, Equivocation, and the Chernoff Bound," *IEEE Transactions on Information Theory* IT-16(4), July 1970, pp. 368–372 — §III proves $P_e \le \tfrac{1}{2}H(X \mid Y)$ for two hypotheses, the achievability-side companion to Fano, used in the exercise on the reported $0.8$ bits. https://doi.org/10.1109/TIT.1970.1054466
+</References>

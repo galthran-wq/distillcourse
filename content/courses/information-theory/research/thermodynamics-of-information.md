@@ -1,112 +1,153 @@
 # Research brief: thermodynamics-of-information (Thermodynamics of information)
 
-status: planned
-module: natural-sciences
-type: core
+status: drafted (kept slug — revise; the lesson MOVES module, from
+natural-sciences to principles, and stays `type: extra`)
+module: principles
+type: extra
 goal: Explain Landauer's principle and compute the work bound of a Szilard engine.
+est_minutes: 32
 
-New lesson closing the course. It gives Shannon's entropy a physical price and
-closes the `entropy` concept's spiral at its deepest level: a bit is not just a
-coding unit but a thermodynamic quantity worth `kT ln 2` of work. It pairs with
-`max-entropy-principle` (the two physics faces of the theory) and pays off the
-`mutual-information` machinery via the feedback second law, where measured
-information enters as `I(X;M)`.
+## ARC
+
+- **Inherits:** entropy (`entropy-as-average-surprise`), mutual information
+  (`mutual-information`), and the exponential max-entropy form
+  (`max-entropy-principle`), which is the Boltzmann distribution.
+- **Spine step:** step 9, *Entropy as a choice rule* — "…and in physics that
+  choice carries a measurable energy price." Carried as an off-path chapter; the
+  core path survives skipping it and nothing downstream requires it.
+- **Contributes:** a physical price for a bit, and the demonstration that
+  mutual information appears in a thermodynamic inequality with units of joules.
+- **Hands off to:** nothing required.
+
+## Why it moved
+
+Paired with `max-entropy-principle`, whose exponential form *is* the Boltzmann
+distribution — the two lessons share a derivation. The previous
+`natural-sciences` module held only this lesson and `neural-coding`, both
+`extra`, which left the module unable to close on an application. Both lessons
+are re-homed, neither dropped.
 
 ## Sources to consult
 
-- Parrondo, Horowitz & Sagawa 2015, "Thermodynamics of Information" (Nat. Phys.
-  11, 131-139) — the primary review.
-  - **Maxwell's demon** — the apparent second-law violation and its setup.
-  - **Szilard engine** — one molecule, a measured bit, reversible isothermal
-    expansion extracting `W = kT ln 2`.
-  - **Landauer's principle** — erasing/overwriting one bit dissipates at least
-    `kT ln 2`; logical vs thermodynamic irreversibility.
-  - **Bennett's resolution** — the demon's memory reset pays back exactly what
-    the engine extracted; the full cycle obeys `W_total ≥ 0`.
-  - **Feedback second law (Sagawa-Ueda)** — `W ≥ ΔF - kT (ln 2) I(X;M)`:
-    measured information is a thermodynamic resource priced in bits of mutual
-    information (reuse `mutual-information`).
-- Jaynes 1957 (already the max-entropy source) — one back-reference: Boltzmann's
-  H and Shannon's H are the same functional; statistical mechanics as inference.
-- Landauer 1961 and Bennett 1982 — the original results the review synthesizes;
-  cite as primaries in References.
+- **Parrondo, Horowitz & Sagawa 2015** (primary) — Maxwell's demon and its
+  resolution; the Szilard engine (`W = kT ln 2` from one bit); Landauer's
+  principle; and the feedback second law `W ≥ ΔF - kT (ln 2) I(X;M)` that prices
+  measured information in mutual-information units. The open-access 2023
+  Parrondo survey (arXiv:2306.12447) covers the same ground.
+- **Jaynes 1957 §3** — the identification of thermodynamic entropy with Shannon
+  entropy under a mean-energy constraint; this is the bridge and it is already
+  built in the previous lesson.
+- Cover & Thomas, **§4.4** — the second law via Markov chains, with the striking
+  non-physics illustration (two countries with the same tax system see their
+  wealth distributions converge); **§2 historical notes** for Boltzmann's
+  gravestone epitaph `S = k log W`.
+- MacKay, **Appendix B** — partition functions and phase transitions, if the
+  starred material wants it.
 
 ## Key points the lesson must cover
 
-1. **Shannon entropy is thermodynamic entropy** in different units: physical
-   entropy `S = k_B ln W` and Shannon `H = -Σ p log p` are the same functional;
-   one bit of Shannon entropy is `k_B ln 2` of thermodynamic entropy. Concrete
-   opener: the conversion, `1 bit ↔ k_B ln 2 ≈ 9.6 × 10⁻²⁴ J/K`.
-2. **Landauer's principle**: erasing one bit — resetting a two-state memory to a
-   known value regardless of its prior state — reduces the memory's entropy by
-   `k_B ln 2`, so at temperature T it dissipates at least `kT ln 2` of heat
-   (`≈ 2.8 × 10⁻²¹ J` at room temperature). Computation, with the number.
-   Logical irreversibility (erasure) forces the cost; a reversible copy does not.
-3. **The Szilard engine** (worked): one molecule in a box, a partition inserted,
-   a measurement of which side it is on (one bit), then reversible isothermal
-   expansion against the partition extracts `W = kT ln 2` of work per cycle. One
-   measured bit is worth exactly `kT ln 2`.
-4. **Maxwell's demon and its resolution**: the demon seems to extract work from
-   thermal noise forever, violating the second law. Bennett's resolution: the
-   demon's memory must be reset to measure again, and that erasure costs `kT ln 2`
-   by Landauer — exactly the extracted work. The full cycle obeys the second law;
-   `W_total ≥ 0`. Information is the missing bookkeeping entry.
-5. **The feedback second law** (the mutual-information payoff): with measurement,
-   the work bound generalizes to `W ≥ ΔF - kT (ln 2) I(X;M)`, where `I(X;M)` is
-   the mutual information between the system state X and the measurement outcome
-   M. Better measurements (more bits of `I`) license more extractable work. This
-   is the same mutual information the course built, now a physical resource.
-6. **Why it matters** (precise, not hand-wavy): Landauer's bound is a hard floor
-   on the energy cost of irreversible computation — every erased bit in a chip
-   has a thermodynamic minimum cost, approached by recent experiments. Cite the
-   review's experimental confirmation (optical-trap bit erasure) in one sentence.
+1. **Units.** `S_thermo = k ln 2 × H_bits`. One bit is `k ln 2` of entropy,
+   which at room temperature is about `3 × 10^{-21}` J/K. Establish the
+   conversion before anything else; every later number depends on it.
+2. **Szilard's engine.** One molecule in a box; insert a partition; measure
+   which side; move the piston isothermally. The extractable work is exactly
+   `kT ln 2` per measurement — about `3 × 10^{-21}` J at room temperature. Work
+   the cycle step by step.
+3. **The apparent paradox.** The engine extracts work from a single heat bath,
+   which the second law forbids. Maxwell's demon is the same problem with more
+   molecules.
+4. **The resolution (Landauer, Bennett).** Measurement can be done reversibly;
+   *erasure* cannot. Resetting the demon's memory to a known state dissipates at
+   least `kT ln 2` per bit, exactly cancelling the extracted work. The
+   accounting closes. Present this as a refutation (L13): the prevalent
+   intuition is that the demon's measurement costs the energy, and it does not.
+5. **The feedback second law.** With measurement outcome `M`,
+   `W ≥ ΔF - kT (ln 2) I(X;M)`. Mutual information appears in a thermodynamic
+   inequality, in joules. Compute the bound for a one-bit measurement and
+   recover Szilard.
+6. **What is and is not settled.** Landauer's bound has been measured
+   experimentally in single-particle systems; the bound is a bound and real
+   devices dissipate many orders of magnitude more. Give the comparison with a
+   modern CMOS switching energy so the reader can see the scale.
 
 ## Pitfalls / subtleties to flag
 
-- Landauer's cost is for **erasure (logical irreversibility)**, not for
-  computation in general; reversible operations have no such floor. Keep the
-  distinction (erasing ≠ writing ≠ copying).
-- `kT ln 2` uses **natural** log because it is `k_B` × (entropy in nats); the
-  "one bit" factor is the `ln 2` converting bits to nats. State the unit bridge
-  carefully (ties back to the surprisal units discussion).
-- The demon does **not** violate the second law; the naive paradox omits the
-  memory-reset cost. Do not present it as an open puzzle.
-- The feedback second law's sign convention and the direction of `I(X;M)` follow
-  the review; derive the bound's meaning, do not just quote a formula.
-- This is a **lower bound** on dissipated heat / an **upper** bound on extractable
-  work — real devices sit well above the Landauer floor. Do not claim current
-  hardware runs at the limit.
-- Shannon ↔ thermodynamic entropy equality is a statement about the same
-  functional, made precise by Jaynes; attribute the "statistical mechanics as
-  inference" reading to him, one remark.
+- Landauer's principle is about **logically irreversible** operations. Erasure
+  is irreversible; a reversible computation can in principle avoid the cost.
+- `kT ln 2` is a lower bound and an extremely small one — roughly `3 × 10^{-21}`
+  J against a CMOS transistor switching energy around `10^{-15}` J. State the
+  ratio so nobody concludes that Landauer limits current chips.
+- Thermodynamic entropy and Shannon entropy are the same quantity only under the
+  max-entropy identification of the previous lesson. Do not assert the identity
+  without that bridge.
+- Maxwell's demon has a long literature of wrong resolutions (measurement costs
+  energy). The correct one is about erasure. Name the wrong one explicitly as
+  part of the refutation.
+- The feedback second law is an inequality; attaining it requires an ideal
+  protocol.
 
 ## FIGURE PLAN
 
-1. **single `<Figure>` (component)** — the units bridge: one bit shown as
-   `H = 1 bit` (Shannon) and `ΔS = k_B ln 2` (thermodynamic), a labeled
-   conversion arrow `× k_B ln 2`. One idea: entropy is one quantity, two units.
-   Ties back to the surprisal units strip.
-2. **`<FigureSequence>` (4 frames)** — the Szilard cycle: frame 1 one molecule in
-   a box; frame 2 partition inserted; frame 3 measurement records which side
-   (one bit); frame 4 reversible expansion extracts `W = kT ln 2`. Delta = one
-   step. One idea: a measured bit is worth `kT ln 2`. Inspiration: Parrondo et
-   al. Szilard figure (recreate — this is the field's canonical diagram).
-3. **single `<Figure>` (component)** — Landauer erasure: a double-well potential
-   (two memory states) collapsed to a single well (reset), the freed entropy
-   `k_B ln 2` leaving as heat `Q ≥ kT ln 2`, with the room-temperature number.
-   One idea: forgetting a bit costs heat. Inspiration: Parrondo et al. bistable-
-   potential figure (recreate).
-4. **`<FigureSequence>` (3 frames)** — the demon's balance sheet: frame 1 demon
-   measures + extracts `kT ln 2`; frame 2 demon's memory fills (books unbalanced,
-   apparent violation); frame 3 memory reset pays `kT ln 2` back, `W_total = 0`.
-   One idea: the reset closes the loophole. Inspiration: Bennett's resolution /
-   Parrondo feedback-cycle figure.
-5. **single `<Figure>` (component)** — the feedback second law dissected:
-   `W ≥ ΔF - kT (ln 2) I(X;M)` with labels-above-symbols — "free-energy change",
-   "measured information", "the bits you gathered buy this much extra work". One
-   idea: mutual information is a physical resource. Inspiration: Sagawa-Ueda
-   result as stated in the review.
-6. **single `<Figure>` (component)** — the two physics faces: a small panel
-   pairing `max-entropy` (Boltzmann `p ∝ e^{-E/kT}`) with `Landauer` (a bit costs
-   `kT ln 2`), both labeled "Shannon H = thermodynamic S". One idea: the course's
-   entropy is the physicist's entropy. Inspiration: Jaynes 1957 / course spiral.
+1. `draw:` **szilard-1..4.svg** (exist, `<FigureSequence>`) — the Szilard cycle:
+   insert partition, measure, expand isothermally, remove partition, with work
+   and heat tallied per stage.
+2. `draw:` **demon-ledger-1..3.svg** (exist, `<FigureSequence>`) — the demon's
+   accounting: work extracted, memory filling, erasure cost charged, net zero.
+3. `draw:` **NEW, single `<Figure>`** — the unit bridge: `H` in bits on one axis
+   and `S` in J/K on the other, with the `k ln 2` conversion drawn as the slope
+   and one bit marked at `3 × 10^{-21}` J/K.
+4. `draw:` **NEW, single `<Figure>`** — the scale comparison as a log axis:
+   `kT ln 2`, a CMOS switching energy, a DRAM refresh, and a joule, marked in
+   order of magnitude. One idea: the bound is real and nowhere near binding.
+5. `draw:` **NEW, single `<Figure>`** — the feedback second law dissected:
+   `W ≥ ΔF - kT (ln 2) I(X;M)`, with each term labelled above the symbols and
+   the Szilard case plugged in beneath. Inspiration: the playbook's
+   formula-dissection rule.
+6. `source:` **maxwell-1871-demon-passage.png** (already in the lesson's
+   figures/ with credits) — Maxwell's own description of the demon. Keep;
+   float right at the paradox section. The reader must be able to read
+   Maxwell's wording, because the whole dispute has been about what exactly he
+   claimed.
+
+## EXERCISE PLAN
+
+1. *(warm-up)* Compute the work extractable from a Szilard engine at 300 K and
+   at 4 K, and the heat dissipated in erasing one bit at each temperature.
+2. **Boundary probe.** What does Landauer's bound become as `T → 0`? State the
+   limit, then explain why this does not permit free computation, naming the
+   practical quantity that replaces the bound.
+3. **Claim to refute.** "Maxwell's demon fails because measuring the molecule's
+   position costs energy." Refute this — the standard wrong resolution — and
+   state which operation actually carries the cost, with the accounting.
+4. **Derivation the lesson skipped.** Derive `W = kT ln 2` for the isothermal
+   expansion of a one-molecule gas from half the box to the whole box, using the
+   ideal gas law. State which step assumes quasi-static operation.
+5. **Derivation, second direction.** Show that the feedback second law reduces
+   to Szilard's result when `M` is a perfect one-bit measurement of which half
+   the molecule is in, and state what `I(X;M)` becomes for a noisy measurement
+   with error probability `ε`.
+6. **Research-shaped.** Estimate the total energy a modern data centre would
+   dissipate if it operated at the Landauer bound for its bit-erasure rate, and
+   compare with its actual power draw. Report the ratio in orders of magnitude
+   and state the assumption that most affects your estimate.
+7. **Cross-link (E7 in the backward direction).** The demon's memory is a
+   channel from the molecule's position to the demon's record. Compute `I(X;M)`
+   for a demon whose measurement is wrong 10% of the time, and report the
+   reduced extractable work. Reaches back to `channel-capacity` — the solution
+   notes the demon is a BSC and `<Ref>`s it.
+
+## REVISION (kept slug)
+
+**Gain**
+- ARC paragraph stating this is an off-path chapter and naming its dependence on
+  the max-entropy identification of Shannon and thermodynamic entropy.
+- Figures 3, 4, 5 above. The scale comparison in particular prevents the common
+  over-reading that Landauer constrains current hardware.
+- The demon refutation written to the L13 schema, with the wrong resolution
+  stated once and rejected.
+- Depth toward 32 minutes.
+
+**Lose**
+- Any assertion that Shannon and thermodynamic entropy are "the same" without
+  routing through the max-entropy identification.
+- Any implication that Landauer's bound is close to binding in real computers.

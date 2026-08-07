@@ -1,334 +1,555 @@
 A predictive model defines a compressor and a compressor defines a
 predictive model; cross-entropy on a stream equals achievable compressed
-size in bits. This lesson establishes both directions of that equivalence
-and its accounting. The route: arithmetic coding turns next-symbol
-probabilities into a code whose total length is the model's log-loss plus
-two bits; the Kraft budget read backwards turns any lossless coder into a
-probability model; the expected cost per symbol decomposes as entropy rate
-plus divergence; one string coded under three models makes the sizes
-concrete; and the measurements of
-[Delétang et al. (2023)](https://arxiv.org/abs/2309.10668) show a language
-model outcompressing PNG and FLAC on data it was never trained on.
+size in bits.
 
-## From model to code: arithmetic coding spends the surprisal
+The course's seventh move prices a wrong model. <Ref lesson="kl-divergence"/>
+charged the mismatch between a source $p$ and a model $q$ at $D(p\,\|\,q)$
+extra bits per symbol, and <Ref lesson="cross-entropy-loss"/> identified the
+sum of that charge and the source's own entropy, $H(p,q) = H(p) +
+D(p\,\|\,q)$, with the training loss of a probabilistic model. Both results
+are expectations quoted in bits, with no file anywhere in them, so what
+stands open is whether "bits" is an accounting unit or a measurement: whether
+the number printed at the end of a training run is the size of something.
+This lesson closes that with two constructions, one in each direction, and
+prices what each costs.
 
-### The flaw to fix: symbol codes pay their rounding per symbol
+The route: the model-to-compressor direction and its two-bit guarantee, the
+compressor-to-model direction and the wasted bits it exposes, the per-symbol
+accounting that links them, the price of learning a model while coding with
+it, the ladder measured on English, and what a compression ratio is and is
+not evidence of.
 
-<Ref lesson="huffman-by-hand"/> builds the optimal symbol code, and its
-guarantee $H \le L^* < H + 1$ leaves up to one wasted bit on **every
-symbol**: the 90/10 coin of <Ref lesson="source-coding-theorem-lite"/> has
-$H \approx 0.469$ bits but no symbol code beats $1$ bit per flip. Block
-coding shrinks the waste to $1/n$, at the price of building $2^n$
-codewords per block.
+## Direction one: a model and a coder make a compressor
 
-Both fixes share a second, worse limitation: a code table serves **one
-fixed distribution**. The models that matter here are conditional. A
-predictor of English emits a fresh distribution $q(x_t \mid x_{<t})$ at
-every position, one per context; a Huffman table per context is a table
-per prefix of the text. What is needed: a coder that accepts an arbitrary
-distribution at each step and charges the symbol its surprisal under that
-step's distribution. How: *arithmetic coding*, the stream code of
-[MacKay's chapter 6](https://www.inference.org.uk/mackay/itila/).
+The training loss of the previous lesson is a sum of surprisals. To turn it
+into a file, something must convert those surprisals into bits at the rate
+the model quotes them, without rounding.
 
-### One stream, coded by intervals
+For the rest of this lesson a *model* is anything that answers one question:
+given the symbols already sent, what is the probability of each possible next
+symbol? Write the answer $q(x_t \mid x_{<t})$, a distribution over the
+alphabet, strictly positive on every symbol. A table of letter frequencies
+answers that question (ignoring the context), a running count of what has
+followed each letter so far answers it, and so does a network with seventy
+billion parameters. The coder never asks where the numbers came from.
 
-The coder maintains an interval $[\ell, r) \subseteq [0, 1)$, initially
-$[0,1)$. At each step the model supplies a distribution over the next
-symbol; the coder partitions the current interval into subintervals with
-widths **proportional to those probabilities** (in a fixed symbol order)
-and keeps the subinterval of the symbol that actually occurred. No bits
-are emitted along the way; the interval is the state.
+That indifference is a property of the coder built in
+<Ref lesson="arithmetic-coding"/>, which represents a whole message as a
+subinterval of $[0,1)$: at step $t$ it subdivides the current interval in
+proportion to the distribution the model supplies and keeps the piece
+belonging to the symbol that occurred. Nothing about the subdivision requires
+the distributions at different steps to be related, so the model is a
+replaceable module sitting beside a fixed coder.
 
-Concrete run: alphabet $\{A, B\}$, stream $AAB$, model
-$q(A) = 0.8$ at the first position, $q(A \mid A) = 0.8$,
-$q(B \mid AA) = 0.2$.
-
-- Step 1, $A$: $[0, 1) \to [0, 0.8)$. Width $0.8$.
-- Step 2, $A$: $[0, 0.8) \to [0, 0.64)$. Width $0.8 \times 0.8$.
-- Step 3, $B$: the top $0.2$ fraction of $[0, 0.64)$, which is
-  $[0.512,\ 0.64)$. Width $0.128$.
-
-The final width is the product of the conditional probabilities,
-$0.8 \times 0.8 \times 0.2 = 0.128 = q(AAB)$, so its negative log is the
-sum of the surprisals: $-\log_2 0.128 \approx 2.97$ bits. To transmit the
-stream, the coder sends a binary fraction that pins down a dyadic
-interval inside $[0.512, 0.64)$: four bits, `1001`, naming
-$[0.5625, 0.625)$, suffice.
-
-{/* fig PredictThenCode, FigureSequence, 5 frames — the predict-then-code
-   pipeline on the stream AAB. Shared layout, one delta per frame. Top: the
-   stream "A A B" in mono, the current symbol boxed amber. Left middle: a
-   small two-bar model panel showing this step's distribution (labels in
-   KaTeX: $q(A)=0.8$, $q(B)=0.2$ etc., amber bar = the symbol taken). Center:
-   a horizontal unit number line 0 to 1 with ticks at 0, 0.25, 0.5, 0.75, 1;
-   the current interval drawn as a thick amber band, its endpoints and width
-   printed beneath (KaTeX). Bottom right: a running counter "cost so far:
-   $-\log_2(\text{width}) = \dots$ bits". Frames: (1) header "before any
-   symbol": no symbol boxed, model panel empty/muted, band = [0,1), width 1,
-   counter 0.00 bits; (2) header "symbol 1: A": first A boxed, panel
-   $q(A)=0.8, q(B)=0.2$, band narrows to [0, 0.8) (the discarded [0.8,1)
-   left as a muted outline), width 0.8, counter 0.32; (3) header "symbol 2:
-   A": second A boxed, panel $q(A\mid A)=0.8$, band [0, 0.64), width 0.64,
-   counter 0.64; (4) header "symbol 3: B": B boxed, panel
-   $q(B\mid AA)=0.2$, band [0.512, 0.64), width printed as
-   $0.128 = 2^{-2.97}$, counter 2.97; (5) header "emit a dyadic interval
-   inside": same amber band, a blue sub-band [0.5625, 0.625) inside it
-   labeled "$[\tfrac{9}{16}, \tfrac{10}{16})$ — codeword 1001" (codeword in
-   mono), counter line replaced by the tally "4 bits $\le 2.97 + 2$". Only
-   the boxed symbol, model panel, band, and counter change between frames.
-   Colors: amber = the live interval and current symbol, blue = the emitted
-   dyadic interval in frame 5 only, currentColor axis and text. One idea:
-   each symbol multiplies the width by its probability, so the bit cost adds
-   the surprisals. */}
-<FigureSequence
-  name="PredictThenCode"
-  alt="Five frames coding the stream AAB: the unit interval narrows to 0.8, then 0.64, then the slice from 0.512 to 0.64 as each symbol's probability multiplies the width, and a four-bit dyadic interval inside the final slice is emitted"
-  caption="Arithmetic coding of AAB: each symbol keeps a slice proportional to its conditional probability. Final width = q(AAB) = 0.128, so ≈ 2.97 bits, and 4 emitted bits cover it."
-/>
-
-<Task>
-Step through the five frames and track the width: $1 \to 0.8 \to 0.64 \to
-0.128$, each step multiplying by the probability of the symbol taken.
-Check the counter against the widths: $-\log_2 0.64 = 0.64$ and
-$-\log_2 0.128 \approx 2.97$; the last symbol alone, at probability
-$0.2$, contributes $2.32$ of the $2.97$ bits.
-</Task>
-
-Decoding is the same walk run by the receiver: it holds the transmitted
-number, runs the **same model**, subdivides $[0,1)$ identically, and reads
-off which subinterval contains the number: that is symbol 1, which fixes
-the context for the model's next distribution, and so on. The model is
-consulted, never transmitted; both ends must hold an identical copy.
-
-### The guarantee: two bits of overhead, total
-
-<Theorem title="arithmetic coding bound">
-Let $q$ assign every symbol a positive conditional probability
-$q(x_t \mid x_{<t})$, and let $x_{1:n}$ be any stream. The arithmetic
+<Theorem title="the coding cost of a model (Cover &amp; Thomas 13.3)">
+Let $q$ assign a positive conditional probability $q(x_t \mid x_{<t})$ to
+every symbol at every step, and let $x_{1:n}$ be any stream. The arithmetic
 coder driven by $q$ emits a decodable binary string of length
+
 $$
-\text{len}(x_{1:n}) \;\le\; -\log_2 q(x_{1:n}) + 2
-\;=\; \sum_{t=1}^{n} -\log_2 q(x_t \mid x_{<t}) \;+\; 2 \ \text{bits.}
+\ell(x_{1:n}) \;\le\; -\log_2 q(x_{1:n}) + 2
+\;=\; \sum_{t=1}^{n} -\log_2 q(x_t \mid x_{<t}) \;+\; 2 \quad \text{bits.}
 $$
 
 <Proof>
-The final interval has width $w = \prod_t q(x_t \mid x_{<t}) =
-q(x_{1:n})$, since each step scales the width by one conditional
-probability. Choose $k = \lceil -\log_2 w \rceil + 1$, so that
-$2^{-k} \le w/2$. The dyadic cells $[m2^{-k}, (m+1)2^{-k})$ tile $[0,1)$,
-and an interval of width $w \ge 2 \cdot 2^{-k}$ contains at least one
-complete cell; transmit the $k$ bits of that cell's left endpoint. Then
-$k < -\log_2 w + 2$. Decodability: the cell lies inside the final
-interval, hence inside every ancestor interval of the walk, so the
-receiver's replayed subdivision identifies each symbol in turn.
-Termination (knowing when $n$ symbols have been read) is handled by
-transmitting the length separately or reserving an end-of-stream symbol;
-MacKay §6.2 uses the latter, and the cost stays $O(1)$ plus one symbol's
-surprisal.
+Each step multiplies the width of the current interval by the probability of
+the symbol taken, so after $n$ steps the width is
+$w = \prod_t q(x_t \mid x_{<t}) = q(x_{1:n})$, and the equality on the right
+is the chain rule with a logarithm applied.
+
+For the bound, put $k = \lceil -\log_2 w \rceil + 1$, so that
+$2^{-k} \le w/2$. The dyadic cells $[m2^{-k}, (m+1)2^{-k})$ tile $[0,1)$ and
+have width at most half the final interval's, so at least one of them lies
+entirely inside it; transmit the $k$ bits of that cell's left endpoint. Then
+$k < -\log_2 w + 2$.
+
+Decodability: the transmitted cell lies inside the final interval, hence
+inside every interval along the walk, so a receiver running the same model
+reproduces the subdivisions and reads off each symbol in turn. Termination is
+handled by an end-of-stream symbol, which costs its own surprisal and nothing
+more. Finite-precision arithmetic adds $O(n2^{-B})$ bits at $B$ bits of
+precision, negligible at $B = 32$; the renormalization that achieves it is in
+<Ref lesson="arithmetic-coding"/>.
 </Proof>
 </Theorem>
 
-The right-hand side is the model's **log-loss on the stream**: the sum of
-the surprisals $q$ assigns to each symbol in context, exactly the
-quantity that <Ref lesson="cross-entropy-loss"/> identified as the
-training objective of a language model. The two extra bits are paid once
-per stream, not per symbol; on a megabyte of text they are noise. This is
-the repair of Huffman's flaw: the interval carries fractional bits across
-symbols, so nothing is rounded until the very end.
+The right-hand side is the model's log-loss on the stream. Two bits are paid
+once for the whole file, not once per symbol, which is what makes the
+identity useful: on a megabyte of text the overhead is $2$ bits against
+several million.
 
-<KeyFact>
-A predictor plus an arithmetic coder is a lossless compressor whose file
-size is the predictor's log-loss on the stream plus at most two bits:
-cross-entropy is not analogous to a compressed size, it is one.
-</KeyFact>
+### A compressor built from counts, in four steps
 
-## From code to model: every compressor carries a probability model
-
-The reverse direction needs no new machinery.
-<Ref lesson="source-coding-theorem-lite"/> defined the implied
-distribution of a code: lengths $\ell(x)$ obeying the Kraft budget of
-<Ref lesson="kraft-inequality"/> yield
-$q(x) = 2^{-\ell(x)} / c$ with $c = \sum_x 2^{-\ell(x)} \le 1$. The same
-reading applies to a whole compressor. Fix an input length $n$; a lossless
-compressor assigns each of the $|\mathcal{X}|^n$ possible files a distinct
-decodable output, so its lengths satisfy the budget (McMillan), and
+The smallest model that is not fixed in advance counts what it has seen.
+Laplace's rule adds one to every count before normalizing, so that no symbol
+is ever assigned probability zero:
 
 $$
-q_C(x_{1:n}) \;\propto\; 2^{-\ell_C(x_{1:n})}
+q(a \mid x_{<t}) = \frac{F_a + 1}{(t-1) + |\mathcal{X}|},
 $$
 
-is a probability distribution over files. Files the compressor shrinks
-well are exactly the files its implied model rates probable; picking the
-shortest-encoding reconstruction is maximum-probability prediction.
+where $F_a$ is the number of times $a$ has occurred among the first $t-1$
+symbols and $|\mathcal{X}|$ is the alphabet size.
 
-The implied model even predicts **next symbols**. The extra bits the
-compressor spends to append symbol $a$ to a context $x$,
-$\Delta(a) = \ell_C(xa) - \ell_C(x)$, convert to conditional
-probabilities:
+<Example title="coding `aaba` with an add-one model">
+Alphabet $\{a, b\}$, so $|\mathcal{X}| = 2$. Before any symbol arrives both
+counts are $0$ and the rule gives $q(a) = q(b) = \tfrac12$.
 
-$$
-q_C(a \mid x) \;\propto\; 2^{-\Delta(a)} :
-$$
+| $t$ | counts $(F_a, F_b)$ | prediction $q(a)$ | symbol | its $q$ | bits charged |
+| --- | --- | --- | --- | --- | --- |
+| 1 | $(0,0)$ | $\tfrac{0+1}{0+2} = \tfrac12$ | $a$ | $\tfrac12$ | $\log_2 2 = 1.000$ |
+| 2 | $(1,0)$ | $\tfrac{1+1}{1+2} = \tfrac23$ | $a$ | $\tfrac23$ | $\log_2 \tfrac32 = 0.585$ |
+| 3 | $(2,0)$ | $\tfrac{2+1}{2+2} = \tfrac34$ | $b$ | $\tfrac14$ | $\log_2 4 = 2.000$ |
+| 4 | $(2,1)$ | $\tfrac{2+1}{3+2} = \tfrac35$ | $a$ | $\tfrac35$ | $\log_2 \tfrac53 = 0.737$ |
 
-continuations that compress well are continuations the compressor
-expects. [Delétang et al.](https://arxiv.org/abs/2309.10668) run this
-construction on gzip: querying $\ell_{\text{gzip}}(xa)$ for every
-candidate byte $a$ turns gzip into a (weak) generative sequence model,
-sampled from like any language model.
+Total: $4.322$ bits. The product of the four probabilities is
+$\tfrac12 \cdot \tfrac23 \cdot \tfrac14 \cdot \tfrac35 = \tfrac{1}{20}$, and
+$\log_2 20 = 4.3219$, which is the same number: the charges are the
+surprisals of one sequence probability, split across four steps. By the
+theorem the emitted file is at most $6$ bits.
+</Example>
 
-{/* fig PredictorCompressorLoop: the two-way equivalence as one diagram.
-   Two rounded boxes on one horizontal axis. Left box "predictor": KaTeX
-   $q(x_t \mid x_{<t})$ with sub-caption "next-symbol probabilities". Right
-   box "compressor": mono "0100111…" with sub-caption "codeword lengths
-   $\ell(x)$". Between them two labeled arrows: top arrow left-to-right,
-   label "arithmetic coding: $\text{len} \le -\log_2 q(x) + 2$"; bottom
-   arrow right-to-left, label "Kraft reading: $q(x) \propto 2^{-\ell(x)}$".
-   Beneath both boxes one centered gloss line: "one object, two interfaces".
-   Colors: amber = the predictor box and the top arrow (the lesson's
-   subject direction), blue = the compressor box and the bottom arrow;
-   currentColor text. One idea: prediction and compression are the same
-   map, read in opposite directions. */}
-<Figure
-  name="PredictorCompressorLoop"
-  alt="Two boxes, a predictor emitting next-symbol probabilities and a compressor emitting bits, joined by opposite arrows labeled arithmetic coding and the Kraft reading q proportional to two to the minus length"
-  caption="The equivalence, both ways: arithmetic coding maps a predictor to a compressor; the Kraft budget maps a compressor back to a predictor. One object, two interfaces."
+Four symbols coded in $4.32$ bits is worse than four symbols coded in $4$
+bits, which is what a fixed uniform model would have spent. The learning
+model has not yet learned anything worth its cost. This is not an artifact of
+the example: an estimator that starts from no information must pay for the
+information it acquires, and the size of that payment is computed in the
+adaptivity section below.
+
+{/* fig AdaptiveCoderStep, FigureSequence, 4 frames — one step of the
+   count-based coder per frame, on the stream `aaba` of the worked example.
+   Shared layout, exactly one symbol advances per frame. Layout, top to
+   bottom: (1) the stream "a a b a" in mono, all four cells always visible,
+   the current symbol's cell boxed amber, earlier cells filled muted, later
+   cells outlined only; (2) LEFT PANEL "counts before this symbol": two small
+   integer boxes labeled $F_a$ and $F_b$ with the values, stacked; (3) CENTER
+   PANEL "prediction": two horizontal bars for $q(a)$ and $q(b)$ drawn to
+   scale on a common 0–1 track, each labeled in KaTeX with its exact fraction
+   (frame 1: $q(a)=\tfrac12$, $q(b)=\tfrac12$; frame 2: $\tfrac23,\tfrac13$;
+   frame 3: $\tfrac34,\tfrac14$; frame 4: $\tfrac35,\tfrac25$), the bar of
+   the symbol that actually arrives filled amber, the other blue; (4) RIGHT
+   PANEL "charge": the KaTeX line $-\log_2 q = \dots$ with the frame's value
+   (1.000, 0.585, 2.000, 0.737) and beneath it a running total (1.000, 1.585,
+   3.585, 4.322) as a small horizontal accumulating amber bar on a fixed 0–5
+   bit axis; (5) BOTTOM STRIP "counts after the update": the same two integer
+   boxes with the incremented value highlighted amber. Frame headers: "symbol
+   1: a", "symbol 2: a", "symbol 3: b", "symbol 4: a". Only the boxed symbol,
+   the count values, the bar heights, the charge and the running total change
+   between frames; panel positions and the bit axis are pixel-identical. In
+   frame 3 the arriving symbol b is the one with the SHORT bar, so its charge
+   is the tallest of the four: that contrast is the point of the figure.
+   Colors: amber = the symbol taken and the running cost, blue = the
+   alternative, currentColor for axes, labels and boxes. One idea: the coder
+   charges each symbol its predicted surprisal, and the prediction moves only
+   on information the decoder also has. */}
+<FigureSequence
+  name="AdaptiveCoderStep"
+  alt="Four frames coding the string a a b a: each frame shows the counts before the symbol, the two predicted probabilities as bars, the bits charged, and the incremented counts, with the running total rising 1.000, 1.585, 3.585, 4.322"
+  caption="One symbol per frame: predict from the counts so far, charge the symbol its surprisal, then update. The unexpected b in frame 3 costs 2 bits, nearly half the file."
 />
 
+<Task>
+Step through the four frames and read the charge against the bar height: the
+symbol with the taller bar is always the cheaper one, and the total after
+frame 4 is $4.322$ bits. Then check the shortcut: multiply the four fractions
+$\tfrac12, \tfrac23, \tfrac14, \tfrac35$ and confirm the product is
+$\tfrac{1}{20}$, whose negative logarithm is that same total.
+</Task>
+
+<Exercise>
+Run the same add-one coder on the stream `abba`, filling in the four rows of
+the table, and report the total in bits. Then compare it with the total for
+`aaba` and with the $4$ bits a fixed uniform model would spend, and say what
+property of the stream decides the ranking.
+
+<Solution>
+| $t$ | counts $(F_a, F_b)$ | $q(\text{symbol})$ | symbol | bits |
+| --- | --- | --- | --- | --- |
+| 1 | $(0,0)$ | $\tfrac12$ | $a$ | $1.000$ |
+| 2 | $(1,0)$ | $\tfrac{0+1}{1+2} = \tfrac13$ | $b$ | $1.585$ |
+| 3 | $(1,1)$ | $\tfrac{1+1}{2+2} = \tfrac12$ | $b$ | $1.000$ |
+| 4 | $(1,2)$ | $\tfrac{1+1}{3+2} = \tfrac25$ | $a$ | $1.322$ |
+
+Total: $4.907$ bits. The product of the probabilities is
+$\tfrac12 \cdot \tfrac13 \cdot \tfrac12 \cdot \tfrac25 = \tfrac{1}{30}$ and
+$\log_2 30 = 4.907$, agreeing as before.
+
+Ranking: `abba` costs $4.907$, uniform coding costs $4.000$, and `aaba` costs
+$4.322$. What decides it is how skewed the counts get. A model that estimates
+frequencies can only profit when the frequencies are unequal, and `abba` is
+perfectly balanced, so the estimate never becomes useful and the coder pays
+for the attempt. The transferable move is that a learning model's advantage
+is not automatic: it is the divergence between the source and the fixed model
+it is trying to beat, minus what the learning costs.
+</Solution>
+</Exercise>
+
 <KeyFact>
-Every lossless compressor is a probability model spending its Kraft
-budget: $q_C(x) \propto 2^{-\ell_C(x)}$, with next-symbol predictions
-$q_C(a \mid x) \propto 2^{-[\ell_C(xa) - \ell_C(x)]}$. There is no
-model-free compression.
+The coder bills the model's own probabilities and never inspects the source,
+so a confident wrong model produces a file *larger* than the input. Driven
+over ImageNet patches, a small Transformer trained on Wikipedia text produces
+files $1.94$ times the size of the raw data.
 </KeyFact>
 
-## The accounting: bits per symbol = entropy rate + divergence
+## Direction two: a compressor is a model
 
-The two directions fix what a compressor *is*; the course's earlier
-results fix what it *costs*. For an i.i.d. source $p$ coded at the
-model's surprisals, the expected bits per symbol are the cross-entropy,
-and <Ref lesson="cross-entropy-loss"/> decomposed it:
+The first direction needed a coder to be supplied. The second needs nothing
+at all: the model is already present inside any lossless compressor, in its
+output lengths, and reading it out requires no cooperation from whoever wrote
+the program.
 
-$$
-H(p, q) \;=\; H(p) \;+\; D(p \,\|\, q),
-$$
-
-the entropy floor of <Ref lesson="source-coding-theorem-lite"/> plus the
-mismatch cost of <Ref lesson="kl-divergence"/>. For a stationary source
-with memory, English being the standing example, the floor is the
-**entropy rate** of <Ref lesson="entropy-of-english"/>: the per-symbol
-cost of a model with unlimited context. The per-symbol account of any
-model-driven compressor is therefore
+Fix an input length $n$. A lossless compressor $C$ assigns each of the
+$|\mathcal{X}|^n$ possible inputs an output $C(x)$ of length $\ell_C(x)$, and
+distinct inputs must get distinguishable outputs or reconstruction would be
+impossible. McMillan's theorem (<Ref lesson="kraft-inequality"/>, which
+extended the codeword-length budget from prefix codes to every uniquely
+decodable code) therefore applies to those lengths:
 
 $$
-\underbrace{\text{bits per symbol}}_{\text{file size} / n}
-\;=\; \underbrace{H_{\text{rate}}}_{\text{irreducible}}
-\;+\; \underbrace{\text{divergence rate}}_{\text{model's mismatch}}
-\;+\; \underbrace{O(1/n)}_{\text{coder overhead}} .
+c \;=\; \sum_{x \in \mathcal{X}^n} 2^{-\ell_C(x)} \;\le\; 1 .
 $$
 
-Every term has an owner. The entropy rate belongs to the source; no
-compressor moves it. The divergence belongs to the model, is zero only
-for a perfect model, and is exactly what training on log-loss shrinks.
-The overhead belongs to the coder and vanishes with stream length.
+The quantities $2^{-\ell_C(x)}$ are non-negative and sum to at most one, so
+they are a probability distribution up to a deficit. That is the implied
+distribution of a code from <Ref lesson="source-coding-theorem-lite"/>, now
+read off a whole program rather than a codeword table:
 
-{/* fig StreamCostStack: one horizontal stacked bar on a bits-per-character
-   axis 0 to 1.5 (ticks 0, 0.5, 1, 1.5), for the running char-level example:
-   blue segment 0 to 1.0 labeled "$H_{\text{rate}} \approx 1.0$ — the
-   source's floor (entropy-of-english)", amber segment 1.0 to 1.2 labeled
-   "divergence $\approx 0.2$ — the model's mismatch", a bracket over the
-   whole bar labeled "model's cross-entropy: 1.2 bits/char = the compressed
-   size per character". Above the bar the identity in KaTeX with color-bound
-   terms: $\text{bits/char} = \textcolor{#4c8dd6}{H_{\text{rate}}} +
-   \textcolor{#e2903a}{D_{\text{rate}}}$. Payoff line under the bar:
-   "training shrinks only the amber part; no compressor touches the blue".
-   Colors: blue = entropy-rate floor, amber = KL excess, currentColor axis.
-   One idea: file size = floor + mismatch. */}
+$$
+q_C(x) \;=\; \frac{2^{-\ell_C(x)}}{c} .
+$$
+
+Files the compressor shrinks are files its implied model rates probable, and
+the deficit $1 - c$ is not a rounding detail. Every file pays
+$\log_2 \tfrac1c$ bits for the unclaimed budget, on top of whatever its model
+gets wrong.
+
+<Example title="reading the model out of a four-file compressor">
+A compressor is queried on the four one-character files over
+$\{A, B, C, D\}$ and returns outputs of $1$, $3$, $3$ and $3$ bits.
+
+Budget: $c = \tfrac12 + \tfrac18 + \tfrac18 + \tfrac18 = \tfrac78$, which is
+below $1$, so the code is incomplete and $\tfrac18$ of the budget buys
+nothing.
+
+Implied model: divide by $c$, giving
+$q_C = (\tfrac47, \tfrac17, \tfrac17, \tfrac17)$. The compressor is betting
+four to three that the file is `A`.
+
+Slack: $\log_2 \tfrac87 = 0.193$ bits are wasted on every file regardless of
+its contents. A code with lengths $(1,2,3,3)$ over the same alphabet has
+$c = 1$ and wastes nothing, so the slack is a defect of this compressor, not
+a cost of compression.
+
+Conditionals: the model extends to next symbols through length increments.
+If appending to the file `A` gives $\ell_C(AA) = 2$, $\ell_C(AB) = 3$ and
+$\ell_C(AC) = \ell_C(AD) = 4$, the increments over $\ell_C(A) = 1$ are
+$\Delta = (1, 2, 3, 3)$ and
+
+$$
+q_C(\cdot \mid A) \;\propto\; 2^{-\Delta}
+= \left(\tfrac12, \tfrac14, \tfrac18, \tfrac18\right),
+$$
+
+which sums to $1$ and needs no normalization. A continuation that compresses
+well is a continuation the compressor expects.
+</Example>
+
+<Exercise>
+A second compressor returns $2$, $2$, $2$ and $4$ bits on the same four
+one-character files. Compute its Kraft sum, its implied distribution, and the
+bits it wastes per file. Then state which of the two compressors is the
+better bet on a source that emits $A$ three quarters of the time, computing
+the expected length of each.
+
+<Solution>
+Budget: $c = \tfrac14 + \tfrac14 + \tfrac14 + \tfrac{1}{16} = \tfrac{13}{16}$.
+
+Implied distribution: divide each $2^{-\ell}$ by $c$, giving
+$q_C = (\tfrac{4}{13}, \tfrac{4}{13}, \tfrac{4}{13}, \tfrac{1}{13})$.
+
+Slack: $\log_2 \tfrac{16}{13} = 0.30$ bits per file, more than the first
+compressor's $0.193$.
+
+On the source $p = (0.75, \tfrac{1}{12}, \tfrac{1}{12}, \tfrac{1}{12})$ the
+expected lengths are
+
+$$
+\begin{aligned}
+\text{first: } & 0.75(1) + 3\left(\tfrac{1}{12}\right)(3) = 0.75 + 0.75 = 1.50 \text{ bits,}\\
+\text{second: } & 0.75(2) + 2\left(\tfrac{1}{12}\right)(2) + \tfrac{1}{12}(4) = 1.50 + 0.333 + 0.333 = 2.17 \text{ bits.}
+\end{aligned}
+$$
+
+The first wins by $0.67$ bits per file. Its implied model puts $\tfrac47$ on
+$A$ against the second's $\tfrac{4}{13}$, and the source puts $\tfrac34$
+there, so the first compressor's bet is simply closer to the truth. Both sit
+above the source's entropy $H(p) = 1.21$ bits, as they must.
+</Solution>
+</Exercise>
+
+<Figure
+  src="./figures/kraft-slack.svg"
+  alt="A unit budget bar split into claims of one half and three eighths for four files, leaving a hatched unclaimed eighth, above a second bar showing the same claims renormalized into the implied model four sevenths and three sevenths"
+  caption="A compressor's output lengths are a bet, one half per bit of length, out of a budget of one. The unclaimed eighth costs 0.193 bits on every file and buys nothing."
+/>
+
+### The bet a real compressor makes is visible in its ratio
+
+The construction is not confined to toy tables. Take a file of $10^6$
+characters, each independently `0` with probability $0.99$ and `1` with
+probability $0.01$. Its entropy is $H_2(0.01) = 0.0808$ bits per character,
+so an ideal coder stores it in $10^6 \times 0.0808 / 8 \approx 10{,}100$
+bytes, about $1.01\%$ of the raw size. gzip produces $20{,}646$ bytes, or
+$2.1\%$: it spends $0.165$ bits per character where $0.0808$ would do.
+
+Read through the correspondence, that measurement prices gzip's model. Its
+implied distribution is wrong, or wasteful, or both, by
+$0.165 - 0.081 = 0.084$ bits per character, which is more than the entropy of
+the source itself: over half of every bit gzip spends on this file pays for
+its own model error rather than for the file's content.
+
+Two limits on the reverse direction have to be stated. The first is
+practical: $q_C$ is defined for every lossless compressor but computable for
+almost none, since evaluating $q_C(x)$ exactly requires the normalizer $c$,
+a sum over all $|\mathcal{X}|^n$ inputs. Next-symbol conditionals avoid the
+normalizer and are cheap, which is how gzip has been driven as a generative
+sequence model, one candidate byte at a time; the unconditional model is a
+proof of existence, not an extraction procedure.
+
+The second is structural: the construction consumes losslessness at its first
+step, where distinct inputs were required to get distinguishable outputs. A
+lossy codec maps many inputs to one output, so its lengths describe
+equivalence classes of inputs rather than files, and the Kraft sum runs over
+the classes. Two photographs that compress to the same JPEG file are assigned
+the same $2^{-\ell_C}$, and nothing in the lengths says how the class divides
+its probability between them, at any normalization. The reverse direction is
+not degraded by lossiness; it is absent.
+
+<KeyFact>
+The forward direction survives lossiness applied to what quantization keeps:
+the quantized representation is coded losslessly and the identity prices those
+bits exactly, which leaves the discarded remainder to be priced against
+distortion instead, by the curve of <Ref lesson="rate-distortion"/>.
+</KeyFact>
+
+## The accounting: bits per symbol is a floor plus a mismatch
+
+Two constructions establish that models and compressors are the same object.
+What they cost follows from a decomposition the course already has.
+
+<Ref lesson="source-coding-theorem-lite"/> split the expected length of any
+prefix code into three terms: the source's entropy, the divergence of the
+code's implied bet from the truth, and the Kraft slack. The arithmetic coder
+has no slack to speak of and no integer-length rounding, so for an i.i.d.
+source $p$ coded under a fixed model $q$ the accounting collapses to two
+terms plus the fixed overhead:
+
+$$
+\frac{\mathbb{E}[\ell(x_{1:n})]}{n}
+\;=\; \underbrace{H(p)}_{\text{the source's}}
+\;+\; \underbrace{D(p\,\|\,q)}_{\text{the model's}}
+\;+\; \underbrace{O(1/n)}_{\text{the coder's}} .
+$$
+
+The first two terms are $H(p,q)$, the cross-entropy, by the decomposition of
+<Ref lesson="cross-entropy-loss"/>. For a stationary source with memory, and
+a model that uses context, the same computation runs per symbol in the
+long-stream limit with the *entropy rate* of <Ref lesson="entropy-of-english"/>
+in place of $H(p)$: the per-symbol cost of a model with unlimited context,
+which for English is near $1$ bit per character.
+
+Every term has an owner. The entropy rate belongs to the source and no
+compressor moves it. The divergence belongs to the model, is zero only when
+the model is exactly right, and is precisely what training on log-loss
+shrinks. The overhead belongs to the coder and vanishes with stream length.
+
+{/* fig StreamCostStack: built component, see components/figures/information-theory/StreamCostStack.tsx */}
 <Figure
   name="StreamCostStack"
   alt="A stacked bar splitting a model's 1.2 bits per character into a 1.0-bit entropy-rate floor plus 0.2 bits of divergence, with the whole bar labeled as the compressed size per character"
-  caption="A 1.2-bits/char model on a ≈1.0-bit/char source: the file size per character is the floor plus the model's divergence. Only the divergence is improvable."
+  caption="A 1.2-bits/char model on a ≈1.0-bit/char source: the compressed size per character is the floor plus the model's divergence. Only the divergence is improvable."
 />
 
-Concrete numbers, carried over from exercise 7 of
-<Ref lesson="cross-entropy-loss"/>: a character-level model at $1.2$
-bits/char compresses a $10^6$-character text to $150{,}000$ bytes against
-$10^6$ bytes of ASCII, and with English's entropy rate near $1$ bit/char,
-about $0.2$ bits of its rate is divergence: the model's own mismatch,
-the only part a better model removes.
+### The equality is an expectation, and files are finite
 
-<KeyFact>
-Compressed size per symbol = entropy rate + divergence rate + $O(1/n)$:
-the floor is the source's, the mismatch is the model's, and "better
-predictor" and "better compressor" name the same reduction of the same
-middle term.
-</KeyFact>
+The identity above is an expectation over streams, and one stream is a
+sample. Take the $99/1$ source again, with $H = 0.0808$ bits per character.
+A ten-character stream of all zeros costs
+$10 \times \log_2 \tfrac{1}{0.99} = 0.145$ bits under the true model, well
+below the $0.808$ bits the expectation predicts for ten characters; a stream
+containing two ones costs $13.4$ bits, sixteen times the prediction. Both are
+coded by the same model with the same guarantee.
 
-## Better model, smaller file: three models on one string
+The fluctuation is the sum of $n$ per-symbol surprisals, so its standard
+deviation grows like $\sqrt{n}$ while the mean grows like $n$: the measured
+bits per character converge on the cross-entropy at rate $1/\sqrt{n}$. Here
+the per-symbol surprisal has standard deviation $0.660$ bits, so the measured
+rate scatters by $\pm 0.21$ bits per character at $n = 10$ and by
+$\pm 0.0007$ at $n = 10^6$. This is why compression benchmarks are run on
+files of megabytes and why a compression ratio measured on a single short
+file is not a measurement of anything.
 
-<Example title="one string, three models">
-Code the 7-character string `banana_` (`_` marks a trailing space) over
-the alphabet $\{a, b, n, \_\}$, charging each character
-$-\log_2 q(\cdot)$ under three models. Counts are taken from the string
-itself; the cost of shipping those counts is deferred to the next
-section.
+<Figure
+  src="./figures/rate-fluctuation.svg"
+  alt="A shaded band around a dashed line at 0.0808 bits per character, spanning from 0 to 0.29 at ten characters and collapsing onto the line by a million characters, with two ten-character streams marked at 0.015 and 1.34 bits per character"
+  caption="The measured rate on the 99/1 source against stream length: the ±1 s.d. band shrinks like 1/√n. Ten characters buy no measurement of anything; a million pin the rate to three decimals."
+/>
 
-**Model 1, uniform:** $q = \tfrac14$ per character, $2$ bits each.
-Total: $7 \times 2 = 14$ bits.
+## Adaptivity: a model learned from the data need not be shipped with it
 
-**Model 2, letter frequencies:** counts $(a{:}3,\ n{:}2,\ b{:}1,\
-\_{:}1)$ give $q = (\tfrac37, \tfrac27, \tfrac17, \tfrac17)$.
-Per-character surprisals: $\log_2 \tfrac73 \approx 1.222$ for each $a$,
-$\log_2 \tfrac72 \approx 1.807$ for each $n$, $\log_2 7 \approx 2.807$
-for $b$ and for $\_$. Total:
-$3(1.222) + 2(1.807) + 2(2.807) = 3.667 + 3.615 + 5.615 \approx 12.90$
-bits.
+A model estimated from the file being compressed would seem to have to travel
+with the file, since the decoder cannot use counts it has never seen. It does
+not, and the reason is a one-line constraint on when the counts are read.
 
-**Model 3, bigram:** first character from the frequency model, every
-later character from counts of what follows its predecessor. In
-`banana_`: $b$ is always followed by $a$, $n$ always by $a$,
-and $a$ by $n$ twice and $\_$ once, so $q(a \mid b) = 1$,
-$q(a \mid n) = 1$, $q(n \mid a) = \tfrac23$,
-$q(\_ \mid a) = \tfrac13$. The seven charges:
+If the distribution used at step $t$ depends only on $x_{<t}$, the symbols
+already transmitted, then the decoder can compute it too. The decoder decodes
+symbol $1$ using the initial distribution, applies the identical update rule,
+obtains the distribution for step $2$, decodes symbol $2$, and so on. Encoder
+and decoder run the same program on the same data in the same order, so no
+part of the model has to be transmitted. The add-one coder above is exactly
+this arrangement, and its counts were never sent.
 
-| $t$ | symbol | context | $q$ | bits |
+The alternative is a two-pass scheme: read the file, estimate the model, send
+the model, then send the file coded under it. That header is a real cost, and
+for short files it dominates.
+
+<Figure
+  src="./figures/two-pass-vs-adaptive.svg"
+  alt="Three bitstream bars for a 200-character message: a fixed 27-symbol code at 952 bits, a two-pass letter-frequency code at 432 header bits plus 806 data bits, and an adaptive code at about 900 bits with no header"
+  caption="On a 200-character message the two-pass model loses to sending no model at all; it does not break even until 592 characters. The adaptive coder pays no header."
+/>
+
+The figure uses the letter-frequency model of
+<Ref lesson="entropy-of-english"/> over a 27-symbol alphabet, whose $27$
+counts at $16$ bits each make a $432$-bit header. Coding $200$ characters at
+that model's $4.03$ bits per character costs $806$ bits, so the two-pass
+total is $1{,}238$ bits, against $952$ bits for a fixed code that assumes
+nothing and spends $\log_2 27 = 4.76$ bits per character. Sending the model
+does not pay until the data saved, $0.73$ bits per character, covers the
+header: $432 / 0.73 \approx 592$ characters. The third bar is an adaptive
+coder over the same alphabet: the same data cost, no header, and instead a
+regret of order a hundred bits on this message, sized in the next
+subsection.
+
+### What adaptivity costs instead
+
+Dodging the header is not free; the price is paid inside the data, as bits
+spent on early symbols while the counts are still poor. The add-one coder
+makes this exactly computable.
+
+<Example title="the regret of the add-one coder">
+For a binary stream with $F_a$ occurrences of $a$ and $F_b$ of $b$, the
+add-one coder's probabilities telescope. At the step where $a$ occurs for
+the $k$-th time the numerator is $k$; the denominators run
+$2, 3, \ldots, n+1$ over the whole stream. Hence
+
+$$
+q(x_{1:n}) = \frac{F_a!\,F_b!}{(n+1)!},
+\qquad
+\ell \approx \log_2 \frac{(n+1)!}{F_a!\,F_b!} \ \text{bits.}
+$$
+
+Compare that with an *oracle*: the fixed model that already knows the final
+frequencies, $q(a) = F_a/n$, which costs $n H_2(F_a/n)$ bits. At the fixed
+ratio $F_a : F_b = 3 : 1$:
+
+| $n$ | add-one coder | oracle model | difference | $\tfrac12 \log_2 n$ |
 | --- | --- | --- | --- | --- |
-| 1 | $b$ | — | $\tfrac17$ | $2.807$ |
-| 2 | $a$ | $b$ | $1$ | $0$ |
-| 3 | $n$ | $a$ | $\tfrac23$ | $0.585$ |
-| 4 | $a$ | $n$ | $1$ | $0$ |
-| 5 | $n$ | $a$ | $\tfrac23$ | $0.585$ |
-| 6 | $a$ | $n$ | $1$ | $0$ |
-| 7 | $\_$ | $a$ | $\tfrac13$ | $1.585$ |
+| $4$ | $4.32$ | $3.25$ | $1.08$ | $1.00$ |
+| $16$ | $14.92$ | $12.98$ | $1.94$ | $2.00$ |
+| $64$ | $54.82$ | $51.92$ | $2.90$ | $3.00$ |
+| $256$ | $211.57$ | $207.69$ | $3.89$ | $4.00$ |
 
-Total: $\approx 5.56$ bits. The arithmetic coder realizes each total
-within two bits: files of roughly $16$, $15$, and $8$ bits for the same
-seven characters. Context does what it did in
-<Ref lesson="entropy-of-english"/>: after $b$ or $n$ the next character
-is certain and costs nothing.
+Quadrupling the stream adds one bit to the difference, so the excess grows
+like $\tfrac12 \log_2 n$ and its share of the file, $\log_2 n / 2n$, goes to
+zero. One parameter is being learned, and it costs half a logarithm. A model
+with $k$ free parameters costs about $\tfrac{k}{2} \log_2 n$ bits by the same
+argument applied coordinate by coordinate.
 </Example>
 
-The same ladder holds for English at scale, with the canonical
-per-character costs established earlier in the course: $8$ bits for a raw
-ASCII byte, $4.76$ for a fixed-width 27-symbol code, about $4.0$ under
-letter frequencies, $3.3$ with one letter of context, and an entropy rate
-near $1$ as the floor no model beats.
+The two schemes are therefore the same size to leading order: a header
+transmitting $k$ parameters to the precision the data supports also costs
+about $\tfrac{k}{2}\log_2 n$ bits. Adaptivity wins on short files, where a
+crudely coded header is pure overhead, and the two converge on long ones.
 
-{/* fig BitsPerCharLadder: horizontal bar chart, one idea: better model,
-   smaller file. Five rows top to bottom on a shared bits-per-character axis
-   0 to 8 (ticks 0, 2, 4, 6, 8): "raw ASCII byte" = 8.0, "fixed-width, 27
-   symbols" = 4.76, "letter frequencies" = 4.0, "bigram (1 letter of
-   context)" = 3.3, all amber bars with the value printed at each bar's
-   right end; then a dashed blue vertical guide line at ~1.0 spanning the
-   chart height, labeled "$H_{\text{rate}} \approx 1$ — entropy rate
-   (entropy-of-english)". Left labels in currentColor, small muted note
-   under the bigram row: "the demo's three models". Colors: amber = model
-   costs, blue = the floor guide only. Numbers: 8 (ASCII), log2 27 = 4.76,
-   Shannon 1951's F1 ≈ 4.0 and F2 ≈ 3.3, floor ≈ 1. */}
+The construction has one debt, and it is not small. Replay works only when
+the model is a function of the past. A pretrained network is not: its
+parameters were fixed before the file existed, so either both parties already
+hold it, or its description is part of the message. Charging float16
+parameters against the file, a 70-billion-parameter language model scores an
+adjusted compression rate of $14{,}008\%$ on a one-gigabyte corpus, meaning
+the model outweighs the data it compresses by a factor of $140$. Which
+accounting is the honest one is a live question, and this course takes it up
+twice: <Ref lesson="minimum-description-length"/> makes model bits plus data
+bits the object of study, and <Ref lesson="language-models-as-compressors"/>
+measures the rates that are being argued over.
+
+<KeyFact>
+Adaptivity replaces a header with a regret of about
+$\tfrac{k}{2}\log_2 n$ bits for $k$ parameters. That quantity is not an
+artifact of the add-one rule: it reappears as the parameter cost of a
+two-part code in <Ref lesson="minimum-description-length"/> and as the
+per-model penalty in every description-length model selection.
+</KeyFact>
+
+## ★ The add-one coder is a mixture over models
+
+The telescoped total of the last example has a second reading, which explains
+where the $\tfrac12 \log_2 n$ comes from. The Beta integral gives
+
+$$
+\int_0^1 p^{F_a}(1-p)^{F_b}\,dp = \frac{F_a!\,F_b!}{(n+1)!} = q(x_{1:n}) .
+$$
+
+The add-one coder is coding under a *mixture*: it assigns the stream the
+average of the probabilities that every fixed Bernoulli model would assign
+it, weighted by a uniform prior over the parameter. It never commits to a
+value of $p$, and its excess over the oracle is the cost of that hedge. After
+$n$ symbols the models that fit the data occupy a parameter range of width
+about $1/\sqrt{n}$, so the mixture assigns the stream a factor of roughly
+$\sqrt{n}$ less probability than the oracle does, and $\log_2 \sqrt{n}$ is
+the half-logarithm observed in the table.
+
+The uniform prior is not the best choice. Minimizing the worst-case excess
+over all Bernoulli sources selects the Jeffreys prior $\propto
+1/\sqrt{p(1-p)}$, whose sequential form is the Krichevsky-Trofimov rule: add
+$\tfrac12$ rather than $1$ to each count. Its worst-case redundancy is
+$\tfrac{d}{2}\log_2 \tfrac{n}{2\pi e} + O(1)$ for $d$ free parameters, which
+is the same leading term with the best constant. Nothing later in this course
+depends on the constant.
+
+## The ladder, measured
+
+The correspondence and its accounting are general. The ladder of models for
+English gives them numbers, and each rung is now a file size rather than a
+bound.
+
+<Ref lesson="entropy-of-english"/> measured the per-character cost of English
+under models of increasing context, on a 27-symbol alphabet of letters plus
+space. Attaching an arithmetic coder to each of those models turns the column
+of rates into a column of file sizes; a paragraph of $1{,}200$ characters
+gives the scale.
+
+| model | bits per character | 1,200-character paragraph |
+| --- | --- | --- |
+| uniform over 256 byte values | $8.00$ | $1{,}200$ bytes |
+| uniform over the 27 symbols | $4.76$ | $714$ bytes |
+| letter frequencies | $4.03$ | $605$ bytes |
+| one letter of context | $3.32$ | $498$ bytes |
+| the entropy rate itself | $\approx 1$ | $\approx 150$ bytes |
+
+{/* fig BitsPerCharLadder: built component, see components/figures/information-theory/BitsPerCharLadder.tsx */}
 <Figure
   name="BitsPerCharLadder"
   alt="Horizontal bars for the per-character cost of English under four coders, 8, 4.76, 4.0, and 3.3 bits, descending toward a dashed guide at the one-bit entropy rate"
   caption="Bits per character of English under progressively better models, descending toward the ≈1-bit entropy rate. Each bar is a file size; the guide is the floor."
 />
+
+The bottom row is not a model. It is the limit the ladder is descending
+toward, and no one has exhibited a model of English that reaches it. Every
+other row is a model that can be written down in a few lines, and the
+distance between two rows is exactly the divergence between the two models,
+converted into bytes by the accounting above.
 
 <Demo
   name="PredictiveCompressor"
@@ -336,307 +557,361 @@ near $1$ as the floor no model beats.
 />
 
 <Task>
-Type an English sentence and switch models: bits/char should fall from
-$8$ to near $4$ to near $3.5$, and the total size with it. Then load the
-repeated-character preset: the bigram model's bits/char collapses toward
-$0$, since every symbol is predicted almost surely. Then mash the
-keyboard: the three models nearly tie near $8$, the signature of a
-source with no structure for a model to bet on.
+The demo opens with all three coders running on one English sentence, at
+$8.00$, $4.17$ and $3.38$ bits per character: the ladder above, measured on a
+line of text. Then hit its three targets, each of which stays ticked once met.
+
+**1. Drive the bigram under $1.00$ bits/char.** Load the repeated-character
+preset; the rate settles near $0.81$, a tenth of a raw byte, because each
+character is nearly certain given the last.
+
+**2. Make the bigram lose to letter frequencies.** The keyboard-mash preset
+does it. Context costs instead of saving, because the model is charged for
+predictions the preceding character does not support.
+
+**3. Make raw bytes win: put both models above $8.00$ bits/char.** No preset
+reaches this one. Type a dozen or more punctuation and symbol characters with
+no repeats, `@#^&*()_+={}[]|~`: each falls outside the alphabet both models
+were built on, so both charge about $11.7$ bits for it, against the $8$ bits
+of shipping the byte unmodelled.
 </Task>
 
-## Fine print: the model rides on both ends
+## The scoreboard: what a compression ratio measures
 
-**The model must be shared.** Decoding replays the encoder's model
-step by step, so the equivalence prices the coding cost *given the
-model*. An honest total either fixes the same model on both ends in
-advance (a pretrained language model both parties already hold, its cost
-amortized over everything it will ever compress) or adds the bits to
-describe the model itself: a *two-part code*, model bits plus data bits.
-The `banana` example's model 3 quietly cheated on this account: its
-bigram counts came from the string being coded. Making the two-part
-accounting the object of study is
-<Ref lesson="minimum-description-length"/>; exercise 6 runs the
-break-even arithmetic for a shipped model.
+The ladder priced models the course built. The same number prices models it
+did not build, which is what makes compression a measurement instrument
+rather than a piece of engineering.
 
-**Lossless only.** The identity ties prediction to *lossless* coding.
-JPEG and learned image codecs discard information and are governed by a
-different trade-off, rate versus distortion, treated in
-<Ref lesson="rate-distortion"/>; nothing in this lesson bounds them.
+A compression ratio has properties an evaluation metric rarely has. It is
+held out by construction: the decoder must reproduce the file exactly, so
+nothing can be smuggled into the score by fitting the test data, unless the
+fit is also transmitted, in which case it is charged. It has no free
+parameters of its own, no threshold, no averaging convention, no choice among
+several defensible summaries. And it is stated in the same unit as the
+training loss, which is what the first section established.
 
-**Units.** Training frameworks report log-loss in nats. One nat is
-$1/\ln 2 \approx 1.443$ bits (<Ref lesson="what-is-surprise"/>): a model
-at $0.8$ nats/token is a compressor at $1.15$ bits/token, the same
-number in the coding unit.
+### A ratio is an upper bound, not an estimate
 
-**Achievable, not automatic.** The theorem bounds the coding cost of the
-model's probabilities. A production compressor adds headers, containers,
-and speed-motivated approximations, and a weak built-in model besides:
-gzip's window-limited matching corresponds to a predictor with a few
-kilobytes of memory. The claim "better predictor = better compressor" is
-exact for the achievable size, and only approximate for any named tool.
+What it is not is an estimate of the entropy rate. The accounting gives
+bits per symbol $\ge$ entropy rate, with the gap equal to the model's
+divergence plus slack, so a ratio is an upper bound and nothing more. gzip's
+$2.1\%$ on the sparse file above sits at twice the source's true rate. Any
+inference from a compression ratio to the information content of a source
+runs the inequality backwards.
 
-<Aside>
-The predict-then-code split is standard engineering, not a theoretical
-curiosity. Video coding's CABAC (H.264/H.265) is a context-adaptive
-binary arithmetic coder; zstd's entropy stage uses ANS, a
-faster relative of arithmetic coding; the PAQ family and
-[Bellard's NNCP](https://bellard.org/nncp/) drive arithmetic coders with
-context-mixing and neural sequence models and top the
-[Large Text Compression Benchmark](https://mattmahoney.net/dc/text.html).
-The [Hutter Prize](http://prize.hutter1.net/) pays for lossless
-compression of a 1 GB Wikipedia extract on exactly the premise of this
-lesson: better compression of text is better modeling of it.
-</Aside>
+### The instrument measures a pair, not a compressor
 
-## The measurement: a language model outcompresses PNG and FLAC
+A ratio reports the fit between a model class and a source, so the ranking of
+compressors moves when the source moves.
 
-[Delétang et al., "Language Modeling Is Compression"](https://arxiv.org/abs/2309.10668)
-(ICLR 2024) executes the model-to-compressor direction literally:
-Chinchilla 70B, a language model trained almost entirely on text, drives
-an arithmetic coder over 2048-byte chunks of data it was never trained
-on. Measured compressed sizes, as a fraction of raw size: **43.4%** on
-ImageNet image patches, against 58.5% for PNG; **16.4%** on LibriSpeech
-audio, against 30.3% for FLAC. A text model, used as a bettor on raw
-bytes, beats the domain-specific compressors on their own data.
-
-The same paper prices the fine print: those figures charge nothing for
-the 70-billion-parameter model on both ends. Under an *adjusted*
-compression rate that adds the model's own description length, the large
-models stop winning on datasets of this size, exactly the two-part
-accounting that <Ref lesson="minimum-description-length"/> develops.
-
-Read as evaluation rather than engineering, the construction gives a
-clean instrument: compression ratio on held-out bytes is a label-free,
-task-free measure of predictive quality, the guessing game of
-<Ref lesson="entropy-of-english"/> with the human replaced by the model
-and the score settled in bits. A lower loss is a smaller file; there is
-nothing else in the number.
-
-## The course in one line
-
-The equivalence closes the arc the course has been building. Surprisal
-prices one event (<Ref lesson="what-is-surprise"/>); entropy averages it
-and floors lossless description
-(<Ref lesson="source-coding-theorem-lite"/>); the Kraft budget makes
-code lengths and probabilities interchangeable
-(<Ref lesson="kraft-inequality"/>); KL divergence prices betting on the
-wrong distribution (<Ref lesson="kl-divergence"/>); cross-entropy is
-that price as a training loss (<Ref lesson="cross-entropy-loss"/>); and
-arithmetic coding cashes the loss out as a file. What no compressor can
-do is beat the floor, and how far even the shortest-program ideal sits
-out of reach is next, in <Ref lesson="kolmogorov-complexity"/>.
-
-{/* fig CourseSpine: the capstone map, one left-to-right spine of five
-   rounded nodes joined by rightward arrows. Nodes, each with a KaTeX
-   headline and a small muted lesson label underneath: (1) "$H$" /
-   "entropy — the floor" / "surprisal, entropy lessons"; (2)
-   "$\sum 2^{-\ell_i} \le 1$" / "codes — spend the budget" /
-   "prefix-codes, kraft-inequality"; (3) "$D(p\,\|\,q)$" / "mismatch —
-   the extra bits" / "kl-divergence"; (4) "$H(p,q) = H + D$" /
-   "cross-entropy — the training loss" / "cross-entropy-loss"; (5)
-   "$\text{len} \le -\log_2 q + 2$" / "compression — the receipt" /
-   "this lesson". Node 5 amber (the destination), nodes 1–4 currentColor
-   with blue accents on the formulas; arrows plain. Beneath the spine one
-   gloss line: "entropy floors it, Kraft prices it, KL charges the
-   mismatch, training minimizes it, arithmetic coding cashes it". Colors:
-   amber = the final node, blue = formula accents, currentColor
-   otherwise. One idea: the whole course is one pipeline ending in a
-   file size. */}
 <Figure
-  name="CourseSpine"
-  alt="Five nodes in a row, entropy, the Kraft budget, KL divergence, cross-entropy, and compression, joined by arrows, with the compression node highlighted as the destination"
-  caption="The course to this point as one spine: entropy sets the floor, codes spend the Kraft budget, KL prices mismatch, cross-entropy trains against it, compression collects it as a file."
+  src="./figures/benchmark-flip.svg"
+  alt="Two grouped bar charts: on a 20,942-byte text file gzip reaches 39 percent against the count-based arithmetic coder's 61 percent, while on the sparse binary file gzip reaches 2.1 percent against the arithmetic coder's 1.4 percent, with the ideal at 1.01 percent"
+  caption="The same two compressors, two sources, opposite rankings: gzip's repeated-string model fits prose and misses a skewed coin, and the count-based coder does the reverse."
 />
 
+On a $20{,}942$-byte text file, gzip compresses to $39\%$ and the count-based
+arithmetic coder of this lesson only to $61\%$: repeated words and phrases
+are structure that letter counts cannot represent. On the sparse binary file
+the ranking inverts, gzip reaching $2.1\%$ against the count-based coder's
+$1.4\%$, because there are no repeated strings to find and the whole of the
+structure is a single skewed frequency. Neither result is a fact about the
+programs alone.
+
 <KeyFact>
-Entropy sets the floor, the Kraft budget makes lengths bets, KL prices
-the mismatch, and cross-entropy is the coding cost: a predictive model's
-loss on a stream **is** its achievable compressed size, so training a
-language model is running a compression objective at scale.
+Two compression ratios are comparable only when both sides account for the
+model the same way. A ratio that excludes a shipped model's own bits is
+measuring a different quantity from one that includes them, which is why the
+same language model can be reported as the best compressor ever measured and
+as far worse than gzip.
 </KeyFact>
+
+What is established: a model and an arithmetic coder form a lossless
+compressor whose output length is the model's log-loss on the stream plus two
+bits; every lossless compressor carries an implied model $q_C \propto
+2^{-\ell_C}$, so there is no model-free compression, only unstated models;
+the expected size per symbol is the entropy rate plus the model's divergence;
+and a model may be learned during coding at a cost of about
+$\tfrac{k}{2}\log_2 n$ bits rather than a header. What is not established is
+any floor below the entropy rate. <Ref lesson="kolmogorov-complexity"/> takes
+up what happens when the model is allowed to be any program at all and the
+shortest-program length replaces the distribution;
+<Ref lesson="language-models-as-compressors"/> runs the first direction of
+this lesson on a trained network and reports the rates.
 
 ## Exercises
 
 <Exercise>
-Code the 5-character string `noon_` (`_` marks a trailing space) over
-$\{n, o, \_\}$, as in the worked example: compute the total bits
-under (a) the uniform model, (b) the letter-frequency model with counts
-taken from the string, and (c) the bigram model (first character from
-letter frequencies, later characters from the string's bigram counts).
-Use $\log_2 3 \approx 1.585$, $\log_2 5 \approx 2.322$,
-$\log_2 \tfrac52 \approx 1.322$.
+A memoryless model over $\{A, B, C\}$ assigns $q = (0.5, 0.3, 0.2)$ at every
+step. A 12-symbol message contains six $A$s, four $B$s and two $C$s. Compute
+the total coding cost from the surprisals, compute the model's cross-entropy
+against the message's empirical distribution, and check that the emitted file
+length agrees with both to within two bits. Use $\log_2 \tfrac{1}{0.3} =
+1.737$ and $\log_2 \tfrac{1}{0.2} = 2.322$.
 
 <Solution>
-(a) Uniform: $\log_2 3 \approx 1.585$ bits per character;
-$5 \times 1.585 \approx 7.92$ bits.
+Surprisals: $6 \times 1 + 4 \times 1.737 + 2 \times 2.322 = 6 + 6.948 +
+4.644 = 17.59$ bits.
 
-(b) Counts $(n{:}2,\ o{:}2,\ \_{:}1)$, so
-$q = (\tfrac25, \tfrac25, \tfrac15)$. Total:
-$2 \log_2 \tfrac52 + 2\log_2 \tfrac52 + \log_2 5
-= 4(1.322) + 2.322 \approx 7.61$ bits.
+Cross-entropy: the empirical distribution is
+$\hat p = (\tfrac12, \tfrac13, \tfrac16)$, and
 
-(c) Bigrams in `noon_`: $n$ is followed by $o$ (position 1)
-and $\_$ (position 4), so $q(o \mid n) = q(\_ \mid n) =
-\tfrac12$; $o$ is followed by $o$ and $n$ once each, so
-$q(o \mid o) = q(n \mid o) = \tfrac12$. Charges: $n$ from frequencies,
-$\log_2 \tfrac52 \approx 1.322$; then $o \mid n$, $o \mid o$,
-$n \mid o$, $\_ \mid n$ at $1$ bit each. Total:
-$1.322 + 4 \approx 5.32$ bits.
+$$
+H(\hat p, q) = \tfrac12(1) + \tfrac13(1.737) + \tfrac16(2.322)
+= 0.500 + 0.579 + 0.387 = 1.466 \ \text{bits per symbol,}
+$$
 
-The ladder $7.92 \to 7.61 \to 5.32$ mirrors the worked example: the
-frequency model gains little (the counts are nearly uniform), the
-context model gains a third, and an arithmetic coder realizes each
-total within $2$ bits.
+so $12 \times 1.466 = 17.59$ bits over the message. The two computations are
+the same sum grouped differently: the per-symbol average of the charges is
+the cross-entropy against the empirical distribution, whatever the order of
+the symbols.
+
+File length: $\lceil 17.59 \rceil + 1 = 19$ bits, which is within the
+theorem's $17.59 + 2 = 19.59$. Every symbol order with these counts gives the
+same $17.59$, because the model ignores context.
 </Solution>
 </Exercise>
 
 <Exercise>
-A memoryless model on $\{H, T\}$ assigns $q(H) = 0.9$, $q(T) = 0.1$ at
-every step. For the stream $HHT$: compute the arithmetic coder's
-interval after each symbol (subintervals ordered $H$ before $T$), verify
-that the final width equals $q(HHT)$, bound the codeword length with the
-theorem, and exhibit an actual dyadic interval and codeword.
+Consider the model that assigns probability $1$ to whichever symbol actually
+occurs, at every step. Report the file size the construction produces for a
+stream of $n$ symbols. Then explain what such a model implies about the
+source, and why no model can behave this way on a source with a positive
+entropy rate. Name the constraint that rules it out.
 
 <Solution>
-Intervals: $H$: $[0, 0.9)$; $H$: $[0, 0.81)$; $T$: the top $0.1$
-fraction of $[0, 0.81)$, i.e. $[0.729,\ 0.81)$. Width:
-$0.81 - 0.729 = 0.081 = 0.9 \times 0.9 \times 0.1 = q(HHT)$.
+Size: $q(x_{1:n}) = 1$, so the coder's interval never narrows and the bound
+gives $\ell \le -\log_2 1 + 2 = 2$ bits. The file is empty apart from
+framing.
 
-Length bound: $-\log_2 0.081 \approx 3.63$, so the coder needs at most
-$3.63 + 2 = 5.63$, i.e. $5$ bits.
+What it implies: a decoder holding this model reconstructs the stream from
+nothing, so the stream is a constant of the model. That is consistent only if
+the model was chosen after the data was known, in which case the choice
+itself is the description and has not been counted. The stream has been moved
+into the model, not compressed.
 
-Codeword: with $k = \lceil 3.63 \rceil + 1 = 5$, cells have width
-$2^{-5} = 0.03125$. The cell $[0.75, 0.78125)$ lies inside
-$[0.729, 0.81)$. Its left endpoint $0.75 = 0.11000_2$, so the codeword
-is `11000`, $5$ bits as bounded. ($k = 4$ fails: the width-$0.0625$
-cells adjacent to $[0.729, 0.81)$ are $[0.6875, 0.75)$ and
-$[0.75, 0.8125)$, and neither is contained in it, which is why the
-bound reserves the extra bit.)
+Why no source with positive entropy rate admits it: a model is a
+distribution, so $\sum_{x} q(x) = 1$ over all $|\mathcal{X}|^n$ streams of
+length $n$. Assigning $1$ to one stream forces $0$ on every other, and any
+stream that then occurs costs infinitely many bits. At most one stream per
+model can be free. Against an actual source the expected cost is
+$\mathbb{E}[-\log_2 q] \ge n H_{\text{rate}} > 0$, by the same non-negativity
+of divergence that puts the entropy floor under every code.
+
+The constraint that rules it out is normalization, $\sum_x q(x) = 1$, which is
+the Kraft budget of <Ref lesson="kraft-inequality"/> in probability form:
+giving one outcome more probability takes it from the others, exactly as
+shortening one codeword lengthens another.
 </Solution>
 </Exercise>
 
 <Exercise>
-A black-box lossless compressor $C$ is queried on short files over
-$\{A, B, C, D\}$. (a) On the four single-character files it outputs
-$1$, $2$, $3$, $3$ bits respectively; state the implied distribution
-$q_C$ over the next character and check it against the Kraft budget of
-<Ref lesson="kraft-inequality"/>. (b) Appending to the file $A$, the
-outputs are $\ell_C(AA) = 2$ and $\ell_C(AB) = 3$, with continuations
-$C$, $D$ costing $4$ bits each. Compute the implied conditional
-distribution $q_C(\cdot \mid A)$.
+Break this claim. "gzip compresses this file to $30\%$ of its size, so the
+file's entropy rate is about $2.4$ bits per byte." Give two reasons the
+inference fails, one about the direction of an inequality and one about what
+gzip's model can represent, and support the first with a number from this
+lesson.
 
 <Solution>
-(a) $2^{-\ell}$ gives $(\tfrac12, \tfrac14, \tfrac18, \tfrac18)$, which
-sums to exactly $1$: the budget is saturated, so no normalization is
-needed and the code is complete. The implied model is
-$q_C = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$; its
-maximum-probability prediction is $A$.
+**The inequality runs the other way.** Achieved bits per symbol equals the
+entropy rate plus the model's divergence plus its Kraft slack, and the last
+two terms are non-negative. So $2.4$ bits per byte is an *upper bound* on the
+entropy rate, and treating it as an estimate assumes the divergence is zero,
+which is the assumption that gzip's model is exactly right. The sparse binary
+file of this lesson shows the size of the error available: gzip reaches
+$2.1\%$, implying $0.165$ bits per character, where the true entropy is
+$0.0808$. The bound overstates the rate by a factor of two, and there is no
+general bound on how bad the overstatement can be.
 
-(b) Length increments over $\ell_C(A) = 1$:
-$\Delta(A) = 1$, $\Delta(B) = 2$, $\Delta(C) = \Delta(D) = 3$. Weights
-$2^{-\Delta} = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$, summing to
-$1$: $q_C(\cdot \mid A) = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$.
-The compressor's spending pattern *is* a conditional model; here it
-happens to match its unconditional one, i.e. the box treats the second
-character as independent of the first.
+**gzip's model class is narrow.** gzip is LZ77 matching over a 32-kilobyte
+window followed by Huffman coding of the resulting literals and match
+lengths, so the only structure it can represent is repeated byte strings
+within that window, plus per-block symbol frequencies. A source with any
+other kind of structure is invisible to it. A file of the digits of $\pi$, or
+of a slowly ramping counter, is highly predictable and nearly incompressible
+by gzip; its ratio would report a high entropy rate for a source with a very
+low one.
+
+**What the claim presumes.** An entropy rate is a property of a source, that
+is, of a distribution over files. One file has no entropy rate, and any such
+figure quoted from a single file is a statement about the model that produced
+it.
 </Solution>
 </Exercise>
 
 <Exercise>
-A byte-level model reports a log-loss of $0.55$ nats per byte on a
-$2$-megabyte ($2 \times 10^6$-byte) log file. Convert to bits per byte,
-compute the achievable compressed size in kilobytes (ignoring the
-$O(1)$ coder overhead), and the compression ratio against the raw file.
+The lesson asserted that no compressor beats the entropy in expectation and
+used the assertion in the accounting. Prove it. Let $C$ be any uniquely
+decodable lossless compressor on inputs of length $n$ from a source $p$.
+(a) Show that $\sum_x 2^{-\ell_C(x)} \le 1$. (b) Deduce
+$\mathbb{E}[\ell_C] \ge H(p_{1:n})$, and identify the two earlier results
+each part relies on.
 
 <Solution>
-Bits per byte: $0.55 \times 1.443 \approx 0.794$. Total:
-$2 \times 10^6 \times 0.794 \approx 1.587 \times 10^6$ bits
-$= 1.587 \times 10^6 / 8 \approx 198{,}400$ bytes $\approx 198$ kB.
-Ratio: $2 \times 10^6 / 198{,}400 \approx 10.1{:}1$, against $8$ bits
-per byte raw. The nats-to-bits factor is the whole conversion: the
-loss already is the file size in the other unit.
+**(a)** Unique decodability means the map from input sequences to output
+bitstrings is injective and stays injective under concatenation, which is
+exactly the hypothesis of McMillan's theorem
+(<Ref lesson="kraft-inequality"/>): every uniquely decodable code's lengths
+satisfy the Kraft budget $\sum_x 2^{-\ell(x)} \le 1$. Nothing about the
+compressor being a program rather than a table enters; the argument counts
+sequences of codewords. A whole-file compressor is a code on the finite
+alphabet $\mathcal{X}^n$, so the theorem applies verbatim with $x$ ranging
+over the $|\mathcal{X}|^n$ possible files.
+
+**(b)** Set $c = \sum_x 2^{-\ell_C(x)} \le 1$ and $q(x) = 2^{-\ell_C(x)}/c$,
+a genuine distribution. Then $\ell_C(x) = -\log_2 q(x) + \log_2 \tfrac1c$
+and, taking expectations under $p$,
+
+$$
+\mathbb{E}[\ell_C]
+= \sum_x p(x)\log_2 \tfrac{1}{q(x)} + \log_2 \tfrac1c
+= H(p) + D(p\,\|\,q) + \log_2 \tfrac1c .
+$$
+
+Both correction terms are non-negative: $D(p\,\|\,q) \ge 0$ by Gibbs'
+inequality (<Ref lesson="kl-divergence"/>), with equality only when $q = p$,
+and $\log_2 \tfrac1c \ge 0$ because $c \le 1$. Hence
+$\mathbb{E}[\ell_C] \ge H(p)$.
+
+Part (a) rests on McMillan's theorem, which converts "is decodable" into an
+arithmetic budget; part (b) rests on Gibbs' inequality, which converts "is a
+distribution" into non-negativity of the mismatch. Equality needs both
+$c = 1$ (no wasted budget) and $q = p$ (the right bet), and the second
+requires $-\log_2 p(x)$ to be an integer for every $x$, which is why an
+arithmetic coder rather than a symbol code is needed to approach the floor.
 </Solution>
 </Exercise>
 
 <Exercise>
-A sensor emits $H$ with probability $0.99$ and $T$ with probability
-$0.01$, i.i.d. (a) Compute the entropy per flip. (b) State the best any
-symbol code (one codeword per flip, per
-<Ref lesson="huffman-by-hand"/>) achieves, and its overhead. (c) Compute
-the arithmetic coder's expected total for $10^4$ flips under the true
-model, and the resulting compression ratio against the symbol code. Use
-$\log_2 0.99 \approx -0.0145$, $\log_2 100 \approx 6.644$.
+Build the ladder yourself. Take an English text file of at least $10$
+kilobytes. Compute the total coded size, in bytes, under (a) a uniform model
+over the byte values, (b) a letter-frequency model estimated from the file,
+and (c) a bigram model estimated from the file with add-$\alpha$ smoothing at
+$\alpha = 0.1$. Report those three numbers alongside (d) the size gzip
+produces, and state which two rungs gzip's result falls between. State what
+would count as agreement with this lesson's numbers.
 
 <Solution>
-(a) $H = 0.99 \times 0.0145 + 0.01 \times 6.644 \approx 0.0144 + 0.0664
-= 0.0808$ bits per flip.
+**Method.** Coded size is $\sum_t -\log_2 q(x_t \mid \text{context})/8$
+bytes; there is no need to run a coder, since the theorem says the file is
+within two bits of that sum. Case folding and the treatment of punctuation
+change every number, so fix one convention and state it. Smoothing is not
+optional in (c): an unsmoothed bigram model assigns probability zero to any
+pair absent from its own training text, and if the model is estimated from
+the same file this shows up as a spuriously small size rather than as an
+error.
 
-(b) A binary alphabet forces lengths $(1, 1)$: $L = 1$ bit per flip,
-an overhead of $1 - 0.0808 = 0.9192$ bits, about $11$ times the entropy
-itself: the per-symbol rounding flaw at its worst.
+**Expected values** on ordinary English prose, letters and spaces:
 
-(c) Expected log-loss of the true model is the entropy, so the coder
-spends about $10^4 \times 0.0808 + 2 \approx 810$ bits, against
-$10^4$ bits for the symbol code: a ratio of $12.3{:}1$. The two
-overhead bits are paid once for the whole stream, which is exactly what
-the block-coding table of <Ref lesson="source-coding-theorem-lite"/>
-approximated with ever-larger tables.
+- (a) exactly $8.00$ bits per character, so the size equals the raw size.
+- (b) about $4.0$ to $4.3$ bits per character, so roughly half.
+- (c) about $3.3$ to $3.6$ bits per character. It should beat (b) by a few
+  tenths of a bit and not more; a bigram model with $676$ cells estimated
+  from $10$ kilobytes has a few hundred characters per cell at best.
+- (d) gzip on $10$ kilobytes of English typically lands between $40\%$ and
+  $45\%$, that is $3.2$ to $3.6$ bits per character, improving on longer
+  files as its window fills: $39\%$ on the $21$-kilobyte file quoted in this
+  lesson.
+
+**Where gzip sits.** At this size, level with or just below the bigram model,
+and between the letter-frequency rung and the entropy rate. Report which side
+of (c) your file falls on and how the answer moves when you double the file
+length, since gzip's advantage is repeated whole words, which a
+two-character model cannot see and which need length to accumulate.
+
+**What counts as agreement.** Rungs in the stated order, (a) $>$ (b) $>$ (c),
+with (b) within a few tenths of $4.03$ bits per character; a bigram result
+below $3$ bits per character on a file this small is evidence that the model
+is scoring its own training data, not a prediction. Repeat with $\alpha = 1$
+and $\alpha = 0.01$: the bigram number should move by a few tenths of a bit,
+which is the honest size of the modelling choice.
 </Solution>
 </Exercise>
 
 <Exercise>
-A pretrained model with $7 \times 10^9$ parameters at $16$ bits each
-achieves $0.7$ bits per character on a text collection; a self-contained
-dictionary compressor achieves $2.7$ bits per character with negligible
-description length. Under two-part accounting (model bits + data bits),
-find the collection size $N$ in characters at which the model's total
-first beats the compressor's, and the sizes at $N = 10^{10}$
+You are given two memoryless models over $\{a, b, c, d\}$, $M_1 =
+(\tfrac12, \tfrac14, \tfrac18, \tfrac18)$ and $M_2 = (0.4, 0.3, 0.2, 0.1)$,
+and one test stream of $20$ symbols containing ten $a$, five $b$, three $c$
+and two $d$. Decide which model compresses the stream to fewer bits
+*without* coding it, then compute both totals and check. State which quantity
+your decision compared and why the shortcut is available here.
+
+<Solution>
+**The decision.** The empirical distribution of the test stream is
+$\hat p = (0.5, 0.25, 0.15, 0.10)$. Because both models are memoryless, the
+coded length depends on the stream only through these counts, so compare the
+cross-entropies $H(\hat p, M_i)$:
+
+$$
+\begin{aligned}
+H(\hat p, M_1) &= 0.5(1) + 0.25(2) + 0.15(3) + 0.10(3) = 1.750 \ \text{bits/symbol},\\
+H(\hat p, M_2) &= 0.5(1.322) + 0.25(1.737) + 0.15(2.322) + 0.10(3.322) = 1.776 .
+\end{aligned}
+$$
+
+$M_1$ wins, narrowly.
+
+**The check.** Totals over $20$ symbols: $35.0$ bits against $35.5$ bits, a
+margin of half a bit, which is less than the coder's own two-bit overhead. On
+this stream the two models are indistinguishable in practice, and a
+conclusion about which is better would need a longer stream.
+
+**What was compared, and why it was available.** The comparison is between
+cross-entropies of the same empirical distribution against two models, which
+is the same as comparing divergences: $H(\hat p) = 1.743$ bits, so
+$D(\hat p\,\|\,M_1) = 0.007$ and $D(\hat p\,\|\,M_2) = 0.033$. The
+shortcut exists because both models are memoryless, so the coded length is a
+function of the counts alone. Given a model with context, two streams with
+identical counts can cost very different amounts, and the sum must be taken
+symbol by symbol in the actual order.
+</Solution>
+</Exercise>
+
+<Exercise>
+Your bigram model over a 26-letter alphabet needs a table of $26 \times 26$
+counts, and it is not adaptive: the table is estimated in a first pass and
+must be transmitted. Charge $16$ bits per count and compute the header size.
+Then, taking the bigram model to cost $3.32$ bits per character and the
+letter-frequency model $4.03$ bits per character with a negligible header,
+find the file length in characters at which the bigram scheme's total first
+beats the letter-frequency scheme's, and give both totals at $10{,}000$
 characters.
 
 <Solution>
-Model description: $7 \times 10^9 \times 16 = 1.12 \times 10^{11}$
-bits. Totals: model $1.12 \times 10^{11} + 0.7N$; compressor $2.7N$.
-Break-even: $1.12 \times 10^{11} = 2N$, so
-$N = 5.6 \times 10^{10}$ characters, about $56$ GB of text. Below
-that, shipping the model costs more than it saves.
+**Header.** $26 \times 26 = 676$ counts at $16$ bits is $10{,}816$ bits,
+about $1.35$ kilobytes.
 
-At $N = 10^{10}$: model total $1.12 \times 10^{11} + 7 \times 10^9
-= 1.19 \times 10^{11}$ bits; compressor $2.7 \times 10^{10}$ bits. The
-compressor wins by a factor of $4.4$ although its per-character rate is
-almost $4$ times worse. This is the Delétang paper's adjusted-rate
-finding in miniature, and the trade
-<Ref lesson="minimum-description-length"/> turns into a model-selection
-principle.
-</Solution>
-</Exercise>
+**Break-even.** The bigram model saves $4.03 - 3.32 = 0.71$ bits per
+character, so it must cover the header:
 
-<Exercise>
-A character-level model scores $1.4$ bits per character on held-out
-English whose entropy rate is taken as $1.1$ bits per character.
-Identify the irreducible and improvable parts of its rate, compute both
-as fractions, and give the achievable compressed size of a
-$500{,}000$-character novel now and under a hypothetically perfect
-model.
+$$
+n \;=\; \frac{10{,}816}{0.71} \;\approx\; 15{,}200 \ \text{characters.}
+$$
 
-<Solution>
-By the accounting identity, $1.4 = 1.1 + 0.3$: the entropy rate $1.1$
-is the source's floor, and $0.3$ bits per character is the model's
-divergence rate, the only improvable part. Fractions: the mismatch is
-$0.3 / 1.4 \approx 21\%$ of every compressed file, and the model sits
-$0.3 / 1.1 \approx 27\%$ above the floor.
+Below roughly $15$ kilobytes of text the simpler model produces the smaller
+file, despite being a worse predictor of every single character.
 
-Sizes: now, $500{,}000 \times 1.4 = 700{,}000$ bits $= 87.5$ kB.
-Perfect model: $500{,}000 \times 1.1 = 550{,}000$ bits $\approx 69$ kB.
-No model, however trained, goes below the second number: that is the
-source coding theorem of <Ref lesson="source-coding-theorem-lite"/>
-applied at the entropy rate.
+**At $n = 10{,}000$.** Bigram: $10{,}816 + 33{,}200 = 44{,}016$ bits. Letter
+frequencies: $40{,}300$ bits. The better model loses by $3{,}716$ bits.
+
+**What this is.** The total just computed, model bits plus data bits, is a
+*two-part code*, and choosing the model that minimizes it is model selection
+by description length, developed in
+<Ref lesson="minimum-description-length"/>. Two refinements from that lesson
+change the numbers but not the shape. Sixteen bits per count is wasteful: the
+counts only need the precision the data supports, which brings the header
+down to about $\tfrac{k}{2}\log_2 n$ bits with $k = 650$ free parameters,
+around $4{,}300$ bits at $n = 10^4$ and a break-even near $5{,}500$
+characters. And an adaptive bigram model pays that same
+$\tfrac{k}{2}\log_2 n$ as regret instead, without a header, which is why
+practical compressors are adaptive.
 </Solution>
 </Exercise>
 
 <References>
-1. G. Delétang, A. Ruoss, P.-A. Duquenne, E. Catt, T. Genewein, C. Mattern, J. Grau-Moya, L. K. Wenliang, M. Aitchison, L. Orseau, M. Hutter, J. Veness, "Language Modeling Is Compression," ICLR 2024 — §2 states the predictor–compressor equivalence via arithmetic coding; §3 measures Chinchilla 70B as a general-purpose compressor (ImageNet 43.4%, LibriSpeech 16.4%, vs PNG 58.5% and FLAC 30.3%) and defines the adjusted compression rate that charges model size. https://arxiv.org/abs/2309.10668
-2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 6 "Stream Codes": why symbol codes fall short and how arithmetic coding reaches the entropy rate; §6.2 the encoder/decoder and the within-two-bits guarantee. Free online: https://www.inference.org.uk/mackay/itila/
-3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §5.4 the wrong-code cost $H(p) + D(p\|q)$ behind the accounting section; §13.3 arithmetic coding.
-4. I. H. Witten, R. M. Neal, J. G. Cleary, "Arithmetic Coding for Data Compression," *Communications of the ACM*, 30(6), 1987 — the classic practical treatment: incremental encoding/decoding and the separation of model from coder.
-5. J. Rissanen, G. G. Langdon, "Arithmetic Coding," *IBM Journal of Research and Development*, 23(2), 1979 — the original general formulation of arithmetic coding.
+1. G. Delétang, A. Ruoss, P.-A. Duquenne, E. Catt, T. Genewein, C. Mattern, J. Grau-Moya, L. K. Wenliang, M. Aitchison, L. Orseau, M. Hutter, J. Veness, "Language Modeling Is Compression," ICLR 2024 — §2 states both directions of the correspondence: eq. (2) identifies the cross-entropy with the expected code length, and the paragraph on compression-based sequence prediction defines the induced model $2^{-\ell_c}$ and its conditionals. Table 1 gives the raw and parameter-adjusted rates quoted here (Transformer 200K at 194.0% on ImageNet; Chinchilla 70B adjusted at 14008.3% on 1 GB). https://arxiv.org/abs/2309.10668
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 6 "Stream Codes": §6.2 derives the add-one (Laplace) predictive rule as a Bayesian mixture and poses the two-pass-versus-adaptive comparison as exercise 6.2; §6.5 reports the benchmark tables used in the scoreboard section, including the $10^6$-character 99/1 file whose ideal size is ≈10,100 bytes. Free online: https://www.inference.org.uk/mackay/itila/
+3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §13.3 develops arithmetic coding and its $\lceil \log 1/q \rceil + 1$ length, the source of the theorem here; §13.2 treats sequential probability assignment for binary sequences; §5.4 has the wrong-code cost $H(p) + D(p\|q)$.
+4. I. H. Witten, R. M. Neal, J. G. Cleary, "Arithmetic Coding for Data Compression," *Communications of the ACM*, 30(6), 1987, pp. 520–540 — the implementation that separates model from coder, with working C for both an adaptive and a fixed model; read it for the incremental encoder that emits bits before the stream ends.
+5. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441), 2016 — §9.5 derives the Krichevsky-Trofimov "add ½" assignment from the Jeffreys prior and gives its minimax redundancy $\tfrac{d}{2}\log \tfrac{n}{2\pi e} + O(1)$; §9.3 shows that minimax redundancy equals a channel capacity.
 </References>

@@ -1,27 +1,43 @@
 KL divergence D(p||q) is the expected extra code length paid when data
-distributed as p is encoded with a code optimized for q. This lesson computes
-that overhead on a concrete pair of sources, defines $D(p\,\|\,q)$ as the
-expected log-ratio of truth to model, proves the overhead is never negative,
-computes both directions of an asymmetric pair, and establishes the boundary
-case that dominates practice: a model assigning probability zero to a real
-outcome diverges infinitely.
+distributed as p is encoded with a code optimized for q.
 
-## The wrong code: 0.875 extra bits per symbol
+The coding module closed on an identity with one term left unnamed.
+<Ref lesson="source-coding-theorem-lite"/> proved that every prefix code
+spends $L = H(p) + D(p\,\|\,q) + \text{slack}$ bits per symbol, where $q$ is
+the distribution the code's lengths bet on; the entropy floor followed from
+the middle term never being negative, and the middle term itself was carried
+as a formula and set aside. This lesson makes it the subject, because the
+course's argument now moves from codes to models and those are the same
+object: a trained model is a bet on a distribution, and its loss is the price
+of the bet. Every objective in the machine-learning module, from
+cross-entropy through the rate-distortion Lagrangian to the information
+bottleneck, is assembled from this one quantity.
 
-<Ref lesson="source-coding-theorem-lite"/> established that a prefix code
-with lengths $\ell(x)$ bets on the distribution $q(x) = 2^{-\ell(x)}$, and
-that on a *dyadic* source (every probability a power of $\tfrac12$) the
-matched code is exact: each length equals its symbol's surprisal and the
-expected length equals the entropy. This section runs that machinery on a
-mismatched pair and measures the damage.
+The route: the overhead computed on a concrete mismatched pair; the
+definition and the identity cost $=$ entropy $+$ divergence; the proof that
+the overhead is never negative, with its equality condition; the asymmetry
+and what it means that one direction can be infinite while the other is one
+bit; the failure mode of a model that rules out a real outcome; what a small
+divergence does guarantee, since it is not a distance; and the identity
+$I(X;Y) = D\bigl(p(x,y)\,\|\,p(x)p(y)\bigr)$ that the rest of the course runs
+on.
+
+## The unnamed term: 0.875 extra bits per symbol
+
+<Ref lesson="source-coding-theorem-lite"/> established that a prefix code with
+lengths $\ell(x)$ is a bet on the distribution $q(x) = 2^{-\ell(x)}$, and that
+on a *dyadic* source (every probability a power of $\tfrac12$) the matched code
+is exact: each length equals its symbol's surprisal, and the expected length
+equals the entropy. Running that machinery on a mismatched pair turns the
+unnamed term into a number.
 
 ### One code, two sources
 
 A transmitter models its source as $q = (\tfrac12, \tfrac14, \tfrac18,
 \tfrac18)$ over $\{A, B, C, D\}$ and builds the exact code for $q$: lengths
-$\ell_q = (1, 2, 3, 3)$, the matched code of <Ref lesson="prefix-codes"/>.
-The data, however, comes from $p = (\tfrac18, \tfrac18, \tfrac14,
-\tfrac12)$: the same alphabet with the probabilities reversed.
+$\ell_q = (1, 2, 3, 3)$, the matched code of <Ref lesson="prefix-codes"/>. The
+data arrives from $p = (\tfrac18, \tfrac18, \tfrac14, \tfrac12)$, the same
+alphabet with the probabilities reversed.
 
 The code still decodes perfectly; only the price changes. Expected length
 under the true frequencies:
@@ -33,16 +49,21 @@ L = \sum_x p(x)\,\ell_q(x)
 $$
 
 The exact code for $p$ has lengths $(3, 3, 2, 1)$ and costs $H(p) = 1.75$
-bits. The wrong bet therefore costs $2.625 - 1.75 = 0.875$ **extra bits per
-symbol**, paid on every symbol for as long as the code is in use. Nothing is
-broken in the tree: it is an optimal code for a source that is not the one
-transmitting.
+bits. The wrong bet costs $2.625 - 1.75 = 0.875$ **extra bits per symbol**,
+paid on every symbol for as long as the code is in use. Nothing is broken in
+the tree: it is an optimal code for a source that is not the one transmitting.
+
+<Figure
+  src="./figures/cost-split.svg"
+  alt="Two cost bars for the same source: the code built for q spends 2.625 bits, split into a 1.75-bit entropy segment and a 0.875-bit mismatch segment, while the code built for p spends only the 1.75-bit entropy"
+  caption="Only one of the two terms is the model's fault: the 1.75-bit floor is the source's property, the 0.875 bits above it are the bet's."
+/>
 
 ### The overhead, symbol by symbol
 
-Per symbol the wrong code is sometimes *shorter* than the right one: it
-spends 1 bit on $A$ where the ideal is 3, a 2-bit saving. The account
-balances only after weighting each gap by how often $p$ produces the symbol:
+Per symbol the wrong code is sometimes *shorter* than the right one: it spends
+1 bit on $A$ where the ideal is 3, a 2-bit saving. The account balances only
+after weighting each gap by how often $p$ produces the symbol:
 
 $$
 \sum_x p(x)\bigl[\ell_q(x) - \ell_p(x)\bigr]
@@ -51,7 +72,8 @@ $$
 $$
 
 The savings sit on symbols the source rarely emits; the penalties sit on the
-symbols it emits constantly.
+symbols it emits constantly. That weighting is the whole mechanism, and it is
+what makes the quantity depend on which distribution is real.
 
 <FigureSequence
   name="extra-bits"
@@ -62,8 +84,8 @@ symbols it emits constantly.
 <Task>
 Step through the three frames. In frame 2, check that each blue bar is the
 symbol's surprisal under $p$ (for $D$: $-\log_2 \tfrac12 = 1$). In frame 3,
-recompute the tally by hand; the two savings and two penalties must combine
-to $+0.875$, not $0$.
+recompute the tally by hand; the two savings and two penalties must combine to
+$+0.875$, not to $0$.
 </Task>
 
 Substituting $\ell_q(x) = -\log_2 q(x)$ and $\ell_p(x) = -\log_2 p(x)$ turns
@@ -73,19 +95,22 @@ $$
 \ell_q(x) - \ell_p(x) = \log_2 p(x) - \log_2 q(x) = \log_2 \frac{p(x)}{q(x)},
 $$
 
-so the overhead is $\sum_x p(x) \log_2 \tfrac{p(x)}{q(x)}$: a quantity
-computed from the two distributions alone, with no reference to any
-particular tree.
+so the overhead is $\sum_x p(x) \log_2 \tfrac{p(x)}{q(x)}$. No tree, no
+alphabet ordering and no integer length survives into that expression: it is a
+function of the two distributions alone.
 
 <KeyFact>
-The expected overhead of coding source $p$ with the exact code for $q$ is
-$\sum_x p(x) \log_2 \tfrac{p(x)}{q(x)}$ bits per symbol — determined by the
-two distributions themselves, independent of the code that realizes the bet.
+Because the overhead is computable from $p$ and $q$ without reference to any
+code, the same number appears wherever a probability model is scored against
+data with no encoder in sight. That is why the loss minimized when a
+classifier trains is a compressed file size, worked out in
+<Ref lesson="cross-entropy-loss"/>.
 </KeyFact>
 
-## The definition: an expectation of the log-ratio
+## The definition: an expectation of a log-ratio
 
-The number just computed gets a name and a notation.
+The quantity just computed gets a name, a notation, and two conventions at the
+edges of its domain.
 
 <Definition title="Kullback–Leibler divergence">
 For probability distributions $p$ and $q$ on a finite set $\mathcal{X}$, the
@@ -100,17 +125,55 @@ with the conventions $0 \log_2 \tfrac{0}{q} = 0$ and, for $p(x) > 0$,
 $p(x) \log_2 \tfrac{p(x)}{0} = +\infty$.
 </Definition>
 
-The quantity was introduced by
-[Kullback and Leibler (1951)](https://projecteuclid.org/journals/annals-of-mathematical-statistics/volume-22/issue-1/On-Information-and-Sufficiency/10.1214/aoms/1177729694.full);
-Cover & Thomas (§2.3) call it relative entropy. Term by term it is a
-difference of surprisals (<Ref lesson="what-is-surprise"/>): $\log_2
-\tfrac{p(x)}{q(x)} = \bigl(-\log_2 q(x)\bigr) - \bigl(-\log_2 p(x)\bigr)$,
-the model's surprise at $x$ minus the truth's, averaged under the truth.
+Inside the expectation sits a difference of surprisals
+(<Ref lesson="what-is-surprise"/>, where $-\log_2 p(x)$ was fixed as the
+information content of one event): the log-ratio $\log_2 \tfrac{p(x)}{q(x)} =
+\bigl(-\log_2 q(x)\bigr) - \bigl(-\log_2 p(x)\bigr)$ is the model's surprise at
+$x$ minus the truth's. The **summand** of $D(p\,\|\,q)$ is that log-ratio
+multiplied by $p(x)$, so a large gap on a symbol the source rarely emits
+contributes almost nothing to the total. On the mismatched pair of the previous section the extreme log-ratios are equal and
+opposite, $-2$ bits at $A$, where the model is the less surprised of the two,
+and $+2$ bits at $D$, where it is the more; the summands they contribute are
+$\tfrac18(-2) = -0.25$ bits and $\tfrac12(+2) = +1.00$ bits, a four-to-one
+imbalance created entirely by how often $p$ emits each symbol.
 
-### The identity: cost = entropy + divergence
+<Figure
+  src="./figures/logratio-gap.svg"
+  alt="Two pairs of surprisal bars from the mismatched pair: at symbol A the model's one-bit surprisal sits two bits below the truth's three bits, and at symbol D the model's three bits sit two bits above the truth's one; each panel is annotated with its log-ratio of minus or plus two bits and with the summand it contributes, minus 0.25 bits at A and plus 1.00 bits at D"
+  caption="Each log-ratio is a signed gap between two surprisals, negative where the model is less surprised than the truth; the summand is that gap weighted by p, which is what breaks the symmetry between the two extremes."
+/>
 
-Splitting the definition's logarithm gives the accounting identity behind
-the coding story:
+The definition's first convention is the entropy convention of
+<Ref lesson="entropy-as-average-surprise"/>: an outcome that never occurs gets
+weight zero and is never evaluated. The second is not a convention but the
+value, and it is the subject of a section below.
+
+Four cases fix what the definition covers.
+
+- **The canonical case.** The mismatched pair of the previous section:
+  $D(p\,\|\,q) = 0.875$ bits, the extra length a real code pays.
+- **A case with a different surface.** A die is fair, $p = (\tfrac16, \dots,
+  \tfrac16)$, and a gambler's model is $q = (.1, .1, .1, .1, .1, .5)$. Then
+  $D(p\,\|\,q) = \tfrac56 \log_2 \tfrac{1/6}{0.1} + \tfrac16 \log_2
+  \tfrac{1/6}{0.5} = 0.614 - 0.264 = 0.350$ bits per roll. No code, no
+  transmitter: the same sum measures how badly a hypothesis fits a source.
+- **The degenerate case.** $q = p$ makes every log-ratio $\log_2 1 = 0$, so
+  $D(p\,\|\,p) = 0$. The next section proves that nothing else attains it.
+- **The near miss.** Take $\tilde q = (\tfrac14, \tfrac14, \tfrac18,
+  \tfrac18)$, the claims of an incomplete code with lengths $(2,2,3,3)$. The
+  sum $\sum_x p(x)\log_2 \tfrac{p(x)}{\tilde q(x)}$ evaluates fine, but
+  $\tilde q$ sums to $\tfrac34$: it violates the clause that both arguments be
+  distributions, and the number it returns is not an expected overhead. The
+  starred section below prices the difference.
+
+Which clause decides a case you meet in practice is almost always the last
+one: check that the second argument is normalized before reading its
+divergence as bits.
+
+### Cost = entropy + divergence
+
+Splitting the definition's logarithm gives the accounting identity behind the
+coding story:
 
 $$
 \underbrace{\sum_x p(x) \log_2 \frac{1}{q(x)}}_{\text{cost of } q\text{'s code on } p}
@@ -119,60 +182,37 @@ $$
 $$
 
 The left side, the expected bits spent when events from $p$ are coded with
-$q$'s code, is the *cross-entropy* $H(p, q)$: the loss function of modern
-classifiers, developed in <Ref lesson="cross-entropy-loss"/>. Every coding
-cost splits into the entropy floor, which no code avoids, plus the
-divergence, which measures the bet's error.
-
-The balanced-code example of <Ref lesson="source-coding-theorem-lite"/> is
-an instance: on the running source $p = (.5, .25, .15, .1)$, the all-2-bit
-code bets on the uniform $q = (\tfrac14, \tfrac14, \tfrac14, \tfrac14)$ and
-pays $H(p, q) = 2.000$ bits against $H(p) \approx 1.743$: divergence
-$D(p\,\|\,q) \approx 0.257$ bits.
-
-{/* fig KlGapBars: static twin of the KLMismatch demo, on the running
-   source. Left: two aligned 4-bar charts over symbols A, B, C, D — upper
-   row blue bars labeled "true $p$" with heights .5, .25, .15, .1 (values
-   printed on the bars); lower row amber bars labeled "model $q$" uniform
-   .25, .25, .25, .25. Right (or beneath): one horizontal stacked cost bar
-   on a bits-axis 0 to 2.1: blue segment from 0 to 1.743 labeled
-   "$H(p) = 1.743$", amber segment from 1.743 to 2.000 labeled
-   "$D(p\,\|\,q) = 0.257$", right end annotated "$H(p,q) = 2.000$ bits"
-   with a bracket spanning the whole bar. Payoff line under the bar:
-   "cross-entropy = entropy floor + divergence". Colors: blue = the true
-   distribution p and the entropy segment, amber = the model q and the
-   divergence segment, currentColor text/axis. One idea: the gap between
-   the model's cost and the entropy is exactly D(p||q). */}
-<Figure
-  name="KlGapBars"
-  alt="The running source p as blue bars and the uniform model q as amber bars, beside a stacked cost bar splitting the cross-entropy of 2.000 bits into the entropy floor 1.743 plus the divergence 0.257"
-  caption="The uniform model on the running source: cross-entropy 2.000 bits = entropy floor 1.743 + divergence 0.257."
-/>
+$q$'s code, is the *cross-entropy* $H(p, q)$. Every coding cost splits this
+way: an entropy floor that no code avoids, plus a divergence that measures the
+bet's error and nothing else. The floor depends on the source; the divergence
+is the only part a modeller controls.
 
 **Direction convention.** In $D(p \,\|\, q)$ the first argument is the
 **truth**: it supplies the expectation weights, because reality decides how
 often each symbol occurs. The second argument is the **model**: it supplies
-the code. This lesson and the whole ML module keep that order — data first,
-model second.
+the code. This lesson and the whole machine-learning module keep that order,
+data first and model second.
 
 <Remark title="bits and nats">
 With $\log_2$ the divergence is in bits, matching the coding story. Machine
 learning libraries compute with natural logarithms and report **nats**:
-$D_{\text{nats}} = D_{\text{bits}} \cdot \ln 2 \approx 0.693 \cdot
-D_{\text{bits}}$. The conversion is the same unit change as for surprisal
-in <Ref lesson="what-is-surprise"/>; only the constant differs from 1.
+$D_{\text{nats}} = D_{\text{bits}} \cdot \ln 2 \approx 0.693\,D_{\text{bits}}$,
+and back the other way $D_{\text{bits}} \approx 1.443\,D_{\text{nats}}$. A KL
+term of $0.35$ in a training log is therefore about half a bit, and a
+published divergence with no stated base is ambiguous by a factor of $1.443$.
 </Remark>
 
 ## Gibbs' inequality: the overhead is never negative
 
-Individual terms of $D(p\,\|\,q)$ go negative — the wrong code of the first
+Individual terms of $D(p\,\|\,q)$ go negative: the wrong code of the first
 section saved 2 bits on every $A$. The sum cannot.
-<Ref lesson="source-coding-theorem-lite"/> proved this with the tangent
-bound $\ln t \le t - 1$; the standard proof runs through
-[Jensen's inequality](https://en.wikipedia.org/wiki/Jensen%27s_inequality)
-and delivers the equality condition in one stroke.
+<Ref lesson="source-coding-theorem-lite"/> proved this with the tangent bound
+$\ln t \le t - 1$; the proof below instead runs through
+[Jensen's inequality](https://en.wikipedia.org/wiki/Jensen%27s_inequality),
+which delivers the equality condition from the strictness of one concavity
+rather than from a case analysis.
 
-<Theorem title="information inequality">
+<Theorem title="information inequality (Cover &amp; Thomas 2.6.3)">
 For probability distributions $p$ and $q$ on a finite set,
 $$
 D(p \,\|\, q) \ge 0,
@@ -180,10 +220,15 @@ $$
 with equality if and only if $p = q$.
 
 <Proof>
-If some $x$ has $p(x) > 0 = q(x)$, then $D = +\infty$ and the inequality
-holds strictly. Otherwise let $S = \{x : p(x) > 0\}$ and consider the ratio
-$T = q(X)/p(X)$ for $X \sim p$. The function $\log_2$ is strictly concave,
-so Jensen's inequality gives $\mathbb{E}[\log_2 T] \le \log_2 \mathbb{E}[T]$:
+Direct, in three steps: dispose of the infinite case, apply Jensen to the
+ratio $q/p$ under $p$, then read off what equality in Jensen forces.
+
+**Step 1, the infinite case.** If some $x$ has $p(x) > 0 = q(x)$, then
+$D = +\infty$ and the inequality holds strictly.
+
+**Step 2, Jensen.** Otherwise let $S = \{x : p(x) > 0\}$ and consider the
+random ratio $T = q(X)/p(X)$ for $X \sim p$. Since $\log_2$ is concave,
+$\mathbb{E}[\log_2 T] \le \log_2 \mathbb{E}[T]$:
 
 $$
 -D(p\,\|\,q)
@@ -193,10 +238,12 @@ $$
 \;\le\; \log_2 1 = 0 .
 $$
 
-Hence $D(p\,\|\,q) \ge 0$. Equality in Jensen for a strictly concave
-function forces $T$ constant on $S$: $q(x) = c\,p(x)$ there. Equality in
-the last step forces $\sum_{x \in S} q(x) = 1$, so $c = 1$ and $q$ has no
-mass outside $S$: $q = p$.
+Hence $D(p\,\|\,q) \ge 0$.
+
+**Step 3, equality.** $\log_2$ is *strictly* concave, so equality in Jensen
+forces $T$ to be constant on $S$: $q(x) = c\,p(x)$ there. Equality in the last
+step forces $\sum_{x \in S} q(x) = 1$, so $c = 1$ and $q$ places no mass
+outside $S$. Both together say $q = p$.
 </Proof>
 </Theorem>
 
@@ -221,131 +268,217 @@ mass outside $S$: $q = p$.
   caption="Gibbs via Jensen: the average of log₂(q/p) sits below the curve, and the curve value at the mean ratio is at most log₂ 1 = 0."
 />
 
-### One inequality, many corollaries
+<Task>
+Two questions on the proof, answered before reading on. Which step would break
+if $\log_2$ were merely concave and not strictly so, and what would the
+theorem still assert? Answer: only Step 3; the inequality would survive intact
+and the equality case would admit distributions other than $p$. Second: where
+is normalization of $q$ used? Answer: only in the final $\le \log_2 1$, which
+is the reason the result extends to sub-probabilities but not to arbitrary
+non-negative weights.
+</Task>
 
-Gibbs' inequality is the workhorse result of the course so far, in three
-disguises:
+### One inequality, three earlier results
 
-- **The entropy floor.** $L = H(p) + D(p\,\|\,q) + \text{slack} \ge H(p)$:
-  the source coding theorem's converse used exactly this term
-  (<Ref lesson="source-coding-theorem-lite"/>).
+Gibbs' inequality is the load-bearing result of the course so far, and three
+statements already proved are instances of it.
+
+- **The entropy floor.** $L = H(p) + D(p\,\|\,q) + \text{slack} \ge H(p)$: the
+  converse half of the source coding theorem
+  (<Ref lesson="source-coding-theorem-lite"/>) is this term's non-negativity
+  and nothing else.
 - **The uniform bound on entropy.** Against the uniform $u$ on $n$ symbols,
-  $D(p \,\|\, u) = \sum_x p(x)\log_2\bigl(n\,p(x)\bigr) = \log_2 n - H(p)
-  \ge 0$: the bound $H(p) \le \log_2 n$ of
-  <Ref lesson="entropy-as-average-surprise"/>, re-proved in one line. The
-  $0.257$ bits in the figure above is precisely $\log_2 4 - 1.743$.
+  $D(p \,\|\, u) = \sum_x p(x)\log_2\bigl(n\,p(x)\bigr) = \log_2 n - H(p) \ge
+  0$, which is the bound $H(p) \le \log_2 n$ of
+  <Ref lesson="entropy-as-average-surprise"/> in one line. On the course's
+  running source $p = (.5, .25, .15, .1)$ with $H(p) = 1.743$ bits, that
+  divergence is $2 - 1.743 = 0.257$ bits, and it is exactly what an all-2-bit
+  code wastes.
 - **Non-negative mutual information.** $I(X;Y) = D\bigl(p(x,y) \,\|\,
   p(x)\,p(y)\bigr) \ge 0$, the divergence form of
-  <Ref lesson="mutual-information"/>: dependence is a coding overhead
-  relative to assuming independence.
-
-The same one-line pattern powers the maximum entropy principle later in the
-course (<Ref lesson="max-entropy-principle"/>).
+  <Ref lesson="mutual-information"/>, re-derived as a coding statement in the
+  final section.
 
 <KeyFact>
-$D(p\,\|\,q) \ge 0$ with equality only at $q = p$: coding with any wrong
-distribution costs, every entropy bound in this course so far is this
-statement in disguise, and a model's expected loss can never dip below the
-data's entropy.
+The sub-probability case carries the excess of any prefix code that leaves part
+of its Kraft budget unclaimed, and the same one-line bound identifies the
+entropy-maximizing distribution in <Ref lesson="max-entropy-principle"/>,
+without any variational calculus.
 </KeyFact>
 
-## Asymmetry: it matters which distribution is real
+## ★ Incomplete codes: divergence against a sub-probability
 
-$D(p\,\|\,q)$ and $D(q\,\|\,p)$ answer different questions: which
-distribution generates the data, and which one built the code. The two
-numbers differ, in general substantially.
+The near-miss case of the definition left a gap: a real code's claims
+$2^{-\ell(x)}$ need not sum to one, and then the second argument is not a
+distribution. The core path does not use what follows.
+
+<Ref lesson="source-coding-theorem-lite"/> already derived the price. With
+Kraft sum $c = \sum_x 2^{-\ell(x)} \le 1$ (<Ref lesson="kraft-inequality"/>,
+the fraction of a fixed budget the codewords claim), raw claims $\tilde q(x) =
+2^{-\ell(x)}$ and normalized bet $q(x) = \tilde q(x)/c$, the expected length
+splits as $L = H(p) + D(p\,\|\,q) + \log_2 \tfrac1c$. Read in this lesson's
+vocabulary, that derivation settles the near miss: the sum $\sum_x p(x)\log_2
+\tfrac{p(x)}{\tilde q(x)}$ against a sub-probability is not a divergence but a
+divergence plus the slack $\log_2\tfrac1c$. Two things follow that the coding
+lesson did not state. First, that sum is bounded below by $\log_2 \tfrac1c$ rather
+than by $0$, so Gibbs' equality case is unreachable for an incomplete code: no
+amount of re-betting brings it to the entropy floor. Second, **mismatch and
+waste are independent defects** — the $(2,2,3,3)$ code of that lesson keeps an
+almost right bet while leaving a quarter of its budget unclaimed, four fifths
+of its excess being slack, whereas a matched code on a dyadic source has
+$c = 1$ and whatever excess it has entirely in the divergence.
+
+The same distinction survives the move to machine learning. A scoring function
+that is not normalized over the label set assigns lengths whose claims sum to
+less than one, and its excess loss contains a slack term that no amount of
+fitting removes. Normalizing the scores, which is what a softmax layer does,
+sets $c = 1$ and leaves only the divergence to minimize.
+
+## Asymmetry: which distribution is real decides the price
+
+A measure of disagreement between two distributions might be expected not to
+care which one is written first. This one cares, and the gap between the two
+directions can be the whole difference between one bit and infinity.
 
 <Example title="both directions on a 99/1 coin">
-Let $p = (0.99, 0.01)$ over $\{\text{heads}, \text{tails}\}$ and let
-$q = (\tfrac12, \tfrac12)$ be the fair coin.
+Let $p = (0.99, 0.01)$ over $\{\text{heads}, \text{tails}\}$ and let $q =
+(\tfrac12, \tfrac12)$ be the fair coin.
 
-**Forward, $D(p\,\|\,q)$ — fair-coin code on 99/1 data.** The terms:
+**Forward, $D(p\,\|\,q)$, the fair-coin code on 99/1 data.** The terms:
 
 $$
 0.99 \log_2 \frac{0.99}{0.5} = 0.99 \cdot 0.985 \approx 0.976, \qquad
 0.01 \log_2 \frac{0.01}{0.5} = 0.01 \cdot (-5.644) \approx -0.056,
 $$
 
-so $D(p\,\|\,q) \approx 0.976 - 0.056 = 0.919$ bits. Coding check: the fair
-code spends exactly 1 bit per flip, and
-$H(p) = 0.99 \cdot 0.0145 + 0.01 \cdot 6.644 \approx 0.081$ bits, so the
-overhead is $1 - 0.081 = 0.919$ bits.
+so $D(p\,\|\,q) \approx 0.919$ bits. Coding check: the fair code spends
+exactly 1 bit per flip and $H(p) = 0.99 \cdot 0.0145 + 0.01 \cdot 6.644
+\approx 0.081$ bits, so the overhead is $1 - 0.081 = 0.919$ bits.
 
-**Reverse, $D(q\,\|\,p)$ — 99/1 code on fair data.** The terms:
+**Reverse, $D(q\,\|\,p)$, the 99/1 code on fair data.** The terms:
 
 $$
-0.5 \log_2 \frac{0.5}{0.99} = 0.5 \cdot (-0.985) \approx -0.493, \qquad
-0.5 \log_2 \frac{0.5}{0.01} = 0.5 \cdot 5.644 \approx 2.822,
+0.5 \log_2 \frac{0.5}{0.99} \approx -0.493, \qquad
+0.5 \log_2 \frac{0.5}{0.01} \approx 2.822,
 $$
 
 so $D(q\,\|\,p) \approx 2.329$ bits. Coding check: the ideal code for $p$
-assigns $-\log_2 0.99 \approx 0.0145$ bits to heads and $-\log_2 0.01
-\approx 6.644$ bits to tails (idealized fractional lengths, approachable by
-block coding per <Ref lesson="source-coding-theorem-lite"/>). Fair data hits
-the 6.6-bit codeword half the time: cost
-$0.5 \cdot 0.0145 + 0.5 \cdot 6.644 \approx 3.329$ bits per flip, against
-$H(q) = 1$ bit: overhead $2.329$ bits.
+assigns $-\log_2 0.99 \approx 0.0145$ bits to heads and $-\log_2 0.01 \approx
+6.644$ bits to tails (fractional lengths, approachable by block coding per
+<Ref lesson="source-coding-theorem-lite"/>). Fair data hits the 6.6-bit
+codeword half the time: $0.5 \cdot 0.0145 + 0.5 \cdot 6.644 \approx 3.329$
+bits per flip against $H(q) = 1$ bit, an overhead of $2.329$ bits.
 
-The directions differ by a factor of $2.5$.
+The two directions differ by a factor of $2.5$ on the same pair.
 </Example>
 
-The asymmetry is structural, not a numerical accident. The expectation is
-taken under the **first** argument: in $D(p\,\|\,q)$ the badly-modeled
-outcome (tails, log-ratio $-5.6$) occurs 1% of the time; in $D(q\,\|\,p)$
-the badly-modeled outcome (tails again, now with log-ratio $+5.6$) occurs
-50% of the time. Reality decides how often the model's errors are billed.
+The asymmetry is structural. The expectation is taken under the **first**
+argument, so in $D(p\,\|\,q)$ the badly modelled outcome (tails, log-ratio
+$-5.6$) occurs 1% of the time, while in $D(q\,\|\,p)$ the badly modelled
+outcome (tails again, now with log-ratio $+5.6$) occurs half the time.
+Reality decides how often the model's errors are billed.
 
-{/* fig KlAsymmetryPanels: direction matters — two near-identical panels
-   side by side (playbook rule 8). Left panel header "$D(p\,\|\,q) = 0.919$
-   bits": a two-bar chart, blue bars p = (.99, .01) labeled "truth p:
-   99/1", with an amber outline overlay q = (.5, .5) labeled "model q:
-   fair"; one-line gloss under it "fair code on 99/1 data". Right panel
-   header "$D(q\,\|\,p) = 2.329$ bits": the same chart with roles swapped —
-   blue bars (.5, .5) "truth q: fair", amber outline (.99, .01) "model p:
-   99/1"; gloss "99/1 code on fair data — the 6.6-bit codeword fires half
-   the time". Between the panels a bold two-headed arrow struck through
-   with an inequality sign, labeled "$D(p\,\|\,q) \ne D(q\,\|\,p)$".
-   Colors: blue = whichever distribution is the truth in that panel, amber
-   = the model; the color binding to ROLE, not to a fixed distribution, is
-   the point. One idea: swapping which distribution is real changes the
-   number. */}
+<Exercise>
+Same data, a second model. The source is still $p = (0.99, 0.01)$, and the
+model is now $q' = (0.9, 0.1)$ rather than the fair coin. Compute
+$D(p\,\|\,q')$, state how many bits per flip the change of model saves, and
+verify the saving directly as a difference of two expected code lengths. Write
+down which quantity in the identity is unchanged by the swap before opening
+the solution.
+
+<Solution>
+The unchanged quantity is $H(p) = 0.081$ bits: the entropy is the source's
+property and no model touches it.
+
+$$
+D(p\,\|\,q') = 0.99 \log_2 \frac{0.99}{0.9} + 0.01 \log_2 \frac{0.01}{0.1}
+= 0.99(0.1375) + 0.01(-3.322) = 0.136 - 0.033 = 0.103 \text{ bits.}
+$$
+
+Saving against the fair-coin model: $0.919 - 0.103 = 0.816$ bits per flip.
+
+Direct check through the code lengths. The ideal lengths for $q'$ are $-\log_2
+0.9 = 0.152$ bits for heads and $-\log_2 0.1 = 3.322$ bits for tails, so the
+expected cost on $p$-data is $0.99(0.152) + 0.01(3.322) = 0.184$ bits against
+the fair code's $1.000$ bit: a saving of $0.816$ bits, as computed. The cost
+$0.184$ also equals $H(p) + D(p\,\|\,q') = 0.081 + 0.103$, which is the
+identity of the previous section on a second instance.
+
+The transferable move: to compare two models on the same data, compare their
+divergences and skip the entropy, which cancels.
+</Solution>
+</Exercise>
+
+### The extreme case: one bit against infinity
+
+Push the model to the edge of the parameter space and the two directions stop
+being comparable at all. Let $P$ be the fair coin and let $Q$ be the
+point mass on heads, the model "this coin always lands heads". Then
+
+$$
+D(Q\,\|\,P) = 1 \cdot \log_2 \tfrac{1}{1/2} + 0 \cdot \log_2 \tfrac{0}{1/2}
+= 1 \text{ bit}, \qquad
+D(P\,\|\,Q) = \tfrac12 \log_2 \tfrac{1/2}{1} + \tfrac12 \log_2 \tfrac{1/2}{0}
+= +\infty .
+$$
+
 <Figure
-  name="KlAsymmetryPanels"
-  alt="Two panels computing the KL divergence between the 99/1 coin and the fair coin in both directions, giving 0.919 bits and 2.329 bits, joined by a crossed arrow stating the two are unequal"
-  caption="The same pair of distributions, both directions: 0.919 bits forward, 2.329 bits reverse. The expectation is taken under whichever distribution is real."
+  src="./figures/asymmetry-coin.svg"
+  alt="Two panels on the same pair of coins: with the fair coin as truth and always-heads as model the divergence is infinite because of the tails term, and with the roles swapped it is exactly one bit"
+  caption="Fair coin against always-heads: infinite one way, one bit the other. The circled term is the one the swap removes."
 />
 
-### Not a metric: a divergence
+<Remark title="a divergence is evidence per observation">
+The expectation defining $D(p\,\|\,q)$ is the expected log-likelihood ratio
+per draw: over $n$ independent draws from $p$, the expected value of $\log_2
+\tfrac{p(x^n)}{q(x^n)}$ is exactly $n\,D(p\,\|\,q)$ bits of evidence for $p$
+over $q$. The gambler's die of the definition section produces $0.350$ bits a
+roll, so ten rolls accumulate $3.5$ bits, odds of about $11$ to $1$. Read this
+way the asymmetry above is a statement about refutability: a single tail
+carries infinite evidence against "always heads" and settles the question,
+while no finite run of heads ever rules out the fair coin, only accumulating
+one bit per flip against it.
+</Remark>
 
-$D$ fails the symmetry axiom of a metric, and it fails the triangle
-inequality too (exercise 5 constructs a counterexample). What survives is
-$D \ge 0$ with $D = 0$ exactly at $p = q$: enough to serve as a penalty for
-"how far the model is from the data", and the reason the standard term is
-*divergence* rather than distance. Averaging the two directions does not
-repair this; the symmetrized quantity (the Jensen–Shannon divergence) is a
-different object, outside this course's scope.
+### Not a metric
+
+Symmetry is one metric axiom, and the triangle inequality is the other. Both
+fail. Take $p = (0.1, 0.9)$, $q = (0.5, 0.5)$ and $r = (0.9, 0.1)$: then
+$D(p\,\|\,q) = 0.531$ bits and $D(q\,\|\,r) = 0.737$ bits, but $D(p\,\|\,r) =
+2.536$ bits, twice the sum of the two legs. In a metric, going through an
+intermediate point can never be cheaper than going directly, and here it is
+cheaper by a factor of two.
+
+What survives is $D \ge 0$ with equality exactly at $p = q$. That is enough to
+serve as a penalty to minimize, and it is why the standard term is
+*divergence*: writing "the KL distance between $p$ and $q$" states two
+properties the quantity does not have. Averaging the two directions does not
+repair it either; the symmetrized version (the Jensen–Shannon divergence) is a
+different object with different values and is outside this course's scope.
 
 <Aside>
 Forward and reverse KL play distinct roles in machine learning. Fitting a
-model by minimizing the forward direction $D(p\,\|\,q)$ over $q$ — which is
-what maximum-likelihood training does, per
-<Ref lesson="cross-entropy-loss"/> — is *mass-covering*: wherever the data
-puts mass, $q$ must too, or the ratio $p/q$ blows up. Minimizing the reverse
-direction $D(q\,\|\,p)$ over $q$, the choice of variational inference, is
-*mode-seeking*: the expectation under $q$ lets the model simply avoid
-regions where $p$ is small, so a unimodal $q$ tends to lock onto one mode of
-a multimodal $p$ rather than spread across all of them. Bishop's
-*Pattern Recognition and Machine Learning* (§10.1.2) works out both
-behaviors on a two-mode Gaussian. The coding story of this lesson is always
-the forward direction: $D(\text{data} \,\|\, \text{model})$.
+model by minimizing the forward direction $D(p\,\|\,q)$ over $q$, which is
+what maximum-likelihood training does per <Ref lesson="cross-entropy-loss"/>,
+is *mass-covering*: wherever the data puts mass, $q$ must too, or the ratio
+$p/q$ blows up. Minimizing the reverse direction $D(q\,\|\,p)$ over $q$, the
+choice made by variational inference, is *mode-seeking*: the expectation is
+taken under $q$, which lets the model avoid regions where $p$ is small, so a
+unimodal $q$ locks onto one mode of a multimodal $p$ instead of spreading
+across all of them. Bishop's *Pattern Recognition and Machine Learning*
+(§10.1.2) works both behaviours out on a two-mode Gaussian. The coding story
+of this lesson is always the forward direction, $D(\text{data} \,\|\,
+\text{model})$.
 </Aside>
 
-## Zeros in the model: the infinite penalty
+## Zeros in the model: the infinite penalty and its repair
 
-The convention $p \log_2 \tfrac{p}{0} = +\infty$ is not a technicality; it
-is the definition working as intended. Take the running source
-$p = (.5, .25, .15, .1)$ and a model that rules out $D$ entirely:
-$q = (.5, .3, .2, 0)$. The four terms of $D(p\,\|\,q)$:
+The infinite value in the extreme case above was not an artifact of a
+two-symbol alphabet. It is the definition's second convention working as
+intended, and it is the failure mode that dominates practice.
+
+Take the running source $p = (.5, .25, .15, .1)$ and a model that rules out
+$D$ entirely: $q = (.5, .3, .2, 0)$. The four terms:
 
 $$
 .5 \log_2 \tfrac{.5}{.5} = 0, \quad
@@ -354,44 +487,50 @@ $$
 .1 \log_2 \tfrac{.1}{0} = +\infty .
 $$
 
-Three terms are finite and even sum negative; the single zero swamps them
-all: $D(p\,\|\,q) = \infty$.
+Three terms are finite and sum to $-0.128$ bits; the fourth swamps them, and
+$D(p\,\|\,q) = \infty$. The coding reading makes the infinity concrete: the
+ideal length for $D$ under the model is $-\log_2 0 = \infty$, so the code for
+$q$ reserves no codeword for $D$, and the first $D$ the source emits, one draw
+in ten, cannot be transmitted at any finite length. No accuracy on the other
+three symbols compensates.
 
-The coding reading makes the infinity concrete. The ideal length for $D$
-under the model is $-\log_2 0 = \infty$: the code for $q$ reserves **no
-codeword** for $D$, and the first $D$ the source emits cannot be transmitted
-at any finite length. No accuracy on the other three symbols compensates,
-because no finite number of saved bits offsets an unencodable event.
-
-{/* fig MissingOutcomeBlowup: the missing-outcome disaster. Left: aligned
-   bar chart over A, B, C, D — blue bars p = (.5, .25, .15, .1) labeled
-   "truth p", amber bars q = (.5, .3, .2, 0) labeled "model q"; the empty
-   q-slot at D drawn as a dashed hollow outline at zero height, flagged
-   "$q(D) = 0$" with the warning treatment (playbook rule 10: warning color
-   only for "don't"). Right: the four terms of $D(p\,\|\,q)$ as a small
-   signed-bar waterfall: 0, −0.066, −0.062 as short bars near the axis,
-   then the D-term as an arrow shooting off the top edge of the frame,
-   labeled "$0.1 \log_2 \frac{0.1}{0} = +\infty$" in the warning color.
-   Payoff line: "a model that calls a real outcome impossible pays an
-   unbounded penalty". Colors: blue = truth, amber = model, warning color
-   only on the zero slot and the infinite term. One idea: one zero in the
-   model outweighs every finite term. */}
 <Figure
-  name="MissingOutcomeBlowup"
-  alt="The running source beside a model that assigns zero probability to symbol D; three finite divergence terms sit near zero while the fourth term diverges to infinity"
-  caption="One zero in the model: three finite terms (summing to −0.128 bits) and one infinite one. D(p‖q) = ∞."
+  src="./figures/zero-in-model.svg"
+  alt="The running source beside a model that assigns zero probability to symbol D; the code table has finite lengths for A, B and C and no codeword at all for D, and the divergence sum is infinite"
+  caption="A model that calls a real outcome impossible has no codeword for it: three finite terms summing to −0.128 bits, and one that is not finite."
 />
 
-**The support condition.** $D(p\,\|\,q)$ is finite exactly when
-$q(x) = 0$ implies $p(x) = 0$: the model's support must cover the data's.
-The condition is directional, like the divergence itself: for the same pair
-above, the reverse $D(q\,\|\,p) \approx 0.162$ bits is finite, because $p$
-rules out nothing that $q$ produces.
+**The support condition.** $D(p\,\|\,q)$ is finite exactly when $q(x) = 0$
+implies $p(x) = 0$: the model's support must cover the data's. The condition
+is directional, like the divergence. For the same pair, the reverse
+$D(q\,\|\,p) = 0.162$ bits is finite, because $p$ rules out nothing that $q$
+produces.
 
-In practice this is why a language model's softmax never outputs an exact
-zero, and why count-based models are smoothed: one occurring token with
-model probability zero makes the log-loss, which
-<Ref lesson="cross-entropy-loss"/> identifies as a coding cost, infinite.
+### Where the zeros come from, and what they cost to remove
+
+Two kinds of model produce exact zeros. A count-based model assigns
+probability zero to every symbol absent from its training sample, which for an
+$n$-gram table over a large vocabulary is most of the table. A model that
+normalizes scores through a softmax cannot output an exact zero in exact
+arithmetic, but in float32 an output below about $10^{-38}$ underflows to
+zero, at which point the reported loss is $\texttt{inf}$ and the gradient
+becomes $\texttt{nan}$. Both are repaired the same way, by mixing the model
+with something that has full support.
+
+Mix $q$ with the uniform $u$: $q_\lambda = (1-\lambda) q + \lambda u$. Since
+$q_\lambda(x) \ge \lambda u(x)$ everywhere, every ratio obeys
+$\tfrac{p(x)}{q_\lambda(x)} \le \tfrac{p(x)}{\lambda u(x)}$, and taking
+$\log_2$ and the expectation under $p$ gives
+
+$$
+D(p \,\|\, q_\lambda) \;\le\; D(p\,\|\,u) + \log_2 \tfrac{1}{\lambda}.
+$$
+
+With $\lambda = 0.01$ on the pair above, the bound is $0.257 + 6.644 = 6.90$
+bits, and the actual value is $0.408$ bits: the smoothed model pays under half
+a bit where the unsmoothed one paid everything. The mixing weight buys a
+guarantee that degrades only logarithmically, which is why every deployed
+language model smooths, clips or floors its probabilities somewhere.
 
 <Demo
   name="KLMismatch"
@@ -399,220 +538,449 @@ model probability zero makes the log-loss, which
 />
 
 <Task>
-Load the perfect-model preset and verify $D(p\,\|\,q) = 0$ with
-$H(p,q) = H(p)$: Gibbs' equality case. Then drag one bar of $q$ toward zero
-while $p$ keeps mass there and watch $D$ grow without bound, and confirm
-that $H(p)$ never moves: the entropy is the data's property, the divergence
-is the model's fault. Finish on the missing-outcome preset, the static
-figure's disaster live.
+Three targets, in order. Hold $H(p)$ fixed while dragging only $q$ and drive
+$D(p\,\|\,q)$ above 2 bits, then find a pair for which $D(p\,\|\,q)$ and
+$D(q\,\|\,p)$ differ by more than a factor of three, then push one bar of $q$
+to zero where $p$ keeps mass and watch the cost leave the scale. Confirm
+across all three that $H(p)$ never moves: the entropy is the data's property,
+the divergence is the model's fault.
 </Task>
 
 <KeyFact>
-$p(x) > 0$ with $q(x) = 0$ makes $D(p\,\|\,q) = \infty$: a model that
-declares a real outcome impossible pays an unbounded coding penalty, and
-finite divergence requires the model's support to cover the data's.
+The support condition is what a divergence inherits when the alphabet becomes
+continuous: $D(p\,\|\,q)$ is finite only if $p$ is absolutely continuous with
+respect to $q$. Every method later in the course that minimizes a divergence
+over a parametric family, including the rate term of a learned codec in
+<Ref lesson="learned-image-compression"/>, is constrained by it.
 </KeyFact>
+
+## Not a distance, but it controls one: Pinsker's inequality
+
+Symmetry and the triangle inequality both failed above. What a small divergence
+still guarantees is fixed by a single inequality against a metric that survives
+them: total variation.
+
+<Definition title="total variation distance">
+For distributions $p$ and $q$ on a finite set, the **total variation
+distance** is
+$$
+\mathrm{TV}(p, q) = \tfrac12 \sum_x \bigl| p(x) - q(x) \bigr|
+= \max_{E \subseteq \mathcal{X}} \bigl| p(E) - q(E) \bigr| ,
+$$
+the largest disagreement the two distributions can produce about any event.
+</Definition>
+
+Total variation is a genuine metric: symmetric, bounded by 1, obeying the
+triangle inequality, and interpretable directly as a probability gap. The
+useful fact is that the divergence controls it.
+
+<Theorem title="Pinsker's inequality (Polyanskiy &amp; Wu §1.2)">
+For distributions $p$ and $q$ on a finite set,
+$$
+\mathrm{TV}(p, q) \;\le\; \sqrt{\tfrac{\ln 2}{2}\, D(p \,\|\, q)}
+\qquad \text{with } D \text{ in bits,}
+$$
+equivalently $\mathrm{TV} \le \sqrt{D/2}$ with $D$ in nats.
+</Theorem>
+
+A divergence of $0.01$ bits
+forces $\mathrm{TV} \le \sqrt{0.00347} = 0.059$: two distributions that
+disagree by a hundredth of a bit cannot disagree by more than six percentage
+points about *any* event whatsoever. That is what makes a small KL term in a
+training objective worth having even though KL is not a distance.
+
+<Figure
+  src="./figures/pinsker.svg"
+  alt="Total variation plotted against KL divergence with the Pinsker curve marking the boundary of a shaded forbidden region; a near-fair coin pair sits on the curve and this lesson's mismatched pair sits just below it, while an arrow marks a pair with total variation 0.10 and infinite divergence"
+  caption="Pinsker's bound: nothing lands above the curve. The near-fair pair attains it; no bound runs the other way, as the arrow shows."
+/>
+
+### The bound is attained near $p = q$
+
+The bound is not slack. For $p = (0.55, 0.45)$ against the fair coin,
+$D = 0.0072$ bits and the bound gives $\mathrm{TV} \le 0.0500$, against a true
+$\mathrm{TV}$ of exactly $0.0500$: Pinsker is attained in the limit of nearly
+identical distributions, which is the regime a converging optimizer lives in.
+For the mismatched pair of the first section it gives $\mathrm{TV} \le 0.551$
+against a true $0.500$, still informative.
+
+<KeyFact>
+No inequality runs the other way. Total variation $0.10$ is compatible with an
+infinite divergence: put $p = (0.45, 0.45, 0.10)$ and $q = (0.5, 0.5, 0)$, and
+$\mathrm{TV} = 0.10$ while $D(p\,\|\,q) = \infty$. Small total variation is
+therefore no defence against the failure mode of the previous section, and a
+model checked only on aggregate event probabilities can still be an infinitely
+bad code.
+</KeyFact>
+
+## Dependence is an overhead: I(X;Y) is a divergence
+
+The divergence has so far compared a source with a model of it. The last use
+in this lesson compares a joint distribution with a fiction about it, and the
+result is a quantity the course already has a name for.
+<Ref lesson="mutual-information"/> defined $I(X;Y) = H(X) - H(X \mid Y)$, the
+bits that observing $Y$ removes from the uncertainty about $X$, and stated in
+passing that it equals a divergence. With $D$ now defined, that identity has a
+coding proof.
+
+Suppose two variables are coded by two separate encoders, one for $X$ and one
+for $Y$, each optimal for its own marginal. That pair of codebooks is exactly a
+bet that the joint distribution is the product $p(x)p(y)$, and it spends
+$H(X) + H(Y)$ bits per observation. The best joint code spends $H(X,Y)$. The
+excess is
+
+$$
+\bigl[H(X) + H(Y)\bigr] - H(X,Y) = I(X;Y)
+= D\bigl(p(x,y) \,\|\, p(x)p(y)\bigr),
+$$
+
+the first equality being the chain-rule form from
+<Ref lesson="mutual-information"/> and the second the definition of $D$
+applied to the joint table against the product table.
+
+### Separate codes for sky and ground waste 0.311 bits
+
+The weather table of <Ref lesson="mutual-information"/>, in which clear skies
+never coincide with wet ground, makes the accounting concrete. Separate codes
+for sky and ground spend $H(X) + H(Y) = 1 + 0.811 = 1.811$ bits per
+observation; the joint entropy is $H(X,Y) = 1.5$ bits; the excess is $0.311$
+bits, which is the cell-by-cell divergence below. Ignoring the
+dependence between two variables is a coding error, and $I(X;Y)$ is its price
+in bits per observation.
+
+<Figure
+  src="./figures/mi-as-divergence.svg"
+  alt="The weather joint table beside the product of its marginals, with the same edge sums but different cells, and the four cell-by-cell divergence terms summing to 0.311 bits"
+  caption="Same margins, different cells: the divergence of the joint from the product of its marginals, cell by cell, is 0.311 bits."
+/>
+
+The identity is also where the machine-learning module's later objectives get
+their shape: <Ref lesson="information-bottleneck"/> minimizes a difference of
+two such divergences, and <Ref lesson="infonce"/> bounds one from below using
+samples alone, because for high-dimensional variables the entropies in
+$H(X) - H(X\mid Y)$ are unavailable while the ratio inside the logarithm can
+be estimated.
+
+What is established: the mismatch term of the coding decomposition is
+$D(p\,\|\,q)$, an expected log-ratio measured in bits; it is non-negative and
+zero only at $q = p$; it is asymmetric, infinite exactly when the model rules
+out something the data produces, and not a distance, though by Pinsker it
+bounds one. What is not yet established is what happens when the first
+argument is not a source distribution at all but a single observed label.
+<Ref lesson="cross-entropy-loss"/> takes that case up: the cross-entropy
+$H(p,q) = H(p) + D(p\,\|\,q)$ of this lesson's identity becomes a training
+loss, and because $H(p)$ is beyond the model's control, minimizing the loss is
+minimizing the divergence.
 
 ## Exercises
 
 <Exercise>
-Let $p = (\tfrac34, \tfrac14)$ and $q = (\tfrac12, \tfrac12)$. Compute
-$D(p\,\|\,q)$ and $D(q\,\|\,p)$ in bits, and convert $D(p\,\|\,q)$ to nats.
+Compute $D(p\,\|\,q)$ and $D(q\,\|\,p)$ in bits for
+$p = (0.4, 0.3, 0.2, 0.1)$ and $q = (0.25, 0.25, 0.25, 0.25)$, and report the
+forward direction in nats as well. Use $\log_2 1.6 = 0.678$,
+$\log_2 1.2 = 0.263$, $\log_2 0.8 = -0.322$ and $\log_2 0.4 = -1.322$.
 
 <Solution>
-Forward:
-$D(p\,\|\,q) = \tfrac34 \log_2 \tfrac{3/4}{1/2} + \tfrac14 \log_2
-\tfrac{1/4}{1/2} = 0.75 \log_2 1.5 - 0.25 = 0.75 \cdot 0.585 - 0.25
-\approx 0.189$ bits.
-
-Reverse:
-$D(q\,\|\,p) = \tfrac12 \log_2 \tfrac{1/2}{3/4} + \tfrac12 \log_2
-\tfrac{1/2}{1/4} = 0.5 \cdot (-0.585) + 0.5 \cdot 1 \approx 0.208$ bits.
-
-The two directions differ, as expected. In nats:
-$0.189 \times \ln 2 \approx 0.189 \times 0.693 \approx 0.131$ nats.
-</Solution>
-</Exercise>
-
-<Exercise>
-The exact code for $q = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$, lengths
-$(1, 2, 3, 3)$, is used on uniform data $p = (\tfrac14, \tfrac14, \tfrac14,
-\tfrac14)$. Compute the expected length $L$, the entropy $H(p)$, and
-$D(p\,\|\,q)$ term by term, and verify $L = H(p) + D(p\,\|\,q)$.
-
-<Solution>
-Expected length: $L = \tfrac14 (1 + 2 + 3 + 3) = 2.25$ bits. Entropy of the
-uniform source: $H(p) = \log_2 4 = 2$ bits.
-
-Divergence terms:
-$\tfrac14 \log_2 \tfrac{1/4}{1/2} = -0.25$;
-$\tfrac14 \log_2 \tfrac{1/4}{1/4} = 0$;
-$\tfrac14 \log_2 \tfrac{1/4}{1/8} = 0.25$;
-$\tfrac14 \log_2 \tfrac{1/4}{1/8} = 0.25$.
-Sum: $D(p\,\|\,q) = 0.25$ bits.
-
-Verification: $H(p) + D(p\,\|\,q) = 2 + 0.25 = 2.25 = L$. The code is
-complete (Kraft sum 1), so there is no slack term.
-</Solution>
-</Exercise>
-
-<Exercise>
-For the first section's pair, $p = (\tfrac18, \tfrac18, \tfrac14, \tfrac12)$
-and $q = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$, compute the reverse
-direction $D(q\,\|\,p)$ and compare it with $D(p\,\|\,q) = 0.875$. Explain
-the result using the relabeling $A \leftrightarrow D$, $B \leftrightarrow C$.
-
-<Solution>
-Terms of $D(q\,\|\,p)$:
-$\tfrac12 \log_2 \tfrac{1/2}{1/8} = \tfrac12 \cdot 2 = 1$;
-$\tfrac14 \log_2 \tfrac{1/4}{1/8} = \tfrac14 \cdot 1 = 0.25$;
-$\tfrac18 \log_2 \tfrac{1/8}{1/4} = -0.125$;
-$\tfrac18 \log_2 \tfrac{1/8}{1/2} = -0.25$.
-Sum: $D(q\,\|\,p) = 0.875$ bits — equal to the forward direction.
-
-This is a coincidence of the pair's symmetry, not a general law. The
-permutation $\sigma$ swapping $A \leftrightarrow D$ and $B \leftrightarrow
-C$ maps $p$ to $q$ and $q$ to $p$ ($q(x) = p(\sigma(x))$ for every $x$),
-and KL divergence is invariant under relabeling both arguments by the same
-permutation, since the defining sum is merely reindexed. Hence
-$D(q\,\|\,p) = D(q \circ \sigma \,\|\, p \circ \sigma) = D(p\,\|\,q)$. The
-99/1-versus-fair example admits no such relabeling, and its two directions
-differ by a factor of 2.5.
-</Solution>
-</Exercise>
-
-<Exercise>
-Let $p = (0.4, 0.4, 0.2)$ and $q = (0.5, 0.5, 0)$. Compute $D(p\,\|\,q)$
-and $D(q\,\|\,p)$, and state the general condition for $D(p\,\|\,q)$ to be
-finite.
-
-<Solution>
-Forward: the third term is $0.2 \log_2 \tfrac{0.2}{0} = +\infty$, so
-$D(p\,\|\,q) = \infty$: the model rules out an outcome the data produces
-with probability $0.2$.
-
-Reverse, using the convention $0 \log_2 \tfrac{0}{p} = 0$:
+Forward, using $q(x) = 0.25$ throughout so each ratio is $4p(x)$:
 
 $$
-D(q\,\|\,p) = 0.5 \log_2 \tfrac{0.5}{0.4} + 0.5 \log_2 \tfrac{0.5}{0.4}
-+ 0 \cdot \log_2 \tfrac{0}{0.2} = 2 \times 0.5 \cdot 0.322 + 0
-\approx 0.322 \text{ bits}.
+D(p\,\|\,q) = 0.4(0.678) + 0.3(0.263) + 0.2(-0.322) + 0.1(-1.322)
+= 0.271 + 0.079 - 0.064 - 0.132 = 0.154 \text{ bits.}
 $$
 
-$D(p\,\|\,q)$ is finite exactly when $q(x) = 0$ implies $p(x) = 0$: the
-model's support must cover the data's. The condition is directional, which
-is why one direction is infinite and the other finite here.
+Cross-check with the uniform identity: $D(p\,\|\,u) = \log_2 4 - H(p)$, and
+$H(p) = 1.846$ bits, giving $2 - 1.846 = 0.154$ bits.
+
+Reverse, with each ratio $0.25/p(x)$:
+
+$$
+D(q\,\|\,p) = 0.25\bigl[-0.678 - 0.263 + 0.322 + 1.322\bigr]
+= 0.25(0.703) = 0.176 \text{ bits.}
+$$
+
+In nats the forward direction is $0.154 \times 0.693 = 0.107$ nats. The two
+directions differ, as they generally do; here only slightly, because neither
+distribution is close to ruling anything out.
 </Solution>
 </Exercise>
 
 <Exercise>
-Show that KL divergence violates the triangle inequality: for
-$p = (0.1, 0.9)$, $q = (0.5, 0.5)$, $r = (0.9, 0.1)$, compute
-$D(p\,\|\,q)$, $D(q\,\|\,r)$, and $D(p\,\|\,r)$, and compare
-$D(p\,\|\,r)$ with $D(p\,\|\,q) + D(q\,\|\,r)$.
+Let $p$ be uniform on four symbols and let
+$q_\varepsilon = \bigl(\tfrac{1-\varepsilon}{3}, \tfrac{1-\varepsilon}{3},
+\tfrac{1-\varepsilon}{3}, \varepsilon\bigr)$, a model that starves the fourth
+symbol. Write $D(p\,\|\,q_\varepsilon)$ as a function of $\varepsilon$,
+evaluate it at $\varepsilon = 0.1,\ 0.01,\ 0.001$ and $0$, state the rate at
+which it grows, and say what the rate implies for a classifier that
+underestimates the probability of a rare class.
 
 <Solution>
-$D(p\,\|\,q) = 0.1 \log_2 \tfrac{0.1}{0.5} + 0.9 \log_2 \tfrac{0.9}{0.5}
-= 0.1 \cdot (-2.322) + 0.9 \cdot 0.848 \approx -0.232 + 0.763 = 0.531$
-bits.
+Three symbols share the weight $0.75$ under $p$ and $1 - \varepsilon$ under
+$q_\varepsilon$, so
 
-$D(q\,\|\,r) = 0.5 \log_2 \tfrac{0.5}{0.9} + 0.5 \log_2 \tfrac{0.5}{0.1}
-= 0.5 \cdot (-0.848) + 0.5 \cdot 2.322 \approx 0.737$ bits.
+$$
+D(p\,\|\,q_\varepsilon)
+= 0.75 \log_2 \frac{0.75}{1-\varepsilon} + 0.25 \log_2 \frac{0.25}{\varepsilon}.
+$$
 
-$D(p\,\|\,r) = 0.1 \log_2 \tfrac{0.1}{0.9} + 0.9 \log_2 \tfrac{0.9}{0.1}
-= 0.1 \cdot (-3.170) + 0.9 \cdot 3.170 = 0.8 \cdot 3.170 \approx 2.536$
-bits.
+Values: at $\varepsilon = 0.1$, $0.75(-0.2630) + 0.25(1.3219) = 0.133$ bits;
+at $0.01$, $0.75(-0.4005) + 0.25(4.6439) = 0.861$ bits; at $0.001$,
+$0.75(-0.4136) + 0.25(7.9658) = 1.681$ bits; at $\varepsilon = 0$ the second
+term is $0.25 \log_2 \tfrac{0.25}{0} = +\infty$.
 
-Triangle test: $D(p\,\|\,q) + D(q\,\|\,r) \approx 0.531 + 0.737 = 1.268 <
-2.536 \approx D(p\,\|\,r)$. Going "through" $q$ would have to be at least
-as expensive as going directly for a metric; here the direct divergence
-exceeds the two-leg sum by a factor of two. With the symmetry failure of
-the worked example, both metric axioms beyond non-negativity fail: $D$ is a
-divergence, not a distance.
+**Rate.** The first term converges to $0.75 \log_2 0.75 = -0.311$ bits and the
+second grows like $0.25 \log_2 \tfrac{1}{\varepsilon}$: each factor-of-ten
+underestimate of the rare symbol adds $0.25 \times 3.32 = 0.83$ bits in the
+limit, and the observed step from $0.861$ to $1.681$ is already $0.82$ of it.
+Growth is logarithmic in the underestimate, and the singularity is reached
+only at exact zero.
+
+**Consequence.** A classifier that assigns a rare class a hundredth of its
+true probability pays under a bit per example, which no optimizer will treat
+as urgent; a classifier that assigns it exactly zero pays an unbounded loss on
+the first such example. The gap between "badly calibrated" and "broken" is not
+gradual, which is why probability floors are enforced as a hard constraint
+rather than left to the fit.
 </Solution>
 </Exercise>
 
 <Exercise>
-Exercise 1 of <Ref lesson="huffman-by-hand"/> built the Huffman code for
-$q = (0.4, 0.3, 0.2, 0.1)$: lengths $(1, 2, 3, 3)$, cost $1.9$ bits. That
-code is now used on data from $p = (0.1, 0.2, 0.3, 0.4)$ (same symbol
-order, probabilities reversed). Compute the expected length $L$, the
-implied distribution of the code, and $D(p\,\|\,\hat q)$ against it, and
-verify the decomposition $L = H(p) + D(p\,\|\,\hat q)$ from
-<Ref lesson="source-coding-theorem-lite"/>. Use $H(p) \approx 1.846$
-(entropy is invariant under relabeling).
+*"KL divergence measures how different two distributions are, so if
+$D(p\,\|\,q)$ is small then $D(q\,\|\,p)$ is small too."* Exhibit a
+pair on three symbols with one direction under $0.1$ bits and the other above
+$3$ bits, name the structural feature that produces the gap, and state which
+step of the reasoning fails.
 
 <Solution>
-Expected length:
-$L = 0.1 \cdot 1 + 0.2 \cdot 2 + 0.3 \cdot 3 + 0.4 \cdot 3
-= 0.1 + 0.4 + 0.9 + 1.2 = 2.6$ bits.
+**A pair.** Take $p = (0.5, 0.5, 0)$ and $q = (0.49, 0.49, 0.02)$.
 
-Implied distribution: lengths $(1, 2, 3, 3)$ give
-$\hat q = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$, Kraft sum $1$
-(complete, no slack).
+$$
+D(p\,\|\,q) = 2 \times 0.5 \log_2 \frac{0.5}{0.49} = \log_2 1.0204
+= 0.029 \text{ bits,}
+$$
 
-Divergence terms:
-$0.1 \log_2 \tfrac{0.1}{0.5} = 0.1 \cdot (-2.322) \approx -0.232$;
-$0.2 \log_2 \tfrac{0.2}{0.25} = 0.2 \cdot (-0.322) \approx -0.064$;
-$0.3 \log_2 \tfrac{0.3}{0.125} = 0.3 \cdot 1.263 \approx 0.379$;
-$0.4 \log_2 \tfrac{0.4}{0.125} = 0.4 \cdot 1.678 \approx 0.671$.
-Sum: $D(p\,\|\,\hat q) \approx 0.754$ bits.
+using the convention $0 \log_2 \tfrac{0}{0.02} = 0$ on the third symbol. In
+the other direction that third symbol is weighted by $q$ rather than by $p$:
 
-Verification: $H(p) + D \approx 1.846 + 0.754 = 2.600 = L$. A Huffman code
-is optimal only for the distribution it was built from; on the reversed
-source it pays $0.754$ bits per symbol of pure mismatch.
+$$
+D(q\,\|\,p) = 2 \times 0.49 \log_2 \frac{0.49}{0.5}
++ 0.02 \log_2 \frac{0.02}{0} = +\infty ,
+$$
+
+which is certainly above 3 bits.
+
+**The structural feature** is a zero of $p$ where $q$ places mass. The
+direction that averages under $p$ never evaluates the offending ratio, since
+its weight is zero; the direction that averages under $q$ weights it by
+$0.02$ and the log-ratio is infinite.
+
+**Which step fails.** The claim treats $D$ as a property of the unordered
+pair, but $D$ is an expectation, and the choice of first argument chooses the
+weights. Nothing in the definition is symmetric under swapping them.
+
+**How extreme a finite version must be.** Keeping both directions finite makes
+the same point harder to reach: with $q = (0.475, 0.475, 0.05)$ the forward
+direction is $\log_2(0.5/0.475) = 0.074$ bits, and reaching $D(q\,\|\,p) >
+3$ bits then needs $0.05 \log_2 \tfrac{0.05}{p_3} > 3.07$, that is
+$p_3 < 10^{-20}$. A hundredfold gap between the directions essentially
+requires a zero, or something numerically indistinguishable from one.
 </Solution>
 </Exercise>
 
 <Exercise>
-Fix a data distribution $p$. Using Gibbs' inequality, prove that over all
-model distributions $q$, the expected coding cost
-$\sum_x p(x) \bigl(-\log_2 q(x)\bigr)$ is minimized uniquely at $q = p$.
+The **log-sum inequality** states that for non-negative
+$a_1, \dots, a_n$ and $b_1, \dots, b_n$,
+$\sum_i a_i \log \tfrac{a_i}{b_i} \ge \bigl(\sum_i a_i\bigr) \log
+\tfrac{\sum_i a_i}{\sum_i b_i}$, with equality if and only if $a_i / b_i$ is
+constant. Derive it from the convexity of $f(t) = t \log t$, then use it to
+prove $D(p\,\|\,q) \ge 0$ without Jensen's inequality in the form used in the
+lesson. State the equality condition each of the two proofs delivers, and
+which one delivers it with less work.
 
 <Solution>
-By the cost identity,
-$\sum_x p(x)\bigl(-\log_2 q(x)\bigr) = H(p) + D(p\,\|\,q)$. The first term
-does not depend on $q$; the second satisfies $D(p\,\|\,q) \ge 0$ with
-equality if and only if $q = p$, by the information inequality. Hence the
-cost is at least $H(p)$ for every $q$, and equals $H(p)$ only at $q = p$:
-the truth is the unique optimal bet. This is the fact that makes
-cross-entropy a sensible training loss: the minimizer over models is the
-data distribution itself (<Ref lesson="cross-entropy-loss"/>).
+**The log-sum inequality.** Let $B = \sum_j b_j$ and set $\alpha_i = b_i / B$,
+which is a probability vector, and $t_i = a_i / b_i$. The function
+$f(t) = t \log t$ is convex, since $f''(t) = (\log e)/t > 0$ for $t > 0$, and
+strictly so. Jensen's inequality for a convex $f$ reads $\sum_i \alpha_i
+f(t_i) \ge f\bigl(\sum_i \alpha_i t_i\bigr)$, that is
+
+$$
+\sum_i \frac{b_i}{B} \cdot \frac{a_i}{b_i} \log \frac{a_i}{b_i}
+\;\ge\; \Bigl(\sum_i \frac{a_i}{B}\Bigr) \log \Bigl(\sum_i \frac{a_i}{B}\Bigr).
+$$
+
+Multiplying through by $B$ gives $\sum_i a_i \log \tfrac{a_i}{b_i} \ge
+\bigl(\sum_i a_i\bigr) \log \tfrac{\sum_i a_i}{B}$. Strict convexity makes
+equality require $t_i = a_i / b_i$ constant.
+
+**Non-negativity.** Apply it with $a_i = p(x_i)$ and $b_i = q(x_i)$. Both sums
+are 1, so
+
+$$
+D(p\,\|\,q) = \sum_x p(x) \log_2 \frac{p(x)}{q(x)}
+\;\ge\; 1 \cdot \log_2 \frac{1}{1} = 0 .
+$$
+
+**Equality conditions.** The log-sum route gives $p(x)/q(x) = c$ for all $x$
+directly, and normalization of both sides forces $c = 1$, hence $p = q$. The
+Jensen route in the lesson gives $q(x) = c\,p(x)$ on the support of $p$ and
+then needs a second argument, that $q$ has no mass outside that support, to
+finish. The log-sum version is the shorter of the two, and it also generalizes:
+it is the standard tool for convexity statements about $D$, one of which the
+next exercise proves.
 </Solution>
 </Exercise>
 
 <Exercise>
-Let $p_\varepsilon = (1 - \varepsilon, \varepsilon)$ and let
-$q = (\tfrac12, \tfrac12)$. Find the behavior of
-$D(p_\varepsilon\,\|\,q)$ and $D(q\,\|\,p_\varepsilon)$ as
-$\varepsilon \to 0$, evaluating both for $\varepsilon = 10^{-6}$, and
-connect the answer to the support condition.
+Prove that $D$ is jointly convex in its two arguments: for
+$0 \le \lambda \le 1$,
+
+$$
+D\bigl(\lambda p_1 + (1-\lambda)p_2 \,\big\|\, \lambda q_1 + (1-\lambda)q_2\bigr)
+\;\le\; \lambda D(p_1\,\|\,q_1) + (1-\lambda) D(p_2\,\|\,q_2).
+$$
+
+Then deduce what mixing a model toward the truth does: with
+$q_\lambda = (1-\lambda) q + \lambda p$, show $D(p\,\|\,q_\lambda) \le
+(1-\lambda) D(p\,\|\,q)$. Apply both that bound and the divergence itself to
+the model of the zeros section, $p = (.5,.25,.15,.1)$ against
+$q = (.5,.3,.2,0)$, at $\lambda = 0.01$, and say what stops a trainer from
+repairing a zero this way.
 
 <Solution>
-Forward: the fair code always spends exactly 1 bit, so
-$D(p_\varepsilon\,\|\,q) = 1 - H(p_\varepsilon)$. As $\varepsilon \to 0$,
-$H(p_\varepsilon) \to 0$, so the divergence increases to $1$ bit. At
-$\varepsilon = 10^{-6}$: $H \approx 10^{-6} \log_2 10^6 + 1.44 \times
-10^{-6} \approx 2.1 \times 10^{-5}$, giving $D \approx 0.99998$ bits.
+**Convexity.** Fix an outcome $x$ and apply the log-sum inequality of the
+previous exercise with two terms, $a_1 = \lambda p_1(x)$,
+$a_2 = (1-\lambda)p_2(x)$, $b_1 = \lambda q_1(x)$,
+$b_2 = (1-\lambda)q_2(x)$:
 
-Reverse:
-$D(q\,\|\,p_\varepsilon) = \tfrac12 \log_2 \tfrac{1/2}{1-\varepsilon} +
-\tfrac12 \log_2 \tfrac{1/2}{\varepsilon} \approx -1 + \tfrac12 \log_2
-\tfrac{1}{\varepsilon}$, which diverges to $+\infty$. At
-$\varepsilon = 10^{-6}$: $-1 + \tfrac12 \cdot 19.93 \approx 8.97$ bits.
+$$
+\bigl(\lambda p_1(x) + (1-\lambda)p_2(x)\bigr)
+\log_2 \frac{\lambda p_1(x) + (1-\lambda)p_2(x)}{\lambda q_1(x) + (1-\lambda)q_2(x)}
+\le \lambda p_1(x) \log_2 \frac{p_1(x)}{q_1(x)}
++ (1-\lambda) p_2(x) \log_2 \frac{p_2(x)}{q_2(x)},
+$$
 
-Interpretation: $q$ has no zeros, so $D(p_\varepsilon\,\|\,q)$ stays
-bounded no matter how extreme $p_\varepsilon$ becomes. In the reverse
-direction the model $p_\varepsilon$ sends its tails-probability toward
-zero while the data $q$ produces tails half the time: the missing-outcome
-disaster approached continuously, with the divergence growing like
-$\tfrac12 \log_2 \tfrac{1}{\varepsilon}$ on the way to $\infty$.
+where the constants $\lambda$ and $1 - \lambda$ cancel inside each logarithm
+on the right. Summing over $x$ gives the statement.
+
+**Mixing toward the truth.** Apply the result with $p_1 = p_2 = p$, $q_1 = q$
+and $q_2 = p$, at weights $1 - \lambda$ and $\lambda$. The left side is
+$D\bigl(p \,\|\, (1-\lambda)q + \lambda p\bigr)$ and the right side is
+$(1-\lambda) D(p\,\|\,q) + \lambda D(p\,\|\,p) = (1-\lambda) D(p\,\|\,q)$,
+since $D(p\,\|\,p) = 0$. So moving a model a fraction $\lambda$ of the way
+toward the truth multiplies its divergence by at most $1 - \lambda$: the
+improvement is at least proportional to the step, never worse.
+
+**At a zero the bound dies but the mixture does not.** For the zeros-section
+pair $D(p\,\|\,q) = \infty$, so the right side reads $0.99 \cdot \infty$ and
+the bound asserts nothing. The mixture is nonetheless finite, and for a reason
+that does not go through the bound at all: $q_\lambda(x) \ge \lambda\,p(x)$
+wherever $p$ has mass, so every ratio obeys $p(x)/q_\lambda(x) \le
+1/\lambda$ and $D(p\,\|\,q_\lambda) \le \log_2 \tfrac1\lambda$. At
+$\lambda = 0.01$ the mixture is $q_{0.01} = (.5, .2995, .1995, .001)$ and
+
+$$
+D(p\,\|\,q_{0.01}) = 0 - 0.0651 - 0.0617 + .1\log_2 100 = 0.538 \text{ bits,}
+$$
+
+comfortably inside the $\log_2 100 = 6.64$-bit guarantee. A vacuous bound is
+not evidence about the quantity it bounds.
+
+**What actually stops the trainer.** Not the arithmetic but the ingredient:
+$p$ is the distribution being estimated, so $(1-\lambda)q + \lambda p$ is not
+an operation anyone in possession of a model can perform. Smoothing therefore
+mixes with a full-support distribution that is known in advance — the uniform
+of the zeros section, whose guarantee $D(p\,\|\,q_\lambda) \le D(p\,\|\,u) +
+\log_2 \tfrac1\lambda$ uses no knowledge of the truth, and which at this same
+$\lambda$ leaves an actual divergence of $0.408$ bits, below the $0.538$ bits
+of the unavailable mixture toward $p$.
+
+The transferable move: when a bound goes to infinity, recompute the quantity
+before concluding anything about it; a divergence is bounded by $\log_2
+\tfrac1\lambda$ as soon as the model reserves $\lambda$ of its mass for a
+distribution covering the data's support.
+</Solution>
+</Exercise>
+
+<Exercise>
+Three codes are offered for the source $p = (.5, .25, .15, .1)$, with
+$H(p) = 1.743$ bits: code I with lengths $(1,2,3,3)$, code II with lengths
+$(2,2,2,2)$, and code III with lengths $(1,2,3,4)$. Rank them and give the
+gaps in bits per symbol *without* computing any expected length. Then verify
+by computing $L$ for each directly. Say which code's excess is
+mismatch and which code's is waste.
+
+<Solution>
+**Kraft sums and implied distributions**
+(<Ref lesson="kraft-inequality"/>, <Ref lesson="source-coding-theorem-lite"/>).
+Code I: $c = \tfrac12+\tfrac14+\tfrac18+\tfrac18 = 1$, so $q_{\mathrm{I}} =
+(\tfrac12,\tfrac14,\tfrac18,\tfrac18)$ and no slack. Code II: $c = 1$,
+$q_{\mathrm{II}}$ uniform, no slack. Code III: $c = \tfrac12+\tfrac14+\tfrac18
++\tfrac1{16} = 0.9375$, slack $\log_2 \tfrac{1}{0.9375} = 0.093$ bits, and
+$q_{\mathrm{III}} = (0.533, 0.267, 0.133, 0.067)$ after normalizing.
+
+**Divergences.** $D(p\,\|\,q_{\mathrm{I}}) = .15\log_2\tfrac{.15}{.125} +
+.1\log_2\tfrac{.1}{.125} = 0.0395 - 0.0322 = 0.007$ bits (the $A$ and $B$
+terms vanish). $D(p\,\|\,q_{\mathrm{II}}) = \log_2 4 - H(p) = 0.257$ bits by
+the uniform identity. $D(p\,\|\,q_{\mathrm{III}}) = 0.75\log_2 0.9375 +
+.15\log_2 1.125 + .1\log_2 1.5 = -0.070 + 0.025 + 0.058 = 0.014$ bits.
+
+**Ranking, before any expected length is computed.** Total excess over
+$H(p)$ is divergence plus slack: code I, $0.007$; code III,
+$0.014 + 0.093 = 0.107$; code II, $0.257$. So I beats III by $0.100$ bits per
+symbol and III beats II by $0.150$.
+
+**Direct verification.** $L_{\mathrm{I}} = .5(1)+.25(2)+.15(3)+.1(3) = 1.75$;
+$L_{\mathrm{II}} = 2.00$; $L_{\mathrm{III}} = .5(1)+.25(2)+.15(3)+.1(4) =
+1.85$. Gaps to $1.743$: $0.007$, $0.257$, $0.107$, matching term by term.
+
+**Which defect is which.** Code II's entire excess is mismatch: it is a
+complete code betting on the wrong distribution. Code III has an almost
+perfect bet, $0.014$ bits, and wastes $0.093$ bits on an unclaimed sixteenth
+of the budget: its excess is nearly all waste. The two defects are
+independent, and the decomposition separates them without building a single
+tree.
+</Solution>
+</Exercise>
+
+<Exercise>
+A classifier is shown one example whose true label is class $k$, so the label
+distribution is the point mass $p = \delta_k$, and it outputs a predicted
+distribution $q$ over the $K$ classes. Write out $D(p\,\|\,q)$ for this case
+and simplify it as far as it goes. Compute $H(p)$. Then evaluate both for
+$K = 3$, $k = 2$ and $q = (0.2, 0.7, 0.1)$, and say what the model's loss on
+this example is in bits and in nats.
+
+<Solution>
+The sum has $K$ terms, and $K - 1$ of them carry weight $p(x) = 0$ and vanish
+by the convention $0 \log_2 \tfrac{0}{q} = 0$. The surviving term has
+$p(k) = 1$:
+
+$$
+D(\delta_k \,\|\, q) = 1 \cdot \log_2 \frac{1}{q(k)} = -\log_2 q(k).
+$$
+
+The entropy of a point mass is $H(p) = 1 \cdot \log_2 1 = 0$ bits: a known
+label carries no uncertainty.
+
+With $q = (0.2, 0.7, 0.1)$ and $k = 2$: $D = -\log_2 0.7 = 0.515$ bits, which
+is $0.515 \times 0.693 = 0.357$ nats.
+
+**What this is.** The identity of this lesson reads $H(p,q) = H(p) +
+D(p\,\|\,q)$, and with $H(p) = 0$ the cross-entropy and the divergence are the
+same number: the surprisal the model assigned to the label that actually
+occurred. That number, summed over a training set, is the log-loss every
+classifier minimizes, and it is also the length of the compressed file a coder
+armed with this model would produce.
+<Ref lesson="cross-entropy-loss"/> takes the decomposition up in general,
+including the case where the label distribution is not a point mass and
+$H(p) > 0$ puts a floor under the loss that no training run can cross.
 </Solution>
 </Exercise>
 
 <References>
-1. S. Kullback, R. A. Leibler, "On Information and Sufficiency," *Annals of Mathematical Statistics*, 22(1), 1951 — the original paper defining the divergence. https://projecteuclid.org/journals/annals-of-mathematical-statistics/volume-22/issue-1/On-Information-and-Sufficiency/10.1214/aoms/1177729694.full
-2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §2.3 defines relative entropy with the $0$ and $\infty$ conventions; §2.6 proves the information inequality (Theorem 2.6.3) via Jensen; §5.4 gives the wrong-code cost $H(p) + D(p\|q)$.
-3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §2.6 defines relative entropy and states Gibbs' inequality; §2.7 covers Jensen's inequality, from which exercise 2.26 derives it. Free online: https://www.inference.org.uk/mackay/itila/
-4. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.6.1 introduces KL divergence in the ML setting; §10.1.2 contrasts the mode-seeking and mass-covering behavior of reverse and forward KL.
+1. S. Kullback, R. A. Leibler, "On Information and Sufficiency," *Annals of Mathematical Statistics*, 22(1), 1951 — the original definition, stated for general measures and used there to prove that a sufficient statistic preserves the divergence exactly. https://projecteuclid.org/journals/annals-of-mathematical-statistics/volume-22/issue-1/On-Information-and-Sufficiency/10.1214/aoms/1177729694.full
+2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §2.3 defines relative entropy with the zero and infinity conventions; §2.6 (Theorem 2.6.3) proves the information inequality; §2.7 gives the log-sum inequality (Theorem 2.7.1) and the joint convexity of relative entropy (Theorem 2.7.2), both set as exercises here; §5.4 (Theorem 5.4.3) is the wrong-code result of this lesson's first section, with the ceiling-length version.
+3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §2.6 states Gibbs' inequality (called there the most important inequality in the book) and §2.7 the Jensen machinery behind it; exercise 2.26 asks for the proof given here. Free online: https://www.inference.org.uk/mackay/itila/
+4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory*, MIT 6.441, 2016 — §1.2 defines the divergence on general alphabets (including the density and Radon–Nikodym forms this lesson's finite version specializes), gives the fair-coin-against-always-heads asymmetry used above, states Pinsker's inequality as (1.14), and places the divergence inside Csiszár's $f$-divergence family. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
+5. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.6.1 introduces the divergence in the modelling setting; §10.1.2 contrasts the mode-seeking and mass-covering behaviour of the two directions on a two-mode Gaussian.
 </References>

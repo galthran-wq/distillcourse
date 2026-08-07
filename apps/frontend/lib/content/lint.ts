@@ -667,6 +667,25 @@ export function lintCourse(
       });
     }
 
+    // exercise-reference: "exercise 4" in prose is a trap. <Exercise> blocks
+    // share one lesson-wide counter, so a lesson with in-body exercises renders
+    // its closing set from 2 or 3 — and a numeric reference written against a
+    // set that "starts at 1" then names a real but different exercise, which
+    // reads as correct. Refer to an exercise by what it does instead.
+    // Decimal numbers (MacKay's "exercise 39.2") point outside this course.
+    if (entry.mdx !== undefined) {
+      const refs = [...entry.mdx.matchAll(/\bexercises?\s+(\d+)(?!\.\d)\b/gi)];
+      if (refs.length > 0) {
+        const shown = refs.slice(0, 3).map((m) => `"${m[0]}"`).join(", ");
+        diags.push({
+          level: "warn",
+          rule: "exercise-reference",
+          file: entry.mdxPath,
+          message: `lesson "${lesson.slug}": ${refs.length} numeric exercise reference(s) (${shown}) — name the exercise by what it does; numbers shift when an exercise is added, and in-body exercises already offset the closing set`,
+        });
+      }
+    }
+
     // demo-registered: reviewed+ lessons with a demo need a registry entry.
     if (
       lesson.demo !== null &&

@@ -1,18 +1,39 @@
 A noisy channel is a conditional distribution p(y|x), and its capacity is
 the largest mutual information any input distribution can push through it:
 C = max over p(x) of I(X;Y). This lesson defines the discrete memoryless
-channel as a transition table, shows that the information crossing it
-depends on the input distribution as well as on the noise, defines capacity
-as the maximum of $I(X;Y)$ over inputs, and computes it in full for the two
-canonical binary channels: $C = 1 - H(p)$ for the symmetric channel and
-$C = 1 - e$ for the erasure channel.
+channel as a transition table, shows that what crosses the table is decided
+by the sender's input distribution as well as by the noise, and computes the
+maximum in full for the three channels the rest of the module uses.
+
+This is the first move of the course's sixth step, the second of Shannon's
+two limits. The argument so far has priced uncertainty and then priced shared
+uncertainty: <Ref lesson="mutual-information"/> defined
+$I(X;Y) = H(X) - H(X \mid Y)$ as the bits one variable removes from another's
+uncertainty, and <Ref lesson="data-processing-inequality"/> showed that no
+function of the data can raise that number. Both took the joint distribution
+as given. A channel supplies only half of one: it fixes $p(y \mid x)$ and
+leaves $p(x)$ to whoever is transmitting, so the channel's own figure of merit
+has to be the largest $I(X;Y)$ any sender can arrange. This lesson computes
+that maximum. It does not establish what the number is for. Capacity is
+defined here as a maximisation and nothing else; the claim that it is exactly
+the rate at which reliable communication becomes possible belongs to
+<Ref lesson="noisy-channel-coding">the next lesson</Ref> and is not assumed
+anywhere in this one.
+
+The route: the transition table and what memorylessness costs; the input
+dependence of $I(X;Y)$; capacity defined, bounded, and read off a demo; the
+two binary channels computed in full; Shannon's own worked example, in which
+a one percent error rate costs eight percent of the channel; and a channel
+whose best input is not the uniform one.
 
 ## A channel is a transition table
 
-A bit is sent down a wire. Noise flips it with probability $0.1$ and leaves
-it intact with probability $0.9$, each transmission independently of every
-other. The complete physics of the wire, as far as information is
-concerned, fits in a $2 \times 2$ table of conditional probabilities:
+The object to be measured is a physical link, and the first task is to throw
+away everything about it that the theory does not use. A bit is sent down a
+wire. Noise flips it with probability $0.1$ and leaves it intact with
+probability $0.9$, each transmission independently of every other. The
+complete physics of the wire, as far as information is concerned, fits in a
+$2 \times 2$ table of conditional probabilities:
 
 $$
 p(y \mid x):\qquad
@@ -23,10 +44,10 @@ x = 1 & 0.1 & 0.9
 \end{array}
 $$
 
-Each row is a conditional distribution: fix the input $x$, and the row
-gives the probabilities of every possible output. Nothing else about the
-medium enters the theory: copper, fiber, or radio with the same table are
-the same channel.
+Each row is a conditional distribution: fix the input $x$, and the row gives
+the probabilities of every possible output. Copper, fibre, or radio with the
+same table are the same channel, and every result below is a statement about
+the table.
 
 <Definition title="discrete memoryless channel">
 A **discrete memoryless channel** consists of a finite input alphabet
@@ -45,68 +66,71 @@ $p(1 \mid 0) = p(0 \mid 1) = p$ and
 $p(0 \mid 0) = p(1 \mid 1) = 1 - p$.
 </Definition>
 
-{/* fig BscTransition: the BSC(p) as a two-column transition diagram next
-    to its matrix. Left half: input nodes labeled $0$ and $1$ stacked on
-    the left, output nodes $0$ and $1$ stacked on the right; two straight
-    horizontal arrows 0→0 and 1→1 each labeled $1-p$ in currentColor; two
-    crossing diagonal arrows 0→1 and 1→0 each labeled $p$, drawn in amber
-    (the error events are the subject). Right half: the 2×2 matrix
-    $p(y\mid x)$ with row labels $x=0$, $x=1$ and column labels $y=0$,
-    $y=1$, entries $1-p$, $p$ / $p$, $1-p$ (KaTeX); the two $p$ entries
-    amber to match the crossing arrows, the $1-p$ entries currentColor. A
-    thin "names" line binds each crossing arrow to its matrix entry
-    (playbook arrow job 3), or simply rely on the color match. Color
-    roles: amber = the flip (error) transitions, currentColor =
-    everything else. One idea: a channel IS its transition table — the
-    diagram and the matrix carry identical information. Inspiration:
-    Cover & Thomas §7.1.4, MacKay ch. 9 (recreate, do not copy). */}
 <Figure
-  name="BscTransition"
-  alt="The binary symmetric channel drawn as input nodes 0 and 1 connected to output nodes 0 and 1, straight arrows labeled 1 minus p and crossing arrows labeled p, next to the equivalent 2 by 2 transition matrix"
-  caption="BSC(p) twice: as a transition diagram and as the matrix p(y|x). Same object."
+  src="./figures/bsc-transition.svg"
+  alt="The binary symmetric channel drawn as input nodes 0 and 1 connected to output nodes 0 and 1, straight arrows labelled 1 minus p and crossing arrows labelled p, beside the equivalent 2 by 2 transition matrix and the noise term H(Y given X) = H(p)"
+  caption="BSC(p) twice: as a transition diagram and as the matrix p(y|x). Every row has entropy H(p), so the noise term is H(p) whatever is sent."
 />
 
-The general channel is the same picture with more rows and columns: one
-row per input symbol, one conditional distribution per row. The rows need
-not be permutations of each other, and $\mathcal{X}$ and $\mathcal{Y}$
-need not match; the erasure channel below has three outputs for two
-inputs.
+### Four channels against the definition
 
-<KeyFact>
-A discrete memoryless channel is fully specified by its transition table
-$p(y \mid x)$: one conditional distribution per input symbol, independent
-across uses.
-</KeyFact>
+A definition is learned as a boundary. Four cases fix where this one runs.
 
-## Information through the channel depends on the input
+- **The canonical case.** $\mathrm{BSC}(0.1)$, the table above: two inputs,
+  two outputs, both rows a permutation of $(0.9, 0.1)$.
+- **A different surface, same structure.** An *erasure* channel, worked in
+  full below, replaces the input with a third output symbol $?$ instead of
+  corrupting it. Its output alphabet is larger than its input alphabet, which
+  the definition permits: nothing requires $\mathcal{X}$ and $\mathcal{Y}$ to
+  match, only that each row be a distribution over $\mathcal{Y}$.
+- **The degenerate case.** The useless channel $p(y \mid x) = p(y)$, whose
+  rows are all identical. It is a legitimate discrete memoryless channel; its
+  output tells nothing about its input, and the arithmetic below returns zero
+  for it rather than breaking.
+- **The near miss.** A wire whose errors arrive in bursts, so that a flip at
+  use $i$ makes a flip at use $i+1$ more likely. Each single use still has a
+  transition table, and that table can be estimated. What fails is exactly one
+  clause: $p(y_1 \ldots y_n \mid x_1 \ldots x_n)$ is no longer the product of
+  the rows, so the per-use table no longer determines the behaviour of the
+  link over $n$ uses.
 
-The receiver sees $Y$ and wants $X$. The quantity that measures what the
-output tells about the input is the mutual information of
-<Ref lesson="mutual-information"/>,
+Every real link fails the memoryless clause somewhere: fading, thermal drift,
+and interference all correlate errors in time. The standard repair is to
+treat a block of $k$ uses as one use of an *extended channel* with
+$|\mathcal{X}|^k$ inputs, which is memoryless if the correlations do not
+reach past $k$, and to apply the same theory to that.
+
+## What crosses depends on the input, not only on the noise
+
+The transition table alone does not determine how much the receiver learns.
+The receiver sees $Y$ and wants $X$, and the quantity that measures what the
+output says about the input is mutual information
+(<Ref lesson="mutual-information"/>), the drop in uncertainty about one
+variable caused by observing the other:
+
 $$
-I(X;Y) = H(Y) - H(Y \mid X),
+I(X;Y) = H(Y) - H(Y \mid X).
 $$
-and both terms have channel readings. $H(Y \mid X)$ is the **noise**: the
-uncertainty the channel adds to a known input, computed row by row from
-the transition table. $H(Y)$ is the total variety of the output. What gets
-through is the difference.
 
-One term is missing from the table: $I(X;Y)$ is a functional of the
-*joint* distribution $p(x)\,p(y \mid x)$, and the channel supplies only
-the second factor. The input distribution $p(x)$ is chosen by the sender.
-Different choices push different amounts of information through the same
-wire.
+Both terms have channel readings. $H(Y \mid X)$ is the **noise**: the
+uncertainty a known input still leaves in the output, computed row by row
+from the transition table. $H(Y)$ is the total variety of the output. What
+crosses is the difference.
 
-### Two inputs on the same wire: 0.531 against 0.211 bits
+Only one of the two is fixed by the channel. $I(X;Y)$ is a functional of the
+*joint* distribution $p(x)\,p(y \mid x)$, and the table supplies only the
+second factor. The input distribution $p(x)$ is the sender's to choose, and
+different choices push different amounts through the same wire.
 
 <Example title="uniform and biased inputs on BSC(0.1)">
-Fix the channel $\mathrm{BSC}(0.1)$ and write $\pi = P(X = 1)$.
+Fix the channel $\mathrm{BSC}(0.1)$ and write $\pi = P(X = 1)$ for the input
+bias.
 
 **Noise term, any input.** Given $X = 0$ the output is distributed
-$(0.9, 0.1)$; given $X = 1$, $(0.1, 0.9)$. Both rows have the binary
-entropy $H(0.1) \approx 0.469$ bits
-(<Ref lesson="entropy-as-average-surprise"/>), so the weighted average is
-$H(Y \mid X) = 0.469$ bits regardless of $\pi$.
+$(0.9, 0.1)$; given $X = 1$, $(0.1, 0.9)$. Both rows have the binary entropy
+$H(0.1) \approx 0.469$ bits (<Ref lesson="entropy-as-average-surprise"/>,
+where $H(q) = -q\log_2 q - (1-q)\log_2(1-q)$ was computed and plotted), so
+the weighted average is $H(Y \mid X) = 0.469$ bits regardless of $\pi$.
 
 **Uniform input, $\pi = 0.5$.** Then
 $P(Y = 1) = 0.5 \cdot 0.9 + 0.5 \cdot 0.1 = 0.5$: the output is uniform,
@@ -122,59 +146,57 @@ $$
 I(X;Y) \approx 0.680 - 0.469 = 0.211 \text{ bits per use}.
 $$
 
-Same channel, same noise term, less than half the information: a sender
-who almost always transmits $1$ gives the receiver little uncertainty
-worth removing.
+Same channel, same noise term, less than half the information. A sender who
+almost always transmits $1$ leaves the receiver little uncertainty worth
+removing.
 </Example>
 
-The uniform case has been computed before: the joint table of
-$\mathrm{BSC}(p)$ under a uniform input is exactly the dependence-dial
-family of <Ref lesson="mutual-information"/> with agreement probability
-$q = 1 - p$, and its mutual information $1 - H(q) = 1 - H(p)$ matches the
+The uniform case has appeared before. The joint table of $\mathrm{BSC}(p)$
+under a uniform input is exactly the dependence-dial family of
+<Ref lesson="mutual-information"/>, a pair of bits that agree with
+probability $q$, at $q = 1 - p$; its mutual information $1 - H(q)$ matches the
 $0.531$ bits computed there at $q = 0.9$.
 
-{/* fig CapacityOverInputs: a single plot of I(X;Y) against the input
-    bias for a fixed channel BSC(0.1). Axes: horizontal $\pi = P(X{=}1)$
-    from 0 to 1; vertical $I(X;Y)$ in bits from 0 to 0.6. The curve
-    $I(\pi) = H\bigl(0.9\pi + 0.1(1-\pi)\bigr) - H(0.1)$: an inverted U,
-    zero at both endpoints, peak at $\pi = 0.5$. Curve in amber (the
-    subject). A dashed horizontal guide at the peak height labeled
-    $C = 0.531$ (currentColor, dasharray 3 3, opacity 0.5) touching the
-    maximum point, which gets a 4px amber dot labeled $\pi = 0.5$. A
-    second, blue dot on the curve at $\pi = 0.9$, height 0.211, labeled
-    $I = 0.211$ — the worked example's biased input. Color roles: amber =
-    the I(π) curve and its maximum, blue = the suboptimal example input,
-    currentColor = axes and the C guide. One idea: capacity is the peak
-    of this curve — a maximum over something the sender controls. Static
-    twin of the ChannelCapacityDial demo's curve view. */}
-<Figure
-  name="CapacityOverInputs"
-  alt="Inverted-U curve of mutual information against the input bias for a binary symmetric channel with p equal to 0.1: zero at the endpoints, peak of 0.531 bits at the uniform input, with the biased input at 0.9 marked at 0.211 bits"
-  caption="I(X;Y) over the input bias for BSC(0.1): the peak, at the uniform input, is the capacity."
+<FigureSequence
+  name="capacity-max"
+  alt="Three frames over one plot of mutual information against the input bias for BSC(0.1): frame one marks the biased input at 0.211 bits, frame two moves the marker to the peak at 0.531 bits, frame three adds the dashed guide labelling that peak the capacity"
+  caption="I(X;Y) over the input bias for BSC(0.1). The channel fixes the curve; the sender picks the point on it, and the top of the curve gets a name."
 />
 
+<Task>
+Step through the three frames and read the three claims off the curve. Frame
+1: at $\pi = 0.9$ the channel carries $0.211$ bits per use. Frame 2: at
+$\pi = 0.5$ it carries $0.531$, and no other point on the curve is higher.
+Frame 3: that height, and not the whole curve, is what will be called the
+capacity. Then check the endpoints by hand: at $\pi = 0$ the sender transmits
+$0$ every time, $H(Y) = H(0.1) = H(Y \mid X)$, and the difference is zero.
+</Task>
+
 <KeyFact>
-$I(X;Y)$ through a channel depends on the channel and on the input
-distribution: the noise $H(Y \mid X)$ is set by the transition table, but
-how much information crosses is partly the sender's choice.
+The noise term $H(Y \mid X) = \sum_x p(x)\,H(Y \mid X = x)$ is an average over
+the input distribution, so in general it moves when the sender's choice moves.
+It stood still in the example only because every row of $\mathrm{BSC}(p)$ has
+the same entropy. The Z channel below has rows of entropy $0$ and $H(f)$, and
+there the sender changes the noise term as well as the output term.
 </KeyFact>
 
 ## Capacity: the maximum over input distributions
 
-The curve above has a well-defined peak, and the peak deserves the name.
+The curve has a well-defined top, and the top is the only number on it that
+belongs to the channel alone.
 
 <Definition title="channel capacity">
 The **capacity** of a discrete memoryless channel $p(y \mid x)$ is
 $$
 C = \max_{p(x)} I(X;Y),
 $$
-the maximum over all input distributions on $\mathcal{X}$, measured in
-bits per channel use.
+the maximum over all input distributions on $\mathcal{X}$, measured in bits
+per channel use.
 </Definition>
 
-The maximum exists: $I(X;Y)$ is continuous in $p(x)$, and the input
-distributions form a closed and bounded set. Two bounds pin down the
-possible values.
+The maximum is attained rather than merely approached: $I(X;Y)$ is continuous
+in $p(x)$, and the input distributions form a closed and bounded subset of
+$\mathbb{R}^{|\mathcal{X}|}$. Two bounds pin the possible values.
 
 <Theorem title="range of capacity">
 For every discrete memoryless channel,
@@ -184,130 +206,105 @@ $$
 
 <Proof>
 Nonnegativity: $I(X;Y) \ge 0$ for every input distribution
-(<Ref lesson="mutual-information"/>, nonnegativity theorem), so the
-maximum is $\ge 0$. Upper bound: for every input,
-$I(X;Y) \le \min(H(X), H(Y))$ (the upper-bound theorem of the same
-lesson), and entropy is at most the log of the alphabet size
-(<Ref lesson="entropy-as-average-surprise"/>, range theorem):
-$H(X) \le \log_2 |\mathcal{X}|$ and $H(Y) \le \log_2 |\mathcal{Y}|$.
-Every value entering the maximization obeys the bound, hence so does the
-maximum. This is [Cover & Thomas](https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X)
-§7.3.
+(<Ref lesson="mutual-information"/>, nonnegativity theorem), so the maximum of
+a set of nonnegative numbers is nonnegative.
+
+Upper bound: for every input, $I(X;Y) \le \min(H(X), H(Y))$ (the upper-bound
+theorem of the same lesson, which follows from
+$I(X;Y) = H(X) - H(X \mid Y)$ and $H(X \mid Y) \ge 0$), and an entropy is at
+most the log of its alphabet size
+(<Ref lesson="entropy-as-average-surprise"/>, range theorem), so
+$H(X) \le \log_2 |\mathcal{X}|$ and $H(Y) \le \log_2 |\mathcal{Y}|$. Every
+value entering the maximisation obeys the bound, hence so does the largest of
+them.
 </Proof>
 </Theorem>
 
-For a binary-input channel, $C \le 1$ bit per use: no input distribution
-carries more than one bit into a two-symbol alphabet.
+For a binary-input channel this reads $C \le 1$ bit per use: no input
+distribution carries more than one bit into a two-symbol alphabet, however
+clean the wire. The bound by $\log_2|\mathcal{Y}|$ is the one that bites when
+the output alphabet is the smaller of the two, as when a sixteen-level signal
+is read by a comparator that reports only its sign.
 
-### A channel where the maximum is visible: the noisy typewriter
+<KeyFact>
+Capacity is bits per **channel use**, not bits per second. A link that carries
+$0.5$ bits per use and is clocked at $10^6$ uses per second carries
+$5 \times 10^5$ bits per second; the same channel clocked slower carries
+proportionally less, with the same capacity. Every number in this lesson is
+per use, and the conversion needs a symbol rate the transition table does not
+contain.
+</KeyFact>
+
+<Demo
+  name="ChannelCapacityDial"
+  caption="Three binary channels with adjustable noise: the I(X;Y)-against-input-bias curve, with its peak read out as C and the input bias that attains it."
+/>
+
+<Task>
+Three targets, in order, before reading the derivations below. First, drag the
+crossover slider until the symmetric channel carries exactly half a bit per
+use, and record the probability to two decimals. Second, find the two settings
+of that same slider that give $C = 1$, and state what the receiver has to do in
+the second case that it does not do in the first. Third, switch to the erasure
+channel and set its slider to the value at which the symmetric channel had zero
+capacity; read off the two capacities and compare them.
+</Task>
+
+### The maximiser read as a strategy
+
+A distribution over inputs that puts zero probability on some symbols is still
+an input distribution. Choosing $p(x)$ therefore includes choosing which
+symbols to use at all, and on some channels that choice is the whole story.
 
 <Example title="four-key noisy typewriter">
-Inputs and outputs are $\{A, B, C, D\}$, arranged in a cycle. Each key
-prints itself with probability $\tfrac{1}{2}$ and the next letter with
-probability $\tfrac{1}{2}$ ($D$ wraps to $A$).
+Inputs and outputs are $\{A, B, C, D\}$ arranged in a cycle. Each key prints
+itself with probability $\tfrac{1}{2}$ and the next letter with probability
+$\tfrac{1}{2}$, with $D$ wrapping to $A$.
 
 **Noise term.** Every row of the table is a fifty-fifty split over two
-outputs: $H(Y \mid X) = 1$ bit for any input distribution.
+outputs, so $H(Y \mid X) = 1$ bit for any input distribution.
 
-**Output term.** $H(Y) \le \log_2 4 = 2$ bits, attained when $Y$ is
-uniform; a uniform input achieves that. So
+**Output term.** $H(Y) \le \log_2 4 = 2$ bits, attained when $Y$ is uniform,
+which a uniform input achieves: each output symbol is reached from exactly two
+inputs, each contributing $\tfrac{1}{4}\cdot\tfrac{1}{2}$. So
 $$
 C = 2 - 1 = 1 \text{ bit per use}.
 $$
 
-**The maximizer read as a strategy.** A uniform input over $\{A, C\}$
-alone also attains the maximum: $A$ produces an output in $\{A, B\}$, $C$
-an output in $\{C, D\}$, the two output sets are disjoint, and the
-receiver recovers the input exactly. One error-free bit per use, matching
-$C$. Choosing an input distribution includes choosing which symbols to
-use at all.
+**A second maximiser.** The uniform distribution over $\{A, C\}$ alone attains
+the same value: $H(Y \mid X)$ is still $1$, and $Y$ is still uniform over four
+symbols. Read as a strategy it is stronger than the number suggests. $A$
+produces an output in $\{A, B\}$ and $C$ produces one in $\{C, D\}$; the two
+output sets are disjoint, so the receiver recovers the input exactly, and the
+scheme delivers one error-free bit per use with no coding of any kind.
 </Example>
 
-The typewriter is the exceptional case where capacity is reached with
-zero error by symbol-by-symbol signaling. On the BSC no such disjoint
-output sets exist; what the number $C$ promises there is the subject of
-the <Ref lesson="noisy-channel-coding">next lesson</Ref>, and this lesson
-only computes it.
+The maximum is therefore attained by more than one distribution, and one of
+them happens to be error-free. That coincidence is fragile. Enlarge the same
+construction to 27 keys, the letters $A$ through $Z$ plus a space arranged in
+a cycle, each printing itself or its successor with probability
+$\tfrac{1}{2}$: the noise term is still $1$ bit, the output term is still
+maximised by the uniform input, and
 
-<Demo
-  name="ChannelCapacityDial"
-  caption="A binary channel with adjustable noise: capacity readout plus the I(X;Y)-vs-input-bias curve whose peak is C."
-/>
+$$
+C = \log_2 27 - 1 = \log_2 13.5 \approx 3.755 \text{ bits per use}.
+$$
 
-<Task>
-Load the presets in order and read the capacity: *noiseless* gives
-$C = 1$; *BSC p=0.1* gives $C \approx 0.531$; *BSC p=0.5* flattens the
-whole input-bias curve to zero, $C = 0$; *BEC e=0.5* gives $C = 0.5$.
-Then set the BSC slider to $p = 0.2$ and check the peak lands near
-$0.278$ bits.
-</Task>
-
-<Remark title="Shannon's formulation">
-[Shannon's 1948 paper](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf)
-(Part II, §12) defines the rate of transmission as
-$R = H(x) - H_y(x)$: source entropy minus the *equivocation*, his name
-for $H(X \mid Y)$, the receiver's leftover uncertainty about what was
-sent. By the three-forms theorem of
-<Ref lesson="mutual-information"/>, $H(X) - H(X \mid Y) = I(X;Y)$, so his
-$C = \max R$ and the modern $C = \max I$ are the same number.
-</Remark>
-
-<Aside>
-Computing $C$ in general. For a fixed channel, $I(X;Y)$ is a concave
-function of the input distribution, so the maximization is a convex
-program in $|\mathcal{X}| - 1$ variables with no spurious local maxima;
-the [Blahut–Arimoto algorithm](https://en.wikipedia.org/wiki/Blahut%E2%80%93Arimoto_algorithm)
-(1972) solves it by alternating maximization and is the standard tool
-when no symmetry helps. When symmetry does help, it helps completely:
-for a *symmetric* channel, where every row of the transition table is a
-permutation of every other row and likewise every column, the uniform
-input is optimal and
-$C = \log_2 |\mathcal{Y}| - H(\text{row})$, the entropy of any single
-row (Cover & Thomas §7.2). The BSC and the noisy typewriter are both
-instances: $1 - H(p)$ and $2 - 1$.
-</Aside>
-
-<KeyFact>
-Capacity is not a property of the noise alone: $C = \max_{p(x)} I(X;Y)$
-optimizes over the input distribution, which the sender designs. The
-channel fixes the constraint; the sender picks the point on it.
-</KeyFact>
+The error-free strategy no longer reaches it. Two inputs are confusable
+exactly when they are adjacent in the cycle, so a set of inputs with disjoint
+output sets is a set of letters no two of which are neighbours, and an odd
+cycle of length 27 admits at most 13 such letters. Signalling with them gives
+$\log_2 13 \approx 3.700$ bits per use, error-free, and $0.055$ bits per use
+short of $C$. Nothing said so far explains what that last sliver of capacity
+is, or whether anything can collect it. That question stays open until
+<Ref lesson="noisy-channel-coding">the next lesson</Ref>; the rest of this one
+computes the number, not its meaning.
 
 ## The binary symmetric channel: C = 1 − H(p)
 
-The worked example above did the case $p = 0.1$ at two inputs; the full
-maximization takes three lines, one per frame below.
-
-{/* fig BscCapacityDerivation: FigureSequence, component tier, 3 frames.
-    Shared layout across frames: at top, the small BSC(p) transition
-    diagram (nodes 0/1 → 0/1, crossing arrows amber, labels $1-p$ and
-    $p$); below it, three stacked equation slots that fill in one per
-    frame; inactive slots are absent (not grayed — keep frames clean).
-    Frame 1: first slot shows $H(Y \mid X) = H(p)$ with the gloss line
-    "every row has the same entropy — no input can change the noise";
-    both transition-diagram rows briefly annotated with $H(p)$ at their
-    right. Frame 2: adds second slot $H(Y) \le 1$, gloss "output is
-    binary; equality exactly at the uniform input, where
-    $P(Y{=}1) = \tfrac12$"; a small bar next to it showing H(Y) filling
-    to its 1-bit ceiling, ceiling dashed. Frame 3: adds third slot
-    $I(X;Y) = H(Y) - H(Y\mid X) \le 1 - H(p) = C$, gloss "subtract; the
-    bound is attained, so it is the capacity", with the final formula
-    $C = 1 - H(p)$ boxed in amber. Color roles: amber = the quantity
-    each frame settles (the new line), currentColor = carried-over
-    lines and diagram; blue for the H(Y) fill bar in frame 2. Delta =
-    exactly one new derivation line per frame. */}
-<FigureSequence
-  name="BscCapacityDerivation"
-  alt="Three-frame derivation over a fixed BSC diagram: frame one fixes the noise term H(Y|X) = H(p) for any input, frame two caps the output entropy H(Y) at one bit with equality at the uniform input, frame three subtracts to the boxed capacity C = 1 minus H(p)"
-  caption="The BSC capacity in three moves: fix the noise term, cap the output term, subtract."
-/>
-
-<Task>
-Step through the three frames and check each line at $p = 0.1$: the noise
-term is $H(0.1) \approx 0.469$ whatever the input, the output ceiling is
-$1$ bit, and the difference $1 - 0.469 = 0.531$ matches the peak of the
-input-bias curve above.
-</Task>
+The worked example did $\mathrm{BSC}(0.1)$ at two input distributions. The
+maximisation over all of them takes three lines: the noise term is the same
+for every input, so only the output term is left to maximise.
 
 <Theorem title="capacity of the BSC">
 The binary symmetric channel with crossover probability $p$ has
@@ -318,104 +315,195 @@ attained by the uniform input, where
 $H(p) = -p \log_2 p - (1-p) \log_2(1-p)$ is the binary entropy function.
 
 <Proof>
-For any input distribution, each row of the transition matrix is a
-permutation of $(1-p,\ p)$, so every conditional output entropy is
-$H(p)$ and $H(Y \mid X) = H(p)$: the noise term does not depend on the
-input. Hence $I(X;Y) = H(Y) - H(p) \le 1 - H(p)$, since $Y$ is binary
-and $H(Y) \le 1$. Equality requires $Y$ uniform; with $\pi = P(X = 1)$,
+**The noise term is constant.** Each row of the transition matrix is a
+permutation of $(1-p,\ p)$, so every conditional output entropy equals $H(p)$
+and their average is $H(Y \mid X) = H(p)$, whatever $p(x)$ is.
+
+**The output term is capped.** $Y$ takes two values, so $H(Y) \le 1$ bit
+(<Ref lesson="entropy-as-average-surprise"/>, range theorem), and therefore
+$I(X;Y) = H(Y) - H(p) \le 1 - H(p)$ for every input.
+
+**The cap is attained.** Equality needs $Y$ uniform. With $\pi = P(X = 1)$,
 $$
 P(Y = 1) = \pi(1 - p) + (1 - \pi)p = p + \pi(1 - 2p),
 $$
-which equals $\tfrac{1}{2}$ at $\pi = \tfrac{1}{2}$ (for $p \ne
-\tfrac{1}{2}$, only there). The bound is attained, so
-$C = 1 - H(p)$.
+which equals $\tfrac{1}{2}$ at $\pi = \tfrac{1}{2}$. For $p \ne \tfrac{1}{2}$
+the coefficient $1 - 2p$ is nonzero, so $\pi = \tfrac{1}{2}$ is the only
+solution; at $p = \tfrac{1}{2}$ every $\pi$ gives $P(Y=1) = \tfrac{1}{2}$ and
+the bound $1 - H(\tfrac12) = 0$ is attained everywhere. The upper bound is
+achieved, so it is the maximum.
 </Proof>
 </Theorem>
 
-### Three points on the curve: p = 0, 0.1, 0.5
+The equality condition has a geometric reading. The map
+$\pi \mapsto P(Y = 1) = p + \pi(1 - 2p)$ sends the unit interval of input
+biases onto the interval $[p, 1-p]$ of output biases: noise contracts the
+sender's reach toward the middle by the factor $1 - 2p$. At $p = 0.1$ the
+reachable outputs run from $0.1$ to $0.9$ and comfortably include the uniform
+point. At $p = 0.5$ the image collapses to the single point $\tfrac{1}{2}$,
+every input produces the same output distribution, and no choice the sender
+makes is visible at the far end.
 
-- $p = 0$: $C = 1 - H(0) = 1$ bit. A noiseless binary channel carries
-  exactly one bit per use.
-- $p = 0.1$: $C = 1 - 0.469 = 0.531$ bits. Ten percent noise costs
-  nearly half the channel.
-- $p = 0.5$: $C = 1 - H(0.5) = 1 - 1 = 0$. Then
-  $P(Y = 1) = 0.5 + \pi \cdot 0 = 0.5$ for every $\pi$: the output is a
-  fair coin regardless of the input, $Y$ is independent of $X$, and no
-  input distribution shares a single bit with the output.
-
-{/* fig BscCapacityCurve: plot of $C = 1 - H(p)$ over $p \in [0,1]$.
-    Axes: horizontal $p$ (crossover probability) 0 to 1 with ticks at 0,
-    0.5, 1; vertical bits, 0 to 1. Two curves: the binary entropy curve
-    $H(p)$ as a faint blue reference (opacity ~0.5, thin, labeled $H(p)$
-    near its peak) — the same curve as the entropy lesson's
-    binary-entropy figure — and the capacity curve $C = 1 - H(p)$ in
-    amber: value 1 at both ends, touching 0 at $p = 0.5$. Three 4px
-    amber dots on the capacity curve with labels: $(0, 1)$ "noiseless",
-    $(0.1, 0.531)$, $(0.5, 0)$ "useless". A short vertical dashed guide
-    at $p = 0.5$ (currentColor, opacity 0.5). Color roles: amber =
-    capacity (subject), blue = the entropy curve it mirrors,
-    currentColor = axes. One idea: the two curves sum to 1 everywhere —
-    capacity is the bit the noise leaves standing, and it hits zero at
-    p = 1/2, not at p = 1. */}
 <Figure
-  name="BscCapacityCurve"
-  alt="Capacity of the binary symmetric channel plotted over the crossover probability: one at p equals 0 and 1, zero at p equals one half, mirroring the faint binary entropy curve behind it, with the points p equals 0, 0.1 and 0.5 marked"
-  caption="C = 1 − H(p): the capacity curve is the binary entropy curve flipped. Zero sits at p = ½, not at p = 1."
+  src="./figures/bsc-output-squeeze.svg"
+  alt="Three copies of the input-bias interval mapping onto output-bias intervals for crossover 0.1, 0.3 and 0.5: the image shrinks from the interval 0.1 to 0.9, to 0.3 to 0.7, to the single point one half"
+  caption="Noise contracts the reachable output distributions by 1 − 2p. At p = ½ the image is one point, which is why C = 0 there and only there."
 />
 
+Three points fix the shape of $C = 1 - H(p)$.
+
+- $p = 0$: $C = 1 - H(0) = 1$ bit. A noiseless binary channel carries exactly
+  one bit per use, the alphabet bound.
+- $p = 0.1$: $C = 1 - 0.469 = 0.531$ bits. Ten percent noise costs nearly half
+  the channel.
+- $p = 0.5$: $C = 1 - 1 = 0$. The output is a fair coin whatever is sent, $Y$
+  is independent of $X$, and no input distribution shares a single bit with
+  the output.
+
 <Remark title="a 90% flipper is a good channel">
-$C = 1 - H(p)$ is symmetric under $p \leftrightarrow 1 - p$, since
-$H(p) = H(1-p)$: a channel that flips with probability $0.9$ has the
-same $0.531$-bit capacity as one that flips with probability $0.1$. The
-receiver inverts every received bit and faces a $\mathrm{BSC}(0.1)$. At
-$p = 1$ the channel is a deterministic inverter and $C = 1$: perfectly
-wrong is perfectly informative.
+$C = 1 - H(p)$ is symmetric under $p \leftrightarrow 1-p$, because
+$H(p) = H(1-p)$. A channel that flips with probability $0.9$ therefore has the
+same $0.531$-bit capacity as one that flips with probability $0.1$: the
+receiver inverts every bit it receives and is looking at a $\mathrm{BSC}(0.1)$.
+At $p = 1$ the channel is a deterministic inverter and $C = 1$. Reliably wrong
+is as good as reliably right, and the relabelling that converts one into the
+other costs nothing.
 </Remark>
 
+<Exercise>
+Compute the capacity of $\mathrm{BSC}(0.2)$ by the three moves of the proof:
+the noise term, the output ceiling, and the subtraction. Write the noise term
+down before opening the solution. Use $\log_2 5 \approx 2.3219$.
+
+<Solution>
+**Strategy.** Both rows are permutations of $(0.8, 0.2)$, so the first move is
+to evaluate one binary entropy, and the other two moves need no arithmetic
+particular to this channel.
+
+**Noise term.** $H(Y \mid X) = H(0.2) = -0.2\log_2 0.2 - 0.8\log_2 0.8$. With
+$\log_2 0.2 = -\log_2 5 \approx -2.3219$ and
+$\log_2 0.8 = 2 - \log_2 5 \approx -0.3219$,
+$$
+H(0.2) \approx 0.2 \cdot 2.3219 + 0.8 \cdot 0.3219 = 0.4644 + 0.2575
+= 0.7219 \text{ bits}.
+$$
+
+**Output ceiling.** $Y$ is binary, so $H(Y) \le 1$ bit, attained at the
+uniform input, where $P(Y=1) = 0.2 + 0.5 \cdot 0.6 = 0.5$.
+
+**Subtract.** $C = 1 - 0.7219 \approx 0.278$ bits per use. A twenty percent
+flip rate destroys nearly three quarters of the channel, which is the fact the
+next section explains.
+</Solution>
+</Exercise>
+
 <KeyFact>
-A noisy channel and a useless channel are different things, and the
-boundary is $C = 0$: the BSC has positive capacity at every
-$p \ne \tfrac{1}{2}$, and exactly at $p = \tfrac{1}{2}$ the arriving
-bits are independent of the sent ones — noise maximal not when errors
-are certain, but when they are as likely as not.
+On any channel, not just this one, $C = 0$ has a single cause: all rows of
+$p(y \mid x)$ are the same distribution, which makes $Y$ independent of $X$ —
+the useless channel of the opening section. If two rows differ, an input
+distribution supported on those two symbols already carries something, so
+$C > 0$. The $p = \tfrac{1}{2}$ of the BSC is that condition instantiated: the
+one crossover probability at which its two rows coincide.
 </KeyFact>
+
+## Equivocation: an error costs more than the bit it destroyed
+
+The last computation returned $0.278$ bits from a channel that delivers 80% of
+its bits intact, and the discrepancy is not an artefact of the example. It is
+the point Shannon spends most of §12 of the 1948 paper establishing, against
+the natural accounting that a link corrupting a fraction $p$ of its bits
+delivers the remaining $1 - p$ of them.
+
+That accounting is wrong, and its failure is visible at the extreme. Take a
+channel so noisy that the output is independent of the input, sending $1000$
+binary symbols per second. Half of the received symbols are correct, by
+chance; the naive ledger credits the system with 500 bits per second. Shannon
+disposes of it in one sentence: "equally good transmission would be obtained
+by dispensing with the channel entirely and flipping a coin at the receiving
+point." A number that a coin can match is not measuring transmission.
+
+The correction is to subtract not the errors but the uncertainty they leave.
+Shannon's name for $H(X \mid Y)$, the receiver's leftover uncertainty about
+what was sent, is the **equivocation**, and his rate of transmission is
+$R = H(x) - H_y(x)$ in the notation of the paper: source entropy minus
+equivocation. That is $H(X) - H(X \mid Y) = I(X;Y)$, the same quantity this
+lesson maximises, reached from the input side rather than the output side
+(<Ref lesson="mutual-information"/>, three-forms theorem).
+
+<Example title="Shannon's 1000 bits per second at 1% error">
+A source emits $1000$ equiprobable binary symbols per second into a channel
+that flips each one with probability $0.01$, independently. What rate is
+actually transmitted?
+
+**The naive figure.** One percent of the symbols are wrong, so 990 arrive
+correct: 990 bits per second.
+
+**The equivocation.** Receive a $0$. By symmetry of the channel and of the
+source, the posterior probability that a $0$ was sent is $0.99$ and that a $1$
+was sent is $0.01$, and the reversed figures hold for a received $1$. So the
+leftover uncertainty per symbol is
+$$
+H(X \mid Y) = -[\,0.99 \log_2 0.99 + 0.01 \log_2 0.01\,] = H(0.01)
+\approx 0.081 \text{ bits},
+$$
+or $81$ bits per second.
+
+**The rate.** $R = 1000 - 81 = 919$ bits per second, not $990$. The one
+percent of symbols that are wrong cost eight percent of the channel.
+</Example>
+
+<Figure
+  src="./figures/equivocation-919.svg"
+  alt="A bar of 1000 bits per second split into 919 bits per second of transmitted rate and 81 bits per second of equivocation, with the naive figure of 990 marked against it as wrong"
+  caption="1000 bits per second at a 1% error rate: 81 bits per second of equivocation, not 10, and 919 transmitted."
+/>
+
+The multiplier grows as the error rate falls. At $p = 0.01$ the equivocation
+$H(p) \approx 0.081$ is about eight times $p$; at $p = 0.001$ it is
+$0.0114$, about eleven times $p$. The reason is in the dominant term
+$p \log_2 (1/p)$: the receiver's uncertainty is not about *how many* symbols
+were corrupted, which it knows on average, but about *which* ones, and naming
+a rare position costs $\log_2(1/p)$ bits per error.
+
+Shannon's Theorem 10 makes that reading exact, with its hypotheses attached.
+An observer who sees both what was sent and what arrived may feed a side
+channel of capacity $H(X \mid Y)$; provided the correction data is itself
+*encoded* for that channel, the receiver can then repair all but an
+arbitrarily small fraction of the errors, and no smaller capacity achieves
+even that. Up to that fraction, the equivocation is the price of a list of the
+corrupted positions. Halving an error rate therefore does not halve the loss:
+from $p = 0.01$ to
+$p = 0.005$ the equivocation falls only by a factor of $1.8$, to $0.045$ bits,
+because each remaining error is rarer and so more expensive to name.
 
 ## The binary erasure channel: C = 1 − e
 
-The second canonical channel loses symbols instead of flipping them: with
-probability $e$ the receiver gets an erasure mark $?$, and with
-probability $1 - e$ the input arrives exactly. Unlike a flipped bit, an
-erased bit is a failure the receiver can see.
+One channel escapes the previous section's verdict, and it is the one whose
+failures announce themselves. Instead of flipping a symbol, it deletes it:
+with probability $e$ the receiver gets an erasure mark $?$, and with
+probability $1 - e$ the input arrives exactly. No input is ever received as
+the other input. (Here $e$ is the erasure probability, not the base of the
+natural logarithm; every logarithm in this lesson is base 2.)
 
-{/* fig BecTransition: the BEC(e) transition diagram. Input nodes $0$
-    and $1$ on the left; output nodes $0$, $?$, $1$ on the right with
-    $?$ vertically between the other two. Straight arrows 0→0 and 1→1
-    labeled $1-e$ in currentColor; arrows 0→? and 1→? labeled $e$, drawn
-    in amber, converging on the $?$ node, which is amber-outlined. Color
-    roles: amber = the erasure event (subject), currentColor = the
-    faithful transitions. One idea: the erasure channel flags its own
-    failures — errors land on a third symbol the receiver can see,
-    instead of on a valid one. Inspiration: Cover & Thomas §7.1.5
-    (recreate, do not copy). */}
 <Figure
-  name="BecTransition"
-  alt="The binary erasure channel drawn as inputs 0 and 1 mapping to outputs 0, question mark, and 1: straight arrows labeled 1 minus e and arrows into the question-mark node labeled e"
+  src="./figures/bec-transition.svg"
+  alt="The binary erasure channel drawn as inputs 0 and 1 mapping to outputs 0, question mark and 1, with straight arrows labelled 1 minus e and arrows into the question-mark node labelled e"
   caption="BEC(e): with probability e the symbol is replaced by a visible erasure mark, never by the wrong symbol."
 />
 
-### The receiver's ledger at e = 0.2
-
-Take $e = 0.2$ and a uniform input, and count leftover uncertainty
-through $I(X;Y) = H(X) - H(X \mid Y)$, the decomposition from the input
-side. Before transmission, $H(X) = 1$ bit. After: if the output is $0$ or
-$1$ (probability $0.8$), it equals the input and zero uncertainty
-remains; if it is $?$ (probability $0.2$), the erasure says nothing about
-which bit was sent, and the full $1$ bit remains. So
+Count the leftover uncertainty at $e = 0.2$ with a uniform input, working from
+the input side through $I(X;Y) = H(X) - H(X \mid Y)$. Before transmission,
+$H(X) = 1$ bit. After it: if the output is $0$ or $1$, an event of probability
+$0.8$, the output equals the input and nothing is left uncertain; if it is
+$?$, an event of probability $0.2$, the erasure says nothing about which bit
+was sent and the full bit remains. So
 $$
 H(X \mid Y) = 0.8 \cdot 0 + 0.2 \cdot 1 = 0.2, \qquad
 I(X;Y) = 1 - 0.2 = 0.8 \text{ bits per use}.
 $$
-The channel delivers exactly the fraction of symbols that survive.
+The channel delivers exactly the fraction of symbols that survive, which is
+the answer the naive accounting of the previous section would have given for a
+20% failure rate. Here it is correct.
 
 <Theorem title="capacity of the BEC">
 The binary erasure channel with erasure probability $e$ has
@@ -425,222 +513,451 @@ $$
 attained by the uniform input.
 
 <Proof>
-Let $\pi = P(X = 1)$, so $H(X) = H(\pi)$. Condition on the output. If
-$Y \ne \ ?$, then $X = Y$ exactly and the conditional entropy is $0$. If
-$Y = \ ?$, an event of probability $e$ for either input, the posterior is
+Let $\pi = P(X = 1)$, so $H(X) = H(\pi)$, and condition on the output.
+
+If $Y \ne\ ?$ then $X = Y$ exactly, and the conditional entropy is $0$.
+
+If $Y =\ ?$, an event of probability $e$ for either input, Bayes gives
 $P(X = 1 \mid Y = ?) = \pi e / e = \pi$: the erasure leaves the prior
-untouched, with entropy $H(\pi)$. Averaging,
-$H(X \mid Y) = e\,H(\pi)$, hence
+untouched, and the conditional entropy is $H(\pi)$.
+
+Averaging over the two cases, $H(X \mid Y) = e\,H(\pi)$, so
 $$
-I(X;Y) = H(X) - H(X \mid Y) = (1 - e)\,H(\pi) \le 1 - e,
+I(X;Y) = H(\pi) - e\,H(\pi) = (1 - e)\,H(\pi) \le 1 - e,
 $$
-with equality iff $\pi = \tfrac{1}{2}$. So $C = 1 - e$.
+using $H(\pi) \le 1$, with equality exactly at $\pi = \tfrac{1}{2}$. The bound
+is attained, so $C = 1 - e$.
 </Proof>
 </Theorem>
 
-The derivation ran through $H(X) - H(X \mid Y)$ rather than
-$H(Y) - H(Y \mid X)$ because conditioning on the output is trivial here:
-either the input is known exactly or nothing was learned. Exercise 7
-reruns it from the output side and lands on the same $(1-e)H(\pi)$.
+The proof ran from the input side because conditioning on the output is
+trivial here: either the input is known exactly or nothing was learned. On the
+BSC the reverse holds, and the output-side decomposition is the clean one.
+Choosing the decomposition whose conditional term collapses is most of the
+labour in any capacity computation, and the exercise below that re-derives
+the erasure capacity from the output side runs the channel the hard way to
+show what the choice saves.
 
-### Flipping against erasing: the same 0.2, nowhere near the same cost
+### Matched noise, unmatched capacity
 
-Set the two noise parameters equal, $p = e = 0.2$. The erasure channel
-keeps $C = 0.8$ bits per use. The symmetric channel keeps
-$C = 1 - H(0.2) = 1 - 0.722 = 0.278$ bits per use: not $1 - 0.2$,
-because a flip costs $H(0.2) = 0.722$ bits of output entropy, not $0.2$.
+Set the two noise parameters equal at $p = e = 0.2$. The erasure channel keeps
+$0.8$ bits per use; the symmetric channel keeps $0.278$. The same fraction of
+symbols fails, and the cost differs by a factor of nearly three.
 
-The gap has one cause. The erasure channel tells the receiver *which*
-symbols failed; the twenty percent that arrive as $?$ are known losses,
-and the rest are certainties. The symmetric channel corrupts silently:
-every received bit, correct or not, looks the same, and the doubt spread
-over all of them is what $H(0.2)$ prices.
-
-{/* fig BscVsBecBars: two-panel comparison at matched noise 0.2,
-    playbook rule 8. Two horizontal capacity bars on a shared bits axis
-    from 0 to 1 (dashed ceiling at 1 bit labeled "noiseless"). Top bar:
-    BEC(0.2), length 0.8, amber, labeled $C = 1 - e = 0.8$; small gloss
-    "failures are flagged". Bottom bar: BSC(0.2), length 0.278, blue,
-    labeled $C = 1 - H(0.2) \approx 0.28$; gloss "failures are silent".
-    To the left of each bar its mini channel icon (0/1→0/?/1 and
-    0/1→0/1 with crossing arrows), small and monochrome. Payoff line
-    beneath, currentColor: "same 20% noise — knowing which symbols
-    failed is worth 0.52 bits per use". Color roles: amber = BEC (the
-    winner/subject), blue = BSC (contrast), currentColor = axis and
-    text. One idea: erasure beats flipping at the same noise level. */}
 <Figure
-  name="BscVsBecBars"
-  alt="Two capacity bars at matched noise parameter 0.2: the binary erasure channel at 0.8 bits per use versus the binary symmetric channel at about 0.28 bits per use, against a one-bit ceiling"
-  caption="Matched noise, unmatched capacity: at p = e = 0.2 the erasure channel carries nearly three times the bits."
+  src="./figures/bsc-vs-bec-curves.svg"
+  alt="Capacity plotted against the noise parameter for both channels: a straight line from 1 to 0 for the erasure channel and the curve 1 minus H(p) for the symmetric channel, which dips to zero at one half and returns to 1, with the gap at noise 0.2 marked"
+  caption="Same axis, same noise parameter: 1 − e is a straight line, 1 − H(p) is not. At 0.2 the gap is 0.52 bits per use."
 />
 
+The gap has one cause. The erasure channel tells the receiver *which* symbols
+failed, so its equivocation is only the content of the erased symbols
+themselves; nothing has to be spent locating them. The symmetric channel
+corrupts silently, every received bit looks the same whether or not it is
+correct, and the doubt spread over all of them is what $H(p)$ prices. The
+straight line and the curve in the figure are the same subtraction with and
+without that piece of side information.
+
+Which of the two models a given link obeys is therefore an engineering
+decision with a factor-of-three consequence, and it is settled by asking
+whether the hardware flags its own failures: a
+checksummed frame that is discarded on failure is an erasure channel, and the
+same frame delivered unflagged is a symmetric one.
+
+## The Z channel: the best input is not uniform
+
+Both channels so far were maximised by the uniform input, and from two
+examples one would take the uniform input for a general rule. It is not one.
+It is a consequence of a symmetry both examples happen to have, and the
+smallest asymmetric channel breaks it.
+
+<Definition title="Z channel">
+The **Z channel** with error probability $f$ transmits $0$ faithfully and
+corrupts $1$ into $0$ with probability $f$:
+$p(0 \mid 0) = 1$, $p(0 \mid 1) = f$, $p(1 \mid 1) = 1 - f$. Its transition
+diagram has three arrows rather than four, in the shape of the letter.
+</Definition>
+
+The two rows now have different entropies, $H(Y \mid X = 0) = 0$ and
+$H(Y \mid X = 1) = H(f)$, so the noise term $H(Y \mid X) = \pi H(f)$ depends
+on the input bias $\pi = P(X = 1)$. The sender is no longer choosing only how
+much output variety to create; it is choosing how much noise to admit, by
+deciding how often to use the unreliable symbol.
+
+<Example title="Z channel at f = 0.15 (MacKay 9.11)">
+Write $\pi = P(X = 1)$. Only the input $1$ can produce the output $1$, and it
+does so with probability $1 - f$, so $P(Y = 1) = \pi(1 - f)$ and
+$$
+I(\pi) = H\bigl(\pi(1-f)\bigr) - \pi H(f).
+$$
+
+**Differentiate.** With $\tfrac{d}{dq}H(q) = \log_2\frac{1-q}{q}$ and the
+chain-rule factor $1 - f$, setting $I'(\pi) = 0$ gives
+$$
+(1-f)\log_2 \frac{1 - \pi(1-f)}{\pi(1-f)} = H(f).
+$$
+Writing $z = \pi(1-f)$ for the output bias, this rearranges to
+$\frac{1-z}{z} = 2^{H(f)/(1-f)}$, so
+$$
+z^{*} = \frac{1}{1 + 2^{H(f)/(1-f)}}, \qquad
+\pi^{*} = \frac{z^{*}}{1-f}.
+$$
+
+**Evaluate at $f = 0.15$.** $H(0.15) = 0.610$ bits, so the exponent is
+$0.610/0.85 = 0.717$ and $2^{0.717} = 1.644$. Then $z^* = 1/2.644 = 0.378$
+and $\pi^* = 0.378/0.85 = 0.445$. The capacity is
+$$
+C = H(0.378) - 0.445 \cdot 0.610 = 0.957 - 0.271 = 0.685 \text{ bits per use},
+$$
+against $I(0.5) = H(0.425) - 0.5 \cdot 0.610 = 0.984 - 0.305 = 0.679$ bits at
+the uniform input. The optimal sender transmits $1$ slightly less than half
+the time, because that symbol is the only one that can be corrupted.
+</Example>
+
+<Figure
+  src="./figures/z-channel.svg"
+  alt="The Z channel transition diagram beside its mutual information plotted against the input bias for f = 0.15: an asymmetric hump peaking at 0.685 bits at bias 0.445, with the uniform input marked slightly lower at 0.679"
+  caption="Z channel at f = 0.15: the curve is no longer symmetric about ½, and its peak sits at π = 0.445."
+/>
+
+Two readings of the number matter more than the number. First, asymmetric
+noise wants an asymmetric input: the maximiser uses the unreliable symbol
+less, and on channels with more skew the effect is larger. Second, the penalty
+for ignoring this is small here, $0.006$ bits per use or under one percent,
+which is why the uniform input survives as a default in practice even where it
+is not optimal. Substituting the general $z^*$ back into $I$ gives the closed
+form
+$$
+C_{\mathrm{Z}}(f) = \log_2\Bigl(1 + (1-f)\,f^{\,f/(1-f)}\Bigr),
+$$
+which returns $\log_2 1.25 = 0.322$ bits at $f = 0.5$ and tends to $1$ bit as
+$f \to 0$, where the channel becomes the identity.
+
+<Task>
+Return to the dial above, switch it to the Z channel, and raise $f$ from $0$
+towards $0.99$ while watching the marked peak. Report which way the optimal
+bias moves, what value it approaches, and what the capacity readout does over
+the same range.
+</Task>
+
+Both limits sit in the closed form. As $f \to 1$ the capacity falls to zero,
+since $(1-f)\,f^{\,f/(1-f)} \to 0$. The optimal bias does not follow it down.
+Write $u = 1 - f$ and expand the binary entropy for small $u$ as
+$H(f) \approx u\log_2(1/u) + 1.443\,u$: the exponent $H(f)/u$ becomes
+$\log_2(1/u) + 1.443$, so $2^{H(f)/u} \approx 2.718/u$ and
+$$
+\pi^{*} = \frac{z^{*}}{u} \approx \frac{1}{1 + 2.718/u}\cdot\frac{1}{u}
+\longrightarrow 0.368 ,
+$$
+the reciprocal of Euler's number, written numerically because $e$ is the
+erasure probability in this lesson. A symbol corrupted 99 times in 100 is
+still worth sending on more than a third of the uses: on the hundredth it
+arrives unambiguously, since only the input $1$ can produce the output $1$.
+
 <KeyFact>
-At the same noise level, erasure is far cheaper than flipping:
-$C_{\mathrm{BEC}} = 1 - e$ against $C_{\mathrm{BSC}} = 1 - H(p)$, and at
-$0.2$ that is $0.8$ against $0.28$ bits per use. A channel that flags
-its own failures loses only the failed symbols.
+$I(X;Y)$ is concave in $p(x)$ for a fixed channel, so the maximisation has no
+local maximum that is not global, and hill climbing from any starting
+distribution finds $C$. That is what replaces symmetry when a channel has none,
+and it is why capacity is computable at all on alphabets too large to reason
+about by hand.
 </KeyFact>
 
-## The second of Shannon's two limits
+## ★ When no symmetry helps
 
-Both canonical channels happened to be maximized by the uniform input,
-because both are symmetric. That is a property of the examples, not of
-the definition: for an asymmetric channel the optimal input is generally
-non-uniform (Exercise 6 shows a channel whose maximizer puts probability
-$0.4$ on one symbol), and in general $C$ is found numerically as the
-concave maximization in the Aside above. The lesson on
-<Ref lesson="neural-coding"/> applies exactly this quantity to a
-biological channel, as the denominator of coding efficiency.
+Everything computed above used a symmetry to guess the maximiser and an
+inequality to prove it optimal. This section states the general machinery for
+when neither is available. Nothing later depends on it.
 
-Capacity closes a symmetry that the course opened with entropy. Both
-limits are extreme values of the same functional, mutual information:
+**The symmetric shortcut, stated properly.** Call a channel *symmetric* when
+the rows of $p(y \mid x)$ are permutations of each other and the columns are
+permutations of each other, and *weakly symmetric* when the rows are
+permutations of each other and all column sums are equal. For a weakly
+symmetric channel the uniform input is optimal and
+$$
+C = \log_2|\mathcal{Y}| - H(\text{row}),
+$$
+the entropy of any single row. The BSC ($1 - H(p)$), the four-key typewriter
+($2 - 1$) and the 27-key typewriter ($\log_2 27 - 1$) are all instances, and
+the derivations above are the general argument specialised.
 
-{/* fig TwoLimitsMap: the two-extremes map, recreating the idea of
-    Cover & Thomas fig. 1.2. Layout: a horizontal spine with the label
-    $I(X;Y)$ centered in a rounded box; a left arrow from the box to a
-    left terminal box, a right arrow to a right terminal box. Left
-    terminal, blue: header "data compression", body
-    $\min_{p(\hat x \mid x)} I(X;\hat X)$ (KaTeX) with the gloss "the
-    fewest bits that still represent the source — the source-coding
-    side; limit $H(X)$". Right terminal, amber: header "data
-    transmission", body $\max_{p(x)} I(X;Y)$ with the gloss "the most
-    bits a noisy channel passes — the capacity $C$". Under the spine one
-    currentColor line: "one quantity, two extreme points". Color roles:
-    amber = the capacity side (this lesson's subject), blue = the
-    compression side (earlier lessons), currentColor = spine and
-    glosses. One idea: entropy and capacity are the min and max of
-    mutual information — the two operational limits of the theory.
-    Inspiration: Cover & Thomas fig. 1.2 (recreate, do not copy). */}
+**What replaces symmetry.** For any fixed channel, $I(X;Y)$ is a concave
+function of $p(x)$, so the maximisation is a convex program in
+$|\mathcal{X}| - 1$ variables. Its optimum is characterised by an equal-
+distance condition: writing $p_Y^*$ for the output distribution induced by an
+optimal input,
+$$
+D\bigl(p(\cdot \mid x)\,\Vert\, p_Y^*\bigr) = C \quad
+\text{for every } x \text{ the optimal input uses},
+$$
+and $\le C$ for the rest, where $D$ is the Kullback–Leibler divergence
+(<Ref lesson="kl-divergence"/>), the expected extra bits paid for coding with
+the wrong distribution. Geometrically $C$ is the radius of the smallest divergence
+ball containing all the rows, and $p_Y^*$ is its unique centre. The optimal
+input distribution need not be unique; the output distribution it induces
+always is.
+
 <Figure
-  name="TwoLimitsMap"
-  alt="A central mutual information node with two arrows: leftward to data compression, the minimum of I over representations with limit H(X), and rightward to data transmission, the maximum of I over inputs with limit C"
-  caption="Shannon's two limits as the two extremes of mutual information: minimize it and you are compressing; maximize it and you are communicating."
+  src="./figures/divergence-ball.svg"
+  alt="A circle labelled as the smallest divergence ball around the optimal output distribution: two transition-table rows sit on the boundary at divergence C, a third row belonging to an unused input sits inside it, and the radius is labelled C"
+  caption="Capacity as a radius, with divergence for distance: the rows an optimal input uses sit on the boundary, and no row lies outside."
 />
 
-On the compression side, <Ref lesson="source-coding-theorem-lite"/>
-established $H(X)$ as the fewest bits per symbol a lossless code can
-average; the lesson on <Ref lesson="rate-distortion"/> will exhibit that
-side literally as a minimization of $I(X;\hat X)$ over representations.
-On the transmission side, this lesson produced the number
-$C = \max I(X;Y)$ — and so far only the number. That every rate below
-$C$ is actually achievable with vanishing error, and every rate above it
-is not, is the noisy-channel coding theorem, the
-<Ref lesson="noisy-channel-coding">next lesson</Ref>; nothing in this
-one assumes it. For continuous-valued channels the same maximization
-gives the Gaussian-channel formula
-$C = \tfrac{1}{2}\log_2(1 + P/N)$, stated and used, not derived, in
-<Ref lesson="neural-coding"/>.
+**A check on the Z channel.** At $f = 0.5$ the maximiser is $\pi^* = 0.4$
+(computed in the exercise below that maximises the Z channel at
+$f = \tfrac{1}{2}$), so $p_Y^* = (0.8, 0.2)$. The row for input $0$ is $(1, 0)$, at
+divergence $\log_2 \tfrac{1}{0.8} = 0.322$ bits from the centre; the row for
+input $1$ is $(0.5, 0.5)$, at divergence
+$0.5\log_2\tfrac{0.5}{0.8} + 0.5\log_2\tfrac{0.5}{0.2} = 0.322$ bits. The two
+rows are equidistant from $p_Y^*$, and their common distance is the capacity.
+
+**Computing it.** When the alphabet is large and no structure helps, the
+Blahut–Arimoto algorithm alternates between the input distribution and the
+output distribution and converges to $C$ from any interior start. It is the
+standard tool, and it is the concavity above that guarantees the fixed point
+it reaches is the global maximum.
+
+## What capacity does not yet mean
+
+Four channels, four arrow patterns, four capacities. The transition table
+determines the number completely, and the numbers differ by more than the
+noise levels do.
+
+<Figure
+  src="./figures/channel-gallery.svg"
+  alt="Four small transition diagrams side by side with their capacities: the binary symmetric channel at 1 minus H(p), the erasure channel at 1 minus e, the four-key noisy typewriter at 1 bit, and the Z channel at 0.685 bits for f = 0.15"
+  caption="Four arrow patterns, four capacities: only the pattern decides the number."
+/>
+
+Established: a discrete memoryless channel is a transition table and a
+memorylessness assumption; the information crossing it depends on the input
+distribution as well as on the table, so the channel's figure of merit is the
+maximum $C = \max_{p(x)} I(X;Y)$, which lies between $0$ and
+$\min(\log_2|\mathcal{X}|, \log_2|\mathcal{Y}|)$; the symmetric channel has
+$C = 1 - H(p)$ and reaches zero only at $p = \tfrac{1}{2}$; the erasure
+channel has $C = 1 - e$; the cost of silent errors is an entropy rather than
+an error rate; and the uniform input is optimal exactly where the channel is
+symmetric.
+
+What is not established is what $C$ is worth. The 27-key typewriter already
+showed the gap: the best zero-error scheme visible by inspection falls $0.055$
+bits per use short of its capacity, and on the symmetric channel no zero-error
+scheme exists at all, since every output is reachable from every input. So far
+$C$ is the top of a curve. That every rate below it can be achieved with error
+probability driven as close to zero as desired, and that no rate above it can,
+is the noisy-channel coding theorem, proved in
+<Ref lesson="noisy-channel-coding">the next lesson</Ref> out of Fano's
+inequality and the data-processing bound already in hand.
+
+The maximisation also closes a symmetry the course opened with. On the
+compression side, <Ref lesson="source-coding-theorem-lite"/> made $H(X)$ the
+fewest bits per symbol a lossless code can average, and
+<Ref lesson="rate-distortion"/> will write that side explicitly as a
+*minimisation* of $I(X;\hat{X})$ over representations. On the transmission
+side, capacity is the *maximisation* of $I(X;Y)$ over inputs. Both of
+Shannon's limits are extreme values of the same functional.
 
 <KeyFact>
-Entropy and capacity are the two extreme points of mutual information:
-$H(X)$ is the floor reached by minimizing over representations, $C$ the
-ceiling reached by maximizing over channel inputs. Units for both sides
-of this lesson: bits per channel use, under $\log_2$.
+The ceiling gets used as a denominator later. <Ref lesson="neural-coding"/>
+divides a recorded neuron's transmitted information by the capacity of the same
+stimulus-response channel, and the ratio is a coding efficiency between $0$ and
+$1$: how much of the channel the cell in front of the electrode actually uses.
 </KeyFact>
 
 ## Exercises
 
 <Exercise>
-Compute the capacity of $\mathrm{BSC}(0.2)$. Show the noise term, the
-output ceiling, and the subtraction, as in the derivation frames. Use
-$\log_2 5 \approx 2.3219$.
+A link is measured at $0.5$ bits per use, and the failure mode has not been
+diagnosed. Give the crossover probability of a symmetric channel and the
+erasure probability of an erasure channel consistent with that measurement,
+say whether either answer is unique, and state the ratio between the two
+parameters. Then repeat for a link measured at $0.9$ bits per use, and say
+what the ratio does as the measured rate approaches $1$ bit per use, and why.
+Use $H(0.11) \approx 0.500$ and $H(0.013) \approx 0.100$.
 
 <Solution>
-**Noise term.** Each row of the transition matrix is a permutation of
-$(0.8, 0.2)$, so for any input
-$H(Y \mid X) = H(0.2) = -0.2 \log_2 0.2 - 0.8 \log_2 0.8$. With
-$\log_2 0.2 = -\log_2 5 \approx -2.3219$ and
-$\log_2 0.8 = \log_2 4 - \log_2 5 \approx -0.3219$:
-$$
-H(0.2) \approx 0.2 \cdot 2.3219 + 0.8 \cdot 0.3219
-= 0.4644 + 0.2575 = 0.7219 \text{ bits}.
-$$
+**At $0.5$ bits per use.** The erasure channel needs $1 - e = 0.5$, so
+$e = 0.5$, uniquely. The symmetric channel needs $H(p) = 0.5$, so $p = 0.11$ —
+and also $p = 0.89$, since $H(p) = H(1-p)$; the two are the same channel up to
+inverting the received bit, so the honest answer is that the crossover
+probability is determined only up to that reflection. Taking the branch below
+$\tfrac12$, the ratio is $0.5 / 0.11 = 4.5$.
 
-**Output ceiling.** $Y$ is binary, so $H(Y) \le 1$ bit, with equality at
-the uniform input ($P(Y=1) = 0.2 + 0.5 \cdot 0.6 = 0.5$).
+**At $0.9$ bits per use.** The erasure channel needs $e = 0.1$. The symmetric
+channel needs $H(p) = 0.1$, which gives $p = 0.013$. The ratio is
+$0.1 / 0.013 = 7.7$.
 
-**Subtract.** $C = 1 - H(0.2) \approx 1 - 0.7219 = 0.278$ bits per use.
-A twenty-percent flip rate destroys nearly three quarters of the
-channel.
+**The trend.** The ratio grows without bound as the measured rate approaches
+$1$. For small $p$ the binary entropy is dominated by
+$H(p) \approx p \log_2(1/p)$, so matching the two channels means
+$e \approx p\log_2(1/p)$ and
+$$
+\frac{e}{p} \approx \log_2 \frac{1}{p},
+$$
+which diverges as $p \to 0$. At $0.99$ bits per use the numbers are
+$e = 0.01$ against $p \approx 0.00086$, a ratio near $12$.
+
+**The reading.** A silent-error link must be an order of magnitude quieter
+than a self-reporting one to deliver the same rate, and the gap widens the
+cleaner the link gets, because each rare error costs $\log_2(1/p)$ bits to
+locate. The transferable move: capacity is invertible, so a measured rate
+constrains the noise parameter — but only once the failure mode is known.
 </Solution>
 </Exercise>
 
 <Exercise>
-Compute the capacity of $\mathrm{BSC}(0.9)$ and of $\mathrm{BSC}(1)$.
-For each, state the decoding move that makes the capacity usable.
+Compute the capacity of $\mathrm{BSC}(0.5)$ and of $\mathrm{BSC}(1)$. Explain
+why the two answers differ although the second channel is wrong far more
+often, name the physical operation that rescues the second case, and say which
+hypothesis of the BSC capacity proof fails at $p = \tfrac{1}{2}$.
 
 <Solution>
-$C = 1 - H(0.9) = 1 - H(0.1) \approx 1 - 0.469 = 0.531$ bits per use,
-by the symmetry $H(p) = H(1-p)$: the same capacity as
-$\mathrm{BSC}(0.1)$. The receiver inverts every received bit; the
-composite channel from input to inverted output flips with probability
-$0.1$.
+$C = 1 - H(0.5) = 1 - 1 = 0$ bits per use. $C = 1 - H(1) = 1 - 0 = 1$ bit per
+use.
 
-$\mathrm{BSC}(1)$: $C = 1 - H(1) = 1 - 0 = 1$ bit per use. The channel
-inverts deterministically; inverting again recovers the input exactly.
-A channel is useless not when it is usually wrong but when it is
-uninformative: capacity falls to zero only at $p = \tfrac{1}{2}$.
+**Why they differ.** Capacity measures dependence between output and input,
+not agreement. At $p = 1$ the output determines the input exactly, by
+inversion; at $p = \tfrac{1}{2}$ the output is a fair coin whatever was sent,
+and $Y$ is independent of $X$. Being always wrong is a perfect code with a
+relabelled alphabet; being right half the time by chance is no code at all.
+
+**The operation.** The receiver inverts every bit it receives. The composite
+channel from input to inverted output is noiseless, so the inversion is a
+zero-cost relabelling of the output alphabet, and relabelling cannot change
+$I(X;Y)$, which depends only on the joint distribution up to bijections of
+each variable.
+
+**The hypothesis that fails.** Not the bound $I \le 1 - H(p)$, which still
+holds and is still attained. What fails is the uniqueness argument in the
+attainment step: $P(Y = 1) = p + \pi(1 - 2p)$ has coefficient $1 - 2p = 0$ at
+$p = \tfrac{1}{2}$, so every input attains the maximum instead of only the
+uniform one. The maximiser stops being unique exactly where the maximum
+becomes zero.
 </Solution>
 </Exercise>
 
 <Exercise>
-Compute the capacity of $\mathrm{BEC}(0.4)$ and of $\mathrm{BSC}(0.4)$,
-and take the ratio. Use $\log_2 3 \approx 1.585$ and
-$\log_2 5 \approx 2.3219$.
+Break this claim, which is the accounting the equivocation section rejects.
+"A channel that corrupts 10% of the bits sent through it delivers 0.9 bits per
+use: you lose exactly what you corrupt." Give the true capacity of the channel
+the claim describes, name the step that fails, and then produce a channel for
+which the claimed figure is exactly right and state what makes it different.
 
 <Solution>
-Erasure channel: $C = 1 - e = 0.6$ bits per use.
+**The true number.** For $\mathrm{BSC}(0.1)$, $C = 1 - H(0.1) = 1 - 0.469 =
+0.531$ bits per use, not $0.9$. The claim overstates the capacity by $0.37$
+bits per use, or 70% of the true value.
 
-Symmetric channel: $H(0.4) = -0.4 \log_2 0.4 - 0.6 \log_2 0.6$. With
-$\log_2 0.4 = 1 - \log_2 5 \approx -1.3219$ and
-$\log_2 0.6 = \log_2 3 - \log_2 5 \approx -0.7370$:
-$$
-H(0.4) \approx 0.4 \cdot 1.3219 + 0.6 \cdot 0.7370
-= 0.5288 + 0.4422 = 0.9710 \text{ bits},
-$$
-so $C = 1 - 0.9710 = 0.029$ bits per use.
+**The step that fails.** The claim subtracts the error *probability* where the
+correct subtraction is the *entropy* that the errors leave behind:
+$I(X;Y) = H(X) - H(X \mid Y)$ with $H(X \mid Y) = H(p)$ for a uniform input,
+and $H(0.1) = 0.469$, not $0.1$. The extra $0.369$ bits are the cost of not
+knowing which received bits are the corrupted ones; there are about
+$\binom{n}{0.1n} \approx 2^{0.469n}$ plausible error patterns in $n$ uses, and
+naming one of them is what the receiver cannot do.
 
-Ratio: $0.6 / 0.029 \approx 21$. At forty percent noise the erasure
-channel still delivers most of a bit per use, while the symmetric
-channel is within three hundredths of a bit of useless: silent
-corruption at $p = 0.4$ leaves the output nearly independent of the
-input.
+**Where the claim is right.** $\mathrm{BEC}(0.1)$ has $C = 1 - e = 0.9$ bits
+per use exactly. The difference is that its failures are labelled: the
+receiver sees a $?$ and knows precisely which uses were lost, so there is no
+error pattern left to identify and the equivocation is just the content of the
+missing symbols. The claim is not a bad approximation to the symmetric
+channel; it is the exact answer to a different channel.
 </Solution>
 </Exercise>
 
 <Exercise>
-A six-key noisy typewriter has inputs and outputs $\{A, \ldots, F\}$ in
-a cycle; each key prints itself or the next letter with probability
-$\tfrac{1}{2}$ each. Compute its capacity and give an explicit zero-error
-signaling scheme that attains it.
+The erasure capacity was derived from the input side. Derive it twice more.
+(a) From the output side: compute $H(Y \mid X)$ and $H(Y)$ directly for
+$\mathrm{BEC}(e)$ with $\pi = P(X = 1)$ and verify $I(X;Y) = (1-e)H(\pi)$.
+(b) By conditioning on the erasure indicator $E = \mathbf{1}\{Y = \,?\}$,
+which the receiver can compute from $Y$. State which step of (a) the second
+argument replaces.
 
 <Solution>
-Every row of the transition table is a fifty-fifty split over two
-outputs, so $H(Y \mid X) = 1$ bit for any input. The output alphabet has
-six symbols, so $H(Y) \le \log_2 6$, attained at the uniform input
-(each output is reached from two inputs with total probability
-$\tfrac{1}{6}$). Hence
-$$
-C = \log_2 6 - 1 = \log_2 3 \approx 1.585 \text{ bits per use}.
-$$
+**(a) Output side.** Given $X = x$, the output is $x$ with probability $1 - e$
+and $?$ with probability $e$: a two-outcome distribution of entropy $H(e)$,
+the same for both inputs, so $H(Y \mid X) = H(e)$.
 
-Zero-error scheme: use only $\{A, C, E\}$, uniformly. Their output sets
-are $\{A, B\}$, $\{C, D\}$, $\{E, F\}$: pairwise disjoint, so the
-receiver identifies the input exactly and one of three symbols arrives
-error-free, worth $\log_2 3$ bits per use, which equals $C$.
+$Y$ takes the values $0$, $?$, $1$ with probabilities $(1-e)(1-\pi)$, $e$,
+$(1-e)\pi$. Splitting each logarithm of a product,
+$$
+H(Y) = -(1-e)\bigl[(1-\pi)\log_2(1-\pi) + \pi\log_2\pi\bigr]
+- (1-e)\log_2(1-e) - e\log_2 e = (1-e)H(\pi) + H(e).
+$$
+Subtracting, $I(X;Y) = (1-e)H(\pi) + H(e) - H(e) = (1-e)H(\pi)$, maximised at
+$\pi = \tfrac12$ to give $C = 1 - e$.
+
+**(b) Erasure indicator.** $E$ is a function of $Y$, so $(Y, E)$ carries
+exactly the information $Y$ does and $I(X;Y) = I(X;Y,E)$. Condition on $E$:
+$$
+I(X;Y) = H(X) - H(X \mid Y, E)
+= H(X) - \bigl[(1-e)\cdot 0 + e \cdot H(X)\bigr] = (1-e)H(X),
+$$
+since given $E = 0$ the receiver knows $X$ exactly, and given $E = 1$ it knows
+nothing beyond the prior. The channel is a mixture: a noiseless binary channel
+a fraction $1 - e$ of the time and a disconnected wire the rest of the time.
+
+**What is replaced.** The expansion of $H(Y)$ into $(1-e)H(\pi) + H(e)$, the
+only nontrivial algebra in (a), and with it the cancellation of $H(e)$ against
+the noise term. The indicator argument never creates the $H(e)$ that has to
+cancel, because it separates the *fact* of an erasure, which is visible and
+carries no information about the input, from the *content* that was lost. The
+transferable move: when part of the output is a function of the output, split
+on it before expanding anything.
 </Solution>
 </Exercise>
 
 <Exercise>
-An input with $P(X = 1) = 0.2$ feeds $\mathrm{BSC}(0.25)$. Build the
-joint table $p(x, y)$, compute both marginals, then compute $I(X;Y)$ as
-$H(Y) - H(Y \mid X)$ using the recipes of
-<Ref lesson="joint-and-conditional-entropy"/>. Compare with the
-capacity of the channel. Use $H(0.25) \approx 0.8113$ and
+Maximise the Z channel at $f = \tfrac{1}{2}$, so that $p(0 \mid 0) = 1$ and
+$p(0 \mid 1) = p(1 \mid 1) = \tfrac{1}{2}$. Report $I$ at the uniform input,
+the optimal bias $\pi^*$, and $C$; then confirm the general closed form
+$C = \log_2(1 + (1-f)f^{f/(1-f)})$ on this case. Use $H(0.25) \approx 0.8113$
+and $H(0.2) \approx 0.7219$.
+
+<Solution>
+**Uniform input.** $P(Y = 1) = 0.5 \cdot 0.5 = 0.25$, so
+$H(Y) = H(0.25) \approx 0.8113$. The rows have entropies $H(0) = 0$ and
+$H(\tfrac12) = 1$, so $H(Y \mid X) = 0.5 \cdot 0 + 0.5 \cdot 1 = 0.5$ and
+$I(0.5) \approx 0.8113 - 0.5 = 0.311$ bits per use.
+
+**The optimum.** In general $I(\pi) = H(\pi/2) - \pi$ here, since
+$P(Y=1) = \pi/2$ and $H(Y \mid X) = \pi \cdot 1$. Differentiating with
+$\tfrac{d}{dq}H(q) = \log_2\frac{1-q}{q}$ and the chain-rule factor
+$\tfrac12$,
+$$
+\tfrac{1}{2}\log_2\frac{1 - \pi/2}{\pi/2} - 1 = 0
+\;\Longrightarrow\; \frac{2-\pi}{\pi} = 4 \;\Longrightarrow\; \pi^* = 0.4.
+$$
+
+**Capacity.** $C = I(0.4) = H(0.2) - 0.4 \approx 0.7219 - 0.4 = 0.322$ bits
+per use, against $0.311$ at the uniform input: the optimal sender transmits
+the corruptible symbol $1$ only 40% of the time.
+
+**The closed form.** With $f = \tfrac12$, $H(f) = 1$ and $f/(1-f) = 1$, so
+$1 + (1-f)f^{f/(1-f)} = 1 + 0.5 \cdot 0.5 = 1.25$ and
+$\log_2 1.25 = 0.3219$, matching. The transferable move is that the derivative
+condition always reduces to a statement about the *output* bias
+$z = \pi(1-f)$, which is why the closed form exists at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+An input with $P(X = 1) = 0.2$ feeds a binary symmetric channel with
+crossover $0.25$. Decide first which of the three expressions for $I(X;Y)$ is
+cheapest to evaluate here and say what cue decides it. Then build the joint
+table $p(x,y)$, compute both marginals, evaluate $I(X;Y)$, and compare with
+the channel's capacity. Use $H(0.25) \approx 0.8113$ and
 $H(0.35) \approx 0.9341$.
 
 <Solution>
-**Joint table.** $p(x, y) = p(x)\,p(y \mid x)$:
+**Which expression.** $H(Y) - H(Y \mid X)$. The cue is that the conditional
+term is the one the transition table hands you directly: every row of a BSC
+has the same entropy, so $H(Y \mid X) = H(0.25)$ with no averaging to do.
+$H(X) - H(X \mid Y)$ would require inverting the channel with Bayes for each
+output value, and $H(X) + H(Y) - H(X,Y)$ would require a four-term joint
+entropy. The rule generalises: condition on the variable whose conditional
+distribution you were given (<Ref lesson="joint-and-conditional-entropy"/>).
+
+**Joint table.** $p(x,y) = p(x)p(y \mid x)$:
 $$
 \begin{array}{c|cc}
  & y = 0 & y = 1 \\ \hline
@@ -649,99 +966,119 @@ x = 1 & 0.2 \cdot 0.25 = 0.05 & 0.2 \cdot 0.75 = 0.15
 \end{array}
 $$
 
-**Marginals.** Rows: $P(X = 0) = 0.8$, $P(X = 1) = 0.2$ (as designed).
-Columns: $P(Y = 0) = 0.60 + 0.05 = 0.65$, $P(Y = 1) = 0.20 + 0.15
-= 0.35$.
+**Marginals.** $P(X) = (0.8, 0.2)$ by construction;
+$P(Y = 0) = 0.60 + 0.05 = 0.65$ and $P(Y = 1) = 0.20 + 0.15 = 0.35$.
 
-**Conditional entropy.** Each row of $p(y \mid x)$ is a permutation of
-$(0.75, 0.25)$, so
-$H(Y \mid X) = 0.8 \cdot H(0.25) + 0.2 \cdot H(0.25) = H(0.25)
-\approx 0.8113$ bits.
-
-**Mutual information.**
-$H(Y) = H(0.35) \approx 0.9341$ bits, so
+**Mutual information.** $H(Y \mid X) = H(0.25) \approx 0.8113$ and
+$H(Y) = H(0.35) \approx 0.9341$, so
 $$
 I(X;Y) \approx 0.9341 - 0.8113 = 0.123 \text{ bits per use}.
 $$
 
-**Against capacity.** $C = 1 - H(0.25) \approx 1 - 0.8113 = 0.189$ bits
-per use. The biased input realizes $0.123$ of the possible $0.189$
-bits; the remaining $0.066$ is lost to the sender's choice, not to the
-channel.
+**Against capacity.** $C = 1 - H(0.25) \approx 0.189$ bits per use. This
+sender realises $0.123$ of the available $0.189$ bits; the missing $0.066$ is
+lost to the choice of input distribution, not to the channel. The channel is
+identical in both cases, which is the whole reason capacity is defined as a
+maximum.
 </Solution>
 </Exercise>
 
 <Exercise>
-The *Z-channel* transmits $0$ faithfully but flips $1$ to $0$ with
-probability $\tfrac{1}{2}$: $p(0 \mid 0) = 1$,
-$p(0 \mid 1) = p(1 \mid 1) = \tfrac{1}{2}$. Write $\pi = P(X = 1)$.
-(a) Compute $I(X;Y)$ at the uniform input. (b) Show
-$I(\pi) = H(\pi/2) - \pi$ and find the maximizing $\pi$. (c) Compute
-$C$ and compare with (a). Use $H(0.25) \approx 0.8113$ and
-$H(0.2) \approx 0.7219$.
+Measure a real link and report its capacity with an honest error range. Pick
+something you can run a few hundred trials through: a serial line at a
+deliberately high baud rate, a UDP path with sequence numbers, a QR code
+photographed at increasing angles, a radio link at the edge of range. Decide
+from the failure mode whether a BSC or a BEC is the right model, estimate the
+parameter, propagate the uncertainty to $C$, and state a test that would show
+the memoryless model is wrong.
 
 <Solution>
-**(a)** At $\pi = 0.5$: $P(Y = 1) = 0.5 \cdot 0.5 = 0.25$, so
-$H(Y) = H(0.25) \approx 0.8113$. The rows have entropies $H(0) = 0$
-(input $0$, deterministic) and $H(\tfrac{1}{2}) = 1$ (input $1$), so
-$H(Y \mid X) = 0.5 \cdot 0 + 0.5 \cdot 1 = 0.5$. Hence
-$I \approx 0.8113 - 0.5 = 0.311$ bits.
+**Model choice.** If failures arrive labelled — a dropped packet, a
+checksum-flagged frame, an unreadable module — the channel is an erasure
+channel and the parameter is the erasure rate. If failures arrive as
+plausible-looking wrong values, it is a symmetric channel and the parameter is
+the crossover rate. The distinction is exactly the one the equivocation
+section priced, and the size of the mistake depends on how noisy the link is:
+at a 20% failure rate the two models differ by a factor of nearly three
+($0.800$ against $0.278$ bits per use), at 5% by about a third ($0.950$
+against $0.714$).
 
-**(b)** In general $P(Y = 1) = \pi/2$, so $H(Y) = H(\pi/2)$, and
-$H(Y \mid X) = (1 - \pi) \cdot 0 + \pi \cdot 1 = \pi$. Thus
-$I(\pi) = H(\pi/2) - \pi$. Setting the derivative to zero, with
-$H'(q) = \log_2 \tfrac{1-q}{q}$ and the chain rule factor
-$\tfrac{1}{2}$:
-$$
-\tfrac{1}{2} \log_2 \frac{1 - \pi/2}{\pi/2} - 1 = 0
-\;\Longrightarrow\; \frac{2 - \pi}{\pi} = 4
-\;\Longrightarrow\; \pi = 0.4.
-$$
+**Estimate.** With $k$ failures in $n$ independent trials, $\hat{p} = k/n$
+with standard error $\sqrt{\hat p (1-\hat p)/n}$. For a concrete case, $k =
+23$ failures in $n = 500$ gives $\hat p = 0.046 \pm 0.009$.
 
-**(c)** $C = I(0.4) = H(0.2) - 0.4 \approx 0.7219 - 0.4 = 0.322$ bits
-per use, against $0.311$ at the uniform input. The asymmetric noise
-wants an asymmetric input: the symbol $1$ is unreliable, so the
-maximizer uses it less. Uniform inputs are optimal for symmetric
-channels, not in general.
+**Propagate.** For the erasure channel $C = 1 - e$, so the error bar carries
+straight across: $C = 0.954 \pm 0.009$ bits per use. For the symmetric
+channel, $\frac{dC}{dp} = -\log_2\frac{1-p}{p}$, which at $\hat p = 0.046$ is
+$-4.37$, so a $0.009$ uncertainty in $p$ becomes $0.041$ in $C$:
+$C = 1 - H(0.046) = 0.731 \pm 0.041$ bits per use. Report two significant
+figures at most; the derivative blows up as $p \to 0$, so a clean link needs
+many more trials for the same precision in $C$.
+
+**Testing memorylessness.** Split the trials into blocks of 20 and compare the
+variance of the per-block failure counts against the binomial prediction
+$np(1-p)$. Clustered failures give a variance well above it. Equivalently,
+compare the observed distribution of gaps between failures with the geometric
+distribution the model implies. If either test fails, the number computed is
+the capacity of a channel you do not have, and the honest report is the
+per-use failure rate plus the observed burst statistics.
+
+**What counts as agreement.** Split the data in half, compute $C$ separately
+on each half, and check the two values agree within the combined error bars.
+Two halves that disagree by more than that indicate drift in the link during
+the measurement, which is another failure of the memoryless assumption.
 </Solution>
 </Exercise>
 
 <Exercise>
-Rerun the BEC capacity derivation from the output side: for
-$\mathrm{BEC}(e)$ with $\pi = P(X = 1)$, compute $H(Y \mid X)$ and
-$H(Y)$ directly, and verify $I(X;Y) = (1 - e)\,H(\pi)$.
+A binary symmetric channel with $p = 0.11$ has capacity $0.5$ bits per use, so
+half a bit per use is not obviously out of reach. Try to reach it by
+repetition: send each message bit $n$ times and decode by majority vote.
+Compute the probability that a message bit is decoded wrongly for $n = 3$,
+$5$, and $7$, and the rate of each scheme in bits per channel use. Report what
+the error probability and the rate are each doing as $n$ grows, and what that
+implies about the pair you would want.
 
 <Solution>
-**Noise term.** Given $X = x$, the output is $x$ with probability
-$1 - e$ and $?$ with probability $e$: a two-outcome distribution with
-entropy $H(e)$, the same for both inputs. So $H(Y \mid X) = H(e)$.
+**Error probability.** A majority vote over $n$ uses fails when more than
+$n/2$ of the $n$ transmissions flip. With $p = 0.11$:
+$$
+n = 3:\quad \binom{3}{2}p^2(1-p) + p^3 = 3(0.0121)(0.89) + 0.00133 = 0.0336.
+$$
+$$
+n = 5:\quad \textstyle\sum_{k=3}^{5}\binom{5}{k}p^k(1-p)^{5-k}
+= 0.01054 + 0.00065 + 0.00002 = 0.0112.
+$$
+$$
+n = 7:\quad \textstyle\sum_{k=4}^{7}\binom{7}{k}p^k(1-p)^{7-k}
+= 0.00361 + 0.00027 + 0.00001 = 0.00389.
+$$
 
-**Output term.** $Y$ takes the values $0$, $?$, $1$ with probabilities
-$(1-e)(1-\pi)$, $e$, $(1-e)\pi$. Expanding the entropy sum and
-splitting each $\log$ of a product:
-$$
-H(Y) = -(1-e)\bigl[(1-\pi)\log_2(1-\pi) + \pi \log_2 \pi\bigr]
-- (1-e)\log_2(1-e) - e \log_2 e,
-$$
-which is $H(Y) = (1-e)\,H(\pi) + H(e)$.
+**Rate.** One message bit per $n$ channel uses: $0.333$, $0.200$, $0.143$ bits
+per use.
 
-**Subtract.**
-$$
-I(X;Y) = H(Y) - H(Y \mid X) = (1-e)\,H(\pi) + H(e) - H(e)
-= (1-e)\,H(\pi),
-$$
-matching the input-side derivation, and $\le 1 - e$ with equality at
-$\pi = \tfrac{1}{2}$. The erasure entropy $H(e)$ appears in both terms
-and cancels: the visible fact *that* an erasure happened carries no
-information about *what* was sent. Picking the decomposition whose
-conditional term is easy — here either works; on the BSC only the
-output side is clean — is most of the labor.
+**The two trends.** The error probability falls, roughly by a factor of three
+per two extra repetitions, and drives towards zero. The rate also falls
+towards zero, as $1/n$. Repetition buys reliability only by spending rate, and
+every scheme in the family is strictly worse than the last on the axis that
+matters: at $n = 7$ the error is $0.4\%$ and the rate is $0.143$ bits per use,
+less than a third of the $0.5$ the channel is worth.
+
+**What you would want.** A family whose error probability goes to zero while
+the rate stays fixed at some $R < C$. Nothing here suggests such a family
+exists; repetition makes the opposite trade, and the same is true of every
+scheme built by adding redundancy to one bit at a time. That such families do
+exist for every $R < 0.5$ on this channel, and for no $R > 0.5$, is the
+noisy-channel coding theorem of
+<Ref lesson="noisy-channel-coding">the next lesson</Ref>, which gets its rate
+by coding over long blocks rather than over single bits.
 </Solution>
 </Exercise>
 
 <References>
-1. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — Part II: §11 sets up the noisy discrete channel, §12 defines the equivocation $H_y(x)$, the transmission rate $R = H(x) - H_y(x)$, and the capacity $C = \max R$; §§15–16 compute capacities of symmetric-noise examples.
-2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §7.1 catalogs the example channels (noiseless binary, noisy typewriter, BSC in §7.1.4, BEC in §7.1.5), §7.2 solves symmetric channels via the uniform input, §7.3 proves the properties of capacity used here; fig. 1.2 is the two-extremes map recreated above.
-3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 9, §§9.5–9.6: mutual information of a channel and capacity, with worked BSC, BEC, and Z-channel calculations including the non-uniform maximizer of the Z-channel. Free online: https://www.inference.org.uk/mackay/itila/
-4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441 / UIUC ECE 563), 2016 — ch. 4 treats capacity as a saddle point / information radius; §16.4 works the BSC and BEC capacities.
+1. C. E. Shannon, "A Mathematical Theory of Communication," *Bell System Technical Journal*, 27, 1948 — Part II: §11 sets up the noisy discrete channel; §12 defines the equivocation $H_y(x)$, works the 1000-symbols-per-second example at 1% error to 919 bits per second, and proves Theorem 10, that a correction channel of capacity equal to the equivocation lets the receiver correct all but an arbitrarily small fraction of the errors, and that no smaller capacity does; §§15–16 give the capacity formulas for symmetric-noise channels. https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf
+2. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §7.1 works the example channels (noiseless binary, non-overlapping outputs, noisy typewriter, BSC in §7.1.4, BEC in §7.1.5); §7.2 defines symmetric and weakly symmetric channels and proves Theorem 7.2.1, the shortcut $C = \log|\mathcal{Y}| - H(\text{row})$; §7.3 collects the properties of $C$ used here, including concavity of $I(X;Y)$ in the input distribution.
+3. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — ch. 9: §9.3 gives a 27-key noisy typewriter in which each key prints one of *three* neighbouring letters, so that a nine-letter non-confusable subset attains its capacity $\log_2 9$ exactly (§9.6): the fan-out divides the alphabet, which is exactly the condition the 27-key two-output variant above fails; §9.5 works the BSC, BEC and Z channels, and example 9.11 gives the Z channel at $f = 0.15$ the optimal input $p_1^* = 0.445$ and capacity $0.685$ bits quoted here. Free online: https://www.inference.org.uk/mackay/itila/
+4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441, Spring 2016) — §4.4 extremizes mutual information and gives the saddle-point form of the capacity problem with the uniqueness of the capacity-achieving output distribution; §4.5 proves Corollary 4.3, the equal-divergence condition and the reading of $C$ as an information radius, both used in the starred section. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
+5. R. Blahut, "Computation of channel capacity and rate-distortion functions," *IEEE Transactions on Information Theory*, 18(4), 1972 — the alternating-maximisation algorithm for $C$ when no symmetry is available, published independently by S. Arimoto in the same volume.
 </References>

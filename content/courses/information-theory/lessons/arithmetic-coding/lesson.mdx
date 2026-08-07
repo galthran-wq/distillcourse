@@ -1,0 +1,951 @@
+A symbol code must spend a whole number of bits on every symbol, which costs
+up to one bit per symbol however good the model is; arithmetic coding removes
+the constraint by encoding the entire message as a single subinterval of
+[0,1).
+
+The course has proved that entropy is the exact floor on expected code length,
+that a symbol code sits within one bit of it, and that closing the remaining
+gap by coding blocks of $n$ symbols costs a table of $|\mathcal{X}|^n$
+codewords (<Ref lesson="source-coding-theorem-lite"/>). Two assumptions rode
+into that result unexamined: that each symbol gets its own codeword, and that
+the source distribution is known in advance. This lesson drops the first. It
+builds a coder whose total overhead is two bits for the whole message rather
+than one bit per symbol, and whose only contact with the source is a table of
+cumulative probabilities — the separation that
+<Ref lesson="dictionary-coding"/> and the machine-learning module both build
+on.
+
+The route: why the one-bit guarantee is worthless exactly where models are
+best; the interval construction, run in full on a five-symbol message; the
+theorem that names a point inside the final interval in under
+$-\log_2 p + 2$ bits; the decoder and the end-of-message problem; the
+finite-precision machinery that makes the scheme implementable; and the
+interface between model and coder.
+
+## Huffman's worst case: a whole bit for a hundredth of a bit
+
+The one-bit guarantee of <Ref lesson="huffman-by-hand"/> is an absolute bound,
+and absolute bounds say nothing about ratios. Take a source whose commonest
+symbol has probability $0.99$. Its surprisal is
+$-\log_2 0.99 = 0.0145$ bits (<Ref lesson="what-is-surprise"/>). Every prefix
+code must give it a codeword of at least one bit, because a zero-length
+codeword is not a codeword. The code therefore spends 69 times the
+information the symbol carries, and it does so on 99% of the symbols in the
+stream.
+
+One would expect this defect to shrink as models improve. It grows. A model
+that predicts well is a model that often assigns probability close to one, and
+probability close to one is exactly where the integer-length constraint is
+most expensive. The two English-text models that reached 2.2 bits per
+character by 1987 both used arithmetic coding as their final stage.
+
+<Figure
+  src="./figures/overhead-moved.svg"
+  alt="Two bit tallies for a ten-symbol message from a 0.99/0.01 source: a symbol code spends ten one-bit codewords, an arithmetic code spends 0.145 bits of information plus at most two bits of overhead, about 2.1 bits total"
+  caption="Ten symbols from a 0.99/0.01 source: 10 bits under any symbol code, about 2.1 bits under an arithmetic code."
+/>
+
+### The belief the 1987 paper was written to break
+
+Huffman coding is optimal within the class of codes that assign a **whole
+number of bits** to each symbol, and only within it. Witten, Neal and Cleary
+open their paper by naming the misreading: "there is a widespread belief that
+Huffman coding cannot be improved upon." That belief is false, and the reason
+it is false is structural rather than algorithmic. A code's lengths are a bet
+$q(x) = 2^{-\ell(x)}$ on the source (<Ref lesson="source-coding-theorem-lite"/>),
+integer lengths restrict that bet to powers of $\tfrac12$, and no cleverer
+merge rule escapes a restriction on what the code can express. What has to go
+is not the algorithm but the requirement that each symbol carry its own
+codeword.
+
+Their measurements separate the two cases sharply. On a 100,000-byte English
+text file, an arithmetic coder driven by an adaptive single-character model
+produced 57,718 bytes and the adaptive Huffman coder in the UNIX `compact`
+utility produced 57,781 bytes: a difference of one part in a thousand, because
+letter probabilities sit in a range where rounding to integer lengths costs
+little. On a 100,000-byte file built from 10,000 copies of `aaaabaaaac` the
+same two coders produced 12,092 and 16,257 bytes. The second file has
+probabilities $(0.8, 0.1, 0.1)$ and an entropy of $0.922$ bits per character;
+the arithmetic coder reached $0.967$ bits per character, and the best possible
+symbol code for those three probabilities has lengths $(1, 2, 2)$ and cannot
+go below $1.2$.
+
+<KeyFact>
+A predictive model good enough to be worth training spends most of its symbols
+at probabilities near one, so a symbol code would throw away most of what the
+model knows. This is why the compressor–predictor correspondence of
+<Ref lesson="compression-is-prediction"/> is built on the coder of this lesson
+and not on Huffman's.
+</KeyFact>
+
+## The construction: the message is a subinterval
+
+Removing the per-symbol codeword means there is no code table to look up.
+What replaces it is an interval that every symbol narrows.
+
+### Each symbol picks a band out of the current interval
+
+Take the six-symbol alphabet and fixed model used in the 1987 paper, with the
+cumulative ranges the model assigns:
+
+| symbol | probability | range |
+| --- | --- | --- |
+| `a` | .2 | $[0, 0.2)$ |
+| `e` | .3 | $[0.2, 0.5)$ |
+| `i` | .1 | $[0.5, 0.6)$ |
+| `o` | .2 | $[0.6, 0.8)$ |
+| `u` | .1 | $[0.8, 0.9)$ |
+| `!` | .1 | $[0.9, 1.0)$ |
+
+<Example title="encoding eaii!">
+Start with $[0, 1)$. Each symbol replaces the current interval
+$[u, v)$ of width $r = v - u$ by the sub-interval its model range picks
+out of it.
+
+`e` has range $[0.2, 0.5)$, so the interval becomes
+$[0 + 1(0.2),\; 0 + 1(0.5)) = [0.2, 0.5)$, of width $0.3$.
+
+`a` has range $[0, 0.2)$, and $r = 0.3$, so the interval becomes
+$[0.2 + 0.3(0),\; 0.2 + 0.3(0.2)) = [0.2, 0.26)$, of width $0.06$.
+
+`i` has range $[0.5, 0.6)$, and $r = 0.06$, so the interval becomes
+$[0.2 + 0.06(0.5),\; 0.2 + 0.06(0.6)) = [0.23, 0.236)$, of width $0.006$.
+
+The second `i` gives $[0.233, 0.2336)$, of width $0.0006$.
+
+The terminator `!` has range $[0.9, 1.0)$, and $r = 0.0006$, so the final
+interval is
+$$
+[0.233 + 0.0006(0.9),\; 0.233 + 0.0006(1.0)) = [0.23354, 0.2336),
+$$
+of width $0.00006$.
+
+**Bounds check:** the width is the product of the five probabilities,
+$0.3 \times 0.2 \times 0.1 \times 0.1 \times 0.1 = 0.00006$, and
+$-\log_2 0.00006 = 14.02$ bits, which is the sum of the five surprisals.
+</Example>
+
+<FigureSequence
+  name="interval-narrow"
+  alt="Five frames encoding eaii! under the model a .2, e .3, i .1, o .2, u .1, exclamation .1: each frame redraws the current interval at full height, subdivides it by the model, highlights the chosen band, and reports the new endpoints, the width, and minus log two of the width"
+  caption="One symbol per frame. The bar is the current interval redrawn full height; watch the width fall from 0.3 to 0.00006 while the model's proportions never change."
+/>
+
+### The width of the interval is the probability of the message
+
+The arithmetic is the same at every step, which is what makes it a definition
+rather than a procedure.
+
+<Definition title="arithmetic code interval">
+Let a model assign, for each position $n$, a probability
+$P(x_n \mid x_1 \dots x_{n-1})$ to every symbol of the alphabet, and let
+$$
+Q_n(a) = \!\!\sum_{a' < a}\! P(x_n = a' \mid x_1 \dots x_{n-1}),
+\qquad
+R_n(a) = Q_n(a) + P(x_n = a \mid x_1 \dots x_{n-1})
+$$
+be the cumulative probabilities below and including $a$ in a fixed alphabet
+order. Starting from $[u_0, v_0) = [0, 1)$, the interval after $n$ symbols is
+$$
+u_n = u_{n-1} + r_{n-1} Q_n(x_n), \qquad
+v_n = u_{n-1} + r_{n-1} R_n(x_n), \qquad
+r_n = v_n - u_n .
+$$
+Its width is $r_n = P(x_1 \dots x_n)$, the model probability of the whole
+prefix.
+</Definition>
+
+The width identity is the whole construction. Each step multiplies the width
+by one conditional probability, and probabilities of a sequence multiply, so
+after $n$ symbols the interval is exactly as wide as the message is probable.
+Nothing in the recursion requires the symbols to be independent or the model
+to be fixed: $P(x_n \mid x_1 \dots x_{n-1})$ may come from a frequency table,
+a context model, or a neural network, as long as the decoder can reproduce it.
+
+<KeyFact>
+"The same distribution" means bit-exact, not approximately equal: the decoder
+picks a symbol by comparing one number against the cumulative bounds, so a
+table differing from the encoder's in its last place can select a different
+band, and every symbol after that point is garbage. This is why deployed
+coders hand the model's output to the coder as integer frequency counts rather
+than as floating-point probabilities.
+</KeyFact>
+
+<Exercise>
+Encode the two-symbol message `ae` under the same model, reporting the
+interval after each symbol and the width of the final interval. Then state how
+many bits of information the message carries, and check your width against
+that number before opening the solution.
+
+<Solution>
+`a` has range $[0, 0.2)$ applied to $[0, 1)$, giving $[0, 0.2)$ of width
+$0.2$.
+
+`e` has range $[0.2, 0.5)$ applied to $[0, 0.2)$, so
+$\ell = 0 + 0.2(0.2) = 0.04$ and $h = 0 + 0.2(0.5) = 0.10$: the interval is
+$[0.04, 0.10)$, of width $0.06$.
+
+Check: $0.2 \times 0.3 = 0.06$, and
+$-\log_2 0.06 = 4.06$ bits, which is
+$-\log_2 0.2 - \log_2 0.3 = 2.32 + 1.74$. The two surprisals add because the
+widths multiply.
+
+Note what this message is missing: no terminator was coded, so a decoder
+handed a point in $[0.04, 0.10)$ cannot tell `ae` from `aeaaa`. The section on
+decoding takes that up.
+</Solution>
+</Exercise>
+
+### What the coder does not decide: compression is the model's job
+
+<Figure
+  float="right"
+  width="s"
+  src="./figures/model-quality.svg"
+  alt="Three horizontal bars for the message eaii!: 14.02 bits under the Table I model, 12.92 bits under a flat code over six symbols, and 9.61 bits under the message's own symbol frequencies"
+  caption="The same coder, three models: the cost of eaii! is decided by the model, not by the coder."
+/>
+
+The example also shows what the coder does not do. Under this model `eaii!`
+costs $14.02$ bits, while a flat code over six symbols would spend
+$5 \log_2 6 = 12.92$ bits: the arithmetic code is worse than no model at all,
+because the model is wrong about this message. Fit the model to the message
+itself — the frequencies $\{e: .2,\, a: .2,\, i: .4,\, !: .2\}$ — and the same
+coder spends $9.61$ bits. Compression quality is the model's property. The
+coder's only job is to spend $-\log_2 p$ bits on whatever $p$ it is handed,
+and it does that job exactly.
+
+### The same message priced twice
+
+<Demo
+  name="ArithmeticInterval"
+  caption="Type a message and watch the interval narrow, with the running bit count beside the Huffman cost for the same model."
+/>
+
+<Task>
+Two targets, before the next section explains the accounting. Find a
+four-symbol message on which the arithmetic coder beats the Huffman cost by
+more than one bit, and then find a four-symbol message on which the two
+readouts land within a tenth of a bit of each other. Then load the run-of-`e`
+preset: the table's last column prices every `e` at $0.26$ bits of overpay
+under the symbol code, and ten of them read out as 18 arithmetic bits against
+Huffman's 20. Delete `e`s one at a time and record the gap. It does not shrink
+monotonically: it closes to zero at a run of seven and is back to one bit at
+six, so keep going past the first tie and report the shortest run on which
+arithmetic is still ahead.
+</Task>
+
+## The cost: two bits for the whole message
+
+The construction produced an interval, not a bitstring. Turning one into the
+other is where the two bits appear.
+
+A binary string $b_1 b_2 \dots b_k$ read as the fraction
+$0.b_1 b_2 \dots b_k$ names the *dyadic interval*
+$[m 2^{-k},\, (m+1) 2^{-k})$, where $m$ is the integer with binary expansion
+$b_1 \dots b_k$: the set of all numbers whose expansion starts with those $k$
+bits (<Ref lesson="kraft-inequality"/> priced exactly these intervals, at
+$2^{-k}$ of a budget of one). Transmitting $k$ bits therefore tells the
+receiver a dyadic interval, and the receiver knows the message as soon as that
+interval lies wholly inside the message's interval.
+
+<Example title="the codeword for eaii!">
+The final interval is $[0.23354, 0.2336)$, of width $0.00006$. Dyadic
+intervals at level $14$ have width $2^{-14} = 0.000061$, wider than the
+message interval, so none of them can fit. At level $15$ the width is
+$2^{-15} = 0.0000305$, and
+$$
+\left[\tfrac{7653}{32768},\ \tfrac{7654}{32768}\right)
+= [0.2335510,\ 0.2335815) \subset [0.23354,\ 0.2336) .
+$$
+Since $7653 = 001110111100101$ in fifteen bits, the codeword is
+`001110111100101`. Fifteen bits against $14.02$ bits of information.
+</Example>
+
+<Figure
+  src="./figures/dyadic-fit.svg"
+  alt="The interval 0.23354 to 0.2336 drawn as a band, with a 14-bit dyadic cell that hangs off its left end and a 15-bit dyadic cell contained inside it, labelled with the codeword 001110111100101"
+  caption="The 14-bit grid is too coarse to fit a cell inside the message interval; the 15-bit grid is not."
+/>
+
+### Any interval of width w holds a dyadic interval of width above w/4
+
+The example found $15$ bits by inspection. The theorem says what to expect
+without inspecting.
+
+<Theorem title="arithmetic coding cost">
+Let a message $x$ have model probability $p(x) > 0$, so its interval $I(x)$
+has width $w = p(x)$. Then there is a binary string of length
+$$
+\ell(x) = \lceil -\log_2 w \rceil + 1 \;<\; -\log_2 w + 2
+$$
+whose dyadic interval is contained in $I(x)$.
+
+<Proof>
+The claim is that a short enough dyadic grid always drops a whole cell inside
+$I(x)$. Two steps: choose the grid level, then show a cell of that level fits.
+
+**Step 1, the grid.** Put $k = \lceil -\log_2 w \rceil + 1$. Then
+$k \ge -\log_2 w + 1$, so $2^{-k} \le w/2$: cells at level $k$ are at most
+half as wide as $I(x)$.
+
+**Step 2, a cell fits.** Write $g = 2^{-k}$ and $I(x) = [u, u + w)$. Let
+$m$ be the smallest integer with $mg \ge u$; then $mg < u + g$, since
+otherwise $m - 1$ would already have worked. Hence
+$$
+(m+1)g < u + 2g \le u + w ,
+$$
+using $g \le w/2$ in the last step. So $[mg, (m+1)g) \subseteq [u, u+w)$.
+
+For the width: $k < -\log_2 w + 2$ because
+$\lceil t \rceil < t + 1$, so $2^{-k} > 2^{\log_2 w - 2} = w/4$. The cell
+found is more than a quarter as wide as the message interval, and its label is
+$k$ bits long.
+</Proof>
+</Theorem>
+
+Two facts ride on the proof. First, distinct messages have disjoint intervals
+once every message ends with a terminator symbol, so the dyadic cells chosen
+for them are disjoint subintervals of $[0,1)$; their widths $2^{-\ell(x)}$
+therefore sum to at most one, which is the Kraft inequality satisfied by
+construction rather than by design, and the code is prefix-free for the same
+reason. Second, taking the expectation of $\ell(x) < -\log_2 p(x) + 2$ over
+messages of $n$ symbols gives
+$$
+\mathbb{E}[\ell] \;<\; H(X^n) + 2 \;=\; nH(X) + 2 ,
+$$
+so the cost per symbol is below $H(X) + 2/n$.
+
+<Exercise>
+The theorem names a length; it does not name the shortest one. Take the message
+`eeeee`, five copies of the most probable symbol, under this lesson's model.
+Compute the final interval, state the length the theorem guarantees, then find
+by search the coarsest dyadic grid that drops a whole cell inside the interval
+and write that cell's codeword. The optimal symbol code spends $2$ bits on each
+`e`, so Huffman costs $10$ bits here. Say which of your two numbers decides
+whether arithmetic coding wins on this message: the guaranteed length, or the
+searched one. Write down the final interval before opening the solution;
+everything else follows from it.
+
+<Solution>
+**The interval.** Each `e` maps $[u, u+r)$ to $[u + 0.2r,\; u + 0.5r)$:
+$$
+[0.2,\ 0.5) \to [0.26,\ 0.35) \to [0.278,\ 0.305)
+\to [0.2834,\ 0.2915) \to [0.28502,\ 0.28745).
+$$
+The width is $0.00243 = 0.3^5$, and $-\log_2 0.00243 = 8.685$ bits, five
+copies of the surprisal $1.737$.
+
+**What the theorem guarantees.** $\lceil 8.685 \rceil + 1 = 10$ bits.
+
+**What the search finds.** Level $8$ cells have width
+$2^{-8} = 0.003906$, wider than the interval, so no cell of that level or
+coarser can fit. Level $9$ cells have width $2^{-9} = 0.001953$. The smallest
+multiple of $2^{-9}$ at or above $0.28502$ is $146/512 = 0.28515625$, and
+$$
+\left[\tfrac{146}{512},\ \tfrac{147}{512}\right) = [0.2851562,\ 0.2871094)
+\subset [0.28502,\ 0.28745),
+$$
+so nine bits suffice, and the codeword is $146$ written in nine binary digits:
+`010010010`. The next cell, $[147/512,\ 148/512)$, ends at $0.2890625$, past
+the interval, so this cell is the only one that fits and the codeword is
+unique.
+
+**Which number decides.** The searched length. Nine bits against Huffman's ten
+is the whole margin on this message; the guaranteed ten would have tied. Five
+is the shortest run in the demo's run-of-`e` preset on which arithmetic is
+still ahead, and it is ahead by exactly this one bit.
+
+The transferable move: $\lceil -\log_2 w \rceil + 1$ is a worst-case grid
+level, chosen so that a cell fits wherever the interval sits against the grid.
+When the interval happens to sit favourably, one level coarser already works.
+Quote the bound when you need a guarantee; search the grid when a single bit
+decides the comparison.
+</Solution>
+</Exercise>
+
+### Why a worse constant is the better code
+
+Block Huffman coding reaches $H + 1/n$ (<Ref lesson="source-coding-theorem-lite"/>)
+and arithmetic coding only $H + 2/n$: for the same block length the interval
+coder is twice as far from the floor. The comparison is misleading, because
+$n$ is not the same in the two schemes. Block Huffman needs a table of
+$|\mathcal{X}|^n$ codewords, which pins $n$ at 8 or 12 for a binary source and
+at 2 or 3 for bytes. Arithmetic coding needs no table at all: the model is
+consulted once per symbol, so $n$ can be the length of the file. At
+$n = 10^6$, two bits is $2 \times 10^{-6}$ bits per symbol.
+
+<Figure
+  src="./figures/denominator.svg"
+  alt="Two panels for one file of bytes: block Huffman with n equal to 3, a codeword table of 256 cubed entries and 0.33 bits of overhead per symbol; arithmetic with n equal to one million, no codeword table and 0.000002 bits of overhead per symbol"
+  caption="The same file, two schemes: the constant doubles from 1 to 2, and the denominator goes from the largest block a table can hold to the whole file."
+/>
+
+<KeyFact>
+The two bits are paid **per message**, not per symbol, and that single change
+of denominator is the entire result. A reader who remembers "two bits" as a
+per-symbol figure has the lesson exactly backwards: a coder with two bits of
+overhead per symbol would be twice as bad as Huffman rather than unboundedly
+better.
+</KeyFact>
+
+On a source whose probabilities are all powers of $\tfrac12$, Huffman
+codewords have length exactly $-\log_2 p(x)$ for every symbol, so a symbol
+code spends the message's surprisal exactly and arithmetic coding spends up to
+two bits more. Arithmetic coding wins only where integer lengths cost
+something, and the amount it wins by is the accumulated rounding loss minus
+two bits.
+
+## Decoding, and why a message needs an end marker
+
+The decoder is given a number inside the final interval and must recover the
+symbols. It does so by running the encoder's recursion forward, choosing at
+each step the band that contains the number.
+
+### Decoding is the encoder's recursion, run forward
+
+<Example title="decoding 0.23355">
+The value $0.23355$ lies in $[0.2, 0.5)$, the model's range for `e`, so the
+first symbol is `e` and the interval becomes $[0.2, 0.5)$.
+
+Within that interval the value sits at
+$(0.23355 - 0.2)/0.3 = 0.1118$, which falls in $[0, 0.2)$: the second symbol
+is `a`, and the interval becomes $[0.2, 0.26)$.
+
+Within that, $(0.23355 - 0.2)/0.06 = 0.5592$ falls in $[0.5, 0.6)$: the third
+symbol is `i`. Repeating twice more returns `i` and then `!`.
+</Example>
+
+<FigureSequence
+  name="decode"
+  alt="Three frames decoding the number 0.23355: each frame shows the current interval subdivided by the model with an arrow marking the value's position, names the band it falls in, and appends that symbol to the decoded output"
+  caption="The decoder repeats the encoder's arithmetic. Watch the marker's position within the redrawn interval, not its absolute value."
+/>
+
+<Task>
+Follow the marker through the three frames and confirm that its absolute
+position never changes while the band it lands in does. Then decode the first
+symbol of the number $0.61$ under the same model, and the first symbol of
+$0.9$; one of the two answers ends the message immediately.
+</Task>
+
+<Exercise>
+A decoder is handed the number $0.7134$ under this lesson's model. Run the
+recursion, reporting the rescaled position $(x - u)/(v - u)$ at every step,
+until the decoder emits the terminator `!`, or until you can state, with a
+reason, that it never will. At the fifth step the rescaled position lands
+exactly on a band boundary; name the convention that decides which symbol it
+selects. Then give a number the encoder should have sent instead for the
+symbols you recovered, terminator included. Write out at least five steps
+before opening the solution.
+
+<Solution>
+**The recursion.** At each step the rescaled position is
+$t = (0.7134 - u)/(v-u)$, and the band containing $t$ names the symbol.
+
+| step | $t$ | band | symbol | new interval |
+| --- | --- | --- | --- | --- |
+| 1 | $0.7134$ | $[0.6, 0.8)$ | `o` | $[0.6,\ 0.8)$ |
+| 2 | $0.567$ | $[0.5, 0.6)$ | `i` | $[0.70,\ 0.72)$ |
+| 3 | $0.67$ | $[0.6, 0.8)$ | `o` | $[0.712,\ 0.716)$ |
+| 4 | $0.35$ | $[0.2, 0.5)$ | `e` | $[0.7128,\ 0.714)$ |
+| 5 | $0.5$ | $[0.5, 0.6)$ | `i` | $[0.7134,\ 0.71352)$ |
+| 6 | $0$ | $[0, 0.2)$ | `a` | $[0.7134,\ 0.713424)$ |
+
+**The boundary at step 5.** $t = 0.5$ exactly. The model's ranges are
+half-open: `e` holds $[0.2, 0.5)$, which excludes $0.5$, and `i` holds
+$[0.5, 0.6)$, which includes it. Left-closed, right-open is the convention, and
+it is the same one the encoder used to place `i` at $0.5$ in the first place. A
+decoder that tested $t \le 0.5$ for `e` would emit `e` here and every symbol
+after would be garbage.
+
+**Why it never terminates.** After step 5 the interval is
+$[0.7134,\ 0.71352)$ and the received number is its left endpoint. `a`'s band
+starts at the left end of every interval, so $t = 0$ at step 6, and the new
+interval is again left-anchored at $0.7134$. Step 7 gives $t = 0$ again, and so
+on: the decoder emits `a` forever. The number $0.7134$ lies in the interval of
+`oioei`, of `oioeia`, of `oioeiaa`, and of every longer extension by `a`, so no
+finite number of steps identifies the message.
+
+**What should have been sent.** The message is `oioei` followed by the
+terminator. Applying `!`'s range $[0.9, 1.0)$ to $[0.7134,\ 0.71352)$, of width
+$0.00012$, gives
+$$
+[0.7134 + 0.00012(0.9),\ 0.7134 + 0.00012) = [0.713508,\ 0.71352),
+$$
+and any point of that interval will do — $0.71351$, for instance, decodes to
+`oioei!` and stops.
+
+**Bearing.** The terminator is what makes the intervals of distinct complete
+messages disjoint. Without it the intervals are nested, not disjoint: every
+prefix's interval contains its extensions', so a point identifies a message
+only if the receiver was told the length some other way.
+</Solution>
+</Exercise>
+
+### The end marker: a point alone does not say when to stop
+
+Only one end of the interval need be transmitted, and in fact only one point
+inside it. That economy creates the problem. The number $0.0$ lies inside the
+interval of `a`, of `aa`, of `aaa`, and of every longer run, so a decoder
+handed $0.0$ cannot know when to stop, and the exercise above hit the same wall
+at $0.7134$. Two fixes exist and both cost bits: send
+the message length ahead of the data, or reserve a symbol of the alphabet as a
+terminator. Arithmetic coding uses the second, which is why the model above
+carries `!` at probability $0.1$ and why the worked message ends with it. The
+terminator costs $-\log_2 0.1 = 3.32$ bits, priced by the model like any other
+symbol, and a model that expects long messages gives it a small probability
+and a correspondingly small cost.
+
+## ★ The same construction driven by a hand
+
+Running the decoder from a human pointer instead of from a bitstream turns the
+coder into a text entry system. In Dasher, built by Ward, Blackwell and MacKay
+in 2000, the writer sees the unit interval subdivided by a language model —
+probable continuations occupy wide bands, improbable ones narrow slivers — and
+zooms continuously into the region containing the intended text. Steering is
+decoding: the pointer's position plays the part of the received number, and
+the sequence of nested bands it selects is the message.
+
+{/* img dasher-screen: a screenshot of the Dasher interface mid-write — nested
+letter boxes whose heights are the language model's probabilities, the pointer
+inside the box currently being entered, the text written so far along the edge;
+the reader must see that probable continuations are large targets and
+improbable ones are slivers, which is the whole claim of this section. No pool
+candidate; likely source Wikimedia Commons (screenshots in the "Dasher
+(software)" article, from the Inference Group, Cambridge). placement
+float-right */}
+
+Because band width is proportional to probability, the gesture cost of a string
+is its information content, so writing predictable text takes less physical
+effort than writing unpredictable text. A novice reaches about 25 words per
+minute after an hour, roughly half a practised ten-finger typing speed, and the
+same rate is attainable hands-free with gaze direction driving the pointer.
+
+## Finite precision: renormalization and the underflow trap
+
+The worked example used decimals whose precision grew with every symbol. After
+five symbols the endpoints needed five digits; after a thousand they would
+need a thousand. No implementation can carry that, and the fix is the reason
+the 1987 paper exists.
+
+### Renormalization: emit the bits that can no longer change
+
+Real implementations hold `low` and `high` as $c$-bit integers spanning a
+fixed code range, work in binary rather than decimal, and exploit one
+observation: once the leading bits of `low` and `high` agree, no future symbol
+can change them, because every future interval is a subinterval of the current
+one. Those bits are emitted and shifted out, and the interval is doubled to
+refill the register. Three landmarks of the code range decide when: the
+midpoint `Half`, and the quarter points `First_qtr` and `Third_qtr`, one
+quarter and three quarters of the way from the bottom of the range to the top.
+If `high` falls below `Half`, the leading bit is `0`; if `low` reaches `Half`,
+it is `1`.
+
+<FigureSequence
+  name="renormalize"
+  alt="Three frames on a code range marked with First_qtr, Half and Third_qtr: the interval lying below Half and being doubled after emitting a bit, the interval straddling Half so that no bit settles, and the middle-half expansion that doubles the straddling interval about Half while incrementing a pending-bit counter"
+  caption="Frame 2 is the failure the third frame repairs: an interval straddling Half emits no bits and shrinks anyway."
+/>
+
+### The underflow trap: an interval that straddles Half
+
+The failure mode is frame 2. Suppose `low` and `high` converge on `Half` from
+either side without ever agreeing on a leading bit, so that
+`First_qtr ≤ low < Half ≤ high < Third_qtr`. No bit is emitted. The interval
+keeps narrowing. Eventually it spans fewer integers than the model's total
+frequency count, two distinct symbols map to the same integer, and one of them
+can no longer be encoded. This is not a rounding
+nuisance. It is an encoder that stops working on legal input.
+
+### The repair: expand the middle half, count the pending bits
+
+The repair is to expand the middle half. When the interval lies inside
+`[First_qtr, Third_qtr)`, double it about `Half` and increment a counter of
+pending bits. No bit is emitted, because none is known; what is known is that
+whichever bit comes next, the following one is its opposite. When a bit is
+finally emitted, it is followed by that many opposite bits. Underflow becomes
+bookkeeping.
+
+<Aside>
+The decoder's renormalization as it shipped — Figure 3 of the 1987 paper,
+lines 194–213, with the published comments:
+
+```c
+for (;;) {                          /* Loop to get rid of bits.  */
+    if (high < Half) {
+        /* nothing */               /* Expand low half.          */
+    }
+    else if (low >= Half) {         /* Expand high half.         */
+        value -= Half;
+        low   -= Half;              /* Subtract offset to top.   */
+        high  -= Half;
+    }
+    else if (low >= First_qtr       /* Expand middle half.       */
+          && high < Third_qtr) {
+        value -= First_qtr;
+        low   -= First_qtr;         /* Subtract offset to middle */
+        high  -= First_qtr;
+    }
+    else break;                     /* Otherwise exit loop.      */
+    low   = 2*low;
+    high  = 2*high + 1;             /* Scale up code range.      */
+    value = 2*value + input_bit();  /* Move in next input bit.   */
+}
+```
+
+The three arms are the three frames above in order, and the last three lines
+are the doubling shared by all of them. The encoder's loop is the same code
+with the `value` updates deleted and a call to the bit writer inserted in each
+of the first two arms.
+</Aside>
+
+### What the machine word must hold
+
+Two conditions make the bookkeeping sound. The total of the cumulative
+frequencies must fit in a quarter of the code range,
+$$
+\texttt{Max\_frequency} \le \frac{\texttt{Top\_value} + 1 + 1}{4},
+$$
+which is what guarantees that after the expansions the interval is still wide
+enough to separate any two symbols. And the products computed in the bounds
+calculation must not overflow: with frequency counts in $f$ bits and code
+values in $c$ bits, on arithmetic of precision $p$, the requirements are
+$f \le c - 2$ and $f + c \le p$. The published implementation takes
+$f = 14$, $c = 16$ and $p = 31$, which is why its frequency counts are capped
+at $2^{14} - 1 = 16{,}383$ and why a 16-bit machine, forced to $c = 8$ and
+$f = 7$, cannot carry a 256-symbol alphabet at all.
+
+### Three departures from the ideal, all bounded
+
+The three departures from the ideal $-\log_2 p(x)$ are all measurable and all
+small. Terminating the message costs two bits, and rounding the bitstream out
+to a byte boundary can cost seven more. Truncating the divisions in
+fixed-length arithmetic costs on the order of $10^{-4}$ bits per symbol.
+Halving the frequency counts when they threaten to exceed
+`Max_frequency` costs nothing at all for messages under $2^{14}$ bytes, and
+under $0.25\%$ of the encoded size for messages of $10^5$ to $10^6$ bytes.
+
+<KeyFact>
+Every implementation cost in this section is bounded by a constant per message
+or by a fraction of a percent, which is what licenses the rest of the course
+to treat compressed size and $-\log_2 p$ as the same number.
+</KeyFact>
+
+<Task>
+State which of the two renormalization tests — `high < Half` or `low ≥ Half` —
+fires on the interval of frame 1, and what the encoder emits. Then say what
+the pending-bit counter holds after two middle-half expansions in a row, and
+what the encoder writes when the next bit turns out to be `1`.
+</Task>
+
+## The model is a separate module
+
+The coder in the previous section consulted the model exactly once per symbol,
+and asked it for exactly one thing: a table of cumulative frequencies. It never
+learns what a symbol means, how many symbols there are, or whether the model
+changed since the last call.
+
+<Figure
+  src="./figures/model-coder.svg"
+  alt="A MODEL box feeding a cumulative frequency table to a CODER box which emits bits, with a dashed feedback arrow updating the model's counts after each symbol"
+  caption="The whole interface is one cumulative frequency table per symbol."
+/>
+
+### An adaptive model costs the coder nothing
+
+That interface admits an adaptive model with no change to the coder. Start
+every symbol's count at one, encode a symbol, increment its count, and let the
+decoder increment the same count after decoding the same symbol. Encoder and
+decoder stay in step because the update depends only on data the decoder
+already has. No frequency table is transmitted, no representative sample of
+the source is needed, and the statistics track the message as it changes. On
+English text this bare single-character adaptive model reaches 4.8 to 5.3 bits
+per character on files of $10^3$ to $10^4$ bytes and 4.5 to 4.7 bits per
+character on files of $10^5$ to $10^6$ bytes, the difference being how long
+the counts take to converge.
+
+### Any model, the same guarantee
+
+Swapping in a better model changes nothing on the coder's side. A model
+conditioning on the previous few characters, a model conditioning on a
+template of neighbouring pixels, a model that is a trained network: each
+supplies the same table and gets back the same guarantee of
+$-\log_2 p + 2$ bits. That is the sentence the machine-learning module returns
+to, and the reason a language model's cross-entropy can be quoted directly as
+a file size (<Ref lesson="language-models-as-compressors"/>).
+
+<Aside>
+Patents nevertheless kept the coder out of the formats most widely deployed in
+the 1990s. RFC 1951, the DEFLATE specification, lists among its design goals
+that the format "can be implemented readily in a manner not covered by
+patents, and hence can be practiced freely", and DEFLATE is what gzip, PNG and
+HTTP content-encoding carry (<Ref lesson="deflate-and-zstd"/>). The technical
+argument of this lesson and the deployment history run in opposite directions
+for about fifteen years.
+</Aside>
+
+What is established: a message can be coded as a subinterval of $[0,1)$ whose
+width is its model probability, the interval can be named in fewer than
+$-\log_2 p + 2$ bits, and the overhead is therefore constant per message
+rather than proportional to its length. What is not established is where the
+probabilities come from. Every model in this lesson was either supplied in
+advance or accumulated from counts, and both assume the alphabet and the kind
+of structure worth counting. <Ref lesson="dictionary-coding"/> drops that
+assumption, replacing the distribution with the text already seen and still
+converging to the entropy rate of any stationary ergodic source.
+
+## Exercises
+
+<Exercise>
+Take the binary source $p = (A: 0.99,\ B: 0.01)$ and the message $A^{20}$, of
+known length 20. Report the width of the final interval, the arithmetic
+codeword length the theorem guarantees, and the cost of the same message under
+the optimal symbol code. Then describe what happens to each of the two costs
+as $p(A) \to 1$, and name the property of prefix codes that stops the symbol
+code from following.
+
+<Solution>
+Width: $0.99^{20} = 0.8179$. Information:
+$-\log_2 0.8179 = 0.290$ bits, which is $20 \times 0.0145$.
+
+Guaranteed codeword length:
+$\lceil 0.290 \rceil + 1 = 2$ bits. (The bound $-\log_2 w + 2$ gives
+$2.29$; the ceiling form is sharper here.)
+
+Symbol code: with two symbols the only prefix code has lengths $(1,1)$, so
+$A^{20}$ costs $20$ bits — 69 times the information in the message.
+
+**The limit.** As $p(A) \to 1$ the message probability tends to $1$, so
+$-\log_2 w \to 0$ and the arithmetic cost tends to the pure overhead: one to
+two bits for a message of any length. The symbol code stays at $20$ bits for
+all $p(A) < 1$ and never falls below it, because every codeword of a prefix
+code has length at least one and there are $20$ codewords.
+
+The property that blocks it is that a prefix code assigns a separate,
+non-empty codeword to each symbol occurrence, so its cost is bounded below by
+the number of symbols. That bound has nothing to do with the source and
+nothing to do with the algorithm; it is a statement about the code's shape
+(<Ref lesson="prefix-codes"/>).
+</Solution>
+</Exercise>
+
+<Exercise>
+Break this claim: *"arithmetic coding is optimal, so it always produces a
+shorter file than Huffman coding."* Exhibit a source and a message on which
+the two produce the same length, exhibit one on which arithmetic coding is
+strictly longer, and state the general condition that decides which wins as a
+function of the message length $n$.
+
+<Solution>
+**Where arithmetic coding loses.** Take the dyadic source
+$p = (\tfrac12, \tfrac14, \tfrac18, \tfrac18)$ of
+<Ref lesson="huffman-by-hand"/>. Its Huffman code has lengths $(1,2,3,3)$,
+which equal the surprisals exactly, so a Huffman-coded message of $n$ symbols
+costs exactly $-\log_2 p(x)$ bits — the floor. Arithmetic coding on the same
+model costs up to two bits more, whatever $n$ is. On this source arithmetic
+coding never wins and usually loses by one or two bits.
+
+**Where they tie.** On the same source, round the arithmetic cost: for a
+message whose interval happens to contain a dyadic cell at level
+$\lceil -\log_2 p \rceil$, the arithmetic codeword is the same length as the
+Huffman one. Ties are also reached on any source once the per-symbol rounding
+loss accumulates to exactly two bits.
+
+**The condition.** Let $L^{*}$ be the optimal symbol code's expected length
+and $H$ the entropy. Over $n$ symbols the Huffman code spends about
+$nL^{*}$ bits and the arithmetic coder about $nH + 2$. Arithmetic coding wins
+when
+$$
+n\,(L^{*} - H) > 2 ,
+$$
+that is, when the accumulated per-symbol rounding loss exceeds the fixed
+two-bit overhead. The deciding quantity is $L^{*} - H$, which
+<Ref lesson="source-coding-theorem-lite"/> showed is the mismatch between the
+source and the nearest bet a code can place on powers of $\tfrac12$. It is
+zero on dyadic sources, and close to one bit on sources with a near-certain
+symbol, where the break-even $n$ is 2 or 3.
+
+The transferable move: an asymptotic optimality claim says nothing about a
+fixed message, and the crossover is always the ratio of a constant overhead to
+a per-symbol rate difference.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson's theorem shows every interval of width $w$ contains a dyadic
+interval of width more than $w/4$. Show that the factor $4$ cannot be
+improved: construct, for any $k$, an interval of width $w$ just under
+$2^{-k+1}$ that contains no dyadic interval of level $k$, and state the
+largest dyadic interval it does contain. Then say what the construction
+implies about the $+2$ in the cost bound.
+
+<Solution>
+**The construction.** Fix $k$ and a small $\varepsilon > 0$ with
+$\varepsilon < 2^{-k-1}$. Let
+$$
+w = 2^{-k+1} - 2\varepsilon , \qquad
+I = [\,m_0 2^{-k} + \varepsilon,\; m_0 2^{-k} + 2^{-k+1} - \varepsilon\,)
+$$
+for any integer $m_0$ with $I \subseteq [0,1)$: the interval sits inside two
+consecutive level-$k$ cells, clear of the grid by $\varepsilon$ at each end.
+
+**No level-$k$ cell fits.** $I$ meets exactly two level-$k$ cells, and every
+other cell of that level is disjoint from it. The left one,
+$[m_0 2^{-k}, (m_0+1)2^{-k})$, starts $\varepsilon$ below $\inf I$. The right
+one, $[(m_0+1)2^{-k}, (m_0+2)2^{-k})$, starts inside $I$ but ends at
+$m_0 2^{-k} + 2^{-k+1} = \sup I + \varepsilon$, past the end of $I$. The
+$\varepsilon$ subtracted at the right end is what makes this fail: containment
+of half-open intervals allows the two right endpoints to coincide, so an
+interval ending exactly on the grid point $m_0 2^{-k} + 2^{-k+1}$ would have
+contained that cell.
+
+**What does fit.** Level $k+1$, of width $2^{-k-1}$. Cells of that width fit
+because $w = 2^{-k+1} - 2\varepsilon > 2^{-k} = 2 \cdot 2^{-k-1}$, which is
+the theorem's Step 2 hypothesis $g \le w/2$. The ratio of widths is
+$$
+\frac{2^{-k-1}}{w} = \frac{2^{-k-1}}{2^{-k+1} - 2\varepsilon}
+\;\xrightarrow[\varepsilon \to 0]{}\; \frac14 .
+$$
+So the ratio of the best available dyadic width to the interval width can be
+driven arbitrarily close to $\tfrac14$, and the factor $4$ in the theorem is
+the exact worst case.
+
+**Bearing on the bound.** The codeword length here is $k+1$, while
+$-\log_2 w \to k - 1$, so the code spends two bits more than the information
+in the limit. The $+2$ is attained, not merely permitted: no argument of this
+kind can promise $+1$. What can be said is that the worst case requires the
+interval to be positioned adversarially against the grid, which is why
+measured overheads (the two bits of termination, and nothing else of this
+size) match the bound so closely.
+</Solution>
+</Exercise>
+
+<Exercise>
+A student's finite-precision implementation encodes correctly, in the sense
+that the encoder's `low` and `high` match a reference implementation at every
+step, but the decoder reproduces the first three symbols and then emits
+garbage. Inspecting
+the trace shows that around the fourth symbol the encoder's interval sat
+inside `[First_qtr, Third_qtr)` for several steps. Name the bug, name the two
+places it must be fixed, and give the one-line test that would have caught it.
+
+<Solution>
+**The bug.** The encoder is performing middle-half expansions to avoid
+underflow but is not paying for them. Each expansion records that the next bit
+emitted must be followed by an opposite bit. If the pending-bit counter is
+incremented and never spent, or is never incremented at all while the
+expansion still happens, the emitted bitstream is missing bits and the
+decoder's `value` diverges from the encoder's interval. The prefix decodes
+correctly because the bits emitted before the first expansion are still right.
+
+**The two places.** First, in the encoder: every output must go through the
+routine that writes a bit and then writes `bits_to_follow` copies of its
+complement, resetting the counter — never through the raw bit writer. Second,
+in the decoder: it must apply the same middle-half expansion under the same
+condition, shifting `value` along with `low` and `high`. The decoder's job is
+to track the encoder's arithmetic exactly, so any rescaling the encoder does
+and the decoder skips desynchronizes them.
+
+**The test.** Encode and decode a message whose model drives the interval into
+the middle half repeatedly (a long run of one symbol under a near-uniform
+model does it), and assert that the decoded string equals the input. A
+round-trip assertion on a straddling case is the whole test; correctness on
+messages that never straddle `Half` proves nothing about this code path.
+
+A related failure with the same symptom is a cumulative frequency total above
+$(\texttt{Top\_value} + 2)/4$, which lets two symbols collide on one integer;
+checking that inequality at model-update time distinguishes the two.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the 1987 paper's worked example numerically. Encode `eaii!` under
+the model of this lesson and report: the final interval, the number of decimal
+digits its width implies, the entropy of the message under that model, and the
+entropy of the same message under the single-character model fitted to the
+message itself. State what agreement you would accept between your numbers and
+the published $4.22$ and $2.89$ decimal digits.
+
+<Solution>
+**Final interval.** $[0.23354, 0.2336)$, width $0.00006$.
+
+**Digits.** $-\log_{10} 0.00006 = 4.222$ decimal digits, which is the paper's
+$4.22$. In bits, $-\log_2 0.00006 = 14.02$; the conversion factor is
+$\log_2 10 = 3.3219$, and $4.222 \times 3.3219 = 14.02$ confirms the two
+figures are one number in two units.
+
+**Fitted model.** The message `eaii!` has frequencies
+$\{e: \tfrac15,\ a: \tfrac15,\ i: \tfrac25,\ !: \tfrac15\}$. Its per-symbol
+entropy in decimal digits is
+$$
+3\left(\tfrac15 \log_{10} 5\right) + \tfrac25 \log_{10} \tfrac52
+= 0.4194 + 0.1592 = 0.5786 ,
+$$
+so five symbols cost $2.893$ decimal digits: the paper's $2.89$. In bits that
+is $9.61$.
+
+**What counts as agreement.** Exact agreement to the two decimals published,
+because nothing here is estimated: both numbers are closed-form logarithms of
+exactly specified probabilities. A discrepancy in the third decimal means a
+rounding convention (the paper writes `-log 0.00006` for a width it also
+writes as $0.2336 - 0.23354$); a discrepancy in the first decimal means the
+model or the alphabet was transcribed wrongly. The one number to check first
+is the interval width, since every other figure is a logarithm of it.
+
+**Bearing.** The two entropies differ by $1.33$ decimal digits, or $4.4$ bits
+on a five-symbol message, with the coder held fixed. The comparison isolates
+the model's contribution from the coder's, which is what makes the coder a
+neutral instrument for measuring models.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take one 30-character English sentence. Encode it twice with an arithmetic
+coder: once with a fixed letter-frequency model built from a corpus, and once
+with an adaptive model that starts all counts at one and increments after each
+character. Report both bit counts, and account for the difference including
+what each scheme must transmit before the data.
+
+<Solution>
+**Method.** For a message $x_1 \dots x_{30}$ the coded size is
+$\sum_i -\log_2 P(x_i \mid \text{context}) + 2$ bits, so both runs reduce to
+summing surprisals; no interval arithmetic is needed to get the number.
+
+**Fixed model.** With corpus letter frequencies over 27 symbols, English text
+costs roughly $4.1$ bits per character
+(<Ref lesson="entropy-of-english"/>), so about $123$ bits plus two, near
+$16$ bytes. But the decoder needs the table: 27 frequencies at, say, 16 bits
+each is $432$ bits of header, more than triple the data. On a 30-character
+message the fixed model loses badly to a raw 5-bit-per-letter encoding once
+the header is charged.
+
+**Adaptive model.** Starting from 27 counts of one, the first character costs
+$\log_2 27 = 4.75$ bits and later characters cost less as the counts
+concentrate; over 30 characters the total typically lands between $130$ and
+$145$ bits, worse than the fixed model's data portion because the model spends
+the early message learning. The header is empty: the decoder starts from the
+same all-ones table and performs the same updates.
+
+**The accounting.** Fixed model: $123$ bits of data plus a large header.
+Adaptive model: about $140$ bits of data plus nothing. The adaptive scheme
+wins on any message short enough that the header dominates, and its
+disadvantage on the data itself shrinks with message length. Exact numbers
+depend on your sentence and your corpus; the ordering does not.
+
+**Where this goes.** What you have just measured is the cost of describing a
+model versus the cost of learning it while coding — the two-part accounting
+that <Ref lesson="compression-is-prediction"/> turns into an identity between
+predictive loss and file size, and the reason
+<Ref lesson="dictionary-coding"/> can compress a source it was never told
+anything about.
+</Solution>
+</Exercise>
+
+<References>
+1. I. H. Witten, R. M. Neal, J. G. Cleary, "Arithmetic Coding for Data Compression," *Communications of the ACM*, 30(6), 1987, pp. 520–540 — pp. 520–521 for the Huffman critique and the "widespread belief" quoted above; p. 522 for Table I and the `eaii!` trace with Figures 1a/1b; p. 523 for the idealized pseudocode; p. 527 for Figure 3's `arithmetic_decode.c`, whose lines 194–213 are the renormalization loop quoted above; pp. 532–534 for the proof of decoding correctness, the underflow analysis and the `Max_frequency` condition; pp. 534–535 for the word-length constraints $f \le c-2$ and $f + c \le p$; p. 536 for the three sources of overhead; p. 538 for Table IV against UNIX `compact`. https://web.stanford.edu/class/ee398a/handouts/papers/WittenACM87ArithmCoding.pdf
+2. D. J. C. MacKay, *Information Theory, Inference, and Learning Algorithms*, Cambridge University Press, 2003 — §6.2 for the nested-interval construction and the worked bent-coin encoding of `bbba` plus terminator, which reaches the codeword `100111101` incrementally; exercise 6.1 (solution p. 127) for the two-bit termination bound, proved there by the same dyadic-fit picture used here; §6.2's closing pages for Dasher and the Ward, Blackwell & MacKay (2000) reference. Free online: https://www.inference.org.uk/mackay/itila/
+3. T. M. Cover, J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley, 2006 — §13.3 derives arithmetic coding from Shannon–Fano–Elias coding and works the ternary example on $p = (0.4, 0.4, 0.2)$: `ACAA` narrows to $[0.32, 0.3328)$ and is coded in $\lceil \log 1/0.0128 \rceil + 2 = 9$ bits, a second route to the same $+2$.
+4. Y. Polyanskiy, Y. Wu, *Lecture Notes on Information Theory* (MIT 6.441, Spring 2016) — §9.1 states the construction as "map $x^n$ to the largest dyadic interval contained in $I_{x^n}$" and records the resulting bound $\ell \le \lceil \log_2 1/Q(x^n) \rceil + 1$, with the sequential recursion for $F_n(x^n)$ that makes it computable one symbol at a time; §9 opens by contrasting it with the exponential encoder tables of block coding. https://live.ocw.mit.edu/courses/6-441-information-theory-spring-2016/5d8f16adc3385c9ff2975b121bd620e4_MIT6_441S16_course_notes.pdf
+5. L. P. Deutsch, "DEFLATE Compressed Data Format Specification version 1.3," RFC 1951, IETF, 1996 — §1.1 lists the design goals quoted above, including implementability "in a manner not covered by patents". https://www.rfc-editor.org/rfc/rfc1951
+</References>
