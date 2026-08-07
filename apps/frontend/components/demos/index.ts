@@ -21,6 +21,7 @@ export const demos: Record<
   KLMismatch: () => import("./information-theory/KLMismatch"),
   ChannelCodingThreshold: () =>
     import("./information-theory/ChannelCodingThreshold"),
+  HammingSyndrome: () => import("./information-theory/HammingSyndrome"),
   PredictiveCompressor: () =>
     import("./information-theory/PredictiveCompressor"),
   MaxEntDice: () => import("./information-theory/MaxEntDice"),
@@ -30,4 +31,5 @@ export const demos: Record<
   InformationPlane: () => import("./information-theory/InformationPlane"),
   InfoNCESaturation: () => import("./information-theory/InfoNCESaturation"),
   LZ77Window: () => import("./information-theory/LZ77Window"),
+  MIEstimatorBias: () => import("./information-theory/MIEstimatorBias"),
 };

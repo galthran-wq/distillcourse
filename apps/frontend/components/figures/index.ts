@@ -72,6 +72,7 @@ import RdObjective from "./information-theory/RdObjective";
 import CapacityVsRateDistortion from "./information-theory/CapacityVsRateDistortion";
 import GaussianRdCurve from "./information-theory/GaussianRdCurve";
 import NeuralCodecLoop from "./information-theory/NeuralCodecLoop";
+import CodecIdentity from "./information-theory/CodecIdentity";
 import ThreeStringsThreeCodes from "./information-theory/ThreeStringsThreeCodes";
 import TwoPartMessage from "./information-theory/TwoPartMessage";
 import PolyFitTally from "./information-theory/PolyFitTally";
@@ -112,6 +113,9 @@ import SzilardFreeEnergy from "./information-theory/SzilardFreeEnergy";
 import DeflatePipeline from "./information-theory/DeflatePipeline";
 import FanoTwoExpansions from "./information-theory/FanoTwoExpansions";
 import FanoLeCamReduction from "./information-theory/FanoLeCamReduction";
+import BitsPerByteConversion from "./information-theory/BitsPerByteConversion";
+import TokenizerRankingFlip from "./information-theory/TokenizerRankingFlip";
+import ModelCoderPipeline from "./information-theory/ModelCoderPipeline";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -207,6 +211,7 @@ export const figures: Record<string, RegisteredFigure> = {
   CapacityVsRateDistortion: { component: CapacityVsRateDistortion },
   GaussianRdCurve: { component: GaussianRdCurve },
   NeuralCodecLoop: { component: NeuralCodecLoop },
+  CodecIdentity: { component: CodecIdentity, frames: 4 },
   ThreeStringsThreeCodes: { component: ThreeStringsThreeCodes },
   TwoPartMessage: { component: TwoPartMessage },
   PolyFitTally: { component: PolyFitTally, frames: 4 },
@@ -247,4 +252,7 @@ export const figures: Record<string, RegisteredFigure> = {
   DeflatePipeline: { component: DeflatePipeline },
   FanoTwoExpansions: { component: FanoTwoExpansions, frames: 4 },
   FanoLeCamReduction: { component: FanoLeCamReduction },
+  BitsPerByteConversion: { component: BitsPerByteConversion },
+  TokenizerRankingFlip: { component: TokenizerRankingFlip },
+  ModelCoderPipeline: { component: ModelCoderPipeline },
 };
