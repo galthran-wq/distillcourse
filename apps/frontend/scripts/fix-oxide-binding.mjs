@@ -1,4 +1,4 @@
-// tsx with --conditions=import (which every script here runs under, for the
+// tsx with --conditions=import (which the preview script runs under, for the
 // ESM-only deps) mis-serves JSON subpath requires: @tailwindcss/oxide's
 // fallback loader requires its platform package's package.json for a version
 // check, gets transpiled JS instead of JSON, and declares the native binding
