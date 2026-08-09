@@ -1,0 +1,618 @@
+Every quantity in this course is computed from one object: the log of who did
+what, when — rolled up into a funnel and a cohort matrix.
+
+This is the opening move of the course's argument. The course claims that the
+vocabulary of a subscription business (retention, churn, lifetime value,
+acquisition cost) names statistical models fitted to data the company already
+has, and before any model can be fitted the data object has to be fixed. This
+lesson fixes it: the event log, the funnel computed from it, the cohort × age
+matrix that every later lesson fits models to, and the notation the whole
+course reuses. <Ref lesson="retention-and-survival">The next lesson</Ref>
+reads the matrix's rows as survival data.
+
+The route: the event log and the running case, funnels and the discipline
+their conversion rates require, cohorts and their two time axes, the cohort
+matrix and its three reads, and the reason blended aggregates mislead.
+
+## The event log is the primary object
+
+First on the route is the object every later stop is computed from. A
+subscription software company (*SaaS*: software sold as a recurring
+subscription rather than a one-time license) records its history as events.
+Each event is one row with four fields: a customer identifier, an event type,
+a timestamp, and an amount where money moved. Visits, trial signups,
+activations, payments, cancellations: everything the business knows about
+its customers is some set of these rows.
+
+<Figure
+  src="./figures/event-log.svg"
+  alt="A six-row event log on the left; arrows fan out to three aggregations: a funnel, a cohort matrix, and an MRR ledger"
+  caption="One log, three roll-ups: order events within a customer (funnel), group customers by signup month (cohort matrix), sum amounts by calendar month (MRR)."
+/>
+
+The course works one dataset throughout. **The running case:** Relay, a
+fictional invoicing tool priced at \$50 per month, selling since January
+2025 and observed through June 30, 2025; every worked number in this module
+is a roll-up of its log. Three roll-ups matter:
+
+- **Funnel**: order the event types within a customer's history and count
+  how many customers reach each one. The conversion view.
+- **Cohort matrix**: group customers by signup month and count who is still
+  active each month after. The retention view.
+- **MRR ledger**: sum payment amounts by calendar month. *MRR*, monthly
+  recurring revenue, is the revenue view.
+
+<KeyFact>
+Every metric in this course (retention curves, churn, CLV, LTV:CAC, NRR) is
+a grouping and a count or sum over these four fields. A metric whose
+definition cannot be written as a query against the event log is not
+measurable, and every definitional dispute later in the course (who counts as
+active, over which window, with which denominator) is a dispute about the
+query.
+</KeyFact>
+
+## Funnels: conversion rates multiply along the path
+
+The first roll-up orders events inside one customer's history. Relay's path
+to revenue has four states, and April 2025 put concrete numbers on each:
+40,000 site visits produced 2,000 trial signups; 1,400 of those signups
+activated (created their first invoice) within 14 days; 350 paid within 30
+days of signing up. Each hand-off has a rate: 5.0% of visits become signups
+in the same month, 70% of signups activate within 14 days, 25% of activated
+trials pay within 30 days.
+
+<Figure
+  src="./figures/funnel.svg"
+  alt="Four funnel stages with counts, per-hand-off conversion rates with their denominators and windows on the arrows, and the end-to-end product below"
+  caption="Relay's April funnel. Every rate carries its denominator and window; the rates multiply to the end-to-end conversion."
+/>
+
+<Definition title="funnel, conversion rate">
+A **funnel** is an ordered sequence of customer states. The **conversion
+rate** of a hand-off is the fraction of units entering a stage that reach the
+next one, measured over a stated window and against a stated denominator.
+</Definition>
+
+The rates multiply, and the reason is visible in the fractions themselves:
+
+$$
+\frac{350}{40{,}000}
+= \frac{2{,}000}{40{,}000} \times \frac{1{,}400}{2{,}000} \times \frac{350}{1{,}400}
+= 0.050 \times 0.70 \times 0.25 = 0.00875.
+$$
+
+Each denominator cancels the previous numerator, so the product telescopes to
+the end-to-end rate: **0.875%** of April's visitors became paying customers.
+The cancellation is also the condition: it works only because each rate's
+denominator is exactly the previous stage's converts, and each window sits
+inside the end-to-end window.
+
+A rate stated without its denominator and window ("conversion is 3%") is
+not a number that can enter this product. Relay's 5.0% (of visits, same
+month) and its 25% (of activated trials, within 30 days of signup) have
+different denominators, different windows, and different levers behind them;
+a report that drops the qualifiers invites multiplying rates that do not
+compose.
+
+<KeyFact>
+Rates read off calendar-month aggregates violate both conditions at once:
+numerator and denominator draw from different entering cohorts, and the
+windows do not nest. The resulting bias is not small; the calendar-window
+exercise at the end of the lesson constructs a case where the measured rate
+understates the true rate by a quarter.
+</KeyFact>
+
+### Running the funnel backwards
+
+The same product, read right to left, turns a target into a requirement.
+
+<Example title="forward planning from a customer target">
+Relay wants 600 new paying customers in September. Walking the funnel
+backwards at April's rates:
+
+$$
+\frac{600}{0.25} = 2{,}400 \text{ activations}, \quad
+\frac{2{,}400}{0.70} \approx 3{,}429 \text{ trial signups}, \quad
+\frac{3{,}429}{0.050} \approx 68{,}600 \text{ visits}.
+$$
+
+Equivalently in one step: $600 / 0.00875 \approx 68{,}600$. September needs
+roughly 69,000 visits, against April's 40,000. The number is a planning
+input: it prices the gap in traffic that marketing has to close.
+</Example>
+
+The full machinery of decomposing a target into owned driver metrics is
+<Ref lesson="north-star-and-metric-trees">a later lesson</Ref>; here the
+one-line version suffices.
+
+<Exercise>
+Relay's onboarding team believes it can raise activation from 70% to 80% by
+September. At the improved rate, how many visits does the 600-customer target
+require, and by what fraction does the improvement cut the requirement?
+Then state which single-stage change would cut the required visits in half.
+
+<Solution>
+The end-to-end rate becomes $0.050 \times 0.80 \times 0.25 = 0.010$, so the
+requirement is $600 / 0.010 = 60{,}000$ visits, about 8,600 fewer. The cut
+is exactly the ratio of the old rate to the new: $1 - 0.70/0.80 = 12.5\%$.
+
+Halving the required visits means doubling the end-to-end rate, and the
+product is linear in each factor, so doubling any single stage rate does it:
+5.0% → 10% on signup, or 25% → 50% on payment (70% → 140% is not available).
+The stages are interchangeable in the arithmetic; they differ only in what a
+doubling costs, which is a question the arithmetic cannot answer.
+</Solution>
+</Exercise>
+
+## Cohorts: age is not calendar time
+
+The funnel ends at "paid," but the customer's history continues: they pay
+monthly until they stop. The second roll-up groups customers by when they
+were acquired. A *cohort* is the set of customers who signed up in the same
+period: Relay's January cohort, February cohort, and so on. A cohort is
+tracked by *age*: the number of periods since its acquisition month, written
+$t = 0, 1, 2, \ldots$
+
+The two time axes do not coincide. The February cohort at age 1 is March on
+the calendar; the May cohort at age 1 is June. Comparing cells at the same
+age compares different calendar months, and comparing cells in the same
+calendar month compares different ages. Keeping the axes separate is most of
+what cohort analysis is.
+
+### Building the matrix from the log
+
+<Definition title="cohort matrix">
+The **cohort matrix** is the table with one row per cohort $c$ and one column
+per age $t$, whose cell $n_{c,t}$ counts the cohort's customers still active
+$t$ periods after acquisition. The cohort's size is $n_{c,0}$, and the
+fraction still active at age $t$ is $n_{c,t}/n_{c,0}$. The cell $(c,t)$ falls
+in calendar period $c + t$.
+</Definition>
+
+For Relay, "active in a month" means at least one payment event in that
+month. The matrix is built by two passes over the log: assign each customer
+to a cohort by their signup month, then for each cohort count active
+customers at each age.
+
+<FigureSequence
+  name="matrix-build"
+  alt="Four frames building Relay's cohort matrix: customers bucketed into monthly cohorts, the January row filled in by age, all rows filled with a staircase edge, and the unobserved lower-right triangle shaded as future"
+  caption="Building the cohort matrix from the log. The observation boundary is a staircase; below it is the future, not missing data."
+/>
+
+<Task>
+Step through the four frames and track the one change per frame: cohorts
+bucketed, one row counted by age, all rows counted, the unobserved cells
+shaded. Then name what the staircase edge is: every cell on it falls in June
+2025, the last observed month.
+</Task>
+
+The full matrix, as counts:
+
+| Cohort | Size | Age 0 | Age 1 | Age 2 | Age 3 | Age 4 | Age 5 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Jan 2025 | 200 | 200 | 124 | 98 | 84 | 76 | 70 |
+| Feb 2025 | 240 | 240 | 154 | 122 | 106 | 96 | — |
+| Mar 2025 | 300 | 300 | 198 | 159 | 138 | — | — |
+| Apr 2025 | 350 | 350 | 238 | 193 | — | — | — |
+| May 2025 | 400 | 400 | 280 | — | — | — | — |
+| Jun 2025 | 460 | 460 | — | — | — | — | — |
+
+### The unobserved triangle is the future
+
+The empty lower-right triangle is the matrix's defining feature. January has
+been observed for six months and has six cells; June has one. The triangle is
+not missing data to be imputed: those months have not happened. Every live
+customer base has this shape, and any method that consumes cohort data has to
+work on a staircase, not a rectangle.
+<Ref lesson="retention-and-survival">The next lesson</Ref> gives the
+condition its proper name, censoring, and shows what estimating a curve from
+a staircase requires.
+
+<Aside>
+Three choices sit inside the matrix's construction, and each changes cell
+values without changing the object's shape. Bucket width: monthly cohorts
+suit a \$50/month product; weekly buckets suit a consumer app where the first
+days decide everything. Activity definition: "made a payment" differs from
+"logged in," and for Relay the payment definition is the one wired to
+revenue. Age convention: calendar-month ages (used here) put a customer who
+signed up on January 31 at age 1 the next day; strict 30-day ages avoid that
+at the cost of splitting cohorts across calendar months. Reports that
+disagree usually disagree in these choices, not in the log.
+</Aside>
+
+## One matrix, three reads
+
+Each direction through the matrix holds one variable fixed, and each answers
+a different question.
+
+<Figure
+  src="./figures/matrix-reads.svg"
+  alt="The same staircase matrix drawn three times: a row highlighted for one cohort aging, a column highlighted for one age across vintages, and the diagonal highlighted for one calendar month"
+  caption="Row: one cohort ages (retention). Column: same age, successive vintages (product changes). Diagonal: one calendar month (MRR)."
+/>
+
+### The row read: one cohort ages
+
+A row is one cohort's whole recorded life. The canonical example, used
+across this module, is an annual-contract business that acquired 1,000
+customers at the start of Year 1 and observed renewals for four years:
+
+<Example title="reading one cohort's row">
+The row is 1,000 → 631 → 468 → 382 → 326. As fractions of the cohort:
+1.000, 0.631, 0.468, 0.382, 0.326. The period-to-period retention rates,
+each year's survivors as a fraction of the previous year's, are
+
+$$
+\frac{631}{1{,}000} = 63.1\%,\quad
+\frac{468}{631} = 74.2\%,\quad
+\frac{382}{468} = 81.6\%,\quad
+\frac{326}{382} = 85.3\%.
+$$
+
+The fraction surviving falls, and the retention rate **rises** every year.
+Both facts come from the same five numbers; which one a report shows decides
+what the reader concludes.
+</Example>
+
+The rise is not a property of this dataset. Cohort-level retention rates
+rise with age almost everywhere they are measured: regional-magazine renewal
+rates run near 30% at the first renewal, 50% at the second, and 75% for
+longtime readers. This cohort returns in
+<Ref lesson="churn-and-the-sbg-model">the churn lesson</Ref>, which fits a
+model to the row and settles what the rise does and does not mean.
+
+<Exercise>
+Read Relay's February row (240, 154, 122, 106, 96) the same way: compute the
+fraction still active at each age and the four period-to-period retention
+rates. State whether the February cohort shows the same signature as the
+annual-contract cohort.
+
+<Solution>
+Fractions of the cohort: $240/240 = 1.000$, $154/240 = 0.642$,
+$122/240 = 0.508$, $106/240 = 0.442$, $96/240 = 0.400$.
+
+Retention rates: $154/240 = 64.2\%$, $122/154 = 79.2\%$, $106/122 = 86.9\%$,
+$96/106 = 90.6\%$.
+
+Same signature: the surviving fraction falls toward a flattening tail while
+the retention rate rises every month (64.2% → 90.6% over four hand-offs).
+</Solution>
+</Exercise>
+
+### The column read: same age, successive vintages
+
+A column compares cohorts at the same age. Because age is held fixed, any
+movement down a column is a difference between *vintages*: the state of the
+product, onboarding, pricing, and customer mix at each cohort's acquisition
+date. The column read is how product changes are audited: one SaaS company's
+first-month churn fell from
+[15% for its January cohort to **4%** for its July cohort](https://www.forentrepreneurs.com/saas-metrics-2/)
+after fixes to onboarding and early product experience. The improvement is real and
+attributable precisely because every compared cell sits at the same age; the
+same 11-point difference smeared into an aggregate would be unreadable.
+
+### The diagonal read: one calendar month
+
+Cells with equal $c + t$ share a calendar month. Summing the June diagonal of
+Relay's matrix (each cohort's newest cell) counts everyone active in June:
+
+$$
+70 + 96 + 138 + 193 + 280 + 460 = 1{,}237 \text{ active customers},
+$$
+
+which at \$50 per month is June MRR of \$61,850. The diagonal is where the
+cohort view and the accounting view meet: a company's headline "active
+customers" and MRR numbers are always diagonal sums, one calendar period cut
+across every cohort's age.
+
+<Task>
+Compute the May diagonal the same way: the May-dated cell of each cohort
+acquired by May. The sum should land at 979 active customers and \$48,950 of
+MRR.
+</Task>
+
+Replacing the count $n_{c,t}$ by the cohort's summed payment amounts gives
+the *revenue cohort matrix*, the second of the two standard cohort views.
+The two matrices move differently once per-customer amounts vary: a cohort's
+revenue row can rise while its count row falls, when expansion by the
+survivors outweighs the leavers.
+<Ref lesson="mrr-nrr-and-negative-churn">The MRR lesson</Ref> computes that
+case.
+
+<KeyFact>
+Rising within-cohort retention rates are the near-universal signature of
+cohort data: 63.1% → 85.3% in the annual-contract cohort, 64.2% → 90.6% in
+Relay's February row. Two rival explanations fit it: customers grow more
+loyal with tenure, or the churn-prone leave first and the average survivor
+was always stickier.
+<Ref lesson="churn-and-the-sbg-model">The sBG lesson</Ref> shows the second
+explanation suffices with no individual changing at all, and choosing
+between them is what the module's models are for.
+</KeyFact>
+
+## Blended aggregates mix age with vintage
+
+Each of the three reads holds one axis fixed. A *blended* metric holds
+neither: it pools every cohort into one number. Relay's blended monthly
+retention (customers active this month who were also active last month,
+divided by last month's actives) is
+
+$$
+\text{Apr} \to \text{May}: \frac{579}{754} = 76.8\%,
+\qquad
+\text{May} \to \text{Jun}: \frac{777}{979} = 79.4\%.
+$$
+
+### The blend moves when the mix moves
+
+The blend rose 2.6 points. What it measures is a weighted average of
+age-specific retention rates, weighted by each cohort's share of last
+month's base: the May→June figure mixes January's age-5 rate (92.1%) with
+May's age-1 rate (70.0%), and the weights shift every month as new cohorts
+enter and old ones shrink.
+
+The tempting conclusion, that the blend rose because the product got
+stickier, is wrong. The blend moves when the **mix** moves. A company whose
+every cohort behaves identically forever will still see its blended
+retention climb whenever acquisition slows (the base tenures up) and sink
+whenever acquisition surges (young cohorts at their lowest-retention ages
+flood the denominator). The extreme case: a two-cohort company with no new
+acquisition at all, one cohort retaining a constant 85% of its actives each
+month and the other a constant 95%, sees its blend rise from 88.0% to 90.9%
+within a year, because the worse-retained cohort shrinks faster and the
+weights drift toward the better one. The mix-shift exercise at the end of
+the lesson works the arithmetic.
+
+<Figure
+  src="./figures/mix-shift.svg"
+  alt="Chart of monthly retention over eleven months: two dashed flat lines at 85% and 95% for the two cohorts' constant rates, and a blended-retention curve rising from 88.0% to 90.9% between them"
+  caption="No cohort changes; the blend rises anyway. Differential shrinkage shifts the weights toward the better-retained cohort."
+/>
+
+### The pooled curve matches no cohort
+
+<Figure
+  src="./figures/pooled-vs-cohort.svg"
+  alt="Cohort-specific retention rate curves each rising steeply with age, plotted against calendar year, while the pooled aggregate retention rate stays nearly flat around 0.71"
+  caption="Every cohort's retention rate rises with age; the pooled aggregate barely moves. Continuous acquisition keeps the base young, and the blend reports the mix. (After Fader & Hardie, ART Forum tutorial, 2016.)"
+/>
+
+The construction: a business acquires a new cohort every year for ten
+years, and each cohort's retention rate rises from 63% toward 90% as it
+ages. The aggregate rate computed on the pooled base starts at 63%, climbs
+only while the first cohorts age in, and settles near 71% by year five;
+from then on it barely moves. The aggregate is flatter than **every**
+cohort's own curve: it is not a summary of them but a different quantity,
+pinned down by the perpetual inflow of young cohorts.
+
+A membership society's newsletter, the *ION Newsletter* (Winter 2011–2012),
+supplies the specimen: "I am
+happy to report that 41% of new members who joined in 2011 renewed their
+membership in 2012, and that ION has an overall retention of 78%." Both
+numbers are true. The 78% is propped up by long-tenured members at their
+high age-specific rates and says nothing about the new-member experience;
+the 41% is the number that describes it, and it is a row read: the 2011
+cohort at age 1.
+
+### What is established
+
+The event log of (customer, event, timestamp, amount) is the primary object.
+A funnel is its conversion roll-up, with rates that multiply only under
+stated denominators and nested windows. The cohort matrix $n_{c,t}$ is its
+retention roll-up, with age and calendar as separate axes and an unobserved
+triangle where the future has not happened. Rows, columns, and diagonals
+answer different questions; blended aggregates answer none of them cleanly.
+
+One caution carries forward: the matrix records what happened, not what
+customers are disposed to do. In Fader and Hardie's phrase, the analyst sees
+the underlying propensities only through a
+["foggy window"](https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Fader_hardie_jim_09.pdf),
+and a customer who made two purchases last year is not thereby a
+"two-per-year buyer."
+<Ref lesson="retention-and-survival">The next lesson</Ref> reads the
+matrix's rows as survival data: the fraction-still-active sequence becomes a
+survivor function, the unobserved triangle becomes censoring, and the
+period-to-period rates computed here get their standard names.
+
+## Exercises
+
+<Exercise>
+The log below records every payment event for six customers of a
+\$40-per-month product; a customer's cohort is the month of their first
+payment, "active in a month" means at least one payment in it, and the
+observation window closes April 30.
+
+| Customer | Payment months |
+| --- | --- |
+| U1 | Jan, Feb, Mar, Apr |
+| U2 | Jan, Feb |
+| U3 | Jan |
+| U4 | Feb, Mar |
+| U5 | Feb |
+| U6 | Mar, Apr |
+
+Fill in the cohort × age matrix (cohorts Jan–Mar, ages 0–3), mark the
+unobserved cells, and compute each cohort's fraction still active at age 2.
+
+<Solution>
+Cohort assignment: Jan gets U1, U2, U3; Feb gets U4, U5; Mar gets U6.
+Counting actives by age:
+
+| Cohort | Size | Age 0 | Age 1 | Age 2 | Age 3 |
+| --- | --- | --- | --- | --- | --- |
+| Jan | 3 | 3 | 2 | 1 | 1 |
+| Feb | 2 | 2 | 1 | 0 | — |
+| Mar | 1 | 1 | 1 | — | — |
+
+Jan's age-1 actives are U1 and U2 (February payments); its age-2 and age-3
+active is U1 alone. Feb's age-1 active is U4; at age 2 (April) U4 has no
+payment, so the cell is 0: observed, and zero. Mar's age-2 cell falls in
+May, past the window: unobserved, along with Feb's age 3.
+
+Age-2 fractions: Jan $1/3 \approx 33\%$; Feb $0/2 = 0\%$; for Mar no value
+exists, observed or otherwise.
+</Solution>
+</Exercise>
+
+<Exercise>
+Relay's June cohort (460 customers) has exactly one filled cell. State its
+retention curve as observed so far. Then evaluate the claim "our retention
+improved this month — look at the June cohort," and state what the earliest
+date is at which June's month-1 retention can be compared against May's.
+
+<Solution>
+The observed curve is the single point $n_{c,0}/n_{c,0} = 1.00$ at age 0.
+Every cohort in history passes through this point by construction, so the
+curve as observed carries no information about retention at all.
+
+The claim is empty: no June-cohort cell at age ≥ 1 exists, so no retention
+rate for the June cohort has been observed. The first comparable number is
+June's age-1 count, which falls in calendar July and is observable only
+after July closes; at that point $n_{\text{Jun},1}/460$ can be set against
+May's $280/400 = 70\%$. Until then, any "this month" retention claim is
+either a diagonal read (a calendar statement mixing every cohort's age) or a
+statement about older cohorts, not about June.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim with a construction: "Our blended monthly retention rose
+from 88% to 91%, so the product got stickier." Build a two-cohort company
+that acquires no new customers, in which each cohort's monthly retention
+rate is constant forever, yet the blend rises from 88.0% to 90.9%. Name the
+mechanism.
+
+<Solution>
+Let cohort A retain 85% of its actives each month and cohort B retain 95%,
+both constant at every age, with no new customers entering. Blended
+retention in any month is the active-weighted average of the two rates.
+
+Start with 700 A-actives and 300 B-actives:
+$$
+\frac{0.85 \times 700 + 0.95 \times 300}{1{,}000}
+= \frac{595 + 285}{1{,}000} = 88.0\%.
+$$
+
+Each month A shrinks by the factor 0.85 and B by 0.95, so the weights drift
+toward B. After 11 months, $700 \times 0.85^{11} \approx 117$ A-actives and
+$300 \times 0.95^{11} \approx 171$ B-actives remain:
+$$
+\frac{0.85 \times 117 + 0.95 \times 171}{288}
+= \frac{99.45 + 162.45}{288} = 90.9\%.
+$$
+
+No rate changed; only the weights did. A's share of the base fell from 70%
+to 41% because the worse-retained cohort shrinks faster, so a closed base
+tenures toward its better-retained members. The mechanism is **mix shift**:
+a blend is a weighted average of age- and segment-specific rates, and
+differential shrinkage alone moves the weights toward the better-retained
+group. Any inference from a blend to product change must first hold the mix
+fixed, which is exactly what a per-cohort read does.
+</Solution>
+</Exercise>
+
+<Exercise>
+The telescoping product in the funnel section required each rate's
+denominator to be the previous stage's converts. Break it: suppose 5% of any
+month's visitors sign up, half in the same calendar month and half in the
+next, and visits are growing: March 10,000, April 20,000, May 40,000. An
+analyst computes April's "signup rate" as April signups over April visits.
+Compute that rate, compare it with the true 5%, state what happens to the
+measured rate if traffic is flat instead, and give the general condition
+under which stage rates multiply to end-to-end conversion.
+
+<Solution>
+April's signups are half of April's eventual converts plus the delayed half
+of March's: $0.025 \times 20{,}000 + 0.025 \times 10{,}000 = 500 + 250 =
+750$. The measured rate is $750 / 20{,}000 = 3.75\%$, understating the true
+5% by a quarter. May gives the same figure: $(1{,}000 + 500)/40{,}000 =
+3.75\%$. Under steady doubling the bias is stable, so it does not even
+announce itself as a trend break.
+
+Flat traffic at 20,000: $500 + 500 = 1{,}000$ signups, measured rate
+$1{,}000/20{,}000 = 5.0\%$, which is correct. The calendar ratio equals the true
+rate only when inflow is constant; under growth the denominator has already
+grown while the delayed numerator still reflects the smaller past.
+
+The general condition: fix one entering cohort and follow it. End-to-end
+conversion is $(\text{paid within } W)/(\text{entered})$, and it factors as
+a product of stage rates exactly when each rate is measured on the previous
+stage's converts from that same cohort (denominators nest, so the product
+telescopes) and each stage window is contained in $W$ (so no convert is
+counted outside the end-to-end window, and none twice). Calendar-aggregate
+rates violate the nesting: their numerators and denominators draw from
+different cohorts.
+</Solution>
+</Exercise>
+
+<Exercise>
+The table gives monthly churn (the percentage of a cohort's remaining
+customers lost in a given month of life) in the format of the cohort table
+in Skok's SaaS Metrics 2.0. The Month-1 endpoints, 15% and 4%, are Skok's
+reported values; the intermediate vintages and the Month-2 through Month-4
+cells are constructed for this exercise.
+
+| Cohort | Month 1 | Month 2 | Month 3 | Month 4 |
+| --- | --- | --- | --- | --- |
+| Jan | 15% | 9% | 7% | 6% |
+| Mar | 10% | 9% | 7% | — |
+| May | 6% | 7% | — | — |
+| Jul | 4% | — | — | — |
+
+Decide whether the January-to-July improvement is a vintage effect or an age
+effect, and state exactly which cells you compared to decide.
+
+<Solution>
+It is a vintage effect. The 15% → 10% → 6% → 4% series runs down the
+Month-1 **column**: all four cells sit at the same age (first month of life),
+so age is held fixed and the only thing that varies is the acquisition
+vintage, the state of onboarding and product at each cohort's start.
+
+The age effect is a different read: along a **row**, January's churn falls
+15% → 9% → 7% → 6% as the cohort ages, which is the ordinary rising-retention
+signature and would occur with no product change at all.
+
+A fuller audit compares the later columns across vintages: a fix aimed at
+onboarding should concentrate in Month 1 and leave Month 2 onward roughly
+flat, while a uniform downward shift of entire rows would mean the change
+acts at every age, not at the onboarding hand-off.
+</Solution>
+</Exercise>
+
+<Exercise>
+For Relay's January cohort (200, 124, 98, 84, 76, 70), compute two series:
+the fraction of the original cohort surviving at each age, and the fraction
+of the previous month's survivors lost in each month. State which of the two
+series looks closer to constant, and what a forecast of month 6 would have
+to assume.
+
+<Solution>
+Surviving fractions: $124/200 = 0.620$, $98/200 = 0.490$, $84/200 = 0.420$,
+$76/200 = 0.380$, $70/200 = 0.350$.
+
+Fraction of survivors lost each month: $(200-124)/200 = 38.0\%$,
+$(124-98)/124 = 21.0\%$, $(98-84)/98 = 14.3\%$, $(84-76)/84 = 9.5\%$,
+$(76-70)/76 = 7.9\%$.
+
+Neither series is constant, and the loss series is the more structured of
+the two: it falls steeply, then its decline slows (38 → 21 → 14 → 9.5 →
+7.9), while the survivor series just shrinks by ever-smaller steps. A
+month-6 forecast must assume something about the next loss fraction:
+extrapolating the last value (7.9%) and extrapolating the trend give
+different answers, and nothing computed in this lesson says which is right.
+
+The two series are the module's central objects under their working names:
+the survivor fractions are the survivor function $S(t)$, and the per-month
+loss fractions are churn rates.
+<Ref lesson="retention-and-survival">The next lesson</Ref> defines both
+formally, and <Ref lesson="churn-and-the-sbg-model">the sBG lesson</Ref>
+supplies the model that says how the falling churn series continues.
+</Solution>
+</Exercise>
+
+<References>
+1. D. Skok, "SaaS Metrics 2.0 — A Guide to Measuring and Improving What Matters," forentrepreneurs.com — sections "More on Churn: Cohort Analysis," "Two ways to run Cohort Analysis," "Funnel Metrics," and "Using Funnel Metrics in Forward Planning." https://www.forentrepreneurs.com/saas-metrics-2/
+2. P. S. Fader, B. G. S. Hardie, "Probability Models for Customer-Base Analysis" (27th ART Forum tutorial handout), 2016 — the annual-contract cohort read here (slides 3–15) and the cohort-versus-aggregate retention charts and quotations (slides 30–40). http://www.brucehardie.com/talks/cba_tut_art_16_HO.pdf
+3. P. S. Fader, B. G. S. Hardie, "Probability Models for Customer-Base Analysis," *Journal of Interactive Marketing* 23(1), 2009, pp. 61–69 — the "foggy window" framing of observed behavior versus latent propensity, and the classification of business settings the module builds on. https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Fader_hardie_jim_09.pdf
+</References>

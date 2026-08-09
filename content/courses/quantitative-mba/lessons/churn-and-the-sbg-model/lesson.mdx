@@ -1,0 +1,829 @@
+Cohort churn rates fall with tenure in nearly every dataset, and the
+intuitive explanation — customers grow loyal — is usually wrong.
+
+The module so far has one object and one identity:
+<Ref lesson="cohorts-and-funnels">the cohort matrix</Ref>, whose rows are
+survival data, and $S(t) = r_1 r_2 \cdots r_t$ from
+<Ref lesson="retention-and-survival">the survival lesson</Ref>, which also
+left two questions standing: why the observed rates $r_t$ rise with tenure,
+and how to continue $S(t)$ past the observed window. This lesson answers both
+with a single two-parameter model, the shifted-beta-geometric, in which no
+individual customer's behavior changes at all. The route: the projection task
+on a real published dataset, the failure of curve fitting, the sBG model
+built from constant-churn individuals plus heterogeneity, the sorting effect
+that makes its aggregate retention rise, the maximum-likelihood fit, and the
+projection that lands within 2–4% five years past the data.
+
+## Churn, and the projection problem
+
+Both standing questions concern the rate at which customers leave; the
+business word for that rate is *churn*. The churn rate of period $t$ is the
+fraction of customers active at the end of period $t-1$ who are gone by the
+end of $t$, the complement $1 - r_t$ of the
+retention rate of <Ref lesson="retention-and-survival">the previous
+lesson</Ref>. Throughout this lesson churn counts **customers**; when account
+sizes differ, a revenue-weighted churn behaves differently, and
+<Ref lesson="mrr-nrr-and-negative-churn">the revenue-retention lesson</Ref>
+takes that version up.
+
+<Task>
+Closed book, before the new material: (1) state the product identity that
+turns retention rates into the survivor function; (2) with $r_1 = 0.631$
+and $r_2 = 0.742$, compute $S(2)$; (3) name the kind of observation a
+customer still active at the data's edge is, and state which risk sets
+that customer enters; (4) state the direction of the bias when such
+customers are discarded.
+
+<Solution>
+(1) $S(t) = r_1 r_2 \cdots r_t$. (2) $S(2) = 0.631 \times 0.742 = 0.468$.
+(3) A censored lifetime, known only to exceed its observed length; the
+customer contributes exposure to the risk set of every period they
+completed and never counts as a churn. (4) Keeping only completed
+lifetimes selects the short ones, so estimated survival is biased low —
+the $15/850$ error of <Ref lesson="retention-and-survival">the previous
+lesson</Ref>.
+</Solution>
+</Task>
+
+The dataset is the one Fader and Hardie analyze in
+["How to Project Customer Retention"](https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Fader_hardie_jim_07.pdf)
+(2007): annual survival for two segments of a subscription business, first
+published in chapter 12 of Berry and Linoff's 2004 data-mining textbook. The
+canonical cohort the course has carried since
+<Ref lesson="cohorts-and-funnels">lesson 1</Ref> (1,000 customers, then
+631, 468, 382, 326) is exactly the first four years of this dataset's
+Regular segment.
+
+| Year $t$ | High End, % surviving | Regular, % surviving |
+| --- | --- | --- |
+| 0 | 100.0 | 100.0 |
+| 1 | 86.9 | 63.1 |
+| 2 | 74.3 | 46.8 |
+| 3 | 65.3 | 38.2 |
+| 4 | 59.3 | 32.6 |
+| 5 | 55.1 | 28.9 |
+| 6 | 51.7 | 26.2 |
+| 7 | 49.1 | 24.1 |
+| 8 | 46.8 | 22.3 |
+| 9 | 44.5 | 20.7 |
+| 10 | 42.7 | 19.4 |
+| 11 | 40.9 | 18.3 |
+| 12 | 39.4 | 17.3 |
+
+The task of the lesson: use years 0–7 only, produce estimates of
+$S(8), \ldots, S(12)$, and check them against the held-out years 8–12. The
+task is not academic. Expected tenure is $\sum_{t \ge 0} S(t)$, and the
+customer-value formula of <Ref lesson="customer-lifetime-value">the next
+lesson</Ref> sums $S(t)$ over **all** $t$; a seven-year window truncates
+both sums, and the truncation error is exactly the part of the curve that
+has to be projected.
+
+## Curve fitting fails off the page
+
+A first instinct is to fit a flexible function of time to the observed
+points and read the extrapolation off the fitted equation. Berry and Linoff
+ran this exercise on the High End segment; Fader and Hardie replicate it.
+Fitting years 0–7 gives
+
+$$
+\begin{aligned}
+\text{linear:} \quad & y = 0.925 - 0.071\,t, & R^2 = .922\\
+\text{quadratic:} \quad & y = 0.99671 - 0.14223\,t + 0.010185\,t^2, & R^2 = .998\\
+\text{exponential:} \quad & \ln y = -0.062 - 0.102\,t, & R^2 = .963
+\end{aligned}
+$$
+
+with $y$ the fraction surviving. The quadratic's coefficients are printed to
+five decimals because extrapolation amplifies rounding: the three-decimal
+version the paper prints, $y = 0.997 - 0.142\,t + 0.010\,t^2$, gives $0.733$
+at year 12 ($+86\%$ against the actual) where the unrounded fit gives
+$0.757$, the $+92\%$ quoted below. All three fit the window well, the
+quadratic almost perfectly. Extrapolated to year 12 and compared with the
+held-out actuals, the linear model comes in **81% too low**, the exponential
+30% too low, and the quadratic **92% too high**.
+
+<Figure
+  src="./figures/quadratic-seduction.svg"
+  alt="High End survival data for years 0 to 12 with the quadratic fit: nearly perfect through year 7, then curving upward while the actual points keep falling, a +92% gap at year 12"
+  caption="The in-sample champion is the out-of-sample disaster: R² = .998 on years 0–7, +92% at year 12."
+/>
+
+The failures are structural, not unlucky. The linear model's line crosses
+zero just past year 13 and keeps going: negative survival. The quadratic's
+parabola bottoms out at $t \approx 7$, the window's edge, and **rises**
+afterward, and a survivor function cannot rise. On the Regular segment the same three fits
+give the same story (the exponential, the best of the three there, is 54%
+too low at year 12). Polynomials and exponentials in $t$ are shapes, not
+explanations; nothing in them knows that the curve is a product of
+period-by-period renewal decisions, so nothing constrains their behavior
+where there is no data to hold them down.
+
+<KeyFact>
+In-sample $R^2$ measures interpolation and only interpolation. Extrapolation
+is governed by the assumed functional form, and a form chosen for fit
+carries no information about behavior outside the window: $R^2 = .998$ and a
+92% projection error are the same model.
+</KeyFact>
+
+## A population of coins: the sBG model
+
+What survives off the page is a model of the **process** that generates
+renewals, because a process assumption constrains every future period the
+same way it constrains the observed ones. Fader and Hardie build the model
+from a deliberately minimal story:
+
+- at the end of each period, a customer flips a coin: heads, cancel; tails,
+  renew;
+- for a given customer, P(heads) never changes;
+- P(heads) varies across customers.
+
+Nobody renews by coin flip; the authors call the story a *paramorphic*
+representation: a mechanism that reproduces the behavior without claiming
+to be the behavior. The discipline is to start with the simplest story and
+add richness only when the data rejects it.
+
+### One customer: the shifted geometric
+
+<Definition title="shifted-geometric lifetime">
+For a customer with churn probability $\theta \in (0,1)$, the lifetime $T$
+(the period in which cancellation occurs) satisfies
+
+$$
+P(T = t \mid \theta) = \theta (1-\theta)^{t-1}, \qquad
+S(t \mid \theta) = (1-\theta)^{t}, \qquad t = 1, 2, \ldots
+$$
+</Definition>
+
+A $\theta = 0.3$ customer renews each year with probability $0.7$:
+$S(1) = 0.7$, $S(2) = 0.49$, and the probability of cancelling in year 3 is
+$0.7^2 \times 0.3 = 0.147$. Every retention rate of this customer is the
+same $0.7$: the geometric distribution is memoryless, so a homogeneous
+population of such customers has a **flat** $r_t$ series. The data's series
+is not flat: the Regular segment runs from $r_1 = 0.631$ up to
+$r_7 = 0.920$, and the closing exercise of
+<Ref lesson="retention-and-survival">the previous lesson</Ref> showed that
+no constant rate fits even four years of it. Refitting here confirms it: the
+best single coin for the Regular segment ($\hat\theta = 0.226$, by the
+likelihood method below) predicts a flat $0.774$ against an observed climb
+from $0.631$ to $0.920$. The first two story elements cannot carry the data.
+The third does.
+
+### Three customers: heterogeneity already produces the rise
+
+<Example title="a three-type cohort">
+Let a cohort be one-third each of $\theta = 0.1$, $\theta = 0.3$, and
+$\theta = 0.5$ customers. The aggregate survivor function is the average of
+three geometric curves:
+
+$$
+S(t) = \tfrac{1}{3}\,(0.9)^t + \tfrac{1}{3}\,(0.7)^t + \tfrac{1}{3}\,(0.5)^t,
+$$
+
+so $S(1) = 0.700$, $S(2) = 0.517$, $S(3) = 0.399$, $S(4) = 0.320$. The
+aggregate retention rates $r_t = S(t)/S(t-1)$ are
+
+$$
+r_1 = 0.700, \quad r_2 = 0.738, \quad r_3 = 0.772, \quad r_4 = 0.801:
+$$
+
+rising, while every individual's rate stays fixed at $0.9$, $0.7$, or
+$0.5$. The reason is visible in the cohort's composition. At acquisition the
+three types are 33/33/33. Among year-4 survivors the weights are
+proportional to $0.9^4 : 0.7^4 : 0.5^4$, which normalizes to
+**68% / 25% / 7%**: the $\theta = 0.5$ customers have mostly eliminated
+themselves, so the survivors are increasingly the $\theta = 0.1$ type, and
+the average of the survivors' rates drifts up toward $0.9$.
+</Example>
+
+<Exercise>
+A magazine's subscribers are one quarter loyal ($\theta = 0.2$) and three
+quarters casual ($\theta = 0.8$). Compute $r_1$, $r_2$, $r_3$ for the
+cohort, and the composition of the survivors at the end of year 2.
+
+<Solution>
+Survival: $S(1) = 0.25(0.8) + 0.75(0.2) = 0.350$;
+$S(2) = 0.25(0.64) + 0.75(0.04) = 0.190$;
+$S(3) = 0.25(0.512) + 0.75(0.008) = 0.134$.
+
+Rates: $r_1 = 0.350$, $r_2 = 0.190/0.350 = 0.543$,
+$r_3 = 0.134/0.190 = 0.705$.
+
+Composition at the end of year 2: loyal survivors $0.25 \times 0.64 = 0.16$
+of the original cohort, casual survivors $0.75 \times 0.04 = 0.03$, so the
+surviving population is $0.16/0.19 = 84\%$ loyal against 25% at acquisition.
+Two constant coins reproduce the shape of the published magazine-renewal
+climb (about 30%, then 50%, then 75%;
+<Ref lesson="cohorts-and-funnels">lesson 1</Ref>'s numbers): a renewal rate
+that more than doubles while no individual changes.
+</Solution>
+</Exercise>
+
+### From a histogram to a density
+
+Three types are arbitrary; so are ten. The tutorial version of this
+derivation (Fader and Hardie's
+[ART Forum handout](http://www.brucehardie.com/talks/intro_tut_art_16_HO.pdf),
+pp. 26–42) refines the grid: an equally spaced 3-point grid at
+$\theta \in \{1/6, 1/2, 5/6\}$ can put its mean only between $0.167$ and
+$0.833$; a 10-point grid is more flexible and
+less parsimonious; letting the number of grid points go to infinity replaces
+the histogram with a continuous density $g(\theta)$ on $(0,1)$, and the
+mixture sum becomes an integral. For $g$, the standard choice is the beta
+distribution: a two-parameter family on exactly $(0,1)$, flexible enough to
+be U-shaped, J-shaped, reverse-J, or single-peaked,
+
+$$
+g(\theta \mid \alpha, \beta)
+= \frac{\theta^{\alpha-1}(1-\theta)^{\beta-1}}{B(\alpha,\beta)},
+\qquad \alpha, \beta > 0,
+\qquad E(\theta) = \frac{\alpha}{\alpha+\beta},
+$$
+
+where $B(\alpha,\beta) = \int_0^1 \theta^{\alpha-1}(1-\theta)^{\beta-1}
+\,d\theta$ is the beta function.
+
+<FigureSequence
+  name="coin-to-population"
+  alt="Five frames: one customer with one theta and a geometric survival curve; three customer types with three curves; their mixture curve; a ten-bar histogram of theta; the continuous Beta density and the resulting sBG survival curve"
+  caption="From one coin to a population: the mixture of constant-rate individuals, refined until the histogram becomes a Beta density."
+/>
+
+<Task>
+Step through the five frames watching only the right panel. The individual
+curves in frame 2 are each geometric (constant proportional decay); the
+mixture curves from frame 3 on are more convex than any member: steep early,
+flat late. Convexity of the aggregate is the visual signature of
+heterogeneity.
+</Task>
+
+<Definition title="shifted-beta-geometric (sBG) model">
+A cohort follows the **sBG model** with parameters $\alpha, \beta > 0$ when
+each customer's lifetime is shifted-geometric with churn probability
+$\theta$, and $\theta$ varies across customers as
+$\text{Beta}(\alpha,\beta)$. Averaging the individual-level formulas over
+$g(\theta \mid \alpha, \beta)$ gives, for $t = 1, 2, \ldots$,
+
+$$
+P(T = t) = \frac{B(\alpha+1,\, \beta+t-1)}{B(\alpha, \beta)},
+\qquad
+S(t) = \frac{B(\alpha,\, \beta+t)}{B(\alpha, \beta)}.
+$$
+</Definition>
+
+The integrals collapse because the geometric terms $\theta(1-\theta)^{t-1}$
+merge with the beta kernel into another beta integral; the step-by-step
+derivation is Appendix A of the 2007 paper. No beta function ever needs to
+be evaluated in practice: dividing consecutive terms and using
+$\Gamma(x+1) = x\,\Gamma(x)$ gives a **forward recursion**,
+
+$$
+P(T=1) = \frac{\alpha}{\alpha+\beta},
+\qquad
+P(T=t) = \frac{\beta+t-2}{\alpha+\beta+t-1}\;P(T=t-1),
+$$
+
+and $S(t) = 1 - \sum_{i \le t} P(T=i)$. Everything the model produces is
+seven multiplications away from the two parameters.
+
+## Sorting, not loyalty
+
+With the model built, the module's standing question, the rise of observed
+retention rates, has a closed-form answer.
+
+<Theorem title="sBG retention rate (Fader & Hardie 2007, eq. 8)">
+Under the sBG model, the aggregate retention rate is
+
+$$
+r_t = \frac{\beta+t-1}{\alpha+\beta+t-1}
+    = 1 - \frac{\alpha}{\alpha+\beta+t-1},
+$$
+
+strictly increasing in $t$ and approaching 1, while every individual's
+retention probability $1-\theta$ is constant.
+
+<Proof>
+By <Ref lesson="retention-and-survival">the product identity</Ref>,
+$r_t = S(t)/S(t-1)$. Substituting the sBG survivor function,
+
+$$
+r_t = \frac{B(\alpha, \beta+t)}{B(\alpha, \beta+t-1)}
+    = \frac{\Gamma(\beta+t)\,\Gamma(\alpha+\beta+t-1)}
+           {\Gamma(\beta+t-1)\,\Gamma(\alpha+\beta+t)},
+$$
+
+after writing each beta function as
+$B(a,b) = \Gamma(a)\Gamma(b)/\Gamma(a+b)$ and cancelling the common
+$\Gamma(\alpha)$ factors. The recursion $\Gamma(x+1) = x\,\Gamma(x)$ reduces
+the two ratios to $(\beta+t-1)/(\alpha+\beta+t-1)$. The second form follows
+by algebra; it is increasing in $t$ because the subtracted fraction shrinks,
+and it tends to 1 because the fraction tends to 0.
+</Proof>
+</Theorem>
+
+The second form of the formula says what is actually happening. Among
+survivors of $t-1$ periods, the churn probabilities are no longer
+distributed as the acquisition-day $\text{Beta}(\alpha, \beta)$: surviving
+$t-1$ flips multiplies the density by $(1-\theta)^{t-1}$, and renormalizing
+gives $\text{Beta}(\alpha,\, \beta+t-1)$, a distribution pushed toward low
+$\theta$. Its mean is $\alpha/(\alpha+\beta+t-1)$: exactly the fraction
+subtracted in the theorem. So
+
+$$
+r_t = 1 - E[\theta \mid \text{survived } t-1 \text{ periods}]:
+$$
+
+each period's aggregate retention is one minus the **mean churn probability
+of whoever is left**, and whoever is left is an ever-more-selected group.
+For the fitted High End segment (parameters below), mean churn is 14.9% on
+acquisition day and 7.9% among four-year survivors: the cohort's churn rate
+halves while not one customer changes.
+
+<Figure
+  src="./figures/sorting.svg"
+  alt="Left panel: the Beta density of churn probabilities at acquisition and the density among four-year survivors, with dashed drop-lines marking the two means on the θ-axis: 14.9% at acquisition, 7.9% among survivors. Right panel: the retention rate rising from 0.851 toward 0.957 over twelve periods"
+  caption="Sorting made visible: survivorship shifts mean churn from 14.9% at acquisition to 7.9% among four-year survivors (left), and the aggregate retention rate rises on composition alone (right)."
+/>
+
+The practitioner reading of rising renewal rates is that **customers become
+more loyal as the relationship deepens**; the magazine renewal figures of
+<Ref lesson="cohorts-and-funnels">lesson 1</Ref> (roughly 30% at first
+renewal, 50% at second, 75% for longtime readers) circulate in print as
+evidence for exactly that. The inference is invalid. The sBG reproduces any
+such climb with individuals who never change, so an aggregate climb, by
+itself, is **zero evidence** of individual change; the two-type magazine
+exercise above manufactures the published pattern from two constant coins.
+Vaupel and Yashin, demographers who catalogued the same trap in mortality
+data in 1985, call this family of artifacts the *ruse of heterogeneity*:
+dynamics at the population level that are pure composition, with no dynamics
+at the individual level.
+
+The retention curve itself cannot separate the stories. Two designs can:
+
+- **Same age, different vintages.** Loyalty-building (say, an onboarding
+  investment) should raise the early-age rates of the cohorts acquired
+  after it; sorting predicts identical $r_1$ for every vintage. This is
+  the cohort matrix's
+  <Ref lesson="cohorts-and-funnels" id="the-column-read-same-age-successive-vintages">column read</Ref>,
+  and it needs no new machinery.
+- **A model that allows individual dynamics.** Replacing the geometric with
+  a discrete Weibull lets each customer's churn probability rise or fall
+  with tenure and lets the data vote: the beta-discrete-Weibull (BdW)
+  model, which Fader, Hardie, Liu, Davin, and Steenburgh (2018) fit to the
+  two segments of this lesson's dataset. The vote runs against the loyalty
+  story twice over. Where the constant-$\theta$ assumption fails,
+  individual churn probabilities most likely **rise** with tenure — even
+  while the aggregate retention rate climbs — and accounting for
+  cross-sectional heterogeneity matters more than accounting for any
+  individual-level dynamics. The continuous-time analogue, a Weibull-gamma
+  model, reaches the same verdict on a telecommunications provider's churn
+  data (Schweidel, Fader, and Bradlow 2008): individual risk rising with
+  tenure. (The BdW also reproduces an initial *dip* in a retention series,
+  $r_2$ falling below $r_1$ before the climb, as the High End segment's
+  rates do — a shape no mixture of constant coins can produce.)
+
+<KeyFact>
+The sBG is the **null model to beat**, not a law of customer behavior.
+</KeyFact>
+
+## Maximum likelihood in five columns
+
+Fitting the model to the observed window is the audience's home ground:
+write the likelihood of the data as a function of $(\alpha, \beta)$ and
+maximize it. For a cohort of $N$ customers observed for 7 periods, the data
+reduce to eight counts: $n_t$ customers lost in period $t$ for
+$t = 1, \ldots, 7$, and $N - \sum_t n_t$ still active at the end of period
+7. For 1,000 High End customers the losses are 131, 126, 90, 60, 42, 34, 26,
+with 491 survivors.
+
+Each customer lost in period $t$ contributes a factor $P(T = t)$; each
+survivor contributes $S(7)$: a lifetime known only to exceed 7, the
+censored observations of
+<Ref lesson="retention-and-survival">the previous lesson</Ref> entering the
+likelihood as survival probabilities rather than being discarded. The
+log-likelihood is
+
+$$
+LL(\alpha, \beta)
+= \sum_{t=1}^{7} n_t \ln P(T = t)
++ \Bigl(N - \sum_{t=1}^{7} n_t\Bigr) \ln S(7),
+$$
+
+with $P(T=t)$ and $S(7)$ supplied by the forward recursion.
+
+<Figure
+  float="right"
+  width="m"
+  src="./figures/sbg-excel-worksheet.png"
+  alt="Excel worksheet from Appendix B: cells B1, B2, B3 hold alpha 1.000, beta 1.000 and LL -2115.5; below them rows 6 to 12 give t = 1 to 7 with columns P(T=t), S(t), number active (869, 743, 653, 593, 551, 517, 491), number lost (131, 126, 90, 60, 42, 34, 26) and the per-period log-likelihood contributions (-90.8, -225.8, -223.6, -179.7, -142.9, -127.1, -104.7), which sum to -1094.6; a separate cell holds the censored-survivor term 491 times ln 0.125 = -1021.0, and the two parts add to the LL of -2115.5"
+  caption="The whole estimation, as printed: three parameter cells and seven rows. The abstract's promise is literal — the model “can be implemented in a simple Microsoft Excel spreadsheet.”"
+/>
+
+The paper's Appendix B implements this in a worksheet of five columns ($t$,
+$P(T=t)$, $S(t)$, number active, number lost) plus three cells for
+$\alpha$, $\beta$, and $LL$. The recursion lives in the $P(T=t)$ column
+(each cell multiplies the one above by $(\beta+t-2)/(\alpha+\beta+t-1)$),
+and the whole apparatus is an argument in itself: the model asks for nothing
+a 2005 spreadsheet could not deliver.
+
+The optimization run: starting values $\alpha = \beta = 1$ give
+$LL = -2115.5$; Solver, told to maximize the $LL$ cell by changing the two
+parameter cells subject to both being $\ge 0.0001$, converges to
+$LL = -1611.2$ at $\hat\alpha = 0.668$, $\hat\beta = 3.806$. Restarting from
+$\alpha = \beta = 0.01$ (where $LL = -2741.7$) reaches the same optimum:
+the standard check that the optimizer found a maximum of the surface, not an
+artifact of the starting point.
+
+<Remark title="a numerical rule">
+Never evaluate the beta-function ratios directly: $\Gamma(\beta+t)$
+overflows floating point long before $t$ is interesting. The forward
+recursion avoids the issue entirely; where a direct evaluation is wanted
+(one-off checks, continuous $t$), compute in logs via `gammaln` and
+exponentiate the difference.
+</Remark>
+
+<Example title="the same fit in numpy">
+The worksheet translates line for line:
+
+```python
+import numpy as np
+from scipy.optimize import minimize
+
+lost  = np.array([131, 126, 90, 60, 42, 34, 26])   # n_t, years 1-7
+alive = 491                                         # active at year 7
+
+def negLL(params):
+    a, b = params
+    p = [a / (a + b)]
+    for t in range(2, 8):
+        p.append(p[-1] * (b + t - 2) / (a + b + t - 1))
+    p = np.array(p)
+    return -(lost @ np.log(p) + alive * np.log(1 - p.sum()))
+
+fit = minimize(negLL, x0=[1.0, 1.0], bounds=[(1e-4, None)] * 2)
+print(fit.x, -fit.fun)        # [0.668  3.806]  -1611.2
+```
+
+Run once with `x0=[1.0, 1.0]` and once with `x0=[0.01, 0.01]`; both print
+the same $(\hat\alpha, \hat\beta)$. The same code with the Regular segment's
+counts is one of the closing exercises.
+</Example>
+
+<Task>
+Before optimizing, evaluate `negLL([1.0, 1.0])`: it should return 2115.5
+(the worksheet's starting state). After optimizing, confirm
+$(0.668,\ 3.806)$ and $-1611.2$.
+</Task>
+
+For scale: the same likelihood run with a single shared $\theta$ (the
+homogeneous geometric model) tops out at $LL = -1637.1$ for High End and
+$-1794.6$ for Regular. Heterogeneity buys 26 and 114 log-likelihood points
+respectively for one extra parameter; the Regular segment, with its steep
+early churn, is the more mixed population.
+
+<Aside>
+A reader checking the paper will find the body text reporting
+$\hat\alpha = 0.688$ for High End while Appendix B reports $0.668$. The
+appendix is right: $0.668$ is the value that reproduces $LL = -1611.2$, and
+refitting the published counts (the code above) returns $0.668$ to three
+decimals. The body's $0.688$ is a typo that survived copyediting.
+</Aside>
+
+## Projection to year twelve: within 2–4%
+
+The fitted model projects by running the recursion past the window: the
+same formula that fit years 1–7 produces years 8–12, because the model's
+future is the same process as its past, not a curve's continuation. For High
+End, $S(12 \mid 0.668, 3.806) = 37.8\%$ against the held-out actual
+$39.4\%$: **4% low**. For Regular ($\hat\alpha = 0.704$,
+$\hat\beta = 1.182$, fit the same way), $17.0\%$ against $17.3\%$: **2%
+low**. The regressions on the identical window missed by −81%, +92%, and
+−30%.
+
+<Figure
+  src="./figures/sbg-projection.svg"
+  alt="Both segments' survival data for years 0 to 12 with sBG fits: solid curves through the fit window years 0 to 7, dashed extrapolations to year 12 passing within a few percent of the held-out actual points, labeled with the fitted alpha and beta for each segment"
+  caption="Fit on years 0–7 (solid), project to year 12 (dashed): errors of −4% (High End) and −2% (Regular) where the regressions missed by 30–92%."
+/>
+
+The projected retention-rate series tracks equally well: the model's
+$r_t = (\beta+t-1)/(\alpha+\beta+t-1)$ runs through the observed rates out
+to year 12, riding over one unexplained blip in the High End data at year 2
+that no two-parameter model should chase.
+
+### What the fitted parameters say
+
+The parameters are not just projection machinery; they describe the
+population. Both segments fit with $\alpha < 1 < \beta$, the
+**reverse-J** shape: a large mass of low-churn customers plus a tail of
+high-churn ones who exit early. The mix is why the aggregate curve is
+convex and the single-coin fit failed. The segments differ in the mean:
+$E(\theta) = \alpha/(\alpha+\beta)$ is **15%** for High End and **37%** for
+Regular. The four qualitative Beta shapes are worth knowing as vocabulary,
+because a fitted shape is a one-glance diagnosis of the customer base:
+
+<Figure
+  src="./figures/beta-shapes.svg"
+  alt="Four Beta density shapes in a two-by-two grid by alpha and beta above or below 1: U-shaped polarized, interior-mode homogeneous, reverse-J with most mass at low churn, and J-shaped with most mass at high churn"
+  caption="The four shapes of Beta heterogeneity. Both fitted segments are reverse-J: mostly loyal, with a fast-departing minority."
+/>
+
+The fit lab below runs the whole pipeline on the High End data with years
+8–12 held out, scored by the two numbers that matter: the log-likelihood on
+the fit window and the projection error at year 12.
+
+<Task>
+Click **Fit quadratic** to overlay the regression and its +92% holdout
+error, then drag $\alpha$ and $\beta$ until the year-12 projection lands
+within 10% of the held-out 39.4%; the Beta panel shows the population each
+slider position asserts. Note the log-likelihood gap your hand fit leaves,
+then press **MLE (0.668, 3.806)**: the gap drops to zero, confirming that
+no setting of the two sliders does better.
+</Task>
+
+<Demo
+  name="SbgFitLab"
+  caption="The High End series, years 8–12 held out: an sBG fit by hand against the quadratic, with live log-likelihood, year-12 projection error, and the implied Beta(α, β) density."
+/>
+
+<KeyFact>
+The projection inherits the model's assumptions, not just its fit: the sBG
+treats every cohort as a draw from one fixed $\text{Beta}(\alpha,\beta)$, so
+a vintage effect — the same failure that breaks
+<Ref lesson="retention-and-survival" id="independent-censoring-is-an-assumption">independent
+censoring</Ref> — invalidates the extrapolation even where the in-window fit
+is excellent. And both fitted $\hat\alpha < 1$ make $\sum_t S(t)$ diverge —
+the model says expected tenure is infinite — which is why
+<Ref lesson="customer-lifetime-value">the next lesson</Ref> can only sum
+$S(t)$ under a discount factor.
+</KeyFact>
+
+## The model's cell: discrete-time, contractual
+
+The sBG's writ has boundaries, and they are the taxonomy the module's later
+lessons fill in. Two distinctions classify any customer base: whether
+departure is **observed** (contractual: cancellations, non-renewals) or
+latent (noncontractual: a retail customer who simply stops), and whether
+transactions can happen at **any instant** (continuous) or only at fixed
+renewal points (discrete). The sBG occupies exactly one of the four cells: discrete-time,
+contractual. Its continuous-time contractual analog is the
+exponential-gamma model, with the same sorting arithmetic; the
+noncontractual cells, where even "still a customer?" must be inferred (the
+Pareto/NBD and BG/NBD models in continuous time, the BG/BB at discrete
+opportunities), are the subject of
+<Ref lesson="repeat-purchase-models">the repeat-purchase lesson</Ref>.
+Applying the sBG outside its cell (to usage-based "churn" definitions, or
+where death is unobserved) is a category error, not an approximation.
+
+<Figure
+  src="./figures/model-taxonomy.svg"
+  alt="Two-by-two grid classifying customer bases by contractual versus noncontractual relationship and discrete versus continuous time: the sBG in the contractual discrete-time cell, the exponential-gamma in the contractual continuous-time cell, and BG/BB, Pareto/NBD and BG/NBD in the noncontractual row"
+  caption="The four cells of customer-base analysis (Fader & Hardie 2009, after Schmittlein et al. 1987). The sBG covers one; the noncontractual row belongs to the repeat-purchase lesson."
+/>
+
+What is established: churn words resolve to a probability model; a
+two-parameter mixture of constant-churn individuals fits a retention series
+by maximum likelihood in a spreadsheet, projects five years past the window
+within 2–4%, and produces rising aggregate retention by sorting alone,
+$r_t = (\beta+t-1)/(\alpha+\beta+t-1)$. The fitted $S(t \mid \alpha,\beta)$
+now extends to any horizon, which is precisely what a value calculation
+needs: <Ref lesson="customer-lifetime-value">the next lesson</Ref> weights
+it by margin and discount and calls the sum customer lifetime value.
+
+## Exercises
+
+<Exercise>
+With the High End parameters $\alpha = 0.668$, $\beta = 3.806$: compute
+$r_1$, $r_2$, and $r_{10}$ from the closed form, and $S(3)$ via the forward
+recursion (three $P(T=t)$ values, then the complement).
+
+<Solution>
+Closed form $r_t = (\beta+t-1)/(\alpha+\beta+t-1)$:
+
+$$
+r_1 = \frac{3.806}{4.474} = 0.851, \quad
+r_2 = \frac{4.806}{5.474} = 0.878, \quad
+r_{10} = \frac{12.806}{13.474} = 0.950.
+$$
+
+Recursion: $P(T{=}1) = 0.668/4.474 = 0.1493$;
+$P(T{=}2) = 0.1493 \times 3.806/5.474 = 0.1038$;
+$P(T{=}3) = 0.1038 \times 4.806/6.474 = 0.0771$. Then
+$S(3) = 1 - (0.1493 + 0.1038 + 0.0771) = 0.670$.
+
+Cross-check: $S(3) = r_1 r_2 r_3 = 0.851 \times 0.878 \times 0.897 = 0.670$
+with $r_3 = 5.806/6.474 = 0.897$: the two encodings agree, as the product
+identity requires.
+</Solution>
+</Exercise>
+
+<Exercise>
+The High End likelihood used the counts (131, 126, 90, 60, 42, 34, 26; 491
+still active). State which term of $LL(\alpha,\beta)$ is the censored one,
+which cells of the cohort matrix each count comes from, and what would go
+wrong if the 491 were dropped from the likelihood (fitted on the seven loss
+counts alone, renormalized).
+
+Then, for each situation, name the estimator the module supplies — the
+product-limit (Kaplan–Meier) estimator of
+<Ref lesson="retention-and-survival">the previous lesson</Ref>, the
+single-coin geometric, or the sBG — and the cue that decides: (a) a board
+asks for year-12 survival of a cohort observed for seven years; (b) an
+analyst pools staggered cohorts to describe survival over the observed
+window, no projection asked; (c) a product's cohort shows retention rates
+flat at 0.78 across seven years.
+
+<Solution>
+The censored term is $491 \times \ln S(7)$: the survivors' lifetimes are
+known only to exceed 7, so they enter through the survivor function: the
+same rule as <Ref lesson="retention-and-survival">the risk-set
+arithmetic</Ref>, where a censored customer contributes exposure but never a
+death.
+
+Cohort-matrix locations: each loss count $n_t$ is the difference of two
+adjacent cells in the cohort's row, $n_{c,t-1} - n_{c,t}$ (1,000 − 869 =
+131, 869 − 743 = 126, and so on); the 491 is the row's last observed cell,
+the one sitting on the staircase boundary where
+<Ref lesson="cohorts-and-funnels">the matrix</Ref> meets the unobserved
+triangle.
+
+Dropping the survivors conditions the model on $T \le 7$: it fits the
+distribution of lifetimes *given* that the customer churned in the window.
+The sample is then selected for high $\theta$ (only churners are kept), the
+fitted heterogeneity shifts toward high churn, and projected survival is
+biased low: the same discard-the-censored error as the previous lesson's
+$15/850$ estimate, now committed inside a parametric model.
+
+Estimator choice. (a) The sBG: projecting past the window requires a
+process model — the product-limit estimator stops at the staircase
+boundary, and the second section showed what extrapolating fitted shapes
+does. (b) Kaplan–Meier: description inside the window needs no functional
+form, and the product-limit estimator already combines rows of different
+lengths under censoring; a parametric model would add assumptions where
+none are needed. (c) The single coin: a flat $r_t$ series is the
+memoryless signature, so heterogeneity has nothing to explain (the
+$\beta \to \infty$ limit of a later exercise is already the best fit) and
+one parameter beats two. The deciding cues: describe or project, and
+whether the $r_t$ series rises.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take $\beta \to \infty$ with the mean churn probability
+$\alpha/(\alpha+\beta) = c$ held fixed. Show what happens to the variance of
+$g(\theta)$, to $r_t$, and to the model; state which observed feature of the
+data the limiting model can no longer produce.
+
+<Solution>
+The Beta variance is
+$\mathrm{var}(\theta) = \dfrac{\alpha\beta}{(\alpha+\beta)^2(\alpha+\beta+1)}
+= \dfrac{c(1-c)}{\alpha+\beta+1} \to 0$: the density collapses to a point
+mass at $c$, so every customer carries the same coin.
+
+For the retention rate, write $r_t = 1 - \alpha/(\alpha+\beta+t-1)$. With
+$\alpha = c(\alpha+\beta)$ and $\alpha + \beta \to \infty$, the subtracted
+term is $c\,(\alpha+\beta)/(\alpha+\beta+t-1) \to c$ for every fixed $t$,
+so $r_t \to 1 - c$: **constant in $t$**. The sBG degenerates to the
+homogeneous shifted-geometric model.
+
+The lost feature is the rise. A flat $r_t$ series cannot match the observed
+climb ($0.631 \to 0.920$ for Regular), which is why the single-coin fit
+failed in the lesson. The heterogeneity assumption is not decoration: the
+variance of $g$ is exactly what buys a rising aggregate retention rate, and
+in its absence the model reproduces none of the module's central
+observation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Our renewal rate climbed from 60% to 85% over four
+years, so our onboarding investments made customers more loyal." Produce the
+same climb from constant individuals, then state what additional data would
+separate the two stories.
+
+<Solution>
+Fit an sBG to the two endpoints. Require $r_1 = 1 - \alpha/(\alpha+\beta) =
+0.60$ and $r_5 = 1 - \alpha/(\alpha+\beta+4) = 0.85$. The first gives
+$\alpha = 0.4\,s$ with $s = \alpha+\beta$; substituting into the second:
+$0.4s/(s+4) = 0.15$, so $0.25 s = 0.6$, $s = 2.4$, giving
+$\alpha = 0.96$, $\beta = 1.44$. Check the path:
+$r_2 = 1 - 0.96/3.4 = 0.72$, $r_3 = 0.78$, $r_4 = 0.82$, $r_5 = 0.85$: a
+smooth 60→85 climb from customers whose individual probabilities never
+move. The claimed inference fails at the step "aggregate rose, therefore
+individuals changed": sorting produces the rise for free.
+
+Separating data: compare cohorts **across vintages at the same age**. If
+onboarding (which new customers experience once, at the start) built
+loyalty, cohorts acquired after the investment should show higher $r_1$ and
+$r_2$ than earlier cohorts did at the same ages; under pure sorting, every
+vintage repeats the same age profile. Individual-level histories would also
+do it (testing whether a given customer's hazard falls with tenure), but
+the vintage comparison uses only the cohort matrix the company already has.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the distribution of $\theta$ among customers who have survived $t$
+periods, show
+$E[\theta \mid T > t] = \alpha/(\alpha+\beta+t)$, and verify it equals
+$1 - r_{t+1}$. Interpret the result as Bayesian updating.
+
+<Solution>
+By Bayes' rule, the density of $\theta$ conditional on survival is
+
+$$
+g(\theta \mid T > t)
+= \frac{S(t \mid \theta)\, g(\theta)}{S(t)}
+\propto (1-\theta)^t \cdot \theta^{\alpha-1}(1-\theta)^{\beta-1}
+= \theta^{\alpha-1}(1-\theta)^{\beta+t-1},
+$$
+
+which is the $\text{Beta}(\alpha,\ \beta+t)$ kernel, so
+$g(\theta \mid T>t) = \text{Beta}(\alpha, \beta+t)$ and its mean is
+$\alpha/(\alpha+\beta+t)$.
+
+From the theorem, $r_{t+1} = 1 - \alpha/(\alpha+\beta+t)$, so
+$1 - r_{t+1} = \alpha/(\alpha+\beta+t) = E[\theta \mid T > t]$: next
+period's aggregate churn rate is the posterior mean churn probability of
+the current survivors.
+
+Interpretation: each observed renewal is one Bernoulli "success" carrying
+evidence that the customer's $\theta$ is low, and the Beta prior updates by
+adding the survival count to its second parameter: conjugacy, exactly as
+in a Beta-Bernoulli posterior. Sorting **is** Bayesian updating read at the
+population level: the market performs the update physically, by deleting
+the high-$\theta$ customers, and the analyst performs it algebraically.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the Regular segment's fit with your own optimizer. From Table 1,
+the per-1,000 loss counts for years 1–7 are 369, 163, 86, 56, 37, 27, 21,
+with 241 still active. Report $(\hat\alpha, \hat\beta)$, the log-likelihood
+at the optimum and at $\alpha = \beta = 1$, and the year-12 projection
+error against the actual 17.3%.
+
+<Solution>
+Running the lesson's `negLL` with `lost = [369, 163, 86, 56, 37, 27, 21]`
+and `alive = 241`: the optimum is $\hat\alpha = 0.704$,
+$\hat\beta = 1.182$, with $LL = -1680.3$; the starting point
+$\alpha = \beta = 1$ gives $LL = -1741.7$. (Both starting points named in
+the lesson converge to the same optimum.)
+
+Projection: running the recursion to $t = 12$, or multiplying
+$r_t = (1.182+t-1)/(1.886+t-1)$ from $t=1$ to $12$, gives
+$S(12) = 17.0\%$ against the actual $17.3\%$: an error of about $-2\%$
+(relative). The fitted mean churn is $E(\theta) = 0.704/1.886 = 0.373$:
+the Regular segment loses over a third of a fresh cohort in an average
+first flip, yet twelve-year survival is still 17%, because the survivors
+are drawn overwhelmingly from the low-$\theta$ part of the reverse-J.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the High End segment ($\alpha = 0.668$, $\beta = 3.806$) and an annual
+discount rate $d = 10\%$, compute the expected discounted number of future
+renewals, $\sum_{t=1}^{\infty} S(t)/(1+d)^t$ (truncate the sum when the
+terms stop mattering). Compare it with the "expected lifetime" a naive
+calculation would use, $1/E(\theta)$, and state what each number would mean
+attached to a per-period margin.
+
+<Solution>
+The recursion gives $S(t)$; the discounted sum converges geometrically
+(each term is at most $S(t)/1.1^t$), and truncating at $t = 200$ is more
+than enough at $d = 10\%$:
+
+$$
+\sum_{t=1}^{\infty} \frac{S(t)}{1.1^t} \approx 4.92.
+$$
+
+The naive lifetime is $1/E(\theta) = 1/0.149 = 6.70$ years. It is wrong
+twice over. First, it ignores discounting: a renewal in year 15 is not
+worth a renewal in year 1. Second, under heterogeneity the sBG's actual
+expected tenure is not $1/E(\theta)$ at all: with $\alpha = 0.668 < 1$,
+$S(t)$ decays like $t^{-0.668}$ and $\sum_t S(t)$ **diverges**: the fitted
+expected tenure is infinite, because the reverse-J puts non-negligible mass
+on customers with $\theta$ near zero who effectively never leave. The
+discounted sum is finite anyway: discounting caps what the far tail can
+contribute.
+
+Attached to a per-period margin $m$ (paid at each renewal), $m \times 4.92$
+is the expected present value of the customer's future renewals; $m \times
+6.70$ is a number with no consistent interpretation: an undiscounted
+lifetime the model itself contradicts. The first object is, up to the
+margin convention, the customer lifetime value that
+<Ref lesson="customer-lifetime-value">the next lesson</Ref> defines as
+$E(\mathrm{CLV}) = \sum_t m\,S(t)/(1+d)^t$, and the gap between the two
+numbers is that lesson's subject.
+</Solution>
+</Exercise>
+
+<References>
+1. P. S. Fader, B. G. S. Hardie, "How to Project Customer Retention," *Journal of Interactive Marketing* 21(1), 2007, pp. 76–90 — the lesson's skeleton: Table 1 and Figures 1–2 (the regression failure), eqs. 3–8 (the sBG and its retention rate), Appendix A (derivations), Appendix B (the Excel/Solver implementation reproduced here). https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Fader_hardie_jim_07.pdf
+2. P. S. Fader, B. G. S. Hardie, "Probability Models for Customer-Base Analysis," *Journal of Interactive Marketing* 23(1), 2009, pp. 61–69 — the contractual/noncontractual × discrete/continuous taxonomy, the magazine-renewal quotation (Fielding 2005) and its sorting reinterpretation, and the Weibull-gamma pointer. https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Fader_hardie_jim_09.pdf
+3. P. S. Fader, B. G. S. Hardie, "An Introduction to Probability Models for Marketing Research" (27th ART Forum tutorial handout), 2016 — pp. 26–42: the discrete-mixture-to-Beta derivation this lesson follows; pp. 43–55: the likelihood surface and the sorting discussion. http://www.brucehardie.com/talks/intro_tut_art_16_HO.pdf
+4. J. W. Vaupel, A. I. Yashin, "Heterogeneity's Ruses: Some Surprising Effects of Selection on Population Dynamics," *The American Statistician* 39(3), 1985, pp. 176–185 — the general theory of composition artifacts, of which the sorting effect is the customer-base instance.
+5. P. S. Fader, B. G. S. Hardie, Y. Liu, J. Davin, T. Steenburgh, "'How to Project Customer Retention' Revisited: The Role of Duration Dependence," *Journal of Interactive Marketing* 43, 2018, pp. 1–16 — the beta-discrete-Weibull extension, refit to this lesson's two segments: where individual churn probabilities are not constant they most likely rise with tenure, and heterogeneity matters more than individual-level dynamics. http://www.brucehardie.com/papers/037/
+6. D. A. Schweidel, P. S. Fader, E. T. Bradlow, "Understanding Service Retention Within and Across Cohorts Using Limited Information," *Journal of Marketing* 72(1), 2008, pp. 82–94 — a continuous-time (Weibull-gamma) retention model with duration-dependence, promotional, cross-cohort, and calendar-time effects, applied to telecommunications services; finds individual churn risk rising with tenure.
+7. M. J. A. Berry, G. S. Linoff, *Data Mining Techniques*, 2nd ed., Wiley, 2004 — chapter 12: the source of the two-segment dataset and the "parametric approaches do not work" sidebar the lesson's second section replicates.
+8. P. S. Fader, B. G. S. Hardie, "A Spreadsheet-Literate Non-Statistician's Guide to the Beta-Geometric Model," 2014 — the gentlest full walkthrough of the model's mechanics. http://www.brucehardie.com/notes/032/
+</References>
