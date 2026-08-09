@@ -93,4 +93,5 @@ export const demos: Record<
   PerplexityExplorer: () =>
     import("./classical-ml-interview/PerplexityExplorer"),
   EmStepper: () => import("./classical-ml-interview/EmStepper"),
+  SbgFitLab: () => import("./quantitative-mba/SbgFitLab"),
 };

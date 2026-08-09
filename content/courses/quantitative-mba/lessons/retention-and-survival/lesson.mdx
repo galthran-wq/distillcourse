@@ -1,0 +1,674 @@
+A retention curve is a survival curve: the fraction of a cohort still active
+at each age, estimated from data in which most lifetimes are unfinished.
+
+<Ref lesson="cohorts-and-funnels">The previous lesson</Ref> fixed the course's
+data object: the cohort matrix, with age and calendar time as separate axes
+and an unobserved triangle where the future has not happened. Its rows were
+already read as fractions still active, and the period-to-period rates
+computed there rose with age. This lesson supplies the mathematics of the row
+read: the survivor function, the retention rate, the product identity
+connecting them, and the estimator that combines rows of different lengths
+without corrupting the answer. It establishes that the rates rise but does
+not explain the rise; that explanation, and the projection of a curve beyond
+its observed window, is what <Ref lesson="churn-and-the-sbg-model">the churn
+lesson</Ref> contributes next.
+
+The route: the survivor function and the retention rate and the product that
+ties them, censoring and the estimate it wrecks, the product-limit estimator
+(starred), the independence assumption inside every pooled risk set, and the
+diagnostics a curve's shape supports.
+
+## One row, two encodings
+
+The row to be formalized is the one the previous lesson called the canonical
+cohort: an annual-contract business acquires 1,000 customers at the start of
+Year 1, and the successive year-end counts are 1,000, 631, 468, 382, 326
+(<Ref lesson="cohorts-and-funnels" id="the-row-read-one-cohort-ages">the row
+read</Ref>).
+
+<Task>
+Before reading on, recompute two numbers from the previous lesson, closed
+book: the fraction of this cohort still active after three renewals, and the
+third-year retention rate. They should land at $382/1{,}000 = 0.382$ and
+$382/468 = 81.6\%$.
+</Task>
+
+Throughout this module the setting is *contractual*: the customer holds a
+subscription, cancellation is an observed event, and "retained at age $t$"
+means **has not yet cancelled**, not "was active in period $t$". Under this
+definition a customer's *lifetime* $T$ is the number of periods completed
+before cancellation, and what a cohort row records is the distribution of
+$T$.
+
+<Definition title="survivor function, retention rate">
+For a lifetime $T$ measured in periods, the **survivor function** is
+$$
+S(t) = \Pr(T > t), \qquad t = 0, 1, 2, \ldots
+$$
+with $S(0) = 1$. The **retention rate** of period $t$ is the conditional
+probability of surviving period $t$ given survival so far:
+$$
+r_t = \Pr(T > t \mid T > t-1) = \frac{S(t)}{S(t-1)}.
+$$
+</Definition>
+
+The two encodings determine each other, exactly as the funnel's conversion
+rates multiplied out to the end-to-end rate in
+<Ref lesson="cohorts-and-funnels">the previous lesson</Ref>: a cohort's life
+is a funnel whose stages are ages.
+
+<Theorem title="product identity">
+For any lifetime distribution with $S(t-1) > 0$ (so that every rate through
+$r_t$ is defined),
+$$
+S(t) = r_1 r_2 \cdots r_t.
+$$
+<Proof>
+The events $\{T > 0\} \supset \{T > 1\} \supset \cdots \supset \{T > t\}$
+are nested, so each factor $r_i = S(i)/S(i-1)$ exists ($S$ is
+nonincreasing, hence $S(i-1) \ge S(t-1) > 0$), and the product telescopes:
+$$
+r_1 r_2 \cdots r_t
+= \frac{S(1)}{S(0)} \cdot \frac{S(2)}{S(1)} \cdots \frac{S(t)}{S(t-1)}
+= S(t).
+$$
+Nothing else is assumed: the identity is bookkeeping, valid for every
+lifetime distribution.
+</Proof>
+</Theorem>
+
+<Example title="the canonical cohort, both encodings">
+As fractions of the 1,000 acquired, the survivor function is
+
+$$
+S(0) = 1, \quad S(1) = 0.631, \quad S(2) = 0.468, \quad S(3) = 0.382,
+\quad S(4) = 0.326.
+$$
+
+The retention rates are the ratios of successive values:
+
+$$
+r_1 = \frac{0.631}{1} = 0.631, \quad
+r_2 = \frac{0.468}{0.631} = 0.742, \quad
+r_3 = \frac{0.382}{0.468} = 0.816, \quad
+r_4 = \frac{0.326}{0.382} = 0.853.
+$$
+
+The product check runs the identity forward:
+$0.631 \times 0.742 \times 0.816 \times 0.853 = 0.326 = S(4)$.
+</Example>
+
+<Figure
+  src="./figures/row-to-curve.svg"
+  alt="Left, the staircase cohort matrix with its top row highlighted; right, that row replotted as a declining survivor curve from 1.0 to 0.326"
+  caption="The bridge: one row of the cohort matrix, replotted against age, is the empirical survivor function."
+/>
+
+The two encodings carry identical information, but they do not survive messy
+data equally well. $S(t)$ needs the whole row from a single cohort; each
+$r_t$ needs only one **transition**: who was there at age $t-1$, who was
+still there at age $t$. Transitions can be counted wherever they are
+observed, in any cohort old enough to show them. That difference is why the
+rest of this lesson works with rates.
+
+<KeyFact>
+The product identity is the module's load-bearing equation: every method
+that estimates or models retention (the pooled estimator below, the sBG
+model of <Ref lesson="churn-and-the-sbg-model">the next lesson</Ref>, the
+CLV formula after that) computes conditional survival period by period and
+multiplies.
+</KeyFact>
+
+<Remark title="what is not a survivor function">
+Consumer products often report "week-4 retention": the fraction of a cohort
+active *in* week 4, under some activity definition. That series can rise,
+since a dormant user can return, so it violates the one structural property the
+definition imposes, that $T > t$ events are nested and $S$ never increases.
+It is a legitimate metric but not a survivor function, and none of this
+lesson's machinery applies to it. The noncontractual setting, where
+cancellation is never observed at all, gets its own machinery in
+<Ref lesson="repeat-purchase-models">the repeat-purchase lesson</Ref>.
+</Remark>
+
+<Exercise>
+Relay, <Ref lesson="cohorts-and-funnels">the running case</Ref> (the
+fictional \$50-per-month invoicing tool observed January through June 2025),
+has a March cohort with counts 300, 198, 159, 138 at ages 0–3.
+Compute its survivor function and retention rates, and verify the product
+identity at $t = 3$.
+
+<Solution>
+Survivor function: $S(0) = 1$, $S(1) = 198/300 = 0.660$,
+$S(2) = 159/300 = 0.530$, $S(3) = 138/300 = 0.460$.
+
+Retention rates: $r_1 = 0.660$, $r_2 = 159/198 = 0.803$,
+$r_3 = 138/159 = 0.868$.
+
+Check: $0.660 \times 0.803 \times 0.868 = 0.460 = S(3)$. The rates rise with
+age, as in every Relay row so far.
+</Solution>
+</Exercise>
+
+## Censoring: an unfinished lifetime is information
+
+The definitions above assumed a finished row. The matrix's staircase says
+most rows are not: Relay's May cohort has one observed transition, June's has
+none, and every live business is in this position permanently. A customer
+still active when the observation window closes has a lifetime known only
+partially: it exceeds the observed value.
+
+<Definition title="censoring">
+An observation is **censored** at age $L$ when the event of interest
+(cancellation) has not occurred by $L$ and the observation ends there. The
+recorded value says $T > L$: a lower bound, not a missing value and not an
+event.
+</Definition>
+
+The obvious computation, survivors divided by everyone whose status at the
+target age is known (the censored set aside as unusable), does
+not degrade gracefully on censored data: it produces results Kaplan and
+Meier call absurd. The founding paper of the field,
+[Kaplan and Meier (1958)](https://web.stanford.edu/~lutian/coursepdf/KMpaper.pdf),
+opens with a two-sample example built to make the failure undeniable.
+
+<Example title="two samples, one estimate (Kaplan & Meier 1958, §1.3)">
+A random sample of 100 items goes on test at the start of 1955; during the
+year 70 die and 30 survive. At the start of 1956 a second sample of 1,000
+items is added. During 1956, 15 items of the first sample and 750 of the
+second die, leaving 15 two-year survivors and 250 one-year survivors. The
+analysis date is the end of 1956; wanted is $S(2)$, the probability of
+surviving two years.
+
+| | Sample I (from 1955) | Sample II (from 1956) |
+| --- | --- | --- |
+| Initial number | 100 | 1,000 |
+| Died in first year of age | 70 | 750 |
+| Survived one year | 30 | 250 |
+| Died in second year of age | 15 | — window closed |
+| Survived two years | 15 | — window closed |
+
+Sample II's 250 survivors are censored at age one: alive, observed for one
+year, lifetimes known only to exceed it.
+
+**The pooled estimate.** Only 15 items out of everything on test survived
+two years. Setting aside the 250 censored items as unusable leaves
+$1{,}100 - 250 = 850$, and
+
+$$
+\hat{S}(2) = \frac{15}{850} \approx 0.018,
+$$
+
+an absurd result: sample I alone, a complete two-year sample, gives
+$15/100 = 0.15$, eight times larger. The 850-item version discarded exactly
+the items that had survived their first year, so its denominator is loaded
+with early deaths.
+
+**The product estimate.** Both samples observed the first year of age, so
+the first-year rate pools:
+
+$$
+\hat{r}_1 = \frac{30 + 250}{100 + 1{,}000} = 0.255.
+$$
+
+Only sample I observed a second year, so the second-year rate comes from its
+30 one-year survivors alone: $\hat{r}_2 = 15/30 = 0.50$. The product
+identity assembles the answer:
+
+$$
+\hat{S}(2) = \hat{r}_1 \times \hat{r}_2 = 0.255 \times 0.50 = 0.127.
+$$
+</Example>
+
+<FigureSequence
+  name="two-cohort"
+  alt="Four frames: two cohorts drawn as bars over an age axis with one window ending early; the discarded-censored estimate 15/850 marked wrong; the pooled first-year rate 0.255; the second-year conditional rate 0.50 and the product 0.127"
+  caption="Kaplan and Meier's two-sample example: the censored-discarding estimate first, then the product of conditional rates."
+/>
+
+<Task>
+Step through the four frames and track where each number's denominator comes
+from. Frame 2's denominator (850) mixes items observed for one year with
+items observed for two; frame 3's (1,100) counts only first-year exposure;
+frame 4's (30) counts only items that both survived a year and stayed
+observable. The repair is entirely a matter of matching numerators to the
+population actually at risk.
+</Task>
+
+The set of customers eligible to churn at a given age (still active, still
+under observation) is called the *risk set* at that age, and the repair
+above has one rule: each rate uses its **own** risk set. A censored lifetime
+enters every risk set up to its bound and no risk set after. It is neither
+discarded nor counted as churned; it simply stops contributing when the data
+about it stops.
+
+How far a rate can be trusted is a sample-size question with a standard
+answer: a rate $\hat{r}$ computed on a risk set of $n$ customers carries a
+binomial standard error of $\sqrt{\hat{r}(1-\hat{r})/n}$, about 1.7
+percentage points for a rate near 0.7 pooled over 750 customers (the Relay
+computation below) and over 20 points on a risk set of four. The working
+rule this module adopts: distrust every value of $\hat{S}$ from the first
+rate computed on **fewer than about five at-risk customers**, where one
+cancellation moves the rate by twenty points or more and the standard error
+swamps the estimate.
+
+<KeyFact>
+For a growing business the censored share is not a nuisance term but most of
+the dataset: every cohort younger than the horizon of interest is censored at
+its current age. An analysis that drops or "churns" censored customers is
+biased downward by construction, and the faster the company grows, the worse
+the bias: the young, mostly-censored cohorts dominate the base.
+</KeyFact>
+
+<Exercise>
+Estimate Relay's $S(2)$ using every cohort that bears on it. From the
+previous lesson's matrix: April's row is 350, 238, 193 (ages 0–2) and May's
+is 400, 280 (ages 0–1); younger cohorts have no completed transitions at
+these ages. First compute the discard-the-censored estimate (two-period
+survivors over all customers in both cohorts except those censored at age
+one), then the product estimate. Compare both against April's own complete
+row.
+
+<Solution>
+Discarding May's 280 censored customers leaves $750 - 280 = 470$, of whom
+193 reached age 2: $\hat{S}(2) = 193/470 = 0.411$.
+
+Product estimate: both cohorts observed the first transition, so
+$\hat{r}_1 = (238 + 280)/(350 + 400) = 518/750 = 0.691$. Only April observed
+the second: $\hat{r}_2 = 193/238 = 0.811$. Product:
+$\hat{S}(2) = 0.691 \times 0.811 = 0.560$.
+
+April's complete row alone gives $193/350 = 0.551$, consistent with the
+product estimate, which sharpens it with May's 400 additional first-year
+observations. The discard estimate, 0.411,
+understates survival by about a quarter: the same failure as Kaplan and
+Meier's 0.018, softened only because Relay's censored share is smaller. The
+June cohort (460 customers, no completed period) contributes to no rate at
+all.
+</Solution>
+</Exercise>
+
+## ★ The product-limit estimator
+
+The two-sample trick (pool each conditional rate over its own risk set,
+then multiply) generalizes to any number of cohorts, any pattern of
+censoring, and timestamps of any precision. The general form is the
+*product-limit estimator*, now universally called the Kaplan–Meier estimator
+after the 1958 paper.
+
+Order the observed cancellation ages $t_1 < t_2 < \cdots$. Let $n_j$ be the
+risk set just before $t_j$, still active and still observed, and $d_j$ the
+number cancelling at $t_j$. Censored customers leave the risk set at their
+own ages and appear in no $d_j$. Then
+
+$$
+\hat{S}(t) = \prod_{j:\; t_j \le t} \frac{n_j - d_j}{n_j}.
+$$
+
+Each factor is one period's retention rate computed on exactly the customers
+who could have churned then; between cancellation ages the estimate is
+constant, so $\hat{S}$ is a step function that drops only where a
+cancellation was observed.
+
+<Example title="eight customers by hand (Kaplan & Meier 1958, Table 464)">
+Eight customers, timestamps in months. Cancellations at 0.8, 3.1, 5.4, 9.2;
+censored (still active when their windows closed) at 1.0, 2.7, 7.0, 12.1.
+
+| Cancellation age $t_j$ | At risk $n_j$ | Factor $(n_j - d_j)/n_j$ | $\hat{S}(t_j)$ |
+| --- | --- | --- | --- |
+| 0.8 | 8 | 7/8 | 7/8 = 0.875 |
+| 3.1 | 5 | 4/5 | 7/10 = 0.700 |
+| 5.4 | 4 | 3/4 | 21/40 = 0.525 |
+| 9.2 | 2 | 1/2 | 21/80 = 0.2625 |
+
+The risk-set column is the whole computation. All 8 are at risk at 0.8. The
+censorings at 1.0 and 2.7 remove two, so 5 are at risk at 3.1. The
+cancellation itself leaves 4 at risk at 5.4; the censoring at 7.0 removes
+one more, leaving 2 at risk at 9.2. After 9.2 one customer remains, censored
+at 12.1, so beyond 12.1 the estimate is undefined: the last lifetime is
+unfinished, and $\hat{S}(t)$ for $t > 12.1$ is known only to lie between 0
+and 0.2625.
+</Example>
+
+<Figure
+  src="./figures/risk-set.svg"
+  alt="A timeline from 0 to 13 months with filled dots at the four cancellation ages and open circles at the four censoring ages; at-risk counts above each cancellation, conditional fractions below, and the running product at the bottom"
+  caption="The risk set shrinks by both exits: cancellations take a factor, censorings take only a customer."
+/>
+
+### What the paper proves
+
+Three facts complete the picture, stated here and proved in the paper.
+
+- **It is the nonparametric MLE.** Among all distributions, the product-limit
+  estimate maximizes the likelihood of the observed deaths and censorings
+  (Kaplan & Meier 1958, §5): not one heuristic among several but the
+  censored-data analogue of the empirical distribution.
+- **The five-at-risk rule has a bound behind it.** The paper bounds the
+  probability of an undefined tail by $e^{-\bar{N}(t)}$, already under 1%
+  while the expected number still at risk is five (§2.2, eq. 2d): the
+  censoring section's working rule marks where the estimator starts running
+  out of data entirely, not merely where its variance grows.
+- **Discrete data needs no new machinery.** Monthly cohort data has
+  cancellations in month buckets, and for a single cohort with censoring
+  only at the window's edge every factor cancels: $\hat{S}(t) = n_t/n_0$,
+  the simple division the first section already did. The estimator earns its
+  place exactly when observation windows differ (the standing condition of
+  the staircase matrix) or when timestamps are fine enough that "the risk
+  set at this instant" matters.
+
+## Independent censoring is an assumption
+
+Every pooled risk set in this lesson leaned on an unstated premise: that the
+customers censored early would have gone on to survive like the customers
+observed longer. Pooling a risk set assumes, in Kaplan and Meier's
+formulation (§3.2), that for a customer censored at age $L$ the conditional
+survival beyond $L$ equals that of customers whose windows extend past
+$L$: lifetime and censoring age are independent.
+
+In cohort data, censoring age is cohort age: who gets censored at $L$ is
+exactly the cohorts acquired $L$ periods before the analysis date. So the
+assumption fails whenever survival depends on vintage. Kaplan and Meier's
+example is a change in surgical technique five years before the data are
+analyzed, which alters survival only for patients with observation limits
+under five years; the business translation is a pricing change three months
+before Relay's June 30 analysis date, which alters the early ages of recent
+cohorts only. The pooled
+$\hat{r}_1$ then mixes a pre-change rate (from old cohorts) with a
+post-change rate (from young ones), and no reweighting of the pool can
+separate them: age and vintage effects **entangle** inside every factor.
+
+<Figure
+  src="./figures/censoring-is-vintage.svg"
+  alt="Six cohort bars, January through June, on a calendar axis ending at the June 30 analysis date where each bar is censored; a dashed line three months back marks a pricing change, so the March through June bars lie entirely under the new price while January and February cross it, and the censoring ages on the right run 5 down to 0"
+  caption="Censoring age is vintage. A change three months back sits at a different age in every cohort, and the four youngest never saw the old price: pooled early-age rates mix the two regimes."
+/>
+
+### The diagnostic: estimate per cohort, compare
+
+The check is the one the paper itself prescribes and the previous
+lesson already built: group by observation limit, that is by cohort;
+estimate separately; compare. A vintage effect shows up as rows that
+disagree at the same age, which is the
+<Ref lesson="cohorts-and-funnels" id="the-column-read-same-age-successive-vintages">column
+read</Ref>. "Disagree" means beyond sampling noise: two cohorts' rates at
+the same age differ by luck alone by about the root sum of their squared
+standard errors. For Relay's first-year rates, April's $238/350 = 0.680$
+against May's $280/400 = 0.700$, that yardstick is about 3.4 percentage
+points, so the observed 2-point gap licenses pooling; a 10-point gap at the
+same cohort sizes would not. Pooling is a modelling decision that the
+per-cohort comparison must license, not a default.
+
+## Shape: what a finished curve can and cannot say
+
+With estimation settled, the curve itself becomes legible, and practitioners
+read it for one signature before any model is fit. The question is what the
+curve does at the right edge.
+
+<Figure
+  src="./figures/curve-shapes.svg"
+  alt="Three stylized survivor curves: one declining to zero, one flattening at a plateau near 0.4, one dropping steeply in the first periods before flattening low"
+  caption="Three shapes, three verdicts. Only the plateau, wherever it sits, indicates a retained core."
+/>
+
+A curve that runs to zero says every acquired cohort eventually drains away:
+growth means perpetually refilling what
+[Skok's SaaS Metrics 2.0](https://www.forentrepreneurs.com/saas-metrics-2/)
+calls the leaky bucket, and acquisition spend buys temporary revenue. A
+curve that flattens says a fraction of every cohort stays indefinitely at
+the observed horizon: a retained core, the standard cohort-level signature
+that some segment gets durable value from the product (the folklore reading:
+*product–market fit*, a product the segment needs enough to keep paying
+for). Where the plateau sits, and how much
+is lost before it, separates a retention problem from an onboarding problem:
+a steep early drop to a stable plateau loses customers the product never
+activated, while a slow drift to the same plateau loses them along the way.
+
+Two cautions bound the read. A rate computed on fewer than about five
+at-risk customers is noise, so a "flat tail" carried by three customers is
+not a plateau; and a flat stretch within the window never proves flatness
+beyond it. The shape read is a diagnostic, not a projection.
+
+### The fact that stands open
+
+The rate encoding of the same data shows the module's central observation.
+The canonical cohort's retention rates, computed in the first section, are:
+
+$$
+r_1 = 0.631, \qquad r_2 = 0.742, \qquad r_3 = 0.816, \qquad r_4 = 0.853.
+$$
+
+<Figure
+  src="./figures/rising-r.svg"
+  alt="Four points plotting the retention rate against period: 0.631, 0.742, 0.816, 0.853, rising and concave"
+  caption="Retention rates rise with tenure. Explaining this is the next lesson."
+/>
+
+The rise is the rule, not the exception: every Relay row shows it, and
+the previous lesson's magazine-renewal figures (about 30% at the first
+renewal, 50% at the second, 75% for longtime subscribers) show it in
+published form. Nothing in this lesson explains it, and the two candidate
+explanations from
+<Ref lesson="cohorts-and-funnels">the previous lesson</Ref> (customers
+grow loyal, or the loyal are what remains) are both still unrefuted.
+
+The rise also blocks the module's practical need. Expected customer tenure
+and lifetime value are sums over $S(t)$ for **all** $t$, but the data
+delivers $\hat{S}$ only up to the observed horizon.
+Extending the curve requires a rule for how the
+$r_t$ series continues, and a series still rising at the window's edge
+offers no obvious one; the forward exercise below demonstrates that the
+simplest rule, a constant rate, cannot even fit the observed part.
+
+<KeyFact>
+What is established: retention data is survival data; $S(t) = r_1 r_2
+\cdots r_t$; censored lifetimes are lower bounds that belong in risk sets
+and are never discarded or counted as churned; and observed retention rates
+rise with tenure.
+What is open: why they rise, and how to project $S(t)$ past the window.
+<Ref lesson="churn-and-the-sbg-model">The next lesson</Ref> answers both
+with one two-parameter model in which no individual customer's behavior
+changes at all.
+</KeyFact>
+
+## Exercises
+
+<Exercise>
+From $S(1) = 0.60$, $S(2) = 0.45$, $S(3) = 0.38$, compute $r_1, r_2, r_3$.
+Then invert: from $r_1 = 0.55$, $r_2 = 0.80$, $r_3 = 0.90$, recover
+$S(1), S(2), S(3)$.
+
+<Solution>
+Rates from survival: $r_1 = S(1)/S(0) = 0.60$; $r_2 = 0.45/0.60 = 0.75$;
+$r_3 = 0.38/0.45 = 0.844$.
+
+Survival from rates, by the product identity: $S(1) = 0.55$;
+$S(2) = 0.55 \times 0.80 = 0.44$; $S(3) = 0.44 \times 0.90 = 0.396$.
+
+The two computations are inverses; either series determines the other
+exactly.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two boundary cohorts, both with $S(1) = 0.60$. In cohort A nobody cancels
+in period 2 ($r_2 = 1$); in cohort B everybody does ($r_2 = 0$). For each,
+state $S(2)$ and what the later rates $r_3, r_4, \ldots$ look like, and
+identify which quantities stop being estimable. Then contrast B with a
+cohort whose risk set empties by censoring instead.
+
+<Solution>
+**Cohort A:** $S(2) = 0.60 \times 1 = 0.60$: the curve is flat for one
+period, a local piece of the plateau signature. Later rates are unaffected:
+the risk set at age 2 still holds the full 60% of the cohort, and $r_3$ is
+estimable as usual.
+
+**Cohort B:** $S(2) = 0$. Every later $S(t)$ is also 0 (cancellation is
+absorbing, so the curve can never recover), but the later *rates* are
+$r_3 = S(3)/S(2) = 0/0$: undefined, because the risk set is empty. The
+survivor values are known (zero) while the conditional rates past the
+extinction have no data and no meaning. If B were the only cohort observed
+to those ages, no pooled $\hat{r}_t$ for $t > 2$ could be computed from any
+cell of the matrix.
+
+**The contrast:** when censoring empties the risk set (the last customer's
+window closes while they are still active), $\hat{S}$ beyond that age is
+undefined but
+bounded between 0 and its last value. Death-emptied: $S$ known, rates
+undefined. Censoring-emptied: both unknown. The estimator's domain ends at
+whichever comes first.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "We can estimate 24-month retention by averaging the
+24-month survival status of all customers who have been with us at least 1
+month." Using Kaplan and Meier's two-sample numbers (with years in place of
+months), compute what this procedure returns, name the error, and state the
+number the correct procedure gives.
+
+<Solution>
+Every one of the 1,100 items was observed for at least a year, so the
+procedure averages a 0/1 "survived two years" indicator over all of them,
+or over the 850 left after setting aside the 250 whose status at two years
+is unknown. Either way the censored items are mishandled: counted as
+failures, $15/1{,}100 = 0.014$; excluded, $15/850 = 0.018$. Both sit an
+order of magnitude below the complete-sample benchmark $15/100 = 0.15$.
+
+The error: a censored lifetime is the event $\{T > 1\}$, and the procedure
+treats it as either $\{T \le 2\}$ (churned) or as ignorable. It is neither:
+it is information that belongs in the first-year risk set and in no
+second-year quantity. Averaging survival *statuses* replaces conditioning
+with deletion.
+
+The correct procedure multiplies conditional rates over their risk sets:
+$\hat{S}(2) = 0.255 \times 0.50 = 0.127$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The product identity is bookkeeping; the pooled estimator built on it is
+not. When $\hat{r}_t$ pools the age-$t$ transitions of several cohorts,
+write down the population quantity the pooled fraction actually estimates,
+and state the exact condition under which it equals $r_t$.
+
+<Solution>
+A cohort with observation limit $L$ contributes to the age-$t$ risk
+set only if $L \ge t$. The pooled fraction of survivors among those at risk
+therefore estimates
+
+$$
+\Pr(T > t \mid T > t-1,\; L \ge t),
+$$
+
+survival conditioned on being *observable* at age $t$ as well as alive.
+This equals $r_t = \Pr(T > t \mid T > t-1)$ exactly when $T$ and $L$ are
+independent given survival to $t-1$, which is the independent-censoring
+assumption. Since $L$ is set by acquisition date, the condition says
+survival does not depend on vintage; a vintage effect (a pricing change, a
+product overhaul) breaks the equality, and the pooled estimate silently
+blends the regimes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Ten customers; cancellations at months 1.2, 2.5, 4.1, 6.3, 8.8, censorings
+at 0.9, 3.0, 5.5, 7.2, 9.5. Estimate $S$ at each cancellation age by the
+risk-set rule of the censoring section, applied at timestamp precision: at
+each observed cancellation age multiply in the factor $(n_j - d_j)/n_j$,
+where $n_j$ counts the customers still active and still observed just
+before that age and $d_j$ the cancellations at it (the starred section
+derives this product as the Kaplan–Meier estimator). State where the
+estimate becomes undefined, and from which factor the five-at-risk rule
+says to stop trusting it. For comparison, compute the discard-the-censored
+estimate of $S(8.8)$.
+
+<Solution>
+The censoring at 0.9 removes one customer before the first cancellation.
+
+| $t_j$ | At risk $n_j$ | Factor | $\hat{S}(t_j)$ |
+| --- | --- | --- | --- |
+| 1.2 | 9 | 8/9 | 0.889 |
+| 2.5 | 8 | 7/8 | 0.778 |
+| 4.1 | 6 | 5/6 | 0.648 |
+| 6.3 | 4 | 3/4 | 0.486 |
+| 8.8 | 2 | 1/2 | 0.243 |
+
+Between 2.5 and 4.1 the censoring at 3.0 shrinks the risk set to 6; the
+censorings at 5.5 and 7.2 produce the risk sets of 4 and 2. Exactly:
+$\hat{S}(8.8) = \frac{8}{9}\cdot\frac{7}{8}\cdot\frac{5}{6}\cdot\frac{3}{4}\cdot\frac{1}{2} = \frac{35}{144} = 0.243$.
+
+The last customer is censored at 9.5, so $\hat{S}(t)$ is undefined for
+$t > 9.5$, bounded between 0 and 0.243. The five-at-risk rule flags the
+6.3 factor, computed on $n_j = 4$: the last two values rest on four, then
+two, lifetimes and are indicative only.
+
+Discarding the four customers censored before 8.8 leaves six, of whom one
+(the 9.5 censoring) outlived 8.8: $1/6 = 0.167$ against the product
+estimate's 0.243: biased low, as always, by deleting survivors.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the canonical cohort ($r_t = 0.631, 0.742, 0.816, 0.853$), find the
+constant retention rate $\bar{r}$ that best reproduces the observed
+survivor values, by trying a few values. Then report what your $\bar{r}$
+predicts for $S(8)$ and for $r_5$, and state the structural reason no
+constant can fit.
+
+<Solution>
+A constant rate means a geometric curve $S(t) = \bar{r}^{\,t}$, so fitting
+is anchoring: matching $S(1) = 0.631$ forces $\bar{r} = 0.631$, which
+predicts $S(4) = 0.631^4 = 0.159$ against the observed 0.326; half the
+cohort's actual survivors are missing from the model. Matching $S(4) = 0.326$
+forces $\bar{r} = 0.326^{1/4} = 0.756$, which predicts $S(1) = 0.756$
+against the observed 0.631. Any compromise (say $\bar{r} = 0.70$:
+predicted $S$ = 0.700, 0.490, 0.343, 0.240) misses both ends in opposite
+directions.
+
+Taking the end-anchored $\bar{r} = 0.756$: $S(8) = 0.756^8 = 0.106$, and
+$r_5 = 0.756$: a fall from the observed $r_4 = 0.853$, where the trend
+of the series points at 0.87 or higher.
+
+The structural reason: a geometric model has one rate for everybody at
+every age, so its $r_t$ series is flat, and no flat series matches a rising
+one. The observed curve is more concave than any geometric curve: early
+retention too low for the tail, tail too high for the start. The repair is
+not a fancier curve through the points but a population of customers with
+*different* constant rates, whose mixture produces exactly this rising
+series: the sBG model of
+<Ref lesson="churn-and-the-sbg-model">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+The pooled estimator computes $\hat{r}_t$ for each age from the cohort
+matrix of <Ref lesson="cohorts-and-funnels">the first lesson</Ref>. In the
+vocabulary of that lesson's three reads (row, column, diagonal), which
+read does one pooled $\hat{r}_t$ perform, which read is a single cohort's
+$\hat{S}(t)$, and which feature of the matrix decides each risk set's
+membership?
+
+<Solution>
+One pooled $\hat{r}_t$ is a **column read**: two adjacent columns, ages
+$t-1$ and $t$, summed down the cohorts: numerator $\sum_c n_{c,t}$,
+denominator $\sum_c n_{c,t-1}$, over cohorts observed to age $t$. Age is
+held fixed and vintages are mixed, which is precisely why the
+independent-censoring assumption is a no-vintage-effect assumption.
+
+A single cohort's $\hat{S}(t) = n_{c,t}/n_{c,0}$ is a **row read**: one
+cohort followed through its own life.
+
+Risk-set membership is decided by the **staircase boundary**, the diagonal
+of last-observed cells. A cohort belongs to the age-$t$ risk set exactly
+when its row extends to column $t$, i.e., when the cell $(c, t)$ lies on or
+above the staircase; the diagonal is where censoring lives in the matrix.
+</Solution>
+</Exercise>
+
+<References>
+1. E. L. Kaplan, P. Meier, "Nonparametric Estimation from Incomplete Observations," *Journal of the American Statistical Association* 53(282), 1958, pp. 457–481 — §1.3 the two-sample example worked above; §2.1 the product-limit computation (Table 464); §2.2 the ambiguity bound (eq. 2d); §3.2 the independent-censoring caveat; §5 the maximum-likelihood property. https://web.stanford.edu/~lutian/coursepdf/KMpaper.pdf
+2. P. S. Fader, B. G. S. Hardie, "How to Project Customer Retention," *Journal of Interactive Marketing* 21(1), 2007, pp. 76–90 — the survivor-function and retention-rate identities (eqs. 1–2) and the statement of the projection problem the next lesson solves. https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Fader_hardie_jim_07.pdf
+3. P. S. Fader, B. G. S. Hardie, "An Introduction to Probability Models for Marketing Research" (27th ART Forum tutorial handout), 2016 — the 1,000-customer cohort and the survivor/retention vocabulary (pp. 3–6). http://www.brucehardie.com/talks/intro_tut_art_16_HO.pdf
+4. D. Skok, "SaaS Metrics 2.0 — A Guide to Measuring and Improving What Matters," forentrepreneurs.com — the churn and cohort-analysis sections; the leaky-bucket framing of non-flattening retention. https://www.forentrepreneurs.com/saas-metrics-2/
+5. J. P. Klein, M. L. Moeschberger, *Survival Analysis: Techniques for Censored and Truncated Data*, 2nd ed., Springer, 2003 — ch. 3 for the taxonomy of censoring, ch. 4 for the Kaplan–Meier estimator with variance and confidence bands: the dig-deeper text for everything this lesson stated without proof.
+</References>
