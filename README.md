@@ -88,6 +88,29 @@ buttons refuse to run on other models), inside a git worktree on branch
 skills the factory drives,
 invocable directly for one-off writing or revision.
 
+## Research materials (DVC)
+
+The binary layer of the research dossiers — `content/courses/*/research/images/`
+(the captured-image pool) and `research/texts/` (fetched source texts and PDFs) —
+lives in S3 via [DVC](https://dvc.org), not in git; only the small `.dvc`
+pointer files are committed. The briefs and `sources.yaml`/`images.yaml` stay
+in git: they are the reviewable dossier, the blobs are not.
+
+```bash
+uv tool install "dvc[s3]"     # once per machine
+dvc remote modify --local storage access_key_id <key>        # once per checkout;
+dvc remote modify --local storage secret_access_key <secret> # keys live in Beget
+# Beget's S3 rejects boto3's default aws-chunked checksums — always run dvc with:
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+dvc pull                      # fetch the pools
+dvc add content/courses/<c>/research/images && dvc push  # after a research run
+```
+
+A research run (course-factory Canon/Read phases) writes new captures and
+texts to disk; `dvc add` the changed folders and `dvc push` before opening the
+PR, and commit the updated `.dvc` files with it.
+
 ## Development
 
 ```bash
