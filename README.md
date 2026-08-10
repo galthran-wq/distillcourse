@@ -100,6 +100,9 @@ in git: they are the reviewable dossier, the blobs are not.
 uv tool install "dvc[s3]"     # once per machine
 dvc remote modify --local storage access_key_id <key>        # once per checkout;
 dvc remote modify --local storage secret_access_key <secret> # keys live in Beget
+# Beget's S3 rejects boto3's default aws-chunked checksums — always run dvc with:
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
 dvc pull                      # fetch the pools
 dvc add content/courses/<c>/research/images && dvc push  # after a research run
 ```
