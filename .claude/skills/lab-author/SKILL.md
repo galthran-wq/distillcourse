@@ -15,7 +15,8 @@ checkpoint, with the platform verifying outputs server-side.
 
 Binding file formats: @references/conventions.md. Working example (all four
 checkpoint mechanics, executes green): `references/example/`. The capture
-stub for the loop: `references/author_stub.py`. Pedagogy applies in full:
+module for the loop is the build's own:
+`apps/frontend/lib/labs/python/distill_capture.py`. Pedagogy applies in full:
 @docs/pedagogy.md — a lab is course content, same register, same bars.
 
 ## Design before writing
@@ -50,7 +51,7 @@ Never write the whole lab and hope. Grow it checkpoint by checkpoint:
 
 ```
 cd content/courses/<course>/lessons/<lesson>/
-cp <skill>/references/author_stub.py distill.py     # transient, never committed
+cp <repo>/apps/frontend/lib/labs/python/distill_capture.py distill.py   # transient
 uv lock                                             # once, after editing pyproject deps
 # write solution.py incrementally + challenges.yaml entries as you go
 uv run --with pyyaml python solution.py             # runs against uv.lock
@@ -65,10 +66,10 @@ rm -rf distill.py captured.json .venv               # when done
 - Inspect `captured.json` once at the end: expected outputs sane, wrong
   variants present where canonical bugs exist, labels captured.
 - Everything seeded. Run the loop twice; identical `captured.json` or the
-  lab is nondeterministic and will fail validate (#96).
-- Once the build pipeline exists, finish with `npm run build-labs` +
-  `npm run validate` and read the generated `lab.ipynb` as the learner would:
-  scaffold intact, no markers, no outputs, header cell present.
+  lab is nondeterministic and will fail validate.
+- Finish with `npm run build-labs -- <course> <lesson>` + `npm run validate`,
+  and read the generated `labs-dist/public/<course>/<lesson>/lab.ipynb` as the
+  learner would: scaffold intact, no markers, no outputs, header cell present.
 
 ## Checkpoint craft (the check vocabulary)
 
@@ -112,7 +113,6 @@ rm -rf distill.py captured.json .venv               # when done
 - [ ] `course.yaml` checkpoint list matches `challenges.yaml` (ids, kinds,
       required flags); `est_hours` honest per the calibration estimate.
 - [ ] Wrong variants on every checkpoint with a canonical bug.
-- [ ] The generated student scaffold read end-to-end as the learner
-      (once #96 exists: from `lab.ipynb`; until then: solution.py with
-      marker spans mentally cut).
-- [ ] `npm run validate` green (full gate once #96 lands).
+- [ ] The generated `lab.ipynb` read end-to-end as the learner.
+- [ ] `npm run validate` green — it builds the lab and fails on a red
+      checkpoint.
