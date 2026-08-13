@@ -42,6 +42,10 @@ Rules that override defaults:
 - After generating or editing any content file, run `npm run validate` and fix
   failures before reporting done.
 - Lesson MDX has no frontmatter; structural metadata lives in `course.yaml` only.
+- Lab lessons (`type: lab`) are authored ONLY through the `lab-author` skill:
+  `solution.py` (jupytext percent) + `challenges.yaml`, executed to green in
+  the authoring loop before commit. `lab.ipynb` is a build artifact — never
+  hand-written, never committed.
 - `apps/frontend/lib/content/schema.ts` is the normative schema;
   `docs/content-model.md` is the human-readable guide — keep them in sync when
   either changes.
