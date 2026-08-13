@@ -10,6 +10,7 @@ import remarkParse from "remark-parse";
 import remarkMdx from "remark-mdx";
 import remarkMath from "remark-math";
 import { toString as mdastToString } from "mdast-util-to-string";
+import { parse } from "yaml";
 import type { Root } from "mdast";
 import { STATUS_RANK, type LoadedCourse, type LoadedLesson } from "./load";
 import {
@@ -409,6 +410,102 @@ function lintLessonMdx(
   }
 }
 
+/** What a lab lesson directory must hold once the lesson is drafted. */
+const LAB_FILES = ["solution.py", "challenges.yaml", "pyproject.toml", "uv.lock"];
+
+/**
+ * A lab is verified against two files that must agree: `course.yaml` says
+ * what the checkpoints are (display), `challenges.yaml` says how each one is
+ * checked (verification). A checkpoint present in one and not the other is
+ * either a promise nothing verifies or a check nothing shows.
+ */
+function lintLab(
+  entry: LoadedLesson,
+  coursePath: string,
+  diags: Diagnostic[],
+): void {
+  const { lesson } = entry;
+  if (lesson.lab === undefined) return;
+
+  const ids = lesson.lab.checkpoints.map((c) => c.id);
+  for (const id of ids.filter((id, i) => ids.indexOf(id) !== i)) {
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: coursePath,
+      message: `lab "${lesson.slug}": duplicate checkpoint id "${id}"`,
+    });
+  }
+  if (!lesson.lab.checkpoints.some((c) => c.required)) {
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: coursePath,
+      message: `lab "${lesson.slug}": every checkpoint is optional — at least one must be required, or the lab can never be completed`,
+    });
+  }
+
+  // The lab's sources land with the draft, like lesson.mdx: a planned lab is
+  // still just a line in course.yaml.
+  if (STATUS_RANK[lesson.status] < STATUS_RANK.drafted) return;
+
+  for (const name of LAB_FILES) {
+    if (existsSync(join(entry.dir, name))) continue;
+    diags.push({
+      level: "error",
+      rule: "lab-files",
+      file: join(entry.dir, name),
+      message: `lab "${lesson.slug}" is ${lesson.status} but ${name} is missing`,
+    });
+  }
+
+  const challengesPath = join(entry.dir, "challenges.yaml");
+  if (!existsSync(challengesPath)) return; // already reported by lab-files
+
+  // Only the checkpoint ids are read here: how each one is verified is the
+  // lab build's business (#96), what checkpoints exist is this agreement.
+  let doc: unknown;
+  try {
+    doc = parse(readFileSync(challengesPath, "utf8"));
+  } catch (err) {
+    diags.push({
+      level: "error",
+      rule: "lab-files",
+      file: challengesPath,
+      message: `lab "${lesson.slug}": YAML parse error: ${(err as Error).message}`,
+    });
+    return;
+  }
+  const checkpoints = (doc as { checkpoints?: unknown } | null)?.checkpoints;
+  if (
+    typeof checkpoints !== "object" ||
+    checkpoints === null ||
+    Array.isArray(checkpoints)
+  ) {
+    diags.push({
+      level: "error",
+      rule: "lab-files",
+      file: challengesPath,
+      message: `lab "${lesson.slug}": challenges.yaml has no \`checkpoints\` mapping`,
+    });
+    return;
+  }
+
+  const declared = Object.keys(checkpoints);
+  const missing = ids.filter((id) => !declared.includes(id));
+  const extra = declared.filter((id) => !ids.includes(id));
+  if (missing.length > 0 || extra.length > 0) {
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: challengesPath,
+      message: `lab "${lesson.slug}": checkpoint ids differ from course.yaml${
+        missing.length > 0 ? ` — only in course.yaml: ${missing.join(", ")}` : ""
+      }${extra.length > 0 ? ` — only in challenges.yaml: ${extra.join(", ")}` : ""}`,
+    });
+  }
+}
+
 export interface LintOptions {
   /** Frontend app root (apps/frontend); enables the registry checks. */
   appRoot?: string;
@@ -722,6 +819,7 @@ export function lintCourse(
       }
     }
 
+    lintLab(entry, coursePath, diags);
     lintLessonMdx(entry, new Set(bySlug.keys()), diags, options);
   }
 
