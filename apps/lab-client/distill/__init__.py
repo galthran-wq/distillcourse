@@ -135,8 +135,9 @@ def _submit(checkpoint: str, payload: Any) -> dict[str, Any]:
     lab = _opened()
     return _api.submit(
         {
-            # Minted here so that a post retried over a dropped connection is
-            # answered with the verdict it already earned.
+            # One id per attempt, minted here because the submissions log is
+            # keyed by it. Nothing in this client re-sends one — a cell run
+            # again is a new attempt, and the learner meant it to be.
             "id": str(uuid.uuid4()),
             "lesson": lab.lesson,
             "checkpoint": checkpoint,

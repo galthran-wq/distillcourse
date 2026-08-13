@@ -17,6 +17,7 @@ import pytest
 import distill
 from distill import api
 
+HOST = "http://labs.test"
 LAB = "information-theory/surprisal-lab"
 LESSON = f"lesson:{LAB}"
 VERSION = "a1" * 32
@@ -85,11 +86,13 @@ class Server:
     def __init__(self) -> None:
         self.posted: list[dict[str, Any]] = []
         self.bearers: list[str | None] = []
+        self.urls: list[httpx.URL] = []
         self.answer: dict[str, Any] = verdict()
         self.refusal: httpx.Response | None = None
         self.unreachable = False
 
     def handle(self, request: httpx.Request) -> httpx.Response:
+        self.urls.append(request.url)
         if self.unreachable:
             raise httpx.ConnectError("no route to host", request=request)
         if self.refusal is not None:
@@ -107,16 +110,12 @@ class Server:
 def server(monkeypatch: pytest.MonkeyPatch) -> Server:
     fake = Server()
     monkeypatch.delenv(api.TOKEN_VAR, raising=False)
+    monkeypatch.setenv(api.HOST_VAR, HOST)
     monkeypatch.setattr(distill, "_lab", None)
     monkeypatch.setattr(
         distill,
         "_api",
-        api.Api(
-            httpx.Client(
-                base_url="http://labs.test/api/v1",
-                transport=httpx.MockTransport(fake.handle),
-            )
-        ),
+        api.Api(httpx.Client(transport=httpx.MockTransport(fake.handle))),
     )
     return fake
 

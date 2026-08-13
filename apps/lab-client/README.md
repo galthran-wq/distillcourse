@@ -20,7 +20,9 @@ distill.login("<the code from the lesson page>")
 The token that code buys lives in the kernel and nowhere else — not printed,
 not written to disk, gone when the runtime restarts. Pair again after a
 restart, or set `DISTILL_TOKEN` to a token of your own; `DISTILL_API` points
-the client at a backend other than the deployment.
+the client at a backend other than `https://distillcourse.com`. Both are read
+when a request is made, so setting either in a cell below `import distill`
+works.
 
 ## Checkpoints
 

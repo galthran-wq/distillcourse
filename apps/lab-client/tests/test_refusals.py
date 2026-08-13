@@ -61,11 +61,38 @@ def test_a_spent_budget_says_how_long_to_wait_when_the_server_says(
         submit()
 
 
+def test_a_spent_daily_budget_is_a_wait_measured_in_hours(paired: Server) -> None:
+    """What the review budget refuses with: the seconds the server counts in
+    are not what a learner deciding whether to wait needs to read."""
+    paired.refusal = httpx.Response(
+        429,
+        json={"detail": "too many requests, try again later"},
+        headers={"retry-after": "86400"},
+    )
+
+    with pytest.raises(LabError, match="try again in 24 hours"):
+        submit()
+
+
 def test_a_refusal_without_a_delay_is_read_out_as_the_server_worded_it(
     paired: Server,
 ) -> None:
     paired.refusal = httpx.Response(
         429, json={"detail": "too many requests, try again later"}
+    )
+
+    with pytest.raises(LabError, match="too many requests, try again later"):
+        submit()
+
+
+def test_a_delay_given_as_a_date_is_not_read_out_as_a_delay(paired: Server) -> None:
+    """RFC 7231 allows an HTTP-date there. Nothing this client talks to sends
+    one, and printing "try again in Wed, 21 Oct 2015 07:28:00 GMTs" would be
+    worse than the wording the server already supplied."""
+    paired.refusal = httpx.Response(
+        429,
+        json={"detail": "too many requests, try again later"},
+        headers={"retry-after": "Wed, 21 Oct 2015 07:28:00 GMT"},
     )
 
     with pytest.raises(LabError, match="too many requests, try again later"):

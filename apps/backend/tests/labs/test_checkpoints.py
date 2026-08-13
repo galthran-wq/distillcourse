@@ -170,6 +170,10 @@ async def test_only_a_graded_submission_costs_a_day_s_attempt(
         404,
     ]
     assert spent.status_code == 429
+    # The budget is a day's, so the refusal has to say a day: the notebook
+    # client turns this header into the wait it prints, and without it a
+    # learner is told to try "later" with no idea that later means tomorrow.
+    assert spent.headers["retry-after"] == str(int(DAY.total_seconds()))
 
 
 async def test_a_notebook_from_an_older_build_is_turned_away(

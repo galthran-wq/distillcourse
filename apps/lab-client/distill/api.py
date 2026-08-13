@@ -15,8 +15,11 @@ import httpx
 from distill.errors import LabError
 
 # The deployment a notebook opened from the public mirror submits to.
-# DISTILL_API points a checkout at a backend of its own.
-BASE_URL = os.environ.get("DISTILL_API", "https://distillcourse.com").rstrip("/")
+DEFAULT_HOST = "https://distillcourse.com"
+# DISTILL_API points a checkout at a backend of its own. Read where the request
+# is made rather than at import, because the generated notebook's first cell is
+# `import distill`: a host set in any cell after it would otherwise be ignored.
+HOST_VAR = "DISTILL_API"
 # Pairing is skipped entirely when this is set: it belongs to whoever is
 # running that backend, while a pairing code belongs to a learner.
 TOKEN_VAR = "DISTILL_TOKEN"
@@ -65,17 +68,24 @@ class Api:
                 raise LabError(UNPAIRED)
             headers["Authorization"] = f"Bearer {self.token}"
         try:
-            response = self._client.request(method, path, json=body, headers=headers)
+            response = self._client.request(
+                method, _url(path), json=body, headers=headers
+            )
         except httpx.HTTPError:
             raise LabError(UNREACHABLE) from None
         if not response.is_success:
-            raise LabError(_refusal(response)) from None
+            raise LabError(_refusal(response))
         answer: dict[str, Any] = response.json()
         return answer
 
 
 def connect() -> Api:
-    return Api(httpx.Client(base_url=f"{BASE_URL}/api/v1", timeout=TIMEOUT))
+    return Api(httpx.Client(timeout=TIMEOUT))
+
+
+def _url(path: str) -> str:
+    host = os.environ.get(HOST_VAR) or DEFAULT_HOST
+    return f"{host.rstrip('/')}/api/v1{path}"
 
 
 def _refusal(response: httpx.Response) -> str:
@@ -84,9 +94,24 @@ def _refusal(response: httpx.Response) -> str:
     if response.status_code == httpx.codes.CONFLICT:
         return STALE
     after = response.headers.get("retry-after")
-    if response.status_code == httpx.codes.TOO_MANY_REQUESTS and after:
-        return f"too many attempts — try again in {after}s"
+    # RFC 7231 also allows an HTTP-date there; the server sends a delay, and a
+    # date read out as a delay would be worse than not saying one at all.
+    if (
+        response.status_code == httpx.codes.TOO_MANY_REQUESTS
+        and after
+        and after.isdigit()
+    ):
+        return f"too many attempts — try again in {_wait(int(after))}"
     return _detail(response)
+
+
+def _wait(seconds: int) -> str:
+    """The delay as the learner would say it: a daily budget is hours away."""
+    if seconds < 90:
+        return f"{seconds}s"
+    if seconds < 90 * 60:
+        return f"{round(seconds / 60)} minutes"
+    return f"{round(seconds / 3600)} hours"
 
 
 def _detail(response: httpx.Response) -> str:
