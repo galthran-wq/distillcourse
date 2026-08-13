@@ -144,7 +144,12 @@ async def test_a_model_that_is_down_leaves_the_answer_pending(
 
     assert answered.status_code == 200
     assert (answered.json()["passed"], answered.json()["pending"]) == (None, True)
-    assert (await state(session, user)).attempts == 1
+    stored = await state(session, user)
+    assert stored.attempts == 1
+    # The hint says the platform could not judge this, and the page shows what
+    # is stored here as the judge's feedback: an outage never speaks as one.
+    assert stored.feedback is None
+    assert "again in a few minutes" in answered.json()["hint"]
     # Nothing was answered, so there is nothing for the ceiling to count.
     assert (await logged(session, "why-uniform")).usage is None
 

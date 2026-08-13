@@ -1,5 +1,5 @@
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { STATUS_RANK, type LoadedCourse, type LoadedLesson } from "../content/load";
@@ -18,8 +18,20 @@ import { CLIENT_INSTALL, colabUrl, rawUrlBase } from "./mirror";
  * (expected outputs, secret labels, rubrics) goes to the checkpoint API.
  */
 
-/** Copied into the run directory; the rest of the lesson is irrelevant here. */
-const LAB_SOURCES = ["solution.py", "challenges.yaml", "pyproject.toml", "uv.lock", "data"];
+/**
+ * Copied into the run directory; the rest of the lesson is irrelevant here.
+ * `data/` is republished to the mirror verbatim, `private/` never leaves the
+ * run — held-out labels and anything else a checkpoint is graded against read
+ * from there, so the natural file layout is not also a leak.
+ */
+const LAB_SOURCES = [
+  "solution.py",
+  "challenges.yaml",
+  "pyproject.toml",
+  "uv.lock",
+  "data",
+  "private",
+];
 
 /** A lab that outruns this is miscalibrated, not slow. */
 const TIMEOUT_MS = 30 * 60 * 1000;
@@ -43,15 +55,27 @@ export function runCourseLabs(loaded: LoadedCourse, options: LabRunOptions): Dia
       STATUS_RANK[entry.lesson.status] >= STATUS_RANK.drafted &&
       (options.lesson === undefined || entry.lesson.slug === options.lesson),
   );
+  const course = basename(loaded.dir);
+  const distRoot = join(options.repoRoot, "labs-dist");
+  // Before the early return, because a course that lost its last lab is
+  // exactly the case whose leftovers ingest would go on serving. Skipped when
+  // the run is one lesson's: the rest were not asked for, not deleted.
+  if (options.mode === "build" && options.lesson === undefined) {
+    retireLabs(
+      distRoot,
+      course,
+      targets.map((entry) => entry.lesson.slug),
+    );
+  }
   if (targets.length === 0) return [];
 
-  const course = basename(loaded.dir);
   if (spawnSync("uv", ["--version"], { stdio: "ignore" }).status !== 0) {
     return [
       {
-        // A machine without uv can still lint content, so validate only warns.
-        // A build that produced no artifacts has failed, however green it looks.
-        level: options.mode === "build" ? "error" : "warn",
+        // An error in both modes: a lab whose solution was never executed is
+        // unvalidated content, and validate is the gate that says so. uv is a
+        // dependency of validating a course that has labs in it.
+        level: "error",
         rule: "lab-build",
         file: join(loaded.dir, "course.yaml"),
         message: `${targets.length} lab lesson(s) left unbuilt: uv is not installed`,
@@ -59,7 +83,6 @@ export function runCourseLabs(loaded: LoadedCourse, options: LabRunOptions): Dia
     ];
   }
 
-  const distRoot = join(options.repoRoot, "labs-dist");
   const outRoot =
     options.mode === "check" ? mkdtempSync(join(tmpdir(), "labs-check-")) : distRoot;
   try {
@@ -69,6 +92,33 @@ export function runCourseLabs(loaded: LoadedCourse, options: LabRunOptions): Dia
   } finally {
     if (options.mode === "check") rmSync(outRoot, { recursive: true, force: true });
   }
+}
+
+const HALVES = ["private", "public"] as const;
+
+/**
+ * One directory of `labs-dist/`, cut back to the names that still exist. The
+ * ingest reads the private half as the complete list of the labs there are,
+ * so an artifact nothing rebuilds is an answer key nothing can retire.
+ */
+function keepOnly(dir: string, kept: Set<string>): void {
+  if (!existsSync(dir)) return;
+  for (const entry of readdirSync(dir)) {
+    // A lab is `private/<slug>.json` on one side of the split and
+    // `public/<slug>/` on the other; a course is a bare name in both.
+    if (kept.has(basename(entry, ".json"))) continue;
+    rmSync(join(dir, entry), { recursive: true, force: true });
+  }
+}
+
+function retireLabs(distRoot: string, course: string, slugs: string[]): void {
+  for (const half of HALVES) keepOnly(join(distRoot, half, course), new Set(slugs));
+}
+
+/** The same sweep one level up: a course whose directory is gone. */
+export function retireCourses(repoRoot: string, courses: string[]): void {
+  const kept = new Set(courses);
+  for (const half of HALVES) keepOnly(join(repoRoot, "labs-dist", half), kept);
 }
 
 function buildLab(

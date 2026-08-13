@@ -78,24 +78,34 @@ def check(checkpoint: str, fn: Callable[..., Any]) -> None:
     _report(checkpoint, _submit(checkpoint, payload))
 
 
+# Scores travel "higher is better", so an error measure travels negated — the
+# server compares one way for every metric. What is printed is the error.
+LOWER_IS_BETTER = frozenset({"rmse"})
+
+
 def submit_predictions(checkpoint: str, predictions: Any) -> None:
     """Submit predictions for the held-out set; the server scores them."""
     spec = _spec(checkpoint, "metric")
     result = _submit(checkpoint, np.asarray(predictions, dtype=np.float64).tolist())
     score = result["score"]
-    scored = (
-        "" if score is None else f"{spec['metric']} {score:.4f} vs {spec['threshold']}"
-    )
-    _report(checkpoint, result, scored)
+    _report(checkpoint, result, "" if score is None else _scored(spec, score))
+
+
+def _scored(spec: dict[str, Any], score: float) -> str:
+    sign = -1 if spec["metric"] in LOWER_IS_BETTER else 1
+    threshold = sign * float(spec["threshold"])
+    return f"{spec['metric']} {sign * score:.4f} vs {threshold:.4f}"
 
 
 def submit_review(checkpoint: str, text: str) -> None:
-    """Submit a written answer for the judge to read against its rubric."""
+    """Submit a written answer for the judge to read against its rubric.
+
+    Judged while the request is open, so there is nothing to wait for: a
+    verdict that comes back pending is one the server could not reach, and its
+    own hint says to post the answer again. Nothing re-grades it later.
+    """
     _spec(checkpoint, "review")
-    result = _submit(checkpoint, text)
-    _report(
-        checkpoint, result, "recorded, waiting on review" if result["pending"] else ""
-    )
+    _report(checkpoint, _submit(checkpoint, text))
 
 
 def _opened() -> _Lab:

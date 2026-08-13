@@ -9,6 +9,7 @@ from them is a suite passing against a server that does not exist.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import Any
 
 import httpx
@@ -87,9 +88,17 @@ class Server:
         self.posted: list[dict[str, Any]] = []
         self.bearers: list[str | None] = []
         self.urls: list[httpx.URL] = []
+        # A copy, so a test that needs another lab's manifest edits its own.
+        self.manifest = deepcopy(MANIFEST)
         self.answer: dict[str, Any] = verdict()
         self.refusal: httpx.Response | None = None
         self.unreachable = False
+
+    def spec(self, checkpoint: str) -> dict[str, Any]:
+        """The public half of one checkpoint, to edit before `open_lab`."""
+        entry = next(c for c in self.manifest["checkpoints"] if c["id"] == checkpoint)
+        published: dict[str, Any] = entry["spec"]
+        return published
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         self.urls.append(request.url)
@@ -100,7 +109,7 @@ class Server:
         if request.url.path.endswith("/pair"):
             return httpx.Response(200, json={"token": TOKEN})
         if request.url.path.endswith("/manifest"):
-            return httpx.Response(200, json=MANIFEST)
+            return httpx.Response(200, json=self.manifest)
         self.bearers.append(request.headers.get("authorization"))
         self.posted.append(json.loads(request.content))
         return httpx.Response(200, json=self.answer)

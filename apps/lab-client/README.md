@@ -1,7 +1,7 @@
 # distillcourse
 
 The client a lab notebook submits its checkpoints with. The generated notebook
-installs it in its first cell, so a learner's three lines are:
+installs it in its setup cell, so a learner's three lines are:
 
 ```python
 %pip install -q "git+https://github.com/galthran-wq/distillcourse-labs#subdirectory=client"
@@ -11,15 +11,18 @@ distill.open_lab("<course>/<lesson>")
 ```
 
 `open_lab` needs no account: it fetches the lab's manifest, which is public.
-Submitting does, and the lesson page issues the code for it:
+Submitting does, and the lesson page issues the code for it — which is the
+notebook's second generated cell, and the only one a learner edits by hand:
 
 ```python
 distill.login("<the code from the lesson page>")
 ```
 
 The token that code buys lives in the kernel and nowhere else — not printed,
-not written to disk, gone when the runtime restarts. Pair again after a
-restart, or set `DISTILL_TOKEN` to a token of your own; `DISTILL_API` points
+not written to disk, gone when the runtime restarts. It is also ended by the
+account: changing your password or signing out everywhere revokes every
+notebook pairing, and the next checkpoint says so. Pair again after either, or
+set `DISTILL_TOKEN` to a token of your own; `DISTILL_API` points
 the client at a backend other than `https://distillcourse.com`. Both are read
 when a request is made, so setting either in a cell below `import distill`
 works.
@@ -32,10 +35,12 @@ distill.submit_predictions("holdout", p)    # scored against labels you never se
 distill.submit_review("why-uniform", text)  # read by the judge against its rubric
 ```
 
-Each prints one line: `✓`, `✗` or `…` for a review still waiting, the
-checkpoint, whatever the server had to say about it, and how many of the
-required checkpoints you have passed. The server keeps the score — this
-package has no memory between kernels, and re-running a cell is always safe.
+Each prints one line: `✓`, `✗` or `…`, the checkpoint, whatever the server had
+to say about it, and how many of the required checkpoints you have passed. The
+server keeps the score — this package has no memory between kernels, and
+re-running a cell is always safe. A `…` is not a queue: every kind is decided
+while the request is open, including a review, so it means the server could
+not decide this one and the line says to post it again.
 
 `check` generates the inputs from the seed the manifest carries, which is what
 the reference solution was run on at build time, and posts what your function

@@ -39,12 +39,17 @@ def test_a_rebuilt_lab_sends_the_learner_back_for_a_new_notebook(
         submit()
 
 
-def test_an_expired_token_reads_as_pairing_rather_than_as_a_failure(
+def test_a_revoked_token_reads_as_pairing_rather_than_as_a_failure(
     paired: Server,
 ) -> None:
+    """The token outlives the kernel, so a rejected one was ended by the
+    account — a password change or signing out everywhere revokes every
+    notebook pairing. Pairing again is the whole fix, so the line says so."""
     paired.refusal = httpx.Response(401, json={"detail": "not paired"})
 
     with pytest.raises(LabError, match="distill.login"):
+        submit()
+    with pytest.raises(LabError, match="password change"):
         submit()
 
 

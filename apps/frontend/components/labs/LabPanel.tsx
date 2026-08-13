@@ -73,7 +73,13 @@ function useLabProgress(lab: string, signedIn: boolean): States {
   return new Map((progress?.checkpoints ?? []).map((state) => [state.id, state]));
 }
 
-function useThresholds(lab: string, wanted: boolean): Map<string, number> {
+/** What a metric checkpoint is measured with, and the bar it has to clear. */
+interface Target {
+  metric?: string;
+  threshold: number;
+}
+
+function useTargets(lab: string, wanted: boolean): Map<string, Target> {
   const [manifest, setManifest] = useState<LabManifest | null>(null);
 
   useEffect(() => {
@@ -85,7 +91,12 @@ function useThresholds(lab: string, wanted: boolean): Map<string, number> {
     (manifest?.checkpoints ?? []).flatMap((checkpoint) =>
       checkpoint.spec.threshold === undefined
         ? []
-        : [[checkpoint.id, checkpoint.spec.threshold] as const],
+        : [
+            [
+              checkpoint.id,
+              { metric: checkpoint.spec.metric, threshold: checkpoint.spec.threshold },
+            ] as const,
+          ],
     ),
   );
 }
@@ -100,16 +111,28 @@ function figure(value: number): string {
   return String(Number(value.toFixed(3)));
 }
 
+// Scores travel "higher is better", so an error measure travels negated —
+// `app/labs/verify.py` compares one way for every metric. The reader is shown
+// the error itself.
+const LOWER_IS_BETTER = new Set(["rmse"]);
+
+function score(best: number, target: Target | undefined): string {
+  if (target === undefined) return figure(best);
+  const sign = LOWER_IS_BETTER.has(target.metric ?? "") ? -1 : 1;
+  return `${figure(sign * best)} / ${figure(sign * target.threshold)}`;
+}
+
 function standing(
   checkpoint: LabCheckpoint,
   state: CheckpointProgress | undefined,
 ): string {
   if (state === undefined || state.attempts === 0) return "not attempted";
   if (state.passed_at !== null) return `passed ${day(state.passed_at)}`;
-  // A review is graded out of band: until the judge has written back, an
-  // attempt at one is neither passed nor failed.
+  // A review is judged while the submission is open, so an attempt with no
+  // feedback is one the judge never answered. Nothing will answer it later:
+  // the notebook has to post it again.
   if (checkpoint.kind === "review" && state.feedback === null) {
-    return "awaiting review";
+    return "not judged — post it again";
   }
   return state.attempts === 1 ? "1 attempt" : `${state.attempts} attempts`;
 }
@@ -117,11 +140,11 @@ function standing(
 function Checkpoint({
   checkpoint,
   state,
-  threshold,
+  target,
 }: {
   checkpoint: LabCheckpoint;
   state?: CheckpointProgress;
-  threshold?: number;
+  target?: Target;
 }) {
   const best = state?.best_score ?? null;
   const feedback = state?.feedback ?? null;
@@ -147,9 +170,7 @@ function Checkpoint({
           {!checkpoint.required && <span className={LABEL_CLASS}>bonus</span>}
           {checkpoint.kind === "metric" && best !== null && (
             <span className="font-mono text-[11px] text-soft">
-              {threshold === undefined
-                ? figure(best)
-                : `${figure(best)} / ${figure(threshold)}`}
+              {score(best, target)}
             </span>
           )}
           <span className="font-mono text-[11px] text-faint">
@@ -217,8 +238,9 @@ function NotebookCode() {
             {code.code}
           </button>
           <span className="text-sm text-faint">
-            {copied ? "Copied. " : ""}Paste it into the notebook&apos;s first cell; it
-            expires at {new Date(code.expires_at).toLocaleTimeString()}.
+            {copied ? "Copied. " : ""}Paste it into the notebook&apos;s login cell,
+            between the quotes in <code>distill.login(...)</code>; it expires at{" "}
+            {new Date(code.expires_at).toLocaleTimeString()}.
           </span>
         </p>
       )}
@@ -244,7 +266,7 @@ export default function LabPanel({ lab, spec }: { lab: string; spec: LabSpec }) 
   const states = useLabProgress(lab, signedIn);
   // Only a signed-in reader can be shown a threshold: it is drawn beside a
   // best score, and a best score comes from progress, which nobody else has.
-  const thresholds = useThresholds(
+  const targets = useTargets(
     lab,
     signedIn && spec.checkpoints.some((checkpoint) => checkpoint.kind === "metric"),
   );
@@ -292,7 +314,7 @@ export default function LabPanel({ lab, spec }: { lab: string; spec: LabSpec }) 
               key={checkpoint.id}
               checkpoint={checkpoint}
               state={states.get(checkpoint.id)}
-              threshold={thresholds.get(checkpoint.id)}
+              target={targets.get(checkpoint.id)}
             />
           ))}
         </ol>

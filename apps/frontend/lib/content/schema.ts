@@ -62,17 +62,34 @@ export const DemoSpecSchema = z.object({
 
 export const LAB_CHECKPOINT_KINDS = ["exact", "metric", "review"] as const;
 
-export const LabCheckpointSchema = z.object({
-  id: slug,
-  kind: z.enum(LAB_CHECKPOINT_KINDS),
-  /** What the learner has to get working, one line, shown on the page. */
-  text: z.string().min(1),
-  /**
-   * Only the required checkpoints gate lesson completion; the hardest ones
-   * are optional, because partial completion of a lab is the norm.
-   */
-  required: z.boolean().default(true),
-});
+/**
+ * `app/labs/ingest.py` refuses a longer one (`locators.CHECKPOINT_LENGTH`),
+ * and it refuses it after the content index has already been committed — so
+ * the length is checked here, where it is still an authoring mistake.
+ */
+export const CHECKPOINT_ID_MAX = 64;
+
+export const LabCheckpointSchema = z
+  .object({
+    id: slug.max(CHECKPOINT_ID_MAX),
+    kind: z.enum(LAB_CHECKPOINT_KINDS),
+    /** What the learner has to get working, one line, shown on the page. */
+    text: z.string().min(1),
+    /**
+     * Only the required checkpoints gate lesson completion; the hardest ones
+     * are optional, because partial completion of a lab is the norm.
+     */
+    required: z.boolean().optional(),
+  })
+  .transform((checkpoint) => ({
+    ...checkpoint,
+    // A `review` is a model's opinion of a paragraph, and the platform cannot
+    // promise it will ever have one: an outage or a spent budget leaves the
+    // verdict pending forever, and submissions are never re-graded. So a
+    // review checkpoint defaults to optional and gates completion only where
+    // an author asked for it in writing.
+    required: checkpoint.required ?? checkpoint.kind !== "review",
+  }));
 
 /**
  * A lab's DISPLAY contract: what the page and the backend say the lab asks

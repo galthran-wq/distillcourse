@@ -225,8 +225,6 @@ async def standing(
         checkpoints.append(
             CheckpointProgress(
                 id=entry.id,
-                kind=entry.kind,
-                required=entry.required,
                 attempts=state.attempts if state else 0,
                 passed_at=state.passed_at if state else None,
                 best_score=state.best_score if state else None,
@@ -381,7 +379,11 @@ async def _record_attempt(
         attempts=1,
         passed_at=now if verdict.passed else None,
         best_score=verdict.score,
-        feedback=verdict.hint,
+        # A judging that never happened has nothing to say — the same rule the
+        # conflict branch below states, on the first attempt: a pending
+        # verdict's hint is about the platform, and the page shows what is
+        # stored here as the judge's feedback.
+        feedback=None if verdict.pending else verdict.hint,
     )
     await session.execute(
         statement.on_conflict_do_update(

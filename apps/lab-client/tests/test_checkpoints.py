@@ -7,7 +7,7 @@ import pytest
 
 import distill
 from distill.errors import LabError
-from tests.conftest import ATOL, LESSON, VERSION, Server, verdict
+from tests.conftest import ATOL, LAB, LESSON, VERSION, Server, verdict
 
 SEEDED = np.random.default_rng(1337).random(4)
 
@@ -87,20 +87,41 @@ def test_predictions_are_posted_as_plain_numbers_and_scored(
 
     assert paired.posted[0]["payload"] == [0.1, 0.9, 0.5]
     assert capsys.readouterr().out.endswith(
-        "✓ beat-baseline — roc_auc 0.9100 vs 0.85 (2/2 required)\n"
+        "✓ beat-baseline — roc_auc 0.9100 vs 0.8500 (2/2 required)\n"
     )
 
 
-def test_a_review_is_recorded_rather_than_graded(
+def test_an_error_measure_is_printed_as_the_error_it_measures(
     paired: Server, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    paired.answer = verdict(passed=None, pending=True)
+    """Scores are compared "higher is better", so rmse travels negated. The
+    sign is the wire format; what a learner is shown is the error."""
+    paired.answer = verdict(passed=True, score=-0.31, done=2)
+    paired.spec("beat-baseline").update({"metric": "rmse", "threshold": -0.5})
+    distill.open_lab(LAB)
+
+    distill.submit_predictions("beat-baseline", np.array([0.1, 0.9, 0.5]))
+
+    assert capsys.readouterr().out.endswith(
+        "✓ beat-baseline — rmse 0.3100 vs 0.5000 (2/2 required)\n"
+    )
+
+
+def test_a_review_the_judge_could_not_answer_says_to_post_it_again(
+    paired: Server, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A review is judged while the request is open and nothing re-grades a
+    stored verdict, so a pending one is not a queue — it is the server saying
+    it could not decide, in its own words."""
+    paired.answer = verdict(
+        passed=None, pending=True, hint="Judging is unavailable right now."
+    )
 
     distill.submit_review("why-uniform", "Because no outcome is favoured.")
 
     assert paired.posted[0]["payload"] == "Because no outcome is favoured."
     assert capsys.readouterr().out.endswith(
-        "… why-uniform — recorded, waiting on review (1/2 required)\n"
+        "… why-uniform — Judging is unavailable right now. (1/2 required)\n"
     )
 
 

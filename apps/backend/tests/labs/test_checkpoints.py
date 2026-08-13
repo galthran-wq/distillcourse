@@ -318,10 +318,18 @@ async def test_the_page_sees_every_checkpoint_and_where_the_learner_stands(
         "why-uniform",
     ]
     assert checkpoints[0]["attempts"] == 0
-    assert checkpoints[0]["required"] is True
-    assert checkpoints[3]["required"] is False
     assert checkpoints[2]["best_score"] == 0.8125
     assert checkpoints[2]["passed_at"] is None
+    # State and nothing else: what a checkpoint IS — its kind, wording and
+    # required flag — is content, which the page reads from the lesson's own
+    # `lab` block rather than from a second copy here.
+    assert set(checkpoints[0]) == {
+        "id",
+        "attempts",
+        "passed_at",
+        "best_score",
+        "feedback",
+    }
 
 
 async def test_the_page_needs_a_session(client: AsyncClient) -> None:

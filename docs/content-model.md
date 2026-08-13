@@ -26,6 +26,7 @@ content/courses/<course-slug>/
     pyproject.toml     # lab lessons only — the lab's direct, pinned deps
     uv.lock            # lab lessons only — the committed transitive lock
     data/              # lab lessons only, optional — small data files
+    private/           # lab lessons only, optional — never published
 ```
 
 Modules exist only inside `course.yaml`; lesson directories are flat under
@@ -153,12 +154,28 @@ hand-written, never committed (git-ignored).
             - id: logloss
               kind: exact        # exact | metric | review
               text: "Implement the log-loss and its gradient"
-              required: true     # default; optional ones do not gate completion
+              required: true     # the default for exact and metric
             - id: beat-baseline
               kind: metric
               text: "Beat ROC-AUC 0.85 on the held-out set"
               required: false
+            - id: why-not-mse
+              kind: review
+              text: "Say why squared error is the wrong loss here"
+              # required defaults to FALSE on a review, and saying `true`
+              # here means the lesson cannot be completed until a model
+              # agrees with the answer.
 ```
+
+A checkpoint id is kebab-case and at most 64 characters — the length the
+checkpoint API's own key is (`app/content/locators.py`), checked here because
+its ingest refuses a longer one only after the content index has committed.
+
+`required` gates completion, and its default depends on the kind: `true` for
+`exact` and `metric`, `false` for `review`. A review is decided by a model
+call, and an outage or a spent monthly budget leaves that verdict pending with
+nothing to re-grade it — so a review checkpoint gates a lesson only where an
+author writes `required: true` out.
 
 `lab.checkpoints` is the **display** contract — what the lesson page and the
 backend say the lab asks for. `challenges.yaml` is the **verification**
@@ -168,8 +185,9 @@ id — so the page can never promise work the notebook does not check, nor
 announce a threshold where the notebook only asks for a written answer:
 
 - `lab-files` — a drafted lab lesson whose directory lacks `solution.py`,
-  `challenges.yaml`, `pyproject.toml` or `uv.lock`, or whose
-  `challenges.yaml` has no `checkpoints` mapping (error).
+  `challenges.yaml`, `pyproject.toml` or `uv.lock`, whose `challenges.yaml`
+  has no `checkpoints` mapping, or whose `pyproject.toml` floors Python below
+  3.11 — the build driver parses the lock with `tomllib` (error).
 - `lab-checkpoints` — id sets differing between the two files, a `kind` the
   two files disagree on, a duplicate checkpoint id, or a lab whose every
   checkpoint is optional (error).
@@ -179,8 +197,10 @@ executes the reference solution in the environment `uv.lock` pins, and turns
 what it produces into two artefacts under `labs-dist/` (git-ignored):
 
 - `public/<course>/<lesson>/` — the generated `lab.ipynb` (solution spans
-  replaced by `# YOUR CODE HERE`, outputs stripped, a Colab badge and an
-  install-and-download header prepended), `manifest.json` (per checkpoint:
+  replaced by `# YOUR CODE HERE`, outputs stripped, a Colab badge and two
+  generated header cells prepended — setup, then the `distill.login(...)` cell
+  the learner pastes the lesson page's pairing code into), `manifest.json`
+  (per checkpoint:
   kind, seed, `inputs_code`, `atol` — inputs are not secret) and the lesson's
   `data/` files. This half is what the public mirror serves.
 - `private/<course>/<lesson>.json` — the answer key: expected outputs or their
@@ -192,6 +212,19 @@ what it produces into two artefacts under `labs-dist/` (git-ignored):
   ingests apart. This half is what the checkpoint API loads
   (`python -m app.content.ingest <index.json> <labs-private-dir>`) and
   compares against; it never becomes a `documents` row.
+
+The lesson directory's `data/` is republished into that public half file for
+file, so anything a checkpoint is graded against — held-out labels above all —
+belongs in the lesson's `private/` instead: the build copies it into the run
+and into neither artefact. A full build (no course or lesson named) also
+deletes what it did not rebuild from both halves, because the private half is
+read as the complete list of the labs that exist — a leftover artefact would
+be an answer key nothing can retire.
+
+Metric scores are stored and compared as "higher is better", so `rmse` is
+negated: its threshold is authored negative (`threshold: -0.5` means "an RMSE
+under 0.5 passes") while the lesson page and the notebook print the error
+itself.
 
 A checkpoint that raises, a `wrong` variant that matches the solution, a
 metric threshold the reference fails to clear by 0.02, or a solution marker

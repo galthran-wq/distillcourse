@@ -76,6 +76,36 @@ describe("lab lessons", () => {
       CourseSchema.safeParse(withFirstLesson({ type: "lab", lab: broken })).success,
     ).toBe(false);
   });
+
+  it("leaves a review checkpoint optional unless an author says otherwise", () => {
+    // A review is a model's opinion, and an outage leaves that verdict pending
+    // with nothing to re-grade it: gating a lesson on one is opt-in.
+    const reviews = {
+      ...spec,
+      checkpoints: [
+        ...spec.checkpoints,
+        { id: "why-not-mse", kind: "review", text: "Say why not" },
+        { id: "why-convex", kind: "review", text: "Say why convex", required: true },
+      ],
+    };
+    const course = CourseSchema.parse(withFirstLesson({ type: "lab", lab: reviews }));
+
+    expect(course.modules[0].lessons[0].lab?.checkpoints.map((c) => c.required)).toEqual(
+      [true, false, false, true],
+    );
+  });
+
+  it("rejects a checkpoint id the checkpoint API could not store", () => {
+    // `app/labs/ingest.py` refuses it, and only after the content index has
+    // already committed — so it is refused here, where it is still a typo.
+    const broken = {
+      ...spec,
+      checkpoints: [{ id: "a".repeat(65), kind: "exact", text: "?" }],
+    };
+    expect(
+      CourseSchema.safeParse(withFirstLesson({ type: "lab", lab: broken })).success,
+    ).toBe(false);
+  });
 });
 
 describe("ConceptsFileSchema", () => {

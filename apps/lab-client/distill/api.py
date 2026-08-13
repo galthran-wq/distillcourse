@@ -31,6 +31,14 @@ UNREACHABLE = (
 )
 STALE = "the lab was updated — reopen the notebook from the course page"
 UNPAIRED = 'not paired — run distill.login("<the code from the lesson page>")'
+# A token the server will not take. It outlives the kernel, so the likely
+# reason is that the account ended it: changing the password or signing out
+# everywhere revokes every notebook pairing. Pairing again is the whole fix,
+# which is why this says so rather than reporting a failure.
+REVOKED = (
+    "this notebook's pairing has ended — a password change or signing out "
+    'everywhere ends one — run distill.login("<a new code from the lesson page>")'
+)
 
 
 class Api:
@@ -90,7 +98,7 @@ def _url(path: str) -> str:
 
 def _refusal(response: httpx.Response) -> str:
     if response.status_code == httpx.codes.UNAUTHORIZED:
-        return UNPAIRED
+        return REVOKED
     if response.status_code == httpx.codes.CONFLICT:
         return STALE
     after = response.headers.get("retry-after")

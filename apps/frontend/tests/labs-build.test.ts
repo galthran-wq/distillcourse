@@ -30,9 +30,20 @@ function text(cell: NotebookCell): string {
 }
 
 interface Built {
+  root: string;
   diags: Diagnostic[];
   privatePath: string;
   publicDir: string;
+}
+
+function buildFixtureIn(root: string): Built {
+  const courseDir = join(root, "content", "courses", "lint-course");
+  return {
+    root,
+    diags: runCourseLabs(loadCourse(courseDir), { repoRoot: root, mode: "build" }),
+    privatePath: join(root, "labs-dist", "private", "lint-course", "surprisal-lab.json"),
+    publicDir: join(root, "labs-dist", "public", "lint-course", "surprisal-lab"),
+  };
 }
 
 function buildFixture(mutate?: (labDir: string) => void): Built {
@@ -41,11 +52,7 @@ function buildFixture(mutate?: (labDir: string) => void): Built {
   const courseDir = join(root, "content", "courses", "lint-course");
   cpSync(FIXTURE, courseDir, { recursive: true });
   mutate?.(join(courseDir, LAB_DIR));
-  return {
-    diags: runCourseLabs(loadCourse(courseDir), { repoRoot: root, mode: "build" }),
-    privatePath: join(root, "labs-dist", "private", "lint-course", "surprisal-lab.json"),
-    publicDir: join(root, "labs-dist", "public", "lint-course", "surprisal-lab"),
-  };
+  return buildFixtureIn(root);
 }
 
 function filesUnder(dir: string): string[] {
@@ -116,6 +123,12 @@ describe.skipIf(!hasUv)("lab build", () => {
     const published = filesUnder(built.publicDir)
       .map((path) => readFileSync(path, "utf8"))
       .join("\n");
+    // The lesson's own `private/` is where the held-out labels are read from,
+    // and `data/` is republished file for file — so this is the pair that
+    // decides whether the natural layout is also a leak.
+    expect(published).not.toContain(
+      readFileSync(join(FIXTURE, LAB_DIR, "private", "labels.csv"), "utf8"),
+    );
     for (const secret of [
       "BEGIN SOLUTION",
       "END SOLUTION",
@@ -153,7 +166,7 @@ describe.skipIf(!hasUv)("lab build", () => {
   });
 
   it("generates a student notebook that opens clean", () => {
-    const [badge, setup] = notebook.cells;
+    const [badge, setup, login] = notebook.cells;
     expect(badge.cell_type).toBe("markdown");
     expect(text(badge)).toContain(
       "https://colab.research.google.com/github/galthran-wq/distillcourse-labs/blob/main/labs/lint-course/surprisal-lab/lab.ipynb",
@@ -162,6 +175,12 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(text(setup)).toContain("#subdirectory=client");
     expect(text(setup)).toContain("!wget -q -O data/holdout.csv");
     expect(text(setup)).toContain('distill.open_lab("lint-course/surprisal-lab")');
+    // Pairing has a cell of its own to paste into: the code the lesson page
+    // issues is not Python, and there is nowhere else it goes.
+    expect(login.cell_type).toBe("code");
+    expect(text(login)).toContain(
+      'distill.login("PASTE-THE-CODE-FROM-THE-LESSON-PAGE")',
+    );
 
     const body = notebook.cells.map(text).join("\n");
     expect(body.match(/# YOUR CODE HERE/g)).toHaveLength(3);
@@ -224,14 +243,46 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(existsSync(join(root, "labs-dist", "private"))).toBe(false);
   }, MINUTES);
 
-  it("matches the committed canonicalization vectors", () => {
-    const result = spawnSync(
-      "uv",
-      ["run", "--no-project", "--with", "numpy", "--with", "pyyaml", "python", "check_canon_vectors.py"],
-      { cwd: PYTHON_DIR, encoding: "utf8" },
-    );
-    expect(result.stderr + result.stdout).toContain("vectors match");
-    expect(result.status).toBe(0);
+  it.each(["check_canon_vectors.py", "check_metric_vectors.py"])(
+    "matches the committed vectors in %s",
+    (script) => {
+      const result = spawnSync(
+        "uv",
+        ["run", "--no-project", "--with", "numpy", "--with", "pyyaml", "python", script],
+        { cwd: PYTHON_DIR, encoding: "utf8" },
+      );
+      expect(result.stderr + result.stdout).toContain("vectors match");
+      expect(result.status).toBe(0);
+    },
+    MINUTES,
+  );
+
+  it("writes the private artifact in the shape the other two ends read", () => {
+    // The build is the only end that produces this file; the backend's ingest
+    // tests and the client's fake restate its shape from the same pinned list.
+    const shapes = JSON.parse(readFileSync(join(PYTHON_DIR, "wire_shapes.json"), "utf8"));
+    const artifact = JSON.parse(priv);
+    expect(Object.keys(artifact).sort()).toEqual([...shapes.private_artifact].sort());
+    for (const record of Object.values<Record<string, unknown>>(artifact.checkpoints)) {
+      expect(Object.keys(record).sort()).toEqual(
+        [...shapes.private_checkpoint[record.kind as string]].sort(),
+      );
+    }
+  });
+
+  it("retires the artifacts of a lab that no longer exists", () => {
+    // The ingest reads the private half as the complete list of labs, so an
+    // artifact nothing rebuilds is an answer key nothing can retire.
+    const stale = join(built.privatePath, "..", "gone-lab.json");
+    writeFileSync(stale, "{}");
+    const staleDir = join(built.publicDir, "..", "gone-lab");
+    cpSync(built.publicDir, staleDir, { recursive: true });
+
+    buildFixtureIn(built.root);
+
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(staleDir)).toBe(false);
+    expect(existsSync(built.privatePath)).toBe(true);
   }, MINUTES);
 });
 
@@ -250,12 +301,13 @@ describe("a machine without uv", () => {
     }
   }
 
-  it("fails the build and only warns the validator", () => {
-    expect(diagnose("build")).toEqual([
-      expect.objectContaining({ level: "error", rule: "lab-build" }),
-    ]);
-    expect(diagnose("check")).toEqual([
-      expect.objectContaining({ level: "warn", rule: "lab-build" }),
-    ]);
+  it("fails both the build and the validator", () => {
+    // A lab whose solution was never executed is unvalidated content, and
+    // validate is the gate that says so.
+    for (const mode of ["build", "check"] as const) {
+      expect(diagnose(mode)).toEqual([
+        expect.objectContaining({ level: "error", rule: "lab-build" }),
+      ]);
+    }
   });
 });

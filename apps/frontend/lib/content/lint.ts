@@ -417,6 +417,27 @@ function lintLessonMdx(
 /** What a lab lesson directory must hold once the lesson is drafted. */
 const LAB_FILES = ["solution.py", CHALLENGES_FILE, "pyproject.toml", "uv.lock"];
 
+/**
+ * The build driver parses `pyproject.toml` and `uv.lock` with `tomllib`, so a
+ * lab whose environment resolves below this dies inside the run with an
+ * ImportError rather than here with a diagnostic. The client's own floor is
+ * 3.10 (Colab's) and unrelated: the lab's environment is the build's.
+ */
+const LAB_PYTHON_MINOR = 11;
+const REQUIRES_PYTHON = /^\s*requires-python\s*=\s*"[^"]*>=\s*3\.(\d+)/m;
+
+function lintLabPython(entry: LoadedLesson, diags: Diagnostic[]): void {
+  const file = join(entry.dir, "pyproject.toml");
+  const declared = REQUIRES_PYTHON.exec(readFileSync(file, "utf8"));
+  if (declared !== null && Number(declared[1]) >= LAB_PYTHON_MINOR) return;
+  diags.push({
+    level: "error",
+    rule: "lab-files",
+    file,
+    message: `lab "${entry.lesson.slug}": requires-python must be ">=3.${LAB_PYTHON_MINOR}" or higher — the build driver reads pyproject.toml with tomllib`,
+  });
+}
+
 /** Holds the two contracts documented on `LabSpecSchema` to each other. */
 function lintLab(
   entry: LoadedLesson,
@@ -457,6 +478,7 @@ function lintLab(
       message: `lab "${lesson.slug}" is ${lesson.status} but ${name} is missing`,
     });
   }
+  if (existsSync(join(entry.dir, "pyproject.toml"))) lintLabPython(entry, diags);
 
   const challenges = loadChallenges(entry.dir);
   if (!challenges.exists) return; // already reported by lab-files

@@ -181,8 +181,9 @@ def _rmse(labels: Sequence[float], predictions: Sequence[float]) -> float:
 # The build computes the reference score with the numpy versions in
 # `distill_capture.py`; these are the same three formulas without a numpy
 # dependency on the API. Neither end can import the other — one runs inside the
-# lab's own uv environment at build time — so they are kept in step by
-# `tests/labs/test_verify.py`, which asserts the values that module produces.
+# lab's own uv environment at build time — so they are held to one committed
+# file, `python/metric_vectors.json`: `tests/labs/test_verify.py` runs these
+# against it, `python/check_metric_vectors.py` runs those.
 METRICS: dict[str, Callable[[Sequence[float], Sequence[float]], float]] = {
     "roc_auc": _roc_auc,
     "accuracy": _accuracy,

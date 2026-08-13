@@ -561,8 +561,11 @@ GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
   `judge.TIMEOUT_SECONDS`, output that will not validate twice, a spent monthly
   ceiling — leaves the submission `pending` rather than failing the learner,
   and what the call cost is stored on `lab_submissions.usage`, the second row
-  that ceiling sums. A pending verdict overwrites nothing: the feedback the
-  page shows is the last judgement that actually happened.
+  that ceiling sums. A pending verdict overwrites nothing and stores nothing:
+  the feedback the page shows is the last judgement that actually happened,
+  never the hint that says none did. Nothing re-grades a stored submission —
+  the log is append-only — so a pending verdict is not a queue, and both the
+  hint and the page's own line say to post the answer again.
 - The call is made between two transactions, never inside one. `submit` runs
   its checks under the per-(learner, lesson) lock, commits to hand back both
   the lock and the pooled connection, judges with nothing held, then takes the
@@ -580,7 +583,10 @@ GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
   consults and a lab has no flush of its own coming.
 - Rate limits: 60 submissions a minute per learner, and per checkpoint per day
   `LAB_METRIC_ATTEMPTS_PER_DAY` / `LAB_REVIEW_ATTEMPTS_PER_DAY` for the two
-  kinds that cost the server real work. The day's attempt is spent before the
+  kinds that cost the server real work. All of them are in-process fixed
+  windows, so the real daily ceiling is that number times the worker count and
+  a deploy resets it — the bound that actually stops model spend is the
+  monthly cost ceiling, which is counted in the database. The day's attempt is spent before the
   grading it bounds — what bounds a model call has to be — and given back when
   nothing was graded, so a retried id, a stale `content_version`, a checkpoint
   nobody built, a payload the checkpoint refuses and a judging the platform

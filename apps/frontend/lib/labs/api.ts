@@ -37,7 +37,7 @@ export interface PairingCode {
  * same document the grader was ingested with rather than from a second copy.
  */
 export interface LabManifest {
-  checkpoints: { id: string; spec: { threshold?: number } }[];
+  checkpoints: { id: string; spec: { metric?: string; threshold?: number } }[];
 }
 
 export function getLabProgress(lab: string): Promise<LabProgress> {

@@ -56,19 +56,34 @@ Rules that override defaults:
 - Lab lessons (`type: lab`) are authored ONLY through the `lab-author` skill:
   `solution.py` (jupytext percent) + `challenges.yaml`, executed to green in
   the authoring loop before commit. `lab.ipynb` is a build artifact — never
-  hand-written, never committed.
+  hand-written, never committed. The lesson's `data/` is republished to the
+  public mirror file for file; anything a checkpoint is graded against —
+  held-out labels above all — lives in the lesson's `private/`, which the
+  build copies into the run and into neither artifact. A `review`
+  checkpoint's `required` defaults to false (the judge is a model call, and
+  an outage leaves its verdict pending with nothing to re-grade it);
+  `exact` and `metric` default to true.
 - The lab build is `apps/frontend/lib/labs/` (TypeScript orchestration plus
   `python/`, which runs inside each lab's own uv environment) driven by
   `scripts/build-labs.ts`. It EXECUTES the reference solution, and
   `npm run validate` runs it in check mode: a lab whose checkpoints are not
   green fails validation like broken MDX, and `uv` is a validate dependency
-  wherever a lab lesson exists. Output is `labs-dist/` (git-ignored), split
+  wherever a lab lesson exists — missing, it is an error in both modes.
+  Output is `labs-dist/` (git-ignored), split
   into `public/` (student notebook, manifest, data — the mirror's half) and
   `private/` (expected outputs, labels, rubrics — the checkpoint API's half);
   never let the public half carry anything the private half exists to protect.
+  A full build (no course or lesson named) also deletes from both halves what
+  it did not rebuild: ingest reads the private half as the complete list of
+  the labs that exist, so a leftover artifact is an answer key nothing can
+  retire.
   `python/distill_capture.py` is the single implementation of the capture API
   and of canonicalization — the authoring loop copies that same file — and
-  `python/canon_vectors.json` pins that format for the client and the server.
+  the committed files beside it are what hold the three implementations to
+  one contract: `canon_vectors.json` (the value format),
+  `metric_vectors.json` (what each metric is worth — `rmse` negated, so every
+  metric reads higher-is-better) and `wire_shapes.json` (the field names of
+  every message they pass), each read by all the suites that state them.
 - `apps/lab-client/` is the `distill` package a learner's notebook installs:
   Python 3.10 (Colab's floor), httpx + numpy and nothing else,
   `./apps/lab-client/scripts/lint.sh` and `uv run pytest` before reporting

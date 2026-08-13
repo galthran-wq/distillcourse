@@ -77,6 +77,16 @@ def _inputs(spec: dict[str, Any]) -> tuple:
     return ns["inputs"]
 
 
+def login(code: str) -> None:
+    """Nothing to pair with: capture mode posts nowhere.
+
+    Here so the capture surface is the client's surface — a solution that
+    carries the call the generated notebook's login cell makes still executes,
+    and the build strips it from the student notebook rather than shipping two.
+    """
+    print("[capture] login is a no-op: nothing is posted while capturing")
+
+
 def open_lab(slug: str) -> None:
     print(f"[capture] {slug}: {len(challenges())} checkpoints declared")
 

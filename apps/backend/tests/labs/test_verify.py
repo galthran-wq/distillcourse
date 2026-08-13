@@ -5,16 +5,18 @@ from typing import Any
 import pytest
 
 from app.labs import verify
-from tests.labs.conftest import DIGEST, FAILING, LABELS, SPECS
+from tests.labs.conftest import DIGEST, FAILING, SPECS
 
 EXACT = SPECS["surprisal"]["private"]
 DIGESTED = SPECS["entropy-terms"]["private"]
 METRIC = SPECS["beat-baseline"]["private"]
+PYTHON = Path(__file__).parents[3] / "frontend/lib/labs/python"
 # The one statement of what a canonicalized output is, which the client
 # canonicalizes to and this module grades against.
-CANON_VECTORS = (
-    Path(__file__).parents[3] / "frontend/lib/labs/python/canon_vectors.json"
-)
+CANON_VECTORS = PYTHON / "canon_vectors.json"
+# And the one statement of what each metric is worth, which the build
+# calibrates a threshold with and this module grades against.
+METRIC_VECTORS = PYTHON / "metric_vectors.json"
 
 
 def values(*numbers: float) -> dict[str, Any]:
@@ -96,23 +98,32 @@ def test_the_committed_vectors_are_what_this_module_accepts() -> None:
 
 
 def test_a_metric_is_scored_against_the_labels_the_learner_never_sees() -> None:
-    # The values numpy produces for these vectors, in
-    # apps/frontend/lib/labs/python/distill_capture.py: the two ends of the
-    # protocol compute the same three metrics and must agree on them.
     assert verify.verify("metric", METRIC, FAILING) == verify.Verdict(
         passed=False, score=0.8125
     )
-    accuracy = verify.verify("metric", METRIC | {"metric": "accuracy"}, FAILING)
-    rmse = verify.verify("metric", METRIC | {"metric": "rmse"}, FAILING)
-
-    assert accuracy.score == 0.75
-    assert rmse.score == pytest.approx(-0.38770156048177057)
 
 
-def test_tied_predictions_score_by_midrank() -> None:
-    """Without it a constant prediction would score anything but 0.5, and a
-    learner who guessed one number would be told they beat the baseline."""
-    assert verify.METRICS["roc_auc"](LABELS, [0.5] * len(LABELS)) == 0.5
+METRIC_CASES: list[dict[str, Any]] = json.loads(METRIC_VECTORS.read_text())["cases"]
+
+
+@pytest.mark.parametrize(
+    "case", METRIC_CASES, ids=[f"{c['metric']}: {c['name']}" for c in METRIC_CASES]
+)
+def test_a_committed_metric_vector(case: dict[str, Any]) -> None:
+    """The build calibrates a threshold with numpy in `distill_capture.py`;
+    this module grades against it without numpy. Neither can import the other,
+    so the vectors are the agreement — and drift between them fails a learner
+    whose predictions genuinely clear the bar the author set.
+
+    `check_metric_vectors.py` runs the same file against the other end.
+    """
+    score = verify.METRICS[case["metric"]](case["labels"], case["predictions"])
+
+    assert score == pytest.approx(case["score"], abs=1e-12)
+
+
+def test_the_metric_vectors_cover_every_metric_the_platform_grades() -> None:
+    assert {case["metric"] for case in METRIC_CASES} == set(verify.METRICS)
 
 
 def test_predictions_that_do_not_cover_the_held_out_set_are_refused() -> None:

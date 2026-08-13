@@ -34,7 +34,8 @@ module for the loop is the build's own:
      threshold to beat, hints section *after* it (try-first, spoilers
      below); mark it `required: false`;
    - `review` checkpoints are optional garnish (a "why" question with a
-     rubric), always `required: false`.
+     rubric), always `required: false` — which is that kind's default, so
+     write nothing rather than writing it out.
 3. **Difficulty calibration is a design act, not a vibe.** Estimate honest
    solve time: count blanks × their depth (a 15-line vectorized function
    with a shape contract ≈ 20–40 min; an open modeling task ≈ 1–2 h). Under
@@ -69,7 +70,8 @@ rm -rf distill.py captured.json .venv               # when done
   lab is nondeterministic and will fail validate.
 - Finish with `npm run build-labs -- <course> <lesson>` + `npm run validate`,
   and read the generated `labs-dist/public/<course>/<lesson>/lab.ipynb` as the
-  learner would: scaffold intact, no markers, no outputs, header cell present.
+  learner would: scaffold intact, no markers, no outputs, and the two
+  generated header cells — setup, then `distill.login(...)` — at the top.
 
 ## Checkpoint craft (the check vocabulary)
 
@@ -88,6 +90,11 @@ rm -rf distill.py captured.json .venv               # when done
 - `metric` tasks: state the baseline in the text, calibrate the threshold by
   running the reference, and pair the score with a plot of the same
   quantity (learning curve, ROC) generated from the learner's own results.
+  The held-out labels go in the lesson's `private/`, which the build never
+  publishes — `data/` is republished to the public mirror file for file, so a
+  labels file left there is the answer key, in a public repository. And
+  `rmse` is compared negated (higher is better for every metric): its
+  threshold is written negative.
 - Plotting is infrastructure: helpers shipped complete, never blanked; reuse
   one helper to show the correct shape AND a broken shape (diverging loss)
   — the plot is a debugging tool, not decoration.

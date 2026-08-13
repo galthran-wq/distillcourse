@@ -69,9 +69,12 @@ class Manifest(BaseModel):
 
 
 class CheckpointProgress(BaseModel):
+    """One checkpoint's standing, and nothing about what the checkpoint is:
+    its kind, wording and required flag are content, which the page reads from
+    the lesson's own `lab` block. Restating them here would offer a second
+    source for the same fact, and the wrong one."""
+
     id: Checkpoint
-    kind: str
-    required: bool
     attempts: int
     passed_at: datetime | None
     best_score: float | None

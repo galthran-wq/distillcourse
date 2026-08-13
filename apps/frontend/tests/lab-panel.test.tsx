@@ -164,10 +164,26 @@ describe("the lab panel", () => {
     // The best score against the bar the build calibrated, which is the
     // manifest's rather than the lesson's.
     expect(rows(host)[2]).toContain("0.891 / 0.85");
-    // Nothing has failed a review the judge has not answered yet.
-    expect(rows(host)[3]).toContain("awaiting review");
+    // A review is judged while the submission is open, so an attempt with no
+    // feedback is one the judge never answered — and nothing re-grades it.
+    expect(rows(host)[3]).toContain("not judged — post it again");
     expect(host.textContent).toContain("1 / 2 required");
     expect(host.textContent).toContain("0 / 2 bonus");
+  });
+
+  it("shows an error measure as the error, not as the negative it travels as", async () => {
+    // Scores are compared "higher is better", so rmse is stored negated; the
+    // reader is shown the error itself, against the bar as an error too.
+    vi.mocked(getLabProgress).mockResolvedValue({
+      checkpoints: [state("beat-baseline", { best_score: -0.312 })],
+    });
+    vi.mocked(getLabManifest).mockResolvedValue({
+      checkpoints: [{ id: "beat-baseline", spec: { metric: "rmse", threshold: -0.5 } }],
+    });
+
+    const host = await show();
+
+    expect(rows(host)[2]).toContain("0.312 / 0.5");
   });
 
   it("shows a metric score alone where no threshold can be read", async () => {
@@ -224,7 +240,10 @@ describe("the lab panel", () => {
     await act(async () => press(host, "Code for the notebook"));
 
     expect(host.textContent).toContain("K7xR2mQ9pLw4");
-    expect(host.textContent).toContain("first cell");
+    // Named for the cell the generated notebook actually carries: pasting a
+    // pairing code into the setup cell is a SyntaxError.
+    expect(host.textContent).toContain("login cell");
+    expect(host.textContent).toContain("distill.login(...)");
 
     await act(async () => press(host, "K7xR2mQ9pLw4"));
 

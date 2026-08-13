@@ -8,12 +8,16 @@
  * same work and discards the artifacts; that is the mode `npm run validate`
  * uses, because a lab whose solution is not green is invalid content.
  *
- * Needs `uv` on PATH: without it this command can write nothing and fails.
- * (`--check`, and so `npm run validate`, only warns — linting content does
- * not need the environment.)
+ * Needs `uv` on PATH in both modes: a lab whose reference solution was never
+ * executed is unvalidated content, so the diagnostic is an error either way.
+ *
+ * A full build is also the only thing that retires an artifact: what it does
+ * not rebuild, it deletes, because the ingest reads `labs-dist/private/` as
+ * the complete list of the labs that exist.
  */
+import { basename } from "node:path";
 import { loadCourse } from "../lib/content/load";
-import { runCourseLabs } from "../lib/labs/build";
+import { retireCourses, runCourseLabs } from "../lib/labs/build";
 import { reportCourses, selectCourseDirs } from "./content-cli";
 import { repoRoot } from "./paths";
 
@@ -21,7 +25,12 @@ const args = process.argv.slice(2);
 const mode = args.includes("--check") ? "check" : "build";
 const [courseArg, lessonArg] = args.filter((arg) => !arg.startsWith("--"));
 
-const totalErrors = reportCourses(selectCourseDirs(courseArg), (dir) =>
+const courseDirs = selectCourseDirs(courseArg);
+if (mode === "build" && courseArg === undefined) {
+  retireCourses(repoRoot, courseDirs.map((dir) => basename(dir)));
+}
+
+const totalErrors = reportCourses(courseDirs, (dir) =>
   runCourseLabs(loadCourse(dir), { repoRoot, mode, lesson: lessonArg }),
 );
 

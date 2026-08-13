@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+import logfire
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
@@ -96,6 +97,17 @@ async def manifest(key: LessonKey, session: SessionDep) -> Manifest:
     built = await repository.challenges(session, key)
     if declared is None or not built:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no lab at that lesson")
+    unbuilt = [entry.id for entry in declared.checkpoints if entry.id not in built]
+    if unbuilt:
+        # The two halves came from different builds: `make reindex` runs them
+        # together, but the commands are separable and the skew is otherwise
+        # silent — the notebook is never asked for these, while the page goes
+        # on counting them towards a total the learner cannot reach.
+        logfire.error(
+            "a lab declares checkpoints the build never produced",
+            lesson=key,
+            checkpoints=unbuilt,
+        )
     return Manifest(
         lesson=key,
         content_version=next(iter(built.values())).content_version.hex(),

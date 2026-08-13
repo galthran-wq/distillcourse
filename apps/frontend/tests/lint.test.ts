@@ -232,6 +232,20 @@ describe("lintCourse", () => {
     }
   });
 
+  it("flags a lab whose python floor is below the build driver's (lab-files)", () => {
+    // The driver parses pyproject.toml with tomllib; a lower floor dies inside
+    // the run with an ImportError instead of here with a diagnostic.
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "lessons/surprisal-lab/pyproject.toml"),
+        'requires-python = ">=3.11"',
+        'requires-python = ">=3.10"',
+      ),
+    );
+    const diags = errors(lintDir(dir)).filter((d) => d.rule === "lab-files");
+    expect(diags.map((d) => d.message).join()).toContain("requires-python");
+  });
+
   it("flags challenges.yaml without a checkpoints mapping (lab-files)", () => {
     const dir = brokenCopy((d) =>
       writeFileSync(join(d, "lessons/surprisal-lab/challenges.yaml"), "kind: exact\n"),

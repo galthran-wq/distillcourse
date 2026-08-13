@@ -14,7 +14,16 @@ content/courses/<course>/lessons/<lesson>/
   pyproject.toml      # the lab's deps (direct, pinned)
   uv.lock             # full transitive lock — the build/CI env, committed
   data/               # optional small data files shipped to the mirror
+  private/            # optional inputs the learner must never see
 ```
+
+`data/` is **published verbatim** to the public mirror, file for file. Anything
+a checkpoint is graded against — held-out labels above all — goes in
+`private/`, which the build copies into the run directory and into nothing
+else. The natural layout for a metric lab is therefore
+`data/holdout_X.csv` beside `private/holdout_y.csv`, with `labels_code`
+reading the second; a labels file left in `data/` is force-pushed to a public
+repository and nothing will warn you.
 
 `lab.ipynb` is generated — never committed, never hand-written. `course.yaml`
 declares the lesson (`type: lab`, `lab.checkpoints`, `lab.est_hours`); the
@@ -98,7 +107,7 @@ checkpoints:
     threshold: 0.85         # build fails unless the reference beats it by ≥ 0.02
     holdout: data/holdout_X.csv
     labels_code: |          # build-time only; produces `labels` for the private artifact
-      ...
+      labels = np.loadtxt("private/holdout_y.csv")   # never data/
   why-not-mse:
     kind: review
     rubric: |               # private; the judge's grading contract
@@ -111,6 +120,17 @@ checkpoints:
 - `wrong` variants are the best feedback device we have: compute what the
   canonical bug produces and name the bug. Write at least one for the
   checkpoints where a canonical bug exists.
+- **Every metric reads "higher is better"**, so one comparison answers for all
+  three: `rmse` is stored and compared **negated**. Its threshold is therefore
+  written negative — `metric: rmse, threshold: -0.5` means "an RMSE under
+  0.5 passes" — and the reference score the build prints is negative too. The
+  learner is shown the error itself; the sign is the wire format, not the
+  wording.
+- `required` on a checkpoint lives in `course.yaml`, not here, and defaults to
+  `true` for `exact` and `metric` and to `false` for `review`: an outage or a
+  spent judge budget leaves a review verdict pending forever and nothing
+  re-grades it, so a review gates completion only where an author writes
+  `required: true` out.
 
 ## Canonicalization (shared with the server compare and the client)
 
@@ -138,7 +158,11 @@ instead of refusing it, will grade correct answers wrong.
 
 Each lab is a uv project: `pyproject.toml` declares the direct deps, exact-
 pinned (`numpy==2.3.1`), only what the lab imports; `uv lock` produces the
-committed `uv.lock`. The lock is the reproducibility boundary: the build
+committed `uv.lock`. `requires-python` is `">=3.11"` or higher — the build
+driver parses `pyproject.toml` with `tomllib`, and lint refuses a lower floor.
+(The `distill` client is separate and floors at 3.10, which is Colab's; the
+lab's environment is the build's, not Colab's.) The lock is the
+reproducibility boundary: the build
 and the authoring loop execute the solution with `uv run` against it, so the
 env is bit-for-bit stable across machines and time.
 
@@ -166,3 +190,10 @@ to the solution it executes, so the loop and the build cannot disagree.
 build strips them from the student notebook, whose generated header opens the
 session instead. It also replaces the model answer in every
 `distill.submit_review(...)` with a placeholder — the answer never ships.
+
+The generated header is **two** cells, and neither is hand-written: setup
+(installs, `wget`s, `import distill`, `open_lab`) and, after it, the login
+cell — `distill.login("PASTE-THE-CODE-FROM-THE-LESSON-PAGE")`, the one line a
+learner edits, with the code the lesson page's "Code for the notebook" button
+issues. Pairing is a separate step from setup: it is redone whenever the code
+expires or the account revokes the pairing, and setup is not.
