@@ -1,10 +1,11 @@
-"""What a posted checkpoint is worth.
+"""What a posted checkpoint is worth, where a comparison can answer it.
 
 The server runs no code a learner or an author wrote. An `exact` checkpoint is
 a comparison against the output the build captured from the reference solution
 (`apps/frontend/lib/labs/python/`), canonicalized on the client to the format
 `canon_vectors.json` pins; a `metric` one is scored here against labels the
-learner never sees; a `review` one is text the judge grades.
+learner never sees. The third kind, `review`, is prose and is graded by the
+judge in `judge.py`.
 
 Feedback is deliberately coarse — a pass, and a hint only where the output
 matches a wrong variant the author declared. Nothing here reports how far off
@@ -20,7 +21,6 @@ from typing import Any
 # The canonicalization contract: past this many scalars a client sends a
 # digest, so a values payload larger than this was not built by it.
 SMALL_LIMIT = 64
-MAX_REVIEW_CHARS = 4000
 DIGEST_CHARS = 64
 
 
@@ -30,9 +30,12 @@ class Rejected(Exception):
 
 @dataclass(frozen=True)
 class Verdict:
-    # None while a review checkpoint waits for the judge: not a failure, and
-    # not something to record a pass for either.
+    # None where the judge could not answer: not a failure, and not something
+    # to record a pass for either.
     passed: bool | None
+    # The one line of text a verdict carries back — the wrong variant's hint
+    # for an `exact` checkpoint, the judge's feedback for a `review` one. It is
+    # what the page shows and what the notebook prints, so there is one of it.
     hint: str | None = None
     score: float | None = None
     pending: bool = False
@@ -59,18 +62,9 @@ def _metric(spec: dict[str, Any], payload: Any) -> Verdict:
     return Verdict(passed=score >= float(spec["threshold"]), score=score)
 
 
-def _review(_spec: dict[str, Any], payload: Any) -> Verdict:
-    if not isinstance(payload, str) or not payload.strip():
-        raise Rejected("a review checkpoint takes the text of your answer")
-    if len(payload) > MAX_REVIEW_CHARS:
-        raise Rejected(f"an answer is at most {MAX_REVIEW_CHARS} characters")
-    return Verdict(passed=None, pending=True)
-
-
 _KINDS: dict[str, Callable[[dict[str, Any], Any], Verdict]] = {
     "exact": _exact,
     "metric": _metric,
-    "review": _review,
 }
 
 

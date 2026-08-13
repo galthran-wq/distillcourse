@@ -543,6 +543,10 @@ class LabSubmission(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     verdict: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # What the model call cost, for the submissions that took one — the same
+    # row `messages.usage` carries, summed by the same monthly ceiling. Null
+    # for every checkpoint a comparison answered.
+    usage: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
 
 
 # Rating and bookmark are keyed by the same `lesson:` locator `events` and

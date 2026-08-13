@@ -1,17 +1,20 @@
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from httpx import AsyncClient
+from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.labs import repository
+from app.labs import judge, repository
 from app.models import Document, Event, LabChallenge, User
 from app.telemetry import schemas as telemetry
+from tests.harness.conftest import call
 
 LABS = f"{settings.API_V1_STR}/labs"
 COURSE = "information-theory"
@@ -146,6 +149,42 @@ def rows(lesson: str = LESSON) -> list[Any]:
             for entry in DECLARED
         ),
     ]
+
+
+def judging(
+    calls: list[list[ModelMessage]] | None = None, **answer: Any
+) -> FunctionModel:
+    """The judge, answered from the test rather than from a model.
+
+    Records what it was asked wherever it is given somewhere to record it, and
+    answers with whatever it is handed — including output the schema refuses.
+    """
+    args = {"passed": True, "feedback": "Names the constraint."} | answer
+
+    def turn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        if calls is not None:
+            calls.append(messages)
+        return call(info.output_tools[0].name, **args)
+
+    return FunctionModel(turn)
+
+
+def refusing(failure: Exception) -> FunctionModel:
+    """The judge, down."""
+
+    def turn(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        raise failure
+
+    return FunctionModel(turn)
+
+
+@pytest.fixture(autouse=True)
+def judged() -> Iterator[None]:
+    """No test in this package reaches a model: every review submission is
+    graded by this one, and a test that cares what the judge says overrides it
+    again."""
+    with judge.agent.override(model=judging()):
+        yield
 
 
 @pytest.fixture
