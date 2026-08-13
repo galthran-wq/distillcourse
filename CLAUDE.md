@@ -43,7 +43,10 @@ Rules that override defaults:
 
 - `content/courses/*/course.yaml` is the human's curation surface. Skills and
   agents may only flip a lesson's `status` from `planned` to `drafted` and
-  set that lesson's `key_image` there;
+  set that lesson's `key_image` there — plus, for a `type: lab` lesson,
+  rewrite that lesson's own `lab` block (checkpoint ids/kinds/required flags,
+  `est_hours`) to keep it in sync with the `challenges.yaml` the authoring
+  loop executed, and nothing else;
   never set `reviewed`/`published`, never restructure modules/lessons without
   being explicitly asked.
 - Lesson slugs are immutable once status ≥ `drafted`.

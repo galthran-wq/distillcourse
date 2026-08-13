@@ -3,7 +3,7 @@ name: lesson-factory
 description: Launch the course-factory workflow's lesson phase — iterate over planned lessons (write on the session model, build specced demos, author labs through lab-author, opus QA, one fix cycle each) inside the course's worktree branch. Use after the human has curated the course structure and research briefs.
 argument-hint: "<course-slug> [count]"
 disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:*), Bash(git *)
+allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:*), Bash(uv --version), Bash(git *)
 ---
 
 # Lesson Factory
@@ -29,9 +29,12 @@ directly. Any other model: **STOP** and output only:
    missing, stop and point the user at /course-architect.
 
 2. **Preflight.** `npm run validate <slug>` must be green before starting —
-   the human's curation edits may have broken references. If the course
-   plans any `type: lab` lesson, `uv` must be on PATH: labs are authored by
-   executing their solution, and validate builds them the same way.
+   the human's curation edits may have broken references. Then, if
+   `course.yaml` holds any `type: lab` lesson, run `uv --version` yourself
+   and stop on a non-zero exit: labs are authored by executing their
+   solution, so without `uv` the lab agent dies hours into the run. Validate
+   will not have caught it — it builds only labs already at `drafted`, and
+   even then a missing `uv` is a warning there, not an error.
 
 3. **Launch:** Workflow
    `{name: "course-factory", args: {phase: "lessons", slug: "<slug>", count: <n if given>, root: "<absolute worktree path>"}}`.

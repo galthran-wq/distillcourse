@@ -7,8 +7,13 @@ export const meta = {
 
 const PLAN_SCHEMA = {
   type: 'object',
-  required: ['lessons'],
+  required: ['lessons', 'skippedLabs'],
   properties: {
+    skippedLabs: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'slugs of the drafted `type: lab` lessons excluded from `lessons` — an empty array is the positive assertion that the course has none',
+    },
     lessons: {
       type: 'array',
       description: 'lessons with status drafted, excluding type: lab, in course order (modules in file order, lessons in file order)',
@@ -66,7 +71,7 @@ const at = root
 phase('Revise')
 
 const plan = await agent(
-  `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "drafted" EXCEPT \`type: lab\` ones (a lab is revised through the lab-author skill's execution loop, never by this workflow's writer), in course order (modules in file order, lessons in file order within each module). For each, also read content/courses/${slug}/research/<slug>.md: hasRevisionBlock = it contains a "REVISION" section; demoNeedsWork = the REVISION block or the course.yaml demo spec asks the demo to change (a target to hit, a threshold to find, a claim to falsify) rather than just exist.`,
+  `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "drafted" EXCEPT \`type: lab\` ones (a lab is revised through the lab-author skill's execution loop, never by this workflow's writer), in course order (modules in file order, lessons in file order within each module). For each, also read content/courses/${slug}/research/<slug>.md: hasRevisionBlock = it contains a "REVISION" section; demoNeedsWork = the REVISION block or the course.yaml demo spec asks the demo to change (a target to hit, a threshold to find, a claim to falsify) rather than just exist. Return the drafted lab slugs you excluded in \`skippedLabs\` (empty array when the course has none) — they are reported to the human, never silently dropped.`,
   { label: 'plan', model: 'sonnet', schema: PLAN_SCHEMA },
 )
 
@@ -77,6 +82,11 @@ if (argv.from) {
 }
 todo = todo.slice(0, argv.count ?? todo.length)
 log(`revising ${todo.length} drafted lesson(s): ${todo.map((l) => l.slug).join(', ')}`)
+// A drafted lab this workflow steps over may carry a REVISION block of its
+// own, and no writer here will ever act on it — say so instead of leaving the
+// human to infer it from a count.
+const skippedLabs = plan.skippedLabs ?? []
+if (skippedLabs.length) log(`${skippedLabs.length} drafted lab(s) skipped — revise each with /lab-author: ${skippedLabs.join(', ')}`)
 
 // One chain per lesson; pipeline() keeps each lesson's steps in order while
 // letting the next lesson start as soon as a slot frees. Shared-file writers
@@ -172,6 +182,7 @@ const results = done.filter(Boolean)
 return {
   phase: 'revision',
   revised: results.length,
+  skippedLabs,
   ready: results.filter((r) => r.qaReady).length,
   outstanding: results.filter((r) => !r.qaReady).map((r) => ({ slug: r.slug, fixes: r.fixes })),
 }
