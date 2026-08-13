@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { CHIP_CLASS, LABEL_CLASS, buttonClass } from "@/components/ui/styles";
-import { useSignedIn } from "@/lib/auth/signed-in";
 import { useAuth } from "@/lib/auth/store";
 import type { LabCheckpoint, LabSpec } from "@/lib/content/schema";
 import { day } from "@/lib/day";
@@ -15,6 +14,7 @@ import {
   issuePairingCode,
   type CheckpointProgress,
   type LabManifest,
+  type LabProgress,
   type PairingCode,
 } from "@/lib/labs/api";
 import { colabUrl } from "@/lib/labs/mirror";
@@ -35,9 +35,8 @@ const POLL_SECONDS = 30;
 
 type States = Map<string, CheckpointProgress>;
 
-function useLabProgress(lab: string): States {
-  const [progress, setProgress] = useSignedIn(getLabProgress, lab);
-  const signedIn = useAuth().status === "signed-in";
+function useLabProgress(lab: string, signedIn: boolean): States {
+  const [progress, setProgress] = useState<LabProgress | null>(null);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -57,6 +56,9 @@ function useLabProgress(lab: string): States {
       );
     };
 
+    // The first load is the same request under the same rule, so it is the
+    // same call rather than a second path that fails its own way.
+    refresh();
     const beat = window.setInterval(refresh, POLL_SECONDS * 1000);
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("focus", refresh);
@@ -66,7 +68,7 @@ function useLabProgress(lab: string): States {
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("focus", refresh);
     };
-  }, [signedIn, lab, setProgress]);
+  }, [signedIn, lab]);
 
   return new Map((progress?.checkpoints ?? []).map((state) => [state.id, state]));
 }
@@ -238,12 +240,14 @@ function summary(checkpoints: LabCheckpoint[], states: States): string {
 }
 
 export default function LabPanel({ lab, spec }: { lab: string; spec: LabSpec }) {
-  const states = useLabProgress(lab);
+  const signedIn = useAuth().status === "signed-in";
+  const states = useLabProgress(lab, signedIn);
+  // Only a signed-in reader can be shown a threshold: it is drawn beside a
+  // best score, and a best score comes from progress, which nobody else has.
   const thresholds = useThresholds(
     lab,
-    spec.checkpoints.some((checkpoint) => checkpoint.kind === "metric"),
+    signedIn && spec.checkpoints.some((checkpoint) => checkpoint.kind === "metric"),
   );
-  const signedIn = useAuth().status === "signed-in";
 
   return (
     <section className="mt-10 border-t border-line pt-6">

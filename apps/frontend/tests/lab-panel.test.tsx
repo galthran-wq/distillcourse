@@ -232,12 +232,35 @@ describe("the lab panel", () => {
     expect(host.textContent).toContain("Copied.");
   });
 
+  it("keeps what an answer drew when a later load fails", async () => {
+    let unreachable: (failure: unknown) => void = () => {};
+    vi.mocked(getLabProgress).mockImplementationOnce(
+      () => new Promise((_, no) => (unreachable = no)),
+    );
+    vi.mocked(getLabProgress).mockResolvedValue({
+      checkpoints: [state("entropy-terms", { attempts: 3 })],
+    });
+
+    const host = await show();
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(rows(host)[1]).toContain("3 attempts");
+
+    await act(async () => unreachable(new Error("the server is unreachable")));
+
+    expect(rows(host)[1]).toContain("3 attempts");
+  });
+
   it("asks an anonymous reader for nothing", async () => {
     auth = { status: "anonymous", user: null };
 
     const host = await show();
 
     expect(getLabProgress).not.toHaveBeenCalled();
+    // Including the threshold: it is only ever drawn beside a best score,
+    // which an anonymous reader has none of.
+    expect(getLabManifest).not.toHaveBeenCalled();
     expect(rows(host)).toHaveLength(4);
     expect(host.textContent).toContain("Sign in");
   });
