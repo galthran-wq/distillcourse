@@ -30,7 +30,11 @@ what the tutor remembers about a learner across every chat and medium in
 messages are mostly made of in `apps/backend/app/review/`, and everything the
 lab API is — pairing codes and bearer tokens, the manifest a notebook reads,
 the checkpoints it submits and what they are graded against — in
-`apps/backend/app/labs/`. The harness's prompt modules
+`apps/backend/app/labs/`. Its one kind no comparison can answer, a `review`
+checkpoint, is decided by a single toolless model call (`app/labs/judge.py`)
+that borrows the harness's plumbing — the model, the usage row and the monthly
+ceiling, which sums `lab_submissions.usage` alongside `messages.usage`.
+The harness's prompt modules
 (`app/harness/prompts/*.md`) are content, not configuration: `docs/pedagogy.md`
 governs them exactly as it governs lessons, and they are written in the same
 dry register.

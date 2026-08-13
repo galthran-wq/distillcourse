@@ -64,6 +64,7 @@ app/
   labs/
     repository.py    # pairing codes and tokens; challenges, state, submissions
     verify.py        # what a posted checkpoint is worth: comparison and metrics
+    judge.py         # the third kind: a written answer, one model call, a verdict
     ingest.py        # the build's answer keys into `lab_challenges`
     schemas.py       # the wire shapes a notebook and the lab page speak
     deps.py          # LabUser — the learner a notebook is calling for
@@ -191,8 +192,9 @@ blocks. They are content, so `docs/pedagogy.md` governs them the way it
 governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
 inside such a fence is data. The same directory also holds modules for the
-passes that are not the tutor — `title.md` is the whole prompt of the namer,
-which never sees `base.md` and is loaded by `module()` rather than `assemble()`.
+passes that are not the tutor — `title.md` is the whole prompt of the namer and
+`lab_review.md` the whole prompt of a lab's judge, neither of which sees
+`base.md`; both are loaded by `module()` rather than `assemble()`.
 
 A web chat is named from the learner's first question and named again by
 `harness/title.py` once `TITLE_REFRESH_MESSAGES` more have gone by: one short
@@ -212,8 +214,9 @@ messages, compactions — which is why the web API refuses to run in, compact or
 re-model the Telegram thread.
 
 Caps are enforcement, not telemetry: messages per user per day, an
-instance-wide monthly ceiling computed from the cost recorded on every run,
-web searches per user per day, and memory writes per run. Set a spend limit on
+instance-wide monthly ceiling computed from the cost recorded on every run and
+on every judged lab submission, web searches per user per day, and memory
+writes per run. Set a spend limit on
 the OpenRouter key too — that one holds even if this code is wrong.
 
 ## The tutor's tools
@@ -517,9 +520,9 @@ memory, and only then a vector tier.
 
 A lab is a lesson the learner solves in their own Jupyter. The server executes
 nothing they or the author wrote: `app/labs/verify.py` compares a posted
-output against the one the build captured from the reference solution, scores
-predictions against labels the learner never sees, or takes a written answer
-for the judge. Three tables, keyed by the same lesson locator as everything
+output against the one the build captured from the reference solution or
+scores predictions against labels the learner never sees, and `app/labs/judge.py`
+hands a written answer to a model. Three tables, keyed by the same lesson locator as everything
 else: `lab_challenges` (the answer key, per checkpoint), `lab_checkpoint_state`
 (attempts, first pass, best score, the last hint) and `lab_submissions` (the
 append-only log).
@@ -545,7 +548,19 @@ GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
   rebuilt under an open notebook.
 - Feedback is coarse on purpose — a pass, and a hint only where the output
   matches a wrong variant the author declared, naming the bug and never the
-  expected value. Nothing reports how far off an answer was.
+  expected value. Nothing reports how far off an answer was. A `review`
+  checkpoint is the exception, because feedback is all it is for: the judge's
+  sentence comes back in the same field and is what the page shows.
+- The judge (`app/labs/judge.py`, prompt `harness/prompts/lab_review.md`) is
+  one call on a toolless agent, inside the submit request: the private rubric,
+  the learner's answer fenced as untrusted, and a schema-validated
+  `{passed, feedback}` back. It is lenient by instruction — a `review`
+  checkpoint is `required: false` unless an author says otherwise, and the
+  value is the sentence rather than the gate. Anything that stops it
+  answering — an outage, output that will not validate twice, a spent monthly
+  ceiling — leaves the submission `pending` rather than failing the learner,
+  and what the call cost is stored on `lab_submissions.usage`, the second row
+  that ceiling sums.
 - Passing every `required` checkpoint finishes the lesson: the same
   `lesson_completed` event reading one emits (`telemetry.ingest.emit_completion`)
   and the same review ladder, under the same per-(learner, lesson) advisory
