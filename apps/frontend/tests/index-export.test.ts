@@ -279,6 +279,36 @@ describe("courseDocuments", () => {
     expect(spine?.text).toContain("What a demo course is for");
   });
 
+  it("mirrors a lab's checkpoints onto its chunks, and only its own", () => {
+    vi.stubEnv("CONTENT_PREVIEW", "1");
+    const lab = loadedLesson("lab", "The lab", "drafted", "A lab brief.\n", 1);
+    lab.lesson = {
+      ...lab.lesson,
+      type: "lab",
+      lab: {
+        est_hours: 4,
+        checkpoints: [
+          { id: "one", kind: "exact", text: "Implement one", required: true },
+          { id: "two", kind: "metric", text: "Beat the baseline", required: false },
+        ],
+      },
+    };
+    const docs = courseDocuments(
+      course([loadedLesson("main", "The main lesson", "drafted", LESSON_MDX, 0), lab]),
+    );
+
+    expect(lessonChunks(docs, "lab")[0].metadata.lab).toEqual({
+      est_hours: 4,
+      checkpoints: [
+        { id: "one", kind: "exact", text: "Implement one", required: true, order: 0 },
+        { id: "two", kind: "metric", text: "Beat the baseline", required: false, order: 1 },
+      ],
+    });
+    for (const chunk of lessonChunks(docs, "main")) {
+      expect(chunk.metadata).not.toHaveProperty("lab");
+    }
+  });
+
   it("indexes research per file and concepts per entry, whatever the statuses", () => {
     const docs = courseDocuments(course([]));
 

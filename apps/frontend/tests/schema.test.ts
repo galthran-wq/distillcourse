@@ -37,6 +37,47 @@ describe("CourseSchema", () => {
   });
 });
 
+describe("lab lessons", () => {
+  /** The fixture with its first lesson turned into whatever the test needs. */
+  function withFirstLesson(patch: Record<string, unknown>): unknown {
+    const raw = loadYaml(join(FIXTURES, "course.yaml")) as {
+      modules: { lessons: Record<string, unknown>[] }[];
+    };
+    Object.assign(raw.modules[0].lessons[0], patch);
+    return raw;
+  }
+
+  const spec = {
+    est_hours: 4,
+    checkpoints: [
+      { id: "logloss", kind: "exact", text: "Implement the log-loss" },
+      { id: "beat-baseline", kind: "metric", text: "Beat AUC 0.85", required: false },
+    ],
+  };
+
+  it("parses a lab lesson, defaulting checkpoints to required", () => {
+    const course = CourseSchema.parse(withFirstLesson({ type: "lab", lab: spec }));
+    const lab = course.modules[0].lessons[0].lab;
+    expect(lab?.est_hours).toBe(4);
+    expect(lab?.checkpoints.map((c) => c.required)).toEqual([true, false]);
+  });
+
+  it("rejects a lab block on a lesson that is not a lab", () => {
+    expect(CourseSchema.safeParse(withFirstLesson({ lab: spec })).success).toBe(false);
+  });
+
+  it("rejects a lab lesson with no lab block", () => {
+    expect(CourseSchema.safeParse(withFirstLesson({ type: "lab" })).success).toBe(false);
+  });
+
+  it("rejects a checkpoint of an unknown kind", () => {
+    const broken = { ...spec, checkpoints: [{ id: "x", kind: "eyeball", text: "?" }] };
+    expect(
+      CourseSchema.safeParse(withFirstLesson({ type: "lab", lab: broken })).success,
+    ).toBe(false);
+  });
+});
+
 describe("ConceptsFileSchema", () => {
   it("parses the fixture registry", () => {
     const file = ConceptsFileSchema.parse(

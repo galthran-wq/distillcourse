@@ -224,6 +224,91 @@ describe("lintCourse", () => {
     expect(diags.find((d) => d.rule === "image-credit")?.message).toContain("vanished.jpg");
   });
 
+  it("flags a drafted lab missing one of its sources (lab-files)", () => {
+    for (const name of ["solution.py", "challenges.yaml", "pyproject.toml", "uv.lock"]) {
+      const dir = brokenCopy((d) => rmSync(join(d, "lessons/surprisal-lab", name)));
+      const diags = errors(lintDir(dir)).filter((d) => d.rule === "lab-files");
+      expect(diags.map((d) => d.message).join()).toContain(name);
+    }
+  });
+
+  it("flags challenges.yaml without a checkpoints mapping (lab-files)", () => {
+    const dir = brokenCopy((d) =>
+      writeFileSync(join(d, "lessons/surprisal-lab/challenges.yaml"), "kind: exact\n"),
+    );
+    expect(errors(lintDir(dir)).map((d) => d.rule)).toContain("lab-files");
+  });
+
+  it("flags checkpoint ids that disagree with challenges.yaml (lab-checkpoints)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "lessons/surprisal-lab/challenges.yaml"),
+        "  why-uniform:",
+        "  why-uniform-really:",
+      ),
+    );
+    const diags = errors(lintDir(dir)).filter((d) => d.rule === "lab-checkpoints");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain("why-uniform");
+  });
+
+  it("flags a checkpoint kind that disagrees with challenges.yaml (lab-checkpoints)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "lessons/surprisal-lab/challenges.yaml"),
+        "  surprisal:\n    kind: exact",
+        "  surprisal:\n    kind: metric",
+      ),
+    );
+    const diags = errors(lintDir(dir)).filter((d) => d.rule === "lab-checkpoints");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain('"exact" in course.yaml but "metric"');
+  });
+
+  it("flags an unparsable challenges.yaml (lab-files)", () => {
+    const dir = brokenCopy((d) =>
+      writeFileSync(join(d, "lessons/surprisal-lab/challenges.yaml"), "checkpoints: [a: 1\n"),
+    );
+    const diags = errors(lintDir(dir)).filter((d) => d.rule === "lab-files");
+    expect(diags.map((d) => d.message).join()).toContain("YAML parse error");
+  });
+
+  it("flags a duplicate checkpoint id (lab-checkpoints)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(join(d, "course.yaml"), "id: why-uniform", "id: surprisal"),
+    );
+    const messages = errors(lintDir(dir))
+      .filter((d) => d.rule === "lab-checkpoints")
+      .map((d) => d.message);
+    expect(messages.join()).toContain('duplicate checkpoint id "surprisal"');
+  });
+
+  it("flags a lab whose every checkpoint is optional (lab-checkpoints)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "course.yaml"),
+        'text: "Implement surprisal(p) in bits"',
+        'text: "Implement surprisal(p) in bits"\n              required: false',
+      ),
+    );
+    const messages = errors(lintDir(dir))
+      .filter((d) => d.rule === "lab-checkpoints")
+      .map((d) => d.message);
+    expect(messages.join()).toContain("at least one must be required");
+  });
+
+  it("leaves a planned lab alone until it is drafted (lab-files)", () => {
+    const dir = brokenCopy((d) => {
+      rewrite(
+        join(d, "course.yaml"),
+        "        type: lab\n        status: drafted",
+        "        type: lab\n        status: planned",
+      );
+      rmSync(join(d, "lessons/surprisal-lab/solution.py"));
+    });
+    expect(errors(lintDir(dir)).map((d) => d.rule)).not.toContain("lab-files");
+  });
+
   it("flags MDX that parses but fails full compilation (mdx-compile)", () => {
     // Two default exports parse fine (each ESM block is valid on its own)
     // but compileSync rejects the duplicate layout at compile time.

@@ -13,6 +13,11 @@ import { toString as mdastToString } from "mdast-util-to-string";
 import type { Root } from "mdast";
 import { STATUS_RANK, type LoadedCourse, type LoadedLesson } from "./load";
 import {
+  CHALLENGES_FILE,
+  challengesPath,
+  loadChallenges,
+} from "./challenges";
+import {
   CREDITS_FILE,
   creditFor,
   creditMatches,
@@ -409,6 +414,87 @@ function lintLessonMdx(
   }
 }
 
+/** What a lab lesson directory must hold once the lesson is drafted. */
+const LAB_FILES = ["solution.py", CHALLENGES_FILE, "pyproject.toml", "uv.lock"];
+
+/** Holds the two contracts documented on `LabSpecSchema` to each other. */
+function lintLab(
+  entry: LoadedLesson,
+  coursePath: string,
+  diags: Diagnostic[],
+): void {
+  const { lesson } = entry;
+  if (lesson.lab === undefined) return;
+
+  const ids = lesson.lab.checkpoints.map((c) => c.id);
+  for (const id of ids.filter((id, i) => ids.indexOf(id) !== i)) {
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: coursePath,
+      message: `lab "${lesson.slug}": duplicate checkpoint id "${id}"`,
+    });
+  }
+  if (!lesson.lab.checkpoints.some((c) => c.required)) {
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: coursePath,
+      message: `lab "${lesson.slug}": every checkpoint is optional — at least one must be required, or the lab can never be completed`,
+    });
+  }
+
+  // The lab's sources land with the draft, like lesson.mdx: a planned lab is
+  // still just a line in course.yaml.
+  if (STATUS_RANK[lesson.status] < STATUS_RANK.drafted) return;
+
+  for (const name of LAB_FILES) {
+    if (existsSync(join(entry.dir, name))) continue;
+    diags.push({
+      level: "error",
+      rule: "lab-files",
+      file: join(entry.dir, name),
+      message: `lab "${lesson.slug}" is ${lesson.status} but ${name} is missing`,
+    });
+  }
+
+  const challenges = loadChallenges(entry.dir);
+  if (!challenges.exists) return; // already reported by lab-files
+  if (challenges.error !== undefined) {
+    diags.push({
+      level: "error",
+      rule: "lab-files",
+      file: challengesPath(entry.dir),
+      message: `lab "${lesson.slug}": ${CHALLENGES_FILE} is invalid: ${challenges.error}`,
+    });
+    return;
+  }
+
+  const missing = ids.filter((id) => !challenges.ids.includes(id));
+  const extra = challenges.ids.filter((id) => !ids.includes(id));
+  if (missing.length > 0 || extra.length > 0) {
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: challengesPath(entry.dir),
+      message: `lab "${lesson.slug}": checkpoint ids differ from course.yaml${
+        missing.length > 0 ? ` — only in course.yaml: ${missing.join(", ")}` : ""
+      }${extra.length > 0 ? ` — only in ${CHALLENGES_FILE}: ${extra.join(", ")}` : ""}`,
+    });
+  }
+
+  for (const checkpoint of lesson.lab.checkpoints) {
+    const kind = challenges.kinds.get(checkpoint.id);
+    if (kind === undefined || kind === checkpoint.kind) continue;
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: challengesPath(entry.dir),
+      message: `lab "${lesson.slug}": checkpoint "${checkpoint.id}" is kind "${checkpoint.kind}" in course.yaml but "${kind}" in ${CHALLENGES_FILE}`,
+    });
+  }
+}
+
 export interface LintOptions {
   /** Frontend app root (apps/frontend); enables the registry checks. */
   appRoot?: string;
@@ -722,6 +808,7 @@ export function lintCourse(
       }
     }
 
+    lintLab(entry, coursePath, diags);
     lintLessonMdx(entry, new Set(bySlug.keys()), diags, options);
   }
 

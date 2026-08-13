@@ -303,6 +303,18 @@ function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocume
     ...entry.lesson.concepts.introduces,
     ...entry.lesson.concepts.reinforces,
   ];
+  // A lab's checkpoints travel with the lesson: the backend knows content
+  // only through this index, so a checkpoint absent here does not exist.
+  const lab =
+    entry.lesson.lab === undefined
+      ? undefined
+      : {
+          est_hours: entry.lesson.lab.est_hours,
+          checkpoints: entry.lesson.lab.checkpoints.map((c, order) => ({
+            ...c,
+            order,
+          })),
+        };
 
   return perChunk.map(({ chunk: c, text, words }, position) => ({
     corpus: "lesson" as const,
@@ -323,6 +335,7 @@ function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocume
       document_word_count: documentWords,
       solutions_total: solutions,
       concepts,
+      ...(lab !== undefined ? { lab } : {}),
     },
   }));
 }
