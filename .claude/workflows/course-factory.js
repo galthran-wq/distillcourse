@@ -4,9 +4,9 @@ export const meta = {
   whenToUse: 'Invoked by the /course-architect (phase: structure) and /lesson-factory (phase: lessons) skills. Args: {phase, slug, topic?, count?}.',
   phases: [
     { title: 'Canon', detail: 'perplexity deep research: the mainstream sources', model: 'sonnet' },
-    { title: 'Read', detail: 'scope → readers (big books shard by ToC) → merge; readers capture image candidates', model: 'sonnet' },
-    { title: 'Synthesize', detail: 'course.yaml + research dossier (session model)' },
-    { title: 'Lessons', detail: 'write → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson' },
+    { title: 'Read', detail: 'scope → readers (big books shard by ToC) → merge; readers capture image candidates and the source\'s own assignments', model: 'sonnet' },
+    { title: 'Synthesize', detail: 'course.yaml (chapters + the labs the canon\'s assignments justify) + research dossier (session model)' },
+    { title: 'Lessons', detail: 'write → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson; a lab lesson goes to lab-author instead of the writer' },
   ],
 }
 
@@ -60,6 +60,11 @@ const SUMMARY_SCHEMA = {
       },
     },
     gems: { type: 'array', items: { type: 'string' }, description: 'memorable worked examples, striking numbers, analogies, case studies — with chapter pointers' },
+    assignments: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'what the source makes students BUILD by hand (homeworks, problem sets with code, projects, labs), one line each: name + pointer, what the student produces, how the work is cut into steps, what scaffold is given, how it is verified. Empty when the source assigns nothing — never invent one',
+    },
     chapter_map: { type: 'array', items: { type: 'string' }, description: '"topic -> chapter/section" lines' },
   },
 }
@@ -72,9 +77,10 @@ const PLAN_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['slug', 'hasDemo'],
+        required: ['slug', 'type', 'hasDemo'],
         properties: {
           slug: { type: 'string' },
+          type: { type: 'string', description: 'the lesson entry\'s type field — "lab" routes to the lab-author skill, everything else to lesson-writer' },
           hasDemo: { type: 'boolean' },
         },
       },
@@ -207,7 +213,7 @@ if (phaseArg === 'structure') {
         if (kept.length === 0) return null
         if (kept.length === 1) return kept[0]
         return agent(
-          `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape. Concatenate topics and chapter_map in book order; keep EVERY key_result, gem, and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
+          `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape. Concatenate topics, chapter_map and assignments in book order; keep EVERY key_result, gem, assignment and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
           { label: `merge: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SUMMARY_SCHEMA },
         )
       },
@@ -228,6 +234,8 @@ if (phaseArg === 'structure') {
       `1a. REQUIRED — \`spine\`: the course's argument as an ordered chain of moves (pedagogy L10), each step with its \`step\` sentence, display \`label\`, \`years\`/range where meaningful, a concrete \`caption\`, and the \`lessons\` that carry it. Every lesson must appear in exactly one step. The spine is what makes lesson N+1 feel like it follows from lesson N; if a lesson cannot be placed in the chain, the chain or the lesson is wrong.`,
       `1b. REQUIRED — \`intro\`: an INTRODUCTION, not a description of the course. It states the question the course answers and the shape of the answer, in the voice the lessons use. "This course covers entropy, coding, channels and applications" is a table of contents and fails.`,
       `1c. REQUIRED — one APPLICATION lesson at the end of every module (L16): a deployed system, a paper's result reproduced, or a computational study that cashes out that module's theorems on something real (for information theory: JPEG/WebP quantisation, zstd's entropy stage, an LLM's tokenizer and bits-per-byte, a channel-coding standard). It names which module results the artifact uses and where the artifact departs from the idealisation. Give these lessons real goals and briefs like any other.`,
+      `1g. LABS — a module MAY close with a lab: a \`type: lab\` lesson, a 3-5 hour notebook assignment the learner solves in Jupyter while the platform verifies checkpoints (docs/content-model.md "Lab lessons" for the schema, .claude/skills/lab-author/SKILL.md for the genre norms). Decide this per module FROM THE DOSSIER: the reader summaries' \`assignments\` say what the canon makes students build by hand. Each lab you plan must name that grounding ("YSDA's homework 2 has students write attention from scratch"); a module whose canon assigns nothing gets no lab, a course whose canon assigns nothing anywhere gets none at all, and there is never more than one lab per module. Labs are never invented to fill a quota — an unfounded lab is worse than no lab, because it burns 4 hours of the learner's time on work nobody teaching this subject asks for. A lab does not replace the module's APPLICATION lesson (1c) and does not absolve it: the application lesson reads a real artifact, the lab makes the learner build one, and where a module has both the lab comes last.`,
+      `1h. A planned lab is a lesson entry like any other — \`status: planned\`, \`type: lab\`, goal, opening, key_ideas, prerequisites, a spine step — with two differences: \`est_minutes\` is the time to READ THE BRIEF (the assignment's own length is \`lab.est_hours\`), and it carries a \`lab\` block: \`est_hours\` (3-5) plus \`checkpoints\`, the drafted plan. The checkpoint plan follows the progression norm: 2-4 warm-up \`exact\` checkpoints (one function each, instant verdict) -> middle checkpoints that COMPOSE (a later one consumes what an earlier one built) -> exactly one open \`metric\` task last, \`required: false\`; \`review\` checkpoints are optional garnish and always \`required: false\`; at least one checkpoint must stay required. Each id is a kebab-case slug and its \`text\` names a step of the build ("gradient of the log-loss"), never an ordinal ("part 2"). State in the lab's \`goal\` the ONE artifact the learner ends up with — a tour of disconnected exercises is not a lab. The plan is a plan: the lab-author skill executes it later and may split or deepen a checkpoint, so aim the set at an honest 3-5 hours rather than at a count.`,
       `1d. Lesson depth target: a core lesson is planned at 30-40 est_minutes of substantial reading (L2a) — derivations carried through, worked examples, boundary cases — with genuinely optional material planned as \`## ★\` starred sections inside the lesson rather than as thin extra chapters. Do NOT split coherent lessons to hit a number, and do not pad.`,
       `1f. Math in metadata (docs/content-model.md): tagline, goal, outcome and key_result text are typeset with KaTeX — write inline LaTeX between single dollars ($\\sum_i 2^{-l_i} \\le 1$), never ASCII mangling like "2^-li <= 1" or "sigma^2". Short and inline only.`,
       `1e. SLUG CONTINUITY — this course already exists and has drafted lessons. Read the current content/courses/${slug}/course.yaml FIRST. Where your new plan keeps a lesson whose subject matches an existing one, REUSE its exact slug and keep \`status: drafted\` plus any \`key_image\` (its prose will be revised later against the new plan; the brief must say what has to change). Only genuinely new or re-scoped lessons are added with \`status: planned\`. Never rename a drafted slug. In your final message, list explicitly: kept slugs, new slugs, and any existing lesson your plan drops (with the reason) — dropping requires the human's decision, so leave dropped lessons in place and flag them instead of deleting.`,
@@ -237,7 +245,8 @@ if (phaseArg === 'structure') {
       `5. research/<lesson-slug>.md for EVERY lesson — the resumable brief: which source chapters/sections to consult (from the chapter maps), the key points the lesson must cover, and any pitfalls. Mine the reader summaries' figures and gems: name the concrete worked examples and set pieces (with source pointers) the lesson should recreate — do not let them evaporate between reading and writing. Include a FIGURE PLAN section: 4-8 planned visuals for the lesson, each tagged \`draw:\` or \`source:\`. \`draw:\` (the default, most of them) — one line on what it shows, whether it is a single <Figure> or a <FigureSequence> step-through (processes/algorithms should be sequences), and which source figure inspired the idea (recreate ideas, never copy drawings — docs/figures.md). \`source:\` — a real artefact from research/images.yaml that a redrawing would falsify (photograph, apparatus, scan of the original statement, published plot of measured data): give the images.yaml id (its capture is already on disk), the file stem to save the finished crop under, what the reader must be able to see in it, and placement (centered, or float left/right beside the prose). How many \`source:\` entries a lesson earns depends on the subject: for a technical course 1-2 is plenty, because the house voice is drawn figures; for a subject whose artefacts ARE the material (history, art, biology, medicine — photographs, documents, maps, specimens) sourced images can carry half the visuals. Never source what a clean drawing would explain better, and never pad a lesson with decoration. These briefs are what lesson-writer agents will be grounded in later — make them specific.`,
       `5a. Every brief also carries an EXERCISE PLAN (pedagogy E6/E7 + the domain overlay's difficulty floor): 4-8 planned exercises, each one line, and the plan must clear the floor — at most one mechanical warm-up, and at least two of {boundary probe at the degenerate case; plausible false claim to refute; derivation the lesson skipped (corollary, reverse direction, second proof, tight case); research-shaped task (reproduce a number from the source, estimate from real data, design the distinguishing experiment)}. Exactly one exercise is marked FORWARD (E7): it lands the reader on the doorstep of a later lesson's result — computing the object that lesson will name, or hitting the wall its mechanism removes — and the plan says which lesson it reaches. Plugging numbers into the formula just displayed is not an exercise; if the plan reads like a drill sheet, rewrite it.`,
       `5b. Every brief carries an ARC block (L10): what the lesson inherits from the spine, what it contributes, what it hands off — quoted from the spine step it belongs to — plus, for module-final lessons, the APPLICATION spec (the artifact, the module results it uses, the departure from the idealisation). For briefs of lessons that already exist as drafts (kept slugs), add a REVISION block: what the current lesson.mdx must gain (arc/seams/hand-off, exercise overhaul against the floor, application section, deeper derivations toward the depth target) and what it must lose (tautological KeyFacts per L15, citation theatre per L8a, knob-only demos per D1, obvious-narration per L9a).`,
-      `Then run \`npm run validate ${slug}\` and fix everything. Final message: outcomes, one-line module arc, per-source role, assumptions made.`,
+      `5c. A LAB lesson's brief (1g) replaces the FIGURE PLAN and the EXERCISE PLAN with a LAB PLAN — the ARC block still applies, and this brief is what the lab-author skill is grounded in later. The LAB PLAN states: the one artifact the learner builds; the CANON GROUNDING, quoted from the dossier's \`assignments\` with its source pointer (which assignment of which source this lab is modelled on, and where it departs); the dataset or inputs, small enough to ship, with where they come from and their licence; one line per planned checkpoint — what the learner writes, what verifies it, and which earlier checkpoint's output it consumes; the final open task with its metric and a rough threshold to calibrate against; and the canonical bugs worth declaring as known-wrong variants (the sign a learner drops, the normalization they forget). Say what is deliberately NOT blanked (plotting helpers, data loading) — those ship complete.`,
+      `Then run \`npm run validate ${slug}\` and fix everything. Final message: outcomes, one-line module arc, per-source role, which modules end with a lab and the canon assignment each is grounded in (or, when the canon assigns nothing, that no labs were planned and why), assumptions made.`,
     ].join('\n\n'),
     { label: 'synthesize-structure' },
   )
@@ -247,23 +256,39 @@ if (phaseArg === 'structure') {
 if (phaseArg === 'lessons') {
   phase('Lessons')
   const plan = await agent(
-    `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "planned", in course order (modules in file order, lessons in file order within each module). hasDemo = the lesson's demo field is not null.`,
+    `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "planned", in course order (modules in file order, lessons in file order within each module). type = the entry's \`type\` field verbatim; hasDemo = the lesson's demo field is not null.`,
     { label: 'plan', model: 'sonnet', schema: PLAN_SCHEMA },
   )
   const todo = plan.lessons.slice(0, argv.count ?? plan.lessons.length)
-  log(`writing ${todo.length} lesson(s): ${todo.map((l) => l.slug).join(', ')}`)
+  log(`writing ${todo.length} lesson(s): ${todo.map((l) => `${l.slug}${l.type === 'lab' ? ' [lab]' : ''}`).join(', ')}`)
+
+  const labPrompt = (lessonSlug, fixes) =>
+    [
+      `${at}Execute this repo's lab-author skill, non-interactively: read .claude/skills/lab-author/SKILL.md (and the conventions it references) and follow it exactly for course-slug ${slug}, lesson-slug ${lessonSlug}.`,
+      fixes
+        ? `REVISION pass on a lab that already exists: apply these required QA fixes — ${JSON.stringify(fixes)} — and nothing else. Every fix that touches the solution or the checkpoints goes back through the execution loop.`
+        : `Ground the lab in the LAB PLAN of content/courses/${slug}/research/${lessonSlug}.md — the artifact, the canon assignment it is modelled on, the dataset, the checkpoint-by-checkpoint plan and the bugs worth declaring as wrong variants — and in the \`lab\` block already planned in course.yaml. That checkpoint list (ids, kinds, required flags, est_hours) is the plan, not a cage: split or deepen a checkpoint where the difficulty calibration demands it.`,
+      `In course.yaml, THIS lesson's status ends at \`drafted\` (flip it from \`planned\` yourself) and its \`lab\` block ends in sync with the \`challenges.yaml\` you executed; touch nothing else there. Never ask questions — report blockers in your final message.`,
+    ].join('\n\n')
 
   const written = []
   // Sequential on purpose: each lesson must read its prerequisites' final text.
   for (const lesson of todo) {
-    await agent(
-      `${at}Write the lesson: course-slug ${slug}, lesson-slug ${lesson.slug}. Follow your lesson-writer briefing (lesson-author skill + research brief).`,
-      { label: `write: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
-    )
+    // A lab is authored by executing code, not by writing prose: the
+    // lab-author skill's write -> uv run -> green loop, never lesson-writer.
+    const isLab = lesson.type === 'lab'
+    await (isLab
+      ? agent(labPrompt(lesson.slug), { label: `lab: ${lesson.slug}`, phase: 'Lessons' })
+      : agent(
+        `${at}Write the lesson: course-slug ${slug}, lesson-slug ${lesson.slug}. Follow your lesson-writer briefing (lesson-author skill + research brief).`,
+        { label: `write: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
+      ))
     // Figures fan out in parallel — drawn and sourced alike. Builders own
     // only their own files: they never touch the registry, credits.yaml or
-    // lesson.mdx, and one closing agent lands everything shared.
-    const figs = await agent(
+    // lesson.mdx, and one closing agent lands everything shared. A lab has no
+    // FIGURE PLAN: its brief is short and its visuals are plots the notebook
+    // draws from the learner's own results.
+    const figs = isLab ? null : await agent(
       `${at}Figure scan for lesson ${slug}/${lesson.slug}: read content/courses/${slug}/lessons/${lesson.slug}/lesson.mdx and the FIGURE PLAN in content/courses/${slug}/research/${lesson.slug}.md, and return everything still to build.\n\nTwo kinds. kind="component": <Figure name="..."> / <FigureSequence name="..."> references whose PascalCase name is NOT registered in apps/frontend/components/figures/index.ts (kebab-case names are plain SVG files already on disk — ignore those); the spec comes FIRST from the writer's {/* fig <Name>: ... */} comment — copy it verbatim — enriched from the FIGURE PLAN and surrounding prose. kind="sourced": every {/* img <file-stem>: ... */} handoff comment in the MDX and every \`source:\` entry in the FIGURE PLAN whose image file is not yet in the lesson's figures/ dir; the spec must carry what the reader must see, the research/images.yaml candidate id WITH its capture path under content/courses/${slug}/research/images/ when the pool has one — and when it does not, say "no pool candidate" plus whatever source pointer the handoff names, so the builder knows to hunt.`,
       { label: `figure-scan: ${lesson.slug}`, phase: 'Lessons', model: 'sonnet', schema: FIGLIST_SCHEMA },
     )
@@ -308,7 +333,7 @@ if (phaseArg === 'lessons') {
         { label: `demo: ${lesson.slug}`, phase: 'Lessons' },
       )
     }
-    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, full rubric). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
+    const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, ${isLab ? 'lab lesson — build the notebook and score it against the rubric\'s lab section B1-B8, reading it as the learner before you open solution.py; report nothing `npm run validate` already reports' : 'full rubric'}). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
     const qa = await agent(qaPrompt, {
       label: `qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
     })
@@ -317,17 +342,19 @@ if (phaseArg === 'lessons') {
     let finalQa = qa
     let revised = false
     if (qa && !qa.ready && qa.fixes.length > 0) {
-      await agent(
-        `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
-        { label: `fix: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
-      )
+      await (isLab
+        ? agent(labPrompt(lesson.slug, qa.fixes), { label: `fix: ${lesson.slug}`, phase: 'Lessons' })
+        : agent(
+          `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
+          { label: `fix: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
+        ))
       revised = true
       finalQa = await agent(qaPrompt, {
         label: `re-qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
       })
     }
-    written.push({ slug: lesson.slug, qaReady: finalQa ? finalQa.ready : null, revised })
-    log(`${written.length}/${todo.length} done (${lesson.slug}${revised ? ', revised after QA' : ''})`)
+    written.push({ slug: lesson.slug, type: lesson.type, qaReady: finalQa ? finalQa.ready : null, revised })
+    log(`${written.length}/${todo.length} done (${lesson.slug}${isLab ? ' [lab]' : ''}${revised ? ', revised after QA' : ''})`)
   }
   return { phase: 'lessons', written }
 }

@@ -40,7 +40,9 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
    directory, not your worktree — without it they write into the wrong
    checkout (usually master).
    The workflow runs: canon discovery (perplexity deep research) → a
-   sonnet reading swarm (one source-reader agent per source) → synthesis on
+   sonnet reading swarm (one source-reader agent per source, each also
+   reporting what its source makes students BUILD — homeworks, projects,
+   labs) → synthesis on
    the session model, producing `course.yaml`, `concepts.yaml`, and the
    **research dossier** (`research/sources.yaml`, `research/images.yaml` —
    the shortlist of real images the readers found worth sourcing — and
@@ -48,10 +50,17 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
    `draw:` (house style) or `source:` (a real artefact, already captured
    under `research/images/`) — the resumable state that later grounds
    lesson writing).
+   Labs are structure, decided here: a module may close with a `type: lab`
+   lesson — a 3–5 h notebook assignment — carrying `lab.est_hours` and a
+   drafted checkpoint plan, and its brief's LAB PLAN records which canon
+   assignment grounds it. A module whose canon assigns nothing gets no lab;
+   a course whose canon assigns nothing gets none at all. The labs
+   themselves are written later, by /lesson-factory.
 
 4. **On completion:** run `npm run validate <slug>`; then report to the
    human: the outcomes, the module arc (one line each), the source list with
-   roles, and where the dossier lives. If the workflow result lists
+   roles, which modules end with a lab and the canon assignment each lab is
+   grounded in, and where the dossier lives. If the workflow result lists
    `not_fully_read` sources (books the swarm could not find or could only
    read second-hand), surface them PROMINENTLY — never silently omit a
    source: the human will obtain copies from the publishers, and the read
@@ -60,7 +69,9 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
      (this is the main editorial checkpoint — the briefs steer every future
      lesson), including which planned visuals are `source:` real images and
      which are `draw:` — that choice is cheap to change now and expensive
-     later;
+     later, and likewise which modules end with a lab and what each lab
+     builds (a lab is 3–5 h of the learner's time; cut the ones the canon
+     does not back);
    - when satisfied, run `/lesson-factory <slug>` to write lessons;
    - merge the `course/<slug>` branch only when the course is worth shipping.
 

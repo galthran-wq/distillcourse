@@ -69,17 +69,22 @@ buttons refuse to run on other models), inside a git worktree on branch
 
 1. `/course-architect "<topic>"` — canon discovery (perplexity deep
    research) → a sonnet swarm reads the sources, each reader also scouting
-   the few images that would have to be the real artefact → synthesis writes
+   the few images that would have to be the real artefact and reporting what
+   the source makes students build → synthesis writes
    `course.yaml`, `concepts.yaml`, and the `research/` dossier (including
    `images.yaml`, the shortlist, and per-lesson figure plans that say which
-   visuals we draw and which we source).
+   visuals we draw and which we source). Labs are planned here too: a module
+   ends with a `type: lab` lesson — checkpoint plan and `est_hours` — only
+   where the canon assigns that work.
 2. **Human curates** `course.yaml` AND the per-lesson `research/` briefs in
    the worktree — the main editorial checkpoint.
 3. `/lesson-factory <slug> [n]` — per planned lesson, sequentially:
    lesson-writer (session model, grounded in the brief) → figure-artist
    agents in parallel (drawn figures, and sourced images cut from the
    research captures) → demo-builder where specced → opus QA → one fix
-   cycle. Requires the `research/` dossier.
+   cycle. A `type: lab` lesson goes to the lab-author skill instead — the
+   write → execute → green loop — and is QA'd against the lab rubric.
+   Requires the `research/` dossier.
 4. Human reviews in `npm run dev`, flips statuses, merges the branch.
 
 ## Manual single-lesson tools (escape hatch)
