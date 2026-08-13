@@ -64,6 +64,13 @@ The export is the complete index, and ingest deletes every row of the corpora
 it mentions that the file no longer lists — that is how a renamed heading or a
 deleted lesson stops being a search result the tutor can quote.
 
+Reindexing also rebuilds the labs (`npm run build-labs`) and loads their answer
+keys, so the box needs `uv` as well wherever a lab lesson exists. The labs are
+rebuilt rather than assumed: the checkpoint API must compare against the
+outputs the notebooks on the mirror were generated from, and a stale key would
+grade a correct answer wrong. A build that produces nothing leaves
+`lab_challenges` alone rather than emptying it.
+
 ## The Telegram bot
 
 The channel the platform writes to on its own. Without the three `TELEGRAM_*`

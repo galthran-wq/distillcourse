@@ -185,8 +185,13 @@ what it produces into two artefacts under `labs-dist/` (git-ignored):
   `data/` files. This half is what the public mirror serves.
 - `private/<course>/<lesson>.json` — the answer key: expected outputs or their
   digests, known-wrong variants with their hints, the held-out labels, the
-  metric and its threshold, the review rubric. This half is what the
-  checkpoint API compares against.
+  metric and its threshold, the review rubric. Each checkpoint also carries,
+  under `public`, the same fields the manifest above publishes: the checkpoint
+  API serves the manifest itself, and one file is what keeps the inputs a
+  learner computes on and the outputs they are compared against from being two
+  ingests apart. This half is what the checkpoint API loads
+  (`python -m app.content.ingest <index.json> <labs-private-dir>`) and
+  compares against; it never becomes a `documents` row.
 
 A checkpoint that raises, a `wrong` variant that matches the solution, a
 metric threshold the reference fails to clear by 0.02, or a solution marker
@@ -203,8 +208,9 @@ the checkpoint API.
 
 `est_minutes` keeps its usual meaning for a lab: the brief's reading time.
 The assignment's own length is `lab.est_hours`. The checkpoints reach the
-backend as `metadata.lab` (`est_hours` plus each checkpoint with its
-`order`) on every exported chunk of the lesson, mirrored like
+backend as `metadata.lab` (`est_hours`, each checkpoint with its `order`, and
+`data_files` — the lesson's `data/` at the mirror URLs the notebook fetches
+them from) on every exported chunk of the lesson, mirrored like
 `solutions_total`.
 
 ## Validation
