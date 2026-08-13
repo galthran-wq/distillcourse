@@ -10,9 +10,13 @@ import remarkParse from "remark-parse";
 import remarkMdx from "remark-mdx";
 import remarkMath from "remark-math";
 import { toString as mdastToString } from "mdast-util-to-string";
-import { parse } from "yaml";
 import type { Root } from "mdast";
 import { STATUS_RANK, type LoadedCourse, type LoadedLesson } from "./load";
+import {
+  CHALLENGES_FILE,
+  challengesPath,
+  loadChallenges,
+} from "./challenges";
 import {
   CREDITS_FILE,
   creditFor,
@@ -411,7 +415,7 @@ function lintLessonMdx(
 }
 
 /** What a lab lesson directory must hold once the lesson is drafted. */
-const LAB_FILES = ["solution.py", "challenges.yaml", "pyproject.toml", "uv.lock"];
+const LAB_FILES = ["solution.py", CHALLENGES_FILE, "pyproject.toml", "uv.lock"];
 
 /**
  * A lab is verified against two files that must agree: `course.yaml` says
@@ -459,49 +463,28 @@ function lintLab(
     });
   }
 
-  const challengesPath = join(entry.dir, "challenges.yaml");
-  if (!existsSync(challengesPath)) return; // already reported by lab-files
-
-  // Only the checkpoint ids are read here: how each one is verified is the
-  // lab build's business (#96), what checkpoints exist is this agreement.
-  let doc: unknown;
-  try {
-    doc = parse(readFileSync(challengesPath, "utf8"));
-  } catch (err) {
+  const challenges = loadChallenges(entry.dir);
+  if (!challenges.exists) return; // already reported by lab-files
+  if (challenges.error !== undefined) {
     diags.push({
       level: "error",
       rule: "lab-files",
-      file: challengesPath,
-      message: `lab "${lesson.slug}": YAML parse error: ${(err as Error).message}`,
-    });
-    return;
-  }
-  const checkpoints = (doc as { checkpoints?: unknown } | null)?.checkpoints;
-  if (
-    typeof checkpoints !== "object" ||
-    checkpoints === null ||
-    Array.isArray(checkpoints)
-  ) {
-    diags.push({
-      level: "error",
-      rule: "lab-files",
-      file: challengesPath,
-      message: `lab "${lesson.slug}": challenges.yaml has no \`checkpoints\` mapping`,
+      file: challengesPath(entry.dir),
+      message: `lab "${lesson.slug}": ${CHALLENGES_FILE} is invalid: ${challenges.error}`,
     });
     return;
   }
 
-  const declared = Object.keys(checkpoints);
-  const missing = ids.filter((id) => !declared.includes(id));
-  const extra = declared.filter((id) => !ids.includes(id));
+  const missing = ids.filter((id) => !challenges.ids.includes(id));
+  const extra = challenges.ids.filter((id) => !ids.includes(id));
   if (missing.length > 0 || extra.length > 0) {
     diags.push({
       level: "error",
       rule: "lab-checkpoints",
-      file: challengesPath,
+      file: challengesPath(entry.dir),
       message: `lab "${lesson.slug}": checkpoint ids differ from course.yaml${
         missing.length > 0 ? ` — only in course.yaml: ${missing.join(", ")}` : ""
-      }${extra.length > 0 ? ` — only in challenges.yaml: ${extra.join(", ")}` : ""}`,
+      }${extra.length > 0 ? ` — only in ${CHALLENGES_FILE}: ${extra.join(", ")}` : ""}`,
     });
   }
 }

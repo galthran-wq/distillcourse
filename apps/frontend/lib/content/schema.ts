@@ -87,6 +87,15 @@ export const LabSpecSchema = z.object({
   est_hours: z.number().positive(),
 });
 
+/**
+ * The other side of that pair: the lesson directory's `challenges.yaml`. Only
+ * the checkpoint ids are content here — how each one is verified is the lab
+ * build's business, what checkpoints exist is this agreement.
+ */
+export const ChallengesFileSchema = z.object({
+  checkpoints: z.record(z.string(), z.unknown()),
+});
+
 export const LessonSchema = z.object({
   slug,
   title: z.string().min(1),
@@ -224,6 +233,7 @@ export type Outcome = z.infer<typeof OutcomeSchema>;
 export type DemoSpec = z.infer<typeof DemoSpecSchema>;
 export type LabCheckpoint = z.infer<typeof LabCheckpointSchema>;
 export type LabSpec = z.infer<typeof LabSpecSchema>;
+export type ChallengesFile = z.infer<typeof ChallengesFileSchema>;
 export type Lesson = z.infer<typeof LessonSchema>;
 export type Module = z.infer<typeof ModuleSchema>;
 export type Course = z.infer<typeof CourseSchema>;
