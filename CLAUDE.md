@@ -9,7 +9,7 @@ content — it is the constitution for all content generation.
 Monorepo: `content/` and `docs/` at the root, the Next site in
 `apps/frontend/`, the FastAPI backend in `apps/backend/`, deployment in
 `compose.yml` + `ops/` + `Makefile`. The root `package.json` proxies
-`npm run dev|build|test|validate|figure|preview|image|export-index`
+`npm run dev|build|test|validate|figure|preview|image|export-index|build-labs`
 into the frontend — run them from the repo root, with paths written from the
 repo root.
 
@@ -48,6 +48,18 @@ Rules that override defaults:
   `solution.py` (jupytext percent) + `challenges.yaml`, executed to green in
   the authoring loop before commit. `lab.ipynb` is a build artifact — never
   hand-written, never committed.
+- The lab build is `apps/frontend/lib/labs/` (TypeScript orchestration plus
+  `python/`, which runs inside each lab's own uv environment) driven by
+  `scripts/build-labs.ts`. It EXECUTES the reference solution, and
+  `npm run validate` runs it in check mode: a lab whose checkpoints are not
+  green fails validation like broken MDX, and `uv` is a validate dependency
+  wherever a lab lesson exists. Output is `labs-dist/` (git-ignored), split
+  into `public/` (student notebook, manifest, data — the mirror's half) and
+  `private/` (expected outputs, labels, rubrics — the checkpoint API's half);
+  never let the public half carry anything the private half exists to protect.
+  `python/distill_capture.py` is the single implementation of the capture API
+  and of canonicalization — the authoring loop copies that same file — and
+  `python/canon_vectors.json` pins that format for the client and the server.
 - `apps/frontend/lib/content/schema.ts` is the normative schema;
   `docs/content-model.md` is the human-readable guide — keep them in sync when
   either changes.

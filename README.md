@@ -116,7 +116,7 @@ PR, and commit the updated `.dvc` files with it.
 ```bash
 npm run install:frontend   # first time only: installs apps/frontend/node_modules
 npm run dev        # dev server (renders drafted + reviewed + published)
-npm run validate   # schema + shell lint over all content
+npm run validate   # schema + shell lint over all content, labs in check mode
 npm test           # vitest
 npm run lint       # eslint over the frontend
 npm run typecheck  # tsc --noEmit
@@ -126,6 +126,8 @@ npm run image -- check <file>               # sourced-image toolkit: verify,
 npm run preview -- <course> <lesson>        # render a chapter, both themes
 npm run sync-assets  # copy lesson raster figures into the frontend's public/
 npm run export-index # write the search index the backend ingests (index.json)
+npm run build-labs -- [<course> [<lesson>]] [--check]  # execute lab solutions,
+                     # write labs-dist/ (public mirror half + private answer key)
 npm run build      # production build
 ```
 
@@ -160,8 +162,10 @@ does). A host that builds from somewhere else fails the build with an
 explicit message; point it at the tree with `CONTENT_ROOT=/abs/path/content`.
 
 Sourced images (photographs, scans, published plots) need `poppler-utils`
-and `imagemagick` for extraction and resizing; `npm run validate` itself
-stays dependency-free.
+and `imagemagick` for extraction and resizing. `npm run validate` needs
+nothing beyond node — until a course has a lab lesson: labs are executed, so
+validate runs them in check mode and needs `uv` (missing `uv` downgrades the
+lab check to a warning, which is why CI installs it).
 
 Key code (all under `apps/frontend/`): `lib/content/schema.ts` (Zod schemas —
 normative), `lib/content/lint.ts` (shell rules). Guides:

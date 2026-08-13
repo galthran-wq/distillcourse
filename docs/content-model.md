@@ -174,6 +174,33 @@ announce a threshold where the notebook only asks for a written answer:
   two files disagree on, a duplicate checkpoint id, or a lab whose every
   checkpoint is optional (error).
 
+The lab build (`npm run build-labs`, and `npm run validate` in check mode)
+executes the reference solution in the environment `uv.lock` pins, and turns
+what it produces into two artefacts under `labs-dist/` (git-ignored):
+
+- `public/<course>/<lesson>/` — the generated `lab.ipynb` (solution spans
+  replaced by `# YOUR CODE HERE`, outputs stripped, a Colab badge and an
+  install-and-download header prepended), `manifest.json` (per checkpoint:
+  kind, seed, `inputs_code`, `atol` — inputs are not secret) and the lesson's
+  `data/` files. This half is what the public mirror serves.
+- `private/<course>/<lesson>.json` — the answer key: expected outputs or their
+  digests, known-wrong variants with their hints, the held-out labels, the
+  metric and its threshold, the review rubric. This half is what the
+  checkpoint API compares against.
+
+A checkpoint that raises, a `wrong` variant that matches the solution, a
+metric threshold the reference fails to clear by 0.02, or a solution marker
+still standing in the generated notebook — a typo in `# BEGIN SOLUTION` /
+`# END SOLUTION` leaves the answer in the cell — fails validate with the
+checkpoint or cell named: a lab whose solution is not green is invalid
+content, the same as unparsable MDX. Both halves carry
+`content_version` = `sha256(solution.py ‖ challenges.yaml)`, so a notebook
+opened against a since-rebuilt lab is rejected rather than graded against the
+wrong reference. Canonicalization — how an output becomes a comparable value
+list or digest — is pinned by
+`apps/frontend/lib/labs/python/canon_vectors.json`, shared with the client and
+the checkpoint API.
+
 `est_minutes` keeps its usual meaning for a lab: the brief's reading time.
 The assignment's own length is `lab.est_hours`. The checkpoints reach the
 backend as `metadata.lab` (`est_hours` plus each checkpoint with its

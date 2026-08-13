@@ -1,6 +1,6 @@
 # Lab source conventions
 
-Binding formats for lab lessons. The build pipeline (#96) implements exactly
+Binding formats for lab lessons. The build pipeline implements exactly
 this; a lab that deviates fails validate. Genre norms live in SKILL.md — this
 file is the file-format contract.
 
@@ -112,19 +112,33 @@ checkpoints:
   canonical bug produces and name the bug. Write at least one for the
   checkpoints where a canonical bug exists.
 
-## Canonicalization (shared with #97 server compare and #98 client)
+## Canonicalization (shared with the server compare and the client)
 
 Outputs → `np.asarray(dtype=float64)`, C-order. Total scalars ≤ 64: raw
 value list (server compares `allclose(atol)`). Larger: quantize
 `q = np.round(x / atol).astype(int64)`, digest
-`sha256(shape_bytes + b"f8" + q.tobytes())`. Tuples of arrays canonicalize
-element-wise in order.
+`sha256(shape_bytes + b"f8" + q.tobytes())`, where `shape_bytes` is
+`str(array.shape).encode()` — the Python repr, `"(65,)"`. Tuples of arrays
+canonicalize element-wise in order, into one digest.
+
+An output canonicalization cannot represent is refused, not encoded: NaN or an
+infinity anywhere (neither compares equal to itself), and — on the digest path
+— any magnitude at or above `2**63 * atol`, where the quantized values would
+saturate and every such output would share one digest. Either aborts the build
+with the checkpoint named; fix the solution or widen `atol`.
+
+The one implementation is `canonicalize` in
+`apps/frontend/lib/labs/python/distill_capture.py`; the committed vectors next
+to it (`canon_vectors.json`, checked by `check_canon_vectors.py`) are the
+cross-implementation contract — a second implementation that does not
+reproduce them byte for byte, or that encodes a case marked `"rejects": true`
+instead of refusing it, will grade correct answers wrong.
 
 ## Dependencies: pyproject.toml + uv.lock
 
 Each lab is a uv project: `pyproject.toml` declares the direct deps, exact-
 pinned (`numpy==2.3.1`), only what the lab imports; `uv lock` produces the
-committed `uv.lock`. The lock is the reproducibility boundary: build (#96)
+committed `uv.lock`. The lock is the reproducibility boundary: the build
 and the authoring loop execute the solution with `uv run` against it, so the
 env is bit-for-bit stable across machines and time.
 
@@ -137,12 +151,18 @@ Colab-preinstalled transitive dep, pin that dep directly in pyproject.
 Heavy deps (torch) only when the lab needs them; note GPU expectations in
 lesson.mdx.
 
-## The author stub
+## The capture module
 
-`references/author_stub.py` in this skill is the capture-mode `distill`
-module for the authoring loop (and the spec for #96's build stub): `check`
-generates inputs from `challenges.yaml`, runs the fn, canonicalizes, records
-the expected output, runs `wrong` variants, prints ✓/✗;
+`apps/frontend/lib/labs/python/distill_capture.py` is the capture-mode
+`distill`: `check` generates inputs from `challenges.yaml`, runs the fn,
+canonicalizes, records the expected output, runs `wrong` variants, prints ✓/✗;
 `submit_predictions` computes the metric via `labels_code` and asserts the
-threshold margin; `submit_review` records the model answer. `distill.dump()`
-writes the captured private artifact for inspection.
+threshold margin; `submit_review` records the model answer; `distill.dump()`
+writes the captured data for inspection. The build copies the same file next
+to the solution it executes, so the loop and the build cannot disagree.
+
+`solution.py` must therefore end with a `distill.dump()` cell, and open with
+`distill.open_lab("<course>/<lesson>")`. Both are capture-mode calls: the
+build strips them from the student notebook, whose generated header opens the
+session instead. It also replaces the model answer in every
+`distill.submit_review(...)` with a placeholder — the answer never ships.
