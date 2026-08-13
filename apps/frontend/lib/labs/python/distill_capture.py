@@ -1,35 +1,47 @@
-"""Capture-mode `distill` module for the lab authoring loop.
+"""Capture-mode `distill`: records reference outputs instead of posting them.
 
-Import as `distill` next to a lab's solution.py: it reads challenges.yaml,
-runs the declared checks against the solution, records reference outputs, and
-prints verdicts. It is also the executable spec for the build pipeline's
-capture stub (#96): same declaration API, same canonicalization.
+The lab build copies this next to a solution as `distill.py`, so the solution
+runs unchanged while every `check`/`submit_predictions`/`submit_review` call
+records what the reference produces. The authoring loop uses the same file
+(`cp .../distill_capture.py distill.py`), which is why a lab green in the loop
+is green in the build: it is the same code, not a re-implementation.
 
-Usage inside the loop:
-    cd <lesson dir>; cp <skill>/references/author_stub.py distill.py
-    uv run --with-requirements requirements.txt --with pyyaml python solution.py
+    cd <lesson dir>; cp <this file> distill.py
+    uv run --with pyyaml python solution.py
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from pathlib import Path
+from types import FunctionType
 from typing import Any
 
 import numpy as np
 import yaml
 
-_CHALLENGES = yaml.safe_load(Path("challenges.yaml").read_text())["checkpoints"]
+_challenges: dict[str, dict[str, Any]] | None = None
 _captured: dict[str, dict[str, Any]] = {}
 _passed: list[str] = []
 
-# Canonicalization per conventions.md — shared with server compare and client.
+# Canonicalization per the lab conventions — shared verbatim with the server
+# compare and the client. canon_vectors.json pins it for both.
 SMALL_LIMIT = 64
 
+# A reference that only just clears the threshold means the threshold is
+# uncalibrated: the learner would be chasing the author's noise.
+METRIC_MARGIN = 0.02
 
-def _canon(out: Any, atol: float) -> dict[str, Any]:
+
+def challenges() -> dict[str, dict[str, Any]]:
+    global _challenges
+    if _challenges is None:
+        _challenges = yaml.safe_load(Path("challenges.yaml").read_text())["checkpoints"]
+    return _challenges
+
+
+def canonicalize(out: Any, atol: float) -> dict[str, Any]:
     arrays = out if isinstance(out, tuple) else (out,)
     parts = [np.ascontiguousarray(np.asarray(a, dtype=np.float64)) for a in arrays]
     total = sum(p.size for p in parts)
@@ -49,29 +61,30 @@ def _inputs(spec: dict[str, Any]) -> tuple:
 
 
 def open_lab(slug: str) -> None:
-    print(f"[author mode] {slug}: {len(_CHALLENGES)} checkpoints declared")
+    print(f"[capture] {slug}: {len(challenges())} checkpoints declared")
 
 
 def check(cid: str, fn: Any) -> None:
-    spec = _CHALLENGES[cid]
+    spec = challenges()[cid]
     assert spec["kind"] == "exact", f"{cid}: declared {spec['kind']}, checked as exact"
     atol = float(spec["atol"])
-    expected = _canon(fn(*_inputs(spec)), atol)
+    expected = canonicalize(fn(*_inputs(spec)), atol)
     wrong = []
     for variant in spec.get("wrong", []):
         ns: dict[str, Any] = {}
         exec(variant["code"], ns)  # noqa: S102
-        wfn = next(v for v in ns.values() if callable(v))
-        w = _canon(wfn(*_inputs(spec)), atol)
+        # The last def wins: the variant may import names above it.
+        wfn = [v for v in ns.values() if isinstance(v, FunctionType)][-1]
+        w = canonicalize(wfn(*_inputs(spec)), atol)
         assert w != expected, f"{cid}: wrong variant '{variant['hint']}' matches the solution"
         wrong.append({"hint": variant["hint"], **w})
     _captured[cid] = {"kind": "exact", "atol": atol, "expected": expected, "wrong": wrong}
     _passed.append(cid)
-    print(f"✓ {cid} ({len(_passed)}/{len(_CHALLENGES)})")
+    print(f"✓ {cid} ({len(_passed)}/{len(challenges())})")
 
 
 def submit_predictions(cid: str, preds: Any) -> None:
-    spec = _CHALLENGES[cid]
+    spec = challenges()[cid]
     ns: dict[str, Any] = {"np": np}
     exec(spec["labels_code"], ns)  # noqa: S102
     labels = np.asarray(ns["labels"], dtype=np.float64)
@@ -80,26 +93,27 @@ def submit_predictions(cid: str, preds: Any) -> None:
     margin = score - float(spec["threshold"])
     _captured[cid] = {"kind": "metric", **{k: spec[k] for k in ("metric", "threshold")},
                       "labels": labels.tolist(), "reference_score": score}
-    ok = margin >= 0.02
-    print(f"{'✓' if ok else '✗'} {cid}: reference {score:.4f} vs threshold "
-          f"{spec['threshold']} (margin {margin:+.4f}, need ≥ +0.02)")
-    if not ok:
-        sys.exit(1)
+    assert margin >= METRIC_MARGIN, (
+        f"{cid}: reference {score:.4f} vs threshold {spec['threshold']} "
+        f"(margin {margin:+.4f}, need ≥ +{METRIC_MARGIN})"
+    )
     _passed.append(cid)
+    print(f"✓ {cid}: reference {score:.4f} vs threshold {spec['threshold']} "
+          f"(margin {margin:+.4f})")
 
 
 def submit_review(cid: str, text: str) -> None:
-    spec = _CHALLENGES[cid]
+    spec = challenges()[cid]
     _captured[cid] = {"kind": "review", "rubric": spec["rubric"], "model_answer": text}
     _passed.append(cid)
     print(f"✓ {cid} (review: model answer recorded, {len(text)} chars)")
 
 
 def dump(path: str = "captured.json") -> None:
-    missing = set(_CHALLENGES) - set(_captured)
+    missing = set(challenges()) - set(_captured)
     assert not missing, f"declared but never checked: {sorted(missing)}"
     Path(path).write_text(json.dumps(_captured, indent=2))
-    print(f"[author mode] all {len(_captured)} checkpoints green → {path}")
+    print(f"[capture] all {len(_captured)} checkpoints green → {path}")
 
 
 def _roc_auc(y: np.ndarray, p: np.ndarray) -> float:
