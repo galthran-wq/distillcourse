@@ -51,10 +51,11 @@ Never write the whole lab and hope. Grow it checkpoint by checkpoint:
 ```
 cd content/courses/<course>/lessons/<lesson>/
 cp <skill>/references/author_stub.py distill.py     # transient, never committed
+uv lock                                             # once, after editing pyproject deps
 # write solution.py incrementally + challenges.yaml entries as you go
-uv run --with-requirements requirements.txt --with pyyaml python solution.py
+uv run --with pyyaml python solution.py             # runs against uv.lock
 # ✓ per checkpoint, ✗ stops you: fix the solution, the spec, or the threshold
-rm distill.py captured.json                          # when done
+rm -rf distill.py captured.json .venv               # when done
 ```
 
 - A red check is information: either the solution is wrong, the challenge

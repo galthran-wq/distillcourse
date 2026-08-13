@@ -11,7 +11,8 @@ content/courses/<course>/lessons/<lesson>/
   lesson.mdx          # short intro: goal, what gets built, prerequisites
   solution.py         # the reference solution, jupytext percent format
   challenges.yaml     # verification contract
-  requirements.txt    # pinned deps for solution execution AND the Colab install cell
+  pyproject.toml      # the lab's deps (direct, pinned)
+  uv.lock             # full transitive lock — the build/CI env, committed
   data/               # optional small data files shipped to the mirror
 ```
 
@@ -119,12 +120,22 @@ value list (server compares `allclose(atol)`). Larger: quantize
 `sha256(shape_bytes + b"f8" + q.tobytes())`. Tuples of arrays canonicalize
 element-wise in order.
 
-## requirements.txt
+## Dependencies: pyproject.toml + uv.lock
 
-Exact pins (`numpy==2.3.1`), only what the lab imports. It is both the build
-env (`uv run --with-requirements`) and the learner's `%pip install` line —
-one source, no skew. Heavy deps (torch) are allowed only when the lab needs
-them; note GPU expectations in lesson.mdx.
+Each lab is a uv project: `pyproject.toml` declares the direct deps, exact-
+pinned (`numpy==2.3.1`), only what the lab imports; `uv lock` produces the
+committed `uv.lock`. The lock is the reproducibility boundary: build (#96)
+and the authoring loop execute the solution with `uv run` against it, so the
+env is bit-for-bit stable across machines and time.
+
+The generated Colab install cell gets the **direct deps at their locked
+versions** (short list), not the full transitive export — Colab is a
+best-effort runtime with a large preinstalled stack; exact transitive
+replication there is neither achievable nor needed. If a lab breaks on a
+Colab-preinstalled transitive dep, pin that dep directly in pyproject.
+
+Heavy deps (torch) only when the lab needs them; note GPU expectations in
+lesson.mdx.
 
 ## The author stub
 
