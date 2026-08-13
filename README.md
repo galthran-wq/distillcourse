@@ -16,6 +16,7 @@ constitution; the playbook stack holds the mechanics behind it —
 content/          # THE curation surface — courses, lessons, figures (see below)
 apps/frontend/    # the Next site: app/ components/ lib/ public/ scripts/ tests/
 apps/backend/     # the FastAPI service: API, and later the tutor harness
+apps/lab-client/  # the distill client a lab notebook submits its checkpoints with
 ops/              # caddy config, postgres init, the backup restore drill
 compose.yml       # caddy · frontend · backend · postgres · backup
 docs/ .claude/    # the constitution and the authoring skills/workflows

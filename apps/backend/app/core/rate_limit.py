@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from math import ceil
 
 from fastapi import HTTPException, Request, status
 
@@ -29,9 +30,14 @@ class FixedWindow:
             self._window_start = now
         self._hits[key] = self._hits.get(key, 0) + 1
         if self._hits[key] > self.max_requests:
+            # The window is fixed, so the moment it turns is known exactly.
+            # Saying it is what makes a spent daily budget read as "tomorrow"
+            # rather than as "later" to the notebook client, which prints it.
+            wait = self._window_start + self.window - now
             raise HTTPException(
                 status.HTTP_429_TOO_MANY_REQUESTS,
                 "too many requests, try again later",
+                headers={"Retry-After": str(ceil(wait.total_seconds()))},
             )
 
     def clear(self) -> None:

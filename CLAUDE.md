@@ -7,7 +7,8 @@ layout and the authoring loop, and `docs/pedagogy.md` before writing ANY lesson
 content — it is the constitution for all content generation.
 
 Monorepo: `content/` and `docs/` at the root, the Next site in
-`apps/frontend/`, the FastAPI backend in `apps/backend/`, deployment in
+`apps/frontend/`, the FastAPI backend in `apps/backend/`, the `distill` client
+a lab notebook talks to it with in `apps/lab-client/`, deployment in
 `compose.yml` + `ops/` + `Makefile`. The root `package.json` proxies
 `npm run dev|build|test|validate|figure|preview|image|export-index|build-labs`
 into the frontend — run them from the repo root, with paths written from the
@@ -61,6 +62,13 @@ Rules that override defaults:
   `python/distill_capture.py` is the single implementation of the capture API
   and of canonicalization — the authoring loop copies that same file — and
   `python/canon_vectors.json` pins that format for the client and the server.
+- `apps/lab-client/` is the `distill` package a learner's notebook installs:
+  Python 3.10 (Colab's floor), httpx + numpy and nothing else,
+  `./apps/lab-client/scripts/lint.sh` and `uv run pytest` before reporting
+  done. It is the third implementation of canonicalization and holds itself to
+  the same `canon_vectors.json`; the wire shapes it posts belong to
+  `app/labs/schemas.py`, so a change to either is one PR touching both. The
+  package is the source, `client/` in the public mirror is a copy of it.
 - `apps/frontend/lib/content/schema.ts` is the normative schema;
   `docs/content-model.md` is the human-readable guide — keep them in sync when
   either changes.
