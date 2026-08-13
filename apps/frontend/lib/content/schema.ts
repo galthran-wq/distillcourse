@@ -27,6 +27,10 @@ export const LESSON_TYPES = [
   // Advanced off-path chapter (a "starred section"): skippable by
   // construction — lint forbids non-extra lessons from requiring it.
   "extra",
+  // Notebook assignment closing a module: the MDX is a short brief, the work
+  // happens in Jupyter against the lesson dir's solution.py/challenges.yaml
+  // (.claude/skills/lab-author). Its `lab` block is required — see below.
+  "lab",
 ] as const;
 
 export const LESSON_STATUSES = [
@@ -56,6 +60,33 @@ export const DemoSpecSchema = z.object({
   spec: z.string().min(1),
 });
 
+export const LAB_CHECKPOINT_KINDS = ["exact", "metric", "review"] as const;
+
+export const LabCheckpointSchema = z.object({
+  id: slug,
+  kind: z.enum(LAB_CHECKPOINT_KINDS),
+  /** What the learner has to get working, one line, shown on the page. */
+  text: z.string().min(1),
+  /**
+   * Only the required checkpoints gate lesson completion; the hardest ones
+   * are optional, because partial completion of a lab is the norm.
+   */
+  required: z.boolean().default(true),
+});
+
+/**
+ * A lab's DISPLAY contract: what the page and the backend say the lab asks
+ * for. The lesson dir's `challenges.yaml` is the VERIFICATION contract, and
+ * lint cross-checks that both name the same checkpoints — the page must
+ * never promise work the notebook does not check.
+ */
+export const LabSpecSchema = z.object({
+  /** List order is display order. */
+  checkpoints: z.array(LabCheckpointSchema).min(1),
+  /** Honest solve time for the whole lab; labs target 3–5 hours. */
+  est_hours: z.number().positive(),
+});
+
 export const LessonSchema = z.object({
   slug,
   title: z.string().min(1),
@@ -78,7 +109,12 @@ export const LessonSchema = z.object({
   }),
   key_ideas: z.array(z.string().min(1)).min(1).max(5),
   demo: DemoSpecSchema.nullable().default(null),
+  /** Required on a lab lesson, forbidden on every other type. */
+  lab: LabSpecSchema.optional(),
   notes: z.string().optional(),
+}).refine((lesson) => (lesson.lab !== undefined) === (lesson.type === "lab"), {
+  path: ["lab"],
+  message: "`lab` is required when type is \"lab\" and not allowed otherwise",
 });
 
 export const ModuleSchema = z.object({
@@ -186,6 +222,8 @@ export const ConceptsFileSchema = z.object({
 
 export type Outcome = z.infer<typeof OutcomeSchema>;
 export type DemoSpec = z.infer<typeof DemoSpecSchema>;
+export type LabCheckpoint = z.infer<typeof LabCheckpointSchema>;
+export type LabSpec = z.infer<typeof LabSpecSchema>;
 export type Lesson = z.infer<typeof LessonSchema>;
 export type Module = z.infer<typeof ModuleSchema>;
 export type Course = z.infer<typeof CourseSchema>;
