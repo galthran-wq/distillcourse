@@ -69,6 +69,14 @@ Rules that override defaults:
   the same `canon_vectors.json`; the wire shapes it posts belong to
   `app/labs/schemas.py`, so a change to either is one PR touching both. The
   package is the source, `client/` in the public mirror is a copy of it.
+- A lab lesson renders the standard lesson shell and then
+  `components/labs/LabPanel`. Its checklist IS the lesson's own `lab` block —
+  content, never a second read of the build — and only the state beside each
+  row is the API's, through `lib/labs/api.ts` (the browser half of a directory
+  that is otherwise the build's). The one thing the page takes from the built
+  manifest is a `metric` checkpoint's threshold: the build calibrates it, so
+  course.yaml cannot state it. Nothing is pushed to that page — it re-asks on
+  focus and on a slow beat, and asks nothing while the tab is hidden.
 - `apps/frontend/lib/content/schema.ts` is the normative schema;
   `docs/content-model.md` is the human-readable guide — keep them in sync when
   either changes.
