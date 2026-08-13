@@ -125,15 +125,3 @@ def test_predictions_of_the_right_length_but_the_wrong_shape_are_refused() -> No
     stands between it and a formula that would compare a list to a label."""
     with pytest.raises(verify.Rejected):
         verify.verify("metric", METRIC, [[prediction] for prediction in FAILING])
-
-
-def test_a_review_is_stored_for_the_judge_rather_than_graded() -> None:
-    assert verify.verify("review", SPECS["why-uniform"]["private"], "because") == (
-        verify.Verdict(passed=None, pending=True)
-    )
-
-
-def test_an_empty_or_oversized_answer_is_refused() -> None:
-    for payload in ("   ", "x" * (verify.MAX_REVIEW_CHARS + 1), 42):
-        with pytest.raises(verify.Rejected):
-            verify.verify("review", SPECS["why-uniform"]["private"], payload)

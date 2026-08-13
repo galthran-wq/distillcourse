@@ -113,14 +113,16 @@ async def test_a_metric_keeps_the_best_score_it_has_ever_seen(
     assert stored.passed_at is not None
 
 
-async def test_a_review_is_taken_and_left_pending(
+async def test_a_review_is_answered_by_the_judge(
     notebook: AsyncClient, session: AsyncSession, user: User
 ) -> None:
+    """What the judge decides and how it decides it is `test_judge.py`; here it
+    is that the same endpoint grades the third kind at all."""
     answered = await post(notebook, "why-uniform", "Because it spreads the mass.")
 
-    assert answered.json()["passed"] is None
-    assert answered.json()["pending"] is True
-    assert (await state(session, user, "why-uniform")).passed_at is None
+    assert answered.json()["passed"] is True
+    assert answered.json()["pending"] is False
+    assert (await state(session, user, "why-uniform")).passed_at is not None
 
 
 async def test_a_retried_submission_is_answered_with_its_stored_verdict(

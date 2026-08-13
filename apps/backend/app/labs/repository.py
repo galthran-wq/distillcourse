@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 
 from app.content import search
 from app.core.sessions import token_hash
-from app.labs import verify
+from app.labs import judge, verify
 from app.labs.schemas import (
     CheckpointProgress,
     Completion,
@@ -279,7 +279,15 @@ async def submit(
 
     if spend is not None:
         spend(challenge.kind)
-    verdict = verify.verify(challenge.kind, challenge.spec["private"], posted.payload)
+    private = challenge.spec["private"]
+    # A `review` checkpoint is the only kind a comparison cannot answer and the
+    # only one that costs the deployment a model call, which is why it is also
+    # the only one with anything to record about what answering it spent.
+    usage: dict[str, Any] | None = None
+    if challenge.kind == "review":
+        verdict, usage = await judge.grade(session, private, posted.payload)
+    else:
+        verdict = verify.verify(challenge.kind, private, posted.payload)
     session.add(
         LabSubmission(
             id=posted.id,
@@ -287,6 +295,7 @@ async def submit(
             lesson=posted.lesson,
             checkpoint=posted.checkpoint,
             verdict=asdict(verdict),
+            usage=usage,
         )
     )
     await _record_attempt(session, user_id, posted, verdict, now)
