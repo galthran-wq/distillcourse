@@ -2,7 +2,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -83,6 +83,19 @@ async def authenticate(
         row.last_used_at = now
         await session.commit()
     return row.user
+
+
+async def revoke_all(
+    session: AsyncSession, user_id: uuid.UUID, *, now: datetime
+) -> None:
+    """Uncommitted, like the `sessions.revoke_user` it stands beside: ending an
+    account's credentials ends the browser's and the notebook's together or
+    neither, in the caller's transaction."""
+    await session.execute(
+        update(LabToken)
+        .where(LabToken.user_id == user_id, LabToken.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
 
 
 async def prune(session: AsyncSession, now: datetime) -> None:

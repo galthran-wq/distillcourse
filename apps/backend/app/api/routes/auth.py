@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -18,6 +19,7 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
+from app.labs import repository as labs
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -116,6 +118,9 @@ async def logout_all(
     current: CurrentSession, response: Response, session: SessionDep
 ) -> None:
     await sessions.revoke_user(session, current.user_id)
+    # Everywhere includes the notebooks: a lab token speaks for this account
+    # and no browser holds it.
+    await labs.revoke_all(session, current.user_id, now=datetime.now(UTC))
     await session.commit()
     sessions.clear_cookie(response)
 

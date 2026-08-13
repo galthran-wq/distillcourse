@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import getpass
 import logging
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,7 @@ from app.core.security import (
     MIN_PASSWORD_LENGTH,
     get_password_hash,
 )
+from app.labs import repository as labs
 from app.models import User
 from app.telegram import api
 from app.telemetry import passes, progress
@@ -32,11 +34,13 @@ async def _require_user(session: AsyncSession, email: str) -> User:
 async def reset_password(session: AsyncSession, email: str, password: str) -> None:
     user = await _require_user(session, email)
     user.hashed_password = get_password_hash(password)
-    # Whoever knew the old password may still hold a live cookie, and the reset
-    # exists precisely because control of the account is in doubt.
+    # Whoever knew the old password may still hold a live cookie or a paired
+    # notebook, and the reset exists precisely because control of the account is
+    # in doubt.
     await sessions.revoke_user(session, user.id)
+    await labs.revoke_all(session, user.id, now=datetime.now(UTC))
     await session.commit()
-    logger.info("password reset for %s; all sessions revoked", email)
+    logger.info("password reset for %s; sessions and lab tokens revoked", email)
 
 
 async def delete_user(session: AsyncSession, email: str) -> None:

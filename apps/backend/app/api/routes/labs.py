@@ -21,7 +21,10 @@ _codes = register(FixedWindow(CODES_PER_HOUR, window=timedelta(hours=1)))
 _redeems = register(FixedWindow(REDEEMS_PER_MINUTE))
 
 
-class Pairing(BaseModel):
+# Not `Pairing`: `routes/settings.py` already publishes one under that name, and
+# two same-named models in one app cost both of them their OpenAPI component
+# names.
+class PairingCode(BaseModel):
     code: str
     expires_at: datetime
 
@@ -35,10 +38,10 @@ class Token(BaseModel):
 
 
 @router.post("/pairing-code", status_code=status.HTTP_201_CREATED)
-async def pairing_code(session: SessionDep, user: CurrentUser) -> Pairing:
+async def pairing_code(session: SessionDep, user: CurrentUser) -> PairingCode:
     _codes.check(str(user.id))
     code = await repository.issue_code(session, user.id, now=datetime.now(UTC))
-    return Pairing(code=code.code, expires_at=code.expires_at)
+    return PairingCode(code=code.code, expires_at=code.expires_at)
 
 
 @router.post("/pair")

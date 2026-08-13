@@ -6,11 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import cli, crud
-from app.models import Event, LessonProgress, UserSession
+from app.labs import repository as labs
+from app.models import Event, LabToken, LessonProgress, UserSession
 from tests.utils.utils import random_email, random_password, user_session
 
 
-async def test_reset_password_replaces_the_password_and_revokes_sessions(
+async def test_reset_password_replaces_the_password_and_revokes_every_credential(
     session: AsyncSession,
 ) -> None:
     email = random_email()
@@ -19,11 +20,18 @@ async def test_reset_password_replaces_the_password_and_revokes_sessions(
     )
     session.add(user_session(user))
     await session.commit()
+    now = datetime.now(UTC)
+    code = await labs.issue_code(session, user.id, now=now)
+    await labs.redeem(session, code.code, now=now)
 
     await cli.reset_password(session, email, "a-new-password")
 
     assert await crud.authenticate(session, email=email, password="a-new-password")
     assert (await session.scalars(select(UserSession))).all() == []
+    # The paired notebook is a credential for the account too, and the reset
+    # exists because control of the account is in doubt.
+    token = await session.scalar(select(LabToken).where(LabToken.user_id == user.id))
+    assert token is not None and token.revoked_at is not None
 
 
 async def test_a_deactivated_account_cannot_sign_in_and_keeps_what_it_wrote(

@@ -100,15 +100,17 @@ send an `Authorization` header — authenticates over the same cookie for free.
   pairing code, `POST /api/v1/labs/pair` exchanges it for a bearer token, and
   `labs/deps.py:LabUser` is what the lab routes authenticate with. The token
   does not expire — a notebook left open over a weekend must still submit — so
-  `lab_tokens.revoked_at` is the only way one ends; there is no UI for it yet
-  and the operator writes it in psql.
+  `lab_tokens.revoked_at` is the only way one ends. Signing out everywhere and
+  the CLI password reset write it beside the sessions they revoke, because both
+  mean "this account's credentials end here"; a routine `change-password` does
+  not, so rotating a password leaves a running notebook alone.
 - `crud.py` and `core/sessions.py` stage writes and never commit. The route (or
   CLI command) owns the transaction and commits once, so a password change and
   the session revocation it implies cannot land apart.
 
 ```bash
-uv run python -m app.cli reset-password someone@example.com   # prompts, then
-                                                              # revokes their sessions
+uv run python -m app.cli reset-password someone@example.com   # prompts, then revokes
+                                                              # sessions and lab tokens
 uv run python -m app.cli delete-user someone@example.com      # sessions cascade
 uv run python -m app.cli deactivate-user someone@example.com  # closes the account,
                                                               # keeps what it wrote
