@@ -1,6 +1,6 @@
 ---
 name: lesson-factory
-description: Launch the course-factory workflow's lesson phase — iterate over planned lessons (write on the session model, build specced demos, opus QA, one fix cycle each) inside the course's worktree branch. Use after the human has curated the course structure and research briefs.
+description: Launch the course-factory workflow's lesson phase — iterate over planned lessons (write on the session model, build specced demos, author labs through lab-author, opus QA, one fix cycle each) inside the course's worktree branch. Use after the human has curated the course structure and research briefs.
 argument-hint: "<course-slug> [count]"
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:*), Bash(git *)
@@ -29,7 +29,9 @@ directly. Any other model: **STOP** and output only:
    missing, stop and point the user at /course-architect.
 
 2. **Preflight.** `npm run validate <slug>` must be green before starting —
-   the human's curation edits may have broken references.
+   the human's curation edits may have broken references. If the course
+   plans any `type: lab` lesson, `uv` must be on PATH: labs are authored by
+   executing their solution, and validate builds them the same way.
 
 3. **Launch:** Workflow
    `{name: "course-factory", args: {phase: "lessons", slug: "<slug>", count: <n if given>, root: "<absolute worktree path>"}}`.
@@ -42,11 +44,17 @@ directly. Any other model: **STOP** and output only:
    captures the reading swarm already took, verified and credited →
    demo-builder execution where a demo is specced → course-qa on opus with a
    structured verdict → one revision cycle if QA requires fixes.
+   A `type: lab` lesson takes the other route: the lab-author skill's
+   write → `uv run` → green loop produces the brief, `solution.py` and
+   `challenges.yaml` (no lesson-writer, no figure scan), and QA scores it
+   against the rubric's lab section. Labs are slow — a single one is a
+   multi-hour authoring loop; `count` applies to them like any lesson.
 
 4. **On completion:** run `npm run validate <slug>`; report per-lesson
    outcomes (written / QA verdict / revised), remaining planned lessons, and
    remind the human: review in `npm run dev`, flip statuses to `reviewed`
-   themselves, and merge the branch when ready.
+   themselves, and merge the branch when ready — a lab is reviewed by
+   solving a few of its cells in Colab, not by reading its brief.
 
 ## Hard limits
 

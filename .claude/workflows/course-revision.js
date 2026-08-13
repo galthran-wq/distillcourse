@@ -11,7 +11,7 @@ const PLAN_SCHEMA = {
   properties: {
     lessons: {
       type: 'array',
-      description: 'lessons with status drafted, in course order (modules in file order, lessons in file order)',
+      description: 'lessons with status drafted, excluding type: lab, in course order (modules in file order, lessons in file order)',
       items: {
         type: 'object',
         required: ['slug', 'hasDemo', 'demoNeedsWork', 'hasRevisionBlock'],
@@ -66,7 +66,7 @@ const at = root
 phase('Revise')
 
 const plan = await agent(
-  `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "drafted", in course order (modules in file order, lessons in file order within each module). For each, also read content/courses/${slug}/research/<slug>.md: hasRevisionBlock = it contains a "REVISION" section; demoNeedsWork = the REVISION block or the course.yaml demo spec asks the demo to change (a target to hit, a threshold to find, a claim to falsify) rather than just exist.`,
+  `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "drafted" EXCEPT \`type: lab\` ones (a lab is revised through the lab-author skill's execution loop, never by this workflow's writer), in course order (modules in file order, lessons in file order within each module). For each, also read content/courses/${slug}/research/<slug>.md: hasRevisionBlock = it contains a "REVISION" section; demoNeedsWork = the REVISION block or the course.yaml demo spec asks the demo to change (a target to hit, a threshold to find, a claim to falsify) rather than just exist.`,
   { label: 'plan', model: 'sonnet', schema: PLAN_SCHEMA },
 )
 
