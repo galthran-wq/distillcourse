@@ -280,23 +280,38 @@ def _failing_cell(notebook: Any, exc: nbclient.exceptions.CellExecutionError) ->
     return reason
 
 
+def published_fields(spec: dict[str, Any]) -> dict[str, Any]:
+    return {k: spec[k] for k in PUBLIC_FIELDS[spec["kind"]] if k in spec}
+
+
 def public_manifest(
     challenges: dict[str, dict[str, Any]], version: str, config: dict[str, Any]
 ) -> dict[str, Any]:
     checkpoints = {
-        cid: {"kind": spec["kind"], **{k: spec[k] for k in PUBLIC_FIELDS[spec["kind"]] if k in spec}}
+        cid: {"kind": spec["kind"], **published_fields(spec)}
         for cid, spec in challenges.items()
     }
     return {"lab": config["lab"], "content_version": version, "checkpoints": checkpoints}
 
 
 def private_artifact(
-    captured: dict[str, dict[str, Any]], version: str, config: dict[str, Any]
+    captured: dict[str, dict[str, Any]],
+    challenges: dict[str, dict[str, Any]],
+    version: str,
+    config: dict[str, Any],
 ) -> dict[str, Any]:
-    # The model answer is solution material: the judge grades against the
-    # rubric, so nothing downstream needs the author's own wording.
+    # The answer key and, under `public`, the same half the manifest above
+    # publishes — one file, because the checkpoint API serves the manifest
+    # itself and the inputs a learner computes on must come from the build that
+    # captured the outputs they are compared against.
+    #
+    # The model answer is left out of both: it is solution material, and the
+    # judge grades against the rubric rather than against the author's wording.
     checkpoints = {
-        cid: {key: value for key, value in record.items() if key != "model_answer"}
+        cid: {
+            **{key: value for key, value in record.items() if key != "model_answer"},
+            "public": published_fields(challenges[cid]),
+        }
         for cid, record in captured.items()
     }
     return {"lab": config["lab"], "content_version": version, "checkpoints": checkpoints}
@@ -330,7 +345,10 @@ def main() -> int:
     write_json(public / "manifest.json", public_manifest(challenges, version, config))
     if files:
         shutil.copytree("data", public / "data")
-    write_json(Path(config["private_path"]), private_artifact(captured, version, config))
+    write_json(
+        Path(config["private_path"]),
+        private_artifact(captured, challenges, version, config),
+    )
     print(f"[build] {config['lab']}: {len(captured)} checkpoints green")
     return 0
 

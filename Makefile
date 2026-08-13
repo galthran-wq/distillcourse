@@ -29,11 +29,16 @@ deploy:
 
 # Node is required here, not just docker: the export runs the site's own MDX
 # pipeline, which is the only way an indexed anchor and a page anchor cannot
-# diverge.
+# diverge. uv too, wherever a lab lesson exists — the labs are rebuilt rather
+# than assumed, so the answer keys the API grades against are the ones the
+# notebooks on the mirror were generated from.
 reindex:
 	npm run export-index
+	npm run build-labs
 	docker compose cp index.json backend:/tmp/index.json
-	docker compose exec -T backend python -m app.content.ingest /tmp/index.json
+	docker compose exec -T backend rm -rf /tmp/labs-private
+	if [ -d labs-dist/private ]; then docker compose cp labs-dist/private backend:/tmp/labs-private; fi
+	docker compose exec -T backend python -m app.content.ingest /tmp/index.json /tmp/labs-private
 
 backup:
 	docker compose exec backup /backup.sh
