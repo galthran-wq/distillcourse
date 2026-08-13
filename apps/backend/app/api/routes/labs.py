@@ -36,7 +36,8 @@ _codes = register(FixedWindow(CODES_PER_HOUR, window=timedelta(hours=1)))
 _redeems = register(FixedWindow(REDEEMS_PER_MINUTE))
 _submissions = register(FixedWindow(SUBMISSIONS_PER_MINUTE))
 # The two kinds that cost the server real work, budgeted per checkpoint per
-# day. An `exact` checkpoint is a comparison and needs no budget of its own.
+# day and spent by `repository.submit` at the moment it grades. An `exact`
+# checkpoint is a comparison and needs no budget of its own.
 _daily_budgets = {
     "metric": register(FixedWindow(settings.LAB_METRIC_ATTEMPTS_PER_DAY, window=DAY)),
     "review": register(FixedWindow(settings.LAB_REVIEW_ATTEMPTS_PER_DAY, window=DAY)),
@@ -102,7 +103,10 @@ async def manifest(key: LessonKey, session: SessionDep) -> Manifest:
         checkpoints=[
             ManifestCheckpoint(
                 id=entry.id,
-                kind=entry.kind,
+                # From the row that will grade it, not from the index: the two
+                # are separate ingests, and a documents-only reindex would
+                # otherwise advertise a kind the grader has never agreed to.
+                kind=built[entry.id].kind,
                 text=entry.text,
                 required=entry.required,
                 spec=built[entry.id].spec["public"],
@@ -120,12 +124,19 @@ async def submissions(
     posted: Submission, user: LabUser, session: SessionDep
 ) -> SubmissionResult:
     _submissions.check(str(user.id))
-    kind = await repository.kind_of(session, posted.lesson, posted.checkpoint)
-    budget = _daily_budgets.get(kind) if kind is not None else None
-    if budget is not None:
-        budget.check(f"{user.id}:{posted.lesson}:{posted.checkpoint}")
+
+    def spend(kind: str) -> None:
+        """A day's attempt at this checkpoint, charged by `submit` for the
+        submission it is about to grade — a retry of an id already answered and
+        a submission nothing grades cost the learner nothing."""
+        budget = _daily_budgets.get(kind)
+        if budget is not None:
+            budget.check(f"{user.id}:{posted.lesson}:{posted.checkpoint}")
+
     try:
-        return await repository.submit(session, user.id, posted, now=datetime.now(UTC))
+        return await repository.submit(
+            session, user.id, posted, now=datetime.now(UTC), spend=spend
+        )
     except repository.UnknownCheckpoint as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
     except (repository.VersionMismatch, repository.IdReused) as exc:

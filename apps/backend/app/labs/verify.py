@@ -134,8 +134,12 @@ def _predictions(payload: Any, expected: int) -> list[float]:
         raise Rejected("a metric checkpoint takes a list of predictions")
     if len(payload) != expected:
         raise Rejected(f"the held-out set needs {expected} predictions")
-    values = _numbers(payload)
-    return [float(value) for value in values]
+    # `_numbers` keeps whatever nesting it is given, so a right-length list of
+    # lists would otherwise pass both guards and reach the formulas as lists.
+    if any(isinstance(item, list) for item in payload):
+        raise Rejected("a metric checkpoint takes one number per held-out row")
+    predictions: list[float] = _numbers(payload)
+    return predictions
 
 
 def _roc_auc(labels: Sequence[float], predictions: Sequence[float]) -> float:

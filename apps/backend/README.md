@@ -535,6 +535,9 @@ GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
   than by filtering: the answer key lives under a sibling key the route never
   reads. Serving it here rather than from the mirror is what keeps the inputs
   a learner computes on and the outputs they are compared against one ingest.
+  A checkpoint's `kind` comes from the challenge rather than from the index,
+  for the same reason: the two are separate ingests, and the notebook must
+  build the payload the row that grades it takes.
 - A submission carries the id its notebook minted, which is the primary key of
   the log: a post retried over a dropped connection is answered with the
   verdict it already earned and spends no second attempt. It also carries the
@@ -546,10 +549,15 @@ GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
 - Passing every `required` checkpoint finishes the lesson: the same
   `lesson_completed` event reading one emits (`telemetry.ingest.emit_completion`)
   and the same review ladder, under the same per-(learner, lesson) advisory
-  lock, so two submissions landing together finish it once.
+  lock, so two submissions landing together finish it once. `lesson_progress`
+  is re-derived in that transaction too, because it is the projection every
+  reader of completion outside telemetry consults and a lab has no flush of
+  its own coming.
 - Rate limits: 60 submissions a minute per learner, and per checkpoint per day
   `LAB_METRIC_ATTEMPTS_PER_DAY` / `LAB_REVIEW_ATTEMPTS_PER_DAY` for the two
-  kinds that cost the server real work.
+  kinds that cost the server real work. The day's attempt is charged where it
+  is earned — at the grading — so a retried id, a stale `content_version` and
+  a checkpoint nobody built cost the learner nothing.
 
 ## Telemetry
 
@@ -596,6 +604,13 @@ are the client's to choose, so a derived one could be squatted to suppress the
 completion. What makes the emit exactly-once is the absence of the event,
 checked under the same advisory lock the flush holds. That row is where spaced
 repetition subscribes.
+
+Reading is not the only way to finish a lesson, though — passing a lab's
+required checkpoints emits the same event (`app/labs/repository.py`), and a lab
+is finished having met no reading bar at all. So the projection takes the
+earliest `lesson_completed` of the pair wherever the running totals derive
+nothing: the event is the statement that a lesson was finished, and
+`lesson_progress.completed_at` is its projection either way.
 
 A **reading day** is a lower bar over one calendar day of the reader's own
 clock (`users.timezone`): five minutes of credited attention, no scroll depth

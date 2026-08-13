@@ -5,7 +5,15 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import LabCheckpointState, ReviewState, User
+from app.api.routes.labs import DAY, _daily_budgets
+from app.core.rate_limit import FixedWindow
+from app.models import (
+    LabChallenge,
+    LabCheckpointState,
+    LessonProgress,
+    ReviewState,
+    User,
+)
 from tests.labs.conftest import (
     DIGEST,
     FAILING,
@@ -140,6 +148,30 @@ async def test_an_id_that_answered_another_checkpoint_is_refused(
     assert reused.status_code == 409
 
 
+async def test_only_a_graded_submission_costs_a_day_s_attempt(
+    notebook: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The daily budget pays for the work a checkpoint makes the server do, so
+    what the server never grades is free: a retry of an answered id, a notebook
+    from an older build, a checkpoint nobody built."""
+    monkeypatch.setitem(_daily_budgets, "review", FixedWindow(1, window=DAY))
+    once = uuid.uuid4()
+
+    first = await post(notebook, "why-uniform", "Because it spreads the mass.", id=once)
+    retried = await post(notebook, "why-uniform", "Because it is flat.", id=once)
+    stale = await post(notebook, "why-uniform", "Because.", content_version="f0" * 32)
+    unbuilt = await post(notebook, "made-up", "Because.")
+    spent = await post(notebook, "why-uniform", "Because entropy is concave.")
+
+    assert [r.status_code for r in (first, retried, stale, unbuilt)] == [
+        200,
+        200,
+        409,
+        404,
+    ]
+    assert spent.status_code == 429
+
+
 async def test_a_notebook_from_an_older_build_is_turned_away(
     notebook: AsyncClient, session: AsyncSession, user: User
 ) -> None:
@@ -173,6 +205,22 @@ async def test_the_required_checkpoints_finish_the_lesson_exactly_once(
     await post(notebook, "surprisal", SURPRISAL)
 
     assert await completions(session, user) == 1
+
+
+async def test_a_lab_finished_by_its_checkpoints_reads_as_a_finished_lesson(
+    notebook: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """Everything outside telemetry — the tutor, the profile — asks
+    `lesson_progress` whether a lesson is finished, and a lab is finished
+    without a single heartbeat to derive that from."""
+    await pass_all_required(notebook)
+
+    reading = await session.get(
+        LessonProgress, (user.id, LESSON), populate_existing=True
+    )
+
+    assert reading is not None
+    assert reading.completed_at is not None
 
 
 async def test_the_optional_checkpoints_gate_nothing(
@@ -219,6 +267,22 @@ async def test_the_manifest_hands_out_the_inputs_and_nothing_else(
     served = published.text
     for secret in ("expected", "labels", "rubric", "wrong", DIGEST, "Natural log"):
         assert secret not in served
+
+
+async def test_the_manifest_names_the_kind_that_will_grade_the_answer(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """The index and the answer key are two ingests and only one of them
+    grades: after a reindex that carried no lab build, the notebook is still
+    told to post what the stored challenge takes."""
+    challenge = await session.get(LabChallenge, (LESSON, "surprisal"))
+    assert challenge is not None
+    challenge.kind = "metric"
+    await session.commit()
+
+    body = (await client.get(MANIFEST)).json()
+
+    assert body["checkpoints"][0]["kind"] == "metric"
 
 
 async def test_a_lesson_that_is_not_a_lab_has_no_manifest(client: AsyncClient) -> None:

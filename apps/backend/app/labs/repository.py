@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -206,13 +207,6 @@ async def states(
     return {row.checkpoint: row for row in rows}
 
 
-async def kind_of(session: AsyncSession, lesson: str, checkpoint: str) -> str | None:
-    """Which of the three a checkpoint is — the daily budget a submission
-    spends depends on it, and is spent before anything is graded."""
-    challenge = await session.get(LabChallenge, (lesson, checkpoint))
-    return challenge.kind if challenge is not None else None
-
-
 async def standing(
     session: AsyncSession, user_id: uuid.UUID, lesson: str
 ) -> Progress | None:
@@ -243,7 +237,12 @@ async def standing(
 
 
 async def submit(
-    session: AsyncSession, user_id: uuid.UUID, posted: Submission, *, now: datetime
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    posted: Submission,
+    *,
+    now: datetime,
+    spend: Callable[[str], None] | None = None,
 ) -> SubmissionResult:
     """Grade one posted checkpoint and record what it changed, in one transaction.
 
@@ -251,6 +250,10 @@ async def submit(
     the duplicate check below a real one — a retry of a submission still in
     flight waits for it rather than grading the same id twice — and what lets
     `emit_completion` decide about the completion event alone.
+
+    `spend` is what the checkpoint's kind costs the caller's budget, called
+    once for a submission that is about to be graded and never for one this
+    function answers from the log or turns away.
     """
     await progress.lock(session, user_id, posted.lesson)
     stored = await session.get(LabSubmission, posted.id)
@@ -274,6 +277,8 @@ async def submit(
             "this lab has been rebuilt since your notebook was generated"
         )
 
+    if spend is not None:
+        spend(challenge.kind)
     verdict = verify.verify(challenge.kind, challenge.spec["private"], posted.payload)
     session.add(
         LabSubmission(
@@ -292,6 +297,11 @@ async def submit(
         # ladder that subscribes to it. The absence of that event is what makes
         # it fire once, read under the lock above.
         await emit_completion(session, user_id, posted.lesson, now)
+        # And the projection everything outside telemetry reads completion from
+        # (the tutor, the profile): it is derived from the events, so the event
+        # above only counts once it has been re-derived. Here rather than in a
+        # later flush, because a lab nobody read has no later flush.
+        await progress.recompute(session, user_id, posted.lesson)
         await review.start(session, user_id, posted.lesson, now)
     await session.commit()
     return SubmissionResult(**asdict(verdict), progress=completion)

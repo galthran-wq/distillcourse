@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -8,6 +10,11 @@ from tests.labs.conftest import DIGEST, FAILING, LABELS, SPECS
 EXACT = SPECS["surprisal"]["private"]
 DIGESTED = SPECS["entropy-terms"]["private"]
 METRIC = SPECS["beat-baseline"]["private"]
+# The one statement of what a canonicalized output is, which the client
+# canonicalizes to and this module grades against.
+CANON_VECTORS = (
+    Path(__file__).parents[3] / "frontend/lib/labs/python/canon_vectors.json"
+)
 
 
 def values(*numbers: float) -> dict[str, Any]:
@@ -69,6 +76,25 @@ def test_a_payload_of_the_wrong_shape_is_refused() -> None:
             verify.verify("exact", EXACT, payload)
 
 
+def test_the_committed_vectors_are_what_this_module_accepts() -> None:
+    """The vectors `distill_capture.canonicalize` is held to, run against this
+    end of the same contract — the check `check_canon_vectors.py` asks of "any
+    implementation of the contract".
+
+    A canonicalized output is what the client posts, so this module must take
+    each of them back unchanged. It is what pins `SMALL_LIMIT` to the client's:
+    raise it there alone and the vectors past 64 arrive as values rather than
+    as a digest, which is the payload this rejects.
+    """
+    cases = json.loads(CANON_VECTORS.read_text())["cases"]
+    graded = [case for case in cases if not case.get("rejects")]
+    assert graded
+
+    assert {case["name"]: verify._canonical(case["expected"]) for case in graded} == {
+        case["name"]: case["expected"] for case in graded
+    }
+
+
 def test_a_metric_is_scored_against_the_labels_the_learner_never_sees() -> None:
     # The values numpy produces for these vectors, in
     # apps/frontend/lib/labs/python/distill_capture.py: the two ends of the
@@ -92,6 +118,13 @@ def test_tied_predictions_score_by_midrank() -> None:
 def test_predictions_that_do_not_cover_the_held_out_set_are_refused() -> None:
     with pytest.raises(verify.Rejected):
         verify.verify("metric", METRIC, FAILING[:-1])
+
+
+def test_predictions_of_the_right_length_but_the_wrong_shape_are_refused() -> None:
+    """A column rather than a row: the length matches, so only the shape check
+    stands between it and a formula that would compare a list to a label."""
+    with pytest.raises(verify.Rejected):
+        verify.verify("metric", METRIC, [[prediction] for prediction in FAILING])
 
 
 def test_a_review_is_stored_for_the_judge_rather_than_graded() -> None:
