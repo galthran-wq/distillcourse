@@ -26,8 +26,9 @@ proactive slot — lives in `apps/backend/app/scheduling/`, the Telegram channel
 it delivers over — webhook, pairing, sending — in `apps/backend/app/telegram/`,
 what the tutor remembers about a learner across every chat and medium in
 `apps/backend/app/memory/`, the spaced-repetition ladder those proactive
-messages are mostly made of in `apps/backend/app/review/`, and how a learner's
-notebook authenticates to the lab API — pairing codes, bearer tokens — in
+messages are mostly made of in `apps/backend/app/review/`, and everything the
+lab API is — pairing codes and bearer tokens, the manifest a notebook reads,
+the checkpoints it submits and what they are graded against — in
 `apps/backend/app/labs/`. The harness's prompt modules
 (`app/harness/prompts/*.md`) are content, not configuration: `docs/pedagogy.md`
 governs them exactly as it governs lessons, and they are written in the same
@@ -69,6 +70,13 @@ Rules that override defaults:
   own `isReadable`, and chunk anchors come from the site's own rehype-slug —
   if you change how lessons are rendered or which ones render, the export
   follows automatically; if you fork either, search starts lying.
+  The one exception is a lab's answer key: the same command also loads
+  `labs-dist/private/` (`npm run build-labs`, which `make reindex` runs) into
+  `lab_challenges` via `app/labs/ingest.py`. It is an exception because it is
+  the opposite rule — expected outputs, held-out labels and rubrics must NEVER
+  become `documents` rows, which search returns and the tutor quotes. The
+  manifest the notebook reads is served from `lab_challenges.spec["public"]`,
+  whole; nothing assembles it field by field.
 - The site's look is one layer, not per-page decisions: the tokens in
   `apps/frontend/app/globals.css` and the primitives in
   `apps/frontend/components/ui`. `@theme inline` holds the colors, `--radius-*`

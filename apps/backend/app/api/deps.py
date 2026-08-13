@@ -1,9 +1,10 @@
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi import Depends, HTTPException, Path, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.content import locators
 from app.core import sessions
 from app.core.db import session_factory
 from app.harness.repository import HarnessRepository
@@ -59,3 +60,17 @@ def get_repository(session: SessionDep, user: CurrentUser) -> HarnessRepository:
 
 
 RepositoryDep = Annotated[HarnessRepository, Depends(get_repository)]
+
+# The service does not know which lessons exist — the corpus does, and it is
+# ingested separately — so the shape of a slug is the whole check: enough to
+# keep junk out of the columns a route reads and writes.
+Slug = Annotated[
+    str, Path(pattern=locators.SLUG_PATTERN, max_length=locators.SLUG_LENGTH)
+]
+
+
+def lesson_key(course: Slug, lesson: Slug) -> str:
+    return locators.lesson_key(course, lesson)
+
+
+LessonKey = Annotated[str, Depends(lesson_key)]

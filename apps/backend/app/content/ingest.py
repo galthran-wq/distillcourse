@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.content.schemas import ContentIndex, IndexDocument
 from app.core.db import engine, session_factory
+from app.labs import ingest as lab_challenges
 from app.models import Base, Document
 
 logger = logging.getLogger(__name__)
@@ -109,10 +110,14 @@ async def ingest(session: AsyncSession, index: ContentIndex) -> IngestReport:
     )
 
 
-async def main(path: Path) -> None:
+async def main(path: Path, labs_root: Path | None = None) -> None:
     index = ContentIndex.model_validate_json(path.read_text())
     async with session_factory() as session:
         report = await ingest(session, index)
+        # The labs' answer keys land in the same command as the lessons they
+        # belong to: a lab whose brief is on the site and whose challenges are
+        # not is a lesson nobody can submit against.
+        labs = await lab_challenges.ingest(session, labs_root) if labs_root else None
     await engine.dispose()
     logger.info(
         "%s: %d inserted, %d updated, %d unchanged, %d deleted",
@@ -122,10 +127,22 @@ async def main(path: Path) -> None:
         report.unchanged,
         report.deleted,
     )
+    if labs is not None:
+        logger.info(
+            "%s: %d labs, %d checkpoints, %d removed",
+            labs_root,
+            labs.labs,
+            labs.checkpoints,
+            labs.removed,
+        )
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: python -m app.content.ingest <index.json>")
-    asyncio.run(main(Path(sys.argv[1])))
+    if not 2 <= len(sys.argv) <= 3:
+        raise SystemExit(
+            "usage: python -m app.content.ingest <index.json> [<labs-private-dir>]"
+        )
+    asyncio.run(
+        main(Path(sys.argv[1]), Path(sys.argv[2]) if len(sys.argv) == 3 else None)
+    )

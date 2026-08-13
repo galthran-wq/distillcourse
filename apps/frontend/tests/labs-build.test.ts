@@ -100,6 +100,18 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(cp["why-uniform"].rubric).toContain("uniform distribution");
   });
 
+  it("carries the public half the checkpoint API serves as the manifest", () => {
+    // One file, so a learner's inputs and the outputs they are compared
+    // against cannot be two ingests apart.
+    const artifact = JSON.parse(priv);
+    const manifest = JSON.parse(readFileSync(join(built.publicDir, "manifest.json"), "utf8"));
+    for (const [id, checkpoint] of Object.entries<{ kind: string }>(manifest.checkpoints)) {
+      const { kind, ...published } = checkpoint;
+      expect(artifact.checkpoints[id].kind).toBe(kind);
+      expect(artifact.checkpoints[id].public).toEqual(published);
+    }
+  });
+
   it("keeps the answer key out of everything the learner can fetch", () => {
     const published = filesUnder(built.publicDir)
       .map((path) => readFileSync(path, "utf8"))

@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     LargeBinary,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -20,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.content.locators import LESSON_LENGTH, SLUG_LENGTH
+from app.content.locators import CHECKPOINT_LENGTH, LESSON_LENGTH, SLUG_LENGTH
 
 
 class Base(DeclarativeBase):
@@ -472,6 +473,76 @@ class LabToken(Base):
     )
 
     user: Mapped[User] = relationship()
+
+
+class LabChallenge(Base):
+    """What one checkpoint of one lab is graded against.
+
+    Written by `app.labs.ingest` from the build's private artifact, and
+    deliberately not a `documents` row: the tutor quotes documents and search
+    returns them, so an expected output, a held-out label or a rubric stored
+    there would hand out the answers it exists to keep.
+
+    `spec` is `{"public": ..., "private": ...}` — the manifest serves the
+    public half whole and never reads the other, so nothing reaches a learner
+    by being forgotten in a whitelist.
+    """
+
+    __tablename__ = "lab_challenges"
+
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    checkpoint: Mapped[str] = mapped_column(String(CHECKPOINT_LENGTH), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    spec: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # sha256 of the lab's sources, per lab and stored per row. A submission
+    # carries the version its notebook was generated from, and the two must
+    # agree or the reference it would be compared against is not the one the
+    # learner computed for.
+    content_version: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+class LabCheckpointState(Base):
+    """Where one learner stands on one checkpoint."""
+
+    __tablename__ = "lab_checkpoint_state"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH), primary_key=True)
+    checkpoint: Mapped[str] = mapped_column(String(CHECKPOINT_LENGTH), primary_key=True)
+    attempts: Mapped[int] = mapped_column(default=0, server_default="0")
+    passed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    # The best a metric checkpoint has scored, never the last: a learner who
+    # tries a worse model after passing has still passed.
+    best_score: Mapped[float | None] = mapped_column(
+        Numeric(asdecimal=False), default=None
+    )
+    feedback: Mapped[str | None] = mapped_column(Text, default=None)
+
+
+class LabSubmission(Base):
+    """One posted attempt and the verdict it was answered with.
+
+    Append-only, with the notebook's own id as the key — the bargain `events`
+    strikes: a post retried over a dropped connection returns the verdict it
+    already earned instead of spending another attempt at it.
+    """
+
+    __tablename__ = "lab_submissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lesson: Mapped[str] = mapped_column(String(LESSON_LENGTH))
+    checkpoint: Mapped[str] = mapped_column(String(CHECKPOINT_LENGTH))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    verdict: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
 # Rating and bookmark are keyed by the same `lesson:` locator `events` and

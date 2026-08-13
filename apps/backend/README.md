@@ -27,7 +27,8 @@ app/
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
     routes/memories.py # what the tutor remembers: list, edit, delete
-    routes/labs.py   # pairing a notebook: a code out, a bearer token back
+    routes/labs.py   # pairing a notebook, and the checkpoints it submits
+    size.py          # a ceiling on a request body, refused before it is read
   harness/
     agent.py         # the tutor agent, the toolless namer, the model pool, the compaction threshold
     prompts.py       # module concatenation + context blocks
@@ -61,7 +62,10 @@ app/
     updates.py       # one incoming message, end to end; bot commands
     tools.py         # send_message, run by the tutor
   labs/
-    repository.py    # lab pairing codes and the bearer tokens they mint
+    repository.py    # pairing codes and tokens; challenges, state, submissions
+    verify.py        # what a posted checkpoint is worth: comparison and metrics
+    ingest.py        # the build's answer keys into `lab_challenges`
+    schemas.py       # the wire shapes a notebook and the lab page speak
     deps.py          # LabUser — the learner a notebook is calling for
   memory/
     repository.py    # the learner profile: index, read, upsert, delete
@@ -486,7 +490,7 @@ Rows arrive from the frontend's `npm run export-index`, which chunks lessons
 through the site's own MDX pipeline, and are written by
 
 ```bash
-python -m app.content.ingest <index.json>     # `make reindex` from the root
+python -m app.content.ingest <index.json> [<labs-private-dir>]  # `make reindex`
 ```
 
 Ingest is a hash-based upsert: re-running it on an unchanged export writes
@@ -494,12 +498,66 @@ nothing, and a chunk the export no longer lists is deleted, so a locator can
 never outlive the passage it names. It refuses an empty index rather than
 emptying the table, and leaves corpora the file does not mention alone.
 
+The optional second argument is the lab build's `labs-dist/private/`, and it
+is the one thing the content ingest loads that is not a `documents` row:
+expected outputs, held-out labels and rubrics go to `lab_challenges` instead,
+because search returns documents and the tutor quotes them. Same command, so a
+lab's brief and the challenges it is graded against cannot be one deploy
+apart; an absent or empty directory means the labs were not built and leaves
+the table alone rather than un-verifying every lab on the site.
+
 Search is tier 1: a generated `tsvector` (title weight A, body B), a GIN
 index, `websearch_to_tsquery` and `ts_rank_cd`. No idf, deliberately — the
 corpus is hundreds of chunks and the consumer is an agent that reformulates
 its query, so recall matters more than the order of the top few. If that
 stops being good enough, the next step is a BM25 rerank of the top 50 in
 memory, and only then a vector tier.
+
+## Labs
+
+A lab is a lesson the learner solves in their own Jupyter. The server executes
+nothing they or the author wrote: `app/labs/verify.py` compares a posted
+output against the one the build captured from the reference solution, scores
+predictions against labels the learner never sees, or takes a written answer
+for the judge. Three tables, keyed by the same lesson locator as everything
+else: `lab_challenges` (the answer key, per checkpoint), `lab_checkpoint_state`
+(attempts, first pass, best score, the last hint) and `lab_submissions` (the
+append-only log).
+
+```
+GET  /labs/{course}/{lesson}/manifest    # public: what the notebook computes on
+POST /labs/submissions                   # bearer: one attempt at one checkpoint
+GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
+```
+
+- The manifest is the display half from `documents.metadata.lab` joined with
+  `lab_challenges.spec["public"]`, and it is public by construction rather
+  than by filtering: the answer key lives under a sibling key the route never
+  reads. Serving it here rather than from the mirror is what keeps the inputs
+  a learner computes on and the outputs they are compared against one ingest.
+  A checkpoint's `kind` comes from the challenge rather than from the index,
+  for the same reason: the two are separate ingests, and the notebook must
+  build the payload the row that grades it takes.
+- A submission carries the id its notebook minted, which is the primary key of
+  the log: a post retried over a dropped connection is answered with the
+  verdict it already earned and spends no second attempt. It also carries the
+  manifest's `content_version`; a mismatch is 409 and means the lab was
+  rebuilt under an open notebook.
+- Feedback is coarse on purpose — a pass, and a hint only where the output
+  matches a wrong variant the author declared, naming the bug and never the
+  expected value. Nothing reports how far off an answer was.
+- Passing every `required` checkpoint finishes the lesson: the same
+  `lesson_completed` event reading one emits (`telemetry.ingest.emit_completion`)
+  and the same review ladder, under the same per-(learner, lesson) advisory
+  lock, so two submissions landing together finish it once. `lesson_progress`
+  is re-derived in that transaction too, because it is the projection every
+  reader of completion outside telemetry consults and a lab has no flush of
+  its own coming.
+- Rate limits: 60 submissions a minute per learner, and per checkpoint per day
+  `LAB_METRIC_ATTEMPTS_PER_DAY` / `LAB_REVIEW_ATTEMPTS_PER_DAY` for the two
+  kinds that cost the server real work. The day's attempt is charged where it
+  is earned — at the grading — so a retried id, a stale `content_version` and
+  a checkpoint nobody built cost the learner nothing.
 
 ## Telemetry
 
@@ -546,6 +604,13 @@ are the client's to choose, so a derived one could be squatted to suppress the
 completion. What makes the emit exactly-once is the absence of the event,
 checked under the same advisory lock the flush holds. That row is where spaced
 repetition subscribes.
+
+Reading is not the only way to finish a lesson, though — passing a lab's
+required checkpoints emits the same event (`app/labs/repository.py`), and a lab
+is finished having met no reading bar at all. So the projection takes the
+earliest `lesson_completed` of the pair wherever the running totals derive
+nothing: the event is the statement that a lesson was finished, and
+`lesson_progress.completed_at` is its projection either way.
 
 A **reading day** is a lower bar over one calendar day of the reader's own
 clock (`users.timezone`): five minutes of credited attention, no scroll depth
