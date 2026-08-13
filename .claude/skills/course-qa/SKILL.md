@@ -31,12 +31,12 @@ rubric's lab section.
    density and voice.
 
 3. A lab lesson (`type: lab`) is scored against the rubric's lab section
-   (B1–B8) instead of the chapter items, which do not apply to a brief. Get
-   the learner's notebook first: `npm run build-labs -- <course> <lesson>`
-   generates `labs-dist/public/<course>/<lesson>/lab.ipynb`. Read that end to
-   end before opening `solution.py` or `challenges.yaml` — you cannot judge
-   the scaffold from the version that still has the answers in it. The rest
-   of this workflow is unchanged.
+   (B1–B8) in place of the chapter items, minus the carry-overs that section
+   names. Get the learner's notebook first: `npm run build-labs -- <course>
+   <lesson>` generates `labs-dist/public/<course>/<lesson>/lab.ipynb`. Read
+   that end to end before opening `solution.py` or `challenges.yaml` — you
+   cannot judge the scaffold from the version that still has the answers in
+   it.
 
 4. Score every rubric item **PASS / WEAK / FAIL / N-A** with one line of
    quoted evidence each. Judgment items deserve real judgment — a lesson can

@@ -220,7 +220,12 @@ example — read `solution.py` with the marked spans cut by hand instead.
   surrounds the blank still a map — imports present, call site visible, data
   in scope, the return contract stated — or did the cut take the argument
   with it? Free-form cells (no signature, no contract) are legitimate only in
-  the final open task; anywhere else they are a FAIL.
+  the final open task; anywhere else they are a FAIL. Seeding is judged here
+  too: every stochastic step in `solution.py` fixes its seed
+  (`default_rng(seed)`, framework seeds set). The build executes the solution
+  once and captures what it returns as the reference — it never compares two
+  runs — so an unseeded step writes a different `expected` on every rebuild
+  and marks correct answers ✗.
 - **B5 — Feedback (required)**: wherever a canonical bug exists (sign
   dropped, normalization forgotten, off-by-one in indexing, threshold before
   the sigmoid), `challenges.yaml` declares a `wrong` variant for that
@@ -264,8 +269,10 @@ reference solution. It already fails on:
   not beat by ≥ 0.02; a missing `holdout` file;
 - a solution marker, an output, or cell metadata surviving into `lab.ipynb`;
   a cut that leaves unparsable code; a dep in `pyproject.toml` missing from
-  `uv.lock`; a model answer reaching the learner or the private artifact;
-- nondeterminism between two builds (seeding is a build gate, not a reading).
+  `uv.lock`; a model answer reaching the learner or the private artifact.
+
+Determinism is not on that list: validate builds each lab once, so an
+unseeded solution is B4's to catch.
 
 Re-read every line you are about to report: if `npm run validate` would have
 produced it, delete it. QA owns pedagogy; restating a CI finding buys the
