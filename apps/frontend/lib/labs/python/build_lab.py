@@ -42,6 +42,9 @@ SOLUTION_SPAN = re.compile(
     r"^([ \t]*)# BEGIN SOLUTION[ \t]*\n.*?^[ \t]*# END SOLUTION[ \t]*\n?",
     re.S | re.M,
 )
+# What the notebook is checked for after cutting: the span regex is exact, so
+# any typo in a marker leaves it — and the solution under it — in the cell.
+MARKERS = ("BEGIN SOLUTION", "END SOLUTION")
 CHECKPOINT_CALL = re.compile(
     r"distill\.(?:check|submit_predictions|submit_review)\(\s*[\"']([A-Za-z0-9_-]+)[\"']"
 )
@@ -163,7 +166,8 @@ def _review_call(node: ast.Expr) -> str:
 
 def student_cell(source: str) -> str | None:
     """The learner's version of one code cell; None when nothing is left of it."""
-    if SOLUTION_SPAN.search(source) is not None:
+    cut = SOLUTION_SPAN.search(source) is not None
+    if cut:
         source = cut_solutions(source)
     try:
         tree = ast.parse(source)
@@ -186,7 +190,10 @@ def student_cell(source: str) -> str | None:
         for number, line in enumerate(source.split("\n"), start=1)
         if number not in dropped or number in rewritten
     ]
-    if all(not line.strip() or line.lstrip().startswith("#") for line in kept):
+    # Only a cell that was nothing but capture calls disappears. A cell whose
+    # whole body was a solution span is now nothing but the blank — and the
+    # blank is the task.
+    if not cut and all(not line.strip() or line.lstrip().startswith("#") for line in kept):
         return None
     return "\n".join(kept).strip("\n")
 
@@ -216,7 +223,7 @@ def student_notebook(
 ) -> Any:
     notebook = jupytext.reads(source, fmt="py:percent")
     cells = []
-    for cell in notebook.cells:
+    for index, cell in enumerate(notebook.cells):
         if cell.cell_type == "code":
             student = student_cell(cell.source)
             if student is None:
@@ -224,6 +231,14 @@ def student_notebook(
             cell.source = student
             cell.outputs = []
             cell.execution_count = None
+        # The notebook is published: a marker that survived means the solution
+        # under it survived too, so this is a build failure, not a blemish.
+        if any(marker in cell.source for marker in MARKERS):
+            raise LabBuildError(
+                f"cell {index} still carries a solution marker after cutting — "
+                "each marker must read exactly `# BEGIN SOLUTION` / "
+                "`# END SOLUTION` on a line of its own"
+            )
         cell.metadata = {}
         cells.append(cell)
     notebook.cells = header_cells(config, deps, files) + cells

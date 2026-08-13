@@ -41,9 +41,13 @@ distill.check("entropy-terms", entropy_terms)
 
 # %%
 holdout = np.loadtxt("data/holdout.csv", delimiter=",")
+
+# %%
 # BEGIN SOLUTION
 scores = (holdout * np.log2(holdout)).sum(axis=1)
 # END SOLUTION
+
+# %%
 distill.submit_predictions("beat-baseline", scores)
 
 # %%

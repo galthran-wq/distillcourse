@@ -155,6 +155,8 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(body.match(/# YOUR CODE HERE/g)).toHaveLength(3);
     // The blank that swallowed a whole function body needs a statement.
     expect(body.match(/raise NotImplementedError/g)).toHaveLength(1);
+    // A cell that was nothing but a solution span is the blank, not nothing.
+    expect(notebook.cells.map(text)).toContain("# YOUR CODE HERE");
     expect(body).toContain('distill.submit_review("why-uniform", "YOUR ANSWER HERE")');
     expect(body).toContain('distill.check("surprisal", surprisal)');
     expect(body).not.toContain("distill.dump");
@@ -183,6 +185,20 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(broken.diags[0].rule).toBe("lab-build");
     expect(broken.diags[0].message).toContain('checkpoint "surprisal"');
     expect(existsSync(broken.privatePath)).toBe(false);
+  }, MINUTES);
+
+  it("fails the build when a mistyped marker leaves the solution in", () => {
+    const broken = buildFixture((labDir) => {
+      const path = join(labDir, "solution.py");
+      writeFileSync(
+        path,
+        readFileSync(path, "utf8").replace("    # END SOLUTION", "    #END SOLUTION"),
+      );
+    });
+    expect(broken.diags).toHaveLength(1);
+    expect(broken.diags[0].level).toBe("error");
+    expect(broken.diags[0].message).toContain("solution marker");
+    expect(existsSync(broken.publicDir)).toBe(false);
   }, MINUTES);
 
   it("writes nothing in check mode", () => {

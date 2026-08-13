@@ -188,10 +188,12 @@ what it produces into two artefacts under `labs-dist/` (git-ignored):
   metric and its threshold, the review rubric. This half is what the
   checkpoint API compares against.
 
-A checkpoint that raises, a `wrong` variant that matches the solution, or a
-metric threshold the reference fails to clear by 0.02 fails validate with the
-checkpoint named: a lab whose solution is not green is invalid content, the
-same as unparsable MDX. Both halves carry
+A checkpoint that raises, a `wrong` variant that matches the solution, a
+metric threshold the reference fails to clear by 0.02, or a solution marker
+still standing in the generated notebook — a typo in `# BEGIN SOLUTION` /
+`# END SOLUTION` leaves the answer in the cell — fails validate with the
+checkpoint or cell named: a lab whose solution is not green is invalid
+content, the same as unparsable MDX. Both halves carry
 `content_version` = `sha256(solution.py ‖ challenges.yaml)`, so a notebook
 opened against a since-rebuilt lab is rejected rather than graded against the
 wrong reference. Canonicalization — how an output becomes a comparable value
