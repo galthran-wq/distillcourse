@@ -1,11 +1,11 @@
 /**
- * The two things every content CLI does: resolve the course named on the
- * command line, and print diagnostics in the one format the authoring skills
- * are told to read.
+ * The three things every content CLI does: resolve the course named on the
+ * command line, walk the courses collecting diagnostics, and print those in
+ * the one format the authoring skills are told to read.
  */
 import { existsSync } from "node:fs";
-import { join, relative } from "node:path";
-import { listCourseDirs } from "../lib/content/load";
+import { basename, join, relative } from "node:path";
+import { ContentError, listCourseDirs } from "../lib/content/load";
 import type { Diagnostic } from "../lib/content/lint";
 import { contentRoot, repoRoot } from "./paths";
 
@@ -17,6 +17,33 @@ export function selectCourseDirs(courseArg?: string): string[] {
     process.exit(1);
   }
   return [dir];
+}
+
+/**
+ * Runs `collect` over each course and reports what it found, one summary line
+ * per course; returns the error total the CLI exits on. A course that fails to
+ * load is one `course-schema` error, not a crash.
+ */
+export function reportCourses(
+  dirs: string[],
+  collect: (dir: string) => Diagnostic[],
+): number {
+  let totalErrors = 0;
+  for (const dir of dirs) {
+    let diags: Diagnostic[];
+    try {
+      diags = collect(dir);
+    } catch (err) {
+      if (!(err instanceof ContentError)) throw err;
+      diags = [{ level: "error", rule: "course-schema", file: err.file, message: err.message }];
+    }
+    const { errors, warns } = reportDiagnostics(diags);
+    totalErrors += errors;
+    console.log(
+      `${errors === 0 ? "✓" : "✗"} ${basename(dir)}: ${errors} error(s), ${warns} warning(s)`,
+    );
+  }
+  return totalErrors;
 }
 
 export function reportDiagnostics(diags: Diagnostic[]): { errors: number; warns: number } {

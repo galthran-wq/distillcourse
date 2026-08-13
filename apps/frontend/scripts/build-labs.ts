@@ -8,32 +8,21 @@
  * same work and discards the artifacts; that is the mode `npm run validate`
  * uses, because a lab whose solution is not green is invalid content.
  *
- * Needs `uv` on PATH; labs are skipped with a warning where it is missing.
+ * Needs `uv` on PATH: without it this command can write nothing and fails.
+ * (`--check`, and so `npm run validate`, only warns — linting content does
+ * not need the environment.)
  */
-import { basename } from "node:path";
-import { ContentError, loadCourse } from "../lib/content/load";
-import type { Diagnostic } from "../lib/content/lint";
+import { loadCourse } from "../lib/content/load";
 import { runCourseLabs } from "../lib/labs/build";
-import { reportDiagnostics, selectCourseDirs } from "./content-cli";
+import { reportCourses, selectCourseDirs } from "./content-cli";
 import { repoRoot } from "./paths";
 
 const args = process.argv.slice(2);
 const mode = args.includes("--check") ? "check" : "build";
 const [courseArg, lessonArg] = args.filter((arg) => !arg.startsWith("--"));
 
-let totalErrors = 0;
-for (const dir of selectCourseDirs(courseArg)) {
-  let diags: Diagnostic[];
-  try {
-    diags = runCourseLabs(loadCourse(dir), { repoRoot, mode, lesson: lessonArg });
-  } catch (err) {
-    if (!(err instanceof ContentError)) throw err;
-    diags = [{ level: "error", rule: "course-schema", file: err.file, message: err.message }];
-  }
-  if (diags.length === 0) continue;
-  const { errors } = reportDiagnostics(diags);
-  totalErrors += errors;
-  console.log(`${errors === 0 ? "✓" : "✗"} ${basename(dir)}: ${errors} error(s)`);
-}
+const totalErrors = reportCourses(selectCourseDirs(courseArg), (dir) =>
+  runCourseLabs(loadCourse(dir), { repoRoot, mode, lesson: lessonArg }),
+);
 
 process.exit(totalErrors > 0 ? 1 : 0);

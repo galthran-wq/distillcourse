@@ -49,7 +49,9 @@ export function runCourseLabs(loaded: LoadedCourse, options: LabRunOptions): Dia
   if (spawnSync("uv", ["--version"], { stdio: "ignore" }).status !== 0) {
     return [
       {
-        level: "warn",
+        // A machine without uv can still lint content, so validate only warns.
+        // A build that produced no artifacts has failed, however green it looks.
+        level: options.mode === "build" ? "error" : "warn",
         rule: "lab-build",
         file: join(loaded.dir, "course.yaml"),
         message: `${targets.length} lab lesson(s) left unbuilt: uv is not installed`,

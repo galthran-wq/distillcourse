@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadCourse } from "@/lib/content/load";
 import type { Diagnostic } from "@/lib/content/lint";
-import { runCourseLabs } from "@/lib/labs/build";
+import { runCourseLabs, type LabRunMode } from "@/lib/labs/build";
 
 const FIXTURE = join(__dirname, "fixtures", "lint-course");
 const LAB_DIR = join("lessons", "surprisal-lab");
@@ -221,4 +221,29 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(result.stderr + result.stdout).toContain("vectors match");
     expect(result.status).toBe(0);
   }, MINUTES);
+});
+
+describe("a machine without uv", () => {
+  function diagnose(mode: LabRunMode): Diagnostic[] {
+    const root = mkdtempSync(join(tmpdir(), "labs-no-uv-"));
+    roots.push(root);
+    const courseDir = join(root, "content", "courses", "lint-course");
+    cpSync(FIXTURE, courseDir, { recursive: true });
+    const path = process.env.PATH;
+    process.env.PATH = join(root, "no-tools-here");
+    try {
+      return runCourseLabs(loadCourse(courseDir), { repoRoot: root, mode });
+    } finally {
+      process.env.PATH = path;
+    }
+  }
+
+  it("fails the build and only warns the validator", () => {
+    expect(diagnose("build")).toEqual([
+      expect.objectContaining({ level: "error", rule: "lab-build" }),
+    ]);
+    expect(diagnose("check")).toEqual([
+      expect.objectContaining({ level: "warn", rule: "lab-build" }),
+    ]);
+  });
 });
