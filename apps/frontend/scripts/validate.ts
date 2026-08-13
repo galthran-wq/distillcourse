@@ -2,48 +2,26 @@
 /**
  * Content validator: `npm run validate [-- <course> [<lesson>]]`
  *
- * Schema-validates and pedagogy-lints everything under content/courses/.
- * Exit code 1 on any error-level diagnostic. Every authoring skill must run
- * this after generating content and fix failures before reporting done.
+ * Schema-validates and pedagogy-lints everything under content/courses/, and
+ * builds every drafted lab in check mode — a lab whose reference solution is
+ * not green is invalid content, exactly like unparsable MDX. Exit code 1 on
+ * any error-level diagnostic. Every authoring skill must run this after
+ * generating content and fix failures before reporting done.
  *
  * The npm script runs this via `tsx --conditions=import`: lint.ts imports
  * the ESM-only @mdx-js/mdx (whose dep estree-walker exports no `require`
  * condition), and the extra condition lets tsx's CJS transform resolve it.
  */
-import { basename, join, relative } from "node:path";
-import { existsSync } from "node:fs";
-import {
-  ContentError,
-  listCourseDirs,
-  listLessonDirs,
-  loadCourse,
-} from "../lib/content/load";
+import { basename, join } from "node:path";
+import { ContentError, listCourseDirs, listLessonDirs, loadCourse } from "../lib/content/load";
 import { lintCourse, type Diagnostic } from "../lib/content/lint";
+import { runCourseLabs } from "../lib/labs/build";
+import { reportDiagnostics, selectCourseDirs } from "./content-cli";
 import { appRoot, contentRoot, repoRoot } from "./paths";
 
 const [courseArg, lessonArg] = process.argv.slice(2);
 
-function report(diags: Diagnostic[]): { errors: number; warns: number } {
-  let errors = 0;
-  let warns = 0;
-  for (const d of diags) {
-    if (d.level === "error") errors++;
-    else warns++;
-    const path = relative(repoRoot, d.file);
-    console.log(`  ${d.level === "error" ? "✗" : "⚠"} [${d.rule}] ${path}: ${d.message}`);
-  }
-  return { errors, warns };
-}
-
-let courseDirs = listCourseDirs(contentRoot);
-if (courseArg !== undefined) {
-  const dir = join(contentRoot, "courses", courseArg);
-  if (!existsSync(dir)) {
-    console.error(`No such course: ${courseArg} (${relative(repoRoot, dir)})`);
-    process.exit(1);
-  }
-  courseDirs = [dir];
-}
+const courseDirs = selectCourseDirs(courseArg);
 
 if (courseDirs.length === 0) {
   console.log("No courses under content/courses/ — nothing to validate.");
@@ -51,7 +29,6 @@ if (courseDirs.length === 0) {
 }
 
 let totalErrors = 0;
-let totalWarns = 0;
 
 for (const dir of courseDirs) {
   const name = basename(dir);
@@ -63,6 +40,7 @@ for (const dir of courseDirs) {
       lessonDirsOnDisk: listLessonDirs(dir),
       allCourseSlugs: listCourseDirs(contentRoot).map((d) => basename(d)),
     });
+    diags.push(...runCourseLabs(loaded, { repoRoot, mode: "check", lesson: lessonArg }));
     if (lessonArg !== undefined) {
       const lessonPrefix = join(dir, "lessons", lessonArg);
       diags = diags.filter(
@@ -84,9 +62,8 @@ for (const dir of courseDirs) {
     }
   }
 
-  const { errors, warns } = report(diags);
+  const { errors, warns } = reportDiagnostics(diags);
   totalErrors += errors;
-  totalWarns += warns;
   console.log(
     `${errors === 0 ? "✓" : "✗"} ${name}: ${errors} error(s), ${warns} warning(s)`,
   );
