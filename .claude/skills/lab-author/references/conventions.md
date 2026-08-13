@@ -121,11 +121,18 @@ value list (server compares `allclose(atol)`). Larger: quantize
 `str(array.shape).encode()` — the Python repr, `"(65,)"`. Tuples of arrays
 canonicalize element-wise in order, into one digest.
 
+An output canonicalization cannot represent is refused, not encoded: NaN or an
+infinity anywhere (neither compares equal to itself), and — on the digest path
+— any magnitude at or above `2**63 * atol`, where the quantized values would
+saturate and every such output would share one digest. Either aborts the build
+with the checkpoint named; fix the solution or widen `atol`.
+
 The one implementation is `canonicalize` in
 `apps/frontend/lib/labs/python/distill_capture.py`; the committed vectors next
 to it (`canon_vectors.json`, checked by `check_canon_vectors.py`) are the
 cross-implementation contract — a second implementation that does not
-reproduce them byte for byte will grade correct answers wrong.
+reproduce them byte for byte, or that encodes a case marked `"rejects": true`
+instead of refusing it, will grade correct answers wrong.
 
 ## Dependencies: pyproject.toml + uv.lock
 

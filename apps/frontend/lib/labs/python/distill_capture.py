@@ -41,14 +41,31 @@ def challenges() -> dict[str, dict[str, Any]]:
     return _challenges
 
 
+class CanonicalizationError(ValueError):
+    """An output canonicalization cannot represent; the lab's author must fix it."""
+
+
 def canonicalize(out: Any, atol: float) -> dict[str, Any]:
     arrays = out if isinstance(out, tuple) else (out,)
     parts = [np.ascontiguousarray(np.asarray(a, dtype=np.float64)) for a in arrays]
+    for p in parts:
+        if not np.isfinite(p).all():
+            raise CanonicalizationError(
+                "output holds NaN or an infinity: neither compares equal to itself, "
+                "so no reference built from it can be matched"
+            )
     total = sum(p.size for p in parts)
     if total <= SMALL_LIMIT:
         return {"values": [p.tolist() for p in parts]}
     h = hashlib.sha256()
     for p in parts:
+        # Past int64 the quantized values saturate and every such output
+        # collides on one digest — silently grading wrong answers right.
+        if p.size and np.abs(p / atol).max() >= 2**63:
+            raise CanonicalizationError(
+                f"output exceeds the quantization range: |x| must stay under "
+                f"{2**63 * atol:.3g} at atol={atol:g}"
+            )
         q = np.round(p / atol).astype(np.int64)
         h.update(str(p.shape).encode() + b"f8" + q.tobytes())
     return {"digest": h.hexdigest()}
@@ -117,9 +134,12 @@ def dump(path: str = "captured.json") -> None:
 
 
 def _roc_auc(y: np.ndarray, p: np.ndarray) -> float:
-    order = np.argsort(p)
-    ranks = np.empty(len(p))
-    ranks[order] = np.arange(1, len(p) + 1)
+    # Midranks, not positions: tied predictions must share the average of the
+    # ranks they span, or a constant prediction would score anything but 0.5.
+    _, inverse, counts = np.unique(p, return_inverse=True, return_counts=True)
+    ends = np.cumsum(counts)
+    # `ravel` because numpy 2.0 shaped the inverse like the input, 2.1 flat.
+    ranks = (((ends - counts) + ends + 1) / 2)[inverse.ravel()]
     pos = y == 1
     n1, n0 = pos.sum(), (~pos).sum()
     return float((ranks[pos].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
