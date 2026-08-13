@@ -36,6 +36,18 @@ LESSON_SECTION = re.compile(rf"{LESSON.pattern}(#{ANCHOR})?")
 # and their separator.
 LESSON_LENGTH = len("lesson:") + 2 * SLUG_LENGTH + 1
 
+# The other half of a lab checkpoint's identity, after the lesson locator: a
+# kebab-case id from the lesson's `challenges.yaml`. Its own bound rather than
+# SLUG_LENGTH, because it is read in a notebook cell beside the code it checks
+# and never appears in a path.
+CHECKPOINT_LENGTH = 64
+
+
+def lesson_key(course: str, lesson: str) -> str:
+    """The locator the index gives a lesson — the one string telemetry,
+    ratings, the review ladder and lab checkpoints all file a lesson under."""
+    return f"lesson:{course}/{lesson}"
+
 
 def course_of(locator: str) -> str:
     """The course a locator belongs to. `<corpus>:<course>[/<rest>]`.
