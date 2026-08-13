@@ -27,6 +27,7 @@ app/
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
     routes/memories.py # what the tutor remembers: list, edit, delete
+    routes/labs.py   # pairing a notebook: a code out, a bearer token back
   harness/
     agent.py         # the tutor agent, the toolless namer, the model pool, the compaction threshold
     prompts.py       # module concatenation + context blocks
@@ -45,7 +46,7 @@ app/
     clock.py         # users.timezone -> ZoneInfo, for every run and the poller
     security.py      # password hashing (argon2, bcrypt kept) + length policy
     sessions.py      # session lifecycle: token, row, cookie, sliding expiry
-    rate_limit.py    # fixed-window limiter for signup and login
+    rate_limit.py    # fixed-window limiter for signup, login and pairing
     observability.py # logfire: fastapi + sqlalchemy + httpx
   scheduling/
     policy.py        # quiet hours, the slot timeout, the budget, coalescing
@@ -59,6 +60,9 @@ app/
     thread.py        # the one thread and the run that speaks into it
     updates.py       # one incoming message, end to end; bot commands
     tools.py         # send_message, run by the tutor
+  labs/
+    repository.py    # lab pairing codes and the bearer tokens they mint
+    deps.py          # LabUser — the learner a notebook is calling for
   memory/
     repository.py    # the learner profile: index, read, upsert, delete
     tools.py         # read_memory / save_memory / delete_memory
@@ -92,16 +96,28 @@ send an `Authorization` header — authenticates over the same cookie for free.
   because proactive messages are scheduled against the user's own clock.
 - Password reset and email verification do not exist; the operator resets a
   password from the CLI below.
+- Notebooks do not use the cookie. A lab page issues a 10-minute single-use
+  pairing code, `POST /api/v1/labs/pair` exchanges it for a bearer token, and
+  `labs/deps.py:LabUser` is what the lab routes authenticate with. The token
+  does not expire — a notebook left open over a weekend must still submit — so
+  `lab_tokens.revoked_at` is the only way one ends, and everything that means
+  "this account's credentials end here" writes it beside the sessions it
+  revokes: signing out everywhere, `change-password`, the CLI password reset,
+  deactivating an account. `change-password` spares the browser that asked and
+  no notebook: a token pasted into a notebook that is shared or committed is the
+  likeliest leak, and the password change is the only recovery a learner reaches
+  without the operator.
 - `crud.py` and `core/sessions.py` stage writes and never commit. The route (or
   CLI command) owns the transaction and commits once, so a password change and
   the session revocation it implies cannot land apart.
 
 ```bash
-uv run python -m app.cli reset-password someone@example.com   # prompts, then
-                                                              # revokes their sessions
+uv run python -m app.cli reset-password someone@example.com   # prompts, then revokes
+                                                              # sessions and lab tokens
 uv run python -m app.cli delete-user someone@example.com      # sessions cascade
-uv run python -m app.cli deactivate-user someone@example.com  # closes the account,
-                                                              # keeps what it wrote
+uv run python -m app.cli deactivate-user someone@example.com  # revokes sessions and
+                                                              # lab tokens, keeps what
+                                                              # it wrote
 uv run python -m app.cli activate-user someone@example.com    # opens it again
 ```
 
@@ -351,7 +367,8 @@ poller could sweep the lease of a row the first is still delivering and send it
 twice. Scale it and that assumption has to be revisited first.
 
 The worker also owns the daily housekeeping sweep of rows nothing will read
-again: expired sessions, spent pairing codes and update ids older than a week.
+again: expired sessions, pairing codes past their ten minutes — Telegram's and
+the labs' — and update ids older than a week.
 
 ## Spaced repetition
 

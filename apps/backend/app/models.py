@@ -421,6 +421,59 @@ class TgUpdateSeen(Base):
     )
 
 
+class LabPairingCode(Base):
+    """A one-time code the learner copies from a lab page into their notebook.
+
+    Whoever holds the string can mint a token that speaks for the learner, so
+    it is short-lived and spent on first use — the same bargain `tg_pairing_codes`
+    strikes, which is why it is stored in the clear.
+    """
+
+    __tablename__ = "lab_pairing_codes"
+
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+
+class LabToken(Base):
+    """What a paired notebook authenticates its checkpoint calls with.
+
+    One token answers for every lab: pairing happens once per runtime session,
+    not once per assignment. It never expires — a Colab notebook left open for
+    a weekend must still submit — so `revoked_at` is the only way one ends.
+
+    The raw token lives in the learner's notebook and nowhere else; the row
+    holds `sha256(token)`, like a browser session's.
+    """
+
+    __tablename__ = "lab_tokens"
+
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+    user: Mapped[User] = relationship()
+
+
 # Rating and bookmark are keyed by the same `lesson:` locator `events` and
 # `lesson_progress` carry, so a reader's votes, their reading and the corpus
 # all name a lesson with one string.

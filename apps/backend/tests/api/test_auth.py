@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -8,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud
 from app.core import rate_limit, security, sessions
 from app.core.config import settings
-from app.models import UserSession
+from app.labs import repository as labs
+from app.models import LabToken, UserSession
 from tests.utils.utils import random_email, random_password, signup, signup_body
 
 AUTH = f"{settings.API_V1_STR}/auth"
@@ -204,6 +206,23 @@ async def test_logout_all_ends_every_session_of_the_user(
     assert (await client.get(f"{AUTH}/me")).status_code == 401
 
 
+async def test_logout_all_unpairs_the_notebooks_as_well(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """A lab token speaks for the account and no browser holds it, so the sweep
+    that ends every session has to reach it too."""
+    body = await signup(client)
+    user_id = uuid.UUID(body["id"])
+    now = datetime.now(UTC)
+    code = await labs.issue_code(session, user_id, now=now)
+    await labs.redeem(session, code.code, now=now)
+
+    assert (await client.post(f"{AUTH}/logout-all")).status_code == 204
+
+    token = await session.scalar(select(LabToken).where(LabToken.user_id == user_id))
+    assert token is not None and token.revoked_at is not None
+
+
 async def test_change_password_keeps_this_session_and_drops_the_others(
     client: AsyncClient, other_client: AsyncClient
 ) -> None:
@@ -225,6 +244,27 @@ async def test_change_password_keeps_this_session_and_drops_the_others(
             f"{AUTH}/login", json=login_body(body, password="a-new-password")
         )
     ).status_code == 200
+
+
+async def test_change_password_unpairs_the_notebooks(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """The browser asking keeps its session; a notebook has none to keep, and a
+    pasted token is the copy of the credential most likely to have leaked."""
+    body = await signup(client)
+    user_id = uuid.UUID(body["id"])
+    now = datetime.now(UTC)
+    code = await labs.issue_code(session, user_id, now=now)
+    await labs.redeem(session, code.code, now=now)
+
+    response = await client.post(
+        f"{AUTH}/change-password",
+        json={"current_password": body["password"], "new_password": "a-new-password"},
+    )
+
+    assert response.status_code == 204
+    token = await session.scalar(select(LabToken).where(LabToken.user_id == user_id))
+    assert token is not None and token.revoked_at is not None
 
 
 async def test_change_password_rejects_a_wrong_current_password(

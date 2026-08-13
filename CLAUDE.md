@@ -25,8 +25,10 @@ messages the platform starts by itself — the poller process, quiet hours, the
 proactive slot — lives in `apps/backend/app/scheduling/`, the Telegram channel
 it delivers over — webhook, pairing, sending — in `apps/backend/app/telegram/`,
 what the tutor remembers about a learner across every chat and medium in
-`apps/backend/app/memory/`, and the spaced-repetition ladder those proactive
-messages are mostly made of in `apps/backend/app/review/`. The harness's prompt modules
+`apps/backend/app/memory/`, the spaced-repetition ladder those proactive
+messages are mostly made of in `apps/backend/app/review/`, and how a learner's
+notebook authenticates to the lab API — pairing codes, bearer tokens — in
+`apps/backend/app/labs/`. The harness's prompt modules
 (`app/harness/prompts/*.md`) are content, not configuration: `docs/pedagogy.md`
 governs them exactly as it governs lessons, and they are written in the same
 dry register.
