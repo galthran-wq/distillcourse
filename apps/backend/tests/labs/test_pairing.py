@@ -110,20 +110,34 @@ async def committed_code() -> AsyncGenerator[str]:
         await session.commit()
 
 
-async def test_two_notebooks_redeeming_at_once_leave_one_token(
+async def test_a_code_another_redeem_is_holding_mints_nothing(
     committed_code: str,
 ) -> None:
+    """The contention is staged rather than raced: two `redeem` calls fired at
+    once interleave wherever the event loop happens to put them, which is not a
+    gate. Here one connection holds the code's row exactly as an in-flight
+    redeem does, and the second must be turned away — `skip_locked` — instead of
+    waiting out the lock and then minting a second token for a spent code.
+    """
     factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    async def attempt() -> str | None:
-        async with factory() as session:
-            try:
-                return await repository.redeem(session, committed_code, now=NOW)
-            except repository.PairingRejected:
-                return None
+    async with factory() as inflight, factory() as latecomer:
+        await inflight.execute(
+            select(LabPairingCode)
+            .where(LabPairingCode.code == committed_code)
+            .with_for_update()
+        )
+        with pytest.raises(repository.PairingRejected):
+            # The timeout is the failure, not a slow test: without `skip_locked`
+            # this blocks on the held row until the holder lets go.
+            await asyncio.wait_for(
+                repository.redeem(latecomer, committed_code, now=NOW), timeout=5
+            )
+        await inflight.rollback()
 
-    minted = [token for token in await asyncio.gather(attempt(), attempt()) if token]
-
-    assert len(minted) == 1
     async with factory() as session:
-        assert len((await session.scalars(select(LabToken))).all()) == 1
+        assert (await session.scalars(select(LabToken))).all() == []
+        # Refused for being held, not for being unknown: with the holder gone
+        # the same code is still good, so the assertion above cannot pass on a
+        # code that was never there.
+        assert await repository.redeem(session, committed_code, now=NOW)

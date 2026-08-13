@@ -61,6 +61,10 @@ async def set_active(session: AsyncSession, email: str, active: bool) -> None:
     user.is_active = active
     if not active:
         await sessions.revoke_user(session, user.id)
+        # And the notebooks. `revoked_at` is the only thing that ends a lab
+        # token, so one left alone here survives the deactivation and starts
+        # authenticating again the moment the account is reopened.
+        await labs.revoke_all(session, user.id, now=datetime.now(UTC))
     await session.commit()
     logger.info("%s is now %s", email, "active" if active else "deactivated")
 

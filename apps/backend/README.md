@@ -100,10 +100,13 @@ send an `Authorization` header — authenticates over the same cookie for free.
   pairing code, `POST /api/v1/labs/pair` exchanges it for a bearer token, and
   `labs/deps.py:LabUser` is what the lab routes authenticate with. The token
   does not expire — a notebook left open over a weekend must still submit — so
-  `lab_tokens.revoked_at` is the only way one ends. Signing out everywhere and
-  the CLI password reset write it beside the sessions they revoke, because both
-  mean "this account's credentials end here"; a routine `change-password` does
-  not, so rotating a password leaves a running notebook alone.
+  `lab_tokens.revoked_at` is the only way one ends, and everything that means
+  "this account's credentials end here" writes it beside the sessions it
+  revokes: signing out everywhere, `change-password`, the CLI password reset,
+  deactivating an account. `change-password` spares the browser that asked and
+  no notebook: a token pasted into a notebook that is shared or committed is the
+  likeliest leak, and the password change is the only recovery a learner reaches
+  without the operator.
 - `crud.py` and `core/sessions.py` stage writes and never commit. The route (or
   CLI command) owns the transaction and commits once, so a password change and
   the session revocation it implies cannot land apart.
@@ -112,8 +115,9 @@ send an `Authorization` header — authenticates over the same cookie for free.
 uv run python -m app.cli reset-password someone@example.com   # prompts, then revokes
                                                               # sessions and lab tokens
 uv run python -m app.cli delete-user someone@example.com      # sessions cascade
-uv run python -m app.cli deactivate-user someone@example.com  # closes the account,
-                                                              # keeps what it wrote
+uv run python -m app.cli deactivate-user someone@example.com  # revokes sessions and
+                                                              # lab tokens, keeps what
+                                                              # it wrote
 uv run python -m app.cli activate-user someone@example.com    # opens it again
 ```
 

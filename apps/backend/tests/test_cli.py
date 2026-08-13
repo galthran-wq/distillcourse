@@ -43,6 +43,9 @@ async def test_a_deactivated_account_cannot_sign_in_and_keeps_what_it_wrote(
     )
     session.add(user_session(user))
     await session.commit()
+    now = datetime.now(UTC)
+    code = await labs.issue_code(session, user.id, now=now)
+    await labs.redeem(session, code.code, now=now)
 
     await cli.set_active(session, email, False)
 
@@ -54,6 +57,10 @@ async def test_a_deactivated_account_cannot_sign_in_and_keeps_what_it_wrote(
 
     await cli.set_active(session, email, True)
     assert user.is_active is True
+    # Reopening the account does not reopen the credentials it was closed over:
+    # the browser signs in again, and so does the notebook.
+    token = await session.scalar(select(LabToken).where(LabToken.user_id == user.id))
+    assert token is not None and token.revoked_at is not None
 
 
 async def test_delete_user_takes_the_sessions_with_it(session: AsyncSession) -> None:

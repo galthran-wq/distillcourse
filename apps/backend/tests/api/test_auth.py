@@ -246,6 +246,27 @@ async def test_change_password_keeps_this_session_and_drops_the_others(
     ).status_code == 200
 
 
+async def test_change_password_unpairs_the_notebooks(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """The browser asking keeps its session; a notebook has none to keep, and a
+    pasted token is the copy of the credential most likely to have leaked."""
+    body = await signup(client)
+    user_id = uuid.UUID(body["id"])
+    now = datetime.now(UTC)
+    code = await labs.issue_code(session, user_id, now=now)
+    await labs.redeem(session, code.code, now=now)
+
+    response = await client.post(
+        f"{AUTH}/change-password",
+        json={"current_password": body["password"], "new_password": "a-new-password"},
+    )
+
+    assert response.status_code == 204
+    token = await session.scalar(select(LabToken).where(LabToken.user_id == user_id))
+    assert token is not None and token.revoked_at is not None
+
+
 async def test_change_password_rejects_a_wrong_current_password(
     client: AsyncClient,
 ) -> None:

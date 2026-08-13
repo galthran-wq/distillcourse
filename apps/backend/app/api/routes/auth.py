@@ -138,4 +138,10 @@ async def change_password(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "incorrect password")
     current.user.hashed_password = get_password_hash(body.new_password)
     await sessions.revoke_user(session, current.user_id, keep=current.token_hash)
+    # No `keep` for the notebooks. This browser is spared because it is the one
+    # asking; a lab token cannot ask, and it is the copy of the credential most
+    # likely to have leaked — pasted into a notebook that gets shared or
+    # committed — while a password change is the only recovery a learner reaches
+    # without the operator.
+    await labs.revoke_all(session, current.user_id, now=datetime.now(UTC))
     await session.commit()
