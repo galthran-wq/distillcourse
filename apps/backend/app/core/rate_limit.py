@@ -10,27 +10,28 @@ class FixedWindow:
     """A per-process fixed-window counter, keyed by whatever the caller counts.
 
     One dict cleared whole when the window turns: no per-key expiry
-    bookkeeping, and memory bounded by the number of keys seen in a minute.
+    bookkeeping, and memory bounded by the number of keys seen in one window.
     Counters are per process, so with N uvicorn workers the effective ceiling
     is N * max_requests — enough to keep credential stuffing and a runaway
     client off a box that has no shared cache to count in.
     """
 
-    def __init__(self, max_requests: int) -> None:
+    def __init__(self, max_requests: int, window: timedelta = WINDOW) -> None:
         self.max_requests = max_requests
+        self.window = window
         self._window_start = datetime.now(UTC)
         self._hits: dict[str, int] = {}
 
     def check(self, key: str) -> None:
         now = datetime.now(UTC)
-        if now - self._window_start >= WINDOW:
+        if now - self._window_start >= self.window:
             self._hits.clear()
             self._window_start = now
         self._hits[key] = self._hits.get(key, 0) + 1
         if self._hits[key] > self.max_requests:
             raise HTTPException(
                 status.HTTP_429_TOO_MANY_REQUESTS,
-                "too many requests, try again in a minute",
+                "too many requests, try again later",
             )
 
     def clear(self) -> None:

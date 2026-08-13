@@ -14,6 +14,7 @@ from app.harness import runner
 from app.harness.limits import LimitExceeded
 from app.harness.prompts import RunKind
 from app.harness.repository import HarnessRepository
+from app.labs import repository as labs
 from app.models import Schedule, User
 from app.review import repository as review
 from app.review import subject
@@ -173,6 +174,7 @@ async def housekeep(session: AsyncSession, now: datetime) -> None:
     the one with a clock of its own."""
     await sessions.delete_expired(session)
     await telegram.prune(session, now)
+    await labs.prune(session, now)
     await session.commit()
 
 
