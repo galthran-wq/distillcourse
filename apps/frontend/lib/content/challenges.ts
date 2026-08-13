@@ -1,13 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parse } from "yaml";
-import { ChallengesFileSchema } from "./schema";
+import { loadYamlFile } from "./load";
+import { ChallengesFileSchema, type LabCheckpointKind } from "./schema";
 
 /**
- * Loader for a lab lesson's `challenges.yaml` — the verification contract the
- * lab build compiles into the student notebook. Only the checkpoint ids are
- * read here; the linter cross-checks them against the display contract in
- * course.yaml, so the page can never promise work the notebook does not check.
+ * Loader for a lab lesson's `challenges.yaml` — the VERIFICATION half of the
+ * contract pair documented on `LabSpecSchema` in schema.ts.
  */
 
 export const CHALLENGES_FILE = "challenges.yaml";
@@ -19,27 +16,24 @@ export function challengesPath(lessonDir: string): string {
 export interface LoadedChallenges {
   /** Declared checkpoint ids, in file order. */
   ids: string[];
+  /** Declared verification kind, per id — absent where the file omits it. */
+  kinds: Map<string, LabCheckpointKind>;
   /** Present but unparsable/invalid; the message the linter reports. */
   error?: string;
   exists: boolean;
 }
 
 export function loadChallenges(lessonDir: string): LoadedChallenges {
-  const path = challengesPath(lessonDir);
-  if (!existsSync(path)) return { ids: [], exists: false };
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(path, "utf8"));
-  } catch (err) {
-    return {
-      ids: [],
-      exists: true,
-      error: `YAML parse error: ${(err as Error).message}`,
-    };
+  const file = loadYamlFile(challengesPath(lessonDir), ChallengesFileSchema);
+  const checkpoints = Object.entries(file.data?.checkpoints ?? {});
+  const kinds = new Map<string, LabCheckpointKind>();
+  for (const [id, checkpoint] of checkpoints) {
+    if (checkpoint.kind !== undefined) kinds.set(id, checkpoint.kind);
   }
-  const parsed = ChallengesFileSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { ids: [], exists: true, error: parsed.error.message };
-  }
-  return { ids: Object.keys(parsed.data.checkpoints), exists: true };
+  return {
+    ids: checkpoints.map(([id]) => id),
+    kinds,
+    error: file.error,
+    exists: file.exists,
+  };
 }

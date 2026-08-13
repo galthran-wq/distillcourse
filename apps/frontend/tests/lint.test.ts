@@ -252,6 +252,27 @@ describe("lintCourse", () => {
     expect(diags[0].message).toContain("why-uniform");
   });
 
+  it("flags a checkpoint kind that disagrees with challenges.yaml (lab-checkpoints)", () => {
+    const dir = brokenCopy((d) =>
+      rewrite(
+        join(d, "lessons/surprisal-lab/challenges.yaml"),
+        "  surprisal:\n    kind: exact",
+        "  surprisal:\n    kind: metric",
+      ),
+    );
+    const diags = errors(lintDir(dir)).filter((d) => d.rule === "lab-checkpoints");
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain('"exact" in course.yaml but "metric"');
+  });
+
+  it("flags an unparsable challenges.yaml (lab-files)", () => {
+    const dir = brokenCopy((d) =>
+      writeFileSync(join(d, "lessons/surprisal-lab/challenges.yaml"), "checkpoints: [a: 1\n"),
+    );
+    const diags = errors(lintDir(dir)).filter((d) => d.rule === "lab-files");
+    expect(diags.map((d) => d.message).join()).toContain("YAML parse error");
+  });
+
   it("flags a duplicate checkpoint id (lab-checkpoints)", () => {
     const dir = brokenCopy((d) =>
       rewrite(join(d, "course.yaml"), "id: why-uniform", "id: surprisal"),

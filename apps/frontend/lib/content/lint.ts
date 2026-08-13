@@ -417,12 +417,7 @@ function lintLessonMdx(
 /** What a lab lesson directory must hold once the lesson is drafted. */
 const LAB_FILES = ["solution.py", CHALLENGES_FILE, "pyproject.toml", "uv.lock"];
 
-/**
- * A lab is verified against two files that must agree: `course.yaml` says
- * what the checkpoints are (display), `challenges.yaml` says how each one is
- * checked (verification). A checkpoint present in one and not the other is
- * either a promise nothing verifies or a check nothing shows.
- */
+/** Holds the two contracts documented on `LabSpecSchema` to each other. */
 function lintLab(
   entry: LoadedLesson,
   coursePath: string,
@@ -485,6 +480,17 @@ function lintLab(
       message: `lab "${lesson.slug}": checkpoint ids differ from course.yaml${
         missing.length > 0 ? ` — only in course.yaml: ${missing.join(", ")}` : ""
       }${extra.length > 0 ? ` — only in ${CHALLENGES_FILE}: ${extra.join(", ")}` : ""}`,
+    });
+  }
+
+  for (const checkpoint of lesson.lab.checkpoints) {
+    const kind = challenges.kinds.get(checkpoint.id);
+    if (kind === undefined || kind === checkpoint.kind) continue;
+    diags.push({
+      level: "error",
+      rule: "lab-checkpoints",
+      file: challengesPath(entry.dir),
+      message: `lab "${lesson.slug}": checkpoint "${checkpoint.id}" is kind "${checkpoint.kind}" in course.yaml but "${kind}" in ${CHALLENGES_FILE}`,
     });
   }
 }

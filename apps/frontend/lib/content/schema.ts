@@ -77,8 +77,9 @@ export const LabCheckpointSchema = z.object({
 /**
  * A lab's DISPLAY contract: what the page and the backend say the lab asks
  * for. The lesson dir's `challenges.yaml` is the VERIFICATION contract, and
- * lint cross-checks that both name the same checkpoints — the page must
- * never promise work the notebook does not check.
+ * lint cross-checks that both agree on the checkpoint ids and kinds — the
+ * page must never promise work the notebook does not check, nor announce a
+ * threshold where the notebook only asks for a written answer.
  */
 export const LabSpecSchema = z.object({
   /** List order is display order. */
@@ -88,12 +89,15 @@ export const LabSpecSchema = z.object({
 });
 
 /**
- * The other side of that pair: the lesson directory's `challenges.yaml`. Only
- * the checkpoint ids are content here — how each one is verified is the lab
- * build's business, what checkpoints exist is this agreement.
+ * The other side of that pair: the lesson directory's `challenges.yaml`. Its
+ * shared surface is the checkpoint id and `kind`; everything else in an entry
+ * is the lab build's business, so entries stay open.
  */
 export const ChallengesFileSchema = z.object({
-  checkpoints: z.record(z.string(), z.unknown()),
+  checkpoints: z.record(
+    z.string(),
+    z.looseObject({ kind: z.enum(LAB_CHECKPOINT_KINDS).optional() }),
+  ),
 });
 
 export const LessonSchema = z.object({
@@ -232,6 +236,7 @@ export const ConceptsFileSchema = z.object({
 export type Outcome = z.infer<typeof OutcomeSchema>;
 export type DemoSpec = z.infer<typeof DemoSpecSchema>;
 export type LabCheckpoint = z.infer<typeof LabCheckpointSchema>;
+export type LabCheckpointKind = (typeof LAB_CHECKPOINT_KINDS)[number];
 export type LabSpec = z.infer<typeof LabSpecSchema>;
 export type ChallengesFile = z.infer<typeof ChallengesFileSchema>;
 export type Lesson = z.infer<typeof LessonSchema>;

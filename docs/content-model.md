@@ -162,14 +162,17 @@ hand-written, never committed (git-ignored).
 
 `lab.checkpoints` is the **display** contract — what the lesson page and the
 backend say the lab asks for. `challenges.yaml` is the **verification**
-contract — how each checkpoint is checked. Lint holds them to the same id
-set, so the page can never promise work the notebook does not check:
+contract — how each checkpoint is checked. Lint holds them to the same id set
+and, where `challenges.yaml` states a `kind` of its own, to the same kind per
+id — so the page can never promise work the notebook does not check, nor
+announce a threshold where the notebook only asks for a written answer:
 
 - `lab-files` — a drafted lab lesson whose directory lacks `solution.py`,
   `challenges.yaml`, `pyproject.toml` or `uv.lock`, or whose
   `challenges.yaml` has no `checkpoints` mapping (error).
-- `lab-checkpoints` — id sets differing between the two files, a duplicate
-  checkpoint id, or a lab whose every checkpoint is optional (error).
+- `lab-checkpoints` — id sets differing between the two files, a `kind` the
+  two files disagree on, a duplicate checkpoint id, or a lab whose every
+  checkpoint is optional (error).
 
 `est_minutes` keeps its usual meaning for a lab: the brief's reading time.
 The assignment's own length is `lab.est_hours`. The checkpoints reach the
