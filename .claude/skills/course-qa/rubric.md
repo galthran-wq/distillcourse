@@ -174,3 +174,106 @@ Score each item PASS / WEAK / FAIL / N-A with quoted evidence.
   apparatus, stable container grammar — never the same box style for
   essential and optional material), not by intensifying adjectives. Flag
   intensifier-marked importance with quotes.
+
+## Lab lessons (`type: lab`)
+
+A lab is a 3–5 hour Jupyter assignment; the MDX is a brief and the teaching
+happens in the notebook. On a lab lesson this section REPLACES the chapter
+items above, except four that still apply to `lesson.mdx`: 1 (opening), 12
+(references, where the brief cites), A1 (placement in the course's argument),
+A3 (hand-off to what follows). Score the remaining chapter items N-A in one
+line, not item by item. Register is scored here, as B6, over the brief and
+the notebook's markdown cells together.
+
+Read in this order: the brief; the `lab` block in `course.yaml` (checkpoint
+list, `text` lines, `required` flags, `est_hours`); the generated
+`labs-dist/public/<course>/<lesson>/lab.ipynb` end to end as the learner —
+scaffold, prose, plots, hints, and nothing else; only then `solution.py` and
+`challenges.yaml`, for what the learner cannot see (cut spans, wrong
+variants, thresholds, rubrics). Reading the solution first is how a reviewer
+misses that the cut version is unsolvable. Where no notebook can be generated
+— a lab that is not a course lesson, such as the lab-author skill's own
+example — read `solution.py` with the marked spans cut by hand instead.
+
+- **B1 — One artifact (required)**: name what exists at the end that did not
+  exist at the start. A tour of disconnected exercises — three unrelated
+  functions sharing a dataset — fails here however good each exercise is.
+- **B2 — Progression (required)**: warm-up `exact` checkpoints (one function,
+  instant verdict) → composition → one open `metric` task last. Name the
+  composition edges: which checkpoint's output is consumed by which later
+  one. No edge is a FAIL — B1 failing again, in the verification contract.
+  On the flags: the open task and any `review` checkpoint are `required:
+  false`; a required checkpoint the hint ladder cannot rescue, or a set where
+  everything is required, is a FAIL. Each `text` line in `course.yaml` names
+  a step of the build ("gradient of the log-loss"), not an ordinal.
+- **B3 — Honest difficulty (required)**: count the blanks and their depth (a
+  vectorized function with a shape contract ≈ 20–40 min; an open modeling
+  task ≈ 1–2 h), total them, and hold the total against `est_hours` and the
+  3–5 h target. Two explicit fails: (a) the Ng floor — a blank that is one
+  line inside a pre-written loop, where the learner transcribes a spec
+  instead of writing the function; quote every one; (b) a difficulty cliff —
+  a step whose depth jumps with no hint ladder (strategy → pseudocode →
+  last-resort snippet) after it. Under ~3 h of honest work is a required fix,
+  and the fix is deeper checkpoints, never more prose.
+- **B4 — Scaffold (required)**: every blank sits behind a fixed signature and
+  a docstring carrying Args/Returns with shapes. Judge the CUT cells: is what
+  surrounds the blank still a map — imports present, call site visible, data
+  in scope, the return contract stated — or did the cut take the argument
+  with it? Free-form cells (no signature, no contract) are legitimate only in
+  the final open task; anywhere else they are a FAIL. Seeding is judged here
+  too: every stochastic step in `solution.py` fixes its seed
+  (`default_rng(seed)`, framework seeds set). The build executes the solution
+  once and captures what it returns as the reference — it never compares two
+  runs — so an unseeded step writes a different `expected` on every rebuild
+  and marks correct answers ✗.
+- **B5 — Feedback (required)**: wherever a canonical bug exists (sign
+  dropped, normalization forgotten, off-by-one in indexing, threshold before
+  the sigmoid), `challenges.yaml` declares a `wrong` variant for that
+  checkpoint. Name each missing one concretely — the bug a learner will write
+  and the checkpoint that will answer it with nothing but ✗. Then read the
+  hints that do exist: a hint names the bug ("lost the minus before the
+  mean") and leaks neither the expected value nor the line to type.
+- **B6 — Prose (required)**: the formula stands immediately before the blank
+  it motivates, in the same cell or the one above; a plain-English
+  restatement precedes every LaTeX block; the dataset arrives with a
+  one-paragraph cover story (what it is, how it was measured, what one row
+  means) before it is used; non-goals are explicit where a library call would
+  dissolve the task. Register is `docs/pedagogy.md`'s — dry, declarative —
+  across the brief and the notebook markdown alike; quote every rhetorical
+  question, tease, or chatty aside.
+- **B7 — Plots as infrastructure (required)**: plotting helpers ship
+  complete — a blanked plotting function is a FAIL, because the learner
+  debugs WITH the plot — and one helper is used to show both the correct
+  shape and a broken one (diverging loss, a flat learning curve), so the
+  learner knows what wrong looks like before they produce it. The `metric`
+  task pairs its score with a plot of the same quantity, drawn from the
+  learner's own results.
+- **B8 — `review` rubrics are gradeable (required)**: for each `review`
+  checkpoint, read the private rubric and ask whether two honest graders
+  could disagree wildly; if they could, it fails. A rubric turning on a
+  keyword ("mentions convexity") or on taste ("a good explanation") fails.
+  It names what a passing answer must establish, admits the alternative
+  routes to it, and fails only clearly off-task answers — a `review`
+  checkpoint is a prompt to think, not a gate.
+
+### What CI already owns (self-test before reporting)
+
+`npm run validate` lints the lab and builds it, which means executing the
+reference solution. It already fails on:
+
+- a missing `solution.py` / `challenges.yaml` / `pyproject.toml` / `uv.lock`;
+  duplicate checkpoint ids; ids or kinds that differ between `course.yaml`
+  and `challenges.yaml`; a lab with no required checkpoint;
+- a solution that errors; an output that will not canonicalize (NaN,
+  infinity, saturating magnitude); a `metric` threshold the reference does
+  not beat by ≥ 0.02; a missing `holdout` file;
+- a solution marker, an output, or cell metadata surviving into `lab.ipynb`;
+  a cut that leaves unparsable code; a dep in `pyproject.toml` missing from
+  `uv.lock`; a model answer reaching the learner or the private artifact.
+
+Determinism is not on that list: validate builds each lab once, so an
+unseeded solution is B4's to catch.
+
+Re-read every line you are about to report: if `npm run validate` would have
+produced it, delete it. QA owns pedagogy; restating a CI finding buys the
+author nothing the build did not already give them.
