@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.labs import DAY, _daily_budgets
 from app.core.rate_limit import FixedWindow
+from app.labs import judge
 from app.models import (
     LabChallenge,
     LabCheckpointState,
@@ -27,6 +28,7 @@ from tests.labs.conftest import (
     VERSION,
     completions,
     post,
+    refusing,
 )
 
 # Every test here is about a lab that exists.
@@ -154,23 +156,24 @@ async def test_only_a_graded_submission_costs_a_day_s_attempt(
     notebook: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The daily budget pays for the work a checkpoint makes the server do, so
-    what the server never grades is free: a retry of an answered id, a notebook
-    from an older build, a checkpoint nobody built."""
+    what the server never grades is free: a notebook from an older build, a
+    checkpoint nobody built, a payload the checkpoint refuses, a judging the
+    platform could not do, and a retry of an id already answered."""
     monkeypatch.setitem(_daily_budgets, "review", FixedWindow(1, window=DAY))
     once = uuid.uuid4()
 
-    first = await post(notebook, "why-uniform", "Because it spreads the mass.", id=once)
-    retried = await post(notebook, "why-uniform", "Because it is flat.", id=once)
     stale = await post(notebook, "why-uniform", "Because.", content_version="f0" * 32)
     unbuilt = await post(notebook, "made-up", "Because.")
+    refused = await post(notebook, "why-uniform", "   ")
+    with judge.agent.override(model=refusing(RuntimeError("openrouter is down"))):
+        pending = await post(notebook, "why-uniform", "Because it is flat.")
+    first = await post(notebook, "why-uniform", "Because it spreads the mass.", id=once)
+    retried = await post(notebook, "why-uniform", "Because it is flat.", id=once)
     spent = await post(notebook, "why-uniform", "Because entropy is concave.")
 
-    assert [r.status_code for r in (first, retried, stale, unbuilt)] == [
-        200,
-        200,
-        409,
-        404,
-    ]
+    assert [r.status_code for r in (stale, unbuilt, refused)] == [409, 404, 400]
+    assert pending.json()["pending"] is True
+    assert [first.status_code, retried.status_code] == [200, 200]
     assert spent.status_code == 429
     # The budget is a day's, so the refusal has to say a day: the notebook
     # client turns this header into the wait it prints, and without it a

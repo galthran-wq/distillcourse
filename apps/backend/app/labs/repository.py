@@ -236,38 +236,48 @@ async def standing(
     return Progress(checkpoints=checkpoints)
 
 
+@dataclass(frozen=True)
+class Budget:
+    """A day's attempts at one checkpoint, as the caller counts them.
+
+    Two calls rather than one because grading a `review` checkpoint is a model
+    call: what bounds a model call has to be spent before it is made, and given
+    back when it turns out nothing was graded.
+    """
+
+    spend: Callable[[str], None]
+    refund: Callable[[str], None]
+
+
 async def submit(
     session: AsyncSession,
     user_id: uuid.UUID,
     posted: Submission,
     *,
     now: datetime,
-    spend: Callable[[str], None] | None = None,
+    budget: Budget | None = None,
 ) -> SubmissionResult:
-    """Grade one posted checkpoint and record what it changed, in one transaction.
+    """Grade one posted checkpoint and record what it changed.
 
     The lock is telemetry's, on the same (learner, lesson) key. It is what makes
-    the duplicate check below a real one — a retry of a submission still in
-    flight waits for it rather than grading the same id twice — and what lets
+    the duplicate check a real one — a retry of a submission still in flight
+    waits for it rather than grading the same id twice — and what lets
     `emit_completion` decide about the completion event alone.
 
-    `spend` is what the checkpoint's kind costs the caller's budget, called
-    once for a submission that is about to be graded and never for one this
-    function answers from the log or turns away.
+    A `review` checkpoint is decided by a model, and nothing that waits on a
+    model may hold that lock or a pooled connection while it does — the harness
+    claims its chat and commits for the same reason. So that one kind is graded
+    between two transactions rather than inside one: the checks below, then the
+    judging with nothing held, then the writing half under the lock again, with
+    the duplicate check asked a second time under it.
+
+    `budget` is what the checkpoint's kind costs the caller, spent before the
+    grading it bounds and given back when nothing was graded.
     """
     await progress.lock(session, user_id, posted.lesson)
-    stored = await session.get(LabSubmission, posted.id)
-    if stored is not None:
-        if (stored.user_id, stored.lesson, stored.checkpoint) != (
-            user_id,
-            posted.lesson,
-            posted.checkpoint,
-        ):
-            raise IdReused("that submission id already answered another checkpoint")
-        return SubmissionResult(
-            **stored.verdict,
-            progress=await _completion(session, user_id, posted.lesson),
-        )
+    answered = await _answered(session, user_id, posted)
+    if answered is not None:
+        return answered
 
     challenge = await session.get(LabChallenge, (posted.lesson, posted.checkpoint))
     if challenge is None:
@@ -277,17 +287,35 @@ async def submit(
             "this lab has been rebuilt since your notebook was generated"
         )
 
-    if spend is not None:
-        spend(challenge.kind)
-    private = challenge.spec["private"]
+    kind, private = challenge.kind, challenge.spec["private"]
+    if budget is not None:
+        budget.spend(kind)
     # A `review` checkpoint is the only kind a comparison cannot answer and the
     # only one that costs the deployment a model call, which is why it is also
     # the only one with anything to record about what answering it spent.
     usage: dict[str, Any] | None = None
-    if challenge.kind == "review":
-        verdict, usage = await judge.grade(session, private, posted.payload)
-    else:
-        verdict = verify.verify(challenge.kind, private, posted.payload)
+    graded = False
+    try:
+        if kind == "review":
+            verdict, usage = await judge.grade(session, private, posted)
+            # `grade` let the lock go to make its call, so this is the second
+            # time of asking: a retry of this id may have been answered whole
+            # while the model was thinking, and that verdict is the one that
+            # stands.
+            await progress.lock(session, user_id, posted.lesson)
+            answered = await _answered(session, user_id, posted)
+            if answered is not None:
+                return answered
+        else:
+            verdict = verify.verify(kind, private, posted.payload)
+        graded = not verdict.pending
+    finally:
+        # The day's attempt buys a judgement, not an attempt at one: a payload
+        # the checkpoint refuses, an outage, a ceiling the deployment has spent
+        # — none of it is the learner's doing, and none of it costs them a
+        # checkpoint they can no longer answer today.
+        if budget is not None and not graded:
+            budget.refund(kind)
     session.add(
         LabSubmission(
             id=posted.id,
@@ -314,6 +342,29 @@ async def submit(
         await review.start(session, user_id, posted.lesson, now)
     await session.commit()
     return SubmissionResult(**asdict(verdict), progress=completion)
+
+
+async def _answered(
+    session: AsyncSession, user_id: uuid.UUID, posted: Submission
+) -> SubmissionResult | None:
+    """The verdict this submission id already earned, if it has one.
+
+    The notebook mints the id, so this is an idempotency key: a post retried
+    over a dropped connection is told what the first one decided, and the same
+    id answering a second checkpoint is a client bug rather than a retry.
+    """
+    stored = await session.get(LabSubmission, posted.id)
+    if stored is None:
+        return None
+    if (stored.user_id, stored.lesson, stored.checkpoint) != (
+        user_id,
+        posted.lesson,
+        posted.checkpoint,
+    ):
+        raise IdReused("that submission id already answered another checkpoint")
+    return SubmissionResult(
+        **stored.verdict, progress=await _completion(session, user_id, posted.lesson)
+    )
 
 
 async def _record_attempt(
@@ -348,7 +399,13 @@ async def _record_attempt(
                 "best_score": func.greatest(
                     LabCheckpointState.best_score, statement.excluded.best_score
                 ),
-                "feedback": statement.excluded.feedback,
+                # A judging that never happened has nothing to say, and what
+                # the page shows is the last thing that was actually decided.
+                "feedback": (
+                    LabCheckpointState.feedback
+                    if verdict.pending
+                    else statement.excluded.feedback
+                ),
             },
         )
     )

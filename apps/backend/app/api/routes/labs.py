@@ -36,8 +36,8 @@ _codes = register(FixedWindow(CODES_PER_HOUR, window=timedelta(hours=1)))
 _redeems = register(FixedWindow(REDEEMS_PER_MINUTE))
 _submissions = register(FixedWindow(SUBMISSIONS_PER_MINUTE))
 # The two kinds that cost the server real work, budgeted per checkpoint per
-# day and spent by `repository.submit` at the moment it grades. An `exact`
-# checkpoint is a comparison and needs no budget of its own.
+# day and charged by `repository.submit` for what it actually grades. An
+# `exact` checkpoint is a comparison and needs no budget of its own.
 _daily_budgets = {
     "metric": register(FixedWindow(settings.LAB_METRIC_ATTEMPTS_PER_DAY, window=DAY)),
     "review": register(FixedWindow(settings.LAB_REVIEW_ATTEMPTS_PER_DAY, window=DAY)),
@@ -124,18 +124,29 @@ async def submissions(
     posted: Submission, user: LabUser, session: SessionDep
 ) -> SubmissionResult:
     _submissions.check(str(user.id))
+    # A day's attempts at this one checkpoint, spent by `submit` before the
+    # grading it bounds and given back when nothing was graded: a retry of an
+    # id already answered, a payload the checkpoint refuses and a judging the
+    # platform could not do all cost the learner nothing.
+    key = f"{user.id}:{posted.lesson}:{posted.checkpoint}"
 
     def spend(kind: str) -> None:
-        """A day's attempt at this checkpoint, charged by `submit` for the
-        submission it is about to grade — a retry of an id already answered and
-        a submission nothing grades cost the learner nothing."""
         budget = _daily_budgets.get(kind)
         if budget is not None:
-            budget.check(f"{user.id}:{posted.lesson}:{posted.checkpoint}")
+            budget.check(key)
+
+    def refund(kind: str) -> None:
+        budget = _daily_budgets.get(kind)
+        if budget is not None:
+            budget.refund(key)
 
     try:
         return await repository.submit(
-            session, user.id, posted, now=datetime.now(UTC), spend=spend
+            session,
+            user.id,
+            posted,
+            now=datetime.now(UTC),
+            budget=repository.Budget(spend=spend, refund=refund),
         )
     except repository.UnknownCheckpoint as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc))

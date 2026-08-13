@@ -216,8 +216,8 @@ re-model the Telegram thread.
 Caps are enforcement, not telemetry: messages per user per day, an
 instance-wide monthly ceiling computed from the cost recorded on every run and
 on every judged lab submission, web searches per user per day, and memory
-writes per run. Set a spend limit on
-the OpenRouter key too — that one holds even if this code is wrong.
+writes per run. Set a spend limit on the OpenRouter key too — that one holds
+even if this code is wrong.
 
 ## The tutor's tools
 
@@ -519,13 +519,13 @@ memory, and only then a vector tier.
 ## Labs
 
 A lab is a lesson the learner solves in their own Jupyter. The server executes
-nothing they or the author wrote: `app/labs/verify.py` compares a posted
-output against the one the build captured from the reference solution or
-scores predictions against labels the learner never sees, and `app/labs/judge.py`
-hands a written answer to a model. Three tables, keyed by the same lesson locator as everything
-else: `lab_challenges` (the answer key, per checkpoint), `lab_checkpoint_state`
-(attempts, first pass, best score, the last hint) and `lab_submissions` (the
-append-only log).
+nothing they or the author wrote: `app/labs/verify.py` compares a posted output
+against the one the build captured from the reference solution or scores
+predictions against labels the learner never sees, and `app/labs/judge.py` hands
+a written answer to a model. Three tables, keyed by the same lesson locator as
+everything else: `lab_challenges` (the answer key, per checkpoint),
+`lab_checkpoint_state` (attempts, first pass, best score, the last hint) and
+`lab_submissions` (the append-only log).
 
 ```
 GET  /labs/{course}/{lesson}/manifest    # public: what the notebook computes on
@@ -557,22 +557,34 @@ GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
   `{passed, feedback}` back. It is lenient by instruction — a `review`
   checkpoint is `required: false` unless an author says otherwise, and the
   value is the sentence rather than the gate. Anything that stops it
-  answering — an outage, output that will not validate twice, a spent monthly
+  answering — an outage, a call that never comes back inside
+  `judge.TIMEOUT_SECONDS`, output that will not validate twice, a spent monthly
   ceiling — leaves the submission `pending` rather than failing the learner,
   and what the call cost is stored on `lab_submissions.usage`, the second row
-  that ceiling sums.
+  that ceiling sums. A pending verdict overwrites nothing: the feedback the
+  page shows is the last judgement that actually happened.
+- The call is made between two transactions, never inside one. `submit` runs
+  its checks under the per-(learner, lesson) lock, commits to hand back both
+  the lock and the pooled connection, judges with nothing held, then takes the
+  lock again to write — asking a second time whether this submission id has
+  been answered, because a retry of it may have finished while the model was
+  thinking. A judging that hangs must not be able to block this learner's
+  telemetry flush or starve the connection pool, which is why the harness
+  claims its chat and commits before running a model too.
 - Passing every `required` checkpoint finishes the lesson: the same
-  `lesson_completed` event reading one emits (`telemetry.ingest.emit_completion`)
-  and the same review ladder, under the same per-(learner, lesson) advisory
-  lock, so two submissions landing together finish it once. `lesson_progress`
-  is re-derived in that transaction too, because it is the projection every
-  reader of completion outside telemetry consults and a lab has no flush of
-  its own coming.
+  `lesson_completed` event reading one emits
+  (`telemetry.ingest.emit_completion`) and the same review ladder, under the
+  same per-(learner, lesson) advisory lock, so two submissions landing together
+  finish it once. `lesson_progress` is re-derived in that transaction too,
+  because it is the projection every reader of completion outside telemetry
+  consults and a lab has no flush of its own coming.
 - Rate limits: 60 submissions a minute per learner, and per checkpoint per day
   `LAB_METRIC_ATTEMPTS_PER_DAY` / `LAB_REVIEW_ATTEMPTS_PER_DAY` for the two
-  kinds that cost the server real work. The day's attempt is charged where it
-  is earned — at the grading — so a retried id, a stale `content_version` and
-  a checkpoint nobody built cost the learner nothing.
+  kinds that cost the server real work. The day's attempt is spent before the
+  grading it bounds — what bounds a model call has to be — and given back when
+  nothing was graded, so a retried id, a stale `content_version`, a checkpoint
+  nobody built, a payload the checkpoint refuses and a judging the platform
+  could not do all cost the learner nothing.
 
 ## Telemetry
 

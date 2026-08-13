@@ -40,6 +40,17 @@ class FixedWindow:
                 headers={"Retry-After": str(ceil(wait.total_seconds()))},
             )
 
+    def refund(self, key: str) -> None:
+        """Give back a hit whose work never happened.
+
+        For a budget that has to be spent before the work it bounds — a model
+        call — rather than after it. Guarded rather than trusted: the window may
+        have turned since the hit was counted, and a key must never be owed an
+        attempt it never made.
+        """
+        if self._hits.get(key):
+            self._hits[key] -= 1
+
     def clear(self) -> None:
         self._hits.clear()
         self._window_start = datetime.now(UTC)
