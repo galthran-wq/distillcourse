@@ -24,6 +24,7 @@ from app.models import (
     Document,
     LabChallenge,
     LabCheckpointState,
+    LabDeviceCode,
     LabPairingCode,
     LabSubmission,
     LabToken,
@@ -90,6 +91,85 @@ async def redeem(session: AsyncSession, code: str, *, now: datetime) -> str:
     return token
 
 
+class DevicePending(Exception):
+    """The learner has not clicked Approve yet; the notebook asks again."""
+
+
+class DeviceGone(Exception):
+    """Nothing more will come of this code, in words the learner is told."""
+
+
+async def issue_device(session: AsyncSession, *, now: datetime) -> LabDeviceCode:
+    """A pairing the notebook starts, before anyone has signed in for it.
+
+    Unauthenticated on purpose — the caller is a kernel with no session — so
+    the row binds nobody until an approval does. Whoever holds the string can
+    only ever approve it onto their own account, which is why creating one is
+    rate-limited rather than guarded.
+    """
+    row = LabDeviceCode(
+        code=secrets.token_urlsafe(CODE_BYTES), expires_at=now + CODE_TTL
+    )
+    session.add(row)
+    await session.commit()
+    return row
+
+
+async def approve_device(
+    session: AsyncSession, code: str, user_id: uuid.UUID, *, now: datetime
+) -> None:
+    """Bind the signed-in learner to a pairing their notebook started.
+
+    First approval wins and is the only one: a code that already names an
+    account is refused whoever asks — including that same account — so a spent
+    code cannot be re-pointed while the notebook is still polling for it.
+    """
+    row = await session.scalar(
+        select(LabDeviceCode).where(LabDeviceCode.code == code).with_for_update()
+    )
+    if row is None:
+        raise PairingRejected("that code is not one of ours")
+    if row.expires_at <= now:
+        raise PairingRejected("that code has expired")
+    if row.user_id is not None:
+        raise PairingRejected("that code has already been approved")
+    row.user_id = user_id
+    await session.commit()
+
+
+async def poll_device(session: AsyncSession, code: str, *, now: datetime) -> str:
+    """The notebook asking whether its approval has happened yet.
+
+    The token is minted here, in the request that carries it away, rather than
+    at approval: the raw string has to reach the notebook in some response, and
+    minting it in that one is what keeps it out of the database. What approval
+    left behind is `user_id`; what the release leaves behind is the token's
+    hash, which is also the mark that makes this a one-time answer.
+
+    The row is locked without `skip_locked`, unlike `redeem`: the only
+    contender is the same code polled or approved twice at once, and the loser
+    must see what the winner wrote — a released code, an approval — rather than
+    be told the code does not exist.
+    """
+    row = await session.scalar(
+        select(LabDeviceCode).where(LabDeviceCode.code == code).with_for_update()
+    )
+    if row is None:
+        raise PairingRejected("that code is not one of ours")
+    if row.approved_token_hash is not None:
+        raise DeviceGone("that code has already delivered its token")
+    if row.expires_at <= now:
+        raise DeviceGone("the approval expired — run distill.login() again")
+    if row.user_id is None:
+        raise DevicePending
+    token = secrets.token_urlsafe(TOKEN_BYTES)
+    hashed = token_hash(token)
+    session.add(LabToken(token_hash=hashed, user_id=row.user_id))
+    row.approved_token_hash = hashed
+    await session.commit()
+    return token
+
+
 async def authenticate(
     session: AsyncSession, token: str, *, now: datetime
 ) -> User | None:
@@ -126,6 +206,7 @@ async def prune(session: AsyncSession, now: datetime) -> None:
     """Codes nothing will read again. Uncommitted: this is one sweep of the
     poller's housekeeping pass, which commits them together."""
     await session.execute(delete(LabPairingCode).where(LabPairingCode.expires_at < now))
+    await session.execute(delete(LabDeviceCode).where(LabDeviceCode.expires_at < now))
 
 
 class UnknownCheckpoint(Exception):

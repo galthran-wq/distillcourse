@@ -16,10 +16,12 @@ from pydantic import BaseModel
 from app.labs.schemas import (
     CheckpointProgress,
     Completion,
+    Device,
     Manifest,
     ManifestCheckpoint,
     Submission,
     SubmissionResult,
+    Token,
 )
 from tests.labs.conftest import DECLARED, SPECS
 from tests.labs.test_ingest import ARTIFACT
@@ -36,6 +38,8 @@ def fields(model: type[BaseModel]) -> set[str]:
 
 
 def test_every_message_the_notebook_exchanges_has_the_pinned_fields() -> None:
+    assert fields(Device) == set(SHAPES["device"])
+    assert fields(Token) == set(SHAPES["token"])
     assert fields(Manifest) == set(SHAPES["manifest"])
     assert fields(ManifestCheckpoint) == set(SHAPES["manifest_checkpoint"])
     assert fields(Submission) == set(SHAPES["submission"])

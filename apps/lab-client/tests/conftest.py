@@ -24,6 +24,16 @@ LESSON = f"lesson:{LAB}"
 VERSION = "a1" * 32
 TOKEN = "the-long-lived-bearer-token"
 CODE = "K7xR2mQ9pLw4"
+DEVICE_CODE = "dQ4nXw8pR2mL"
+
+# The two device-flow answers, module-level so `test_wire` can hold their
+# shapes to the same pinned file the real API's suite is held to.
+DEVICE = {
+    "code": DEVICE_CODE,
+    "approve_url": f"{HOST}/labs/pair/{DEVICE_CODE}",
+    "expires_at": "2026-08-14T12:10:00Z",
+}
+TOKEN_ANSWER = {"token": TOKEN}
 
 INPUTS_CODE = "p = rng.random(4)\ninputs = (p,)\n"
 ATOL = 1e-06
@@ -93,6 +103,11 @@ class Server:
         self.answer: dict[str, Any] = verdict()
         self.refusal: httpx.Response | None = None
         self.unreachable = False
+        # The device flow's script: how many polls answer "not yet" before the
+        # token, and a refusal that pre-empts the poll entirely (an expiry).
+        self.polls_before_approval = 0
+        self.device_refusal: httpx.Response | None = None
+        self._device_polls = 0
 
     def spec(self, checkpoint: str) -> dict[str, Any]:
         """The public half of one checkpoint, to edit before `open_lab`."""
@@ -107,7 +122,16 @@ class Server:
         if self.refusal is not None:
             return self.refusal
         if request.url.path.endswith("/pair"):
-            return httpx.Response(200, json={"token": TOKEN})
+            return httpx.Response(200, json=TOKEN_ANSWER)
+        if request.url.path.endswith("/labs/device"):
+            return httpx.Response(201, json=DEVICE)
+        if f"/labs/device/{DEVICE_CODE}" in request.url.path:
+            if self.device_refusal is not None:
+                return self.device_refusal
+            self._device_polls += 1
+            if self._device_polls <= self.polls_before_approval:
+                return httpx.Response(428, json={"detail": "not approved yet"})
+            return httpx.Response(200, json=TOKEN_ANSWER)
         if request.url.path.endswith("/manifest"):
             return httpx.Response(200, json=self.manifest)
         self.bearers.append(request.headers.get("authorization"))

@@ -189,8 +189,9 @@ function Checkpoint({
 }
 
 /**
- * What pairs a notebook with this account: a code issued here and pasted
- * there. Same shape as the Telegram code in the settings — one press, the
+ * The paste fallback for pairing: a code issued here and typed into
+ * `distill.login("…")` when the approval link the notebook prints is not an
+ * option. Same shape as the Telegram code in the settings — one press, the
  * string on screen, and what it is for beside it.
  */
 function NotebookCode() {
@@ -238,8 +239,9 @@ function NotebookCode() {
             {code.code}
           </button>
           <span className="text-sm text-faint">
-            {copied ? "Copied. " : ""}Paste it into the notebook&apos;s login cell,
-            between the quotes in <code>distill.login(...)</code>; it expires at{" "}
+            {copied ? "Copied. " : ""}Run <code>distill.login(&quot;…&quot;)</code>{" "}
+            with it in the notebook — the fallback when the login cell&apos;s
+            approval link is not an option; it expires at{" "}
             {new Date(code.expires_at).toLocaleTimeString()}.
           </span>
         </p>

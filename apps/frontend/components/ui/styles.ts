@@ -68,6 +68,14 @@ export const FIELD_LABEL_CLASS = "mb-1 block text-soft";
 export const LABEL_CLASS = "font-mono text-[11px] uppercase tracking-wider text-faint";
 
 /**
+ * A boxed message for something the server refused — the auth card's, the
+ * approval page's. Spacing around it is the caller's, as everywhere here; so
+ * is `role="alert"`, which is about when it appears, not how it looks.
+ */
+export const ALERT_CLASS =
+  "rounded-sm border border-accent/40 bg-accent/10 px-3 py-2 text-[13px] text-accent";
+
+/**
  * The surface anything that opens over the page is drawn on — a menu, the
  * preview of a referenced passage. It opens out of the corner it hangs from,
  * which is the caller's to name along with where it hangs; closing it is

@@ -10,7 +10,7 @@ from app import crud
 from app.core.db import engine
 from app.core.sessions import token_hash
 from app.labs import repository
-from app.models import LabPairingCode, LabToken, User
+from app.models import LabDeviceCode, LabPairingCode, LabToken, User
 
 NOW = datetime.now(UTC)
 
@@ -78,6 +78,74 @@ async def test_the_codes_nothing_will_read_are_pruned(
     assert [row.code for row in await session.scalars(select(LabPairingCode))] == [
         fresh
     ]
+
+
+async def test_an_approved_device_code_releases_one_token_and_only_one(
+    session: AsyncSession, user: User
+) -> None:
+    code = (await repository.issue_device(session, now=NOW)).code
+
+    with pytest.raises(repository.DevicePending):
+        await repository.poll_device(session, code, now=NOW)
+
+    await repository.approve_device(session, code, user.id, now=NOW)
+    token = await repository.poll_device(session, code, now=NOW)
+
+    assert await repository.authenticate(session, token, now=NOW) == user
+    row = await session.get(LabDeviceCode, code)
+    # The release left the hash behind, never the raw string.
+    assert row is not None and row.approved_token_hash == token_hash(token)
+    with pytest.raises(repository.DeviceGone, match="already delivered"):
+        await repository.poll_device(session, code, now=NOW)
+
+
+async def test_an_expired_device_code_neither_approves_nor_releases(
+    session: AsyncSession, user: User
+) -> None:
+    late = NOW + repository.CODE_TTL + timedelta(minutes=1)
+    code = (await repository.issue_device(session, now=NOW)).code
+
+    with pytest.raises(repository.PairingRejected, match="expired"):
+        await repository.approve_device(session, code, user.id, now=late)
+    with pytest.raises(repository.DeviceGone, match="expired"):
+        await repository.poll_device(session, code, now=late)
+    assert await session.scalar(select(LabToken)) is None
+
+
+async def test_a_device_code_is_approved_at_most_once(
+    session: AsyncSession, user: User, other_user: User
+) -> None:
+    """First approval wins, and a spent code cannot be re-pointed — not by a
+    second account, not by the one that approved it."""
+    code = (await repository.issue_device(session, now=NOW)).code
+    await repository.approve_device(session, code, user.id, now=NOW)
+
+    for approver in (other_user, user):
+        with pytest.raises(repository.PairingRejected, match="already been approved"):
+            await repository.approve_device(session, code, approver.id, now=NOW)
+
+    assert (
+        await repository.authenticate(
+            session, await repository.poll_device(session, code, now=NOW), now=NOW
+        )
+        == user
+    )
+
+
+async def test_a_device_code_nobody_issued_is_refused(session: AsyncSession) -> None:
+    with pytest.raises(repository.PairingRejected, match="not one of ours"):
+        await repository.poll_device(session, "made-up", now=NOW)
+
+
+async def test_the_device_codes_nothing_will_read_are_pruned(
+    session: AsyncSession,
+) -> None:
+    await repository.issue_device(session, now=NOW - 2 * repository.CODE_TTL)
+    fresh = (await repository.issue_device(session, now=NOW)).code
+
+    await repository.prune(session, NOW)
+
+    assert [row.code for row in await session.scalars(select(LabDeviceCode))] == [fresh]
 
 
 async def test_a_deleted_learner_takes_their_codes_and_tokens_with_them(

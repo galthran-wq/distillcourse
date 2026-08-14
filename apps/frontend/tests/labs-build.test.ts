@@ -175,12 +175,11 @@ describe.skipIf(!hasUv)("lab build", () => {
     expect(text(setup)).toContain("#subdirectory=client");
     expect(text(setup)).toContain("!wget -q -O data/holdout.csv");
     expect(text(setup)).toContain('distill.open_lab("lint-course/surprisal-lab")');
-    // Pairing has a cell of its own to paste into: the code the lesson page
-    // issues is not Python, and there is nowhere else it goes.
+    // Pairing has a cell of its own: it fails and is re-run on its own
+    // occasions, and it ships ready to run — no placeholder to edit.
     expect(login.cell_type).toBe("code");
-    expect(text(login)).toContain(
-      'distill.login("PASTE-THE-CODE-FROM-THE-LESSON-PAGE")',
-    );
+    expect(text(login)).toContain("distill.login()");
+    expect(text(login)).not.toContain("PASTE");
 
     const body = notebook.cells.map(text).join("\n");
     expect(body.match(/# YOUR CODE HERE/g)).toHaveLength(3);

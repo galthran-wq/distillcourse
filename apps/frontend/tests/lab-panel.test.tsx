@@ -240,10 +240,9 @@ describe("the lab panel", () => {
     await act(async () => press(host, "Code for the notebook"));
 
     expect(host.textContent).toContain("K7xR2mQ9pLw4");
-    // Named for the cell the generated notebook actually carries: pasting a
-    // pairing code into the setup cell is a SyntaxError.
-    expect(host.textContent).toContain("login cell");
-    expect(host.textContent).toContain("distill.login(...)");
+    // Said as the call to make: the generated login cell is `distill.login()`
+    // with no argument, so the code goes into a call the learner types.
+    expect(host.textContent).toContain('distill.login("…")');
 
     await act(async () => press(host, "K7xR2mQ9pLw4"));
 

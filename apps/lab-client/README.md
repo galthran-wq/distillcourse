@@ -11,21 +11,29 @@ distill.open_lab("<course>/<lesson>")
 ```
 
 `open_lab` needs no account: it fetches the lab's manifest, which is public.
-Submitting does, and the lesson page issues the code for it — which is the
-notebook's second generated cell, and the only one a learner edits by hand:
+Submitting does, and pairing is the notebook's second generated cell:
 
 ```python
-distill.login("<the code from the lesson page>")
+distill.login()
 ```
 
-The token that code buys lives in the kernel and nowhere else — not printed,
+With no argument it prints an approval link — open it in the browser you are
+signed in on, click Approve, and the cell finishes on its own within a few
+seconds. `distill.login("<code>")` with a code from the lesson page is the
+fallback for a learner with no signed-in browser to click from.
+
+A token already at hand skips pairing entirely, in this order: `DISTILL_TOKEN`
+in the environment; the same name stored as a Colab Secret (the Secrets panel
+is write-only from outside — this client never puts one there); then the
+approval flow; then an explicit code.
+
+The token pairing buys lives in the kernel and nowhere else — not printed,
 not written to disk, gone when the runtime restarts. It is also ended by the
 account: changing your password or signing out everywhere revokes every
-notebook pairing, and the next checkpoint says so. Pair again after either, or
-set `DISTILL_TOKEN` to a token of your own; `DISTILL_API` points
-the client at a backend other than `https://distillcourse.com`. Both are read
-when a request is made, so setting either in a cell below `import distill`
-works.
+notebook pairing, and the next checkpoint says so. Pair again after either.
+`DISTILL_API` points the client at a backend other than
+`https://distillcourse.com`; like `DISTILL_TOKEN` it is read when a request is
+made, so setting either in a cell below `import distill` works.
 
 ## Checkpoints
 
