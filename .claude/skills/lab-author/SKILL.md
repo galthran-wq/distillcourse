@@ -107,7 +107,14 @@ rm -rf distill.py captured.json .venv               # when done
 - The "reference → analogous" device earns its place: give one class fully
   working ("no need to change anything"), ask for the sibling by analogy.
 - Formula immediately before the blank it motivates; plain-English
-  restatement before LaTeX; dataset gets a one-paragraph cover story.
+  restatement before LaTeX; dataset gets a one-paragraph cover story WITH a
+  source citation. Scope the formula rule: it covers definitions and
+  objectives, never the blank's own answer — where the derivation IS the
+  checkpoint (interview-prep labs above all), print the objective and let
+  the finite-difference referee judge the derived gradient. A printed
+  closed form turns the checkpoint into transcription (found the hard way
+  in the first lab: the gradient formula sat one cell above the gradient
+  blank).
 - Explicit non-goals in task text ("do not call sklearn's vectorizer here —
   debugging with it is fine").
 - Hints as a ladder after hard tasks: strategy → pseudocode → last-resort
