@@ -224,6 +224,11 @@ export default async function CoursePage({
                           extra
                         </span>
                       )}
+                      {lesson.type === "lab" && (
+                        <span className="rounded-sm border border-accent/40 px-1.5 py-0.5 text-accent">
+                          lab
+                        </span>
+                      )}
                       {readable ? (
                         <>
                           {previewMode() && lesson.status !== "published" && (
@@ -231,7 +236,11 @@ export default async function CoursePage({
                               {lesson.status}
                             </span>
                           )}
-                          <span>{lesson.est_minutes} min</span>
+                          <span>
+                            {lesson.lab !== undefined
+                              ? `~${lesson.lab.est_hours} h`
+                              : `${lesson.est_minutes} min`}
+                          </span>
                         </>
                       ) : (
                         <span>planned</span>
