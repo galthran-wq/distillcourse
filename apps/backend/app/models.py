@@ -445,6 +445,31 @@ class LabPairingCode(Base):
     )
 
 
+class LabDeviceCode(Base):
+    """A pairing the notebook starts: the code names an approval the learner
+    clicks through in a signed-in browser, not a string they copy.
+
+    Created unauthenticated, so `user_id` is whoever approved it — NULL until
+    someone does. `approved_token_hash` is stamped when the poll that finds the
+    approval mints the token: it marks the one release, after which the code
+    answers nothing. The raw token exists only in the poll response that
+    carries it to the notebook; this row keeps `sha256(token)`, as `lab_tokens`
+    does.
+    """
+
+    __tablename__ = "lab_device_codes"
+
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, default=None
+    )
+    approved_token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, default=None)
+
+
 class LabToken(Base):
     """What a paired notebook authenticates its checkpoint calls with.
 

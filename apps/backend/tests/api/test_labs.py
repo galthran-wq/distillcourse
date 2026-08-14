@@ -4,11 +4,15 @@ from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes.labs import CODES_PER_HOUR
+from app.api.routes.labs import (
+    CODES_PER_HOUR,
+    DEVICE_CODES_PER_HOUR,
+    DEVICE_POLLS_PER_MINUTE,
+)
 from app.core.config import settings
 from app.core.sessions import token_hash
 from app.labs import repository
-from app.models import LabPairingCode, LabToken, User
+from app.models import LabDeviceCode, LabPairingCode, LabToken, User
 
 LABS = f"{settings.API_V1_STR}/labs"
 
@@ -75,3 +79,69 @@ async def test_code_issuance_is_rate_limited(signed_in: AsyncClient) -> None:
         assert (await signed_in.post(f"{LABS}/pairing-code")).status_code == 201
 
     assert (await signed_in.post(f"{LABS}/pairing-code")).status_code == 429
+
+
+async def test_a_notebook_walks_the_device_flow_end_to_end(
+    signed_in: AsyncClient, session: AsyncSession, user: User
+) -> None:
+    """`signed_in` plays both parties: the routes the notebook calls take no
+    auth, so the cookie it also carries only matters at the approval."""
+    started = await signed_in.post(f"{LABS}/device")
+    assert started.status_code == 201
+    body = started.json()
+    code = body["code"]
+    assert body["approve_url"] == f"{settings.FRONTEND_HOST}/labs/pair/{code}"
+    assert datetime.fromisoformat(body["expires_at"]) > datetime.now(UTC)
+
+    pending = await signed_in.get(f"{LABS}/device/{code}")
+    assert pending.status_code == 428
+
+    assert (await signed_in.post(f"{LABS}/device/{code}/approve")).status_code == 204
+
+    released = await signed_in.get(f"{LABS}/device/{code}")
+    assert released.status_code == 200
+    token = released.json()["token"]
+    stored = await session.scalar(
+        select(LabToken).where(LabToken.token_hash == token_hash(token))
+    )
+    assert stored is not None and stored.user_id == user.id
+    # The raw token went out exactly once; from here the code is spent.
+    assert (await signed_in.get(f"{LABS}/device/{code}")).status_code == 410
+
+
+async def test_an_anonymous_visitor_cannot_approve(client: AsyncClient) -> None:
+    code = (await client.post(f"{LABS}/device")).json()["code"]
+
+    assert (await client.post(f"{LABS}/device/{code}/approve")).status_code == 401
+
+
+async def test_an_expired_device_code_answers_gone(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    code = (await client.post(f"{LABS}/device")).json()["code"]
+    await session.execute(update(LabDeviceCode).values(expires_at=datetime.now(UTC)))
+    await session.commit()
+
+    expired = await client.get(f"{LABS}/device/{code}")
+
+    assert expired.status_code == 410
+    assert "distill.login()" in expired.json()["detail"]
+
+
+async def test_device_issuance_is_rate_limited(client: AsyncClient) -> None:
+    for _ in range(DEVICE_CODES_PER_HOUR):
+        assert (await client.post(f"{LABS}/device")).status_code == 201
+
+    assert (await client.post(f"{LABS}/device")).status_code == 429
+
+
+async def test_device_polling_is_rate_limited_per_code(client: AsyncClient) -> None:
+    code = (await client.post(f"{LABS}/device")).json()["code"]
+
+    for _ in range(DEVICE_POLLS_PER_MINUTE):
+        assert (await client.get(f"{LABS}/device/{code}")).status_code == 428
+
+    assert (await client.get(f"{LABS}/device/{code}")).status_code == 429
+    # The window is the code's, not the endpoint's: another notebook's wait is
+    # not spent by this one's looping.
+    assert (await client.get(f"{LABS}/device/other")).status_code == 404

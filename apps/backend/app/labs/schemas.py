@@ -19,6 +19,29 @@ Checkpoint = Annotated[
 ContentVersion = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
+class Redemption(BaseModel):
+    """A pairing code posted back by the notebook that was handed it."""
+
+    code: str
+
+
+class Token(BaseModel):
+    """The one response a raw lab token ever rides in — redeeming a pairing
+    code, or the device poll that found its approval."""
+
+    token: str
+
+
+class Device(BaseModel):
+    """What starting a device pairing hands the notebook: the code it will
+    poll, and the URL the learner approves at — built server-side so the
+    client needs no idea how the site's routes are laid out."""
+
+    code: str
+    approve_url: str
+    expires_at: datetime
+
+
 class Submission(BaseModel):
     """One posted attempt at one checkpoint."""
 

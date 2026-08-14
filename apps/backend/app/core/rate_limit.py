@@ -73,7 +73,7 @@ _signup_and_login = register(FixedWindow(MAX_REQUESTS))
 
 
 def rate_limit(request: Request) -> None:
-    _signup_and_login.check(_client_address(request))
+    _signup_and_login.check(client_address(request))
 
 
 def reset() -> None:
@@ -81,7 +81,7 @@ def reset() -> None:
         limiter.clear()
 
 
-def _client_address(request: Request) -> str:
+def client_address(request: Request) -> str:
     # The last entry, not the first: it is the one the proxy in front of us
     # appended, while everything to its left is whatever the client chose to
     # send. caddy discards a client-sent X-Forwarded-For outright, and this
