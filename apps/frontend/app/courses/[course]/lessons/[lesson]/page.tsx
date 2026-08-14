@@ -191,7 +191,11 @@ export default async function LessonPage({
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[12px] text-faint">
                 <span className="text-soft">{lesson.goal}</span>
-                <span>~{lesson.est_minutes} min</span>
+                <span>
+                  {lesson.lab !== undefined
+                    ? `~${lesson.lab.est_hours} h`
+                    : `~${lesson.est_minutes} min`}
+                </span>
                 <BookmarkToggle />
               </div>
             </header>
