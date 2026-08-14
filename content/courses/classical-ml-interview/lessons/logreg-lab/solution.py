@@ -54,7 +54,7 @@ assert np.allclose(sigmoid(np.array([-3.0, 3.0])), 1 - sigmoid(np.array([3.0, -3
 distill.check("sigmoid", sigmoid)
 
 # %% [markdown]
-# ## 2. Log-loss, without blowing up
+# ## 2. A numerically stable log-loss
 #
 # The loss is the negative mean log-likelihood of a Bernoulli model — the
 # further your predicted probability is from the label, the more you pay:
@@ -103,14 +103,14 @@ distill.check("log-loss", log_loss)
 # %% [markdown]
 # ## 3. The gradient
 #
-# Differentiating the loss gives the cleanest gradient in classical ML — the
-# same shape as least squares, with the residual $p - y$:
-#
-# $$\nabla_w L = \frac{1}{n} X^\top (p - y), \qquad
-# \frac{\partial L}{\partial b} = \frac{1}{n}\sum_i (p_i - y_i)$$
-#
-# (The derivation is in the logistic-regression lesson: the $\sigma'$ factor
-# cancels against the log's derivative.)
+# Now differentiate the loss with respect to $w$ and $b$ — **on paper, from
+# scratch**. This is the derivation interviewers actually ask for, so no
+# formula is printed here. Two honest checks are below you: the
+# finite-difference referee in the next cell will expose an analytic gradient
+# that disagrees with your own loss, and the server compares against the
+# reference. The result simplifies sharply — the $\sigma'$ factor is supposed
+# to cancel; if yours still carries it, keep simplifying. The lesson has the
+# worked derivation to verify against afterwards.
 
 # %%
 def grad(w, b, X, y):
@@ -205,13 +205,15 @@ distill.check("fit-gd", fit)
 # ## 5. L2 regularization
 #
 # On separable data the likelihood pushes $\|w\| \to \infty$; the fix from the
-# lesson is a penalty on the weights. Combined objective and its gradient:
+# lesson is a penalty on the weights. The objective:
 #
-# $$L_{\lambda}(w, b) = L(w, b) + \lambda \|w\|^2, \qquad
-# \nabla_w L_\lambda = \nabla_w L + 2\lambda w$$
+# $$L_{\lambda}(w, b) = L(w, b) + \lambda \|w\|^2$$
 #
-# The intercept is **not** penalized: $b$ absorbs the base rate of the
-# positive class and says nothing about model complexity.
+# Derive its gradient yourself — it is one line on top of checkpoint 3, but
+# two details carry the points: what the derivative of $\lambda\|w\|^2$
+# actually is, and the fact that the intercept is **not** penalized ($b$
+# absorbs the base rate of the positive class and says nothing about model
+# complexity).
 
 # %%
 def loss_grad_l2(w, b, X, y, lam):
@@ -231,7 +233,104 @@ def loss_grad_l2(w, b, X, y, lam):
 distill.check("l2", loss_grad_l2)
 
 # %% [markdown]
-# ## 6. Open task: diagnose real tumors
+# ## 6. Newton's method (optional, the interview classic)
+#
+# "Logistic regression has no closed form — so what converges faster than
+# gradient descent?" The expected answer is Newton's method (a.k.a. IRLS),
+# and the expected follow-up is the Hessian. The generic step, over the
+# stacked parameter $\theta = (w, b)$:
+#
+# $$\theta \leftarrow \theta - H^{-1} \nabla_\theta L$$
+#
+# You already derived $\nabla_\theta L$ in checkpoint 3. **Derive the Hessian
+# yourself** — differentiate the gradient once more; the same $\sigma'$ that
+# cancelled there now stays, as a per-example weight. Ten steps of this
+# reach what GD needs thousands for.
+#
+# Implementation notes: stack a column of ones onto X so the intercept rides
+# along in $\theta$; solve the linear system (`np.linalg.solve`), never
+# invert; record `log_loss` before each step, like `fit`.
+
+# %%
+def newton(X, y, iters):
+    """Train logistic regression by Newton's method.
+
+    Args:
+        X: (n, d) features.  y: (n,) labels in {0, 1}.
+        iters: number of Newton steps from a zero initialization.
+    Returns:
+        (w, b, losses): (d,) weights, scalar intercept, (iters,) loss history
+        where losses[t] is the loss BEFORE step t.
+    """
+    # BEGIN SOLUTION
+    n, d = X.shape
+    Xa = np.column_stack([X, np.ones(n)])
+    theta = np.zeros(d + 1)
+    losses = np.empty(iters)
+    for t in range(iters):
+        losses[t] = log_loss(theta[:d], theta[d], X, y)
+        p = sigmoid(Xa @ theta)
+        g = Xa.T @ (p - y) / n
+        H = (Xa * (p * (1 - p))[:, None]).T @ Xa / n
+        theta = theta - np.linalg.solve(H, g)
+    return theta[:d], theta[d], losses
+    # END SOLUTION
+
+# %%
+distill.check("newton", newton)
+
+# %% [markdown]
+# ## 7. Implement AUC
+#
+# Before the open task you need a way to score yourself — so build the scorer.
+# "Implement ROC-AUC" is itself a standard interview exercise, because the
+# elegant route is not the ROC curve at all: AUC is the probability that a
+# random positive outscores a random negative (ties count half), which makes
+# it a rank statistic. With $R_1$ the sum of the positives' ranks among all
+# $n_1 + n_0$ scores:
+#
+# $$\mathrm{AUC} = \frac{R_1 - n_1(n_1+1)/2}{n_1 n_0}$$
+#
+# The craft is in the ties: **tied scores must share the average of their
+# ranks**, or the formula silently favors whichever order the sort produced.
+# The challenge inputs are quantized on purpose — an implementation that
+# ranks by sort position alone will not match.
+
+# %%
+def roc_auc(y, scores):
+    """Area under the ROC curve, by the rank formula.
+
+    Args:
+        y: (n,) labels in {0, 1}, both classes present.
+        scores: (n,) real-valued scores, ties possible.
+    Returns:
+        Scalar AUC in [0, 1].
+    """
+    # BEGIN SOLUTION
+    order = np.argsort(scores, kind="stable")
+    ranks = np.empty(len(scores))
+    i = 0
+    while i < len(scores):
+        j = i
+        while j + 1 < len(scores) and scores[order[j + 1]] == scores[order[i]]:
+            j += 1
+        ranks[order[i : j + 1]] = (i + j) / 2.0 + 1.0
+        i = j + 1
+    n1 = int(y.sum())
+    n0 = len(y) - n1
+    return (ranks[y == 1].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0)
+    # END SOLUTION
+
+# %%
+# Hand-checkable cases: a perfect ranking, and an all-tied one.
+assert roc_auc(np.array([0.0, 1.0]), np.array([0.2, 0.9])) == 1.0
+assert roc_auc(np.array([0.0, 1.0, 0.0, 1.0]), np.full(4, 0.5)) == 0.5
+
+# %%
+distill.check("auc", roc_auc)
+
+# %% [markdown]
+# ## 8. Open task: diagnose real tumors
 #
 # `data/train.csv` is the Wisconsin breast-cancer diagnostic dataset: 400
 # fine-needle aspirates, 30 measured features per tumor (radii, textures,
@@ -244,6 +343,22 @@ distill.check("l2", loss_grad_l2)
 #
 # This checkpoint is optional — but it is the lab. Everything before it was
 # parts; this is the machine.
+#
+# Data: W. H. Wolberg, W. N. Street, O. L. Mangasarian, *Breast Cancer
+# Wisconsin (Diagnostic)*, UCI Machine Learning Repository, 1993.
+
+# %%
+# Infrastructure (do not modify): the ROC curve behind the number you submit.
+# Use it on your own validation split — a healthy curve hugs the top-left
+# corner; the diagonal is a coin flip. Pair every submitted score with this
+# picture before spending an attempt.
+def plot_roc(y, scores):
+    ts = np.unique(scores)[::-1]
+    tpr = [np.mean(scores[y == 1] >= t) for t in ts]
+    fpr = [np.mean(scores[y == 0] >= t) for t in ts]
+    plt.plot([0.0, *fpr, 1.0], [0.0, *tpr, 1.0])
+    plt.plot([0, 1], [0, 1], "--")
+    plt.xlabel("FPR"); plt.ylabel("TPR"); plt.show()
 
 # %%
 # BEGIN SOLUTION
@@ -260,7 +375,7 @@ preds = sigmoid(((X_ho - mu) / sd) @ w + b)
 distill.submit_predictions("beat-auc", preds)
 
 # %% [markdown]
-# Stuck? Open the hints in order.
+# If stuck, open the hints in order — each is more specific than the last.
 #
 # <details><summary>Hint 1 — strategy</summary>
 #
@@ -279,7 +394,8 @@ distill.submit_predictions("beat-auc", preds)
 # preds ← sigmoid(X_ho @ w + b)
 # ```
 # To estimate your AUC before spending an attempt, hold out ~80 rows of
-# train.csv yourself and score against them (you have the labels there).
+# train.csv yourself and score them with YOUR `roc_auc` from checkpoint 7 —
+# you have both the labels and the scorer.
 # </details>
 #
 # <details><summary>Hint 3 — last resort</summary>
@@ -289,7 +405,7 @@ distill.submit_predictions("beat-auc", preds)
 # </details>
 
 # %% [markdown]
-# ## 7. Written answer: why not squared error?
+# ## 9. Written answer: why not squared error?
 #
 # In 3–6 sentences, in the cell below: why is squared error a poor training
 # loss for logistic regression, and what exactly does cross-entropy fix? A
