@@ -51,3 +51,12 @@ export function getLabManifest(lab: string): Promise<LabManifest> {
 export function issuePairingCode(): Promise<PairingCode> {
   return call<PairingCode>("/labs/pairing-code", "POST");
 }
+
+/**
+ * The click that points a waiting notebook at this account: the code came out
+ * of `distill.login()` as an approval URL, and the cookie session is what the
+ * approval binds. The notebook finds out by polling; nothing comes back here.
+ */
+export function approveDevice(code: string): Promise<void> {
+  return call<void>(`/labs/device/${encodeURIComponent(code)}/approve`, "POST");
+}

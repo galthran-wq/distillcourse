@@ -54,10 +54,6 @@ CHECKPOINT_CALL = re.compile(
 # client-side.
 CAPTURE_ONLY = {"dump", "login", "open_lab"}
 
-# What the learner replaces in the generated login cell. Loud enough that a
-# cell run before it is edited fails on the code rather than on the pairing.
-PAIRING_PLACEHOLDER = "PASTE-THE-CODE-FROM-THE-LESSON-PAGE"
-
 KERNELSPEC = {"name": "python3", "display_name": "Python 3", "language": "python"}
 
 # Whitelist, never a blacklist: a key nobody anticipated in challenges.yaml
@@ -207,16 +203,16 @@ def header_cells(config: dict[str, Any], deps: list[str], files: list[str]) -> l
     """Two cells the learner runs before anything they wrote: setup, then
     pairing. Separate because they fail for unrelated reasons and are re-run on
     unrelated occasions — setup once per kernel, pairing again whenever the
-    code has expired or the pairing was revoked."""
+    approval expired or the pairing was revoked."""
     badge = "https://colab.research.google.com/assets/colab-badge.svg"
     intro = (
         f"[![Open In Colab]({badge})]({config['colab_url']})\n\n"
         "Run the two cells below once per session. The first installs the "
         "lab's pinned dependencies and the `distill` client, fetches the data "
         "files, and reads what this lab asks for. The second pairs this "
-        "kernel with your account so the checkpoints you submit count: press "
-        "**Code for the notebook** on the lesson page and paste the code it "
-        "gives you between the quotes."
+        "kernel with your account so the checkpoints you submit count: it "
+        "prints a link — open it in the browser you are signed in on and "
+        "press **Approve**."
     )
     setup = [f'%pip install -q {" ".join(deps)} "{config["client_install"]}"']
     if files:
@@ -225,9 +221,10 @@ def header_cells(config: dict[str, Any], deps: list[str], files: list[str]) -> l
         setup += [f'!wget -q -O {f} {config["raw_url_base"]}/{f}' for f in files]
     setup += ["", "import distill", "", f'distill.open_lab("{config["lab"]}")']
     login = [
-        "# The code is on the lesson page, under “Code for the notebook”.",
-        "# It expires in ten minutes; press the button again for a fresh one.",
-        f'distill.login("{PAIRING_PLACEHOLDER}")',
+        "# Prints a link; approve this notebook from your signed-in browser.",
+        '# No browser session anywhere? distill.login("<code>") takes the code',
+        "# the lesson page issues instead.",
+        "distill.login()",
     ]
     return [
         nbformat.v4.new_markdown_cell(intro),

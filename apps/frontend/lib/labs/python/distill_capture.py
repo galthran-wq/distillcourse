@@ -77,7 +77,7 @@ def _inputs(spec: dict[str, Any]) -> tuple:
     return ns["inputs"]
 
 
-def login(code: str) -> None:
+def login(code: str | None = None) -> None:
     """Nothing to pair with: capture mode posts nowhere.
 
     Here so the capture surface is the client's surface — a solution that

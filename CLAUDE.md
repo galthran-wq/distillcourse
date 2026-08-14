@@ -28,9 +28,14 @@ it delivers over — webhook, pairing, sending — in `apps/backend/app/telegram
 what the tutor remembers about a learner across every chat and medium in
 `apps/backend/app/memory/`, the spaced-repetition ladder those proactive
 messages are mostly made of in `apps/backend/app/review/`, and everything the
-lab API is — pairing codes and bearer tokens, the manifest a notebook reads,
+lab API is — pairing and bearer tokens, the manifest a notebook reads,
 the checkpoints it submits and what they are graded against — in
-`apps/backend/app/labs/`. Its one kind no comparison can answer, a `review`
+`apps/backend/app/labs/`. Pairing runs notebook-first: `distill.login()` gets
+a device code, prints an approval URL (`/labs/pair/[code]`, cookie-authed) and
+polls until the raw token is released — exactly once, only its hash ever
+stored; the code a learner copies off the lesson page into `login("<code>")`
+is the no-browser fallback, and a `DISTILL_TOKEN` env var or Colab Secret
+outranks both. Its one kind no comparison can answer, a `review`
 checkpoint, is decided by a single toolless model call (`app/labs/judge.py`)
 that borrows the harness's plumbing — the model, the usage row and the monthly
 ceiling, which sums `lab_submissions.usage` alongside `messages.usage`.

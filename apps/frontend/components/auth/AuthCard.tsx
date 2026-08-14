@@ -67,7 +67,13 @@ export default function AuthCard({ mode }: { mode: Mode }) {
             timezone,
           });
       setUser(user);
-      router.push("/");
+      // Where a guarded page sent this visitor from (`?next=`), read at submit
+      // rather than via useSearchParams, which would cost the page a Suspense
+      // boundary for one string. Same-site paths only: an absolute URL here
+      // would make the login form an open redirect.
+      const next = new URLSearchParams(window.location.search).get("next");
+      // "//host" is protocol-relative and would leave the site too.
+      router.push(next?.startsWith("/") && !next.startsWith("//") ? next : "/");
     } catch (failure) {
       setError(
         failure instanceof ApiError ? failure.message : "the server is unreachable",
