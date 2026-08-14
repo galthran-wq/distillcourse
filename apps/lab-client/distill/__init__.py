@@ -2,7 +2,7 @@
 
     import distill
 
-    distill.login("<the code from the lesson page>")
+    distill.login()
     distill.open_lab("<course>/<lesson>")
 
 Everything after that is one call per checkpoint. The server grades and keeps
@@ -13,6 +13,7 @@ kernels.
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -50,10 +51,38 @@ class _Lab:
 _lab: _Lab | None = None
 
 
-def login(code: str) -> None:
-    """Exchange a pairing code from the lesson page for this session's token."""
-    _api.pair(code)
-    print("paired — checkpoints from this kernel count towards your progress")
+# How often the kernel asks whether the learner has clicked Approve. The
+# server allows 60 polls per minute per code, so this spends a third of it.
+POLL_SECONDS = 3
+
+PAIRED = "paired — checkpoints from this kernel count towards your progress"
+
+
+def login(code: str | None = None) -> None:
+    """Pair this kernel with your account.
+
+    With no argument, prints a link to approve this notebook from the browser
+    you are signed in on, and waits for the click. With a code from the lesson
+    page, exchanges it directly — the fallback for a kernel whose learner has
+    no browser session anywhere.
+
+    Skipped entirely when a token is already at hand: `DISTILL_TOKEN` in the
+    environment, or a Colab Secret of that name you stored yourself.
+    """
+    if code is not None:
+        _api.pair(code)
+        print(PAIRED)
+        return
+    if _api.token is not None:
+        print("already paired — this kernel holds a token")
+        return
+    started = _api.begin_device()
+    print(f"→ Open {started['approve_url']} and approve this notebook")
+    # The wait ends by the server's word, not a clock here: approval releases
+    # the token, and an expired code answers with what to do about it.
+    while not _api.poll_device(str(started["code"])):
+        time.sleep(POLL_SECONDS)
+    print(PAIRED)
 
 
 def open_lab(lab: str) -> None:

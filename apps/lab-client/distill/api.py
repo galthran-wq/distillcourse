@@ -20,8 +20,9 @@ DEFAULT_HOST = "https://distillcourse.com"
 # is made rather than at import, because the generated notebook's first cell is
 # `import distill`: a host set in any cell after it would otherwise be ignored.
 HOST_VAR = "DISTILL_API"
-# Pairing is skipped entirely when this is set: it belongs to whoever is
-# running that backend, while a pairing code belongs to a learner.
+# Pairing is skipped entirely when this is set — in the environment, or as a
+# Colab Secret of the same name the learner stored by hand (Colab's `userdata`
+# is read-only from a notebook, so nothing here ever writes one).
 TOKEN_VAR = "DISTILL_TOKEN"
 
 TIMEOUT = 30.0
@@ -54,12 +55,33 @@ class Api:
 
     @property
     def token(self) -> str | None:
-        return os.environ.get(TOKEN_VAR) or self._paired
+        return os.environ.get(TOKEN_VAR) or _colab_secret() or self._paired
 
     def pair(self, code: str) -> None:
         self._paired = str(
             self._request("POST", "/labs/pair", body={"code": code})["token"]
         )
+
+    def begin_device(self) -> dict[str, Any]:
+        """Start a pairing this kernel will poll for: the server hands back the
+        code and the URL the learner approves it at, signed in on the site."""
+        return self._request("POST", "/labs/device")
+
+    def poll_device(self, code: str) -> bool:
+        """One ask: True once the approval released the token, which is kept
+        here and never returned; False while it has not happened yet. A code
+        the server is done with — expired, already released — is a LabError
+        whose message says what to do."""
+        try:
+            response = self._client.get(_url(f"/labs/device/{code}"))
+        except httpx.HTTPError:
+            raise LabError(UNREACHABLE) from None
+        if response.status_code == httpx.codes.PRECONDITION_REQUIRED:
+            return False
+        if not response.is_success:
+            raise LabError(_refusal(response))
+        self._paired = str(response.json()["token"])
+        return True
 
     def manifest(self, lab: str) -> dict[str, Any]:
         return self._request("GET", f"/labs/{lab}/manifest")
@@ -89,6 +111,23 @@ class Api:
 
 def connect() -> Api:
     return Api(httpx.Client(timeout=TIMEOUT))
+
+
+def _colab_secret() -> str | None:
+    """The token a learner stored in Colab's Secrets panel, if this kernel is
+    Colab and they granted this notebook access to it."""
+    try:
+        from google.colab import userdata  # type: ignore[import-not-found]
+    except ImportError:
+        return None
+    try:
+        value = userdata.get(TOKEN_VAR)
+    except Exception:
+        # Colab's own SecretNotFoundError / NotebookAccessError, neither of
+        # which exists as a type outside Colab: both mean "nothing to use
+        # here", and the flow falls through to pairing.
+        return None
+    return str(value) or None
 
 
 def _url(path: str) -> str:

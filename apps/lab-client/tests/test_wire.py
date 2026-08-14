@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import distill
-from tests.conftest import MANIFEST, Server, verdict
+from tests.conftest import DEVICE, MANIFEST, TOKEN_ANSWER, Server, verdict
 
 SHAPES: dict[str, Any] = json.loads(
     (
@@ -26,6 +26,11 @@ def test_the_manifest_the_fake_serves_is_the_one_the_api_serves() -> None:
     assert set(MANIFEST) == set(SHAPES["manifest"])
     for checkpoint in MANIFEST["checkpoints"]:
         assert set(checkpoint) == set(SHAPES["manifest_checkpoint"])
+
+
+def test_the_device_answers_the_fake_serves_are_the_ones_the_api_serves() -> None:
+    assert set(DEVICE) == set(SHAPES["device"])
+    assert set(TOKEN_ANSWER) == set(SHAPES["token"])
 
 
 def test_the_verdict_the_fake_answers_with_is_the_one_the_api_answers_with() -> None:
