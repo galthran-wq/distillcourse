@@ -154,7 +154,16 @@ cross-implementation contract — a second implementation that does not
 reproduce them byte for byte, or that encodes a case marked `"rejects": true`
 instead of refusing it, will grade correct answers wrong.
 
-## Dependencies: pyproject.toml + uv.lock
+## Dependencies: pyproject.toml + uv.lock + .python-version
+
+Every lab pins its interpreter with a `.python-version` file (currently
+`3.12`, Colab's CPython) next to pyproject. Without it uv picks the newest
+interpreter it can find, and a too-new Python turns pinned scientific deps
+into sdist builds — no wheels exist yet for that CPython, so the lab
+"works" only where compilers happen to be installed (found the hard way:
+numpy 2.3.1 has no cp314 wheels; the deploy image build died compiling it
+from source while every compiler-equipped machine passed silently).
+
 
 Each lab is a uv project: `pyproject.toml` declares the direct deps, exact-
 pinned (`numpy==2.3.1`), only what the lab imports; `uv lock` produces the

@@ -29,6 +29,9 @@ const LAB_SOURCES = [
   "challenges.yaml",
   "pyproject.toml",
   "uv.lock",
+  // Without the interpreter pin uv picks the newest Python it can find, and
+  // pinned scientific deps degrade to sdist builds where no wheels exist yet.
+  ".python-version",
   "data",
   "private",
 ];
