@@ -27,7 +27,11 @@ rm -rf "$OUT/client/.venv" "$OUT/client/.pytest_cache" "$OUT/client/.mypy_cache"
 find "$OUT/client" -type d -name __pycache__ -exec rm -rf {} +
 cp ops/mirror/README.md "$OUT/README.md"
 
-if grep -rn "BEGIN SOLUTION" "$OUT"; then
-	echo "assemble: solution marker in the mirror tree — refusing to publish" >&2
+# Only grep's clean no-match (exit 1) may publish: a match — or a tree it
+# could not scan — must not.
+status=0
+grep -rn "BEGIN SOLUTION" "$OUT" || status=$?
+if [ "$status" -ne 1 ]; then
+	echo "assemble: solution marker in the mirror tree (or grep failed) — refusing to publish" >&2
 	exit 1
 fi

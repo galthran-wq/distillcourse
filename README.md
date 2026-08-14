@@ -17,7 +17,7 @@ content/          # THE curation surface — courses, lessons, figures (see belo
 apps/frontend/    # the Next site: app/ components/ lib/ public/ scripts/ tests/
 apps/backend/     # the FastAPI service: API, and later the tutor harness
 apps/lab-client/  # the distill client a lab notebook submits its checkpoints with
-ops/              # caddy config, postgres init, the backup restore drill
+ops/              # caddy config, postgres init, restore drill, mirror assembly
 compose.yml       # caddy · frontend · backend · postgres · backup
 docs/ .claude/    # the constitution and the authoring skills/workflows
 ```

@@ -105,11 +105,15 @@ jobs:
           install -d -m 700 ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/mirror
           chmod 600 ~/.ssh/mirror
+          # Host keys fetched over TLS rather than trusted on first use: a
+          # swallowed push would leave the mirror silently stale under green CI.
+          curl -fsSL https://api.github.com/meta \
+            | jq -r '.ssh_keys[] | "github.com \(.)"' > ~/.ssh/known_hosts
           cd mirror-tree
           git init -q -b main
           git config user.name "distillcourse CI"
           git config user.email "actions@users.noreply.github.com"
           git add -A
           git commit -q -m "mirror of $GITHUB_SHA"
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/mirror -o StrictHostKeyChecking=accept-new" \
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/mirror -o StrictHostKeyChecking=yes" \
             git push -q --force git@github.com:galthran-wq/distillcourse-labs.git main
