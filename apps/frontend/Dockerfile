@@ -1,12 +1,20 @@
 # Build context is the REPO ROOT, not this directory:
 #   docker build -f apps/frontend/Dockerfile .
 # The image needs content/, which lives at the repo root next to apps/.
-FROM node:22-alpine AS deps
+# deps and build run on slim (glibc), not alpine: validate executes lab
+# reference solutions through uv, and scientific wheels (numpy, matplotlib)
+# ship manylinux builds universally while musl coverage is a lottery. The
+# runtime stage below stays alpine — it receives only built JS.
+FROM node:22-slim AS deps
 WORKDIR /app/apps/frontend
 COPY apps/frontend/package.json apps/frontend/package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS build
+FROM node:22-slim AS build
+# uv is a validate dependency wherever a lab lesson exists (it executes the
+# lab's solution against its uv.lock); the static binary comes from the
+# pinned official image, and uv fetches a managed CPython on first use.
+COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /usr/local/bin/
 WORKDIR /app/apps/frontend
 # CONTENT_PREVIEW=1 renders drafted+reviewed lessons (personal staging).
 # Build with --build-arg CONTENT_PREVIEW=0 for the public published-only site.

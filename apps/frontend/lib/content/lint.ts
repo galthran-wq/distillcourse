@@ -415,7 +415,15 @@ function lintLessonMdx(
 }
 
 /** What a lab lesson directory must hold once the lesson is drafted. */
-const LAB_FILES = ["solution.py", CHALLENGES_FILE, "pyproject.toml", "uv.lock"];
+const LAB_FILES = [
+  "solution.py",
+  CHALLENGES_FILE,
+  "pyproject.toml",
+  "uv.lock",
+  // The interpreter pin: without it uv resolves to the newest Python and
+  // wheel-less scientific deps fall back to sdist builds (deploy killer).
+  ".python-version",
+];
 
 /**
  * The build driver parses `pyproject.toml` and `uv.lock` with `tomllib`, so a
