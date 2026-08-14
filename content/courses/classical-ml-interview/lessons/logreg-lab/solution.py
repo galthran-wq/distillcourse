@@ -2,18 +2,21 @@
 # # Lab: logistic regression from scratch
 #
 # You will build a complete logistic-regression classifier with nothing but
-# numpy: the sigmoid, a numerically stable log-loss, its gradient, a batch
-# gradient-descent trainer, L2 regularization — and then use your own code to
-# diagnose real tumors, submitting predictions against held-out labels you
-# never see.
+# numpy — the sigmoid, a numerically stable log-loss, a gradient you derive
+# yourself, a batch gradient-descent trainer, L2 regularization, Newton's
+# method, and your own ROC-AUC scorer — and then use that code to diagnose
+# real tumors, submitting predictions against held-out labels you never see.
 #
 # Ground rules:
 #
-# - **No sklearn, no scipy** — the model is yours end to end. (Using them to
-#   sanity-check on your own machine is fine; the graded work is numpy.)
+# - **No sklearn, no scipy** — the model and the scorer are yours end to end.
+#   (Using them to sanity-check on your own machine is fine; the graded work
+#   is numpy.)
 # - Each checkpoint cell submits your function to the course server, which
 #   compares outputs against a reference. Run them as you go; partial
-#   completion is normal — the last two checkpoints are optional.
+#   completion is normal — three checkpoints are optional, and the checklist
+#   on the lesson page marks which (Newton's method mid-lab, the open
+#   modeling task, the written answer).
 
 # %%
 import numpy as np
@@ -244,8 +247,9 @@ distill.check("l2", loss_grad_l2)
 #
 # You already derived $\nabla_\theta L$ in checkpoint 3. **Derive the Hessian
 # yourself** — differentiate the gradient once more; the same $\sigma'$ that
-# cancelled there now stays, as a per-example weight. Ten steps of this
-# reach what GD needs thousands for.
+# cancelled there now stays, as a per-example weight. Single-digit step
+# counts reach what GD needs thousands of iterations for — the checkpoint
+# trains in eight.
 #
 # Implementation notes: stack a column of ones onto X so the intercept rides
 # along in $\theta$; solve the linear system (`np.linalg.solve`), never
