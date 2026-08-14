@@ -73,3 +73,47 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run validate
+
+  # The public mirror (github.com/galthran-wq/distillcourse-labs) is a build
+  # artifact: labs-dist's public half plus a copy of the client, committed with
+  # no history and force-pushed over a deploy key that can write to the mirror
+  # alone — the monorepo token never touches the mirror and vice versa.
+  mirror:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [frontend, lab-client]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      # build-labs re-executes each lab's reference solution: the notebooks
+      # published here must be the ones the answer keys were generated from.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: npm ci
+        working-directory: apps/frontend
+      - run: npm run build-labs
+      - run: ./ops/mirror/assemble.sh mirror-tree
+      - name: Force-push the mirror
+        env:
+          DEPLOY_KEY: ${{ secrets.LABS_MIRROR_DEPLOY_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/mirror
+          chmod 600 ~/.ssh/mirror
+          # Host keys fetched over TLS rather than trusted on first use: a
+          # swallowed push would leave the mirror silently stale under green CI.
+          curl -fsSL https://api.github.com/meta \
+            | jq -r '.ssh_keys[] | "github.com \(.)"' > ~/.ssh/known_hosts
+          cd mirror-tree
+          git init -q -b main
+          git config user.name "distillcourse CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "mirror of $GITHUB_SHA"
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/mirror -o StrictHostKeyChecking=yes" \
+            git push -q --force git@github.com:galthran-wq/distillcourse-labs.git main
