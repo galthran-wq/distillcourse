@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
+import { ALERT_CLASS } from "@/components/ui/styles";
 import { useAuth } from "@/lib/auth/store";
 import { ApiError } from "@/lib/http";
 import { approveDevice } from "@/lib/labs/api";
@@ -61,10 +62,7 @@ export default function ApproveNotebook({ code }: { code: string }) {
               If you did not just run its login cell, close this tab.
             </p>
             {error !== null && (
-              <p
-                role="alert"
-                className="mt-4 rounded-sm border border-accent/40 bg-accent/10 px-3 py-2 text-[13px] text-accent"
-              >
+              <p role="alert" className={`mt-4 ${ALERT_CLASS}`}>
                 {error}
               </p>
             )}

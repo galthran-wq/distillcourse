@@ -73,7 +73,10 @@ def login(code: str | None = None) -> None:
         _api.pair(code)
         print(PAIRED)
         return
-    if _api.token is not None:
+    # Only a token from outside the kernel short-circuits: one paired earlier
+    # here may have been revoked since, and re-running this cell is the
+    # advertised way to pair again.
+    if _api.provisioned is not None:
         print("already paired — this kernel holds a token")
         return
     started = _api.begin_device()

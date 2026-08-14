@@ -135,6 +135,20 @@ def test_the_environment_outranks_the_colab_secret(
     assert server.bearers == ["Bearer from-the-environment"]
 
 
+def test_running_the_login_cell_again_replaces_a_revoked_pairing(
+    server: Server, instant: list[float]
+) -> None:
+    """A pairing made earlier in this kernel never short-circuits: the server
+    may have revoked it, and re-running the cell is the advertised recovery."""
+    distill.login(CODE)
+
+    distill.login()
+
+    assert any("/labs/device" in str(url) for url in server.urls)
+    # Approved before the first poll, so the loop never napped.
+    assert instant == []
+
+
 def test_a_kernel_that_is_colab_without_the_secret_still_pairs(
     server: Server, monkeypatch: pytest.MonkeyPatch
 ) -> None:

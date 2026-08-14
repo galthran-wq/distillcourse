@@ -31,14 +31,14 @@ UNREACHABLE = (
     "could not reach distillcourse — check the connection and run the cell again"
 )
 STALE = "the lab was updated — reopen the notebook from the course page"
-UNPAIRED = 'not paired — run distill.login("<the code from the lesson page>")'
+UNPAIRED = "not paired — run distill.login() and approve it from your signed-in browser"
 # A token the server will not take. It outlives the kernel, so the likely
 # reason is that the account ended it: changing the password or signing out
 # everywhere revokes every notebook pairing. Pairing again is the whole fix,
 # which is why this says so rather than reporting a failure.
 REVOKED = (
     "this notebook's pairing has ended — a password change or signing out "
-    'everywhere ends one — run distill.login("<a new code from the lesson page>")'
+    "everywhere ends one — run distill.login() to pair again"
 )
 
 
@@ -54,8 +54,17 @@ class Api:
         self._paired: str | None = None
 
     @property
+    def provisioned(self) -> str | None:
+        """A token the learner supplied out of band — the environment, or a
+        Colab Secret. What no-argument login defers to. A token paired earlier
+        in this kernel is deliberately not one: the pairing cell is what a
+        learner re-runs after a revocation, so it must pair again rather than
+        report the dead token as already good."""
+        return os.environ.get(TOKEN_VAR) or _colab_secret()
+
+    @property
     def token(self) -> str | None:
-        return os.environ.get(TOKEN_VAR) or _colab_secret() or self._paired
+        return self.provisioned or self._paired
 
     def pair(self, code: str) -> None:
         self._paired = str(

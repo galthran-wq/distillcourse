@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button, Input } from "@/components/ui";
+import { ALERT_CLASS } from "@/components/ui/styles";
 import { login, signup, MIN_PASSWORD_LENGTH } from "@/lib/auth/api";
 import { ApiError } from "@/lib/http";
 import { setUser } from "@/lib/auth/store";
@@ -72,8 +73,14 @@ export default function AuthCard({ mode }: { mode: Mode }) {
       // boundary for one string. Same-site paths only: an absolute URL here
       // would make the login form an open redirect.
       const next = new URLSearchParams(window.location.search).get("next");
-      // "//host" is protocol-relative and would leave the site too.
-      router.push(next?.startsWith("/") && !next.startsWith("//") ? next : "/");
+      // "//host" is protocol-relative and would leave the site too, and URL
+      // resolution reads "\" as "/", so "/\host" is the same door.
+      const stays =
+        next !== null &&
+        next.startsWith("/") &&
+        !next.startsWith("//") &&
+        !next.startsWith("/\\");
+      router.push(stays ? next : "/");
     } catch (failure) {
       setError(
         failure instanceof ApiError ? failure.message : "the server is unreachable",
@@ -125,10 +132,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
             </>
           )}
           {error !== null && (
-            <p
-              role="alert"
-              className="rounded-sm border border-accent/40 bg-accent/10 px-3 py-2 text-[13px] text-accent"
-            >
+            <p role="alert" className={ALERT_CLASS}>
               {error}
             </p>
           )}
