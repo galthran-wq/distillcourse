@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ViewTransition } from "react";
 import type { MDXComponents } from "mdx/types";
+import LabPanel from "@/components/labs/LabPanel";
 import DemoHost from "@/components/mdx/DemoHost";
 import LessonTelemetry from "@/components/LessonTelemetry";
 import LessonPosition from "@/components/LessonPosition";
@@ -199,6 +200,13 @@ export default async function LessonPage({
           <div className="prose-lesson py-10">
             <MDXContent components={components} />
           </div>
+
+          {/* A lab lesson's MDX is the brief; the work it briefs is here. The
+              lab is named by the pair the mirror names it by, which is also
+              what the checkpoint API takes as its path. */}
+          {lesson.lab !== undefined && (
+            <LabPanel lab={`${course.course.slug}/${lesson.slug}`} spec={lesson.lab} />
+          )}
 
           <LessonRating />
 

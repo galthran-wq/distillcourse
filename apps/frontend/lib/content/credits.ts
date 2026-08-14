@@ -1,6 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parse } from "yaml";
+import { loadYamlFile } from "./load";
 import { CreditsFileSchema, type ImageCredit } from "./schema";
 
 /**
@@ -48,21 +47,10 @@ export function creditFor(
 }
 
 export function loadCredits(lessonDir: string): LoadedCredits {
-  const path = creditsPath(lessonDir);
-  if (!existsSync(path)) return { entries: [], exists: false };
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(path, "utf8"));
-  } catch (err) {
-    return {
-      entries: [],
-      exists: true,
-      error: `YAML parse error: ${(err as Error).message}`,
-    };
-  }
-  const parsed = CreditsFileSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { entries: [], exists: true, error: parsed.error.message };
-  }
-  return { entries: parsed.data.images, exists: true };
+  const file = loadYamlFile(creditsPath(lessonDir), CreditsFileSchema);
+  return {
+    entries: file.data?.images ?? [],
+    error: file.error,
+    exists: file.exists,
+  };
 }

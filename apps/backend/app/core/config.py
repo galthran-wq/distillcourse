@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_USERNAME: str | None = None
     TELEGRAM_WEBHOOK_SECRET: str | None = None
 
+    # Per learner, per lab checkpoint, per day. A metric checkpoint costs a
+    # scoring pass and a review one costs a judge run, which is why they differ
+    # by a factor of five; both leave room for a real session of iterating.
+    LAB_METRIC_ATTEMPTS_PER_DAY: int = 50
+    LAB_REVIEW_ATTEMPTS_PER_DAY: int = 10
+
     DAILY_MESSAGE_CAP: int = 100
     WEB_SEARCH_DAILY_CAP: int = 20
     # The instance-wide ceiling is the software half of the budget; the other

@@ -14,8 +14,10 @@ from app.core import sessions
 from app.core.config import settings
 from app.harness.agent import tutor
 from app.harness.repository import HarnessRepository
+from app.labs import repository as labs
 from app.models import (
     Chat,
+    LabPairingCode,
     Message,
     Schedule,
     TgLink,
@@ -546,6 +548,17 @@ async def test_housekeeping_removes_the_pairing_codes_and_update_ids_nothing_rea
 
     assert await session.scalar(select(TgPairingCode)) is None
     assert await session.scalar(select(TgUpdateSeen)) is None
+
+
+async def test_housekeeping_removes_the_lab_codes_nothing_reads(
+    session: AsyncSession, user: User
+) -> None:
+    now = datetime.now(UTC)
+    await labs.issue_code(session, user.id, now=now - 2 * labs.CODE_TTL)
+
+    await worker.housekeep(session, now)
+
+    assert await session.scalar(select(LabPairingCode)) is None
 
 
 async def test_housekeeping_removes_the_sessions_nothing_will_read(

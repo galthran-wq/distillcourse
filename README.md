@@ -16,7 +16,8 @@ constitution; the playbook stack holds the mechanics behind it —
 content/          # THE curation surface — courses, lessons, figures (see below)
 apps/frontend/    # the Next site: app/ components/ lib/ public/ scripts/ tests/
 apps/backend/     # the FastAPI service: API, and later the tutor harness
-ops/              # caddy config, postgres init, the backup restore drill
+apps/lab-client/  # the distill client a lab notebook submits its checkpoints with
+ops/              # caddy config, postgres init, restore drill, mirror assembly
 compose.yml       # caddy · frontend · backend · postgres · backup
 docs/ .claude/    # the constitution and the authoring skills/workflows
 ```
@@ -68,17 +69,22 @@ buttons refuse to run on other models), inside a git worktree on branch
 
 1. `/course-architect "<topic>"` — canon discovery (perplexity deep
    research) → a sonnet swarm reads the sources, each reader also scouting
-   the few images that would have to be the real artefact → synthesis writes
+   the few images that would have to be the real artefact and reporting what
+   the source makes students build → synthesis writes
    `course.yaml`, `concepts.yaml`, and the `research/` dossier (including
    `images.yaml`, the shortlist, and per-lesson figure plans that say which
-   visuals we draw and which we source).
+   visuals we draw and which we source). Labs are planned here too: a module
+   ends with a `type: lab` lesson — checkpoint plan and `est_hours` — only
+   where the canon assigns that work.
 2. **Human curates** `course.yaml` AND the per-lesson `research/` briefs in
    the worktree — the main editorial checkpoint.
 3. `/lesson-factory <slug> [n]` — per planned lesson, sequentially:
    lesson-writer (session model, grounded in the brief) → figure-artist
    agents in parallel (drawn figures, and sourced images cut from the
    research captures) → demo-builder where specced → opus QA → one fix
-   cycle. Requires the `research/` dossier.
+   cycle. A `type: lab` lesson goes to the lab-author skill instead — the
+   write → execute → green loop — and is QA'd against the lab rubric.
+   Requires the `research/` dossier.
 4. Human reviews in `npm run dev`, flips statuses, merges the branch.
 
 ## Manual single-lesson tools (escape hatch)
@@ -116,7 +122,7 @@ PR, and commit the updated `.dvc` files with it.
 ```bash
 npm run install:frontend   # first time only: installs apps/frontend/node_modules
 npm run dev        # dev server (renders drafted + reviewed + published)
-npm run validate   # schema + shell lint over all content
+npm run validate   # schema + shell lint over all content, labs in check mode
 npm test           # vitest
 npm run lint       # eslint over the frontend
 npm run typecheck  # tsc --noEmit
@@ -126,6 +132,8 @@ npm run image -- check <file>               # sourced-image toolkit: verify,
 npm run preview -- <course> <lesson>        # render a chapter, both themes
 npm run sync-assets  # copy lesson raster figures into the frontend's public/
 npm run export-index # write the search index the backend ingests (index.json)
+npm run build-labs -- [<course> [<lesson>]] [--check]  # execute lab solutions,
+                     # write labs-dist/ (public mirror half + private answer key)
 npm run build      # production build
 ```
 
@@ -160,8 +168,10 @@ does). A host that builds from somewhere else fails the build with an
 explicit message; point it at the tree with `CONTENT_ROOT=/abs/path/content`.
 
 Sourced images (photographs, scans, published plots) need `poppler-utils`
-and `imagemagick` for extraction and resizing; `npm run validate` itself
-stays dependency-free.
+and `imagemagick` for extraction and resizing. `npm run validate` needs
+nothing beyond node — until a course has a lab lesson: labs are executed, so
+validate runs them in check mode and needs `uv` (missing `uv` downgrades the
+lab check to a warning, which is why CI installs it).
 
 Key code (all under `apps/frontend/`): `lib/content/schema.ts` (Zod schemas —
 normative), `lib/content/lint.ts` (shell rules). Guides:

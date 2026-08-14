@@ -1,41 +1,17 @@
-from collections.abc import Callable, Coroutine
 from datetime import date
-from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
-from fastapi.routing import APIRoute
+from fastapi import APIRouter, status
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.size import size_limited
 from app.core.rate_limit import FixedWindow, register
 from app.telemetry import ingest, passes
 from app.telemetry.schemas import MAX_BATCH_BYTES, MAX_BATCHES_PER_MINUTE, EventBatch
 
-
-class SizeLimited(APIRoute):
-    """Turns an oversized body away before FastAPI reads and parses it.
-
-    A dependency could not: the body is read before dependencies are solved,
-    so the caps in `schemas` are pydantic's and only ever apply to a batch
-    already buffered whole. caddy holds the same ceiling for a request that
-    declares no length at all.
-    """
-
-    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
-        handler = super().get_route_handler()
-
-        async def refuse_oversized(request: Request) -> Response:
-            declared = request.headers.get("content-length", "")
-            if declared.isdigit() and int(declared) > MAX_BATCH_BYTES:
-                raise HTTPException(
-                    status.HTTP_413_CONTENT_TOO_LARGE, "batch too large"
-                )
-            return await handler(request)
-
-        return refuse_oversized
-
-
-router = APIRouter(prefix="/telemetry", tags=["telemetry"], route_class=SizeLimited)
+router = APIRouter(
+    prefix="/telemetry", tags=["telemetry"], route_class=size_limited(MAX_BATCH_BYTES)
+)
 
 # Keyed by user, not by address: a household behind one address reads several
 # lessons at once, and it is an account that could flood the table.

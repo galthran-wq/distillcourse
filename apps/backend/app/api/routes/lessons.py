@@ -1,27 +1,12 @@
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser, SessionDep
-from app.content.locators import SLUG_LENGTH, SLUG_PATTERN
+from app.api.deps import CurrentUser, LessonKey, SessionDep
 from app.lessons import state
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
-
-# The service does not know which lessons exist — the corpus does, and it is
-# ingested separately — so the shape of a slug is the whole check: enough to
-# keep junk out of the columns the curator reads.
-Slug = Annotated[str, Path(pattern=SLUG_PATTERN, max_length=SLUG_LENGTH)]
-
-
-def lesson_key(course: Slug, lesson: Slug) -> str:
-    # The index's locator: what telemetry already stores a reader's progress
-    # under, so the profile can join a rating, a bookmark and a visit.
-    return f"lesson:{course}/{lesson}"
-
-
-LessonKey = Annotated[str, Depends(lesson_key)]
 
 
 class LessonState(BaseModel):

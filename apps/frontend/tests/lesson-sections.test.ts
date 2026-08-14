@@ -30,7 +30,12 @@ describe("the section index the build ships", () => {
   it("keys every readable lesson by its locator, under its own headings", async () => {
     const sections = await getLessonSections();
 
-    expect(Object.keys(sections)).toEqual(["lesson:lint-course/intro-surprise"]);
+    // The lab lesson is in there too: a lab is a lesson, so its brief is a
+    // place a question can point at like any chapter.
+    expect(Object.keys(sections)).toEqual([
+      "lesson:lint-course/intro-surprise",
+      "lesson:lint-course/surprisal-lab",
+    ]);
     // The lesson's h2s, with the ids rehype-slug put on the page itself.
     expect(sections["lesson:lint-course/intro-surprise"]).toEqual([
       {

@@ -279,6 +279,51 @@ describe("courseDocuments", () => {
     expect(spine?.text).toContain("What a demo course is for");
   });
 
+  it("mirrors a lab's checkpoints onto its chunks, and only its own", () => {
+    vi.stubEnv("CONTENT_PREVIEW", "1");
+    const lab = loadedLesson("lab", "The lab", "drafted", "A lab brief.\n", 1);
+    lab.lesson = {
+      ...lab.lesson,
+      type: "lab",
+      lab: {
+        est_hours: 4,
+        checkpoints: [
+          { id: "one", kind: "exact", text: "Implement one", required: true },
+          { id: "two", kind: "metric", text: "Beat the baseline", required: false },
+        ],
+      },
+    };
+    const docs = courseDocuments(
+      course([loadedLesson("main", "The main lesson", "drafted", LESSON_MDX, 0), lab]),
+    );
+
+    expect(lessonChunks(docs, "lab")[0].metadata.lab).toEqual({
+      est_hours: 4,
+      checkpoints: [
+        { id: "one", kind: "exact", text: "Implement one", required: true, order: 0 },
+        { id: "two", kind: "metric", text: "Beat the baseline", required: false, order: 1 },
+      ],
+      // Nothing under data/ in this lesson dir; the case below has one.
+      data_files: [],
+    });
+    for (const chunk of lessonChunks(docs, "main")) {
+      expect(chunk.metadata).not.toHaveProperty("lab");
+    }
+
+    // The build copies data/ to the mirror verbatim, so the directory is the
+    // list and the URL is where the notebook will fetch it from.
+    lab.dir = fileURLToPath(
+      new URL("./fixtures/lint-course/lessons/surprisal-lab", import.meta.url),
+    );
+    const withData = courseDocuments(course([lab]));
+
+    expect(lessonChunks(withData, "lab")[0].metadata.lab).toMatchObject({
+      data_files: [
+        "https://raw.githubusercontent.com/galthran-wq/distillcourse-labs/main/labs/demo-course/lab/data/holdout.csv",
+      ],
+    });
+  });
+
   it("indexes research per file and concepts per entry, whatever the statuses", () => {
     const docs = courseDocuments(course([]));
 

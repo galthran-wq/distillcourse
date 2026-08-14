@@ -63,6 +63,16 @@ findings:
   studies the source is known for (with pointers): the concrete set pieces
   a lesson could recreate. A great source's gems are half its value —
   hunt for them, don't wait to stumble on them.
+- **Assignments** — what the source makes students BUILD by hand: homework
+  notebooks, problem sets with code, projects, labs (with pointers). Per
+  assignment, report what the student produces (one artifact or a tour of
+  exercises), at what granularity the work is cut into steps, what is given
+  as scaffold, and how it is verified (autograded tests, a metric threshold
+  on held-out data, a written report, nothing). This is design signal, not
+  content: it decides whether a module of our course ends with a lab and
+  what that lab builds. A source that assigns nothing — a monograph, a
+  survey — reports an empty list; never invent an assignment for it, and
+  never promote a worked example in the text to one.
 - **Chapter map** — for each major topic: "topic → chapter/section to consult".
 
 **Store the raw material you fetch.** Whatever you actually read — a

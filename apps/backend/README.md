@@ -27,6 +27,8 @@ app/
     routes/settings.py # the learner's own settings, pairing included
     routes/telegram.py # POST /api/tg/webhook — Telegram's only entry point
     routes/memories.py # what the tutor remembers: list, edit, delete
+    routes/labs.py   # pairing a notebook, and the checkpoints it submits
+    size.py          # a ceiling on a request body, refused before it is read
   harness/
     agent.py         # the tutor agent, the toolless namer, the model pool, the compaction threshold
     prompts.py       # module concatenation + context blocks
@@ -45,7 +47,7 @@ app/
     clock.py         # users.timezone -> ZoneInfo, for every run and the poller
     security.py      # password hashing (argon2, bcrypt kept) + length policy
     sessions.py      # session lifecycle: token, row, cookie, sliding expiry
-    rate_limit.py    # fixed-window limiter for signup and login
+    rate_limit.py    # fixed-window limiter for signup, login and pairing
     observability.py # logfire: fastapi + sqlalchemy + httpx
   scheduling/
     policy.py        # quiet hours, the slot timeout, the budget, coalescing
@@ -59,6 +61,13 @@ app/
     thread.py        # the one thread and the run that speaks into it
     updates.py       # one incoming message, end to end; bot commands
     tools.py         # send_message, run by the tutor
+  labs/
+    repository.py    # pairing codes and tokens; challenges, state, submissions
+    verify.py        # what a posted checkpoint is worth: comparison and metrics
+    judge.py         # the third kind: a written answer, one model call, a verdict
+    ingest.py        # the build's answer keys into `lab_challenges`
+    schemas.py       # the wire shapes a notebook and the lab page speak
+    deps.py          # LabUser — the learner a notebook is calling for
   memory/
     repository.py    # the learner profile: index, read, upsert, delete
     tools.py         # read_memory / save_memory / delete_memory
@@ -92,16 +101,28 @@ send an `Authorization` header — authenticates over the same cookie for free.
   because proactive messages are scheduled against the user's own clock.
 - Password reset and email verification do not exist; the operator resets a
   password from the CLI below.
+- Notebooks do not use the cookie. A lab page issues a 10-minute single-use
+  pairing code, `POST /api/v1/labs/pair` exchanges it for a bearer token, and
+  `labs/deps.py:LabUser` is what the lab routes authenticate with. The token
+  does not expire — a notebook left open over a weekend must still submit — so
+  `lab_tokens.revoked_at` is the only way one ends, and everything that means
+  "this account's credentials end here" writes it beside the sessions it
+  revokes: signing out everywhere, `change-password`, the CLI password reset,
+  deactivating an account. `change-password` spares the browser that asked and
+  no notebook: a token pasted into a notebook that is shared or committed is the
+  likeliest leak, and the password change is the only recovery a learner reaches
+  without the operator.
 - `crud.py` and `core/sessions.py` stage writes and never commit. The route (or
   CLI command) owns the transaction and commits once, so a password change and
   the session revocation it implies cannot land apart.
 
 ```bash
-uv run python -m app.cli reset-password someone@example.com   # prompts, then
-                                                              # revokes their sessions
+uv run python -m app.cli reset-password someone@example.com   # prompts, then revokes
+                                                              # sessions and lab tokens
 uv run python -m app.cli delete-user someone@example.com      # sessions cascade
-uv run python -m app.cli deactivate-user someone@example.com  # closes the account,
-                                                              # keeps what it wrote
+uv run python -m app.cli deactivate-user someone@example.com  # revokes sessions and
+                                                              # lab tokens, keeps what
+                                                              # it wrote
 uv run python -m app.cli activate-user someone@example.com    # opens it again
 ```
 
@@ -171,8 +192,9 @@ blocks. They are content, so `docs/pedagogy.md` governs them the way it
 governs lessons. Blocks carrying text from outside the platform are fenced
 with their provenance, and `base.md` is where the tutor is told that anything
 inside such a fence is data. The same directory also holds modules for the
-passes that are not the tutor — `title.md` is the whole prompt of the namer,
-which never sees `base.md` and is loaded by `module()` rather than `assemble()`.
+passes that are not the tutor — `title.md` is the whole prompt of the namer and
+`lab_review.md` the whole prompt of a lab's judge, neither of which sees
+`base.md`; both are loaded by `module()` rather than `assemble()`.
 
 A web chat is named from the learner's first question and named again by
 `harness/title.py` once `TITLE_REFRESH_MESSAGES` more have gone by: one short
@@ -192,9 +214,10 @@ messages, compactions — which is why the web API refuses to run in, compact or
 re-model the Telegram thread.
 
 Caps are enforcement, not telemetry: messages per user per day, an
-instance-wide monthly ceiling computed from the cost recorded on every run,
-web searches per user per day, and memory writes per run. Set a spend limit on
-the OpenRouter key too — that one holds even if this code is wrong.
+instance-wide monthly ceiling computed from the cost recorded on every run and
+on every judged lab submission, web searches per user per day, and memory
+writes per run. Set a spend limit on the OpenRouter key too — that one holds
+even if this code is wrong.
 
 ## The tutor's tools
 
@@ -351,7 +374,8 @@ poller could sweep the lease of a row the first is still delivering and send it
 twice. Scale it and that assumption has to be revisited first.
 
 The worker also owns the daily housekeeping sweep of rows nothing will read
-again: expired sessions, spent pairing codes and update ids older than a week.
+again: expired sessions, pairing codes past their ten minutes — Telegram's and
+the labs' — and update ids older than a week.
 
 ## Spaced repetition
 
@@ -469,7 +493,7 @@ Rows arrive from the frontend's `npm run export-index`, which chunks lessons
 through the site's own MDX pipeline, and are written by
 
 ```bash
-python -m app.content.ingest <index.json>     # `make reindex` from the root
+python -m app.content.ingest <index.json> [<labs-private-dir>]  # `make reindex`
 ```
 
 Ingest is a hash-based upsert: re-running it on an unchanged export writes
@@ -477,12 +501,96 @@ nothing, and a chunk the export no longer lists is deleted, so a locator can
 never outlive the passage it names. It refuses an empty index rather than
 emptying the table, and leaves corpora the file does not mention alone.
 
+The optional second argument is the lab build's `labs-dist/private/`, and it
+is the one thing the content ingest loads that is not a `documents` row:
+expected outputs, held-out labels and rubrics go to `lab_challenges` instead,
+because search returns documents and the tutor quotes them. Same command, so a
+lab's brief and the challenges it is graded against cannot be one deploy
+apart; an absent or empty directory means the labs were not built and leaves
+the table alone rather than un-verifying every lab on the site.
+
 Search is tier 1: a generated `tsvector` (title weight A, body B), a GIN
 index, `websearch_to_tsquery` and `ts_rank_cd`. No idf, deliberately — the
 corpus is hundreds of chunks and the consumer is an agent that reformulates
 its query, so recall matters more than the order of the top few. If that
 stops being good enough, the next step is a BM25 rerank of the top 50 in
 memory, and only then a vector tier.
+
+## Labs
+
+A lab is a lesson the learner solves in their own Jupyter. The server executes
+nothing they or the author wrote: `app/labs/verify.py` compares a posted output
+against the one the build captured from the reference solution or scores
+predictions against labels the learner never sees, and `app/labs/judge.py` hands
+a written answer to a model. Three tables, keyed by the same lesson locator as
+everything else: `lab_challenges` (the answer key, per checkpoint),
+`lab_checkpoint_state` (attempts, first pass, best score, the last hint) and
+`lab_submissions` (the append-only log).
+
+```
+GET  /labs/{course}/{lesson}/manifest    # public: what the notebook computes on
+POST /labs/submissions                   # bearer: one attempt at one checkpoint
+GET  /labs/{course}/{lesson}/progress    # cookie: what the lesson page draws
+```
+
+- The manifest is the display half from `documents.metadata.lab` joined with
+  `lab_challenges.spec["public"]`, and it is public by construction rather
+  than by filtering: the answer key lives under a sibling key the route never
+  reads. Serving it here rather than from the mirror is what keeps the inputs
+  a learner computes on and the outputs they are compared against one ingest.
+  A checkpoint's `kind` comes from the challenge rather than from the index,
+  for the same reason: the two are separate ingests, and the notebook must
+  build the payload the row that grades it takes.
+- A submission carries the id its notebook minted, which is the primary key of
+  the log: a post retried over a dropped connection is answered with the
+  verdict it already earned and spends no second attempt. It also carries the
+  manifest's `content_version`; a mismatch is 409 and means the lab was
+  rebuilt under an open notebook.
+- Feedback is coarse on purpose — a pass, and a hint only where the output
+  matches a wrong variant the author declared, naming the bug and never the
+  expected value. Nothing reports how far off an answer was. A `review`
+  checkpoint is the exception, because feedback is all it is for: the judge's
+  sentence comes back in the same field and is what the page shows.
+- The judge (`app/labs/judge.py`, prompt `harness/prompts/lab_review.md`) is
+  one call on a toolless agent, inside the submit request: the private rubric,
+  the learner's answer fenced as untrusted, and a schema-validated
+  `{passed, feedback}` back. It is lenient by instruction — a `review`
+  checkpoint is `required: false` unless an author says otherwise, and the
+  value is the sentence rather than the gate. Anything that stops it
+  answering — an outage, a call that never comes back inside
+  `judge.TIMEOUT_SECONDS`, output that will not validate twice, a spent monthly
+  ceiling — leaves the submission `pending` rather than failing the learner,
+  and what the call cost is stored on `lab_submissions.usage`, the second row
+  that ceiling sums. A pending verdict overwrites nothing and stores nothing:
+  the feedback the page shows is the last judgement that actually happened,
+  never the hint that says none did. Nothing re-grades a stored submission —
+  the log is append-only — so a pending verdict is not a queue, and both the
+  hint and the page's own line say to post the answer again.
+- The call is made between two transactions, never inside one. `submit` runs
+  its checks under the per-(learner, lesson) lock, commits to hand back both
+  the lock and the pooled connection, judges with nothing held, then takes the
+  lock again to write — asking a second time whether this submission id has
+  been answered, because a retry of it may have finished while the model was
+  thinking. A judging that hangs must not be able to block this learner's
+  telemetry flush or starve the connection pool, which is why the harness
+  claims its chat and commits before running a model too.
+- Passing every `required` checkpoint finishes the lesson: the same
+  `lesson_completed` event reading one emits
+  (`telemetry.ingest.emit_completion`) and the same review ladder, under the
+  same per-(learner, lesson) advisory lock, so two submissions landing together
+  finish it once. `lesson_progress` is re-derived in that transaction too,
+  because it is the projection every reader of completion outside telemetry
+  consults and a lab has no flush of its own coming.
+- Rate limits: 60 submissions a minute per learner, and per checkpoint per day
+  `LAB_METRIC_ATTEMPTS_PER_DAY` / `LAB_REVIEW_ATTEMPTS_PER_DAY` for the two
+  kinds that cost the server real work. All of them are in-process fixed
+  windows, so the real daily ceiling is that number times the worker count and
+  a deploy resets it — the bound that actually stops model spend is the
+  monthly cost ceiling, which is counted in the database. The day's attempt is spent before the
+  grading it bounds — what bounds a model call has to be — and given back when
+  nothing was graded, so a retried id, a stale `content_version`, a checkpoint
+  nobody built, a payload the checkpoint refuses and a judging the platform
+  could not do all cost the learner nothing.
 
 ## Telemetry
 
@@ -529,6 +637,13 @@ are the client's to choose, so a derived one could be squatted to suppress the
 completion. What makes the emit exactly-once is the absence of the event,
 checked under the same advisory lock the flush holds. That row is where spaced
 repetition subscribes.
+
+Reading is not the only way to finish a lesson, though — passing a lab's
+required checkpoints emits the same event (`app/labs/repository.py`), and a lab
+is finished having met no reading bar at all. So the projection takes the
+earliest `lesson_completed` of the pair wherever the running totals derive
+nothing: the event is the statement that a lesson was finished, and
+`lesson_progress.completed_at` is its projection either way.
 
 A **reading day** is a lower bar over one calendar day of the reader's own
 clock (`users.timezone`): five minutes of credited attention, no scroll depth

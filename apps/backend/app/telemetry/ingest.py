@@ -30,7 +30,7 @@ async def record(session: AsyncSession, user: User, batch: EventBatch) -> None:
         )
     completed_at = await progress.recompute(session, user.id, batch.lesson)
     if completed_at is not None:
-        await _emit_completion(session, user.id, batch.lesson, completed_at)
+        await emit_completion(session, user.id, batch.lesson, completed_at)
         # The subscription spaced repetition is built on. Unconditional rather
         # than guarded by the emit: the ladder's own key is what makes a second
         # completion of the same lesson a no-op, and a ladder that failed to
@@ -130,13 +130,20 @@ def _payload(event: RawEvent) -> dict[str, Any] | None:
         return None
 
 
-async def _emit_completion(
+async def emit_completion(
     session: AsyncSession, user_id: uuid.UUID, lesson: str, completed_at: datetime
 ) -> None:
+    """The one statement that a lesson was finished, whatever finished it.
+
+    Reading is one way (`record` above), passing a lab's required checkpoints
+    is the other (`app/labs/repository.py`); both call this under
+    `progress.lock` for the same (learner, lesson), which is what makes the
+    event exactly-once.
+    """
     # A random id rather than one derived from (user, lesson): ids are the
     # client's to mint, so a predictable one could be inserted first and
     # suppress this event for good. What makes the emit exactly-once is the
-    # absence of the event, read and acted on under the lock `record` holds.
+    # absence of the event, read and acted on under that lock.
     # Stamped with the completion instant rather than now(), so the derived
     # event cannot move the `last_seen` of the reading it describes.
     emitted = await session.scalar(

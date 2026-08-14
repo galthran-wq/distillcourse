@@ -9,6 +9,7 @@ import remarkRehype from "remark-rehype";
 import rehypeSlug from "rehype-slug";
 import { visit } from "unist-util-visit";
 import type { Root, RootContent, Element } from "hast";
+import { rawUrlBase } from "../labs/mirror";
 import type { LoadedCourse, LoadedLesson } from "./load";
 import { lessonKey, type Corpus } from "./locator";
 import { isMdxJsxNode, stringAttr, type MdxJsxNode } from "./mdx-jsx";
@@ -280,6 +281,27 @@ function countJsx(nodes: RootContent[], name: string): number {
   return total;
 }
 
+/**
+ * Where the lab's data files can be fetched from, absolute. The build copies
+ * `data/` to the mirror verbatim, so the directory is the list; the URL scheme
+ * is the mirror's own (lib/labs/mirror) and is stated in one place only.
+ */
+function labDataFiles(courseSlug: string, entry: LoadedLesson): string[] {
+  const base = rawUrlBase(`${courseSlug}/${entry.lesson.slug}`);
+  return listFiles(join(entry.dir, "data")).map((path) => `${base}/data/${path}`);
+}
+
+function listFiles(dir: string, prefix = ""): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((item) =>
+      item.isDirectory()
+        ? listFiles(join(dir, item.name), `${prefix}${item.name}/`)
+        : [`${prefix}${item.name}`],
+    );
+}
+
 function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocument[] {
   const root = toHast(entry.mdx as string, "mdx");
   resolveRefs(
@@ -303,6 +325,19 @@ function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocume
     ...entry.lesson.concepts.introduces,
     ...entry.lesson.concepts.reinforces,
   ];
+  // A lab's checkpoints travel with the lesson: the backend knows content
+  // only through this index, so a checkpoint absent here does not exist.
+  const lab =
+    entry.lesson.lab === undefined
+      ? undefined
+      : {
+          est_hours: entry.lesson.lab.est_hours,
+          checkpoints: entry.lesson.lab.checkpoints.map((c, order) => ({
+            ...c,
+            order,
+          })),
+          data_files: labDataFiles(course.course.slug, entry),
+        };
 
   return perChunk.map(({ chunk: c, text, words }, position) => ({
     corpus: "lesson" as const,
@@ -323,6 +358,7 @@ function lessonDocuments(course: LoadedCourse, entry: LoadedLesson): IndexDocume
       document_word_count: documentWords,
       solutions_total: solutions,
       concepts,
+      ...(lab !== undefined ? { lab } : {}),
     },
   }));
 }

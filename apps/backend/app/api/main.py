@@ -4,6 +4,7 @@ from app.api.routes import (
     auth,
     chats,
     health,
+    labs,
     lessons,
     memories,
     profile,
@@ -20,3 +21,4 @@ api_router.include_router(lessons.router)
 api_router.include_router(profile.router)
 api_router.include_router(settings.router)
 api_router.include_router(memories.router)
+api_router.include_router(labs.router)

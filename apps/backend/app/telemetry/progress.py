@@ -163,6 +163,12 @@ def _completed_at(user_id: uuid.UUID, lesson: str, threshold: int) -> Select[Any
     One bucket, so the totals run over the whole history: someone who reads it
     in five sittings has read it, which is what separates completion from the
     reading day a single sitting has to earn on its own.
+
+    Reading is not the only way to finish a lesson, though — passing a lab's
+    required checkpoints emits the completion event directly
+    (`app/labs/repository.py`), and a lab is finished without ever meeting a
+    reading bar. So an existing event answers for a history that does not: the
+    projection honours the log rather than deriving a second opinion from it.
     """
     running = _running(user_id, lesson, literal_column("1"))
     reached = _first(
@@ -170,7 +176,18 @@ def _completed_at(user_id: uuid.UUID, lesson: str, threshold: int) -> Select[Any
         running.c.active_seconds >= threshold,
         running.c.max_scroll_pct >= COMPLETION_SCROLL_PCT,
     ).subquery()
-    return select(reached.c.reached_at)
+    emitted = (
+        select(func.min(Event.server_ts))
+        .where(
+            Event.user_id == user_id,
+            Event.lesson == lesson,
+            Event.type == schemas.COMPLETED,
+        )
+        .scalar_subquery()
+    )
+    return select(
+        func.coalesce(select(reached.c.reached_at).scalar_subquery(), emitted)
+    )
 
 
 async def threshold_seconds(session: AsyncSession, lesson: str) -> int:
