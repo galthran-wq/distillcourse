@@ -14,6 +14,7 @@ import { collapsePanel, togglePanel, usePanel, usePanelBox } from "@/lib/chat/st
 import { LessonsProvider, type Lessons } from "@/lib/content/links";
 import { SectionsProvider, useLoadedSections } from "@/lib/content/sections";
 import { useExitDelay } from "@/lib/ui/exit";
+import { lockScroll } from "@/lib/ui/scroll-lock";
 
 export default function ChatWidget({ lessons }: { lessons: Lessons }) {
   const auth = useAuth();
@@ -61,10 +62,10 @@ export default function ChatWidget({ lessons }: { lessons: Lessons }) {
       if (event.key === "Escape") collapsePanel();
     };
     window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      unlock();
     };
   }, [expanded]);
 

@@ -199,10 +199,9 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
           <ChatMenu
             current={session.summary}
             chats={chats}
-            models={models}
             expanded={expanded}
             onSelect={(chat) => run(selectSession(chat))}
-            onModel={(id) => run(changeModel(id))}
+            onNew={() => run(clearSession())}
           />
         )}
       </header>
@@ -238,7 +237,13 @@ export default function ChatPanel({ session, panel, expanded }: Props) {
               {line}
             </p>
           )}
-          <Composer disabled={busy(status)} onSubmit={submit} />
+          <Composer
+            disabled={busy(status)}
+            onSubmit={submit}
+            models={models}
+            model={session.summary.model}
+            onModel={(id) => run(changeModel(id))}
+          />
         </div>
       </div>
     </>

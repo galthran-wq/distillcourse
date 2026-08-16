@@ -20,8 +20,10 @@ import MentionPalette, {
   mentionRowId,
 } from "@/components/chat/Mentions";
 import { PendingQuote, QuoteRow } from "@/components/chat/Quotes";
+import ModelPicker from "@/components/chat/ModelPicker";
 import { Button } from "@/components/ui";
 import { FIELD_BOX_CLASS, FIELD_BOX_INPUT_CLASS } from "@/components/ui/styles";
+import type { ChatModel } from "@/lib/chat/api";
 import { matchCommands, type Command } from "@/lib/chat/commands";
 import { asked, mentions, typingAt, write, type Mention } from "@/lib/chat/mention";
 import { useQuotes, type Quote } from "@/lib/chat/quote";
@@ -35,9 +37,13 @@ interface Props {
   disabled: boolean;
   /** The passages come with the text: they are what the question is about. */
   onSubmit: (text: string, quotes: Quote[]) => void;
+  /** The model picker in the footer reads these; the menu no longer carries it. */
+  models: ChatModel[];
+  model: string;
+  onModel: (id: string) => void;
 }
 
-export default function Composer({ disabled, onSubmit }: Props) {
+export default function Composer({ disabled, onSubmit, models, model, onModel }: Props) {
   // Outside the component, so that an unsent message survives a reload.
   const text = useDraft();
   const quotes = useQuotes();
@@ -227,54 +233,62 @@ export default function Composer({ disabled, onSubmit }: Props) {
           </QuoteRow>
         )}
         <MentionRow draft={text} />
-        {/* The field is the box, not the textarea: the send button sits in it
-            beside the text rather than floating over the corner of it, and the
-            border and the ring belong to the two of them together. */}
+        {/* The field is the box, not the textarea: the line the reader writes on
+            top, and under it a footer that carries the model picker at one end
+            and the send button at the other. The border and the ring belong to
+            all of it together, the way a Cursor-style composer reads. */}
         <div
           className={FIELD_BOX_CLASS}
-          // The box is wider and taller than the text in it — its padding, the
-          // gap, and the column over the send button once the draft wraps. All
-          // of that reads as the field, and used to be textarea surface where a
-          // press put the caret; it still is.
+          // The box is wider and taller than the text in it — its padding, and
+          // the footer row under the line. All of that reads as the field, and a
+          // press on any of it puts the caret back in the line.
           onMouseDown={(event) => {
             if (event.target !== event.currentTarget) return;
             event.preventDefault();
             field.current?.focus();
           }}
         >
-          <textarea
-            ref={field}
-            value={text}
-            onChange={(event) => type(event.target.value, event.target.selectionStart)}
-            // Every other way the caret moves: the arrows, a click into the
-            // middle of the line, a drag over it.
-            onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
-            onKeyDown={onKeyDown}
-            rows={1}
-            aria-label="Message the tutor"
-            // The field stands in for the list hanging over it: it keeps the
-            // focus, so it is what says the list is open and which row of it
-            // Enter would take. Only while it is — the rest of the time this
-            // is a message field and has nothing to say about a list.
-            role={open ? "combobox" : undefined}
-            aria-expanded={open || undefined}
-            aria-controls={open ? list.id : undefined}
-            aria-activedescendant={open ? list.rowId(active) : undefined}
-            placeholder={disabled ? "the tutor is answering…" : "Ask about this section"}
-            // Geometry only: the fill, the line and the ring are the box's.
-            // The height matches the send button beside it, so one line of
-            // text sits level with it.
-            className={`${FIELD_BOX_INPUT_CLASS} max-h-36 min-h-10 flex-1 resize-none overflow-y-auto px-2.5 py-2.5`}
-          />
-          <Button
-            type="submit"
-            variant="solid"
-            size="icon"
-            disabled={!ready}
-            aria-label="Send"
-          >
-            <SendIcon />
-          </Button>
+          <div className="flex w-full flex-col gap-1">
+            <textarea
+              ref={field}
+              value={text}
+              onChange={(event) => type(event.target.value, event.target.selectionStart)}
+              // Every other way the caret moves: the arrows, a click into the
+              // middle of the line, a drag over it.
+              onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              aria-label="Message the tutor"
+              // The field stands in for the list hanging over it: it keeps the
+              // focus, so it is what says the list is open and which row of it
+              // Enter would take. Only while it is — the rest of the time this
+              // is a message field and has nothing to say about a list.
+              role={open ? "combobox" : undefined}
+              aria-expanded={open || undefined}
+              aria-controls={open ? list.id : undefined}
+              aria-activedescendant={open ? list.rowId(active) : undefined}
+              placeholder={disabled ? "the tutor is answering…" : "Ask about this section"}
+              // Geometry only: the fill, the line and the ring are the box's.
+              className={`${FIELD_BOX_INPUT_CLASS} max-h-36 min-h-9 w-full resize-none overflow-y-auto px-1.5 py-1`}
+            />
+            <div className="flex items-center justify-between gap-1.5">
+              <ModelPicker
+                models={models}
+                current={model}
+                disabled={disabled}
+                onModel={onModel}
+              />
+              <Button
+                type="submit"
+                variant="solid"
+                size="icon"
+                disabled={!ready}
+                aria-label="Send"
+              >
+                <SendIcon />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </form>
