@@ -7,7 +7,6 @@ import { QuoteRow, SentQuote } from "@/components/chat/Quotes";
 import ToolChip from "@/components/chat/ToolChip";
 import { attachedQuotes, quoted, type Quote } from "@/lib/chat/quote";
 import Reasoning from "@/components/chat/Reasoning";
-import { STREAM_THROTTLE_MS, useThrottledValue } from "@/lib/ui/throttle";
 
 // Within this much of the end counts as reading the newest message. Anything
 // further up is the reader looking at something, and the transcript stays put.
@@ -44,20 +43,13 @@ function Question({ text, attached }: { text: string; attached: Quote[] }) {
 }
 
 /**
- * An assistant answer's text, re-parsed at most `THROTTLE_MS` while it streams.
- * The hook passes the text straight through once the turn settles, so the final
- * render is the whole answer, never a throttled frame short of it.
- */
-function AssistantText({ text, streaming }: { text: string; streaming: boolean }) {
-  return <Markdown text={useThrottledValue(text, STREAM_THROTTLE_MS, streaming)} />;
-}
-
-/**
  * One turn of the transcript. Memoised so a settled turn does not re-render
- * while a later one streams: only the streaming turn's `message` reference
- * changes per token, and only it carries `streaming`. Even were a settled turn
- * to re-render, its `Markdown` is memoised on unchanged text and would not
- * re-parse — this keeps it from reconciling at all.
+ * while a later one streams: the SDK clones only the streaming message, so its
+ * `message` reference changes per throttled tick while settled turns keep
+ * theirs, and only it carries `streaming`. Even were a settled turn to
+ * re-render, its `Markdown` is memoised on unchanged text and would not
+ * re-parse — this keeps it from reconciling at all. The stream itself is
+ * throttled at the source (`ChatPanel`'s `experimental_throttle`).
  */
 const Turn = memo(function Turn({
   message,
@@ -99,7 +91,7 @@ const Turn = memo(function Turn({
               attached={attachedQuotes(message.metadata)}
             />
           ) : (
-            <AssistantText key={index} text={part.text} streaming={streaming} />
+            <Markdown key={index} text={part.text} />
           );
         }
         if (isToolUIPart(part)) {

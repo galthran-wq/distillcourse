@@ -239,9 +239,10 @@ export default function Composer({ disabled, onSubmit, models, model, onModel }:
             all of it together, the way a Cursor-style composer reads. */}
         <div
           className={FIELD_BOX_CLASS}
-          // The box is wider and taller than the text in it — its padding, and
-          // the footer row under the line. All of that reads as the field, and a
-          // press on any of it puts the caret back in the line.
+          // A press on the box's own padding — the strip around the column
+          // below — reads as a press on the field and puts the caret back in the
+          // line. Presses inside the column reach the textarea, the picker or
+          // the send button and are theirs.
           onMouseDown={(event) => {
             if (event.target !== event.currentTarget) return;
             event.preventDefault();

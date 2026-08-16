@@ -54,8 +54,21 @@ function failure(error: unknown): string {
   return error instanceof ApiError ? error.message : "the server is unreachable";
 }
 
+/**
+ * How often the transcript re-renders while an answer streams, at most. A reply
+ * arrives a token at a time, and each render re-parses the message's markdown
+ * and re-runs KaTeX over it; per token that saturates the main thread and the
+ * tab stops painting ("Page unresponsive"). The SDK's own throttle bounds it to
+ * ~8/s — combined with the memoised turns (`Messages`), only the streaming turn
+ * re-parses, and only that often. The reasoning trace rides the same throttle.
+ */
+const STREAM_THROTTLE_MS = 120;
+
 export default function ChatPanel({ session, panel, expanded }: Props) {
-  const { messages, sendMessage, status, error } = useChat({ chat: session.chat });
+  const { messages, sendMessage, status, error } = useChat({
+    chat: session.chat,
+    experimental_throttle: STREAM_THROTTLE_MS,
+  });
   const [models, setModels] = useState<ChatModel[]>([]);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [menu, setMenu] = useState(false);

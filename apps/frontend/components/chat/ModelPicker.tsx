@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ChevronIcon } from "@/components/chat/icons";
-import { MENU_ITEM_CLASS, POPOVER_CLASS } from "@/components/ui/styles";
+import { CHIP_CLASS, MENU_ITEM_CLASS, POPOVER_CLASS } from "@/components/ui/styles";
 import type { ChatModel } from "@/lib/chat/api";
 import { useDismiss } from "@/lib/ui/dismiss";
 
@@ -32,13 +32,16 @@ export default function ModelPicker({
 
   return (
     <div ref={box} className="relative">
+      {/* The site's small outlined control that names a thing (ui/styles): here
+          it names the model the chat runs on, Cursor-style, at the foot of the
+          composer. */}
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen(!open)}
         aria-label="Model"
         aria-expanded={open}
-        className="flex items-center gap-1 rounded-sm px-1.5 py-1 text-[12px] text-soft transition-colors duration-(--motion-fast) hover:text-ink disabled:pointer-events-none disabled:opacity-45"
+        className={`${CHIP_CLASS} inline-flex gap-1 px-1.5 py-1 disabled:pointer-events-none disabled:opacity-45`}
       >
         {name}
         <ChevronIcon

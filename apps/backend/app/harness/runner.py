@@ -85,12 +85,21 @@ def _prefix(messages: Sequence[ModelMessage], block: str) -> None:
                 return
 
 
-def _model(chat: Chat, run_kind: RunKind) -> OpenRouterModel:
+def _model(
+    chat: Chat, run_kind: RunKind, *, reasoning: bool = False
+) -> OpenRouterModel:
     """Which model answers. The learner's choice is theirs for the dialogue
     they are having; a run the platform starts by itself — a review, a
     proactive message, a compaction — is the instance's own spending and goes
-    to the default, whatever the chat was last switched to (#10)."""
-    return model_for(chat.model if run_kind == "chat" else settings.DEFAULT_CHAT_MODEL)
+    to the default, whatever the chat was last switched to (#10).
+
+    `reasoning` is asked for only by the web streaming path, the one place a
+    trace has a dropdown to land in; everywhere else it stays off so its tokens
+    are not billed for nothing."""
+    return model_for(
+        chat.model if run_kind == "chat" else settings.DEFAULT_CHAT_MODEL,
+        reasoning=reasoning,
+    )
 
 
 class Compaction(BaseModel):
@@ -394,7 +403,9 @@ async def _drain(
                 async for chunk in adapter.run_stream(
                     message_history=history,
                     deps=deps,
-                    model=_model(chat, "chat"),
+                    # The web dialogue is the only run whose client shows a
+                    # reasoning trace, so it is the only one that asks for one.
+                    model=_model(chat, "chat", reasoning=True),
                     instructions=instructions,
                     run_id=str(run_id),
                     on_complete=capture,

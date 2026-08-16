@@ -61,7 +61,7 @@ def chat_model(openrouter_id: str) -> ChatModel:
 
 
 @lru_cache
-def model_for(openrouter_id: str) -> OpenRouterModel:
+def model_for(openrouter_id: str, *, reasoning: bool = False) -> OpenRouterModel:
     model = chat_model(openrouter_id)
     # Usage accounting returns what OpenRouter actually billed, which is what the
     # monthly ceiling is counted in. `parallel_tool_calls` only permits the model
@@ -74,12 +74,15 @@ def model_for(openrouter_id: str) -> OpenRouterModel:
         openrouter_usage={"include": True},
         parallel_tool_calls=True,
     )
-    if model.reasoning:
-        # Low effort: the trace is a UX affordance shown in a dropdown, not a
-        # quality lever, and higher effort inflates latency and the token
-        # ceiling. `exclude` defaults False, so the trace streams to the client.
-        reasoning: OpenRouterReasoning = {"effort": "low"}
-        model_settings["openrouter_reasoning"] = reasoning
+    # Only where the model has a reasoning trace AND the caller has a place to
+    # show it: the web streaming chat, whose client renders the trace in a
+    # dropdown. Never for a title, a compaction, a proactive message or a
+    # Telegram turn — none of them surface it, and the tokens would be billed
+    # against the monthly ceiling for nothing. Low effort: it is a UX affordance,
+    # not a quality lever. `exclude` defaults False, so the trace is returned.
+    if model.reasoning and reasoning:
+        openrouter_reasoning: OpenRouterReasoning = {"effort": "low"}
+        model_settings["openrouter_reasoning"] = openrouter_reasoning
     return OpenRouterModel(
         model.openrouter_id,
         provider=OpenRouterProvider(api_key=settings.OPENROUTER_API_KEY),
