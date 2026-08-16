@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MOTION_FAST_MS } from "@/components/ui/styles";
 import { useExitDelay } from "@/lib/ui/exit";
+import { lockScroll } from "@/lib/ui/scroll-lock";
 
 interface Props {
   src: string;
@@ -30,10 +31,10 @@ export default function Lightbox({ src, alt, width, height, className }: Props) 
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      unlock();
     };
   }, [open]);
 

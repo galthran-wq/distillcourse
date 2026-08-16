@@ -2,7 +2,7 @@
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import ChatMenu from "@/components/chat/ChatMenu";
-import type { ChatModel, ChatSummary } from "@/lib/chat/api";
+import type { ChatSummary } from "@/lib/chat/api";
 import { composing } from "./chat-fixture";
 import { mounted, stubResizeObserver, stubScrollIntoView, type } from "./utils/dom";
 
@@ -202,32 +202,30 @@ const SUMMARY: ChatSummary = {
 
 const CHATS: ChatSummary[] = [SUMMARY];
 
-const MODELS: ChatModel[] = [
-  { openrouter_id: "moonshotai/kimi-k3", display_name: "Kimi K3", context_window: 200000 },
-];
-
 describe("the chat menu", () => {
   const { host, render } = mounted();
 
-  it("has one home for each function and is not the commands'", () => {
+  it("switches chats and starts one — not the commands, not the model", () => {
     act(() =>
       render(
         <ChatMenu
           current={SUMMARY}
           chats={CHATS}
-          models={MODELS}
           expanded={false}
           onSelect={() => {}}
-          onModel={() => {}}
+          onNew={() => {}}
         />,
       ),
     );
 
     const menu = host().textContent ?? "";
+    // The commands run from the composer's palette, not here.
     expect(menu).not.toContain("/clear");
     expect(menu).not.toContain("/compact");
-    // What it does keep.
-    expect(menu).toContain("Kimi K3");
+    // The model moved to the composer's footer (ModelPicker), not here.
+    expect(menu).not.toContain("Kimi K3");
+    // What it does keep: a way to start a chat, and the chats to switch to.
+    expect(menu).toContain("New chat");
     expect(menu).toContain("Entropy");
   });
 });

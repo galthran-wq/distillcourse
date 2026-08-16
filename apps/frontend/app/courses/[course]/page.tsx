@@ -11,6 +11,7 @@ import { getCourse, getCourses } from "@/lib/content/site";
 import { isReadable, previewMode } from "@/lib/content/visibility";
 import Figure from "@/components/mdx/Figure";
 import FigureSequence from "@/components/mdx/FigureSequence";
+import MathText from "@/components/mdx/MathText";
 import * as Blocks from "@/components/mdx/Blocks";
 import { assetUrl } from "@/lib/content/images";
 import Lightbox from "@/components/mdx/Lightbox";
@@ -104,7 +105,7 @@ export default async function CoursePage({
                   –
                 </span>
                 <span>
-                  {p.text}
+                  <MathText text={p.text} />
                   {p.course !== undefined && (
                     <>
                       {" "}
@@ -131,7 +132,7 @@ export default async function CoursePage({
               <span aria-hidden className="text-faint">
                 –
               </span>
-              {o.text}
+              <MathText text={o.text} />
             </li>
           ))}
         </ul>
@@ -150,7 +151,7 @@ export default async function CoursePage({
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <span className="text-soft">
-                    {kr.text}{" "}
+                    <MathText text={kr.text} />{" "}
                     {/* Only the arrow is tied to the title. A nowrap title is
                         wider than a phone's column, and the li is a flex row,
                         so it would widen the whole document instead. */}
@@ -277,7 +278,9 @@ export default async function CoursePage({
           <SectionLabel>Main sources</SectionLabel>
           <ol className="flex flex-col gap-1.5 pl-5 text-[0.92rem] leading-relaxed text-soft">
             {course.sources.map((s, i) => (
-              <li key={i}>{s}</li>
+              <li key={i}>
+                <MathText text={s} />
+              </li>
             ))}
           </ol>
         </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { memo, type ComponentProps } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -54,7 +54,15 @@ function ChipAnchor({ href, children, ...rest }: Link) {
 const COMPONENTS = { a: Anchor };
 const CHIP_COMPONENTS = { a: ChipAnchor };
 
-export default function Markdown({
+// Memoised because it is the expensive node in the transcript: parsing markdown
+// and running KaTeX over it. A streaming answer re-renders `Messages` on every
+// throttled tick, and without this every settled turn would re-parse itself each
+// time. Memo holds the render steady while its `text` is unchanged, so a settled
+// turn costs nothing while a later one streams, and the streaming turn re-parses
+// only when its text actually advances — at most as often as the stream is
+// throttled (`ChatPanel`'s `experimental_throttle`). Lessons and sections come
+// from context, which bypasses memo and re-renders on a real change.
+const Markdown = memo(function Markdown({
   text,
   chips = false,
 }: {
@@ -83,4 +91,6 @@ export default function Markdown({
       </ReactMarkdown>
     </div>
   );
-}
+});
+
+export default Markdown;

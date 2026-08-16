@@ -24,6 +24,10 @@ class ChatModel(BaseModel):
     openrouter_id: str
     display_name: str
     context_window: int
+    # Ask the model to emit a reasoning trace, which the client streams into a
+    # dropdown. Opt-in per model: a model that does not reason ignores it, and
+    # forcing it on one that does inflates every answer's latency and token cost.
+    reasoning: bool = False
 
 
 class Settings(BaseSettings):
@@ -61,6 +65,7 @@ class Settings(BaseSettings):
             openrouter_id="moonshotai/kimi-k3",
             display_name="Kimi K3",
             context_window=1_048_576,
+            reasoning=True,
         ),
     ]
     DEFAULT_CHAT_MODEL: str = "moonshotai/kimi-k3"

@@ -304,7 +304,7 @@ async def test_a_failure_before_the_stream_is_told_to_the_client(
     """Building the model happens outside the adapter's own error handling —
     the client still gets an error, and the chat keeps no empty reply."""
 
-    def explode(_model: str) -> None:
+    def explode(_model: str, **_: object) -> None:
         raise RuntimeError("no openrouter key")
 
     monkeypatch.setattr(runner, "model_for", explode)
@@ -612,7 +612,7 @@ async def test_a_run_that_failed_does_not_rename_the_chat(
     """A name is written from what was said, and a run that produced nothing
     said nothing."""
 
-    def explode(_model: str) -> None:
+    def explode(_model: str, **_: object) -> None:
         raise RuntimeError("no openrouter key")
 
     named_by: list[str] = []

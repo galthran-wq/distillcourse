@@ -1,11 +1,12 @@
 "use client";
 
 import { isToolUIPart, type ChatStatus, type UIMessage } from "ai";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import Markdown from "@/components/chat/Markdown";
 import { QuoteRow, SentQuote } from "@/components/chat/Quotes";
 import ToolChip from "@/components/chat/ToolChip";
 import { attachedQuotes, quoted, type Quote } from "@/lib/chat/quote";
+import Reasoning from "@/components/chat/Reasoning";
 
 // Within this much of the end counts as reading the newest message. Anything
 // further up is the reader looking at something, and the transcript stays put.
@@ -40,6 +41,67 @@ function Question({ text, attached }: { text: string; attached: Quote[] }) {
     </>
   );
 }
+
+/**
+ * One turn of the transcript. Memoised so a settled turn does not re-render
+ * while a later one streams: the SDK clones only the streaming message, so its
+ * `message` reference changes per throttled tick while settled turns keep
+ * theirs, and only it carries `streaming`. Even were a settled turn to
+ * re-render, its `Markdown` is memoised on unchanged text and would not
+ * re-parse — this keeps it from reconciling at all. The stream itself is
+ * throttled at the source (`ChatPanel`'s `experimental_throttle`).
+ */
+const Turn = memo(function Turn({
+  message,
+  streaming,
+}: {
+  message: UIMessage;
+  /** This is the answer being written right now: throttle its markdown. */
+  streaming: boolean;
+}) {
+  return (
+    <article
+      aria-label={message.role === "user" ? "You" : "Tutor"}
+      // A turn rises into place as it is added. The answer inside it is written
+      // a token at a time and does not animate: the element is there from the
+      // first token, and this only plays on the node React inserts.
+      className={`transition-[opacity,translate] duration-(--motion-base) starting:translate-y-1.5 starting:opacity-0 ${
+        message.role === "user"
+          ? "ml-auto w-fit max-w-[85%] rounded-md bg-accent/10 px-3 py-2"
+          : ""
+      }`}
+    >
+      {message.parts.map((part, index) => {
+        if (part.type === "reasoning") {
+          // Open and streaming while the model is still thinking this block;
+          // collapsed once it is done (the answer proper has begun).
+          return (
+            <Reasoning
+              key={index}
+              text={part.text}
+              active={streaming && part.state !== "done"}
+            />
+          );
+        }
+        if (part.type === "text") {
+          return message.role === "user" ? (
+            <Question
+              key={index}
+              text={part.text}
+              attached={attachedQuotes(message.metadata)}
+            />
+          ) : (
+            <Markdown key={index} text={part.text} />
+          );
+        }
+        if (isToolUIPart(part)) {
+          return <ToolChip key={index} part={part} />;
+        }
+        return null;
+      })}
+    </article>
+  );
+});
 
 /**
  * The question is in and nothing has come back yet: three dots waiting where
@@ -116,7 +178,13 @@ export default function Messages({
     // time, and a transcript that announces itself on every one of them reads
     // the whole conversation out again per token. Each turn says who spoke,
     // which is what is needed.
-    <div ref={view} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 py-3">
+    <div
+      ref={view}
+      onScroll={onScroll}
+      // `overscroll-contain`: a stream that reaches the bottom must not chain
+      // its scroll into the page behind the panel.
+      className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
+    >
       {/* Expanded, the panel is far wider than a column of prose should be. */}
       <div className="mx-auto max-w-2xl">
         <div className="space-y-4">
@@ -127,7 +195,7 @@ export default function Messages({
             </p>
           )}
           {messages.map((message, turn) => (
-            <article
+            <Turn
               // By position, not by id: the backend gives every stored question
               // of every chat the same id — it derives one from fields a
               // question has none of — so an id is not an identity here, and
@@ -135,35 +203,15 @@ export default function Messages({
               // nodes. A transcript is only ever appended to, which makes
               // position one.
               key={turn}
-              aria-label={message.role === "user" ? "You" : "Tutor"}
-              // A turn rises into place as it is added. The answer inside it is
-              // written a token at a time and does not animate: the element is
-              // there from the first token, and this only plays on the node
-              // React inserts.
-              className={`transition-[opacity,translate] duration-(--motion-base) starting:translate-y-1.5 starting:opacity-0 ${
-                message.role === "user"
-                  ? "ml-auto w-fit max-w-[85%] rounded-md bg-accent/10 px-3 py-2"
-                  : ""
-              }`}
-            >
-              {message.parts.map((part, index) => {
-                if (part.type === "text") {
-                  return message.role === "user" ? (
-                    <Question
-                      key={index}
-                      text={part.text}
-                      attached={attachedQuotes(message.metadata)}
-                    />
-                  ) : (
-                    <Markdown key={index} text={part.text} />
-                  );
-                }
-                if (isToolUIPart(part)) {
-                  return <ToolChip key={index} part={part} />;
-                }
-                return null;
-              })}
-            </article>
+              message={message}
+              // The last turn, while the run streams, is the answer being
+              // written: throttle its markdown. Everything above it is settled.
+              streaming={
+                status === "streaming" &&
+                turn === messages.length - 1 &&
+                message.role === "assistant"
+              }
+            />
           ))}
         </div>
         <Waiting status={status} />
