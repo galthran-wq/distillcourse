@@ -127,7 +127,7 @@ async def test_a_platform_run_bills_the_default_model_whatever_the_chat_uses(
     not what the platform starts by itself (#10)."""
     asked: list[str] = []
     monkeypatch.setattr(
-        runner, "model_for", lambda openrouter_id: asked.append(openrouter_id)
+        runner, "model_for", lambda openrouter_id, **_: asked.append(openrouter_id)
     )
 
     async def no_retitle(*_args: object, **_kwargs: object) -> None:
