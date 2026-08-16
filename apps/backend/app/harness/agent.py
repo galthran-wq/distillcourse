@@ -1,7 +1,11 @@
 from functools import lru_cache
 
 from pydantic_ai import Agent, Tool
-from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
+from pydantic_ai.models.openrouter import (
+    OpenRouterModel,
+    OpenRouterModelSettings,
+    OpenRouterReasoning,
+)
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.core.config import ChatModel, settings
@@ -58,12 +62,28 @@ def chat_model(openrouter_id: str) -> ChatModel:
 
 @lru_cache
 def model_for(openrouter_id: str) -> OpenRouterModel:
+    model = chat_model(openrouter_id)
+    # Usage accounting returns what OpenRouter actually billed, which is what the
+    # monthly ceiling is counted in. `parallel_tool_calls` only permits the model
+    # to emit several tool calls in one response — the tutor is told to batch
+    # independent lookups (base.md), and one response of parallel calls collapses
+    # what would be several round-trips into one. The calls still run serially
+    # through the tools' `sequential=True` barriers, so the shared session is
+    # never touched concurrently.
+    model_settings = OpenRouterModelSettings(
+        openrouter_usage={"include": True},
+        parallel_tool_calls=True,
+    )
+    if model.reasoning:
+        # Low effort: the trace is a UX affordance shown in a dropdown, not a
+        # quality lever, and higher effort inflates latency and the token
+        # ceiling. `exclude` defaults False, so the trace streams to the client.
+        reasoning: OpenRouterReasoning = {"effort": "low"}
+        model_settings["openrouter_reasoning"] = reasoning
     return OpenRouterModel(
-        chat_model(openrouter_id).openrouter_id,
+        model.openrouter_id,
         provider=OpenRouterProvider(api_key=settings.OPENROUTER_API_KEY),
-        # Usage accounting returns what OpenRouter actually billed, which is
-        # what the monthly ceiling is counted in.
-        settings=OpenRouterModelSettings(openrouter_usage={"include": True}),
+        settings=model_settings,
     )
 
 
