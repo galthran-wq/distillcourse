@@ -1,0 +1,225 @@
+The 4,601-message spam corpus — 57 word and character frequencies from one Hewlett-Packard employee's mailbox — is where this module's three roads meet: every classifier just built fits it, and their disagreements are interpretable.
+
+The module's machinery is complete: <Ref lesson="logistic-regression">road 1</Ref> models the log-odds directly, <Ref lesson="naive-bayes">road 2</Ref> models each class (cheaply by factorizing, or <Ref lesson="lda-gda">at full strength with Gaussians</Ref>), and <Ref lesson="svm-dual-kernels">road 3</Ref> lets the margin pick the boundary, with a kernel to curve it. What no lesson has done is the practitioner's job: run all of it on one real deployed problem and read what the fits claim about the data. This lesson does that on the corpus ESL uses for the same purpose, establishing it as the course's benchmark; <Ref lesson="spam-tree">trees</Ref> and <Ref lesson="spam-ensembles">ensembles</Ref> will re-enter it in modules 6 and 7. The route: the corpus and its collection story; four fits and one error table; the fitted weights, read for agreement and for leakage; the disagreements about probability and shape; and the operating threshold when a lost email costs ten seen spams.
+
+## The corpus: 4,601 messages from one mailbox
+
+<Task>
+Three retrievals before the data, closed book. (1) From <Ref lesson="naive-bayes">the naive Bayes lesson</Ref>: the Bernoulli model's weight on feature $j$ is the smoothed log odds ratio $w_j = \log\frac{\theta_{j|1}(1-\theta_{j|0})}{\theta_{j|0}(1-\theta_{j|1})}$, computable from that feature's own $2\times2$ count table and nothing else. (2) From <Ref lesson="logistic-regression">the logistic lesson</Ref>: a logistic coefficient is a *conditional* log odds ratio (the effect of one feature with all others held fixed), so correlated predictors reshuffle credit. (3) From <Ref lesson="statistical-learning">the opening lesson</Ref>: the optimal decision at a point minimizes the conditional expected loss there, and under 0–1 loss that means a threshold of $\tfrac12$ on $p(y{=}1 \mid x)$.
+</Task>
+
+In 1999 a group at Hewlett-Packard Labs in Palo Alto (Mark Hopkins, Erik Reeber, George Forman, and Jaap Suermondt) assembled a corpus for exactly the task this module's classifiers were built for: server-side mail filtering, the classical era's live deployed classification problem. The spam came from HP's postmaster and from users who filed complaints; the ham (legitimate mail) came from filed work and personal messages, overwhelmingly George Forman's own. Each of the 4,601 messages was reduced to 57 numbers: 48 word frequencies (the percentage of the message's words matching `free`, `money`, `george`, …), 6 character frequencies (`;` `(` `[` `!` `$` `#`), and 3 statistics of capital-letter runs (average, longest, total). The label is binary, and 1,813 of 4,601 messages — **39.4%** — are spam: the base rate every fitted probability below is anchored to.
+
+<Figure
+  src="./figures/row-anatomy.svg"
+  alt="A strip of 57 cells, one per feature, for one spam message of the corpus; nonzero entries are filled amber and labeled: remove 0.46, internet 1.86, free 1.86, your 1.40 among the word frequencies, exclamation 0.57 and dollar 0.21 among the characters, and a longest capital run of 64"
+  caption="One feature row. Of 57 entries, 37 are exactly zero; the message's vocabulary (free, internet, remove, your), its punctuation (!, $), and a 64-character run of capitals are what the classifiers see."
+/>
+
+A feature row is sparse: the message above uses 20 of the 57 tracked features, and zero is the modal value of nearly every column. ESL's Table 1.1 already contains the fact the audit below turns on: among the features separating the classes most strongly, the word `george` averages **0.00%** in spam against 1.27% in ham, and `hp` shows 0.02% against 0.90%. The recipient's own first name and employer are the corpus's strongest evidence of legitimacy.
+
+The protocol is fixed once and inherited from ESL, so every number this course ever computes on the corpus is comparable: a randomly chosen test set of **1,536 messages**, a training set of **3,065**, the same split ESL uses for every spam fit it reports. Training, tuning, and selection touch the 3,065 only.
+
+## Four fits, one test set
+
+Each classifier is fitted exactly as its lesson built it, with one preprocessing decision per model family. The frequency features are heavily skewed with a floor at zero, so the three feature-based fits use $\log(x + 0.1)$, ESL's transform for this data; logistic regression and the SVM additionally standardize each transformed feature to unit variance on the training rows, the precondition <Ref lesson="ridge-lasso">the penalties lesson</Ref> set before anything is penalized. Naive Bayes uses the Bernoulli event model on presence indicators $x_j > 0$ with add-one smoothing, <Ref lesson="naive-bayes">the count-and-smooth recipe</Ref> verbatim. Logistic regression carries a light L2 penalty (the default that <Ref lesson="logistic-regression">the separation theorem</Ref> made mandatory in libraries). LDA is <Ref lesson="lda-gda">the pooled-covariance plug-in</Ref>, means and one $57 \times 57$ covariance. The RBF-SVM's two dials are set by 5-fold cross-validation on the training set over a $4 \times 4$ grid, landing at $C = 10$, $\gamma = 0.01$. The table's last column is *test AUC*: the probability that a randomly drawn spam outscores a randomly drawn ham, a ranking measure the error column is blind to.
+
+| model | test error | ±SE | test AUC |
+| --- | --- | --- | --- |
+| naive Bayes (Bernoulli, add-one) | 11.0% | 0.8 | 0.951 |
+| LDA | 6.6% | 0.6 | 0.975 |
+| logistic (L2) | 5.9% | 0.6 | 0.982 |
+| RBF-SVM ($C{=}10$, $\gamma{=}0.01$) | 5.2% | 0.6 | 0.987 |
+
+<Figure
+  src="./figures/error-dotplot.svg"
+  alt="Dot plot of test errors with two-standard-error bars: RBF-SVM 5.2%, logistic 5.9%, LDA 6.6%, naive Bayes 11.0%; hollow markers show ESL's published linear logistic at 7.6% and additive logistic at 5.3%"
+  caption="The module's error ladder on the common split. Filled dots are this chapter's fits (±2 binomial SE); hollow circles are ESL's published numbers on the same data."
+/>
+
+The standard-error column is part of the result. With 1,536 test messages, a 6% error rate carries a binomial standard error of about 0.6 points, so the table supports exactly two separations: naive Bayes loses to everything by 4 to 6 points (many standard errors), and the three other boundaries sit within 1.4 points of one another, with the SVM's half-point edge over logistic worth about one standard error: suggestive, not settled.
+
+Two published rungs calibrate ours. ESL's linear logistic regression tests at **7.6%** on this split. Refitting without the log transform reproduces that number exactly (7.6%), which localizes the entire gap to our 5.9%: the transform, not the model, is worth 1.7 points on this skewed data. Reproduction discipline is the reason the table's numbers are labeled as this chapter's own rather than presented as ESL's. ESL's additive logistic model reaches **5.3%** by giving each feature a fitted curve instead of a slope: a preview of what module 6's smoothers buy. The ladder keeps growing after this module: the classification tree tests at 9.3% (<Ref lesson="spam-tree">module 6</Ref>), and ensembles push toward 4.5–5.4% (<Ref lesson="spam-ensembles">module 7</Ref>), all on this same split.
+
+<KeyFact>
+On this problem, *which* full-strength boundary is fitted matters far less than what is thrown away to fit one cheaply. Re-splitting the corpus scatters every number in the table by about its standard error (naive Bayes included: 10.7% to 11.9% over three fresh seeds), but the factorization's 5-point deficit survives every split. The noise lives in the estimates, the gap in the model.
+</KeyFact>
+
+## Reading the fitted weights: agreement, then a fingerprint
+
+Every model in the table except the SVM is linear in its features, so each publishes a per-feature weight: naive Bayes its log odds ratios $w_j$, logistic its conditional coefficients, LDA a close cousin of the logistic vector. Ranking features by weight in the two models the module contrasted sharpest, naive Bayes against logistic, reads the corpus twice, once marginally and once conditionally.
+
+<Figure
+  src="./figures/concordance.svg"
+  alt="Two slopegraphs connecting each feature's rank under naive Bayes to its rank under logistic regression; the spamward panel shows nearly parallel lines for remove, dollar, exclamation, free, money and 000; the hamward panel shows george and hp stable at the top while 857, telnet, labs, hpl and 650 crash from naive Bayes ranks 2 through 11 to logistic ranks 14 through 43, all flagged amber as the mailbox fingerprint"
+  caption="Rank concordance of the two fitted weight vectors. Spamward: agreement. Hamward: naive Bayes prices eleven copies of the same fact — the mailbox's identity — and logistic pays for it once."
+/>
+
+**Spamward, the models agree.** `remove`, `!`, `$`, `free`, `money`, `000` head both lists: unsubscribe language, urgency punctuation, and currency, the spam vocabulary of 1999. The one systematic exception is instructive: logistic ranks the total run of capital letters first among all 57 features, while Bernoulli naive Bayes cannot see it at all: every message contains at least one capital, so the presence indicator is constantly 1 and the feature contributes only a constant absorbed into the intercept. The event model is part of the classifier, exactly as <Ref lesson="naive-bayes">the event-model comparison</Ref> warned: binarization deleted the three capital-run features, and some of naive Bayes' 5-point deficit is that deletion.
+
+**Hamward, the models split, and the split is the generative–discriminative frame in action.** The corpus carries eleven features that state one fact — whose mailbox this is: the recipient's first name (`george`), his employer's names and hostnames (`hp`, `hpl`, `lab`, `labs`), its Unix-era vocabulary (`telnet`, `cs`), and number fragments — `650` and `857`, pieces of an HP Labs Palo Alto phone number (the documentation itself flags `650`, the local area code), with `415` (the Bay Area code next door) and `85` beside them. Naive Bayes' entire hamward top-8 comes from that family — `george`, `857`, `telnet`, `cs`, `lab`, `labs`, `415`, `hpl` — with `hp` at #9 and `650` at #11. Each weight is computed from its own $2\times2$ table, so eleven near-copies of "this is George's work mailbox" each get a full-size vote. Logistic regression, pricing coefficients jointly, pays for the fingerprint once: `george` and `hp` keep large coefficients, while `hpl` collapses to rank 30 (coefficient $-0.03$), `labs` to 31, and `650` flips to weakly *positive*. This is <Ref lesson="logistic-regression">the CORIS credit reshuffling</Ref>, replayed on real mail. Marginally, all eleven features look excellent; conditionally, nine of them are redundant.
+
+### The audit: the best features are leakage
+
+Both models, however they price it, agree on the headline: the strongest evidence of legitimate mail is the identity of the mailbox's owner. The corpus documentation says so itself, in a sentence worth quoting because it is the course's first live encounter with the failure mode module 5 formalizes:
+
+> "Our collection of non-spam e-mails came from filed work and personal e-mails, and hence the word 'george' and the area code '650' are indicators of non-spam. … One would either have to blind such non-spam indicators or get a very wide collection of non-spam to generate a general purpose spam filter."
+
+The feature `george` is genuinely predictive *for this dataset*: the corpus's spam essentially never contains the recipient's name, and George's correspondents used it constantly. It is simultaneously worthless, or worse, for any other deployment: a filter shipped to a user named Alice inherits a large hamward weight on a word her mail never contains and a model whose single strongest feature fires on nothing. The feature encodes the identity of the data source, not the concept "spam". That is *data leakage* in its deployment sense: information available in the training corpus that will not be available, or will not mean the same thing, where the model is used. Deleting `george` and `hp` and refitting costs the logistic model about 1.2 points of test error (5.9% to 7.0%), and the honest reading is that the degraded number is the better estimate of the filter's worth on anyone else's mail.
+
+<KeyFact>
+A feature can be a top predictor and a defect at the same time: `george`'s weight is real signal about *this corpus* and pure leakage with respect to *any other mailbox*. Benchmark error measures the first; deployment cares about the second. <Ref lesson="imbalance-leakage">Module 5</Ref> builds the taxonomy and the audit checklist this example motivates.
+</KeyFact>
+
+## Where the models disagree: probability and shape
+
+The error table hides the disagreements that matter for using these models. Two of the fits state probabilities and one states a shape assumption, and the corpus tests all three claims.
+
+### Naive Bayes: right ranking, wrong probabilities
+
+Naive Bayes' AUC of 0.951 says it *orders* messages competently: a random spam outscores a random ham 95 times in 100. Its stated probabilities are another matter. On the test set, **81%** of its posteriors fall outside $[0.01, 0.99]$ (logistic: 51%): the model is nearly always nearly certain. Cutting the probability axis into ten equal-width bins and comparing each bin's stated probability against what happened:
+
+<Figure
+  src="./figures/reliability.svg"
+  alt="Two reliability panels plotting observed spam rate against stated probability in ten equal-width bins; naive Bayes' points form a flattened S far off the diagonal, with the lowest bin of 926 messages at stated 0.005 but observed 0.085, while logistic regression's points sit near the diagonal in every bin"
+  caption="Reliability on the test set. Naive Bayes' certainty is unearned in both tails; logistic tracks the diagonal. Dot area follows the number of messages in the bin."
+/>
+
+The bottom bin carries the failure: 926 messages the model calls spam with average probability 0.005, of which **8.5%** are actually spam, seventeen times the stated rate. The top bin claims 99.4% and delivers 92.5%. This is <Ref lesson="naive-bayes">the saturation the factorization predicts</Ref>, cashed on real data: correlated words are partial copies of one another (the eleven-feature mailbox fingerprint above is the extreme case), the factorization counts each copy as independent evidence, and the posterior odds multiply once per copy. The boundary survives because sign survives; the magnitudes are fiction. What a *reliability curve* measures, and how a miscalibrated model is repaired, is <Ref lesson="classification-metrics">module 5's opening business</Ref>; here it is enough that the failure is visible in one table.
+
+### LDA: wrong densities, serviceable boundary
+
+LDA's model says each class is one Gaussian in 57 dimensions. The data contradicts the assumption directly:
+
+<Figure
+  src="./figures/zero-inflation.svg"
+  alt="Two histograms of log-transformed frequency of the word free, one per class; in ham 91 percent of messages sit in a point mass at exactly zero and in spam 45 percent, with a dashed Gaussian curve over each showing the density LDA assumes, which matches neither the spike nor the remainder"
+  caption="The word `free`, within class, after the log transform. A Gaussian has no point mass: the fitted class-conditionals (dashed) are wrong for 91% of ham and 45% of spam on this feature alone."
+/>
+
+The word `free` is *absent* from 91% of ham and 45% of spam: after the log transform, each class-conditional is a spike at $\log 0.1$ plus a smeared tail, and the Gaussian LDA fits carries neither. Yet LDA tests at 6.6%, within a point of logistic regression. This is <Ref lesson="lda-gda">the decision-versus-estimation argument</Ref> passing a live test: the LDA boundary is a function of class means and a pooled covariance only, the moments do capture where the classes sit and how they co-vary, and a boundary needs the densities to be right only near itself. The densities are unusable (any posterior or outlier score read off them inherits the spike-versus-bell mismatch); the line they imply is fine.
+
+### The SVM: a half point, bought with a grid
+
+The RBF-SVM's 5.2% is the table's best number, and its price is visible in the protocol: sixteen $(C, \gamma)$ candidates times five folds is eighty fits before the final one, machinery neither LDA (closed form, one pass) nor logistic (one IRLS run) needed. The tuned machine keeps 607 support vectors, one training message in five, and its half-point edge over logistic is roughly one standard error on this split. On fresh random splits the edge's *sign* is stable even where its size is not. Whether half a point pays for a Gram matrix and a grid search is a deployment question, not a mathematics question.
+
+## Threshold economics: a lost email costs ten seen spams
+
+Everything above scored the classifiers by counting errors as if both kinds cost the same. No mail user prices them that way, and the corpus documentation is blunt: "False positives (marking good mail as spam) are very undesirable." A filtered-away job offer costs more than ten spams skimmed and deleted. The machinery for asymmetric costs is <Ref lesson="statistical-learning">the opening lesson's</Ref> pointwise expected-loss argument, applied with real numbers.
+
+<Example title="the 10 : 1 threshold, from lesson 1's argument">
+Let $p = p(\text{spam} \mid x)$, and price a false positive (flagging real mail) at $L_{01} = 10$ against $L_{10} = 1$ for a false negative (passing a spam). At a message with posterior $p$, flagging costs $10\,(1-p)$ in expectation; passing costs $p$. Flag exactly when
+
+$$
+10\,(1 - p) \;<\; p
+\qquad\Longleftrightarrow\qquad
+p \;>\; \tfrac{10}{11} \;\approx\; 0.909 .
+$$
+
+The general form is $p > L_{01}/(L_{01} + L_{10})$, and the 0–1 threshold of $\tfrac12$ is the special case $L_{01} = L_{10}$. Nothing is refitted: the boundary of <Ref lesson="logistic-regression">the logistic model</Ref> slides parallel to itself, orientation untouched.
+</Example>
+
+<Figure
+  src="./figures/cost-curves.svg"
+  alt="Expected cost per message against classification threshold for the logistic model under two cost ratios; the one-to-one curve is a shallow bowl with minimum near 0.56, the ten-to-one curve falls steeply and bottoms out at 0.85, with dashed verticals at the Bayes thresholds one half and ten elevenths"
+  caption="The logistic model's cost curves on the test set. Changing the loss moves the optimal operating point from near ½ to near 10/11; the small gap between each empirical minimum (green) and its Bayes threshold is finite-sample and calibration slack."
+/>
+
+At threshold $\tfrac12$ the logistic filter makes 39 false positives and 51 false negatives on the 1,536 test messages, for an expected cost of 0.29 per message at 10 : 1 prices. Moving to the computed threshold $\tfrac{10}{11}$ trades them: 6 false positives, 162 false negatives, cost **0.14** per message. Half the cost, by moving one number. The empirical minimum sits at 0.85 rather than 0.909 because the Bayes-threshold argument trusts the model's probabilities and the test set is finite; a perfectly calibrated model would put them together in expectation.
+
+The threshold argument also explains why calibration is not a cosmetic concern. Run naive Bayes at the same 0.909 threshold and it still commits **36 false positives**, six times the logistic filter's count, because its saturated posteriors cross any threshold: probabilities that are fiction make cost-based thresholds fiction too. And the corpus documentation records where the extreme version of this trade lands: demanding *zero* false positives on this data let 20–25% of spam through. Choosing the ratio, summarizing a whole threshold sweep, and repairing a model's probabilities before thresholding them are precisely <Ref lesson="classification-metrics">the next module's subject</Ref>; this section spent one threshold to show the stakes.
+
+## What the benchmark is not
+
+The module closes on this corpus, so the corpus's own idealizations should be on the record next to its numbers. Three departures separate the benchmark from the deployed problem it samples.
+
+### The i.i.d. assumption dies adversarially
+
+Every guarantee this course states assumes train and test are draws from one distribution. Spam is written by people paid to defeat filters: the vocabulary of this corpus (`free`, `money`, `000`, `!`) is the spam of 1999, and weights fitted to it decay as senders adapt with misspellings, images, and new vocabularies. The 39.4% base rate is equally a snapshot. No split of this dataset, however honest, measures that decay; only monitoring a deployed filter does.
+
+### One mailbox is not a population
+
+The leakage audit above is the sharp end of a general fact: the corpus's ham distribution is one person's professional life at one employer. Every hamward weight partially encodes that identity, `george` most visibly. Benchmark error on this split is an honest estimate of exactly one quantity, performance on more of George's 1999 mail, and an optimistic one for every other mailbox.
+
+### Costs are asymmetric, and one threshold is not a methodology
+
+One threshold table and one reliability figure are not an evaluation methodology. Choosing metrics under asymmetry, estimating error honestly when the same data tunes and judges, and auditing pipelines for leakage before believing any number: that is the module-5 agenda, and this lesson's loose ends (the unformalized leakage, the uncalibrated naive Bayes, the single hand-picked cost ratio) are its opening exhibits.
+
+What stands established: the module's three roads all fit the corpus, landing at 5.2–6.6% with the naive factorization at 11.0%; their fitted weights agree on the spam vocabulary and disagree exactly where the generative–discriminative frame predicts, on redundant evidence; the strongest features are leakage with respect to any other deployment; and one applied threshold shift halves a realistic cost. <Ref lesson="logreg-lab">The lab that follows</Ref> rebuilds road 1 from raw numpy against held-out checkpoints, and <Ref lesson="classification-metrics">module 5</Ref> takes up the measurement debts this lesson named.
+
+## Exercises
+
+<Exercise>
+Warm-up on the fitted logistic model. Its features are standardized log-frequencies, so a coefficient is the log-odds change per one training-set standard deviation of $\log(x + 0.1)$. The fitted coefficients include `!` at $+0.68$ and `meeting` at $-0.73$. (a) Compute the factor by which one standard deviation more `!` multiplies the odds of spam, and likewise for `meeting`. (b) A message moves one standard deviation up in *both*. What happens to its odds, and what property of the model makes the two effects compose this way?
+
+<Solution>
+(a) One standard deviation of `!` multiplies the odds by $e^{0.68} \approx 1.97$: roughly doubles them. One standard deviation of `meeting` multiplies them by $e^{-0.73} \approx 0.48$: roughly halves them.
+
+(b) The odds multiply by $e^{0.68 - 0.73} = e^{-0.05} \approx 0.95$: the two effects nearly cancel. Composition is multiplicative on the odds scale because the model is additive on the log-odds scale: $\log$-odds $= \beta^\top x$, so simultaneous moves add their contributions before exponentiation, <Ref lesson="logistic-regression">the odds-ratio reading</Ref> exactly. Note what the answer is not: a statement about probabilities. The same odds factor moves a mid-range message far more than a saturated one, since $\partial p/\partial x_j = \beta_j\, p(1-p)$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: delete the leakage. Refit the L2 logistic model with `george` and `hp` removed from the feature set (54 remaining word/char features plus the capital runs, same transform and split). (a) The measured test error moves from 5.9% to about 7.0%. Express the change in errors-per-thousand messages. (b) The deployed filter should prefer the *worse* number. State the argument precisely, naming what each of the two numbers estimates. (c) The fitted model still contains `hpl`, `650`, `857`, `labs`, `telnet`. Predict the direction of the bias that remains, and check the prediction against the fuller deletion (all eleven mailbox-fingerprint features), which tests at about 7.2%.
+
+<Solution>
+(a) $1.2$ points is about 12 more misclassified messages per thousand, roughly 18 on this 1,536-message test set.
+
+(b) The two numbers estimate different quantities. With `george` and `hp` in, test error estimates performance on more mail addressed to this mailbox, because the features encode the recipient's identity and that identity is constant across both splits. With them out, the estimate is closer to performance on a mailbox where those features carry no signal, which is the deployment population for a shipped filter. A filter buyer is quoted the first number and receives the second; preferring the honest 7.0% is preferring an estimate of the quantity that will actually be realized. This is the general leakage argument: deleting leaked features degrades the benchmark number while improving its validity.
+
+(c) Direction: the 5.9%-to-7.0% run still leaks, because the surviving fingerprint features are correlated proxies for the deleted ones, and logistic regression re-routes credit through them (the reshuffling mechanism, now working against the auditor). So 7.0% should still be optimistic, and the fuller deletion should degrade further: it does, to 7.2%. The small size of the extra step is itself informative: logistic had priced the redundant copies near zero, so most of the leaked signal traveled through `george` and `hp`. An auditor working from naive Bayes' weight table, where every copy carries a full-size weight, would have caught the whole family on the first pass: a rare audit advantage of marginal pricing.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Naive Bayes matched the others on AUC-style ranking, so its probability outputs are fine — ranking and probability are the same information." Use the measured reliability table, built on ten equal-width probability bins (bottom bin, stated below 0.1: 926 messages, mean stated 0.005, observed 0.085; top bin, stated above 0.9: 481 messages, mean stated 0.994, observed 0.925), and name one place in a mail pipeline where each property — ranking and calibration — is the one that matters.
+
+<Solution>
+The claim fails because ranking is invariant to any strictly increasing distortion of the score, and calibration is not. If every posterior $p$ is replaced by a monotone squash of itself, the order of messages (hence AUC) is unchanged, while the stated probabilities can be arbitrarily wrong. Naive Bayes is that case realized: correlated features multiply into the odds once per copy, which distorts the posterior monotonically toward the extremes. The measured table exhibits the separation: an AUC of 0.951 coexists with a bottom bin that claims 0.5% spam and contains 8.5% (off by a factor of seventeen) and a top bin claiming 99.4% that delivers 92.5%.
+
+Where ranking matters: any triage view, such as sorting the inbox or a moderation queue by spam score and reading from the clean end; only order is consumed, and naive Bayes is nearly as good as logistic there. Where calibration matters: any thresholded action with asymmetric costs, such as "auto-delete only above $p = 10/11$". The lesson measured the consequence: at that threshold the calibrated logistic model makes 6 false positives, the miscalibrated naive Bayes 36, with the *same* ranking quality. The step that fails in the claim is "so": AUC bounds nothing about the probability scale.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the error table on fresh splits. Re-split the 4,601 messages 3,065/1,536 at random (fresh seed), refit all four models with the lesson's protocol, and repeat for a few seeds. State before running which pairwise gaps you expect to survive the standard errors printed in the lesson's table (±0.6 for the three boundaries near 6%, ±0.8 for naive Bayes), and which you expect to be split noise. Three measured runs for comparison: (NB, logistic, LDA, SVM) = (11.9, 6.3, 7.0, 4.9), (10.7, 5.7, 6.2, 5.0), (10.7, 4.8, 6.2, 4.2) percent.
+
+<Solution>
+Prediction the theory supports: the naive-Bayes gap (4–6 points, many SEs) survives every split; the SVM-versus-linear gap (half a point to a point and a half) should survive in *sign*, since it is present on the ESL split and driven by a real mechanism (the RBF boundary can curve); the logistic-versus-LDA gap (0.7 points on the ESL split) is within joint noise and should not be trusted.
+
+The three runs deliver two confirmations and one warning. The naive-Bayes gap survives every seed, at 5.0 to 5.9 points over the best linear model. Note what does *not* happen: naive Bayes' own error is no steadier than anyone else's. It scatters from 10.7% to 11.9%, a 1.2-point spread in line with its ±0.8 standard error, the largest in the table (binomial noise grows with the error rate), so in absolute points it moves *more* across splits than logistic does. Model bias fixes the level its error sits at; it does nothing to shrink the sampling noise of any one estimate of that level, and a claim like "naive Bayes barely moves across splits" would confuse the two. The SVM beats both linear models on every seed, by 0.6 to 1.4 points over logistic: sign stable, size noisy, as predicted. The warning is logistic-versus-LDA: logistic happens to lead on all three fresh seeds as well, by 0.5 to 1.4 points, which looks like sign stability; but each single gap is on the order of one joint standard error, and the four splits all resample the same 4,601 messages, so they are four correlated looks at one dataset, not four replications. A single shared split makes numbers comparable; neither it nor a handful of overlapping re-splits makes a sub-SE difference real.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review, on <Ref lesson="lda-gda">the LDA fit's assumptions</Ref>. Within the training ham class, the word `free` is exactly zero in 91% of messages; after the $\log(x+0.1)$ transform this is a point mass of 91% at $-2.30$, with fitted class moments $\hat\mu \approx -2.16$, $\hat\sigma \approx 0.52$. (a) Describe what a QQ-plot of this within-class sample against the fitted Gaussian looks like, and compute the Gaussian's predicted probability of the region at or below the point mass, $\Pr(Z \le (-2.30 + 2.16)/0.52)$. (b) Reconcile the violation with LDA's 6.6% test error using the lesson that fitted it. (c) Name one LDA output that should *not* be trusted on this data, and why.
+
+<Solution>
+(a) The empirical quantile function is flat at $-2.30$ for the first 91% of probability mass, then jumps into the positive tail: the QQ-plot is a long horizontal shelf followed by a steep rise, nothing like the diagonal. The fitted Gaussian, by contrast, puts $\Pr(Z \le -0.27) = \Phi(-0.27) \approx 0.39$ below the point-mass value: it expects 39% of the class at or below a value where the data piles 91%, and spreads the rest smoothly where the data has a gap. Both the location of mass and its shape are wrong.
+
+(b) The reconciliation is the decision-versus-estimation argument: LDA's *boundary* depends only on $\hat\mu_0, \hat\mu_1, \hat\Sigma$, and those moments still encode the true facts that matter: spam's `free` distribution sits a full unit higher in log-frequency and co-varies with the other spam markers. The boundary is a linear functional of moments; the moments are estimated fine; only the *distributional shape* wrapped around them is fiction. Classification consumes the boundary, so it survives; this is <Ref lesson="lda-gda">the STATLOG phenomenon</Ref> (a false model's stable boundary beating fancier ones) on the course's own benchmark.
+
+(c) Any density-derived output: the posterior probabilities $\sigma(a(x))$ (miscalibrated for the same reason naive Bayes' are: the model's likelihoods are wrong, so magnitudes are wrong even where signs are right) and the outlier score $p(x)$ from <Ref lesson="lda-gda">the "what owning $p(x)$ buys" list</Ref>: a mixture of Gaussians assigns absurdly low density to perfectly ordinary messages that sit in a point mass, so "this input is foreign" readings are meaningless here.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. For the logistic filter on the test set, the lesson reports operating points at two thresholds: $t = 0.5$ gives (TP, FP, FN, TN) $= (544, 39, 51, 902)$, and $t = 10/11$ gives $(433, 6, 162, 935)$. (a) Verify that both matrices are consistent with 595 spam and 941 ham test messages, and compute each threshold's error rate. (b) The error rate *rises* from 5.9% to 10.9% at the cost-optimal threshold. Explain in one sentence why that is correct behavior, not a defect. (c) A different user prices a lost real mail at only three seen spams: $L_{01} = 3$, $L_{10} = 1$. Derive her operating threshold by the worked example's argument, then compute the expected cost per message of *both* matrices above at her prices and decide which of the two available operating points she should run. (d) Try to summarize what changed between the two matrices in a single number that does not mislead. Report what you tried and what each candidate hides.
+
+<Solution>
+(a) Rows: $544 + 51 = 595$ spam, $39 + 902 = 941$ ham at $t = 0.5$; $433 + 162 = 595$ and $6 + 935 = 941$ at $t = 10/11$. Errors: $(39+51)/1536 = 5.9\%$ and $(6+162)/1536 = 10.9\%$.
+
+(b) Error rate weighs the two mistake types equally, and the whole point of the move was to price them 10 : 1; under the stated costs the second matrix is *better* (0.14 against 0.29 per message), so a metric that says it is worse is measuring the wrong thing.
+
+(c) Flag when $3\,(1-p) < p$, i.e. $p > \tfrac34$: the general threshold $p > L_{01}/(L_{01}+L_{10})$ evaluated at the new prices. Neither given matrix operates at $0.75$, so price both. At 3 : 1 the $t = 0.5$ matrix costs $(3 \cdot 39 + 51)/1536 \approx 0.109$ per message; the $t = 10/11$ matrix costs $(3 \cdot 6 + 162)/1536 \approx 0.117$. The ordering reverses: for her, the default threshold beats the 10 : 1 operating point, because $10/11$ buys false-positive protection she is not paying for at the price of 111 extra passed spams. The threshold belongs to the loss matrix, not to the classifier — reusing a threshold tuned to someone else's costs can be worse than no tuning at all, and her own optimum at $0.75$ lies between the two published points on the sweep.
+
+(d) Candidates and what they hide. *Accuracy/error*: hides the cost asymmetry, per (b). *Precision at the flag* ($544/583 = 0.933$ versus $433/439 = 0.986$): shows the false-positive cleanup but hides the 111 additional spams now passed through. *Recall* ($0.914$ versus $0.728$): the mirror image, hiding the false-positive gain. *Expected cost*: honest, but only for one hand-picked ratio: change 10 : 1 to 3 : 1 and the ranking of the two matrices flips, per (c), so it summarizes the choice, not the classifier. No single number carries a two-dimensional trade-off; what is needed is the systematic menu (confusion-derived rates, the full threshold sweep as a curve, and cost-independent summaries of it), which is exactly what <Ref lesson="classification-metrics">the next lesson</Ref> builds, starting from this pair of matrices.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — Ch. 1, Example 1 and Table 1.1: the spam data introduced, with the george/hp class means quoted here; §9.1.2: the 3,065/1,536 split, the log(x + 0.1) transform, the published 7.6% linear-logistic and 5.3% additive-logistic test errors, and the $L_{01}/(L_{01}+L_{10})$ threshold discussion; §9.2.5: the 9.3% classification tree this course reaches in module 6. Free online: https://hastie.su.domains/ElemStatLearn/
+2. M. Hopkins, E. Reeber, G. Forman, J. Suermondt, "Spambase," UCI Machine Learning Repository, 1999 — the corpus and its documentation: collection story, feature definitions, the 39.4% base rate, the zero-false-positive note, and the creators' own warning that `george` and `650` are personalized non-spam indicators that must be blinded for a general-purpose filter. https://archive.ics.uci.edu/dataset/94/spambase (ESL's mirror of the data and split: https://hastie.su.domains/ElemStatLearn/datasets/)
+3. L. F. Cranor, B. A. LaMacchia, "Spam!," *Communications of the ACM* 41(8), 1998, pp. 74–83 — the deployed problem as it stood when the corpus was collected: scale, costs, and the server-side filtering setting this module's classifiers target.
+4. A. Y. Ng, M. I. Jordan, "On Discriminative vs. Generative Classifiers: A Comparison of Logistic Regression and Naive Bayes," *Advances in Neural Information Processing Systems* 14, 2002 — the asymptotic frame behind this chapter's naive-Bayes-versus-logistic reading; on this corpus's sample size, the discriminative asymptote is what shows. https://ai.stanford.edu/~ang/papers/nips01-discriminativegenerative.pdf
+</References>

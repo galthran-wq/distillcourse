@@ -1,0 +1,296 @@
+checkpoints:
+  sigmoid:
+    kind: exact
+    seed: 11
+    atol: 1.0e-9
+    inputs_code: |
+      inputs = (rng.normal(0.0, 3.0, size=40),)
+    wrong:
+      - hint: "Sign flip in the exponent: 1/(1+e^z) is σ(−z), a decreasing curve — and it still passes the σ(0)=0.5 and symmetry checks. The formula wants e^{−z}."
+        code: |
+          def f(z):
+              import numpy as np
+              return 1.0 / (1.0 + np.exp(z))
+  log-loss:
+    kind: exact
+    seed: 13
+    atol: 1.0e-9
+    inputs_code: |
+      # Rows scaled 20x push |logits| past 300: a log-loss written as
+      # log(sigmoid) instead of logaddexp goes non-finite here and can
+      # never match the expected value.
+      X = rng.normal(size=(60, 5))
+      X[:12] *= 20.0
+      w = rng.normal(0.0, 4.0, size=5)
+      b = 0.5
+      y = (rng.random(60) > 0.4).astype(float)
+      inputs = (w, b, X, y)
+    wrong:
+      - hint: "Lost the minus: log-loss is the NEGATIVE mean log-likelihood."
+        code: |
+          def f(w, b, X, y):
+              import numpy as np
+              z = X @ w + b
+              return np.mean(y * (-np.logaddexp(0.0, -z)) + (1 - y) * (-np.logaddexp(0.0, z)))
+      - hint: "The loss is a MEAN over the n examples, not a sum."
+        code: |
+          def f(w, b, X, y):
+              import numpy as np
+              z = X @ w + b
+              return np.sum(y * np.logaddexp(0.0, -z) + (1 - y) * np.logaddexp(0.0, z))
+  grad:
+    kind: exact
+    seed: 17
+    atol: 1.0e-9
+    inputs_code: |
+      X = rng.normal(size=(50, 4))
+      w = rng.normal(size=4)
+      b = -0.3
+      y = (rng.random(50) > 0.5).astype(float)
+      inputs = (w, b, X, y)
+    wrong:
+      - hint: "Did you average over the n examples? The loss is a MEAN, so its gradient is too."
+        code: |
+          def f(w, b, X, y):
+              import numpy as np
+              p = 1.0 / (1.0 + np.exp(-(X @ w + b)))
+              return X.T @ (p - y), np.sum(p - y)
+      - hint: "Sign: this is the gradient of the negative log-likelihood, so it points along (p − y), not (y − p)."
+        code: |
+          def f(w, b, X, y):
+              import numpy as np
+              p = 1.0 / (1.0 + np.exp(-(X @ w + b)))
+              return X.T @ (y - p) / len(y), np.mean(y - p)
+  fit-gd:
+    kind: exact
+    seed: 19
+    atol: 1.0e-6
+    inputs_code: |
+      X = rng.normal(size=(80, 3))
+      w_true = np.array([2.0, -1.0, 0.5])
+      y = (rng.random(80) < 1.0 / (1.0 + np.exp(-(X @ w_true)))).astype(float)
+      inputs = (X, y, 0.5, 250)
+    wrong:
+      - hint: "The weights should DESCEND the loss: w −= lr·∇w, not +=."
+        code: |
+          def f(X, y, lr, iters):
+              import numpy as np
+              w = np.zeros(X.shape[1]); b = 0.0
+              losses = np.empty(iters)
+              for t in range(iters):
+                  z = X @ w + b
+                  p = 1.0 / (1.0 + np.exp(-np.clip(z, -500, 500)))
+                  losses[t] = np.mean(y * np.logaddexp(0.0, -z) + (1 - y) * np.logaddexp(0.0, z))
+                  w += lr * (X.T @ (p - y) / len(y))
+                  b += lr * np.mean(p - y)
+              return w, b, losses
+      - hint: "Record the loss BEFORE the step: losses[t] is the loss at the parameters step t starts from."
+        code: |
+          def f(X, y, lr, iters):
+              import numpy as np
+              w = np.zeros(X.shape[1]); b = 0.0
+              losses = np.empty(iters)
+              for t in range(iters):
+                  z = X @ w + b
+                  p = 1.0 / (1.0 + np.exp(-z))
+                  w -= lr * (X.T @ (p - y) / len(y))
+                  b -= lr * np.mean(p - y)
+                  z = X @ w + b
+                  losses[t] = np.mean(y * np.logaddexp(0.0, -z) + (1 - y) * np.logaddexp(0.0, z))
+              return w, b, losses
+  l2:
+    kind: exact
+    seed: 23
+    atol: 1.0e-9
+    inputs_code: |
+      X = rng.normal(size=(40, 6))
+      w = rng.normal(size=6)
+      b = 0.7
+      y = (rng.random(40) > 0.5).astype(float)
+      inputs = (w, b, X, y, 0.1)
+    wrong:
+      - hint: "The intercept is not penalized — b measures the base rate, not model complexity."
+        code: |
+          def f(w, b, X, y, lam):
+              import numpy as np
+              z = X @ w + b
+              p = 1.0 / (1.0 + np.exp(-z))
+              n = len(y)
+              loss = np.mean(y * np.logaddexp(0.0, -z) + (1 - y) * np.logaddexp(0.0, z)) + lam * (w @ w + b * b)
+              return loss, X.T @ (p - y) / n + 2.0 * lam * w, np.mean(p - y) + 2.0 * lam * b
+      - hint: "d(λ‖w‖²)/dw = 2λw — the factor 2 is missing from the gradient."
+        code: |
+          def f(w, b, X, y, lam):
+              import numpy as np
+              z = X @ w + b
+              p = 1.0 / (1.0 + np.exp(-z))
+              loss = np.mean(y * np.logaddexp(0.0, -z) + (1 - y) * np.logaddexp(0.0, z)) + lam * (w @ w)
+              return loss, X.T @ (p - y) / len(y) + lam * w, np.mean(p - y)
+  separable-divergence:
+    kind: exact
+    seed: 37
+    atol: 1.0e-6
+    inputs_code: |
+      # Two clusters a clean margin apart: linearly separable, so the
+      # unpenalized ||w|| history must diverge and the λ=0.1 one must cap.
+      X0 = rng.normal(size=(15, 2)) * 0.6 + np.array([-2.0, -2.0])
+      X1 = rng.normal(size=(15, 2)) * 0.6 + np.array([2.0, 2.0])
+      X = np.vstack([X0, X1])
+      y = np.concatenate([np.zeros(15), np.ones(15)])
+      inputs = (X, y, 1.0, 1000, (0.0, 0.1))
+    wrong:
+      - hint: "λ never reaches the update: the penalty only caps ||w|| if its 2λw term is part of the step, not just of the reported loss."
+        code: |
+          def f(X, y, lr, iters, lams):
+              import numpy as np
+              out = []
+              for lam in lams:
+                  w = np.zeros(X.shape[1]); b = 0.0
+                  norms = np.empty(iters)
+                  for t in range(iters):
+                      norms[t] = np.sqrt(w @ w)
+                      p = 1.0 / (1.0 + np.exp(-(X @ w + b)))
+                      w -= lr * (X.T @ (p - y) / len(y))
+                      b -= lr * np.mean(p - y)
+                  out.append(norms)
+              return tuple(out)
+      - hint: "Record ||w|| BEFORE the step, like the loss history in fit — yours is shifted by one iteration."
+        code: |
+          def f(X, y, lr, iters, lams):
+              import numpy as np
+              out = []
+              for lam in lams:
+                  w = np.zeros(X.shape[1]); b = 0.0
+                  norms = np.empty(iters)
+                  for t in range(iters):
+                      p = 1.0 / (1.0 + np.exp(-(X @ w + b)))
+                      w -= lr * (X.T @ (p - y) / len(y) + 2.0 * lam * w)
+                      b -= lr * np.mean(p - y)
+                      norms[t] = np.sqrt(w @ w)
+                  out.append(norms)
+              return tuple(out)
+  newton:
+    kind: exact
+    seed: 3
+    atol: 1.0e-6
+    inputs_code: |
+      # Two nearly-collinear feature pairs: the curvature is wildly uneven,
+      # which is exactly what stalls gradient descent and leaves Newton
+      # indifferent. The expected output pins the whole comparison: Newton's
+      # 8-step loss history, GD's loss after the same 8 steps, and GD's loss
+      # after 2000.
+      Z = rng.normal(size=(200, 4))
+      X = Z.copy()
+      X[:, 1] = 0.99 * Z[:, 0] + np.sqrt(1 - 0.99 ** 2) * Z[:, 1]
+      X[:, 3] = 0.99 * Z[:, 2] + np.sqrt(1 - 0.99 ** 2) * Z[:, 3]
+      w_true = 3.0 * np.array([1.0, -1.2, 0.8, -1.0])
+      y = (rng.random(200) < 1.0 / (1.0 + np.exp(-(X @ w_true + 0.2)))).astype(float)
+      inputs = (X, y, 1.0, 8, 2000)
+    wrong:
+      - hint: "The Hessian carries the σ(1−σ) example weights — without them this is a rescaled gradient step, not Newton, and it is nowhere near converged after 8 steps."
+        code: |
+          def f(X, y, lr, newton_iters, gd_iters):
+              import numpy as np
+              def sig(z): return 1.0 / (1.0 + np.exp(-z))
+              def ll(w, b):
+                  z = X @ w + b
+                  return np.mean(y * np.logaddexp(0.0, -z) + (1 - y) * np.logaddexp(0.0, z))
+              n, d = X.shape
+              Xa = np.column_stack([X, np.ones(n)])
+              theta = np.zeros(d + 1)
+              ln = np.empty(newton_iters)
+              for t in range(newton_iters):
+                  ln[t] = ll(theta[:d], theta[d])
+                  p = sig(Xa @ theta)
+                  theta = theta - np.linalg.solve(Xa.T @ Xa / n, Xa.T @ (p - y) / n)
+              w = np.zeros(d); b = 0.0
+              lg = np.empty(gd_iters + 1)
+              for t in range(gd_iters + 1):
+                  lg[t] = ll(w, b)
+                  p = sig(X @ w + b)
+                  w -= lr * (X.T @ (p - y) / n)
+                  b -= lr * np.mean(p - y)
+              return ln, lg[newton_iters], lg[gd_iters]
+      - hint: "σ′ = σ(1−σ), not σ: the Newton weights are p·(1−p)."
+        code: |
+          def f(X, y, lr, newton_iters, gd_iters):
+              import numpy as np
+              def sig(z): return 1.0 / (1.0 + np.exp(-z))
+              def ll(w, b):
+                  z = X @ w + b
+                  return np.mean(y * np.logaddexp(0.0, -z) + (1 - y) * np.logaddexp(0.0, z))
+              n, d = X.shape
+              Xa = np.column_stack([X, np.ones(n)])
+              theta = np.zeros(d + 1)
+              ln = np.empty(newton_iters)
+              for t in range(newton_iters):
+                  ln[t] = ll(theta[:d], theta[d])
+                  p = sig(Xa @ theta)
+                  H = (Xa * p[:, None]).T @ Xa / n
+                  theta = theta - np.linalg.solve(H, Xa.T @ (p - y) / n)
+              w = np.zeros(d); b = 0.0
+              lg = np.empty(gd_iters + 1)
+              for t in range(gd_iters + 1):
+                  lg[t] = ll(w, b)
+                  p = sig(X @ w + b)
+                  w -= lr * (X.T @ (p - y) / n)
+                  b -= lr * np.mean(p - y)
+              return ln, lg[newton_iters], lg[gd_iters]
+  auc:
+    kind: exact
+    seed: 29
+    atol: 1.0e-9
+    inputs_code: |
+      # Quantized scores: heavy ties on purpose — position-based ranks
+      # cannot match the tie-averaged reference.
+      scores = np.round(rng.random(80), 1)
+      y = (rng.random(80) < 0.55).astype(float)
+      inputs = (y, scores)
+    wrong:
+      - hint: "Tied scores must share the AVERAGE of their ranks; sort-position ranks favor whichever tied element the sort emitted first."
+        code: |
+          def f(y, scores):
+              import numpy as np
+              order = np.argsort(scores, kind="stable")
+              ranks = np.empty(len(scores))
+              ranks[order] = np.arange(1, len(scores) + 1)
+              n1 = int(y.sum()); n0 = len(y) - n1
+              return (ranks[y == 1].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0)
+      - hint: "Ranks taken in DESCENDING score order flip the statistic — this returns exactly 1 − AUC. The rank formula wants ascending ranks: the lowest score gets rank 1."
+        code: |
+          def f(y, scores):
+              import numpy as np
+              order = np.argsort(-scores, kind="stable")
+              ranks = np.empty(len(scores))
+              i = 0
+              while i < len(scores):
+                  j = i
+                  while j + 1 < len(scores) and scores[order[j + 1]] == scores[order[i]]:
+                      j += 1
+                  ranks[order[i : j + 1]] = (i + j) / 2.0 + 1.0
+                  i = j + 1
+              n1 = int(y.sum()); n0 = len(y) - n1
+              return (ranks[y == 1].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0)
+  beat-auc:
+    kind: metric
+    metric: roc_auc
+    threshold: 0.975
+    holdout: data/holdout_X.csv
+    labels_code: |
+      labels = np.loadtxt("private/holdout_y.csv")
+  why-not-mse:
+    kind: review
+    rubric: |
+      The question: why is squared error a poor training loss for logistic
+      regression, and what does cross-entropy fix?
+
+      Pass if the answer gives at least one of the two real reasons:
+      (a) squared error composed with the sigmoid is non-convex in the
+      weights, so gradient descent loses its guarantees, or (b) the gradient
+      of squared error carries a σ'(z) factor that vanishes when the sigmoid
+      saturates, so confidently-wrong predictions barely learn — while
+      cross-entropy's gradient is (p − y)·x, which stays large exactly there.
+      A correct answer phrased differently (MLE of a Bernoulli, proper
+      scoring rule) also passes. Fail only if the answer is clearly off-task
+      or states a falsehood as its main claim (e.g. "MSE cannot be used with
+      probabilities at all").

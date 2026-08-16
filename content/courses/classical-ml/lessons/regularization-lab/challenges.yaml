@@ -1,0 +1,227 @@
+checkpoints:
+  center-standardize:
+    kind: exact
+    seed: 101
+    atol: 1.0e-9
+    inputs_code: |
+      # Deliberately wild scales and offsets: a standardizer that quietly
+      # assumes clean inputs has nowhere to hide.
+      X = rng.normal(size=(10, 4)) * np.array([1.0, 12.0, 0.3, 55.0]) + np.array([2.0, -30.0, 0.5, 400.0])
+      y = rng.normal(2.5, 1.2, size=10)
+      inputs = (X, y)
+    wrong:
+      - hint: "The convention is the POPULATION standard deviation (np.std's default, ddof=0), computed on the training rows — not the n−1 sample version."
+        code: |
+          def f(X, y):
+              import numpy as np
+              mu, sd = X.mean(0), X.std(0, ddof=1)
+              return (X - mu) / sd, y - y.mean(), mu, sd, y.mean()
+      - hint: "The response is centered, never scaled — predictions must come back in the units of y."
+        code: |
+          def f(X, y):
+              import numpy as np
+              mu, sd = X.mean(0), X.std(0)
+              return (X - mu) / sd, (y - y.mean()) / y.std(), mu, sd, y.mean()
+  ols-solve:
+    kind: exact
+    seed: 202
+    atol: 1.0e-6
+    inputs_code: |
+      X = rng.normal(size=(40, 6))
+      X = (X - X.mean(0)) / X.std(0)
+      y = X @ np.array([1.5, 0.0, -2.0, 0.5, 0.0, 1.0]) + rng.normal(0.0, 0.4, size=40)
+      y = y - y.mean()
+      inputs = (X, y)
+  ridge-svd:
+    kind: exact
+    seed: 303
+    atol: 1.0e-6
+    inputs_code: |
+      X = rng.normal(size=(50, 6))
+      X = (X - X.mean(0)) / X.std(0)
+      y = X @ np.array([2.0, -1.0, 0.0, 0.5, 0.0, 1.5]) + rng.normal(0.0, 0.5, size=50)
+      y = y - y.mean()
+      inputs = (X, y, np.array([0.0, 1.0, 10.0, 100.0]))
+    wrong:
+      - hint: "λ is being added to the scale d_j, not to the variance d_j² — check the units of what you added to what."
+        code: |
+          def f(X, y, lams):
+              import numpy as np
+              U, dv, Vt = np.linalg.svd(X, full_matrices=False)
+              comp = U.T @ y
+              return np.stack([Vt.T @ ((dv / (dv + lam)) * comp / dv) for lam in lams])
+      - hint: "The shrinkage was applied to u_jᵀy rather than to the OLS component along v_j — the division by d_j belongs to the OLS solution."
+        code: |
+          def f(X, y, lams):
+              import numpy as np
+              U, dv, Vt = np.linalg.svd(X, full_matrices=False)
+              comp = U.T @ y
+              return np.stack([Vt.T @ ((dv**2 / (dv**2 + lam)) * comp) for lam in lams])
+  soft-threshold:
+    kind: exact
+    seed: 404
+    atol: 1.0e-9
+    inputs_code: |
+      z = rng.normal(0.0, 2.0, size=15)
+      z = np.append(z, [0.0, 0.8, -0.8])   # the boundary cases, exactly
+      inputs = (z, 0.8)
+    wrong:
+      - hint: "Sign error: S moves |z| DOWN by γ — sign(z)·max(|z|−γ, 0), never |z|+γ."
+        code: |
+          def f(z, gamma):
+              import numpy as np
+              return np.sign(z) * (np.abs(z) + gamma)
+      - hint: "This is HARD thresholding (best subset's operator). Soft thresholding also shrinks the survivors by γ."
+        code: |
+          def f(z, gamma):
+              import numpy as np
+              return z * (np.abs(z) > gamma)
+      - hint: "The magnitude is right and the sign is gone: S returns sign(z)·max(|z|−γ, 0), so negative inputs must come back negative."
+        code: |
+          def f(z, gamma):
+              import numpy as np
+              return np.maximum(np.abs(z) - gamma, 0.0)
+  lasso-cd:
+    kind: exact
+    seed: 505
+    atol: 1.0e-6
+    inputs_code: |
+      # A correlated predictor pair, so the penalty has a real routing
+      # decision to make — the design the prostate data poses at full scale.
+      X = rng.normal(size=(60, 8))
+      X[:, 1] = 0.7 * X[:, 0] + 0.5 * X[:, 1]
+      X = (X - X.mean(0)) / X.std(0)
+      y = X @ np.array([2.0, 0.0, -1.5, 0.0, 0.0, 1.0, 0.0, 0.0]) + rng.normal(0.0, 0.5, size=60)
+      y = y - y.mean()
+      inputs = (X, y, np.array([0.7, 0.3, 0.1, 0.02]))
+    wrong:
+      - hint: "The coordinate update must see the residual with x_j's own contribution added back: z_j = β_j + x_jᵀr/n, THEN threshold. Thresholding x_jᵀr/n of the full residual double-counts the coordinate you are updating."
+        code: |
+          def f(X, y, lambdas):
+              import numpy as np
+              n, d = X.shape
+              beta = np.zeros(d)
+              out = np.empty((len(lambdas), d))
+              for i, lam in enumerate(lambdas):
+                  for _ in range(10_000):
+                      delta = 0.0
+                      for j in range(d):
+                          r = y - X @ beta
+                          z = X[:, j] @ r / n
+                          bj = np.sign(z) * max(abs(z) - lam, 0.0)
+                          delta = max(delta, abs(bj - beta[j]))
+                          beta[j] = bj
+                      if delta < 1e-10:
+                          break
+                  out[i] = beta
+              return out
+      - hint: "Check the objective's scale: with (1/(2n))·RSS the threshold in the update is λ itself. Minimizing (1/2)·RSS + λ‖β‖₁ instead makes the effective threshold λ/n, and the path barely shrinks."
+        code: |
+          def f(X, y, lambdas):
+              import numpy as np
+              n, d = X.shape
+              beta = np.zeros(d)
+              out = np.empty((len(lambdas), d))
+              for i, lam in enumerate(lambdas):
+                  for _ in range(10_000):
+                      delta = 0.0
+                      for j in range(d):
+                          r = y - X @ beta
+                          z = beta[j] + X[:, j] @ r / n
+                          bj = np.sign(z) * max(abs(z) - lam / n, 0.0)
+                          delta = max(delta, abs(bj - beta[j]))
+                          beta[j] = bj
+                      if delta < 1e-10:
+                          break
+                  out[i] = beta
+              return out
+  prostate-table:
+    kind: exact
+    seed: 7
+    atol: 1.0e-6
+    inputs_code: |
+      raw = np.loadtxt("data/prostate.csv", delimiter=",", skiprows=1)
+      # λ = 23.12 solves df(λ) = 5.0 on this design; λ = 0.22 puts the
+      # lasso's shrinkage factor s at 0.366 — the study's CV choices.
+      inputs = (raw[:, :8], raw[:, 8], 23.12, 0.22)
+    wrong:
+      - hint: "The penalties are not unit-invariant: standardize the predictors first, or age and pgg45 are penalized on scales fifty times apart and the table comes out wrong in every row."
+        code: |
+          def f(X_raw, y_raw, lam_ridge, lam_lasso):
+              import numpy as np
+              n, d = X_raw.shape
+              Xc = X_raw - X_raw.mean(0)          # centered, never scaled
+              ybar = y_raw.mean()
+              yc = y_raw - ybar
+              ols = np.linalg.lstsq(Xc, yc, rcond=None)[0]
+              U, dv, Vt = np.linalg.svd(Xc, full_matrices=False)
+              ridge = Vt.T @ ((dv / (dv**2 + lam_ridge)) * (U.T @ yc))
+              c = (Xc**2).mean(0)
+              beta = np.zeros(d)
+              for _ in range(100_000):
+                  delta = 0.0
+                  for j in range(d):
+                      r = yc - Xc @ beta + Xc[:, j] * beta[j]
+                      z = Xc[:, j] @ r / n
+                      bj = np.sign(z) * max(abs(z) - lam_lasso, 0.0) / c[j]
+                      delta = max(delta, abs(bj - beta[j]))
+                      beta[j] = bj
+                  if delta < 1e-10:
+                      break
+              table = np.zeros((9, 3))
+              table[0] = ybar
+              table[1:, 0], table[1:, 1], table[1:, 2] = ols, ridge, beta
+              return table
+      - hint: "The intercept is not penalized: center y and leave the intercept out of the penalized problem — λ has no business shrinking the mean of lpsa."
+        code: |
+          def f(X_raw, y_raw, lam_ridge, lam_lasso):
+              import numpy as np
+              n, d = X_raw.shape
+              Xs = (X_raw - X_raw.mean(0)) / X_raw.std(0)
+              Xa = np.column_stack([Xs, np.ones(n)])
+              ols = np.linalg.lstsq(Xs, y_raw - y_raw.mean(), rcond=None)[0]
+              ridge = np.linalg.solve(Xa.T @ Xa + lam_ridge * np.eye(d + 1), Xa.T @ y_raw)
+              beta = np.zeros(d + 1)
+              for _ in range(100_000):
+                  delta = 0.0
+                  for j in range(d + 1):
+                      r = y_raw - Xa @ beta + Xa[:, j] * beta[j]
+                      z = Xa[:, j] @ r / n
+                      bj = np.sign(z) * max(abs(z) - lam_lasso, 0.0)
+                      delta = max(delta, abs(bj - beta[j]))
+                      beta[j] = bj
+                  if delta < 1e-10:
+                      break
+              table = np.zeros((9, 3))
+              table[0] = [y_raw.mean(), ridge[d], beta[d]]
+              table[1:, 0], table[1:, 1], table[1:, 2] = ols, ridge[:d], beta[:d]
+              return table
+  why-exact-zeros:
+    kind: review
+    rubric: |
+      The question: why does coordinate descent for the lasso produce
+      coefficients that are exactly zero, while ridge regression — however
+      large λ — never does?
+
+      Pass if the answer names the real mechanism on the lasso side: the
+      ℓ1 penalty's corner (non-differentiability) at zero — equivalently,
+      the subgradient of λ|β_j| at 0 is the whole interval [−λ, λ], so zero
+      is optimal whenever the coordinate's correlation with the residual
+      lands inside it; equivalently, the soft-threshold update maps the
+      entire interval |z| ≤ λ to exactly 0. AND contrasts ridge correctly:
+      its penalty is smooth, shrinkage is multiplicative — a factor like
+      d_j²/(d_j²+λ) strictly between 0 and 1 — so a nonzero coefficient is
+      scaled down but never reaches zero for finite λ. KKT/subgradient
+      phrasings and the orthonormal-case operators both count.
+
+      Fail if the answer only restates "L1 gives sparsity, L2 does not"
+      without a mechanism, attributes the zeros to numerical rounding or to
+      the algorithm's stopping rule, or claims ridge reaches zero
+      asymptotically at some finite λ.
+  beat-test-error:
+    kind: metric
+    metric: rmse
+    threshold: -0.72
+    holdout: data/holdout_X.csv
+    labels_code: |
+      labels = np.loadtxt("private/holdout_y.csv")

@@ -1,0 +1,423 @@
+Expected prediction error at a point splits exactly into three terms — irreducible noise, squared bias, and variance — and every modeling choice in classical machine learning trades one term against another.
+
+<Ref lesson="statistical-learning">The previous lesson</Ref> established that risk, not training error, is the object of learning, and its closing experiment showed two ways to lose: the rigid line was systematically wrong on every draw, the jagged 1-NN boundary was different on every draw. What stands open is whether those are two examples or the whole list. This lesson proves they are the whole list: beyond the noise floor, systematic miss and sample-to-sample fluctuation are the only components of expected squared error, and each admits a closed form for concrete methods. The route: the quantity that makes bias and variance well defined; the identity computed on an example small enough to enumerate; the general proof; closed forms for $k$-NN and linear fits; the same identity at the level of parameter estimators, where deliberate bias first wins on purpose; the diagnosis toolkit; and the boundary of validity at 0–1 loss.
+
+## The object: a procedure scored over retrainings
+
+Pricing flexibility requires first fixing what is being priced, and it is not the error of one fitted model. The data model specializes the previous lesson's setup: pairs are drawn from a distribution $D$ with
+
+$$
+Y = f(X) + \varepsilon, \qquad \mathbb{E}[\varepsilon] = 0, \qquad \operatorname{Var}(\varepsilon) = \sigma^2,
+$$
+
+where $f$ is the unknown target and the noise $\varepsilon$ is independent of everything else. Under this model $f$ is exactly the Bayes predictor $\mathbb{E}[Y \mid X = x]$ from the previous lesson, and $\sigma^2$ is the Bayes risk at every point: the floor even the oracle pays. A learning procedure receives the sample $S$ of $n$ pairs and returns a fitted predictor $\hat{f}_S$. Two sources of randomness are now in play, and they are different in kind: the **draw of $S$**, which decides which model gets fitted, and the **noise $\varepsilon$** in the fresh test label.
+
+<Definition title="expected test error at a point">
+Fix a test input $x_0$. The *expected test error* of the procedure at $x_0$ is
+
+$$
+\operatorname{Err}(x_0) = \mathbb{E}_{S,\,\varepsilon}\!\left[\left(y - \hat{f}_S(x_0)\right)^2\right],
+$$
+
+the average squared error against a fresh noisy label $y = f(x_0) + \varepsilon$, taken over fresh training samples $S$ and fresh noise. The *average prediction* of the procedure at $x_0$ is $\bar{f}(x_0) = \mathbb{E}_S[\hat{f}_S(x_0)]$.
+</Definition>
+
+The subscript $S$ is the load-bearing part, and it is where the standard confusion lives. The claim "my fitted model has high variance" is, read literally, meaningless: one fitted model is one function; at $x_0$ it has a single number as its miss, and a single number does not split into a systematic part and a fluctuating part. The split only exists for the **procedure**: retrain on a fresh sample, predict at the same $x_0$, repeat, and examine the distribution of predictions. What varies is the training set; the test point stays fixed. Everyday usage survives because it is shorthand: "this model overfits" means "the procedure that produced it has high variance", and this lesson's algebra is about the procedure.
+
+The retraining experiment is short enough to run in full. Draw twelve noisy samples of $f(x) = \sin(\pi x)$ with $\sigma = 0.3$, fit a polynomial by least squares, redraw, repeat twenty times, first with degree 1, then with degree 9 (the demo and the closing simulation exercise reuse this target, sample size, and noise level):
+
+<FigureSequence
+  name="spaghetti"
+  alt="Four frames, each with two panels fitting resampled noisy sine data by degree-1 and degree-9 polynomials: one fit each, then twenty overlaid fits, then their pointwise average against the dashed target, then labels marking the average's standing miss as bias and the fits' spread as variance"
+  caption="Twenty retrainings on fresh 12-point samples of sin(πx). The sheaf's spread is variance; the average curve's standing miss is bias."
+/>
+
+<Task>
+Step through the four frames. In frame 2, compare the spread of the two sheaves: the degree-1 lines nearly coincide, the degree-9 curves disagree by more than the full range of the data. In frame 3, compare each blue average with the dashed target: the degree-9 average tracks it closely, the degree-1 average cannot bend into it. Each panel is bad at exactly one of the two things.
+</Task>
+
+<KeyFact>
+Each of the three terms ahead is a function of $x_0$, not one number for the whole input space: $\operatorname{Err}(x_0)$ prices the procedure at a single point, and the test error the rest of the course optimizes is its average $\mathbb{E}_{x_0}[\operatorname{Err}(x_0)]$ over the input distribution — the quantity the closing simulation exercise estimates by averaging the three terms over a test grid.
+</KeyFact>
+
+## The identity on numbers small enough to enumerate
+
+The two panels fail in opposite ways; the decomposition prices both failures in one currency, and the pricing is visible on a two-value example before any algebra.
+
+<Example title="jumpy versus stable">
+At a fixed $x_0$ let $f(x_0) = 4$, with label noise $\varepsilon = \pm 1$ equally likely, so $y \in \{3, 5\}$ and $\sigma^2 = \mathbb{E}[\varepsilon^2] = 1$.
+
+**Procedure A (unbiased, jumpy).** The training draw pushes the fit to $\hat{f}_S(x_0) = 3$ or $5$, each with probability $\tfrac12$. The noise and the fit are independent, so all four $(y, \hat{f})$ combinations are equally likely:
+
+$$
+\operatorname{Err}_A(x_0) = \tfrac14\left[(3-3)^2 + (3-5)^2 + (5-3)^2 + (5-5)^2\right] = \tfrac14(0+4+4+0) = 2.
+$$
+
+Bookkeeping: $\bar{f}(x_0) = \tfrac12(3+5) = 4$, so the average prediction is exactly right, and the spread around it is $\mathbb{E}_S[(\hat{f} - 4)^2] = 1$. Noise $+$ miss$^2$ $+$ spread $= 1 + 0 + 1 = 2$: the direct computation and the three-part accounting agree.
+
+**Procedure B (biased, stable).** Always predict $4.5$, whatever $S$ says. Then $y - 4.5 = \varepsilon - 0.5$ and
+
+$$
+\operatorname{Err}_B(x_0) = \mathbb{E}\left[(\varepsilon - 0.5)^2\right] = \sigma^2 + 0.25 = 1.25.
+$$
+
+Bookkeeping: standing miss $4.5 - 4 = 0.5$, spread $0$. Noise $+$ miss$^2$ $+$ spread $= 1 + 0.25 + 0 = 1.25$.
+</Example>
+
+The biased procedure wins, $1.25$ against $2$: a half-unit of systematic error costs less than a full unit of fluctuation, because only the **sum** of the three terms is the score. "Trade-off" is in this sense a misleading name. Nothing forces an even exchange, and the whole business of regularization, taken up from <Ref lesson="ridge-lasso">the ridge and lasso lesson</Ref> onward, is buying large variance reductions at small bias prices.
+
+<Exercise>
+Same bookkeeping, fresh numbers, before the general theorem: a procedure has $\mathbb{E}_S[\hat{f}_S(x_0)] = 3$ and $\operatorname{Var}_S(\hat{f}_S(x_0)) = 0.5$ at a point where the truth is $f(x_0) = 4$ and the label noise has $\sigma^2 = 1$. Compute $\operatorname{Err}(x_0)$ and each term's share of it.
+
+<Solution>
+The standing miss is $\bar{f}(x_0) - f(x_0) = 3 - 4 = -1$, contributing $(-1)^2 = 1$. The spread contributes $0.5$, the noise $1$:
+
+$$
+\operatorname{Err}(x_0) = \sigma^2 + \text{miss}^2 + \text{spread} = 1 + 1 + 0.5 = 2.5,
+$$
+
+with shares $40\%$ noise, $40\%$ squared miss, $20\%$ spread. Only the last two respond to modeling choices, and of those only the $0.5$ would shrink if more data were collected; the reason is the learning-curve section below.
+</Solution>
+</Exercise>
+
+## The decomposition: noise + bias² + variance
+
+The example's three-part accounting is a theorem, and the two quantities it tracked get their permanent names first.
+
+<Definition title="bias and variance at a point">
+For a procedure with average prediction $\bar{f}(x_0) = \mathbb{E}_S[\hat{f}_S(x_0)]$,
+
+$$
+\operatorname{Bias}(x_0) = \bar{f}(x_0) - f(x_0),
+\qquad
+\operatorname{Var}(x_0) = \mathbb{E}_S\!\left[\left(\hat{f}_S(x_0) - \bar{f}(x_0)\right)^2\right].
+$$
+</Definition>
+
+The proof is a direct computation in three moves: substitute the data model into $y$, insert $-\bar{f} + \bar{f}$ inside the square, and check that both cross terms average to zero (one by the definition of $\bar{f}$, one by the independence of $\varepsilon$ from $S$).
+
+<Theorem title="bias–variance decomposition (ESL Eq. 7.9)">
+Under the model $y = f(x_0) + \varepsilon$ with $\mathbb{E}[\varepsilon] = 0$, $\operatorname{Var}(\varepsilon) = \sigma^2$, and $\varepsilon$ independent of $S$,
+
+$$
+\operatorname{Err}(x_0) = \underbrace{\sigma^2}_{\text{noise}} \;+\; \underbrace{\left(f(x_0) - \bar{f}(x_0)\right)^2}_{\text{bias}^2} \;+\; \underbrace{\mathbb{E}_S\!\left[\left(\hat{f}_S(x_0) - \bar{f}(x_0)\right)^2\right]}_{\text{variance}}.
+$$
+
+<Proof>
+Abbreviate $f = f(x_0)$, $\hat{f} = \hat{f}_S(x_0)$, $\bar{f} = \bar{f}(x_0)$; all expectations run over $S$ and $\varepsilon$. Substituting $y = f + \varepsilon$ and inserting $-\bar f + \bar f$,
+
+$$
+y - \hat{f} = (f - \bar{f}) + (\bar{f} - \hat{f}) + \varepsilon .
+$$
+
+Expanding $(a + b + c)^2 = a^2 + b^2 + c^2 + 2ab + 2ac + 2bc$ with $a = f - \bar{f}$, $b = \bar{f} - \hat{f}$, $c = \varepsilon$, and collecting $2ac + 2bc = 2c(a+b) = 2\varepsilon(f - \hat f)$:
+
+$$
+\mathbb{E}\!\left[(y - \hat{f})^2\right]
+= (f - \bar{f})^2
++ \mathbb{E}_S\!\left[(\bar{f} - \hat{f})^2\right]
++ \mathbb{E}[\varepsilon^2]
++ 2(f - \bar{f})\,\mathbb{E}_S[\bar{f} - \hat{f}]
++ 2\,\mathbb{E}\!\left[(f - \hat{f})\,\varepsilon\right].
+$$
+
+The first square carries no expectation because $f - \bar{f}$ is a fixed number once $x_0$ is fixed. Both cross terms vanish:
+
+- $\mathbb{E}_S[\bar{f} - \hat{f}] = \bar{f} - \mathbb{E}_S[\hat{f}] = \bar{f} - \bar{f} = 0$, since $\bar{f}$ is by definition the mean of $\hat{f}$ over $S$;
+- $\mathbb{E}[(f - \hat{f})\,\varepsilon] = \mathbb{E}_S[f - \hat{f}]\cdot\mathbb{E}[\varepsilon] = 0$, since $\varepsilon$ is independent of $S$ and $\mathbb{E}[\varepsilon] = 0$.
+
+Finally $\mathbb{E}[\varepsilon^2] = \operatorname{Var}(\varepsilon) = \sigma^2$ because $\mathbb{E}[\varepsilon] = 0$. The three surviving terms are the claim.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="proof"
+  alt="Four frames of staged algebra: the error with y substituted, the inserted average prediction with color-coded groups, the two cross terms struck out with their one-line reasons, and the surviving noise, bias-squared, and variance terms named"
+  caption="The proof in four moves: substitute, insert −f̄ + f̄, kill both cross terms, name the survivors."
+/>
+
+<Task>
+Close the frames and reproduce the derivation on paper, including the one-line reason each cross term vanishes. If either reason took more than a sentence, reread the proof: the two zeros use nothing beyond the definition of a mean and the independence of $\varepsilon$ from $S$.
+</Task>
+
+### Reading the three terms
+
+Each term blames a different actor, and each is nonnegative, so the decomposition doubles as a lower bound: $\operatorname{Err}(x_0) \ge \sigma^2$ always.
+
+<Figure
+  src="./figures/decomposition.svg"
+  alt="The decomposition identity with each term underbraced and color-bound to a panel below it: gray noise panel with labels jittering at x0, blue bias panel with the average fit missing the target, amber variance panel with individual fits spread around their average"
+  caption="The identity dissected: each term is one panel's failure, at one fixed x₀, and nothing else contributes."
+/>
+
+**Noise** $\sigma^2$ is the problem's property, not the model's: it is the Bayes risk at $x_0$ established in <Ref lesson="statistical-learning" id="the-bayes-predictor-the-best-answer-if-d-were-known">the previous lesson</Ref>, paid even by the oracle $\hat{f} = f$. **Bias** is the procedure's systematic miss: the model family cannot represent $f$ near $x_0$, or the fitting method will not reach it; for a fixed family at fixed complexity, no amount of data moves it. **Variance** is sensitivity to the draw: how far one retraining lands from the procedure's own average. This is exactly the promised split of the epistemic error into a systematic piece and a fluctuating piece. The theorem adds that the split is exhaustive: there is no fourth term, no interaction, no residual.
+
+## Two closed forms: a dial and a bill
+
+For most procedures the three terms are estimated by simulation, but two workhorses admit exact formulas, and each formula teaches a different lesson: $k$-NN exposes a dial that moves bias and variance in opposite directions, and the linear fit presents a bill for every parameter.
+
+### k-nearest neighbors: the trade in one formula
+
+For the $k$-nearest-neighbor fit $\hat{f}_k(x_0) = \tfrac{1}{k}\sum_{\ell=1}^{k} y_{(\ell)}$, averaging the labels of the $k$ training inputs nearest to $x_0$ (with the training inputs held fixed, so all randomness is in the labels), the decomposition evaluates term by term to
+
+$$
+\operatorname{Err}(x_0) \;=\; \sigma^2 \;+\; \Bigl[f(x_0) - \frac{1}{k}\sum_{\ell=1}^{k} f(x_{(\ell)})\Bigr]^2 \;+\; \frac{\sigma^2}{k},
+$$
+
+where $x_{(\ell)}$ is the $\ell$-th nearest training input to $x_0$. The closing exercise on this formula derives it from the theorem directly. $k$ enters the two controllable terms with opposite effect. The variance is the variance of an average of $k$ noisy labels, $\sigma^2/k$: doubling the neighborhood halves it, mechanically. The bias compares $f(x_0)$ with the average of $f$ over the $k$ nearest inputs: as $k$ grows the neighborhood widens, the average pulls in values of $f$ from farther away, and for any smooth, curved $f$ the miss grows.
+
+<Figure
+  src="./figures/knn-tradeoff.svg"
+  alt="Analytic bias squared, variance sigma-squared over k, and their total plotted against the number of neighbors k for sin(pi x) at x0 = 0.5 with 50 fixed inputs and sigma 0.3; variance falls as 1/k, bias squared rises, the total is U-shaped with minimum at k = 16 just above the dashed noise floor"
+  caption="The closed form plotted, not sketched: σ²/k falls, bias²(k) rises, and their sum turns at k = 16 for this target."
+/>
+
+The previous lesson's $k$-sweep on the mixture data showed a U-shaped test error empirically; this figure is the same U produced by two analytic terms crossing. At $k = 1$ the bias is the single gap $f(x_0) - f(x_{(1)})$, near zero when inputs are dense, and the variance is a full $\sigma^2$: the memorizing end pays everything in fluctuation. At $k = n$ the variance is a negligible $\sigma^2/n$ and the fit is the global label mean: the constant-predictor end pays everything in standing miss.
+
+### Linear fits: each parameter costs σ²/n of variance
+
+For a linear model $\hat{f}_p(x) = x^\top \hat{\beta}$ with $p$ coefficients fit by least squares, the variance at $x_0$ is $\lVert h(x_0)\rVert^2 \sigma^2$, where $h(x_0)$ is the vector of weights the fit places on the $n$ training labels. The point-by-point value depends on where $x_0$ sits, but its average over the training inputs collapses to something clean:
+
+$$
+\frac{1}{n}\sum_{i=1}^{n} \operatorname{Var}\bigl(\hat{f}_p(x_i)\bigr) = \frac{p}{n}\,\sigma^2 .
+$$
+
+<Aside>
+The average has a two-line proof. With design matrix $X$ and $h(x_0) = X(X^\top X)^{-1}x_0$, the sum $\sum_i \lVert h(x_i)\rVert^2$ is the trace of the projection matrix $X(X^\top X)^{-1}X^\top$, and a projection onto a $p$-dimensional column space has trace $p$. <Ref lesson="ols">The least-squares lesson</Ref> constructs this projection view in full.
+</Aside>
+
+Read as a bill: every coefficient added to a least-squares model costs $\sigma^2/n$ of average variance, whether or not it reduces the bias. This is the first quantitative statement of a theme the linear-model module develops: dimensions are not free, and the price is paid in the variance column.
+
+<Remark title="model bias and estimation bias (ESL Eq. 7.14)">
+For linear families the bias itself splits in two. *Model bias* is the gap between $f$ and the best linear approximation to it, reducible only by enriching the family (more features, transformations, interactions). *Estimation bias* is the gap between the best linear approximation and what the procedure converges to. For least squares the estimation bias is zero; regularized fits such as ridge make it deliberately nonzero, because shrinking coefficients buys back variance. The next section shows the purchase paying off in the simplest possible setting.
+</Remark>
+
+<KeyFact>
+Two numbers to keep: $k$-NN variance is $\sigma^2/k$, and average least-squares variance is $(p/n)\,\sigma^2$. Both are exact, and both say the same thing in different coordinates: averaging over more labels divides the fluctuation, and every fitted degree of freedom adds its own share of it.
+</KeyFact>
+
+## The estimator version: deliberate bias, priced and profitable
+
+Stripping away the test point specializes the identity to plain parameter estimation, where the classical evidence that unbiasedness is overrated lives. For an estimator $\hat{\theta}$ of a fixed parameter $\theta^*$ there is no fresh label and hence no noise term; inserting $\mathbb{E}[\hat{\theta}]$ exactly as in the proof above gives
+
+$$
+\operatorname{MSE}(\hat\theta) \;=\; \mathbb{E}\bigl[(\hat{\theta} - \theta^*)^2\bigr] \;=\; \operatorname{bias}^2(\hat\theta) + \operatorname{Var}(\hat\theta).
+$$
+
+<Example title="the shrunk mean beats the sample mean (Murphy §4.7.6)">
+Estimate a Gaussian mean $\theta^*$ from $n$ draws with known $\sigma$. The sample mean $\bar{x}$ is unbiased with variance $\sigma^2/n$. The competing estimator shrinks toward a prior guess $\theta_0$:
+
+$$
+\tilde{\theta} = w\,\bar{x} + (1-w)\,\theta_0, \qquad w = \frac{n}{n + \kappa_0},
+$$
+
+which is the MAP estimate under a Gaussian prior of strength $\kappa_0$ centered at $\theta_0$. Its bias and variance follow from linearity:
+
+$$
+\mathbb{E}[\tilde\theta] - \theta^* = (1-w)(\theta_0 - \theta^*), \qquad \operatorname{Var}(\tilde\theta) = w^2\,\frac{\sigma^2}{n},
+$$
+
+so $\operatorname{MSE}(\tilde\theta) = (1-w)^2(\theta_0-\theta^*)^2 + w^2\sigma^2/n$. Set the prior wrong on purpose: $\theta_0 = 0$ while the truth is $\theta^* = 1$, with $\sigma = 1$. The ratio against the MLE is then
+
+$$
+\frac{\operatorname{MSE}(\tilde\theta)}{\operatorname{MSE}(\bar x)} = w^2 + n(1-w)^2 = \frac{n\,(n + \kappa_0^2)}{(n+\kappa_0)^2},
+$$
+
+which for $\kappa_0 = 1$ equals $n(n+1)/(n+1)^2 = n/(n+1) < 1$ for every $n$: the biased estimator wins at all sample sizes, despite aiming at the wrong center. For $\kappa_0 = 2$ the ratio $n(n+4)/(n+2)^2 < 1$ likewise always; for $\kappa_0 = 3$ it exceeds $1$ once $n > 3$, the point at which confidence in a wrong prior starts costing more than it saves.
+</Example>
+
+<Figure
+  src="./figures/mse-ratio.svg"
+  alt="MSE of the shrunk mean relative to the MLE plotted against sample size for prior strengths 1, 2, and 3, with the MLE baseline at ratio 1; strengths 1 and 2 stay below 1 at all sample sizes, strength 3 rises above 1 beyond n equal to 3"
+  caption="Shrinking toward a wrong guess still beats the unbiased estimator, if the shrinkage is mild: the first bit of bias is nearly free, the first bit of variance reduction is not."
+/>
+
+The mechanism is the shape of the two terms near $w = 1$: moving $w$ slightly below $1$ raises $\operatorname{bias}^2$ from zero at second order, $(1-w)^2$, while cutting variance at first order. Some shrinkage therefore always helps; only the amount is in question. This is the entire logic of ridge regression stated one dimension early, and the module on the linear model prices the multivariate version exactly.
+
+## Diagnosis: what the terms look like from outside
+
+Neither bias nor variance is observable (both require $f$ and an average over retrainings), so using the decomposition on real problems means reading its signatures in quantities that are observable. Two readings cover practice: error against flexibility, and error against sample size.
+
+### Against flexibility: the U-curve
+
+Sweeping any flexibility dial (polynomial degree, $1/k$, tree depth) moves bias² down and variance up, and their sum through a minimum:
+
+<Figure
+  src="./figures/ucurve.svg"
+  alt="Bias squared falling, variance rising, a flat noise floor, their U-shaped sum, and a monotonically falling dashed training error, plotted against model flexibility"
+  caption="Test error is the sum of the three terms and turns back up; training error keeps falling and says nothing about the right half."
+/>
+
+Training error tracks none of this: more flexibility always fits the sample at hand better, so it falls toward zero precisely while true error turns upward. The right half of the U is *overfitting* as defined in <Ref lesson="statistical-learning">the previous lesson</Ref> (training error falling while risk rises), now with its cause named: the error past the minimum is dominated by variance. The left half, dominated by bias², is *underfitting*. On our running example the simulated terms behave exactly this way: degree 1 totals $0.32$ of expected test error, and of its $0.23$ above the noise floor nearly all is bias²; degree 9 totals $0.21$, its $0.12$ of reducible error almost pure variance; degree 3 totals $0.12$, only a third above the $0.09$ noise floor (the research-shaped closing exercise reproduces the full table).
+
+<Demo
+  name="BiasVarianceExplorer"
+  caption="Polynomial fits to fresh noisy samples of sin(πx): degree slider, train/test error traces, and a resample button that redraws the training set."
+/>
+
+<Task>
+Do the variance observation before reading on: set degree 9 and press resample five times, watching the fitted curve. The swing from draw to draw is the variance term made visible; the readout's test MSE jitters with it. Then set degree 0: resampling barely moves the flat fit, but it misses the target everywhere; that standing gap is bias. Finally find the degree where the amber test curve bottoms out, and confirm the blue training curve gave no warning at all.
+</Task>
+
+One boundary note, stated once and left for the course's last module: this U is the classical picture, and <Ref lesson="double-descent">the double-descent lesson</Ref> shows regimes of modern practice where the right half turns back down. Nothing there repeals the identity (it is an identity), but "flexibility" and "parameter count" stop being the same axis.
+
+### Against sample size: learning curves
+
+Plotting training and validation error against $n$ separates the two failure modes, because $n$ enters the terms asymmetrically: variance shrinks with data ($\sigma^2/k$ at fixed neighborhood fraction, $(p/n)\sigma^2$ directly), while bias, at fixed model complexity, does not move at all.
+
+<Figure
+  src="./figures/learning-curves.svg"
+  alt="Two panels of training and validation error versus training set size: high-bias curves converge onto a plateau above the desired error; high-variance curves keep a persistent gap with validation error still falling"
+  caption="Left: curves converge onto a plateau of bias² + σ² that more data cannot lower. Right: the persistent train–validation gap is variance, still being bought down by data."
+/>
+
+The two panels are the whole diagnostic. Training error far above the target says the model cannot even fit the data it sees: bias, and the remedies are a richer family, more features, or less regularization. A large train–validation gap says the model fits what it sees and not what it does not: variance, and the remedies are more data, more regularization, or averaging, the route <Ref lesson="bagging-random-forests">the ensembles module</Ref> industrializes. Estimating these curves honestly, without spending test data, is its own craft, and <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> builds it.
+
+<KeyFact>
+At fixed complexity, adding training data cures variance and never bias: both curves flatten onto the plateau at $\text{bias}^2 + \sigma^2$, so if the plateau already sits above the target, more data is wasted effort and the model family itself must change. The exception is a procedure whose complexity grows with the data — $k$-NN at fixed $k$ is one, its neighborhoods shrinking as inputs pack denser, so its bias does fall with $n$; the consistency result of <Ref lesson="knn-curse">the next lesson</Ref> rests on exactly that.
+</KeyFact>
+
+## Where the sum breaks: 0–1 loss
+
+Every statement so far priced squared error, and the additivity is a squared-error fact, not a law of nature. Under 0–1 loss the analogous accounting fails, and it fails for a reason worth carrying into every classification chapter ahead.
+
+Consider a point where the true class-1 probability is $\eta(x_0) = 0.9$ and a procedure's average probability estimate is $0.6$. The squared miss is $(0.9 - 0.6)^2 = 0.09$: considerable. The classification consequence is zero: $0.6$ is on the same side of $\tfrac12$ as $0.9$, so the predicted class is right and the error rate at $x_0$ stays at the Bayes floor of $0.1$. Estimation errors that do not cross the decision boundary are free.
+
+<Figure
+  src="./figures/zero-one.svg"
+  alt="Two panels plotting cost against the average probability estimate at a point with true probability 0.9: squared loss is a smooth parabola through estimates 0.6 and 0.45, while 0-1 loss is flat at 0.1 for estimates above one half and jumps to 0.9 below it"
+  caption="Squared loss prices every miss; 0–1 loss prices only the boundary crossing. Between 0.9 and 0.5, bias is free."
+/>
+
+The consequences invert several squared-loss instincts. Bias and variance stop adding and start interacting: reducing variance helps only when the average estimate is on the correct side of the boundary, and a procedure whose average is on the wrong side can be rescued by more variance, since only the fluctuations reach the correct side. The simulation in [Hastie, Tibshirani and Friedman](https://hastie.su.domains/ElemStatLearn/) (§7.3.1) shows a $k$-NN classifier whose misclassification rate keeps improving as $k$ grows past the point where its squared bias is already rising: the tuning that minimizes squared error and the tuning that minimizes classification error genuinely differ.
+
+<Remark title="the decomposition is a squared-error theorem">
+For classification, "bias–variance" is a metaphor, not an identity: no additive decomposition of 0–1 risk into the three terms exists, and several inequivalent generalizations compete in the literature (Domingos 2000 unifies them). The vocabulary remains useful (instability across retrainings is real and measurable for classifiers), but the arithmetic of this lesson may only be applied to squared loss.
+</Remark>
+
+What stands established: expected squared test error at a point is exactly noise plus squared bias plus variance, the split is over retrainings at a fixed test point, and it is exhaustive: the two failure modes the previous lesson exhibited are the only two. The terms have closed forms for $k$-NN ($\sigma^2/k$ variance against a widening-neighborhood bias) and linear fits ($(p/n)\sigma^2$ on average), the estimator version legitimizes deliberate bias, and learning curves read the terms off observable quantities. What the closed form for $k$-NN quietly assumed is that neighbors are near: <Ref lesson="knn-curse">the next lesson</Ref> works the $k$ dial in earnest and then shows that in high dimensions the nearest training points are not near at all, which breaks the bias term in a way no choice of $k$ repairs.
+
+## Exercises
+
+<Exercise>
+Derive the $k$-NN closed form from the decomposition theorem. Setup: training inputs $x_1, \dots, x_n$ fixed, labels $y_i = f(x_i) + \varepsilon_i$ with independent noise of variance $\sigma^2$, and $\hat{f}_k(x_0) = \tfrac{1}{k}\sum_{\ell=1}^k y_{(\ell)}$ the average label of the $k$ inputs nearest to $x_0$. Compute the bias and variance terms, assemble $\operatorname{Err}(x_0)$, and check both endpoints $k = 1$ and $k = n$ make sense.
+
+<Solution>
+Strategy: with the inputs fixed, which $k$ points are nearest is not random, so $\hat{f}_k(x_0)$ is an average of $k$ independent noisy labels: compute its mean and variance directly, then plug into the theorem.
+
+Mean: $\mathbb{E}[\hat{f}_k(x_0)] = \tfrac{1}{k}\sum_{\ell=1}^k \mathbb{E}[y_{(\ell)}] = \tfrac{1}{k}\sum_{\ell=1}^k f(x_{(\ell)})$, since each $\varepsilon_{(\ell)}$ has mean zero. Hence
+
+$$
+\operatorname{Bias}(x_0) = \frac{1}{k}\sum_{\ell=1}^k f(x_{(\ell)}) - f(x_0).
+$$
+
+Variance: the labels are independent with variance $\sigma^2$ each, and the variance of an average of $k$ independent terms divides by $k$:
+
+$$
+\operatorname{Var}(x_0) = \operatorname{Var}\Bigl(\frac{1}{k}\sum_{\ell=1}^k \varepsilon_{(\ell)}\Bigr) = \frac{1}{k^2}\cdot k\,\sigma^2 = \frac{\sigma^2}{k}.
+$$
+
+The theorem then gives $\operatorname{Err}(x_0) = \sigma^2 + \bigl[f(x_0) - \tfrac{1}{k}\sum_\ell f(x_{(\ell)})\bigr]^2 + \sigma^2/k$, which is the formula in the chapter (ESL Eq. 7.10).
+
+Endpoints. At $k = 1$: variance $\sigma^2$ (a single noisy label, no averaging), bias $f(x_{(1)}) - f(x_0)$, which tends to zero as inputs grow dense around $x_0$ for continuous $f$: the flexible extreme pays in fluctuation, not in miss. At $k = n$: variance $\sigma^2/n$, negligible, but the bias compares $f(x_0)$ with the average of $f$ over all inputs: the fit is the global mean, the constant-predictor extreme, paying in miss. The transferable move: for any linear-in-the-labels fit $\hat f(x_0) = \sum_i w_i y_i$, the variance is always $\sigma^2 \sum_i w_i^2$, and only the weights' geometry differs between methods.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: set $\sigma^2 = 0$, so labels are noiseless and the "irreducible" term vanishes. (a) For the memorizing predictor of <Ref lesson="statistical-learning">the statistical learning lesson</Ref> — store the sample, predict the stored label on stored inputs and $0$ elsewhere — compute all three terms at a fixed $x_0$ that has probability zero of appearing in $S$, and name which term carries all the error. (b) Exhibit a procedure whose variance is strictly positive even though $\sigma^2 = 0$, and state what that says about the word "irreducible".
+
+<Solution>
+(a) Off the sample, the memorizer is the constant $0$ whatever $S$ was drawn, so at $x_0$: $\hat{f}_S(x_0) = 0$ for almost every $S$. The average prediction is $\bar{f}(x_0) = 0$, the variance is $\mathbb{E}_S[(0-0)^2] = 0$, the noise is $0$ by assumption, and
+
+$$
+\operatorname{Err}(x_0) = 0 + \bigl(f(x_0) - 0\bigr)^2 + 0 = f(x_0)^2 .
+$$
+
+All the error is bias²: the memorizer is not jumpy at unseen points; it is systematically, maximally wrong there, the pure-bias corner wearing a zero-training-error disguise.
+
+(b) Take 1-nearest-neighbor with random training inputs (the realistic case, in contrast to the fixed-design assumption of the closed form). The prediction at $x_0$ is $f(x_{(1)})$, and the identity of the nearest input $x_{(1)}$ changes from draw to draw, so $\hat{f}_S(x_0)$ fluctuates across retrainings even with noiseless labels: $\operatorname{Var}(x_0) > 0$ whenever $f$ is non-constant near $x_0$. Randomness in which data arrived is a source of variance independent of label noise.
+
+What this says about "irreducible": $\sigma^2$ is irreducible by modeling: no procedure goes below it. The converse does not hold: $\sigma^2 = 0$ does not make error zero or even small, since both controllable terms can be large on noiseless data. Noise bounds the floor, not the ceiling.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "an unbiased estimator is always preferable to a biased one." Use the family $\hat{\mu}_\alpha = \alpha\,\bar{y}$, $\alpha \in [0,1]$, for estimating a mean $\mu \neq 0$ from $n$ iid observations with noise variance $\sigma^2$: compute $\operatorname{MSE}(\alpha)$, find its minimizer, and name the exact step at which the claim's reasoning fails.
+
+<Solution>
+$\mathbb{E}[\bar{y}] = \mu$ and $\operatorname{Var}(\bar{y}) = \sigma^2/n$, so $\hat\mu_\alpha$ has bias $(\alpha - 1)\mu$ and variance $\alpha^2 \sigma^2/n$. The estimator identity gives
+
+$$
+\operatorname{MSE}(\alpha) = (1-\alpha)^2 \mu^2 + \alpha^2\,\frac{\sigma^2}{n}.
+$$
+
+Setting the derivative to zero: $-2(1-\alpha)\mu^2 + 2\alpha \sigma^2/n = 0$, so
+
+$$
+\alpha^* = \frac{\mu^2}{\mu^2 + \sigma^2/n} \;<\; 1,
+$$
+
+with the second derivative $2\mu^2 + 2\sigma^2/n > 0$ confirming a minimum. Since $\alpha^* < 1$ strictly whenever $\sigma^2 > 0$, the unbiased choice $\alpha = 1$ is never MSE-optimal in this family: some shrinkage always wins, however small.
+
+The failing step: the claim compares estimators by the bias term alone, silently treating variance as equal; but MSE $=$ bias² $+$ variance, and near $\alpha = 1$ the bias² cost of shrinking is second-order, $(1-\alpha)^2\mu^2$, while the variance saving is first-order. Ranking by one term of a two-term sum is the error. (The caveat that keeps the claim from being fully dead: $\alpha^*$ depends on the unknown $\mu$, so the optimal shrinkage is not implementable as stated; but fixed, data-independent shrinkage as in the chapter's $\kappa_0$ example still wins over a range of truths, which is all the refutation needs.)
+</Solution>
+</Exercise>
+
+<Exercise>
+The statistical learning lesson's final exercise redrew the mixture training set five times and recorded test errors: 1-NN gave $13.1, 16.4, 13.9, 16.2, 17.5$ percent (range $4.4$ points) and 15-NN gave $11.5, 13.6, 11.1, 12.1, 12.5$ percent (range $2.5$ points), against a Bayes floor of $11\%$. With this lesson's vocabulary: (a) name the quantity the range of each list was measuring; (b) name what the comparison of the two averages against the floor reflects; (c) state why this lesson's three-term arithmetic nevertheless cannot be applied to these percentages as it stands.
+
+<Solution>
+(a) The spread across retrainings at fixed test data is the procedure's variance made visible: the five numbers are five draws of the random variable "test error of $\hat{f}_S$", and the 1-NN list's larger range shows the fitted predictor fluctuating more with its sample.
+
+(b) The averages sit at about $15.4\%$ for 1-NN and $12.2\%$ for 15-NN over a floor of $11\%$. The persistent elevation of the average performance above the floor is the systematic component — for 15-NN, roughly a point of it, small because averaging fifteen votes tracks the smooth Bayes boundary well; 1-NN's elevation mixes a small systematic part with the cost of its fluctuations.
+
+(c) These are 0–1-loss error rates, and the additive decomposition is a squared-error theorem: for classification, no identity writes expected misclassification as noise $+$ bias² $+$ variance, and errors that stay on the correct side of the boundary cost nothing. The spread is still real and still diagnostic — instability is instability under any loss — but assigning the percentage points to terms of a sum, as parts (a) and (b) informally did, is a heuristic reading, not this lesson's theorem.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the qualitative content of ISLP's Figure 2.12 numerically. Protocol: target $f(x) = \sin(\pi x)$ on $[-1,1]$, $n = 12$ equispaced training inputs, noise $\sigma = 0.3$; for each degree $d \in \{1, 3, 9\}$, fit least-squares polynomials on $R = 2000$ resampled training sets, and estimate (averaged over a fixed test grid): the squared bias, the variance, and the expected test MSE measured directly. State what would count as agreement before running it, then compare with the run in the solution.
+
+<Solution>
+Agreement criterion: the identity predicts measured expected test MSE $=$ $\sigma^2$ + bias² + variance at every degree, up to Monte Carlo error of a few percent; qualitatively, bias² should collapse and variance grow as $d$ rises, with the sum minimized at the middle degree.
+
+Our run ($R = 2000$, test grid of 101 points):
+
+| degree | bias² | variance | noise $\sigma^2$ | sum | measured test MSE |
+|---|---|---|---|---|---|
+| 1 | $0.219$ | $0.014$ | $0.090$ | $0.323$ | $0.323$ |
+| 3 | $0.006$ | $0.026$ | $0.090$ | $0.122$ | $0.122$ |
+| 9 | $0.000$ | $0.118$ | $0.090$ | $0.208$ | $0.208$ |
+
+The sum matches the direct measurement to three decimals at every degree — tighter than $R = 2000$ alone would deliver, and for a reason worth noting: both columns are computed from the same 2000 fits, so the fitted-curve contribution cancels exactly and the only independent randomness between them is the fresh test noise, a few $10^{-4}$ of Monte Carlo error. The pattern is ISLP Fig. 2.12's: the bias² column collapses by degree 3 (the cubic can bend into one arch of the sine), the variance column grows four-and-a-half-fold from degree 3 to 9, and the minimum sits at the middle flexibility, a third above the noise floor. Degree 9's total is better than degree 1's here (on this target, underfitting is the worse failure), which is exactly why the diagnosis has to be read off the data rather than assumed.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation: ridge regression estimates $\hat{\beta}_\lambda = (X^\top X + \lambda I)^{-1} X^\top y$. In the orthonormal-design case $X^\top X = I_p$ (with noise variance $\sigma^2$), compute the variance of each coordinate of $\hat{\beta}_\lambda$ as a function of $\lambda$, compare it with the least-squares value at $\lambda = 0$, and compute the bias of each coordinate. What do the two formulas jointly suggest about small $\lambda > 0$?
+
+<Solution>
+With $X^\top X = I_p$ the formula collapses coordinatewise: $\hat{\beta}_\lambda = (1+\lambda)^{-1} X^\top y = \hat{\beta}_{\text{OLS}}/(1+\lambda)$. Since $\operatorname{Var}(\hat\beta_{\text{OLS},j}) = \sigma^2$ in this design,
+
+$$
+\operatorname{Var}(\hat{\beta}_{\lambda,j}) = \frac{\sigma^2}{(1+\lambda)^2},
+$$
+
+strictly less than the OLS variance $\sigma^2$ for every $\lambda > 0$: the very first turn of the ridge knob cuts variance. The bias follows from $\mathbb{E}[\hat\beta_{\lambda,j}] = \beta_j/(1+\lambda)$:
+
+$$
+\operatorname{bias}(\hat{\beta}_{\lambda,j}) = \frac{\beta_j}{1+\lambda} - \beta_j = -\frac{\lambda}{1+\lambda}\,\beta_j .
+$$
+
+Near $\lambda = 0$ the variance drops linearly in $\lambda$ (derivative $-2\sigma^2$) while the squared bias grows only quadratically (as $\lambda^2 \beta_j^2$): the shrunk-mean argument, verbatim, one coordinate at a time. So some $\lambda > 0$ always lowers the MSE below OLS's, and you have just computed the core of the existence theorem that <Ref lesson="ridge-lasso">the ridge and lasso lesson</Ref> states and prices in the general, non-orthonormal case.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §2.9 (Eqs. 2.46–2.47): the k-NN decomposition and the test/training error schematic; §7.3 (Eqs. 7.9–7.14): the decomposition with the k-NN and linear-fit closed forms and the model/estimation bias split; §7.3.1: why 0–1 loss does not decompose additively. Free online: https://hastie.su.domains/ElemStatLearn/
+2. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §2.2.2, Eq. (2.7) and Figs. 2.9–2.12: the flexibility U-curve across three targets, reproduced numerically in the research-shaped exercise. Free online: https://www.statlearning.com
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §4.7.6: the estimator-level MSE decomposition, the shrunk-mean example (Fig. 4.24), and the classification caveat. Free online: https://probml.github.io/pml-book/book1.html
+4. S. Geman, E. Bienenstock, R. Doursat, "Neural Networks and the Bias/Variance Dilemma," *Neural Computation* 4(1), 1992 — the paper that fixed the modern terminology and worked the decomposition for nonparametric estimators.
+5. P. Domingos, "A Unified Bias-Variance Decomposition and its Applications," ICML 2000 — the framework unifying the competing 0–1-loss generalizations mentioned in the final section.
+6. K. Q. Weinberger, "Lecture 12: Bias-Variance Tradeoff," CS4780, Cornell University, 2018 — the same derivation with the expectation taken over the test point as well, a useful second presentation. https://www.cs.cornell.edu/courses/cs4780/2018fa/lectures/lecturenote12.html
+</References>

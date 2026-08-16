@@ -1,0 +1,270 @@
+Ninety-seven prostate-cancer patients, eight clinical predictors, one question — which measurements predict PSA — and every estimator this module built gives a different answer; choosing among them is the module's skill, exercised on its canonical dataset.
+
+The module's argument is complete as machinery: <Ref lesson="ols">least squares</Ref> projects and certifies, <Ref lesson="ridge-lasso">the penalties</Ref> trade bias for variance with the mechanism exposed, <Ref lesson="regression-diagnostics">the diagnostics</Ref> audit the assumptions, and <Ref lesson="splines-gams">effective degrees of freedom</Ref> put every fit on one complexity axis. What no lesson has done is the practitioner's job: run the toolkit on one real dataset, tune each estimator honestly, and defend a choice. This lesson reproduces the published study that does exactly that, the prostate-cancer thread of [ESL Chapter 3](https://hastie.su.domains/ElemStatLearn/), and reads its results with everything the module proved. <Ref lesson="regularization-lab">The lab</Ref> then rebuilds each fit as verified code.
+
+The route: the data and the correlation structure that decides everything downstream; the full least-squares fit and its conditional inference; cross-validation and the one-standard-error rule as the tuning protocol; the coefficient table, read estimator by estimator; and the test-set verdict, including what it cannot say.
+
+## The data: two correlated clusters and one dominant predictor
+
+<Task>
+Three retrievals before the data, closed book; check against the named lessons only after writing all three down. (1) From <Ref lesson="ridge-lasso">the penalties lesson</Ref>: the orthonormal-case actions of ridge, lasso, and best subset on an OLS coefficient (proportional shrink, soft threshold, hard threshold). (2) From <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>: what near-duplicate predictors do to their individual coefficients, and to their sum. (3) From <Ref lesson="splines-gams">the smoothers lesson</Ref>: the formula $\operatorname{df}(\lambda) = \sum_j d_j^2/(d_j^2+\lambda)$ and its value at $\lambda = 0$.
+</Task>
+
+*Prostate-specific antigen* (PSA) is a protein the prostate sheds into the blood; its level rises with prostate cancer, and monitoring it is a standard part of managing the disease. Stamey et al. (1989) measured PSA and a set of clinical variables in 97 men about to undergo radical prostatectomy (surgical removal of the prostate), asking which measurements track the antigen level. The modeling task, fixed by ESL and inherited here: predict the log of PSA, `lpsa`, from eight predictors.
+
+- `lcavol`: log cancer volume. `lweight`: log prostate weight. `age`: in years.
+- `lbph`: log amount of benign prostatic hyperplasia (non-cancerous enlargement). `svi`: seminal vesicle invasion, a binary indicator that the cancer has spread into the adjacent glands.
+- `lcp`: log capsular penetration (how far the tumor has broken through the prostate's outer capsule). `gleason`: the Gleason score, a pathologist's tumor grade (6 to 9 here), treated as a number. `pgg45`: percent of Gleason grades 4 or 5.
+
+The protocol, fixed once and published with the data: the 97 cases are split into a **training set of 67** and a **test set of 30**, and the predictors are standardized to unit variance, the precondition <Ref lesson="ridge-lasso">the penalties lesson</Ref> established before any penalty is applied. Every fit below is trained, tuned, and selected on the 67; the 30 are touched only for the final verdict.
+
+<Figure
+  src="./figures/scatter-matrix.svg"
+  alt="Four-by-four scatterplot matrix of lpsa, lcavol, lweight, and lcp for all 97 patients, with the lpsa-lcavol and lcavol-lcp panels highlighted in amber and pairwise correlations printed in each panel"
+  caption="A 4×4 corner of the scatterplot matrix (all 97 patients; the idea of ESL Fig. 1.1). Amber marks the two relationships that drive the whole study: lcavol tracks the response, and lcp tracks lcavol."
+/>
+
+Before any fitting, the scatterplot matrix already shows the structure that will decide the estimators' disagreements. `lcavol` is the dominant predictor: correlation $0.73$ with the response, visibly linear. `lcp` is also strongly related to the response ($r = 0.55$), and almost as strongly to `lcavol` ($r = 0.69$), with a floor of censored values at its minimum (many tumors have zero capsular penetration). The predictors form two correlated clusters: a disease-extent cluster \{`lcavol`, `lcp`, `svi`\} with pairwise correlations $0.59$ to $0.69$ on the 67 training cases, and a grading cluster \{`gleason`, `pgg45`\} at $0.76$. The predictor–predictor correlations the prose below reuses are training-set values ($\rho = 0.69$ for lcavol–lcp above all); the figure, and the two response correlations above, use all 97 patients — there lcavol–lcp reads $0.68$, and the lpsa–lcp value of $0.55$ falls to $0.49$ on the 67 training cases. By the variance-inflation identity of <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>, coefficients inside these clusters are exactly the ones the data determines worst.
+
+<Aside>
+The dataset also carries a reminder that clinical data arrives unaudited. The first edition of ESL shipped patient 32 with `lweight` $= 6.1$: a $449$-gram prostate, roughly ten times a plausible organ weight. The corrected value, $44.9$ grams, entered the second edition after a reader checked. One implausible row in 97 is precisely the kind of point <Ref lesson="regression-diagnostics">the diagnostics lesson's</Ref> leverage-and-influence audit exists to surface before it bends a fit.
+</Aside>
+
+<KeyFact>
+Every disagreement in this study's coefficient table is decided by the correlation structure visible in this section: `lcavol` will anchor every model, and `lcp`'s fate (significant alone, negative under OLS, deleted by the lasso) is the collinearity chapter replayed on real data.
+</KeyFact>
+
+## The full fit: every Z-score is a conditional claim
+
+The first estimator is plain least squares on all eight standardized predictors, the estimator whose sampling theory <Ref lesson="ols">the least-squares lesson</Ref> derived: $\hat\beta$ with covariance $\sigma^2 (X^\top X)^{-1}$, and per-coefficient Z-scores (coefficient over standard error) that are approximately significant at the 5% level when $|Z| > 2$.
+
+### The fit: four predictors clear the bar
+
+Fitting on the 67 training cases reproduces ESL Table 3.2:
+
+| Term | Coefficient | Std. error | Z-score |
+| --- | --- | --- | --- |
+| intercept | 2.46 | 0.09 | 27.60 |
+| `lcavol` | 0.68 | 0.13 | 5.37 |
+| `lweight` | 0.26 | 0.10 | 2.75 |
+| `age` | −0.14 | 0.10 | −1.40 |
+| `lbph` | 0.21 | 0.10 | 2.06 |
+| `svi` | 0.31 | 0.12 | 2.47 |
+| `lcp` | −0.29 | 0.15 | −1.87 |
+| `gleason` | −0.02 | 0.15 | −0.15 |
+| `pgg45` | 0.27 | 0.15 | 1.74 |
+
+Four predictors clear the bar — `lcavol` far above it at $Z = 5.37$, then `lweight`, `svi`, and `lbph` between $2$ and $3$ — and four do not. Dropping the insignificant four at once and applying the F-test gives $F = 1.67$, $p = 0.17$: the data offers no evidence that the excluded half contributes anything jointly. The standard-error column also records *where* the design is informative: the five largest standard errors ($0.12$–$0.15$) belong to `lcavol`, `svi`, `lcp`, `gleason`, and `pgg45` — exactly the five members of the previous section's two correlated clusters, as the variance-inflation identity requires.
+
+**The model works.** Predicting every test case by the training mean of `lpsa` gives a test error of $1.057$ (mean squared error on the 30 held-out cases); the full linear model scores $0.521$. Eight clinical measurements **cut the baseline error in half**, and no fit below improves on that headline by more than a tenth.
+
+### Marginal versus conditional: two answers about lcp
+
+**The Z-scores are conditional.** A Z-score answers one precise question: does this predictor add anything *given the other seven*. For `lcp` the conditional and marginal answers disagree completely. Alone, `lcp` is a strong predictor: regressing `lpsa` on it by itself gives coefficient $0.59$ with $Z = 4.5$. Inside the full model it is negative and insignificant, because `lcavol` sits in the same regression and carries the shared disease-extent signal: the credit-reshuffling that <Ref lesson="regression-diagnostics">the diagnostics lesson's</Ref> canyon picture explains, running at $\rho = 0.69$ rather than $0.99$.
+
+<Figure
+  src="./figures/lcp-marginal-conditional.svg"
+  alt="Two scatterplots of the 67 training cases: lpsa against lcp alone with a positive fitted line of slope 0.59, and the added-variable plot of lpsa against lcp given the other seven predictors with a negative fitted line of slope minus 0.29"
+  caption="Both regressions the table's lcp row could be confused with, computed on the 67 training cases. Left: the marginal fit. Right: the added-variable plot — what is left of lpsa and of lcp after the other seven predictors explain what they can; its slope IS the full model's coefficient −0.29."
+/>
+
+The right panel is the picture of the conditional claim: once the other seven predictors — `lcavol` above all — have explained their share of both variables, the residual cloud is nearly slopeless, tilted slightly downward. The sign of $-0.29$ is not a claim that capsular penetration lowers PSA; it is the least-squares split of a signal two predictors share.
+
+## Four dials, one protocol: cross-validation and the one-SE rule
+
+Every remaining estimator in the module is a *family* indexed by one complexity dial: best subset by the subset size $k$, ridge by $\operatorname{df}(\lambda)$, the lasso by the shrinkage factor $s = t/\sum_j |\hat\beta_j|$ from <Ref lesson="ridge-lasso">its path</Ref>. Comparing the families fairly requires setting each dial from the training data alone, by one shared protocol.
+
+### The error estimate, stated as the black box it is
+
+The protocol is **tenfold cross-validation**: divide the 67 training cases at random into ten near-equal parts; for each part in turn, fit the estimator at every dial setting on the other nine and record the squared prediction error on the held-out part; average the ten errors per setting. The scatter of the ten per-fold errors also yields a standard error for each average (their standard deviation over $\sqrt{10}$), which is what the error bars below show. That is the entire description this lesson gives. Why ten folds, what bias and variance this estimate itself carries, and when it can be catastrophically fooled are <Ref lesson="cross-validation-bootstrap">module 5's</Ref> subject; here the machinery is used, not audited.
+
+<Definition title="the one-standard-error rule">
+Let $\operatorname{CV}(m)$ be the cross-validated error estimate at dial setting $m$, with standard error $\operatorname{SE}(m)$, and let $m^*$ minimize $\operatorname{CV}$. The **one-standard-error rule** selects the *least complex* setting $m_1$ satisfying
+$$
+\operatorname{CV}(m_1) \;\le\; \operatorname{CV}(m^*) + \operatorname{SE}(m^*).
+$$
+The rule treats every setting within one standard error of the minimum as statistically tied, and breaks the tie toward parsimony.
+</Definition>
+
+The rule exists because the curve it reads is an *estimate*: its minimum's location is partly fold noise, and chasing it rewards noise with complexity. The in-sample alternatives ($C_p$, AIC, BIC, adjusted $R^2$; ISLP §6.1.3 surveys them) correct training error analytically instead; the resampling route needs no formula for the optimism and is what ESL's study uses.
+
+<Example title="applying the rule to the best-subset curve">
+Our tenfold run on the 67 training cases (fresh random folds) gives, for subset sizes $k = 0, 1, \dots, 8$, the CV estimates
+$$
+1.49,\; 0.70,\; 0.61,\; 0.75,\; 0.64,\; 0.70,\; 0.61,\; 0.57,\; 0.59 .
+$$
+**Step 1, the minimum.** The smallest value is $\operatorname{CV}(7) = 0.57$, with standard error $0.11$.
+**Step 2, the threshold.** $0.57 + 0.11 = 0.68$: any subset size whose estimate is at most $0.68$ is a statistical tie with the winner.
+**Step 3, the smallest qualifier.** $k = 0$ gives $1.49$ and $k = 1$ gives $0.70$: both fail. $k = 2$ gives $0.61 \le 0.68$: qualifies. The rule selects $k = 2$.
+The wiggles between $k = 2$ and $k = 8$ (up at 3, down at 6) are fold noise on a curve that is genuinely flat there: exactly the situation the rule is built for.
+</Example>
+
+<Figure
+  src="./figures/cv-curves.svg"
+  alt="Two panels of tenfold cross-validation error with one-standard-error bars: best subset error against subset size with the one-SE choice at k equals 2, and lasso error against shrinkage factor with the one-SE choice at s equals 0.40"
+  caption="Tenfold CV on the 67 training cases, computed here with a fresh fold assignment (the logic of ESL Fig. 3.7). Both curves are flat near their minima; the amber dashed line is min + 1 SE, and the amber point is the rule's choice."
+/>
+
+<Exercise>
+Apply the rule to our lasso curve. The tenfold estimates over the shrinkage factor $s$ (subset of the grid):
+
+| $s$ | 0.20 | 0.30 | 0.40 | 0.50 | 0.60 | 0.80 | 0.95 | 1.00 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| $\operatorname{CV}$ | 0.91 | 0.76 | 0.68 | 0.62 | 0.60 | 0.60 | 0.587 | 0.588 |
+| $\operatorname{SE}$ | 0.20 | 0.17 | 0.14 | 0.12 | 0.12 | 0.12 | 0.115 | 0.114 |
+
+Identify the minimum, compute the threshold, and state the rule's choice. Write both numbers down before opening.
+
+<Solution>
+The minimum is $\operatorname{CV}(0.95) = 0.587$ with $\operatorname{SE} = 0.115$, so the threshold is $0.587 + 0.115 = 0.702$. Scanning from the sparse end: $s = 0.20$ ($0.91$) and $s = 0.30$ ($0.76$) fail; $s = 0.40$ gives $0.68 \le 0.702$ and qualifies. The rule selects $s = 0.40$, a model with four active predictors, although the raw minimum sits at $s = 0.95$, a model using all eight. The gap between the two choices is the rule's entire content: the curve cannot distinguish $s = 0.40$ from $s = 0.95$, so complexity breaks the tie.
+</Solution>
+</Exercise>
+
+Flat minima make the chosen setting fold-sensitive in the third decimal: ESL's own folds selected $\hat s \approx 0.36$; ours select $0.40$. The active sets agree, and the honest summary is that on this data the *rule*, not the minimum, does the choosing. The published choices, used from here on: subset size $k = 2$, ridge $\operatorname{df}(\lambda) = 5.0$ (which back-solves to $\lambda \approx 24$), lasso $s = 0.36$. The same protocol tuned ESL's two remaining entrants, *principal components regression* (regress on the top principal directions of the standardized design: 7 of 8 directions chosen) and *partial least squares* (response-guided directions: 2 chosen); both are derived-direction methods this course constructs with <Ref lesson="pca">module 8's machinery</Ref>, and they appear below as context rows only.
+
+## The coefficient table: six answers to one question
+
+Fitting each estimator at its chosen setting on the 67 training cases and standing the results side by side reproduces the module's central artifact, ESL's Table 3.3.
+
+| Term | LS | Best subset | Ridge | Lasso | PCR | PLS |
+| --- | --- | --- | --- | --- | --- | --- |
+| intercept | 2.465 | 2.477 | 2.452 | 2.468 | 2.497 | 2.452 |
+| `lcavol` | 0.680 | 0.740 | 0.420 | 0.533 | 0.543 | 0.419 |
+| `lweight` | 0.263 | 0.316 | 0.238 | 0.169 | 0.289 | 0.344 |
+| `age` | −0.141 |  | −0.046 |  | −0.152 | −0.026 |
+| `lbph` | 0.210 |  | 0.162 | 0.002 | 0.214 | 0.220 |
+| `svi` | 0.305 |  | 0.227 | 0.094 | 0.315 | 0.243 |
+| `lcp` | −0.288 |  | 0.000 |  | −0.051 | 0.079 |
+| `gleason` | −0.021 |  | 0.040 |  | 0.232 | 0.011 |
+| `pgg45` | 0.267 |  | 0.133 |  | −0.056 | 0.084 |
+| **test error** | 0.521 | 0.492 | 0.492 | 0.479 | 0.449 | 0.528 |
+| **std. error** | 0.179 | 0.143 | 0.165 | 0.164 | 0.105 | 0.152 |
+
+Blank cells are variables the estimator dropped; every tuning parameter was chosen by the previous section's protocol (ESL Table 3.3; the last two rows are test-set mean squared error and its standard error over the 30 held-out cases).
+
+<Figure
+  src="./figures/coef-dotplot.svg"
+  alt="Dot plot of the eight predictors' coefficients under least squares, best subset, ridge, and lasso, with dropped coefficients drawn as hollow circles at zero"
+  caption="The four core columns of the table as one picture: subset and lasso drop variables (hollow dots at zero), ridge keeps all eight and shrinks, and every estimator agrees on lcavol and lweight."
+/>
+
+<Figure
+  src="./figures/paths-chosen.svg"
+  alt="Ridge coefficient paths against effective degrees of freedom and lasso paths against the shrinkage factor, computed on the prostate training data, with the cross-validation choices df equals 5 and s equals 0.36 marked and the lcavol and lcp paths highlighted"
+  caption="Where the table's columns live: each is one vertical slice of a path (computed here; choices df = 5.0 and s = 0.36). Amber: lcavol. Blue: lcp, which ridge drives through zero and the lasso holds at exactly zero."
+/>
+
+### What shrinkage did and what selection did
+
+**Ridge kept everyone and shrank everyone.** Against the LS column, `lcavol` falls from $0.680$ to $0.420$ and every other coefficient moves toward zero, hardest in the directions the design determines worst: the SVD anatomy of <Ref lesson="ridge-lasso">the penalties lesson</Ref>, visible as the smooth bending of the left panel's paths. The printed $0.000$ for `lcp` is rounding, not selection: that lesson proved no finite $\lambda$ zeroes a ridge coefficient, and the path shows `lcp` *crossing* zero near $\operatorname{df} = 5$ on its way from negative to positive. A coefficient whose sign depends on the penalty setting is a coefficient the data does not determine; ridge's answer for the weak half of the table is "small, sign unknown."
+
+**Subset and lasso agree on the core.** Best subset at $k = 2$ keeps \{`lcavol`, `lweight`\}; the lasso at $s = 0.36$ keeps \{`lcavol`, `lweight`, `svi`, `lbph`\}, and the fourth survivor `lbph` enters at $0.002$, on the boundary of its own activation kink. On this data the subset sequence is nested (`lcavol`, then `lweight`, then `svi`, then `lbph`, the same order the lasso path activates them), so the two selection mechanisms, hard and soft, tell one story: two predictors carry most of the signal, two more add a little, and the rest add nothing the training data can certify. The agreement is a property of this design, not a law: <Ref lesson="ridge-lasso">the penalties lesson's</Ref> hard-versus-soft comparison says exactly when the two can diverge.
+
+**The surviving coefficients are shrunken on purpose.** The lasso's `lweight` is $0.169$ against LS's $0.263$: soft thresholding subtracts its penalty from every survivor, buying the variance reduction the module priced. Best subset, which refits by plain least squares on its two keepers, shows the opposite signature: `lcavol` *rises* to $0.740$, absorbing part of the correlated signal its deleted neighbors used to carry.
+
+### The lcp deletion, read correctly
+
+The correct reading of the lasso's blank `lcp` cell: *given* `lcavol` in the model, `lcp`'s additional contribution is below the penalty's noise floor. A widespread misreading treats the blank as a discovery that the variable is irrelevant: "the lasso found that capsular penetration doesn't matter for PSA." That reading is false, and this dataset is the cleanest refutation available. Marginally, `lcp` is one of the strongest single predictors on the table ($r = 0.55$ with `lpsa`; univariate $Z = 4.5$). Its signal travels with `lcavol` ($\rho = 0.69$), the lasso must pay $\lambda$ per unit of coefficient on each, and one well-placed coefficient on `lcavol` buys almost everything the pair jointly offers, so the penalty routes the entire shared signal through the stronger twin and zeroes the weaker. A clinician who stopped measuring capsular penetration because "the model dropped it" would be acting on a claim the model never made. Selection is a statement about *conditional redundancy in this design*, and it transfers to no other set of predictors; the discriminating check is always the marginal fit, which here contradicts the blank cell.
+
+<KeyFact>
+The same collinearity that inflates OLS variances (<Ref lesson="regression-diagnostics">the VIF identity</Ref>) makes lasso selection unstable within a correlated cluster: which twin survives can flip under resampling, while the cluster's total contribution stays put.
+</KeyFact>
+
+The two context columns confirm the module's geometry from outside. PCR with 7 of 8 directions deletes exactly one thing: the component of $\hat\beta$ along the design's lowest-variance principal direction, whose loadings sit almost entirely on `pgg45`, `gleason`, `lcp`, and `lcavol` — a contrast *between* the twins within each collinear cluster, and the direction on which LS spends a large coefficient component precisely because the data measures it worst. Deleting it leaves the well-determined coordinates untouched (`lweight`, `age`, `lbph`, `svi` sit within $0.03$ of the LS column) and reshuffles only the cluster coordinates, flipping which twin carries the grading signal: `gleason` $0.232$ against LS's $-0.021$, `pgg45` $-0.056$ against $0.267$, `lcp` $-0.051$ against $-0.288$, `lcavol` down from $0.680$ to $0.543$. PLS with 2 supervised directions lands near ridge. Both are shrinkage in a rotated basis, which is why their columns contain no exact zeros anywhere.
+
+## The verdict: what 30 test cases can and cannot say
+
+The bottom rows of the table are the study's verdict.
+
+<Figure
+  src="./figures/test-verdict.svg"
+  alt="Test errors of the six estimators with plus-minus one standard error bars, all intervals overlapping and all crossing the dashed line at the best mean of 0.449"
+  caption="The bottom rows of the table, drawn (the reading Murphy's boxplot makes of the same experiment): every interval crosses the best mean. On 30 test cases, no method separates from any other."
+/>
+
+### The ranking the standard errors erase
+
+The means order the methods: PCR $0.449$, lasso $0.479$, ridge and best subset $0.492$, LS $0.521$, PLS $0.528$. The standard errors erase the ordering: they run $0.105$ to $0.179$, two to four times the gaps between methods, and **every method's interval contains every other method's mean**. The honest summary of the study is a tie: every tuned estimator lands near $0.45$–$0.53$ against a baseline of $1.06$, and 30 test cases cannot rank them. Murphy's independent rerun of the same comparison (§11.4.5) reshuffles the details (his lasso keeps five predictors and scores $0.457$) without changing that summary, which is itself evidence for it.
+
+What a practitioner reports, then, is not "the lasso won." It is: the signal is real (baseline halved); it concentrates in two to four predictors led by `lcavol`; the tuned estimators are statistically indistinguishable on this split; and the model chosen (say the lasso's, for its sparsity) is preferred on parsimony and interpretability, not on measured error. The one-SE rule is the same judgment applied inside each family: among ties, take the simplest.
+
+### Three departures from the idealization
+
+**The split is single**: one fixed 67/30 division, so the test errors are one draw of a random variable whose spread the SE row only estimates; a different split reshuffles the ranking (module 5 makes the split itself the object of study). **The protocol has a small leak**: reproducing the published table exactly requires standardizing the predictors with statistics computed from all 97 patients, test rows included. Harmless at this scale, but the habit of letting any fitted quantity touch the test set is what <Ref lesson="wrong-way-cv">module 5's blunder lesson</Ref> exists to indict. **Predictive error is not clinical value**: Stamey's question was association, several predictors (cancer volume among them) are measured on the removed specimen, and nothing in a test MSE of $0.45$ says the model is useful for any decision made before surgery.
+
+### The hand-off
+
+What stands established: the module's estimators, tuned by one protocol on one real dataset, agree on the signal's location, disagree on the credit assignment exactly where the design is collinear, and cannot be separated by held-out error at $n = 97$, with each behavior in the table predicted by a result this module proved: the conditional nature of Z-scores by <Ref lesson="ols">the covariance formula</Ref>, ridge's everywhere-nonzero shrinkage by its closed form, the lasso's exact zeros by the subgradient kink, the reshuffling by the <Ref lesson="regression-diagnostics">variance-inflation identity</Ref>, and the common complexity axis by <Ref lesson="splines-gams">$\operatorname{tr}(S)$</Ref>. Two pieces of machinery ran as black boxes: cross-validation and its error bars, which <Ref lesson="cross-validation-bootstrap">module 5</Ref> opens, and the solvers (normal equations, SVD shrinkage, coordinate descent), which <Ref lesson="regularization-lab">the lab</Ref> makes you build against this table as the acceptance test.
+
+## Exercises
+
+<Exercise>
+From the reproduced table, list (a) the predictors every one of the six estimators keeps with visible size, and (b) the predictors that appear with a nonzero printed coefficient only in the non-selecting columns (LS, ridge, PCR, PLS). For each group, state in one sentence what the estimators are jointly claiming about it.
+
+<Solution>
+(a) `lcavol` and `lweight` appear in every column, always with the two largest magnitudes (lcavol $0.42$–$0.74$, lweight $0.17$–$0.34$). The joint claim: their contribution survives every penalty and every selection mechanism at every tuning chosen, so it is signal the training data certifies under any of the module's inductive biases.
+
+(b) `age`, `lcp`, `gleason`, and `pgg45` are kept only by the estimators structurally incapable of producing exact zeros. Both selection mechanisms (hard thresholding at $k=2$, soft thresholding at $s = 0.36$) price their conditional contribution below the noise floor, and the full model's own inference agrees: all four have $|Z| < 2$, and the F-test for dropping them jointly gives $p = 0.17$. The claim is conditional redundancy, not irrelevance: `lcp`'s strong marginal correlation ($0.55$) is exactly the case the next exercise dissects. (`svi` and `lbph` sit between the groups: kept by the lasso at $0.094$ and $0.002$, dropped by best subset.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. Suppose the CV curve comes back flat: every dial setting, including the null model, lies within one standard error of the minimum. What does the one-SE rule return, and why is that the right degenerate answer rather than a failure of the rule? Then say what the same reading implies when only the *null model* fails the threshold, as in the lesson's actual curves.
+
+<Solution>
+The rule returns the null model (subset size $0$, or $s = 0$): it is the least complex setting among the qualifiers, and by hypothesis it qualifies. This is correct behavior, not breakdown. A curve that flat says the cross-validation estimate cannot distinguish any model from predicting the training mean — the data, at this sample size and fold noise, contains no certifiable predictive signal. Returning the null model is the only answer that refuses to charge complexity for evidence that does not exist; picking the raw minimum instead would select a model on pure fold noise, the exact failure the rule is built to prevent. The degenerate case also exposes the rule's structure: it is a lexicographic decision, first statistical adequacy (within one SE of the best), then parsimony, and when the adequacy criterion stops discriminating, parsimony decides everything.
+
+In the lesson's curves the null model fails the threshold by a wide margin ($1.49$ against a threshold of $0.68$ for subsets) while nearly all non-null settings qualify. The reading is the study's actual conclusion in miniature: the data certifies *that* there is signal, and barely discriminates *how much machinery* to spend on it, so the rule spends the minimum: two predictors.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "The lasso dropped `lcp`, so capsular penetration is unrelated to PSA level." Name the evidence in this lesson that contradicts it, the mechanism that produced the zero anyway, and the general confusion the claim commits.
+
+<Solution>
+The contradicting evidence is marginal: `lcp` alone predicts `lpsa` with correlation $0.55$ over the 97 patients, and its univariate regression on the 67 training rows has $Z = 4.5$: far stronger evidence of a relationship than several variables the lasso kept (`lbph`'s univariate relationship is weaker, yet it survives at $0.002$). An unrelated variable does not produce a univariate Z-score of $4.5$ on 67 cases.
+
+The mechanism: `lcp` shares its signal with `lcavol` ($\rho = 0.69$). The lasso pays $\lambda$ per unit of $|\beta|$ on each variable separately, so when two predictors carry overlapping signal, concentrating the coefficient on the stronger one buys nearly the whole fit at nearly half the penalty; the subgradient interval at zero (<Ref lesson="ridge-lasso">the soft-thresholding theorem</Ref>) then absorbs the weaker twin's residual pull exactly. The zero records that `lcp`'s *conditional* contribution, given `lcavol` and the rest, is below the threshold: the same conditional statement the OLS Z-score of $-1.87$ makes, sharpened to an exact zero.
+
+The confusion is selection ≠ marginal relevance: a sparse fit answers "which minimal set of these columns spans the signal in this design," a conditional and design-relative question, while the claim reads it as the marginal question "is this variable related to the response." The two questions have opposite answers for `lcp`, and only the marginal one is about biology.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson skipped. Let two columns of the centered design be exactly equal, $x_1 = x_2$, and consider ridge and lasso at penalty $\lambda > 0$. (a) Show that the lasso objective is constant on a continuum of optimal solutions: if $(\beta_1, \beta_2) = (c, 0)$ with $c > 0$ is optimal, so is every same-sign split $(\alpha c, (1-\alpha)c)$, $\alpha \in [0,1]$. (b) Show that ridge's optimum is unique and splits the coefficient symmetrically, $\beta_1 = \beta_2$, deriving it from strict convexity.
+
+<Solution>
+Both objectives depend on the coefficients only through the fit $X\beta$, which involves $\beta_1, \beta_2$ only via $x_1\beta_1 + x_2\beta_2 = x_1(\beta_1 + \beta_2)$, plus the penalty.
+
+(a) Fix the sum $\beta_1 + \beta_2 = c$; every split leaves the residual term unchanged. The $\ell_1$ penalty contributes $\lambda(|\beta_1| + |\beta_2|) \ge \lambda|\beta_1 + \beta_2| = \lambda|c|$, with equality exactly when $\beta_1$ and $\beta_2$ have the same sign (or one is zero). So every same-sign split of $c$ achieves the same objective value as $(c, 0)$, and if one of them is optimal, all are: the solution set contains the whole segment from $(c,0)$ to $(0,c)$. The lasso objective with duplicated columns is convex but not strictly convex, and a solver's reported answer on that segment is an artifact of the algorithm: the instability behind the "which twin survives" warning in the body, met here in its exact-duplicate limit.
+
+(b) The ridge penalty on the segment is $\lambda(\beta_1^2 + \beta_2^2)$ with $\beta_1 + \beta_2 = c$ fixed. Writing $\beta_1 = c/2 + t$, $\beta_2 = c/2 - t$ gives $\beta_1^2 + \beta_2^2 = c^2/2 + 2t^2$, strictly minimized at $t = 0$: among all splits with the same fit, ridge strictly prefers the symmetric one. Uniqueness globally follows from <Ref lesson="ridge-lasso">the penalties lesson's</Ref> existence theorem: the ridge Hessian $X^\top X + \lambda I$ is positive definite for every $\lambda > 0$, duplicated columns included, so the objective is strictly convex and has one minimizer, which by the segment argument must satisfy $\beta_1 = \beta_2$. The transferable statement: strict convexity of the penalty forces democratic credit within a correlated group; the $\ell_1$ penalty's flat facets permit oligarchy, and the elastic net's $\ell_2$ component exists to restore the democracy without giving up the zeros.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the table's core and diagnose the residue. Protocol: download [prostate.data](https://hastie.su.domains/ElemStatLearn/datasets/prostate.data) (97 rows, `train` indicator included); standardize the eight predictors to unit variance; on the 67 training rows fit OLS, ridge at $\operatorname{df}(\lambda) = 5$ (solve $\sum_j d_j^2/(d_j^2+\lambda) = 5$ for $\lambda$ via the training design's singular values), and the lasso at $s = 0.36$ (coordinate descent along a $\lambda$ grid, stopping where $\sum_j|\beta_j| = 0.36 \sum_j |\hat\beta_j^{\text{ols}}|$). State in advance what counts as agreement: OLS and ridge columns of the lesson's table to two decimals; lasso active set \{`lcavol`, `lweight`, `svi`\} with `lbph` on the boundary. Then diagnose whichever discrepancy you find first.
+
+<Solution>
+Our run: ridge at $\operatorname{df} = 5$ back-solves to $\lambda \approx 24.0$ and reproduces the published ridge column to two decimals — the agreement criterion stated above ($0.419, 0.238, -0.047, 0.162, 0.226, 0.002, 0.041, 0.132$). Six of the eight entries differ from Table 3.3 in the third decimal, `lcp`'s $0.002$ against the printed $0.000$ among them: third-decimal residue from the back-solved $\lambda$ and the table's own rounding, not from the solver. The lasso at $s = 0.360$ gives $(0.533, 0.174, 0, 0, 0.073, 0, 0, 0)$: the published `lcavol` exactly, `lweight` and `svi` off by $0.005$–$0.021$, and `lbph` at zero where the table prints $0.002$: the fourth variable is entering at almost exactly $s = 0.36$, so its coefficient is hypersensitive to grid placement and convergence tolerance there.
+
+The first discrepancy most reproductions hit is upstream of any solver: standardizing with training-row statistics gives an OLS `lcavol` of $0.716$, not the published $0.680$. Matching Table 3.2 to the second decimal requires standardizing with the sample standard deviation computed over **all 97 patients, test rows included**, the convention the published study used. The diagnosis is a standardization convention, and it doubles as a caution: the divisor ($n-1$ sample vs. population, training-only vs. full-data) changes coefficients in the second decimal, which is larger than several differences between estimators in the table. Murphy's rerun (§11.4.5, [PML book 1](https://probml.github.io/pml-book/book1.html)) differs further (his lasso keeps five predictors, test error $0.457$), from a different tuning and preprocessing of the same 97 rows. None of these reruns move any method outside any other's error bar, which is the table's actual finding.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Build the tuning curve yourself, deterministically: on the 67 training rows (standardized as above; the file is sorted by `lpsa`), assign row $i$ to fold $i \bmod 10$; for each fold, fit the lasso path on the other nine folds and record held-out squared error at each $s$ on a grid over $[0.05, 1]$; average, attach standard errors, and apply the one-SE rule. Report the chosen $s$ and the active set there.
+
+<Solution>
+With these folds the curve bottoms out at $s = 0.85$ ($\operatorname{CV} = 0.56$, $\operatorname{SE} = 0.11$), the threshold is $0.67$, and the smallest qualifying setting is $s = 0.35$, where the active set is \{`lcavol`, `lweight`, `svi`\}: the same three-predictor core as the published choice $\hat s = 0.36$, reached from a completely different fold assignment. (The near-stratification is why the deterministic folds behave well: sorting by the response and dealing rows round-robin puts every fold across the full range of `lpsa`.)
+
+The computation lands you on module 5's doorstep with its questions already concrete. The number $0.56$ is itself an estimate of a risk: what is *its* bias (the folds train on 60 cases, not 67) and *its* variance (why $\sqrt{10}$, when the ten fold errors share training data and are not independent)? Why ten folds rather than 5 or 67? And when is the whole construction invalid: what had to be true of the standardization, and of any feature selection, for the folds to be honest? Those questions are exactly where <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> begins, and the last one is <Ref lesson="wrong-way-cv">the blunder lesson's</Ref> subject.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §3.2.1: the prostate data, Table 3.1 (correlations) and Table 3.2 (the full fit's Z-scores and the F-test); §3.3–3.4: subset selection and shrinkage on the same data, Fig. 3.7 (the CV curves with 1-SE bars, recreated here) and Table 3.3 (the coefficient table this lesson reproduces); §3.4.1–3.4.2: the df = 5 and ŝ = 0.36 choices; §3.5: PCR (7 directions) and PLS (2 directions); Fig. 1.1: the scatterplot matrix; §7.10, p. 244: the one-standard-error rule. Free online: https://hastie.su.domains/ElemStatLearn/
+2. T. A. Stamey, J. N. Kabalin, J. E. McNeal, I. M. Johnstone, F. Freiha, E. A. Redwine, N. Yang, "Prostate Specific Antigen in the Diagnosis and Treatment of Adenocarcinoma of the Prostate: II. Radical Prostatectomy Treated Patients," *Journal of Urology* 141(5), 1989, pp. 1076–1083 — the source study: PSA against clinical and pathological measures in 97 radical-prostatectomy patients.
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §11.4.5: the same four-estimator comparison rerun end to end (Fig. 11.11: the coefficient table; Fig. 11.12: the test-error boxplot whose reading this lesson's verdict figure adopts). Free online: https://probml.github.io/pml-book/book1.html
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §6.1.3: $C_p$, AIC, BIC, and adjusted $R^2$ as the analytic alternatives to the validation route used here. Free online: https://www.statlearning.com/
+</References>

@@ -1,0 +1,337 @@
+The linear model is linear in coefficients, not in inputs: replace x with a spline basis and the same least-squares machinery fits curves — with a penalty whose effective degrees of freedom put every smoother on one complexity scale.
+
+The module's argument stands at this point: least squares projects (<Ref lesson="ols" />), penalties trade bias for variance with an exact ledger (<Ref lesson="ridge-lasso" />), and <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> closed with the one failure it patched only locally: a curved mean function, treated there by transforming a variable by hand. This lesson makes nonlinearity the subject. Everything happens inside the linear model: new columns buy the curvature, the ridge machinery already built pays its variance bill, and a single number, the trace of the smoother matrix, prices the result on the same scale as every estimator this course has fit. <Ref lesson="prostate-study">The module's case study</Ref> then takes the assembled toolkit to its verdict.
+
+The route: derived columns and why the polynomial ones fail; piecewise cubics with the constraints counted; the smoothing spline and the theorem that makes an infinite-dimensional problem finite; effective degrees of freedom as the common currency; and additive models, fitted by backfitting.
+
+## The move: change the columns, not the machinery
+
+<Task>
+Three retrievals before the new material, closed book; check against the named lessons only after writing all three down. (1) From <Ref lesson="ridge-lasso">the penalties lesson</Ref>: write the ridge solution $(X^\top X + \lambda I)^{-1} X^\top y$ and the per-direction shrink factor $d_j^2/(d_j^2+\lambda)$. (2) From the same lesson: write $\operatorname{df}(\lambda) = \sum_j d_j^2/(d_j^2 + \lambda)$ and its two endpoint values. (3) From <Ref lesson="regression-diagnostics">the diagnostics lesson's</Ref> forward exercise: write the leave-one-out shortcut $y_i - \hat y_{(-i),i} = r_i/(1 - h_{ii})$. All three return below.
+</Task>
+
+Nothing in the least-squares derivations required the columns of $X$ to be raw measurements. The normal equations, the hat matrix, the Gauss–Markov argument of <Ref lesson="ols">the least-squares lesson</Ref> hold for any fixed design, so a model **linear in transformed inputs** is still a linear model.
+
+<Definition title="basis expansion">
+A *basis expansion* replaces an input $x$ by a fixed vector of derived features $h_1(x), \dots, h_M(x)$ and fits
+
+$$
+f(x) = \sum_{m=1}^{M} \beta_m\, h_m(x)
+$$
+
+by least squares (or any penalized or likelihood method) in the coefficients $\beta$. The functions $h_m$ are chosen before seeing $y$; all the fitting is linear algebra on the matrix $B$ with entries $B_{im} = h_m(x_i)$.
+</Definition>
+
+The interaction terms and log transforms of <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> were already basis expansions with hand-picked $h_m$. The systematic choice, powers $h_m(x) = x^{m-1}$, is the classical one and fails in a characteristic way: each monomial is a **global** function, so every coefficient moves the fit everywhere, and the tails pay for the middle. A degree-15 polynomial fitted to wage-versus-age data (3,000 male workers in ISLP's Wage data) tracks the interior acceptably and then swings wildly past age 60, where data is thin and $x^{15}$ is enormous; a natural cubic spline with the same degrees of freedom stays near the data there, because it buys its flexibility from low-degree pieces rather than high powers, and its tails are constrained to be linear — both constructions are built in the next section (ISLP Fig. 7.7 plots the comparison). Raising the degree buys wiggle in the middle at the price of explosion at the edges, because a polynomial has no way to be flexible in one region and quiet in another.
+
+The repair is piecewise structure: keep the degree low and fixed, and add flexibility by adding pieces of the axis rather than powers. That choice, plus the continuity needed to hide the seams, is the spline.
+
+## Piecewise cubics: constraints do the accounting
+
+The natural first attempt at locality drops all structure, and the sequence below rebuilds it one constraint at a time. Split the axis at *knots* $\xi_1 < \xi_2$ into three regions and fit a separate cubic in each: 3 regions $\times$ 4 coefficients $= 12$ parameters, and a fit that jumps at both knots, discontinuities no data justified. Demanding that $f$, $f'$ and $f''$ agree across each knot removes $3$ parameters per knot and produces a visually seamless curve.
+
+<FigureSequence
+  name="spline-build"
+  alt="Four frames on one noisy scatter: a global cubic underfits; three unconstrained piecewise cubics fit well but jump at the knots; continuity constraints produce a seamless 6-df cubic spline; a natural cubic spline with six knots spends the same 6 df with linear tails"
+  caption="One dataset, four fits: the df arithmetic 12 − 2×3 = 6 happens between frames 2 and 3; frame 4 respends the 4 boundary df on interior knots."
+/>
+
+<Task>
+Step through the four frames and track the parameter count: 4, then 12, then 6, then 6 again with different placement. In frame 2, read the two jumps at $\xi_1$ and $\xi_2$; in frame 3, confirm they are gone; in frame 4, follow the curve past the boundary knots and check it is a straight line on both sides.
+</Task>
+
+<Example title="the parameter count, once">
+A cubic spline with the two knots $\xi_1, \xi_2$: 3 regions $\times$ 4 parameters $-$ 2 knots $\times$ 3 constraints $= 6$ free parameters. A basis that carries the constraints built in (ESL Eq. 5.3) is
+
+$$
+h_1 = 1,\quad h_2 = x,\quad h_3 = x^2,\quad h_4 = x^3,\quad h_5 = (x - \xi_1)_+^3,\quad h_6 = (x - \xi_2)_+^3,
+$$
+
+with $t_+ = \max(t, 0)$ the positive part: six functions for a six-dimensional space. Each *truncated power* $(x-\xi_\ell)_+^3$ is exactly zero left of its knot and switches on a new cubic to the right, so smoothly that $f$, $f'$ and $f''$ are continuous at $\xi_\ell$ and only $f'''$ jumps (the closing set's continuity exercise verifies this). In general, a cubic spline with $K$ knots has $K + 4$ parameters.
+</Example>
+
+<Exercise>
+Count the free parameters of a continuous piecewise-*linear* fit (an order-2 spline) with $K$ interior knots, by the region-and-constraint arithmetic, and write down its truncated-power basis. Do the count before opening.
+
+<Solution>
+$K+1$ regions $\times$ 2 parameters $-$ $K$ knots $\times$ 1 constraint (only continuity of $f$ is available: matching $f'$ too would merge adjacent lines) $= K + 2$. The basis: $\{1,\ x,\ (x-\xi_1)_+, \dots, (x-\xi_K)_+\}$, which is $K+2$ functions. Each hinge $(x - \xi_\ell)_+$ bends the slope at its knot without breaking the function, the order-2 analogue of the truncated cube. The transferable move: for order-$M$ pieces with maximal continuity, the count is always $M + K$.
+</Solution>
+</Exercise>
+
+### Natural splines: spend the boundary's parameters where the data is
+
+Splines inherit the polynomial's tail problem in aggravated form: beyond the last knot the fit is an unconstrained cubic supported by half a region of data, and the pointwise variance of the fit explodes near the boundaries, worse for a cubic spline than for a global cubic (ESL Fig. 5.3 plots the comparison). A *natural cubic spline* adds the constraint that the function is **linear beyond the boundary knots**. Two constraints per side free $4$ parameters, so a natural cubic spline with $K$ knots has exactly $K$ free parameters, and the freed capacity is respent on interior knots, where data exists to support it. The price is bias near the boundaries, accepted deliberately: where information runs out, assume the least curved thing.
+
+Knot placement remains a modeling choice, made bluntly in practice: fix the total degrees of freedom and put knots at quantiles of $x$. The sensitivity to the exact positions is mild, and the smoothing spline of the next section removes the choice entirely.
+
+<Aside>
+The truncated-power basis is the right object for proofs and the wrong one for computation: powers of large numbers make $B^\top B$ badly conditioned. Software uses the *B-spline* basis instead, an equivalent basis of local, banded functions with which all spline computations cost $O(n)$; the recursion that builds it is in de Boor's monograph and in the Appendix to ESL Chapter 5. Nothing in this lesson changes with the basis, because the fitted space is identical.
+</Aside>
+
+### The phoneme curves: fewer columns as regularization
+
+Basis expansions were introduced above to *add* flexibility; the same device run in reverse is a regularizer, and the phoneme data show the reversal at realistic scale. The task is to distinguish two spoken vowels ("aa" as in *father*, "ao" as in *water*) from the *log-periodogram* of the recorded frame: the log power of the speech signal at each of 256 frequencies, a 256-dimensional input. Logistic regression on the raw 256 features (fit on 1,000 training frames drawn from 695 "aa" and 1,022 "ao" examples, so always guessing the majority class already errs at only 40.5% — the floor the error rates below stand against) returns the jagged blue coefficient curve below: with roughly four observations per coefficient, and neighboring frequencies strongly correlated, adjacent coefficients swing to cancel each other, and the curve is mostly noise.
+
+<Figure
+  src="./figures/phoneme.svg"
+  alt="Jagged 256-coefficient logistic regression curve over frequency in blue, with the smooth 12-basis natural spline version in amber, and a tally showing test error falling from 0.255 to 0.158"
+  caption="Coefficients as a function of frequency, recreated qualitatively from ESL Fig. 5.5: 256 free coefficients versus 12 natural-spline coordinates. The restriction halves the test error."
+/>
+
+The repair constrains the coefficient *function* $\beta(f)$ to be smooth in frequency: write $\beta = B\theta$ with $B$ a $256 \times 12$ natural-spline basis matrix on uniform knots, and fit the 12-dimensional $\theta$ by the same logistic regression on the filtered inputs $x^* = B^\top x$. Training error rises from 0.080 to 0.185, and test error falls from **0.255 to 0.158**. Nothing was penalized; twelve well-shaped columns simply cannot represent the high-frequency noise that 256 free coordinates absorb.
+
+<KeyFact>
+Choosing columns and choosing $\lambda$ are the same trade in different clothes, which is why the next section can replace knot selection by a penalty: a basis is a bias–variance dial even with no penalty attached.
+</KeyFact>
+
+## The smoothing spline: one penalty instead of every knot decision
+
+Regression splines leave three choices open (order, number of knots, placement), and the preceding sections made them by judgment. The smoothing spline eliminates all three with one move: keep **every** knot and let a penalty do the restraining. Among all functions $f$ with two continuous derivatives, minimize
+
+$$
+\operatorname{RSS}(f, \lambda) = \sum_{i=1}^{n} \big(y_i - f(x_i)\big)^2 + \lambda \int f''(t)^2\, dt .
+$$
+
+The penalty is the one <Ref lesson="ridge-lasso">the penalties lesson's</Ref> closing exercise arrived at from the failure of penalizing polynomial coefficients: it charges for *curvature of the fitted function itself*, not for coefficient size in some basis. At $\lambda = 0$ any interpolant of the data is optimal; as $\lambda \to \infty$ no curvature is tolerated and the minimizer is the least-squares straight line (the boundary-probe exercise works out why a line and not a constant). In between, $\lambda$ indexes a family of compromises.
+
+### The theorem that makes the problem finite
+
+The criterion is defined over an infinite-dimensional function space, and minimizing over all twice-differentiable functions looks like a calculus-of-variations problem. It is not, and the reason is the theorem that makes smoothing splines usable:
+
+<Theorem title="the minimizer is a finite-dimensional spline (Green and Silverman §2.2–2.3; ESL Ex. 5.7)">
+For $\lambda > 0$ and at least two distinct $x_i$, the minimizer of $\operatorname{RSS}(f, \lambda)$ over all functions with two continuous derivatives exists, is unique, and is a natural cubic spline with knots at the distinct values of $x_1, \dots, x_n$.
+
+<Proof>
+Sketch; the full argument is Green and Silverman's Theorems 2.3 and 2.4. The plan: show that natural cubic splines beat all competitors with the same fitted values, then minimize over that finite family.
+
+**Step 1, the interpolation lemma.** Let $g$ be the natural cubic spline interpolating any prescribed values $z_i$ at the $x_i$ (the interpolant exists and is unique because natural splines with these $n$ knots form an $n$-dimensional space). Let $\tilde g$ be any other twice-differentiable function with $\tilde g(x_i) = z_i$ for all $i$, and set $h = \tilde g - g$, so $h(x_i) = 0$ at every knot. Integrating $\int g'' h''$ by parts twice, using that $g''$ vanishes beyond the boundary knots (naturalness) and that $g'''$ is constant between knots, leaves only $-\sum_j g'''(x_j^+)\{h(x_{j+1}) - h(x_j)\}$, and every $h(x_j)$ is zero, so the cross term $\int g'' h''$ vanishes. Hence
+
+$$
+\int \tilde g''(t)^2\, dt = \int g''(t)^2\, dt + \int h''(t)^2\, dt \;\ge\; \int g''(t)^2\, dt,
+$$
+
+with equality only if $h'' \equiv 0$, which together with $h(x_i) = 0$ at $n \ge 2$ points forces $h \equiv 0$.
+
+**Step 2, reduction.** Take any candidate $\tilde f$ and let $g$ be the natural spline interpolating the values $\tilde f(x_i)$. The data term of $\operatorname{RSS}$ is identical for both; by Step 1 the penalty term of $g$ is no larger, and strictly smaller unless $\tilde f$ was already that spline. So no candidate outside the $n$-dimensional natural-spline family can be optimal, and the infinite-dimensional problem collapses to a finite one, where existence and uniqueness follow from strict convexity in the coefficients (next display).
+</Proof>
+</Theorem>
+
+### The finite problem: generalized ridge
+
+Writing the solution in a natural-spline basis $f(x) = \sum_{j=1}^n \theta_j\, h_j(x)$, with $B_{ij} = h_j(x_i)$ and the *penalty matrix* $\Omega_{jk} = \int h_j''(t)\, h_k''(t)\, dt$, the criterion becomes
+
+$$
+\operatorname{RSS}(\theta, \lambda) = (y - B\theta)^\top (y - B\theta) + \lambda\, \theta^\top \Omega\, \theta,
+\qquad
+\hat\theta = (B^\top B + \lambda \Omega)^{-1} B^\top y .
+$$
+
+ESL calls this "a generalized ridge regression": it is <Ref lesson="ridge-lasso">the ridge estimator</Ref> with the identity penalty replaced by $\Omega$, a matrix that charges coefficients according to how much curvature their basis function carries. One difference matters and returns below: $\Omega$ is singular. Its null space is the span of the constant and linear basis functions, whose second derivatives vanish, so those two directions of coefficient space are unpenalized at every $\lambda$. Ridge with $\lambda I$ shrinks everything; the smoothing spline shrinks everything except straight lines.
+
+Here the natural expectation fails, and the failure is the point of the construction. A spline with $n$ knots has $n$ parameters, so one expects $n$ degrees of freedom and an interpolating, overfit curve. The fitted smoothing spline at any $\lambda > 0$ is neither: the penalty removes the capacity the knots provide, continuously, and the number of parameters stops being a meaningful complexity measure at all. The discriminating instance is the bone-density data: 485 measurements of relative change in spinal bone mineral density between consecutive visits (about a year apart), taken on 261 North American adolescents, one smoothing spline per sex, each with a knot at every distinct age — 168 knots for the female curve, 152 for the male — and each fitted curve behaves like a model with about 12 parameters. What "about 12 parameters" means, precisely, is the next section's business.
+
+<Figure
+  src="./figures/bmd-splines.svg"
+  alt="Scatter of relative spinal bone-density change against age, 485 measurements on 261 adolescents, with a df = 12 smoothing spline fitted per sex; dashed guides mark the female peak near age 12.3 and the male peak near 14.6, about two years apart"
+  caption="Two smoothing splines with over 150 knots each, held to df = 12 (fitted here on the public bone data): the female growth-spurt peak lands about two years before the male one, and neither curve interpolates anything."
+/>
+
+<KeyFact>
+Knots set the capacity ceiling; $\lambda$ decides how much of it is used — counting knots to judge a smoothing spline's complexity confuses the dial's range with its setting.
+</KeyFact>
+
+## Effective degrees of freedom: every smoother on one scale
+
+The claim "behaves like 12 parameters" needs a definition, and the definition needs the object that all this module's estimators share. A *linear smoother* is any procedure whose fitted values are a fixed linear map of the responses: $\hat{f} = S\, y$, with $S$ depending on the $x_i$ and the tuning constants but never on $y$. OLS is one ($S = H$, the hat matrix of <Ref lesson="ols">the least-squares lesson</Ref>); ridge is one; the regression splines above are one ($S$ the projection onto the basis columns); the smoothing spline is one, with
+
+$$
+S_\lambda = B\,(B^\top B + \lambda \Omega)^{-1} B^\top .
+$$
+
+For projections, $\operatorname{tr}(H) = p$ counts the fitted parameters (the identity <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> used as a leverage budget). The definition extends by analogy:
+
+<Definition title="effective degrees of freedom">
+For a linear smoother with matrix $S$, the *effective degrees of freedom* is $\operatorname{df} = \operatorname{tr}(S)$, the sum of the self-influences $S_{ii} = \partial \hat f(x_i)/\partial y_i$. For the smoothing spline, $\operatorname{df}(\lambda) = \operatorname{tr}(S_\lambda)$, a continuous, decreasing function of $\lambda$.
+</Definition>
+
+The trace is computable from the eigenvalues, and the eigenvalues expose the mechanism. $S_\lambda$ can be rewritten in the *Reinsch form* $S_\lambda = (I + \lambda K)^{-1}$ with $K$ independent of $\lambda$ (ESL Ex. 5.9), so its eigenvalues are
+
+$$
+\rho_k(\lambda) = \frac{1}{1 + \lambda d_k},
+$$
+
+with $d_k \ge 0$ the eigenvalues of the penalty $K$ and $d_1 = d_2 = 0$: the two unpenalized directions are the linear functions, never shrunk, and every rougher eigenfunction is damped the more, the higher its curvature. The parallel with <Ref lesson="ridge-lasso">ridge's</Ref> factors $d_j^2/(d_j^2+\lambda)$ is exact, with one inversion of meaning: ridge shrinks hardest where the *design* has least variance, the smoothing spline shrinks hardest where the *function* would be most curved.
+
+<Example title="a trace, by hand">
+Suppose the penalty eigenvalues of a five-point problem are $d = (0,\, 0,\, 1,\, 4,\, 16)$. At $\lambda = 1$,
+
+$$
+\operatorname{df}(1) = \frac11 + \frac11 + \frac12 + \frac15 + \frac1{17} = 2.759 :
+$$
+
+two whole parameters for the line that is never penalized, half a parameter for the mildest curve, and less than a sixteenth for the roughest. A smoothing spline spends fractions of parameters, most of them on smooth shapes.
+</Example>
+
+<Exercise>
+Same eigenvalues. Compute $\operatorname{df}(4)$, then the limits of $\operatorname{df}(\lambda)$ as $\lambda \to 0$ and $\lambda \to \infty$, and name what each limit fits.
+
+<Solution>
+$\operatorname{df}(4) = 1 + 1 + \tfrac15 + \tfrac1{17} + \tfrac1{65} = 2.274$. As $\lambda \to 0$ every $\rho_k \to 1$ and $\operatorname{df} \to 5 = n$: $S_0 = I$, the interpolant. As $\lambda \to \infty$ the three penalized eigenvalues die and $\operatorname{df} \to 2$: only the null space survives, and $S_\infty$ is the hat matrix of simple linear regression on $x$. The endpoints of the dial are the interpolant and the least-squares line, never a constant — the same null-space fact the boundary-probe exercise proves.
+</Solution>
+</Exercise>
+
+The reason this trace deserves the name "degrees of freedom" and a central place: it is one number, defined identically for every linear smoother, and this course has already met it three times without the name. The promise made in <Ref lesson="ridge-lasso">the penalties lesson</Ref> is now redeemed: ridge's $\sum_j d_j^2/(d_j^2+\lambda)$ *is* $\operatorname{tr}(S)$ for the ridge smoother. OLS on $p$ columns has $\operatorname{tr}(H) = p$. And $k$-NN (<Ref lesson="knn-curse" />), which averages the $k$ neighbors of each query with weight $1/k$ each, has $S_{ii} = 1/k$ at every training point, hence $\operatorname{df} = n/k$: the small-$k$ fits that memorized noise islands were literally high-dimensional models.
+
+<Figure
+  src="./figures/df-ruler.svg"
+  alt="A single logarithmic axis of effective degrees of freedom from 1 to 100 with markers for the least-squares line at 2, ridge at 5.2, OLS at 8, a smoothing spline at 12, k-NN at 20, and interpolation at 100"
+  caption="One currency: tr(S) places the LS line, ridge, OLS, the smoothing spline, and k-NN on a single axis, with interpolation (df = n) at the far end."
+/>
+
+<KeyFact>
+Effective degrees of freedom is the module's complexity currency: $\operatorname{tr}(S) = p$ for OLS, $\sum_j d_j^2/(d_j^2+\lambda)$ for ridge, $n/k$ for $k$-NN, $\operatorname{tr}(S_\lambda)$ for the smoothing spline. Two smoothers at equal df are comparable fits regardless of their internal parameter counts — which is what makes "a spline with df = 5 per term" a meaningful specification inside the additive models below.
+</KeyFact>
+
+A second contrast on the same ruler ties back to <Ref lesson="ridge-lasso">the hard-versus-soft theme</Ref>: a regression spline's $S$ is a projection, eigenvalues all 0 or 1, keeping $M$ function-space directions at full weight and deleting the rest, exactly as best subset does to coordinates; the smoothing spline's eigenvalues fill $(0,1]$, discounting every direction continuously, as ridge does. ESL's terms are *projection smoother* and *shrinking smoother*, and the choice between them is the same discrete-versus-continuous selection trade the penalties lesson priced.
+
+### Choosing λ: the dial has a bias–variance readout
+
+$\operatorname{df}(\lambda)$ is monotone in $\lambda$, so the smoothing parameter can be specified as a df target and solved numerically (the BMD fits above are `df = 12`; the $\lambda$ this back-solves to depends on how the implementation scales the age axis, which is why df, not $\lambda$, is the portable specification). What value to target is a bias–variance question, and for a linear smoother both terms are computable exactly on synthetic data: $\operatorname{Bias} = f - S f$ and $\operatorname{Cov}(\hat f\,) = \sigma^2 S S^\top$.
+
+<Figure
+  src="./figures/lambda-sweep.svg"
+  alt="Left: one noisy dataset with three smoothing-spline fits at 5, 9, and 20 degrees of freedom; right: squared bias falling and variance rising as functions of df, their sum minimized near df equal to 9"
+  caption="The dial swept on ESL's test function sin(12(x+0.2))/(x+0.2): df = 5 trims the hills and fills the valleys, df = 20 chases individual points; the computed bias²+variance curve bottoms out near df = 9."
+/>
+
+On real data the curves on the right are unobservable and must be estimated; that machinery, cross-validation, belongs to <Ref lesson="cross-validation-bootstrap">module 5</Ref>. One piece is already owned: the leave-one-out identity proved in <Ref lesson="regression-diagnostics">the diagnostics lesson's</Ref> forward exercise, $y_i - \hat f^{(-i)}(x_i) = r_i / (1 - S_{ii})$, holds for the smoothing spline with $S_\lambda$ in place of $H$, so all $n$ leave-one-out errors, at every candidate $\lambda$, cost one fit each: the entire tuning curve is cheap for linear smoothers. That identity is why smoothing splines shipped with automatic $\lambda$ selection decades before generic cross-validation tooling existed.
+
+## Additive models: one smooth per predictor
+
+Everything above is one-dimensional, and the obvious multivariate extension fails first: a smoothing spline in $p$ inputs (penalizing total curvature of a surface) meets the same curse of dimensionality that <Ref lesson="knn-curse">emptied high-dimensional neighborhoods</Ref>, since flexible surface estimation needs data everywhere the surface lives. The classical compromise keeps one-dimensional smooths and adds them.
+
+<Definition title="additive model">
+An *additive model* posits
+
+$$
+Y = \alpha + \sum_{j=1}^{p} f_j(X_j) + \varepsilon,
+$$
+
+each $f_j$ an arbitrary smooth one-dimensional function. A *generalized additive model* (GAM) puts the same additive form on the scale of a link function, $g(\mu) = \alpha + \sum_j f_j(X_j)$, extending <Ref lesson="glm">the GLM construction</Ref> exactly as GLMs extended the linear model. Identifiability requires a convention, since constants can shuttle between $\alpha$ and the $f_j$: each $f_j$ averages zero over the data, which forces $\hat\alpha = \bar y$.
+</Definition>
+
+Fitting drops out of the penalized criterion. Minimize
+
+$$
+\sum_{i=1}^{n} \Big( y_i - \alpha - \sum_{j} f_j(x_{ij}) \Big)^2 + \sum_{j} \lambda_j \int f_j''(t_j)^2\, dt_j
+$$
+
+over all the $f_j$ at once. Fix every function except $f_j$ and collect the *partial residual* $r_i^{(j)} = y_i - \hat\alpha - \sum_{k \ne j} \hat f_k(x_{ik})$: the criterion, as a function of $f_j$ alone, is exactly the one-dimensional smoothing-spline problem with targets $r^{(j)}$. By the theorem above, the update is one application of the smoother matrix, $\hat f_j \leftarrow S_j\, r^{(j)}$. Cycling $j = 1, \dots, p, 1, \dots$ until nothing moves is *backfitting* (ESL Algorithm 9.1): blockwise coordinate descent on a jointly convex criterion, each block solved exactly by a smoother the lesson already built. For linear smoothers the iteration is a Gauss–Seidel pass on a linear system, and it converges under mild conditions on the $S_j$.
+
+<FigureSequence
+  name="backfitting"
+  alt="Three frames of backfitting on two-feature data: the first smooth fitted to partial residuals against x1, then the second fitted to updated residuals against x2, then both stabilized after eight cycles matching the true component functions"
+  caption="Backfitting on y = sin(πx₁) + x₂² − ⅓ + ε: each step smooths the partial residuals of one coordinate with the other held fixed; the cycle stabilizes in a handful of passes."
+/>
+
+<Task>
+Step through the three frames. In frame 1, note that the $x_1$ smooth is fitted against targets that still contain all of $f_2$'s signal, and absorbs a slightly wrong shape; in frame 2, the $x_2$ smooth is fitted to residuals already cleaned of most of $f_1$; in frame 3, check both recovered curves against the dashed truth. The mutual cleanup is the whole algorithm.
+</Task>
+
+For a GAM with a non-identity link the same engine runs inside <Ref lesson="glm">the GLM lesson's</Ref> IRLS loop, a combination called *local scoring*: form the working response $z_i = \hat\eta_i + (y_i - \hat p_i)/(\hat p_i(1-\hat p_i))$ and weights $\hat p_i(1 - \hat p_i)$ exactly as Newton's method for logistic regression prescribes, then replace the weighted least-squares inner solve by a weighted backfitting pass, and iterate to convergence.
+
+### Why smoothness is required: unconstrained likelihood memorizes
+
+The [1986 Hastie–Tibshirani paper](https://doi.org/10.1214/ss/1177013604) that introduced GAMs contains a two-line argument that fixes what the smoothness requirement is for. Try to estimate a logistic $\eta(x)$ by maximizing the likelihood over the values $\eta(x_1), \dots, \eta(x_n)$ with no constraint at all: the maximum sends $\hat\eta(x_i) = +\infty$ wherever $y_i = 1$ and $-\infty$ wherever $y_i = 0$, and the fitted probabilities are the observed labels — the memorizer of <Ref lesson="statistical-learning">the course's first lesson</Ref>, rebuilt in likelihood clothing. Every nonparametric estimate in this lesson is the same maximization *plus* a smoothness restriction, and the restriction is what makes the answer an estimate of anything.
+
+On real data the payoff of the additive compromise is twofold. First, accuracy where effects genuinely bend: on the 4,601-message spam corpus (57 word- and character-frequency features, the dataset <Ref lesson="spam-filter">module 4's case study</Ref> works in full), an additive logistic model with about 4 df per term achieves **5.3% test error against 7.6%** for linear logistic regression — the additive model is the flexible end of the benchmark ladder that module's classifiers climb. Second, and distinctively, interpretability: because the model is a sum of one-dimensional pieces, each $\hat f_j$ is a complete description of feature $j$'s contribution, plottable with pointwise error bands.
+
+<Figure
+  src="./figures/gam-panel.svg"
+  alt="Three panels showing fitted partial functions of a wage GAM: a mild rise in year, a rise-then-fall curve in age peaking near 45, and five increasing education levels"
+  caption="An additive fit read one axis at a time (a Wage-style fit, after ISLP Fig. 7.11): wages drift up by year, peak in middle age, and step up with education — three statements no single coefficient table carries."
+/>
+
+The same additivity that buys the panels is the model's hard ceiling: a GAM represents no interaction, because $f(x_1, x_2) = x_1 x_2$ has no additive decomposition, and no choice of $\lambda_j$ creates one (the closing forward exercise measures the resulting irreducible residual). Interactions must be added by hand ($f_{jk}(x_j, x_k)$ terms, with the surface-smoothing cost that entails) or learned by a different model class.
+
+<KeyFact>
+The panels are trustworthy only as far as the predictors are distinct: when predictors are strongly correlated, the fitted $\hat f_j$ are not separately identified — *concurvity*, the smooth analogue of the collinearity <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> priced — and the pointwise bands around each $\hat f_j$ then understate the true uncertainty. The full treatment is in Hastie and Tibshirani's monograph.
+</KeyFact>
+
+What stands established: basis expansions put curve fitting inside the linear model; constraint arithmetic prices regression splines and boundary linearity spends parameters where data lives; the smoothing spline turns knot selection into one penalty, with a finite natural-spline minimizer computed by generalized ridge; $\operatorname{tr}(S)$ prices every linear smoother in one currency, with the leave-one-out shortcut making the dial cheap to tune; and backfitting assembles one-dimensional smooths into additive models, with interactions as the named residual gap. The module now holds least squares, ridge, lasso, diagnostics, and flexible basis fits. <Ref lesson="prostate-study">The prostate study</Ref> puts the estimators side by side on the module's dataset and makes the choice among them; the interaction gap stays open until <Ref lesson="decision-trees">module 6</Ref>.
+
+## Exercises
+
+<Exercise>
+Count the free parameters of (a) a cubic spline with 4 interior knots and (b) its natural version (linear beyond the outermost of those knots), both by region-and-constraint arithmetic and by basis counting. State the general formulas.
+
+<Solution>
+(a) 5 regions $\times$ 4 parameters $-$ 4 knots $\times$ 3 constraints $= 8$. Basis count: $\{1, x, x^2, x^3\}$ plus four truncated cubes, $4 + K = 8$. General formula: $K + 4$.
+
+(b) Naturalness adds 2 constraints in each unbounded region (the $x^2$ and $x^3$ coefficients of the outer cubics must vanish): $8 - 4 = 4$. General formula: $K$, the number of knots. The four freed parameters are what the natural spline respends on extra interior knots at equal total df — the trade of the figure sequence's final frame.
+</Solution>
+</Exercise>
+
+<Exercise>
+Verify that $\{1, x, x^2, x^3, (x-\xi)_+^3\}$ spans the cubic splines with the single knot $\xi$: show that $f(x) = \beta_1 + \beta_2 x + \beta_3 x^2 + \beta_4 x^3 + \beta_5 (x-\xi)_+^3$ has continuous $f$, $f'$, $f''$ at $\xi$ for every $\beta$, compute the jump in $f'''$, and check the dimension against the constraint count.
+
+<Solution>
+Left of $\xi$ the last term is identically zero; right of $\xi$ it is $\beta_5(x-\xi)^3$. At $x = \xi$: the term's value $\beta_5 \cdot 0^3 = 0$, its first derivative $3\beta_5 \cdot 0^2 = 0$, and its second derivative $6\beta_5 \cdot 0 = 0$ all vanish, so $f$, $f'$, $f''$ approach the same values from both sides, whatever $\beta_5$. The third derivative is $0$ on the left and $6\beta_5$ on the right: a jump of exactly $6\beta_5$, so $\beta_5$ measures the knot's third-derivative break and $\beta_5 = 0$ recovers the global cubic.
+
+Dimension check: 2 regions $\times$ 4 $-$ 1 knot $\times$ 3 $= 5$ basis functions, as listed. Linear independence: a combination vanishing identically vanishes on $x < \xi$, forcing $\beta_1 = \dots = \beta_4 = 0$ (a cubic with infinitely many roots is zero), and then $\beta_5 (x-\xi)^3 \equiv 0$ on $x > \xi$ forces $\beta_5 = 0$. So the five functions are a basis, and the space of one-knot cubic splines is exactly 5-dimensional.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. Show that as $\lambda \to \infty$ the smoothing spline tends to the least-squares *line* through the data, not to a constant and not to $\bar y$. Identify the subspace of functions the penalty cannot see, and connect it to the two eigenvalues of $S_\lambda$ that equal 1 at every $\lambda$.
+
+<Solution>
+The penalty $\lambda \int f''^2$ diverges with $\lambda$ for any $f$ with $\int f''^2 > 0$, so in the limit only functions with $f'' \equiv 0$ remain affordable: the affine functions $f(x) = a + bx$, the *null space* of the penalty. Within that two-dimensional subspace the penalty term is exactly zero at every $\lambda$, so the criterion reduces to the residual sum of squares, minimized by the ordinary least-squares line. A nonzero slope costs nothing because a line has no curvature; the fit flattens to $\bar y$ only if the data's LS slope is itself zero.
+
+In eigenvalue terms: $S_\lambda = (I + \lambda K)^{-1}$ has $\rho_k = 1/(1+\lambda d_k)$, and the null space of the penalty gives $d_1 = d_2 = 0$, hence $\rho_1 = \rho_2 = 1$ for every $\lambda$: the components of $y$ along constant and linear shapes pass through untouched, always, and $\operatorname{df}(\lambda) \to 2$ rather than 0. The general principle: a penalized method's $\lambda \to \infty$ limit is least squares on the penalty's null space — for ridge that null space is $\{0\}$ and the limit is the null model, which is why the two limits differ.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "A smoothing spline places a knot at every data point, so it has $n$ parameters, must interpolate the data, and therefore overfits." Name the two quantities the claim conflates and the step at which the inference fails.
+
+<Solution>
+The claim is true only at $\lambda = 0$. The failing step is "has $n$ parameters, must interpolate": the basis has $n$ coordinates, but the fitted coefficients are $\hat\theta = (B^\top B + \lambda\Omega)^{-1} B^\top y$, and for $\lambda > 0$ the penalty makes whole regions of that coordinate space effectively unreachable, exactly as ridge's penalty did in <Ref lesson="ridge-lasso">the penalties lesson</Ref>. The conflated quantities are the **dimension of the function space searched** (the capacity ceiling, $n$) and the **effective degrees of freedom of the fitted map** ($\operatorname{tr}(S_\lambda)$, the capacity used). The first is fixed by the knots; the second is set by $\lambda$ and runs continuously from $n$ down to 2. A smoothing spline at $\operatorname{df}(\lambda) = 12$ on the bone data's 259 female measurements is a 12-parameter-equivalent estimator that happens to be parameterized with 168 coordinates, one per distinct age. Overfitting is a property of df, not of knot count — the discriminating instance is the BMD figure, visibly smooth with a knot at every distinct age.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. For ridge regression on an orthonormal design ($X^\top X = I_p$, all singular values $d_j = 1$), compute the smoother matrix $S = X(X^\top X + \lambda I)^{-1} X^\top$'s trace as a function of $\lambda$, evaluate it for $p = 8$ at $\lambda \in \{0, 1, 3\}$, and place the three fits on this lesson's df ruler. Which $\lambda$ makes ridge on 8 columns the complexity equal of OLS on 2?
+
+<Solution>
+Each direction contributes $d_j^2/(d_j^2 + \lambda) = 1/(1+\lambda)$, so $\operatorname{tr}(S) = p/(1+\lambda)$: orthonormal ridge spends the same fraction of a parameter on every coordinate. For $p = 8$: $\operatorname{df} = 8$, $4$, and $2$ at $\lambda = 0, 1, 3$. On the ruler these sit at OLS's own mark, at half of it, and at the LS-line mark. Complexity 2 requires $8/(1+\lambda) = 2$, i.e. $\lambda = 3$: with that penalty, an eight-predictor ridge fit is as flexible as a two-parameter regression, even though all eight coefficients are nonzero. The composed lesson: <Ref lesson="ridge-lasso">ridge's</Ref> shrink factors and this lesson's df are one bookkeeping system, and "how many predictors does the model use" and "how complex is the model" are different questions with different answers.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the bone-density result. Protocol: download the [bone data](https://hastie.su.domains/ElemStatLearn/datasets/bone.data) (485 measurements: age, sex, and relative change in spinal BMD between consecutive visits); separately for each sex, fit a smoothing spline of `spnbmd` on age at approximately 12 effective degrees of freedom (any standard implementation accepts a df target); locate the age at which each fitted curve peaks; report the male-minus-female gap. State in advance what counts as agreement: ESL Fig. 5.6's reading that the female growth spurt precedes the male by about two years.
+
+<Solution>
+Expected outcome: both curves rise to a single dominant peak in early adolescence and decay toward zero past age 17 (bone density stabilizes after the growth spurt, so the year-over-year *change* falls to nothing). The female peak lands near age 12 and the male near 14–15 — the fits behind this lesson's BMD figure peak at 12.3 and 14.6 — a gap of roughly two years; a computed gap anywhere in about 1.5–2.5 years is agreement, since the peak locations move by a few tenths of a year with the df target and with how ties in age are handled. Two checks worth performing on the way: the solved $\lambda$ at df $= 12$ depends on the implementation's scaling of the age axis (ESL, which normalizes, reports $\lambda \approx 0.00022$; on raw ages it comes out near 1), and pushing df to 30 should visibly roughen both curves without moving the peaks much — the peak locations are a low-frequency feature, which is why a 12-df summary suffices to see them. The reproduced fact is the lesson's use case in miniature: no global polynomial family was specified, yet the fitted curves support a quantitative, checkable claim about where their maxima sit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Generate $n = 200$ points with $x_1, x_2$ independent uniform on $[-1, 1]$ and $y = x_1 x_2 + \varepsilon$, $\sigma = 0.1$. Backfit an additive model with two smoothing splines (df $\approx 5$ each). Report what the fitted $\hat f_1$ and $\hat f_2$ look like, compute the residual variance, and describe the pattern the residuals make in the $(x_1, x_2)$ plane.
+
+<Solution>
+Both fitted functions come out flat, indistinguishable from noise around zero, and no smoothing level changes that. The reason is exact: the best additive approximation to $x_1 x_2$ under independent, centered inputs is the zero function, because $\mathbb{E}[x_1 x_2 \mid x_1] = x_1\, \mathbb{E}[x_2] = 0$ (and symmetrically in $x_2$), so every backfitting update smooths targets whose conditional mean is identically zero. The residuals therefore carry the entire signal: their variance is close to $\operatorname{Var}(x_1 x_2) + \sigma^2 = \tfrac13 \cdot \tfrac13 + 0.01 \approx 0.12$, ten times the noise floor, and plotting residual sign in the $(x_1, x_2)$ plane shows the checkerboard of the product: positive in the first and third quadrants, negative in the second and fourth. The structure is visible, systematic, and invisible to the model class: no sum of one-variable functions represents it.
+
+The wall this exercise hits is the one the course removes next: a decision tree's second split on $x_2$ *within* a branch already split on $x_1$ is exactly a learned interaction, which is <Ref lesson="decision-trees">module 6's</Ref> subject, and boosted trees make interaction order an explicit capacity dial, taken up with <Ref lesson="gradient-boosting">gradient boosting</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §5.2: piecewise polynomials, the truncated-power basis (Eq. 5.3), natural splines and the boundary-variance figure (Fig. 5.3); §5.2.3: the phoneme example and its error table; §5.4: the smoothing spline, the finite minimizer (Eqs. 5.9–5.12) and the BMD fit (Fig. 5.6); §5.4.1: smoother matrices, df$_\lambda$ = trace($S_\lambda$), the Reinsch form and eigenanalysis; §5.5: the bias–variance sweep (Fig. 5.9); Ex. 5.7: the interpolation argument sketched in this lesson's theorem; §9.1: GAMs, backfitting (Algorithm 9.1), local scoring (Algorithm 9.2), and the spam GAM's 5.3%. Free online: https://hastie.su.domains/ElemStatLearn/
+2. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — Ch. 7: the gentler regression-spline build, the degree-15 polynomial comparison (Fig. 7.7), smoothing splines with the LOOCV shortcut (§7.5.2), and GAMs on the Wage data (§7.7, Fig. 7.11). Free online: https://www.statlearning.com/
+3. T. Hastie, R. Tibshirani, "Generalized Additive Models," *Statistical Science* 1(3), 1986, pp. 297–318 — the original paper: local scoring derived from expected log-likelihood (§5, including the unconstrained-maximization degeneracy quoted here), backfitting (§7), and the worked medical examples. https://doi.org/10.1214/ss/1177013604
+4. T. Hastie, R. Tibshirani, *Generalized Additive Models*, Chapman & Hall, 1990 — the monograph: fitting details, degrees of freedom for additive fits, concurvity, and inference for the component functions.
+5. P. J. Green, B. W. Silverman, *Nonparametric Regression and Generalized Linear Models: A Roughness Penalty Approach*, Chapman & Hall, 1994 — Ch. 2: the full proof that the roughness-penalty minimizer is a natural cubic spline (Theorems 2.3–2.4), followed in this lesson's proof sketch.
+6. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §11.5: regression splines with B-spline basis illustrations, smoothing splines, and the GAM pointer, all in the ridge-regression frame this module uses. Free online: https://probml.github.io/pml-book/book1.html
+7. C. de Boor, *A Practical Guide to Splines*, Springer, 1978 (rev. 2001) — the B-spline recursion and the numerical case against truncated powers.
+</References>

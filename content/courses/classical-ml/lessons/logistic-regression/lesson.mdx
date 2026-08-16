@@ -1,0 +1,384 @@
+Logistic regression models the log-odds as a linear function; maximum likelihood then yields a convex loss whose gradient has exactly the least-squares form (y − p)x.
+
+The course so far has an engine and one branch of it running: module 2 built the likelihood machinery and priced it, and module 3 spent that machinery on the Gaussian branch, the linear model with its penalties and diagnostics. What stands open is classification: a boundary between classes rather than a curve through responses. This module reaches a *linear* boundary by three independent principles (model the class probability, model each class, maximize the margin), and their disagreements are the module's subject. This lesson walks the first road.
+
+## Road one of three: model the probability directly
+
+<Ref lesson="statistical-learning">The opening lesson</Ref> proved that the classifier minimizing 0–1 risk is the Bayes rule: predict the class whose conditional probability $p(y = 1 \mid x)$ exceeds $\tfrac12$. That makes $p(y=1 \mid x)$ the complete object: whoever has it has the optimal classifier, the confidence of every call, and the input every cost-weighted decision rule needs. The three roads differ in how they approach it. Road 1 estimates $p(y=1\mid x)$ directly and never models $x$; road 2 models each class's $x$-distribution and inverts with Bayes' rule; road 3 abandons probability and asks geometry to pick the boundary.
+
+<Figure
+  src="./figures/three-roads.svg"
+  alt="Two clouds of points crossed by three different linear boundaries: an amber line from modeling p(y=1|x) directly, a blue line from modeling each class, and a green maximum-margin line, each with its own orientation, with a legend naming the three roads"
+  caption="The module's map: the same two clouds, three principles, three different lines — each optimal for a different reason. This lesson fits line 1."
+/>
+
+<Task>
+Three retrievals before the new material, closed book; check against the named lessons only after writing all three down. (1) From <Ref lesson="glm">the GLM lesson</Ref>: write the Bernoulli's natural parameter as a function of its mean $\varphi$, and the inverse of that map. (2) From the same lesson: write the log-likelihood gradient that every canonical GLM shares. (3) From <Ref lesson="gradient-descent">the optimization lesson</Ref>: write Newton's step, name its convergence rate near the optimum, and state its per-step cost in the dimension $d$. All three return below.
+</Task>
+
+### The model, inherited
+
+<Ref lesson="glm">The GLM lesson</Ref> settled what the sigmoid is: not a squashing function chosen from a menu, but the inverse of the Bernoulli's own natural parameterization, produced by algebra rather than picked. Attaching a linear score to that natural parameter is the entire model.
+
+<Definition title="logistic regression">
+**Logistic regression** models a binary label $y \in \{0,1\}$ given features $x \in \mathbb{R}^{d+1}$ (a constant $1$ appended, so the intercept rides inside the vector) as
+
+$$
+p(y = 1 \mid x; \beta) \;=\; \sigma(\beta^\top x) \;=\; \frac{1}{1 + e^{-\beta^\top x}},
+$$
+
+equivalently: the *log-odds* $\log\frac{p}{1-p}$ equal the linear score $\eta = \beta^\top x$. The parameters are fit by maximum likelihood. (The coefficient vector is written $\beta$ from here on, the convention of this module's statistical sources; it plays exactly the role $w$ played in the GLM lesson.)
+</Definition>
+
+The model is one object on two scales, and the common half-truth — "the model is nonlinear, so its coefficients have no constant meaning" — is wrong on exactly one of them. On the probability scale the fitted function is a nonlinear S-curve; on the log-odds scale it is a straight line, and everything structural about the model lives on the lower panel: the coefficients are the line's slopes, and equal increments in any feature move the log-odds by equal amounts everywhere.
+
+<Figure
+  src="./figures/sigmoid-anatomy.svg"
+  alt="Two stacked panels over a shared x axis: the top shows the S-shaped probability curve sigma of eta of x, the bottom the straight log-odds line eta of x with slope beta one marked; a dashed vertical at eta equals zero crosses both panels at the decision boundary"
+  caption="The anatomy of the fit. The curve above is the line below passed through σ; the boundary is where the line crosses zero."
+/>
+
+### The boundary is a hyperplane
+
+Classifying by the larger probability means predicting $\hat y = 1$ when $\sigma(\beta^\top x) \ge \tfrac12$, and since $\sigma$ is strictly increasing with $\sigma(0) = \tfrac12$, that is exactly $\beta^\top x \ge 0$. The decision boundary is the hyperplane $\{x : \beta^\top x = 0\}$, linear in $x$ although $\sigma$ is not. The same monotonicity handles any other threshold: $\sigma(\beta^\top x) \ge \tau$ is $\beta^\top x \ge \log\frac{\tau}{1-\tau}$, the same hyperplane translated. Because $p$ depends on $x$ only through the scalar $\beta^\top x$, every equal-probability set is a hyperplane parallel to the boundary: the model grades its confidence by distance from the boundary, converted through $\sigma$.
+
+Nonlinearity, when wanted, enters through the features: replace $x$ by a map $\phi(x)$ and the boundary $\beta^\top \phi(x) = 0$ curves in $x$-space while every derivation below survives untouched, because the model stays linear in $\beta$.
+
+<KeyFact>
+Changing the classification threshold, reweighting the classes, or (as in case-control studies) sampling the two classes at artificial rates all move only the intercept: the boundary slides parallel to itself and never tilts. Orientation belongs to the slopes alone; that is why coefficients fitted on a 50/50 case-control sample remain valid when the disease rate is 5%.
+</KeyFact>
+
+## The Bernoulli likelihood becomes the loss
+
+The model named, the fit follows <Ref lesson="mle-map">the likelihood recipe</Ref>. Each label is a Bernoulli draw with success probability $p_i = \sigma(\beta^\top x_i)$, so for $n$ independent observations
+
+$$
+L(\beta) = \prod_{i=1}^n p_i^{\,y_i}(1-p_i)^{1-y_i},
+\qquad
+\ell(\beta) = \sum_{i=1}^n \big[\, y_i \log p_i + (1-y_i)\log(1-p_i) \,\big].
+$$
+
+<Definition title="cross-entropy loss">
+The **cross-entropy (log) loss** of a predicted probability $p \in (0,1)$ against a label $y \in \{0,1\}$ is
+$$
+L(y, p) = -\big[\, y \log p + (1-y)\log(1-p) \,\big],
+$$
+the negative Bernoulli log-likelihood of one observation. Minimizing average cross-entropy and maximizing the likelihood are the same problem.
+</Definition>
+
+The loss reads case by case: for $y = 1$ it is $-\log p$, for $y = 0$ it is $-\log(1-p)$, and a confident wrong prediction ($p \to 0$ while $y = 1$) is charged without bound. Differentiating $\sigma(\eta) = (1+e^{-\eta})^{-1}$:
+
+$$
+\sigma'(\eta) = \frac{e^{-\eta}}{(1+e^{-\eta})^2}
+= \underbrace{\frac{1}{1+e^{-\eta}}}_{\sigma(\eta)} \cdot \underbrace{\frac{e^{-\eta}}{1+e^{-\eta}}}_{1-\sigma(\eta)}
+= \sigma(\eta)\big(1 - \sigma(\eta)\big):
+$$
+
+the sigmoid's slope is the Bernoulli variance at that point, largest ($\tfrac14$) at $\eta = 0$ and dying in both tails. <Ref lesson="glm">The moment factory</Ref> produced this same identity as $A'' = \sigma(1-\sigma)$; in the proof below, the factor $\sigma(1-\sigma)$ is exactly what cancels the loss's denominators $y/p$ and $(1-y)/(1-p)$.
+
+<Theorem title="gradient of the log-likelihood">
+For $\ell(\beta)$ as above with $p_i = \sigma(\beta^\top x_i)$,
+$$
+\nabla \ell(\beta) \;=\; \sum_{i=1}^n \big( y_i - p_i \big)\, x_i .
+$$
+
+<Proof>
+It suffices to differentiate one observation's term; write $p = \sigma(\eta)$, $\eta = \beta^\top x$. The chain rule runs through $p$, then $\eta$:
+$$
+\frac{\partial}{\partial \beta}\big[ y \log p + (1-y)\log(1-p) \big]
+= \Big( \frac{y}{p} - \frac{1-y}{1-p} \Big) \cdot \frac{\partial p}{\partial \eta} \cdot \frac{\partial \eta}{\partial \beta} .
+$$
+The middle factor is the identity just proved, $\partial p/\partial\eta = p(1-p)$, and $\partial\eta/\partial\beta = x$. Multiplying out,
+$$
+\Big( \frac{y}{p} - \frac{1-y}{1-p} \Big)\, p(1-p)
+= y(1-p) - (1-y)p
+= y - p :
+$$
+the factor $p(1-p)$ cancels both denominators exactly, leaving $(y-p)\,x$ per observation. Summing gives the claim.
+</Proof>
+</Theorem>
+
+This is <Ref lesson="glm">the universal gradient</Ref> $\sum_i(y_i - \mu_i)x_i$, now earned by hand, and the cancellation in the last step is not luck: it is the canonical-link cancellation, the response function's slope equalling the response's variance.
+
+Setting the gradient to zero gives the score equations $\sum_i (y_i - p_i)x_i = 0$; the first coordinate (the intercept's) says the fitted probabilities sum to the observed number of positives. The system is transcendental, with no closed-form root: this is the model <Ref lesson="gradient-descent">the optimization lesson</Ref> opened on as its motivating obstruction.
+
+Convexity of the loss — the property that makes every stationary point global — follows from the second derivative, one more pass of the same chain rule.
+
+<Exercise>
+Differentiate the gradient once more: show that the Hessian of the negative log-likelihood $J(\beta) = -\ell(\beta)$ is $\nabla^2 J = X^\top W X$ with $W = \operatorname{diag}\big(p_i(1-p_i)\big)$, conclude that $J$ is convex, and state exactly when strict convexity fails. Write $\partial p_i / \partial \beta$ before opening the solution.
+
+<Solution>
+Strategy: only $p_i$ depends on $\beta$ in $\nabla J = \sum_i (p_i - y_i)x_i$, and its derivative is the sigmoid identity pushed through the chain rule.
+
+$\partial p_i/\partial \beta = \sigma'(\eta_i)\,x_i = p_i(1-p_i)\,x_i$, so
+$$
+\nabla^2 J(\beta) = \sum_{i=1}^n p_i(1-p_i)\, x_i x_i^\top = X^\top W X,
+$$
+with $X$ the $n \times (d+1)$ design matrix. For any $v$, $v^\top X^\top W X\, v = \sum_i p_i(1-p_i)(x_i^\top v)^2 \ge 0$: the Hessian is positive semidefinite everywhere, so $J$ is convex by <Ref lesson="gradient-descent">the second-order test</Ref>, and any stationary point is a global minimum.
+
+Strictness: for finite $\beta$ every weight $p_i(1-p_i)$ is strictly positive, so $v^\top \nabla^2 J\, v = 0$ forces $x_i^\top v = 0$ for all $i$, i.e. $Xv = 0$. Strict convexity therefore fails exactly when $X$ lacks full column rank (collinear features, or $d+1 > n$), the same degeneracy that <Ref lesson="ols">broke the normal equations</Ref>. A second, subtler flatness appears only in the limit: as $\lVert\beta\rVert \to \infty$ the weights saturate toward zero, and on separable data the loss flattens toward its infimum without reaching it; the penultimate section is about exactly that. The transferable move: for any GLM the Hessian is $X^\top W X$ with $W$ the per-observation variance, so convexity is inherited, never re-proved.
+</Solution>
+</Exercise>
+
+### Why not squared error on the probabilities
+
+A natural alternative fits the same model by least squares: minimize $\sum_i (y_i - \sigma(\beta^\top x_i))^2$. It fails on two counts, both visible in the single-observation losses as functions of the score $\eta$ at $y = 1$. First, **convexity is lost**: the cross-entropy term rewrites as $-y\eta + \log(1+e^\eta)$, linear plus softplus, convex in $\eta$ and hence in $\beta$; the squared term $(1-\sigma(\eta))^2$ composes a convex square with the non-convex $\sigma$, and its second derivative changes sign (concave in the left tail, convex in the right), so descent methods lose the global guarantee the previous exercise just established.
+
+Second, **squared error's gradient vanishes on confident mistakes**: at $y=1$ the cross-entropy slope is $\sigma(\eta) - 1$, approaching $-1$ as $\eta \to -\infty$, while the squared-error slope is $-2\sigma(\eta)(1-\sigma(\eta))^2$, suppressed by the factor $\sigma'$ in the tail. At $\eta = -4$, a point the model calls wrong with 98% confidence, the slopes are $-0.98$ against $-0.035$: a 28-fold gap exactly on the worst mistakes.
+
+<Figure
+  src="./figures/loss-compare.svg"
+  alt="Cross-entropy and squared error plotted against the score eta for a positive example: cross-entropy rises with slope near minus one as eta decreases, while squared error flattens toward one in the shaded confidently-wrong region"
+  caption="One positive observation. In the shaded region the model is confidently wrong; cross-entropy still pulls with slope ≈ −1 while squared error has gone flat."
+/>
+
+The failure is not properness: squared error on probabilities is the Brier score, a perfectly proper scoring rule that <Ref lesson="classification-metrics">module 5</Ref> uses for evaluation. The failure is optimization.
+
+## Newton is reweighted least squares
+
+With gradient and Hessian in hand, <Ref lesson="gradient-descent">Newton's method</Ref> applies directly, and for this model the step has a second identity that explains both its behavior and its name in software. The Newton update on $J = -\ell$ is
+
+$$
+\beta^{\text{new}} = \beta + \big( X^\top W X \big)^{-1} X^\top (y - p),
+$$
+
+with $p$ and $W$ evaluated at the current $\beta$. (Because $W$ contains no $y_i$, the observed Hessian already equals its expectation, so this is also the Fisher-scoring step named in <Ref lesson="gradient-descent">the optimization lesson</Ref>.) Factor $X^\top W$ out of both terms:
+
+$$
+\beta^{\text{new}}
+= \big( X^\top W X \big)^{-1} X^\top W \underbrace{\big[ X\beta + W^{-1}(y - p) \big]}_{z}
+= \arg\min_b\; (z - Xb)^\top W\, (z - Xb).
+$$
+
+Each Newton iteration is a **weighted least-squares solve**: regress the *adjusted response* $z = X\beta + W^{-1}(y-p)$ on $X$ with weights $W$, exactly the machinery of module 3 with a diagonal reweighting. The scheme is *iteratively reweighted least squares* (IRLS); it is what R's `glm` and statsmodels run.
+
+The adjusted response is the current score nudged by each observation's error divided by its variance; the weights $p_i(1-p_i)$ are largest at the undecided points and vanish on saturated ones, so each solve is driven by the observations the current fit is least sure about, and confidently classified points drop out.
+
+<KeyFact>
+The IRLS identity outlives the solver: the final iteration's weighted regression is where logistic inference and diagnostics come from — $(X^\top W X)^{-1}$ at convergence is the asymptotic coefficient covariance, and module 3's leverage and residual diagnostics apply to the last adjusted fit unchanged.
+</KeyFact>
+
+### The Challenger data, fitted
+
+The running dataset for the rest of the lesson is small, real, and consequential. On January 28, 1986 the space shuttle Challenger exploded 73 seconds after launch, killing its crew of seven; the cause was the failure of a rubber O-ring seal in a booster joint, stiffened by the coldest launch temperature in the program's history, 31°F. The data available *before* that launch: 23 previous flights, each with its launch temperature and whether any O-ring was damaged.
+
+| temp (°F) | 53 | 57 | 58 | 63 | 66 | 67 | 67 | 67 | 68 | 69 | 70 | 70 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| failure | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+| temp (°F) | 70 | 70 | 72 | 73 | 75 | 75 | 76 | 76 | 78 | 79 | 81 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| failure | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
+
+Seven failures in 23 flights, and the four coldest launches on record are four of them. The model is one-dimensional, $p(\text{failure} \mid T) = \sigma(\beta_0 + \beta_1 T)$, and IRLS fits it from a standing start.
+
+<FigureSequence
+  name="irls"
+  alt="Three frames of one IRLS iteration on the Challenger data: the flat starting fit at one half with equal weights, the adjusted responses at plus and minus two built on a secondary z axis, and the weighted least-squares line with its sigmoid image as the new fit, the loss dropping from 15.94 to 10.59"
+  caption="One IRLS iteration on the Challenger data. Frame 1: the start, β = 0. Frame 2: the working targets. Frame 3: one weighted least-squares solve, and the loss drops from 15.94 to 10.59."
+/>
+
+<Task>
+Step through the frames and verify frame 2's arithmetic yourself: at $\beta = (0,0)$ every $\eta_i = 0$, every $p_i = \tfrac12$, every weight is $\tfrac14$, so $z_i = 0 + (y_i - \tfrac12)/\tfrac14 = \pm 2$. With all weights equal, frame 3's solve is plain least squares of $\pm 2$ targets on temperature: a module 3 computation with no new content.
+</Task>
+
+<Example title="the full IRLS run (Casella &amp; Berger 12.3.1)">
+Starting from $\beta = (0, 0)$, negative log-likelihood $15.942$, the iterates are:
+
+| iteration | $\beta_0$ | $\beta_1$ | $-\ell(\beta)$ |
+| --- | --- | --- | --- |
+| 1 | 9.619 | −0.1495 | 10.5925 |
+| 2 | 13.656 | −0.2112 | 10.1793 |
+| 3 | 14.938 | −0.2306 | 10.1577 |
+| 4 | 15.042 | −0.2322 | 10.1576 |
+
+The fifth solve repeats the fourth to four decimals: convergence in four iterations, the error in $\beta_0$ falling $5.4 \to 1.4 \to 0.11 \to 0.001$ — each step roughly squares the last, the rate <Ref lesson="gradient-descent">the optimization lesson</Ref> proved for Newton near the optimum. The MLE is $\hat\beta_0 = 15.043$, $\hat\beta_1 = -0.232$: failure log-odds fall by $0.232$ per degree of warming. The inverse of the final $X^\top W X$ prices the fit, per <Ref lesson="fisher-information">the information bound</Ref>: $\operatorname{se}(\hat\beta_1) = \sqrt{0.012} \approx 0.11$, giving the 95% interval $(-0.447, -0.017)$; the slope is negative with room to spare, from 23 rows.
+</Example>
+
+Concavity makes the run reliable but not unconditionally so: a Newton step can overshoot, and production fitters guard it with step-halving when the likelihood fails to improve. The price is the one <Ref lesson="gradient-descent">the optimization lesson</Ref> quoted: each iteration forms and solves a $(d+1)\times(d+1)$ system, $O(nd^2 + d^3)$, trivial at classical dimensions and prohibitive at $d$ in the millions, where the fitting reverts to plain or stochastic gradient steps on the same $(y_i - p_i)x_i$.
+
+## Reading the fit: odds ratios, and one extrapolation
+
+A fitted logistic model is read on the odds scale, and the rule takes one line. Adding one unit to feature $j$ adds $\beta_j$ to the log-odds regardless of every other feature's value, so it **multiplies the odds by $e^{\beta_j}$**: constant on the odds scale, though not on the probability scale, where the same shift moves a mid-range case far more than a saturated one ($\partial p/\partial x_j = \beta_j\, p(1-p)$).
+
+For the Challenger fit: each degree colder multiplies the odds of O-ring failure by $e^{0.232} = 1.26$; five degrees colder multiplies them by $e^{1.16} = 3.19$. A launch at 65°F is a coin flip ($\hat p = 0.49$); at 70°F the model gives $0.23$, and at 75°F, $0.09$.
+
+<Figure
+  src="./figures/challenger.svg"
+  alt="O-ring failures as zeros and ones against launch temperature with the fitted logistic curve; a shaded zone below 53 degrees marks the region with no data, and the launch-morning temperature of 31 degrees is marked on the curve at probability 0.9996"
+  caption="The fitted curve on the 23 pre-Challenger flights. The launch-morning forecast sits 22°F below the coldest flight ever flown — deep inside the shaded zone the data never visited."
+/>
+
+Asked about the launch morning, the model answers $\hat p(31°\text{F}) = \sigma(15.043 - 0.232 \cdot 31) = 0.9996$: failure odds of roughly 2,500 to 1. The number is an extrapolation 22°F below the coldest launch in the record: the fourth decimal is set entirely by the assumption that the log-odds stay linear down to 31°F, and no observation below 53°F tests that assumption.
+
+The launch decision, however, did not need the fourth decimal: every flight below 66°F had failed, the slope was significantly negative from the record alone, and the model's direction was unambiguous at any temperature below the observed range. The postmortem analysis of Dalal, Fowlkes, and Hoadley reconstructed the pre-launch discussion and found the fatal step was not extrapolation but data deletion: the engineers' briefing charts examined only the seven flights *with* incidents, among which temperature shows no trend, discarding the sixteen clean flights, all warm, that carry the signal.
+
+### The CORIS table: correlated predictors reshuffle the credit
+
+One coefficient against one feature reads cleanly; a column of coefficients against correlated features does not. The data come from the Coronary Risk-Factor Study (CORIS), a 1983 baseline survey in three rural districts of the Western Cape: 462 white males aged 15–64, of whom 160 had suffered myocardial infarction, against 302 controls. A logistic regression of infarction on seven risk factors gives (ESL, Table 4.2):
+
+| predictor | coefficient | std. error | Z score |
+| --- | --- | --- | --- |
+| (intercept) | −4.130 | 0.964 | −4.285 |
+| sbp (systolic blood pressure) | 0.006 | 0.006 | 1.023 |
+| tobacco (lifetime, kg) | 0.080 | 0.026 | 3.034 |
+| ldl (cholesterol) | 0.185 | 0.057 | 3.219 |
+| famhist (family history) | 0.939 | 0.225 | 4.178 |
+| obesity | −0.035 | 0.029 | −1.187 |
+| alcohol | 0.001 | 0.004 | 0.136 |
+| age | 0.043 | 0.010 | 4.184 |
+
+The Z score is the one <Ref lesson="prostate-study">the prostate study</Ref> read down its own table: coefficient over standard error, approximately significant at the 5% level when $|Z| > 2$. Read the coefficients as established risk factors and two rows look wrong: systolic blood pressure is not significant ($|Z| \approx 1$, against the $\approx 2$ threshold), and obesity carries a *negative* sign, as if it protected the heart. Both are genuine, well-measured cardiac risk factors; fitted alone, each is significant with a positive sign.
+
+<Figure
+  src="./figures/coris-z.svg"
+  alt="Horizontal bar chart of the seven CORIS predictors' Z scores with dashed significance thresholds at plus and minus two: tobacco, ldl, famhist, and age clear the threshold, while sbp and alcohol fall inside the band and obesity's bar points negative"
+  caption="Table 4.2 as a picture. Two established risk factors, highlighted, land inside the not-significant band — obesity on the wrong side of zero."
+/>
+
+The resolution is that a multiple-regression coefficient is conditional: $\beta_j$ prices a unit of feature $j$ *at fixed values of all the others*, and in a cohort where blood pressure, obesity, age, and tobacco rise together, the shared signal is credited once and the leftovers can land anywhere, including below zero. This is the same credit reshuffling the <Ref lesson="prostate-study">prostate study</Ref> exhibited among correlated clinical measurements, and <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> priced it exactly: correlated designs inflate coefficient variances and make individual coefficients answer a conditional question nobody asked.
+
+The usable readings survive: tobacco's $0.080$ says each kilogram of lifetime tobacco use multiplies infarction odds by $e^{0.080} = 1.083$, about 8%, with 95% interval $e^{0.080 \pm 2\cdot 0.026} = (1.03, 1.14)$.
+
+<KeyFact>
+A wrong-signed or insignificant coefficient on a correlated predictor is not a variable-selection verdict: the conditional question it answers — does obesity add risk *at fixed* blood pressure, age, and tobacco — is not the question of whether obesity belongs in the model. Whether a predictor earns its place is decided by out-of-sample error under <Ref lesson="cross-validation-bootstrap">module 5's resampling machinery</Ref>, never by the sign of one fitted coefficient.
+</KeyFact>
+
+## Separable data: the likelihood has no maximum
+
+Everything so far suggests the fit improves as the training data get cleaner: fewer misclassified points, better likelihood, better model. Perfectly clean data reverse the story: on a training set that the model can separate exactly, the maximum-likelihood problem has no solution at all.
+
+<Theorem title="divergence under separation">
+Suppose some $\beta^\star$ strictly separates the classes: $\beta^{\star\top} x_i > 0$ whenever $y_i = 1$ and $\beta^{\star\top} x_i < 0$ whenever $y_i = 0$. Then $\ell$ has no maximizer: $\sup_\beta \ell(\beta) = 0$ is approached but never attained, and any maximizing sequence has $\lVert \beta \rVert \to \infty$.
+
+<Proof>
+Scale the separator: take $\beta = c\,\beta^\star$ and let $c \to \infty$. Every score $c\,\beta^{\star\top}x_i$ runs to $+\infty$ on positives and $-\infty$ on negatives, so every $p_i \to y_i$ and every likelihood factor increases monotonically toward $1$: $\ell(c\,\beta^\star) \uparrow 0$. But for any finite $\beta$, each factor is strictly below $1$ and $\ell(\beta) < 0$. The supremum $0$ is a limit, not a value, and since scaling any separator up always improves the likelihood, no finite point can be optimal.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/separable.svg"
+  alt="Two separated clusters on a line with three fitted sigmoids of increasing steepness for beta equal to one, five, and twenty-five, and a tally showing the negative log-likelihood falling from 0.88 through 0.014 to three times ten to the minus eleven"
+  caption="Four separable points. Scaling the slope up always helps: the sigmoid sharpens toward a step, the loss falls toward 0, and no finite β wins."
+/>
+
+### The symptom in software: perfect training accuracy
+
+In software the pathology looks like success: the solver reports enormous coefficients, fitted probabilities of exactly $0$ and $1$, perfect training accuracy, and (if it is honest) a convergence warning. The regime where this happens routinely is small $n$ with large $d$: with more directions than points, general-position data are separable by construction, so a wide model that classifies its training set perfectly has demonstrated the geometry of its design matrix and nothing about the world.
+
+The seed of the phenomenon appeared in <Ref lesson="glm">the GLM lesson's</Ref> boundary-probe exercise: three heads in three flips drive the natural parameter to infinity, which is perfect separation in the intercept-only model, and the zero-count catastrophe of <Ref lesson="mle-map">the likelihood lesson</Ref> in its original form.
+
+### The fix: penalize
+
+The fix is the one the course has used since module 2. Maximizing $\ell(\beta) - \tfrac{\lambda}{2}\lVert\beta\rVert^2$ adds a term that falls without bound as $\lVert\beta\rVert$ grows while $\ell$ is bounded above by $0$, so the penalized objective is coercive; it is also strictly concave (convex NLL plus strictly convex penalty), so a finite maximizer exists and is unique, with no rank condition and no separation condition.
+
+By <Ref lesson="mle-map">the MAP correspondence</Ref> this is a Gaussian prior on $\beta$, the logistic twin of <Ref lesson="ridge-lasso">ridge</Ref>; a Laplace prior gives $\ell_1$-penalized logistic regression, which zeroes coefficients exactly as in the linear model and is the standard tool when $d$ is large. Regularized logistic regression is the default in every mature library for exactly this reason, not as a tuning nicety.
+
+<KeyFact>
+Separation corrupts the inference before the point estimate: the saturating weights $p_i(1-p_i) \to 0$ collapse the information matrix $X^\top W X$, so the reported standard errors diverge alongside the coefficients — an enormous $\hat\beta_j$ with a still-larger standard error is the fingerprint in a fitted table. And the penalized replacement is a MAP estimate, not an MLE: its value depends on $\lambda$ and on the units of the features, a dependence the unpenalized fit never had.
+</KeyFact>
+
+### Two neighbors: the perceptron, and where gradient descent points
+
+The *perceptron*, Rosenblatt's 1958 learning rule and the ancestor of this whole family, is the degenerate limit of logistic regression: replace $\sigma$ by a hard threshold and the SGD update $(y_i - p_i)x_i$ becomes "add misclassified points to $\beta$". It converges only when the data are separable, precisely the regime where the logistic MLE does not exist, so the two methods fail on complementary territory.
+
+And unpenalized gradient descent on separable data does not wander: the norm grows like $\log t$ while the *direction* $\beta/\lVert\beta\rVert$ converges to the maximum-margin separator ([Soudry et al., 2018](https://jmlr.org/papers/v19/18-188.html)), the object road 3 constructs on purpose two lessons from now.
+
+## Softmax: the same machinery for K classes
+
+The two-class lesson generalizes without new ideas. With $K$ classes, give each class its own coefficient vector $\beta_k$ and normalize the exponentiated scores:
+
+$$
+p(y = k \mid x) = \frac{e^{\beta_k^\top x}}{\sum_{j=1}^K e^{\beta_j^\top x}},
+$$
+
+the *softmax*: positive, summing to one, and reducing to the sigmoid at $K = 2$ (divide through by $e^{\beta_2^\top x}$: only $\beta = \beta_1 - \beta_2$ survives, which also shows the parameterization is redundant, fixed in practice by pinning one class's vector to zero or by penalizing). The loss is again the negative log-likelihood, $-\log p(y_i \mid x_i)$, again convex, and its gradient generalizes the two-class form verbatim: for class $k$,
+
+$$
+\nabla_{\beta_k} \big[ -\log p(y \mid x) \big] = \big( p_k - \mathbf{1}\{y = k\} \big)\, x,
+$$
+
+the predicted probability vector minus the one-hot label, times the features.
+
+<Figure
+  src="./figures/softmax-regions.svg"
+  alt="Three softmax classes in the plane: three linear pairwise boundaries meet at a single point and cut the plane into three convex regions, one per predicted class, with all three probabilities equal to one third at the meeting point"
+  caption="K = 3. Every pairwise boundary pₖ = pⱼ is a hyperplane; the predicted-class regions they cut are convex, and at their common point all three probabilities tie at ⅓."
+/>
+
+IRLS carries over with a block-structured weight matrix; every pairwise decision boundary $p_k = p_j$ is the hyperplane $(\beta_k - \beta_j)^\top x = 0$, so each predicted-class region is an intersection of half-spaces — convex, however many classes there are; and separation causes the same divergence, cured by the same penalty.
+
+What stands established: road 1 is complete. Modeling the log-odds as linear plus maximum likelihood yields a convex loss, the gradient $\sum_i (y_i - p_i)x_i$, a Newton solver that is iterated weighted least squares converging in a handful of steps, coefficients that read as conditional odds ratios, one honest pathology with a standard fix, and a $K$-class extension on the same machinery.
+
+<Ref lesson="naive-bayes">The next lesson</Ref> starts road 2 from the opposite end: model $p(x \mid y)$ for each class and invert with Bayes' rule; two lessons on, <Ref lesson="lda-gda">the LDA lesson</Ref> shows that Gaussian class models produce exactly the sigmoid-of-linear form fitted here with different parameter values, and the final exercise below computes that collision on simulated data.
+
+## Exercises
+
+<Exercise>
+Warm-up on the Challenger fit, $\hat\beta_0 = 15.043$, $\hat\beta_1 = -0.232$. (a) Invert the fit: at what temperature does the model put the failure probability at $0.10$, and where does that temperature sit relative to the 23-flight record? (b) The intercept is the log-odds of failure at 0°F. Compute the corresponding probability and explain why that number says nothing about shuttles.
+
+<Solution>
+(a) $\hat p = 0.10$ is log-odds $\log\frac{0.1}{0.9} = -2.197$, so $15.043 - 0.232\,T = -2.197$ gives $T = 17.240/0.232 = 74.3°\mathrm{F}$. Only 7 of the 23 recorded flights launched that warm: the model rates two-thirds of the program's own history above 10% failure risk. The coldest flight on record, 53°F, sits 21 degrees below that line, at $\eta = 15.043 - 0.232 \cdot 53 = 2.75$, $\hat p = 0.94$ — the record's cold end is already fitted as near-certain failure (that flight did have an O-ring incident), so 31°F is not a borderline case nudged past the data but a point far beyond a boundary the record itself had crossed.
+
+(b) At $T = 0$ the log-odds are $15.043$: odds $e^{15.043} \approx 3.4$ million to one, $\hat p = 1 - 3\cdot 10^{-7}$. The number is a coordinate artifact, not a physical statement: 0°F lies 53 degrees below the coldest observation, so nothing in the data constrains the curve there, and the intercept merely anchors the line at wherever the feature's zero happens to sit. Centering temperature at 70°F changes the intercept to $15.043 - 0.232 \cdot 70 = -1.20$ — the log-odds at 70°F, $\hat p = 0.23$, matching the body's value — while changing no prediction: only temperature *differences*, priced by $\hat\beta_1$, are the model's content.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: one feature predicts perfectly. Take four observations of a single feature (no intercept): $x = -1$ twice with $y = 0$, and $x = +1$ twice with $y = 1$. (a) Write the negative log-likelihood $J(\beta)$ and show the MLE does not exist, with fitted probabilities tending to $0$ and $1$. (b) Add the penalty $\tfrac{\lambda}{2}\beta^2$ and find the optimum for $\lambda = 0.5$. (c) State the stationarity-level reason a penalized optimum is always finite, as a bound on $\lVert\hat\beta\rVert$.
+
+<Solution>
+(a) Every observation is on its correct side when $\beta > 0$: each contributes $\log(1 + e^{-\beta})$, so $J(\beta) = 4\log(1+e^{-\beta})$. This is strictly decreasing in $\beta$ (derivative $-4\sigma(-\beta) < 0$), so $\inf J = 0$ is approached as $\beta \to \infty$ and never attained; the fitted probabilities $\sigma(\pm\beta)$ tend to $1$ and $0$. This is the divergence theorem in its smallest instance: the data are separated by $\beta^\star = 1$.
+
+(b) The penalized objective $J_\lambda(\beta) = 4\log(1+e^{-\beta}) + \tfrac{\lambda}{2}\beta^2$ has stationarity condition $4\sigma(-\beta) = \lambda\beta$. The left side falls from $4$ to $0$, the right side rises from $0$ without bound, so there is exactly one crossing. For $\lambda = 0.5$, solving numerically gives $\hat\beta = 1.48$: check $4\sigma(-1.48) = 4 \cdot 0.185 = 0.741 = 0.5 \cdot 1.48$. The fitted probability at $x = 1$ is $\sigma(1.48) = 0.81$: confident, finite, honest.
+
+(c) At any penalized optimum, stationarity reads $\lambda\hat\beta = \sum_i (y_i - p_i)x_i$. The right side is bounded no matter what: each $|y_i - p_i| < 1$, so $\lVert \sum_i (y_i - p_i)x_i \rVert \le \sum_i \lVert x_i\rVert$. Hence $\lVert\hat\beta\rVert \le \tfrac{1}{\lambda}\sum_i \lVert x_i \rVert$ always: the likelihood's gradient is bounded, the penalty's grows without limit, so the stationarity equation balances at finite norm for every dataset and every $\lambda > 0$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "logistic regression is a linear model, so it cannot give calibrated probabilities on problems with a nonlinear truth." Identify the two distinct properties the claim conflates, then construct a one-dimensional example with a nonlinear true relationship where the fitted logistic model's boundary is useless but its probability output remains honest.
+
+<Solution>
+The claim conflates the *shape of the decision boundary* (a geometric property, linear in whatever features are supplied) with *calibration* (an agreement between predicted probabilities and observed frequencies, a property of the probability scale that <Ref lesson="classification-metrics">module 5</Ref> measures). Neither implies the other, and the word "so" is where the argument fails.
+
+Construction: let $x \sim \mathrm{Uniform}[-2, 2]$ and let the truth be $p(y=1 \mid x) = \sigma\big(4(x^2 - 1)\big)$: positives live at large $|x|$, and the base rate works out to $0.516$. By symmetry the best logistic model in the raw feature has slope zero: it fits $\hat p(x) \approx 0.516$ everywhere (the intercept-only MLE is the base rate). Its boundary is useless (accuracy is chance), yet its probability output is exactly honest at the resolution it reports: it predicts 51.6% positives and 51.6% materialize. Discrimination fails while calibration survives. The converse dissociation also exists: a model predicting $0.99$ on one side of the *correct* boundary and $0.01$ on the other, when the true conditional probabilities are $0.7$ and $0.3$, classifies perfectly and is badly miscalibrated. Last, the "linear" premise itself is weaker than it sounds: with features $(1, x, x^2)$ the truth above is exactly linear in the features, and the same fitting machinery recovers boundary and calibration both; linearity constrains the feature space, not the problem.
+</Solution>
+</Exercise>
+
+<Exercise>
+The CORIS puzzle in miniature. Simulate $n = 2{,}000$ observations: $x_1 \sim \mathcal N(0,1)$, $x_2 = 0.9\,x_1 + \sqrt{0.19}\,\varepsilon$ with $\varepsilon \sim \mathcal N(0,1)$ (so $\operatorname{corr}(x_1, x_2) = 0.9$), and $y \sim \mathrm{Bernoulli}\big(\sigma(-1 + 1.2\,x_1)\big)$: the truth uses only $x_1$. Fit three logistic regressions (on $x_2$ alone, on $x_1$ alone, and on both) and explain the three $x_2$ coefficients with <Ref lesson="regression-diagnostics">the diagnostics lesson's</Ref> machinery.
+
+<Solution>
+A representative run (seeds move the second decimal): alone, $x_2$ gets coefficient $+1.04$, strongly significant on its standard error though it has no causal role at all; $x_1$ alone gets $+1.21$; jointly, $x_1$ keeps $+1.26$ and $x_2$ collapses to $-0.05$, indistinguishable from zero and negative in sign. That is the CORIS table in miniature: obesity and blood pressure are real marginal risk factors that lose significance (and obesity its sign) once their correlated companions enter.
+
+The diagnostics frame explains all three numbers. Marginally, $x_2$ is a proxy: at correlation $0.9$ it carries most of $x_1$'s signal, so the single-predictor fit rewards it. Conditionally, $x_2$'s coefficient prices only the variation of $x_2$ *at fixed $x_1$* (the $\sqrt{0.19}\,\varepsilon$ residual), which is pure noise with respect to $y$, so its true conditional coefficient is $0$ and the fitted $-0.05$ is sampling noise around it. And the noise is amplified: the variance-inflation factor is $1/(1 - 0.9^2) = 5.3$, so $x_2$'s standard error is $\sqrt{5.3} \approx 2.3$ times what it would be in an orthogonal design — small sign flips around zero are expected, not anomalous. The lesson transfers verbatim to CORIS: a wrong-signed coefficient on a correlated predictor is the conditional question's answer, not a discovery about obesity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce Casella and Berger's fit. Using the 23 rows tabulated in the lesson, fit the logistic model $p(\text{failure} \mid T) = \sigma(\beta_0 + \beta_1 T)$ yourself, by IRLS or any optimizer. State in advance what counts as agreement: $\hat\beta = (15.043, -0.232)$ to three decimals, $\hat p(31°\mathrm{F}) = 0.9996$, and $\operatorname{se}(\hat\beta_1) \approx 0.11$ from the inverse information matrix. Then state the launch-decision implication of your fit in one sentence.
+
+<Solution>
+IRLS from $\beta = (0,0)$: build $p$ and $W = \operatorname{diag}(p_i(1-p_i))$, solve $(X^\top W X)\,\delta = X^\top(y - p)$, update, repeat. The trace matches the lesson's Example: $(9.619, -0.150) \to (13.656, -0.211) \to (14.938, -0.231) \to (15.042, -0.232)$, converged at iteration 4 with $-\ell = 10.158$. Predictions: $\hat p(31) = \sigma(15.043 - 7.197) = 0.9996$, agreeing with the published value. Uncertainty: form the final $X^\top W X$ and invert it in code, not from rounded entries — its determinant, $278.5$, is a near-cancelling difference of two terms near $49{,}500$, and rounding the matrix to three significant figures before inverting moves the answer to $\operatorname{se} = 0.118$. The exact inverse has diagonal $(54.4,\ 0.0117)$, so $\operatorname{se}(\hat\beta_1) = \sqrt{0.0117} = 0.108$ and the 95% interval is $(-0.447, -0.017)$: the slope is significantly negative from 23 rows. One-sentence implication: the pre-launch record already said that cold launches fail (every flight below 66°F had an O-ring incident, and the fitted odds at 31°F are about 2,500 to 1 against a clean flight), so the data supported a scrub without any faith in the fourth decimal of an extrapolation. (Dalal, Fowlkes, and Hoadley's postmortem shows the analysis actually presented pre-launch discarded the 16 incident-free flights, exactly the rows that carry the temperature signal.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Simulate two classes of 200 points each in $\mathbb{R}^2$: class 0 from $\mathcal N(\mu_0, \Sigma)$ and class 1 from $\mathcal N(\mu_1, \Sigma)$ with $\mu_0 = (0,0)$, $\mu_1 = (2,1)$, and shared $\Sigma = \begin{bmatrix} 1 & 0.5 \\ 0.5 & 1 \end{bmatrix}$. (a) Fit logistic regression and record the direction of its boundary normal. (b) With no likelihood optimization at all, compute the class means $\hat\mu_0, \hat\mu_1$ and pooled covariance $\hat\Sigma$, and form the direction $\hat\Sigma^{-1}(\hat\mu_1 - \hat\mu_0)$. Compare the two directions, and compute the population version $\Sigma^{-1}(\mu_1 - \mu_0)$.
+
+<Solution>
+A representative run: logistic regression returns $\hat\beta = (-1.84,\ 2.13,\ 0.12)$, boundary normal direction $(0.998,\ 0.058)$ after normalizing. The plug-in construction gives $\hat\Sigma^{-1}(\hat\mu_1 - \hat\mu_0)$ with direction $(0.998,\ 0.061)$: the same line, to the second decimal, from two computations that share nothing; one maximized a conditional likelihood by IRLS, the other did arithmetic on means and covariances. The population direction is $\Sigma^{-1}(\mu_1 - \mu_0) = \tfrac{1}{0.75}\begin{bmatrix} 1 & -0.5 \\ -0.5 & 1 \end{bmatrix}\begin{pmatrix} 2 \\ 1 \end{pmatrix} = (2,\ 0)$: the second feature's coefficient is exactly zero, because its mean separation is fully explained by its correlation with the first: the reshuffling of the CORIS exercise, reappearing in the generative arithmetic.
+
+The construction in (b) is linear discriminant analysis, and the agreement is no accident: Gaussian classes with a shared covariance make $p(y=1 \mid x)$ exactly a sigmoid of a linear function, so both methods estimate the same population boundary, from opposite directions, with different efficiency and different failure modes (on separable samples, (b) still returns finite numbers while the logistic MLE diverges). Which fit to prefer, and what the generative detour buys, is <Ref lesson="lda-gda">the LDA/QDA lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. G. Casella, R. L. Berger, *Statistical Inference*, 2nd ed., Duxbury, 2002 — §12.3: logistic regression as a binary-response regression; Example 12.3.1 (the Challenger data and fit, Table 12.3.1, the 0.9996 prediction) and Example 12.3.2 (the information matrix and the confidence interval for the slope) that this chapter's fit reproduces.
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §4.4.1: the score equations and the Newton-as-IRLS derivation (eqs. 4.21–4.28) this chapter follows; §4.4.2: the South African heart disease study and Table 4.2; §4.4.4: $\ell_1$-regularized logistic regression. Free online: https://hastie.su.domains/ElemStatLearn/
+3. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — ch. 2: the sigmoid derivative identity, the likelihood, and the gradient derivation at the level of completeness this chapter mirrors, with the "same form as least squares" observation. https://cs229.stanford.edu/main_notes.pdf
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §10.2.3–10.2.6: MLE, its optimization, and IRLS; §10.2.5: the perceptron as the hard-threshold limit; §10.2.7: MAP estimation and why separability makes the penalty necessary; §10.3: multinomial logistic regression and the softmax gradient. Free online: https://probml.github.io/pml-book/book1.html
+5. S. R. Dalal, E. B. Fowlkes, B. Hoadley, "Risk Analysis of the Space Shuttle: Pre-Challenger Prediction of Failure," *Journal of the American Statistical Association* 84(408), 1989, pp. 945–957 — the full statistical postmortem: the 23-flight data, the incident-only briefing charts, and the pre-launch risk assessment that the data supported.
+6. D. Soudry, E. Hoffer, M. S. Nacson, S. Gunasekar, N. Srebro, "The Implicit Bias of Gradient Descent on Separable Data," *Journal of Machine Learning Research* 19(70), 2018 — on separable data the gradient-descent iterates' direction converges to the maximum-margin separator while the norm grows logarithmically. https://jmlr.org/papers/v19/18-188.html
+</References>

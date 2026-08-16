@@ -1,0 +1,383 @@
+The OLS guarantees hold only under explicit assumptions, and each assumption fails in a characteristic, diagnosable way.
+
+The module's account so far is a chain of certificates: <Ref lesson="ols">the least-squares lesson</Ref> proved existence, unbiasedness, the covariance formula, and Gauss–Markov's best-in-class verdict, each from named hypotheses, and <Ref lesson="ridge-lasso">the penalty lesson</Ref> built the first repair for one of them, the near-singular design. What stands open is the audit: on a given dataset, nothing in the fitted output says whether those hypotheses held. This lesson ties each guarantee to the assumption that pays for it, each assumption to the diagnostic that tests it, and each failure to its standard remedy.
+
+The route: the assumption-to-guarantee map and the quartet that motivates it; residual plots, with heteroscedasticity and its three remedies; collinearity, the variance-inflation identity, and the Credit-data demonstration; leverage and influence from the hat matrix; robust regression and the one-typo catastrophe; and the interpretation traps around $R^2$, p-values, and confounding.
+
+## The audit map: every guarantee names its price
+
+<Task>
+Three retrievals from <Ref lesson="ols">the least-squares lesson</Ref>, closed book, before the new material. (1) State GM1–GM3 and the conclusion each one buys. (2) Write the covariance of $\hat\beta$ and name the assumption the derivation substituted. (3) From that lesson's first exercise: write the residual vector as a function of the noise alone, and the value of $\operatorname{trace}(H)$. All three are load-bearing below.
+</Task>
+
+The Gauss–Markov story is a proof chain, and each link consumes exactly one assumption. Full column rank (GM3) buys existence and uniqueness of $\hat\beta = (X^\top X)^{-1}X^\top y$. Exogeneity (GM1, $\mathbb{E}[\varepsilon] = 0$ with the linear mean correct) buys unbiasedness. Spherical errors (GM2, $\operatorname{Cov}(\varepsilon) = \sigma^2 I$) buy the covariance formula $\sigma^2 (X^\top X)^{-1}$ and the BLUE verdict. Normality, an extra beyond Gauss–Markov, buys the exact $t$ and $F$ pivots. The chain orders the failures: a violation invalidates the guarantees at and below its own link and leaves everything above intact. That single observation organizes the whole lesson: it says precisely what each diagnostic is testing and what is lost when the test fails.
+
+<Figure
+  src="./figures/audit-map.svg"
+  alt="Four-row map connecting each OLS guarantee (existence, unbiasedness, covariance formula and BLUE, exact t and F pivots) to the assumption that pays for it (GM3, GM1, GM2, normality) and to the diagnostic that audits it (VIF, residual curvature, funnel and tracking, studentized residuals)"
+  caption="The lesson's spine: each guarantee, the assumption that pays for it, and the diagnostic that audits it. A violation costs its row and the rows below, never above."
+/>
+
+## The quartet: four datasets the printout cannot tell apart
+
+From a healthy summary table one would expect the assumptions to hold; the record shows the table cannot carry that information. The four datasets below share the fitted line $\hat y = 3 + 0.5x$, the same $R^2 = 0.67$, the same residual sum of squares: every number a regression printout reports. One satisfies the assumptions; one violates the mean model; one contains a bad response value; one hangs its entire slope on a single observation.
+
+<Figure
+  src="./figures/quartet.svg"
+  alt="Four scatterplots with the identical fitted line y = 3 + 0.5x and R squared 0.67: healthy noise, a smooth curve the line cuts through, a near-perfect line with one outlier, and ten points at one x value plus a single distant point that fixes the slope"
+  caption="Four data sets, one summary. Every diagnostic in this lesson exists because the printout cannot distinguish these panels; only plots and per-point statistics can."
+/>
+
+<Task>
+Assign each panel to a row of the audit map before reading on. One panel is the null, with nothing to fix; each of the other three realizes exactly one failure. Write the full panel-to-row mapping down, then check it against the next paragraph.
+</Task>
+
+The mapping the audit map forces: **(a)** is the null, noise around a correct line. **(b)** breaks GM1: the points trace a smooth curve the straight line cuts through, so the mean model is wrong. **(c)** holds a suspect response, one point far off an otherwise near-perfect line, the robust-regression case. **(d)** concentrates the fit in one point, ten observations at a single $x$ and one far away that fixes the slope alone, the leverage case.
+
+<KeyFact>
+The external checks divide by what they read. Residual-based diagnostics see the responses only through the fit, so they weaken exactly where the fit chases the failure: the quartet's panel (d) gives a residual plot nothing to show. Leverage and the VIF are computed from the design alone, before any response arrives, so a failure the fit absorbs is still visible to them.
+</KeyFact>
+
+## Residual plots: auditing the mean and the variance at once
+
+The audit's workhorse reads the noise directly. <Ref lesson="ols">The least-squares lesson</Ref>'s first exercise showed $r = (I - H)\,\varepsilon$: the residual vector is the noise minus the part the design can imitate. Under GM1–GM2, then, a plot of $r_i$ against the fitted values $\hat y_i$ is a structureless horizontal band: mean zero at every level, constant spread, no drift. Fitted values, not raw $y_i$, go on the horizontal axis: the normal equations make $r$ orthogonal to $\hat y$, so structure against $\hat y$ is always a finding, while residuals plotted against $y$ correlate with the axis even when nothing is wrong.
+
+<Figure
+  src="./figures/gallery.svg"
+  alt="Four residual-versus-fitted panels: a structureless band, a U-shaped curved pattern with an amber trend line, a funnel of growing spread with dashed envelope lines, and a cluster of points plus one isolated fitted value far to the right with a small residual"
+  caption="The residual gallery. Each violation leaves its own signature, and panel (d)'s signature is the absence of one: an isolated point the plot cannot indict."
+/>
+
+**Curvature (panel b)** indicts GM1: the mean model is wrong, so the fit is biased everywhere, and everything downstream (unbiasedness, the covariance formula, the pivots) is built on a misspecified target. The remedy family is transformation: polynomials, interactions, $\log x$. GM1 requires linearity *in the coefficients* only, so transformed features stay inside the OLS machinery; when no small set of transformations suffices, the systematic treatment is the spline bases of <Ref lesson="splines-gams">the next lesson</Ref>.
+
+**Tracking**, residuals that drift in slow waves when plotted in time order, indicts the no-correlation half of GM2. The coefficients survive, but positively correlated errors mean the sample carries fewer independent observations than $n$, so the covariance formula understates the true variance and every interval is too narrow. The remedies (generalized least squares, time-series error models) sit outside this course; the honest-measurement consequence, time-aware validation splits, is <Ref lesson="cross-validation-bootstrap">module 5's</Ref>.
+
+### Heteroscedasticity: the funnel breaks the error bars and only the error bars
+
+**The funnel (panel c)** indicts the equal-variance half of GM2: $\operatorname{Var}(\varepsilon_i) = \sigma_i^2$ grows with the signal, the pattern <Ref lesson="insurance-claims">the insurance study</Ref> produced from Poisson counts, where the residual spread was the square root of the fitted rate. *Heteroscedasticity* is the standard name for it.
+
+A persistent belief holds that heteroscedasticity biases the OLS coefficients. It does not. Unbiasedness was proved from GM1 alone: $\hat\beta = \beta + (X^\top X)^{-1}X^\top\varepsilon$ has mean $\beta$ for *any* noise covariance, because the expectation never touched second moments. What actually breaks is the line that did: substituting $\operatorname{Cov}(\varepsilon) = \Sigma = \operatorname{diag}(\sigma_1^2, \dots, \sigma_n^2)$ instead of $\sigma^2 I$ into $\operatorname{Cov}(A\varepsilon) = A\Sigma A^\top$ gives
+
+$$
+\operatorname{Cov}(\hat\beta) = (X^\top X)^{-1} X^\top \Sigma\, X\, (X^\top X)^{-1},
+$$
+
+the **sandwich**, which collapses to $\sigma^2(X^\top X)^{-1}$ exactly when $\Sigma = \sigma^2 I$. Every standard error, $t$-statistic, and confidence interval computed from the textbook formula is therefore wrong, typically too confident where the noise is loud, and the BLUE verdict is forfeit, since a weighting scheme now beats equal weighting. The discriminating picture: across repeated samples from a funnel, the fitted slopes still average to the truth; it is the printed error bars, not the coefficients, that lie.
+
+Three remedies, ordered from data fix to formula fix:
+
+- **Transform the response.** Spread proportional to level is multiplicative noise, $y = f(x)\cdot\eta$; taking logs makes it additive with constant variance, and the funnel in the residual plot closes.
+- **Weighted least squares.** With known or modeled variances, minimize $\sum_i w_i r_i^2$ with $w_i = 1/\sigma_i^2$. The weights are not a heuristic: dividing row $i$ through by $\sigma_i$ yields a model satisfying GM1–GM3 exactly, so OLS on the rescaled data (which is WLS on the original) is BLUE under heteroscedasticity. The closing derivation exercise carries this out from the likelihood.
+- **Robust (sandwich) standard errors.** Keep the OLS point estimates and repair only the reported uncertainty: plug $\operatorname{diag}(\hat r_1^2, \dots, \hat r_n^2)$ into the sandwich in place of $\Sigma$, following [White (1980)](https://www.jstor.org/stable/1912934). No variance model required.
+
+<KeyFact>
+The three remedies rank by what they claim to know about the variance: the log transform asserts a law (spread proportional to level), WLS asserts the individual $\sigma_i$, the sandwich asserts nothing and repairs only the reported uncertainty. When the mean–variance relation is structural rather than accidental, as with counts, the right category is none of these: <Ref lesson="glm">the GLM lesson</Ref> asserts the law itself, which is where <Ref lesson="insurance-claims">the insurance study's funnel</Ref> was finally resolved.
+</KeyFact>
+
+## Collinearity: the valley where coefficients lose their identity
+
+GM3's exact failure (duplicated columns, $p > n$) closed <Ref lesson="ols">the least-squares lesson</Ref>; the common disease is the near-failure, *multicollinearity*: predictors nearly linearly dependent, $(X^\top X)^{-1}$ existing but enormous. The failure is visible at hand-computation scale.
+
+<Example title="a 2% wiggle in y flips a sign">
+Two features, no intercept: $x_1 = (1, 2, 3)$ and $x_2 = (1.01,\ 2,\ 2.99)$, nearly proportional. Then
+
+$$
+X^\top X = \begin{pmatrix} 14 & 13.98 \\ 13.98 & 13.9602 \end{pmatrix},
+\qquad
+\det(X^\top X) = 14 \times 13.9602 - 13.98^2 = 0.0024 ,
+$$
+
+so the inverse divides by $0.0024$ and magnifies everything. For $y = (2, 4, 6)$, solving the normal equations gives $\hat\beta = (2, 0)$. Move the response to $y = (2,\ 4.1,\ 5.9)$, where no target changes by more than $0.1$, and the same solve gives $\hat\beta = (-3, 5)$: the first coefficient swung from $2$ to $-3$ and flipped sign. The fitted values barely moved (fit B predicts $(2.05, 4, 5.95)$), and the **sum** $\hat\beta_1 + \hat\beta_2 = 2$ in both fits. The data pin the combined effect precisely and the split between the twins not at all.
+</Example>
+
+The geometry behind the arithmetic is the shape of the RSS surface. With orthogonal predictors the contours are a bowl and the minimum is sharp; correlation stretches the bowl into a valley; near-duplication into a canyon whose floor is almost flat along $\beta_1 + \beta_2 = \text{const}$, so tiny data changes slide the minimizer far along it.
+
+<FigureSequence
+  name="valley"
+  alt="Three frames of RSS contours in the coefficient plane: circular contours for orthogonal predictors, elongated ellipses for correlated predictors, and an extreme canyon for near-duplicate predictors with the near-optimal set stretched along the line beta1 plus beta2 constant"
+  caption="One RSS surface family, three designs. The amber contour is the set of coefficient pairs the data cannot tell apart; only its shape changes between frames. Inspired by ISLP Fig. 3.15."
+/>
+
+<Task>
+Step through the three frames watching only the amber contour: a dot, a dash, a floor. Then verify the worked example against frame 3: both of its solutions, $(2,0)$ and $(-3,5)$, sit on the same canyon floor $\beta_1 + \beta_2 = 2$.
+</Task>
+
+### The variance-inflation identity
+
+The valley has an exact per-coefficient price, and it factorizes into the correlation's contribution.
+
+<Theorem title="variance inflation">
+Under GM1–GM3, for a model with intercept, the variance of the $j$-th coefficient is
+
+$$
+\operatorname{Var}(\hat\beta_j) = \frac{\sigma^2}{(1 - R_j^2) \sum_i (x_{ij} - \bar x_j)^2},
+$$
+
+where $R_j^2$ is the $R^2$ from regressing $x_j$ on all the other predictors.
+
+<Proof>
+Let $z_j$ be the residual vector from regressing column $x_j$ on the remaining columns (intercept included), so $z_j$ is orthogonal to every other column and $x_j = z_j + (\text{fitted part})$. Two applications of the projection facts from <Ref lesson="ols">the least-squares lesson</Ref>: first, $z_j^\top \hat y = \hat\beta_j\, z_j^\top x_j = \hat\beta_j \lVert z_j \rVert^2$, since $z_j$ kills every other column's term and $z_j^\top x_j = z_j^\top z_j$; second, $z_j^\top y = z_j^\top \hat y$, since $z_j$ lies in the column space and $r \perp \operatorname{col}(X)$. Together,
+
+$$
+\hat\beta_j = \frac{z_j^\top y}{\lVert z_j \rVert^2},
+\qquad
+\operatorname{Var}(\hat\beta_j) = \frac{z_j^\top (\sigma^2 I)\, z_j}{\lVert z_j \rVert^4} = \frac{\sigma^2}{\lVert z_j \rVert^2} .
+$$
+
+Only the part of $x_j$ the other predictors cannot imitate identifies $\hat\beta_j$. Finally, $\lVert z_j \rVert^2$ is the RSS of the auxiliary regression, which by the definition of its $R^2$ equals $(1 - R_j^2)\sum_i (x_{ij} - \bar x_j)^2$. ∎
+</Proof>
+</Theorem>
+
+<Definition title="variance inflation factor">
+The **variance inflation factor** of predictor $j$ is
+$$
+\operatorname{VIF}_j = \frac{1}{1 - R_j^2} ,
+$$
+the factor by which $\operatorname{Var}(\hat\beta_j)$ exceeds its value in an uncorrelated design of the same column variance. $\operatorname{VIF}_j = 1$ means no shared variance; the conventional flags are $5$ ($R_j^2 = 0.8$) to $10$ ($R_j^2 = 0.9$); the standard error inflates by $\sqrt{\operatorname{VIF}_j}$.
+</Definition>
+
+Computing it needs no new machinery: one auxiliary regression per predictor, read off its $R^2$. The correlation matrix is the cheaper first look, but it misses dependence spread across three or more variables; hence *multi*collinearity, and hence the VIF.
+
+### The Credit demonstration: a 12× standard error
+
+ISLP's Credit data (400 simulated cardholder records of balance, age, credit limit, and credit rating, where limit and rating track each other almost perfectly) makes the identity concrete. Regressing balance on `age` and `limit` gives a limit coefficient of $0.173$ with standard error $0.005$: $t = 34.5$, unambiguous. Swap `age` for `rating` and the limit coefficient becomes $0.025$ with standard error $0.064$: the standard error **grew 12-fold**, and the p-value rose from below $10^{-4}$ to $0.70$. The same predictor, on the same responses, went from the model's strongest variable to statistically invisible, because `rating` can imitate it.
+
+Fitting all three predictors at once, the reported VIFs are $1.01$ for age and about $160$ for limit and rating each; dropping `rating` costs almost nothing the data can see, moving $R^2$ from $0.754$ to $0.750$.
+
+<Exercise>
+Check the Credit numbers against the identity: from the two standard errors $0.005$ and $0.064$, compute the implied variance ratio and the implied $R_j^2$ of limit on rating (treating the designs as comparable), and compare with the reported VIF of about $160$.
+
+<Solution>
+The variance ratio is $(0.064/0.005)^2 = 12.8^2 \approx 164$, consistent with the reported $\operatorname{VIF} \approx 160$ for limit. The implied auxiliary fit: $1/(1 - R_j^2) = 164$ gives $R_j^2 \approx 0.994$: rating reproduces limit to within half a percent of its variance, which is why their split is unidentifiable. The transferable move: SE ratios square into variance ratios, and a VIF is only an $R^2$ wearing different units.
+</Solution>
+</Exercise>
+
+Three remedies, in increasing order of machinery. **Drop** one variable of the cluster: the survivor absorbs the shared effect (its meaning changes accordingly), and the fit barely moves, as the Credit numbers show. **Combine** the cluster into one feature: a sum, an index, or a principal component (<Ref lesson="pca">module 8's machinery</Ref>). **Ridge**: <Ref lesson="ridge-lasso">the penalty lesson</Ref>'s estimator adds $\lambda$ to every eigenvalue of $X^\top X$, which is precisely a floor under the canyon: the flat direction is the small-eigenvalue direction ridge shrinks hardest, and the variance reduction is bought with the bias that lesson priced.
+
+<KeyFact>
+Multicollinearity damages inference and interpretation, not necessarily prediction: the fitted surface is stable wherever the data support it, so test error can be fine while every individual coefficient, standard error, and p-value is untrustworthy. "Holding the others fixed" describes a counterfactual the data never exhibit.
+</KeyFact>
+
+## Leverage: the design's own diagnostic
+
+Residual plots audit the noise; the design itself can concentrate the fit in single rows, and the object that measures this is already built. From <Ref lesson="ols">the least-squares lesson</Ref>, $\hat y = Hy$ with $H = X(X^\top X)^{-1}X^\top$, so $\hat y_i = \sum_j h_{ij} y_j$: row $i$ of the hat matrix says whose responses shape observation $i$'s fitted value.
+
+<Definition title="leverage">
+The **leverage** of observation $i$ is $h_{ii}$, the $i$-th diagonal entry of the hat matrix: the weight of $y_i$ in its own fitted value, $h_{ii} = \partial \hat y_i / \partial y_i$. With an intercept, $1/n \le h_{ii} \le 1$, and $\sum_i h_{ii} = \operatorname{trace}(H) = p$, so the average leverage is $p/n$; the working flags are $2p/n$ to $3p/n$. In simple regression,
+$$
+h_{ii} = \frac{1}{n} + \frac{(x_i - \bar x)^2}{\sum_l (x_l - \bar x)^2} :
+$$
+leverage grows quadratically with distance from $\bar x$, and depends on the design only; no response enters.
+</Definition>
+
+<Example title="one far-out x owns its own fit">
+Simple regression on $x = (1, 2, 3, 4, 10)$: $n = 5$, $p = 2$, $\bar x = 4$, $\sum_l (x_l - \bar x)^2 = 9 + 4 + 1 + 0 + 36 = 50$. For the point at $x = 10$,
+$$
+h = \frac{1}{5} + \frac{36}{50} = 0.2 + 0.72 = 0.92 .
+$$
+Against an average of $p/n = 0.4$ and a flag at $2p/n = 0.8$, this point is far over: $92\%$ of its fitted value is its own response, so the line passes near it almost regardless of the other four points.
+</Example>
+
+<Exercise>
+For the same $x = (1, 2, 3, 4, 10)$, compute all five leverages, verify they sum to $p = 2$, and apply the $2p/n$ flag. Write the formula's two terms separately before adding.
+
+<Solution>
+$h_i = \tfrac15 + (x_i - 4)^2/50$ gives
+$$
+h = \bigl(0.2 + \tfrac{9}{50},\ 0.2 + \tfrac{4}{50},\ 0.2 + \tfrac{1}{50},\ 0.2 + 0,\ 0.2 + \tfrac{36}{50}\bigr) = (0.38,\ 0.28,\ 0.22,\ 0.20,\ 0.92).
+$$
+Sum: $2.00 = p$, the trace identity from <Ref lesson="ols">the least-squares lesson</Ref> observed numerically. Only $x = 10$ exceeds the $0.8$ flag. Note what the sum implies: leverage is a budget: one point can hold $h_{ii} \approx 1$ only by taking it from the rest.
+</Solution>
+</Exercise>
+
+### Outlier is not influence, and the fit hides its own suspects
+
+An *outlier* is unusual in $y$: a response far off the trend. High leverage is unusual in $x$. *Influence*, actually changing the coefficients, requires both at once, and the four combinations behave differently enough that conflating them misdirects the audit.
+
+<Figure
+  src="./figures/leverage-grid.svg"
+  alt="Four panels each showing eight fixed points with their dashed fitted line plus one added amber point: added in the middle on trend (fit unchanged), middle off trend (intercept shifts, slope survives), far right on trend (fit unchanged but the point holds a veto), far right off trend (the slope collapses from 0.41 to 0.17)"
+  caption="One added point, four fates. Only the high-leverage, large-residual combination rewrites the slope; the middle outlier mainly inflates σ̂ and every error bar with it."
+/>
+
+Reading residuals raw misses exactly the dangerous cell. Since $r = (I - H)\varepsilon$, the residual variances are $\operatorname{Var}(r_i) = \sigma^2 (1 - h_{ii})$: high-leverage points get *automatically small* residuals, because the fit chases them. The comparable quantity is the **studentized residual** $t_i = r_i / (\hat\sigma\sqrt{1 - h_{ii}})$, with $|t_i| > 3$ the conventional outlier flag; the combined ranking is [Cook's distance](https://www.jstor.org/stable/1268249) $D_i = (t_i^2/p) \cdot h_{ii}/(1 - h_{ii})$, large only when residual and leverage are both substantial.
+
+The protocol for a flagged point is *investigate before deleting*: a transcription error is fixed with cause, a genuine extreme is information about the tail, and silent deletion is unreported model surgery.
+
+## Robust regression: pricing the catastrophe
+
+Deletion is manual; robust losses automate the down-weighting, and the likelihood reading from <Ref lesson="mle-map">the estimation module</Ref> says exactly what is being traded. Least squares is maximum likelihood under Gaussian noise, and the Gaussian's thin tails are the vulnerability: a squared penalty lets one absurd point outbid any number of sane ones. Replace the noise model with a heavy-tailed density and the same machinery produces estimators that refuse the bid.
+
+### The potoroo typo: one keystroke, a quarter of the slope
+
+The canonical demonstration is Casella and Berger's potoroo experiment. In measurements of CO₂ against O₂ concentrations in the pouches of 23 potoroos (a rabbit-sized Australian marsupial), the least-squares line is $\hat y = 18.67 - 0.89x$ and the *least absolute deviations* (LAD) line (minimize $\sum_i |r_i|$ instead of $\sum_i r_i^2$) is $18.59 - 0.89x$: indistinguishable.
+
+Then one data-entry slip: animal 15's oxygen value $18$ typed as $10$. The least-squares line becomes $6.41 - 0.23x$: **the slope cut to a quarter** by a single keystroke, with $R^2$ collapsing from $0.93$ to $0.27$. LAD moves only to $15.95 - 0.75x$.
+
+<Figure
+  src="./figures/potoroo.svg"
+  alt="Two scatterplots of CO2 versus O2 for 23 potoroos: on the original data the least-squares and LAD lines coincide at slope minus 0.89; with one point mistyped from (18, 2.6) to (10, 2.6) the least-squares slope collapses to minus 0.23 while LAD gives minus 0.75 and a Huber M-estimate minus 0.68"
+  caption="The one-typo catastrophe (Casella & Berger, Table 12.4.1). Least squares follows the typo; the absolute-error and Huber fits stay with the 22 honest points."
+/>
+
+<Task>
+Locate the typo point in the right panel and compute its leverage before reading on. The corrupted design has $n = 23$, mean $\bar x \approx 18$, and $\sum_l (x_l - \bar x)^2 \approx 85.6$; the typo sits at $x = 10$. Apply the simple-regression formula for $h_{ii}$ and compare the result with the average $p/n$.
+</Task>
+
+The audit's verdict on the typo: it sits $8$ units from the corrupted mean, so $h = 1/23 + 7.98^2/85.6 = 0.79$, against an average of $2/23 \approx 0.09$. High leverage and a large deviation from the trend: the influential cell of the previous section's grid, realized.
+
+### Breakdown: the median's protection stops at the design
+
+Least squares generalizes the mean (the minimizer of $\sum(y_i - m)^2$), LAD the median, and the location theory prices the difference through the **breakdown value**: the fraction of arbitrarily corrupted data an estimator tolerates before it can be dragged anywhere. The mean's is $0\%$, one bad value moving it without bound; the median's is $50\%$.
+
+In regression the inheritance is conditional. Least squares keeps breakdown $0\%$. LAD inherits genuine protection against corrupted *responses*: in a fixed, well-spread design, no small minority of bad $y$-values moves the line far. But that is a location result, and it stops at the design: a single point of high enough leverage drags the LAD line too, arbitrarily far as the point moves out.
+
+Since nothing prevents a corrupting point from arriving at such leverage, Rousseeuw & Leroy (1987) put LAD's overall regression breakdown at $1/n$, effectively $0\%$. The potoroo panel already showed the mechanism at benign scale: one corrupted point in 23, at leverage $0.79$, moved the LAD slope from $-0.89$ to $-0.75$.
+
+The price of the median analogy does transfer: under genuinely Gaussian errors, LAD's asymptotic efficiency relative to least squares is $2/\pi \approx 64\%$, the same ratio as median to mean, so the $y$-robustness costs about a third of the sample.
+
+### The loss menu: every loss is a noise model
+
+The modern menu interpolates between the poles, and each entry is a noise model:
+
+| noise model | per-residual loss | estimator |
+|---|---|---|
+| Gaussian | $r^2/2$ | least squares |
+| Laplace | $\lvert r \rvert$ | LAD |
+| Student-$t$ | bounded-influence NLL | robust regression |
+| (loss-first) | Huber: $r^2/2$ for $\lvert r\rvert \le \delta$, then linear | M-estimate |
+
+The [Huber loss](https://en.wikipedia.org/wiki/Huber_loss), quadratic inside a threshold $\delta$ and linear beyond it, keeps least-squares efficiency on the inliers and LAD's bounded pull on the outliers, and is differentiable everywhere, so ordinary gradient methods fit it. On the potoroo typo it lands between the poles: $14.67 - 0.68x$.
+
+Computer vision's alternative, RANSAC, reaches robustness by consensus instead of loss shape: fit small random subsets, keep the model most points agree with. Consensus is indifferent to how far a dissenting point sits, in $x$ as much as in $y$, which is how RANSAC and the high-breakdown estimators (least median of squares, least trimmed squares) escape the leverage ceiling that binds every per-residual loss.
+
+<KeyFact>
+Run the leverage screen before choosing the loss: $h_{ii}$ is set by the design alone, before any response arrives, so no loss function changes which rows can own their fitted values. The loss decides how a suspect response is weighed; only the design audit decides whether one row was ever in a position to dictate the fit.
+</KeyFact>
+
+## Interpretation traps: what a healthy table does not certify
+
+The audit so far tests assumptions; the final discipline is about reading the numbers even when every assumption holds. Three traps account for most misreadings in practice.
+
+### R² rises by construction
+
+With an intercept, total variation splits as $\sum_i (y_i - \bar y)^2 = \sum_i (\hat y_i - \bar y)^2 + \operatorname{RSS}$, and $R^2 = 1 - \operatorname{RSS}/\operatorname{TSS}$ is the explained fraction. It cannot judge model additions:
+
+<Theorem title="R² never decreases when features are added">
+If model B contains all features of model A plus extra ones, then $R^2_B \ge R^2_A$ on the training data.
+
+<Proof>
+The models are nested: every fit available to A is available to B with the extra coefficients set to zero, so minimizing RSS over the superset gives $\operatorname{RSS}_B \le \operatorname{RSS}_A$, while TSS depends only on $y$. ∎
+</Proof>
+</Theorem>
+
+The theorem rigs every $R^2$ comparison in favor of the larger model: pure-noise features rate as progress. The *adjusted* version, $\bar R^2 = 1 - (1 - R^2)\frac{n-1}{n-p}$, replaces the sums of squares by degrees-of-freedom-corrected variance estimates and falls when a feature's contribution is below chance level. It is still an in-sample heuristic; the honest arbiter of model comparisons is held-out error, by <Ref lesson="cross-validation-bootstrap">module 5's</Ref> protocols.
+
+<Figure
+  src="./figures/r2-inflation.svg"
+  alt="R squared and adjusted R squared plotted against the number of pure-noise features added to a fixed 50-observation regression: R squared climbs steadily while adjusted R squared declines"
+  caption="Junk features added to a fixed regression (n = 50): R² climbs by construction; adjusted R² charges a degree of freedom per feature and falls."
+/>
+
+And a high $R^2$ certifies nothing about form: the quartet that opened this lesson holds $R^2 = 0.67$ across a correct model, a curved one, a corrupted one, and a one-point one. [Anscombe (1973)](https://www.jstor.org/stable/2682899) built the original four for exactly this argument.
+
+### Confounding: credit assigned to the wrong predictor
+
+In ISLP's Advertising data (product sales against TV, radio, and newspaper budgets in 200 markets), newspaper alone predicts sales: coefficient $0.055$, $t = 3.3$, $p = 0.001$. Add TV and radio to the regression and the newspaper coefficient becomes $-0.001$ with $p = 0.86$. No contradiction: markets that spend on radio also spend on newspaper (correlation $0.35$), so in the simple regression newspaper collected credit for radio's effect. The multiple regression, holding radio fixed, reveals it had none of its own.
+
+The trap generalizes beyond advertising. A regression of shark attacks on ice-cream sales at a beach shows a solid positive coefficient; temperature drives both, and entering it kills the ice-cream term.
+
+The variable doing the driving is a *confounder*, and the pattern has a warning attached: the fix worked here because the confounder was **measured**. An unmeasured confounder leaves the same bias in place with nothing in the fitted output to flag it: no residual plot, no VIF, no $R^2$ detects a variable that is absent. Causal conclusions need more than a regression; this course states the boundary and stays on the predictive side of it.
+
+### Significant, causal, important: three separate claims
+
+A small p-value says the coefficient is *detectable at this sample size*: with $n$ large enough, every nonzero association clears the bar, however tiny. Importance is a claim about magnitude against costs, read from the coefficient's size in the units that matter, never from its p-value. And causal is a claim about interventions, which the confounding examples just priced. The three certify one another in no direction.
+
+What stands established: every OLS guarantee is tied to a testable assumption (curvature tests the mean model, the funnel and tracking test the error covariance, VIF prices the design's redundancy, leverage locates its concentration), and each failure has a named remedy, from transformations and WLS through ridge to robust losses. The one failure this lesson patched only locally is nonlinearity itself; <Ref lesson="splines-gams">the next lesson</Ref> makes it the subject, replacing $x$ with spline bases so that the same least-squares machinery fits curves with a controlled variance bill. <Ref lesson="prostate-study">The module's case study</Ref> then puts every estimator built so far on one table.
+
+## Exercises
+
+<Exercise>
+Warm-up. A predictor's auxiliary regression on its colleagues gives $R_j^2 = 0.9$; a second predictor's gives $R_j^2 = 0.99$. Compute both VIFs and the factor by which each standard error is inflated, and state which conventional flag each crosses.
+
+<Solution>
+$\operatorname{VIF} = 1/(1 - 0.9) = 10$ and $1/(1 - 0.99) = 100$. Standard errors inflate by the square roots: $\sqrt{10} \approx 3.2$ and $10$. The first sits exactly at the aggressive end of the conventional $5$–$10$ flag; the second is far beyond any threshold: its $t$-statistic is a tenth of what the same data would give in an uncorrelated design, so a genuinely strong predictor can print as noise.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. Suppose observation $i$ has $h_{ii} = 1$. Show that the fit passes through it exactly (that is, $\hat y_i = y_i$ for every response vector), so its residual is identically zero. Conclude that no residual-based diagnostic can ever flag this point, and name what to use instead. Hint: $H$ is symmetric and idempotent, so $h_{ii} = \sum_j h_{ij}^2$.
+
+<Solution>
+From symmetry and idempotence, $h_{ii} = (H^2)_{ii} = \sum_j h_{ij}h_{ji} = \sum_j h_{ij}^2 = h_{ii}^2 + \sum_{j \ne i} h_{ij}^2$, so $h_{ii}(1 - h_{ii}) = \sum_{j \ne i} h_{ij}^2 \ge 0$, which incidentally proves $0 \le h_{ii} \le 1$ in general. At $h_{ii} = 1$ the left side is zero, forcing $h_{ij} = 0$ for every $j \ne i$; then $\hat y_i = \sum_j h_{ij} y_j = y_i$ exactly, whatever the responses. The residual is $0$ by construction, its variance $\sigma^2(1 - h_{ii}) = 0$ agrees, and the studentized residual is $0/0$: raw and studentized residuals are structurally blind here. What still works: the leverage itself ($h_{ii} = 1$ is maximal and $\operatorname{trace}(H) = p$ says the point has consumed an entire parameter), and the *deleted* residual $y_i - \hat y_{(-i),i}$, computed by refitting without the point: the fit was reproducing $y_i$, not validating it, and only removal reveals which.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Heteroscedasticity biases the OLS coefficients, so a funnel-shaped residual plot means the fitted slope cannot be trusted." Name the exact step of the OLS analysis that fails under heteroscedasticity and the steps that do not, using the audit map.
+
+<Solution>
+The claim is false at the word "biases". Unbiasedness sits on the audit map's GM1 row: the derivation $\hat\beta = \beta + (X^\top X)^{-1}X^\top\varepsilon$, $\mathbb{E}[\hat\beta] = \beta$ uses only $\mathbb{E}[\varepsilon] = 0$ and never touches second moments, so a funnel leaves the slope unbiased (and consistent). What the funnel breaks is the GM2 row: the substitution $\operatorname{Cov}(\varepsilon) = \sigma^2 I$ in the covariance derivation, hence the formula $\sigma^2(X^\top X)^{-1}$, hence every standard error, $t$, p-value, and interval computed from it, and with them the BLUE verdict, since WLS now has smaller variance. The correct reading of the funnel: the slope estimate is trustworthy on average; the printed uncertainty about it is not. Remedies in order: transform, WLS if variances are known or modeled, sandwich standard errors if only inference needs repair.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson skipped. Let $y_i = x_i^\top \beta + \varepsilon_i$ with independent $\varepsilon_i \sim \mathcal{N}(0, \sigma_i^2)$ and the $\sigma_i^2$ known. Derive the maximum-likelihood estimator of $\beta$, show it minimizes a weighted RSS, and show it equals OLS on the rescaled data $\tilde y_i = y_i/\sigma_i$, $\tilde x_i = x_i/\sigma_i$. State why the rescaled problem satisfies GM1–GM2, and what that implies.
+
+<Solution>
+The log-likelihood is
+$$
+\ell(\beta) = -\tfrac12 \sum_i \log(2\pi\sigma_i^2) - \tfrac12 \sum_i \frac{(y_i - x_i^\top\beta)^2}{\sigma_i^2} ,
+$$
+and only the second sum involves $\beta$: maximizing $\ell$ is minimizing $\sum_i w_i (y_i - x_i^\top\beta)^2$ with $w_i = 1/\sigma_i^2$: weighted least squares, each observation weighted by its precision. Substituting $\tilde y_i = y_i / \sigma_i$ and $\tilde x_i = x_i/\sigma_i$ turns each term into $(\tilde y_i - \tilde x_i^\top \beta)^2$: the WLS objective is exactly the OLS objective on the rescaled data. The rescaled noise is $\tilde\varepsilon_i = \varepsilon_i / \sigma_i$ with mean $0$ and variance $\sigma_i^2/\sigma_i^2 = 1$ for every $i$: GM1 and GM2 hold exactly. Gauss–Markov then applies to the rescaled problem, so WLS is BLUE for $\beta$ under heteroscedasticity with known variance structure, the guarantee plain OLS forfeits. The transferable move: a heteroscedastic model is a homoscedastic model wearing row-dependent units, and the weights are the unit conversion.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. <Ref lesson="insurance-claims">Module 2's insurance study</Ref> fitted a Gaussian linear model to claim counts and found residual standard deviations of $0.16$ in the lowest fifth of fitted values and $0.61$ in the highest. (a) Diagnose from this lesson's audit map: which assumption, which guarantee, which plot. (b) The remedies section offers transformations and WLS; module 2 offered a different fix. Say why the Poisson GLM beats a variance-stabilizing transformation for this data.
+
+<Solution>
+(a) The fourfold widening of residual spread with fitted level is heteroscedasticity: the funnel, seen numerically instead of visually. On the audit map it sits on the GM2 row: unbiasedness survives, the covariance formula and BLUE die, and every error bar of the Gaussian fit is wrong (overconfident where claims are frequent). The plot is residuals against fitted values.
+
+(b) For counts, the funnel is not a nuisance but a law: $\operatorname{Var}(y \mid x) = \lambda(x)$ is the Poisson identity, so the "violation" is structure the model should assert, not patch away. A transformation like $\sqrt{y}$ only approximately stabilizes the variance, wrecks the scale (predictions of $\sqrt{\text{claims}}$ retransform with bias), and does nothing about the Gaussian's mass on negative counts; WLS needs weights $1/\sigma_i^2 = 1/\lambda_i$, which depend on the very means being estimated; iterating that dependency is precisely the IRLS loop of <Ref lesson="glm">the GLM lesson</Ref>. The Poisson GLM is the fixed point of the patches: it models the mean–variance law exactly, keeps rates positive through the log link, and scores itself with the deviance rather than a squared error the noise model contradicts.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. Reproduce the Credit collinearity flip. Download the Credit data from [the ISLP site](https://www.statlearning.com) (Data Sets section), and fit two regressions of `Balance`: on {`Age`, `Limit`} and on {`Rating`, `Limit`}. Report the limit coefficient and its standard error in both, the SE ratio, and the VIFs in the three-predictor model. State in advance what counts as agreement: SE ratio within $10\%$ of ISLP's $12.8$, and limit's p-value in the second model above $0.5$.
+
+<Solution>
+The standard errors of $\hat\beta$ come from $\hat\sigma^2 (X^\top X)^{-1}$: fit each model (`lstsq`), compute $\hat\sigma^2 = \operatorname{RSS}/(n - p)$ with $n = 400$, $p = 3$, and take square roots of the diagonal. Expected results, matching ISLP Table 3.11: model 1 gives limit $\approx 0.173$ with SE $\approx 0.005$ ($t \approx 34$); model 2 gives limit $\approx 0.025$ with SE $\approx 0.064$, $p \approx 0.70$, an SE ratio of $\approx 12.8$, squaring to a variance inflation of $\approx 164$. The three-predictor VIFs come from the three auxiliary regressions: $\approx 1.01$ for age, $\approx 160$ for limit and for rating. Agreement by the stated criterion confirms both the identity ($\operatorname{VIF} \approx$ the squared SE ratio) and its cause: $R^2 \approx 0.994$ for limit regressed on rating. The failure mode to check if numbers disagree: unstandardized columns are fine here (VIF is scale-invariant), but dropping rows with missing values or including the intercept twice will shift every figure.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. For a linear smoother, the leave-one-out (LOO) residual has a shortcut: prove that
+$$
+y_i - \hat y_{(-i),i} = \frac{r_i}{1 - h_{ii}} ,
+$$
+where $\hat y_{(-i),i}$ is the prediction at $x_i$ of the model fitted without observation $i$. Hint: consider fitting the full model to the modified response vector $\tilde y$ that replaces $y_i$ by $\hat y_{(-i),i}$. Then apply it: for the mistyped potoroo data, the typo point has $r_i = -1.52$ and $h_{ii} = 0.787$; compute its LOO residual and compare with the ordinary residual.
+
+<Solution>
+Let $\beta_{(-i)}$ be the fit without observation $i$, and let $\tilde y$ equal $y$ except $\tilde y_i = \hat y_{(-i),i}$. The OLS objective on $\tilde y$ splits as $\sum_{j \ne i}(\tilde y_j - x_j^\top\beta)^2 + (\hat y_{(-i),i} - x_i^\top \beta)^2$; the candidate $\beta_{(-i)}$ minimizes the first sum by definition and zeroes the second term, so it minimizes the whole objective: the full fit to $\tilde y$ *is* the deleted fit. Applying the hat matrix to $\tilde y$ at row $i$:
+$$
+\hat y_{(-i),i} = (H\tilde y)_i = \sum_j h_{ij} y_j - h_{ii} y_i + h_{ii}\, \hat y_{(-i),i} = \hat y_i - h_{ii} y_i + h_{ii}\, \hat y_{(-i),i} ,
+$$
+and solving for $\hat y_{(-i),i}$ gives $\hat y_{(-i),i} = (\hat y_i - h_{ii} y_i)/(1 - h_{ii})$, hence $y_i - \hat y_{(-i),i} = (y_i - \hat y_i)/(1 - h_{ii}) = r_i/(1 - h_{ii})$.
+
+On the potoroo typo: $-1.52 / (1 - 0.787) = -7.13$, against an ordinary residual of $-1.52$. The deleted fit (which is essentially the clean 22-point line, $18.67 - 0.89x$) predicts $9.73$ at $x = 10$, and $2.6 - 9.73 = -7.13$ checks. The fit's own residual understated the point's misfit almost fivefold, because the point had dragged the line toward itself; the deleted residual is the honest number.
+
+The identity is more than a diagnostic: it computes all $n$ leave-one-out errors from a *single* fit, at no extra cost. That shortcut is the engine that makes leave-one-out cross-validation cheap for linear smoothers, and <Ref lesson="cross-validation-bootstrap">module 5's resampling lesson</Ref> runs on it.
+</Solution>
+</Exercise>
+
+<References>
+1. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §3.3.3, "Potential Problems": the six-problem audit (non-linearity, correlated errors, heteroscedasticity, outliers, leverage, collinearity) with the residual-plot figures, the Credit collinearity demonstration (Table 3.11, Fig. 3.15, the VIF), and §3.2.2: the Advertising newspaper flip and the shark-attack confounder. Free online: https://www.statlearning.com/
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §3.2: coefficient Z-scores, the variance formula, and correlated-predictor behavior on the prostate data; Algorithm 3.1 (successive orthogonalization) is the general form of the variance-inflation proof's residual-regression step. Free online: https://hastie.su.domains/ElemStatLearn/
+3. G. Casella, R. L. Berger, *Statistical Inference*, 2nd ed., Duxbury, 2002 — §12.4: robust regression, the potoroo data (Table 12.4.1, Fig. 12.4.1), breakdown values, the LAD asymptotics giving the $2/\pi$ efficiency, and the regression M-estimator; §11.3: the Gaussian linear model's inference.
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §11.6: robust linear regression as likelihood replacement — Laplace, Student-$t$, the Huber loss, RANSAC. Free online: https://probml.github.io/pml-book/book1.html
+5. F. J. Anscombe, "Graphs in Statistical Analysis," *The American Statistician* 27(1), 1973, pp. 17–21 — the original quartet: identical regression summaries, four datasets. https://www.jstor.org/stable/2682899
+6. H. White, "A Heteroskedasticity-Consistent Covariance Matrix Estimator and a Direct Test for Heteroskedasticity," *Econometrica* 48(4), 1980, pp. 817–838 — the sandwich estimator behind robust standard errors. https://www.jstor.org/stable/1912934
+7. R. D. Cook, "Detection of Influential Observation in Linear Regression," *Technometrics* 19(1), 1977, pp. 15–18 — the deletion-based influence measure. https://www.jstor.org/stable/1268249
+8. P. J. Rousseeuw, A. M. Leroy, *Robust Regression and Outlier Detection*, Wiley, 1987 — Ch. 1: the breakdown point in the regression setting; a single leverage point breaks LAD and the other M-estimators ($1/n$), and the least-median-of-squares and least-trimmed-squares estimators recover $50\%$.
+</References>

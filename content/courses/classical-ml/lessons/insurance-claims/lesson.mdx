@@ -1,0 +1,285 @@
+On 678,000 real French motor-insurance policies — 94% of them with zero claims — ridge regression predicts negative claim counts and squared error ranks it above the model that cannot; the GLM framework exists for exactly this data.
+
+Module 2 is now complete on paper: <Ref lesson="mle-map">the likelihood lesson</Ref> made "write the log-likelihood, solve the score equation" the universal estimator recipe, <Ref lesson="fisher-information">the information lesson</Ref> put a floor under what any such estimator can achieve, <Ref lesson="gradient-descent">the optimization lesson</Ref> supplied the solvers, and <Ref lesson="glm">the GLM lesson</Ref> assembled all of it into a model factory whose Poisson branch was built for count data it had not yet seen.
+
+This lesson is the module's application — the published insurance-claims study from Murphy's *Probabilistic Machine Learning* (§12.5), run start to finish. The result habit resists most is the one that decides the outcome: the evaluation metric belongs to the model family, not to convention.
+
+## The portfolio: 678,000 policies, mostly silent
+
+<Task>
+Three retrievals before the data, closed book. (1) Write the Poisson deviance from <Ref lesson="glm">the GLM lesson</Ref>: $D(y, \hat\mu) = 2\sum_i [\,y_i \log(y_i/\hat\mu_i) - y_i + \hat\mu_i\,]$, with a zero-count row contributing $2\hat\mu_i$. (2) Write the universal gradient of any canonical GLM: $\sum_i (y_i - \mu_i)x_i$. (3) From that lesson's research exercise: a Gaussian on claim counts with fitted mean $0.1$ and the variance taken as $0.1$, the Poisson-matched value, puts about $38\%$ of its mass below zero. All three numbers are load-bearing below.
+</Task>
+
+The dataset is a French motor third-party-liability portfolio ([freMTPL2freq](https://www.openml.org/d/41214), the standard actuarial benchmark) of **678,013 policies**. Each row carries nine features: driver age, vehicle age and power, the bonus-malus score (the French no-claims coefficient, a running discount for claim-free years and a surcharge after claims), fuel type, vehicle brand, and the region, area code, and population density of the driver's home commune.
+
+### Policy, exposure, claim frequency
+
+Three more terms of actuarial vocabulary cover everything else this lesson needs. A *policy* is one vehicle insured for a stated period. Its *exposure* is that period's length in years, here mostly a year or less. Its *claim frequency* is the number of claims filed divided by the exposure, claims per insured year.
+
+The modeling task is to predict expected claim frequency from the features, and the task is the business: a premium must cover the expected claims of the policies that pay it, so a frequency model is a pricing engine, not a diagnostic.
+
+### The target's shape
+
+The target's shape is the whole problem. **93.9% of exposure carries zero claims**, the average frequency is 0.10 claims per year, and the tail is long. A small minority of policies file one, two, or more claims, and a claim on a short policy produces a large frequency.
+
+The support argument is cleanest on annual claim counts, so fix a policy insured for exactly one year at the portfolio rate. Its claim count is an integer, mostly $0$, occasionally $1$ or $2$, and across such policies the counts average $0.1$, which is exactly the mostly-zero count data <Ref lesson="glm">the GLM lesson</Ref>'s Poisson branch was constructed for. The study's frequency target is the exposure-weighted form of the same likelihood, the count divided by the years observed; the offset section below makes that equivalence exact, and nothing in the argument changes when it does.
+
+The two candidate noise models assert different things about the count histogram, and one assertion is checkable by eye. Take the Gaussian first, with mean $0.1$ and its variance set to $0.1$, the Poisson-matched value the previous lesson's closing exercise adopted. That distribution puts 37.6% of its probability mass on negative claim counts, outcomes no policy can produce, and it assigns probability zero to the single outcome that describes 94 of every 100 policies, because a density has no mass at a point. Fitting the variance by maximum likelihood instead of matching it makes the absurdity worse, not better. The target's honest spread is the 0.56 noise floor computed below (standard deviation 0.75), and a Gaussian that wide pushes about 45% of its mass below zero.
+
+The Poisson(0.1) puts $e^{-0.1} = 0.905$ on zero claims, $0.090$ on one, and nothing anywhere a count cannot go.
+
+<Figure
+  src="./figures/two-likelihoods.svg"
+  alt="Two panels showing the same annual claim-count histogram with 94 percent of mass at zero: on the left a Gaussian density with mean 0.1 and Poisson-matched variance 0.1 overlaid, its 37.6 percent of mass below zero shaded; on the right the Poisson pmf with stems at 0, 1, 2 matching the histogram bars"
+  caption="One count histogram, two assertions. With its variance matched to the Poisson's 0.1, the Gaussian spends over a third of its belief on impossible negative counts, and the honestly fitted, wider variance raises that share toward half; the Poisson's support is the data's."
+/>
+
+## Three models on one long-tailed target
+
+The study fits three predictors of increasing commitment, all on the same train/test split (a third of the portfolio, 223,745 policies, held out). Each is a model this module already owns.
+
+### Three fitted models
+
+**The dummy.** Predict the portfolio-average frequency, 0.10, for every policy — an insurer pricing every driver identically. This is the constant that minimizes squared error with no features at all, and it sets the floor every real model must beat.
+
+**Ridge.** Linear regression on engineered features (continuous variables binned into deciles, categoricals one-hot encoded) with a small squared-coefficient penalty for numerical stability, which is what makes it ridge rather than plain least squares (<Ref lesson="ridge-lasso">module 3</Ref> studies the penalty in its own right). Under <Ref lesson="mle-map">the likelihood lesson</Ref>'s correspondence, minimizing squared error is maximum likelihood under Gaussian noise, so this model is the left panel of the figure above, fitted per policy.
+
+**The Poisson GLM.** The same engineered features, the log link, deviance minimized; equivalently, the Poisson likelihood maximized. Its predicted rate $e^{w^\top x}$ is positive for every policy by construction.
+
+### Fitting 678k rows
+
+All three models sit inside the universal gradient of <Ref lesson="glm">the GLM lesson</Ref>: $\nabla \ell = \sum_i (y_i - \mu_i)x_i$, with only the formula for $\mu$ differing. A stochastic-gradient pass (<Ref lesson="gradient-descent">the optimization lesson</Ref>) costs one cheap update per row, so 678k rows are a few seconds of arithmetic, no matrix inversion required. The scale demands nothing this module did not already build.
+
+<Figure
+  src="./figures/claims-histograms.png"
+  alt="Four log-scale histograms of the held-out insurance test set side by side: the observed claim frequencies with a spike of over 100,000 policies at zero and a thinning tail out to 30, the dummy regressor's single bar at 0.1, ridge's narrow hump whose leftmost bin starts to the left of zero, and the Poisson regressor's right-skewed strictly positive predictions running out past 3"
+  caption="The same test set, predicted four ways. Ridge's hump straddles zero; only the Poisson GLM's predictions have the data's shape."
+/>
+
+The histograms separate the three models before any metric is computed. The dummy has no spread at all. Ridge spreads, but symmetrically about a small positive center. It fails to reach the long tail, and its left shoulder crosses zero. On the held-out set it assigns a **negative expected claim frequency to 595 real policies**. The Poisson GLM's predictions are right-skewed and strictly positive, tracking the data's shape.
+
+<KeyFact>
+Ridge's negative predictions follow from its noise model, not from any defect in the fit. A likelihood whose support includes $(-\infty, 0)$ will, fitted honestly, place predictions there. The failure was visible in the likelihood's shape before a single parameter was estimated.
+</KeyFact>
+
+## The flip: squared error cannot rank these models
+
+Fitted models need a score, and habit reaches for mean squared error. From the histograms one would expect any reasonable score to prefer the Poisson model; the record shows otherwise. Murphy's Table 12.1, on the held-out policies:
+
+| model | MSE | MAE | Poisson deviance |
+| --- | --- | --- | --- |
+| dummy | 0.564 | 0.189 | 0.625 |
+| ridge | **0.560** | **0.177** | 0.601 |
+| Poisson GLM | **0.560** | 0.186 | **0.594** |
+
+Mean squared error cannot separate ridge from the Poisson GLM at three decimals, and mean absolute error actively prefers ridge, the model that predicts impossible rates. Only the deviance column ranks the three models the way the histograms and (below) the calibration data say they should be ranked.
+
+### Why the columns disagree
+
+Three facts explain the columns. First, squared error is not model-free: <Ref lesson="glm">the GLM lesson</Ref> showed that the residual sum of squares *is* the Gaussian family's deviance, so scoring this contest by MSE is grading a count problem by the Gaussian's own rules — the wrong family judging by its own law.
+
+Second, with 94% zeros the per-policy squared error is dominated by irreducible noise. The whole column sits near 0.56 while the differences any model can achieve live in the third decimal, below the noise floor.
+
+Third, the deviance is the test-set log-likelihood in disguise (twice the gap to the saturated ceiling), so it scores each row's *asserted distribution*, not just its point prediction. It is undefined wherever $\hat\mu \le 0$, so ridge's 595 negative-rate rows are dropped from its deviance average, the published protocol's way of scoring a model on the rows where it makes sense at all.
+
+### Six rows, by hand
+
+The flip is arithmetic, and six rows make it visible. The extract below is chosen to span the portfolio (three safe policies, one average, two risky, exposure one year each), with each model behaving as it does at scale — ridge shrinking toward the mean and dipping below zero on the safest row, the Poisson GLM spreading multiplicatively.
+
+<Example title="squared error and deviance on a six-policy extract">
+Observed counts $y = (0, 0, 0, 0, 0, 1)$; ridge predicts $\hat\mu = (-0.04, 0.04, 0.10, 0.16, 0.18, 0.24)$, the Poisson GLM $\hat\mu = (0.05, 0.06, 0.10, 0.48, 0.52, 0.62)$.
+
+**Squared error**, one zero row and the claim row in full. On row 5, a silent policy, ridge pays $(0 - 0.18)^2 = 0.0324$ while the Poisson model pays $(0 - 0.52)^2 = 0.2704$. Squared error charges the Poisson model heavily for daring a high rate on a policy that stayed silent. On row 6, the realized claim, ridge pays $(1 - 0.24)^2 = 0.5776$ and the Poisson model $(1 - 0.62)^2 = 0.1444$. Summed over all six rows, ridge totals $0.6488/6 = 0.108$ against the Poisson model's $0.6613/6 = 0.110$. **Ridge wins the MSE contest.**
+
+**Deviance**, same rows. A zero-count row contributes $2\hat\mu$, so row 5 costs ridge $2(0.18) = 0.36$ and the Poisson model $2(0.52) = 1.04$ — a *linear* charge for predicted risk that did not materialize, against squared error's quadratic one. The claim row costs ridge $2[\log(1/0.24) - 1 + 0.24] = 2(1.427 - 0.76) = 1.33$ and the Poisson model $2[\log(1/0.62) - 1 + 0.62] = 2(0.478 - 0.38) = 0.20$. The count likelihood punishes calling a realized claim a $0.24$-per-year event nearly seven times harder than calling it $0.62$. Row 1 carries ridge's $\hat\mu = -0.04$, where the deviance is undefined, so the row is dropped and ridge is averaged over five rows. Totals: ridge $2.294/5 = 0.459$, Poisson $2.616/6 = 0.436$. **The Poisson GLM wins the deviance contest**, even with ridge excused from the row it disqualified itself on.
+</Example>
+
+<Figure
+  src="./figures/ranking-flip.svg"
+  alt="A six-row table of policies with observed counts, ridge and Poisson predictions, per-row squared errors and deviance contributions, and totals: MSE 0.108 versus 0.110 picking ridge, mean deviance 0.459 versus 0.436 picking the Poisson model, with ridge's negative first-row prediction marked as dropped"
+  caption="The flip on six rows. Squared error's verdict and the likelihood's verdict disagree, and row 6, the realized claim, is where the likelihood collects."
+/>
+
+The per-row columns show the mechanism. On zero rows, deviance charges $2\hat\mu$ (linear) where squared error charges $\hat\mu^2$ (quadratic), so honest high rates on risky-but-silent policies are cheap for the likelihood and expensive for MSE; on the claim row, deviance's $y\log(y/\hat\mu)$ term grows without bound as $\hat\mu \to 0$ where squared error's charge is capped near $y^2$, so under-predicting realized claims is where the likelihood collects.
+
+The two metrics disagree because they price exactly the two errors an insurer cares about in opposite proportions. For scale, the dummy on these six rows scores MSE $0.143$ and deviance $0.634$ — last by both, as in the full table.
+
+<Exercise>
+Compute mean absolute error for all three models on the six-row extract (dummy predicts $0.10$ everywhere), and compare the resulting ranking with Table 12.1's MAE column. Write the six absolute errors for one model before opening the solution.
+
+<Solution>
+Ridge: $|{-0.04}|, 0.04, 0.10, 0.16, 0.18, 0.76$. The first entry shows MAE, like MSE, indifferent to the sign of a prediction; the impossible negative rate costs almost nothing. Sum $1.28$, MAE $= 0.213$. Poisson: $0.05 + 0.06 + 0.10 + 0.48 + 0.52 + 0.38 = 1.59$, MAE $= 0.265$. Dummy: $5(0.10) + 0.90 = 1.40$, MAE $= 0.233$.
+
+Ranking: ridge best, then dummy, then Poisson. The extract reproduces Table 12.1's headline (ridge first by MAE; the table's fine ordering of dummy and Poisson differs, which six rows of noise cannot resolve). MAE favors small predictions here because on a zero row the absolute error *is* $\hat\mu$, so with 94% zeros MAE is nearly a penalty on predicting any risk at all; the conditional median of a mostly-zero target is zero, and MAE is minimized by medians. A metric that rewards predicting "no risk" for everyone is measuring something an insurer cannot price with.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The metric belongs to the model family. Squared error is the Gaussian's deviance, absolute error is the median's loss, and the Poisson deviance is the count likelihood's own yardstick. A likelihood-modeled target is scored by its likelihood's deviance, and a metric borrowed from a different family can silently invert the ranking. The scope is exactly that — not "deviance always," but "the noise model and the metric are one choice, made twice."
+</KeyFact>
+
+## Calibration: an insurer needs prices, not point predictions
+
+A scalar metric, deviance included, is still one number; the deliverable is a price list, and pricing puts a specific demand on the model. Predicting any single policy's realized count is hopeless by design. With rates near 0.1, chance dominates, and the best conceivable predictor leaves nearly all per-policy error in place.
+
+What the insurer needs is that predicted rates be *right on average within every risk segment*. Premiums are set per segment, and the sum of predicted rates over a segment is the claim bill the premiums must cover.
+
+### The decile check
+
+The check is a *calibration plot*: sort the test policies by predicted rate, cut them into tenths, and compare each tenth's mean prediction with its observed claim frequency. Three verdicts come out.
+
+The dummy is perfectly calibrated (every tenth's prediction, 0.10, matches the portfolio average) and useless, because it cannot tell a risky tenth from a safe one. Calibration without discrimination prices nothing.
+
+Ridge is miscalibrated exactly where the histograms predicted, with negative mean predictions in the safest tenth and a compressed risky tail; in aggregate it **forecasts 10,693 claims for a test set that filed 11,935**, leaving a tenth of the claim bill unpriced — for an insurer not a statistic but an underwriting loss. The Poisson GLM tracks each tenth and forecasts 11,930 of the 11,935.
+
+<Figure
+  src="./figures/calibration-deciles.svg"
+  alt="Observed claim frequency per predicted-rate tenth as rising dots, with the Poisson model's mean predictions tracking the dots closely while ridge's line starts below zero for the safest tenth and falls short of the observed frequency in the riskiest tenths"
+  caption="Calibration by tenths (schematic, after Murphy Fig. 12.2; the totals are the study's). Ridge misses at both ends and under-forecasts the total claim bill by a tenth; the Poisson GLM's forecast misses by five claims in twelve thousand."
+/>
+
+The deviance column and the calibration plot agree, and that agreement is not a coincidence. Deviance is held-out log-likelihood, and a model that systematically misstates rates pays for it row by row. Proper calibration machinery for classifiers (reliability curves, recalibration maps) is <Ref lesson="classification-metrics">module 5's</Ref> subject; here the decile plot is enough to confirm the likelihood's ranking against the quantity the application actually consumes.
+
+## The offset: unequal exposure inside the log link
+
+The target section promised that the frequency target and the count likelihood are one model; the offset is where that promise is kept. The models above predict claim *frequency*, but what a policy generates is a claim *count* over its own exposure, and exposures differ. A policy insured for six months at rate $\lambda$ per year is expected to file $0.5\lambda$ claims; the same driver insured for two years, $2\lambda$ — a fourfold difference in expected count with identical risk. A count model that ignores $t$ confounds risk with time on the books.
+
+<Figure
+  src="./figures/offset.svg"
+  alt="Two policy cards with identical features and rate 0.1 claims per year but exposures 0.5 and 2 years, giving expected counts 0.05 and 0.20, above the formula log mu equals w transpose x plus log t with the log-exposure term labeled as the offset with coefficient fixed at one"
+  caption="Same risk, four times the exposure, four times the expected count — the exposure enters the log link as a term with nothing to fit."
+/>
+
+### One line in the link
+
+The GLM absorbs this in one line. Model the count as $y \sim \mathrm{Poisson}(\mu)$ with $\mu = t \cdot \lambda(x)$, rate per year times years observed, and keep the log link on the rate: $\lambda(x) = e^{w^\top x}$. Then
+
+$$
+\log \mu \;=\; \log t \;+\; w^\top x :
+$$
+
+the log-exposure enters the linear predictor as a regressor whose coefficient is fixed at $1$, called an *offset*. Nothing else changes: the likelihood is still Poisson, the fit is still the universal gradient with $\mu_i = t_i e^{w^\top x_i}$ (the closing derivation exercise verifies the $(y_i - \mu_i)x_i$ form survives), and every coefficient keeps its rate interpretation: $e^{w_j}$ multiplies the *annual* rate, whatever the exposure.
+
+The published study reaches the same place by the equivalent route the target section named, dividing the count by exposure to form the frequency target and weighting each row's loss by its exposure; for the Poisson deviance the two formulations coincide term by term.
+
+## Where the idealization departs
+
+The study, faithfully executed, still idealizes the portfolio in two ways worth naming, because each marks the boundary of what this module's machinery certifies.
+
+### The rows are not independent
+
+The likelihood multiplied 678k terms as if policies were iid draws. But one driver renews across years, a hailstorm files a thousand correlated claims in one region in one week, and the portfolio's rate drifts year to year with fuel prices, enforcement, and fleet composition.
+
+The fitted rates survive this (the score equation is still a sensible estimating equation), but every uncertainty statement built on the iid likelihood, from <Ref lesson="fisher-information">Fisher-information</Ref> standard errors outward, overstates precision, and last year's fit prices next year's drifted portfolio only approximately.
+
+### The tail outruns the Poisson
+
+<Ref lesson="glm">The GLM lesson</Ref>'s moment factory forces the Poisson's variance to equal its mean, both derivatives of the same $e^\eta$; real claim counts run wider than their mean, the *overdispersion* flagged there and realized here.
+
+The standard exit is the negative binomial, $\operatorname{Var} = \mu + \alpha\mu^2$, one dispersion parameter beyond the Poisson; as before, the fitted rates remain sensible under overdispersion while variance-based error bars and tests become overconfident.
+
+### What stands established
+
+Module 2 is now executed end to end on a real actuarial task. The likelihood engine chose the noise model by looking at the data's support; the GLM factory built the regression; SGD fitted it at a scale where 678k rows are routine; deviance, the likelihood's own metric, ranked the models that squared error could not separate and absolute error ranked backwards; and calibration confirmed the ranking against the quantity the business consumes. The demonstration to carry forward is the metric one: the yardstick belongs to the model family, not to habit.
+
+What comes next is not a retreat from the Gaussian branch but its full development. Where the response genuinely is continuous and symmetric-noise, least squares is exact maximum likelihood, and <Ref lesson="ols">module 3</Ref> gives it the treatment this module gave the family: three derivations, a minimum-variance guarantee, and then the diagnostic toolkit whose absence this lesson just exposed, beginning with the funnel-shaped residual plot the final exercise below produces (<Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> names it).
+
+## ★ Excess zeros: when one likelihood is not enough
+
+The Poisson fixes the zero problem the Gaussian has; some count data out-zeros the Poisson itself, and the same discipline (read the data's shape, then build the likelihood to match) produces a composite model rather than a single family. The canonical case is ecological (ESL §10.14.2): predicting the catch of Black Oreo Dory, a deep-water fish, from 17,000 research trawls taken around New Zealand's exclusive economic zone between 1979 and 2005, with depth, temperature, and salinity as features.
+
+<Figure
+  src="./figures/nz-trawls.png"
+  alt="Map of New Zealand and its exclusive economic zone with the locations of 17,000 research trawls: small blue dots blanket the continental shelf around both islands and the Campbell Plateau to the south, while the 2,353 red dots marking trawls that caught Black Oreo Dory form a narrow band along the deep ridge running east-southeast from the South Island, with a thin scatter down the southwest coast"
+  caption="Every research trawl, 1979–2005: red where Black Oreo Dory was caught (2,353 of 17,000), blue where nothing came up. The red hugs one deep ridge — most of the zeros are water the fish does not live in."
+  float="right"
+  width="m"
+/>
+
+Only 2,353 of the 17,000 trawls caught the species at all — 86% zeros, but unlike the insurance zeros these come from two different mechanisms: trawls in water the fish does not inhabit (structural zeros no rate model should explain) and trawls that simply got unlucky where the fish lives. A single Poisson at the fitted mean cannot carry both. The study's model factors the target instead:
+
+$$
+\mathbb{E}(Y \mid X) \;=\; \mathbb{E}(Y \mid Y > 0,\, X) \cdot \Pr(Y > 0 \mid X),
+$$
+
+a logistic model (the Bernoulli branch of the same GLM factory) for whether the catch is positive, times a regression fitted only on the 2,353 positive trawls for how large. Each factor is an exponential-family model from this module; the composition is what handles the zeros.
+
+The purpose-built alternative, the *zero-inflated Poisson* (Lambert 1992), a mixture of a point mass at zero with a Poisson, formalizes the same two-mechanism reading inside one likelihood. The insurance data is only mildly zero-inflated (the previous lesson's closing exercise measured the gap: Poisson(0.1) predicts 90.5% zeros against 94% observed, most of which the exposure offset explains), which is why one Poisson suffices there and does not here.
+
+## Exercises
+
+<Exercise>
+A policy files $y = 2$ claims; the fitted model predicted $\hat\mu = 0.5$. Compute this row's Poisson deviance contribution. For comparison, compute the contribution if the model had predicted $\hat\mu = 2$ (the saturated value) and if the dummy's $\hat\mu = 0.1$ had been used.
+
+<Solution>
+From the formula, $D_i = 2[\,y\log(y/\hat\mu) - y + \hat\mu\,]$. At $\hat\mu = 0.5$: $D_i = 2[\,2\log 4 - 2 + 0.5\,] = 2[\,2.773 - 1.5\,] = 2.545$. At $\hat\mu = 2$: $2[\,2\log 1 - 2 + 2\,] = 0$, the saturated floor; a row predicted exactly contributes nothing. At $\hat\mu = 0.1$: $2[\,2\log 20 - 2 + 0.1\,] = 2[\,5.991 - 1.9\,] = 8.18$, more than three times the 0.5-rate charge; each further halving of the predicted rate on a realized claim adds about $2y\log 2 \approx 2.77$ to the bill. The transferable reading is that deviance contributions are per-row log-likelihood gaps, pricing how implausible the model called the outcome, not how far off the number was.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. (a) Show from the deviance formula that a zero-claim policy's contribution reduces to $2\hat\mu$, finite for every $\hat\mu > 0$, no matter how much risk the model wrongly predicted. (b) Show that for $y > 0$ the contribution diverges as $\hat\mu \to 0^+$. (c) The two limits are asymmetric: predicting risk that never materializes is boundedly cheap, calling a realized claim near-impossible is unboundedly dear. State which model family owns this asymmetry, and what a Gaussian's charge for the same two errors would be.
+
+<Solution>
+(a) At $y = 0$ the convention $y\log y = 0$ (the limit of $y \log y$ as $y \to 0$) kills the log term: $D_i = 2[\,0 - 0 + \hat\mu\,] = 2\hat\mu$. Linear in the predicted rate, finite for all $\hat\mu$.
+
+(b) For fixed $y > 0$, $D_i = 2[\,y\log y - y\log\hat\mu - y + \hat\mu\,]$ and $-y\log\hat\mu \to +\infty$ as $\hat\mu \to 0^+$.
+
+(c) The asymmetry is the Poisson likelihood's, not the metric machinery's: $\log p(y \mid \mu) = y\log\mu - \mu - \log y!$ is the quantity being differenced, and a likelihood charges $-\log p$, which is infinite exactly for outcomes the model calls impossible. A model that predicts $\hat\mu = 0.001$ for a policy that then claims asserted a one-in-a-thousand-year event; observing it is damning evidence against the model, and the deviance records exactly that. The Gaussian's charge for both errors is the same symmetric $(y - \hat\mu)^2/2$; it cannot distinguish "unlikely" from "impossible" because no outcome is impossible under a support that covers the whole line, which is also why it happily predicts negative rates. The failure belongs to the mis-specified family; the divergence is the correct family refusing to average it away.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Ridge's MAE of 0.177 beats the Poisson GLM's 0.186, and its MSE is no worse, so ridge predicts claims at least as well; the deviance column just measures something Poisson regression is trained on, so citing it is circular." Name the step that fails, and support the refutation with the six-row extract's numbers.
+
+<Solution>
+The failing step is treating MSE and MAE as model-free while calling deviance model-bound: all three are likelihood-derived. MSE is the Gaussian family's deviance (<Ref lesson="glm">the GLM lesson</Ref> derived RSS as exactly that) and MAE is the loss whose minimizer is the conditional median, so the quoted comparison grades a count-modeling contest by a Gaussian's rules and a median's rules, then objects that the count likelihood's rules favor the count model. Symmetric, sign-blind metrics reward exactly the behavior the extract exhibits: ridge's $\hat\mu = -0.04$ on row 1 costs $0.0016$ in squared error and $0.04$ in absolute error, near-perfect scores for asserting an impossible event, while the deviance is undefined there because no Poisson distribution has that parameter. And with a mostly-zero target the median is zero, so MAE is nearly a penalty on predicting any risk; the in-body exercise showed even the dummy beating the Poisson GLM by MAE on the extract. The non-circular referee is the calibration data, which consumes no likelihood: ridge under-forecasts the realized claim bill by a tenth (10,693 against 11,935) while the Poisson model misses by five claims — the deviance ranking, confirmed by an external standard. "Predicts claims better" must mean "states claim rates closer to the truth," and two of the three metrics never measure that.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the Poisson GLM with an exposure offset. Policy $i$ has exposure $t_i$, features $x_i$, count $y_i \sim \mathrm{Poisson}(\mu_i)$ with $\mu_i = t_i e^{w^\top x_i}$. (a) Write the log-likelihood. (b) Compute its gradient in $w$ and show the universal $(y_i - \mu_i)x_i$ form survives, offset and all. (c) A colleague proposes adding $\log t_i$ as an ordinary feature with a free coefficient $\beta$ instead of fixing $\beta = 1$. State what a fitted $\hat\beta \ne 1$ would assert about claims, and why the offset is the right default.
+
+<Solution>
+(a) Substituting $\mu_i$ into the Poisson log-density and dropping the $w$-free $\log y_i!$ terms:
+$$
+\ell(w) = \sum_i \big[\, y_i(\log t_i + w^\top x_i) - t_i e^{w^\top x_i} \,\big] + \text{const}.
+$$
+
+(b) The first term contributes $y_i x_i$ to the gradient ($\log t_i$ is constant in $w$); the second contributes $-t_i e^{w^\top x_i} x_i = -\mu_i x_i$. Hence $\nabla \ell = \sum_i (y_i - \mu_i)x_i$: the offset changed the formula for $\mu_i$ and nothing else, so the same SGD line of code fits the exposure-aware model. The offset enters only through $\eta_i = w^\top x_i + \log t_i$, whose gradient in $w$ is $x_i$ regardless of $t_i$, so <Ref lesson="glm">the GLM lesson</Ref>'s canonical-link cancellation applies unchanged.
+
+(c) With free $\beta$, $\mathbb{E}[y_i] = t_i^{\beta} e^{w^\top x_i}$, so expected claims would scale as exposure to the power $\beta$. $\hat\beta = 0.8$, say, would assert that a two-year policy generates only $2^{0.8} \approx 1.74$ times the claims of a one-year policy at the same risk — sublinear accumulation of risk over time. That is a substantive hypothesis (it can be true, e.g. if long policies select careful drivers), not a default: absent evidence, claims from a constant-rate process accumulate proportionally to time observed, which is exactly $\beta = 1$. The offset encodes the physics of exposure; freeing $\beta$ turns a unit of measurement into a fitted parameter.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: the flip in miniature. Generate a synthetic portfolio with features $x_1, x_2 \sim \mathcal{N}(0,1)$ iid, rate $\lambda = \exp(-2.5 + 0.8x_1 - 0.5x_2)$, and count $y \sim \mathrm{Poisson}(\lambda)$; 1,000 training rows, 10,000 test rows. Fit (i) the constant $\bar y$, (ii) linear-Gaussian regression (least squares on $y$), (iii) the Poisson GLM (Newton on the universal gradient converges in a handful of steps). Report test MSE and mean Poisson deviance for each, handling non-positive predictions the way the published study does. State beforehand which ordering you expect to agree with Murphy's Table 12.1.
+
+<Solution>
+One run (seed-dependent; yours will differ in the second decimal). The generator gives 89% zeros and mean rate 0.12, insurance-shaped. Results on the 10,000 test rows:
+
+| model | MSE | mean deviance |
+| --- | --- | --- |
+| constant | 0.149 | 0.574 |
+| linear-Gaussian | 0.134 | 0.522 (1,314 rows masked) |
+| Poisson GLM | 0.124 | 0.449 |
+
+The deviance ordering (constant worst, linear middle, Poisson best) agrees with Table 12.1, and that agreement is the stable part. Two departures from the published table are themselves instructive. First, here MSE *also* prefers the Poisson model: with a correctly specified generator and a strong signal, the true-rate model has the best conditional mean too, and MSE can see it. The real portfolio's signal is weak enough that MSE's differences drown in the 0.56 noise floor and the column ties; whether squared error can rank count models at all depends on the noise regime, while the deviance ordering does not. Second, least squares here produces 1,314 negative predictions in 10,000 (thirteen percent, against the study's 595 in 223,745) because the synthetic log-linear signal is steep, so the linear approximation crosses zero often. Reproducing a published comparison, as always, reproduces its qualitative verdict, not its decimals.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. On the synthetic portfolio of the previous exercise, take the fitted linear-Gaussian model and plot its residuals $y_i - \hat\mu_i$ against its fitted values $\hat\mu_i$ on the test set. Describe the shape, compute the standard deviation of the residuals within the lowest and highest fifths of the fitted values, and explain the shape from the Poisson mean–variance identity. Predict which assumption of the Gaussian linear model this violates; <Ref lesson="ols">module 3's least-squares lesson</Ref> collects that model's assumptions as the Gauss–Markov conditions.
+
+<Solution>
+The plot funnels: residuals hug zero on the left and fan out to the right. On the run above, the residual standard deviation is 0.16 in the lowest fitted fifth and 0.61 in the highest, a fourfold widening. The identity explains the widths, not just the trend: for Poisson data $\operatorname{Var}(y \mid x) = \lambda(x)$, so the residual spread at rate $\lambda$ is $\sqrt{\lambda}$, and $\sqrt{0.03} \approx 0.17$, $\sqrt{0.37} \approx 0.61$; the funnel's envelope is the square root of the fitted rate. The violated assumption is homoscedasticity. The Gaussian linear model asserts one noise variance for every row, and this data's variance grows with the mean by construction. That funnel-shaped residual plot is the standard diagnostic for *heteroscedasticity*, and <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> makes it precise: which step of the Gauss–Markov argument it breaks, what it does to standard errors, and the standard remedies, of which this module's GLM, which models the variance rather than repairing it, is the most principled.
+</Solution>
+</Exercise>
+
+<References>
+1. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §12.5: the insurance-claims study this chapter executes (the data, Fig. 12.1's histogram panels, Table 12.1's metric comparison, Fig. 12.2's calibration plots, and the deviance definition 12.35–12.37); §12.2–12.4: the Poisson GLM, link options, and the universal gradient it is fitted by. Free online: https://probml.github.io/pml-book/book1.html
+2. scikit-learn developers, "Poisson regression and non-normal loss," scikit-learn example gallery — the study's source pipeline: the freMTPL2freq data (OpenML 41214), the feature engineering, exposure weighting, the masking of non-positive predictions in the deviance computation, and the 595-negative-predictions count. https://scikit-learn.org/stable/auto_examples/linear_model/plot_poisson_regression_non_normal_loss.html
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §10.14.2: the New Zealand fisheries study of the starred section, Fig. 10.18 (the trawl map), and the composite presence-times-abundance model (10.54). Free online: https://hastie.su.domains/ElemStatLearn/
+4. D. Lambert, "Zero-Inflated Poisson Regression, with an Application to Defects in Manufacturing," *Technometrics* 34(1), 1992 — the zero-inflated Poisson model named in the starred section.
+5. P. McCullagh, J. A. Nelder, *Generalized Linear Models*, 2nd ed., Chapman & Hall, 1989 — §6.4 and ch. 6 generally: offsets in log-linear and rate models, and the standard treatment of overdispersion this chapter's closing section summarizes.
+6. A. C. Cameron, P. K. Trivedi, *Regression Analysis of Count Data*, 2nd ed., Cambridge University Press, 2013 — chs. 3–4: the negative binomial exit from Poisson overdispersion, and the econometrics of exposure and rate models.
+</References>

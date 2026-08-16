@@ -1,0 +1,453 @@
+The least-squares estimator has a closed form, (XᵀX)⁻¹Xᵀy, three independent derivations — calculus, geometry, likelihood — and a minimum-variance guarantee with explicit fine print.
+
+<Ref lesson="insurance-claims">Module 2's closing study</Ref> ended with a promise: where the response is genuinely continuous with symmetric noise, least squares is exact maximum likelihood, and the Gaussian branch of the GLM factory deserves the treatment the Poisson branch just received. This lesson opens that account. The course has established that risk, not training error, is the object of learning, and that estimation runs on one engine, the likelihood, with <Ref lesson="fisher-information">a floor</Ref> under what any unbiased estimator can achieve. What stands open is the linear model itself: its exact solution, the geometry behind the solution's shape, and the theorem certifying that nothing beats it among the competitors the theorem names. That qualifier is the module's agenda: <Ref lesson="ridge-lasso">the next lesson</Ref> beats least squares by stepping outside it.
+
+The route: the objective, with a three-point fit computed by hand; the matrix-calculus derivation of the normal equations; the same equations re-read as projection geometry; the likelihood reading in two lines; the estimator's mean, covariance, and sampling distribution, which meet the Cramér–Rao floor; the Gauss–Markov theorem proved in full; and the singular case, with the solvers that survive it.
+
+## The objective: one number scores every candidate line
+
+<Task>
+Three retrievals before the new material, closed book; check against the named lessons only after writing all three down. (1) From <Ref lesson="mle-map">the likelihood lesson</Ref>: state why minimizing $\sum_i (y_i - w x_i - b)^2$ is maximum likelihood under Gaussian noise. (2) From <Ref lesson="fisher-information">the information lesson</Ref>: state the matrix Cramér–Rao bound, $\operatorname{Cov}(W) \succeq I(\theta)^{-1}$ for unbiased $W$, with $I$ the Fisher information of the whole sample. (3) From <Ref lesson="bias-variance">the decomposition lesson</Ref>: write the two-term identity that scores an estimator's MSE. All three return below.
+</Task>
+
+The data is $n$ observations $(x_i, y_i)$ with $x_i$ a vector of features and $y_i$ a real response, and the model is linear in the coefficients: $f(x) = \beta_0 + \beta_1 x_1 + \cdots + \beta_{p-1} x_{p-1}$, with intercept $\beta_0$ and $p$ coefficients in total. In the matrix form below the intercept is carried by an all-ones first column of the design, which makes $\beta_0$ a coefficient like any other. The fitting criterion is the *residual sum of squares*,
+
+$$
+\operatorname{RSS}(\beta) = \sum_{i=1}^n \big( y_i - f(x_i) \big)^2 ,
+$$
+
+one number per candidate coefficient vector, charging each observation the square of its miss. Minimizing it is a bare calculus problem, and a three-point instance shows everything the general machinery will formalize.
+
+<Example title="three points, two unknowns">
+Fit a line $y = \beta_0 + \beta_1 x$ to the points $(0, 1)$, $(1, 2)$, $(2, 2)$. The objective is
+
+$$
+\operatorname{RSS}(\beta_0, \beta_1) = (1 - \beta_0)^2 + (2 - \beta_0 - \beta_1)^2 + (2 - \beta_0 - 2\beta_1)^2 .
+$$
+
+Both partial derivatives, term by term:
+
+$$
+\frac{\partial \operatorname{RSS}}{\partial \beta_0} = -2\big[(1 - \beta_0) + (2 - \beta_0 - \beta_1) + (2 - \beta_0 - 2\beta_1)\big] = -2\,\big[ 5 - 3\beta_0 - 3\beta_1 \big],
+$$
+
+$$
+\frac{\partial \operatorname{RSS}}{\partial \beta_1} = -2\big[(2 - \beta_0 - \beta_1) + 2(2 - \beta_0 - 2\beta_1)\big] = -2\,\big[ 6 - 3\beta_0 - 5\beta_1 \big].
+$$
+
+Setting both to zero gives two linear equations, $3\beta_0 + 3\beta_1 = 5$ and $3\beta_0 + 5\beta_1 = 6$. Subtracting: $2\beta_1 = 1$, so $\hat\beta_1 = \tfrac12$ and $\hat\beta_0 = \tfrac{7}{6}$. The fitted values are $\big(\tfrac76, \tfrac53, \tfrac{13}{6}\big)$ and the residuals $r_i = y_i - \hat y_i$ are $\big({-\tfrac16}, \tfrac13, {-\tfrac16}\big)$, with $\operatorname{RSS} = \tfrac16$.
+
+Two facts sit in these numbers. The residuals sum to zero: $-\tfrac16 + \tfrac13 - \tfrac16 = 0$. And they are orthogonal to the inputs: $0 \cdot (-\tfrac16) + 1 \cdot \tfrac13 + 2 \cdot (-\tfrac16) = 0$. Neither is a coincidence of this dataset; both are the stationarity conditions themselves, and the geometry section names them.
+</Example>
+
+<Figure
+  src="./figures/threepoint.svg"
+  alt="Three data points with the fitted line y = 7/6 + x/2 and the three residuals marked as dashed vertical segments of length -1/6, +1/3, -1/6"
+  caption="The three-point fit: residuals −1/6, +1/3, −1/6 sum to zero and are orthogonal to x: the normal equations, visible in the numbers."
+/>
+
+Stacking the data turns the sum into a norm. The *design matrix* $X \in \mathbb{R}^{n \times p}$ holds one observation per row (its first column all ones, treated like any other column), $y \in \mathbb{R}^n$ stacks the responses, and
+
+$$
+\operatorname{RSS}(\beta) = \lVert y - X\beta \rVert^2 = (y - X\beta)^\top (y - X\beta).
+$$
+
+For the example, $X$ has rows $(1,0), (1,1), (1,2)$. Everything that follows is the analysis of this one quadratic function of $\beta$.
+
+## The calculus derivation: expand, differentiate, solve
+
+The two partial derivatives of the example become one matrix gradient, and the only new apparatus is a pair of identities. For a constant vector $b$ and a symmetric matrix $A$, both provable entry by entry:
+
+$$
+\nabla_\beta \big( b^\top \beta \big) = b, \qquad \nabla_\beta \big( \beta^\top A \beta \big) = 2A\beta .
+$$
+
+The first is the vector form of $\tfrac{d}{d\beta}(b\beta) = b$; the second is the vector form of $\tfrac{d}{d\beta}(a\beta^2) = 2a\beta$, and its factor of 2 requires $A$ symmetric. These two lines are the lesson's entire matrix-calculus toolkit.
+
+<FigureSequence
+  name="gradient"
+  alt="Four frames deriving the normal equations: the expanded objective with terms labeled constant, linear, and quadratic in beta; the gradient computed term by term with the two identities named; the gradient set to zero giving the normal equations; and the solved closed form with the rank condition"
+  caption="The derivation in four steps: expand, differentiate term by term, set to zero, solve. Each gradient term sits under the objective term that produced it."
+/>
+
+<Task>
+Step through the four frames and check each gradient term against its identity: the linear term uses $\nabla_\beta(b^\top\beta) = b$ with $b = -2X^\top y$, the quadratic term uses $\nabla_\beta(\beta^\top A\beta) = 2A\beta$ with $A = X^\top X$, which is symmetric because $(X^\top X)^\top = X^\top X$. Then name the exact frame where the full-rank assumption enters: frames 1–3 hold for every $X$; only the inversion in frame 4 needs $\operatorname{rank}(X) = p$.
+</Task>
+
+<Definition title="ordinary least squares and the normal equations">
+The **normal equations** of the least-squares problem are
+
+$$
+X^\top X \beta = X^\top y ,
+$$
+
+a system of $p$ linear equations in the $p$ coefficients. When $X$ has full column rank, $X^\top X$ is positive definite, the system has a unique solution, and the **ordinary least squares** (OLS) estimator is
+
+$$
+\hat\beta = (X^\top X)^{-1} X^\top y .
+$$
+</Definition>
+
+The stationary point is a minimum, not a saddle: the Hessian of the objective is $2X^\top X$, which is positive semidefinite always ($v^\top X^\top X v = \lVert Xv \rVert^2 \ge 0$) and positive definite exactly under full rank. On the three-point data, $X^\top X = \begin{pmatrix} 3 & 3 \\ 3 & 5 \end{pmatrix}$ and $X^\top y = \begin{pmatrix} 5 \\ 6 \end{pmatrix}$: the matrix form reproduces, entry for entry, the two equations the example derived by hand. The general formula names a computation already done.
+
+<Exercise>
+Set up and solve the normal equations by hand for the data $(1,2), (2,2), (3,4)$ with an intercept: form $X^\top X$ and $X^\top y$, solve the $2 \times 2$ system, and check the answer against the scalar formulas $\hat\beta_1 = \sum_i (x_i - \bar x)(y_i - \bar y) / \sum_i (x_i - \bar x)^2$ and $\hat\beta_0 = \bar y - \hat\beta_1 \bar x$. Write both equations before opening the solution.
+
+<Solution>
+Strategy hint: the columns of $X$ are $(1,1,1)$ and $(1,2,3)$, so the entries of $X^\top X$ are the four inner products among them.
+
+$X^\top X = \begin{pmatrix} 3 & 6 \\ 6 & 14 \end{pmatrix}$, $X^\top y = \begin{pmatrix} 8 \\ 18 \end{pmatrix}$. The system $3\beta_0 + 6\beta_1 = 8$, $6\beta_0 + 14\beta_1 = 18$: doubling the first and subtracting gives $2\beta_1 = 2$, so $\hat\beta_1 = 1$ and $\hat\beta_0 = (8-6)/3 = \tfrac23$.
+
+The scalar formulas are the normal equations solved symbolically: the first equation says $n\beta_0 + n\bar x \beta_1 = n \bar y$, i.e. $\hat\beta_0 = \bar y - \hat\beta_1 \bar x$; substituting it into the second and simplifying leaves $\hat\beta_1 = \sum (x_i - \bar x)(y_i - \bar y)/\sum (x_i - \bar x)^2$. Here $\bar x = 2$, $\bar y = \tfrac83$: numerator $(-1)(-\tfrac23) + 0 + (1)(\tfrac43) = 2$, denominator $2$, so $\hat\beta_1 = 1$ and $\hat\beta_0 = \tfrac83 - 2 = \tfrac23$. Same answer by both routes; the matrix form is the scalar recipe with the bookkeeping industrialized.
+</Solution>
+</Exercise>
+
+## The geometry: fitting is projection
+
+Calculus produced the normal equations; reading them as a statement about vectors in $\mathbb{R}^n$ explains them. Rearranged, they say
+
+$$
+X^\top ( y - X\hat\beta ) = 0 :
+$$
+
+the *residual vector* $r = y - X\hat\beta$ has zero inner product with every column of $X$, hence with everything in the columns' span. That span, $\operatorname{col}(X) \subseteq \mathbb{R}^n$, is a $p$-dimensional subspace of the $n$-dimensional space where the whole response vector lives, and the fitted vector $\hat y = X\hat\beta$ is the point of that subspace at which the residual stands perpendicular. In the three-point example this was the pair of facts sitting in the numbers: $\sum_i r_i = 0$ is orthogonality to the all-ones column, $\sum_i x_i r_i = 0$ is orthogonality to the other one.
+
+<Figure
+  src="./figures/projection.svg"
+  alt="The response vector y in n-dimensional space above the plane spanned by the columns of X, with its orthogonal projection y-hat in the plane and the residual r = y minus y-hat perpendicular to it, annotated with X-transpose r equals zero"
+  caption="The picture behind the formula: ŷ is the orthogonal projection of y onto col(X), and the perpendicularity of the residual is the normal equations."
+/>
+
+Perpendicularity is also a complete, calculus-free proof of minimality. For any candidate $\beta$, decompose $y - X\beta = r + X(\hat\beta - \beta)$: the first piece is orthogonal to the second, which lies in $\operatorname{col}(X)$, so Pythagoras gives
+
+$$
+\lVert y - X\beta \rVert^2 = \lVert r \rVert^2 + \lVert X(\hat\beta - \beta) \rVert^2 \;\ge\; \lVert r \rVert^2 ,
+$$
+
+with equality exactly when $X\beta = X\hat\beta$. No competitor's RSS beats the projection's, and the inequality identifies precisely which competitors tie: those producing the *same fitted vector* — the fact that keeps the fit unique even when the coefficients are not, once $X^\top X$ turns singular.
+
+### The hat matrix: projection as an operator
+
+The map from $y$ to its projection is linear: substituting the closed form into $\hat y = X\hat\beta$ leaves a single $n \times n$ matrix applied to $y$, fixed by the design alone.
+
+<Definition title="hat matrix">
+For $X$ of full column rank, the **hat matrix** is
+
+$$
+H = X (X^\top X)^{-1} X^\top \in \mathbb{R}^{n \times n},
+$$
+
+so that $\hat y = Hy$ and $r = (I - H)\,y$.
+</Definition>
+
+Two properties make $H$ a projection. It is symmetric, $H^\top = H$, by inspection of the formula. And it is idempotent:
+
+$$
+H^2 = X (X^\top X)^{-1} \underbrace{X^\top X (X^\top X)^{-1}}_{=\,I} X^\top = H ,
+$$
+
+projecting twice changes nothing, because the first projection already landed in the subspace. Its complement $I - H$ is then also symmetric and idempotent: the projection onto the orthogonal complement, the subspace where residuals live. One more identity, $\operatorname{trace}(H) = p$, is left as the first end exercise; it prices the projection's dimension and becomes the ancestor of effective degrees of freedom in <Ref lesson="splines-gams">the splines lesson</Ref>.
+
+<Exercise>
+For the three-point example, compute $H$ explicitly, then verify all three claims numerically: $Hy = \hat y$, $H^\top = H$, and $\operatorname{trace}(H) = 2$. Compute $(X^\top X)^{-1}$ first.
+
+<Solution>
+$\det(X^\top X) = 3 \cdot 5 - 3 \cdot 3 = 6$, so $(X^\top X)^{-1} = \tfrac16 \begin{pmatrix} 5 & -3 \\ -3 & 3 \end{pmatrix}$. Then
+
+$$
+H = X (X^\top X)^{-1} X^\top = \frac{1}{6} \begin{pmatrix} 5 & 2 & -1 \\ 2 & 2 & 2 \\ -1 & 2 & 5 \end{pmatrix}.
+$$
+
+Check: $Hy = \tfrac16\big(5 + 4 - 2,\; 2 + 4 + 4,\; -1 + 4 + 10\big) = \big(\tfrac76, \tfrac{10}{6}, \tfrac{13}{6}\big)$, the fitted values from the worked example. The matrix is visibly symmetric, and $\operatorname{trace}(H) = \tfrac{5 + 2 + 5}{6} = 2 = p$. The transferable observation: $H$ depends on $X$ only; the design decides how the responses are blended into fits before any $y$ is seen.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The projection $\hat y$ is unique for every $X$, full rank or not; the coefficient vector $\hat\beta$ is unique only when the columns are linearly independent. Everything that goes wrong with least squares, and both of its classical repairs (ridge's penalty and the minimum-norm choice), lives in the gap between those two statements.
+</KeyFact>
+
+## The likelihood: the third derivation, inherited
+
+The third derivation is already on the books. <Ref lesson="mle-map">The likelihood lesson</Ref> proved, in scalar form, that least squares is maximum likelihood under Gaussian noise; the matrix restatement is two lines. Model the response as $y = X\beta + \varepsilon$ with $\varepsilon \sim \mathcal{N}(0, \sigma^2 I_n)$; the log-likelihood of the sample is
+
+$$
+\ell(\beta) = -\frac{n}{2} \log (2\pi\sigma^2) \;-\; \frac{1}{2\sigma^2} \lVert y - X\beta \rVert^2 ,
+$$
+
+and maximizing over $\beta$ is minimizing $\operatorname{RSS}(\beta)$: the MLE is $\hat\beta$. <Ref lesson="glm">The GLM lesson</Ref> reached the same equations a third way, as the $(y - \mu)x$ score equation of the Gaussian family.
+
+The likelihood reading is also where the method began. Adrien-Marie Legendre published least squares in 1805, as an algebraic fitting criterion in an appendix on comet orbits; Gauss claimed use of it since 1795 and in 1809 published the probabilistic argument that the noise law justifying the criterion is exactly the bell curve now bearing his name; the priority dispute is documented in [Stigler (1981)](https://doi.org/10.1214/aos/1176345451).
+
+Three derivations, one estimator, and each contributes something the others do not. Calculus delivers existence and the closed form. Geometry delivers uniqueness of the fit, the residual structure, and the hat matrix. The likelihood delivers a noise model, and with it everything probabilistic: the sampling distribution built next, and the efficiency verdict that sharpens Gauss–Markov's.
+
+## The estimator as a random variable
+
+<Remark title="the fixed-design convention, stated once">
+Throughout this module, $X$ is treated as fixed and known; all randomness enters through $\varepsilon$, so $y$ is random and $\hat\beta$, a function of $y$, is random too. Every expectation and covariance below is taken over repeated draws of the noise at the same $X$, matching the repeated-sampling picture in the figure below.
+</Remark>
+
+Assume for now only two moments of the noise: $\mathbb{E}[\varepsilon] = 0$ and $\operatorname{Cov}(\varepsilon) = \sigma^2 I_n$, no distributional shape. Substituting $y = X\beta + \varepsilon$ into the closed form,
+
+$$
+\hat\beta = (X^\top X)^{-1} X^\top (X\beta + \varepsilon) = \beta + (X^\top X)^{-1} X^\top \varepsilon :
+$$
+
+the estimator is the truth plus a linear blend of the noise. Its mean is immediate, $\mathbb{E}[\hat\beta] = \beta$, since the blend has mean zero: OLS is **unbiased**. Its covariance follows from $\operatorname{Cov}(Az) = A \operatorname{Cov}(z) A^\top$:
+
+$$
+\operatorname{Cov}(\hat\beta)
+= (X^\top X)^{-1} X^\top \big( \sigma^2 I \big) X (X^\top X)^{-1}
+= \sigma^2 (X^\top X)^{-1} .
+$$
+
+<Figure
+  src="./figures/spaghetti.svg"
+  alt="One thick true line with sixteen thin fitted lines from repeated noise draws scattered around it, and their dashed average lying on the true line"
+  caption="Repeated sampling at a fixed design: each thin line is the OLS fit to one noise draw. The fits average to the truth (unbiasedness); their spread is σ²(XᵀX)⁻¹."
+/>
+
+<Task>
+Read both derived facts off the figure (the thin lines' average lands on the truth; their spread is the covariance), then price the spread on the three-point example. From the hat-matrix exercise, $(X^\top X)^{-1} = \tfrac16\begin{pmatrix} 5 & -3 \\ -3 & 3 \end{pmatrix}$, so $\operatorname{Var}(\hat\beta_1) = \tfrac{3}{6}\sigma^2 = \sigma^2/2$. With the noise estimate $\hat\sigma^2 = \operatorname{RSS}/(n - p) = \tfrac{1/6}{1} = \tfrac16$, the slope's standard error is $\sqrt{1/12} \approx 0.29$; against a fitted slope of $0.5$, three points settle very little.
+</Task>
+
+The noise scale itself is estimated by $\hat\sigma^2 = \operatorname{RSS}/(n - p)$; the divisor $n - p$ rather than $n$ makes it unbiased, and the first end exercise proves this in one line from $\operatorname{trace}(H) = p$. Adding the Gaussian assumption upgrades the two moments to a full distribution: $\hat\beta$ is a linear function of the Gaussian vector $\varepsilon$, hence itself Gaussian,
+
+$$
+\hat\beta \sim \mathcal{N}\!\big( \beta, \; \sigma^2 (X^\top X)^{-1} \big).
+$$
+
+### The floor, attained: OLS is efficient under Gaussian noise
+
+The covariance just derived is not merely small; under Gaussian noise it is the smallest possible. The score of the model is $\nabla_\beta \ell = X^\top (y - X\beta)/\sigma^2$, and the Fisher information matrix of the sample works out to $X^\top X / \sigma^2$, so the matrix Cramér–Rao bound (<Ref lesson="fisher-information">the information lesson</Ref>'s floor, in its vector form $\operatorname{Cov}(W) \succeq I(\beta)^{-1}$) reads
+
+$$
+\operatorname{Cov}(W) \;\succeq\; \sigma^2 (X^\top X)^{-1} \qquad \text{for every unbiased } W .
+$$
+
+The right-hand side is exactly $\operatorname{Cov}(\hat\beta)$: the floor is attained, at every $n$, not merely in the limit. The mixed-review exercise at the end carries out the computation; it generalizes the through-the-origin case that closed the information lesson.
+
+<KeyFact>
+Under Gaussian noise, no unbiased estimator of any form, linear or not, improves on OLS — a certificate exactly as strong as its distributional hypothesis, and void the moment Gaussianity is removed.
+</KeyFact>
+
+The same Gaussian sampling distribution is what turns coefficients into test statistics: $z_j = \hat\beta_j / (\hat\sigma \sqrt{v_j})$, with $v_j$ the diagonal entry of $(X^\top X)^{-1}$ in $\beta_j$'s position, follows a $t_{n-p}$ distribution under $\beta_j = 0$, and nested models are compared by an $F$ ratio of RSS drops. The pivots and their derivations are Casella & Berger §11.3; the working practice is ISLP §3.1. What those numbers do and do not mean about individual predictors (the traps of correlated columns and confounding) is <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>'s subject.
+
+<Aside>
+The $t$ pivot on the three-point example, as arithmetic: $t = \hat\beta_1 / \operatorname{se}(\hat\beta_1) = 0.5 / 0.289 \approx 1.73$ on $n - p = 1$ degree of freedom. The two-sided 5% critical value of $t_1$ is $12.7$; three observations, one spent on the intercept and effectively one on the slope, leave essentially no evidence about anything. The pivot's own logic: $(\hat\beta_j - \beta_j)/(\hat\sigma\sqrt{v_j})$ is $t_{n-p}$ because numerator and denominator are independent, the one Gaussian, the other a scaled $\chi$.
+</Aside>
+
+## The Gauss–Markov theorem: the certificate and its fine print
+
+The Gaussian efficiency verdict leans on a distributional assumption that real residuals routinely violate. The [Gauss–Markov theorem](https://en.wikipedia.org/wiki/Gauss%E2%80%93Markov_theorem) is the distribution-free replacement, and its hypotheses deserve to be read before its conclusion, because each one fails somewhere in practice and each failure has its own lesson.
+
+- **(GM1) Exogeneity.** $\mathbb{E}[\varepsilon] = 0$: the linear mean model is correct, and nothing systematic is left in the errors. Violated by omitted curvature and confounders; stress-tested by the residual plots of <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>.
+- **(GM2) Homoscedastic, uncorrelated errors.** $\operatorname{Cov}(\varepsilon) = \sigma^2 I_n$: every observation equally noisy, no two correlated. *Homoscedasticity* is the equal-variance half; its failure is the funnel-shaped residual plot the diagnostics lesson names, and correlated errors are the standard failure on time series.
+- **(GM3) Full column rank.** $\operatorname{rank}(X) = p$, so $(X^\top X)^{-1}$ exists. Its failure is this lesson's closing section.
+
+What the list does not contain is any distribution. A persistent belief holds that least squares *assumes* Gaussian errors and is invalidated without them. It does not and is not: the theorem below uses only the two moments in GM1–GM2, so unbiasedness, the covariance formula, and the optimality-in-class verdict all survive arbitrarily non-Gaussian noise (with finite variance). What Gaussianity actually buys is the upgrade already seen: exact $t$/$F$ pivots and the stronger, all-comers efficiency certificate. The discriminating case: under heavy-tailed but finite-variance noise, OLS remains BLUE, while the Gaussian-only claims quietly degrade to approximations.
+
+The theorem's statement compresses to one acronym: OLS is **BLUE**, the best linear unbiased estimator. Both adjectives are load-bearing, and the proof shows exactly where each is spent. **Goal:** show any linear unbiased competitor has covariance at least OLS's. **Hypotheses:** GM1–GM3, fixed design. **Mode:** direct, by decomposition. **Roadmap:** (1) write any competitor as OLS plus a deviation $D$; (2) show unbiasedness forces $DX = 0$; (3) compute the competitor's covariance and watch the cross terms vanish; (4) read off the conclusion from $DD^\top \succeq 0$.
+
+<Theorem title="Gauss–Markov">
+Under GM1–GM3, let $\tilde\beta = Cy$ be any linear estimator that is unbiased for every $\beta$. Then
+
+$$
+\operatorname{Cov}(\tilde\beta) \;\succeq\; \operatorname{Cov}(\hat\beta) = \sigma^2 (X^\top X)^{-1}
+$$
+
+in the positive-semidefinite order — equivalently $\operatorname{Var}(a^\top \tilde\beta) \ge \operatorname{Var}(a^\top \hat\beta)$ for every linear combination $a^\top\beta$ — with equality only for $\tilde\beta = \hat\beta$.
+
+<Proof>
+**Step 1, decompose.** Define $D = C - (X^\top X)^{-1} X^\top$, so that $C = (X^\top X)^{-1} X^\top + D$: the competitor is OLS plus a deviation.
+
+**Step 2, unbiasedness pins $D$.** By GM1, $\mathbb{E}[\tilde\beta] = C\,\mathbb{E}[y] = CX\beta$. Unbiasedness for *every* $\beta$ requires $CX\beta = \beta$ for all $\beta$, hence the matrix identity $CX = I_p$. Substituting the decomposition, $CX = (X^\top X)^{-1}X^\top X + DX = I_p + DX$, so $DX = 0$.
+
+**Step 3, the covariance.** By GM2, $\operatorname{Cov}(y) = \sigma^2 I_n$, so $\operatorname{Cov}(\tilde\beta) = \sigma^2 C C^\top$. Expanding with the decomposition,
+
+$$
+CC^\top = (X^\top X)^{-1} X^\top X (X^\top X)^{-1}
+\;+\; (X^\top X)^{-1} (DX)^\top \;+\; DX (X^\top X)^{-1}
+\;+\; DD^\top ,
+$$
+
+and $DX = 0$ kills both cross terms, leaving
+
+$$
+\operatorname{Cov}(\tilde\beta) = \sigma^2 \big[ (X^\top X)^{-1} + DD^\top \big].
+$$
+
+**Step 4, conclude.** $DD^\top$ is positive semidefinite: $a^\top DD^\top a = \lVert D^\top a \rVert^2 \ge 0$ for every $a$. So $\operatorname{Cov}(\tilde\beta) - \operatorname{Cov}(\hat\beta) = \sigma^2 DD^\top \succeq 0$, which is the claim, and every linear functional pays the surcharge $\operatorname{Var}(a^\top\tilde\beta) = \operatorname{Var}(a^\top\hat\beta) + \sigma^2 \lVert D^\top a \rVert^2$. Equality for all $a$ forces $D = 0$, i.e. the competitor is OLS itself.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/gm-map.svg"
+  alt="A schematic of the space of linear estimators with the unbiased ones forming a band, OLS at the center of variance contours, and a competitor displaced by a matrix D with DX = 0, annotated with the covariance decomposition"
+  caption="The proof as a map: unbiased linear estimators form an affine subspace through OLS, and moving by any D with DX = 0 adds σ²DDᵀ to the covariance."
+/>
+
+<Task>
+Three comprehension checks on the proof, in writing. (1) Summarize the argument in one sentence. (2) Justify why unbiasedness must hold for every $\beta$, not just the true one: a single $\beta$ would only give $DX\beta = 0$ for that vector, not the matrix identity $DX = 0$ that kills the cross terms. (3) Name where each hypothesis is spent: GM1 in step 2's expectation, GM2 in step 3's $\operatorname{Cov}(y) = \sigma^2 I$, GM3 in the existence of $(X^\top X)^{-1}$ from step 1 onward.
+</Task>
+
+### What the theorem does not say
+
+The certificate compares OLS against estimators that are both linear in $y$ and unbiased, and each adjective is an exit door. Drop unbiasedness: a deliberately biased estimator may accept a small squared bias to buy a large variance cut, winning on MSE; that is the arithmetic <Ref lesson="bias-variance">the decomposition lesson</Ref> priced and <Ref lesson="mle-map">the likelihood lesson</Ref> saw win on the Gaussian variance. Drop linearity too, and shrinkage can dominate OLS uniformly: the [James–Stein estimator](https://en.wikipedia.org/wiki/James%E2%80%93Stein_estimator) (1961) shrinks $\hat\beta$ nonlinearly toward zero and, for $p \ge 3$ under Gaussian noise, has strictly smaller MSE than OLS at every single $\beta$ — under the prediction loss $\lVert X(\tilde\beta - \beta) \rVert^2$, equivalently coordinate-wise when the design is orthonormal; for the coefficient loss $\lVert \tilde\beta - \beta \rVert^2$ on a general design, uniform dominance holds only under an extra condition on the spectrum of $(X^\top X)^{-1}$. Nothing in either construction contradicts the theorem; both simply decline to enter its comparison class.
+
+<KeyFact>
+"Best linear unbiased" is a statement about a class, not about estimation. From the next lesson on, this course's estimators are deliberately biased (that is what regularization is), and they beat OLS in exactly the regimes where variance, not bias, dominates the error.
+</KeyFact>
+
+## Singularity: when the formula fails and the fit does not
+
+GM3 has been load-bearing since frame 4 of the derivation, and it fails in two ordinary ways. Exactly collinear columns (a duplicated measurement, a redundant dummy encoding, a feature that is the sum of two others) make $\operatorname{rank}(X) < p$. And $p > n$ makes rank deficiency automatic: $X^\top X$ is $p \times p$ with rank at most $n$. In either case $X^\top X$ is singular and the closed form is unusable.
+
+The minimization problem itself is untouched. The normal equations remain consistent (the system $X^\top X\beta = X^\top y$ always has solutions, because $X^\top y$ lies in the column space of $X^\top$, which equals that of $X^\top X$); what changes is that the solution set is now an entire affine subspace, $\hat\beta^0 + \operatorname{null}(X)$: adding any vector that $X$ maps to zero changes nothing the data can see. The geometry section's equality clause said precisely this, competitors tying exactly when they produce the same fitted vector, so every solution yields the *same* $\hat y$, the still-unique projection of $y$ onto the (collapsed) column space. The fit survives; the coefficients lose their identity.
+
+<Figure
+  src="./figures/singular.svg"
+  alt="Left: two collinear columns spanning a line in data space, with y projected onto the line and the projection still unique. Right: the coefficient plane with the solution set as a dashed line of equivalent betas and the minimum-norm solution marked"
+  caption="Exact collinearity: col(X) collapses to a line, ŷ stays unique (left), while the coefficient vectors achieving it form a whole line (right). Green: the minimum-norm choice."
+/>
+
+Among the infinitely many solutions, one is canonical: the **minimum-norm** solution, the point of the solution set closest to the origin, which is what the SVD-based pseudo-inverse (and numpy's `lstsq`) returns. Here it is only a tie-breaking convention; in <Ref lesson="double-descent">the epilogue</Ref> it becomes load-bearing, as the interpolator that gradient descent finds in the $p \gg n$ regime.
+
+Near-singularity is the quantitative version of the same disease. When columns are almost collinear, $(X^\top X)^{-1}$ exists but is enormous along the nearly-null direction, and $\operatorname{Cov}(\hat\beta) = \sigma^2 (X^\top X)^{-1}$ inflates with it: the fit stays stable while individual coefficients swing wildly between samples. <Ref lesson="regression-diagnostics">The diagnostics lesson</Ref> measures this per predictor (variance inflation factors); <Ref lesson="ridge-lasso">the next lesson</Ref> repairs it, and the repair also fixes exact singularity outright: $X^\top X + \lambda I$ is invertible for every $\lambda > 0$. The forward exercise computes that repair on this section's problem.
+
+## In practice: solve, never invert
+
+Everything above says $(X^\top X)^{-1} X^\top y$; production code should almost never compute it that way. Forming $X^\top X$ *squares the condition number*: $\kappa(X^\top X) = \kappa(X)^2$, so a design that is merely ill-conditioned becomes numerically singular in the normal equations. Double precision carries about 16 significant digits, and each power of ten in the condition number of the matrix actually factorized costs roughly one of them — so at $\kappa(X) = 10^8$, a solver working on $X$ retains roughly 8 digits, while the explicit normal-equations inverse, working on a matrix with $\kappa = 10^{16}$, retains none.
+
+<Figure
+  src="./figures/digits.svg"
+  alt="Correct digits in the computed coefficients versus the condition number of X on a log scale: a blue line for QR/SVD solvers losing one digit per power of ten, and an amber line for the explicit normal-equations inverse losing two digits per power of ten and hitting zero at condition number ten to the eighth"
+  caption="Float64's 16-digit budget against κ(X): factorizing X pays the condition number once, inverting XᵀX pays it squared. At κ(X) = 10⁸ the routes return 8 digits and none."
+/>
+
+### The factorizations that avoid the squaring
+
+The standard solvers work on $X$ itself. QR: with $X = QR$ ($Q^\top Q = I$, $R$ upper triangular), the least-squares problem collapses to $R\beta = Q^\top y$, solved by back-substitution with no inversion. SVD, the route inside [numpy.linalg.lstsq](https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html) and scikit-learn's `LinearRegression`, costs more and handles rank deficiency gracefully, returning the minimum-norm solution of the previous section. <Ref lesson="regularization-lab">This module's lab</Ref> builds both routes and measures the difference on a deliberately fragile design.
+
+Two units-of-measurement habits complete the practice. Each coefficient carries units, response units per unit of its feature, so raw coefficient magnitudes are not comparable across features measured on different scales; comparing or penalizing them (as every method from the next lesson onward does) requires standardized columns. And centering the features decouples the intercept: with centered columns, $\hat\beta_0 = \bar y$ exactly, and the intercept drops out of the rest of the algebra.
+
+### What stands established
+
+The linear model has an exact solution $\hat\beta = (X^\top X)^{-1}X^\top y$, reached by calculus, explained by projection, and licensed by likelihood; its sampling behavior at a fixed design is $\mathbb{E}[\hat\beta] = \beta$ and $\operatorname{Cov}(\hat\beta) = \sigma^2(X^\top X)^{-1}$, Gaussian when the noise is, and efficient there by the Cramér–Rao floor; Gauss–Markov certifies it best-in-class among linear unbiased estimators from second moments alone; and the certificate's class has two exits.
+
+<Ref lesson="ridge-lasso">The next lesson</Ref> takes the biased exit deliberately: a penalty on coefficient size that trades bias for variance, repairs singularity, and turns the flat valley of collinear designs back into a well-posed problem.
+
+## Exercises
+
+<Exercise>
+The projection's dimension. Prove that $\operatorname{trace}(H) = p$ for $H = X(X^\top X)^{-1}X^\top$ with $X$ of full column rank $p$. Then use it: show that under GM1–GM2, $\mathbb{E}[\operatorname{RSS}] = (n - p)\,\sigma^2$, so $\hat\sigma^2 = \operatorname{RSS}/(n-p)$ is unbiased. For the second part, first show $r = (I - H)\varepsilon$.
+
+<Solution>
+**Trace.** The trace is invariant under cyclic permutation, $\operatorname{trace}(ABC) = \operatorname{trace}(BCA)$, so
+
+$$
+\operatorname{trace}\!\big( X (X^\top X)^{-1} X^\top \big) = \operatorname{trace}\!\big( (X^\top X)^{-1} X^\top X \big) = \operatorname{trace}(I_p) = p .
+$$
+
+**Residuals see only noise.** Since $HX = X$ (columns of $X$ are already in the subspace), $(I - H)X = 0$, and
+
+$$
+r = (I - H)\,y = (I - H)(X\beta + \varepsilon) = (I - H)\,\varepsilon :
+$$
+
+the residual vector is the noise, minus the part of the noise the design can imitate.
+
+**Expected RSS.** Using idempotence and symmetry of $I - H$,
+
+$$
+\mathbb{E}[\operatorname{RSS}] = \mathbb{E}\big[ \varepsilon^\top (I-H) \varepsilon \big]
+= \operatorname{trace}\big( (I-H)\, \mathbb{E}[\varepsilon\varepsilon^\top] \big)
+= \sigma^2 \operatorname{trace}(I - H) = \sigma^2 (n - p),
+$$
+
+so dividing RSS by $n - p$ exactly undoes the shrinkage that fitting $p$ directions of noise caused. The transferable move: $\operatorname{trace}$ of the fitting operator counts the parameters the fit effectively spends, the idea that <Ref lesson="splines-gams">the splines lesson</Ref> promotes to a definition, *effective degrees of freedom* $= \operatorname{trace}$ of the smoother matrix, valid even for smoothers with no parameter count to quote.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. Take $X = \begin{pmatrix} 1 & 1 \\ 2 & 2 \\ 3 & 3 \end{pmatrix}$ (the second column duplicates the first) and $y = (1, 2, 2)^\top$. Show that $X^\top X$ is singular; exhibit two different coefficient vectors with identical fitted values, and compute those fitted values; and state which Gauss–Markov hypothesis died and what that does to the theorem's conclusion.
+
+<Solution>
+Both columns equal $x = (1,2,3)^\top$, so $X^\top X = \begin{pmatrix} 14 & 14 \\ 14 & 14 \end{pmatrix}$, determinant $14^2 - 14^2 = 0$: singular.
+
+Any $\beta$ enters the fit only through the sum $\beta_1 + \beta_2$, since $X\beta = (\beta_1 + \beta_2)\,x$. The best single multiple of $x$ is the through-the-origin fit $\hat c = x^\top y / x^\top x = (1 + 4 + 6)/14 = \tfrac{11}{14}$, so $\beta = \big(\tfrac{11}{14}, 0\big)$ and $\beta = \big(0, \tfrac{11}{14}\big)$ (and the whole line $\beta_1 + \beta_2 = \tfrac{11}{14}$) all produce the same fitted vector $\hat y = \tfrac{11}{14}(1,2,3) \approx (0.79, 1.57, 2.36)$. As a check, the residual $r = y - \hat y = \tfrac{1}{14}(3, 6, -5)$ satisfies $x^\top r = \tfrac{1}{14}(3 + 12 - 15) = 0$: still orthogonal, still the unique projection.
+
+The dead hypothesis is GM3, full column rank. With it goes the object the theorem talks about: "the variance of $\hat\beta$" is undefined when $\hat\beta$ is not a function of the data, so the conclusion is not false but vacuous. The fitted values, being unique, remain estimable; the individual coefficients do not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "OLS is BLUE, so no estimator has smaller mean squared error." Name the two escape doors the claim ignores, then make one of them concrete: for the trivial estimator $\tilde\beta = 0$ (ignore the data entirely), compute its MSE and OLS's MSE for estimating $\beta$, and exhibit the condition under which the trivial estimator wins.
+
+<Solution>
+The claim silently converts "best among linear unbiased estimators, in variance" into "best among all estimators, in MSE". The two doors out of the comparison class: **nonlinear** estimators (James–Stein shrinks $\hat\beta$ by a data-dependent factor and, for $p \ge 3$ under Gaussian noise, wins uniformly in prediction MSE — in coefficient MSE too when the design is orthonormal) and **biased** ones (ridge, the entire next lesson).
+
+The trivial door: $\tilde\beta = 0$ has variance zero and bias $-\beta$, so, summing squared error over coordinates, $\operatorname{MSE}(\tilde\beta) = \lVert \beta \rVert^2$. OLS is unbiased with $\operatorname{MSE}(\hat\beta) = \operatorname{trace}\operatorname{Cov}(\hat\beta) = \sigma^2 \operatorname{trace}\big( (X^\top X)^{-1} \big)$. Whenever
+
+$$
+\lVert \beta \rVert^2 < \sigma^2 \operatorname{trace}\big( (X^\top X)^{-1} \big)
+$$
+
+holds, i.e. the true coefficient vector is small relative to the noise and the design's conditioning, the estimator that never looks at the data beats the optimal one that does. No theorem is violated: $\tilde\beta = 0$ is biased at every $\beta \ne 0$, so Gauss–Markov never ranked it. The step that fails in the claim is the substitution of MSE for variance while keeping the word "best". This is the doorstep of shrinkage: an estimator *between* $0$ and $\hat\beta$ captures the win without the absurdity, which is exactly what ridge does.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. For the fixed-design Gaussian linear model $y = X\beta + \varepsilon$, $\varepsilon \sim \mathcal{N}(0, \sigma^2 I_n)$ with $\sigma^2$ known: (a) compute the score $\nabla_\beta \ell$ and verify it has mean zero; (b) compute the Fisher information matrix of the sample, $I(\beta) = \mathbb{E}[\nabla_\beta \ell \, \nabla_\beta \ell^\top]$; (c) state the matrix Cramér–Rao bound and conclude that OLS attains it at every $n$. The observations are independent but not identically distributed (each has its own $x_i$), so work with the whole-sample score directly, as <Ref lesson="fisher-information">the information lesson</Ref>'s final exercise did for $p = 1$.
+
+<Solution>
+(a) From $\ell(\beta) = -\lVert y - X\beta \rVert^2 / (2\sigma^2) + \text{const}$, the gradient is
+
+$$
+\nabla_\beta \ell = \frac{1}{\sigma^2} X^\top ( y - X\beta ) = \frac{1}{\sigma^2} X^\top \varepsilon ,
+$$
+
+which has mean $X^\top \mathbb{E}[\varepsilon]/\sigma^2 = 0$. (Setting it to zero and solving is the normal equations again: the MLE route, one more time.)
+
+(b) $I(\beta) = \mathbb{E}\big[ \tfrac{1}{\sigma^4} X^\top \varepsilon \varepsilon^\top X \big] = \tfrac{1}{\sigma^4} X^\top (\sigma^2 I) X = \dfrac{X^\top X}{\sigma^2}$. The curvature route agrees instantly: $-\nabla^2_\beta \ell = X^\top X/\sigma^2$, a constant matrix, so information equals negative expected curvature with no averaging needed.
+
+(c) The bound: $\operatorname{Cov}(W) \succeq I(\beta)^{-1} = \sigma^2 (X^\top X)^{-1}$ for every unbiased $W$. The body derived $\operatorname{Cov}(\hat\beta) = \sigma^2 (X^\top X)^{-1}$ exactly: OLS sits on the matrix floor at every sample size. With $p = 1$ and no intercept, $X^\top X = \sum_i x_i^2$ and the display reduces to $\sigma^2/\sum_i x_i^2$, the scalar case computed at the end of <Ref lesson="fisher-information">the information lesson</Ref>. Under Gaussian noise, then, both certificates hold at once: best unbiased of any form (Cramér–Rao) and best linear unbiased under second moments alone (Gauss–Markov), the second surviving when the first's hypothesis fails.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: numerical fragility, measured. Download the prostate dataset that anchors this module ([prostate.data](https://hastie.su.domains/ElemStatLearn/datasets/prostate.data), 97 patients, 8 predictors, a `train` indicator column). (a) On the 67 training rows, standardize the predictors to unit variance, add an intercept, and compute $\hat\beta$ twice: via `numpy.linalg.lstsq` and via the explicit formula `inv(X.T @ X) @ X.T @ y`. State in advance what counts as success: matching ESL Table 3.2 (intercept $2.46$, `lcavol` $0.68$, `lweight` $0.26$) to two decimals, both routes agreeing to at least 6 digits. (b) Append a corrupted duplicate of `lcavol` (the column plus Gaussian noise of standard deviation $10^{-9}$) and recompute both ways. Report $\lVert \beta_{\text{inv}} - \beta_{\text{lstsq}} \rVert$ and compare the two routes' RSS. Explain what you observe using the condition-number argument from the practice section.
+
+<Solution>
+(a) On the clean design both routes agree to near machine precision and reproduce the published coefficients: $\kappa(X)$ is modest (the standardized prostate predictors are correlated but far from collinear), so squaring it in $X^\top X$ still leaves ample digits.
+
+(b) The corrupted duplicate makes two columns equal to within $10^{-9}$, so $\kappa(X) \sim 10^9$ and $\kappa(X^\top X) \sim 10^{18}$: beyond float64's ~16 digits. The explicit inverse is now arithmetic on a matrix that is numerically singular: depending on platform it raises an error or returns coefficients with the twin columns carrying huge offsetting values, and $\lVert \beta_{\text{inv}} - \beta_{\text{lstsq}} \rVert$ comes out many orders of magnitude above the $10^{-6}$-scale agreement of part (a). `lstsq`, factorizing $X$ itself (SVD, condition $10^9$, ~7 digits retained), returns a stable answer that splits the coefficient across the twins. The diagnostic that matters: compare RSS, not coefficients. Both solutions fit the *training* responses almost equally well, because the flat valley of near-collinear designs means wildly different $\beta$ produce nearly the same $\hat y$. That is the lesson's uniqueness split, observed in floating point: the fit is stable, the coefficients are not. Exact digits vary by BLAS/LAPACK build; the orders of magnitude do not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Return to the singular problem of the boundary probe: $X$ with duplicated column $x = (1,2,3)^\top$ and $y = (1,2,2)^\top$, where OLS had infinitely many solutions. Compute $\hat\beta_\lambda = (X^\top X + \lambda I)^{-1} X^\top y$ for $\lambda = 0.01$ (symmetry makes it a one-line solve), then take $\lambda \to 0^+$ and compare the limit with the minimum-norm solution on the line $\beta_1 + \beta_2 = \tfrac{11}{14}$.
+
+<Solution>
+$X^\top X + \lambda I = \begin{pmatrix} 14 + \lambda & 14 \\ 14 & 14 + \lambda \end{pmatrix}$ and $X^\top y = (11, 11)^\top$. The system is symmetric under swapping the coordinates and so is its right-hand side, so the solution has $\beta_1 = \beta_2 = t$ with $(28 + \lambda)\,t = 11$:
+
+$$
+\hat\beta_\lambda = \left( \frac{11}{28 + \lambda}, \; \frac{11}{28 + \lambda} \right),
+\qquad
+\hat\beta_{0.01} \approx (0.3927,\; 0.3927).
+$$
+
+For every $\lambda > 0$ the matrix is invertible and the answer unique and finite: the penalty repaired the singularity outright. As $\lambda \to 0^+$ the solution tends to $\big(\tfrac{11}{28}, \tfrac{11}{28}\big)$, and this is exactly the minimum-norm point of the solution line: minimizing $\beta_1^2 + \beta_2^2$ subject to $\beta_1 + \beta_2 = \tfrac{11}{14}$ splits the total evenly, giving $\tfrac{11}{28}$ each.
+
+The repair has a name: $\hat\beta_\lambda$ is **ridge regression**, and <Ref lesson="ridge-lasso">the next lesson</Ref> is its analysis: what the penalty costs in bias, what it buys in variance, and why its $\lambda \to 0^+$ limit being the minimum-norm interpolator matters far beyond tie-breaking. You have just computed the module's first deliberately biased estimator.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §3.2: the normal equations, the projection geometry (Figs. 3.1–3.2 inspired this lesson's projection figure), the sampling distribution $\hat\beta \sim \mathcal{N}(\beta, \sigma^2(X^\top X)^{-1})$, and §3.2.2: the Gauss–Markov theorem with the bias–variance commentary the fine-print section follows. Free online: https://hastie.su.domains/ElemStatLearn/
+2. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §1.2: the matrix-derivative derivation of the normal equations, every step, whose completeness this lesson's calculus section mirrors; §1.3: the probabilistic (MLE) interpretation. https://cs229.stanford.edu/main_notes.pdf
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §11.2.2: OLS as MLE, the geometric interpretation, and §11.2.2.3: why production code solves by QR/SVD instead of inverting (the practice section's argument); §7.5: SVD, pseudo-inverse, and condition numbers. Free online: https://probml.github.io/pml-book/book1.html
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §3.1: standard errors, confidence intervals, and the population-line-vs-sample-lines picture (Fig. 3.3) recreated as this lesson's repeated-sampling figure. Free online: https://www.statlearning.com/
+5. G. Casella, R. L. Berger, *Statistical Inference*, 2nd ed., Duxbury, 2002 — §11.3.2–11.3.4: the Gaussian linear model's distribution theory and the exact $t$ pivots for slope and intercept behind the inference paragraph.
+6. S. M. Stigler, "Gauss and the Invention of Least Squares," *Annals of Statistics* 9(3), 1981, pp. 465–474 — the documentary record of the Legendre–Gauss priority dispute. https://doi.org/10.1214/aos/1176345451
+7. W. James, C. Stein, "Estimation with Quadratic Loss," *Proceedings of the Fourth Berkeley Symposium on Mathematical Statistics and Probability*, vol. 1, 1961, pp. 361–379 — the $p \ge 3$ shrinkage estimator that uniformly beats the maximum-likelihood estimate of a Gaussian mean, which is OLS in the orthonormal/prediction-loss reading of the fine-print section; extending coefficient-loss dominance to general designs requires a spectral condition (M. E. Bock, "Minimax Estimators of the Mean of a Multivariate Normal Distribution," *Annals of Statistics* 3(1), 1975, pp. 209–218).
+</References>

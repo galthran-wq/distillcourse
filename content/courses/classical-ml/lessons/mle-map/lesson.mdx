@@ -1,0 +1,458 @@
+Most classical estimators are maximum-likelihood estimates in disguise, and every standard regularizer is the log of a prior.
+
+Module 1 established that risk, not training error, is the object of learning, and that fitting means minimizing an average loss over a pre-committed class, with the losses themselves (squared, zero–one) taken as given. <Ref lesson="zipcode-digits">Its closing lesson</Ref> ended on the resulting gap: assumptions were being carried into methods by hand-derived geometry, and the systematic alternative is to write a probability model for the data and let its likelihood do the deriving. This lesson builds that engine. One recipe — write the log-likelihood, set its derivative to zero — reproduces the classical estimators; the recipe turns out to be exactly module 1's empirical risk minimization under a particular loss; where it fails, the repair is a prior, and the log of the prior is a penalty this course will meet again as ridge, lasso, and smoothing. The route: the likelihood function and the recipe; the recipe run on the Bernoulli, Gaussian, and categorical models; the identity with risk minimization; two failures, one mild and one catastrophic; the Beta-prior repair worked to the end; and the prior-to-penalty dictionary.
+
+## The likelihood function: the data fixed, the parameter free
+
+Module 1's unknown was a predictor; this module's unknown is a number. A coin of unknown bias is flipped 7 times and lands `H H T H H T H`: 5 heads, 2 tails. The model is the simplest one possible (independent flips, each heads with probability $\theta$), and the probability of this exact sequence, for any candidate $\theta$, is
+
+$$
+\theta \cdot \theta \cdot (1-\theta) \cdot \theta \cdot \theta \cdot (1-\theta) \cdot \theta \;=\; \theta^5 (1-\theta)^2 .
+$$
+
+Read as a function of the data with $\theta$ fixed, this is a probability. Read as a function of $\theta$ with the data fixed, it is a score for candidate parameter values: $\theta = 0.5$ gives the observed sequence probability $0.5^7 \approx 0.0078$; $\theta = 5/7$ gives $\approx 0.0152$, nearly twice as much; $\theta = 0.9$ gives $\approx 0.0059$. The second reading is the *likelihood function*, and the value of $\theta$ that maximizes it is the estimate.
+
+<Definition title="likelihood and the maximum-likelihood estimate">
+Let $S = (x_1, \dots, x_n)$ be a sample drawn iid from a model density or pmf $p(x \mid \theta)$ with unknown parameter $\theta$. The **likelihood** of $\theta$ is the joint probability of the sample, read as a function of $\theta$:
+$$
+L(\theta) = \prod_{i=1}^{n} p(x_i \mid \theta),
+$$
+and the **maximum-likelihood estimate** (MLE) is any maximizer $\hat{\theta} = \arg\max_\theta L(\theta)$. The **log-likelihood** is $\ell(\theta) = \log L(\theta) = \sum_i \log p(x_i \mid \theta)$, with $\log$ the natural logarithm.
+</Definition>
+
+The likelihood is not a distribution over $\theta$: nothing makes $\int L(\theta)\,d\theta = 1$, and no probability statement about $\theta$ is being made. $L$ ranks candidates, nothing more. Two conventions from <Ref lesson="statistical-learning">the opening lesson</Ref> carry over: $S$ is the sample, $n$ its size. The symbol $L$ did service there as the loss function; this chapter reserves $L(\theta)$, always with the parameter as argument, for the likelihood.
+
+Taking the log changes nothing and simplifies everything: $\log$ is strictly increasing, so $\ell$ and $L$ have the same maximizers, and the product of $n$ densities becomes a sum of $n$ terms, differentiable term by term and numerically sane where the product of hundreds of small numbers is not.
+
+<Figure
+  src="./figures/likelihood-panels.svg"
+  alt="Left: the likelihood of theta for 5 heads in 7 flips, peaking at 5/7; right: the log-likelihood of the same data, peaking at the same 5/7"
+  caption="One dataset, two readings of the same function: the log transform moves every value but no maximizer."
+/>
+
+The maximization itself is first-year calculus, and it is worth fixing as a three-step recipe, because the rest of this course applies it dozens of times: **write** the log-likelihood as a sum over observations; **differentiate** in the parameter and set the derivative to zero; **solve**, then confirm the stationary point is a maximum (second derivative, or a boundary check). The method is due to [R. A. Fisher](https://en.wikipedia.org/wiki/Ronald_Fisher), who developed and championed it from 1912 onward.
+
+<Task>
+Run the recipe on the coin: differentiate $\ell(\theta) = 5\log\theta + 2\log(1-\theta)$, set the result to zero, and confirm the solution is $\theta = 5/7$, the peak in both panels above.
+</Task>
+
+## One recipe, three estimators
+
+The familiar formulas of classical statistics — the empirical fraction, the sample mean, the sample variance — are not definitions but consequences: each is what the recipe returns on the corresponding model.
+
+### Bernoulli: the empirical fraction
+
+<Example title="MLE for the Bernoulli parameter">
+Let $x_1, \dots, x_n \in \{0,1\}$ be iid $\mathrm{Bernoulli}(\theta)$ with $k = \sum_i x_i$ ones. Each observation contributes $\theta^{x_i}(1-\theta)^{1-x_i}$, so
+
+$$
+\ell(\theta) = k \log \theta + (n-k)\log(1-\theta),
+\qquad
+\ell'(\theta) = \frac{k}{\theta} - \frac{n-k}{1-\theta}.
+$$
+
+Setting $\ell'(\theta) = 0$ gives $k(1-\theta) = (n-k)\theta$, hence $k = n\theta$ and
+
+$$
+\hat{\theta} = \frac{k}{n}.
+$$
+
+The second derivative $\ell''(\theta) = -k/\theta^2 - (n-k)/(1-\theta)^2$ is negative everywhere, so the stationary point is the global maximum, provided $0 < k < n$. When $k = 0$ or $k = n$ the derivative is never zero and the maximum sits on the boundary: $\hat\theta = 0$ or $1$. That boundary case looks like a footnote; it returns below as the lesson's central failure.
+</Example>
+
+### Gaussian: the sample mean and the sample variance
+
+For continuous data the model is a density, and the canonical case is $x_1,\dots,x_n$ iid $\mathcal{N}(\mu, \sigma^2)$ with both parameters unknown.
+
+<FigureSequence
+  name="gaussian-recipe"
+  alt="Three frames: a candidate Gaussian over three data points with the per-point densities as bar heights and their product as the likelihood; the log-likelihood curve over mu; the curve's flat tangent at mu equal to the sample mean 2.5"
+  caption="The recipe on the Gaussian mean: slide the curve, multiply the heights, climb the log-likelihood to its flat point."
+/>
+
+<Task>
+Step through the frames. In frame 1, the candidate $\mu = 1.5$ sits on top of two points and starves the third: its likelihood is dragged down by the factor $0.004$. In frame 3, moving to $\mu = \bar{x} = 2.5$ trades a little height at $x_1$ for a twelvefold gain at $x_3$; verify on the product line that $L(2.5)$ is about $4.5$ times $L(1.5)$.
+</Task>
+
+<Example title="MLE for the Gaussian mean and variance">
+The log of the density $\tfrac{1}{\sqrt{2\pi\sigma^2}} e^{-(x-\mu)^2/2\sigma^2}$, summed over the sample, is
+
+$$
+\ell(\mu, \sigma^2) = -\frac{1}{2\sigma^2} \sum_{i=1}^n (x_i - \mu)^2 - \frac{n}{2} \log \sigma^2 - \frac{n}{2}\log 2\pi .
+$$
+
+**Mean.** $\dfrac{\partial \ell}{\partial \mu} = \dfrac{1}{\sigma^2}\sum_i (x_i - \mu) = 0$ forces $\sum_i x_i = n\mu$, so $\hat{\mu} = \bar{x}$, the sample mean, whatever $\sigma^2$ is: $\sigma^2$ only scales the equation.
+
+**Variance.** Treat $v = \sigma^2$ as the variable and substitute $\hat\mu$:
+$$
+\frac{\partial \ell}{\partial v} = \frac{1}{2v^2} \sum_i (x_i - \bar{x})^2 - \frac{n}{2v} = 0
+\quad\Longrightarrow\quad
+\hat{\sigma}^2 = \frac{1}{n} \sum_{i=1}^n (x_i - \bar{x})^2 .
+$$
+
+Both stationary points are maxima (the second derivatives are negative there). The divisor is $n$, not the $n-1$ of many textbooks' "sample variance"; the difference is the subject of the next section, and this chapter never silently swaps the two.
+</Example>
+
+The recipe transfers to any density whose log is differentiable, and the transfer is worth doing once by hand before the pattern is trusted.
+
+<Exercise>
+Counts of arrivals in four equal time windows are $2, 0, 3, 1$. Model them as iid Poisson: $p(x \mid \lambda) = e^{-\lambda} \lambda^{x} / x!$ for $x = 0, 1, 2, \dots$ Write the log-likelihood, run the recipe, and report $\hat{\lambda}$. Write the derivative down before opening the solution.
+
+<Solution>
+Strategy: the recipe verbatim; the only new content is the Poisson's log.
+
+$$
+\ell(\lambda) = \sum_{i=1}^4 \left( -\lambda + x_i \log \lambda - \log x_i! \right) = -4\lambda + 6 \log \lambda - \text{const},
+$$
+
+using $\sum_i x_i = 6$. Then $\ell'(\lambda) = -4 + 6/\lambda = 0$ gives $\hat{\lambda} = 6/4 = 1.5$, and $\ell''(\lambda) = -6/\lambda^2 < 0$ confirms a maximum. In general $\hat\lambda = \bar{x}$: the MLE of a Poisson rate is the empirical rate, the same shape of answer as the Bernoulli's empirical fraction and the Gaussian's empirical mean. The transferable move: the $-\log x_i!$ terms never touched the derivative, so additive constants in $\theta$ can be dropped at the "write" step.
+</Solution>
+</Exercise>
+
+### Categorical: a constraint enters
+
+A die with $K$ faces, rolled $n$ times with face $j$ appearing $N_j$ times, has log-likelihood $\ell(\theta) = \sum_{j=1}^K N_j \log \theta_j$, but the parameters are not free: they must satisfy $\sum_j \theta_j = 1$. Setting bare derivatives to zero fails ($\partial \ell / \partial \theta_j = N_j/\theta_j$ is never zero); the constraint is handled with a Lagrange multiplier. The Lagrangian and its stationarity condition are
+
+$$
+\mathcal{L}(\theta, \lambda) = \sum_j N_j \log \theta_j + \lambda \Big( 1 - \sum_j \theta_j \Big),
+\qquad
+\frac{\partial \mathcal{L}}{\partial \theta_j} = \frac{N_j}{\theta_j} - \lambda = 0
+\;\Longrightarrow\;
+N_j = \lambda\, \theta_j ,
+$$
+
+and finishing the argument (solving for $\lambda$, and certifying that the result is the constrained maximum) is an exercise at the chapter's end. The answer is $\hat{\theta}_j = N_j / n$: the empirical fraction again, once per category. One consequence deserves flagging now: a face never observed gets $\hat\theta_j = 0$ exactly.
+
+<KeyFact>
+One recipe produces the empirical fraction, the sample mean, the sample variance, and the per-category frequencies: the summary statistics of classical data analysis are all maximum-likelihood estimates under the corresponding model. The recipe, not the individual formulas, is what this course reuses.
+</KeyFact>
+
+## Maximum likelihood is empirical risk minimization
+
+The recipe was stated as a maximization of fit; module 1's frame was a minimization of loss. These are the same operation. Define the *log-loss* of parameter $\theta$ on observation $x$ as $-\log p(x \mid \theta)$: the cost of $x$ under $\theta$ is high exactly when $\theta$ made $x$ improbable. Then
+
+$$
+\hat{R}(\theta) = \frac{1}{n} \sum_{i=1}^n \big(-\log p(x_i \mid \theta)\big) = -\frac{1}{n}\, \ell(\theta),
+$$
+
+so minimizing the empirical risk under log-loss is maximizing the log-likelihood: the MLE **is** the ERM rule of <Ref lesson="statistical-learning">the opening lesson</Ref>, with hypothesis class $\{p(\cdot \mid \theta)\}$ and log-loss as the loss. Everything module 1 established about ERM (that it certifies nothing by itself, that the class carries the inductive bias) applies verbatim.
+
+The true risk under log-loss has an exact decomposition, and it identifies what maximum likelihood is aiming at.
+
+<Theorem title="log-loss risk = entropy + KL (Murphy §4.2.2; Shalev-Shwartz &amp; Ben-David §24.1.2)">
+Let the data be drawn from a pmf $p$ and evaluated under a model pmf $q = p(\cdot \mid \theta)$. Then
+$$
+R(\theta) = \mathbb{E}_{X \sim p}\big[ -\log q(X) \big] = \underbrace{-\sum_x p(x) \log p(x)}_{H(p)} \;+\; \underbrace{\sum_x p(x) \log \frac{p(x)}{q(x)}}_{\mathrm{KL}(p \,\|\, q)} ,
+$$
+where $H(p)$, the entropy, does not depend on $\theta$, and the Kullback–Leibler divergence satisfies $\mathrm{KL}(p \,\|\, q) \ge 0$ with equality exactly when $q = p$.
+
+<Proof>
+Add and subtract $\log p(x)$ inside the expectation:
+$$
+-\sum_x p(x) \log q(x) = -\sum_x p(x) \log p(x) + \sum_x p(x) \big( \log p(x) - \log q(x) \big) = H(p) + \mathrm{KL}(p \,\|\, q).
+$$
+Nonnegativity of the KL term follows from Jensen's inequality applied to the concave $\log$: $\; -\mathrm{KL}(p\|q) = \sum_x p(x) \log\frac{q(x)}{p(x)} \le \log \sum_x p(x) \frac{q(x)}{p(x)} = \log 1 = 0$, with equality only when $q/p$ is constant, i.e. $q = p$.
+</Proof>
+</Theorem>
+
+Two readings, one per distribution plugged in for $p$. With $p$ the **true** distribution: the population-best parameter is the one whose model is KL-closest to the truth, and if the truth lies in the model family, it is the minimizer; if it does not, maximum likelihood still lands on the best available approximation, with the KL gap as the permanent price of the wrong family. With $p$ the **empirical** distribution $\hat{p}_S$ (mass $1/n$ at each observation): the empirical risk is $H(\hat{p}_S) + \mathrm{KL}(\hat{p}_S \| p(\cdot\mid\theta))$, so the MLE is the model KL-closest to the data's histogram.
+
+<Figure
+  src="./figures/kl-projection.svg"
+  alt="The one-parameter model family drawn as a curve inside the space of all distributions, with the empirical distribution as a point off the curve and a dashed segment to its KL-closest point on the curve, the MLE"
+  caption="Fitting as projection: each candidate theta is a point on the curve, and the MLE is the one KL-closest to the empirical distribution. A family that misses the data's histogram entirely still has a closest point."
+/>
+
+<KeyFact>
+Three descriptions, one estimator: maximize the likelihood $=$ minimize empirical risk under log-loss $=$ minimize the KL divergence from the empirical distribution to the model. Losses in this course are not chosen by taste; they are negative log-likelihoods of noise models.
+</KeyFact>
+
+<Example title="least squares is Gaussian maximum likelihood">
+Model a scalar response as a line plus Gaussian noise: $y_i = w x_i + b + \varepsilon_i$ with $\varepsilon_i$ iid $\mathcal{N}(0, \sigma^2)$, so $p(y_i \mid x_i) = \mathcal{N}(y_i \mid w x_i + b, \sigma^2)$. The negative log-likelihood of the responses is
+
+$$
+-\ell(w, b) = \frac{1}{2\sigma^2} \sum_{i=1}^n \big( y_i - w x_i - b \big)^2 + \frac{n}{2}\log(2\pi\sigma^2).
+$$
+
+For fixed $\sigma^2$, the second term is constant and the prefactor $1/2\sigma^2$ is positive, so minimizing the NLL in $(w, b)$ is exactly minimizing the sum of squared residuals: **least squares is the MLE under Gaussian noise**. Squared error was never an arbitrary choice; it is the assumption "the scatter around the line is Gaussian", made quantitative.
+</Example>
+
+<Ref lesson="ols">The linear-model module</Ref> redoes this in matrix form and adds the geometry; <Ref lesson="logistic-regression">the classification module</Ref> runs the same move on a Bernoulli response and obtains the cross-entropy loss; <Ref lesson="glm">the GLM lesson</Ref> mechanizes the correspondence for a whole family of noise models. In each case the modeling decision is the distribution, and the loss follows.
+
+## The first failure, mild: the variance estimate is biased
+
+An estimator produced by maximizing fit ought, one would expect, to at least be centered on the truth. The Gaussian variance shows the opposite: the recipe's output is systematically too small, by a computable factor.
+
+Take $n = 2$ observations from $\mathcal{N}(\mu, \sigma^2)$. The fitted mean is the midpoint $\bar{x} = (x_1 + x_2)/2$, and the fitted variance collapses to a function of the gap:
+
+$$
+\hat{\sigma}^2 = \frac{(x_1 - \bar{x})^2 + (x_2 - \bar{x})^2}{2} = \frac{(x_1 - x_2)^2}{4}.
+$$
+
+Since $x_1 - x_2$ has mean $0$ and variance $2\sigma^2$, $\;\mathbb{E}[(x_1-x_2)^2] = 2\sigma^2$ and $\mathbb{E}[\hat\sigma^2] = \sigma^2/2$: on average, **half** the true variance. The mechanism: the fitted Gaussian measures spread around the sample mean, which has chased the sample, so the sample always looks tighter from $\bar{x}$ than it does from $\mu$.
+
+<Figure
+  src="./figures/sigma-bias.svg"
+  alt="Three two-point samples from the same wide Gaussian, each with its fitted Gaussian centered between the two points and visibly narrower than the truth"
+  caption="Three samples of n = 2 from one Gaussian (dashed): every fitted curve (solid) is too narrow, because spread is measured from the sample's own mean. Recreated from Bishop, PRML Fig. 1.15."
+/>
+
+The general statement follows from one decomposition. For any sample, expanding $x_i - \mu = (x_i - \bar{x}) + (\bar{x} - \mu)$ and summing squares (the cross term vanishes because $\sum_i (x_i - \bar{x}) = 0$):
+
+$$
+\sum_{i=1}^n (x_i - \mu)^2 = \sum_{i=1}^n (x_i - \bar{x})^2 + n(\bar{x} - \mu)^2 .
+$$
+
+Take expectations. The left side is $n\sigma^2$; the last term is $n \operatorname{Var}(\bar{x}) = n \cdot \sigma^2/n = \sigma^2$. Hence $\mathbb{E}\big[\sum_i (x_i - \bar{x})^2\big] = (n-1)\sigma^2$ and
+
+$$
+\mathbb{E}\big[\hat{\sigma}^2\big] = \frac{n-1}{n}\, \sigma^2 .
+$$
+
+This is *bias* in exactly <Ref lesson="bias-variance">the decomposition lesson's</Ref> sense: a nonzero $\mathbb{E}[\hat\theta] - \theta$, a systematic miss that no averaging over samples removes. Dividing by $n - 1$ instead of $n$ makes the estimator unbiased (that is the textbook "sample variance"), and the two conventions coexist in software to this day. The disease is real but mild: the factor $(n-1)/n \to 1$, so the bias dies at rate $1/n$, and at $n = 100$ it is a one-percent effect. Whether the unbiased version is actually *better* is a different question, and the answer is no: the refutation exercise at the chapter's end shows the biased MLE has the smaller mean squared error, the first working instance of the bias-for-variance trade module 1 previewed.
+
+## The second failure, catastrophic: zero counts
+
+The variance bias shrank as $1/n$, which invites the conclusion that maximum likelihood's failures are all of that kind: errors that more data repairs. The Bernoulli boundary case breaks the pattern: its cost is infinite, and for rare events no realistic sample size prevents it.
+
+Let the truth be $\theta^* = 0.01$ and the sample $n = 34$ flips. The probability of seeing no heads at all is $0.99^{34} \approx 0.71$: the *typical* outcome. The recipe then returns $\hat\theta = k/n = 0$, and the model $\mathrm{Bernoulli}(0)$ declares heads impossible. Its true risk under log-loss, by the entropy-plus-KL split, is
+
+$$
+R(\hat{\theta}) = \theta^* \cdot \big( -\log 0 \big) + (1 - \theta^*) \cdot \big( -\log 1 \big) = \infty :
+$$
+
+the first future head costs an infinite loss, and one is coming: the event has probability $1$ in the long run. The persistence scales as $1/\theta^*$: the all-zeros probability $(1-\theta^*)^n$ stays at $\tfrac{1}{2}$ or above until $n$ reaches $\log 2 \,/\, \big({-\log(1-\theta^*)}\big) \approx 0.69/\theta^*$ — $n = 69$ for this coin, about $6{,}900$ for a one-in-ten-thousand event — so for rare events, samples of any realistic size *usually* produce an estimator with infinite risk. This is the black-swan problem of classical philosophy in estimation form (Europeans, having recorded only white swans, priced a black one at impossible, until Dutch explorers found black swans in Australia in 1697), and it is <Ref lesson="statistical-learning">the memorizer</Ref>'s ghost: a model that fits the observed counts perfectly, wrong about the distribution in the most expensive way available.
+
+<Figure
+  src="./figures/allzeros-probability.svg"
+  alt="The probability of observing no heads in n flips of a coin with heads probability 0.01, decaying from 1, marked at 0.71 for n equal to 34, at one half near n equal to 69, and at 0.13 for n equal to 200"
+  caption="How long the catastrophe persists: for a 1-in-100 event, the all-zeros sample — and with it the infinite-risk estimate — stays the majority outcome to n = 69 and remains a one-in-seven event at n = 200."
+/>
+
+<KeyFact>
+A single unobserved category makes the maximum-likelihood risk infinite under log-loss: $\hat\theta$ assigns probability zero to an event of positive probability, and $-\log 0 = \infty$. Smoothing the estimate away from the boundary is not a cosmetic adjustment; it converts infinite risk into finite risk.
+</KeyFact>
+
+## The repair, worked to the end: a prior on the coin
+
+The failure is that the data alone, in small samples, can assert certainty the world does not contain. The repair is to give $\theta$ its own distribution (a *prior* $p(\theta)$, chosen before the data) and to combine it with the likelihood by Bayes' rule into a *posterior* $p(\theta \mid S) \propto p(S \mid \theta)\, p(\theta)$. For the coin, one family of priors makes every step closed-form. The *Beta distribution* $\mathrm{Beta}(a, b)$, a density on $[0,1]$ with shape parameters $a, b > 0$, is
+
+$$
+p(\theta) = \frac{\theta^{\,a-1} (1-\theta)^{\,b-1}}{B(a,b)},
+$$
+
+with $B(a,b)$ the normalizing constant. Its shape mimics a likelihood that has already seen $a - 1$ heads and $b - 1$ tails; $\mathrm{Beta}(1,1)$ is the uniform distribution, and $\mathrm{Beta}(2,2)$ is a gentle bump preferring $\theta$ near $\tfrac12$.
+
+<Example title="the Beta posterior, in two lines">
+With $k$ heads in $n$ flips, the posterior is the product of likelihood and prior, normalized:
+
+$$
+p(\theta \mid S) \;\propto\; \theta^{k}(1-\theta)^{n-k} \cdot \theta^{\,a-1}(1-\theta)^{\,b-1}
+\;=\; \theta^{\,(a + k) - 1} (1-\theta)^{\,(b + n - k) - 1},
+$$
+
+which is again a Beta shape:
+
+$$
+p(\theta \mid S) = \mathrm{Beta}\big(\theta \mid a + k,\; b + n - k\big).
+$$
+
+The prior's parameters simply add to the data's counts — the prior acts as $a + b$ **pseudo-counts**, $a$ of them heads — and the posterior stays in the prior's family, a property called *conjugacy*. For the running coin (5 heads, 2 tails) under a $\mathrm{Beta}(2,2)$ prior, the posterior is $\mathrm{Beta}(7, 4)$.
+</Example>
+
+<Figure
+  src="./figures/beta-update.svg"
+  alt="Prior Beta(2,2), scaled likelihood for 5 heads and 2 tails, and posterior Beta(7,4) as three curves on the same axes, with the MAP 2/3 and MLE 5/7 marked"
+  caption="Bayes' rule as count addition: 2+5 pseudo-and-observed heads, 2+2 tails. The posterior peak sits between the prior's and the likelihood's."
+/>
+
+A point estimate from the posterior is one maximization away, and it is the same maximization as before with the log-prior along for the ride.
+
+<Definition title="MAP estimation">
+The **maximum a posteriori** (MAP) estimate is the posterior mode:
+$$
+\hat{\theta}_{\text{MAP}} = \arg\max_\theta\, p(\theta \mid S) = \arg\max_\theta\, \big[ \log p(S \mid \theta) + \log p(\theta) \big],
+$$
+since the normalizing constant of the posterior does not depend on $\theta$. A uniform prior makes the second term constant, and MAP reduces to maximum likelihood.
+</Definition>
+
+For the Beta posterior, the objective $(a+k-1)\log\theta + (b+n-k-1)\log(1-\theta)$ has exactly the Bernoulli log-likelihood's shape, so the recipe's Bernoulli answer applies with shifted counts:
+
+$$
+\hat{\theta}_{\text{MAP}} = \frac{k + a - 1}{n + a + b - 2}.
+$$
+
+Under $\mathrm{Beta}(2,2)$ this is $\dfrac{k+1}{n+2}$ — **add-one smoothing**, the rule of adding one fictitious head and one fictitious tail. The numbers for the running coin: MLE $5/7 \approx 0.714$, MAP $6/9 = 2/3 \approx 0.667$, pulled toward the prior's $\tfrac12$. For the catastrophic case ($0$ heads in $3$ flips) the MLE is $0$ and its risk infinite, while add-one gives $\hat\theta = 1/5$: strictly inside $(0,1)$, hence finite risk, whatever the true $\theta^*$ (the mixed-review exercise computes it). The same construction with a Dirichlet prior smooths the categorical model's $K$ counts at once; <Ref lesson="naive-bayes">the naive Bayes lesson</Ref> uses exactly that to keep a text classifier's unseen words from zeroing out whole documents.
+
+The posterior holds more than its mode. Its mean is $\dfrac{a + k}{a + b + n}$, which rearranges into a weighted average of prior guess and data estimate:
+
+$$
+\mathbb{E}[\theta \mid S] = \lambda \cdot \frac{a}{a+b} + (1 - \lambda) \cdot \frac{k}{n},
+\qquad
+\lambda = \frac{a + b}{a + b + n}.
+$$
+
+<Figure
+  src="./figures/shrinkage-weight.svg"
+  alt="The prior weight lambda equal to 4 over 4 plus n and the data weight 1 minus lambda plotted against n for a Beta(2,2) prior, crossing at n equal to 4, with the running coin's n equal to 7 marked at lambda equal to 4/11"
+  caption="Priors govern small samples; data governs large ones: the two weights cross where the real count n matches the a + b = 4 pseudo-counts, and never again."
+/>
+
+For the running coin: $\tfrac{4}{11} \cdot \tfrac12 + \tfrac{7}{11} \cdot \tfrac57 = \tfrac{7}{11} \approx 0.636$, *shrunk* from the MLE toward the prior mean by a factor set by the ratio of pseudo-counts to real counts; as $n$ grows, $\lambda \to 0$ and every Bayes-flavored estimate converges to the MLE.
+
+## The penalty dictionary: regularizers are log-priors
+
+The MAP objective, written as a minimization, is the negative log-likelihood plus $-\log p(\theta)$. The first term is module 1's empirical risk (times $n$); the second is a function that penalizes parameter values the prior disfavors. Every choice of prior is therefore a choice of penalty, and the two priors that dominate practice have penalties this course will use for the rest of its length.
+
+**Gaussian prior.** Give each coordinate of a weight vector $w \in \mathbb{R}^d$ an independent $\mathcal{N}(0, \tau^2)$ prior. Then
+
+$$
+-\log p(w) = \sum_{j=1}^d \frac{w_j^2}{2\tau^2} + \text{const} = \frac{1}{2\tau^2} \lVert w \rVert_2^2 + \text{const},
+$$
+
+a quadratic penalty on size. Combined with the Gaussian-noise NLL of the least-squares example, the MAP objective becomes $\sum_i (y_i - w x_i - b)^2 + \lambda \lVert w \rVert_2^2$ with $\lambda = \sigma^2 / \tau^2$: penalized least squares, the estimator <Ref lesson="ridge-lasso">the ridge lesson</Ref> analyzes in matrix form. The strength has a meaning, not just a dial: it is the **noise-to-prior variance ratio**, large when the data is noisy or the prior confident, exactly when shrinking toward zero should win.
+
+**Laplace prior.** The double-exponential density $p(w_j) \propto e^{-|w_j|/b}$ gives $-\log p(w) = \tfrac{1}{b} \lVert w \rVert_1 + \text{const}$: the absolute-value penalty whose corner at zero produces exactly-zero coefficients, the lasso of the same lesson.
+
+<Figure
+  src="./figures/penalty-dictionary.svg"
+  alt="The MAP objective with the log-prior term braced as the penalty, and two rows: a Gaussian density silhouette mapping to the squared L2 penalty (ridge), a Laplace density silhouette mapping to the L1 penalty (lasso)"
+  caption="The dictionary read in both directions: a prior determines a penalty; a penalty confesses a prior."
+/>
+
+<KeyFact>
+The dictionary is bidirectional and is used both ways all course: Gaussian prior $\leftrightarrow$ $\ell_2$ penalty (ridge), Laplace prior $\leftrightarrow$ $\ell_1$ penalty (lasso), Dirichlet pseudo-counts $\leftrightarrow$ smoothing. Whenever a later lesson adds a penalty to a loss, it is doing MAP estimation, and the implied prior can be read off by exponentiating the negative penalty.
+</KeyFact>
+
+One honest caveat closes the construction. MAP is still a **point estimate**: of the whole posterior, it keeps the mode's location and discards the spread. The same posterior $\mathrm{Beta}(7,4)$ that produced $2/3$ also carries a standard deviation of about $0.14$, an honest statement of how little seven flips settle. It is also tied to the parameterization: the mode of a density moves under a change of variables (the starred section below contrasts this with a clean property of the MLE). The road that keeps the whole posterior (predicting by integrating $\theta$ out rather than plugging any point estimate in) is <Ref lesson="bayesian-linear-regression">module 10's</Ref>; one taste of it: under a *uniform* prior, the fully Bayesian predictive probability of heads is $\tfrac{k+1}{n+2}$, add-one smoothing again, this time from marginalization rather than from a $\mathrm{Beta}(2,2)$ mode.
+
+What stands established: estimation has one engine — write the log-likelihood, differentiate, solve — and its outputs are the classical estimators; the engine is empirical risk minimization under log-loss, equivalently KL projection of the empirical distribution onto the model; it fails mildly on the Gaussian variance and catastrophically on zero counts; and the repair, a prior, adds a log-penalty to the objective, with Gaussian and Laplace priors yielding the $\ell_2$ and $\ell_1$ penalties the rest of the course spends. What stands open is a floor: the recipe produces *an* estimator, and nothing yet says how good any estimator can be. <Ref lesson="fisher-information">The next lesson</Ref> answers with the likelihood's own curvature — the Fisher information — and a bound, Cramér–Rao, that no unbiased estimator beats; the closing forward exercise lands on its doorstep.
+
+## ★ The invariance property
+
+A practical question the recipe seems not to answer: the MLE of $\theta$ is in hand, but the quantity of interest is a function of it: the odds $\theta/(1-\theta)$, the standard deviation $\sigma = \sqrt{\sigma^2}$, a failure probability $e^{-\lambda t}$. No new maximization is needed.
+
+<Theorem title="invariance of the MLE (Casella &amp; Berger 7.2.10)">
+If $\hat{\theta}$ is the MLE of $\theta$, then for any function $g$, the MLE of $g(\theta)$ is $g(\hat{\theta})$.
+
+<Proof>
+When $g$ is one-to-one this is bookkeeping: maximizing over $\eta = g(\theta)$ traverses the same likelihood values as maximizing over $\theta$, so the maximum sits at $\eta = g(\hat\theta)$. When $g$ is many-to-one, "the likelihood of $\eta$" needs a definition, and the right one is the *induced likelihood* $L^*(\eta) = \sup_{\theta : g(\theta) = \eta} L(\theta)$: the best likelihood achievable by any parameter mapping to $\eta$. Its supremum over $\eta$ sweeps out exactly $\sup_\theta L(\theta) = L(\hat\theta)$, and the value $\eta = g(\hat\theta)$ attains it, since $\hat\theta$ itself lies in the set $\{\theta : g(\theta) = g(\hat\theta)\}$. Hence $g(\hat\theta)$ maximizes $L^*$.
+</Proof>
+</Theorem>
+
+For the running coin, the MLE of the odds is $(5/7)/(2/7) = 2.5$ with no further work, and the MLE of $\sigma$ in the Gaussian example is $\sqrt{\hat\sigma^2}$. The property is special to maximum likelihood: it fails for MAP, because a change of variables multiplies a *density* by a Jacobian factor, which relocates the mode: the MAP estimate of $\log$-odds is not the $\log$ of the MAP odds. An estimator built from the likelihood alone commutes with reparameterization; one built from a posterior density does not. (It also fails for unbiasedness: $\mathbb{E}[g(\hat\theta)] \ne g(\mathbb{E}[\hat\theta])$ for nonlinear $g$, which is one more reason the next lesson's optimality theory is stated for the likelihood's own quantities.)
+
+## Exercises
+
+<Exercise>
+Four measured lifetimes of a component are $0.4,\ 1.1,\ 1.7,\ 2.8$ (years). Model them as iid exponential, $p(x \mid \lambda) = \lambda e^{-\lambda x}$ for $x \ge 0$, with rate $\lambda > 0$. Compute the MLE $\hat\lambda$, verify it is a maximum, and state the MLE of the mean lifetime $1/\lambda$.
+
+<Solution>
+Strategy: the recipe on a new family.
+
+$$
+\ell(\lambda) = \sum_{i=1}^4 \big( \log \lambda - \lambda x_i \big) = 4 \log \lambda - 6\lambda,
+$$
+
+using $\sum_i x_i = 6.0$. Then $\ell'(\lambda) = 4/\lambda - 6 = 0$ gives $\hat{\lambda} = 4/6 = 2/3$ per year, and $\ell''(\lambda) = -4/\lambda^2 < 0$ everywhere confirms the global maximum. In general $\hat\lambda = n / \sum_i x_i = 1/\bar{x}$: the empirical rate. The MLE of the mean lifetime is $1/\hat\lambda = \bar{x} = 1.5$ years, either directly (the exponential's mean parameterization has MLE $\bar x$ by the same recipe) or in one step by the invariance property of the starred section, applied to $g(\lambda) = 1/\lambda$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Finish the categorical derivation. From the stationarity condition $N_j = \lambda\, \theta_j$ of the body's Lagrangian: (a) solve for $\lambda$ and conclude $\hat{\theta}_j = N_j/n$; (b) certify that this is the global constrained maximum, not merely a stationary point; one clean route uses this lesson's KL identity rather than second derivatives; (c) state what the solution does when some $N_j = 0$, and why no interior maximum exists in that case.
+
+<Solution>
+(a) Sum the condition over $j$: $\sum_j N_j = \lambda \sum_j \theta_j$. The left side is $n$ and the constraint forces the right sum to $1$, so $\lambda = n$ and $\hat{\theta}_j = N_j / n$.
+
+(b) For any feasible $\theta$ and the empirical distribution $\hat{p}_j = N_j/n$,
+$$
+\ell(\hat{p}) - \ell(\theta) = \sum_j N_j \log \frac{\hat p_j}{\theta_j} = n \sum_j \hat{p}_j \log \frac{\hat{p}_j}{\theta_j} = n\, \mathrm{KL}(\hat{p} \,\|\, \theta) \ge 0,
+$$
+by the theorem's nonnegativity clause, with equality only at $\theta = \hat{p}$. So $\hat p$ beats every competitor on the simplex at once, a global certificate no local second-order check provides.
+
+(c) If $N_j = 0$, the formula returns $\hat\theta_j = 0$, a boundary point: the objective contains no $\log \theta_j$ term to push $\theta_j$ off zero, and any mass on category $j$ is mass stolen from categories that do appear in the data. This is the zero-count failure in $K$-way form: one unseen category, and the fitted model prices its first appearance at $-\log 0 = \infty$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a single Gaussian observation. With $n = 1$, the recipe's formulas give $\hat\mu = x_1$ and $\hat{\sigma}^2 = 0$. (a) Show that the likelihood $L(\mu, \sigma^2)$ is actually unbounded as $\sigma^2 \to 0$ with $\mu = x_1$, so the degenerate answer is what maximization genuinely wants. (b) State exactly which use of the estimate breaks. (c) Show that MAP with any prior on $\sigma^2$ whose density decays like $e^{-\beta/\sigma^2}$ near zero (an inverse-gamma prior, for instance) restores a strictly positive variance estimate.
+
+<Solution>
+(a) At $\mu = x_1$ the exponent vanishes and $L = (2\pi\sigma^2)^{-1/2} \to \infty$ as $\sigma^2 \to 0$. The "estimate" $\hat\sigma^2 = 0$ is the supremum's location; no interior maximum exists.
+
+(b) Prediction breaks. The plug-in predictive density $\mathcal{N}(x_1, 0)$ is a point mass at $x_1$: it assigns density zero (log-loss $+\infty$) to every future observation except the one value already seen, and probability one to an event (exact repetition) of probability zero. Any downstream computation that evaluates a density (log-loss risk, a likelihood-ratio, a GLM deviance) is destroyed; the mean estimate $\hat\mu = x_1$, by contrast, is crude but usable.
+
+(c) With prior $p(\sigma^2) \propto (\sigma^2)^{-\alpha-1} e^{-\beta/\sigma^2}$, the log-posterior in $v = \sigma^2$ (at $\mu = x_1$) is $-\tfrac12 \log v - (\alpha + 1)\log v - \beta/v + \text{const}$. As $v \to 0$ the term $-\beta/v \to -\infty$ faster than the $\log$ terms diverge upward, so the boundary is repelled; setting the derivative to zero gives $\hat{v}_{\text{MAP}} = \beta / (\alpha + \tfrac32) > 0$. The transferable point: the likelihood's divergence is polynomial in $1/\sigma$, the prior's suppression is exponential, and any proper prior with that behavior converts an unbounded maximization into a well-posed one, the same repair as add-one smoothing on a continuous parameter.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "maximum likelihood picks the parameter best supported by the data, so the MLE is unbiased." Then refute the repaired version, "biased estimators are worse": exhibit an unbiased estimator and a biased one for the same quantity where the biased one has strictly smaller mean squared error, and name the trade.
+
+<Solution>
+The first claim dies on the Gaussian variance: $\mathbb{E}[\hat\sigma^2_{\text{MLE}}] = \tfrac{n-1}{n}\sigma^2 \ne \sigma^2$ for every $n$ and every $\sigma^2 > 0$. The failing step is the inference from "maximizes fit" to "centered on the truth": maximization is a statement about the observed sample, bias about the average over samples, and nothing links them. (The invariance property sharpens the point: if $\hat\theta$ were unbiased for $\theta$, $g(\hat\theta)$ would generally not be unbiased for $g(\theta)$, yet both are MLEs.)
+
+For the second claim, compare the two variance estimators on Gaussian data, $s^2 = \tfrac{1}{n-1}\sum_i (x_i - \bar x)^2$ (unbiased) and $\hat\sigma^2_{\text{MLE}} = \tfrac{n-1}{n} s^2$ (biased). Using $\operatorname{Var}(s^2) = 2\sigma^4/(n-1)$:
+$$
+\mathrm{MSE}(s^2) = \frac{2\sigma^4}{n-1},
+\qquad
+\mathrm{MSE}(\hat\sigma^2_{\text{MLE}}) = \Big(\tfrac{n-1}{n}\Big)^2 \frac{2\sigma^4}{n-1} + \Big(\tfrac{\sigma^2}{n}\Big)^2 = \frac{(2n-1)\,\sigma^4}{n^2}.
+$$
+Cross-multiplying, $(2n-1)(n-1) = 2n^2 - 3n + 1 < 2n^2$ for every $n \ge 2$ (at $n = 1$, $s^2$ is undefined): the MLE's MSE is strictly smaller, at $n = 2$ by $0.75\sigma^4$ against $2\sigma^4$. The trade is <Ref lesson="bias-variance">the decomposition lesson's</Ref>: the shrunken estimator accepts a small squared bias and buys a larger variance reduction, the same arithmetic that will justify ridge regression's deliberate bias.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. A coin with true $\theta^* = 0.1$ is flipped $3$ times and lands all tails. Using module 1's definition of risk with log-loss as the loss: (a) compute the risk of the MLE $\hat\theta = 0$; (b) compute the risk of the add-one estimate; (c) split the answer to (b) into its entropy and KL parts and say what each part is the price of.
+
+<Solution>
+(a) $R(0) = \theta^* (-\log 0) + (1-\theta^*)(-\log 1) = \infty$: the memorizer's arithmetic, in one parameter.
+
+(b) Add-one gives $\hat\theta = (0+1)/(3+2) = 1/5$. Then
+$$
+R(1/5) = 0.1 \log \frac{1}{0.2} + 0.9 \log \frac{1}{0.8} = 0.1(1.609) + 0.9(0.223) = 0.362 \text{ nats}.
+$$
+
+(c) By the theorem, $R = H(p^*) + \mathrm{KL}(p^* \| p_{\hat\theta})$. The entropy of $\mathrm{Bernoulli}(0.1)$ is $0.1 \log 10 + 0.9 \log \tfrac{10}{9} = 0.325$ nats: the irreducible part, paid even by $\hat\theta = \theta^*$, the log-loss analogue of module 1's Bayes floor. The remainder, $0.362 - 0.325 = 0.037$ nats, is the KL term: the finite, shrinkable price of estimating $0.2$ where the truth is $0.1$ from three flips. The comparison with (a) is the section's point: smoothing converts an infinite excess into a $0.037$-nat one.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the dictionary in both directions, on the body's regression example $y_i = w x_i + b + \varepsilon_i$. (a) Replace the Gaussian noise with Laplace noise, $\varepsilon_i$ iid with density $p(\varepsilon) = \tfrac{1}{2\beta} e^{-|\varepsilon|/\beta}$, and derive the loss that maximum likelihood tells you to minimize. (b) A colleague fits $\sum_i (y_i - w x_i - b)^2 + \lambda \lVert w \rVert_2^2$ with $\lambda = 4$ and estimates the noise variance at $\sigma^2 = 2$. State the prior on each coordinate of $w$ that this objective implicitly assumes. (c) Using (a), say in one sentence why the Laplace-noise fit is less disturbed by a single wildly wrong $y_i$ than least squares is.
+
+<Solution>
+(a) The negative log-likelihood of the responses is
+$$
+-\ell(w, b) = \frac{1}{\beta} \sum_{i=1}^n \big| y_i - w x_i - b \big| + n \log(2\beta),
+$$
+so for fixed $\beta$ the MLE minimizes the sum of **absolute** residuals: Laplace noise stands to least absolute deviations exactly as Gaussian noise stands to least squares. Same dictionary, different row — the noise model, not taste, picks the loss.
+
+(b) Read the penalty back through $\lambda = \sigma^2/\tau^2$: $\tau^2 = \sigma^2/\lambda = 2/4 = 0.5$, so the objective is MAP under an independent $\mathcal{N}(0, 0.5)$ prior on each $w_j$. Equivalently, exponentiate the negative penalty: $e^{-\lambda w_j^2 / 2\sigma^2} = e^{-w_j^2 / 1}$ per coordinate (up to normalization), a mean-zero Gaussian with variance $\sigma^2/\lambda$. The colleague has assumed, whether they meant to or not, that weights of magnitude much above $\sqrt{0.5} \approx 0.7$ are improbable.
+
+(c) An outlier at distance $r$ from the line costs $r^2/2\sigma^2$ under the Gaussian model but only $r/\beta$ under Laplace: the linear tail prices large residuals as merely unlikely rather than astronomically so, so one bad point cannot dominate the sum and drag the whole line toward itself.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. For the Bernoulli MLE $\hat\theta = k/n$: (a) compute $\operatorname{Var}(\hat\theta)$ exactly; (b) evaluate the quantity $1/\big(n I(\theta)\big)$ for $I(\theta) = \dfrac{1}{\theta(1-\theta)}$, and compare; (c) with $n = 34$ and $\theta = 0.5$, give the numerical standard deviation of $\hat\theta$.
+
+<Solution>
+(a) $k$ is a sum of $n$ independent Bernoulli variables, so $\operatorname{Var}(k) = n\theta(1-\theta)$ and
+$$
+\operatorname{Var}(\hat\theta) = \frac{\theta(1-\theta)}{n}.
+$$
+
+(b) $1/(n I(\theta)) = \theta(1-\theta)/n$: identical, for every $\theta$ and $n$.
+
+(c) $\sqrt{0.25/34} \approx 0.086$: on 34 flips of a fair coin, the estimate typically misses the truth by nearly nine percentage points — about three flips' worth of heads ($\operatorname{sd}(k) = \sqrt{34 \cdot 0.25} \approx 2.9$).
+
+The match in (b) is not a coincidence to admire but a theorem to prove: the function $I(\theta)$ is the *Fisher information* of one Bernoulli observation, and <Ref lesson="fisher-information">the next lesson</Ref> shows that $1/(nI(\theta))$ is a floor (the Cramér–Rao bound) under the variance of *every* unbiased estimator of $\theta$, with the MLE attaining it here exactly and in general asymptotically. You have just computed both sides of that theorem for its simplest case.
+</Solution>
+</Exercise>
+
+<References>
+1. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §4.2: the MLE, its KL justification, and the worked Bernoulli/categorical/Gaussian estimates; §4.5.1: MAP for the Bernoulli, add-one smoothing, and the black-swan framing; §4.6.2: the beta-binomial model in full (posterior, mode, mean, variance, predictive). Free online: https://probml.github.io/pml-book/book1.html
+2. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — §24.1: maximum likelihood as ERM with log-loss, the entropy-plus-KL risk decomposition, and the zero-estimate example with its infinite-risk analysis. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+3. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.2.4: the Gaussian MLE and the $(N-1)/N$ bias with Fig. 1.15 (recreated in this chapter); §1.2.5: regularized curve fitting as MAP with $\lambda = \alpha/\beta$; §2.1–2.2: Beta and Dirichlet conjugacy. Free online: https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+4. G. Casella, R. L. Berger, *Statistical Inference*, 2nd ed., Duxbury, 2002 — §6.3.1: the likelihood function as the data's summary; §7.2.2: MLE definition, the boundary caveat, and Theorem 7.2.10 (invariance), whose proof the starred section follows.
+</References>

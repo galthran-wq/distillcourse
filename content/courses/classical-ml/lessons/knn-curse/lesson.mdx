@@ -1,0 +1,369 @@
+The simplest classifier — vote among the nearest training points — is asymptotically within a factor of two of optimal, and high dimensionality is exactly what breaks it.
+
+<Ref lesson="statistical-learning">The statistical learning lesson</Ref> established that risk, not training error, is the object of learning, and exhibited 1-NN as the flexible extreme of its two postures; <Ref lesson="bias-variance">the bias–variance lesson</Ref> priced that flexibility exactly: variance $\sigma^2/k$ against a bias set by how far the $k$ nearest inputs sit from the query. Both left one premise unexamined: that the nearest training points are actually near. This lesson examines it, and gets the course's first complete verdict on a concrete algorithm: the strongest guarantee flexibility ever earns, and the exact law by which dimension revokes it. The route: the rule and its metric; $k$ as the dial, worked live; the Cover–Hart factor-of-two guarantee; a finite-sample bound whose rate $n^{-1/(d+1)}$ carries the dimension in the exponent; the geometry behind that exponent, in three computations; the matching lower bound that convicts every method, not just this one; and the reasons the verdict is routinely suspended on real data.
+
+## The rule: the training set is the model
+
+Every method after this one fits parameters; $k$-NN fits nothing. It stores the sample and answers queries by lookup, which makes it the cleanest possible test case for the course's question: whatever generalization it achieves cannot come from a model, so it must come entirely from the geometry of the data. The whole algorithm fits in one computation.
+
+<Example title="3-NN by hand">
+Six labeled training points in two dimensions and a query $q = (3, 3)$:
+
+| point | $x_1$ | $x_2$ | label | $\lVert x - q \rVert^2$ |
+| --- | --- | --- | --- | --- |
+| $a$ | 1 | 2 | green | $4 + 1 = 5$ |
+| $b$ | 2 | 4 | blue | $1 + 1 = 2$ |
+| $c$ | 3 | 1 | green | $0 + 4 = 4$ |
+| $d$ | 4 | 4 | blue | $1 + 1 = 2$ |
+| $e$ | 5 | 2 | green | $4 + 1 = 5$ |
+| $f$ | 5 | 5 | blue | $4 + 4 = 8$ |
+
+Sorting by distance: $b$ and $d$ at $\sqrt{2}$, then $c$ at $2$, then $a$ and $e$ at $\sqrt{5}$, then $f$. The $k = 3$ neighbor set is $\{b, d, c\}$; the vote is blue 2, green 1, so the prediction is **blue**. If the six points carried numeric targets instead of labels, the regression prediction would be the mean target over $\{b, d, c\}$.
+</Example>
+
+<Definition title="k-nearest-neighbor rule">
+Given training pairs $(x_1, y_1), \dots, (x_n, y_n)$, a distance $\rho$, and a query $x$, let $x_{(1)}, \dots, x_{(k)}$ denote the $k$ training inputs closest to $x$ under $\rho$. The $k$-NN **classifier** predicts the majority label among $y_{(1)}, \dots, y_{(k)}$; the $k$-NN **regressor** predicts the average $\tfrac{1}{k}\sum_{\ell=1}^{k} y_{(\ell)}$.
+</Definition>
+
+<Figure
+  src="./figures/knn-vote.svg"
+  alt="Two panels with the same twelve labeled points and an amber query: a k = 3 circle whose vote is blue 2 to green 1, and a k = 11 circle whose vote is green 6 to blue 5"
+  caption="One query, one training set, two dials: the 3 nearest points vote blue, the 11 nearest vote green."
+/>
+
+Both forms estimate the same object. <Ref lesson="statistical-learning">The statistical learning lesson</Ref> derived the Bayes predictor: the conditional mean under squared loss, the majority class under 0–1 loss, both functions of the conditional distribution at the query. The neighbor average $\tfrac1k \sum y_{(\ell)}$ estimates $\mathbb{E}[Y \mid X = x]$ by relaxing "conditioning at $x$" to "conditioning near $x$", and the vote thresholds the same estimate at $\tfrac12$.
+
+The distance is a genuine hyperparameter, and the default Euclidean choice silently trusts the units. Customers described by (age in years, income in dollars): query $(30, 60000)$, candidate A $(31, 61000)$, candidate B $(55, 60500)$. Raw squared distances put A at $1 + 1000^2 \approx 10^6$ and B at $625 + 500^2 \approx 2.5 \times 10^5$: the metric declares the 55-year-old the nearer neighbor because a 500-dollar gap outweighs a 25-year one, and age never enters the comparison. Standardizing each feature to unit variance reverses the ranking. Scaling before any distance computation is mandatory, and <Ref lesson="feature-engineering">the feature engineering lesson</Ref> treats the general problem; here it is one sentence of hygiene. Cost is the mirror image of a parametric fit: training is free, but each prediction scans the sample, $O(nd)$ per query.
+
+<KeyFact>
+Every guarantee and every failure below is a statement about whether the labels being averaged come from points whose conditionals $\eta(x) = \Pr(Y = 1 \mid X = x)$ match the query's. That criterion is the entire content of calling $k$-NN a *plug-in* Bayes classifier: the Bayes rule runs on an estimated conditional, and it inherits exactly the estimate's quality.
+</KeyFact>
+
+<Exercise>
+Eight training points, query $q = (2, 2)$, Euclidean distance: $a = (1,2)$ class A, $b = (3,3)$ B, $c = (4,2)$ B, $d = (0,3)$ A, $e = (3,0)$ A, $f = (5,4)$ B, $g = (0,0)$ B, $h = (5,5)$ A. Classify $q$ by 1-NN, 3-NN, and 5-NN. Write the three squared-distance computations before opening.
+
+<Solution>
+Squared distances to $q$: $a$: $1$; $b$: $2$; $c$: $4$; $d$ and $e$: $5$ each; $g$: $8$; $f$: $13$; $h$: $18$.
+
+**1-NN:** nearest is $a$, class **A**. **3-NN:** $\{a, b, c\}$, vote A 1, B 2: class **B**. **5-NN:** $\{a, b, c, d, e\}$, vote A 3, B 2: class **A**.
+
+The prediction flips twice as $k$ grows. Nothing about the query changed; the estimate of $\eta(q)$ did, as the average pulled in labels from farther away. Which of the three answers to trust is not decidable from the training data alone; that is the model-selection problem the next section puts a dial on.
+</Solution>
+</Exercise>
+
+## k is the bias–variance dial, worked live
+
+The flip in the exercise is the dial from <Ref lesson="bias-variance">the bias–variance lesson</Ref> moving through its range, and that lesson already derived the exact price list (ESL Eq. 7.10):
+
+$$
+\operatorname{Err}(x_0) = \sigma^2 + \Bigl[f(x_0) - \frac{1}{k}\sum_{\ell=1}^{k} f(x_{(\ell)})\Bigr]^2 + \frac{\sigma^2}{k}.
+$$
+
+Growing $k$ divides the variance by $k$ and widens the neighborhood the bias averages over. The two corners are predictors already met: at $k = 1$ each training point is its own nearest neighbor and training error is identically zero, the memorizer's signature softened into an inductive bias of pure proximity. At $k = n$ every query sees the same neighbor set and the classifier predicts the global majority class everywhere, a constant. Note the inversion: $1/k$, not $k$, is the flexibility axis, so the U-curve runs backwards along $k$.
+
+<Demo
+  name="KnnBoundaryExplorer"
+  caption="k-NN decision regions on a fixed two-class mixture; the k slider (odd values 1–51) redraws the regions and reports train error on the 100 memorized points and test error on 300 held-out points."
+/>
+
+<Task>
+Start at the $k = 1$ preset: train error is exactly $0.00$, and the regions contain small islands, each owned by a single training point sitting inside the other class's territory. Slide $k$ up and record the $k$ where test error bottoms out (it lands in the 9–15 range on this draw). Then push to $k = 51$ and watch test error rise again as the boundary oversmooths. The islands that vanish between $k = 1$ and the optimum are variance made visible; selecting $k$ by train error would keep every one of them.
+</Task>
+
+In practice $k$ is chosen by cross-validation, whose protocols <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> builds; odd $k$ avoids vote ties in binary problems. What no choice of $k$ can do is repair a neighborhood whose members are not near; that failure is what the rest of this lesson quantifies.
+
+## The guarantee: twice the Bayes error, from almost nothing
+
+Before the failure, the result that makes $k$-NN worth analyzing at all. The floor for any classifier was derived in <Ref lesson="statistical-learning">the statistical learning lesson</Ref>: predict the majority class of the conditional $\eta(x) = \Pr(Y = 1 \mid X = x)$ and pay $\min\{\eta(x), 1 - \eta(x)\}$ pointwise. That floor now gets its permanent name, because this lesson measures everything against it.
+
+<Definition title="Bayes error">
+For binary classification under 0–1 loss, the **Bayes error** is the risk of the Bayes classifier,
+$$
+R^* = \mathbb{E}_X\bigl[\min\{\eta(X),\, 1 - \eta(X)\}\bigr],
+$$
+the minimum risk any classifier can achieve on the distribution.
+</Definition>
+
+A concrete point first. Suppose $\eta(x) = 0.7$ at some query. The Bayes classifier predicts class 1 and errs with probability $0.3$. Now let the sample be so dense that the nearest neighbor $x_{(1)}$ essentially coincides with $x$. The 1-NN prediction is the neighbor's label: a fresh draw from a Bernoulli with the same bias $0.7$, independent of the query's own label. Two independent Bernoulli(0.7) draws disagree with probability $0.7 \cdot 0.3 + 0.3 \cdot 0.7 = 0.42$. So 1-NN pays $0.42$ where Bayes pays $0.30$: worse, but bounded by twice the floor, since $2\eta(1-\eta) \le 2\min\{\eta, 1-\eta\}$ at every point (the factor $\max\{\eta, 1-\eta\} \le 1$ is what gets discarded).
+
+<Figure
+  src="./figures/coverhart.svg"
+  alt="At a query with eta 0.7, the true label and the nearest neighbor's label are two independent draws from the same Bernoulli bias, disagreeing with probability 0.42, shown as an error bar between the Bayes error 0.30 and the cap 0.60"
+  caption="The whole argument at one point: the neighbor's label is a second coin with the query's own bias, and two coins disagree at most twice as often as the better coin errs."
+/>
+
+The general statement is due to [Thomas Cover and Peter Hart](https://isl.stanford.edu/~cover/papers/transIT/0021cove.pdf), whose 1967 paper opened the theoretical study of nearest neighbors by proving that this pointwise picture survives the limit.
+
+<Theorem title="Cover–Hart, 1967 (asymptotic form)">
+Under mild regularity conditions on the distribution, the risk $R_n$ of the 1-NN classifier on $n$ samples converges as $n \to \infty$ to
+$$
+R_\infty = \mathbb{E}_X\bigl[2\,\eta(X)(1 - \eta(X))\bigr],
+\qquad
+R^* \;\le\; R_\infty \;\le\; 2R^*(1 - R^*) \;\le\; 2R^*.
+$$
+
+<Proof>
+Sketch, following the pointwise computation. In any region of positive density, the distance from a query $x$ to its nearest sample point tends to zero as $n \to \infty$, so $\eta(x_{(1)}) \to \eta(x)$ for continuous $\eta$. The predicted label and the true label are then independent draws from (asymptotically) the same conditional, disagreeing with probability $\eta(x)(1-\eta(x)) + (1-\eta(x))\eta(x) = 2\eta(x)(1-\eta(x))$. Writing $r(x) = \min\{\eta(x), 1-\eta(x)\}$, this equals $2r(x)(1 - r(x)) \le 2r(x)$ pointwise; taking expectations gives $R_\infty \le 2R^*$. The sharper cap $2R^*(1-R^*)$ follows from Jensen's inequality, because $t \mapsto 2t(1-t)$ is concave; the lower bound $R^* \le R_\infty$ holds because no classifier beats Bayes.
+</Proof>
+</Theorem>
+
+The theorem is remarkable for what it does not assume: no model, no smoothness rate, no parametric family. Memorize the data, ask one neighbor, and asymptotically at most half the achievable performance is on the table. It also reads backwards: an observed 1-NN error rate bounds the Bayes error from below in the limit, so a 1-NN run at 10% says the problem's floor is asymptotically no better than 5%: a cheap diagnostic for how hard a classification problem can possibly be.
+
+<KeyFact>
+Asymptotically, 1-NN's risk is at most $2R^*(1 - R^*) \le 2R^*$, and the entire argument rests on one premise, $x_{(1)} \to x$. The theorem says nothing about any finite sample; whether the nearest neighbor of a real query is near is a question about $n$ against the dimension, and it is the next section's subject.
+</KeyFact>
+
+## The finite-sample bound: the dimension lives in the exponent
+
+Cover–Hart is a statement about the limit; an engineer holds $n$ points. A finite-sample bound closes the gap, at the price of an explicit smoothness assumption: the conditional $\eta$ is *$c$-Lipschitz*, meaning $|\eta(x) - \eta(x')| \le c\,\lVert x - x'\rVert$ for all $x, x'$: nearby points have nearby label probabilities, with $c$ setting how fast "nearby" decays. This is the "things that look alike have alike labels" intuition, made quantitative so that it can be charged for.
+
+<Theorem title="finite-sample 1-NN bound (Shalev-Shwartz &amp; Ben-David 19.3)">
+Let $\mathcal{X} = [0,1]^d$, $\mathcal{Y} = \{0,1\}$, and let $D$ be a distribution whose conditional probability $\eta$ is $c$-Lipschitz. Then the 1-NN rule $h_S$ on an i.i.d. sample $S$ of size $n$ satisfies
+$$
+\mathbb{E}_{S}\bigl[R(h_S)\bigr] \;\le\; 2R^* \;+\; 4\,c\,\sqrt{d}\; n^{-\frac{1}{d+1}}.
+$$
+
+<Proof>
+Sketch in three steps, each elementary.
+
+**Step 1: error ≤ 2·Bayes + c·(distance to the neighbor).** Repeating the Cover–Hart pointwise computation without taking limits, the probability that two draws from $\eta(x)$ and $\eta(x')$ disagree is $2\eta(x)(1-\eta(x)) + (\eta(x) - \eta(x'))(2\eta(x) - 1)$; bounding the second factor by 1 and applying Lipschitzness leaves $2\eta(x)(1-\eta(x)) + c\lVert x - x'\rVert$. Since $\mathbb{E}[\eta(1-\eta)] \le \mathbb{E}[\min\{\eta, 1-\eta\}] = R^*$, the expected 1-NN risk is at most $2R^* + c\,\mathbb{E}\lVert x - x_{(1)}\rVert$: the whole finite-sample question is how far away the nearest neighbor sits.
+
+**Step 2: cover the cube and count missed boxes.** Slice $[0,1]^d$ into $T^d$ boxes of edge $\varepsilon = 1/T$. If the query's box contains a sample point, the nearest neighbor is at most the box diagonal $\sqrt{d}\,\varepsilon$ away; if the box was missed by all $n$ samples, only the trivial bound $\sqrt{d}$ holds. A box of probability mass $p$ is missed with probability $(1-p)^n \le e^{-pn}$, and maximizing $p\,e^{-pn}$ shows each box contributes at most $1/(en)$ of expected mass, so the missed boxes carry expected mass at most $T^d/(en)$ in total. Hence
+$$
+\mathbb{E}\lVert x - x_{(1)}\rVert \;\le\; \sqrt{d}\,\Bigl(\frac{T^d}{e\,n} + \frac{1}{T}\Bigr).
+$$
+
+<Figure
+  src="./figures/gridcover.svg"
+  alt="The unit square cut into a five by five grid with sample points in most boxes; a query in a hit box has its neighbor within the box diagonal, a query in a shaded missed box has only the trivial diagonal bound, and the expected mass of missed boxes is at most T squared over e times n"
+  caption="The grid-cover argument at d = 2, T = 5: nearness is bought box by box, and the sample must be large enough to hit every box that matters."
+/>
+
+**Step 3: balance.** The first term grows and the second shrinks as the grid refines; setting $T = n^{1/(d+1)}$ balances them and yields $\mathbb{E}\lVert x - x_{(1)}\rVert \le 4\sqrt{d}\, n^{-1/(d+1)}$ after absorbing constants. Substituting into Step 1 gives the theorem.
+</Proof>
+</Theorem>
+
+The same analysis extends to $k$-NN: for $k \ge 10$ the expected risk is at most $(1 + \sqrt{8/k})\,R^* + (6c\sqrt{d} + k)\,n^{-1/(d+1)}$ (their Theorem 19.5). Both appearances of $k$ matter: it divides inside the multiplicative constant, pulling it from 2 toward 1, and it adds inside the additive coefficient, so a larger vote sharpens the asymptotic factor at a growing finite-sample price — the dial of the worked-live section, priced directly into the bound's two terms.
+
+### Reading the exponent
+
+Everything is in $n^{-1/(d+1)}$. The rate is honest at low dimension and catastrophic at high, and the crossover is quantitative. With a million samples:
+
+| $d$ | 2 | 10 | 100 |
+| --- | --- | --- | --- |
+| $n^{-1/(d+1)}$ at $n = 10^6$ | $0.010$ | $0.285$ | $0.872$ |
+
+At $d = 2$, a million points push the excess-over-$2R^*$ term to the third decimal. At $d = 100$ they accomplish essentially nothing: the term has decayed 13% from its $n = 1$ value. Inverting the bound makes the same point in sample-size currency: driving the excess term below $\varepsilon$ requires $n \ge (4c\sqrt{d}/\varepsilon)^{d+1}$. For $c = 1$ and $\varepsilon = 0.1$ that is about $1.8 \times 10^{5}$ samples at $d = 2$, about $10^{23}$ at $d = 10$, and about $10^{263}$ at $d = 100$, a number that exceeds the count of atoms in the observable universe (about $10^{80}$) cubed. No engineering closes that gap.
+
+<KeyFact>
+The finite-sample price of "no model" is the rate $n^{-1/(d+1)}$: each added dimension multiplies the sample size needed for fixed accuracy by roughly $4c\sqrt{d}/\varepsilon$ — about a hundredfold at $\varepsilon = 0.1$. The boundary between "real method" and "worst-case hopeless" therefore sits at around a dozen dimensions, not at hundreds.
+</KeyFact>
+
+## The curse in three computations
+
+The exponent is not an artifact of the proof's grid; it is the geometry of high-dimensional space, and three short computations expose it from three sides. The name is older than the theory: Richard Bellman coined *curse of dimensionality* in 1961 for the exponential cost of gridding high-dimensional state spaces in dynamic programming, and every manifestation below is a version of that cost. All three run on the cleanest possible model, points uniform in the unit cube $[0,1]^d$.
+
+### Edge length: neighborhoods stop being local
+
+A $k$-NN estimate at fixed $k/n$ averages over a neighborhood holding a fixed fraction $r$ of the data. For uniform data the captured fraction equals the neighborhood's volume, so a sub-cube of edge $e$ captures $e^d = r$, which inverts to
+
+$$
+e_d(r) = r^{1/d}.
+$$
+
+The formula looks tame; the exponent $1/d$ is the whole curse. At $d = 2$, a 10% neighborhood is a sub-square of edge $0.1^{1/2} \approx 0.32$, recognizably local. At $d = 3$ the edge is $0.46$. At $d = 10$ it is $0.1^{1/10} \approx 0.80$: to average over a tenth of the data, the "neighborhood" must span **80% of every axis** — the full range of each of the ten coordinates. Shrinking the fraction barely helps, because the exponent fights back: capturing 1% at $d = 10$ still needs 63% of every axis, and at $d = 100$ a 1% neighborhood spans 95.5% of each. The word *local* has stopped describing anything, and the bias term of the decomposition (the gap between $f$ at the query and the average of $f$ over the neighborhood) inherits the full width of the input space.
+
+<FigureSequence
+  name="edge"
+  alt="Three frames sharing one layout: a sub-square of edge 0.32 capturing 10 percent of a unit square, a sub-cube of edge 0.46 capturing 10 percent of a unit cube, and ten axes each 80 percent covered at d equal 10, with an axis-coverage bar growing across the frames"
+  caption="The same 10% of the data at d = 2, 3, 10: the edge r^(1/d) climbs from 0.32 to 0.80 of every axis."
+/>
+
+<Task>
+Step through the frames and verify each edge on paper: $0.32^2 \approx 0.1$, $0.46^3 \approx 0.1$, $0.80^{10} \approx 0.107$. Then extend the sequence one frame in your head: at $d = 100$ the edge is $0.1^{1/100} = e^{-0.023} \approx 0.977$: the "neighborhood" is the cube.
+</Task>
+
+### Distance to the nearest neighbor: everyone is far
+
+The edge computation fixed the captured fraction; the second computation fixes the sample and asks how far the single nearest point sits. Put $N$ uniform points in the unit ball and query at the center. One point lies beyond radius $x$ with probability $1 - x^d$ (the fraction of the ball's volume within radius $x$ is $x^d$), so all $N$ do with probability $(1 - x^d)^N$, and setting that to $\tfrac12$ gives the median nearest-neighbor distance (ESL Eq. 2.24):
+
+$$
+\operatorname{med}(N, d) = \Bigl(1 - \tfrac{1}{2}^{1/N}\Bigr)^{1/d}.
+$$
+
+For $N = 500$ points at $d = 10$ the median is $0.52$: the nearest of five hundred samples typically sits more than halfway to the boundary of the support. At $d = 100$ it is $0.94$. The same volume arithmetic says where the data itself is: the fraction of the ball within 10% of its surface is $1 - 0.9^d$, which is 19% at $d = 2$ and 99.997% at $d = 100$: essentially every sample point hugs the boundary. A query is then closer to the edge of the data than to any sample, and estimating there is extrapolation dressed as interpolation.
+
+### Distance concentration: nearest stops meaning anything
+
+The third computation attacks the ranking itself. For two independent uniform points in $[0,1]^d$, the squared distance $\lVert X - Z \rVert^2 = \sum_{j=1}^d (X_j - Z_j)^2$ is a sum of $d$ i.i.d. terms with mean $\tfrac16$ and variance $\tfrac{7}{180}$, so the distance concentrates around $\sqrt{d/6} \approx 0.41\sqrt{d}$ with a spread that stays near $0.24$ no matter how large $d$ grows: the mean runs away while the spread stands still. Relative to the typical distance, the spread vanishes as $1/\sqrt{d}$.
+
+<Figure
+  src="./figures/distance-hist.svg"
+  alt="Three histograms of all pairwise distances among 300 uniform points at d equal 2, 10, and 100: the mean climbs from 0.51 to 1.27 to 4.08 while the spread stays near 0.24, and the per-point farthest-to-nearest ratio falls from about 35 to 3 to 1.4"
+  caption="All pairwise distances among 300 uniform points, computed: the mean grows like √d, the spread never moves, and by d = 100 a point's farthest neighbor is only ~1.4× its nearest."
+/>
+
+The histograms are computed, not sketched: among 300 uniform points at $d = 2$, the median point's farthest neighbor is about 35 times farther than its nearest; at $d = 10$ the ratio is 3; at $d = 100$ it is $1.4$. When every candidate sits at nearly the same distance, the identity of the "$k$ nearest" is decided by noise, their labels carry little more information about $\eta(x)$ than $k$ random draws from the whole sample, and the vote slides toward the global majority: the $k = n$ corner arrived at without anyone touching the dial.
+
+| $d$ | 2 | 10 | 100 |
+| --- | --- | --- | --- |
+| edge of a 10%-of-the-data neighborhood, $0.1^{1/d}$ | 0.32 | **0.80** | 0.977 |
+| median distance to nearest of 500 samples (unit ball) | 0.04 | 0.52 | 0.94 |
+| farthest/nearest neighbor of a typical point (300 samples) | 35 | 3.1 | 1.4 |
+
+<KeyFact>
+Locality, nearness, and ranking fail in that order as $d$ grows, and they are the three assumptions the vote runs on.
+</KeyFact>
+
+### The practical reading: irrelevant features poison the metric
+
+The geometry has a working-engineer translation, and it corrects a plausible belief. The belief: adding features can never hurt $k$-NN, because distances computed on more coordinates carry strictly more information. It is false, and the failure is not statistical fine print. Each irrelevant coordinate adds a full-variance random term $(X_j - Z_j)^2$ to every squared distance while the informative coordinates' contribution stays fixed, so the signal's share of the metric shrinks toward zero and the neighbor ranking decouples from the features that matter: the concentration histograms above, rebuilt one useless axis at a time.
+
+The experiment, recreated from ISLP's §3.5 comparison: 50 training points, a target depending on one real feature through a smooth nonlinear $f$, and pure-noise features added two at a time. Both 1-NN and least squares see the identical data.
+
+<Figure
+  src="./figures/noise-dims.svg"
+  alt="Test mean squared error against the number of pure-noise features added: the 1-NN curve climbs seventeen-fold from 0.04 to 0.70 while the least-squares curve rises under two-fold from 0.08 to 0.15, with 1-NN winning only at zero noise features"
+  caption="Computed on 400 replications: with no junk features 1-NN beats the misspecified linear fit; eighteen junk features later 1-NN's error is 17× its start while least squares has not doubled."
+/>
+
+With no junk features the flexible method wins: 1-NN's test MSE is half of least squares', which pays a standing bias for forcing a line through a curve. Eighteen junk features later, 1-NN's error has multiplied seventeen-fold while least squares' has not doubled: the linear fit spends one coefficient per junk feature, a variance cost of $\sigma^2/n$ each by <Ref lesson="bias-variance">the bias–variance lesson</Ref>'s accounting, while 1-NN pays through the metric itself. The replacement model: features are not free for a distance-based method; each one must earn its place in the metric, or be scaled out, selected out, or projected out before the distance is computed.
+
+## The lower bound: the curse is the problem's, not the method's
+
+One escape route remains open so far: perhaps the $n^{-1/(d+1)}$ rate is a weakness of nearest-neighbor voting, and a cleverer rule dodges the exponential bill. A matching lower bound closes it.
+
+<Theorem title="no learner escapes (Shalev-Shwartz &amp; Ben-David 19.4)">
+For every $c > 1$ and every learning rule $A$ whatsoever, there exists a distribution over $[0,1]^d \times \{0,1\}$ whose conditional probability $\eta$ is $c$-Lipschitz and whose Bayes error is zero, on which $A$'s expected error exceeds $\tfrac14$ whenever $n \le (c+1)^d/2$.
+
+<Proof>
+Idea. Place a grid on $[0,1]^d$ with spacing $1/c$; it has $(c+1)^d$ points, and since distinct grid points are at least $1/c$ apart, every one of the $2^{(c+1)^d}$ labelings of the grid extends to a $c$-Lipschitz $\eta$: the smoothness assumption puts no constraint at all below its own length scale. The class of admissible targets therefore contains all binary functions on $(c+1)^d$ points, and the No-Free-Lunch argument (<Ref lesson="learning-theory">the learning theory module</Ref> proves it) applies: a sample seeing at most half of the grid leaves the labels of the unseen half completely undetermined, and an adversarial choice of target forces any rule to err on them at rate $\ge \tfrac14$ in expectation.
+</Proof>
+</Theorem>
+
+The reading matters more than the constant. The exponential sample cost attaches to the *assumption* (smoothness in $d$ ambient dimensions), not to the algorithm: under Lipschitz smoothness alone, information sufficient to pin down the target simply does not fit in a sub-exponential sample, whoever is doing the learning. So the curse cannot be engineered away; it can only be traded away, by buying stronger assumptions. Every remaining module of this course is a version of that purchase: linearity (<Ref lesson="ols">the linear model</Ref>) collapses the sample cost to polynomial by asserting the target's global shape; the penalties, margins, trees, and ensembles ahead assert weaker structure at intermediate prices.
+
+## ★ The vote was a generative model in disguise
+
+The $k$-NN vote was introduced as a heuristic; it is also, exactly, a Bayes classifier built from a particular density estimate ([Murphy §16.3.4](https://probml.github.io/pml-book/book1.html)), a construction that connects this lesson to the generative road of module 4 before that road is built.
+
+Estimate the density of class $c$ at $x$ by counting: grow a ball around $x$ until it contains $K$ training points of any class, call its volume $V(x)$, and let $N_c(x)$ of the captured points belong to class $c$, out of $N_c$ class-$c$ points overall. The natural density estimate is count over volume,
+
+$$
+\hat{p}(x \mid y = c) = \frac{N_c(x)}{N_c\, V(x)},
+$$
+
+a *balloon* estimator: the bandwidth inflates per query until it holds enough data. Feed these into Bayes' rule with the empirical class priors $\hat{p}(y = c) = N_c/N$:
+
+$$
+\hat{p}(y = c \mid x)
+= \frac{\frac{N_c(x)}{N_c V(x)} \cdot \frac{N_c}{N}}
+       {\sum_{c'} \frac{N_{c'}(x)}{N_{c'} V(x)} \cdot \frac{N_{c'}}{N}}
+= \frac{N_c(x)}{\sum_{c'} N_{c'}(x)}
+= \frac{N_c(x)}{K},
+$$
+
+since the ball holds $K$ points in total. The volume, the priors, and the class totals all cancel, and what remains is the fraction of the $K$ nearest neighbors carrying class $c$: the vote. The heuristic and the generative construction are the same classifier, which explains with no further work why the vote estimates $\eta(x)$ and why its quality is exactly the quality of a density estimate at $x$. That object is what <Ref lesson="kernel-smoothing">the kernel smoothing lesson</Ref> studies with fixed rather than ballooning bandwidths, and its curse-of-dimensionality story is this lesson's, verbatim.
+
+## Why 256-dimensional k-NN works anyway
+
+The verdict so far is clean: a factor-of-two guarantee in the limit, an exponential bill on the way there, and a lower bound certifying that the bill is real. One measured fact stands against it, and reconciling the two is the next lesson's subject.
+
+<Figure src="./figures/usps-digits-preview.png" float="right" width="m" alt="A six-row by ten-column grid of scanned handwritten digits, one column per digit 0 through 9, each drawn on a coarse 16-by-16 pixel raster with visibly stepped strokes. Every column shows six different people's handwriting: the zeros range from a thin oval to a heavy filled loop, one 6 is inked into a solid blob, one 9 is barely a grey wisp, one 4 is written as an upside-down T." caption="Sixty ZIP-code digits scanned from live US mail, each a 16 × 16 grayscale grid — the 256 raw pixel dimensions on which plain Euclidean 1-NN misclassifies 5.5% of the test set." />
+
+Handwritten ZIP-code digits scanned from live US mail, represented as raw $16 \times 16$ grayscale grids, are points in $d = 256$. The worst-case arithmetic above prices that dimension beyond all reach: $n^{-1/257}$ decays so slowly that $7{,}291$ training digits should teach nothing. Measured reality: plain Euclidean 1-NN classifies the standard USPS test set at **5.5% error** (ESL §13.3.3), within a factor of about two of human performance on the same digits. The resolution is that the lower bound's adversary is free to label $(c+1)^{256}$ grid points arbitrarily, and real digit images occupy a vanishing corner of that freedom: a handwritten "3" varies by translation, slant, stroke thickness, and a handful of shape degrees of freedom, so the data concentrates near a surface of low *intrinsic* dimension embedded in the 256-dimensional pixel space. Distances measured between points on that surface behave like distances in the intrinsic dimension, and the curse's constants are set there: single digits, not 256.
+
+That observation converts the curse from a verdict into an engineering agenda, and the course's remaining modules are its items, each a named way of spending assumptions to buy back locality or replace it:
+
+- **Fix the metric's units.** Standardize features so the distance is not owned by whichever coordinate has the biggest numbers: the one-sentence hygiene from this lesson, made systematic in <Ref lesson="feature-engineering">feature engineering</Ref>.
+- **Shrink $d$ before measuring.** Project onto the few directions that carry the data's variation, so the metric operates in something near the intrinsic dimension: <Ref lesson="pca">principal component analysis</Ref>.
+- **Build the invariances into the metric.** If a rotated "3" is the same digit, the distance should say so; <Ref lesson="zipcode-digits">the next lesson</Ref> does exactly this on the USPS benchmark, where an invariance-aware distance cuts 1-NN's error from 5.5% to 2.6%.
+- **Abandon locality for structure.** Assert a global functional form and pay bias instead of neighborhood variance: the road through the linear model, boundaries, trees, and ensembles that the noise-feature experiment already previewed.
+
+What stands established: the $k$-NN rule is the plug-in Bayes classifier with $k$ dialing variance $\sigma^2/k$ against neighborhood bias; asymptotically 1-NN is within a factor of two of the Bayes error with essentially no assumptions; at finite samples the guarantee decays at rate $n^{-1/(d+1)}$ under Lipschitz smoothness, the geometry behind that exponent kills locality, nearness, and ranking in turn, and no algorithm escapes the exponential sample cost without stronger assumptions. What stands open is the objection just filed: making "low intrinsic dimension" and "invariance in the metric" precise on real data. <Ref lesson="zipcode-digits">The ZIP-code benchmark lesson</Ref> takes it up on the digits themselves.
+
+## Exercises
+
+<Exercise>
+Boundary probe: set $k = n$. (a) Show that the $k$-NN classifier becomes a single constant prediction (the training majority class) for every query. (b) Using the closed-form decomposition, compute the bias and variance of the $k = n$ regressor at a query $x_0$, and state which term carries the error. (c) Name the hypothesis of the Cover–Hart argument that has been pushed to its degenerate extreme, and say what the opposite extreme $k = 1$ pushes instead.
+
+<Solution>
+(a) At $k = n$ the neighbor set of every query is the entire training sample, so the vote is the global label count, independent of $x$: the classifier is the constant "majority class", and its risk is the probability of the minority class (on balanced classes $\tfrac12$, the coin-toss baseline of <Ref lesson="statistical-learning">the statistical learning lesson</Ref>).
+
+(b) The regressor is $\hat{f}(x_0) = \tfrac1n \sum_i y_i$ for every $x_0$. From the decomposition: variance $= \sigma^2/n$, negligible; bias $= \tfrac1n\sum_i f(x_i) - f(x_0)$, the gap between the global average of $f$ and its value at the query, which is large wherever $f$ varies. Essentially all reducible error is bias.
+
+(c) Cover–Hart needs the labels being consulted to come from points whose conditional $\eta$ matches the query's; $k = n$ consults points spread over the entire support, so "conditioning near $x$" has degenerated into "not conditioning at all": locality is dead by choice of $k$ rather than by geometry. The $k = 1$ extreme keeps locality maximal and instead pushes the variance side: a single Bernoulli draw, no averaging, the full $\sigma^2$. The curse of dimensionality is the statement that in high $d$ the geometry forces the $k = n$ failure on you even at small $k$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the edge-length formula $e_d(r) = r^{1/d}$ for uniform data in $[0,1]^d$, then build the table the chapter did not print: the edge needed to capture $r = 0.1$ and $r = 0.01$ of the data at $d = 1, 2, 10, 100$. State which entry kills the phrase "reduce the neighborhood fraction to restore locality", and why the variance side forbids the other escape.
+
+<Solution>
+For uniform data the captured fraction equals the sub-cube's volume; a cube of edge $e$ has volume $e^d$, so $e^d = r$ gives $e = r^{1/d}$.
+
+| $d$ | 1 | 2 | 10 | 100 |
+| --- | --- | --- | --- | --- |
+| $e_d(0.1)$ | 0.10 | 0.32 | 0.79 | 0.977 |
+| $e_d(0.01)$ | 0.01 | 0.10 | 0.63 | 0.955 |
+
+The killing entry is $e_{100}(0.01) = 0.955$: dropping the captured fraction by a full order of magnitude, from 10% to 1%, shrinks the edge at $d = 100$ only from 0.977 to 0.955, because the fraction enters through the $1/d$-th root; locality is not restored, while the data being averaged has fallen tenfold. That is the squeeze from the variance side: capturing fewer points means averaging fewer labels, and the variance term $\sigma^2/k$ of the decomposition grows in exact proportion. High dimension leaves no setting of the neighborhood that is simultaneously local (small bias) and populated (small variance).
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "adding features never hurts $k$-NN, since distances computed on more coordinates contain strictly more information, so the neighbor ranking can only improve." Name the exact step that fails, support it with the arithmetic of squared distances, and state the empirical signature you would expect if the claim were tested by adding pure-noise features to a working $k$-NN pipeline.
+
+<Solution>
+The failing step is the jump from "more information in the distance" to "more information in the ranking". Squared Euclidean distance is a sum over coordinates, $\lVert x - z\rVert^2 = \sum_j (x_j - z_j)^2$. An informative coordinate contributes a term correlated with the label difference; a pure-noise coordinate contributes an i.i.d. random term of fixed mean and variance ($\tfrac16$ and $\tfrac{7}{180}$ for uniform features). Adding $q$ noise coordinates adds $q$ such terms to each of the $\binom{n}{2}$ pairwise distances at once, so the total distance concentrates around its mean (spread/mean $\to 0$ like $1/\sqrt{q}$) while the informative contribution stays fixed: the ranking of candidate neighbors is progressively decided by the noise sum, not the signal. The information is "in the distance" only in the useless sense of being buried in it.
+
+Empirical signature: test error rises steeply and roughly monotonically with each batch of junk features while a parametric baseline on the same data barely moves. That is exactly the computed figure in the chapter, where eighteen noise features multiplied 1-NN's test MSE seventeen-fold while least squares' rose by under a factor of two. The transferable rule: for distance-based methods, features are a cost until proven otherwise; select, scale, or project before the metric.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review, using <Ref lesson="bias-variance">the bias–variance lesson</Ref>'s machinery. For 1-D $k$-NN regression on $n$ roughly equispaced inputs with noise variance $\sigma^2$, suppose the smooth-target bias bound $|\text{bias}(x_0)| \le B\,(k/n)^2$ holds (the $k$ nearest inputs span a window of width $\approx k/n$, and a smooth $f$'s window average misses $f(x_0)$ at second order). (a) Find the $k$ minimizing the reducible error $B^2 (k/n)^4 + \sigma^2/k$, and evaluate it for $B = 1$, $\sigma^2 = 1$, $n = 1000$. (b) Repeat in $d$ dimensions with the Lipschitz bias bound $|\text{bias}| \le c\,(k/n)^{1/d}$, and compare the resulting rate with this lesson's exponent.
+
+<Solution>
+(a) Minimize $g(k) = B^2 k^4/n^4 + \sigma^2/k$: setting $g'(k) = 4B^2k^3/n^4 - \sigma^2/k^2 = 0$ gives $k^5 = \sigma^2 n^4/(4B^2)$, so
+
+$$
+k^* = \Bigl(\frac{\sigma^2 n^4}{4B^2}\Bigr)^{1/5} \;\propto\; n^{4/5}.
+$$
+
+For $B = 1$, $\sigma^2 = 1$, $n = 1000$: $k^* = (10^{12}/4)^{1/5} \approx 190$, nearly a fifth of the sample and far from the $k \in \{3, 5, 7\}$ folk default; the optimal reducible error scales as $n^{-4/5}$, close to the parametric $n^{-1}$. In one smooth dimension, locality is cheap.
+
+(b) In $d$ dimensions a neighborhood holding $k$ of $n$ uniform points has radius $\approx (k/n)^{1/d}$, so minimize $c^2(k/n)^{2/d} + \sigma^2/k$. Differentiating: $\tfrac{2c^2}{d}\,k^{2/d - 1}/n^{2/d} = \sigma^2/k^2$, giving $k^* \propto n^{2/(d+2)}$ and optimal error $\propto n^{-2/(d+2)}$. The exponent collapses with $d$ exactly like the chapter's $n^{-1/(d+1)}$ (the two differ because one assumes a bias bound, the other bounds the raw neighbor distance): at $d = 2$ the rate is $n^{-1/2}$; at $d = 100$ it is $n^{-1/51}$, so halving the error requires multiplying the sample by $2^{51} \approx 2 \times 10^{15}$. The curse is visible from inside the bias–variance ledger, with no new theory needed.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. Euclidean 1-NN achieves 5.5% test error on the USPS digits with $n \approx 7{,}300$ training images of ambient dimension 256. Test whether that observation is consistent with the finite-sample bound's rate by computing $n^{-1/(d+1)}$ in two directions: (a) evaluate the rate term at $d = 256$ and state what the bound promises there; (b) find the largest $d$ for which the rate term alone (dropping the constant $4c\sqrt{d} \ge 1$) is below 0.05, a generous budget for the observed excess error. State the conclusion about the data before opening; what would count as consistency is a $d$ within an order of magnitude of 256.
+
+<Solution>
+(a) With $\ln 7300 \approx 8.9$: $n^{-1/257} = e^{-8.9/257} \approx 0.966$. The bound promises error at most $2R^* + 4c\sqrt{256} \cdot 0.966 \approx 2R^* + 62c$, which is vacuous by a factor of hundreds. At $d = 256$ the worst-case guarantee says nothing until $n \sim (1/\varepsilon)^{257}$.
+
+(b) Require $e^{-8.9/(d+1)} \le 0.05$, i.e. $8.9/(d+1) \ge \ln 20 \approx 3.0$, i.e. $d + 1 \le 2.97$: the largest qualifying dimension is $d = 1$ (at $d = 2$ the rate term is $e^{-8.9/3} \approx 0.051$, already over budget). Restoring the constant $4c\sqrt{d}$ only tightens this. So the observed performance is consistent with the worst-case rate only if the digits behave like data of dimension about **one**: more than two orders of magnitude below the ambient 256, nowhere near the consistency criterion.
+
+Conclusion: the observation does not falsify the theorem (which is an upper bound over worst cases, plus a lower bound over adversarial distributions); it falsifies the premise that USPS digits exercise their ambient dimension. Real handwriting varies along a handful of directions (translation, slant, thickness, shape), so the effective dimension governing neighbor distances is tiny, and the curse's constants are set there. This is the quantitative content of the manifold claim <Ref lesson="zipcode-digits">the next lesson</Ref> develops on the digits themselves.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Work in $16 \times 16$ binary images, distance = squared Euclidean (= count of differing pixels). The training set contains an upright digit template $A$ with 12 lit pixels and a different-class template $B$, also 12 lit pixels, whose slanted stroke shares 6 lit pixels with $A$. The query is $A$ rotated by 15°: the rotation keeps 4 of $A$'s 12 lit pixels in their cells and moves the other 8, so the rotated query (still 12 lit pixels) shares 4 lit pixels with $A$ and, because the rotation tilts the stroke toward $B$'s slant, 8 with $B$. (a) Compute the squared distances from the query to $A$ and to $B$, and give 1-NN's prediction. (b) State in one sentence what property of the metric, not of the sample size, caused the error, and what a repaired metric would have to satisfy.
+
+<Solution>
+(a) For binary images, differing pixels = (lit in one only) + (lit in the other only). Query vs $A$: both have 12 lit, sharing 4, so $8 + 8 = 16$ differing pixels: $d^2 = 16$. Query vs $B$: sharing 8, so $4 + 4 = 8$ differing pixels: $d^2 = 8$. 1-NN declares $B$, the wrong class, at half the distance of the right one. No additional upright training data fixes this particular query; the failure survives $n \to \infty$ over upright digits.
+
+(b) Euclidean pixel distance charges a rigid rotation, which changes the digit's identity not at all, as heavily as a change of class: the metric is not invariant under the transformations the label is invariant under. A repaired metric must score the distance between a query and the whole set of a template's rotations (and translations, thickness changes) rather than the single stored template, so that identity-preserving transformations cost nothing. That metric exists, is computable, and is called tangent distance; building it, and watching it cut USPS 1-NN error from 5.5% to 2.6%, is <Ref lesson="zipcode-digits">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Ch. 19: the finite-sample 1-NN bound (Lemmas 19.1–19.2, Theorem 19.3), the No-Free-Lunch lower bound (Theorem 19.4), and the k-NN extension (Theorem 19.5). Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+2. T. M. Cover, P. E. Hart, "Nearest Neighbor Pattern Classification," *IEEE Transactions on Information Theory* 13(1), 1967, pp. 21–27 — the asymptotic factor-of-two theorem, with the exact limit $\mathbb{E}[2\eta(1-\eta)]$ and the sharper cap $2R^*(1-R^*)$. https://isl.stanford.edu/~cover/papers/transIT/0021cove.pdf
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §2.5: the curse computations (edge length $r^{1/p}$, Fig. 2.6; median nearest-neighbor distance, Eq. 2.24); §7.3 Eq. 7.10: the k-NN decomposition used here; §13.3: the Cover–Hart discussion (Eqs. 13.2–13.5) and the USPS 5.5%/2.6% error figures; §13.4 Eq. 13.7: the median-radius version of the sparsity computation. Free online: https://hastie.su.domains/ElemStatLearn/
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §16.1: the KNN classifier and the curse (Fig. 16.3); §16.3.4: the balloon-KDE derivation of the vote reproduced in the starred section. Free online: https://probml.github.io/pml-book/book1.html
+5. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §3.5, Figs. 3.16–3.20: KNN regression against linear regression as noise dimensions accumulate, the experiment recreated in this chapter's figure. Free online: https://www.statlearning.com
+6. R. E. Bellman, *Adaptive Control Processes: A Guided Tour*, Princeton University Press, 1961 — the origin of the phrase "curse of dimensionality," for the exponential cost of gridding state spaces.
+</References>

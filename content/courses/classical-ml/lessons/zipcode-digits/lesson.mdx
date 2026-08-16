@@ -1,0 +1,266 @@
+The US Postal Service's handwritten digits — 16×16 grids scanned from live mail — were classical ML's proving ground, and a nearest-neighbor rule with the right distance beat carefully engineered neural networks on them.
+
+Module 1 is now complete on paper: <Ref lesson="statistical-learning">the statistical learning lesson</Ref> made risk, not training error, the object of learning and set the Bayes floor beneath every classifier; <Ref lesson="bias-variance">the bias–variance lesson</Ref> split expected error into noise, bias, and variance; <Ref lesson="knn-curse">the nearest-neighbor lesson</Ref> priced the simplest classifier and ended with an unresolved objection, a measured 5.5% error in 256 dimensions that the worst-case theory prices as impossible. This lesson cashes the module out on the deployed system behind that number and resolves the objection twice: intrinsic dimension explains why the vote works at all, and an invariance built into the metric, a bias injected on purpose and true, explains how it then beat networks engineered for years. The route: the benchmark and its numbers; the manifold that saves the vote; tangent distance; the published error ladder read as this course's map; the reject option; and the assumptions deployment breaks.
+
+## The benchmark: 7,291 digits from live mail
+
+A ZIP code handwritten on an envelope is machine-read in stages: locate the code, segment it into single characters, and classify each character as a digit 0–9. The classification stage is the module's problem statement made physical: inputs $x \in \mathbb{R}^{256}$ (a $16 \times 16$ grayscale grid, deslanted and size-normalized from the raw binary scans), labels $y \in \{0, \dots, 9\}$, and a loss that in deployment is not even symmetric, since a misread digit misroutes a letter while an unread one merely joins the hand-sorting queue. The USPS benchmark distributed with this task holds **7,291 training digits and 2,007 test digits**, scanned from real envelopes at postal centers.
+
+<Figure src="./figures/usps-digits.png" alt="A six-row, ten-column grid of scanned handwritten digits zero through nine from US postal envelopes; each column holds one class and the six samples in it differ sharply — thin wispy strokes beside heavy inked ones, upright beside slanted, closed loops beside broken ones, and one six so heavily written its loop is a solid blob." caption="Six samples of each class, scanned from live US mail: the within-class spread is the problem statement." />
+
+The same class spans thin wisps and inked blobs, upright and slanted strokes, closed and broken loops.
+
+### Two calibrating numbers: machine 5.5%, human 2.5%
+
+Plain 1-NN with Euclidean distance on the raw pixels, the rule <Ref lesson="knn-curse">the previous lesson</Ref> analyzed, misclassifies **5.5%** of the test set: one digit in 18. Human transcribers shown the same test images err on about **2.5%** of them, one in 40, because the set is genuinely hard, containing fragments and barely legible strokes that survive segmentation (Simard et al. 1993 report the human figure). The gap between 5.5 and 2.5 is the room this lesson's method will close.
+
+<KeyFact>
+The USPS benchmark is the module's results deployed: $k$-NN is the classifier, the human 2.5% stands in for the Bayes floor's order of magnitude, and the bias–variance ledger prices every improvement. Euclidean 1-NN starts at 5.5%, 2.2 times the human rate — above the asymptotic Cover–Hart ceiling of twice the Bayes error, with no contradiction: the ceiling binds the infinite-sample limit, and $n = 7{,}291$ has not reached it.
+</KeyFact>
+
+## Why the vote survives 256 dimensions: the manifold, made visible
+
+The objection filed at the end of <Ref lesson="knn-curse">the nearest-neighbor lesson</Ref> was quantitative: at $d = 256$ the worst-case bound needs samples beyond all physical possibility, yet 7,291 digits deliver 5.5%. The resolution was asserted there and is demonstrated here, with one digit and one transformation: pixel images of digits do not exercise their ambient dimension.
+
+<Figure src="./figures/digit-manifold.png" float="right" width="m" alt="Three panels. Left: a scanned handwritten '6' on a 64-by-57 pixel grid, its stroke a thick black curve with visibly stepped edges. Middle: an image of the same size filled with uniformly random black and white pixels — pure static, with no stroke or shape anywhere in it. Right: a scatter plot with axes 'PC no 1' and 'PC no 2', both running from about -0.1 to 0.1, in which several hundred red crosses lie on a closed near-perfect circle of radius about 0.075 centred on the origin; small grey copies of the '6' are printed around the outside of the ring, each rotated to match its position on the circle." caption="One USPS '6' (64 × 57 = 3,648 pixels), a uniform random draw from the same pixel space, and 360 one-degree rotations of that '6' projected onto their first two principal components — 3,648 coordinates, one closed loop." />
+
+### One '6', 360 rotations: intrinsic dimension one
+
+Take a single higher-resolution scan of a '6': $64 \times 57 = 3{,}648$ pixels, a point in $\mathbb{R}^{3648}$. A uniformly random point of that space is static: noise with no stroke, no contrast structure, nothing. Digit images are a vanishing corner of the space, not a typical sample of it. Now rotate the '6' one degree at a time, 360 times. The rotations trace a closed one-dimensional curve through $\mathbb{R}^{3648}$, and projecting the 360 images onto their top two principal directions (the projection is module 8's machinery; here it is a black box that preserves the dominant variation) reveals the curve as a near-perfect circle in the plane. Three thousand six hundred coordinates, and the entire dataset lives on a loop of **intrinsic dimension one**.
+
+### From one loop to the benchmark's manifold
+
+Real handwriting varies along more directions than rotation (translation, scale, slant, stroke thickness, and a handful of genuine shape degrees of freedom per class), but the count stays in the tens, not the hundreds. The data concentrates near a low-dimensional surface embedded in pixel space, distances between digits behave like distances in the intrinsic dimension, and the curse's constants are set there. This is the *manifold hypothesis*, and for digits it is not a hypothesis: the circle is computed from real pixels. The benchmark's own preprocessing already exploited it, quietly: deslanting and size-normalizing the raw scans removes two of the variation directions before any classifier runs.
+
+<KeyFact>
+Ambient dimension is what the data is stored in; intrinsic dimension is what it varies along, and the curse prices the latter. But the same manifold that saves the vote also indicts the metric: rotating a digit moves it a long way along the manifold in Euclidean distance while changing its identity not at all, so the coordinates the data varies along are largely coordinates the label ignores.
+</KeyFact>
+
+## Tangent distance: the invariance made computable
+
+The indictment in the key fact is exactly the failure the previous lesson's final exercise computed: a '3' rotated 15° lands closer, pixelwise, to a slanted-stroke impostor of another class than to its own upright template, and no amount of additional upright data repairs it. The flaw is not in the sample but in the metric: Euclidean pixel distance charges an identity-preserving transformation as heavily as a change of class. The fix is to measure distance in a way that refuses to charge for the transformations the label is invariant under.
+
+### From orbits to tangent lines
+
+For an image $x$, let its *invariance manifold* be the curve of all its small rotations, the loop of the previous section. The *invariant metric* between two images is the shortest Euclidean distance between their two curves: the distance between the digits as orbits, not as points. Two problems stop this from being used directly. Computing the minimum over two nonlinear curves in $\mathbb{R}^{256}$ is expensive, and the metric is too invariant: allow rotations of any size and a '6' rotated 180° coincides with a '9', so the metric declares the two classes identical. The bias "rotation preserves identity" is true only for small rotations.
+
+Simard, Le Cun, and Denker's 1993 solution linearizes: replace each curve by its **tangent line** at the stored image. Small rotations then cost nothing, large ones are automatically penalized (far along the tangent line the points stop resembling any digit, so nothing matches them), and every computation becomes least squares.
+
+<FigureSequence
+  name="tangent"
+  alt="Four frames sharing one layout: three rotated copies of a handwritten 3; the curve those rotations trace through pixel space; the tangent line approximating the curve at the unrotated image; and a second image's curve and tangent line, with the tangent distance between the two lines shorter than the Euclidean distance between the two points"
+  caption="ESL's Figs 13.10–13.11 as a step-through: rotations trace a curve, the tangent line approximates it, and distance is measured line to line instead of point to point."
+/>
+
+<Task>
+Step through the frames, then verify the construction's two claims on the final frame: the dashed tangent-line segment is shorter than the dotted point-to-point segment (rotation credit granted), and the two tangent lines are lines, not planes: one invariance direction each, so the credit is limited to small rotations.
+</Task>
+
+<Definition title="tangent distance">
+For images $x, x' \in \mathbb{R}^{256}$ with tangent vectors $T$ and $T'$ (each a direction in $\mathbb{R}^{256}$, computed by finite-differencing a small rotation of its image), the *tangent distance* is
+
+$$
+d_T(x, x') \;=\; \min_{\alpha,\, \alpha'} \bigl\lVert (x + \alpha T) - (x' + \alpha' T') \bigr\rVert.
+$$
+</Definition>
+
+The minimum is a two-variable least-squares problem, and its closed form is a projection: writing $w = x - x'$, the optimal residual $w + \alpha T - \alpha' T'$ must be orthogonal to both tangent directions, so $d_T(x, x')$ is the norm of the component of $x - x'$ orthogonal to $\operatorname{span}\{T, T'\}$: Euclidean distance with the part that the two invariance directions explain subtracted out. The algebra is two equations in two unknowns.
+
+<Aside>
+The objective is $\lVert w + A\beta \rVert^2$ over $\beta = (\alpha, \alpha')$, where $A = [\,T \;\; {-T'}\,] \in \mathbb{R}^{256 \times 2}$ stacks the two directions as columns. Setting both partial derivatives to zero gives the normal equations $A^{\top}\!A\,\beta = -A^{\top} w$; with the five inner products $a = T^{\top} T$, $b = T^{\top} T'$, $c = T'^{\top} T'$, $p = T^{\top} w$, $q = T'^{\top} w$, they read
+
+$$
+a\,\alpha - b\,\alpha' = -p, \qquad b\,\alpha - c\,\alpha' = -q,
+$$
+
+a $2 \times 2$ system with solution $\alpha = (bq - cp)/(ac - b^2)$, $\alpha' = (aq - bp)/(ac - b^2)$ whenever $T$ and $T'$ are not parallel ($ac > b^2$). Substituting back, the minimum is the standard least-squares residual $\lVert w \rVert^2 - w^{\top}\!A(A^{\top}\!A)^{-1}A^{\top} w$, which in the same five inner products is
+
+$$
+d_T(x, x')^2 \;=\; \lVert x - x' \rVert^2 \;-\; \frac{c\,p^2 - 2b\,pq + a\,q^2}{ac - b^2}.
+$$
+
+The second term is the squared length of the projection of $x - x'$ onto $\operatorname{span}\{T, T'\}$: the rotation credit, in closed form. What happens when the non-parallel condition fails is the boundary-probe exercise on the rotation-symmetric disc.
+</Aside>
+
+Classification is 1-NN as before, with $d_T$ in place of the Euclidean metric: nothing else about the module's method changes.
+
+### Seven invariances, and the result
+
+Rotation is one of seven transformations handwritten digits are invariant under: translation in two directions, scaling in two, rotation, shear, and stroke thickness. Each contributes one tangent vector, so each image's tangent "line" is a 7-dimensional affine subspace of $\mathbb{R}^{256}$, and the minimization runs over $7 + 7 = 14$ coefficients: the same projection, with $14 \times 14$ normal equations in place of the $2 \times 2$ system. On the USPS benchmark the results were, at the time, the best known (ESL Table 13.1):
+
+| method | test error |
+| --- | --- |
+| hand-crafted neural network | 4.9% |
+| 1-NN, Euclidean distance | 5.5% |
+| 1-NN, tangent distance | **2.6%** |
+
+The memorize-and-vote rule, given a metric that encodes what a digit is, cut its error by more than half and beat a neural network that years of architecture engineering had fitted to this exact task, landing at 2.6% against the human transcribers' 2.5%. The one comparison the table cannot make is speed: matching every query against 7,291 seven-dimensional tangent subspaces is a per-envelope cost a sorting line cannot pay at mail volume, and that cost, not accuracy, kept tangent distance off the deployed sorters.
+
+An alternative implementation of the same idea is *hints* (Abu-Mostafa 1995): augment the training set with explicitly transformed copies of each image and use the plain Euclidean metric. For one invariance this works; for seven, a grid of transformed copies grows exponentially in the number of invariance directions (the curse of dimensionality again, spent on the orbit instead of the input), while the tangent subspace captures all seven directions with seven vectors.
+
+### What was actually purchased
+
+It is tempting to read tangent distance as a *more powerful* matcher, a classifier with extra flexibility. The reading is exactly backwards. Tangent distance removes distinctions: it declares every small rotation, shift, and thickening of an image to be the same evidence, collapsing each training point's orbit to a single representative. That is an assumption imposed before the data speaks: bias, in <Ref lesson="bias-variance">the bias–variance lesson</Ref>'s exact sense. It pays twice. The variance term falls because each stored digit now stands for a 7-parameter family of variants, multiplying the effective sample near any query without collecting a single new envelope. The bias term does not rise, because the injected assumption is *true* for this task: a slightly rotated '3' really is a '3'. Inject a false version of the same assumption (full rotation invariance, say) and the bias is real: '6' and '9' merge, and no sample size recovers them.
+
+<KeyFact>
+This is the module's closing move: a finite sample teaches something exactly when the method carries an assumption that is true. Every later method in the course is a different choice of which assumption to carry.
+</KeyFact>
+
+## The error ladder: this course's map, published in advance
+
+The USPS digits, and their larger NIST-derived successor MNIST (60,000 training and 10,000 test digits), became the proving ground every new classifier of the 1990s reported against. Read with the module tags attached, the published ladder is this course's syllabus stated as measurements.
+
+<Figure
+  src="./figures/error-ladder.svg"
+  alt="Two horizontal bar charts of published test error rates: on the USPS test set, Euclidean 1-NN at 5.5 percent, a hand-built convolutional net at 4.9, and tangent-distance 1-NN at 2.6 against a dashed human line at 2.5; on MNIST, tangent-distance 1-NN at 1.1, a degree-9 polynomial SVM at 0.8, LeNet-5 at 0.8, and boosted LeNet-4 at 0.7, each tagged with the course module that builds it"
+  caption="The published ladders (ESL Table 13.1; LeCun et al. 1998), tagged by the course module that owns each rung. Note the two panels' scales differ: the benchmarks are different test sets."
+/>
+
+### Restriction beats capacity, one rung up
+
+The pattern of this lesson repeats above it: the two methods that pushed below 1% on MNIST are a maximum-margin machine whose kernel builds in a similarity structure (<Ref lesson="svm-dual-kernels">module 4's subject</Ref>) and a boosted ensemble (<Ref lesson="adaboost">module 7's</Ref>): each an assumption-carrying restriction, not a capacity increase. Even the neural-net rung obeys it: on a deliberately small 320-digit training set, test accuracy climbs from 80.0% to 98.4% across five architectures ordered by *increasing constraint*: local connectivity, then one and then two levels of weight sharing, with free parameters falling from the plain network's 2,570 to about 1,060 shared across 5,194 connections (ESL Table 11.1). Weight sharing is spatial invariance injected into the network rather than the metric: what climbs the table is not capacity but how much of the task's structure the architecture assumes.
+
+### 0.7% and 0.8% share a rung
+
+The ladder's bottom rungs are closer than they look: LeCun et al. report a binomial standard error of about 0.1% on the MNIST estimates, so 0.7% and 0.8% are statistically indistinguishable. The true uncertainty, they note, is larger still, because the community tuned against this test set for a decade. Honest measurement of differences that small is <Ref lesson="cross-validation-bootstrap">module 5's</Ref> entire subject.
+
+### The floor is the human error, not zero
+
+Every ladder on this benchmark family flattens near the human error, the empirical stand-in for the Bayes floor that <Ref lesson="statistical-learning">lesson 1</Ref> proved no method beats: ambiguous fragments are ambiguous, and past 2.5% on USPS the remaining errors are increasingly digits that people also misread.
+
+## The reject option: lesson 1's decision theory reaches the sorting line
+
+A deployed sorter has a third action unavailable to a benchmark classifier: decline, and send the envelope to a human. This changes the decision problem in precisely the way <Ref lesson="statistical-learning">lesson 1's</Ref> asymmetric-loss exercise handled: actions are priced, and the cheapest conditional action wins.
+
+<Example title="the accept threshold at c = 20">
+Let a hand-sorted letter cost 1 unit and a misrouted one cost $c = 20$ units. Predicting class $\hat{y}$ at a point where the conditional probability of being right is $\eta$ has expected cost $20(1 - \eta)$: nothing when right, 20 units when wrong. Rejecting costs 1 regardless. Predicting is cheaper exactly when
+
+$$
+20\,(1 - \eta) \;\le\; 1
+\quad\Longleftrightarrow\quad
+\eta \;\ge\; 1 - \tfrac{1}{20} \;=\; 0.95.
+$$
+</Example>
+
+The general statement is Chow's rule (1970): answer only when the estimated posterior clears $1 - 1/c$, reject the rest.
+
+### The vote margin estimates the conditional
+
+The classifier does not know $\eta$, but the module's own machinery estimates it: the vote. Take the 1-NN prediction, and score its confidence by the *vote margin* $\hat{\eta}(x)$, the fraction of the 20 nearest training digits that agree with the predicted label. This is the neighborhood estimate of the conditional that <Ref lesson="knn-curse">the previous lesson</Ref> built. The reject numbers from here on come from this chapter's own run on the public USPS files, which reproduces 1-NN at **5.6%** (113 errors on the 2,007 test digits); the published 5.5% differs by rounding and tie-handling. On that run, the margin ranks the two populations without separating them: the median margin is 1.0 (unanimous) among correct predictions against 0.5 among errors, but 23% of the correct predictions also fall below the 0.95 line.
+
+<Figure
+  src="./figures/reject.svg"
+  alt="Left: histograms of the 20-neighbor vote margin for correct versus wrong 1-NN predictions on the USPS test set, with correct predictions massed at margin 1 and errors spread nearly flat, and a dashed accept threshold at 0.95. Right: error on accepted digits against the fraction rejected, falling from 5.6 percent at no rejection through the human 2.5 percent line near 9 percent rejection to 0.75 percent at 27 percent rejection, with the Chow threshold point marked"
+  caption="Computed on the 2,007 USPS test digits: the vote margin ranks errors (left), so trading rejection rate against error is a threshold choice (right)."
+/>
+
+<Task>
+Read the operating point off the right panel: at Chow's threshold $\hat{\eta} \ge 0.95$, the machine hands 27% of digits to the human queue and misreads one in 130 (0.75%) of the rest. Then account for the trade on the left panel: the errors removed concentrate in the low-margin bins, where roughly 43% of the predictions in the four lowest bins are wrong, while most of the rejected mass is high-margin correct predictions (23% of correct predictions sit below the threshold; the 0.9 bin alone holds about 155 digits, nearly all right). The accepted error falls fast because the errors leave first; the reject fraction is large because many right answers leave with them.
+</Task>
+
+### The cost account: theory's direction, data's dial
+
+The expected cost per digit confirms the theory's direction while correcting its letter. With no rejection, cost is $20 \times 0.056 = 1.12$ hand-sorts per digit; at the 0.95 threshold it falls to $0.38$, a threefold saving. But the empirical cost minimum on this test set sits at threshold 0.90, not the theoretical 0.95, because Chow's rule is optimal for the *true* posterior, and a 20-vote fraction is a noisy, biased estimate of it. Turning scores into trustworthy probabilities is calibration, <Ref lesson="classification-metrics">module 5's metrics lesson</Ref>.
+
+## Where the idealization departs
+
+The benchmark models the sorting line as i.i.d. draws of pre-cut digits under symmetric loss. Deployment breaks each clause, and naming the breaks is part of the module's method, not a footnote to it.
+
+**The mail stream is not i.i.d.** One writer addresses many envelopes, so errors arrive correlated by handwriting style: a loop-hating '2' fails ten times in one mailbag, not once. The independent-error arithmetic behind the standard-error calculations above understates the variance of deployed performance, and style drift (new pens, new demographics, printed labels displacing handwriting) moves the distribution the training scans froze.
+
+**Segmentation is upstream and unmodeled.** The 2,007 test digits are the survivors of a segmentation stage the benchmark takes as given. Touching digits, underlines, and ZIP codes broken across a fold produce errors charged, in deployment, to the whole pipeline; LeCun et al.'s 1998 study reports that on real envelopes segmentation, not isolated-character classification, dominated the error budget, a boundary the benchmark cannot see.
+
+<KeyFact>
+A benchmark error is a property of a frozen, pre-segmented test set under symmetric loss; a deployed error is a property of a pipeline, a mail stream, and a price list. Every ladder number in this lesson is the former, so none of them is a forecast of the latter.
+</KeyFact>
+
+**The loss is asymmetric and the benchmark's is not.** The 5.5%-versus-2.6% ladder scores symmetric misclassification, but the deployed objective is the priced one of the previous section; the reject region, absent from every ladder number, is what the post office actually bought.
+
+### Module 1, executed end to end
+
+What stands established: the module, executed end to end on a deployed system. Risk with an asymmetric loss defined the task; the Bayes floor, standing in as measured human error, calibrated it; $k$-NN classified; the vote margin estimated the conditional; and the decisive improvement came from injecting a true assumption into the metric, the bias–variance ledger's prediction realized on live mail. The open question is the one the tangent construction begs: invariance was hand-derived geometry, and seven tangent vectors is as far as hand-derivation goes. The systematic way to carry assumptions is to write down a probability model for the data and let its likelihood do the deriving; <Ref lesson="mle-map">module 2</Ref> builds that engine.
+
+## Exercises
+
+<Exercise>
+From this chapter's 1-NN run on the USPS test set, three rows of the confusion table (rows are true classes; the diagonal is correct):
+
+| true class | test digits | correct | errors |
+| --- | --- | --- | --- |
+| '0' | 359 | 355 | 4 |
+| '4' | 200 | 182 | 18 (8 of them read as '9') |
+| '8' | 166 | 148 | 18 |
+
+Compute the per-class error rates and the pooled error over these three classes, and state why the pooled figure must be a count-weighted average rather than the mean of the three rates.
+
+<Solution>
+Per-class error is errors over that class's test count: '0': $4/359 = 1.1\%$; '4': $18/200 = 9.0\%$; '8': $18/166 = 10.8\%$.
+
+Pooled error is total errors over total digits: $(4 + 18 + 18)/(359 + 200 + 166) = 40/725 = 5.5\%$. The unweighted mean of the three rates, $(1.1 + 9.0 + 10.8)/3 = 7.0\%$, is wrong because the classes are not equally frequent in the test set: '0' contributes 359 of the 725 digits, so its low rate carries proportionally more of the pooled figure. The two summaries answer different questions (pooled error is the risk under the test set's class frequencies; the per-class rates are the conditional risks), and the '4'→'9' concentration (8 of 18 errors) shows the errors are structured by shape adjacency, not spread uniformly: exactly the structure a confusion-aware loss or a reject rule can exploit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. Let $x$ be a perfectly rotation-symmetric image: a centered uniform disc. (a) Compute its rotation tangent vector $T$. (b) What does the tangent distance $d_T(x, x') = \min_{\alpha, \alpha'} \lVert (x + \alpha T) - (x' + \alpha' T') \rVert$ degenerate to in the rotation direction, and does the degeneracy break the method? (c) Which clause of the construction quietly assumed the degenerate case away, and why does the least-squares implementation survive it anyway?
+
+<Solution>
+(a) The tangent vector is the derivative of the image under rotation: $T = \lim_{\theta \to 0} (x_\theta - x)/\theta$. Rotating a centered disc changes no pixel, so $x_\theta = x$ for every $\theta$ and $T = 0$.
+
+(b) With $T = 0$ the "tangent line" $\{x + \alpha T\}$ collapses to the single point $x$: the minimization over $\alpha$ is over nothing, and the rotation direction contributes plain Euclidean distance. No break: the orbit of a rotation-symmetric image genuinely is a single point, so the tangent approximation is not merely surviving the degenerate case: it is exact there. The metric grants rotation credit in exact proportion to how much rotation actually moves the image, which for a disc is not at all.
+
+(c) The construction's language ("the curve of rotated versions", "the tangent line") assumes the orbit is one-dimensional, which fails when the transformation fixes the image. An implementation that normalized $T$ to unit length would divide by zero; the least-squares formulation never normalizes: it solves $\min_\alpha \lVert \alpha T - v \rVert$, which for $T = 0$ returns $\lVert v \rVert$, so rank-deficient tangent sets are handled by the algebra with no special case. The transferable check: a metric built from local linearizations must be probed where the linearization has lower rank than advertised.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Tangent distance improves on Euclidean 1-NN because it makes the classifier more flexible: it can match a query in more ways, so it fits the data better." Name the step that fails, and support the refutation with (a) the bias–variance ledger and (b) a transformation for which the same construction would make the classifier strictly worse.
+
+<Solution>
+The failing step is "matches in more ways $\Rightarrow$ fits better", which misidentifies what changed. Flexibility in <Ref lesson="bias-variance">the bias–variance lesson</Ref>'s sense is the capacity to represent more distinct hypotheses; tangent distance shrinks that capacity. It imposes an equivalence (all small transforms of an image are the same evidence), thereby *removing* distinctions the Euclidean classifier was free to draw. Fewer distinctions is bias, injected before the data speaks.
+
+(a) On the ledger, the equivalence collapses each stored digit's orbit to one representative, so every query effectively sees a several-fold larger local sample: the variance term falls. The bias term is the error the assumption itself introduces, which is zero when the assumption is true; and "a slightly rotated '3' is a '3'" is true. Net effect: error 5.5% → 2.6% with *less* flexibility, the mirror image of the claim.
+
+(b) Make the invariance false and the same construction injects real bias: full 360° rotation invariance identifies '6' with '9', and no sample size separates two classes the metric has declared equal. The lesson's small-rotation restriction is not a computational convenience; it is the boundary of where the assumption is true. Flexibility arguments cannot see this distinction; only the ledger can.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. The USPS files are public (`zip.train`, `zip.test`, linked from the ESL site). Draw a random 1,000-digit subsample of the training set, run Euclidean 1-NN against the full 2,007-digit test set, and report test error with a binomial standard error $\sqrt{\hat{p}(1-\hat{p})/n}$. Before running, state what would count as consistency with the published full-data 5.5%: should your number be above or below it, and by a sampling-noise margin or a real one?
+
+<Solution>
+Prediction first: the subsample number must sit *above* 5.5% by a real margin, not a noise margin: with a seventh of the training data, nearest neighbors are farther and the neighborhood-mismatch error grows; if 1,000 digits matched 5.5%, the learning curve would already be flat and the full 7,291 would be wasted collection effort.
+
+One run (seed-dependent; yours will differ by a few tenths): error $9.4\% \pm 0.7\%$, against the chapter's reproduced $5.6\%$ on the full training set. The gap $9.4 - 5.6 = 3.8$ percentage points is over five standard errors: real, as predicted, so the curve is still falling at $n = 7{,}291$. The *rate* of fall is itself informative: a 7.3-fold data increase cut the excess error above the human floor by a factor of several: decay far too fast for the worst-case rate $n^{-1/(d+1)}$ at $d = 256$, which predicts imperceptible movement, and consistent with the low intrinsic dimension of the manifold section. Agreement with a published benchmark number, as always, means agreement of the whole procedure: same training set size, same metric, same test set, every clause a place two honest implementations can differ.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. A sorting machine's misroute costs $c$ times a hand-sort. Using <Ref lesson="statistical-learning">lesson 1's</Ref> pointwise-cheapest-action derivation: (a) derive the accept threshold for general $c$, and evaluate it at $c = 20$ and $c = 100$; (b) from this chapter's operating table (no rejection: error 5.6%; threshold 0.90: reject 21.9%, error on accepted 0.89%; threshold 0.95: reject 27.0%, error on accepted 0.75%) compute the expected cost per digit (in hand-sort units) of all three policies at $c = 20$, and identify the cheapest.
+
+<Solution>
+(a) Accept and predict when the conditional cost of predicting is below the cost of rejecting: $c(1 - \eta) \le 1$, i.e. $\eta \ge 1 - 1/c$, which is Chow's rule. At $c = 20$: accept when $\eta \ge 0.95$. At $c = 100$: $\eta \ge 0.99$, which a 20-neighbor vote cannot even express between 0.95 and 1.0; costlier mistakes demand finer posterior estimates, not just higher thresholds.
+
+(b) Cost per digit = $c \cdot \Pr(\text{accept and wrong}) + \Pr(\text{reject})$. No rejection: $20 \times 0.056 = 1.12$. Threshold 0.90: accepted fraction $0.781$, error within it $0.0089$, so $20 \times 0.781 \times 0.0089 + 0.219 = 0.139 + 0.219 = 0.36$. Threshold 0.95: $20 \times 0.730 \times 0.0075 + 0.270 = 0.110 + 0.270 = 0.38$.
+
+Cheapest is threshold 0.90 at 0.36, below the Chow-optimal 0.95's 0.38, though both crush the no-reject 1.12. No contradiction: Chow's rule is optimal under the true posterior, and the empirical vote margin is a biased, 20-step-quantized estimate of it, so the empirically best threshold shifts. The rule sets the design; the data sets the dial.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. On your 1,000-digit subsample from the reproduction exercise above, run the following procedure as a black box: center the training images (subtract the mean image), compute the singular value decomposition of the centered data matrix, keep the top 40 right-singular directions, project both training and test images onto them, and run 3-NN in the resulting $\mathbb{R}^{40}$. Compare the test error with 3-NN on the raw 256 pixels. The 40 directions retain about 87% of the pixel variance; state before running whether discarding 216 coordinates and 13% of the variance should help or hurt a distance-based classifier, and why.
+
+<Solution>
+The chapter's geometry predicts *help*: <Ref lesson="knn-curse">the previous lesson</Ref> showed that coordinates carrying no class-relevant variation still contribute full-strength noise terms to every squared distance, drowning the informative directions; if digit variation concentrates near a low-dimensional surface, the trailing pixel directions are mostly such noise, and deleting them cleans the metric.
+
+One run on the same subsample: 3-NN on raw pixels 10.6%; 3-NN on the 40 projected coordinates **8.8%**: a sixth of the error removed by throwing away five-sixths of the coordinates. The black box is *principal component analysis*: the top-variance directions of the centered data, which for digit images capture the strokes' dominant modes of covariation. Why the top-variance directions should be the class-relevant ones at all (they need not be, in general) is <Ref lesson="pca">module 8's subject</Ref>; this exercise is its doorstep: the manifold of this lesson, found from data rather than assumed.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §13.3.3: invariant metrics and tangent distance, Figs. 13.10–13.11 (the construction recreated in this chapter's sequence), Table 13.1 (the USPS error ladder); §11.7: the ZIP-code data, the Net-1–Net-5 constraint experiment (Table 11.1), and the MNIST state-of-the-art list with its standard-error caveat. Free online: https://hastie.su.domains/ElemStatLearn/ (the `zip.train`/`zip.test` files used for this chapter's computations are distributed on the same page).
+2. P. Simard, Y. Le Cun, J. Denker, "Efficient Pattern Recognition Using a New Transformation Distance," *Advances in Neural Information Processing Systems* 5, 1993 — the tangent-distance method, its USPS results, and the ~2.5% human-error measurement on the same test set.
+3. Y. LeCun, L. Bottou, Y. Bengio, P. Haffner, "Gradient-Based Learning Applied to Document Recognition," *Proceedings of the IEEE* 86(11), 1998 — the MNIST benchmark comparison (tangent 1-NN 1.1%, polynomial SVM 0.8%, LeNet-5 0.8%, boosted LeNet-4 0.7%), and the field study of full check-reading pipelines in which segmentation dominates the deployed error budget.
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §20.4.2: the manifold hypothesis and Fig. 20.29, the rotated-'6' PCA circle reproduced beside this chapter's manifold section. Free online: https://probml.github.io/pml-book/book1.html
+5. C. K. Chow, "On Optimum Recognition Error and Reject Tradeoff," *IEEE Transactions on Information Theory* 16(1), 1970 — the reject rule $\eta \ge 1 - 1/c$ and the error–reject tradeoff curve.
+6. Y. S. Abu-Mostafa, "Hints," *Neural Computation* 7(4), 1995 — learning invariances by training-set augmentation, the alternative this chapter compares against tangent distance.
+</References>
