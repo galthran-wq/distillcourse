@@ -160,6 +160,12 @@ import FanoLeCamReduction from "./information-theory/FanoLeCamReduction";
 import BitsPerByteConversion from "./information-theory/BitsPerByteConversion";
 import TokenizerRankingFlip from "./information-theory/TokenizerRankingFlip";
 import ModelCoderPipeline from "./information-theory/ModelCoderPipeline";
+import GlmAssemblyDiagram from "./classical-ml/GlmAssemblyDiagram";
+import OneGradientThreeModels from "./classical-ml/OneGradientThreeModels";
+import NewtonPriceLedger from "./classical-ml/NewtonPriceLedger";
+import SgdTwoTargets from "./classical-ml/SgdTwoTargets";
+import LarPathSteps from "./classical-ml/LarPathSteps";
+import ElasticNetGrouping from "./classical-ml/ElasticNetGrouping";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -343,4 +349,10 @@ export const figures: Record<string, RegisteredFigure> = {
   BitsPerByteConversion: { component: BitsPerByteConversion },
   TokenizerRankingFlip: { component: TokenizerRankingFlip },
   ModelCoderPipeline: { component: ModelCoderPipeline },
+  GlmAssemblyDiagram: { component: GlmAssemblyDiagram },
+  OneGradientThreeModels: { component: OneGradientThreeModels },
+  NewtonPriceLedger: { component: NewtonPriceLedger },
+  SgdTwoTargets: { component: SgdTwoTargets },
+  LarPathSteps: { component: LarPathSteps, frames: 4 },
+  ElasticNetGrouping: { component: ElasticNetGrouping },
 };

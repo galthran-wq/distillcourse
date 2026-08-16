@@ -1,0 +1,427 @@
+One recipe — an exponential-family response with a linear natural parameter — generates linear regression, logistic regression, and Poisson regression from the same three assumptions.
+
+This module built the estimation engine one piece at a time: <Ref lesson="mle-map">the likelihood lesson</Ref> writes a log-likelihood and solves its score equation, <Ref lesson="fisher-information">the information lesson</Ref> prices any estimator by the score's variance, and <Ref lesson="gradient-descent">the optimization lesson</Ref> supplies solvers for score equations with no closed-form root. What that lesson closed on is the gap this one fills: every model so far met the engine separately, each with its own loss, its own gradient, and its own curvature. The separateness is an artifact of notation. The Bernoulli, Gaussian, and Poisson are members of one algebraic family; the family's normalizing term manufactures means, variances, and Fisher information by differentiation; attaching a linear predictor to the family yields the three named regressions; and all of them share the log-likelihood gradient $\sum_i (y_i - \mu_i)x_i$. The route: the rewriting that exposes the family; the log-partition's derivatives; the three assumptions that assemble a model; the universal gradient and its Fisher-scoring step; deviance, the family's own loss; and the sufficiency theorem that says why exactly these families admit the treatment.
+
+## The rewriting machine: three distributions, one template
+
+The unification rests on an algebraic fact about the three noise models this course has already fitted, and the fact is invisible in their standard forms. Exposing it is a rewriting exercise, and the rewriting itself is the skill: every construction in this chapter begins by reading a distribution's entries off the rewritten form.
+
+<Task>
+Three retrievals before the new algebra, closed book. (1) State the three-step recipe of <Ref lesson="mle-map">the likelihood lesson</Ref>: write the log-likelihood, differentiate, solve. (2) From <Ref lesson="fisher-information">the information lesson</Ref>'s closing exponential-family exercise: for $p(x \mid \eta) = h(x)\,e^{\eta T(x) - A(\eta)}$, recall $\mathbb{E}[T] = A'(\eta)$ and $I(\eta) = A''(\eta)$. (3) From <Ref lesson="gradient-descent">the optimization lesson</Ref>'s forward exercise: one Fisher-scoring step on the Bernoulli log-likelihood lands exactly on $k/n$, from any start. This chapter is where those three answers converge.
+</Task>
+
+### Bernoulli first: the log-odds appear by themselves
+
+Take the Bernoulli pmf with success probability $\varphi$, written so that one formula covers both outcomes: $p(y \mid \varphi) = \varphi^y (1-\varphi)^{1-y}$ for $y \in \{0, 1\}$. Exponentiate its own logarithm and collect the terms by their dependence on $y$:
+
+$$
+p(y \mid \varphi)
+= \exp\big( y \log \varphi + (1-y)\log(1-\varphi) \big)
+= \exp\Big( \underbrace{\log\tfrac{\varphi}{1-\varphi}}_{\text{coefficient of } y} \cdot\, y \;+\; \log(1-\varphi) \Big).
+$$
+
+The coefficient that the algebra puts in front of $y$ is $\log\frac{\varphi}{1-\varphi}$: the **log-odds**. Name it $\eta$ and solve backwards: $e^\eta = \varphi/(1-\varphi)$ gives $\varphi = 1/(1+e^{-\eta}) = \sigma(\eta)$, the sigmoid. One notation note before going further: $\eta$, which served <Ref lesson="gradient-descent">the optimization lesson</Ref> as the learning rate, here reverts to its statistical role as the *natural parameter*; this chapter contains no learning rates.
+
+The result corrects a widespread account of logistic regression. The sigmoid is commonly presented as a choice: scores must be squashed into $(0,1)$, and $\sigma$ is picked from the menu of S-shaped functions for its convenient derivative. That account is wrong about the direction of the logic. Nothing was squashed here: writing the Bernoulli in the form above *produces* the log-odds as the distribution's own internal parameter, and the sigmoid is nothing but that parameterization inverted. A different S-curve (the probit, met below) is a different modeling assumption, not a different squash, and the closing exercises show it forfeits an algebraic identity the sigmoid gets for free.
+
+### The template, named
+
+<Definition title="exponential family">
+A family of distributions over $y$ is an **exponential family** if its pmf or density can be written
+
+$$
+p(y \mid \eta) = h(y)\, \exp\big( \eta\, T(y) - A(\eta) \big),
+$$
+
+where $\eta$ is the **natural parameter**, $T(y)$ is the *sufficient statistic*, $h(y)$ is the *base measure* (a factor free of $\eta$), and $A(\eta)$ is the *log-partition function*, fixed by normalization: $e^{A(\eta)} = \int h(y)\, e^{\eta T(y)}\, dy$ (a sum in the discrete case). A choice of $h$, $T$, $A$ fixes the family; varying $\eta$ over the open set where the integral is finite (the *natural parameter space*) sweeps out its members.
+</Definition>
+
+The Bernoulli computation reads off $h(y) = 1$, $T(y) = y$, $\eta = \log\frac{\varphi}{1-\varphi}$, and $A(\eta) = -\log(1-\varphi) = \log(1+e^\eta)$. Every distribution on this chapter's core path has $T(y) = y$; vector-valued $T$ handles multi-parameter members and the multinomial, and is deferred to where those arrive. The Gaussian and the Poisson submit to the same manipulation, with one different move each: the Gaussian's square is expanded and the $y^2$ term exiled into $h(y)$, the Poisson's $\lambda^y$ becomes $e^{y\log\lambda}$.
+
+<FigureSequence
+  name="rewrite-machine"
+  alt="Three frames with a fixed exponential-family template row on top; each frame rewrites one distribution (Bernoulli, Gaussian with unit variance, Poisson) into the template and files its natural parameter, log-partition, base measure, and sufficient statistic into a ledger, ending with the inverted parameter map: sigmoid, identity, exponential"
+  caption="The rewriting machine, run three times. Only the member changes per frame; watch η, A(η), h(y) land in the same ledger slots, and read each frame's bottom-right cell: the inversion of η is the sigmoid, the identity, the exponential."
+/>
+
+For the Gaussian (variance fixed at $1$), the natural parameter *is* the mean, so no inversion is needed; for the Poisson, $\eta = \log\lambda$, so inverting gives $\lambda = e^\eta$, positive for every real $\eta$. The three inverted maps, sigmoid, identity, and exponential, are the response functions of the three regressions this lesson assembles, and each was produced by the algebra, none chosen.
+
+<Remark title="the dispersion parameter, honestly">
+Fixing the Gaussian's variance at $1$ is not a trick but a scope decision. With $\sigma^2$ free, the Gaussian still fits an extended template, $p(y \mid \eta, \sigma^2) = h(y, \sigma^2)\exp\big((\eta y - A(\eta))/\sigma^2\big)$, the *exponential dispersion family*, where $\sigma^2$ scales the noise without touching the mean structure; the Poisson's overdispersed cousins live in the same extension. Everything this chapter derives (the response functions, the gradient, the deviance up to a factor $1/\sigma^2$) survives with the dispersion carried along as a known or separately estimated constant. The two-parameter machinery adds bookkeeping, not ideas, and the standard treatment is McCullagh and Nelder's monograph, cited at the end.
+</Remark>
+
+The template also has instructive non-members. $\mathrm{Uniform}(0, \theta)$, the distribution that voided <Ref lesson="fisher-information">the Cramér–Rao bound</Ref>, fails here for the same structural reason it failed there: its support moves with the parameter, and no factorization $h(y)\exp(\eta T(y) - A(\eta))$, whose support is fixed by $h$ alone, can express a density whose zero set depends on $\theta$. Membership in the family is exactly what guaranteed the regularity conditions of the information theory; the two lessons certify each other.
+
+The rewriting transfers to any family whose log is affine in some statistic of $y$, and it is worth doing once unassisted.
+
+<Exercise>
+The geometric distribution $p(y \mid \varphi) = (1-\varphi)^{y-1}\varphi$ on $y \in \{1, 2, 3, \dots\}$ models the number of trials up to the first success. Rewrite it into exponential-family form and read off $h$, $T$, $\eta$, and $A(\eta)$; state the natural parameter space; and invert $A'$ to find the response function a geometric GLM would use. Do the regrouping on paper before opening the solution.
+
+<Solution>
+Strategy: exponentiate the log and collect the coefficient of $y$, exactly as for the Bernoulli.
+
+$$
+p(y \mid \varphi) = \exp\big( (y-1)\log(1-\varphi) + \log\varphi \big)
+= \exp\Big( \log(1-\varphi)\cdot y + \log\tfrac{\varphi}{1-\varphi} \Big).
+$$
+
+So $h(y) = 1$, $T(y) = y$, $\eta = \log(1-\varphi)$, and $A(\eta) = -\log\frac{\varphi}{1-\varphi}$. Expressing $A$ in $\eta$: from $\varphi = 1 - e^\eta$, $A(\eta) = \log\frac{1-\varphi}{\varphi} = \log\frac{e^\eta}{1-e^\eta} = \eta - \log(1-e^\eta)$. The natural parameter space is $\eta < 0$ (equivalently $0 < \varphi < 1$): an open half-line, not all of $\mathbb{R}$; openness of the space returns as the subject of the first closing exercise. The mean is
+$$
+A'(\eta) = 1 + \frac{e^\eta}{1-e^\eta} = \frac{1}{1-e^\eta} = \frac{1}{\varphi},
+$$
+which is the geometric's known mean, so a GLM with this response would predict $\mu = 1/(1 - e^{w^\top x})$, valid where $w^\top x < 0$. The transferable move: the natural parameter is always the coefficient the algebra attaches to $T(y)$, and the response function is always $A'$ inverted through the parameter map.
+</Solution>
+</Exercise>
+
+## The log-partition is a moment factory
+
+The rewriting filed each distribution's normalizing constant into $A(\eta)$, which looks like bookkeeping. It is the opposite: $A$ carries the family's moments, and differentiating it replaces every expectation integral this chapter would otherwise need. The Bernoulli shows the pattern before the general proof: $A(\eta) = \log(1+e^\eta)$ has
+
+$$
+A'(\eta) = \frac{e^\eta}{1+e^\eta} = \sigma(\eta) = \varphi,
+\qquad
+A''(\eta) = \sigma(\eta)\big(1 - \sigma(\eta)\big) = \varphi(1-\varphi):
+$$
+
+the first derivative is the Bernoulli mean, the second is the Bernoulli variance. Neither computation consulted the pmf.
+
+<Theorem title="log-partition derivatives">
+For an exponential family $p(y \mid \eta) = h(y)e^{\eta T(y) - A(\eta)}$, on the interior of the natural parameter space,
+$$
+\mathbb{E}_\eta\big[T(Y)\big] = A'(\eta),
+\qquad
+\operatorname{Var}_\eta\big(T(Y)\big) = A''(\eta).
+$$
+
+<Proof>
+Differentiate the normalization identity $e^{A(\eta)} = \int h(y)\, e^{\eta T(y)}\, dy$ in $\eta$ (the interchange of derivative and integral is licensed on the interior of the natural parameter space, where the integrand is dominated). The chain rule on the left and differentiation under the integral on the right give
+$$
+A'(\eta)\, e^{A(\eta)} = \int T(y)\, h(y)\, e^{\eta T(y)}\, dy,
+$$
+and dividing both sides by $e^{A(\eta)}$ turns the right side into $\int T(y)\, p(y \mid \eta)\, dy = \mathbb{E}_\eta[T(Y)]$, proving the first identity. The second follows by differentiating once more; that computation is the exercise directly below.
+</Proof>
+</Theorem>
+
+<Exercise>
+Finish the proof: differentiate $A'(\eta)\,e^{A(\eta)} = \int T(y)\, h(y)\, e^{\eta T(y)}\, dy$ once more in $\eta$ and conclude $A''(\eta) = \operatorname{Var}(T(Y))$. Write the product rule's two left-side terms before opening the solution.
+
+<Solution>
+Strategy: product rule on the left, differentiation under the integral on the right, then divide by $e^{A(\eta)}$ again.
+
+Left side: $\frac{d}{d\eta}\big[ A'(\eta)\, e^{A(\eta)} \big] = A''(\eta)\, e^{A(\eta)} + A'(\eta)^2\, e^{A(\eta)}$. Right side: $\int T(y)^2\, h(y)\, e^{\eta T(y)}\, dy$. Dividing by $e^{A(\eta)}$:
+$$
+A''(\eta) + A'(\eta)^2 = \mathbb{E}\big[T(Y)^2\big],
+$$
+and since $A'(\eta) = \mathbb{E}[T(Y)]$ by the proven clause,
+$$
+A''(\eta) = \mathbb{E}\big[T^2\big] - \big(\mathbb{E}[T]\big)^2 = \operatorname{Var}\big(T(Y)\big).
+$$
+Two corollaries ride along free. First, $A'' \ge 0$ everywhere, so $A$ is convex and $A'$ is nondecreasing: the mean map is invertible wherever the variance is positive, which is what makes "solve for the parameter" legitimate throughout this chapter. Second, a variance is computed with no integral in sight: the transferable move is that in an exponential family, moment computations are calculus on $A$.
+</Solution>
+</Exercise>
+
+The second derivative is a quantity this course has met under another name. <Ref lesson="fisher-information">The information lesson</Ref>'s closing exercise computed, for exactly this family, $I(\eta) = A''(\eta)$: the Fisher information in the natural parameterization. Combined with the theorem, one number wears three hats: $A''(\eta)$ is the curvature of the log-likelihood, the variance of the sufficient statistic, and the information one observation carries about $\eta$. (The same exercise showed the caveat: information is parameterization-dependent, and $I(\varphi) = 1/(\varphi(1-\varphi))$ for the Bernoulli's mean parameter. The natural parameterization is the one in which information *equals* variance.)
+
+<Figure
+  src="./figures/bernoulli-moment-factory.svg"
+  alt="Three stacked panels over a shared eta axis: the Bernoulli log-partition log(1 plus e to the eta), its first derivative the sigmoid labeled as the mean, and its second derivative sigma times one minus sigma labeled as the variance and the Fisher information"
+  caption="The factory run on the Bernoulli: differentiate the log-partition once and the sigmoid appears as the mean curve; differentiate again and the variance curve appears, which is also I(η)."
+/>
+
+<Task>
+Read the factory's output off the panels. On the middle curve, mark where $A'(\eta) = \tfrac12$: it is $\eta = 0$, log-odds zero. On the bottom curve, read the value there: $\tfrac14$, the largest variance a Bernoulli attains, decaying toward $0$ in both tails. An observation is most informative exactly where the outcome is least decided; saturated units ($|\eta|$ large) carry almost none. This tail behavior is what will make the weights in Fisher scoring die on confidently classified points.
+</Task>
+
+Run the factory on the other two members. Gaussian: $A(\eta) = \eta^2/2$, so $A' = \eta = \mu$ and $A'' = 1$, a constant variance, which is the homoscedasticity that <Ref lesson="ols">the least-squares lesson</Ref> assumes. Poisson: $A(\eta) = e^\eta$, so $A' = A'' = e^\eta = \lambda$. The Poisson's mean and variance are not merely equal by coincidence of formulas; the family's structure *forces* them equal, since both are derivatives of the same $e^\eta$. Real counts are routinely more spread than their mean (claim counts, read counts, visit counts), a failure called *overdispersion*; the honest summary is that the Poisson GLM's fitted means remain sensible under it, while its variance-based error bars and tests become overconfident, and the standard repairs (a fitted dispersion factor, or the negative binomial's $\operatorname{Var} = \mu + \alpha\mu^2$) live in the dispersion extension noted above. This course flags the issue where the data raise it and otherwise works with the clean one-parameter family.
+
+<KeyFact>
+Every later object of this chapter — the Hessian $X^\top W X$, the Fisher-scoring weights, the reach of the Cramér–Rao floor — is $A''(\eta)$ evaluated per observation.
+</KeyFact>
+
+## Three assumptions assemble a model
+
+The family so far describes a lone response $y$; regression needs $y$ conditioned on features $x \in \mathbb{R}^d$. The passage from one to the other is three assumptions, and each buys something specific.
+
+<Definition title="generalized linear model (Ng &amp; Ma, CS229 ch. 3)">
+A **generalized linear model** (GLM) for a response $y$ given features $x$ assumes:
+
+1. **the family** — $y \mid x \sim \mathrm{ExponentialFamily}(\eta)$ for a fixed choice of $h$, $T$, $A$ with $T(y) = y$;
+2. **linearity** — the natural parameter is linear in the features: $\eta = w^\top x$;
+3. **the target** — the model predicts the conditional mean, $\mu(x) = \mathbb{E}[y \mid x]$.
+</Definition>
+
+Assumption 1 fixes the noise and therefore, through <Ref lesson="mle-map">the likelihood engine</Ref>, the loss; nothing about the loss remains to be chosen once the family is named. Assumption 2 is the design choice, the "linear" in the name: one score $w^\top x$ summarizes the features, exactly as in every linear model of this course. Assumption 3 closes the construction, because the mean of an exponential family is not a new unknown: by the moment factory,
+
+$$
+\mu(x) = \mathbb{E}[y \mid x] = A'(\eta) = A'(w^\top x).
+$$
+
+The prediction rule is forced. For the Gaussian, $A'(\eta) = \eta$, and the model is $\mu(x) = w^\top x$: linear regression. For the Bernoulli, $A'(\eta) = \sigma(\eta)$, and the model is $\mu(x) = \sigma(w^\top x)$: logistic regression, sigmoid included, derived. For the Poisson, $A'(\eta) = e^\eta$, and the model is $\mu(x) = e^{w^\top x}$: Poisson regression, with a rate that is positive for every $w$ and every $x$ because the exponential's range is $(0, \infty)$. The same crank run on the multinomial, with a one-hot vector $T$, yields softmax regression; the [CS229 lecture notes](https://cs229.stanford.edu/main_notes.pdf) carry that derivation out in full.
+
+<Figure
+  name="GlmAssemblyDiagram"
+  alt="The GLM assembly line: features flow into the linear predictor eta equals w transpose x, through the response function to the mean mu, into exponential-family noise producing y; below, the same columns filled in for linear, logistic, and Poisson regression with their identity, sigmoid, and exp response functions"
+  caption="One pipeline, three instantiations. The response-function column is never a free choice: each row's entry inverts that row's natural parameter."
+/>
+
+### The link menu, and what canonical buys
+
+<Definition title="link function">
+In a GLM, the **link function** $g$ maps the mean to the linear predictor, $g(\mu) = w^\top x$; its inverse $g^{-1}$, the *response function*, maps the score to the mean. The **canonical link** is $g = (A')^{-1}$, the choice under which the linear predictor *is* the natural parameter: identity for the Gaussian, log-odds (logit) for the Bernoulli, log for the Poisson.
+</Definition>
+
+The canonical link is the default, not a law. Any strictly monotone map from the mean's range onto the score's range defines a coherent model: *probit* regression puts $\mu = \Phi(w^\top x)$, with $\Phi$ the Gaussian cdf, and fits binary data almost indistinguishably from the logit. What the canonical choice buys is algebraic and arrives in the next section: a gradient of one universal shape, and a Newton step that coincides with Fisher scoring. A closing exercise makes the price of the non-canonical choice exact.
+
+### The Poisson branch, concretely
+
+Counts are where the assembly earns its keep, and they are the data of <Ref lesson="insurance-claims">the next lesson</Ref>: policies, each with a number of claims in a year, mostly $0$, occasionally $1$ or $2$, rarely more. The log link supplies two properties that count data require. First, positivity: a straight-line model $\mu = w^\top x$ fitted to counts crosses zero somewhere in feature space and predicts a negative expected count there, a value no count-generating process can have; $\mu = e^{w^\top x}$ cannot. Second, multiplicativity: under the log link, a unit increase in feature $j$ multiplies the predicted rate by $e^{w_j}$. A fitted claims model with $w_{\text{urban}} = 0.18$ asserts that urban policies run $e^{0.18} \approx 1.20$, about twenty percent higher claim rates than otherwise identical rural ones, at every baseline; the same coefficient in a linear-link model would assert a fixed additive $0.18$ claims per year, as implausible for a policyholder at rate $0.05$ as for one at rate $2$.
+
+<Figure
+  src="./figures/poisson-link-panels.svg"
+  alt="Two panels of the same count data against a feature: on the left an identity-link straight line fitted to the counts exits below zero, a region shaded as impossible; on the right the log link's exponential mean curve stays positive over the whole feature range"
+  caption="The same count data under two links. The straight line's tail predicts negative counts; the log link's mean is positive for every w and every x. The next lesson exhibits exactly this failure on 678,000 real policies."
+/>
+
+The three-row table in the assembly diagram is worth committing to memory as a unit: family, response function, mean range, support. It is the entire model-selection interface of the GLM framework; picking the row whose support matches the response variable is the whole decision, and everything downstream is derivation.
+
+## The universal gradient: prediction error times features
+
+With the model assembled, run the engine on it. The log-likelihood of $n$ independent observations $(x_i, y_i)$ under any canonical GLM is, substituting $\eta_i = w^\top x_i$ into the family's log-density,
+
+$$
+\ell(w) \;=\; \sum_{i=1}^n \Big[ y_i\, \eta_i - A(\eta_i) + \log h(y_i) \Big],
+\qquad \eta_i = w^\top x_i .
+$$
+
+Every model-specific constant sits in the $\log h(y_i)$ terms, which do not contain $w$; what remains is one function shape for the entire family, and one differentiation settles all of it.
+
+<Theorem title="the universal gradient (Murphy, PML §12.4)">
+For any canonical-link GLM with $T(y) = y$,
+$$
+\nabla_w\, \ell(w) \;=\; \sum_{i=1}^n \big( y_i - \mu_i \big)\, x_i,
+\qquad \mu_i = A'(w^\top x_i) = \mathbb{E}[y \mid x_i],
+$$
+and the Hessian is $\nabla^2_w\, \ell(w) = -\sum_i A''(\eta_i)\, x_i x_i^\top = -X^\top W X$ with $W = \operatorname{diag}\big(A''(\eta_1), \dots, A''(\eta_n)\big)$, so $\ell$ is concave and every stationary point is a global maximizer.
+
+<Proof>
+Chain rule through $\eta_i$, term by term. The term $y_i\, \eta_i = y_i\, w^\top x_i$ is linear in $w$ with gradient $y_i x_i$. The term $A(\eta_i)$ has gradient $A'(\eta_i)\, x_i$, and the moment factory identifies $A'(\eta_i)$ as the model's conditional mean $\mu_i$. The $\log h(y_i)$ terms vanish under $\nabla_w$. Summing gives the gradient. Differentiating once more, only the $A'(\eta_i)x_i$ terms depend on $w$, contributing $-A''(\eta_i)\, x_i x_i^\top$ each; stacking the $x_i$ as rows of $X$ writes the sum as $-X^\top W X$. Since $A''(\eta_i) = \operatorname{Var}(y \mid x_i) \ge 0$, the Hessian is negative semidefinite everywhere, and concavity promotes any stationary point to a global maximum by <Ref lesson="gradient-descent">the convexity theorem</Ref> applied to $-\ell$.
+</Proof>
+</Theorem>
+
+The formula reads as a sentence: the gradient is **prediction error times features**, summed. Every way this course has fitted a model to data so far is an instance of that sentence.
+
+<Figure
+  name="OneGradientThreeModels"
+  alt="The gradient formula, sum of prediction error times features, dissected with underbraces, above three rows instantiating it: least squares with mu equal to the linear score, logistic with mu equal to the sigmoid, Poisson with mu equal to the exponential"
+  caption="The module's keeper. Three likelihoods, one update rule: only the formula for μ changes, and the fitting code is the same code."
+/>
+
+Three readings of the same display. **Least squares:** with $\mu_i = w^\top x_i$, setting the gradient to zero gives $\sum_i (y_i - w^\top x_i)x_i = X^\top(y - Xw) = 0$, the normal equations that <Ref lesson="ols">the next module's opening lesson</Ref> derives twice more, by matrix calculus and by projection. **Logistic:** the gradient is $\sum_i (y_i - \sigma(w^\top x_i))x_i$, the expression whose score equation <Ref lesson="gradient-descent">the optimization lesson</Ref> exhibited as unsolvable in closed form; <Ref lesson="logistic-regression">module 4's opening lesson</Ref> re-derives it by hand and watches the cancellation that produces it, which is this theorem in disguise. **Poisson:** $\sum_i (y_i - e^{w^\top x_i})x_i$, count minus predicted rate, times features. A stochastic-gradient step $w \leftarrow w + \alpha\,(y_i - \mu_i)\,x_i$ is therefore the same line of code for all three models, with only the function computing $\mu$ swapped.
+
+<KeyFact>
+The $(y - \mu)x$ form belongs to the canonical link, not to GLMs as such: canonicity makes the response function's slope equal the response's variance $A''(\eta)$, and the two cancel in the chain rule — a cancellation non-canonical links do not get, as the refutation exercise shows.
+</KeyFact>
+
+### Fisher scoring: Newton with the expected curvature
+
+The Hessian being $-X^\top W X$ puts <Ref lesson="gradient-descent">Newton's method</Ref> one substitution away. *Fisher scoring* is Newton's step with the observed curvature replaced by its expectation, the Fisher information matrix; for a canonical GLM the substitution changes nothing, because $A''(\eta_i)$ contains no $y_i$, so the observed and expected curvatures are already the same matrix $X^\top W X$. The step is
+
+$$
+w_{t+1} = w_t + \big( X^\top W X \big)^{-1} X^\top (y - \mu),
+$$
+
+with $W$ and $\mu$ evaluated at $w_t$. One rewriting shows what the step is doing. Define the *working response* $z = Xw_t + W^{-1}(y - \mu)$, the current scores nudged by the inverse-variance-weighted errors; then the step becomes $w_{t+1} = (X^\top W X)^{-1} X^\top W z$, which is exactly a weighted least-squares solve of $z$ against $X$ with weights $W$. Fitting any GLM is therefore iterated linear regression: linearize, reweight by each observation's current variance, solve, repeat. The scheme is called *iteratively reweighted least squares* (IRLS); it is how R's `glm` and statsmodels fit these models, it converges in a handful of steps at the moderate dimensions where classical statistics lives, and <Ref lesson="logistic-regression">the logistic-regression lesson</Ref> runs it in full on its own case. The weights are the moment factory's variance curve: near-saturated observations ($A''(\eta_i) \approx 0$) drop out of the solve, and the undecided ones drive it. One full pass on a small Poisson dataset shows every part of the loop in numbers.
+
+<Example title="one Fisher-scoring step on four counts">
+Four observations of a count against a single feature, with an intercept: $x = (0, 1, 2, 3)$, $y = (1, 1, 2, 3)$. The model is the Poisson branch, $\mu = e^{w_0 + w_1 x}$, so the design matrix $X$ has rows $x_i^\top = (1, x_i)$, and $A''(\eta) = e^\eta = \mu$: each observation's weight is its current fitted rate. Start at $w^{(0)} = (0, 0)$.
+
+**Evaluate at $w^{(0)}$.** Every score is $\eta_i = 0$, so every fitted rate is $\mu_i = e^0 = 1$ and $W = \operatorname{diag}(1, 1, 1, 1)$. The working response is
+$$
+z_i = \eta_i + \frac{y_i - \mu_i}{\mu_i} = 0 + \frac{y_i - 1}{1},
+\qquad z = (0,\, 0,\, 1,\, 2).
+$$
+
+**Solve the weighted least squares.** With unit weights the solve is ordinary least squares of $z$ against $X$:
+$$
+X^\top W X = \begin{bmatrix} 4 & 6 \\ 6 & 14 \end{bmatrix},
+\qquad
+X^\top W z = \begin{bmatrix} 3 \\ 8 \end{bmatrix},
+$$
+and with $\det(X^\top W X) = 4 \cdot 14 - 6 \cdot 6 = 20$,
+$$
+w^{(1)} = \frac{1}{20}\begin{bmatrix} 14 & -6 \\ -6 & 4 \end{bmatrix}\begin{bmatrix} 3 \\ 8 \end{bmatrix}
+= \frac{1}{20}\begin{bmatrix} 42 - 48 \\ -18 + 32 \end{bmatrix}
+= \begin{bmatrix} -0.3 \\ \phantom{-}0.7 \end{bmatrix}.
+$$
+
+**Re-evaluate and repeat.** At $w^{(1)}$ the fitted rates are $\mu = e^{-0.3 + 0.7x} = (0.74,\ 1.49,\ 3.00,\ 6.05)$: the step overshot, predicting rate $6.05$ for the row with count $3$. That row's weight in the new $W$ is $6.05$ — the largest of the four — so the next solve is pulled hardest by exactly the row the current fit gets most wrong, and the slope comes back down. The iterates are
+$$
+(-0.3,\ 0.7) \;\to\; (-0.231,\ 0.503) \;\to\; (-0.181,\ 0.426) \;\to\; (-0.177,\ 0.420),
+$$
+and the fifth solve repeats the fourth to four decimals: convergence in four iterations. At the fit, the rates are $(0.84,\ 1.27,\ 1.94,\ 2.95)$, summing to $7.00 = \sum_i y_i$ — the intercept's score equation $\sum_i (y_i - \mu_i) = 0$, holding exactly, as the universal gradient says it must.
+</Example>
+
+The framework's name and shape both date to the same act: John Nelder and Robert Wedderburn introduced the term "generalized linear model" in a [1972 JRSS paper](https://doi.org/10.2307/2344614) that unified regression models until then fitted by separate ad-hoc algorithms, and the unification *was* the algorithm — one IRLS loop, parameterized by a family and a link.
+
+## Deviance: squared error, generalized
+
+Fitting is settled; judging a fit is not, and the family supplies its own yardstick. The raw maximized log-likelihood will not serve directly: its value carries the $\sum_i \log h(y_i)$ terms and the arbitrary units of the density, so "$\ell = -3{,}214$" means nothing in isolation. The repair is to measure each model against the best conceivable fit of the same family to the same rows: the *saturated model*, which spends one mean parameter per observation and sets each $\mu_i$ wherever that row's likelihood is largest. For the Poisson, $\frac{d}{d\mu}(y\log\mu - \mu) = y/\mu - 1$ vanishes at $\mu = y$; for the Gaussian likewise $\mu = y$. The saturated model reproduces every observation exactly, which makes it useless for prediction and perfect as a ceiling.
+
+<Definition title="deviance">
+The **deviance** of fitted means $\hat\mu = (\hat\mu_1, \dots, \hat\mu_n)$ for observations $y = (y_1, \dots, y_n)$ under a GLM family is twice the log-likelihood gap to the saturated model:
+$$
+D(y, \hat\mu) \;=\; 2 \sum_{i=1}^n \Big[ \log p\big(y_i \mid \mu_i = y_i\big) - \log p\big(y_i \mid \mu_i = \hat\mu_i\big) \Big] \;\ge\; 0 ,
+$$
+with equality exactly when the fit is saturated. Minimizing deviance is maximizing likelihood; lower held-out deviance is higher held-out log-likelihood.
+</Definition>
+
+<Figure
+  src="./figures/deviance-gap.svg"
+  alt="A vertical log-likelihood scale with two horizontal ticks: the saturated model, one mean per row, as the ceiling, and the fitted GLM below it, with the doubled gap between them labeled as the deviance and the Gaussian case annotated as residual sum of squares"
+  caption="Deviance is a doubled gap on the log-likelihood scale: the fitted model measured from the saturated ceiling rather than from an arbitrary zero."
+/>
+
+The nonnegativity is by construction (each saturated term maximizes its row), and the $\log h(y_i)$ terms, identical in both models, cancel in the subtraction: deviance is unit-free in exactly the way the raw log-likelihood is not. Two evaluations connect it to numbers this course already uses.
+
+**Gaussian, $\sigma^2 = 1$:** $\log p(y \mid \mu) = -\tfrac12(y-\mu)^2 - \tfrac12\log 2\pi$. The saturated term is $-\tfrac12 \log 2\pi$, so each row contributes $2 \cdot \tfrac12 (y_i - \hat\mu_i)^2$ and
+
+$$
+D(y, \hat\mu) = \sum_{i=1}^n (y_i - \hat\mu_i)^2 = \mathrm{RSS}:
+$$
+
+the deviance of a Gaussian GLM *is* the residual sum of squares. Squared error was never a generic loss; it is one family's deviance, which is the sharpest form of the fact, from <Ref lesson="mle-map">the likelihood lesson</Ref>, that least squares is Gaussian maximum likelihood.
+
+**Poisson:** $\log p(y \mid \mu) = y\log\mu - \mu - \log y!$. Subtracting the fitted term from the saturated term ($\mu = y$) row by row, the $\log y!$ cancels and
+
+$$
+D(y, \hat\mu) = 2 \sum_{i=1}^n \Big[ y_i \log\frac{y_i}{\hat\mu_i} - y_i + \hat\mu_i \Big],
+$$
+
+with the convention $y\log y = 0$ at $y = 0$, so a zero-count row contributes $2\hat\mu_i$: the model pays for predicting risk where none materialized, in proportion to the predicted rate, and pays without bound ($y_i\log(y_i/\hat\mu_i) \to \infty$ as $\hat\mu_i \to 0$) for calling an observed claim nearly impossible. That asymmetry is the count likelihood speaking, and no symmetric per-row error has it.
+
+<KeyFact>
+Deviance is the metric that ranks the models on the next lesson's 678,000-policy claims data, where squared error ranks them wrongly — and it is undefined for a model that predicts a negative rate, which is a verdict, not a limitation.
+</KeyFact>
+
+## Sufficiency: why these families and no others
+
+Every construction above leaned on one structural feature of the template: $\eta\,T(y)$ is the only place where parameter and data meet. The feature has a name and a converse, and together they answer the question of why this chapter's family, rather than some other, is the one that unifies classical regression.
+
+Write the log-likelihood of an iid sample $y_1, \dots, y_n$ from the family:
+
+$$
+\ell(\eta) = \sum_{i=1}^n \log h(y_i) \;+\; \eta \sum_{i=1}^n T(y_i) \;-\; n A(\eta) .
+$$
+
+The first sum does not involve $\eta$; everything the sample has to say about the parameter is carried by the single number $\sum_i T(y_i)$. A statistic with this property is called *sufficient*: conditional on its value, the remaining detail of the sample is independent of the parameter (the general criterion is the factorization theorem, Casella and Berger §6.2, and the display above is its instance for this family). The practical content is compression without loss: the coin's seven flips reduce to "5 heads"; a year of Poisson counts reduces to their total; a stream of observations updates a GLM fit through a running sum of fixed size, whatever $n$ becomes. The same structure is why exponential families admit *conjugate priors*, the closed-form Bayesian updates of <Ref lesson="mle-map">the Beta–Bernoulli computation</Ref>: a prior that mimics the likelihood's shape stays in its own family because the likelihood's shape never changes, only its two sufficient numbers do (Bishop, PRML §2.4).
+
+<Figure
+  src="./figures/sufficiency-collapse.svg"
+  alt="Two panels: on the left, exponential-family observations y1 through yn collapse through converging arrows into a single box holding the running sum of T(yi), labeled as fixed size for every n; on the right, a Cauchy sample's observations map straight down onto the whole ordered list, labeled as the smallest sufficient statistic, growing with n"
+  caption="Sufficiency drawn. An exponential-family sample collapses into one fixed-size sum before the likelihood ever looks at it; a Cauchy sample — the heavy-tailed density examined below — compresses into nothing smaller than itself."
+/>
+
+The converse is the stronger statement. Fixed-size sufficient summaries are not a convenience some families happen to offer; under regularity they are the *defining mark* of exponential families. The result was proved independently in 1935–36 by Georges Darmois, Bernard Koopman, and Edwin Pitman, and is stated here without proof.
+
+<Theorem title="Pitman–Koopman–Darmois, stated">
+Let $p(y \mid \theta)$ be a family of densities with common support, smooth in $y$ and $\theta$. If for every sample size $n$ the iid sample admits a sufficient statistic of bounded dimension (not growing with $n$), then the family is an exponential family.
+</Theorem>
+
+Distributions outside the family make the point by their absence. A sample from the Cauchy distribution, the heavy-tailed density $1/[\pi(1+(y-\theta)^2)]$ with no mean, admits no fixed-size summary: its sufficient statistic is, in effect, the whole ordered sample, and no bounded set of numbers replaces it. The Uniform$(0,\theta)$ evades the theorem through its moving support (its maximum *is* sufficient), which is the same exemption that voided its Cramér–Rao floor. The exponential family is thus not one convenient class among many; it is precisely the class on which "write the log-likelihood, accumulate one statistic, solve" runs at fixed cost, and therefore the class this module's engine turns into a model factory.
+
+What stands established: the Bernoulli, Gaussian, and Poisson are one family $h(y)e^{\eta T(y) - A(\eta)}$, whose log-partition manufactures mean, variance, and Fisher information as $A'$ and $A''$; three assumptions attach a linear predictor and force the sigmoid, identity, and exponential response functions rather than permitting them; every canonical GLM has gradient $\sum_i (y_i - \mu_i)x_i$ and Hessian $-X^\top W X$, so one concave maximization and one Fisher-scoring loop fit them all; deviance extends squared error to the whole family; and the sufficiency theorem certifies that no wider class supports the same machinery. What stands open is contact with data. <Ref lesson="insurance-claims">The next lesson</Ref> runs the factory on 678,000 real motor-insurance policies, where the response is a claim count, the Gaussian branch fails in exactly the ways this chapter predicts, and deviance, not squared error, ranks the models; after it, <Ref lesson="logistic-regression">module 4</Ref> takes the Bernoulli branch as its first road to a classification boundary. The closing exercise below computes the deviance verdict in miniature.
+
+## ★ Curved families: a parabola in the natural parameter space
+
+The chapter's families each had one free parameter filling one slot in the exponent. The two-parameter Gaussian, written in full exponential-family form, has a two-dimensional natural parameter $(\eta_1, \eta_2) = (\mu/\sigma^2,\, -1/2\sigma^2)$ filling two slots, $\eta_1 y + \eta_2 y^2$, and its natural parameter space is an open half-plane: a *full* family, dimension of the parameter equal to the number of exponent terms. Constraints between the parameters change the geometry without leaving the algebra. Assume $\sigma^2 = \mu^2$ (a constant coefficient of variation, standard in analysis-of-variance settings): the family still writes itself in the two-slot form, but $(\eta_1, \eta_2) = (1/\mu,\, -1/2\mu^2)$ now traces the parabola $\eta_2 = -\eta_1^2/2$ inside the half-plane. Casella and Berger (Example 3.4.8) call such families *curved* exponential families: the exponent's dimension exceeds the parameter's, and the natural parameter lives on a lower-dimensional manifold rather than an open set.
+
+The distinction matters at the edges of this course's toolkit. The moment-factory identities survive on curved families, but the clean equivalences of the full case (information $=$ variance of $T$, MLE as a moment match, one sufficient statistic per parameter) acquire correction terms, because the parameter can no longer move freely in every exponent direction. Curved families also arise uninvited: the central limit theorem hands every large-sample analysis a $\mathcal{N}(\theta, \tau^2(\theta)/n)$ approximation whose variance is tied to its mean, a curved normal family, so the geometry is a fact of asymptotics rather than a taxonomic curiosity. The GLM construction of this chapter stays on full one-parameter families on purpose: it is the regime where every identity is exact.
+
+## Exercises
+
+<Exercise>
+Boundary probe: the family's edge. A coin is flipped $n = 3$ times and lands heads every time. (a) Write the Bernoulli log-likelihood in the natural parameter, $\ell(\eta) = k\eta - n\log(1+e^\eta)$ with $k = 3$, and show it has no maximizer: $\ell$ is strictly increasing on all of $\mathbb{R}$. (b) Explain what this says about the natural parameter space, and connect it to the zero-count catastrophe of <Ref lesson="mle-map">the likelihood lesson</Ref>. (c) Add a Gaussian prior on $\eta$ with variance $\tau^2 = 1$ and show the MAP estimate is finite; locate it numerically.
+
+<Solution>
+(a) With $k = n = 3$, $\ell(\eta) = 3\eta - 3\log(1+e^\eta) = -3\log(1+e^{-\eta})$. Since $e^{-\eta}$ is strictly decreasing, $\ell$ is strictly increasing, with $\ell(\eta) \to 0$ from below as $\eta \to \infty$: the supremum is approached but never attained. There is no MLE in the natural parameterization.
+
+(b) The natural parameter space is *open*: $\varphi \in (0,1)$ maps onto $\eta \in (-\infty, \infty)$, and the boundary distributions $\varphi \in \{0, 1\}$ are not exponential-family members at all (no density of the form $h(y)e^{\eta y - A(\eta)}$ with $h > 0$ on $\{0,1\}$ can put probability zero on a support point). The mean-parameter answer $\hat\varphi = k/n = 1$ of the likelihood lesson was a boundary supremum; in the honest coordinates the estimate runs away to infinity. This is the zero-count catastrophe restated geometrically, and it is the exact mechanism of *perfect separation* in <Ref lesson="logistic-regression">logistic regression</Ref>: when a feature direction classifies every training point correctly, the likelihood is strictly increasing in $\|w\|$ along it, and the fit diverges just as $\eta$ does here.
+
+(c) The MAP objective is $J(\eta) = 3\eta - 3\log(1+e^\eta) - \eta^2/2$. As $\eta \to \pm\infty$ the quadratic dominates the (at most linear) likelihood terms, so $J \to -\infty$ in both directions and a finite maximizer exists. Setting $J'(\eta) = 3 - 3\sigma(\eta) - \eta = 0$ gives $3\sigma(-\eta) = \eta$; trying $\eta = 0.88$: $3/(1+e^{0.88}) = 3/3.411 \approx 0.880$, a fixed point. So $\hat\eta_{\text{MAP}} \approx 0.88$, i.e. $\hat\varphi = \sigma(0.88) \approx 0.71$: three heads in three flips yield a $71\%$ estimate rather than certainty. The transferable move: an open parameter space plus a boundary-seeking likelihood is the signature of a problem that needs a prior (or penalty), and the quadratic penalty always wins the tail contest against a linear score.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "any invertible response function gives a GLM whose gradient is $\sum_i (y_i - \mu_i)x_i$; the canonical link is just a convention." Work with a Bernoulli response and a general response function $\mu_i = f(w^\top x_i)$, derive the actual gradient, exhibit the extra factor for the probit choice $f = \Phi$, and name precisely what the canonical choice was doing.
+
+<Solution>
+The Bernoulli log-likelihood in the mean is $\ell = \sum_i \big[ y_i \log \mu_i + (1-y_i)\log(1-\mu_i) \big]$ with $\mu_i = f(\eta_i)$, $\eta_i = w^\top x_i$. Chain rule:
+$$
+\nabla_w \ell = \sum_i \Big[ \frac{y_i}{\mu_i} - \frac{1-y_i}{1-\mu_i} \Big] f'(\eta_i)\, x_i
+= \sum_i (y_i - \mu_i)\, \frac{f'(\eta_i)}{\mu_i(1-\mu_i)}\; x_i .
+$$
+The claimed form holds exactly when the middle factor is $1$, i.e. when $f'(\eta) = \mu(1-\mu) = \operatorname{Var}(y \mid x)$. For the canonical $f = \sigma$, indeed $\sigma' = \sigma(1-\sigma)$, and the factor cancels. For the probit $f = \Phi$, the factor is $\phi(\eta)\big/\big[\Phi(\eta)(1-\Phi(\eta))\big]$ with $\phi$ the standard normal density; at $\eta = 0$ it equals $0.3989/0.25 \approx 1.6$, and it varies with $\eta$, so no rescaling removes it. The claim's failing step is attributing the $(y-\mu)x$ form to "GLM" when it belongs to "canonical link": canonicity makes the response function's slope equal the variance function $A''$, so the chain-rule factor and the likelihood's inverse-variance factor are the same number and cancel. Probit regression remains a perfectly coherent model (Bishop, PRML §4.3.5); it simply pays a per-observation weight in its gradient, and its Newton step no longer coincides with Fisher scoring, because with the cancellation gone the observed Hessian picks up $y$-dependent terms whose expectation must be taken separately.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review with <Ref lesson="fisher-information">the information lesson</Ref>. For logistic regression, the sample Fisher information matrix is $I(w) = X^\top W X$ with $W_{ii} = \sigma(\eta_i)(1-\sigma(\eta_i))$. Take the three observations $x_1 = (1, 0)$, $x_2 = (1, 1)$, $x_3 = (1, 2)$ (first coordinate an intercept) at $w = (0, 0)$. (a) Compute $I(w)$. (b) Compute $I(w)^{-1}$ and read off the best-case standard error of the slope estimate. (c) State at which $w$ this dataset is most informative, and why.
+
+<Solution>
+(a) At $w = (0,0)$ every score is $\eta_i = 0$, so $\sigma(\eta_i) = \tfrac12$ and every weight is $\tfrac14$. Then
+$$
+I(w) = \tfrac14 \sum_{i=1}^3 x_i x_i^\top
+= \tfrac14 \left( \begin{bmatrix} 1 & 0 \\ 0 & 0 \end{bmatrix} + \begin{bmatrix} 1 & 1 \\ 1 & 1 \end{bmatrix} + \begin{bmatrix} 1 & 2 \\ 2 & 4 \end{bmatrix} \right)
+= \tfrac14 \begin{bmatrix} 3 & 3 \\ 3 & 5 \end{bmatrix}
+= \begin{bmatrix} 0.75 & 0.75 \\ 0.75 & 1.25 \end{bmatrix}.
+$$
+
+(b) $\det I = 0.75 \cdot 1.25 - 0.75^2 = 0.375$, so
+$$
+I^{-1} = \frac{1}{0.375}\begin{bmatrix} 1.25 & -0.75 \\ -0.75 & 0.75 \end{bmatrix}
+= \begin{bmatrix} 10/3 & -2 \\ -2 & 2 \end{bmatrix}.
+$$
+By the matrix Cramér–Rao bound of the information lesson, $\operatorname{Cov}(\hat w) \succeq I(w)^{-1}$, so the slope's variance is at least $2$: a best-case standard error of $\sqrt{2} \approx 1.4$ on the log-odds slope. Three observations cannot pin a logistic slope to better than about $\pm 1.4$, which on the odds scale is a factor of $e^{1.4} \approx 4$ per unit of $x$ — an honest statement of how little three points settle.
+
+(c) The weights $\sigma(\eta)(1-\sigma(\eta))$ are maximal, at $\tfrac14$, exactly when every $\eta_i = 0$: the moment factory's variance curve peaks at the undecided point. Any $w$ that moves the scores away from zero shrinks some weights and (in the positive-semidefinite ordering) can only reduce the information. A dataset is most informative about a logistic boundary when the model is least sure of its labels; confidently classified points contribute almost nothing, which is also why the IRLS weights concentrate the fit on the points near the boundary.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: quantify the wrong model before meeting it. In the insurance setting of <Ref lesson="insurance-claims">the next lesson</Ref>, roughly $94\%$ of policies file zero claims and the mean claim rate is about $0.1$ per policy-year. Model the claim count with a Gaussian fitted by maximum likelihood, taking the fitted mean as $0.1$ and the fitted variance as $0.1$ (the Poisson-matched value). (a) Compute the fraction of the fitted Gaussian's probability mass that lies below zero. (b) Compute the probability the fitted Gaussian assigns to the single most common outcome, $y = 0$ exactly. (c) Compare both numbers with the Poisson$(0.1)$ model and state the conclusion in one sentence.
+
+<Solution>
+(a) The fitted Gaussian is $\mathcal{N}(0.1,\, 0.1)$, standard deviation $\sqrt{0.1} \approx 0.316$. The mass below zero is
+$$
+\Phi\!\left( \frac{0 - 0.1}{0.316} \right) = \Phi(-0.316) \approx 0.376 :
+$$
+about $38\%$ of the model's belief sits on negative claim counts, outcomes that cannot occur.
+
+(b) A continuous density assigns probability zero to the exact point $y = 0$ — the outcome that describes $94$ of every $100$ policies. (Its density there, $\approx 1.2$, is not a probability; integrating over any sensible rounding window, say $(-0.5, 0.5)$, lumps impossible negative values together with the zeros and cannot separate "no claims" from "minus one claim".)
+
+(c) The Poisson$(0.1)$ model assigns probability $0$ to negative counts by construction and $e^{-0.1} \approx 0.905$ to zero claims, within a few points of the observed $94\%$ (the residual gap is real: exposures vary across policies and the data are mildly zero-inflated, which the next lesson handles with an exposure offset). Conclusion: the Gaussian is not slightly miscalibrated on this data but structurally wrong — it spends over a third of its probability on impossible events and none on the modal one — and the failure is invisible to a fitted-mean comparison, since both models report mean $0.1$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation: the deviance verdict in miniature. A toy portfolio has five policies with observed claim counts $y = (0, 0, 0, 1, 3)$. Two models predict expected counts:
+model A, from a linear-link fit, $\hat\mu_A = (-0.05,\ 0.05,\ 0.1,\ 0.9,\ 3.0)$; model B, from a log-link Poisson fit, $\hat\mu_B = (0.1,\ 0.1,\ 0.2,\ 1.1,\ 2.5)$. Both predict $4.0$ total claims, matching the observed total. (a) Compute each model's mean squared error. (b) Compute each model's Poisson deviance. (c) State the verdict and what it previews.
+
+<Solution>
+(a) Model A's errors are $(0.05, -0.05, -0.1, 0.1, 0)$, so $\mathrm{MSE}_A = (0.0025 + 0.0025 + 0.01 + 0.01 + 0)/5 = 0.005$. Model B's errors are $(-0.1, -0.1, -0.2, -0.1, 0.5)$, so $\mathrm{MSE}_B = (0.01 + 0.01 + 0.04 + 0.01 + 0.25)/5 = 0.064$. By squared error, model A is nearly thirteen times better.
+
+(b) Poisson deviance: $D = 2\sum_i [\,y_i\log(y_i/\hat\mu_i) - y_i + \hat\mu_i\,]$, with $y\log y = 0$ at $y = 0$, so a zero-count row contributes $2\hat\mu_i$. Model B, row by row: $2(0.1) + 2(0.1) + 2(0.2) = 0.8$ for the three zero rows; the $y = 1$ row gives $2[\log(1/1.1) - 1 + 1.1] = 2(0.1 - 0.0953) = 0.009$; the $y = 3$ row gives $2[3\log(3/2.5) - 3 + 2.5] = 2(0.547 - 0.5) = 0.094$. Total $D_B \approx 0.90$. Model A's first prediction is $\hat\mu = -0.05$: a negative rate. The Poisson likelihood $e^{-\mu}\mu^y/y!$ is not a probability distribution for $\mu < 0$; the row's log-likelihood, and with it the deviance, is undefined. $D_A$ does not exist.
+
+(c) Squared error certifies model A as the better model; the Poisson deviance rules that model A is not a model of count data at all, because it asserts a rate no counting process can have. The disqualification is the metric working correctly: deviance evaluates predictions inside the probability model of the response, and a prediction outside the model's parameter space fails at the door rather than being averaged into a good-looking score. This is precisely the pattern of <Ref lesson="insurance-claims">the next lesson</Ref>, where a ridge regression on 678,000 real policies posts squared error as good as the Poisson GLM's while predicting negative claim rates, and the deviance column, not the MSE column, ranks the models the way the calibration data say they should be ranked.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — ch. 3: the exponential family, the Bernoulli and Gaussian rewrites, the three GLM assumptions, and the derivation of least squares and logistic regression as GLMs that this chapter's assembly section follows. https://cs229.stanford.edu/main_notes.pdf
+2. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §3.4: exponential-family definitions and the log-partition/moment identities; §12.2: the linear, binomial, and Poisson examples with their $A$, $A'$, $A''$; §12.4: the universal gradient (12.31), the Hessian, and the convexity/uniqueness of the GLM MLE; §12.5: the insurance-claims study, deviance (12.35–12.37), and the metric comparison the closing exercise previews. Free online: https://probml.github.io/pml-book/book1.html
+3. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §2.4: the exponential family, sufficiency, and conjugate priors; §4.3.6: canonical link functions and the $(y - \mu)x$ gradient; §4.3.3: iteratively reweighted least squares. Free online: https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+4. G. Casella, R. L. Berger, *Statistical Inference*, 2nd ed., Duxbury, 2002 — §3.4: exponential families in full rigor, the natural parameterization and parameter space, Theorem 3.4.2 (the differentiation identities behind the moment factory), and Example 3.4.8 (the curved normal family of the starred section); §6.2: sufficiency and the factorization theorem.
+5. J. A. Nelder, R. W. M. Wedderburn, "Generalized Linear Models," *Journal of the Royal Statistical Society, Series A* 135(3), 1972 — the paper that named the class and gave IRLS as its single fitting algorithm. https://doi.org/10.2307/2344614
+6. P. McCullagh, J. A. Nelder, *Generalized Linear Models*, 2nd ed., Chapman & Hall, 1989 — the standard monograph: ch. 2, the model components, links, and deviance; ch. 6, overdispersion and the dispersion-parameter machinery this chapter summarizes in one remark.
+7. B. O. Koopman, "On Distributions Admitting a Sufficient Statistic," *Transactions of the American Mathematical Society* 39(3), 1936, pp. 399–409 — one of the three independent proofs that bounded-dimension sufficiency characterizes exponential families (with G. Darmois, 1935, and E. J. G. Pitman, 1936); the source of the theorem stated without proof in the sufficiency section.
+</References>

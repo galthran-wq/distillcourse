@@ -1,0 +1,377 @@
+A predictor that memorizes its training set achieves zero training error and predicts no better than chance on everything else — so whatever learning is, it is not the minimization of training error.
+
+This is the opening move of a course that asks one question throughout: why a model fitted to a finite sample says anything about data it has never seen. Stating the question precisely requires objects this lesson defines: a data-generating distribution, a loss, and two error numbers, one computable from the sample and one that is the actual object of interest. With those in place, the lesson derives the best predictor anyone could use if the distribution were known, works the memorizing counterexample in full, and states the classical repair: commit to a restricted class of predictors before the data arrive. The route: the formal setup; the Bayes predictor under squared and zero–one loss; the memorizer; empirical risk minimization with an inductive bias; and one two-dimensional dataset fitted by the two extreme postures every later method interpolates between.
+
+## The setup: two error numbers, one computable
+
+Learning is measured on data the learner has not seen, and the smallest problem that shows why is a market stall. A newcomer to a Pacific island must predict whether a papaya is tasty before buying it, from two measurements available at the stall: the fruit's color, on a scale from dark green through red to dark brown, and its softness, from rock-hard to mushy. The evidence is a sample of papayas already bought, measured, and tasted. Nothing else is available: no theory of papayas, no seller's advice, no rulebook.
+
+### The formal model: four ingredients
+
+Every supervised learning problem has the papaya problem's shape, and the formal model keeps exactly its ingredients.
+
+- **Features and labels.** Each instance is a feature vector $x \in \mathcal{X}$ (here $\mathcal{X} \subset \mathbb{R}^2$: color, softness) with a label $y \in \mathcal{Y}$. A finite $\mathcal{Y}$, such as $\{0,1\}$ for not-tasty/tasty, makes the problem *classification*; $\mathcal{Y} = \mathbb{R}$ makes it *regression*.
+- **The distribution.** Instances arrive as draws of a random pair $(X, Y)$ from a joint distribution $D$ over $\mathcal{X} \times \mathcal{Y}$: which papayas the market stocks, and how tastiness relates to their looks. $D$ is fixed but entirely unknown to the learner.
+- **The sample.** The training data $S = ((x_1, y_1), \dots, (x_n, y_n))$ consists of $n$ pairs drawn independently from $D$. Independence and identical distribution are the model's one substantive commitment: tomorrow's papayas come from the same market as today's, and today's were not selected to make a point.
+- **The predictor and the loss.** The learner outputs a function $f : \mathcal{X} \to \mathcal{Y}$, and a loss $L(\hat{y}, y) \ge 0$ prices each mistake. The two workhorses: *zero–one loss* $L(\hat{y}, y) = \mathbf{1}[\hat{y} \neq y]$ for classification, and *squared loss* $L(\hat{y}, y) = (\hat{y} - y)^2$ for regression.
+
+<Figure
+  src="./figures/pipeline.svg"
+  alt="Pipeline from unknown distribution D to sample to learner to fitted predictor, judged on a fresh draw from D highlighted in amber"
+  caption="The learning pipeline. The predictor is fitted on the sample but judged on a fresh draw, a quantity the learner never observes."
+/>
+
+### Risk and empirical risk
+
+A predictor is good if it performs well on the next papaya, not on the ones already tasted, and the two performances get separate names.
+
+<Definition title="risk and empirical risk">
+Let $f : \mathcal{X} \to \mathcal{Y}$ be a predictor and $L$ a loss. The **risk** of $f$ is its expected loss on a fresh draw from $D$:
+$$
+R(f) = \mathbb{E}_{(X,Y) \sim D}\left[ L(f(X), Y) \right].
+$$
+The **empirical risk** of $f$ on the sample $S$ is its average loss over the training pairs:
+$$
+\hat{R}(f) = \frac{1}{n} \sum_{i=1}^{n} L(f(x_i), y_i).
+$$
+</Definition>
+
+Under zero–one loss the risk is simply a probability: $R(f) = \Pr(f(X) \neq Y)$, the chance of a mistake on the next instance. A coin toss on a problem with balanced classes has $R = \tfrac{1}{2}$.
+
+The two quantities differ in kind, not just in value. $\hat{R}(f)$ is computable by anyone holding the sample; it is also a random variable, since redrawing $S$ changes it. $R(f)$ is a fixed number determined by $f$ and $D$, and because $D$ is unknown the learner **never observes** it: not for the final model, not for any candidate along the way.
+
+<KeyFact>
+Arranging for a computable quantity ($\hat{R}$, a function of the sample) to say something about a quantity no algorithm can evaluate ($R$, the only number that defines success) is not a technicality of machine learning; it is the entire subject.
+</KeyFact>
+
+<Remark title="notation and synonyms, fixed for the whole course">
+This lesson binds symbols the rest of the course reuses without comment: $X, Y$ a fresh feature–label pair, $D$ their joint distribution, $S$ the sample, $n$ its size, $L$ the loss, $R$ the risk, $\hat{R}$ the empirical risk, $\hat{f}$ a fitted predictor, $f^*$ the Bayes predictor defined below. The literature is not so consistent: *risk*, *generalization error*, *true error*, and *test error* all name $R$ (or estimates of it); *empirical risk* and *training error* both name $\hat{R}$; a predictor is also called a *hypothesis* (hence $h$) or a *classifier*.
+</Remark>
+
+## The Bayes predictor: the best answer if $D$ were known
+
+Risk is an average over $D$, so if $D$ were known, finding the best predictor would be a calculus problem, not a data problem. Solving that best case is not idle: it produces the exact target every fitted model in this course approximates, and a floor that no amount of data lowers.
+
+The key structural fact is that the minimization splits point by point. Conditioning on $X$,
+$$
+R(f) = \mathbb{E}_{X}\Big[\, \mathbb{E}_{Y \mid X}\big[ L(f(X), Y) \mid X \big] \Big],
+$$
+and $f$'s value at one $x$ does not constrain its value at any other. The best $f$ therefore makes the inner expectation as small as possible at each $x$ separately: at every point, choose the prediction that minimizes the expected loss against the conditional distribution of $Y$ there.
+
+### Squared loss: predict the conditional mean
+
+Fix one point $x$ and suppose the conditional distribution of $Y$ there is known completely: $Y$ takes the value $1$ with probability $0.5$, the value $2$ with probability $0.3$, and the value $6$ with probability $0.2$. A prediction at $x$ is just a number $c$, and its expected squared error is
+
+$$
+\rho(c) = 0.5\,(1-c)^2 + 0.3\,(2-c)^2 + 0.2\,(6-c)^2
+       = c^2 - 4.6\,c + 8.9 = (c - 2.3)^2 + 3.61.
+$$
+
+The result is a parabola in $c$ with its minimum at $c = 2.3$, which is exactly $\mathbb{E}[Y \mid x] = 0.5 \cdot 1 + 0.3 \cdot 2 + 0.2 \cdot 6$. The leftover $3.61$ is $\operatorname{Var}(Y \mid x)$: guessing the mean still incurs it, and no guess does better.
+
+<Figure
+  src="./figures/bayes-parabola.svg"
+  alt="Left: the conditional distribution of Y at a fixed x with atoms at 1, 2, 6 and the mean 2.3 marked; right: the expected squared error of guessing c, a parabola with minimum value Var(Y|x) = 3.61 at c = 2.3"
+  caption="At a fixed x, expected squared error is a parabola in the guess c: minimized at the conditional mean, floored by the conditional variance."
+/>
+
+<Theorem title="Bayes predictor under squared loss">
+For $\mathcal{Y} = \mathbb{R}$ and $L(\hat{y}, y) = (\hat{y}-y)^2$, the risk is minimized by the conditional mean,
+$$
+f^*(x) = \mathbb{E}[Y \mid X = x],
+$$
+and its risk is $R(f^*) = \mathbb{E}\left[\operatorname{Var}(Y \mid X)\right]$.
+
+<Proof>
+Fix $x$ and write $\mu = \mathbb{E}[Y \mid X = x]$. For any constant $c$,
+$$
+\mathbb{E}\big[(Y-c)^2 \mid X = x\big]
+= \mathbb{E}\big[(Y-\mu)^2 \mid X = x\big] + 2(\mu - c)\,\mathbb{E}\big[Y-\mu \mid X = x\big] + (\mu-c)^2,
+$$
+by writing $Y - c = (Y - \mu) + (\mu - c)$ and expanding the square. The middle term vanishes because $\mathbb{E}[Y - \mu \mid X = x] = 0$, leaving
+$$
+\mathbb{E}\big[(Y-c)^2 \mid X = x\big] = \operatorname{Var}(Y \mid X = x) + (\mu - c)^2,
+$$
+which is minimized uniquely at $c = \mu$, with minimum value $\operatorname{Var}(Y \mid X = x)$. Since this holds at every $x$, the function $f^*(x) = \mathbb{E}[Y \mid X=x]$ minimizes the inner expectation everywhere at once, and averaging the pointwise minimum over $X$ gives $R(f^*) = \mathbb{E}[\operatorname{Var}(Y \mid X)]$.
+</Proof>
+</Theorem>
+
+Statisticians call $f^*$ the *regression function*. Its risk is not zero: as long as $Y$ genuinely varies at fixed $x$ (two papayas with identical color and softness, one tasty and one not), even the perfect model pays $\operatorname{Var}(Y \mid X)$ on average.
+
+<Aside>
+The floor $\mathbb{E}[\operatorname{Var}(Y \mid X)]$ is *aleatoric* uncertainty: randomness in the world that no additional data removes, because it survives even when $D$ is known exactly. Everything a fitted model loses beyond the floor is *epistemic*: error due to having only $n$ draws from $D$, which more data can shrink. <Ref lesson="bias-variance">The next lesson</Ref> splits the epistemic part itself into two pieces, a systematic one and a fluctuating one, and that three-way split organizes the rest of the course.
+</Aside>
+
+### Zero–one loss: predict the most probable class
+
+For binary classification write $\eta(x) = \Pr(Y = 1 \mid X = x)$. Fix an $x$ with $\eta(x) = 0.7$. Predicting $1$ there is wrong with probability $0.3$; predicting $0$ is wrong with probability $0.7$.
+
+<Theorem title="Bayes classifier under zero–one loss">
+For $\mathcal{Y} = \{0, 1\}$ and $L(\hat{y}, y) = \mathbf{1}[\hat{y} \neq y]$, the risk is minimized by
+$$
+f^*(x) = \begin{cases} 1 & \text{if } \eta(x) \ge \tfrac{1}{2}, \\ 0 & \text{otherwise,} \end{cases}
+$$
+with pointwise error $\min\{\eta(x),\, 1 - \eta(x)\}$ and risk $R(f^*) = \mathbb{E}\big[\min\{\eta(X), 1 - \eta(X)\}\big]$.
+
+<Proof>
+Fix $x$. Predicting the class $g \in \{0,1\}$ is wrong exactly when $Y \neq g$, so the conditional expected loss is $\Pr(Y \neq g \mid X = x)$: it equals $1 - \eta(x)$ for $g = 1$ and $\eta(x)$ for $g = 0$. The smaller of the two is $\min\{\eta(x), 1-\eta(x)\}$, attained by choosing $g = 1$ precisely when $\eta(x) \ge 1 - \eta(x)$, that is, when $\eta(x) \ge \tfrac{1}{2}$. (At $\eta(x) = \tfrac{1}{2}$ both choices cost the same, so the tie-break is arbitrary.) Averaging the pointwise minimum over $X$ gives the stated risk. With more than two classes the same one-line comparison gives $f^*(x) = \arg\max_g \Pr(Y = g \mid X = x)$.
+</Proof>
+</Theorem>
+
+This $f^*$ is the *Bayes classifier*, and its risk, the *Bayes error*, is the floor for the problem: no rule, fitted or hand-built, has smaller risk, because no rule beats the pointwise minimum at any $x$. The floor is zero only when $\eta(x)$ is $0$ or $1$ almost everywhere, meaning the label is a deterministic function of the features.
+
+<Example title="three bins of softness">
+Coarsen the papaya problem to a single feature with three values. Softness is *hard*, *firm*, or *mushy* with probabilities $0.3, 0.4, 0.3$, and the conditional probability of tasty is
+$$
+\eta(\text{hard}) = 0.9, \qquad \eta(\text{firm}) = 0.6, \qquad \eta(\text{mushy}) = 0.2.
+$$
+The Bayes classifier predicts tasty on *hard* and *firm* (both $\eta \ge \tfrac12$) and not-tasty on *mushy*. Its risk adds the pointwise errors weighted by how often each bin occurs:
+$$
+R(f^*) = 0.3\,(0.1) + 0.4\,(0.4) + 0.3\,(0.2) = 0.03 + 0.16 + 0.06 = 0.25.
+$$
+For comparison, the rule "tasty only when hard" errs with probability $0.1$ on *hard*, $0.6$ on *firm* (it rejects a bin that is mostly tasty), and $0.2$ on *mushy*:
+$$
+R = 0.03 + 0.24 + 0.06 = 0.33.
+$$
+The floor at $0.25$ is real: every one of the $2^3 = 8$ possible rules lands at or above it, and only $f^*$ attains it.
+</Example>
+
+<Figure
+  src="./figures/eta-threshold.svg"
+  alt="Three stacked bars for the softness bins hard, firm, mushy, each split at height eta(x) with a dashed threshold line at one half; the class mass the Bayes prediction rejects is shaded amber with values 0.1, 0.4, 0.2"
+  caption="Thresholding η at ½ leaves the smaller class mass (amber) as the error in every bin; the occurrence-weighted amber total is the Bayes error 0.25."
+/>
+
+<Exercise>
+The same market, different numbers. (a) $X$ takes four values, each with probability $\tfrac{1}{4}$, and $\eta = (0.8,\ 0.55,\ 0.45,\ 0.1)$ across them. Find the Bayes classifier and the Bayes error. (b) Compute the risk of the constant rule $f \equiv 0$. (c) Squared loss, single point: at some fixed $x$, $Y = 0$ with probability $0.6$ and $Y = 10$ with probability $0.4$. Find the risk-minimizing prediction and its expected squared error. Write your three answers down before opening the solution.
+
+<Solution>
+Strategy: everything is pointwise. Apply the two theorems bin by bin, then average with the bin probabilities.
+
+(a) Predict $1$ where $\eta \ge \tfrac12$: on the first two values. Pointwise errors are $\min\{\eta, 1-\eta\} = (0.2,\ 0.45,\ 0.45,\ 0.1)$, so
+$$
+R(f^*) = \tfrac{1}{4}(0.2 + 0.45 + 0.45 + 0.1) = \tfrac{1.2}{4} = 0.3.
+$$
+
+(b) $f \equiv 0$ errs whenever $Y = 1$, with pointwise error $\eta$ itself:
+$$
+R(f) = \tfrac{1}{4}(0.8 + 0.55 + 0.45 + 0.1) = \tfrac{1.9}{4} = 0.475
+$$
+— worse than the floor by $0.175$, almost all of it from the first bin, where the constant rule rejects a value that is tasty four times in five.
+
+(c) The best constant is the conditional mean $c = 0.6 \cdot 0 + 0.4 \cdot 10 = 4$, with risk
+$$
+\operatorname{Var}(Y \mid x) = \mathbb{E}[Y^2 \mid x] - 4^2 = 40 - 16 = 24.
+$$
+Note that $4$ is a value $Y$ never takes. The Bayes predictor under squared loss need not be a possible outcome; under zero–one loss it always is, because there the optimization is over the labels themselves.
+</Solution>
+</Exercise>
+
+## The memorizer: a perfect score that learns nothing
+
+The Bayes predictor requires $D$, and the learner has only $S$. The tempting surrogate: since $\hat{R}$ is computable and $R$ is not, pick the predictor that makes $\hat{R}$ smallest. Behind it sits an assumption — a model that fits its training data well has learned the pattern, and the better the fit, the more it has learned. Without further conditions, the assumption is false, and one predictor refutes it.
+
+### A perfect score, worked in full
+
+Take the papaya problem with a concrete distribution. Feature vectors are uniformly distributed over a square region $C$ of area $2$ in the color–softness plane, and tastiness is deterministic: $y = 1$ exactly on an inner square $T$ of area $1$, $y = 0$ outside it. The labels being a function of $x$, the Bayes error is $0$: this is a problem where perfect prediction is possible in principle.
+
+Now define the *memorizer*, a predictor any programmer can implement in one line, a lookup table with a default:
+
+$$
+h_S(x) = \begin{cases} y_i & \text{if } x = x_i \text{ for some } i \in \{1, \dots, n\}, \\ 0 & \text{otherwise.} \end{cases}
+$$
+
+<Example title="the memorizer's two errors (Shalev-Shwartz &amp; Ben-David §2.2.1)">
+**Empirical risk.** Every training point is in the table, so $h_S(x_i) = y_i$ for all $i$, and
+$$
+\hat{R}(h_S) = \frac{1}{n}\sum_{i=1}^n \mathbf{1}[h_S(x_i) \neq y_i] = 0
+$$
+— for every sample, of every size, from every distribution. No predictor can do better on the sample, so any procedure that only minimizes training error is entitled to return $h_S$.
+
+**Risk.** The features are continuous and the distribution is uniform, so a fresh draw $X$ hits the finite set $\{x_1, \dots, x_n\}$ with probability $0$. Off that set, $h_S$ is the constant $0$. It is therefore wrong exactly where the truth is $1$: on the inner square $T$, minus at most $n$ isolated points, which change no probability. Hence
+$$
+R(h_S) = \Pr\big(X \in T\big) = \frac{\text{area}(T)}{\text{area}(C)} = \frac{1}{2}.
+$$
+
+A coin toss has risk $\tfrac{1}{2}$. The constant predictor $0$, which uses no data at all, has risk $\tfrac{1}{2}$. The Bayes classifier has risk $0$. And none of these numbers moves if $n$ grows from ten to a million: $\hat{R}(h_S)$ stays $0$, $R(h_S)$ stays $\tfrac{1}{2}$.
+</Example>
+
+<Figure
+  src="./figures/memorizer.svg"
+  alt="Two panels showing the papaya square: on the training sample every stored point returns its stored label so empirical risk is zero; on a fresh draw the memorizer predicts 0 on the whole inner tasty square, giving risk one half"
+  caption="The memorizer on the papaya distribution: a perfect score on the sample, a coin-toss score on the distribution."
+/>
+
+### Why the fit is not evidence
+
+The diagnosis matters more than the verdict. The memorizer's fit certifies nothing because it was **guaranteed in advance**: $\hat{R}(h_S) = 0$ holds for every possible sample, so observing it conveys no information about $D$ whatsoever. An observation that could not have come out otherwise supports no inference. The fit is real; it is just not evidence.
+
+The gap the memorizer opens has a name, and so does the act of opening it. The difference $R(f) - \hat{R}(f)$ is the *generalization error* of a fitted predictor: how much worse it does on the distribution than on its own sample. Driving $\hat{R}$ down by fitting sample-specific detail in ways that leave $R$ high is *overfitting*. The memorizer is overfitting in its purest form (generalization error $\tfrac{1}{2}$, the maximum this problem allows), and every overfit model in this course is a diluted version of it.
+
+<KeyFact>
+Every generalization guarantee in this course is a statement about the gap $R - \hat{R}$, never about $\hat{R}$ alone.
+</KeyFact>
+
+## The fix: commit to a class before seeing the data
+
+The failure was not minimizing training error; it was minimizing it over *all functions*, a search space so permissive that a lookup table qualifies. The classical repair restricts the search.
+
+<Definition title="empirical risk minimization over a class">
+Let $\mathcal{H}$ be a set of predictors chosen **before** seeing the data, called a *hypothesis class*. The **ERM rule** over $\mathcal{H}$ returns
+$$
+\hat{f} \in \operatorname*{arg\,min}_{f \in \mathcal{H}} \hat{R}(f).
+$$
+</Definition>
+
+The restriction to $\mathcal{H}$ is called an *inductive bias*: the learner is biased toward some predictors and away from others, on grounds that owe nothing to the sample. For the papaya problem, a reasonable $\mathcal{H}$ is the set of axis-aligned rectangles: predict tasty inside some rectangle in the color–softness plane, not-tasty outside. That class expresses prior knowledge (moderate color and moderate softness go together with taste), it contains the Bayes classifier itself, since the true tasty region is a square, and, as <Ref lesson="learning-theory">the learning theory module</Ref> proves, ERM over it cannot overfit the way the memorizer does: with enough samples, small $\hat{R}$ forces small $R$ for every predictor in the class at once.
+
+<Figure
+  src="./figures/class-containment.svg"
+  alt="A large region of all functions from X to zero-one containing two smaller regions: the lookup tables that hold the memorizer, and the axis-aligned rectangles that ERM searches, containing the Bayes classifier for the papaya problem"
+  caption="ERM searches only the pre-committed class (blue). The memorizer sits in a different, over-permissive corner of function space; the rectangle class is small enough to certify and still contains the target."
+/>
+
+The choice of $\mathcal{H}$ faces both ways. Too rich a class re-admits the memorizer: the class of "all functions equal to $1$ on some finite set" contains $h_S$ for every $S$, so its ERM inherits the disaster. Too poor a class may exclude anything close to $f^*$, so even the best member has high risk. And no fixed choice wins everywhere: for every learner there is a distribution on which it fails (the No Free Lunch theorem, proved in the same module), so inductive bias is not a regrettable shortcut but the load-bearing component. The course's later methods restate this one decision: penalties shrink an over-rich class softly, margins and averaging restrain it geometrically and statistically, and honest measurement checks what the restriction bought.
+
+## Two postures: the rigid line and the jagged neighborhood
+
+A hypothesis class can be tight or loose, and the consequences are visible in a fitted boundary before any theory quantifies them. The classical demonstration is a two-dimensional classification problem from [Hastie, Tibshirani and Friedman](https://hastie.su.domains/ElemStatLearn/) (§2.3), recreated here by their recipe with our own draw. Each class is a mixture of ten Gaussian clusters: ten centers for class 0 drawn once from $N\big((1,0)^{\mathsf T}, \mathbf{I}\big)$ and ten for class 1 from $N\big((0,1)^{\mathsf T}, \mathbf{I}\big)$; each observation then picks one of its class's centers uniformly at random and scatters around it as $N(m, \mathbf{I}/5)$. The training set is 100 points per class, with 10,000 fresh points held out for measuring risk. Our draw uses NumPy's `default_rng(22)` — centers first (class 0, then class 1), then the training sample, then the test sample, each point drawn as a center index followed by a Gaussian offset — and every number and boundary below comes from it. The mixture structure makes the true boundary genuinely curved, so neither extreme below is right.
+
+### Three fits on one sample
+
+Two fitting rules, from opposite ends of the spectrum:
+
+- **Least squares.** Code the classes as $y \in \{0, 1\}$, fit the linear function $\beta_0 + \beta_1 x_1 + \beta_2 x_2$ by minimizing squared error on the sample, and predict class $1$ where the fitted value exceeds $\tfrac{1}{2}$. The entire fit is three numbers; the boundary is a straight line, whatever the data say. (<Ref lesson="ols">The linear model module</Ref> derives this fit in full.)
+- **$k$-nearest neighbors.** At any query point, find the $k$ closest training points and take the majority vote of their labels; equivalently, average their $0/1$ labels and threshold at $\tfrac{1}{2}$. Nothing is fitted at all; the sample itself is the model, and $k$ sets how local the vote is.
+
+At $k = 1$ the connection to the previous section is exact. Each training point is its own nearest neighbor, so 1-NN reproduces every training label and its training error is identically zero: the memorizer's signature. The difference is that 1-NN extends each stored label over a whole cell of the plane rather than a single point, so its risk is bad but not maximal: an inductive bias of pure proximity, weak but not empty.
+
+<FigureSequence
+  name="mixture"
+  alt="Four frames on the same two-class mixture data: a straight least-squares boundary, a wigglier 15-nearest-neighbor boundary, a jagged 1-nearest-neighbor boundary with island regions circled, and the smooth dashed Bayes boundary overlaid"
+  caption="One training set, three fitted boundaries, and the target: rigidity and flexibility are visible before any theory measures them."
+/>
+
+<Task>
+Step through the four frames. In frame 1, count the training points on the wrong side of the line: the line cannot bend to collect them. In frame 3, find the dashed rings: each is an island of territory captured by a single training point, and every island is a small memorizer. In frame 4, compare the 1-NN boundary with the dashed Bayes boundary: the jagged curve is chasing the smooth one and overshooting locally.
+</Task>
+
+Both rules are estimating the same object. The Bayes classifier thresholds $\eta(x) = \Pr(Y=1 \mid X=x)$ at $\tfrac12$, and each method builds a sample surrogate for it: $k$-NN estimates $\eta(x)$ by an average over a neighborhood (conditioning at a point relaxed to conditioning near a point), while least squares assumes $\eta$ is approximately linear and pools the entire sample to estimate three coefficients. The first assumption is local and weak, the second global and strong, and the fitted boundaries inherit exactly those characters: the line is stable across redraws of the data but cannot bend; the neighborhood vote follows every local cluster, including the ones that are noise.
+
+### The first U-curve: test error stops rewarding flexibility
+
+The held-out points price the postures. On our draw, least squares misclassifies **25.5%** of the fresh points, 15-NN **21.3%**, 1-NN **25.5%** (against its 0% training error), and the Bayes rule — computable here because the recipe's densities are known — errs on **20.4%** of the same points. The floor moves with the drawn centers: Hastie, Tibshirani and Friedman report a Bayes rate of 0.21 for their own draw of this recipe. Sweeping $k$ makes the pattern systematic:
+
+<Figure
+  src="./figures/kcurve.svg"
+  alt="Training and test misclassification error of k-nearest neighbors as k varies on a log scale from 151 to 1, with the least-squares errors marked as squares and the Bayes error as a dashed horizontal line; test error is U-shaped and training error falls to zero at k = 1"
+  caption="Training error rewards flexibility without limit; test error stops rewarding it near k ≈ 15 and punishes it thereafter."
+/>
+
+<Task>
+Read three facts off the curve. First: training error (blue) falls overall as $k$ shrinks — with small upticks along the way, since it is one draw's average, not a theorem — and reaches exactly $0$ at $k = 1$, by construction rather than achievement. Second: test error (amber) is U-shaped, best at $k = 15$ at 21.3%, within a point of the Bayes floor. Third: both extremes lose. $k = 151$ averages over half the dataset and underuses local structure; $k = 1$ trusts single points. Selecting $k$ by training error would always return $k = 1$, the worst choice on display.
+</Task>
+
+The U-shape is the first appearance of a curve this course will meet in every module, and the lesson that follows names its two causes exactly. One fact about the flexible end carries forward: <Ref lesson="knn-curse">the nearest-neighbor lesson</Ref> proves that even 1-NN, the jagged extreme, has asymptotic risk at most twice the Bayes error. Chasing single points is wasteful, not hopeless.
+
+<KeyFact>
+Most of classical machine learning operates between frame 1 and frame 3: ridge and lasso, splines, trees, ensembles, and kernel machines are all bargains between the line's stability and the neighborhood's flexibility, and every one of them strikes the bargain before seeing the data.
+</KeyFact>
+
+What stands established: risk, the expected loss on a fresh draw, is the object of learning, and it is never directly observable; the Bayes predictor (conditional mean under squared loss, most probable class under zero–one loss) is the unreachable target and its risk the floor; the memorizer proves that empirical risk alone certifies nothing, since $\hat{R} = 0$ is compatible with coin-toss risk; and restriction-before-data is the price of any guarantee. What stands open is the cost of the restriction itself: the rigid line failed by being systematically wrong, the jagged neighborhood by fluctuating with its sample. <Ref lesson="bias-variance">The next lesson</Ref> proves these are the *only* two ways to lose (expected error decomposes exactly into irreducible noise, squared bias, and variance) and turns the U-curve from a picture into an equation.
+
+## Exercises
+
+<Exercise>
+Five labeled points have $y = (3,\ -1,\ 2,\ 0,\ 5)$. Predictor $f$ outputs $(2,\ 0,\ 2,\ 1,\ 3)$ on them; predictor $g$ outputs $(3,\ -1,\ 2,\ 0,\ 0)$. Compute the empirical risk of both predictors under zero–one loss (exact match) and under squared loss, and state which predictor each loss prefers.
+
+<Solution>
+Zero–one loss counts mismatches. $f$ matches only the third point: $\hat{R}_{0\text{–}1}(f) = \tfrac{4}{5} = 0.8$. $g$ matches the first four: $\hat{R}_{0\text{–}1}(g) = \tfrac{1}{5} = 0.2$.
+
+Squared loss adds squared gaps. For $f$: $(1 + 1 + 0 + 1 + 4)/5 = 1.4$. For $g$: $(0 + 0 + 0 + 0 + 25)/5 = 5.0$.
+
+Zero–one prefers $g$ (0.2 vs 0.8); squared prefers $f$ (1.4 vs 5.0). Neither ranking is wrong: $g$ is exactly right four times and badly wrong once, $f$ is slightly wrong everywhere, and the two losses price those profiles oppositely. The loss is part of the problem statement: change it and the ranking of predictors, and therefore the meaning of "best", changes with it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose $\eta(x) = \tfrac{1}{2}$ exactly on a region $A$ with $\Pr(X \in A) = 0.2$, and $\eta(x) = 0.9$ everywhere else. The Bayes classifier's tie-breaking rule on $A$ was left arbitrary in the theorem. Show that every choice on $A$ (predict $1$, predict $0$, or even flip a coin at each point) yields the same risk, and compute the Bayes error.
+
+<Solution>
+Strategy: risk splits over $A$ and its complement; examine the $A$ part on its own.
+
+On $A$, whatever the prediction, the label disagrees with it with probability exactly $\tfrac{1}{2}$: predicting $1$ errs with probability $1 - \eta = \tfrac12$, predicting $0$ errs with probability $\eta = \tfrac12$, and a randomized prediction errs with any mixture of the two, which is still $\tfrac12$. So the contribution of $A$ to the risk is $0.2 \times \tfrac{1}{2} = 0.1$ for every tie-breaking rule.
+
+Off $A$, the Bayes choice is forced: $\eta = 0.9 \ge \tfrac12$, so predict $1$, with pointwise error $1 - 0.9 = 0.1$ and contribution $0.8 \times 0.1 = 0.08$.
+
+Bayes error: $R(f^*) = 0.1 + 0.08 = 0.18$, attained by *every* tie-break on $A$. This is why the theorem can leave the tie-break arbitrary: at a tie both actions have identical conditional cost, so optimality is unaffected. The degenerate region is also the problem's hard core: over half of the total Bayes error comes from the 20% of the space where the label is genuinely a coin toss, and no classifier, however clever, recovers anything there.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "$\hat{R}(f) = 0$ on a sample of one million points, so by the law of large numbers $R(f)$ must be small." Name the exact step that fails and the missing ingredient that would repair it.
+
+<Solution>
+The memorizer is the counterexample at any sample size. On the papaya distribution, take $n = 10^6$: the memorizer $h_S$ still stores every pair, still achieves $\hat{R}(h_S) = 0$, and still has $R(h_S) = \tfrac{1}{2}$, because off the (probability-zero) training set it remains the constant $0$. A million points of perfect fit coexist with coin-toss risk.
+
+The failing step is the appeal to the law of large numbers. That law says: for a **fixed** function $f$, the average of $L(f(x_i), y_i)$ over iid draws converges to its expectation $R(f)$. But $h_S$ is not fixed: it was constructed *from the sample after seeing it*, so the summands $L(h_S(x_i), y_i)$ are not an honest random sample of $h_S$'s behavior on $D$; they are the points where $h_S$ was built to succeed. The averaging theorem is being applied to a quantity chosen adversarially against it.
+
+The missing ingredient is a class $\mathcal{H}$ fixed before the data. If $f$ had been committed to in advance (or drawn from a small enough pre-committed class), then $\hat{R}(f) = 0$ on a million points really would force $R(f)$ small with overwhelming probability. Making "small enough" precise, and uniform over the whole class at once, is exactly what <Ref lesson="learning-theory">the learning theory module</Ref> does.
+</Solution>
+</Exercise>
+
+<Exercise>
+In screening problems the two mistakes cost differently. Let a false positive (predict $1$, truth $0$) cost $1$ and a false negative (predict $0$, truth $1$) cost $c \ge 1$. Derive the Bayes classifier for this loss, and evaluate the threshold at $c = 1$ and $c = 99$.
+
+<Solution>
+Strategy: repeat the zero–one derivation pointwise, with the two error costs no longer equal.
+
+Fix $x$ and write $\eta = \eta(x)$. Predicting $1$ incurs cost only if the truth is $0$: conditional expected loss $(1 - \eta) \cdot 1$. Predicting $0$ incurs cost only if the truth is $1$: conditional expected loss $\eta \cdot c$. Predict $1$ whenever it is the cheaper action:
+$$
+1 - \eta \le c\,\eta
+\iff 1 \le \eta\,(1 + c)
+\iff \eta \ge \frac{1}{1 + c}.
+$$
+The Bayes classifier thresholds $\eta$ at $1/(1+c)$ rather than $\tfrac{1}{2}$.
+
+Checks: at $c = 1$ the costs are symmetric and the threshold is $\tfrac{1}{2}$, recovering the earlier theorem. At $c = 99$, where a missed disease costs ninety-nine times a false alarm, the threshold is $\tfrac{1}{100}$: sound the alarm at a 1% probability of disease. The transferable move: the Bayes predictor is always "choose the pointwise cheapest action under the conditional distribution"; symmetric zero–one loss is the special case where cheapest means most probable. <Ref lesson="classification-metrics">The evaluation module's metrics lesson</Ref> returns to this when it derives decision thresholds from costs instead of defaults.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two published figures for handwritten-digit classification, taken at face value: human error on the USPS ZIP-code test set is about $2.5\%$, and the best machine ensembles on digit benchmarks of this kind reach about $0.7\%$. For each number, state precisely what it does and does not tell you about the Bayes error of digit classification, and name one reason the comparison between the two is looser than it looks.
+
+<Solution>
+A human reading digits is a classifier: some fixed (if unknown) function from pixel images to labels. Any classifier's risk is an upper bound on the Bayes error, since $R(f^*) \le R(f)$ for every $f$. So the human figure gives $R^* \le 2.5\%$ for the USPS distribution, and nothing more. In particular it is **not** a lower bound: human performance is not the Bayes classifier, and the machine figure proves it, since $0.7\% < 2.5\%$ means humans sit visibly above the floor on this task family.
+
+The machine figure likewise gives only an upper bound, $R^* \le 0.7\%$, for *its* benchmark's distribution. Neither number, nor any achieved error rate, can lower-bound $R^*$ away from zero: bounding the Bayes error from below requires knowledge of the distribution (some mass of images genuinely ambiguous between classes), not a record of attempts.
+
+Two reasons the comparison is loose. First, the figures come from different test sets, hence different distributions $D$; a bound on one is not a bound on the other, and sloppy digits from live mail are a harder distribution than a cleaned benchmark. Second, both numbers are empirical risks on finite test sets, not risks: $2.5\%$ on the USPS test set of about $2{,}000$ digits is roughly $50$ errors, with a standard error near $0.35$ percentage points, so differences of a few tenths between published figures are within measurement noise. <Ref lesson="zipcode-digits">The module's benchmark lesson</Ref> works through this error ladder in full.
+</Solution>
+</Exercise>
+
+<Exercise>
+Return to the mixture data, using the recipe and seed stated in the lesson. Keep the ten cluster centers per class and the 10,000-point test set fixed, and redraw the 200-point training set five times (our redraws reseed the generator at 22000 through 22004 and repeat only the training draw). For each draw, fit 1-NN and 15-NN and record their test errors. Before running it, predict which rule's five numbers will be more spread out, and why; then compare with the run in the solution.
+
+<Solution>
+Strategy: the test set and distribution never change, so any variation across the five numbers has exactly one source, the training draw. Predict more spread for the rule that depends more delicately on individual training points.
+
+Our run (percent test error over five redraws):
+
+| rule | five test errors | range |
+|---|---|---|
+| 1-NN | 26.7, 25.0, 26.2, 25.3, 25.2 | 1.7 points |
+| 15-NN | 22.4, 22.4, 21.7, 22.6, 23.1 | 1.4 points |
+
+1-NN is worse on average by more than three points, and its numbers are more spread — though five draws barely resolve the spread: extending the same experiment to fifty redraws gives standard deviations of 1.5 points for 1-NN against 1.1 for 15-NN. The mechanism is visible in the lesson's frame 3: each training point owns a cell of the plane outright, so moving a single point redraws the boundary in its whole neighborhood, and the islands appear and vanish from draw to draw. Averaging fifteen votes dampens exactly this sensitivity, which is why 15-NN's numbers cluster.
+
+The spread you measured has a name and an exact algebra. It is the *variance* of the estimator: the component of expected error caused by the fitted predictor fluctuating around its own average behavior as the training sample redraws. <Ref lesson="bias-variance">The next lesson</Ref> isolates it as one of exactly three terms in the expected test error (noise, squared bias, variance) and shows that the flexibility that let 1-NN drive training error to zero is precisely what it is paying for here.
+</Solution>
+</Exercise>
+
+<References>
+1. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Ch. 2: the statistical learning framework, the papaya problem, the memorizing predictor (§2.2.1), and ERM with inductive bias (§2.3). Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §2.3: least squares vs. nearest neighbors on the mixture data (Figs. 2.1–2.5, recreated here with our own draw); §2.4: statistical decision theory, the regression function, and the Bayes classifier. Free online: https://hastie.su.domains/ElemStatLearn/
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §1.2: empirical risk and the fitting pipeline; §1.2.4: the No Free Lunch theorem; §5.1: Bayes decision theory, including asymmetric losses. Free online: https://probml.github.io/pml-book/book1.html
+4. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — Ch. 1: the learning-scenarios vocabulary (risk, hypothesis, generalization) used across the theoretical literature. Free online: https://cs.nyu.edu/~mohri/mlbook/
+</References>

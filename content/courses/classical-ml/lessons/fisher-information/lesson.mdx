@@ -1,0 +1,485 @@
+Before asking which estimator to use, ask how well any estimator can possibly do: the Cramér–Rao bound puts a floor under the variance of every unbiased estimator, and the floor is one over the Fisher information.
+
+<Ref lesson="mle-map">The previous lesson</Ref> built the engine: write the log-likelihood, differentiate, solve. Its closing exercise computed both sides of a coincidence: the Bernoulli MLE $\hat\theta = k/n$ has variance $\theta(1-\theta)/n$, and the expression $1/(nI(\theta))$ with $I(\theta) = 1/(\theta(1-\theta))$ equals exactly the same thing. <Ref lesson="bias-variance">The decomposition lesson</Ref> supplied the frame for judging any estimator: MSE splits as squared bias plus variance, so among unbiased estimators, variance is the entire score sheet. This lesson proves the coincidence is a theorem: no unbiased estimator of $\theta$ has variance below $1/(nI(\theta))$, and the MLE reaches that floor in the limit.
+
+The route: the score function and its zero mean; Fisher information as the score's variance and as the log-likelihood's expected curvature; the [Cramér–Rao bound](https://en.wikipedia.org/wiki/Cram%C3%A9r%E2%80%93Rao_bound) proved by one application of Cauchy–Schwarz; three worked verdicts (a floor attained, a floor honest but unreachable, a floor that evaporates); and the asymptotic efficiency of the MLE, with usable standard errors as the by-product.
+
+## The score: the recipe's derivative, before the data arrive
+
+<Task>
+Three retrievals before the new object, closed book; check against <Ref lesson="mle-map">the likelihood lesson</Ref> and <Ref lesson="bias-variance">the decomposition lesson</Ref> only after writing all three down. (1) State the three-step MLE recipe. (2) Write the two-term identity that scores an estimator's MSE. (3) Compute $\operatorname{Var}(k/n)$ for $k \sim \mathrm{Binomial}(n, \theta)$ — the result is the number this lesson turns into a law.
+</Task>
+
+The recipe's second step already manufactures this lesson's central object. For one observation $x \sim \mathcal{N}(\mu, \sigma^2)$, the derivative of $\log p(x \mid \mu)$ in the parameter is $(x - \mu)/\sigma^2$. For one Bernoulli observation, it is
+$$
+\frac{\partial}{\partial \theta} \Big[ x \log\theta + (1-x)\log(1-\theta) \Big] = \frac{x}{\theta} - \frac{1-x}{1-\theta} = \frac{x - \theta}{\theta(1-\theta)}.
+$$
+Both expressions have a property visible by inspection: plugging in $\mathbb{E}[X] = \mu$ (or $\mathbb{E}[X] = \theta$) makes them zero. Averaged over data drawn from the model, the derivative of the log-likelihood vanishes.
+
+<Definition title="score function">
+For a model density or pmf $p(x \mid \theta)$ with scalar parameter $\theta$, the **score** of one observation is
+$$
+s(x; \theta) = \frac{\partial}{\partial \theta} \log p(x \mid \theta),
+$$
+and the score of an iid sample is the log-likelihood's derivative, $\ell'(\theta) = \sum_{i=1}^n s(x_i; \theta)$, with $\ell$ as in <Ref lesson="mle-map">the previous lesson</Ref>.
+</Definition>
+
+### Two readings of one function
+
+The score is a function of two arguments, and the two readings do different jobs. At fixed data, it is a function of $\theta$: the recipe sets it to zero, and its root is the MLE. At fixed $\theta$, it is a *random variable*, a function of $X$: this is the reading the theory below uses, and every expectation and variance in this chapter is taken in it, over $X \sim p(\cdot \mid \theta)$ at the fixed true $\theta$.
+
+<Figure
+  src="./figures/score-views.svg"
+  alt="Two panels: the score of a Gaussian as a function of x at fixed theta, a line crossing zero at x equal to theta with the density overlaid; and as a function of theta at fixed data, a line crossing zero at the MLE"
+  caption="One function, two readings: at fixed θ the score is a mean-zero random variable; at fixed data its root is the MLE."
+/>
+
+### Mean zero, proved in half a line
+
+The zero-mean observation is general, and its half-line proof carries the whole chapter's fine print. Since $\partial_\theta \log p = (\partial_\theta p)/p$,
+$$
+\mathbb{E}_\theta\big[ s(X; \theta) \big]
+= \int \frac{\partial_\theta\, p(x \mid \theta)}{p(x \mid \theta)}\, p(x \mid \theta)\, dx
+= \int \partial_\theta\, p(x \mid \theta)\, dx
+= \frac{d}{d\theta} \int p(x \mid \theta)\, dx
+= \frac{d}{d\theta}\, 1 = 0 .
+$$
+Every equality is bookkeeping except the third, which moves a derivative past an integral. That move is an assumption about the model, not a fact of calculus, and this chapter's third worked example is the model that refuses it.
+
+<Remark title="the regularity conditions, stated once">
+Two conditions are assumed wherever this chapter says "under regularity": **(R1)** differentiation and integration can be interchanged, for $p(x\mid\theta)$ and for $W(x)\,p(x\mid\theta)$ with $W$ the estimator under study; **(R2)** the support $\{x : p(x \mid \theta) > 0\}$ does not depend on $\theta$. (R2) is the checkable surrogate: when the support is fixed, (R1) holds for the standard families (every exponential family passes), and when the support moves with $\theta$, the interchange picks up a boundary term and fails. Densities like $\mathrm{Uniform}(0, \theta)$ fail (R2), and everything built below is void for them.
+</Remark>
+
+## Fisher information: the score's variance is the log-likelihood's curvature
+
+A mean-zero random variable is characterized next by its spread, and the score's spread is the quantity R. A. Fisher introduced in the 1920s as the measure of what one observation is worth.
+
+<Definition title="Fisher information">
+The **Fisher information** of one observation at $\theta$ is the variance of its score:
+$$
+I(\theta) = \operatorname{Var}_\theta\big( s(X; \theta) \big) = \mathbb{E}_\theta\big[ s(X; \theta)^2 \big],
+$$
+the second equality because the score has mean zero.
+</Definition>
+
+### The curvature identity: information is expected downward curvature
+
+The same number has a second, more mechanical form: it is the expected downward curvature of the log-likelihood.
+
+<Theorem title="the curvature identity (Casella &amp; Berger 7.3.11)">
+Under (R1)–(R2), with $\log p(x \mid \theta)$ twice differentiable in $\theta$,
+$$
+I(\theta) = -\,\mathbb{E}_\theta\!\left[ \frac{\partial^2}{\partial \theta^2} \log p(X \mid \theta) \right].
+$$
+
+<Proof>
+Differentiate the zero-mean identity $\int (\partial_\theta \log p)\, p\, dx = 0$ once more in $\theta$, moving the derivative under the integral (this is (R1) again). The product rule gives two terms:
+$$
+0 = \int \big(\partial^2_\theta \log p\big)\, p \, dx \;+\; \int \big(\partial_\theta \log p\big)\big(\partial_\theta\, p\big)\, dx .
+$$
+In the second term substitute $\partial_\theta p = (\partial_\theta \log p)\,p$; it becomes $\int (\partial_\theta \log p)^2 p\, dx = \mathbb{E}_\theta[s^2] = I(\theta)$. The first term is $\mathbb{E}_\theta[\partial^2_\theta \log p]$, and rearranging finishes the proof.
+</Proof>
+</Theorem>
+
+The curvature reading is what makes the name honest. A sharply peaked log-likelihood means a single draw discriminates hard between nearby parameter values; a flat one means the draw is nearly silent about $\theta$. Both curves below have the same maximizer, and the difference between them is exactly $I(\theta)$.
+
+<Figure
+  src="./figures/curvature.svg"
+  alt="Two log-likelihood curves with the same maximizer: a sharply curved one labeled large information and a flat one labeled small information"
+  caption="Same maximum, different certainty: I(θ) is the expected downward curvature of the log-likelihood at the truth."
+/>
+
+### Two routes to the same number
+
+<Example title="information of a Gaussian mean, both ways">
+Let $X \sim \mathcal{N}(\mu, \sigma^2)$ with $\sigma^2$ known. The score in $\mu$ is $s = (X - \mu)/\sigma^2$.
+
+**Variance route.** $\operatorname{Var}(s) = \operatorname{Var}(X)/\sigma^4 = \sigma^2/\sigma^4 = 1/\sigma^2$.
+
+**Curvature route.** $\partial^2_\mu \log p = \partial_\mu \big[(x-\mu)/\sigma^2\big] = -1/\sigma^2$, a constant, so $-\mathbb{E}[\partial^2_\mu \log p] = 1/\sigma^2$.
+
+Both routes give $I(\mu) = 1/\sigma^2$: a tight Gaussian ($\sigma$ small) is informative, a wide one is not, and the units check out: information carries units of $1/\theta^2$, so its reciprocal is a variance.
+</Example>
+
+<Exercise>
+Compute the Fisher information of one $\mathrm{Poisson}(\lambda)$ observation by both routes, using $p(x \mid \lambda) = e^{-\lambda}\lambda^x / x!$ and $\operatorname{Var}(X) = \lambda$. Write the score down before opening the solution.
+
+<Solution>
+Strategy hint: the score was already computed in <Ref lesson="mle-map">the likelihood lesson</Ref>'s Poisson exercise; only the variance and curvature steps are new.
+
+$\log p = -\lambda + x \log \lambda - \log x!$, so $s(x; \lambda) = x/\lambda - 1$, which has mean $\lambda/\lambda - 1 = 0$ as required.
+
+**Variance route.** $\operatorname{Var}(s) = \operatorname{Var}(X)/\lambda^2 = \lambda/\lambda^2 = 1/\lambda$.
+
+**Curvature route.** $\partial^2_\lambda \log p = -x/\lambda^2$, so $-\mathbb{E}[\partial^2_\lambda \log p] = \lambda/\lambda^2 = 1/\lambda$.
+
+$I(\lambda) = 1/\lambda$: rare-event rates (small $\lambda$) are, per observation, the easy ones to pin down in absolute terms. The transferable move: when the second derivative is simpler than the squared first derivative (here $-x/\lambda^2$ against $(x/\lambda - 1)^2$), the curvature route is the shorter computation.
+</Solution>
+</Exercise>
+
+### Information is linear in sample size
+
+One more line completes the toolkit. The sample score $\ell'(\theta)$ is a sum of $n$ independent copies of $s(X;\theta)$, and variances of independent terms add, so the information in a sample is
+$$
+I_n(\theta) = \operatorname{Var}_\theta\big( \ell'(\theta) \big) = n\, I(\theta).
+$$
+Information is linear in sample size, which is why every floor below carries a factor $1/n$ and every best-case standard error falls like $1/\sqrt{n}$.
+
+<KeyFact>
+The curvature $-\ell''$ measured here is not single-use apparatus: it returns as the Hessian that <Ref lesson="gradient-descent">Newton's method</Ref> divides by, as the weights of the IRLS loop, and as the variance function of every <Ref lesson="glm">generalized linear model</Ref>. The floor and those algorithms run on the same quantity.
+</KeyFact>
+
+## The Cramér–Rao bound: a floor from one Cauchy–Schwarz
+
+The pieces assemble into the module's centerpiece. **Goal:** for any estimator $W(X_1,\dots,X_n)$ with mean $\mathbb{E}_\theta W = \tau(\theta)$, a lower bound on $\operatorname{Var}_\theta(W)$ that no such estimator beats. **Hypotheses:** iid sampling and the regularity conditions (R1)–(R2). **Mode:** direct, by one application of the Cauchy–Schwarz inequality. **Roadmap:** (1) show that the covariance between $W$ and the sample score equals $\tau'(\theta)$, whatever $W$ is; (2) apply Cauchy–Schwarz to that covariance; (3) rearrange.
+
+### The engine: any estimator's covariance with the score is its mean's derivative
+
+Step 1 is the working part, and it is the zero-mean derivation run with $W$ inside the integral. Writing $L(\theta) = \prod_i p(x_i \mid \theta)$ for the likelihood,
+$$
+\frac{d}{d\theta}\, \mathbb{E}_\theta[W]
+= \int W\, \partial_\theta L \, d\mathbf{x}
+= \int W \,\big(\partial_\theta \log L\big)\, L \, d\mathbf{x}
+= \mathbb{E}_\theta\big[ W\, \ell'(\theta) \big]
+= \operatorname{Cov}_\theta\big( W, \ell'(\theta) \big),
+$$
+the first equality by (R1) applied to $W L$, and the last because $\mathbb{E}_\theta[\ell'(\theta)] = 0$ makes the product moment a covariance. The identity is the theorem's engine: the covariance of *any* estimator with the score is fixed by the estimator's mean alone.
+
+### One Cauchy–Schwarz finishes it
+
+<Theorem title="Cramér–Rao inequality, iid case (Casella &amp; Berger 7.3.9–7.3.10)">
+Let $X_1, \dots, X_n$ be iid $p(x \mid \theta)$ satisfying (R1)–(R2), and let $W$ be an estimator with $\mathbb{E}_\theta W = \tau(\theta)$ differentiable and $\operatorname{Var}_\theta W < \infty$. Then
+$$
+\operatorname{Var}_\theta(W) \;\ge\; \frac{\big[\tau'(\theta)\big]^2}{n\, I(\theta)} .
+$$
+In particular, every unbiased estimator of $\theta$ ($\tau(\theta) = \theta$, $\tau' = 1$) satisfies $\operatorname{Var}_\theta(W) \ge 1/(nI(\theta))$.
+
+<Proof>
+For any two random variables, $[\operatorname{Cov}(U, V)]^2 \le \operatorname{Var}(U)\operatorname{Var}(V)$: this is Cauchy–Schwarz. Take $U = W$ and $V = \ell'(\theta)$. The covariance identity above gives $\operatorname{Cov}_\theta(W, \ell'(\theta)) = \tau'(\theta)$, and the additivity of information gives $\operatorname{Var}_\theta(\ell'(\theta)) = nI(\theta)$. Therefore
+$$
+\big[\tau'(\theta)\big]^2 \;\le\; \operatorname{Var}_\theta(W)\cdot n I(\theta),
+$$
+and dividing by $nI(\theta)$ proves the theorem.
+</Proof>
+</Theorem>
+
+The bound was proved independently by Harald Cramér and C. R. Rao in the mid-1940s, in each case as one inequality inside a larger theory of estimation; the proof above is the modern short form. Its structure is worth fixing before the applications, because every later verdict traces back to one of its three steps.
+
+<FigureSequence
+  name="crproof"
+  alt="Three frames building the Cramér–Rao proof: the covariance identity between an unbiased estimator and the score, the Cauchy–Schwarz inequality applied to the pair, and the rearranged variance floor"
+  caption="The proof skeleton for unbiased W: a covariance forced to equal 1, one Cauchy–Schwarz, one rearrangement."
+/>
+
+<Task>
+Step through the frames and place the hypotheses: unbiasedness is spent entirely in step 1 (it sets the covariance to $d\theta/d\theta = 1$); regularity is spent twice, in step 1's derivative-past-the-integral and in the zero mean that makes the product moment a covariance. Confirm that step 2 uses nothing about the model at all: Cauchy–Schwarz holds for any two random variables.
+</Task>
+
+## The bound at work: attained, honest, and broken
+
+A floor earns its keep by what it settles. Three canonical models return three different verdicts, and together they are the instruction manual for using the bound.
+
+### Poisson: the floor ends the search
+
+The search problem the bound solves is real. For iid $\mathrm{Poisson}(\lambda)$ data both the sample mean $\bar{X}$ and the sample variance $S^2$ are unbiased estimators of $\lambda$, because the Poisson's mean and variance are both $\lambda$. Comparing them head-to-head means computing $\operatorname{Var}(S^2)$, a long calculation; winning that comparison would still leave the infinite family $a\bar{X} + (1-a)S^2$, unbiased for every $a$, plus every unbiased estimator nobody has written down. Pairwise comparison cannot terminate.
+
+<Example title="the sample mean is the best unbiased estimator of a Poisson rate (Casella &amp; Berger 7.3.12)">
+The floor terminates it in two lines. The in-body exercise above computed $I(\lambda) = 1/\lambda$, so every unbiased estimator $W$ of $\lambda$ satisfies
+$$
+\operatorname{Var}_\lambda(W) \;\ge\; \frac{1}{n I(\lambda)} = \frac{\lambda}{n}.
+$$
+And $\operatorname{Var}_\lambda(\bar{X}) = \operatorname{Var}(X)/n = \lambda/n$ exactly. The sample mean sits on the floor, so no unbiased estimator has smaller variance at any $\lambda$: $\bar{X}$ beats $S^2$, every mixture $a\bar{X} + (1-a)S^2$, and every candidate not yet invented, all without computing a single competitor's variance.
+</Example>
+
+<Figure
+  src="./figures/floor-plot.svg"
+  alt="Variance versus lambda for Poisson estimators at n equal 10: the floor lambda over n with the sample mean sitting on it, the sample variance strictly above, and a shrunken biased estimator dipping below the floor"
+  caption="The floor as a decision tool: X̄ on it (best unbiased), S² above it, and a biased estimator legitimately below it."
+/>
+
+The figure's third curve guards against the standard misreading. The floor does **not** say that no estimator has variance below $1/(nI)$; it says no *unbiased* one does. The claim "nothing beats the Cramér–Rao bound" is false as usually meant: the shrunken estimator $0.8\bar{X}$ has variance $0.64\,\lambda/n$, well under the floor, at the price of bias $-0.2\lambda$. The floor's hypothesis, unbiasedness, is doing real work, and dropping it reopens the MSE competition that <Ref lesson="bias-variance">the decomposition lesson</Ref> already scored: near the unbiased end, the first unit of bias is nearly free and the first unit of variance reduction is not. Ridge regression will run exactly this trade at industrial scale in <Ref lesson="ridge-lasso">the penalized-regression lesson</Ref>.
+
+<Exercise>
+For iid $\mathcal{N}(\mu, \sigma^2)$ with $\sigma^2$ known, state the Cramér–Rao floor for unbiased estimators of $\mu$ and check whether $\bar{X}$ attains it. Then write out the sample score $\ell'(\mu)$ and describe its algebraic relationship to $\bar{X} - \mu$.
+
+<Solution>
+From the worked example, $I(\mu) = 1/\sigma^2$, so the floor is $\sigma^2/n$. The sample mean has $\operatorname{Var}(\bar{X}) = \sigma^2/n$: attained, so $\bar{X}$ is the best unbiased estimator of a Gaussian mean.
+
+The sample score is
+$$
+\ell'(\mu) = \sum_{i=1}^n \frac{x_i - \mu}{\sigma^2} = \frac{n}{\sigma^2}\big( \bar{x} - \mu \big):
+$$
+an exact multiple of the estimator's error $\bar{x} - \mu$, with a factor depending only on the parameter. The next subsection turns exactly this shape, score $= a(\theta)\,[W - \tau(\theta)]$, into a test for when the floor can be reached at all.
+</Solution>
+</Exercise>
+
+### Gaussian variance: a floor that is honest but out of reach
+
+Attainment is not guaranteed, and the Gaussian variance is the canonical case. Estimate $\sigma^2$ from iid $\mathcal{N}(\mu, \sigma^2)$ with $\mu$ unknown. Writing $v = \sigma^2$ and differentiating $\log p = -(x-\mu)^2/(2v) - \tfrac12 \log v - \tfrac12 \log 2\pi$ twice in $v$, the curvature identity gives
+$$
+I(\sigma^2) = -\,\mathbb{E}\!\left[ \frac{(x-\mu)^2}{ - v^3} + \frac{1}{2v^2} \right]
+= \frac{\sigma^2}{\sigma^6} - \frac{1}{2\sigma^4} = \frac{1}{2\sigma^4},
+\qquad\text{floor} = \frac{2\sigma^4}{n}.
+$$
+One hypothesis of this computation must be said aloud: with $\mu$ unknown the parameter is the *pair* $(\mu, \sigma^2)$, and the bound that legitimately governs it is the matrix version stated in the closing boundaries below, $\operatorname{Cov}(W) \succeq \tfrac{1}{n} I(\mu, \sigma^2)^{-1}$. The Gaussian's information matrix is diagonal, $\operatorname{diag}\big(1/\sigma^2,\ 1/(2\sigma^4)\big)$ — the cross term $-\mathbb{E}[\partial_\mu \partial_v \log p] = \mathbb{E}[X - \mu]/v^2$ vanishes — so the inverse's $(\sigma^2, \sigma^2)$ entry equals the scalar $1/I(\sigma^2)$, and the scalar floor $2\sigma^4/n$, together with the scalar attainment verdict run below, survives the nuisance parameter intact. In a model whose information matrix is not diagonal, $[I^{-1}]_{22} > 1/I_{22}$: the scalar formula would still be a valid lower bound, but a slack one — not knowing the other coordinate raises the true floor.
+
+The standard unbiased estimator, the sample variance $S^2$ with divisor $n-1$, has $\operatorname{Var}(S^2) = 2\sigma^4/(n-1)$ (the derivation is an end exercise). That is strictly above the floor at every $n$: the gap is a factor $n/(n-1)$, about 11% at $n = 10$. Either a better unbiased estimator exists, or the floor is simply not reachable here; the bound alone cannot say which, and the equality condition of Cauchy–Schwarz can.
+
+<Theorem title="attainment (Casella &amp; Berger 7.3.15)">
+Under the Cramér–Rao hypotheses, an unbiased estimator $W$ of $\tau(\theta)$ attains the bound if and only if
+$$
+\ell'(\theta) = a(\theta)\,\big[ W(\mathbf{x}) - \tau(\theta) \big]
+$$
+for some function $a(\theta)$: the sample score must be an exact $\theta$-dependent multiple of the estimator's error.
+
+<Proof>
+Cauchy–Schwarz holds with equality exactly when the two variables are perfectly linearly related. Applied to the pair $(W, \ell'(\theta))$ at fixed $\theta$, equality in the Cramér–Rao proof therefore requires $\ell'(\theta)$ to be an affine function of $W$ with probability one; centering both variables ($\mathbb{E}\,\ell' = 0$, $\mathbb{E} W = \tau(\theta)$) forces the affine relation through the means, which is the displayed form.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/attainment-scatter.svg"
+  alt="Two scatter plots of the pair (W, sample score) at fixed theta: on the left every draw lies exactly on the line through (tau(theta), 0), the equality case of Cauchy-Schwarz; on the right the draws scatter around a best-fit line, so the correlation is below one and the variance exceeds the floor"
+  caption="Attainment is a geometric event: the floor is met exactly when every sample lands on one line through (τ(θ), 0)."
+/>
+
+Run the test on the Gaussian. The sample score in $v = \sigma^2$ is
+$$
+\ell'(v) = \sum_{i=1}^n \left[ \frac{(x_i - \mu)^2}{2v^2} - \frac{1}{2v} \right]
+= \frac{n}{2v^2} \left[ \frac{1}{n}\sum_{i=1}^n (x_i - \mu)^2 \;-\; v \right],
+$$
+which has exactly the required shape, with $a(v) = n/2v^2$ and $W = \tfrac{1}{n}\sum_i (x_i - \mu)^2$. So the floor **is** attainable when $\mu$ is known: that $W$ is unbiased for $\sigma^2$ and its variance is $2\sigma^4/n$ on the nose. When $\mu$ is unknown, the unique candidate the equality condition permits contains $\mu$ and is not a statistic; no computable unbiased estimator satisfies the condition, and the floor is unreachable. $S^2$'s 11% gap at $n=10$ is not a defect of $S^2$: it is the price of not knowing $\mu$, and whether $S^2$ is nonetheless the best unbiased estimator is settled (affirmatively) by a different tool in the exercises.
+
+### Uniform(0, θ): a floor that evaporates
+
+The third verdict is the trap. For iid $\mathrm{Uniform}(0, \theta)$, the density is $f(x \mid \theta) = 1/\theta$ on $[0, \theta]$, so $\partial_\theta \log f = -1/\theta$ and $\mathbb{E}[s^2] = 1/\theta^2$. Feeding this into the formula mechanically produces a "floor" of $\theta^2/n$ for unbiased estimators of $\theta$.
+
+The floor is fiction. Take the sample maximum $Y = \max(X_1, \dots, X_n)$, whose density is $n y^{n-1}/\theta^n$ on $[0,\theta]$. Then $\mathbb{E}[Y] = \tfrac{n}{n+1}\theta$, so $\tfrac{n+1}{n} Y$ is unbiased, and a direct computation ($\mathbb{E}[Y^2] = \tfrac{n}{n+2}\theta^2$) gives
+$$
+\operatorname{Var}\!\left( \frac{n+1}{n}\, Y \right) = \frac{\theta^2}{n(n+2)} ,
+$$
+smaller than the claimed floor $\theta^2/n$ by a factor of $n + 2$: twelve times smaller at $n = 10$, and growing. An honest theorem cannot be beaten by a factor that grows with $n$; a hypothesis must have failed, and it is (R2). The support $[0, \theta]$ moves with $\theta$, so differentiating $\int_0^\theta h(x) \tfrac{1}{\theta}\, dx$ in $\theta$ picks up a boundary term $h(\theta)/\theta$ by the Leibniz rule, and the derivative does not pass through the integral. The first symptom is upstream of the bound entirely: this score has $\mathbb{E}_\theta[s] = -1/\theta \ne 0$, so the zero-mean identity, the covariance identity, and the bound all collapse together.
+
+<Figure
+  src="./figures/uniform-trap.svg"
+  alt="Left: uniform densities on 0 to theta for two values of theta, showing the support edge moving with the parameter. Right: the variance of the unbiased max-based estimator far below the invalid theta squared over n floor"
+  caption="When the support edge is the parameter, regularity fails: the mechanical 'floor' θ²/n is void, and an unbiased estimator sits far below it."
+/>
+
+<KeyFact>
+Before quoting $1/(nI(\theta))$, check the support. If the region where $p(x \mid \theta) > 0$ depends on $\theta$, the score is not mean-zero, the bound is void, and estimators may legitimately sit far below the formula's value; the formula silently assumed (R2). Exponential families always pass the check; truncation-type and boundary-type models are where it fails.
+</KeyFact>
+
+## The MLE attains the floor in the limit
+
+The floor rates candidates; it does not name a winner. In the three regular examples the winner happened to be an MLE ($\bar{X}$ in all three), and that is the general pattern, stated asymptotically.
+
+### The limit law: the MLE's limiting variance is the floor
+
+<Definition title="asymptotic efficiency">
+A sequence of estimators $W_n$ is **asymptotically efficient** for $\theta$ if $\sqrt{n}\,(W_n - \theta) \to \mathcal{N}\big(0,\, 1/I(\theta)\big)$ in distribution: its limiting variance is the Cramér–Rao floor.
+</Definition>
+
+<Theorem title="asymptotic efficiency of the MLE (Casella &amp; Berger 10.1.12)">
+Let $X_1, X_2, \dots$ be iid $p(x \mid \theta_0)$ satisfying the regularity conditions (a six-item list: iid sampling, identifiability, common support, the truth interior to the parameter space, three $\theta$-derivatives of the density, and a dominated third derivative). Then the MLE $\hat\theta_n$ satisfies
+$$
+\sqrt{n}\,\big( \hat\theta_n - \theta_0 \big) \;\longrightarrow\; \mathcal{N}\!\left( 0,\; \frac{1}{I(\theta_0)} \right)
+\quad\text{in distribution.}
+$$
+
+<Proof>
+Sketch; the full argument is Casella &amp; Berger §10.1.2. The MLE is a root of the score, and Taylor-expanding the sample score around the truth exploits exactly that:
+$$
+0 = \ell'(\hat\theta_n) \approx \ell'(\theta_0) + (\hat\theta_n - \theta_0)\,\ell''(\theta_0)
+\quad\Longrightarrow\quad
+\sqrt{n}\,(\hat\theta_n - \theta_0) = \frac{\ell'(\theta_0)/\sqrt{n}}{-\ell''(\theta_0)/n}.
+$$
+The numerator is $\sqrt{n}$ times an average of iid mean-zero terms $s(x_i; \theta_0)$ with variance $I(\theta_0)$, so the central limit theorem sends it to $\mathcal{N}(0, I(\theta_0))$. The denominator is an average of iid terms $-\partial^2_\theta \log p(x_i \mid \theta_0)$ with mean $I(\theta_0)$ by the curvature identity, so the law of large numbers sends it to $I(\theta_0)$. Slutsky's theorem combines them: the ratio converges to $\mathcal{N}(0, I(\theta_0))/I(\theta_0) = \mathcal{N}(0, 1/I(\theta_0))$. The higher-order Taylor terms are where the third-derivative conditions are spent.
+</Proof>
+</Theorem>
+
+### Standard errors from the observed curvature
+
+The practical face of the theorem is the standard error that ships with every ML fit. For large $n$, $\hat\theta \approx \mathcal{N}\big(\theta_0,\, 1/(nI(\theta_0))\big)$, and since $\theta_0$ is unknown the variance is estimated by plugging in $\hat\theta$, or more directly by the *observed information* $\hat{I}_n = -\ell''(\hat\theta)$, the measured curvature of the fitted log-likelihood:
+$$
+\operatorname{se}(\hat\theta) \;\approx\; \frac{1}{\sqrt{n\, I(\hat\theta)}} \;\approx\; \frac{1}{\sqrt{ -\ell''(\hat\theta) }} .
+$$
+[Efron and Hinkley (1978)](https://doi.org/10.1093/biomet/65.3.457) showed the observed version is the better of the two: it reflects the curvature of the likelihood actually obtained rather than the one expected on average. Either way, the error bar on a maximum-likelihood estimate is the reciprocal square root of a curvature, which is why software that maximizes a log-likelihood reports standard errors from its Hessian at no extra cost.
+
+<Figure
+  src="./figures/mle-narrowing.svg"
+  alt="Three sampling distributions of the MLE centered at the true parameter, for n equal 10, 40, and 160: each quadrupling of n halves the width, approaching the normal law with variance one over n times the information, with the standard error marked as the half-width read off the observed curvature"
+  caption="The theorem in one picture: θ̂ concentrates on θ₀ at rate 1/√n, and the fitted curvature −ℓ″(θ̂) prices the remaining width."
+/>
+
+<Task>
+Two standard errors, by hand. (1) For the fair coin at $n = 34$: $\operatorname{se} = 1/\sqrt{34 \cdot I(0.5)} = \sqrt{0.25/34} \approx 0.086$, reproducing exactly the number computed from the binomial variance in <Ref lesson="mle-map">the previous lesson</Ref>'s forward exercise. (2) For that lesson's running coin, 5 heads in 7 flips: $I(5/7) = 1/\big(\tfrac57 \cdot \tfrac27\big) = 4.9$, so $\operatorname{se} = 1/\sqrt{7 \times 4.9} \approx 0.17$, and the 95% interval $0.71 \pm 0.33$ covers two-thirds of the parameter space — its upper end even runs past $1$, the normal approximation itself overreaching at $n = 7$: seven flips settle very little, now with a number attached.
+</Task>
+
+### Three boundaries: finite $n$, bias, and vector parameters
+
+Three honest boundaries close the account. First, the theorem is a limit: at finite $n$ the MLE can be biased (the Gaussian $\hat\sigma^2$ underestimates by the factor $(n-1)/n$ from <Ref lesson="mle-map">the previous lesson</Ref>) and its variance can differ from the floor in either direction. Second, the floor itself never governed biased estimators, and deliberately biased ones can undercut it in MSE at any $n$. Third, everything above is stated for scalar $\theta$; with $d$ parameters, the score is a gradient, the information is the $d \times d$ matrix $I(\theta) = \mathbb{E}[\nabla \log p \, \nabla \log p^\top] = -\mathbb{E}[\nabla^2 \log p]$, and the bound reads $\operatorname{Cov}(W) \succeq \tfrac{1}{n} I(\theta)^{-1}$ in the ordering of positive semidefinite matrices. That matrix is the object <Ref lesson="glm">the GLM lesson</Ref> computes from log-partition derivatives and IRLS inverts; this chapter spent only its diagonal case, when the Gaussian-variance verdict survived an unknown $\mu$.
+
+<KeyFact>
+The asymptotic statement itself has an exception clause: estimators exist whose limiting variance beats $1/I(\theta)$. Lucien Le Cam proved in 1953 that the exception is thin — the set of parameter values where any estimator does so has measure zero, and the price is inflated finite-$n$ risk next to each exceptional point. Off such null sets, the MLE's limiting variance is unimprovable; the ★ section constructs the one famous violator.
+</KeyFact>
+
+What stands established: estimation now has an engine and a floor. The score is mean-zero under regularity; its variance, the Fisher information, is also the log-likelihood's expected curvature and adds across observations; no unbiased estimator beats $[\tau']^2/(nI)$, with equality exactly when the score is proportional to the estimator's error; the floor is real for regular models, unattainable for some targets, and void when the support moves with the parameter; and the MLE attains it asymptotically, with standard errors read off the observed curvature. What stands open is computation: every solved example had a score equation with a closed-form root, and logistic regression's does not. <Ref lesson="gradient-descent">The next lesson</Ref> builds the iterative machinery — gradient descent, its stochastic variant, and the Newton step that divides by this lesson's curvature. The floor itself returns in module 3, where least squares under Gaussian noise sits exactly on it; the final exercise below lands on that doorstep.
+
+## ★ Superefficiency: the fine print on "asymptotically optimal"
+
+The asymptotic floor has a genuine exception, found by Joseph Hodges in 1951 (published in Lucien Le Cam's 1953 study of maximum likelihood). Take iid $\mathcal{N}(\theta, 1)$, where $I(\theta) = 1$ and the floor for unbiased estimators is $1/n$. Hodges' estimator tests whether the sample mean is close to zero and snaps toward zero when it is:
+$$
+d_n = \begin{cases} \bar{X} & \text{if } |\bar{X}| \ge n^{-1/4}, \\[2pt] a\bar{X} & \text{if } |\bar{X}| < n^{-1/4}, \end{cases}
+\qquad 0 < a < 1 .
+$$
+For $\theta \ne 0$ the threshold eventually never triggers and $\sqrt{n}(d_n - \theta) \to \mathcal{N}(0, 1)$: ordinary efficiency. At $\theta = 0$ the snap always triggers and $\sqrt{n}\, d_n \to \mathcal{N}(0, a^2)$ with $a^2 < 1$: the asymptotic variance beats the floor at that single point.
+
+No theorem is contradicted. The finite-$n$ Cramér–Rao bound governs unbiased estimators, and $d_n$ is biased at every finite $n$; what $d_n$ violates is the asymptotic bound, and Le Cam proved that the violation set is always of measure zero — here the single point $\theta = 0$. The practical price is paid next door: for true $\theta$ near zero but not zero, the snap-to-zero step is a wrong bet, and at finite $n$ the estimator's risk near the special point is worse than $\bar{X}$'s, increasingly so as $n$ grows. Superefficiency is the reason careful statements of MLE optimality say "efficient at every $\theta$, among estimators whose risk behaves uniformly well", rather than "nothing does better anywhere". The fine print does not move the practice: the MLE-plus-observed-information recipe survives, and the estimator that games a single point loses everywhere around it.
+
+## Exercises
+
+<Exercise>
+For iid $\mathrm{Bernoulli}(\theta)$: compute $I(\theta)$ by both the variance route and the curvature route, state the Cramér–Rao floor for unbiased estimators of $\theta$, and determine whether the MLE $\hat\theta = k/n$ attains it, using the attainment condition rather than a variance computation.
+
+<Solution>
+**Variance route.** $s(x;\theta) = (x - \theta)/\big(\theta(1-\theta)\big)$, so $\operatorname{Var}(s) = \operatorname{Var}(X)/\big[\theta(1-\theta)\big]^2 = \theta(1-\theta)/\big[\theta(1-\theta)\big]^2 = 1/\big(\theta(1-\theta)\big)$.
+
+**Curvature route.** $\partial^2_\theta \log p = -x/\theta^2 - (1-x)/(1-\theta)^2$, so
+$$
+I(\theta) = \mathbb{E}\!\left[\frac{X}{\theta^2} + \frac{1-X}{(1-\theta)^2}\right] = \frac{1}{\theta} + \frac{1}{1-\theta} = \frac{1}{\theta(1-\theta)} .
+$$
+
+**Floor.** $1/(nI(\theta)) = \theta(1-\theta)/n$.
+
+**Attainment.** The sample score is
+$$
+\ell'(\theta) = \frac{k}{\theta} - \frac{n-k}{1-\theta} = \frac{k - n\theta}{\theta(1-\theta)} = \frac{n}{\theta(1-\theta)} \left[ \frac{k}{n} - \theta \right],
+$$
+exactly the form $a(\theta)[W - \theta]$ with $a(\theta) = n/(\theta(1-\theta))$ and $W = k/n$. So $k/n$ attains the floor and is the best unbiased estimator of $\theta$; this upgrades <Ref lesson="mle-map">the previous lesson</Ref>'s numerical match, $\operatorname{Var}(k/n) = \theta(1-\theta)/n$, from coincidence to consequence.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the variance of the sample variance that the Gaussian subsection quoted. For iid $\mathcal{N}(\mu, \sigma^2)$, use the fact (from the sampling-distribution theory of the Gaussian) that $(n-1)S^2/\sigma^2 \sim \chi^2_{n-1}$, together with $\operatorname{Var}(\chi^2_k) = 2k$. Then: (a) confirm $\operatorname{Var}(S^2) = 2\sigma^4/(n-1)$ and compute the ratio of the Cramér–Rao floor to this variance; (b) show that the biased MLE $\hat\sigma^2 = \tfrac{n-1}{n}S^2$ has MSE below the *floor* for unbiased estimators, and state what that does and does not prove.
+
+<Solution>
+$S^2 = \tfrac{\sigma^2}{n-1} \cdot \tfrac{(n-1)S^2}{\sigma^2}$, so
+$$
+\operatorname{Var}(S^2) = \left( \frac{\sigma^2}{n-1} \right)^2 \operatorname{Var}\big(\chi^2_{n-1}\big) = \frac{\sigma^4}{(n-1)^2}\, \cdot 2(n-1) = \frac{2\sigma^4}{n-1}.
+$$
+
+(a) Floor over variance: $\dfrac{2\sigma^4/n}{2\sigma^4/(n-1)} = \dfrac{n-1}{n} \to 1$. The unreachable gap closes at rate $1/n$: $S^2$ is asymptotically efficient even though it misses the floor at every finite $n$.
+
+(b) The MLE has $\operatorname{Var}(\hat\sigma^2) = \big(\tfrac{n-1}{n}\big)^2 \tfrac{2\sigma^4}{n-1} = \tfrac{2(n-1)\sigma^4}{n^2}$ and bias $-\sigma^2/n$, so
+$$
+\operatorname{MSE}(\hat\sigma^2) = \frac{2(n-1)\sigma^4}{n^2} + \frac{\sigma^4}{n^2} = \frac{(2n-1)\sigma^4}{n^2} \;<\; \frac{2\sigma^4}{n} = \text{the floor},
+$$
+since $2n - 1 < 2n$. This proves the floor does not constrain MSE once bias is allowed; it does **not** prove the MLE is the best biased estimator (no such uniform winner exists), and it does not touch the floor's actual claim, which is about variance of unbiased estimators only. The transferable move is the same shrinkage arithmetic as <Ref lesson="bias-variance">the decomposition lesson</Ref>'s: second-order bias cost, first-order variance saving.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. As $\theta \to 0$ in the Bernoulli model, $I(\theta) = 1/(\theta(1-\theta)) \to \infty$: information per flip becomes infinite. Reconcile this with the practical fact, established in <Ref lesson="mle-map">the previous lesson</Ref>'s zero-count analysis, that rare-event probabilities are the *hard* case: compute what the floor promises in absolute terms, what it implies in relative terms, and the sample size needed to estimate $\theta = 10^{-4}$ to $\pm 10\%$ relative error.
+
+<Solution>
+**Absolute terms.** The floor $\theta(1-\theta)/n \to 0$ as $\theta \to 0$: the promise of tiny absolute error is honest. An estimator of a one-in-ten-thousand probability will indeed be within a few times $\sqrt{\theta/n}$ of the truth, which is tiny.
+
+**Relative terms.** The target shrinks faster than the error bar. The relative standard error is
+$$
+\frac{\operatorname{se}(\hat\theta)}{\theta} = \frac{1}{\theta}\sqrt{\frac{\theta(1-\theta)}{n}} = \sqrt{\frac{1-\theta}{n\theta}} \;\longrightarrow\; \infty \quad\text{as } \theta \to 0 \text{ at fixed } n.
+$$
+
+**The number.** Demanding $\operatorname{se} \le 0.1\,\theta$ means $\theta(1-\theta)/n \le 0.01\,\theta^2$, i.e. $n \ge 100\,(1-\theta)/\theta \approx 10^6$ at $\theta = 10^{-4}$: a million flips, roughly a hundred expected successes. The two views agree once the question is stated: "infinite information" is information about $\theta$'s absolute location, and rare-event estimation is hard because the question asked of it is relative. Below $n \approx 1/\theta$ the situation is qualitatively worse still: the typical sample contains no successes at all, and the MLE returns the zero-count catastrophe of <Ref lesson="mle-map">the previous lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "$S^2$ does not attain the Cramér–Rao bound for $\sigma^2$, so $S^2$ is not the best unbiased estimator: a better unbiased one must exist." Name the exact step at which the reasoning fails, prove that no unbiased estimator can attain the bound when $\mu$ is unknown, and state (one sentence, with attribution) the tool that settles what the bound cannot.
+
+<Solution>
+The failing step is the inference "misses the bound $\Rightarrow$ improvable", which silently assumes the bound is attainable. A lower bound proves nothing about existence of estimators near it.
+
+By the attainment theorem, any unbiased $W$ attaining the bound must satisfy $\ell'(\sigma^2) = a(\sigma^2)[W - \sigma^2]$. The body computed
+$$
+\ell'(\sigma^2) = \frac{n}{2\sigma^4}\left[ \frac{1}{n}\sum_{i=1}^n (x_i - \mu)^2 - \sigma^2 \right],
+$$
+and the bracketed function is the *only* candidate $W$ (the proportionality pins $W$ down up to the free function $a$, which cannot absorb data-dependence). It contains the unknown $\mu$, so it is not a statistic; no estimator, hence no unbiased estimator, attains the bound. The claim's conclusion is also false on the merits: $S^2$ *is* the best unbiased estimator of $\sigma^2$, by the Lehmann–Scheffé theorem — an unbiased function of a complete sufficient statistic (here $(\bar{X}, S^2)$) is the unique best unbiased estimator (Casella &amp; Berger §7.3.3). The bound and the winner simply do not touch: the floor is set by curvature, the winner by sufficiency.
+</Solution>
+</Exercise>
+
+<Exercise>
+The exponential-family case, which the rest of the course spends. Let $p(x \mid \eta) = h(x)\, e^{\eta\, T(x) - A(\eta)}$ with natural parameter $\eta$ and log-partition function $A$. (a) Compute the score and show the zero-mean identity forces $\mathbb{E}[T(X)] = A'(\eta)$. (b) Show $I(\eta) = A''(\eta) = \operatorname{Var}(T(X))$. (c) Check (b) on the Bernoulli in its natural parameterization $\eta = \log\tfrac{\theta}{1-\theta}$, and reconcile the answer with $I(\theta) = 1/(\theta(1-\theta))$ from the Bernoulli warm-up above.
+
+<Solution>
+(a) $\log p = \log h(x) + \eta T(x) - A(\eta)$, so $s(x; \eta) = T(x) - A'(\eta)$. Setting $\mathbb{E}[s] = 0$ gives $\mathbb{E}[T(X)] = A'(\eta)$: the log-partition's first derivative is the mean of the sufficient statistic.
+
+(b) Curvature route: $\partial^2_\eta \log p = -A''(\eta)$, a constant in $x$, so $I(\eta) = A''(\eta)$. Variance route: $\operatorname{Var}(s) = \operatorname{Var}(T(X))$ since $A'(\eta)$ is a constant. Equating the two: $\operatorname{Var}(T(X)) = A''(\eta)$. In an exponential family, information, curvature, and the sufficient statistic's variance are one number.
+
+(c) For the Bernoulli, $A(\eta) = \log(1 + e^\eta)$, so $A''(\eta) = \tfrac{e^\eta}{(1+e^\eta)^2} = \theta(1-\theta)$. This is *not* $1/(\theta(1-\theta))$, and both are correct: information depends on the parameterization. The reparameterization rule follows from the chain rule for the score, $s(x;\eta) = s(x;\theta)\,\tfrac{d\theta}{d\eta}$, giving $I(\eta) = I(\theta)\big(\tfrac{d\theta}{d\eta}\big)^2$; with $\tfrac{d\theta}{d\eta} = \theta(1-\theta)$, indeed $\tfrac{1}{\theta(1-\theta)} \cdot \theta^2(1-\theta)^2 = \theta(1-\theta)$. The payoff arrives in <Ref lesson="glm">the GLM lesson</Ref>: $A'$ and $A''$ are the mean and variance functions that generate every generalized linear model, and (b) is why the IRLS weights are variances.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce a published standard error. The [1977 EM paper](https://web.mit.edu/6.435/www/Dempster77.pdf) of Dempster, Laird, and Rubin opens with genetic-linkage data due to Rao: $197$ animals distributed over four phenotype categories with counts $(125, 18, 20, 34)$ and model cell probabilities $\big(\tfrac12 + \tfrac{\pi}{4},\; \tfrac{1-\pi}{4},\; \tfrac{1-\pi}{4},\; \tfrac{\pi}{4}\big)$. In the published discussion, C. A. B. Smith derives a standard error of about $0.051$ for $\hat\pi$. (a) Write the log-likelihood and find the MLE by solving the score equation. (b) Compute the observed information $-\ell''(\hat\pi)$ and the resulting standard error. State before computing what you will count as agreement with Smith.
+
+<Solution>
+Agreement criterion, fixed in advance: match Smith's $0.051$ to two significant figures.
+
+(a) Dropping constants (the $\tfrac14$ factors), the multinomial log-likelihood is
+$$
+\ell(\pi) = 125 \log(2 + \pi) + 38 \log(1 - \pi) + 34 \log \pi,
+$$
+pooling the two middle categories ($18 + 20 = 38$). The score is
+$$
+\ell'(\pi) = \frac{125}{2+\pi} - \frac{38}{1-\pi} + \frac{34}{\pi} .
+$$
+Multiplying through by $\pi(1-\pi)(2+\pi)$ and collecting terms gives the quadratic $197\pi^2 - 15\pi - 68 = 0$, whose root in $(0,1)$ is
+$$
+\hat\pi = \frac{15 + \sqrt{225 + 4 \cdot 197 \cdot 68}}{2 \cdot 197} = \frac{15 + \sqrt{53809}}{394} \approx 0.6268 .
+$$
+
+(b) Differentiating again,
+$$
+-\ell''(\pi) = \frac{125}{(2+\pi)^2} + \frac{38}{(1-\pi)^2} + \frac{34}{\pi^2} ,
+$$
+and at $\hat\pi = 0.6268$: $\;125/6.900 + 38/0.1393 + 34/0.3929 \approx 18.1 + 272.9 + 86.5 = 377.5$. So
+$$
+\operatorname{se}(\hat\pi) \approx \frac{1}{\sqrt{377.5}} \approx 0.0515 ,
+$$
+which agrees with Smith's $0.051$ to two significant figures. Smith in fact obtained his value by a different route: he read the *fraction of missing information* off the EM iteration's convergence rate and inflated the complete-data binomial error accordingly, so the agreement is a genuine cross-check of two methods, not the same computation twice. The transferable move: once any method delivers $\hat\theta$, the curvature of the log-likelihood at $\hat\theta$ prices its uncertainty.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Fit a line through the origin, $y_i = \beta x_i + \varepsilon_i$ with $\varepsilon_i$ iid $\mathcal{N}(0, \sigma^2)$, the inputs $x_1, \dots, x_n$ fixed and $\sigma^2$ known. (a) Derive the MLE $\hat\beta$ with the recipe. (b) Show it is unbiased and compute its variance exactly. (c) Compute the sample Fisher information for $\beta$ (the observations are independent but not identically distributed, so work with $\operatorname{Var}(\ell'(\beta))$ directly) and compare the Cramér–Rao floor with (b).
+
+<Solution>
+(a) $\ell(\beta) = -\tfrac{1}{2\sigma^2}\sum_i (y_i - \beta x_i)^2 + \text{const}$, so
+$$
+\ell'(\beta) = \frac{1}{\sigma^2}\sum_{i=1}^n x_i \big( y_i - \beta x_i \big) = 0
+\quad\Longrightarrow\quad
+\hat\beta = \frac{\sum_i x_i y_i}{\sum_i x_i^2} .
+$$
+
+(b) $\mathbb{E}[\hat\beta] = \sum_i x_i (\beta x_i) / \sum_i x_i^2 = \beta$: unbiased. Since the $y_i$ are independent with variance $\sigma^2$,
+$$
+\operatorname{Var}(\hat\beta) = \frac{\sum_i x_i^2\, \sigma^2}{\big(\sum_i x_i^2\big)^2} = \frac{\sigma^2}{\sum_i x_i^2} .
+$$
+
+(c) The sample score $\ell'(\beta) = \tfrac{1}{\sigma^2}\sum_i x_i \varepsilon_i$ has mean zero and variance $\tfrac{1}{\sigma^4}\sum_i x_i^2 \sigma^2 = \sum_i x_i^2/\sigma^2$, so the floor is $\sigma^2 / \sum_i x_i^2$: identical to (b), at every $n$, not just in the limit. The attainment condition confirms it structurally: $\ell'(\beta) = \tfrac{\sum_i x_i^2}{\sigma^2}\big[\hat\beta - \beta\big]$, the score as an exact multiple of the estimator's error.
+
+You have just proved that least squares is the best unbiased estimator of a regression coefficient under Gaussian noise — the Cramér–Rao route to a result whose famous distribution-free sibling is the Gauss–Markov theorem: <Ref lesson="ols">the least-squares lesson</Ref> proves that among *linear* unbiased estimators, OLS wins with no Gaussian assumption at all, and prices what the weaker hypothesis costs.
+</Solution>
+</Exercise>
+
+<References>
+1. G. Casella, R. L. Berger, *Statistical Inference*, 2nd ed., Duxbury, 2002 — §7.3.2: the Cramér–Rao theorem (7.3.9, 7.3.10) with the Cauchy–Schwarz proof followed here, the curvature identity (7.3.11), the attainment corollary (7.3.15), and the worked Poisson (7.3.8/7.3.12), Uniform (7.3.13), and normal-variance (7.3.14/7.3.16) examples; §7.3.3: sufficiency, completeness, and Lehmann–Scheffé; §10.1.2: asymptotic normality and efficiency of the MLE (10.1.12) with the Taylor-expansion proof; Miscellanea 10.6.1: Hodges' superefficient estimator; 10.6.2: the regularity conditions (A1)–(A6).
+2. H. Cramér, *Mathematical Methods of Statistics*, Princeton University Press, 1946 — §32.3: the "Cramér" half of the bound, derived as one step in a complete asymptotic theory of estimation; the surrounding chapters supply the efficiency definitions this chapter's asymptotic section inherits.
+3. C. R. Rao, "Information and the Accuracy Attainable in the Estimation of Statistical Parameters," *Bulletin of the Calcutta Mathematical Society* 37, 1945, pp. 81–91 — the "Rao" half: the inequality by essentially the Cauchy–Schwarz argument followed here, in the same short paper that introduces the information metric on parameter space (the Fisher–Rao metric).
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §4.7.2: the sampling distribution of the MLE as $\mathcal{N}(\theta^*, I^{-1})$ and standard errors from the information matrix, the practical reading of this chapter. Free online: https://probml.github.io/pml-book/book1.html
+5. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §8.2.2: score, observed and expected information, and ML standard errors in the model-inference workflow. Free online: https://hastie.su.domains/ElemStatLearn/
+6. B. Efron, D. V. Hinkley, "Assessing the Accuracy of the Maximum Likelihood Estimator: Observed Versus Expected Fisher Information," *Biometrika* 65(3), 1978 — the case for the observed information in standard errors. https://doi.org/10.1093/biomet/65.3.457
+7. A. P. Dempster, N. M. Laird, D. B. Rubin, "Maximum Likelihood from Incomplete Data via the EM Algorithm," *JRSS-B* 39(1), 1977 — §1: the genetic-linkage data of the research exercise; C. A. B. Smith's discussion contribution derives the 0.051 standard error from the EM convergence rate. https://web.mit.edu/6.435/www/Dempster77.pdf
+8. L. Le Cam, "On Some Asymptotic Properties of Maximum Likelihood Estimates and Related Bayes' Estimates," *University of California Publications in Statistics* 1, 1953 — the first publication of J. L. Hodges' 1951 superefficient estimator, and the proof that the set of superefficiency points always has measure zero.
+</References>

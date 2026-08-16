@@ -1,0 +1,507 @@
+Solving the margin QP through its Lagrangian dual reveals that the classifier depends on the data only through inner products — replace those with a kernel and the SVM becomes nonlinear for free.
+
+<Ref lesson="svm-max-margin">The previous lesson</Ref> closed road 3 with a convex quadratic program and two debts on the books: the boundary it draws is still a hyperplane, and the reason a wide margin should generalize is still an expectation bound. This lesson pays the first debt and makes the second one precise. The dual, derived in full, shows the data entering the problem only as an $m \times m$ table of inner products; substituting a kernel for those inner products buys a feature space of arbitrary (even infinite) dimension at no computational cost, and the lesson ends by stating exactly what that purchase does to the overfitting question, with the formula module 9 will prove. The module's next stop runs all three roads on one real corpus.
+
+## The toolkit: a constraint becomes a price
+
+<Task>
+Three retrievals before the new machinery, closed book. (1) From <Ref lesson="svm-max-margin">the margin lesson</Ref>: the soft-margin SVM is $\min \tfrac12\lVert w\rVert^2 + C\sum_i \xi_i$ subject to $y_i(w^\top x_i + b) \ge 1 - \xi_i$ and $\xi_i \ge 0$, with $y \in \{-1,+1\}$. (2) Same lesson: *support vectors* were defined geometrically: the points whose constraints hold with equality, at least one on each side of the band. (3) From <Ref lesson="gradient-descent">the optimization lesson</Ref>: a convex objective under affine constraints has no non-global local minima.
+</Task>
+
+The margin QP has $m$ inequality constraints, and the tool for constrained optima is the one from multivariable calculus: attach a multiplier to each constraint and look for stationary points of the combined function. For inequality constraints the multipliers additionally carry a sign, $\alpha_i \ge 0$, which makes every term $\alpha_i\, g_i(w)$ nonpositive at feasible points — the inequality behind weak duality and, below, complementary slackness. The machinery is worth one concrete run before it is stated in general.
+
+<Example title="the whole pipeline in one dimension">
+Minimize $\tfrac12 w^2$ subject to $w \ge 1$: the hard-margin problem for a single training point $x = 1$, $y = +1$, with no intercept.
+
+Attach a multiplier $\alpha \ge 0$ to the constraint written as $w - 1 \ge 0$:
+$$
+L(w, \alpha) = \tfrac12 w^2 - \alpha\,(w - 1).
+$$
+
+For fixed $\alpha$, minimize over $w$: $\partial L/\partial w = w - \alpha = 0$, so $w = \alpha$. Substituting back leaves a function of $\alpha$ alone:
+$$
+W(\alpha) = \tfrac12\alpha^2 - \alpha(\alpha - 1) = \alpha - \tfrac12\alpha^2.
+$$
+
+Maximize over $\alpha \ge 0$: $W'(\alpha) = 1 - \alpha = 0$ gives $\alpha^\ast = 1$, with $W(\alpha^\ast) = \tfrac12$. The primal optimum is $w^\ast = 1$ with value $\tfrac12$: the two optima agree. At the solution the constraint is tight ($w^\ast = 1$), its multiplier is positive ($\alpha^\ast = 1$), and $w^\ast = \alpha^\ast y x$: the one-point preview of everything below.
+</Example>
+
+### Lagrangian duality in general
+
+The example's three moves (attach, minimize, maximize) are the whole definition.
+
+<Definition title="Lagrangian and dual problem">
+For a problem $\min_w f(w)$ subject to $g_i(w) \le 0$, $i = 1,\dots,m$, the **Lagrangian** is
+$$
+L(w, \alpha) = f(w) + \sum_{i=1}^m \alpha_i\, g_i(w), \qquad \alpha_i \ge 0,
+$$
+the **dual function** is $W(\alpha) = \min_w L(w, \alpha)$, and the **dual problem** is $\max_{\alpha \ge 0} W(\alpha)$. ($W$ is reserved for the dual function throughout; $g_i$ always names a constraint.)
+</Definition>
+
+Two facts govern when solving the dual solves the primal. *Weak duality* always holds: for feasible $w$, every term $\alpha_i g_i(w)$ is $\le 0$, so $W(\alpha) \le f(w)$, and the dual optimum lower-bounds the primal optimum. *Strong duality*, equality of the two optima, holds for convex problems with a strictly feasible point (Slater's condition), and for convex objectives with affine constraints feasibility alone suffices. The SVM's constraints are affine in $(w, b, \xi)$ and the soft-margin program is always feasible, so strong duality holds with no further checking; the full account this paragraph compresses is [CS229 §6.5](https://cs229.stanford.edu/main_notes.pdf).
+
+### The KKT conditions and complementary slackness
+
+Strong duality has a pointwise consequence: four equations and inequalities that characterize optimal pairs.
+
+<Definition title="KKT conditions">
+A pair $(w, \alpha)$ satisfies the **Karush–Kuhn–Tucker conditions** for the problem above if:
+
+1. **stationarity**: $\nabla_w L(w, \alpha) = 0$;
+2. **primal feasibility**: $g_i(w) \le 0$ for every $i$;
+3. **dual feasibility**: $\alpha_i \ge 0$ for every $i$;
+4. **complementary slackness**: $\alpha_i\, g_i(w) = 0$ for every $i$.
+</Definition>
+
+<Theorem title="KKT characterize optimality (CS229, §6.5)">
+For a convex, differentiable problem in which strong duality holds, every primal–dual optimal pair $(w^\ast, \alpha^\ast)$ satisfies the KKT conditions, and every pair satisfying them is primal–dual optimal.
+</Theorem>
+
+The course uses the theorem as stated; the proof is in the cited notes. Condition 4 is the interpretive one. Its product pairs a nonnegative factor (condition 3) with a nonpositive one (condition 2), and a product vanishes only if a factor does: for each constraint, **either** the constraint is tight ($g_i = 0$) **or** its multiplier is zero. In the one-dimensional example the constraint was tight and $\alpha^\ast > 0$; a constraint with room to spare would have carried $\alpha^\ast = 0$ and exerted no force on the solution.
+
+<KeyFact>
+Complementary slackness says every constraint at an optimum is either active or ignorable; there is no third state. Applied to the margin QP, this dichotomy becomes the theorem that only margin-touching points carry weight, and it is the reason the classifier the dual produces is sparse.
+</KeyFact>
+
+## The dual of the margin QP: two derivatives and a substitution
+
+The pipeline of the one-dimensional example, run on the hard-margin program, takes five numbered moves, each one line. Write the constraints as $g_i(w,b) = -[\,y_i(w^\top x_i + b) - 1\,] \le 0$.
+
+**Step 1, the Lagrangian.** One multiplier $\alpha_i \ge 0$ per training point:
+
+$$
+L(w, b, \alpha) \;=\; \tfrac12 \lVert w \rVert^2 \;-\; \sum_{i=1}^m \alpha_i \bigl[\, y_i (w^\top x_i + b) - 1 \,\bigr].
+$$
+
+**Step 2, stationarity in $w$.** The gradient $\nabla_w L = w - \sum_i \alpha_i y_i x_i$ vanishes at
+
+$$
+w \;=\; \sum_{i=1}^m \alpha_i y_i x_i :
+$$
+
+the weight vector is a weighted combination of training points, with $\alpha_i$ as point $i$'s weight.
+
+**Step 3, stationarity in $b$.** $\partial L/\partial b = -\sum_i \alpha_i y_i = 0$ forces
+
+$$
+\sum_{i=1}^m \alpha_i y_i \;=\; 0 .
+$$
+
+This is a constraint on $\alpha$, not a formula for $b$: $b$ multiplies exactly this sum in $L$ and therefore drops out of the objective entirely.
+
+**Step 4, substitution.** Expand $L$ into its pieces and insert steps 2 and 3. With $w = \sum_j \alpha_j y_j x_j$:
+
+$$
+\tfrac12\lVert w\rVert^2 = \tfrac12 \sum_{i}\sum_{j} \alpha_i \alpha_j y_i y_j \langle x_i, x_j\rangle,
+\qquad
+\sum_i \alpha_i y_i\, w^\top x_i = \sum_{i}\sum_{j} \alpha_i \alpha_j y_i y_j \langle x_i, x_j\rangle,
+$$
+
+and the term $b\sum_i \alpha_i y_i$ is zero. The two identical double sums combine as $\tfrac12\Sigma\Sigma - \Sigma\Sigma = -\tfrac12\Sigma\Sigma$.
+
+**Step 5, the dual QP.** What remains is a function of $\alpha$ alone, maximized subject to the sign conditions and step 3's constraint.
+
+<FigureSequence
+  name="dual-derivation"
+  alt="Five frames deriving the SVM dual: the Lagrangian assembled with one multiplier per constraint, the two stationarity conditions boxed, the substitution with the b-term struck out, and the final dual QP in which data appear only as inner products"
+  caption="The dual in five moves. The ledger on the left grows one line per frame; the last line contains no w and no b."
+/>
+
+<Task>
+Step through the five frames, then close them and reproduce the ledger on paper: Lagrangian, $\partial_w$, $\partial_b$, substitution, dual QP. The exercise after the worked example below asks for a run of this pipeline with nothing on screen.
+</Task>
+
+<Theorem title="dual of the hard-margin SVM">
+For linearly separable data, the dual of $\min \tfrac12\lVert w\rVert^2$ s.t. $y_i(w^\top x_i + b) \ge 1$ is
+
+$$
+\max_{\alpha}\; W(\alpha) = \sum_{i=1}^m \alpha_i - \tfrac12\sum_{i,j} \alpha_i\alpha_j y_i y_j \langle x_i, x_j\rangle
+\qquad \text{s.t.} \quad \alpha_i \ge 0, \quad \textstyle\sum_i \alpha_i y_i = 0,
+$$
+
+strong duality holds, and the primal solution is recovered as $w^\ast = \sum_i \alpha_i^\ast y_i x_i$.
+</Theorem>
+
+The dual is a concave quadratic maximization in $m$ variables with one equality constraint and sign constraints: still a convex QP, and its structural payoff is already visible. The coordinates of $w$, the intercept $b$, and the raw entries of every $x_i$ are gone; the data enter **only as the $m \times m$ table of inner products** $\langle x_i, x_j\rangle$.
+
+<Example title="the two-point dual, by hand">
+The previous lesson solved $x_+ = (2,2)$, $y = +1$ and $x_- = (0,0)$, $y = -1$ in the primal: $w = (\tfrac12, \tfrac12)$, $b = -1$. The dual reproduces it.
+
+Step 3's constraint: $\alpha_+ - \alpha_- = 0$, so $\alpha_+ = \alpha_- = \alpha$. Inner products: $\langle x_+, x_+\rangle = 8$, $\langle x_+, x_-\rangle = \langle x_-, x_-\rangle = 0$. The double sum keeps one term:
+
+$$
+W(\alpha) = 2\alpha - \tfrac12\,\alpha^2 \cdot 8 = 2\alpha - 4\alpha^2 .
+$$
+
+$W'(\alpha) = 2 - 8\alpha = 0$ gives $\alpha^\ast = \tfrac14$. Then $w = \tfrac14 (+1)(2,2) + \tfrac14(-1)(0,0) = (\tfrac12, \tfrac12)$. Both points have $\alpha > 0$, so both sit on the margin; from $x_+$: $y_+(w^\top x_+ + b) = 2 + b = 1$, so $b = -1$. Consistency check: $W(\tfrac14) = \tfrac12 - \tfrac14 = \tfrac14$ equals the primal value $\tfrac12\lVert w\rVert^2 = \tfrac14$, as strong duality demands.
+</Example>
+
+<Exercise>
+The paired computation, before reading on: solve the dual for $x_- = (0,0)$, $y = -1$ and $x_+ = (4,0)$, $y = +1$. The primal solution, from the previous lesson's exercises, is $w = (\tfrac12, 0)$, $b = -1$. Recover $\alpha^\ast$, $w$, and $b$, and verify that the dual optimal value equals the primal optimal value.
+
+<Solution>
+Strategy hint: the equality constraint collapses the problem to one variable, exactly as in the worked example.
+
+$\alpha_+ - \alpha_- = 0$ forces $\alpha_+ = \alpha_- = \alpha$. Inner products: $\langle x_+, x_+\rangle = 16$; both products involving $x_- = (0,0)$ vanish. So
+$$
+W(\alpha) = 2\alpha - \tfrac12 \cdot 16\,\alpha^2 = 2\alpha - 8\alpha^2,
+$$
+maximized at $W'(\alpha) = 2 - 16\alpha = 0$, i.e. $\alpha^\ast = \tfrac18$.
+
+Then $w = \tfrac18(+1)(4,0) + \tfrac18(-1)(0,0) = (\tfrac12, 0)$. Both $\alpha$'s are positive, so both points are margin support vectors; from $x_+$: $w^\top x_+ + b = 2 + b = 1$, so $b = -1$ (check at $x_-$: $-(0 + b) = 1$, consistent).
+
+Values: primal $\tfrac12\lVert w\rVert^2 = \tfrac18$; dual $W(\tfrac18) = \tfrac14 - \tfrac18 = \tfrac18$. Equal, as strong duality requires. The transferable move: the equality constraint from $\partial_b$ always eliminates one degree of freedom before any calculus happens.
+</Solution>
+</Exercise>
+
+### Soft margin: one new derivative, one box
+
+Repeating the derivation for the soft-margin program adds multipliers $\mu_i \ge 0$ for the constraints $\xi_i \ge 0$:
+
+$$
+L = \tfrac12\lVert w\rVert^2 + C\sum_i \xi_i - \sum_i \alpha_i\bigl[y_i(w^\top x_i + b) - 1 + \xi_i\bigr] - \sum_i \mu_i \xi_i .
+$$
+
+Stationarity in $w$ and $b$ gives the same two equations as before. The one new derivative, $\partial L/\partial \xi_i = C - \alpha_i - \mu_i = 0$, makes every $\xi_i$ coefficient in $L$ vanish, so the slack terms cancel and $W(\alpha)$ is **unchanged**. What the new equation does contribute is a ceiling: $\mu_i = C - \alpha_i$ must be $\ge 0$, so
+
+$$
+0 \;\le\; \alpha_i \;\le\; C .
+$$
+
+The interpretation was already priced in the primal: slack costs $C$ per unit, so no single point can be worth more than $C$ of pull on the solution. The box constraint is that sentence as an inequality, and it is the *entire* difference between the hard- and soft-margin duals ([CS229 §6.7](https://cs229.stanford.edu/main_notes.pdf); the same equations are ESL's 12.10–12.16).
+
+<Remark title="what the dual is not">
+The dual is not a speed trick. It has $m$ variables and a dense $m \times m$ quadratic term; solving it is how classical SVM software works (Platt's SMO algorithm optimizes two $\alpha_i$ at a time, holding the equality constraint, [CS229 §6.8](https://cs229.stanford.edu/main_notes.pdf)), but for a linear SVM with $m \gg d$ the primal is the cheaper problem. The dual's payoff is structural: the inner-product form, which admits kernels, and complementary slackness, which produces sparsity.
+</Remark>
+
+<KeyFact>
+Because $W(\alpha)$ survives the softening intact, so does its inner-product structure: every kernel statement in the rest of this lesson applies to the hard- and soft-margin machines alike.
+</KeyFact>
+
+## Support vectors are a theorem, not a definition
+
+The previous lesson *defined* support vectors geometrically, as the points whose constraints are tight, and promised the claim behind the name: that the rest of the sample could vanish without moving the solution. Complementary slackness, applied to the soft-margin problem, delivers that claim as a computation. The condition splits into two product families, one per constraint family:
+
+$$
+\alpha_i \bigl[ y_i f(x_i) - 1 + \xi_i \bigr] = 0,
+\qquad
+\mu_i\, \xi_i = (C - \alpha_i)\, \xi_i = 0,
+$$
+
+with $f(x) = w^\top x + b$. Case analysis on $\alpha_i$ sorts every training point into one of three regimes:
+
+- **$\alpha_i = 0$**: then $\mu_i = C > 0$ forces $\xi_i = 0$, so $y_i f(x_i) \ge 1$. The point is on or outside the margin and contributes nothing to $w$.
+- **$0 < \alpha_i < C$**: the first product forces $y_i f(x_i) = 1 - \xi_i$, and $\mu_i > 0$ forces $\xi_i = 0$, so $y_i f(x_i) = 1$ exactly. The point sits on a margin line.
+- **$\alpha_i = C$**: $\mu_i = 0$ leaves $\xi_i$ free, so $y_i f(x_i) = 1 - \xi_i \le 1$. The point is inside the band or misclassified.
+
+<Figure
+  src="./figures/alpha-regimes.svg"
+  alt="A soft-margin scatter with the three alpha regimes labeled: plain points outside the margin with alpha zero, green-ringed points on the dashed margin lines with alpha strictly between zero and C, and green-ringed points inside the band or misclassified with alpha equal to C; the two complementary slackness equations beside the regime table"
+  caption="KKT reads off the geometry: α = 0 outside the margin, 0 < α < C exactly on it, α = C inside or beyond. Only the ringed points carry weight."
+/>
+
+### The theorem, read off the regimes
+
+Reading the first regime backwards proves the advertised theorem: every point strictly outside the margin has $\alpha_i = 0$, appears in $w = \sum_i \alpha_i y_i x_i$ with coefficient zero, and can be deleted without changing the optimum. The *support vectors* are exactly the points with $\alpha_i > 0$: the vectors on which, in Cortes and Vapnik's phrase, the solution "can be expanded". On real data most points fall in the first regime, so most $\alpha_i$ vanish and the solution is sparse.
+
+### Prediction: a vote of the stored support vectors
+
+Prediction inherits the sparsity. Substituting $w = \sum_i \alpha_i y_i x_i$ into $f(x) = w^\top x + b$:
+
+$$
+f(x) \;=\; \sum_{i:\,\alpha_i > 0} \alpha_i y_i\, \langle x_i, x\rangle \;+\; b ,
+$$
+
+a weighted vote of the stored support vectors against the query, in which the query too appears only inside inner products. The intercept comes from the second regime: any point with $0 < \alpha_j < C$ satisfies $y_j f(x_j) = 1$ exactly, an equation in which $b$ is the only unknown; the derivation, and why $\alpha_j = C$ points cannot serve, is the $b$-recovery exercise at the end of the chapter. Implementations average the resulting estimate over all margin support vectors for numerical stability.
+
+<KeyFact>
+Training needs $\langle x_i, x_j\rangle$; predicting needs $\langle x_i, x\rangle$; recovering $b$ needs them too. No step of the dual pipeline ever touches a coordinate of any data point except inside an inner product.
+</KeyFact>
+
+## The kernel trick: pay for the inner product, not the space
+
+The previous lesson's final exercise made ring-shaped data separable by appending one hand-chosen feature, $\lVert x\rVert^2$. The systematic version is a *feature map* $\varphi: \mathbb{R}^d \to \mathbb{R}^p$ followed by a linear SVM in $\mathbb{R}^p$; the section above says the SVM will only ever ask for $\langle \varphi(x), \varphi(z)\rangle$. If that inner product can be computed without visiting $\mathbb{R}^p$, the dimension $p$ stops being a cost.
+
+<Example title="one number, two prices">
+Let $d = 2$ and expand the square of a shifted inner product, keeping every term:
+$$
+(x^\top z + 1)^2 = 1 + 2x_1z_1 + 2x_2z_2 + x_1^2z_1^2 + x_2^2z_2^2 + 2x_1x_2\,z_1z_2 .
+$$
+Each summand is a product of a function of $x$ alone and the same function of $z$, so the right side is itself an inner product $\langle \varphi(x), \varphi(z)\rangle$ for the 6-dimensional map
+$$
+\varphi(x) = \bigl(1,\ \sqrt2\,x_1,\ \sqrt2\,x_2,\ x_1^2,\ x_2^2,\ \sqrt2\,x_1x_2\bigr).
+$$
+
+Check on $x = (1,2)$, $z = (3,1)$. Explicit route: $\varphi(x) = (1,\ \sqrt2,\ 2\sqrt2,\ 1,\ 4,\ 2\sqrt2)$, $\varphi(z) = (1,\ 3\sqrt2,\ \sqrt2,\ 9,\ 1,\ 3\sqrt2)$, and $\langle\varphi(x),\varphi(z)\rangle = 1 + 6 + 4 + 9 + 4 + 12 = 36$. Kernel route: $x^\top z = 5$, and $(5 + 1)^2 = 36$. Same number; the second route never built a 6-dimensional vector.
+</Example>
+
+<Figure
+  src="./figures/kernel-ledger.svg"
+  alt="Two panels computing the same inner product 36: the left builds the 6-coordinate feature map for both points and takes a 6-term dot product; the right computes one plus x-transpose-z and squares it in three operations; cost tallies under each panel"
+  caption="The degree-2 ledger. Equality is an algebraic identity; the cost asymmetry is the entire point."
+/>
+
+<Definition title="kernel">
+A **kernel** on $\mathbb{R}^d$ is a function $K(x, z) = \langle \varphi(x), \varphi(z)\rangle$ for some feature map $\varphi$ from $\mathbb{R}^d$ into an inner-product space. The **kernel trick** is the substitution $\langle x_i, x_j\rangle \to K(x_i, x_j)$ in any algorithm that touches data only through inner products.
+</Definition>
+
+The kernelized SVM trains by maximizing $W(\alpha)$ with $K(x_i, x_j)$ in place of $\langle x_i, x_j\rangle$, under the same box and equality constraints, and predicts with
+
+$$
+f(x) = \sum_{i:\,\alpha_i>0} \alpha_i y_i\, K(x_i, x) + b :
+$$
+
+a linear separator in $\varphi$-space, hence a curved boundary in input space. On the ring data, the degree-2 kernel's feature space already contains the coordinates $x_1^2$ and $x_2^2$, and a plane in those two coordinates is the previous lesson's hand-built circle, found automatically, because the optimizer searches all of $\varphi$-space at once.
+
+<Figure
+  src="./figures/ring-lift.svg"
+  alt="Left panel: ring-shaped two-class data in the plane with no separating line; right panel: the same points plotted in the squared coordinates x1-squared and x2-squared, separated by the straight line x1-squared plus x2-squared equals 2.5; beneath, the expansion of the degree-2 kernel identity and its 6-dimensional feature map"
+  caption="The lift the kernel pays for. In (x₁², x₂²) — two of φ's six coordinates — the line x₁² + x₂² = 2.5 separates ring from disk: the previous lesson's hand-built feature, found inside the kernel's feature space."
+/>
+
+The arithmetic that makes this consequential is the cost of the explicit route at scale. For monomials up to degree 3 on $d = 1000$ inputs, the feature vector has $1 + d + d^2 + d^3 \approx 10^9$ coordinates, so one explicit inner product costs a billion multiplies; the kernel $(x^\top z + 1)^3$ delivers the identical number for $1000$ multiplies and a cube: six orders of magnitude cheaper, per entry of the Gram table ([CS229 §5.2–5.3](https://cs229.stanford.edu/main_notes.pdf)). The feature space's dimension has moved out of every cost formula: training touches the $m \times m$ kernel table, prediction touches the support vectors, and $w = \sum_i \alpha_i y_i \varphi(x_i)$, an object of dimension $10^9$, is never materialized.
+
+### The RBF kernel: every degree at once
+
+The workhorse kernel goes further than any fixed degree. The *RBF (Gaussian) kernel* is
+
+$$
+K(x, z) = \exp\bigl(-\gamma\,\lVert x - z\rVert^2\bigr), \qquad \gamma > 0 ,
+$$
+
+a similarity that decays with distance at rate $\gamma$. Factoring $K(x,z) = e^{-\gamma\lVert x\rVert^2}\, e^{2\gamma x^\top z}\, e^{-\gamma\lVert z\rVert^2}$ and Taylor-expanding $e^{2\gamma x^\top z} = \sum_{k\ge0} (2\gamma)^k (x^\top z)^k / k!$ writes the middle factor as a positively weighted sum of polynomial kernels of *every* degree $k$. A feature map realizing all of them at once must contain scaled monomials of every degree: the feature space is infinite-dimensional. Nothing in the algorithm changes, because $\varphi$ appears in no computed quantity. Texts that write $K(x,z) = \exp(-\lVert x - z\rVert^2/2\sigma^2)$ mean the same kernel with $\gamma = 1/(2\sigma^2)$; this course uses $\gamma$, matching scikit-learn.
+
+## What makes a kernel legal: PSD on every finite set
+
+The substitution invites abuse: any formula that "measures similarity" looks like a candidate for $K$, and most candidates correspond to no feature map at all. The object that decides is the one the algorithm actually consumes. Collect the kernel values on the training sample into the *Gram matrix* $G \in \mathbb{R}^{m \times m}$, $G_{ij} = K(x_i, x_j)$: the dual objective is a function of $G$ and the labels, and nothing else.
+
+<Figure
+  src="./figures/gram-matrix.svg"
+  alt="A 20 by 20 heat map of the RBF kernel matrix for ten disk points and ten ring points sorted by class: a bright disk-disk block, a bright diagonal, a ring-ring block bright only near the diagonal, and near-zero cross blocks"
+  caption="The RBF Gram matrix for 20 ring-and-disk points, sorted by class. Training and prediction read these m² numbers and nothing else; 'is K legal' is a question about exactly this matrix."
+/>
+
+<Theorem title="Mercer's condition, Gram-matrix form (CS229, §5.4)">
+A symmetric $K : \mathbb{R}^d \times \mathbb{R}^d \to \mathbb{R}$ is a kernel, i.e. equals $\langle\varphi(x),\varphi(z)\rangle$ for some feature map $\varphi$, if and only if for **every** finite set $\{x_1, \dots, x_n\}$ the Gram matrix $G_{ij} = K(x_i, x_j)$ is positive semidefinite.
+
+<Proof>
+Necessity is one identity. If $K$ has a feature map, then for any points and any $v \in \mathbb{R}^n$,
+$$
+v^\top G v = \sum_{i,j} v_i v_j \langle \varphi(x_i), \varphi(x_j)\rangle
+= \Bigl\lVert \sum_i v_i\, \varphi(x_i) \Bigr\rVert^2 \ge 0,
+$$
+a squared length; symmetry of $G$ is symmetry of the inner product. Sufficiency, building a feature space out of nothing but PSD Gram matrices, is the construction in the next subsection, where the feature vector of $x$ is taken to be the function $K(x, \cdot)$ itself.
+</Proof>
+</Theorem>
+
+The quantifier decides what a finite check can establish: one Gram matrix with a negative eigenvalue **disproves** a kernel, but no number of passing matrices proves one. Proving validity in practice uses closure rules instead: if $k_1, k_2$ are kernels, $c > 0$, and $g$ is any function, then
+
+$$
+c\,k_1, \qquad k_1 + k_2, \qquad k_1 k_2, \qquad g(x)\,k_1(x,z)\,g(z), \qquad \exp(k_1)
+$$
+
+are kernels, as is any polynomial of $k_1$ with nonnegative coefficients (Bishop §6.2's construction table; Mohri's Theorem 6.10 proves the closures under sum, product, limits, and composition).
+
+<Example title="the RBF kernel is legal, by composition">
+Factor $\exp(-\gamma\lVert x - z\rVert^2) = e^{-\gamma\lVert x\rVert^2} \cdot e^{2\gamma\, x^\top z} \cdot e^{-\gamma\lVert z\rVert^2}$ and build the middle factor first. $x^\top z$ is a kernel (feature map: the identity); $2\gamma\, x^\top z$ by scaling; $e^{2\gamma x^\top z}$ by exponentiation; multiplying by $g(x)\,g(z)$ with $g(u) = e^{-\gamma\lVert u\rVert^2}$ is the fourth rule. Every finite Gram matrix of the RBF kernel is therefore PSD, including the one in the heat map above, whose smallest eigenvalue is provably $\ge 0$ before any arithmetic is done.
+</Example>
+
+<Figure
+  src="./figures/closure-rules.svg"
+  alt="An assembly line of four boxes from x-transpose-z to the RBF kernel, each arrow labeled with the closure rule applied: scaling by a positive constant, exponentiation, and framing by g(x) times g(z)"
+  caption="The RBF kernel assembled from x&#7488;z by three closure rules. Each arrow preserves PSD-ness, so no Gram matrix of the end product can carry a negative eigenvalue."
+/>
+
+### The RKHS: the space where $f$ lives
+
+The sufficiency direction of Mercer's condition has a concrete construction, and one paragraph of it is enough for this course. Given a PSD $K$, define the feature vector of $x$ to be the *function* $\Phi(x) = K(x, \cdot)$, and take $\mathcal{H}$ to be all finite linear combinations $f = \sum_i a_i K(x_i, \cdot)$, completed under the inner product $\langle K(x_i,\cdot), K(x_j,\cdot)\rangle = K(x_i, x_j)$. PSD-ness of the Gram matrices is exactly what makes this a legitimate inner product, and the definition delivers the *reproducing property* $f(x) = \langle f, K(x, \cdot)\rangle$: evaluation is an inner product against the feature vector. $\mathcal{H}$ is the *reproducing kernel Hilbert space* (RKHS) of $K$ (Mohri, Theorem 6.8). The kernelized SVM's decision function $f = \sum_i \alpha_i y_i K(x_i, \cdot) + b$ is a member of $\mathcal{H}$, with norm $\lVert f - b\rVert_{\mathcal H}^2 = \sum_{i,j}\alpha_i\alpha_j y_i y_j K(x_i, x_j) = \lVert w\rVert^2$: the primal's margin objective, recovered as a function norm. That norm is the quantity module 9's capacity bound will constrain, and it is the only piece of RKHS machinery the course will need.
+
+<Figure
+  src="./figures/reproducing-property.svg"
+  alt="Three Gaussian kernel bumps centered at three data points, one with negative weight below the axis, summing to a single orange function f; a dashed vertical at a query point x marks f of x with the annotation that evaluation equals the inner product of f with K of x dot"
+  caption="A member of ℋ is a weighted sum of kernel bumps, one per data point. Evaluating it anywhere is an inner product against that point's own feature vector K(x, ·): the reproducing property."
+/>
+
+## ★ The representer theorem: the optimum lives on the data
+
+The dual derivation produced $w = \sum_i \alpha_i y_i \varphi(x_i)$ for the SVM specifically. The pattern is far more general, and the general statement explains why kernelization is a property of regularized fitting rather than of margins.
+
+<Theorem title="representer theorem (Shalev-Shwartz &amp; Ben-David, Thm. 16.1)">
+Let $\varphi$ map $\mathcal X$ into a Hilbert space, and consider
+$$
+\min_{w}\; \Bigl( h\bigl(\langle w, \varphi(x_1)\rangle, \dots, \langle w, \varphi(x_m)\rangle\bigr) + R\bigl(\lVert w \rVert\bigr) \Bigr)
+$$
+for an arbitrary function $h : \mathbb{R}^m \to \mathbb{R}$ and a nondecreasing $R : \mathbb{R}_+ \to \mathbb{R}$. Then some optimal solution has the form $w = \sum_{i=1}^m a_i\, \varphi(x_i)$.
+
+<Proof>
+Let $w^\ast$ be optimal and decompose it against the span of the data: $w^\ast = \sum_i a_i \varphi(x_i) + u$ with $\langle u, \varphi(x_i)\rangle = 0$ for all $i$. Set $w = w^\ast - u$. By orthogonality $\lVert w^\ast\rVert^2 = \lVert w\rVert^2 + \lVert u\rVert^2$, so $\lVert w\rVert \le \lVert w^\ast\rVert$ and $R(\lVert w\rVert) \le R(\lVert w^\ast\rVert)$ since $R$ is nondecreasing. And for every $i$, $\langle w, \varphi(x_i)\rangle = \langle w^\ast, \varphi(x_i)\rangle$, so the $h$-term is unchanged. The objective at $w$ is therefore no larger than at $w^\ast$, and $w$ lies in the span.
+</Proof>
+</Theorem>
+
+Every problem of the course's regularized-loss template qualifies: hinge loss plus $\lVert w\rVert^2$ is the soft-margin SVM, squared loss plus $\lVert w\rVert^2$ gives kernel ridge regression, whose closed form $a = (K + \lambda I)^{-1} y$ Bishop derives in §6.1 with no margin anywhere in sight. What distinguishes the SVM among kernelized fits is sparsity: squared and logistic losses put nonzero weight on every training point, while the hinge's flat zero region (<Ref lesson="svm-max-margin">the source of everything support-vector</Ref>) zeroes most of the $a_i$. The theorem also explains why the dual search over $\alpha \in \mathbb{R}^m$ loses nothing against the primal search over an infinite-dimensional $w$: an optimum in the span of $m$ data points has only $m$ degrees of freedom that matter.
+
+## γ and C: two dials, and where the memorizer returns
+
+The kernelized machine on the ring data has exactly two knobs: $\gamma$, how local each support vector's vote is, and $C$, the price of slack carried over unchanged from <Ref lesson="svm-max-margin">the soft margin</Ref>. The four panels below are fitted on one sample of 64 ring-and-disk points (the demo's data), with a held-out test set of 256.
+
+<Figure
+  src="./figures/kernel-gallery.svg"
+  alt="Four panels fitting the same ring-in-disk data: a linear kernel drawing a useless straight line with 30 percent train and 35 percent test error; a cubic polynomial kernel drawing an off-center oval at 9 and 11 percent; an RBF kernel at gamma one drawing a clean circle at 3 and 4 percent with 24 support vectors; and an RBF kernel at gamma 251 drawing islands around individual disk points with zero train error and 30 percent test error"
+  caption="One dataset, four kernels, honest tallies. The linear kernel cannot draw a circle at any C; γ = 251 draws one island per memorized point: zero train error, 30% test error."
+/>
+
+### Reading the gallery
+
+The panels are the bias–variance ledger of <Ref lesson="bias-variance">module 1</Ref> written in kernels. The linear kernel is the wrong hypothesis class: 30% training error and no setting of $C$ fixes it. At $\gamma = 1$ the Gaussian bumps span a few neighbors each, and the fitted circle generalizes (3.1% train, 3.9% test, 24 support vectors of 64). At $\gamma = 251$ each bump has shrunk below the spacing of the data: every disk point gets a private island, training error is exactly zero, test error is 30%; 62 of 64 points are support vectors, because with near-orthogonal feature vectors no point can be represented by its neighbors. The machine has reproduced <Ref lesson="statistical-learning">the memorizer of lesson 1</Ref> inside the most sophisticated method the course has built; the boundary-probe exercise solves the $\gamma \to \infty$ dual exactly and finds a lookup table.
+
+<Demo
+  name="KernelBoundaryExplorer"
+  caption="RBF-SVM on the ring data: γ and C on log sliders, support vectors ringed in green, train/test error live. Presets: γ too small, balanced, γ too large."
+/>
+
+<Task>
+Find the memorization threshold. Start from the *balanced* preset and raise $\gamma$ slowly: the boundary hugs the ring tighter, then fragments into islands; train error reaches 0.000 while test error climbs toward 0.3. Record the $\gamma$ where train error first hits zero, then back off to the $\gamma$ minimizing *test* error and note the support-vector count at each: the sparse solution and the memorizing one are the same machine at two bandwidths.
+</Task>
+
+### Scores are not probabilities
+
+<Ref lesson="svm-max-margin">The hinge-loss comparison</Ref> established that an SVM score carries no calibrated probability — the hinge's population minimizer keeps only the Bayes decision — and kernelizing changes nothing: $f$ is still a hinge minimizer, now ranging over $\mathcal H$ instead of hyperplanes. When probabilities are required, a logistic link is fitted to the scores afterwards (Platt scaling), with the calibration machinery of <Ref lesson="classification-metrics">module 5</Ref>.
+
+## Kernels move the curse; they do not repeal it
+
+An infinite-dimensional feature space suggests a machine that finds low-dimensional structure wherever it hides: that kernels beat <Ref lesson="knn-curse">the curse of dimensionality</Ref>. They do not, and the canonical demonstration is ESL's *skin of the orange* experiment (§12.3.4). Class 1: four independent standard normal features. Class 2: the same, conditioned on $9 \le \sum_j x_j^2 \le 16$, a shell around the first class, like skin around an orange. The Bayes error is 2.9%. The experiment is run twice: as stated, and with six pure-noise standard normal features appended. The noise features carry no information; the Bayes error does not move.
+
+| method | test error, 4 real features | test error, + 6 noise features |
+| --- | --- | --- |
+| SVM, degree-2 polynomial kernel | 0.078 | 0.152 |
+| SVM, degree-5 polynomial kernel | 0.180 | 0.370 |
+| BRUTO (adaptive additive model) | 0.084 | 0.090 |
+| Bayes | 0.029 | 0.029 |
+
+### Why the noise hurts: the kernel weights every coordinate
+
+Six irrelevant dimensions **double** the degree-2 SVM's error, and do worse to degree 5, while the additive model, free to examine coordinates and drop them, gives up 0.6 points. The mechanism is visible in the kernel itself: $(x^\top z + 1)^2$ weights every monomial by a fixed universal scheme, so the implicit feature space treats $x_5 x_9$ (noise times noise) exactly like $x_1 x_2$ (signal times signal). The kernel cannot concentrate on a subspace it is not told about; margin maximization then spends data fighting variance in directions that carry nothing.
+
+<KeyFact>
+A kernel is a prior, not a search. Choosing $K$ fixes which functions are cheap (small $\lVert f\rVert_{\mathcal H}$) and which are expensive, and the SVM finds low-error boundaries only among the cheap ones. Kernels relocate the curse of dimensionality into the choice of $K$. They do not repeal it: six noise features doubled a kernel SVM's error on a problem whose Bayes error they left untouched.
+</KeyFact>
+
+## The debt, stated with its number
+
+The honest ledger of this lesson has an entry that module 1 says should be fatal. The RBF machine fits 64 training points in an infinite-dimensional feature space: by every instinct the course has built (<Ref lesson="bias-variance">flexibility buys variance</Ref>, and capacity must be paid for in data), this is the far right of the U-curve, and the fitted model should be the memorizer. The record shows test error of 3.9%. The kernel gallery's $\gamma = 251$ panel proves the capacity for disaster is real; the $\gamma = 1$ panel generalizes anyway, and nothing proved so far explains the difference.
+
+### The bound that will pay it
+
+The explanation exists, and its shape can be stated now. For kernel hypotheses with $\lVert f\rVert_{\mathcal H} \le \Lambda$ and margin level $\rho$, Mohri's Corollary 6.13 bounds the true error by the margin-violation rate on the sample plus a capacity term:
+
+$$
+R(h) \;\le\; \widehat{R}_{S,\rho}(h) \;+\; 2\,\frac{\sqrt{\operatorname{Tr}[K]\,\Lambda^2/\rho^2}}{m} \;+\; 3\sqrt{\frac{\log\tfrac2\delta}{2m}} .
+$$
+
+No dimension appears anywhere in it. The capacity is carried by $\operatorname{Tr}[K]$, the trace of the Gram matrix (for the RBF kernel exactly $m$, since every diagonal entry is $K(x,x) = 1$), together with the norm budget $\Lambda$ and the margin $\rho$. The closing forward exercise evaluates the term on the ring data and finds it finite, dimension-free, and shrinking like $1/\sqrt m$. Proving this bound requires machinery the course does not yet have (Rademacher complexity, built in <Ref lesson="rademacher-stability">module 9</Ref>, and the margin theory of <Ref lesson="margin-bounds">its final payoff</Ref>); until then it is an IOU with the formula visible.
+
+<Figure
+  src="./figures/debt-note.svg"
+  alt="The module-1 U-curve of train and test error against flexibility, with the axis broken and extended to infinity where a question-mark pin marks the RBF feature space, and a dashed IOU box stating the trace-of-K margin bound to be paid in module 9"
+  caption="The debt note. The U-curve has no prediction at p = ∞ except disaster; the observed test error is 0.04. The bound in the box, with no dimension in it, is module 9's to prove."
+/>
+
+### Established and outstanding
+
+What stands established: the margin QP solved through its Lagrangian dual exposes the data entering only as inner products, complementary slackness turns the geometric support-vector picture into a theorem and a sparse classifier, and any PSD kernel substitutes for the inner product, polynomial kernels at $O(d)$ cost per entry regardless of degree and the RBF kernel's infinite-dimensional feature space among them. The limits are equally established: kernels encode priors rather than search for structure, scores are not probabilities, and the generalization of an infinite-capacity machine is an explicitly outstanding debt with a named bound. <Ref lesson="spam-filter">The next lesson</Ref> takes the module's three roads (likelihood, generative modeling, margin) onto one real corpus of 4,601 emails and reads their disagreements. Kernels themselves return twice more: as covariance functions in <Ref lesson="gaussian-processes">Gaussian processes</Ref> and as objects to approximate in <Ref lesson="random-features">random features</Ref>.
+
+## Exercises
+
+<Exercise>
+Warm-up on the object the algorithm consumes. For $K(x,z) = (x^\top z + 1)^2$ and the four points $x_1 = (0,0)$, $x_2 = (1,0)$, $x_3 = (0,1)$, $x_4 = (1,1)$: (a) compute the $4\times4$ Gram matrix; (b) verify symmetry; (c) prove it is positive semidefinite without computing an eigenvalue, by exhibiting the factorization Mercer's necessity proof uses.
+
+<Solution>
+(a) Pairwise inner products: $x_1$ with anything is 0; $x_2^\top x_3 = 0$; $x_2^\top x_4 = x_3^\top x_4 = 1$; $x_2^\top x_2 = x_3^\top x_3 = 1$; $x_4^\top x_4 = 2$. Applying $(\cdot + 1)^2$:
+$$
+G = \begin{pmatrix} 1 & 1 & 1 & 1 \\ 1 & 4 & 1 & 4 \\ 1 & 1 & 4 & 4 \\ 1 & 4 & 4 & 9 \end{pmatrix}.
+$$
+
+(b) Symmetric by inspection, as it must be: $K(x,z) = K(z,x)$ because the inner product is symmetric.
+
+(c) Let $\Phi \in \mathbb{R}^{4\times6}$ stack the explicit feature vectors $\varphi(x_i) = (1, \sqrt2 x_{i1}, \sqrt2 x_{i2}, x_{i1}^2, x_{i2}^2, \sqrt2 x_{i1}x_{i2})$ from the worked example. The expansion identity gives $G = \Phi\Phi^\top$ entry by entry, so for any $v$: $v^\top G v = \lVert \Phi^\top v\rVert^2 \ge 0$. (Numerically the eigenvalues are $\approx 13.22,\ 3.00,\ 1.47,\ 0.31$, all positive, summing to $\operatorname{tr} G = 18$; consistent, but the factorization is the proof; four passing eigenvalues would establish nothing about other point sets.)
+</Solution>
+</Exercise>
+
+<Exercise>
+The derivation the lesson stated but did not do. (a) From the soft-margin KKT conditions, derive the recovery formula for $b$ from a support vector with $0 < \alpha_j < C$. (b) Show exactly which step fails for a point with $\alpha_j = C$, and what the failure leaves you with. (c) State why implementations average over all margin support vectors.
+
+<Solution>
+(a) For $0 < \alpha_j < C$: the second slackness family $(C - \alpha_j)\xi_j = 0$ with $C - \alpha_j > 0$ forces $\xi_j = 0$; the first family with $\alpha_j > 0$ forces $y_j f(x_j) - 1 + \xi_j = 0$, hence $y_j f(x_j) = 1$. Expand $f$ and multiply by $y_j$, using $y_j^2 = 1$:
+$$
+b = y_j - \sum_{i} \alpha_i y_i\, K(x_i, x_j).
+$$
+
+(b) At $\alpha_j = C$, the multiplier $\mu_j = C - \alpha_j = 0$, so nothing forces $\xi_j = 0$; the KKT equality reads $y_j f(x_j) = 1 - \xi_j$ with $\xi_j \ge 0$ unknown. Solving for $b$ leaves the one-sided relation $y_j f(x_j) \le 1$: an inequality on $b$, not a value. Symmetrically, $\alpha_j = 0$ points give $y_j f(x_j) \ge 1$, the other inequality. Only the middle regime pins the equation.
+
+(c) Each margin support vector gives an algebraically identical $b$ at the exact optimum, but a numerical solver stops at approximate $\alpha$'s, so the per-point estimates disagree at roundoff-to-tolerance scale; averaging them is a free variance reduction. The transferable move: whenever an optimality condition holds with equality on a subset, that subset is a system of consistency equations for the remaining unknowns.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: the kernel that refuses to compare. As $\gamma \to \infty$ the RBF Gram matrix on $m$ distinct points converges to the identity $I$ (diagonal entries are always 1; off-diagonals $\to 0$). Solve the dual exactly at $K = I$ for balanced classes ($m/2$ per class) and $C \ge 1$: find every $\alpha_i$, show every point is a support vector, and describe the resulting classifier $f$. Name the predictor from lesson 1 it reproduces.
+
+<Solution>
+With $K = I$ the double sum collapses: $W(\alpha) = \sum_i \alpha_i - \tfrac12\sum_i \alpha_i^2$ (the $y_i^2 = 1$ diagonal terms survive). The objective is separable; each coordinate maximizes $\alpha - \tfrac12\alpha^2$ at $\alpha_i = 1$, inside the box for $C \ge 1$, and balance makes the constraint hold: $\sum_i \alpha_i y_i = (m/2) - (m/2) = 0$. So $\alpha_i = 1$ for every $i$: **all** $m$ points are support vectors. (Consistency: $y_j f(x_j) = \alpha_j K_{jj} = 1$, every point exactly on the margin, which is the regime $0 < \alpha < C$ when $C > 1$.)
+
+The classifier: $f(x) = \sum_i y_i K(x_i, x) + b$, and by the symmetry of the solution $b = 0$. At $\gamma$ huge, $K(x_i, x) \approx 1$ if $x$ nearly coincides with $x_i$ and $\approx 0$ otherwise: on a training point, $f$ returns that point's label; anywhere else, $f \approx 0$ and the sign is noise. This is the memorizer of <Ref lesson="statistical-learning">the first lesson</Ref> (zero training error, chance behavior off the sample) reborn inside the dual machinery, with the Gram matrix $I$ as its signature: a kernel that calls every pair of distinct points totally dissimilar can only look labels up.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the claim: "$K(x,z) = -\lVert x - z\rVert^2$ is a fine kernel, since it is largest (zero) for identical points and decreases with dissimilarity." (a) Break it on the three scalar points $x = 0, 1, 2$, naming the condition that fails. (b) Explain why no similarity-shaped intuition can rescue it, using the trace. (c) Repair it: turn $-\gamma\lVert x-z\rVert^2$ into a legal kernel using operations from this lesson, and state which route is actually valid.
+
+<Solution>
+(a) The Gram matrix is $G = -\begin{pmatrix} 0 & 1 & 4 \\ 1 & 0 & 1 \\ 4 & 1 & 0\end{pmatrix}$. Test $v = (1,1,1)$: $v^\top G v = -2(1 + 4 + 1) = -12 < 0$. One non-PSD Gram matrix violates Mercer's condition, so no feature map exists; the failed condition is positive semidefiniteness, not symmetry.
+
+(b) $\operatorname{tr} G = \sum_i K(x_i, x_i) = 0$ while $G \ne 0$; a symmetric matrix's trace is the sum of its eigenvalues, so a zero trace with any nonzero entry forces at least one negative eigenvalue. Any $K$ with $K(x,x) = 0$ and $K \not\equiv 0$ fails on some finite set, however reasonable its shape: a kernel needs $K(x,x) = \lVert\varphi(x)\rVert^2$ to carry the squared lengths, and this one sets every length to zero while claiming nonzero cross terms.
+
+(c) Exponentiate: $\exp(-\gamma\lVert x - z\rVert^2)$ is the RBF kernel. The valid route is *not* the closure rule "$\exp$ of a kernel is a kernel": part (a) just proved the exponent is not a kernel. The legal construction is the factorization from the lesson: $e^{-\gamma\lVert x\rVert^2}\,e^{2\gamma x^\top z}\,e^{-\gamma\lVert z\rVert^2}$, which is (exponential of a scaled kernel $x^\top z$) times $g(x)g(z)$, every factor licensed by the closure rules. The exponentiation repairs the failure because it routes the distance through $x^\top z$, restoring the diagonal to $K(x,x) = 1$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. <Ref lesson="splines-gams">Module 3's basis expansions</Ref> fit $f(x) = \sum_{k} \beta_k h_k(x)$: a fixed dictionary of nonlinear features, then a linear fit. Show that the kernelized classifier is an instance of the same architecture, and name the two structural differences that the kernel formulation introduces.
+
+<Solution>
+Instance: the kernel machine fits $f(x) = \sum_i a_i K(x_i, x) + b$ with $a_i = \alpha_i y_i$, which is a linear combination of the fixed nonlinear features $h_i(\cdot) = K(x_i, \cdot)$: a basis expansion whose fit is linear in its coefficients, exactly the module-3 template. (The smoothing spline was already this: its penalized fit lived in a function space with a finite-dimensional minimizer — an instance of the representer theorem, the general fact that an optimum of a regularized fit lies in the span of the data, before it had a name.)
+
+Difference one: the dictionary is not designed but *induced*: choosing $K$ implicitly chooses the infinite family of features $\varphi$, with their relative weights baked in; the spline modeler chose knots and basis functions by hand. Difference two: the expansion is *supported on the data*: there is one basis function per training point, centered at it, rather than a data-independent dictionary (the span-of-the-data form again), and with the hinge loss most coefficients are exactly zero, a sparsity no spline basis provides. (Same architecture, different currency: splines pay in chosen basis size, kernels pay in $m$.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: skin of the orange in miniature. Design and run the experiment. Class $-1$: four independent $\mathcal N(0,1)$ features. Class $+1$: the same, conditioned on $9 \le \sum_{j=1}^4 x_j^2 \le 16$. Train on 100 points per class; test on 1,000. Fit (i) an RBF-SVM with $\gamma$ and $C$ tuned by cross-validation on all available features, and (ii) the same machine given only the four real features (the oracle). Run both with and without six appended $\mathcal N(0,1)$ noise features. State before running what pattern of the four numbers would support "kernels do not repeal the curse", and what published numbers the pattern should be compared against.
+
+<Solution>
+Prediction that supports the claim: the oracle's error is identical in both runs (its inputs do not change), while the all-features machine degrades materially when the six noise dimensions are appended; the gap between columns, not either column alone, is the finding. ESL's Table 12.2 is the reference scale: the degree-2 polynomial SVM went from 0.078 to 0.152 (error doubled) when six noise features were added, against a Bayes error of 0.029 that the noise leaves untouched; an RBF machine shows the same pattern with its own magnitudes. A run of exactly this recipe gives an oracle near 0.06 in both conditions, while the all-features machine's error roughly doubles when the noise is appended (0.06 → 0.13 in one run); seeds move the numbers, the ordering and the roughly-doubling are stable.
+
+Reading: the noise features enter $\lVert x - z\rVert^2$ symmetrically with the signal features, so every kernel evaluation is corrupted by six coordinates of pure distance noise, and the margin optimizer cannot down-weight them: the kernel fixes the geometry before the data are consulted. What would *refute* the claim: the all-features machine matching the oracle in the noise condition. Nothing in the theory forbids a cleverer, adaptive kernel from achieving that; that is why kernel choice, not kernel fitting, is where the curse now lives.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. (a) Show that for the RBF kernel, $\operatorname{Tr}[K] = m$ on any sample of any dimension. (b) Substitute into the capacity term $2\sqrt{\operatorname{Tr}[K]\Lambda^2/\rho^2}\,/\,m$ of the bound in the final section and simplify. (c) Evaluate at the demo's scale, $m = 64$, for a normalized fit with $\Lambda/\rho = 4$, and state the two facts about the resulting number that module 1's U-curve cannot account for.
+
+<Solution>
+(a) $K(x_i, x_i) = \exp(-\gamma \cdot 0) = 1$ for every point, so $\operatorname{Tr}[K] = \sum_{i=1}^m 1 = m$, independent of the data, the dimension $d$, and $\gamma$.
+
+(b) $2\sqrt{m\,\Lambda^2/\rho^2}/m = 2\,(\Lambda/\rho)\,/\sqrt{m}$.
+
+(c) At $m = 64$, $\Lambda/\rho = 4$: the term is $2 \cdot 4 / \sqrt{64} = 1.0$. At this sample size the bound is vacuous (an error bound above 1 excludes nothing), and sixteen times the data brings the term to $0.25$: informative at $m \approx 1000$. The two facts beyond the U-curve's reach: the number is **finite and dimension-free** (an infinite-dimensional feature space contributes nothing to it) and it is controlled by the margin geometry $\Lambda/\rho$ and the sample size alone, shrinking as $1/\sqrt m$. Capacity here is not counted in parameters. This is precisely the bound <Ref lesson="margin-bounds">module 9's margin bounds</Ref> prove, using the Rademacher machinery of <Ref lesson="rademacher-stability">the preceding lesson</Ref>; the trace computation in (a) is the step that deletes dimension from the answer.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — §5.1–5.3: feature maps, the $10^9$-coordinate cubic-features arithmetic, and the kernelized LMS derivation; §5.4: kernel properties and the Mercer theorem in the Gram-matrix form this chapter states; §6.5: Lagrange duality and KKT; §6.6–6.7: the dual derivation and the box constraint; §6.8: the SMO algorithm. https://cs229.stanford.edu/main_notes.pdf
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §12.2.1, eqs. 12.10–12.16: the soft-margin Lagrangian, stationarity conditions, and KKT products; §12.3.1, eqs. 12.19–12.22: kernels in the dual and the three standard kernels; §12.3.2: the SVM as a penalization method; §12.3.4 and Table 12.2: the skin-of-the-orange experiment reproduced in this chapter's table. Free online: https://hastie.su.domains/ElemStatLearn/
+3. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — §6.2: PDS kernels, Theorem 6.8 (the RKHS construction and reproducing property), Theorem 6.10 (closure properties); §6.3, Theorem 6.12 and Corollary 6.13: the $\operatorname{Tr}[K]$ Rademacher and margin bounds quoted as this chapter's IOU. Free online: https://cs.nyu.edu/~mohri/mlbook/
+4. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §6.1: dual representations and kernel ridge regression $a = (K+\lambda I)^{-1}y$; §6.2: the kernel construction rules (6.13–6.22); §7.1: the SVM dual and the ν-SVM variant.
+5. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — §16.1–16.2: the general kernel framework and Theorem 16.1, the representer theorem, whose proof the starred section follows. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+6. C. Cortes, V. Vapnik, "Support-Vector Networks," *Machine Learning* 20, 1995, pp. 273–297 — Appendix A: the Kuhn–Tucker derivation of the dual; §4: kernels as dot products in feature space; the origin of the support-vector expansion and terminology. https://link.springer.com/article/10.1007/BF00994018
+7. J. C. Platt, "Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods," in *Advances in Large Margin Classifiers*, MIT Press, 1999 — the post-hoc sigmoid fit (Platt scaling) named in the dials section, for readers who need probabilities from an SVM before module 5 treats calibration.
+</References>

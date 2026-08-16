@@ -1,0 +1,354 @@
+Among all separating hyperplanes, the SVM picks the one with maximum margin; slack variables and the parameter C extend the same idea to non-separable data.
+
+Roads 1 and 2 both chose their line by likelihood: <Ref lesson="logistic-regression">road 1</Ref> fitted the conditional probability, <Ref lesson="lda-gda">road 2</Ref> fitted a model of each class and inverted with Bayes' rule, and the previous lesson closed on the observation that neither line responds in any controlled way to the *gap* between the classes. Road 3 makes the gap itself the criterion, with no probability model anywhere in the construction. This lesson formulates that criterion as an optimization problem, proves the first honest piece of evidence that it generalizes, and extends it to data no hyperplane separates.
+
+## The flaw: zero training error does not pick a line
+
+<Task>
+Three retrievals before the new material, closed book. (1) From <Ref lesson="logistic-regression">road 1</Ref>: on separable data the unregularized logistic MLE does not exist; the norm of any maximizing sequence diverges, and gradient descent's *direction* converges to a specific separator. (2) From <Ref lesson="ridge-lasso">module 3</Ref>: the template $\text{loss} + \lambda \cdot \text{penalty}$ trades data fit against coefficient size, and $\lambda$ prices the trade. (3) From <Ref lesson="gradient-descent">the optimization lesson</Ref>: a convex objective under affine constraints has no non-global local minima.
+</Task>
+
+Two conventions change at the door of road 3, both from the SVM literature. Labels become $y \in \{-1, +1\}$ rather than $\{0, 1\}$: the single expression $y\,(w^\top x + b)$ is then positive exactly when the classification is correct, and every formula below leans on that. The parameters are written $(w, b)$, with the intercept kept separate; $w$ plays exactly the role $\beta$ played in the last three lessons, but the intercept's separate treatment will matter (the penalty never touches $b$).
+
+The oldest algorithm for a linear boundary is the *perceptron*, Rosenblatt's 1958 learning rule, met in <Ref lesson="logistic-regression">road 1</Ref> as the hard-threshold limit of logistic regression's SGD update: visit misclassified points and add $y_i x_i$ to $w$. On linearly separable data it provably stops after finitely many updates at a separating hyperplane. Which hyperplane is the flaw: the answer depends on the random starting point and the order in which points are visited. Same data, three random starts, three different zero-error lines.
+
+<FigureSequence
+  name="perceptron-flaw"
+  alt="Three frames on one separable two-class scatter: a first perceptron run's separating line with zero training errors, then two further runs adding two more zero-error lines, then the maximum-margin corridor shaded with its boundary bold and three support points circled"
+  caption="Step through: three perceptron runs, three separators, identical training error. Frame 3: the widest empty corridor around the data touches only three points and picks one line."
+/>
+
+Training error cannot break the tie: every candidate scores zero. Roads 1 and 2 break it, but by criteria that answer to the wrong points. The previous lesson's final exercise measured this: LDA's line answers to class means and covariances, so dragging one already-safe point farther from the boundary *moves the line*; the logistic fit answers to the likelihood, with the tie on separable data broken only by the regularizer. Neither is a controlled function of the distance between the boundary and the closest points.
+
+The margin criterion targets that distance directly: among separating hyperplanes, choose the one maximizing the distance to the nearest training point. The immediate argument for it is robustness. If every training point clears the boundary by at least $\rho$, then any test point within $\rho$ of a training point of its own class is classified the same way; the max-margin hyperplane makes that safety radius as large as it can be. Whether this yields a *generalization* guarantee is a separate question, taken up two sections below.
+
+<KeyFact>
+The max-margin criterion is decided entirely by the training points nearest the boundary; every point farther away could move or vanish without changing the answer. That indifference is the opposite of LDA, whose boundary answers to every point through the class moments, and it is the structural source of everything called "support vector" below.
+</KeyFact>
+
+## The geometric margin: distance, made signed
+
+The criterion needs the distance from a point to a hyperplane, computed before it is generalized. Take the line $3x_1 + 4x_2 - 12 = 0$, so $w = (3, 4)$, $b = -12$, $\lVert w \rVert = 5$. For $x = (4, 3)$: $w^\top x + b = 12 + 12 - 12 = 12$, and the Euclidean distance from $x$ to the line is $12/5 = 2.4$. For $x = (1, 1)$: $w^\top x + b = -5$, distance $5/5 = 1$, on the other side. The general statement: decomposing $x = x_\perp + r\, w / \lVert w \rVert$ with $x_\perp$ on the hyperplane gives $w^\top x + b = r \lVert w \rVert$, so the **signed distance** is $r = (w^\top x + b)/\lVert w \rVert$. The one-line derivation from the projection is the second exercise below.
+
+<Definition title="functional and geometric margin">
+For a training example $(x_i, y_i)$ with $y_i \in \{-1, +1\}$, the **functional margin** of the hyperplane $(w, b)$ is $\hat\gamma_i = y_i\,(w^\top x_i + b)$, and the **geometric margin** is
+$$
+\gamma_i = \frac{y_i\,(w^\top x_i + b)}{\lVert w \rVert},
+$$
+the signed distance made positive for correct classifications. The margin of $(w, b)$ on a sample is $\gamma = \min_i \gamma_i$: the clearance of the worst-placed point.
+</Definition>
+
+## Scale freedom: maximizing the margin is minimizing ‖w‖
+
+The functional margin cannot be the objective. Replacing $(w, b)$ by $(2w, 2b)$ leaves the hyperplane and every distance unchanged but doubles every $\hat\gamma_i$, so any candidate could be "improved" by rescaling. This *scale freedom* is a nuisance and a tool: since scaling is free, the scale may be fixed by convention, and the convenient convention pins the smallest functional margin to $1$.
+
+<FigureSequence
+  name="margin-derivation"
+  alt="Three frames: the signed distance of a point from a line computed with concrete numbers; the same line with w and b doubled showing the functional margin double while the distance stays 2.4; the rescaled w with the nearest point pinned to functional margin 1 and the boxed conclusion margin equals one over the norm of w"
+  caption="The normalization move on one concrete line: distance formula, scale freedom, canonical rescaling."
+/>
+
+<Task>
+Step through the three frames and track the number $2.4$: it survives the doubling of $(w, b)$ in frame 2 and reappears as $1/\lVert w \rVert = 12/5$ in frame 3. Then close the figure and reproduce the three steps on paper before reading the theorem.
+</Task>
+
+<Theorem title="margin of the canonical hyperplane">
+Suppose $(w, b)$ separates the sample and is scaled so that $\min_i y_i (w^\top x_i + b) = 1$. Then the geometric margin equals $1/\lVert w \rVert$, the margin band between $w^\top x + b = \pm 1$ has total width $2/\lVert w \rVert$, and maximizing the margin over all separating hyperplanes is equivalent to minimizing $\tfrac12 \lVert w \rVert^2$ under the constraints $y_i(w^\top x_i + b) \ge 1$.
+
+<Proof>
+With the scaling fixed, $\gamma = \min_i y_i(w^\top x_i + b)/\lVert w \rVert = 1/\lVert w \rVert$, and the band between the two marginal hyperplanes $w^\top x + b = \pm 1$ has width twice that. Geometric margins are invariant to positive rescaling of $(w, b)$, so restricting attention to canonically scaled hyperplanes discards no candidate: every separating hyperplane has exactly one canonical representative (divide by its smallest functional margin). Over that set, maximizing $\gamma = 1/\lVert w \rVert$ is minimizing $\lVert w \rVert$, hence minimizing the differentiable, strictly convex surrogate $\tfrac12 \lVert w \rVert^2$, since $t \mapsto \tfrac12 t^2$ is strictly increasing on $t \ge 0$. The normalization itself relaxes to the stated inequality constraints: at any optimum some constraint is tight, else $(w,b)$ could be shrunk, reducing the objective.
+</Proof>
+</Theorem>
+
+<Definition title="hard-margin SVM">
+For linearly separable data, the **hard-margin SVM** is the solution of
+$$
+\min_{w,\,b}\ \tfrac{1}{2}\lVert w \rVert^2
+\qquad \text{subject to} \qquad
+y_i\,(w^\top x_i + b) \ge 1, \quad i = 1, \dots, m.
+$$
+The prediction rule is $\hat y = \operatorname{sign}(w^\top x + b)$.
+</Definition>
+
+The objective is quadratic and the $m$ constraints are affine in $(w, b)$: a *quadratic program* (QP), the class of optimization problems with quadratic objective and linear constraints, convex here in the sense of <Ref lesson="gradient-descent">the optimization lesson</Ref>. More than convex: the objective is strictly convex in $w$, so the optimal $w$ is **unique** — and $b$ is pinned with it: at the optimum, constraints are tight on both sides of the band (an untouched side would let the boundary shift toward it and $\lVert w \rVert$ shrink), and two tight constraints with opposite labels determine $b$ from $w$. The flaw that opened the lesson is closed at the level of the problem statement, not the algorithm: the perceptron's answer depended on its starting point because its problem had many solutions; this problem has one.
+
+<Figure
+  src="./figures/margin-diagram.svg"
+  alt="The canonical margin picture: solid boundary where w transpose x plus b is zero, dashed marginal lines at plus and minus one, three circled support points on the dashed lines, the weight vector w drawn normal to the boundary, and a double arrow of width two over the norm of w"
+  caption="The canonical picture. The circled points sit exactly on the marginal hyperplanes; w is normal to all three lines; the band is 2/‖w‖ wide."
+/>
+
+The points whose constraints hold with equality, sitting exactly on $w^\top x + b = \pm 1$, are the *support vectors* — for now a geometric name for the tight constraints, with at least one on each side of the band (otherwise the band could widen). The claim the name advertises, that deleting every other point leaves the solution unchanged, is proved in the next section, where it yields a generalization bound.
+
+<Example title="a maximum margin by hand">
+Two points: $x_+ = (2, 2)$ with $y = +1$ and $x_- = (0, 0)$ with $y = -1$. By symmetry the max-margin boundary is the perpendicular bisector: direction $w \propto x_+ - x_- = (2, 2)$, through the midpoint $(1, 1)$.
+
+Canonical scaling fixes the constant. Set $w = (a, a)$ and require functional margin $1$ at both points: at $x_-$, $-(0 + b) = 1$ gives $b = -1$; at $x_+$, $4a + b = 1$ then gives $a = \tfrac12$.
+
+So $w = (\tfrac12, \tfrac12)$, $b = -1$, $\lVert w \rVert = 1/\sqrt2$, margin width $2/\lVert w \rVert = 2\sqrt2$: exactly the distance between the two points, as the geometry demands. Adding a third point $x = (3, 3)$, $y = +1$ changes nothing: its functional margin is $\tfrac12 \cdot 3 + \tfrac12 \cdot 3 - 1 = 2 > 1$, the constraint is slack, and the point is not a support vector.
+</Example>
+
+<Exercise>
+The paired computation, before the solution: $x_- = (0, 0)$ with $y = -1$ and $x_+ = (4, 0)$ with $y = +1$. Find $w$, $b$, and the margin width. Then add $x = (5, 2)$ with $y = +1$ and decide, by checking one constraint rather than re-solving, whether the solution moves.
+
+<Solution>
+Strategy hint: perpendicular bisector, then pin both functional margins to $1$, exactly as in the worked example.
+
+By symmetry the boundary is $x_1 = 2$, so $w \propto (1, 0)$. With $w = (a, 0)$: at $x_-$, $-b = 1$; at $x_+$, $4a + b = 1$. So $b = -1$, $a = \tfrac12$: $w = (\tfrac12, 0)$, $b = -1$, $\lVert w \rVert = \tfrac12$, margin width $2/\lVert w \rVert = 4$, the full gap between the points.
+
+Added point: $y\,(w^\top x + b) = \tfrac12 \cdot 5 + 0 \cdot 2 - 1 = 1.5 \ge 1$. Its constraint is satisfied with room, so the old optimum remains feasible and optimal: the solution does not move, and $(5, 2)$ is not a support vector. The transferable move: a new point disturbs a solved QP only if it violates the current solution's constraint.
+</Solution>
+</Exercise>
+
+<KeyFact>
+"Margin $= 2/\lVert w \rVert$" is a fact about the canonical scaling, not about hyperplanes: it holds only after the convention $\min_i y_i(w^\top x_i + b) = 1$ spends the scale freedom. Forgetting the convention leaves the formula unmotivated and hides where the constraint set $y_i(w^\top x_i + b) \ge 1$ comes from.
+</KeyFact>
+
+## Why the widest corridor: a leave-one-out guarantee
+
+Roads 1 and 2 carried optimality stories with them; the margin so far carries a plausibility argument about perturbations. One real guarantee is available with no machinery beyond what this lesson has built, and it runs through the observation the support vectors' name advertises: most points do not matter. The *leave-one-out error* of an algorithm on a sample of size $m$ is the fraction of points misclassified when the algorithm is trained on the other $m - 1$ and tested on the held-out point, averaged over all $m$ choices.
+
+### The bound: error at most the support-vector fraction, in expectation
+
+<Theorem title="leave-one-out bound (Mohri, Foundations of ML, Thm. 5.4)">
+Assume samples drawn from $\mathcal D$ are linearly separable. Let $h_S$ be the hard-margin SVM trained on sample $S$, $R(h_S)$ its true error rate, and $N_{\mathrm{SV}}(S)$ its number of support vectors. Then
+$$
+\operatorname*{E}_{S \sim \mathcal D^m}\bigl[R(h_S)\bigr] \;\le\; \operatorname*{E}_{S \sim \mathcal D^{m+1}}\!\left[\frac{N_{\mathrm{SV}}(S)}{m+1}\right].
+$$
+
+<Proof>
+Three steps: a deletion lemma (removing a non-support point leaves the solution unchanged), its contrapositive (a leave-one-out error implicates a support vector), and an averaging identity that converts the leave-one-out count into true error.
+
+**Step 1, deletion stability.** Fix a separable sample $S$ of size $m+1$ with SVM solution $(w^*, b^*)$ and support-vector set $V$ (the tight constraints). Claim: the SVM trained on $V$ alone is still $(w^*, b^*)$. Suppose some $(u, c)$ satisfied $V$'s constraints with $\tfrac12\lVert u \rVert^2 < \tfrac12\lVert w^* \rVert^2$, and slide along the segment $(w_t, b_t) = (1-t)(w^*, b^*) + t(u, c)$. Each constraint in $V$ is an affine inequality satisfied at both endpoints, hence along the whole segment; each constraint outside $V$ is *strictly* slack at $t = 0$, hence still satisfied for small $t > 0$. So for small $t$ the point $(w_t, b_t)$ is feasible for the full problem, and convexity of the objective gives $\tfrac12\lVert w_t \rVert^2 \le (1-t)\tfrac12\lVert w^* \rVert^2 + t \tfrac12\lVert u \rVert^2 < \tfrac12\lVert w^* \rVert^2$, contradicting the optimality of $w^*$. Hence no such $(u, c)$ exists, and by uniqueness the solution on $V$ is $(w^*, b^*)$. Now remove one non-support point $x$: the constraint set of $S - \{x\}$ sits between $V$'s and $S$'s, so its optimal value is sandwiched between two equal values, and by uniqueness its solution is again $(w^*, b^*)$.
+
+**Step 2, contrapositive.** If $x \in S$ is not a support vector, Step 1 gives $h_{S - \{x\}} = h_S$, and $h_S$ classifies $x$ correctly (its constraint holds). So if the leave-one-out test errs on $x$, then $x$ is a support vector: at most $N_{\mathrm{SV}}(S)$ of the $m+1$ leave-one-out tests can fail, and the leave-one-out error of the sample is at most $N_{\mathrm{SV}}(S)/(m+1)$.
+
+**Step 3, averaging (Mohri, Lemma 5.3).** The expected leave-one-out error at size $m+1$ equals the expected true error at size $m$: by linearity, it is the average over $i$ of $\Pr[h_{S - \{x_i\}} \text{ errs on } x_i]$; since the sample is i.i.d., every term equals the $i = 1$ term, which is exactly the probability that an SVM trained on a fresh $m$-point sample misclassifies an independent fresh point, i.e. $\operatorname{E}_{S' \sim \mathcal D^{m}}[R(h_{S'})]$. Taking expectations of Step 2's inequality over $S \sim \mathcal D^{m+1}$ and applying the identity gives the theorem.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="loo"
+  alt="Three frames on one separable sample of twelve points: the fitted maximum-margin boundary with three circled support vectors; the same solution with a non-support point held out and unchanged; the fit with a support vector held out instead, the boundary visibly moved and the margin widened"
+  caption="The proof in pictures. Holding out any of the 9 non-support points changes nothing and the point is classified correctly; only the 3 support vectors can cost a leave-one-out error, so the LOO error here is at most 3/12."
+/>
+
+<Task>
+Three comprehension checks on the proof, one sentence each. (1) Name where separability is used (Step 1 assumes the full problem is feasible, and Step 2 needs "constraint holds ⇒ correctly classified", which is the feasibility of $x$'s constraint). (2) Name where uniqueness is used (twice in Step 1's sandwich: without it, the smaller problem could have a *different* minimizer of equal norm). (3) State why the same argument fails for LDA: deleting any point changes the class moments, so no analogue of Step 1 exists.
+</Task>
+
+### How much the bound delivers: sparsity buys generalization, loosely
+
+The theorem is the first appearance of a pattern that runs to the end of the course: **sparsity buys generalization**. A solution determined by few points cannot have used most of the sample, and each unused point acts as a free test case. But the bound must be read at its actual strength. It controls only the *expectation* of the error over samples, with no statement about fluctuations around it; and it is loose in practice. On the textbook mixture benchmark, the bound evaluates to 62% and 85% at the two settings displayed, against test errors near 30% ([ESL](https://hastie.su.domains/ElemStatLearn/) §12.2.2): true, and far above the truth.
+
+<KeyFact>
+The claim "maximum margin implies good generalization" is not yet proved in this course, and this lesson does not pretend otherwise. The leave-one-out bound is the honest down payment: error is controlled by the support-vector fraction, in expectation. The full debt, high-probability bounds that improve with the margin and never mention dimension, is paid by <Ref lesson="margin-bounds">module 9's margin bounds</Ref>.
+</KeyFact>
+
+## Slack: the margin priced for real data
+
+The hard-margin program fails on real data twice, in different ways. First, infeasibility: if no hyperplane separates the classes (one mislabeled point deep inside the other class suffices), then no $(w, b)$ satisfies all constraints, and the QP has no solution at all, not a poor one. Second, fragility while still feasible: the constraints are absolute, so one extreme point that keeps the data barely separable dictates the whole solution. In the data below, a single added point swings the hard-margin hyperplane and collapses the margin from $0.87$ to $0.42$.
+
+<Figure
+  src="./figures/outlier-swing.svg"
+  alt="Left panel: hard-margin boundary before and after one added point near the opposite cluster, rotated with a much thinner band. Right panel: the soft-margin boundary at C equal to one half staying close to the original, with a slack arrow of length xi about 1.5 from the added point to its margin line"
+  caption="One added point. Hard margin: the plane swings and the margin halves. Soft margin: the plane stays and the point pays ξ ≈ 1.5."
+/>
+
+The repair, introduced by Cortes and Vapnik in the 1995 paper that named support-vector networks, makes the constraints purchasable: each point may violate its margin constraint by an amount $\xi_i \ge 0$, and violations are billed in the objective at a price $C$.
+
+<Definition title="soft-margin SVM">
+For $C > 0$, the **soft-margin SVM** is
+$$
+\min_{w,\,b,\,\xi}\ \tfrac{1}{2}\lVert w \rVert^2 + C \sum_{i=1}^{m} \xi_i
+\qquad \text{subject to} \qquad
+y_i\,(w^\top x_i + b) \ge 1 - \xi_i, \quad \xi_i \ge 0.
+$$
+The $\xi_i$ are **slack variables**: $\xi_i$ measures how far point $i$ sits on the wrong side of its marginal hyperplane, in functional-margin units.
+</Definition>
+
+The program is feasible for every dataset (take the $\xi_i$ large enough), is still a convex QP, and recovers the hard margin as $C \to \infty$.
+
+### Reading a slack value: three regimes
+
+The value of each $\xi_i$ at the optimum sorts the training set into three regimes.
+
+<Example title="reading slack values">
+Take $w = (1, 1)$, $b = -4$, so $f(x) = x_1 + x_2 - 4$, and three points with $y = +1$:
+
+- $x = (3.2, 2.4)$: $f = 1.6 \ge 1$, constraint satisfied outright, $\xi = 0$. Outside the margin, no cost.
+- $x = (3.0, 1.6)$: $f = 0.6$, so $\xi = 1 - 0.6 = 0.4$. Correctly classified but inside the band: $0 < \xi < 1$.
+- $x = (1.5, 1.3)$: $f = -1.2$, so $\xi = 1 - (-1.2) = 2.2 > 1$. On the wrong side of the boundary: misclassified.
+
+The slack bill is $C \sum_i \xi_i = C\,(0 + 0.4 + 2.2) = 2.6\,C$. A misclassification always forces $\xi > 1$, so $\sum_i \xi_i$ upper-bounds the number of training errors: the linear bill is a convex proxy for the error count, the same move the logistic loss made for the same reason.
+</Example>
+
+<Figure
+  src="./figures/slack-taxonomy.svg"
+  alt="A margin band with three annotated positive points: one outside the margin with xi zero, one inside the band with xi 0.4 and a short arrow, one misclassified with xi 2.2 and a long arrow, plus the tally of total slack 2.6"
+  caption="The three slack regimes on one band: ξ = 0 outside, 0 < ξ < 1 inside on the correct side, ξ > 1 misclassified. Arrows measure each violation."
+/>
+
+### C prices slack: large C is light regularization
+
+$C$ is the price of one unit of slack, paid in units of margin: raising $C$ makes violations expensive and pushes the fit toward the hard margin. The standard confusion says the opposite: "$C$ is a regularization strength, so larger $C$ regularizes more." It is wrong. The regularizer in the objective is the margin term $\tfrac12\lVert w \rVert^2$, and it carries no knob; $C$ multiplies the *data-fit* term. Dividing the objective by $C$ shows the exact dictionary: the SVM's $C$ behaves as $1/(2\lambda)$ of the module 3 template, so large $C$ is *light* regularization. The next section makes that identification an equation.
+
+|  | small $C$ (slack is cheap) | large $C$ (slack is dear) |
+| --- | --- | --- |
+| margin band | wide | narrow |
+| total slack $\sum_i \xi_i$ | large | small |
+| equivalent penalty $\lambda = 1/(2C)$ | heavy | light |
+| bias–variance posture | high bias, low variance | low bias, high variance |
+| limit | $w \to 0$: the band swallows everything | hard margin; infeasible on overlap |
+
+<Figure
+  src="./figures/c-sweep.svg"
+  alt="Three panels of the same overlapping two-class data fitted at C equal to 0.1, 1, and 100: the margin band width shrinks from 2.56 to 1.92 to 0.96 while the number of points with positive slack falls from 9 to 4 to 2"
+  caption="One overlapping dataset, three prices for slack. Raising C narrows the band from 2.56 to 0.96 and shrinks the set of margin violators from 9 points to 2."
+/>
+
+<Demo
+  name="SvmMarginExplorer"
+  caption="Soft-margin SVM on draggable 2D data: boundary, margin band, support vectors highlighted, C on a log slider. Presets: separable, one outlier, heavy overlap."
+/>
+
+<Task>
+Falsify the claim "every training point shapes the boundary". Load the *one outlier* preset and drag any of the 7 points outside the margin band around its own side: the boundary does not move at all until the point crosses the dashed line, and takes hold the moment it enters the band. Then sweep $C$ from 0.1 to 100 and watch the readout: the band narrows from 2.91 to 1.41 and the support set from 10 points to 5, but $\sum\xi$ only falls from 4.9 to 3.8, never to 0 — the outlier sits inside the $-1$ cluster, the data are non-separable at every $C$, and no price recovers the hard margin.
+</Task>
+
+## The hinge view: module 3's template with a new loss
+
+The QP's slack variables can be eliminated by hand, and what remains is a form this course has seen since <Ref lesson="ridge-lasso">ridge</Ref>: a loss summed over the data plus an $\ell_2$ penalty.
+
+### The equivalence: slacks minimize out to a loss function
+
+<Theorem title="soft margin ≡ hinge loss + L2 (Shalev-Shwartz &amp; Ben-David, Claim 15.5)">
+$(w, b, \xi)$ solves the soft-margin QP if and only if $(w, b)$ minimizes the unconstrained objective
+$$
+\sum_{i=1}^m \max\bigl(0,\ 1 - y_i\,(w^\top x_i + b)\bigr) \;+\; \lambda \lVert w \rVert^2,
+\qquad \lambda = \frac{1}{2C},
+$$
+and at the optimum $\xi_i = \max\bigl(0,\ 1 - y_i(w^\top x_i + b)\bigr)$.
+
+<Proof>
+Fix $(w, b)$ and minimize the QP objective over the feasible $\xi$ alone. The objective is increasing in each $\xi_i$, and the constraints demand $\xi_i \ge 0$ and $\xi_i \ge 1 - y_i(w^\top x_i + b)$; the smallest feasible value is therefore $\xi_i^* = \max\bigl(0,\ 1 - y_i(w^\top x_i + b)\bigr)$, and any larger choice is suboptimal. Substituting $\xi^*$ eliminates both constraint families and leaves $\tfrac12\lVert w \rVert^2 + C\sum_i \max(0,\ 1 - y_i(w^\top x_i + b))$; dividing by the positive constant $C$ changes no minimizer and yields the stated form with $\lambda = 1/(2C)$.
+</Proof>
+</Theorem>
+
+<Definition title="hinge loss">
+The **hinge loss** of a score $f(x) = w^\top x + b$ against a label $y \in \{-1, +1\}$ is
+$$
+\ell_{\text{hinge}}\bigl(y, f(x)\bigr) = \max\bigl(0,\ 1 - y\,f(x)\bigr):
+$$
+zero for points at or beyond their margin ($y f \ge 1$), rising linearly with the violation inside it.
+</Definition>
+
+### Hinge against cross-entropy: sparsity, probabilities, smoothness
+
+The equivalence settles the ledger of the module so far. Squared loss plus $\ell_2$ is ridge; cross-entropy plus $\ell_2$ is regularized logistic regression; hinge plus $\ell_2$ is the linear SVM. One architecture, three losses, and the geometry of the margin was this loss's derivation: the constrained and penalized forms are the same model in two notations. It also proves the two limits read off the table above: as $C \to \infty$, $\lambda \to 0$ and only the hinge sum matters (the hard-margin constraint in penalty form); as $C \to 0$, $\lambda \to \infty$ and $w \to 0$.
+
+<Figure
+  src="./figures/losses.svg"
+  alt="Loss curves against the signed margin t equal to y times f of x: the zero-one step, the hinge max of zero and one minus t, and the rescaled logistic loss log base two of one plus e to the minus t; the hinge is exactly zero beyond t equal to one with that flat region shaded amber, while the logistic curve stays positive everywhere"
+  caption="The loss zoo on one margin axis. Both convex curves upper-bound the 0/1 step and pass through (0, 1). Only the hinge is exactly zero beyond the margin — the shaded region."
+/>
+
+Three contrasts separate the two convex losses, and each is a consequence of the hinge's flat zero region against the logistic curve's everywhere-positive tail.
+
+- **Sparsity.** The hinge is *exactly zero* on $y f \ge 1$: a safely classified point contributes nothing to the objective and nothing to any subgradient, so the solution depends only on the points at or inside the margin — the soft-margin support vectors, and exactly the sparsity the leave-one-out bound converts into a guarantee. The logistic loss is positive everywhere; every point pulls on $w$ forever, which is also why <Ref lesson="logistic-regression">the unregularized logistic optimum ran off to infinity</Ref> on separable data while the hard-margin optimum is finite and attained.
+- **Probabilities.** Cross-entropy is a negative log-likelihood whose population minimizer is the true log-odds, so its fitted values are probability estimates. The hinge's population minimizer is $f^*(x) = \operatorname{sign}\bigl(2\,p(y{=}1 \mid x) - 1\bigr)$ (ESL, Table 12.1): the Bayes *decision*, with the magnitude of $p$ discarded. An SVM score orders points; it does not rate them. "Confidently right costs nothing" is one property with two consequences — it creates support vectors and it destroys probability information.
+- **Smoothness.** Cross-entropy is differentiable; the hinge has a kink at $y f = 1$ and is minimized by subgradient or coordinate methods, at no conceptual cost since convexity survives (each hinge term is a maximum of two affine functions of $(w, b)$).
+
+<KeyFact>
+In the hinge form the penalty falls on $w$ alone — the intercept rides free, the same convention ridge applied to $\beta_0$. Everything distinctive about the SVM (support vectors, sparsity, score without probability) follows from the hinge's flat zero region, not from the QP formalism.
+</KeyFact>
+
+What stands established: road 3 reaches a linear boundary from geometry alone. The margin criterion repairs the perceptron's non-uniqueness, the canonical scaling turns it into a strictly convex QP with margin $2/\lVert w \rVert$, slack and $C$ price it for overlapping data, the whole construction is hinge loss plus $\ell_2$ in module 3's template, and the leave-one-out bound ties its error, in expectation, to the support-vector fraction. Two debts are on the books. Why a *wide* margin should help beyond that expectation bound is deferred to <Ref lesson="margin-bounds">module 9</Ref>. And the boundary is still a hyperplane: the machinery for making it nonlinear (solving this QP through its Lagrangian dual, where the data appear only through inner products and a kernel can replace them) is <Ref lesson="svm-dual-kernels">the next lesson</Ref>, which also derives the multiplier characterization of the support vectors that this lesson identified geometrically.
+
+## Exercises
+
+<Exercise>
+Warm-up on a fixed hyperplane: $w = (1, 1)$, $b = -3$, and four labeled points: $(3, 2)$ and $(4, 4)$ with $y = +1$; $(1, 1)$ and $(0, 2)$ with $y = -1$. (a) Compute each point's functional and geometric margin and the margin of the sample. (b) Check whether $(w, b)$ is canonically scaled. (c) Which points would be support vectors if this hyperplane were the max-margin solution — and what about the answer shows that it is not?
+
+<Solution>
+(a) $f(x) = x_1 + x_2 - 3$, $\lVert w \rVert = \sqrt 2$. Point by point: $(3,2)$: $f = 2$, $\hat\gamma = 2$, $\gamma = 2/\sqrt2 = 1.414$. $(4,4)$: $f = 5$, $\hat\gamma = 5$, $\gamma = 3.536$. $(1,1)$: $f = -1$, $\hat\gamma = 1$, $\gamma = 0.707$. $(0,2)$: $f = -1$, $\hat\gamma = 1$, $\gamma = 0.707$. Sample margin: $\min_i \gamma_i = 0.707$.
+
+(b) $\min_i \hat\gamma_i = 1$, so the scaling is already canonical, and consistently $\gamma = 1/\lVert w \rVert = 0.707$.
+
+(c) The candidates are the points achieving the minimum: $(1, 1)$ and $(0, 2)$, both with $y = -1$. Both marginal points sit on the *same* side, and no positive point touches $w^\top x + b = +1$ (the nearest, $(3,2)$, has $\hat\gamma = 2$). A max-margin solution must have a tight constraint on each side, since otherwise the boundary can shift toward the untouched class and widen the band; so this canonically scaled hyperplane is separating but not optimal. Canonical scaling is a normalization every separator can wear; optimality is a further property.
+</Solution>
+</Exercise>
+
+<Exercise>
+The derivation the lesson stated but did not do: prove that the signed distance from $x$ to the hyperplane $\{z : w^\top z + b = 0\}$ is $(w^\top x + b)/\lVert w \rVert$, from the decomposition of $x$ into a component on the hyperplane plus a multiple of the unit normal.
+
+<Solution>
+Write $x = x_\perp + r\,\dfrac{w}{\lVert w \rVert}$, where $x_\perp$ is the orthogonal projection of $x$ onto the hyperplane and $r$ is the signed length of the normal component ($r > 0$ on the side $w$ points into). Apply $z \mapsto w^\top z + b$ to both sides:
+$$
+w^\top x + b = \underbrace{w^\top x_\perp + b}_{=\,0,\ x_\perp \text{ on the hyperplane}} + \; r\,\frac{w^\top w}{\lVert w \rVert} = r\,\lVert w \rVert,
+$$
+so $r = (w^\top x + b)/\lVert w \rVert$. The Euclidean distance is $|r|$, and multiplying by the label makes it signed-for-correctness: $\gamma = y\,(w^\top x + b)/\lVert w \rVert$ is positive exactly when $x$ is on its labeled side. The transferable move: an affine functional evaluated at a point reads off scaled signed distance to its own zero set; that is why $f(x) = w^\top x + b$ can serve as both classifier and geometry throughout the lesson.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: the same input with both labels. The dataset is two copies of the same point, $x_1 = x_2 = (1, 0)$, with $y_1 = +1$ and $y_2 = -1$. (a) Show the hard-margin QP is infeasible. (b) Show the soft-margin QP has a solution for every $C > 0$, find it, and compute the optimal slacks. (c) Name the hypothesis that died and how slack priced its failure.
+
+<Solution>
+(a) The two constraints read $w^\top x + b \ge 1$ and $-(w^\top x + b) \ge 1$ at the same $x$. Adding them gives $0 \ge 2$: the feasible set is empty for every $(w, b)$. Separability is not merely helpful to the hard margin; it is the feasibility of its constraint set.
+
+(b) With slack the constraints are $\xi_1 \ge 1 - (w^\top x + b)$ and $\xi_2 \ge 1 + (w^\top x + b)$, plus $\xi_i \ge 0$. Writing $s = w^\top x + b$: $\xi_1 + \xi_2 \ge \max(0, 1 - s) + \max(0, 1 + s) \ge 2$ for every $s$, with equality exactly when $s \in [-1, 1]$ (both hinges active, summing to $2$). The objective $\tfrac12\lVert w \rVert^2 + C(\xi_1 + \xi_2)$ is therefore at least $2C$, and the value $2C$ is attained by $w = 0$, $b = 0$, $\xi_1 = \xi_2 = 1$: minimal norm, minimal total slack. The optimum exists for every $C$, and no value of $C$ changes it: the conflict is label noise that no boundary can resolve, every $s \in [-1, 1]$ carries the same minimal slack bill of $2C$, and $w = 0$ is the unique minimum-norm choice among those ties.
+
+(c) The dead hypothesis is separability: identical inputs with opposite labels certify that the Bayes error is bounded away from zero at that input, so *no* hypothesis class fixes it. Slack prices the failure at exactly one unit per conflicting point ($\xi_i = 1$, the point sitting on the boundary at distance $0$, one full functional-margin unit short): the objective converts an infeasibility, which is absolute, into a cost, which is finite and comparable with the margin term. That conversion is what makes the method usable on data whose classes genuinely overlap.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute the half of this claim that is false: "increasing $C$ makes violations more expensive, so it always improves training accuracy, and therefore test accuracy too." (a) Prove that the optimal total slack $\sum_i \xi_i$ is non-increasing in $C$. (b) Break the test-accuracy half with the one-outlier configuration, and name the bias–variance reading.
+
+<Solution>
+(a) Let $(w_1, \xi_1)$ be optimal at $C_1$ and $(w_2, \xi_2)$ at $C_2$, with $C_1 < C_2$, writing $\Sigma_k = \sum_i \xi_{k,i}$ and $\Omega_k = \tfrac12\lVert w_k \rVert^2$. Each optimum beats the other's variables at its own price: $\Omega_1 + C_1 \Sigma_1 \le \Omega_2 + C_1 \Sigma_2$ and $\Omega_2 + C_2 \Sigma_2 \le \Omega_1 + C_2 \Sigma_1$. Adding the two inequalities cancels the $\Omega$'s: $C_1 \Sigma_1 + C_2 \Sigma_2 \le C_1 \Sigma_2 + C_2 \Sigma_1$, i.e. $(C_2 - C_1)(\Sigma_2 - \Sigma_1) \le 0$, so $\Sigma_2 \le \Sigma_1$. Raising the price never buys more violation; since $\sum_i \xi_i$ upper-bounds the training-error count, the training fit tightens (weakly) as $C$ grows.
+
+(b) Put one mislabeled point near the opposite cluster in otherwise separable data. At small $C$ the optimizer pays the outlier's slack and leaves the boundary where the bulk of both classes puts it. At large $C$ that slack becomes intolerable: the boundary swings toward the outlier and the band narrows — the outlier-swing figure's left panel, purchased voluntarily. The training set is fitted better; every future point drawn near the old boundary on the outlier's side is now misclassified, so test error rises. The reading is <Ref lesson="bias-variance">the bias–variance ledger</Ref>: $C$ is a flexibility knob, large $C$ is low bias and high variance, and the claim's "therefore" is the fallacy that training fit transfers to test fit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. (a) Rewrite the soft-margin objective in the regularized-loss form and map the constants exactly, both for the summed loss ($\lambda$ in terms of $C$) and for Shalev-Shwartz–Ben-David's averaged form $\min_w \lambda' \lVert w \rVert^2 + \tfrac1m \sum_i \ell_{\text{hinge}}$ ($\lambda'$ in terms of $C$ and $m$). (b) Compare the result term by term with ridge from <Ref lesson="ridge-lasso">module 3</Ref>: what is identical, what is swapped, and which two fitting conventions carry over unchanged?
+
+<Solution>
+(a) By the equivalence theorem, minimizing $\tfrac12\lVert w \rVert^2 + C\sum_i \xi_i$ equals minimizing $\sum_i \ell_{\text{hinge}} + \lambda\lVert w \rVert^2$ with $\lambda = 1/(2C)$ (divide by $C$). Dividing instead by $Cm$ gives the averaged form $\tfrac1m \sum_i \ell_{\text{hinge}} + \lambda' \lVert w \rVert^2$ with $\lambda' = 1/(2Cm)$: the same problem, so a $C$ quoted without knowing whether the implementation sums or averages the loss is ambiguous by a factor of $m$ — a real source of irreproducible "same $C$" comparisons across libraries.
+
+(b) Identical: the architecture (empirical loss plus $\ell_2$ penalty on the weights), the convexity of the whole objective, and the bias–variance role of the constant. Swapped: the loss. Squared error on a continuous response becomes hinge on a signed margin; ridge's loss is smooth and never zero off the data, the hinge is kinked and exactly zero on safe points, which is why ridge solutions depend on every observation while SVM solutions depend on the support set. Carried over unchanged: the intercept is unpenalized ($\lVert w \rVert^2$ excludes $b$, as ridge excluded $\beta_0$; penalizing it would make the fit depend on where the origin sits), and features must be standardized before fitting, because both the penalty and the margin are Euclidean quantities that let a large-scale feature dominate.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: check the leave-one-out bound empirically. Generate $m = 200$ points in $\mathbb R^2$, 100 per class, from $\mathcal N(\mu_\pm, I)$ with $\mu_+ - \mu_- = (2, 0)$ (overlapping classes, Bayes error $\Phi(-1) \approx 15.9\%$). For each $C \in \{0.01, 0.1, 1, 10, 100\}$: fit the soft-margin SVM, count the support vectors (points with $y_i f(x_i) \le 1$), and measure the leave-one-out error by 200 refits. State before running what would count as confirming the theorem, then compare.
+
+<Solution>
+What counts as confirmation: $\widehat{R}_{\text{LOO}} \le N_{\mathrm{SV}}/m$ at every $C$ — the per-sample inequality from Step 2 of the proof, which carries to the soft margin because the deletion argument needs only that a point with an inactive constraint ($y_i f(x_i) > 1$, hence $\xi_i = 0$) leaves the solution unchanged and is classified correctly. The theorem promises nothing about tightness, so a large gap does not refute it.
+
+A representative run (seeds move these by a few points): $N_{\mathrm{SV}} = 143,\ 97,\ 74,\ 66,\ 63$ as $C$ rises through the grid, giving bounds $71.5\%,\ 48.5\%,\ 37\%,\ 33\%,\ 31.5\%$, against measured LOO errors of about $16.5\%,\ 16\%,\ 16\%,\ 16.5\%,\ 17.5\%$. The bound holds everywhere and is loose everywhere — by a factor of two at best, four at worst, exactly the looseness ESL reports on its mixture benchmark (bounds of 62% and 85% against test errors near 30%). Two structural readings. First, the support set shrinks as $C$ grows (the band narrows, fewer points sit inside it), so the *bound* improves with $C$ even where the measured error worsens: the bound tracks sparsity, not accuracy, and is a poor tool for choosing $C$. Second, the bound's floor here is the overlap itself: every point inside the class-overlap region is a margin violator at any $C$, so $N_{\mathrm{SV}}/m$ cannot fall below roughly the overlap mass, while LOO error sits near the Bayes rate. Sparsity arguments cap the error from above; they do not see the error floor.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Sample class $-1$ uniformly from the disk of radius 1 and class $+1$ uniformly from the ring with radii 2 to 3, 100 points each, centered at the origin. (a) Argue that no linear classifier does much better than about 32% error on this population, so the soft-margin SVM at any $C$ misclassifies roughly one point in three here. (b) Map each point by $\phi(x_1, x_2) = (x_1,\ x_2,\ x_1^2 + x_2^2)$ and find, by hand, a plane in $\mathbb R^3$ separating the images — then the canonically scaled maximum-margin one, assuming the boundary depends only on the third coordinate.
+
+<Solution>
+(a) Consider a half-plane $\{x : v^\top x \ge c\}$ predicting $+1$; the configuration is rotationally symmetric, so every direction $v$ faces the same geometry and only the cut position $c$ matters. The ring surrounds the disk, so any half-plane containing most of the ring contains the whole disk (predicting $+1$ everywhere: error $\tfrac12$, all of class $-1$). The best compromise pushes the line out to graze the disk, at $c = 1$: the disk is then classified perfectly, but the half-plane captures only the ring's near cap — under 40% of the ring's area (the two circular segments give 37%) — and misclassifies the remaining 63% of class $+1$, for a total error of $\tfrac12 \cdot 0.63 \approx 32\%$. Moving the cut only hurts: retreating into the disk ($c = 0.8$ gives 33%) adds disk errors faster than it gains ring area, and advancing to the ring's inner edge ($c = 2$) already costs 40%. One error in three is the best any line can do. The failure is not the margin criterion's; the hypothesis class contains no good boundary.
+
+(b) The third coordinate is $z = \lVert x \rVert^2$: disk points have $z \le 1$, ring points $z \in [4, 9]$. The images are separated by any plane $z = c$ with $1 < c < 4$: linear in $\mathbb R^3$, a circle back in the plane. For the max-margin plane of the form $w = (0, 0, w_3)$, $b$: the binding constraints are the extreme $z$ values $z = 1$ ($y = -1$) and $z = 4$ ($y = +1$), giving $-(w_3 + b) = 1$ and $4 w_3 + b = 1$, so $w_3 = \tfrac23$, $b = -\tfrac53$: the boundary $z = 2.5$, margin $1/\lVert w \rVert = \tfrac32$ in $z$ units, support vectors on the disk's rim and the ring's inner edge. One hand-chosen feature made an unsolvable linear problem separable with a wide margin. Systematic feature maps, and the reason the SVM can afford enormous ones (the dual depends on the data only through inner products, so a kernel function buys the feature space without ever computing $\phi$) are <Ref lesson="svm-dual-kernels">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §4.5.1: the perceptron algorithm and its three defects (non-uniqueness first) that open this chapter; §4.5.2: the optimal separating hyperplane; §12.2: the support vector classifier, Figure 12.1's margin picture, the slack formulation and the $C$ form (eq. 12.8), and §12.2.2's mixture example with the leave-one-out support-vector bound evaluated at 62% and 85%; §12.3.2 and Table 12.1: the population minimizers of hinge and binomial losses. Free online: https://hastie.su.domains/ElemStatLearn/
+2. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — §5.2: geometric margin, the primal QP and its uniqueness; §5.2.4: Definition 5.2, Lemma 5.3, and Theorem 5.4, the leave-one-out bound this chapter proves; §5.3: the non-separable case and the hinge/quadratic-hinge losses. Free online: https://cs.nyu.edu/~mohri/mlbook/
+3. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — §15.1: Hard-SVM as largest-margin ERM; §15.2: Soft-SVM, Claim 15.5 (the equivalence with regularized hinge loss, in the averaged form the mixed-review exercise maps), and the sample-complexity corollary that previews module 9. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+4. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §7.1: the margin normalization conventions and Figure 7.3's slack geometry that the slack-anatomy figure recreates; §7.1.1: overlapping class distributions; §7.1.2: hinge against logistic and squared losses.
+5. C. Cortes, V. Vapnik, "Support-Vector Networks," *Machine Learning* 20, 1995, pp. 273–297 — the paper that introduced the soft-margin SVM: slack variables, the $C\sum\xi$ objective, and the support-vector terminology. https://link.springer.com/article/10.1007/BF00994018
+6. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — ch. 6: functional and geometric margins, the optimal margin classifier QP, and the outlier motivation for regularization that the outlier-swing figure recreates. https://cs229.stanford.edu/main_notes.pdf
+7. D. Soudry, E. Hoffer, M. S. Nacson, S. Gunasekar, N. Srebro, "The Implicit Bias of Gradient Descent on Separable Data," *Journal of Machine Learning Research* 19(70), 2018 — unregularized gradient descent on the logistic loss drifts, in direction, to the maximum-margin separator this chapter constructs on purpose. https://jmlr.org/papers/v19/18-188.html
+</References>
