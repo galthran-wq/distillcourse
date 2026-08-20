@@ -1,7 +1,11 @@
 from functools import lru_cache
 
 from pydantic_ai import Agent, Tool
-from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
+from pydantic_ai.models.openrouter import (
+    OpenRouterModel,
+    OpenRouterModelSettings,
+    OpenRouterReasoning,
+)
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.core.config import ChatModel, settings
@@ -57,13 +61,32 @@ def chat_model(openrouter_id: str) -> ChatModel:
 
 
 @lru_cache
-def model_for(openrouter_id: str) -> OpenRouterModel:
+def model_for(openrouter_id: str, *, reasoning: bool = False) -> OpenRouterModel:
+    model = chat_model(openrouter_id)
+    # Usage accounting returns what OpenRouter actually billed, which is what the
+    # monthly ceiling is counted in. `parallel_tool_calls` only permits the model
+    # to emit several tool calls in one response — the tutor is told to batch
+    # independent lookups (base.md), and one response of parallel calls collapses
+    # what would be several round-trips into one. The calls still run serially
+    # through the tools' `sequential=True` barriers, so the shared session is
+    # never touched concurrently.
+    model_settings = OpenRouterModelSettings(
+        openrouter_usage={"include": True},
+        parallel_tool_calls=True,
+    )
+    # Only where the model has a reasoning trace AND the caller has a place to
+    # show it: the web streaming chat, whose client renders the trace in a
+    # dropdown. Never for a title, a compaction, a proactive message or a
+    # Telegram turn — none of them surface it, and the tokens would be billed
+    # against the monthly ceiling for nothing. Low effort: it is a UX affordance,
+    # not a quality lever. `exclude` defaults False, so the trace is returned.
+    if model.reasoning and reasoning:
+        openrouter_reasoning: OpenRouterReasoning = {"effort": "low"}
+        model_settings["openrouter_reasoning"] = openrouter_reasoning
     return OpenRouterModel(
-        chat_model(openrouter_id).openrouter_id,
+        model.openrouter_id,
         provider=OpenRouterProvider(api_key=settings.OPENROUTER_API_KEY),
-        # Usage accounting returns what OpenRouter actually billed, which is
-        # what the monthly ceiling is counted in.
-        settings=OpenRouterModelSettings(openrouter_usage={"include": True}),
+        settings=model_settings,
     )
 
 

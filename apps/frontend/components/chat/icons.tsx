@@ -89,6 +89,15 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+/** A down chevron; the disclosure that shows it rotates it when open. */
+export function ChevronIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 6l4 4 4-4" />
+    </Glyph>
+  );
+}
+
 /** Three dots. Drawn as zero-length round strokes, so it needs no fill. */
 export function MoreIcon(props: IconProps) {
   return (

@@ -150,6 +150,15 @@ export function composing(): Composing {
               onSubmit={(text) => {
                 sent.push(text);
               }}
+              models={[
+                {
+                  openrouter_id: "moonshotai/kimi-k3",
+                  display_name: "Kimi K3",
+                  context_window: 200000,
+                },
+              ]}
+              model="moonshotai/kimi-k3"
+              onModel={() => {}}
             />
           </LessonsProvider>
         </SectionsProvider>,
