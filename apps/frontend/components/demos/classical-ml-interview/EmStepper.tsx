@@ -9,7 +9,10 @@
  * readout never decreases and Δ = 0 on E-steps, since only the M-step
  * changes parameters. The k-means toggle recolors the same points by
  * hard argmax assignment for comparison. Presets are initializations on
- * the same data, so final ℓ values are comparable.
+ * the same data, so final ℓ values are comparable. Shared by the gmm-em
+ * lessons of classical-ml-interview and classical-ml; the "spike on one
+ * point" preset exists for the latter's singularity task — ℓ climbs at
+ * every M-step while one component degenerates onto a single point.
  */
 import { useState } from "react";
 import { Panel, PresetGroup, Button, Readout } from "@/components/ui";
@@ -66,11 +69,18 @@ const PRESETS: { label: string; params: Params }[] = [
     label: "near the fit",
     params: { pi: [0.42, 0.58], mu: [[2.6, 2.0], [7.1, 5.6]], cov: [[0.35, 0.18, 0.35], [0.75, 0.35, 0.55]] },
   },
+  {
+    // Component 0 sits exactly on the most isolated data point with a small
+    // radius: no neighbor is close enough to pull it back out, so each M-step
+    // shrinks it further and ℓ still climbs — the likelihood singularity.
+    label: "spike on one point",
+    params: { pi: [0.1, 0.9], mu: [PTS[49], [5, 4]], cov: [[0.1225, 0, 0.1225], [6, 0, 6]] },
+  },
 ];
 
 function pdf(p: Pt, mu: Pt, cov: Cov): number {
   const [a, b, c] = cov;
-  const det = Math.max(a * c - b * b, 1e-6);
+  const det = Math.max(a * c - b * b, 1e-14);
   const dx = p[0] - mu[0];
   const dy = p[1] - mu[1];
   const q = (c * dx * dx - 2 * b * dx * dy + a * dy * dy) / det;
@@ -89,7 +99,11 @@ function eStep(P: Params): { gamma: number[]; ll: number } {
   return { gamma, ll };
 }
 
-/** Weighted MLE; small diagonal regularizer keeps covariances non-singular. */
+/**
+ * Weighted MLE. The 1e-6 diagonal term is a float-safety floor, deliberately
+ * far below pixel scale so the spike preset's collapse is visible: the ellipse
+ * shrinks to nothing on screen before the floor stops the numbers.
+ */
 function mStep(gamma: number[]): Params {
   const comps = [0, 1].map((k) => {
     const g = gamma.map((gi) => (k === 0 ? gi : 1 - gi));
@@ -104,7 +118,7 @@ function mStep(gamma: number[]): Params {
       b += v * dx * dy;
       c += v * dy * dy;
     });
-    return { pi: N / PTS.length, mu: [mx, my] as const, cov: [a / N + 0.02, b / N, c / N + 0.02] as const };
+    return { pi: N / PTS.length, mu: [mx, my] as const, cov: [a / N + 1e-6, b / N, c / N + 1e-6] as const };
   });
   return { pi: comps.map((c) => c.pi), mu: comps.map((c) => c.mu), cov: comps.map((c) => c.cov) };
 }
@@ -124,9 +138,9 @@ function halfStep(s: State): State {
     const params = mStep(s.gamma);
     const e = eStep(params); // e.ll = ℓ(θ_new)
     if (e.ll - s.ll < 1e-3) {
-      // Converged: near the fixed point the regularized update stops
-      // improving ℓ (the +0.02 regularizer perturbs the exact maximizer),
-      // so freeze at the current state — the readout stays monotone.
+      // Converged: near the fixed point the update stops improving ℓ (the
+      // diagonal floor perturbs the exact maximizer), so freeze at the
+      // current state — the readout stays monotone.
       return { ...s, converged: true, steps: s.steps + 1, prevLl: s.ll };
     }
     return { params, gamma: s.gamma, ll: e.ll, next: "E", steps: s.steps + 1, converged: false, prevLl: s.ll };

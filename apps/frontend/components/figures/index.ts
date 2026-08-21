@@ -166,6 +166,15 @@ import NewtonPriceLedger from "./classical-ml/NewtonPriceLedger";
 import SgdTwoTargets from "./classical-ml/SgdTwoTargets";
 import LarPathSteps from "./classical-ml/LarPathSteps";
 import ElasticNetGrouping from "./classical-ml/ElasticNetGrouping";
+import OptimismFormulaAnatomy from "./classical-ml/OptimismFormulaAnatomy";
+import VarianceFormulaAnatomy from "./classical-ml/VarianceFormulaAnatomy";
+import AdaboostStagewiseCrosswalk from "./classical-ml/AdaboostStagewiseCrosswalk";
+import TwoBlockDescent from "./classical-ml/TwoBlockDescent";
+import LogSumApart from "./classical-ml/LogSumApart";
+import LaplacianQuadraticForm from "./classical-ml/LaplacianQuadraticForm";
+import RelaxationFeasibleSets from "./classical-ml/RelaxationFeasibleSets";
+import SpectralEmbeddingRows from "./classical-ml/SpectralEmbeddingRows";
+import UmapConstructionStrip from "./classical-ml/UmapConstructionStrip";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -355,4 +364,13 @@ export const figures: Record<string, RegisteredFigure> = {
   SgdTwoTargets: { component: SgdTwoTargets },
   LarPathSteps: { component: LarPathSteps, frames: 4 },
   ElasticNetGrouping: { component: ElasticNetGrouping },
+  OptimismFormulaAnatomy: { component: OptimismFormulaAnatomy },
+  VarianceFormulaAnatomy: { component: VarianceFormulaAnatomy },
+  AdaboostStagewiseCrosswalk: { component: AdaboostStagewiseCrosswalk },
+  TwoBlockDescent: { component: TwoBlockDescent },
+  LogSumApart: { component: LogSumApart },
+  LaplacianQuadraticForm: { component: LaplacianQuadraticForm },
+  RelaxationFeasibleSets: { component: RelaxationFeasibleSets },
+  SpectralEmbeddingRows: { component: SpectralEmbeddingRows },
+  UmapConstructionStrip: { component: UmapConstructionStrip },
 };

@@ -1,0 +1,188 @@
+On the same spam corpus the course has carried since module 4, the ensemble race finishes: bagging 5.4%, random forest 4.9%, gradient boosting 4.5% — and each gap is explained by a formula from this module.
+
+The module's derivations are complete: <Ref lesson="bagging-random-forests">the correlated-average formula</Ref> says what averaging can and cannot remove, <Ref lesson="adaboost">stagewise reweighting</Ref> and <Ref lesson="gradient-boosting">function-space gradient descent</Ref> attack the bias averaging preserves, and <Ref lesson="xgboost">the second-order objective</Ref> industrialized the loop. What none of them has yet faced is the course's benchmark. This lesson is the module's application: ESL's published three-way race on the 4,601-message corpus, reproduced with our own fits and an XGBoost lane the book predates, with every gap in the finishing order traced to the mechanism that predicts it, and the supervised error ladder the course opened in <Ref lesson="spam-filter">module 4</Ref> closed.
+
+## The published claim, and the reproduction protocol
+
+<Figure
+  src="./figures/esl-spam-race.png"
+  alt="ESL Figure 15.1, titled Spam Data: test error from 0.040 to 0.070 against number of trees from 0 to 2500, with three step curves. Orange bagging falls steeply from above 0.070 and settles on a dashed line at 0.054; light blue random forest falls to a dashed line at about 0.0488; green gradient boosting with 5-node trees descends more slowly, crossing below the forest near 500 trees, and settles on a dashed line at 0.045. All three are flat well before 2500 trees, and every curve moves in small steps rather than smoothly"
+  caption="The original. Dashed lines are the three plateaus — bagging 5.4, forest 4.88, boosting 4.5 — and each visible step is one message of the 1,536, worth 0.065 points."
+  float="right"
+  width="m"
+/>
+
+The artifact is Figure 15.1 of *The Elements of Statistical Learning*, the opening figure of its random-forests chapter: three test-error curves against the number of trees, on this course's own corpus and its own 3,065/1,536 split. The book's endpoints are bagging **5.4%**, random forest **4.88%**, gradient boosting **4.5%**, and its caption carries a detail worth keeping: each visible step in a curve is a change of a single misclassification, because one message is $1/1536 \approx 0.065$ points. The text beside the figure states the claim a reproduction must test: bagging is significantly worse than both ensembles by a paired test, while the forest is not significantly worse than boosting.
+
+<Task>
+Three retrievals before the race, closed book. (1) From <Ref lesson="bagging-random-forests">the bagging lesson</Ref>: write the variance of a $B$-average of correlated trees and name the term $B$ cannot remove. (2) From the same lesson: what an out-of-bag prediction is, and what it estimates. (3) From <Ref lesson="gradient-boosting">the boosting lesson</Ref>: which term of the error decomposition stagewise fitting attacks that averaging cannot. All three are graded against data below.
+</Task>
+
+### Every dial stated
+
+The reproduction runs on ESL's exact split, with each lane's dials fixed in advance and stated. **Bagging**: 1,000 unpruned trees on bootstrap resamples. **Random forest**: the same with $m = 7 = \lfloor\sqrt{57}\rfloor$ candidates per split, the <Ref lesson="bagging-random-forests">inventors' default</Ref>. **Gradient boosting**, matching the book's recipe: trees capped at 5 leaves, shrinkage $\nu = 0.1$, and the round count chosen by five-fold cross-validation on the training set (it picks $M = 991$; the book's tenfold CV picked all 2,500). **XGBoost**, the lane the book predates: the <Ref lesson="xgboost">package defaults</Ref> as that lesson stated them, $\eta = 0.3$, depth-6 trees, $\lambda = 1$, and the wrapper's default budget of 100 rounds. Seeds fixed; every number below is ours unless labeled ESL's.
+
+## The race rerun: the ordering reproduces, the gaps compress
+
+<Figure
+  src="./figures/race.svg"
+  alt="Test error versus number of trees on a log scale for four methods on the spam corpus: bagging in blue falls to a plateau near 5.3 percent, random forest in green to 4.9, gradient boosting in amber descends slowly from above to 4.9 at 2500 trees, and a dashed XGBoost curve passes through a marked point of 4.5 percent at its 100-round budget, dips to 4.4 near 150 rounds, then drifts back near 4.8; hollow circles at the right edge mark ESL's published endpoints 5.4, 4.9 and 4.5, and a bracket shows the plus-minus one standard error of 0.56 points"
+  caption="Our race, drawn to the original's axes. Hollow circles at the right edge are ESL's published finishes; the filled dot on the dashed curve marks XGBoost's pre-registered 100-round budget, the finish the text quotes; the bracket is ±1 binomial SE at this test-set size."
+/>
+
+<Task>
+Read the figure against the original above it before reading on. Check three things: the order of the plateaus (same in both), where each curve stops moving (bagging and the forest by about 50 trees, boosting still drifting at 1,000), and how many SE brackets fit inside the largest ensemble-to-ensemble gap (about one).
+</Task>
+
+The finishing order reproduces exactly. Bagging ends at **5.3%** (82 of 1,536 messages) against the book's 5.4; the random forest ends at **4.9%** (4.88% to the second decimal, the book's own number); gradient boosting at its CV-chosen round count scores **4.9%** (75 of 1,536 — 4.88% to the second decimal, coincidentally the forest's exact count) against the book's 4.5, six messages apart; XGBoost finishes at **4.5%** on its default budget. The shapes reproduce too: the two averaging methods reach their plateaus within a few dozen trees and then wiggle by single messages, while the shrunken booster is still descending at round 700, buying its bias reduction <Ref lesson="gradient-boosting">a small $\nu$-step at a time</Ref>. Past its dip, the XGBoost curve drifts up half a point: at $\eta = 0.3$ with depth-6 trees, late rounds genuinely overfit, which is the behavior ESL already noted in its own boosting curve.
+
+One number in the race is a selection trap worth naming. The minimum of our boosting curve over all 2,500 rounds is 4.5%, the book's figure exactly. But a minimum over 2,500 correlated noisy numbers is <Ref lesson="cross-validation-bootstrap">the optimism module 5 priced</Ref>, and the honest quote is the error at the round CV chose before looking: 4.9%.
+
+<KeyFact>
+What reproduces is the ordering and the shapes; what does not is the exact gaps. With 1,536 test messages one standard error is 0.56 points, the three ensemble finishes span 0.5 points, and our run compresses the book's bagging-to-boosting gap from 0.9 points to 0.5. Any two runs of this race agree on who wins and disagree, by messages, on by how much.
+</KeyFact>
+
+## Attribution: each gap read off a formula
+
+A leaderboard is not the payoff; the module's claim is that each gap in it was predicted before the race was run. Three mechanisms were derived; each now gets its audit.
+
+### The plateau is ρσ², and the forest's win is decorrelation
+
+The <Ref lesson="bagging-random-forests">correlated-average formula</Ref> says a $B$-average's variance is $\rho\sigma^2 + (1-\rho)\sigma^2/B$: the second term dies at rate $1/B$, the first never moves, so the curve must fall steeply over the first few dozen trees and then sit on a floor no additional tree can lower. That shape is what the race shows, empirically: bagging's curve moves by single messages from 50 trees to 1,000, so the removable term is spent early and the remaining 950 trees dispute a plateau only $\rho$ can move. The formula supplies the shape and the direction of every lever; where exactly the motion stops is a fact of this corpus, and the warm-up exercise works the approach rate at the properly measured sampling correlation, which <Ref lesson="bagging-random-forests">the bagging lesson</Ref> put at about 0.05 for bootstrapped trees — far below any number measurable from a single fitted forest.
+
+It also predicts where the forest's advantage must come from, and the prediction is checkable because it is lopsided. Feature subsampling weakens each tree (the best of 7 candidate splits loses to the best of 57) while decorrelating the ensemble, so if the formula is the right account, the forest should have worse individual trees and a better plateau, with the pair correlation moving the same direction as the plateau.
+
+<Figure
+  src="./figures/rho-audit.svg"
+  alt="A two-column audit table under the formula rho sigma squared plus one minus rho sigma squared over B: bagging has single-tree test error 10.0 percent, pair agreement of 0.77 as a proxy for rho, ensemble plateau 5.3 percent; the m equals 7 forest has a worse single-tree error of 11.2 percent, lower agreement 0.70, and a lower plateau of 4.9 percent"
+  caption="The audit: the forest's trees are individually worse and its ensemble is better, so the 0.4-point gain can only have come through ρ."
+/>
+
+Measured on our 1,000-tree runs: the forest's trees are individually worse (11.2% mean single-tree test error against bagging's 10.0%) and its pair correlation is lower (0.77 to 0.70 — the same agreement proxy the <Ref lesson="bagging-random-forests">bagging lesson</Ref> used, with the same caveat: every easy message both trees get right inflates it, so it overstates the sampling $\rho$ by an order of magnitude and is quoted here only for its direction). Strength down, correlation down, plateau down 5.3% to 4.9%: the gain arrived through the only channel the formula leaves open. That is <Ref lesson="bagging-random-forests">Breiman's strength–correlation trade</Ref> audited on real mail rather than asserted on a simulation.
+
+### What boosting fixes that no average can
+
+The formula's other prediction is negative: an average of identically distributed trees keeps a single tree's expectation, so wherever the typical tree is wrong, the vote is wrong at any $B$. Bias is invisible to averaging, and <Ref lesson="gradient-boosting">stagewise fitting</Ref> exists to attack it. The corpus lets both claims be tested point by point: take bagging's 82 errors and sort them by how many of the 1,000 bagged trees err on each message.
+
+<Figure
+  src="./figures/attribution-bins.svg"
+  alt="Grouped bar chart over three bins of bagging's 82 test errors, sorted by the fraction of bagged trees that err on each message; bars show the error rate of bagging, random forest, gradient boosting and XGBoost within each bin: in the 50 to 70 percent bin of 32 messages the forest is still wrong on 56 percent and the boosters on 34 to 41; in the 70 to 90 percent bin of 33 messages the forest is wrong on 94 percent and the boosters on 70 to 79; on the 17 near-unanimous messages every method stays wrong except one boosting fix"
+  caption="Bagging's 82 errors, binned by how many of its 1,000 trees agree on the mistake. Averaging methods only help where trees disagree; boosting reaches into the agreement bins; the unanimous core moves for no one."
+/>
+
+<Task>
+Before reading on, predict from the mechanisms which method should dominate each bin. Then check the bars: identify the bin where the forest does most of its work, and the bin where boosting holds its largest lead over the forest.
+</Task>
+
+The bins separate the decomposition on real data. On the 32 messages where the bagged trees lean wrong without agreeing (50–70% of trees err), disagreement means fluctuation, fluctuation is variance, and the decorrelated forest repairs just under half of them while the boosters repair three-fifths to two-thirds. On the 33 messages where 70–90% of trees agree on the error, the typical tree is wrong: that is bias, the forest fixes 2 of 33, and boosting fixes a fifth to a third, because rounds that <Ref lesson="adaboost">upweight what the current fit gets wrong</Ref> are aimed at exactly this bin. And on the 17 messages the trees err on near-unanimously, nothing helps: every method leaves at least 16 of 17 wrong. In total, of bagging's 82 errors the forest repairs 16, each booster 29, and 43 are repaired by no method in the race.
+
+<KeyFact>
+The unfixable 43 are a measurement of the corpus, not of the methods: messages whose feature vectors genuinely look like the other class, the empirical remnant of the Bayes floor from <Ref lesson="statistical-learning">module 1</Ref>. The overlap is literal: the 3,065-row training split holds exactly one feature vector that appears with both labels — two rows identical in all 57 features, one marked spam and one not (identical rows, not necessarily identical messages: the features are frequencies). No fit that is a function of the features can clear that floor, and the race's last half-point is being fought inside it.
+</KeyFact>
+
+## Out-of-bag error against the held-out set
+
+The module's remaining claim about the averaging methods is that they carry their own validation: the <Ref lesson="bagging-random-forests">out-of-bag estimate</Ref> grades each training point with the roughly third of the trees that never saw it, and is advertised as cross-validation for free. The benchmark has a held-out set, so for once the free estimate can be graded against a real one.
+
+<Figure
+  src="./figures/oob-overlay.svg"
+  alt="Two panels of misclassification versus trees on a log scale from 25 to 1000: for bagging the OOB curve starts at 6.4 percent, settles near 6.0 and stays about 0.7 points above the test curve near 5.3; for the m equals 7 random forest the OOB curve falls from 6.3 to about 5.1 and runs within 0.2 points of the test curve at 4.9"
+  caption="OOB (amber) over test (blue), computed on our runs. Both OOB curves start pessimistic while committees are small, then track: within 0.2 points for the forest, within about 0.7 for bagging."
+/>
+
+The claim survives with its fine print visible. Both OOB curves start high, since at $B = 25$ each point's committee averages nine trees and a nine-tree forest is genuinely worse; past $B \approx 200$ the forest's OOB error runs at 5.0–5.1% against a test error of 4.9%, agreement well within one standard error of either estimate (the OOB side is measured on 3,065 points, so its own SE is about 0.4). Bagging's OOB sits a steadier 0.6–0.7 points above its test error: still within joint noise, but consistently on the pessimistic side, and pessimism is the safe direction for a stopping signal. The practical readings from the bagging lesson stand unchanged on the benchmark: the OOB curve says 200 trees suffice about as well as the test curve does, and it said so without spending a single held-out message.
+
+## The ladder closed: what survives the standard errors
+
+The corpus's supervised ladder, opened in <Ref lesson="spam-filter">module 4</Ref> and extended in <Ref lesson="spam-tree">module 6</Ref>, now closes.
+
+<Figure
+  src="./figures/final-ladder.svg"
+  alt="Dot plot of test error for eleven models on the common spam split, tagged by module: naive Bayes 11.0, pruned tree 9.3 published and 8.3 ours, logistic on raw features 7.6, LDA 6.6, logistic on log features 5.9, bagging 5.4 published and 5.3 ours, additive logistic 5.3, RBF-SVM 5.2, random forest 4.9 where the published circle and our dot coincide, gradient boosting 4.5 published and 4.9 ours, XGBoost 4.5; filled dots carry whiskers of plus-minus one standard error"
+  caption="The ladder, closed. Hollow circles are ESL's published numbers, filled dots ours, whiskers ±1 SE. The whole ensemble block sits inside about two SE of width."
+/>
+
+Read with its error bars, the ladder supports fewer claims than its eleven rungs suggest, and the honest close is to say which. The chasms are real: naive Bayes loses to everything by many SE, and the single tree loses to every ensemble by three to five points — never fewer than five standard errors, even setting our 8.3% tree against our 5.3% bagger — the module's headline paid in full. The fine structure is not: from bagging at 5.3 down to XGBoost at 4.5 the entire ensemble block spans less than two standard errors.
+
+### Significance: McNemar on the discordant messages
+
+Error-rate differences on a shared test set deserve a sharper instrument than two SEs added in quadrature, because the two classifiers are graded on the same messages. *McNemar's test* uses only the disagreements: if two classifiers were equally good, the messages that exactly one gets wrong should split evenly between them, so the split is a coin-flip count. ESL applies it to this race (its Exercise 10.6) and reports that bagging is significantly worse than both rivals, the forest not significantly worse than boosting.
+
+<Example title="McNemar on our bagging-versus-forest run">
+On the 1,536 test messages, bagging alone errs on $n_{01} = 16$, the forest alone on $n_{10} = 9$; the other 1,511 messages are concordant and carry no information about the difference. Under the null the 25 discordant messages split $\mathrm{Bin}(25, \tfrac12)$. The continuity-corrected statistic is
+
+$$
+\chi^2 = \frac{(|n_{01} - n_{10}| - 1)^2}{n_{01} + n_{10}} = \frac{(7-1)^2}{25} = 1.44,
+$$
+
+well short of the 3.84 that the $\chi^2_1$ distribution demands at the 5% level; the exact binomial two-sided $p$ is $0.23$. The 0.5-point gap in the headline error rates rests on a 16-to-9 coin-flip count.
+</Example>
+
+Our run therefore sharpens the moral rather than the ranking. Forest versus boosting: 21 discordant messages each way, agreement so exact the test returns $p = 1$. Bagging versus forest: the computation above, the direction the book found but short of its significance, because our bagging finished a step better and the discordant pool is 25 messages. A half-point gap at $n = 1{,}536$ lives at the edge of what a paired test can certify, and whether it crosses the line depends on the draw. The reproducible facts are the ordering and the mechanism audits above; the pairwise verdicts are properties of one run.
+
+### What did not change, and what a deployment decides on
+
+Two of the module's standing audits survive into the winner. First, leakage: the boosted model's importance list leads with `ch$`, `ch!`, and `remove`, and still carries `hp` at fourth and `george` in its top ten: the recipient's employer and first name, the features <Ref lesson="spam-filter">module 4's audit</Ref> flagged as portable to no other mailbox. Every model in the race fit them; every error rate on this page is optimistic about deployment on anyone else's mail; a 4.5% with `george` in the model is not a 4.5% claim about spam.
+
+Second, <Ref lesson="classification-metrics">the metric</Ref>: the ladder ranks by 0–1 error, and the corpus's own documentation prices a false positive at ten times a false negative. Re-thresholding the boosted model at the implied $p > 10/11$ trades a tranche of false positives for extra false negatives at a tenth of the price, and the saving is not marginal: that one threshold move is worth more expected cost than the entire bagging-to-boosting gap (the cost-machinery exercise below runs the arithmetic). A deployment would also weigh what no ladder shows: the forest's trees train independently in parallel and ship an OOB estimate for free, the booster needs its $\nu$–$M$ schedule tuned and monitored, and all four models inherit the drift problem of a 1999 vocabulary. On the ladder's own metric the race has a winner; on a deployment's, the module's honest summary is that averaging, decorrelation, and stagewise bias attack each bought exactly what their formulas said, and the last half-point between them is smaller than the decisions the formulas do not cover.
+
+What stands established: the published race reproduces on our fits in ordering and shape (5.3 / 4.9 / 4.9, XGBoost 4.5, against the book's 5.4 / 4.88 / 4.5); bagging's plateau is the $\rho\sigma^2$ floor and the forest's 0.4-point win rides on measured decorrelation with weaker trees; boosting's further gain is bias repair, visible as reach into the bins where bagged trees agree on their errors; OOB tracks held-out error to within a fraction of a point; and of the ladder's fine structure, only the tree-to-ensemble chasm and the mechanisms themselves are settled at this test-set size. <Ref lesson="boosting-lab">The lab that follows</Ref> rebuilds the winning machine from raw numpy, and the exercise below that boosts past a zero-ish training error at benchmark scale hands its unexplained plot to <Ref lesson="margin-bounds">module 9</Ref>.
+
+## Exercises
+
+<Exercise>
+Warm-up from the curves. (a) From our race figure, read off the approximate $B$ beyond which bagging's test error stops improving, and state which term of $\rho\sigma^2 + (1-\rho)\sigma^2/B$ dies with $B$ and which sets the plateau. (b) At the properly measured sampling correlation the <Ref lesson="bagging-random-forests">bagging lesson</Ref> quoted for bootstrapped trees, $\rho \approx 0.05$, find the $B$ at which the removable term has fallen to 10% of the floor. (c) Reconcile (b) with (a): the formula says variance is still shrinking past $B = 50$, yet the error curve there is flat.
+
+<Solution>
+(a) The curve is flat from roughly $B = 50$: everything after moves within single messages (±0.2 points). The dying term is $(1-\rho)\sigma^2/B$; the floor $\rho\sigma^2$ contains no $B$, so only $\rho$, not more trees, can move the plateau — the design brief random forests answered. (b) $0.95\sigma^2/B \le 0.1 \times 0.05\sigma^2$ gives $B \ge 190$: on the formula's account, variance keeps shrinking measurably through the first two hundred trees. Substituting the audit figure's 0.77 here would be the proxy error — that number is test-set agreement, inflated by every easy message, and it would put the 10% mark at $B = 3$. (c) Test error is not variance: at 1,536 messages it moves in steps of $1/1536 \approx 0.065$ points, and shrinking score fluctuations change it only when they flip a vote across ½, so the tail of the variance decay is invisible at this resolution. The OOB section agrees: those curves, graded on twice as many points, keep drifting until about $B = 200$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: turn the decorrelation knob off. Run your library's random forest with $m = p$ (all 57 features candidates at every split) at $B = 500$ on the standard split, next to plain bagging at the same $B$ and seed. Predict the relationship before running, and state which parameter setting makes bagging a member of the random-forest family.
+
+<Solution>
+With $m = p$ the per-split lottery includes every feature, so the "restricted" search is the full greedy search and the algorithm is exactly bagging: the forest family contains bagging as its $m = p$ corner (<Ref lesson="bagging-random-forests">the definition</Ref> said so; this run demonstrates it). The sameness to predict is *in distribution* — the same procedure over the same resampling scheme — not per seed: sklearn's `RandomForestClassifier(max_features=None)` and `BaggingClassifier` consume the random stream differently, so one shared seed typically leaves the two fits a few messages apart. In our run they happened to land on the same 5.14% — report that as an observation; the check that carries the exercise is that the pair sits well inside one SE, at any seed. The transferable reading: the forest's entire advantage over bagging is the distance from $m = p$ down to $m = \sqrt{p}$, i.e. purely the decorrelation dial, and any claimed forest-versus-bagging comparison that also changed depth, sampling, or seeds is comparing more than the mechanism.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute, after conceding what is true: "Gradient boosting beats the random forest on this benchmark, so boosting is the stronger method in general." Use one result from this module, one measurement from this lesson, and this preview of the course's closing benchmark, taken as given: across the 45 tabular datasets of the Grinsztajn suite that module 11 studies, the spread of tuned scores within the tree-ensemble family is comparable to the gaps between families.
+
+<Solution>
+The concession: on ESL's run boosting finishes 0.4 points ahead, and the mechanism story is real: it attacks a term the forest cannot. The refutation is scope, three ways. (1) This module: Breiman's noise experiments (quoted in <Ref lesson="adaboost">the AdaBoost lesson</Ref>) flip 5% of training labels and AdaBoost's test error rises about 21% on average across datasets against the forest's 2%: change one property of the data and the ranking inverts, because the exponential-family losses concentrate weight on exactly the corrupted points. (2) This lesson: our own rerun of the same race on the same split lands forest and boosting dead even (21 discordant messages each way, $p = 1$), so the benchmark does not even rank the two stably across runs, let alone across datasets. (3) The stated benchmark: if the within-family spread across 45 datasets matches the between-family gaps, then a 0.4-point ordering on one dataset cannot rank the family's members in general — <Ref lesson="tabular-showdown">the course's closing lesson</Ref> establishes the finding. What generalizes is the mechanisms: averaging cuts variance to a $\rho\sigma^2$ floor, decorrelation lowers the floor, stagewise fitting cuts bias at a price in noise robustness. A dataset ranks methods on itself only.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: put error bars on the race itself. Rerun all three lanes at seeds 0, 1, 2 (fixed split, $B = 500$ for the averaging methods, $M = 1{,}000$ for the booster at $\nu = 0.1$, 5-leaf trees), report each method's mean ± spread, and run McNemar for the one pair the lesson leaves unworked: bagging versus gradient boosting — the discordant counts for the reference fits are derivable from this lesson's attribution figure and the two error counts, before you rerun anything. State which published claims your reproduction confirms. Reference values from our runs are in the solution.
+
+<Solution>
+Our three seeds: bagging 5.14 / 5.40 / 5.40 (mean 5.32, spread ±0.15), forest 4.82 / 4.82 / 4.69 (4.77 ± 0.08), boosting 4.88 / 4.95 / 4.95 (4.93 ± 0.04). Two findings carry the exercise. First, the seed-to-seed spread is 3 to 10 times smaller than the 0.56-point binomial SE: the dominant uncertainty in every number on the ladder is the finite test set, not the algorithms' coin flips, so averaging over seeds cannot rescue a comparison at this $n$. Second, the derivation for the reference fits: the attribution figure says the booster repairs 29 of bagging's 82 errors, so $n_{01} = 29$; the booster's own 75 errors are the $82 - 29 = 53$ shared ones plus $n_{10} = 22$ of its own. On the 51 discordant messages, $\chi^2 = (|29-22|-1)^2/51 = 0.71$, exact binomial two-sided $p = 0.40$ — our bagging-to-boosting gap, 0.5 points, is a 29-to-22 coin-flip count. Confirmed: the ordering (bagging worst at every seed, forest and boosting within a step of each other) and the book's forest-versus-boosting non-separation. Not confirmed on our draw: the significance of the book's bagging deficit, against either rival, which our tighter bagging run pulls inside noise. A reproduction that states which published claims it does and does not recover, with the sample-size arithmetic attached, is the deliverable; a bare "we got 4.9" is not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review with module 5's cost machinery. The corpus documentation prices a false positive (real mail flagged) at ten times a false negative, giving the Bayes threshold $p > 10/11$. Our boosted model's test confusion at threshold ½ is (TP, FP, FN, TN) $= (564, 44, 31, 897)$; at $10/11$ it is $(547, 22, 48, 919)$. (a) Compute both error rates and both expected costs per message. (b) Explain why the booster's threshold can be moved this finely when <Ref lesson="spam-tree">the spam tree's</Ref> could not. (c) State what this does to the ladder's ranking question.
+
+<Solution>
+(a) Threshold ½: error $(44+31)/1536 = 4.9\%$, cost $(10 \cdot 44 + 31)/1536 = 0.31$ per message. Threshold $10/11$: error $(22+48)/1536 = 4.6\%$, cost $(10 \cdot 22 + 48)/1536 = 0.17$: the cost nearly halves (and here even the raw error dips, because the ½ threshold was overcalling spam relative to the test mix). (b) The boosted model outputs a continuum of scores, so raising the threshold peels off exactly the least-confident positives; the 23-leaf tree's score took only 17 distinct values, so its operating points came in steps of whole leaves. (c) The 10:1 regime rewrites the question the ladder answers: a model half a point worse on 0–1 error but better calibrated near $p = 10/11$ can be the cheaper filter, so the module's race settles which mechanism wins on symmetric error and leaves the deployment choice to <Ref lesson="classification-metrics">module 5's</Ref> machinery, exactly as the honest close said.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Boost depth-4 trees on the spam training set for 800 rounds (AdaBoost, nothing tuned) and plot training and test error against rounds. Report the round at which training error stops improving, what value it stops at and why it cannot reach zero on this corpus, and what the test error does over the hundreds of rounds after.
+
+<Solution>
+In our run the training error reaches $1/3065 \approx 0.03\%$ by round 200 and never moves again; zero is unreachable in principle, because the training split contains one pair of rows with identical 57-dimensional feature vectors and opposite labels (the KeyFact's pair), so every classifier that is a function of the features errs on at least one of the two. From round 200 the training set therefore has nothing left to teach. The classical account says the 600 rounds that follow add capacity to a model with nothing left to fit and should buy pure variance; instead the test error wanders within a tenth of a point and finishes at its lowest, 4.4% at round 200 to 4.3% at round 800, with no upturn. This is <Ref lesson="adaboost">the AdaBoost lesson's</Ref> mystery reproduced on real mail at benchmark scale rather than on a synthetic sphere, and the plot you have just drawn is the exhibit <Ref lesson="margin-bounds">module 9's margin bounds</Ref> exist to explain: the quantity still improving after round 200 is not the error but the margin distribution.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — Ch. 15: the race itself (Fig. 15.1) with the 5.4/4.88/4.5 endpoints and the McNemar comparison (§15.2), the correlated-average formula (Eq. 15.1), OOB error against test error (§15.3.1, Fig. 15.4), random-forest variable importance (§15.3.2, Fig. 15.5), and the analysis of decorrelation and bias (§15.4); §10.8: gradient boosting on spam at 4.5% with the importance spectrum (Fig. 10.6) and partial dependences (Figs. 10.7–10.8); Ex. 10.6: the McNemar construction used in this lesson. Free online: https://hastie.su.domains/ElemStatLearn/
+2. L. Breiman, "Random Forests," *Machine Learning* 45, 2001, pp. 5–32 — the strength–correlation frame audited in this lesson (§2), out-of-bag estimates (§3.1), and the 5%-label-noise experiments cited in the refutation exercise (Table 4). https://doi.org/10.1023/A:1010933404324
+3. M. Hopkins, E. Reeber, G. Forman, J. Suermondt, "Spambase," UCI Machine Learning Repository, 1999 — the corpus, the feature definitions, the 10:1 cost statement behind the re-thresholding exercise, and the warning about the personalized indicators. https://archive.ics.uci.edu/dataset/94/spambase (ESL's mirror of the data and the fixed split: https://hastie.su.domains/ElemStatLearn/datasets/)
+4. J. H. Friedman, "Greedy Function Approximation: A Gradient Boosting Machine," *Annals of Statistics* 29(5), 2001, pp. 1189–1232 — the shrinkage-and-rounds discipline the boosting lane runs under (§6). https://doi.org/10.1214/aos/1013203451
+5. T. Chen, C. Guestrin, "XGBoost: A Scalable Tree Boosting System," *KDD 2016* — the system and the defaults ($\eta$, $\lambda$, depth) quoted for the fourth lane. https://doi.org/10.1145/2939672.2939785
+6. F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," *JMLR* 12, 2011, pp. 2825–2830 — with the `xgboost` package, the implementations behind every number computed for this lesson on the standard split. https://scikit-learn.org/
+</References>

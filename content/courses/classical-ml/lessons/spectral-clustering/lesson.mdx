@@ -1,0 +1,386 @@
+Build a similarity graph, take the Laplacian L = D − W, and the eigenvectors attached to its smallest eigenvalues label clusters no centroid method can see — because they relax a graph-cut problem, not a distance-to-center problem.
+
+This module has organized unlabeled data three ways, and all three carry the same geometric commitment: <Ref lesson="kmeans">k-means</Ref> partitions space into convex cells around centers, <Ref lesson="gmm-em">the mixture model</Ref> wraps clusters in ellipsoidal level sets, and <Ref lesson="pca">PCA</Ref> projects onto a linear subspace. The closing exercise of the mixture lesson built the dataset that defeats all three (two concentric rings) and found that the 10-nearest-neighbor graph of those points, which <Ref lesson="knn-curse">module 1's neighborhoods</Ref> already know how to build, splits into one piece per ring. This lesson turns that observation into a method: clusters are weakly connected pieces of a graph, the Laplacian's spectrum finds them, and the eigenproblem machinery is the one PCA built, pointed at the *smallest* eigenvalues instead of the largest. The route: the graph as the model; the Laplacian and the theorem behind the ideal case; the cut objectives and the relaxation that turns them into an eigenproblem; the working algorithm and the choice among three Laplacians; the eigengap; and the counterexample that prices the relaxation honestly.
+
+## The inherited failure: rings have neighborhoods, not centers
+
+The two-ring dataset from <Ref lesson="gmm-em">the mixture lesson's</Ref> final exercise (100 points near radius 1, 100 near radius 3) is the cleanest instance of a cluster that is not a blob. Every point on the outer ring is closer to the *center* of the figure than to most of its own ring, so any method that scores membership by distance to a representative point assigns the ring to no single representative. k-means with $K=2$ converges to a diameter: two centers near the middle, each claiming half of both rings. The mixture fares no better for a structural reason the mixture lesson proved: a Gaussian's level sets are convex ellipsoids and the boundary between two components' responsibilities is a quadric, while an annulus is not convex: no restart, no covariance shape, no amount of likelihood fixes a representational failure.
+
+<FigureSequence
+  name="failure-rings"
+  alt="Three frames on the same two-ring dataset: k-means splitting it by a diameter, a two-component Gaussian mixture fitting two overlapping ellipses, and the 10-nearest-neighbor graph whose edges never cross between the rings"
+  caption="One dataset, three verdicts: both centroid-and-shape methods fail; the 10-NN graph of the same points falls into exactly two pieces."
+/>
+
+<Task>
+Step through the three frames. In frames 1 and 2, find a single point whose assignment respects its ring: in this run there is no such ring-coherent cluster on either side. In frame 3, trace any edge: each of the roughly 1,100 edges joins two points of the same ring, because within-ring neighbors sit a few tenths apart while the rings are two units apart.
+</Task>
+
+What the third frame shows is a change of representation, not a new algorithm. Points on one ring are chained together by short hops; no point has a near neighbor on the other ring. A cluster, on this reading, is not a region around a center but a set of vertices with many internal connections and few external ones, a definition that asks nothing about shape. The tools for it are a weighted graph $G = (V, E)$ with **adjacency matrix** $W = (w_{ij})$, $w_{ij} = w_{ji} \ge 0$ measuring the similarity of points $i$ and $j$, and each vertex's **degree** $d_i = \sum_j w_{ij}$, collected in the diagonal **degree matrix** $D$. Clustering becomes graph partitioning: find a split of $V$ whose crossing edges carry little weight.
+
+## The similarity graph is the model
+
+The reformulation moves the modeling decision to the front: before any spectrum is computed, the data must be turned into a graph, and that construction is where this method's inductive bias enters: the same role the choice of $K$ and covariance shape played for the mixture. Three constructions cover practice. The *ε-neighborhood graph* connects every pair closer than a threshold $\varepsilon$, unweighted. The *kNN graph* connects $i$ and $j$ if either is among the other's $k$ nearest neighbors; the *mutual kNN graph* requires both directions. The kNN constructions are then weighted by similarity, typically the Gaussian $w_{ij} = \exp(-\lVert x_i - x_j\rVert^2 / 2\sigma^2)$ restricted to the connected pairs. The bandwidth $\sigma$ has a working rule of its own: take it on the order of the mean distance from a point to its $k$-th nearest neighbor with $k \approx \log n + 1$, so that similarity decays at the scale local neighborhoods actually occupy. On a kNN graph the choice is second-order, because the mask decides which pairs exist before the weight is consulted; on the fully connected graph, where the weights are the only structure, $\sigma$ is the decision that matters.
+
+The constructions differ exactly where data has more than one density scale. A single $\varepsilon$ tuned to a dense region is too small for a sparse one, whose points fall apart into fragments. The kNN graph adapts (everyone gets $k$ neighbors at whatever distance supplies them), and that same adaptivity joins a sparse group to a dense one nearby. The mutual graph is the compromise: it connects within a density scale and refuses to bridge across scales.
+
+<Figure
+  src="./figures/graph-choices.svg"
+  alt="Four panels: a dataset with a dense arc, a sparse arc, and a sparse blob; the epsilon graph shattering the sparse groups; the kNN graph joining across densities; the mutual kNN graph separating the dense arc from the sparse structures"
+  caption="One two-scale dataset under the three constructions: ε commits to one scale, kNN bridges scales, mutual kNN separates them."
+/>
+
+The standard default is the kNN graph: it is sparse, robust to parameter choice, and its failure is visible (too-small $k$ disconnects the graph into more pieces than there are clusters). Connectivity theory says $k$ on the order of $\log n$ suffices asymptotically; on a finite sample, choose $k$ so the graph has no more components than the clusters you believe in. None of these recommendations has a theorem behind it. The graph is an assumption about which similarities matter, and everything downstream, the theorems below included, is conditional on it.
+
+## The Laplacian: the matrix whose zero eigenvalues count pieces
+
+With the graph fixed, the question is how to read "weakly connected pieces" off a matrix. The answer is a matrix built from $W$ and $D$ that converts connectivity questions into linear algebra.
+
+<Example title="W, D, and L on five vertices">
+Take five vertices with weighted edges $w_{12} = 3$, $w_{13} = 1$, $w_{23} = 2$, $w_{45} = 2$: a triangle and a separate pair. The degrees are $d = (4, 5, 3, 2, 2)$, and
+
+$$
+L \;=\; D - W \;=\;
+\begin{pmatrix}
+4 & -3 & -1 & 0 & 0\\
+-3 & 5 & -2 & 0 & 0\\
+-1 & -2 & 3 & 0 & 0\\
+0 & 0 & 0 & 2 & -2\\
+0 & 0 & 0 & -2 & 2
+\end{pmatrix}.
+$$
+
+Every row sums to zero, because $d_i$ is the sum of row $i$ of $W$. Now evaluate the quadratic form at $f = (1, 2, 0, 1, 1)^\top$. Directly: $Lf = (-2,\, 7,\, -5,\, 0,\, 0)^\top$, so $f^\top L f = 1(-2) + 2(7) + 0 + 0 + 0 = 12$. Edge by edge: $w_{12}(f_1{-}f_2)^2 + w_{13}(f_1{-}f_3)^2 + w_{23}(f_2{-}f_3)^2 + w_{45}(f_4{-}f_5)^2 = 3 \cdot 1 + 1 \cdot 1 + 2 \cdot 4 + 2 \cdot 0 = 12$. The match is the identity proved below.
+</Example>
+
+<Definition title="graph Laplacian">
+For an undirected weighted graph with adjacency matrix $W$ and degree matrix $D$, the **(unnormalized) graph Laplacian** is
+$$
+L = D - W.
+$$
+</Definition>
+
+{/* fig LaplacianQuadraticForm: formula dissection of the Laplacian's quadratic form on a small graph. Left: a 5-vertex drawing of the worked example's graph (triangle 1-2-3 with edge weights 3, 1, 2; separate pair 4-5 with weight 2), with the edge (2,3) highlighted amber and the vertex values f_2 = 2, f_3 = 0 printed beside their vertices in blue. Right: the identity in KaTeX, f^\top L f \;=\; \tfrac{1}{2}\sum_{i,j} w_{ij}\,(f_i - f_j)^2, with an amber underbrace beneath w_{ij} labeled "edge weight: how much disagreement costs" and a blue underbrace beneath (f_i - f_j)^2 labeled "disagreement of f across the edge"; below it the highlighted edge's term plugged in: w_{23}(f_2 - f_3)^2 = 2\,(2-0)^2 = 8, amber. Bottom line spanning both: "f^\top L f is small ⟺ f is nearly constant on tightly connected sets". Colors: amber = the edge/weight role, blue = the f-values role; KaTeX via <M>, small SVG for the graph. */}
+<Figure
+  name="LaplacianQuadraticForm"
+  alt="The quadratic form of the Laplacian dissected: edge weights multiply squared disagreements of f across edges, shown with one highlighted edge's term computed on the five-vertex example"
+  caption="The quadratic form, term by term: f⊤Lf sums each edge's weight times the squared disagreement of f across it."
+/>
+
+<Theorem title="the quadratic form (von Luxburg 2007, Prop. 1)">
+For every $f \in \mathbb{R}^n$,
+$$
+f^\top L f = \tfrac{1}{2} \sum_{i,j=1}^{n} w_{ij}\,(f_i - f_j)^2 .
+$$
+Consequently $L$ is symmetric and positive semi-definite, its smallest eigenvalue is $0$ with the constant vector $\mathbb{1}$ as an eigenvector, and all $n$ eigenvalues are real and non-negative: $0 = \lambda_1 \le \lambda_2 \le \dots \le \lambda_n$.
+
+<Proof>
+Three lines, using $d_i = \sum_j w_{ij}$:
+$$
+f^\top L f = f^\top D f - f^\top W f = \sum_i d_i f_i^2 - \sum_{i,j} w_{ij} f_i f_j
+= \tfrac{1}{2}\Bigl(\sum_{i,j} w_{ij} f_i^2 - 2\sum_{i,j} w_{ij} f_i f_j + \sum_{i,j} w_{ij} f_j^2\Bigr),
+$$
+and the bracket is $\sum_{i,j} w_{ij}(f_i - f_j)^2$. The sum of non-negative terms is non-negative for every $f$, which is positive semi-definiteness; symmetry is inherited from $W$ and $D$; and $L\mathbb{1} = D\mathbb{1} - W\mathbb{1} = d - d = 0$ because each row of $W$ sums to the degree.
+</Proof>
+</Theorem>
+
+### From smooth labelings to connected components
+
+$f^\top L f$ is small exactly when $f$ is nearly constant across every heavy edge: when $f$ is *smooth on the graph*. An eigenvector with a small eigenvalue is therefore a labeling of the vertices that heavy edges barely disagree with, and a labeling that disagrees only across light edges is precisely a cluster assignment. The extreme case is a theorem.
+
+<Theorem title="zero eigenvalues count components (von Luxburg 2007, Prop. 2)">
+For an undirected graph with non-negative weights, the multiplicity of the eigenvalue $0$ of $L$ equals the number $k$ of connected components $A_1, \dots, A_k$, and the eigenspace of $0$ is spanned by the indicator vectors $\mathbb{1}_{A_1}, \dots, \mathbb{1}_{A_k}$ (the vector $\mathbb{1}_A$ has entry 1 on the vertices of $A$ and 0 elsewhere).
+
+<Proof>
+The connected case, $k = 1$, carries the idea. Let $f$ be an eigenvector with eigenvalue $0$. Then
+$$
+0 = f^\top L f = \tfrac{1}{2}\sum_{i,j} w_{ij} (f_i - f_j)^2,
+$$
+a sum of non-negative terms, so every term vanishes: whenever $w_{ij} > 0$, necessarily $f_i = f_j$. Along any path of positive-weight edges the value of $f$ is passed unchanged from vertex to vertex, and in a connected graph every pair of vertices is joined by such a path, so $f$ is constant. The eigenspace of $0$ is then exactly the span of $\mathbb{1}$, which is the indicator of the single component, and the multiplicity is 1.
+
+For general $k$ the same argument shows any $0$-eigenvector is constant on each component, and each indicator $\mathbb{1}_{A_i}$ is itself a $0$-eigenvector because no edge leaves $A_i$. Assembling this into the multiplicity statement is a block-matrix argument; the closing exercise on the general-$k$ proof completes it.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/ideal-case.svg"
+  alt="A nine-vertex graph with three components, its block-diagonal adjacency matrix, and the three indicator eigenvectors drawn as bar plots over the vertices, each with eigenvalue zero"
+  caption="The ideal case as linear algebra: order vertices by component and W is block diagonal; the three indicators are the entire 0-eigenspace."
+/>
+
+<Exercise>
+The paired problem: vertices $\{1,\dots,5\}$ with edges $w_{12} = w_{23} = 1$ (a path) and $w_{45} = 3$ (a separate pair). Write down $W$, $D$, and $L$; evaluate $f^\top L f$ for $f = (2, 0, 1, 1, -1)^\top$ both as a matrix product and as the edge sum; and state the multiplicity of the eigenvalue $0$ with a basis of its eigenspace. Attempt the computation on paper before opening the solution.
+
+<Solution>
+Degrees: $d = (1, 2, 1, 3, 3)$, so
+$$
+L = \begin{pmatrix} 1 & -1 & 0 & 0 & 0\\ -1 & 2 & -1 & 0 & 0\\ 0 & -1 & 1 & 0 & 0\\ 0 & 0 & 0 & 3 & -3\\ 0 & 0 & 0 & -3 & 3 \end{pmatrix}.
+$$
+Edge sum: $1\,(2-0)^2 + 1\,(0-1)^2 + 3\,(1-(-1))^2 = 4 + 1 + 12 = 17$. Matrix product: $Lf = (2, -3, 1, 6, -6)^\top$, and $f^\top Lf = 2\cdot 2 + 0 + 1 \cdot 1 + 1 \cdot 6 + (-1)(-6) = 17$. The graph has two components, $\{1,2,3\}$ and $\{4,5\}$, so $0$ has multiplicity 2 with eigenspace spanned by $(1,1,1,0,0)^\top$ and $(0,0,0,1,1)^\top$. The transferable move: the edge sum is usually the faster route, and it makes visible *which* edges pay: here the heavy pair edge contributes 12 of the 17.
+</Solution>
+</Exercise>
+
+<KeyFact>
+On real data the theorem's hypothesis almost never holds exactly (a good similarity graph is *nearly* disconnected, not disconnected), and the theorem degrades gracefully: a few light bridge edges perturb the zero eigenvalues into small ones and the indicators into nearly-piecewise-constant eigenvectors. That perturbed statement, not the exact one, is what spectral clustering runs on.
+</KeyFact>
+
+### The perturbed case: nearly disconnected, nearly indicator
+
+The five-vertex example shows the perturbation concretely. Add a bridge $w_{34} = 0.1$ to the triangle-plus-pair graph. The spectrum of $L$ becomes $0,\ 0.081,\ 4.04,\ 4.34,\ 7.74$: one exact zero (the graph is now connected), and one eigenvalue that is small because the graph is almost not. The eigenvector at $0.081$ is $(0.37,\ 0.37,\ 0.35,\ -0.54,\ -0.56)^\top$ up to sign: within a few percent of constant on $\{1,2,3\}$, constant with the opposite sign on $\{4,5\}$. Thresholding it at zero recovers the two pieces. This is the sign pattern the mixture lesson's exercise found on the rings, now with its mechanism visible; the formal backing, for what "a small perturbation moves eigenvectors only slightly" means, is the Davis–Kahan theorem of matrix perturbation theory, and the size of the eigengap $|\lambda_{k+1} - \lambda_k|$ is what controls the bound.
+
+<Figure
+  src="./figures/luxburg-eigenvectors.png"
+  alt="Histogram of 200 points drawn from four Gaussians on the line, above four rows of panels. Each row shows the ten smallest eigenvalues and the first five eigenvectors of a Laplacian: the two 10-nearest-neighbour rows have four eigenvalues at zero and flat-topped indicator eigenvectors, one per cluster; the two fully-connected rows have a single zero eigenvalue and a constant first eigenvector, with eigenvectors 2 to 4 smooth curves that still change sign between the clusters."
+  caption="The same computation at realistic scale. Rows 1–2 are the 10-NN graph, where the four clusters are exact components: four eigenvalues at zero, four indicator eigenvectors. Rows 3–4 are the fully connected Gaussian-similarity graph, where nothing is disconnected — one zero eigenvalue, a constant first eigenvector, and eigenvectors 2–4 smooth but still nearly piecewise constant on the clusters."
+/>
+
+The experiment: 200 points drawn from four 1-D Gaussians on the line, both graphs built on the same sample. Thresholding eigenvectors 2–4 of the fully connected graph separates every cluster from every other; the ideal case is a theorem, and the real case is that theorem seen through a small perturbation.
+
+## Cuts: what the eigenvector is optimizing
+
+The perturbation story says the small eigenvectors *find* clusters; it does not yet say what they optimize. The answer connects the spectrum to an explicit objective on partitions, and explains the balance property that makes the objective NP-hard and the eigenvector its tractable relaxation.
+
+For disjoint vertex sets, write $\operatorname{cut}(A, \bar A) = \sum_{i \in A, j \in \bar A} w_{ij}$ for the weight crossing a two-way partition. Minimizing the cut alone is solvable in polynomial time and useless: on realistic graphs the minimum cut severs one weakly attached vertex, a cluster of one. The repair is to charge the objective for imbalance.
+
+<Definition title="RatioCut and Ncut">
+For a partition $A_1, \dots, A_k$ of $V$, with $|A|$ the number of vertices in $A$ and $\operatorname{vol}(A) = \sum_{i \in A} d_i$ the total degree in $A$,
+$$
+\operatorname{RatioCut}(A_1,\dots,A_k) = \sum_{i=1}^k \frac{\operatorname{cut}(A_i, \bar A_i)}{|A_i|},
+\qquad
+\operatorname{Ncut}(A_1,\dots,A_k) = \sum_{i=1}^k \frac{\operatorname{cut}(A_i, \bar A_i)}{\operatorname{vol}(A_i)}.
+$$
+</Definition>
+
+Both objectives divide each piece's crossing weight by its size, so a cluster of one buys almost nothing; the sum $\sum_i 1/|A_i|$ is minimized when the sizes are equal, so both favor balanced partitions. The price of the repair: minimizing either objective over partitions is NP-hard. Spectral clustering is what remains when the hardness is relaxed away, and the derivation is short enough to carry in full for RatioCut with $k = 2$.
+
+### The relaxation: from a partition to the second eigenvector
+
+Encode a candidate partition $(A, \bar A)$ as a vector $f \in \mathbb{R}^n$ with two values:
+$$
+f_i = \begin{cases} \;\sqrt{|\bar A| / |A|} & v_i \in A, \\ -\sqrt{|A| / |\bar A|} & v_i \in \bar A. \end{cases}
+$$
+The constants are chosen to make three identities hold at once. First, by the quadratic form, only crossing edges contribute to $f^\top L f$, each paying $\bigl(\sqrt{|\bar A|/|A|} + \sqrt{|A|/|\bar A|}\bigr)^2 = n/|A| + n/|\bar A|$, so
+$$
+f^\top L f = \operatorname{cut}(A, \bar A)\,\Bigl(\tfrac{n}{|A|} + \tfrac{n}{|\bar A|}\Bigr) = n \cdot \operatorname{RatioCut}(A, \bar A).
+$$
+Second, $\sum_i f_i = |A|\sqrt{|\bar A|/|A|} - |\bar A|\sqrt{|A|/|\bar A|} = 0$: every such $f$ is orthogonal to $\mathbb{1}$. Third, $\lVert f \rVert^2 = |A| \cdot \tfrac{|\bar A|}{|A|} + |\bar A| \cdot \tfrac{|A|}{|\bar A|} = n$: every such $f$ has the same length. Minimizing RatioCut is therefore *exactly* the problem
+$$
+\min_{f}\; f^\top L f \quad \text{subject to} \quad f \perp \mathbb{1},\; \lVert f \rVert = \sqrt{n},\; f \text{ takes the two prescribed values.}
+$$
+
+The last constraint carries all the hardness: $f$ ranges over finitely many sign patterns. Drop it, letting $f$ range over all of $\mathbb{R}^n$ under the two remaining constraints, and the problem becomes a textbook one: minimizing a quadratic form over unit-norm vectors orthogonal to the bottom eigenvector is solved, by the [Rayleigh–Ritz theorem](https://en.wikipedia.org/wiki/Min-max_theorem), by the eigenvector of the second-smallest eigenvalue, with value $n\lambda_2$. The optimizer of the relaxed problem is the vector the perturbation section already met: the second eigenvector of $L$, called the *Fiedler vector* after the 1973 paper that first tied $\lambda_2$ to graph connectivity. Its entries are no longer two-valued, so a rounding step converts it back into a partition: threshold at zero, or more robustly, cluster its entries.
+
+{/* fig RelaxationFeasibleSets: where the relaxation loses optimality, drawn on the bridge graph's numbers. One schematic panel. The constraint set {f : f ⊥ 1, ‖f‖ = √n} drawn as one large circle (the sphere intersected with the hyperplane); on the circle ~10 small gray dots = the finitely many two-valued encodings, one per partition (n = 5 gives 15 sign patterns; draw a representative subset), with the discrete optimum's dot amber, labeled with its value f^\top L f = 0.417; elsewhere on the circle a blue star = the Fiedler vector u_2, labeled n\lambda_2 = 0.405; a dashed arrow from the blue star to the amber dot labeled "rounding — no guarantee". Above the circle, two problem statements in KaTeX: left "\min over the dots — NP-hard", right "\min over the whole circle — eigenproblem, value n\lambda_2". Colors: gray = discrete encodings, amber = discrete optimum, blue = relaxed optimizer; KaTeX via <M>; keep the circle geometry schematic (it stands for an (n−2)-sphere). */}
+<Figure
+  name="RelaxationFeasibleSets"
+  alt="The constraint sphere with finitely many two-valued encodings as dots on it, the discrete optimum at value 0.417, the Fiedler vector as a point elsewhere on the sphere at value 0.405, and a rounding arrow back to the discrete set carrying no guarantee"
+  caption="The relaxation in one picture: the two-valued encodings are finitely many points on the sphere f ⊥ 𝟙, ‖f‖ = √n; the eigenproblem minimizes over the whole sphere, so its value can only be lower, and rounding its minimizer back to a partition carries no guarantee."
+/>
+
+<Example title="the relaxation on the bridge graph">
+On the five-vertex bridge graph ($w_{34} = 0.1$), take $A = \{1,2,3\}$: the encoding is $f = (\sqrt{2/3}, \sqrt{2/3}, \sqrt{2/3}, -\sqrt{3/2}, -\sqrt{3/2})^\top \approx (0.816, 0.816, 0.816, -1.225, -1.225)^\top$. Only the bridge crosses, so
+$$
+f^\top L f = 0.1\,(0.816 + 1.225)^2 = 0.417 = 5 \times \underbrace{\bigl(\tfrac{0.1}{3} + \tfrac{0.1}{2}\bigr)}_{\operatorname{RatioCut} \,=\, 1/12} .
+$$
+The relaxed minimum is $n \lambda_2 = 5 \times 0.081 = 0.405$: *below* the best discrete value $0.417$, as a minimum over a larger set must be. The relaxed optimizer, the Fiedler vector $(0.37, 0.37, 0.35, -0.54, -0.56)^\top$, is not two-valued, but its sign pattern reproduces the optimal partition exactly. On this graph, rounding loses nothing; the cockroach graph below is the case where it loses a factor growing with $n$.
+</Example>
+
+### General k: a trace problem, then k-means on the rows
+
+The same encoding generalizes. For a $k$-way partition, stack $k$ scaled indicator columns into $H \in \mathbb{R}^{n \times k}$, $h_{ij} = 1/\sqrt{|A_j|}$ if $v_i \in A_j$ and $0$ otherwise. Then $H^\top H = I$, each column obeys $h_j^\top L h_j = \operatorname{cut}(A_j, \bar A_j)/|A_j|$, and
+$$
+\operatorname{RatioCut}(A_1, \dots, A_k) = \operatorname{Tr}(H^\top L H).
+$$
+Relaxing the indicator structure to an arbitrary matrix with orthonormal columns gives $\min_{H^\top H = I} \operatorname{Tr}(H^\top L H)$, and the trace version of Rayleigh–Ritz answers it: the columns of the optimal $H$ are the first $k$ eigenvectors of $L$. The rounding step now has $k$ columns to round at once, and the standard device is to read the matrix by rows: vertex $i$ becomes the point $y_i = (u_1(i), \dots, u_k(i)) \in \mathbb{R}^k$, the **spectral embedding**, and k-means clusters the $y_i$.
+
+{/* fig SpectralEmbeddingRows: matrix as a literal cell grid, read by rows — the ideal-case eigenvector matrix becoming the embedding. Left: H ∈ R^{9×3} drawn as a 9×3 grid of cells for a graph with three components of three vertices each (rows 1–3 component A, rows 4–6 component B, rows 7–9 component C); column heads u_1, u_2, u_3; cell values the scaled indicators (1/√3 in the component's block, 0 elsewhere), nonzero cells shaded, rows tinted faintly by component color; row 5 outlined amber with the callout y_5 = (u_1(5), u_2(5), u_3(5)) beside it. Right: a small scatter panel — the nine rows plotted as points, showing exactly three visible points (each a stack of three coinciding rows), colored by component, the amber row's point ringed; panel label "k-means sees k point-stacks". A single arrow from the highlighted row to its point, labeled "vertex i ↦ row i". Colors: three component colors for rows/points, amber = the followed row; KaTeX via <M>. */}
+<Figure
+  name="SpectralEmbeddingRows"
+  alt="A nine-by-three eigenvector matrix drawn as a cell grid with one row highlighted and an arrow carrying that row to its point in the embedding, where each component's three identical rows coincide in a single point"
+  caption="The embedding is a change of reading direction: columns of H are eigenvectors, but rows are what gets clustered — in the ideal case each row is a scaled indicator corner, and all rows of one component coincide."
+/>
+
+This final k-means is not the k-means that failed on the rings, because it runs on the embedding rather than on the data. In the ideal $k$-component case the rows are exactly $k$ distinct points: each vertex sits on the (scaled) corner of the indicator it belongs to, all members of a component coinciding; in the perturbed case they sit in $k$ tight point clouds near those corners. Tight, well-separated clouds around $k$ centers are exactly the geometry k-means assumes, so any sensible partitioner would do, and k-means is the convenient one.
+
+<FigureSequence
+  name="pipeline"
+  alt="Four frames: 450 points in three concentric rings; the 10-nearest-neighbor graph built on them; the two-dimensional spectral embedding collapsing each ring to a point; and k-means labels in the embedding mapped back onto the rings"
+  caption="The full pipeline on three rings (radii 1, 2.8, 5, the geometry of ESL §14.5.3): graph, embedding, k-means, labels back."
+/>
+
+<Task>
+Before opening frame 3, predict what 450 points spread over three rings become in the embedding. Then check: in this run the 10-NN graph has exactly three components, so the 150 rows of each ring coincide in a single point: the ideal case of the theorem, reached on real coordinates. k-means in frame 4 is handed three point-stacks and cannot miss.
+</Task>
+
+Computationally the pipeline is one sparse eigenproblem. A kNN graph has $O(nk)$ edges, sparse eigensolvers (Lanczos and relatives) extract a few extreme eigenvectors without ever forming a dense matrix, and their convergence is fast exactly when the eigengap is large, i.e. exactly when the clustering is well-posed. One caveat inherited from degenerate eigenvalues: when eigenvalues coincide or nearly coincide, the solver returns an arbitrary orthonormal basis of the eigenspace rather than the indicators themselves; any such basis is a rotation of the indicators, still piecewise constant on components, so the k-means step is unaffected.
+
+## Three Laplacians, one recommendation
+
+Relaxing Ncut instead of RatioCut runs the identical derivation with $\operatorname{vol}$ in place of $|\cdot|$, and lands on a different matrix: the encoding's constants pick up degrees, the constraint $f \perp \mathbb{1}$ becomes $f \perp D\mathbb{1}$, and a substitution $g = D^{1/2} f$ converts the relaxed problem into a Rayleigh quotient of the *symmetric normalized Laplacian* $L_{\mathrm{sym}} = D^{-1/2} L D^{-1/2}$, whose eigenproblem is equivalent to the generalized problem $Lu = \lambda D u$, which is the eigenproblem of the *random-walk Laplacian* $L_{\mathrm{rw}} = D^{-1} L$. The exercise below runs that chain step by step, with the RatioCut derivation above as its template. Three matrices, three published algorithms, all with the same shape (build graph → bottom $k$ eigenvectors → k-means on rows):
+
+- **Unnormalized**: eigenvectors of $L$; relaxes RatioCut.
+- **Shi–Malik (2000)**: generalized eigenvectors of $Lu = \lambda Du$, i.e. eigenvectors of $L_{\mathrm{rw}}$; relaxes Ncut. Introduced for image segmentation, where the vertices are pixels.
+- **Ng–Jordan–Weiss (2002)**: eigenvectors of $L_{\mathrm{sym}}$, with one extra step: normalize each embedding row to unit length before k-means. The step exists because $L_{\mathrm{sym}}$'s ideal-case eigenvectors are $D^{1/2}\mathbb{1}_{A_i}$, not indicators: low-degree vertices get small entries, and the row normalization undoes the distortion.
+
+<Exercise>
+The parallel problem to the bridge-graph example, run at the general level: derive the Ncut relaxation and identify the matrix that solves it. Encode a partition $(A, \bar A)$ as
+$$
+f_i = \begin{cases} \;\sqrt{\operatorname{vol}(\bar A) / \operatorname{vol}(A)} & v_i \in A, \\ -\sqrt{\operatorname{vol}(A) / \operatorname{vol}(\bar A)} & v_i \in \bar A. \end{cases}
+$$
+**(a)** Prove the three identities that mirror the RatioCut derivation's: $f^\top L f = \operatorname{vol}(V) \cdot \operatorname{Ncut}(A, \bar A)$; $(Df)^\top \mathbb{1} = 0$, i.e. $f \perp D\mathbb{1}$; and $f^\top D f = \operatorname{vol}(V)$. **(b)** Drop the two-valuedness constraint and substitute $g = D^{1/2} f$: show the relaxed problem becomes minimizing $g^\top L_{\mathrm{sym}} g$ subject to $g \perp D^{1/2}\mathbb{1}$ and $\lVert g \rVert^2 = \operatorname{vol}(V)$, and check that $D^{1/2}\mathbb{1}$ is exactly the eigenvector of $L_{\mathrm{sym}}$'s eigenvalue $0$, so Rayleigh–Ritz applies verbatim. **(c)** Translate back: show that $L_{\mathrm{sym}} g = \lambda g$ with $f = D^{-1/2} g$ is equivalent to $L f = \lambda D f$, which is equivalent to $L_{\mathrm{rw}} f = \lambda f$, and conclude which vector the relaxed Ncut problem hands to the rounding step.
+
+<Solution>
+**(a)** Only crossing edges contribute to the quadratic form, and each pays
+$$
+\Bigl(\sqrt{\tfrac{\operatorname{vol}(\bar A)}{\operatorname{vol}(A)}} + \sqrt{\tfrac{\operatorname{vol}(A)}{\operatorname{vol}(\bar A)}}\Bigr)^2 = \frac{\operatorname{vol}(\bar A)}{\operatorname{vol}(A)} + 2 + \frac{\operatorname{vol}(A)}{\operatorname{vol}(\bar A)} = \frac{\operatorname{vol}(V)}{\operatorname{vol}(A)} + \frac{\operatorname{vol}(V)}{\operatorname{vol}(\bar A)},
+$$
+using $\operatorname{vol}(A) + \operatorname{vol}(\bar A) = \operatorname{vol}(V)$ to combine each fraction with a $1$. Hence $f^\top L f = \operatorname{cut}(A, \bar A) \cdot \operatorname{vol}(V) \bigl(\tfrac{1}{\operatorname{vol}(A)} + \tfrac{1}{\operatorname{vol}(\bar A)}\bigr) = \operatorname{vol}(V) \cdot \operatorname{Ncut}(A, \bar A)$. Next, $(Df)^\top \mathbb{1} = \sum_i d_i f_i = \operatorname{vol}(A)\sqrt{\operatorname{vol}(\bar A)/\operatorname{vol}(A)} - \operatorname{vol}(\bar A)\sqrt{\operatorname{vol}(A)/\operatorname{vol}(\bar A)} = \sqrt{\operatorname{vol}(A)\operatorname{vol}(\bar A)} - \sqrt{\operatorname{vol}(A)\operatorname{vol}(\bar A)} = 0$. Finally $f^\top D f = \sum_i d_i f_i^2 = \operatorname{vol}(A) \cdot \tfrac{\operatorname{vol}(\bar A)}{\operatorname{vol}(A)} + \operatorname{vol}(\bar A) \cdot \tfrac{\operatorname{vol}(A)}{\operatorname{vol}(\bar A)} = \operatorname{vol}(\bar A) + \operatorname{vol}(A) = \operatorname{vol}(V)$. Minimizing Ncut is therefore exactly minimizing $f^\top L f$ over vectors satisfying the two constraints *and* taking the two prescribed values, and dropping the last constraint is the relaxation.
+
+**(b)** With every $d_i > 0$ the substitution is invertible, $f = D^{-1/2} g$. The objective becomes $f^\top L f = g^\top D^{-1/2} L D^{-1/2} g = g^\top L_{\mathrm{sym}} g$; the norm constraint becomes $f^\top D f = g^\top g = \operatorname{vol}(V)$; and the orthogonality constraint becomes $0 = (Df)^\top \mathbb{1} = (D^{1/2} g)^\top \mathbb{1} = g^\top D^{1/2} \mathbb{1}$, i.e. $g \perp D^{1/2}\mathbb{1}$. The substitution is what makes Rayleigh–Ritz available at all: $L_{\mathrm{rw}}$ is not symmetric, but $L_{\mathrm{sym}}$ is, and it is positive semi-definite because $g^\top L_{\mathrm{sym}} g = f^\top L f \ge 0$. Its bottom eigenvector: $L_{\mathrm{sym}}(D^{1/2}\mathbb{1}) = D^{-1/2} L D^{-1/2} D^{1/2} \mathbb{1} = D^{-1/2} L \mathbb{1} = 0$, so $D^{1/2}\mathbb{1}$ spans the $0$-eigenspace (for a connected graph), and the relaxed problem is minimizing a symmetric quadratic form over fixed-norm vectors orthogonal to the bottom eigenvector. Rayleigh–Ritz answers it: $g$ is the second eigenvector of $L_{\mathrm{sym}}$, and the minimum value is $\operatorname{vol}(V)\,\lambda_2(L_{\mathrm{sym}})$ — the exact analogue of the RatioCut relaxation's $n\lambda_2(L)$.
+
+**(c)** Substitute $g = D^{1/2} f$ into $L_{\mathrm{sym}} g = \lambda g$: $D^{-1/2} L D^{-1/2} D^{1/2} f = \lambda D^{1/2} f$, i.e. $D^{-1/2} L f = \lambda D^{1/2} f$. Left-multiplying by $D^{1/2}$ gives $L f = \lambda D f$; left-multiplying that by $D^{-1}$ gives $L_{\mathrm{rw}} f = \lambda f$. All three problems share eigenvalues, and the eigenvectors translate by $D^{\pm 1/2}$. The vector handed to the rounding step is $f = D^{-1/2} g$: the second eigenvector of $L_{\mathrm{rw}}$, equivalently the second generalized eigenvector of $Lu = \lambda D u$ — precisely what the Shi–Malik algorithm computes. In the ideal case these $f$ are plain indicators (not the $D^{1/2}$-distorted vectors $L_{\mathrm{sym}}$ returns), which is the third argument below.
+</Solution>
+</Exercise>
+
+### The verdict: normalize, and prefer the random walk
+
+Three independent arguments select the same algorithm: use a normalized Laplacian, and within the pair use $L_{\mathrm{rw}}$.
+
+**The objective:** a good clustering should make between-cluster weight small and within-cluster weight large. Since $W(A, A) = \operatorname{vol}(A) - \operatorname{cut}(A, \bar A)$, minimizing Ncut pushes both goals at once, while $|A|$ counts vertices, not similarity, so RatioCut — the objective the unnormalized $L$ relaxes — only pushes the first.
+
+**Consistency:** as $n \to \infty$ the normalized algorithms converge to a well-defined partition of the underlying distribution under mild conditions, while unnormalized spectral clustering can fail to converge at all.
+
+**The Dirac-spike signature:** the unnormalized failure is visible at finite $n$. Eigenvalues of $L$ that approach the minimum degree $\min_j d_j$ acquire eigenvectors approximating *Dirac spikes*, vectors nearly zero everywhere but at one vertex, and clustering with a spike separates one point from the rest: the mincut pathology, reintroduced by the matrix. The working rule if $L$ is used anyway: trust only eigenvectors whose eigenvalues sit well below $\min_j d_j$.
+
+**Within the normalized pair:** $L_{\mathrm{rw}}$'s ideal eigenvectors are the plain indicators, while $L_{\mathrm{sym}}$'s carry the $D^{1/2}$ factor that the extra row-normalization step must repair; the repair itself misbehaves for very low-degree vertices.
+
+<KeyFact>
+The working default, in one line: build a kNN similarity graph, and cluster with the eigenvectors of $L_{\mathrm{rw}}$ (equivalently, the generalized eigenvectors of $Lu = \lambda Du$). Cut objective, consistency theory, and the Dirac pathology all point at the same choice.
+</KeyFact>
+
+## Choosing k: the eigengap, and what the relaxation does not promise
+
+Every method in this module has faced the number-of-clusters question, and <Ref lesson="gmm-em">the mixture lesson</Ref> answered it with held-out likelihood. Spectral clustering has no likelihood, but the ideal-case theorem hands it a native heuristic: with $k$ true components, exactly $k$ eigenvalues are zero and $\lambda_{k+1}$ is strictly positive, so in the perturbed case one looks for the index where the eigenvalues jump: choose $k$ such that $\lambda_1, \dots, \lambda_k$ are small and $|\lambda_{k+1} - \lambda_k|$ is large. This *eigengap heuristic* is the same quantity Davis–Kahan says controls the quality of the perturbed eigenvectors, so a large gap certifies both the count and the embedding at once.
+
+<Figure
+  src="./figures/eigengap.svg"
+  alt="Three four-Gaussian datasets of increasing overlap and the ten smallest eigenvalues of the random-walk Laplacian for each; the gap after the fourth eigenvalue is wide, then shrinks, then disappears"
+  caption="The eigengap under increasing blur: four zeros then λ₅ ≈ 0.095; a shrunken but readable gap; no gap at all."
+/>
+
+<Task>
+Read $k$ off each panel as the heuristic would: count the eigenvalues before the largest jump. Left panel: four (exact zeros: the 10-NN graph is disconnected). Middle: four, with $\lambda_2$–$\lambda_4$ now lifted to 0.006–0.016 against $\lambda_5 \approx 0.08$. Right: the jumps are all comparable, and the honest reading is that the heuristic declines to answer, which matches the data, where no human count of the overlapping clusters is defensible either.
+</Task>
+
+The degradation is itself information: the heuristic works when clusters are pronounced, blurs as they blur, and returns ambiguity on ambiguous data rather than a confident wrong answer. It interacts with the graph parameters: a too-small $k$ in the kNN construction manufactures components and thus fake zero eigenvalues, which the heuristic will faithfully count.
+
+### The cockroach: the relaxation has no guarantee
+
+The derivation dropped one constraint, and the drop must be priced. The correct statement is strictly negative: the value of the relaxed problem bounds the true minimum from below ($n\lambda_2 \le n \cdot \operatorname{RatioCut}_{\min}$), but nothing bounds the quality of the partition obtained by rounding the eigenvector; the gap between what spectral clustering returns and the optimal cut can be arbitrarily large. Guattery and Miller (1998) constructed the standard witness, a ladder of $4m$ vertices with the rungs removed on one half ($m$ is a size parameter of the graph, not a cluster count — the partition here is 2-way).
+
+<Figure
+  src="./figures/cockroach.svg"
+  alt="The cockroach graph: two horizontal paths of ten vertices joined by rungs only on the right half, with the optimal vertical cut severing two edges and the relaxation's horizontal cut severing all five rungs"
+  caption="The cockroach graph, m = 5: the optimal balanced cut costs 2 edges (RatioCut 2/m); the eigenvector's cut severs the m rungs (RatioCut 1)."
+/>
+
+The optimal balanced 2-partition cuts vertically: left half against right half, severing one edge in each path ($\operatorname{cut} = 2$, $\operatorname{RatioCut} = 2/m$). But the second eigenvector of $L$ on this graph provably splits it *horizontally*, top path against bottom, severing all $m$ rungs: also perfectly balanced, but $\operatorname{RatioCut} = 1$, worse by a factor $m/2 = n/8$ that grows without bound in the graph size. The smooth eigenvector prefers to vary slowly along the long paths rather than jump across the short cut, and rounding cannot recover what the relaxation has already discarded. Approximating balanced cuts within a constant factor is itself NP-hard, so no cheap fix exists; the spectral relaxation is popular because it is a standard eigenproblem (solvable, sparse, deterministic), not because it carries an approximation certificate.
+
+<KeyFact>
+"Spectral clustering minimizes the normalized cut" is false; it minimizes the *relaxation* of the cut, and the discreteness constraint it drops can cost a factor of order $n$ on adversarial graphs (the cockroach), with no general guarantee available even in principle. On graphs whose eigengap is healthy the perturbation argument, not an approximation theorem, is what justifies the output.
+</KeyFact>
+
+## ★ The random-walk reading: Ncut is an escape probability
+
+The name $L_{\mathrm{rw}}$ records a reformulation with content of its own. Normalize each row of $W$ by its degree: $P = D^{-1}W$ is a stochastic matrix, the transition matrix of the random walk on the graph that jumps from $i$ to $j$ with probability $w_{ij}/d_i$. Then $L_{\mathrm{rw}} = I - P$: the small eigenvalues of $L_{\mathrm{rw}}$ are the large eigenvalues of $P$, and spectral clustering reads the walk's slow mixing directions. For a connected, non-bipartite graph the walk has stationary distribution $\pi_i = d_i / \operatorname{vol}(V)$: heavy vertices are visited proportionally more often.
+
+<Theorem title="Ncut as transition probability (Meila & Shi 2001)">
+Run the stationary walk, $X_0 \sim \pi$. For a partition $(A, \bar A)$, with $P(\bar A \mid A) = P(X_1 \in \bar A \mid X_0 \in A)$,
+$$
+\operatorname{Ncut}(A, \bar A) = P(\bar A \mid A) + P(A \mid \bar A).
+$$
+
+<Proof>
+For any sets, $P(X_0 \in A, X_1 \in B) = \sum_{i \in A, j \in B} \pi_i p_{ij} = \sum_{i \in A, j \in B} \frac{d_i}{\operatorname{vol}(V)} \frac{w_{ij}}{d_i} = \frac{1}{\operatorname{vol}(V)} \sum_{i \in A, j \in B} w_{ij}$. Dividing by $P(X_0 \in A) = \operatorname{vol}(A)/\operatorname{vol}(V)$ gives $P(\bar A \mid A) = \operatorname{cut}(A, \bar A)/\operatorname{vol}(A)$, and summing the two directions is the definition of Ncut.
+</Proof>
+</Theorem>
+
+Minimizing Ncut therefore finds the partition a random walker is most reluctant to cross: started inside a cluster, the walk stays inside for a long time. This is the cleanest intuition for why volume, not vertex count, is the right balance term (the walk weighs vertices by degree), and it connects spectral clustering to the diffusion-based embeddings of the literature. One kinship to record: the bottom eigenvectors of $L_{\mathrm{sym}}$ are the *top* eigenvectors of the similarity operator $D^{-1/2} W D^{-1/2}$, so the embedding step is kernel PCA (<Ref lesson="pca">PCA's</Ref> Gram-matrix machinery) applied to a normalized similarity matrix in place of a centered Gram matrix; the kernel-PCA exercise below makes the correspondence exact.
+
+## What is established, and what comes next
+
+Clustering has been reformulated as graph partitioning: the similarity graph carries the modeling bias (kNN as the default construction); the Laplacian's quadratic form measures a labeling's disagreement with the graph; zero eigenvalues count exact components and small eigenvalues count approximate ones; the balanced-cut objectives RatioCut and Ncut relax, exactly and derivably, into the bottom eigenvectors of $L$ and $L_{\mathrm{rw}}$; k-means in the embedding is principled because the embedding concentrates clusters at indicator corners; the eigengap chooses $k$ and degrades gracefully; and the relaxation carries no approximation guarantee, with the cockroach graph as the standing counterexample. The eigenvector embedding did one more thing along the way: it drew a faithful low-dimensional picture of nonconvex structure (frame 3 of the pipeline), which PCA's linear projections provably cannot. <Ref lesson="tsne">The next lesson</Ref> takes up embeddings built for exactly that purpose, t-SNE and UMAP, whose kNN-graph foundations this lesson has already laid, and whose maps introduce distortions of their own that must be read with care.
+
+## Exercises
+
+<Exercise>
+Complete the proof of the components theorem for general $k$: show that if a graph has connected components $A_1, \dots, A_k$, the eigenvalue $0$ of $L$ has multiplicity exactly $k$ with eigenspace $\operatorname{span}\{\mathbb{1}_{A_1}, \dots, \mathbb{1}_{A_k}\}$. Use the structure of $L$ when vertices are ordered by component.
+
+<Solution>
+Order the vertices so that each component's vertices are contiguous. No edge joins different components, so $W$, and with it $L$, is block diagonal, $L = \operatorname{diag}(L_1, \dots, L_k)$, where $L_i$ is the graph Laplacian of the $i$-th component's subgraph (each block has the correct degrees, since all of a vertex's edges stay inside its component). The spectrum of a block-diagonal matrix is the union of the blocks' spectra, and each eigenvector of $L$ is an eigenvector of one block padded with zeros elsewhere.
+
+Each $L_i$ is the Laplacian of a *connected* graph, so by the case proved in the lesson its eigenvalue $0$ has multiplicity exactly 1, with the constant vector on that component as eigenvector. Union over blocks: $0$ appears exactly $k$ times in the spectrum of $L$, once per component, and the corresponding padded eigenvectors are precisely $\mathbb{1}_{A_1}, \dots, \mathbb{1}_{A_k}$. They are linearly independent (disjoint supports), so they span the full $k$-dimensional eigenspace. Both directions are now in hand: indicators are $0$-eigenvectors, and there is no room in the eigenspace for anything outside their span.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two boundary probes for the eigengap heuristic. (a) The fully connected graph on $n$ vertices with equal weights $w_{ij} = w$ for all $i \ne j$: compute the full spectrum of $L$, state what the eigengap heuristic returns, and explain why that is the right answer by computing $\operatorname{RatioCut}(A, \bar A)$ for an arbitrary subset $A$. (b) A graph containing one isolated vertex $v$ (degree $0$): state what the spectrum of $L$ contains, what spectral clustering with $k = 2$ returns, and which step of the pipeline is responsible.
+
+<Solution>
+**(a)** $L = D - W = (n{-}1)w\,I - w(J - I) = nw\,I - w J$, with $J$ the all-ones matrix. $J$ has eigenvalues $n$ (eigenvector $\mathbb{1}$) and $0$ (multiplicity $n{-}1$), so $L$ has eigenvalue $0$ once and $nw$ with multiplicity $n - 1$. The heuristic sees one small eigenvalue and then a flat plateau: the only gap sits after $\lambda_1$, so it returns $k = 1$: the graph is one cluster. That is correct, and the cut computation shows why in the strongest sense: for any $A$ with $|A| = a$, $\operatorname{cut}(A, \bar A) = a(n-a)w$, so $\operatorname{RatioCut}(A,\bar A) = a(n-a)w\,(\tfrac1a + \tfrac1{n-a}) = nw$: every partition scores identically. There is no structure to find, and the spectrum's degeneracy (all nonzero eigenvalues equal) is exactly the statement that no direction of splitting is preferred.
+
+**(b)** An isolated vertex is a connected component of size one, so by the components theorem $\mathbb{1}_{\{v\}}$ is a $0$-eigenvector and $0$ has multiplicity $\ge 2$. With $k = 2$, the embedding separates $v$ from everything else perfectly, and spectral clustering returns the partition $\{v\}$ versus the rest, the "cluster of one" that RatioCut's balance term was introduced to forbid. No step downstream is at fault: the *graph construction* declared $v$ unrelated to all other points, and the algorithm faithfully reports the components of the graph it was given. (For $L_{\mathrm{rw}}$ the situation is worse: $d_v = 0$ makes $D^{-1}$ undefined.) The practical rule from the similarity-graph section follows: check connectivity and isolated vertices before trusting the spectrum, and treat degree-0 or near-0 vertices as outliers to handle separately.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Spectral clustering returns the partition minimizing RatioCut; the derivation proved it." Name the exact step of the derivation where optimality is lost, state what remains provably true about the relaxed value, and give the counterexample with its numbers.
+
+<Solution>
+The derivation established an exact equivalence between minimizing RatioCut and minimizing $f^\top L f$ over vectors $f$ constrained to the two prescribed values $\sqrt{|\bar A|/|A|}$ and $-\sqrt{|A|/|\bar A|}$. Optimality is lost at the relaxation step, "drop the discreteness constraint and let $f$ range over $\mathbb{R}^n$": after that step the minimizer is the Fiedler vector, an object with no obligation to resemble any two-valued vector. What survives is only a one-sided bound: the relaxed value satisfies $n\lambda_2 \le n\cdot\operatorname{RatioCut}_{\min}$, so $\lambda_2$ *lower-bounds* the best achievable balanced-cut score; nothing upper-bounds the RatioCut of the partition obtained by rounding.
+
+The counterexample is the cockroach graph on $4m$ vertices: the optimal balanced cut severs 2 edges (RatioCut $= 2/m$), while the second eigenvector provably yields the horizontal cut through all $m$ rungs (RatioCut $= 1$), a factor $m/2$, i.e. $\Theta(n)$, worse. The claim's error generalizes: a relaxation's *value* always bounds the discrete optimum, but its *argmin*, pushed back through rounding, carries no guarantee unless one is separately proved; for balanced graph cuts, constant-factor approximation is itself NP-hard, so none can exist in general.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. Show that in the ideal case the spectral embedding step is kernel PCA in disguise: (a) prove that $u$ is an eigenvector of $L_{\mathrm{sym}}$ with eigenvalue $\lambda$ if and only if $u$ is an eigenvector of $M = D^{-1/2} W D^{-1/2}$ with eigenvalue $1 - \lambda$; (b) conclude that taking the $k$ *smallest* eigenvectors of $L_{\mathrm{sym}}$ is taking the $k$ *largest* of $M$, and compare with what <Ref lesson="pca">PCA</Ref> does with a Gram matrix. One paragraph each.
+
+<Solution>
+**(a)** $L_{\mathrm{sym}} = I - D^{-1/2} W D^{-1/2} = I - M$, so $L_{\mathrm{sym}} u = \lambda u \iff (I - M)u = \lambda u \iff Mu = (1-\lambda)u$: same eigenvectors, eigenvalues reflected through $1$. Ordering is reversed: the bottom of $L_{\mathrm{sym}}$'s spectrum is the top of $M$'s.
+
+**(b)** PCA's Gram-trick form (the $d \gg n$ route of the PCA lesson) computes the top-$k$ eigenvectors of the $n \times n$ centered Gram matrix of inner products and uses them as sample coordinates. The spectral embedding computes the top-$k$ eigenvectors of the $n \times n$ matrix $M$, a degree-normalized similarity matrix, and uses them as vertex coordinates. Structurally these are the same operation: kernel PCA with $M$ playing the kernel matrix's role. The differences are the normalization ($M$ is degree-normalized rather than centered; the constant-direction top eigenvector of $M$ plays the role centering plays for PCA and is kept rather than removed) and positive-semidefiniteness, which $M$ is not obliged to satisfy for an arbitrary graph, so "kernel" is exact only up to that caveat; the identification is developed in Bengio et al. (2004). The conceptual payoff: PCA finds directions of *maximal variance* in a feature space, the spectral embedding finds directions of *minimal disagreement* on a graph, and one is the mirror image of the other under $\lambda \mapsto 1 - \lambda$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce von Luxburg's Figure 1 experiment in miniature. Draw 200 points on the line from a mixture of four Gaussians with means $2, 4, 6, 8$ and standard deviation $0.25$ (50 points each); build the 10-NN graph weighted by the Gaussian similarity with $\sigma = 1$; form $L_{\mathrm{rw}}$ (as the generalized problem $Lu = \lambda Du$, or via $L_{\mathrm{sym}}$); report the five smallest eigenvalues and whether the eigengap sits at 4. State before running what would count as agreement with the published figure.
+
+<Solution>
+Agreement criterion, fixed in advance: four eigenvalues near zero, a fifth clearly separated (the published figure shows the first four at zero for the 10-NN graph, because the clusters disconnect), and the corresponding eigenvectors piecewise constant on the four clusters.
+
+A typical run (numpy: `d2` pairwise distances, symmetric 10-NN mask, `w = exp(-d2/2)`, then `scipy.linalg.eigh(L, D)` or `eigh` of $L_{\mathrm{sym}}$): at $\sigma_{\text{data}} = 0.25$ the clusters are about 8 standard deviations apart, the 10-NN graph splits into exactly 4 components, and the bottom eigenvalues come out $0, 0, 0, 0$ (machine precision) and $\lambda_5 \approx 0.009$, $\lambda_6 \approx 0.02$: the gap sits at 4, and the ratio $\lambda_5/\lambda_4$ is effectively infinite. Three observations worth recording. First, $\lambda_5$ is *small in absolute terms* even though it is astronomically larger than $\lambda_4$: it is the slowest mixing rate *within* one chain-like 1-D cluster, so the eigengap must always be read relatively, not against a fixed threshold. Second, rerunning with $\sigma_{\text{data}} = 0.5$ typically leaves the graph connected: the zeros at positions 2–4 lift to small positive values and the gap survives in shrunken form: the middle panel of the eigengap figure, reproduced on your own machine. Third, $\sigma = 1$ is far above the bandwidth rule of the similarity-graph section (the mean distance to the $\lceil \log 200 \rceil$-th neighbor here is a few hundredths), so every kept edge gets weight near 1 — and the result is unchanged, because on a kNN graph the mask, not the weight, carries the cluster structure, which is that rule's point.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Generate the three-ring dataset of the pipeline figure (150 points per ring, radii 1, 2.8, 5, radial noise 0.25). (a) Compute its spectral embedding (rows of the two eigenvectors $u_2, u_3$ of $L_{\mathrm{rw}}$ on the 10-NN graph) and plot it. (b) Run t-SNE (any library implementation, default perplexity) on the same 450 points and plot its 2-D map. Both plots separate the three rings; describe what each embedding does to the rings' *sizes* and *mutual distances*, and state which of the two you would trust for reading those properties.
+
+<Solution>
+**(a)** As in the pipeline figure: with the 10-NN graph (near-)disconnected into the three rings, each ring's rows collapse to one tight blob: three well-separated clumps whose positions are determined by the eigenbasis, not by the rings' geometry. Radii and inter-ring gaps are gone entirely: the spectral embedding preserves *connectivity structure* and deliberately discards metric detail within and between components.
+
+**(b)** t-SNE also separates the three rings (its kNN-based neighbor probabilities see the same near-disconnection the Laplacian does), but it renders each ring as an extended shape (often an unrolled arc or a filled blob) with sizes and inter-cluster distances of its own making: the outer ring, with 150 points spread over the largest circumference, is typically drawn no larger than the inner one, and the spacing between the three groups reflects the optimizer's equilibrium, not the factors 1 : 2.8 : 5 in the data. Neither embedding should be read for sizes or distances; the difference is that the spectral embedding visibly abstains (three points carry no size information) while t-SNE draws shapes that *look* meaningfully sized and spaced but are not. What neighbor embeddings preserve, what they fabricate, and how to read them anyway is <Ref lesson="tsne">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. U. von Luxburg, "A Tutorial on Spectral Clustering," *Statistics and Computing* 17(4), 2007 — the lesson's backbone: §2 similarity graphs, §3 Propositions 1–4 (the quadratic form and the components theorem), §4 the three algorithms, §5 the RatioCut/Ncut relaxations and the cockroach discussion (§5.4), §6 the random-walk view (Prop. 5), §7 the Davis–Kahan perturbation argument, §8 practical advice (graph choice, eigengap §8.3, the $L_{\mathrm{rw}}$ recommendation §8.5). https://arxiv.org/abs/0711.0189
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §14.5.3: spectral clustering on three concentric circles (Fig. 14.29), the source geometry for the pipeline figure. Free online: https://hastie.su.domains/ElemStatLearn/
+3. J. Shi, J. Malik, "Normalized Cuts and Image Segmentation," *IEEE TPAMI* 22(8), 2000 — the Ncut objective and the generalized eigenproblem $Lu = \lambda Du$, developed for pixel-graph segmentation.
+4. A. Ng, M. Jordan, Y. Weiss, "On Spectral Clustering: Analysis and an Algorithm," *NIPS* 14, 2002 — the $L_{\mathrm{sym}}$ algorithm with row normalization and its perturbation analysis.
+5. M. Meila, J. Shi, "A Random Walks View of Spectral Segmentation," *AISTATS* 2001 — the Ncut-as-transition-probability identity of the starred section.
+6. S. Guattery, G. Miller, "On the Quality of Spectral Separators," *SIAM J. Matrix Anal. Appl.* 19(3), 1998 — the cockroach graph and the $\Theta(n)$ lower bound on the spectral method's cut quality.
+7. M. Fiedler, "Algebraic Connectivity of Graphs," *Czechoslovak Mathematical Journal* 23(2), 1973 — $\lambda_2$ as a connectivity measure and the second eigenvector later named for him.
+8. Y. Bengio, O. Delalleau, N. Le Roux, J.-F. Paiement, P. Vincent, M. Ouimet, "Learning Eigenfunctions Links Spectral Embedding and Kernel PCA," *Neural Computation* 16(10), 2004 — the spectral-embedding/kernel-PCA correspondence of the kernel-PCA exercise.
+9. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning*, Cambridge, 2014 — §22.3: a compact independent treatment of graph-cut clustering and the unnormalized relaxation. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+</References>

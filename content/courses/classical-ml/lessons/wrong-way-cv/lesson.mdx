@@ -1,0 +1,241 @@
+Screen 5,000 noise features against the labels, keep the best 100, then cross-validate: the protocol reports 3% error on a problem whose true error rate is 50% — and versions of this blunder have appeared in top-journal papers.
+
+The evaluation module has built its discipline in three layers: <Ref lesson="classification-metrics">the metrics lesson</Ref> fixed what each number answers, <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> built the protocols that estimate those numbers without optimism, and <Ref lesson="imbalance-leakage">the leakage lesson</Ref> with <Ref lesson="feature-engineering">the features lesson</Ref> established the pipeline law: every data-dependent step is part of the model and runs inside the fold.
+
+What stands open is scale: the law has so far been violated only in miniature, in closing exercises that read 20% and 24% on coin-flip labels. This lesson is the module's application — the full-size demonstration the ESL authors published after watching the blunder reach print repeatedly, reproduced with our own code and stated seeds.
+
+The route: the construction that makes 50% the only honest answer; the reproduction; the mechanism, dissected until the bogus number is predictable to two decimals; the fix and its one legitimate exception; the audit that converts the pure case into a test for the disguised ones.
+
+## Pure noise referees the protocol
+
+The experiment's design solves a measurement problem: to weigh a protocol, the true error must be known exactly, and no real dataset supplies that.
+
+<Task>
+Closed book, from the module so far. (1) From <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: a cross-validated score estimates the error of the whole procedure, so every fitted step must run inside the folds. (2) From <Ref lesson="feature-engineering">the features lesson</Ref>: selection is fitting; a correlation filter reads the labels, and its output (which columns exist) is a function of them. (3) From <Ref lesson="imbalance-leakage">the leakage lesson</Ref>: a transform fitted on all rows is the fourth leakage carrier, and its audit question is what the step was computed from.
+</Task>
+
+The construction, from [ESL §7.10.2](https://hastie.su.domains/ElemStatLearn/): $N = 50$ samples in two classes of 25, and $p = 5{,}000$ features, each an independent standard Gaussian drawn without reference to the labels. Independence makes the conditional class probability $\tfrac12$ at every point of feature space, so the Bayes error (the floor <Ref lesson="statistical-learning">the opening lesson</Ref> proved no classifier beats) is 50%, and every classifier's true error is exactly 50%. The dataset is a referee: any protocol reporting materially less than 50% is measuring its own leak, in percentage points, with the sign known in advance.
+
+The recipe under test is ESL's "typical strategy" for genomic-scale problems, three steps long: (1) screen the predictors, keeping a subset with strong univariate correlation with the class labels; (2) build a classifier on the survivors; (3) cross-validate to tune and to estimate the error. Each step is standard. With a top-100 correlation screen and a 1-nearest-neighbor classifier, the recipe's 5-fold CV reported an **average error of 3%** over 50 simulations of the pure-noise problem.
+
+<Figure
+  src="./figures/two-pipelines.svg"
+  alt="Two pipelines side by side: on the left, screening on all 50 samples precedes the 5-fold split, with an amber leak arrow from the validation fold into the screening step and a reported error of 3 to 5 percent; on the right, the split comes first and screening runs inside each fold, reporting about 50 percent"
+  caption="Two pipelines, identical parts, one step moved across the fold boundary — and a 45-point difference in the reported error."
+/>
+
+## The reproduction: 5% claimed, 50% true
+
+A reproduction is worth exactly as much as its protocol statement. Ours, for each seed 0–9: draw $X \in \mathbb{R}^{50 \times 5000}$ standard normal from `numpy.default_rng(seed)`, fix labels at $+1$ for the first 25 rows and $-1$ for the rest; screen by keeping the 100 features with the largest correlation with the label vector; assign rows to five folds of 10 by a random permutation; classify with 1-NN under Euclidean distance on the kept columns (<Ref lesson="knn-curse">the nearest-neighbor lesson's</Ref> memorizer, chosen deliberately: no model converts contamination into agreement faster).
+
+The wrong way screens once, on all 50 rows, before the folds exist; the right way re-screens inside each fold, on its 40 training rows. Both share the seed and the fold assignment.
+
+The results: wrong-way CV errors of 6, 0, 10, 4, 8, 6, 4, 4, 6, 4 percent across the ten seeds, **mean 5.2% ± 0.9**, against right-way errors averaging **50.4% ± 3.1**, scattered around the truth exactly as an honest estimate from 50 samples should be.
+
+<Figure
+  src="./figures/repro-dotstrip.svg"
+  alt="Dot strip of ten seeds' cross-validated errors: the wrong-way protocol's dots cluster between 0 and 10 percent around a mean of 5.2, near the dashed ESL 3 percent line; the right-way protocol's dots scatter between 42 and 72 percent around a mean of 50.4, straddling the dashed 50 percent truth line"
+  caption="Ten seeds, two protocols, one dataset per seed. The right way's scatter is honest sampling noise; the wrong way's tight cluster near zero is manufactured."
+/>
+
+ESL reports 3%; our recipe lands at 5%. The published description leaves implementation freedom: "highest correlation" could mean signed or absolute value, and the fold assignment and tie-breaking are unstated. Screening on $|r|$ instead drops our wrong-way average to 1.0%. Every resolution of the ambiguity lands between 1% and 5%, forty-five points and more below the truth, so the conclusion is insensitive to the details while the headline number is not. Stating seeds, reporting the residual disagreement, and testing its sensitivity is what separates a reproduction from an advertisement.
+
+<KeyFact>
+Reported 3–5%, truth 50%: moving one step across the fold boundary moved the error estimate by about 45 percentage points. Every fold was disjoint, the classifier was refit five times, and the number was still fiction: fold hygiene inspects the split, and this leak does not live in the split.
+</KeyFact>
+
+## The mechanism: the survivors remember every fold
+
+A 45-point error deserves a mechanism precise enough to predict it, and the screening step supplies one in two moves: an order-statistics move that manufactures strong-looking features, and an exchangeability move that explains why holding out a fold removes none of their false strength.
+
+### Where the survivors' strength comes from
+
+Start with one feature. Its sample correlation $r$ with 50 balanced labels is, under independence, approximately Gaussian with mean 0 and standard deviation $1/\sqrt{N} \approx 0.14$. One such feature is unremarkable; the screen ranks 5,000 of them and keeps the extreme tail.
+
+<Example title="predicting the screening histogram">
+Keeping $k = 100$ of $p = 5{,}000$ keeps the fraction $\alpha = 0.02$, so the survival threshold is the upper-$\alpha$ Gaussian quantile scaled by the sd: $\Phi^{-1}(0.98) \cdot 0.141 = 2.05 \times 0.141 = 0.29$. The survivors' mean is the conditional mean beyond that quantile, $\frac{\varphi(2.05)}{0.02} \times 0.141 = 2.42 \times 0.141 = 0.34$, and the largest of the 5,000 sits near $\sqrt{2\ln p} \times 0.141 \approx 0.58$. Measured at seed 0: threshold 0.286, survivor mean 0.339, maximum 0.536. The first two predictions land within 0.005; the crude extreme-value bound overshoots the maximum as it should.
+
+Each survivor, inspected alone, would pass a naive significance test: $r = 0.34$ at $N = 50$ gives $t = r\sqrt{N-2}/\sqrt{1-r^2} \approx 2.5$, nominal $p \approx 0.02$. The strength is real arithmetic and false evidence: the expected best of 5,000 tries, not a property of any feature.
+</Example>
+
+<Exercise>
+Rerun the prediction for a smaller pool: $p = 500$, still keeping $k = 100$. Compute the survival threshold and the survivors' mean correlation, and state in one sentence what the change implies for the size of the leak. ($\varphi(0.84) = 0.280$.)
+
+<Solution>
+The kept fraction is now $\alpha = 100/500 = 0.2$: threshold $\Phi^{-1}(0.8) \times 0.141 = 0.84 \times 0.141 = 0.12$, and survivors' mean $\frac{\varphi(0.84)}{0.2} \times 0.141 = 1.40 \times 0.141 = 0.20$, against 0.29 and 0.34 at $p = 5{,}000$. A shallower tail yields weaker survivors, so the false signal the folds inherit is smaller and the bogus error estimate should sit closer to 50%; the fix section's leak-scaling figure shows the measured curve, and the boundary-probe exercise reproduces it.
+</Solution>
+</Exercise>
+
+### Why holding out a fold removes nothing
+
+The screen used all 50 labels; cross-validation then holds 10 of them out and treats them as fresh. They are not, and the failure is quantitative. Write the screening score of feature $j$ as the label-weighted average $s_j = \tfrac{1}{50}\sum_i x_{ij}y_i$ (with standardized features this is the correlation, up to vanishing centering terms). The sum splits over the five folds:
+
+$$
+s_j \;=\; \frac{1}{5}\sum_{k=1}^{5} s_j^{(k)}, \qquad s_j^{(k)} = \frac{1}{10}\sum_{i \in F_k} x_{ij}\,y_i ,
+$$
+
+and the five fold scores $s_j^{(k)}$ are exchangeable given their average. Exchangeability forces $\mathbb{E}\bigl[s_j^{(k)} \mid s_j\bigr] = s_j$ for every fold $k$, including the fold about to be held out. A survivor selected for $s_j \approx 0.34$ is therefore *expected* to score about 0.34 on the validation fold too: the split attenuates the leak by exactly nothing. Under the right way the selection reads only the other 40 rows, $s_j^{(k)}$ is independent of it, and the held-out score has mean 0.
+
+<FigureSequence
+  name="screening-mechanism"
+  alt="Four histograms on shared axes: the 5,000 noise features' label correlations forming a Gaussian bell of width 0.14; the top 100 shaded amber beyond the threshold 0.29; those 100 features' correlations recomputed on a held-out fold of 10, centered near 0.31; and the right-way version, screened on the other 40 only, centered on zero"
+  caption="ESL's Figure 7.10, rebuilt as a sequence from our seed-0 run. Frames 3 and 4 differ in one thing only: whether the held-out fold's labels took part in the selection."
+/>
+
+<Task>
+Step through the frames. Frames 1–2: check the worked example's three predictions (threshold 0.29, survivor mean 0.34, max near 0.5) against the drawn histogram. Before opening frame 3, use the exchangeability identity to predict where the held-out-fold histogram will center; then verify it lands near 0.31 (30-replication mean 0.33; ESL's variant of the recipe reports about 0.28). Frame 4 is the control: mean 0.
+</Task>
+
+The consequence, stated in the resampling lesson's terms: honest CV grades a fitted rule on data that is, conditional on the rule, a fresh draw from the population. Here the rule includes the kept feature set, and conditional on that set the validation fold's labels are tilted toward agreement with the kept features, agreement a 1-NN classifier converts straight into matching neighbors. The fold is disjoint in rows and contaminated in distribution.
+
+<KeyFact>
+After full-data screening, each held-out fold's labels correlate about 0.3 with every kept feature, on a problem whose population correlations are all zero — and no fold geometry touches this. The exchangeability identity holds for folds of any size, so 10-fold, leave-one-out, stratification, and repeated CV all inherit the same tilt; the only variable with any purchase is whether the fold's labels entered the selection.
+</KeyFact>
+
+### The protocol is innocent
+
+The blunder invites a wrong general lesson, and ESL records it verbatim: a scientist at a proteomics lab meeting argued that cross-validation must fail in high dimensions *even done right* — a predictor fitted to the whole training set splits the data well, the argument runs, so it will also split any four-fifths of it well, and its CV error will come out small.
+
+The argument is false, and the step that fails is identifiable: it grades a *fixed* predictor, but honest cross-validation refits the entire procedure per fold, search included. The scientist's argument is an accurate description of the wrong way (fit once, then rotate folds around the frozen result), mistaken for a description of cross-validation.
+
+ESL's companion simulation (§7.10.3) settles it: $N = 20$ samples, $p = 500$ noise features, the classifier a best single-split stump. The best stump chosen on each fold's 16 training samples carries no information about the held-out 4, its split point re-estimated on 16 samples misclassifies half of them, and honest 5-fold CV averages 50%, with the wide per-dataset variability an $N = 20$ estimate must carry.
+
+## The fix is the position of the step
+
+The mechanism clears the individual parts: screening is a legitimate technique, 1-NN a legitimate classifier, 5-fold CV a legitimate protocol. ESL's corrected recipe changes only the order: divide the samples into folds *first*; then, for each fold, screen on the other four folds, build the classifier on the same four, and score the held-out one. Selection moved inside the fold is what the reproduction ran as "the right way," and it reads 50%.
+
+### Selection is part of the model
+
+The general rule is the module's pipeline law with its scope stated fully: **every data-dependent choice is part of the model** — not only fitted transforms like scalers and encoders, but searches: which features exist, which hyperparameter won, which model family was kept. Cross-validation is honest about exactly the procedure that runs inside its folds, so the procedure inside the folds must be the whole procedure.
+
+<Figure
+  src="./figures/corrected-loop.svg"
+  alt="The corrected pipeline: the 50 samples are split into five folds first, and inside each round the screen, the 1-NN fit, and the scoring all run on the 40 training rows; a dashed inset shows the extra level a tuned screen size demands, an inner CV on the 40 that picks k without the outer fold's participation"
+  caption="The fix drawn out: the split comes first, every fitted step lives inside the round, and a tuned k adds one more level of the same structure."
+/>
+
+This is the shape <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> named nested cross-validation (the outer loop measures, every selection lives in the inner one), met here at the feature-selection stage. When a knob like the screen size $k$ remains to be tuned, honesty demands the figure's inset: an inner CV on each round's 40 rows picks $k$, and the outer fold grades a choice it never took part in. The final exercise measures the optimism of skipping that level.
+
+### The leak scales with the pool
+
+How much the step's position matters is set by the pool it selects from. Rerunning both protocols at three pool sizes turns the worked example's arithmetic into a dose curve: the wrong way reads **4.3%** at $(p, k) = (5{,}000, 100)$, **34.7%** at $(500, 100)$, and **46.3%** at $(50, 10)$, while the right way stays within a few points of 50% at every setting. A shallower tail makes weaker survivors, and fewer survivors accumulate less false agreement in the 1-NN distance.
+
+<Figure
+  src="./figures/leak-vs-pool.svg"
+  alt="Two lines over three pool settings: the wrong-way error rises from 4.3 percent at p equals 5,000 to 34.7 percent at p equals 500 and 46.3 percent at p equals 50, while the right-way error stays flat near the dashed 50 percent truth line; dashed vertical gaps mark 47, 21, and 6 points of optimism"
+  caption="Same wrong protocol, three pools: nearly harmless at p = N, catastrophic at p = 100N. The boundary-probe exercise reproduces and explains both comparisons."
+/>
+
+### The one exception: steps that read no labels
+
+ESL attaches one qualification, and it is the discriminating boundary of the whole subject: *unsupervised* screening may run before the split. Keeping the 1,000 highest-variance of the 5,000 features on all 50 samples is acceptable, because a step that never reads the labels cannot hand its survivors any label agreement for the folds to mistake for skill.
+
+The audit question is what a step *reads*, not what it computes: label-reading selection outside the folds rewrote the reported error by 45 points, while row-reading standardization outside the folds moved it by half a percent in <Ref lesson="feature-engineering">the features lesson's</Ref> closing measurement.
+
+<Ref lesson="learning-theory">Module 9</Ref> will restate this section as a theorem: concentration bounds hold for a hypothesis fixed before the sample is drawn, and anything chosen by looking at the sample needs a uniform guarantee over everything that could have been chosen; the wrong way is what spending a fixed-hypothesis guarantee on a data-chosen hypothesis looks like at $N = 50$.
+
+<KeyFact>
+The exception has a boundary of its own: a variance screen on all 50 samples still *reads the validation rows*, and the leakage lesson's row-reading audit flags it. It is tolerated because CV's verdict is label agreement, which a step that never saw a label cannot tilt — a concession measured in tenths of a percent, withdrawn the moment the step's inputs include $y$, as a supervised imputer's do.
+</KeyFact>
+
+## The audit: five disguises of one leak
+
+The pure case is naked: nobody screens 5,000 features on all their data without noticing that a step ran. This is where the artifact departs from practice: real pipelines commit the same leak through steps with innocent names, and the audit consists of mapping each onto the pure case.
+
+<Figure
+  src="./figures/disguise-map.svg"
+  alt="A generic pipeline of raw table, fitted step, fold split, and fit-plus-score, with an amber arrow showing the scored rows feeding the fitted step; below, five occupants of the fitted-step slot: a scaler's parameters, an imputer's fill values, a feature screen's kept set, hyperparameters tuned against the test set across papers, and a benchmark's surviving entries, each labeled with what it reads"
+  caption="One slot, five occupants. The audit question is constant: what did this step read, and was it recomputed inside every fold?"
+/>
+
+**A scaler's $\mu$ and $\sigma$, fit on all rows.** Same shape, mildest dose: the step reads test rows but no labels, and <Ref lesson="feature-engineering">the features lesson</Ref> measured the damage at half a percent of MSE against the screen's 30 points of error rate. It stays inside the fold because the discipline is cheap and the exceptions (near-duplicate rows, tiny $N$) are not announced in advance.
+
+**An imputer's fill values, learned from all rows.** Identical analysis, until the imputation model regresses each feature on the others and the response sneaks into the imputer's inputs, at which point the step reads labels and the dose jumps categories.
+
+**A feature screen at genomic scale.** The pure case in its native habitat, and the reason the ESL authors were reading such papers at all: tens of thousands of expression measurements, dozens of tissue samples, and a screening step that touches all of them before any validation begins.
+
+**Hyperparameters tuned against the test set, paper after paper.** No single author leaks: each evaluates a frozen model once. The *field* runs the wrong way, with the community as the outer loop: the benchmark's fixed test set plays the role of the 50 labels, and the literature's accepted numbers are the maximum of many measurements on it. The KDDCUP99 fragility numbers from <Ref lesson="imbalance-leakage">the leakage lesson</Ref> (a published 6.2% becoming 18% when the training rows were reshuffled) show what such a maximum is made of.
+
+**A benchmark's surviving entries.** The same failure from the leaderboard's side: selection among thousands of submissions, graded on one test set, is a screen with the test labels in the loop; what survives is partly the submission that fit the test set's noise best.
+
+### The published record
+
+The damage this lesson reproduces is not hypothetical, and one sentence from the source states its extent: "we have seen this blunder committed many times in published papers in top rank journals" (ESL §7.10.2). The detailed audit the authors point to is [Ambroise and McLachlan (2002)](https://doi.org/10.1073/pnas.102102699), which re-analyzed the flagship cancer-microarray datasets of the era (62 colon tissue samples, 72 leukemia samples) and showed that published gene-signature classifiers whose selection had run outside the resampling carried near-zero reported error rates that rose to roughly 15% and 5% under external validation. The pattern outlived microarrays: the reproducibility survey <Ref lesson="imbalance-leakage">the leakage lesson</Ref> cited traces leakage-driven failures through hundreds of papers across 17 fields, with selection outside the evaluation loop among the recurring types.
+
+What stands established: the module's pipeline law now has a measured worst case, a reported 3–5% on a true 50%, with a mechanism that predicts both the survivors' false strength (order statistics of $p$ correlations) and its survival of the split (fold exchangeability), a fix that is a change of position rather than of technique, and an audit reducible to one question asked of every step. <Ref lesson="validation-lab">The module's lab</Ref> builds the harness that makes the right way the path of least resistance: its checkpoints include both pipelines from this lesson, and watching its report change from 3% to 50% is the harness's own acceptance test. <Ref lesson="learning-theory">Module 9</Ref> then proves the principle the fix instantiates: guarantees require the hypothesis fixed before the data.
+
+## Exercises
+
+<Exercise>
+Derive the screening arithmetic the lesson used. (a) For one feature of iid standard Gaussians and fixed balanced $\pm 1$ labels over $N$ samples, show the label-weighted score $s = \tfrac1N \sum_i x_i y_i$ has mean 0 and standard deviation $1/\sqrt{N}$, and state why the sample correlation behaves the same to leading order. (b) For $p$ independent features, express the top-$k$ survival threshold and the survivors' mean score through the Gaussian quantile and density, and evaluate both at $N = 50$, $p = 5{,}000$, $k = 100$. (c) Give the $\sqrt{2\ln p}$ ballpark for the largest score and evaluate it. Compare all three against the measured 0.286, 0.339, 0.536.
+
+<Solution>
+(a) Each term $x_i y_i$ is $\pm x_i$, still standard Gaussian, so $s$ is an average of $N$ iid standard Gaussians: exactly $\mathcal{N}(0, 1/N)$, sd $1/\sqrt{50} = 0.141$. The correlation divides $s$ by the product of sample sds ($\approx 1$ for a standard Gaussian feature and exactly 1 for $\pm1$ labels) and subtracts means of order $1/\sqrt{N}$; both corrections perturb $s$ at second order.
+
+(b) Keeping $k$ of $p$ keeps the fraction $\alpha = k/p$; a Gaussian score survives when it exceeds the upper-$\alpha$ quantile, so the threshold is $\Phi^{-1}(1-\alpha)/\sqrt{N}$ and the survivors' mean is the Gaussian tail mean, $\frac{\varphi(\Phi^{-1}(1-\alpha))}{\alpha \sqrt{N}}$. At $\alpha = 0.02$: $\Phi^{-1}(0.98) = 2.05$, threshold $0.29$; $\varphi(2.05)/0.02 = 2.42$, survivor mean $0.34$.
+
+(c) The maximum of $p$ iid standard Gaussians concentrates near $\sqrt{2\ln p} = \sqrt{2\ln 5000} = 4.13$, giving $4.13/\sqrt{50} = 0.58$. Measured values: 0.286, 0.339, 0.536. The quantile predictions are essentially exact; the crude maximum bound overshoots by the well-known second-order (log-log) correction. The transferable conclusion: with $p \gg N$, features with correlations near $2$–$4$ standard errors exist *by construction*, so "the screened features look strong" is a statement about $p$, never evidence about the features.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: reproduce the leak-scaling figure. Rerun both protocols (seeds 200–219, 20 repetitions each) at its three settings: $p = 5{,}000$ keeping 100; $p = 500$ keeping 100; $p = 50$ keeping 10. Then explain the two comparisons separately, in the screening arithmetic's terms: what changes from $p = 5{,}000$ to $p = 500$ at fixed $k$, and what changes from $(500, 100)$ to $(50, 10)$ at fixed kept fraction.
+
+<Solution>
+Computed for this lesson: wrong-way error 4.3% at $(5000, 100)$, 34.7% at $(500, 100)$, 46.3% at $(50, 10)$; the right way reads 51.5%, 55.2%, 52.2% throughout, the honest verdict at every setting up to fold noise.
+
+From $p = 5{,}000$ to $p = 500$ at fixed $k = 100$: the kept fraction rises from 0.02 to 0.2, the survival threshold falls from 0.29 to 0.12, and each survivor's false correlation drops from 0.34 to 0.20: a weaker tail, so the folds inherit less false signal per feature and the bogus estimate recovers 30 points toward the truth. From $(500, 100)$ to $(50, 10)$ at fixed fraction 0.2: per-survivor strength is unchanged (same quantile), but only 10 tilted coordinates vote in the 1-NN distance instead of 100, so less false agreement accumulates and the gap shrinks from 20 points to about 6. The moral, in the screening arithmetic's terms: the leak's size is monotone in both knobs — the tail depth $p/k$ (per-survivor strength) and the count $k$ (how many tilted coordinates the classifier consumes). Large-$p$ pipelines are not merely quantitatively riskier; the same wrong protocol that is nearly harmless at $p = N$ is fully catastrophic at $p = 100N$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Our pipeline avoided ESL's blunder because we used 10-fold cross-validation rather than 5-fold, so each screening saw a larger training fraction." Name the property that honest cross-validation requires of each fold, state why it is violated identically for every fold count, and predict what the wrong-way error does as the number of folds grows, before checking against the measured values.
+
+<Solution>
+The claim's failing step is locating the blunder inside the fold geometry. The property honest CV requires: for each fold $k$, everything fitted, the screen's kept set included, must be a function of the data outside fold $k$ alone, so that conditional on the fitted rule, fold $k$ is distributed as a fresh draw. Pre-split screening reads all $N$ labels, so the kept set is a function of every fold's labels regardless of how many folds there are; the exchangeability identity $\mathbb{E}[s_j^{(k)} \mid s_j] = s_j$ holds for folds of any size, so each validation fold inherits the survivors' full false correlation whether it contains 10 rows or 1. If anything, more folds slightly *helps the leak* (each 1-NN trains on more contaminated rows). Measured on seeds 0–9: 5.2% at 5-fold, 4.4% at 10-fold, 4.6% at 50-fold (leave-one-out). The fold count moves the estimate's bias and variance in the ways <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> derived, for a rule fitted honestly; it has no purchase on a selection made before the folds existed.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson sketched: show that pre-split screening biases the fold-error estimate downward by writing the selection event into the conditional distribution of the validation labels. Work at sketch level with the lesson's notation: labels $y = (y_{F_k}, y_{-k})$, features $X$, kept set $S = S(X, y)$, and a classifier fitted on the training folds' rows of $X_S$. State (a) the factorization an honest protocol licenses, (b) the Bayes-rule tilt the wrong way introduces, and (c) the direction of the resulting bias.
+
+<Solution>
+(a) Honest protocol: $S = S(X, y_{-k})$ does not read $y_{F_k}$, so conditional on $(X, S)$ and the fitted classifier, the validation labels keep their unconditional law — under the null, fair coins independent of $X_S$'s validation rows. Expected fold error: $\tfrac12$, whatever the classifier does.
+
+(b) Wrong way: $S$ reads all of $y$. Conditioning on the realized selection, Bayes' rule gives
+
+$$
+\Pr\bigl(y_{F_k} \mid X, S = s\bigr) \;=\; \frac{\Pr\bigl(S = s \mid X, y_{F_k}, y_{-k}\bigr)\,\Pr(y_{F_k})}{\Pr(S = s \mid X, y_{-k})},
+$$
+
+and the likelihood factor is not constant in $y_{F_k}$: the screen keeps feature $j$ when its total score $\tfrac15\sum_m s_j^{(m)}$ is extreme, and that total contains the fold-$k$ term $s_j^{(k)}(y_{F_k})$. Label configurations whose fold-$k$ scores agree with the kept features' direction make the observed selection more probable, so they are up-weighted: conditional on $S$, the validation labels are tilted toward agreement with every kept column (the exchangeability identity quantifies the tilt: each survivor's expected fold-$k$ score equals its full-sample score, about $+0.34$).
+
+(c) The classifier was trained, on the other folds, to predict in exactly the kept features' direction, since the training folds are tilted the same way by the same conditioning. Predictor and validation labels therefore agree more often than chance, and the fold error's conditional expectation drops below $\tfrac12$: bias strictly downward, by an amount growing with the tilt. The sketch is the general template: any evaluation is biased exactly when the conditional law of the evaluation labels, given everything fitted, differs from the law of future data — the formalization of "the fold is no longer exchangeable with the future."
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped, the lesson's core artifact: reproduce the experiment yourself. Protocol: $N = 50$ (25 per class), $p = 5{,}000$ iid standard Gaussian features, top-100 correlation screen, 1-NN, 5-fold CV, 20 repetitions with fresh data each; report both protocols' mean error ± standard error. State your agreement criterion against ESL's published 3% and 50% in advance, and state which disagreements would and would not matter.
+
+<Solution>
+Criterion stated in advance: the reproduction succeeds if the wrong-way mean lands below 10% and the right-way mean lands within two standard errors of 50%; the wrong-way point value is *not* required to match 3%, because the published recipe under-specifies the screen (signed versus absolute correlation) and the fold assignment.
+
+Computed for this lesson (seeds 100–119): wrong way $4.5\% \pm 0.6$, right way $53.1\% \pm 1.5$. Verdict: both criteria met. The wrong way reproduces the catastrophe (45 points of optimism) and the right way straddles the truth. The residual 4.5-versus-3 disagreement is attributable to unstated implementation choices (our signed-screen and $|r|$-screen variants bracket it at 5.2% and 1.0%) and would matter only if a conclusion depended on the leak's third significant digit; no conclusion here does. Reporting the criterion, the seeds, and the sensitivity of the residual is the reproduction discipline this module's lab will hold every later result to.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Run only honest, inside-the-fold screening, but let the screen size $k$ range over the grid $\{10, 25, 50, 100, 200\}$, compute the 5-fold CV error for each, and report the *minimum* over the grid, as routine hyperparameter tuning does. Over 20 repetitions of the pure-noise problem, compare the reported minimum against the truth, and against each fixed $k$'s average. What residual disease does the honest screen leave, and what removes it?
+
+<Solution>
+Computed for this lesson (seeds 300–319): each fixed $k$'s CV error averages 51.7–54.7% (individually honest, scattered above and below 50% per run), but the reported min-over-grid averages $45.8\% \pm 1.3$: about 5 points of optimism survived, with single runs reporting 38%. The disease is the wrong way one level up: the minimum of five roughly unbiased, noisy estimates is biased below the truth, because picking the winner picks its luck. It is the same order-statistics arithmetic as the screen, with the grid as the feature pool ($p = 5$ instead of 5,000, hence points of optimism instead of tens). Selection has consumed the folds' verdict, so the winning score may not be reported as the error estimate. What removes it is an outer loop that never took part in the choice: nested cross-validation, exactly as <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> prescribed for tuned models. Building that fully nested harness, and verifying it reports 50% on this problem while the shortcuts report 46% and 3%, is <Ref lesson="validation-lab">the lab that closes this module</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.10.2 (the wrong and right way to do cross-validation: the $N{=}50$, $p{=}5000$ construction, the 3% result, Figure 7.10, the unsupervised-screening qualification, and the "top rank journals" sentence quoted here), §7.10.3 (the does-CV-really-work stump simulation behind the refutation section), §7.10.1 (the fold mechanics this lesson assumes). Free online: https://hastie.su.domains/ElemStatLearn/
+2. C. Ambroise, G. J. McLachlan, "Selection Bias in Gene Extraction on the Basis of Microarray Gene-Expression Data," *PNAS* 99(10), 2002 — the audit of the microarray literature cited by ESL: external validation of published gene-signature classifiers on the colon (62 samples) and leukemia (72 samples) datasets. https://doi.org/10.1073/pnas.102102699
+3. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §6.4 (interpreting results in high dimensions: why with $p \gg n$ something always correlates, and what may honestly be reported). Free online: https://www.statlearning.com/
+4. S. Kapoor, A. Narayanan, "Leakage and the Reproducibility Crisis in Machine-Learning-Based Science," *Patterns* 4(9), 2023 — the field-by-field accounting of the published record, with pre-split selection among the recurring leakage types. https://doi.org/10.1016/j.patter.2023.100804
+5. S. Varma, R. Simon, "Bias in Error Estimation When Using Cross-Validation for Model Selection," *BMC Bioinformatics* 7:91, 2006 — the measured optimism of tuned CV scores that the forward exercise reproduces on noise, and the nested repair. https://doi.org/10.1186/1471-2105-7-91
+</References>

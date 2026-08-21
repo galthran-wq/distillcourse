@@ -1,0 +1,328 @@
+Model quality is bounded by feature quality; encoding, scaling, and selecting features are engineering decisions with quantifiable failure modes.
+
+The evaluation module has built honest measurement in three layers: <Ref lesson="classification-metrics">the metrics lesson</Ref> established what each score answers, <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> established the protocols that estimate scores without optimism, and <Ref lesson="imbalance-leakage">the leakage lesson</Ref> established that a fitted transform running outside the folds is one of the four ways a good-looking number lies. What every layer took as given is the design matrix itself: the columns a model sees are not data but decisions, and each decision has a failure mode with a mechanism behind it. This lesson works the decisions in pipeline order and ties each to machinery already derived: encodings to collinearity and the leakage taxonomy, imputation to the missingness mechanism, scaling to penalty units and distance geometry, selection to the lasso. The route: features as modeling claims and the pipeline law; the three categorical encodings and target encoding's leak, derived; missing values and the mechanism that decides their treatment; scaling as a statistical decision, priced at $10^8$ samples; selection by filter, wrapper, and embedded penalty, with the filter's blind spot worked in full; and the manual constructions that still beat automation.
+
+## A feature is a modeling claim
+
+<Task>
+Three retrievals before anything new, closed book; check against the named lessons only after writing all three down. (1) From <Ref lesson="ridge-lasso">the penalties lesson</Ref>: a length feature is re-expressed in millimeters instead of meters. Write the factor by which the column changes, the factor by which its least-squares coefficient changes, and the factor by which that coefficient's contribution to the $\ell_2$ penalty changes. (2) From <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: state, in one sentence, what a cross-validated score estimates, and what that implies for a transform fitted before the split. (3) From <Ref lesson="imbalance-leakage">the leakage lesson's</Ref> mixed-review exercise: a scaler was fitted on all rows, including a held-out point five training sigmas from the mean. Name the two fitted numbers that point contaminated, state roughly what $z$-score it then reported for itself, and name the taxonomy row this instantiates. All three return below.
+</Task>
+
+<Ref lesson="statistical-learning">The opening lesson</Ref> located a learner's prior knowledge in one place, the hypothesis class. There is a second place, chosen earlier and usually silently: the representation. Before any class of predictors over softness–color rectangles could be posed, someone decided that a papaya is a softness and a color. Every column of a design matrix is such a decision, and its quality is not intrinsic: it is relative to the model that consumes it.
+
+<Example title="one feature, two learners (Shalev-Shwartz & Ben-David, Ex. 25.1)">
+Let $x_1$ be uniform on $[-1,1]$, let $y = x_1^2$, and let $x_2 = y + z$ with $z$ uniform on $[-0.01, 0.01]$. One feature may be kept.
+
+For a quadratic learner, $x_1$ is perfect: $y$ is exactly $x_1^2$, risk zero. For a linear learner, $x_1$ is useless: $\operatorname{Cov}(x_1, x_1^2) = \mathbb{E}[x_1^3] = 0$ by symmetry, so the best linear predictor from $x_1$ is the constant $\mathbb{E}[y] = \tfrac13$, with risk $\operatorname{Var}(x_1^2) = \tfrac15 - \tfrac19 \approx 0.089$. From $x_2$ the linear fit $\hat{y} = x_2$ leaves only the noise, risk $\mathbb{E}[z^2] \approx 3.3 \times 10^{-5}$. The better feature depends entirely on the learner.
+</Example>
+
+The course has met this before as a success: <Ref lesson="zipcode-digits">the ZIP-code chapter's</Ref> tangent distance built rotation invariance into the metric and beat raw pixels: feature engineering as deliberate bias injection. This lesson is the systematic version, and it inherits one law wholesale.
+
+### The pipeline law
+
+Encoding a category, filling a missing value, standardizing a column, and choosing a feature subset are all *maps fitted from data*: category means, fill values, $\mu$ and $\sigma$, a chosen set. A fitted map is part of the model. It is therefore learned on training rows only and applied, frozen, to everything else. This is the preprocessing-leakage row of <Ref lesson="imbalance-leakage">the taxonomy</Ref>, promoted from one failure case to the organizing rule of this lesson.
+
+<Figure
+  src="./figures/pipeline-law.svg"
+  alt="A pipeline from raw rows through encode, impute, scale, select, to model, with a split marker before it and an amber bracket spanning every stage after the split labeled fitted on training rows only"
+  caption="The pipeline law. Every stage after the split learns parameters; all of them are the model's."
+/>
+
+<KeyFact>
+Whether a transform is "preprocessing" or "modeling" is not a property of the transform; it is a property of what it was fitted on. Every stage below that learns from data has a leak mode that consists, exactly, of fitting it outside the fold.
+</KeyFact>
+
+## Encoding categories: the map is part of the fit
+
+The first decision on the way from a raw table to a design matrix is what to do with columns that are not numbers. Three standard maps cover practice, and each carries a trap that follows from machinery this course has already built.
+
+### One-hot: K columns, one of them redundant
+
+A categorical variable with $K$ levels becomes $K$ indicator columns: level $k$ maps to the vector with a 1 in position $k$. The map invents no order and no spacing, since each level gets its own coefficient, at the price of $K$ columns per variable.
+
+The trap is exact collinearity. The $K$ indicators sum to $1$ in every row, which is the intercept column, so a design with an intercept and all $K$ indicators has linearly dependent columns: $X^\top X$ is singular, the OLS coefficients are not unique, and the symptom is <Ref lesson="regression-diagnostics">multicollinearity</Ref> at its degenerate endpoint. The standard fix drops one indicator; the dropped level becomes the reference, and each remaining coefficient is the contrast against it. Penalized fits change the calculus: ridge and lasso are defined for singular designs, and keeping all $K$ columns with a penalty treats the levels symmetrically instead of privileging a reference; both conventions are in use.
+
+### Ordinal: only when the order is real
+
+Integer codes ($\text{small} \mapsto 1$, $\text{medium} \mapsto 2$, $\text{large} \mapsto 3$) cost one column and preserve order. A linear model, though, reads the spacing as fact: it is forced to fit the same increment from small to medium as from medium to large. A tree reads only the order, so invented spacing costs it nothing; invented order on an unordered category, though, constrains which level-subsets a single split can separate. Ordinal encoding is a claim that the order is real; applied to car colors, it is a false claim in any model.
+
+### Target encoding: a one-column model of y
+
+For a high-cardinality categorical (ZIP codes, merchant IDs: thousands of levels), one-hot explodes the design matrix and leaves most indicators nearly empty. The standard compression is drastic:
+
+<Definition title="target encoding">
+**Target encoding** replaces category $c$ with a statistic of the response within that category, canonically the mean $\operatorname{enc}(c) = \bar{y}_c$ computed on training rows. One column results, on the scale of $y$ itself.
+</Definition>
+
+Four cases fix the boundary. The canonical case: city $\mapsto$ mean house price in that city, a genuinely informative single column. A structurally different instance: any per-category statistic of $y$ (a median, a rate) is the same object with the same properties. The degenerate case: a category with one training row, whose encoding is that row's label, verbatim. And the near-miss: count encoding, category $\mapsto$ its frequency, has the same shape but uses no $y$: it violates exactly the clause that makes target encoding dangerous, and correspondingly it cannot leak the label.
+
+The degenerate case is not rare: with thousands of levels, singleton and near-singleton categories are the norm, and for them the encoded column is a noisy copy of the label. Fit and evaluate naively and the label has crossed the fold boundary inside a feature. Computed for this lesson: 2,000 rows, fair-coin labels, one categorical with 1,000 levels, mean-encoded on all rows, then 5-fold cross-validated. The protocol reports **24% error** on a problem whose true error is 50%. Every fold was disjoint; the leak entered through the column.
+
+<FigureSequence
+  name="target-encoding-leak"
+  alt="Three frames: a small table where the label column flows into an encoded column computed over all rows, with a singleton category receiving exactly its own label; the resulting cross-validation readout of 24 percent error on coin-flip labels; the arrow rerouted so each fold is encoded only from the other folds, restoring the readout to 50 percent"
+  caption="One column, one leak, one fix. The singleton row is the tell: naively encoded, its feature equals its label."
+/>
+
+The fix reroutes the arrow. **Out-of-fold encoding**: partition the training rows into $K$ folds; encode the rows of fold $k$ using category means computed from the other $K-1$ folds; encode test rows with means from all training rows. A category absent from the encoding rows falls back to the global prior $\bar{y}$. The companion repair for rare categories is prior blending: shrink each category mean toward the prior with a pseudo-count $m$,
+
+$$
+\operatorname{enc}(c) = \frac{n_c\,\bar{y}_c + m\,\bar{y}}{n_c + m},
+$$
+
+the same pseudo-count arithmetic as <Ref lesson="naive-bayes">Laplace smoothing</Ref>, applied to an encoder. Blending treats the variance of rare-category means; out-of-fold computation treats the leak; production pipelines use both. Leave-one-out and ordered variants (encode each row from the rows "before" it in a random order, the CatBoost scheme) are refinements of the same idea: no row's encoding may be a function of its own label.
+
+<Exercise>
+The training table is (city, $y$): A 1, A 0, A 1, A 0, B 1, B 1, B 0, C 1, split into two folds: fold 1 $=$ \{A 1, A 0, B 1, C 1\} and fold 2 $=$ \{A 1, A 0, B 1, B 0\}. Compute the naive full-data encoding and the out-of-fold encoding for every fold-1 row, before opening the solution.
+
+<Solution>
+Naive, from all 8 rows: $\bar{y}_A = 2/4 = 0.5$, $\bar{y}_B = 2/3 \approx 0.67$, $\bar{y}_C = 1/1 = 1$. The C row's feature equals its own label.
+
+Out-of-fold, fold-1 rows encoded from fold 2 only: A $\mapsto (1+0)/2 = 0.5$; B $\mapsto (1+0)/2 = 0.5$; C is absent from fold 2, so C $\mapsto$ prior $= \bar{y}_{\text{fold 2}} = 0.5$. The singleton's label no longer appears in its own feature; the transferable move is that "absent category $\to$ prior" is not a fallback but the honest answer: fold 2 contains no information about C beyond the base rate.
+</Solution>
+</Exercise>
+
+<Figure
+  src="./figures/encoding-table.svg"
+  alt="A grid of encoding recommendations: rows for low cardinality, high cardinality, and genuinely ordered levels; columns for linear or penalized models, distance-based models, and trees; each cell names the encoding and its footnoted trap"
+  caption="The encoding decision in one grid. Every cell's footnote is a mechanism from this lesson."
+/>
+
+<KeyFact>
+The leak is a property of the column, not of the model that consumes it: <Ref lesson="xgboost">the boosted-tree pipelines</Ref> of module 7, immune to scaling and able to route around missing values, are precisely where high-cardinality target statistics are the default encoding, and they inherit the naive version's leak unchanged. No downstream fit can un-leak a feature that already contains its own label.
+</KeyFact>
+
+## Missing values: the mechanism decides the fix
+
+The next stage of the pipeline fills holes, and the right fill depends on why the value is missing: a modeling question, not a plumbing one. The standard taxonomy conditions on the missingness pattern $M$ (which entries are absent), the observed values $X_{\text{obs}}$, and the hidden ones $X_{\text{mis}}$:
+
+| Mechanism | Definition | Example |
+|---|---|---|
+| **MCAR**: missing completely at random | $M$ independent of both $X_{\text{obs}}$ and $X_{\text{mis}}$ | a sensor drops readings uniformly |
+| **MAR**: missing at random | $M$ depends only on observed values | older patients skip an online field, and age is recorded |
+| **NMAR**: not missing at random | $M$ depends on the hidden value itself | the sickest patients were not tested; a sensitive survey question left blank |
+
+<Figure
+  src="./figures/missingness-mechanisms.svg"
+  alt="Three copies of a small age-and-test table: under MCAR the missing test cells fall on arbitrary rows; under MAR they fall on the high-age rows, with the recorded age column highlighted; under NMAR they fall where the hidden test values, shown ghosted, are high"
+  caption="One table, three mechanisms. Only the third leaves no trace in the observed columns: the ghosted values are high, and nothing recorded says so."
+/>
+
+### Ignorable or not
+
+Under MCAR and MAR the mechanism can be ignored and imputation is legitimate: everything the fill needs to know is in the observed columns. Under NMAR the hole itself carries information, and filling it replaces evidence with assumption.
+
+The clinical case in the table's last row draws the line. A measurement skipped because the doctor judged the patient too sick means the observed data paint a rosier population than the true one, and any imputer trained on the observed rows inherits the distortion, however good its regression.
+
+### Three treatments, in rising order of effort
+
+**Deletion.** Dropping incomplete rows is defensible only when losses are few and MCAR is plausible; otherwise it both wastes data and biases the sample.
+
+**Imputation.** The fill is the column mean or median at minimum, a per-feature predictive model (each feature regressed on the others) when the features are dependent enough to support it. Either way the imputer is a fitted map, a mean or a whole regression, and the pipeline law applies: fill values are learned on training rows and frozen.
+
+**The indicator column.** A binary is-missing feature added alongside the fill costs one column and hedges the NMAR case: if missingness predicts the response, the model can use that fact. The same column doubles as a diagnostic, since an indicator that comes out strongly predictive is evidence the mechanism was never ignorable.
+
+### Trees route around the hole
+
+Trees sidestep the fill entirely: a split can route missing values by *surrogate splits* (backup splitting rules ranked by agreement with the primary) or learn a per-split default direction. Both devices belong to <Ref lesson="decision-trees">the trees lesson</Ref> and <Ref lesson="xgboost">its gradient-boosted successor</Ref>; here they mark imputation's boundary: a model family for which it is optional.
+
+<KeyFact>
+The taxonomy cannot be checked from the table it classifies: MAR and NMAR differ only through values that are, by definition, absent, so no statistic of the observed data certifies that imputation was safe. A predictive missingness indicator can convict the mechanism; nothing in the data can acquit it.
+</KeyFact>
+
+## Scaling: a statistical decision priced in samples
+
+With the columns numeric and complete, the next decision is their units, and the opening gate's first retrieval is the reason they matter: re-expressing a length in millimeters instead of meters multiplies the column by $10^3$, divides its least-squares coefficient by $10^3$, and divides that coefficient's share of the $\ell_2$ penalty by $10^6$: a unit change silently de-regularizes a feature. The mechanism is that the $\ell_2$ and $\ell_1$ penalties add $\beta_j^2$ or $|\beta_j|$ across features as if coefficients were comparable, and a coefficient's size is set by its feature's unit. <Ref lesson="ridge-lasso">The penalties lesson</Ref> issued the practice (standardize predictors, center, leave the intercept unpenalized) as a convention. The following example, worked with exact numbers, upgrades it to a necessity.
+
+<Example title="the price of an unscaled feature (Shalev-Shwartz & Ben-David §25.2)">
+Two features, one response. Draw $y$ uniformly from $\{\pm 1\}$; set $x_1 = y + 0.5\alpha$ with $\alpha$ uniform on $\{\pm 1\}$, and $x_2 = 10^{-4}\,y$. The second feature is perfect ($y = 10^4 x_2$ identically), so the risk-optimal coefficient vector is $\beta^\star = (0,\ 10^4)$ with $L(\beta^\star) = 0$.
+
+Ridge regression cannot see it. The penalty charges $\beta^\star$ its squared norm, $\lambda \lVert \beta^\star \rVert^2 = 10^8 \lambda$, while the rival $\beta = (1, 0)$ pays risk $\mathbb{E}[(x_1 - y)^2] = \mathbb{E}[(0.5\alpha)^2] = 0.25$ plus a penalty of $\lambda$. The ridge objective prefers the wrong vector whenever
+
+$$
+10^8 \lambda > 0.25 + \lambda
+\quad\Longleftrightarrow\quad
+\lambda > \frac{0.25}{10^8 - 1} \approx 0.25 \times 10^{-8}.
+$$
+
+A useful $\lambda$ scales like $1/m$ for sample size $m$, so beating that threshold demands on the order of $10^8$ samples: with fewer, ridge converges to the neighborhood of $(0.8,\ 0)$, the best $x_1$-only fit, and carries risk $0.20$ on a problem whose achievable risk is zero. Rescale each feature to $[-1,1]$ (so $\tilde{x}_2 = y$) and $\beta^\star$ becomes $(0, 1)$ with $\lVert \beta^\star \rVert^2 = 1$: any $\lambda \le 10^{-3}$ now lands essentially on the truth.
+</Example>
+
+<Figure
+  src="./figures/scale-pathology.svg"
+  alt="Two panels of ridge coefficient paths against the regularization strength on a log axis; on raw features the coefficient of the perfect feature is zero for every realistic lambda and appears only below ten to the minus eight, while the standardized panel shows it at one across the whole range"
+  caption="The pathology, computed. Left: on raw features, β₂ (as a fraction of its target 10⁴) is invisible until λ < 10⁻⁸. Right: standardized, it is the whole model at every reasonable λ."
+/>
+
+The mechanism is not special to ridge, and cataloguing who shares it organizes the whole scaling question. **Penalized fits**: as above, the penalty prices coefficients in feature units, so unit choices reallocate regularization. **Distance methods**: <Ref lesson="knn-curse">k-NN</Ref> and kernel machines compute $\lVert x - x' \rVert$, and a feature measured in grams contributes $10^6$ times the squared-distance share of the same feature in kilograms; scale decides which features the metric responds to. **Gradient descent**: heterogeneous scales elongate the loss bowl, and <Ref lesson="gradient-descent">the optimization lesson</Ref> priced that in iterations: the zig-zag regime whose cure was a better-conditioned quadratic.
+
+### Who is immune, and why
+
+Trees do not appear on the list, for a reason worth proving rather than asserting: a split asks $x_j \le t$, one feature at a time, and only the order of values within a feature decides which splits are available and what each one costs. Any strictly increasing transform $g$ applied to a feature relabels every threshold $t$ as $g(t)$ and changes nothing else: same partitions reachable, same impurities, same tree. Standardizing an input to a tree, a random forest, or a boosted ensemble is a no-op (the exercise set makes this precise, and states what trees still need from this lesson: the encodings). One caveat crosses over from the previous section: μ and σ are fitted parameters, so for the models that do need scaling, they are computed on training rows only, the fold-discipline case the leakage lesson already worked in miniature.
+
+<KeyFact>
+Standardization is a claim, not a neutral change of units: dividing by $\sigma$ assigns every feature the same penalty per standard deviation. That is the right default when no column is privileged; where columns already share a meaningful scale, it backfires — standardizing this lesson's one-hot indicators magnifies the rarest categories most, because a near-constant column has the smallest $\sigma$.
+</KeyFact>
+
+## Selection three ways: filter, wrapper, embedded
+
+The last stage discards columns. The motives are cost (each medical feature is a test someone pays for), interpretability, and above all variance: fewer columns is a smaller hypothesis class, and in the $p \gg n$ regime less fitting is reliably better: heavily regularized, aggressively reduced models beat elaborate ones in simulation after simulation. Three families of methods exist, distinguished by how much of the model they consult, and the cheapest family has a blind spot that this section works out in full.
+
+### Filters: score features one at a time
+
+A filter scores each feature alone against the response and keeps the top $k$. For squared loss the canonical score falls out of a computation: the best single-feature affine fit $\min_{a,b} \tfrac1m \lVert a v + b - y \rVert^2$ leaves residual $\tfrac1m \lVert y - \bar{y}\rVert^2 \left(1 - \rho^2\right)$ (the empirical variance of $y$, cut by the factor $1 - \rho^2$), where $\rho$ is the empirical *Pearson correlation* between the feature and the response, so ranking features by their single-feature fit is ranking them by $|\rho|$. One pass over the columns, $O(p)$ work, no model in the loop: this is why filters are the default first move at genomic scale.
+
+A feature with $\rho = 0$ is useless alone. From this one would expect it to be safely discardable; the following construction, small enough to verify by hand, shows the opposite.
+
+<Example title="zero correlation, essential feature (Shalev-Shwartz & Ben-David §25.1.1)">
+Let $x_1$ be uniform on $\{\pm 1\}$, let $z$ be an independent uniform on $\{\pm 1\}$, set $x_2 = -\tfrac12 x_1 + \tfrac12 z$, and let $y = x_1 + 2 x_2$. Substituting the definition of $x_2$: $y = x_1 - x_1 + z = z$. Two facts follow at once.
+
+**Marginal score.** The filter score of $x_1$ is zero: all means vanish, and $\mathbb{E}[y x_1] = \mathbb{E}[z x_1] = 0$ by independence; expanding the other way, $\mathbb{E}[y x_1] = \mathbb{E}[x_1^2] + 2\mathbb{E}[x_2 x_1] = 1 - 1 = 0$. On any large sample, $x_1$'s correlation with $y$ sits at noise level, below fresh random columns often enough to rank behind them.
+
+**Joint contribution.** No model without $x_1$ can work: $y = x_1 + 2x_2$ holds identically, so the two-feature regression recovers $(1, 2)$ with zero residual. From $x_2$ alone, the best predictor is $\hat{y} = x_2$ (since $\operatorname{Cov}(x_2,y) = \operatorname{Var}(x_2) = \tfrac12$), leaving risk $\tfrac12$: half the response variance, unremovable without the "useless" feature. The filter keeps $x_2$, discards $x_1$, and locks in that risk.
+</Example>
+
+<Figure
+  src="./figures/filter-blindspot.svg"
+  alt="Two scatter panels from the counterexample: on the left, x1 against y shows four equally weighted corner clusters and a flat regression line labeled correlation zero; on the right, the partial residual y minus two x2 against x1 shows every point exactly on the unit-slope line"
+  caption="The blind spot, plotted. Marginally (left) x₁ carries nothing; jointly (right) it is exact: y − 2x₂ = x₁ without error."
+/>
+
+The failure is structural, not an artifact of Pearson's formula: mutual-information and AUC filters score features one at a time too, and any such score is blind to a feature whose contribution exists only given another. Filters price marginal association; interactions are invisible by construction.
+
+### Wrappers: consult the model, and pay for it
+
+A wrapper consults the actual learner. **Forward greedy selection** starts empty and, at each round, refits with each remaining candidate added, keeping the one that helps most. For least squares, the orthogonal-matching-pursuit implementation keeps an orthonormal basis of the chosen columns, so each round costs one projection per candidate rather than a full refit. Because the model is in the loop, a compensating pair like $(x_1, x_2)$ can be found: once $x_2$ is in, $x_1$'s incremental value is enormous. The bill is $O(pk)$ model fits for $k$ features, against the filter's $O(p)$ correlations; backward elimination runs the same idea from the full set, and exhaustive best-subset search over all $2^p$ sets is the ideal both approximate and neither affords beyond a few dozen features. One forward pointer: AdaBoost, <Ref lesson="adaboost">module 7's</Ref> algorithm, is exactly forward greedy selection run over a dictionary of weak learners (Shalev-Shwartz & Ben-David, Remark 25.3): the same loop, selecting functions instead of columns.
+
+### Embedded: the lasso finishes the story
+
+The third family builds selection into the fit. The honest objective, empirical risk subject to at most $k$ nonzero coefficients ($\lVert \beta \rVert_0 \le k$), is computationally hard; relaxing the count to the $\ell_1$ norm gives precisely <Ref lesson="ridge-lasso">the lasso</Ref>, and module 3's soft-thresholding result becomes, in this light, a selection theorem: in the one-feature problem, with the column normalized so that $\lVert x \rVert^2 / m = 1$ (the standardization the scaling section prescribed), the solution is $\beta = \operatorname{sign}(\langle x,y\rangle)\left[\,|\langle x,y\rangle|/m - \lambda\,\right]_+$, zero unless the feature–response covariance $\langle x,y\rangle/m$ clears $\lambda$ in magnitude. Drop the normalization and the bracket is divided by $\lVert x \rVert^2/m$: what a feature must clear depends on its units, the scaling section's claim restated by the estimator itself. On standardized orthogonal designs, then, the lasso is a marginal-association filter with threshold $\lambda$. On correlated designs it is strictly more: each coordinate-descent update thresholds the covariance with the *partial residual*, the response minus the other features' fits, so a feature is scored on what it adds to the current model, not on what it does alone. That is exactly the property that rescues $x_1$ in the counterexample, at one fit's cost instead of a wrapper's $O(pk)$.
+
+### Selection is fitting
+
+Whatever the family, the selected set is a function of the labels (a filter reads them through correlations, a wrapper through validation scores, the lasso through its fit), so selection obeys the pipeline law like any other stage. <Ref lesson="cross-validation-bootstrap">The resampling lesson's</Ref> closing exercise measured the violation: screening 10 features from 1,000 pure-noise columns on all rows, then cross-validating the survivors, reported 20% error on coin-flip labels. The full anatomy of that blunder (ESL's version reports 3%, and versions of it reached top journals) is <Ref lesson="wrong-way-cv">the next lesson</Ref>, which reproduces it end to end.
+
+<KeyFact>
+Selection is the pipeline's one irreversible stage: a downstream model can reweight, rescale, or ignore any column it is given, but it cannot resurrect a discarded one. The filter's verdict on $x_1$ caps every model fitted after it at risk $\tfrac12$; no capacity added later buys that back.
+</KeyFact>
+
+## Manual features that still win
+
+Selection removes columns; the complementary craft adds them, and the additions that survive are the ones that hand a restricted model something its hypothesis class cannot build.
+
+### Four constructions
+
+**Interactions.** A linear model with one-hot main effects for vehicle type and country of origin can express "trucks are inefficient" and "American cars are inefficient" but not "American trucks are worse than the sum of both": that sentence lives in the *interaction* column, the product of the two indicators (a *feature cross*), and adding it is the only way a linear fit will ever say it.
+
+<Figure
+  src="./figures/interaction-gap.svg"
+  alt="A two-by-two grid of fuel efficiency by vehicle type and origin; three cells fix the additive fit, which forces 18 mpg in the American-truck cell while the data say 13, and an annotation points the missing five at the product column"
+  caption="Main effects fill three cells and then have no freedom left: the fourth is forced. The −5 the data demand there can live only in the product column."
+/>
+
+**Ratios.** The same move with domain knowledge doing the multiplying: price per square foot, debt to income; quantities the model would need a product or quotient of coefficients to imitate.
+
+**Logarithms and clips.** Logs serve counting features, where the difference between 0 and 1 occurrences means more than between 1,000 and 1,001; a log (or a clip, for heavy tails) is a one-line change to the geometry a linear fit or a distance sees.
+
+**Bins.** Binning a continuous feature into indicator ranges is a crude basis expansion; <Ref lesson="splines-gams">the splines lesson</Ref> built the principled version of exactly this, with continuity restored and complexity priced in effective degrees of freedom.
+
+### What survives automation
+
+Much of this craft is being automated from two directions. Trees and their ensembles (modules 6–7) discover threshold interactions and monotone transforms on their own; a boosted tree needs neither the log nor the bins.
+
+Three constructions outlast that: encodings (a tree still cannot read "Boston"), domain ratios whose factors the model never sees separately, and the subtraction side of the craft. On the tabular benchmark this course closes with, adding uninformative features widens the gap in favor of tree ensembles, because rotationally invariant learners pay more for noise directions than axis-aligned ones do; <Ref lesson="tabular-showdown">the final module</Ref> weighs that evidence in full.
+
+What stands established: features are modeling claims, judged relative to the model that consumes them; the three categorical encodings each carry a derived trap, target encoding's being a label leak repaired by out-of-fold means; missingness is handled by mechanism, with the indicator column as the NMAR hedge; scaling is a statistical decision that penalty, distance, and gradient methods require and trees provably ignore; and selection, by filter, wrapper, or lasso, is a fitted step, blind to interactions exactly when it prices features marginally. The module's law now covers every stage of the pipeline. <Ref lesson="wrong-way-cv">The next lesson</Ref> breaks that law once, deliberately, at full scale (feature selection outside the folds, ESL's 3%-on-a-coin-flip result) and builds the audit that keeps it broken nowhere else; <Ref lesson="validation-lab">the module's lab</Ref> then turns the whole discipline into working code.
+
+## Exercises
+
+<Exercise>
+A categorical feature has four levels \{A, B, C, D\}. Write the design matrix for five observations (A, B, C, D, A) using an intercept and all four indicator columns; exhibit a nonzero vector in its null space, state what that does to the OLS normal equations, and give the drop-one repair with the interpretation of the resulting coefficients.
+
+<Solution>
+With columns $(\mathbf{1}, \mathbb{1}_A, \mathbb{1}_B, \mathbb{1}_C, \mathbb{1}_D)$:
+
+$$
+X = \begin{pmatrix} 1&1&0&0&0\\ 1&0&1&0&0\\ 1&0&0&1&0\\ 1&0&0&0&1\\ 1&1&0&0&0 \end{pmatrix}.
+$$
+
+Every row's four indicators sum to 1, so $\mathbb{1}_A + \mathbb{1}_B + \mathbb{1}_C + \mathbb{1}_D = \mathbf{1}$ and the vector $v = (1, -1, -1, -1, -1)^\top$ satisfies $Xv = 0$. Hence $X^\top X v = 0$: the matrix is singular, the normal equations $X^\top X \beta = X^\top y$ have infinitely many solutions, and $\beta$ is not identified: adding $c$ to the intercept and subtracting $c$ from every level coefficient changes no fitted value.
+
+Repair: drop one indicator, say $\mathbb{1}_A$. The intercept becomes the mean response of level A (the reference), and each remaining coefficient $\beta_B, \beta_C, \beta_D$ is the difference between its level's mean and A's. Same fitted values, unique parameters, interpretable contrasts.
+</Solution>
+</Exercise>
+
+<Exercise>
+Verify the blind-spot construction analytically. With $x_1, z$ independent uniform on $\{\pm 1\}$, $x_2 = -\tfrac12 x_1 + \tfrac12 z$, and $y = x_1 + 2x_2$: (a) compute $\operatorname{Corr}(x_1, y)$ and $\operatorname{Corr}(x_2, y)$; (b) show the two-feature least-squares problem has the exact solution $(\beta_1, \beta_2) = (1, 2)$ with zero residual, checking that the design is not collinear; (c) state the risk of the best model built on the filter's $k=1$ choice.
+
+<Solution>
+(a) All variables have mean zero. $y = x_1 + 2(-\tfrac12 x_1 + \tfrac12 z) = z$, so $\operatorname{Cov}(x_1, y) = \mathbb{E}[x_1 z] = 0$: $\operatorname{Corr}(x_1, y) = 0$. For $x_2$: $\operatorname{Cov}(x_2, y) = \mathbb{E}\left[(-\tfrac12 x_1 + \tfrac12 z)z\right] = \tfrac12$, $\operatorname{Var}(x_2) = \tfrac14 + \tfrac14 = \tfrac12$, $\operatorname{Var}(y) = 1$, so $\operatorname{Corr}(x_2, y) = \tfrac{1/2}{\sqrt{1/2}} = \tfrac{1}{\sqrt2} \approx 0.71$.
+
+(b) $y = x_1 + 2x_2$ holds identically by construction, so $(1,2)$ achieves zero residual; least squares finds it uniquely provided the covariance matrix is invertible. $\operatorname{Cov}(x_1, x_2) = -\tfrac12$, so the matrix is $\bigl(\begin{smallmatrix} 1 & -1/2 \\ -1/2 & 1/2 \end{smallmatrix}\bigr)$ with determinant $\tfrac12 - \tfrac14 = \tfrac14 > 0$: invertible, correlation $-1/\sqrt2$, well short of collinear.
+
+(c) The filter ranks $x_2$ ($|\rho| = 0.71$) over $x_1$ ($|\rho| = 0$) and keeps $x_2$. Best predictor from $x_2$ alone: slope $\operatorname{Cov}/\operatorname{Var} = 1$, i.e. $\hat{y} = x_2$, leaving risk $\operatorname{Var}(y) - \operatorname{Cov}^2/\operatorname{Var}(x_2) = 1 - \tfrac{1/4}{1/2} = \tfrac12$. Half the response variance is the permanent price of scoring features one at a time on this problem.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. A category appears exactly once in the training data, with label $y_i = 1$ on a problem with prior $\bar{y} = 0.1$. (a) State its naive target encoding and what a cross-validated model sees when that row is in a validation fold. (b) State its out-of-fold encoding. (c) Show that prior blending with pseudo-count $m$ interpolates the two, and compute the blended value at $m = 20$; explain why rare categories are exactly where the blend matters.
+
+<Solution>
+(a) Naive: $\operatorname{enc} = \bar{y}_c = y_i = 1$, the row's own label. If the encoding was computed on all rows (the naive protocol), the validation fold receives a feature that is the answer for this row; across many rare categories the model learns "trust the encoded column," and the CV score inflates exactly as target leakage predicts.
+
+(b) Out-of-fold: the encoding folds exclude this row, and the category then has no rows at all in them, so it falls back to the prior: $\operatorname{enc} = 0.1$.
+
+(c) The blend $\frac{n_c \bar{y}_c + m\bar{y}}{n_c + m}$ at $n_c = 1$ gives $\frac{1 + 0.1m}{1 + m}$; at $m = 20$, $\frac{3}{21} \approx 0.14$. As $m \to 0$ it returns the raw mean (1); as $m \to \infty$, the prior (0.1): a pseudo-count interpolation. For common categories $n_c \gg m$ and the blend is invisible; for singletons it is nearly the whole value. That is the right shape: the raw mean of one observation is the least trustworthy statistic in the table, and it is also the one that carries the label verbatim, so smoothing and leak repair concentrate on the same rows.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Trees need standardized features too; otherwise features with large scales dominate the splits." Prove the invariance for a single split, state the general conclusion, and name what tree models do need from this lesson.
+
+<Solution>
+Let $g$ be strictly increasing and replace feature $x_j$ by $g(x_j)$. A split is a rule $x_j \le t$; for the finitely many training values $v_1 < \dots < v_r$ of $x_j$, the distinct partitions of the data achievable by thresholding are exactly the $r-1$ "gaps," and the split $x_j \le t$ with $t$ in the gap $(v_i, v_{i+1})$ sends the same rows left as $g(x_j) \le t'$ with $t'$ in $(g(v_i), g(v_{i+1}))$, an interval nonempty and order-preserving because $g$ is strictly increasing. So the set of achievable partitions is unchanged; every candidate split has the same impurity decrease before and after; a greedy tree grower makes the same choices and returns the same tree with relabeled thresholds. Standardization is the case $g(u) = (u - \mu)/\sigma$, $\sigma > 0$: a no-op. Nothing "dominates" because splits never compare one feature's values with another's, only with a threshold in the same units. The claim's failing step is importing the distance-method mechanism (cross-feature comparison) into a model that does not contain it.
+
+What trees do need from this lesson: encodings for categorical inputs (an unordered category ordinally encoded constrains which level subsets one split can separate; target encoding must still be out-of-fold, since the leak does not care what model consumes the column), and a missing-value policy, though there the tree's surrogate/default machinery is an answer rather than a need.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. <Ref lesson="prostate-study">The prostate study</Ref> ended with the lasso keeping three of eight predictors at its cross-validated $\lambda$. (a) Classify that procedure in this lesson's taxonomy, and say what score the lasso implicitly used where a filter would use $|\rho|$. (b) State what the fold discipline adds when reporting that model's error: which number from the study's protocol is an honest estimate, and which retelling of it would commit this module's sin?
+
+<Solution>
+(a) Embedded selection: the $\ell_1$ penalty zeroed five coefficients inside the fit itself; module 3 was doing feature selection before this module named it. The implicit score is the covariance with the partial residual at the current coefficients (the coordinate-descent update thresholds $x_j^\top r_{-j}$), i.e. joint incremental value, not marginal association; that is why correlated predictors like `lcavol` and `lcp` shed credit to each other along the path instead of being scored independently.
+
+(b) Honest: the cross-validated error curve that chose $\lambda$, read at its minimum with the one-standard-error band (the selection ran inside the folds, so the score already pays for it), and, better, the held-out test error the study reported on rows no fit or selection ever touched. The sin: fixing the three survivors, refitting OLS on them, and cross-validating that three-variable model as if the set had been known in advance. The selection consumed the labels; a protocol that forgets this re-uses them for free, which is precisely the shape of the blunder <Ref lesson="wrong-way-cv">the next lesson</Ref> reproduces at scale.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. Build the counterexample into a benchmark: $n = 500$ training rows, $p = 50$ standard-normal features; overwrite $x_2 \leftarrow (-x_1 + z)/2$ with fresh noise $z$; response $y = x_1 + 2x_2 + 0.5(x_3 + x_4 + x_5) + 0.5\varepsilon$, features 6–50 pure noise. Inside 5-fold CV, compare (i) filter: top-5 $|\rho|$, then least squares on the survivors; (ii) the lasso with an inner CV for $\lambda$. Report per-method CV error, how often $x_1$ is selected, and the mean pairwise Jaccard overlap of the selected sets across folds. Before running: predict which method selects $x_1$, and predict which has the more stable selected set.
+
+<Solution>
+Computed for this lesson over 20 replications (irreducible risk $0.25$): the filter selects $x_1$ in **3%** of folds and averages CV-MSE **0.76**; the lasso selects $x_1$ in **100%** of folds and averages **0.27**. The filter's error is no accident: without $x_1$ the best attainable risk is $0.25 + \operatorname{Var}(x_1 \mid x_2)\!=\!0.75$, and the filter pins itself to it because $x_1$'s marginal correlation sits at noise level ($\approx 1/\sqrt{500}$), indistinguishable from the 45 junk columns.
+
+The stability result inverts the naive prediction: the filter is more stable (Jaccard $0.77$ against the lasso's $0.50$). It reliably keeps $x_2, \dots, x_5$ and churns only its fifth slot among noise columns; the lasso always finds the five real features but lets varying handfuls of noise features enter with small coefficients, so its sets differ more. The moral is a boundary on a common heuristic: selection stability across folds measures reproducibility, not correctness. A filter can be stably, structurally wrong; stability plus a test-error comparison is the minimum honest report.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Take any regression pipeline from this module (standardize $\to$ ridge, say, on $n \approx 60$ rows with heterogeneous feature scales) and run its 5-fold CV twice: once with $\mu, \sigma$ computed on all $n$ rows before splitting, once computed inside each fold. Measure the gap. Then, without running it, predict the corresponding gap for a pipeline whose pre-split step is feature screening on 1,000 noise columns, and check against the resampling lesson's closing exercise.
+
+<Solution>
+Computed for this lesson (50 replications, $n = 60$, $p = 30$, log-normal column scales): CV-MSE $1.672$ with standardization outside the folds against $1.681$ inside: a gap of $0.009$, about half a percent, within fold noise. Standardization leaks only two numbers per column, and those numbers barely move when a fifth of the rows is held out.
+
+The same experiment with selection as the pre-split step belongs to a different regime, and the prediction should be categorical, not incremental: screening reads the labels, and its output (which columns exist) is high-dimensional and label-driven. Measured in <Ref lesson="cross-validation-bootstrap">the resampling lesson's</Ref> closing exercise: 20% reported error on coin-flip labels against the honest 50%. No ratio of the two gaps is meaningful (one is 30 points of error rate, the other 0.009 in MSE); the honest comparison is categorical: selection outside the folds rewrites the reported score, while standardization outside the folds moves it within fold noise. The general form of this experiment (any fitted step run before the split, with the gap as the measured leak) is exactly what <Ref lesson="wrong-way-cv">the next lesson</Ref> instruments at full scale, with ESL's original $p = 5{,}000$ construction; the ranking this exercise establishes (selection catastrophic, scaling marginal) is the reason its audit checklist starts where it does.
+</Solution>
+</Exercise>
+
+<References>
+1. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Ch. 25: Example 25.1 (feature quality is learner-relative), §25.1.1 (the Pearson filter derivation and the zero-correlation counterexample), §25.1.2 (forward greedy selection and OMP; Remark 25.3 on AdaBoost), §25.1.3 (ℓ₁ relaxation and the one-dimensional soft-threshold), §25.2 (the ridge scale pathology and the transformation catalogue). Free PDF: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+2. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §1.5.3 (one-hot encoding and feature crosses, the vehicle example), §1.5.5 (the MCAR/MAR/NMAR taxonomy in the notation used here). Free online: https://probml.github.io/pml-book/book1.html
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §9.6 (missing data: mechanisms, imputation, the too-sick-to-measure example, multiple imputation), §9.2.4 (surrogate splits), §18.1 (the "less fitting is better" simulations behind the selection motive), §7.10.2 (the selection-outside-CV blunder, next lesson's subject). Free online: https://hastie.su.domains/ElemStatLearn/
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §6.1: best-subset and stepwise selection, the exhaustive ideal this lesson's wrappers approximate. Free online: https://www.statlearning.com/
+5. D. Micci-Barreca, "A Preprocessing Scheme for High-Cardinality Categorical Attributes in Classification and Prediction Problems," *SIGKDD Explorations* 3(1), 2001 — the target-encoding blend of category mean and prior that this lesson's smoothing formula instantiates. https://doi.org/10.1145/507533.507538
+6. L. Prokhorenkova, G. Gusev, A. Vorobev, A. V. Dorogush, A. Gulin, "CatBoost: Unbiased Boosting with Categorical Features," *NeurIPS*, 2018 — ordered target statistics: the each-row-encoded-from-its-predecessors scheme mentioned as the ordered variant. https://arxiv.org/abs/1706.09516
+7. I. Guyon, A. Elisseeff, "An Introduction to Variable and Feature Selection," *JMLR* 3, 2003 — the filter/wrapper/embedded taxonomy and the fuller catalogue of filter scores and their shared marginality. https://jmlr.org/papers/v3/guyon03a.html
+8. L. Grinsztajn, E. Oyallon, G. Varoquaux, "Why Do Tree-Based Models Still Outperform Deep Learning on Tabular Data?," *NeurIPS*, 2022 — the uninformative-features experiment behind the closing seam: adding noise columns widens the tree ensembles' lead. https://arxiv.org/abs/2207.08815
+</References>

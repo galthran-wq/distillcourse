@@ -2,12 +2,15 @@
 
 /**
  * BoostingStagesExplorer — gradient boosting with regression stumps on a
- * fixed 1D noisy dataset (y = 0.7·sin(2πx) + 0.5x − 0.25 + ε, σ = 0.25,
+ * fixed 1D noisy dataset (y = 0.7·sin(4πx) + 0.5x − 0.25 + ε, σ = 0.25,
  * seeded PRNG). Both runs (ν = 0.1 and ν = 1.0, M = 0…100) are precomputed
  * at module load; the iteration slider just indexes frames. Left panel:
  * data, true curve, accumulated fit F_M. Right panel: current residuals
  * y − F_M — the targets the next tree would fit — with the ±σ noise floor
- * marked. Guided task (lesson): find where ν = 1.0 residuals stop shrinking.
+ * marked. Shared by classical-ml-interview and classical-ml
+ * (gradient-boosting): signal complexity and seed are tuned so the ν = 1.0
+ * residual RMSE first reaches the noise floor at M = 15 — the classical-ml
+ * task says "near M ≈ 15", so retune both together or not at all.
  */
 import { useState } from "react";
 import { Panel, PresetGroup, Slider, Readout, Button } from "@/components/ui";
@@ -37,8 +40,8 @@ function mulberry32(seed: number) {
 const gauss = (rng: () => number) =>
   Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
 
-const f = (x: number) => 0.7 * Math.sin(2 * Math.PI * x) + 0.5 * x - 0.25;
-const rng = mulberry32(11);
+const f = (x: number) => 0.7 * Math.sin(4 * Math.PI * x) + 0.5 * x - 0.25;
+const rng = mulberry32(7);
 const XS = Array.from({ length: N }, () => rng()).sort((a, b) => a - b);
 const YS = XS.map((x) => f(x) + SIGMA * gauss(rng));
 const GX = Array.from({ length: GRID }, (_, j) => j / (GRID - 1));

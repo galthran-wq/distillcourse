@@ -1,0 +1,351 @@
+Averaging B identically distributed trees leaves bias unchanged and cuts variance only down to a floor set by the between-tree correlation — random forests exist to attack that floor.
+
+This lesson opens the module that resolves the debt <Ref lesson="spam-tree">the previous lesson</Ref> could not pay: its audit refit the spam tree on ten bootstrap resamples and watched the root question change identity four times, and its closing exercise averaged those ten refits into a 5.9% classifier where the single tree scored 8.3%. The course now has a low-bias, high-variance model family and one measured demonstration that averaging repairs it. This lesson supplies the theory of that repair and both algorithms built on it.
+
+The route: why averaging independent replicas would divide the variance term of <Ref lesson="bias-variance">the decomposition</Ref> by $B$, and why one dataset forbids independence; the correlated-average formula, derived in full and read three ways; bagging, the learners it helps and the ones it cannot; per-split feature subsampling and the strength–correlation trade; the out-of-bag error estimate and the theorem that more trees never overfit; the two variable-importance tallies; and the one term of the decomposition the whole construction never touches.
+
+## Averaging: the classical cure for variance
+
+<Task>
+Three retrievals before the new material, closed book. (1) From <Ref lesson="bias-variance">the decomposition lesson</Ref>: write the three terms of expected squared prediction error, and name the term that dominates for a deep unpruned tree. (2) From <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: write the probability that a fixed observation is absent from one bootstrap resample of $n$ points, and its limit. (3) From <Ref lesson="spam-tree">the spam audit</Ref>: across ten bootstrap refits of the pruned spam tree, state roughly what happened to the root split and to the test error. All three are load-bearing below.
+</Task>
+
+For independent replicas, the arithmetic of averaging is two lines. Let $\hat f_1, \dots, \hat f_B$ be predictors of the same quantity whose predictions at a fixed query point are independent with common variance $\sigma^2$. The average $\bar f = \tfrac{1}{B}\sum_b \hat f_b$ has
+
+$$
+\operatorname{Var}(\bar f\,) = \frac{1}{B^2}\sum_{b=1}^B \operatorname{Var}(\hat f_b) = \frac{\sigma^2}{B},
+\qquad
+\mathbb{E}[\bar f\,] = \mathbb{E}[\hat f_1]:
+$$
+
+variance divided by $B$, expectation (hence bias) untouched. A hundred independent copies of the spam tree would cut its variance a hundredfold and leave everything else alone.
+
+For classification the aggregate is a **majority vote**, and independence is worth even more there.
+
+<Example title="a committee of coin-grade voters">
+Let $M$ classifiers each be correct with probability $\theta = 0.51$, barely better than a coin, with independent errors. The vote is correct when more than $M/2$ of them are, a binomial tail probability: for $M = 1{,}000$ voters it is $0.73$, and for $M = 10{,}000$ it is $0.97$. A committee of near-coins, none of which knows anything much, votes its way to near-certainty, and the only ingredient consumed is independence.
+</Example>
+
+The obstacle is one sentence long: there is one training set, every tree must be grown from it, and models grown from the same rows do not err independently. <Ref lesson="cross-validation-bootstrap">The bootstrap</Ref> manufactures the closest available substitutes, resamples drawn with replacement, each omitting about $36.8\%$ of the rows; but any two resamples still share, in expectation, about $63.2\%$ of their distinct rows pairwise, and the trees grown on them inherit that overlap as correlated predictions.
+
+<KeyFact>
+Every design decision in this module is an attempt to manufacture, from one dataset, replicas as close to independent as possible; the correlation $\rho$ that remains measures exactly how far the attempt falls short.
+</KeyFact>
+
+## The variance of a correlated average
+
+The shortfall has a computable price. Two trees first, with numbers. Suppose two trees' predictions at a fixed point each have standard deviation $10$ across training draws ($\sigma^2 = 100$). Independent, their average would have variance $100/2 = 50$. At correlation $\rho = 0.9$,
+
+$$
+\operatorname{Var}\!\left(\tfrac{Z_1 + Z_2}{2}\right)
+= \tfrac{1}{4}\bigl[\operatorname{Var}(Z_1) + \operatorname{Var}(Z_2) + 2\operatorname{Cov}(Z_1, Z_2)\bigr]
+= \tfrac{1}{4}\bigl[100 + 100 + 2(0.9)(100)\bigr] = 95.
+$$
+
+Averaging two nearly redundant trees bought a 5% reduction, not 50%. The general statement is the module's central formula.
+
+<Theorem title="variance of a correlated average (ESL Eq. 15.1)">
+Let $Z_1, \dots, Z_B$ be identically distributed with $\operatorname{Var}(Z_b) = \sigma^2$ and pairwise correlation $\operatorname{Corr}(Z_i, Z_j) = \rho \geq 0$ for all $i \neq j$. Then
+
+$$
+\operatorname{Var}\!\left(\frac{1}{B}\sum_{b=1}^{B} Z_b\right) \;=\; \rho\sigma^2 \;+\; \frac{1-\rho}{B}\,\sigma^2 .
+$$
+
+<Proof>
+By bilinearity of covariance,
+
+$$
+\operatorname{Var}\!\left(\frac{1}{B}\sum_b Z_b\right) = \frac{1}{B^2}\sum_{i=1}^{B}\sum_{j=1}^{B} \operatorname{Cov}(Z_i, Z_j).
+$$
+
+The double sum is a $B \times B$ grid of covariances with $B^2$ cells of two kinds. The $B$ diagonal cells are variances, $\operatorname{Cov}(Z_i, Z_i) = \sigma^2$. The $B(B-1)$ off-diagonal cells are covariances of distinct pairs, each equal to $\rho\sigma^2$ by the definition of correlation with equal variances. Summing the two kinds:
+
+$$
+\operatorname{Var}\!\left(\frac{1}{B}\sum_b Z_b\right)
+= \frac{1}{B^2}\Bigl[B\sigma^2 + B(B-1)\rho\sigma^2\Bigr]
+= \frac{\sigma^2}{B} + \frac{B-1}{B}\,\rho\sigma^2
+= \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2,
+$$
+
+the last step by writing $\tfrac{B-1}{B} = 1 - \tfrac{1}{B}$ and collecting the $1/B$ terms.
+</Proof>
+</Theorem>
+
+<Figure
+  name="VarianceFormulaAnatomy"
+  alt="The variance of a correlated average dissected: a B-by-B covariance grid whose B diagonal cells carry sigma squared and B(B-1) off-diagonal cells carry rho sigma squared, feeding the formula rho sigma squared plus (1 minus rho) sigma squared over B, with underbraces marking the floor term that survives B to infinity and the term that dies at rate 1 over B"
+  caption="The grid's diagonal feeds the vanishing term; the off-diagonal mass feeds the floor."
+/>
+
+### Three readings, one program
+
+**The floor.** The second term dies at rate $1/B$, and trees are cheap and parallel, so it is never the binding constraint. The first term does not contain $B$: no number of trees crosses $\rho\sigma^2$. The sanity checks bracket it: $\rho = 0$ recovers the independent $\sigma^2/B$, and $\rho = 1$ gives $\sigma^2$, since averaging identical copies changes nothing.
+
+**The bias.** The $Z_b$ are identically distributed, so $\mathbb{E}[\bar Z] = \mathbb{E}[Z_1]$: the average has exactly the bias of a single bootstrap-trained tree, whatever $B$. Averaging is a pure variance instrument.
+
+**The program.** Expected error is noise plus bias² plus variance, and the formula splits the ensemble's variance into a part $B$ removes for free and a part only *decorrelation* can touch. The entire module is now one sentence: drive $\sigma^2$'s bias partner down by growing trees deep, let $B$ kill the second term, and attack $\rho$ without giving back too much elsewhere. Bagging executes the first two clauses; random forests exist for the third.
+
+<Figure
+  src="./figures/variance-floor.svg"
+  alt="Ensemble variance as a fraction of single-tree variance plotted against the number of trees for correlations 0, 0.3, and 0.7: each curve drops steeply over the first ten trees and flattens onto its own dashed floor at rho sigma squared, while the rho equals zero curve continues toward zero"
+  caption="Past a few dozen trees every curve sits on its floor ρσ²; only lowering ρ moves the flat part."
+/>
+
+<Exercise>
+The paired computation, before the algorithms. Take $\sigma^2 = 100$. (a) At $\rho = 0.7$, evaluate the ensemble variance at $B = 10$, $25$, $100$, and $\infty$. (b) At fixed $B = 25$, cut the correlation to $\rho = 0.2$ and evaluate again. (c) State, in one sentence, which intervention a practitioner holding 25 trees should spend effort on.
+
+<Solution>
+(a) $\operatorname{Var} = 70 + 30/B$: at $B = 10$, $73$; at $B = 25$, $71.2$; at $B = 100$, $70.3$; limit $70$. (b) $20 + 80/25 = 23.2$. (c) Growing the forest from 25 trees to infinitely many recovers $1.2$ units of variance, while cutting $\rho$ from $0.7$ to $0.2$ at the same $B$ recovers $48$: past a few dozen trees, decorrelation is the only lever that matters, which is the design argument for random forests below.
+</Solution>
+</Exercise>
+
+<Remark title="what ρ is, precisely">
+$\rho$ is the correlation between the *predictions* of two trees at a fixed query point, viewed as random variables over the draw of the training data and any randomness in the algorithm (ESL §15.4.1 gives the formal definition). It is not the correlation between features, and it is not the agreement of two fitted trees on one dataset, which is inflated by every easy point both classify correctly. Measured properly, $\rho$ for bootstrapped trees is small in absolute terms (0.05 or lower is typical, ESL Fig. 15.9), and the floor $\rho\sigma^2$ matters anyway because a deep tree's $\sigma^2$ is enormous.
+</Remark>
+
+<KeyFact>
+The formula's silent hypothesis is that the trees are identically distributed — every one grown by the same recipe, which pins the ensemble's expectation to a single tree's. Everything built in this lesson satisfies that hypothesis and therefore inherits the base tree's bias in full; the sequential scheme of <Ref lesson="adaboost">the next lesson</Ref> exists to break exactly this exchangeability.
+</KeyFact>
+
+## Bagging: aggregate the bootstrap refits
+
+The formula fixes the design; the first algorithm is the least that implements it.
+
+<Definition title="bagging">
+**Bagging** (bootstrap aggregation, Breiman 1996): draw $B$ bootstrap resamples of the training set, grow one deep, unpruned tree on each, and aggregate: average the predictions for regression, majority-vote the classes (or average the leaf class-fractions) for classification.
+</Definition>
+
+Deep and unpruned is not carelessness; it is the division of labor the formula dictates. A lone tree must manage bias and variance by itself, which is what <Ref lesson="decision-trees">cost-complexity pruning</Ref> was for. A forest member outsources variance to the average, which can remove it, and keeps bias low by growing out, because the average provably cannot remove bias. Pruning a bagged tree would add bias the ensemble can never repair while suppressing variance the ensemble was about to cancel anyway.
+
+<FigureSequence
+  name="bagging"
+  alt="Four frames on a two-class scatter: a single depth-3 tree's staircase boundary at 14.1 percent test error; three bootstrap resamples in side panels, duplicated rows double-ringed and omitted rows hollow, each growing a visibly different tree; the three boundaries overlaid on one panel; and the vote of fifty bootstrap trees, a steadier boundary at 11.8 percent"
+  caption="Bagging assembled on a two-Gaussian toy problem (n = 40, depth-3 trees). In the resample panels, a double ring marks a row drawn twice and a hollow ring a row the resample missed."
+/>
+
+<Task>
+Step through the four frames. Frame 2: confirm that each resample redraws the boundary, and find the resample whose tree loses five points of test error (19.1%) to an unlucky draw. Frame 3: the three boundaries disagree most exactly where the classes mix, which is where a vote has the most fluctuation to cancel. Frame 4: the 50-tree vote reads 11.8% against the single tree's 14.1%; the drawn boundary is steadier, not smarter, and its systematic shape is still a staircase average.
+</Task>
+
+On the benchmark the same move was already made: <Ref lesson="spam-tree">the audit's</Ref> ten refits, averaged, scored 5.9% against the single pruned tree's 8.3%. Scaled up to 500 unpruned trees on the standard 3,065/1,536 split (computed for this lesson), bagging reaches **5.1%** test error against 9.0% for one unpruned tree; ESL's run of the same recipe reports 5.4%. Roughly half the single tree's error was fluctuation, and the average refunds it.
+
+### Two boundaries of the method
+
+**Stable learners gain nothing.** Bagging's leverage is precisely the instability it inherits: resamples differing in a third of their rows must produce genuinely different trees, or there is nothing to cancel. For a *stable* estimator the bootstrap replicas are near-copies of one another, and the aggregate collapses onto the original estimator. The clean extreme is any linear statistic: bagging the sample mean returns, in the $B \to \infty$ limit, exactly the sample mean (ESL §8.7); the bootstrap manufactures extra randomness, and the average then removes precisely the randomness it manufactured, net zero. The third exercise works the computation, including the correlation value that makes the formula say the same thing.
+
+**Under 0–1 loss, averaging can hurt.** For squared error the population version of bagging never can: writing $f_{\text{ag}} = \mathbb{E}[\hat f^*]$,
+
+$$
+\mathbb{E}\bigl[(Y - \hat f^*(x))^2\bigr] = \mathbb{E}\bigl[(Y - f_{\text{ag}}(x))^2\bigr] + \mathbb{E}\bigl[(\hat f^* (x)- f_{\text{ag}}(x))^2\bigr] \;\geq\; \mathbb{E}\bigl[(Y - f_{\text{ag}}(x))^2\bigr],
+$$
+
+so aggregation shaves off a nonnegative variance term (ESL Eq. 8.52). Classification error does not decompose this way, and the committee arithmetic runs in reverse for bad voters: a vote concentrates the ensemble on whatever the majority tendency is, so it amplifies classifiers that are right on average and entrenches ones that are not. The minimal case: a randomized rule that predicts the (always correct) class 1 with probability only 0.4 has error 0.6, and bagging it yields error 1.0: the vote settles on the wrong answer everywhere. The wisdom-of-crowds condition is that each voter beat chance; bagging buys variance reduction, never correctness.
+
+<KeyFact>
+Bagging is a pure variance tool with two hypotheses attached: the base learner must be unstable enough that $\rho < 1$, and, under 0–1 loss, right more often than wrong where it matters. Deep trees satisfy the first by the measured instability of the previous lesson; nothing in the construction supplies the second.
+</KeyFact>
+
+## Random forests: decorrelation at every split
+
+Bagging randomizes the rows and leaves one correlation channel wide open. On the spam corpus the channel has a name: the root contest that <Ref lesson="spam-tree">the audit</Ref> watched is between `ch$` and `ch!` — the frequencies of the `$` and `!` characters in a message — and every bootstrap resample still contains both features at nearly full strength. Growing 500 bagged trees on the training set (computed for this lesson), the root split uses `ch$` in 375 of them and `ch!` in the other 125: **two distinct root features** in five hundred trees. Below the shared root, the second tiers see similar sub-tables and repeat the pattern. The trees are structural near-copies; their predictions move together across training draws, and the floor sits high.
+
+<Figure
+  src="./figures/roots.svg"
+  alt="Root-feature census over 500 trees on the spam training set: under bagging only two roots occur, the dollar-sign frequency 375 times and the exclamation-mark frequency 125 times; under a random forest with m equal to 7 there are 30 distinct root features led by the same two at 71 and 55 with free, remove, your and others following"
+  caption="What feature subsampling randomizes, measured: the same 500-tree budget produces 2 distinct root questions under bagging and 30 under m = 7."
+/>
+
+<Definition title="random forest">
+A **random forest** (Breiman 2001) is bagging with one modification: at **every split**, draw $m$ of the $p$ features uniformly at random and restrict the split search to those $m$. The inventors' defaults (ESL §15.3): $m = \lfloor\sqrt{p}\rfloor$ with minimum node size 1 for classification, $m = \lfloor p/3\rfloor$ with minimum node size 5 for regression. Setting $m = p$ recovers plain bagging, so the forest's one new dial interpolates from bagging down to $m = 1$, where the split feature is not chosen at all, only its threshold.
+</Definition>
+
+The candidate set is redrawn at every node, not once per tree, so even two trees that agree at the root diverge below it. The mechanism in one line of arithmetic: a split's candidate set omits any given feature with probability $(p-m)/p$; on spam with $m = 7$ of $p = 57$, **88% of splits** never see `ch$` at all. Other features lead, structures diverge (the census above shows 30 distinct roots), and $\rho$ falls.
+
+### The trade: correlation climbs, strength stalls
+
+Decorrelation is bought with weaker members: the best split among 7 candidates is generally worse than the best among 57, so each tree alone fits worse. Breiman's empirical discovery, the reason the defaults are so small, is that the two effects move on different schedules. His Forest-RI experiments plot the individual trees' accuracy (his *strength*, the expected margin of one randomized tree) and the between-tree correlation against $m$: strength rises quickly and then plateaus, while correlation keeps climbing all the way to $m = p$. The error-minimizing $m$ therefore sits low. The same sweep on the spam corpus, computed for this lesson at $B = 500$:
+
+<Figure
+  src="./figures/msweep.svg"
+  alt="Three aligned panels against m on a log scale from 1 to 57: single-tree test error falls from 13.2 to 10.0 percent and flattens past m near 10; the mean correlation between tree prediction vectors climbs steadily from 0.64 to 0.77; the ensemble test error is lowest at m equal 1 with 4.1 percent and worst at m equal 57 with 5.1 percent"
+  caption="The m-sweep on spam, B = 500. Middle panel: correlation of tree-pair prediction vectors on the test set — an agreement proxy that overstates the sampling ρ but tracks its trend."
+/>
+
+<Task>
+Read the three panels top to bottom at $m = 7$ and $m = 57$. The single tree weakens by 1.2 points going from 57 to 7 candidates; the pair correlation drops by 0.07; the ensemble nets 0.3 points of test error from the exchange, and continuing all the way to $m = 1$ nets 1.0. Then check the claim the defaults encode: everywhere right of $m \approx 10$, strength has stopped improving while correlation is still rising, so large $m$ buys nothing.
+</Task>
+
+Breiman's theoretical frame for the same trade bounds generalization error by the two quantities at once.
+
+<Theorem title="strength–correlation bound (Breiman 2001, Thm. 2.3)">
+Call a tree's *raw margin* at a labeled point its vote for the true class minus its vote for the strongest wrong class ($\pm 1$ for a single tree), viewed as a function of the point and of the randomness draw $\Theta$ (resample plus candidate lotteries) that grew the tree. Suppose the forest's strength $s$ — the raw margin's expectation over the data distribution and $\Theta$ together — is positive, and let $\bar\rho$ be the mean correlation between the raw margin functions of two trees grown from independent draws $\Theta, \Theta'$, each correlation taken across the data distribution. Then
+
+$$
+PE^{*} \;\leq\; \frac{\bar\rho\,(1 - s^2)}{s^2}.
+$$
+</Theorem>
+
+The proof is one Chebyshev step (error is the probability the forest's margin goes negative, bounded by the margin's variance over $s^2$, and that variance is at most $\bar\rho(1-s^2)$), and the bound is loose in absolute terms. This $\bar\rho$ is a third quantity, distinct from both of the lesson's earlier correlations: the variance formula's $\rho$ compares predictions at one fixed query point across training draws, the sweep figure's proxy compares raw prediction vectors on a finite test set (which every easy point inflates), while $\bar\rho$ compares whole margin functions across the data distribution with only the growing randomness varying. The bound's value is its direction: error improves by shrinking $\bar\rho$ without collapsing $s$, the classification statement of the regression formula. The plateau makes the trade lopsided, and Breiman's tables carry it to the extreme: across his benchmark suite, $m = 1$, a forest whose split features are chosen entirely at random, averaged within one percentage point of the tuned setting, and our spam sweep agrees (4.1% at $m = 1$). The same choice cut computation: searching 1 candidate instead of 256 made Forest-RI about 40 times faster than AdaBoost on the zip-code digits, four minutes against three hours on the hardware of 2001.
+
+### What small m costs, and where it fails
+
+The dial is a genuine bias–variance trade. Restricting candidates makes each tree's fit coarser, and ESL's simulation study (§15.4.2) shows ensemble bias rising as $m$ falls; the error-optimal $m$ balances the falling floor against the rising bias, which is why $m$ is worth tuning rather than fixing.
+
+ESL's reading of why small $m$ still wins so often is a ridge analogy: among many correlated, similarly informative predictors, ridge shrinks all coefficients so every predictor has a diminished say; a small-$m$ forest achieves the same democratization by lottery, forcing each correlated predictor to take its turn as the primary split.
+
+The failure mode follows from the same picture. With few relevant features among many pure-noise ones, a small candidate set often contains no relevant feature at all, single-tree strength collapses, and the forest degrades (ESL §15.3.4): the regime where the bound's $s^2$ denominator, not its $\bar\rho$ numerator, is the problem. On the 15-class gene-expression benchmark ($p = 500$ correlated genes, where a single tree scores 45.7%), $m = \sqrt{p}$ beats $m = p$ at every ensemble size: many correlated predictors is exactly the ridge-like regime.
+
+<KeyFact>
+On spam the exchange rate is: dropping from 57 candidates to 1 costs the single tree 3 points of error and buys the ensemble 1. The sign of that trade is a property of the dataset, not of the algorithm — it depends on what fraction of the features carry signal — so $m$ is the one forest dial worth a sweep on every new problem, and the next section supplies the free error estimate to sweep it against.
+</KeyFact>
+
+## Out-of-bag error: the omitted rows as a test set
+
+Everything so far spends the bootstrap's in-bag rows; the out-of-bag remainder now pays for the measurement. Each tree's resample omits about $36.8\%$ of the training points (<Ref lesson="cross-validation-bootstrap">module 5's arithmetic</Ref>, $(1 - 1/n)^n \to e^{-1}$), so for every training point, roughly a third of the forest never saw it.
+
+<Definition title="out-of-bag error">
+A point is *out of bag* (OOB) for tree $b$ if the $b$-th bootstrap resample omitted it. The **OOB prediction** for a training point aggregates only the trees for which it is out of bag (its *OOB committee*, about $0.368\,B$ trees); the **OOB error** is the average loss of these predictions over the training set.
+</Definition>
+
+<Figure
+  src="./figures/oob-mechanics.svg"
+  alt="A grid of ten tree rows by twenty-four training-point columns with in-bag cells filled and out-of-bag cells empty; one column is outlined in amber with its four out-of-bag cells highlighted, labeled as point i's OOB committee of 4 of 10 trees"
+  caption="OOB mechanics: each row is one tree's bootstrap sample; each point is scored only by the rows that left it out."
+/>
+
+Every point is graded by a sub-forest that treats it as unseen data, so the OOB error behaves like cross-validation with no folds, no refits, and no held-out data: for large $B$ it is essentially equivalent to leave-one-out CV of the forest (ESL Ex. 15.2), at zero training cost beyond the run already paid for. The standard uses follow: watch the OOB curve to decide when $B$ is enough, and tune $m$ by comparing OOB errors across a small grid.
+
+<Figure
+  src="./figures/oob-curve.svg"
+  alt="OOB and test misclassification error against the number of trees on a log scale from 5 to 2500 for the spam forest with m equal 7: the OOB curve starts near 10 percent where each point has too few voters, crosses down to about 4.9 percent, and both curves run flat from about 200 trees to 2500, ending at OOB 4.9 and test 4.8 percent"
+  caption="OOB against test error for the spam forest (m = 7), computed for this lesson. The two estimates converge and then neither moves for two thousand more trees."
+/>
+
+The curve carries both honesty caveats. At small $B$ the OOB estimate is **pessimistic**, not unbiased: each point's committee is a forest one-third the size of the real one (at $B = 5$ some training points have no committee at all), so the curve starts near 10% while the true test error is already below 6%, and the estimate is trustworthy only after it flattens. Breiman's own instruction: run past convergence. And an OOB error that was minimized over a grid of $m$ values inherits the optimism of any minimized noisy estimate, <Ref lesson="cross-validation-bootstrap">the selection effect module 5 priced</Ref>: tune on OOB, but quote a number no tuning ever touched.
+
+### More trees never overfit, and what that does not say
+
+The flat right half of the curve is not luck; it is a theorem.
+
+<Theorem title="forests converge (Breiman 2001, Thm. 1.2)">
+As $B \to \infty$, the generalization error of a random forest converges almost surely to a limiting value determined by the data distribution and the randomized tree-growing procedure.
+</Theorem>
+
+$B$ is not a complexity parameter. Each tree is an independent draw of one fixed randomized predictor, and the forest's vote is a Monte Carlo estimate of that predictor's expectation: more trees reduce estimation noise and add no representational power, so the error curve flattens and never turns back up: from $B = 200$ to $B = 2{,}500$ the spam test curve above wiggles inside a quarter-point band and the OOB curve only declines. The theorem does not say the limit is good. The limit is a property of the tree-growing procedure, and fully grown trees with tiny leaves on a noisy target converge to an overfit limit; ESL (§15.3.4) reports small but real gains from limiting depth in noisy regression problems. The knobs must not blur: **depth, minimum leaf size, and $m$** regularize a forest; $B$ only stabilizes it.
+
+<KeyFact>
+OOB error is cross-validation the training run already paid for: honest once the curve flattens, pessimistic before it, and optimistic the moment it is minimized over. Adding trees cannot overfit (Breiman's theorem), but the limit being converged to can itself be bad, and only the tree-shape knobs, not $B$, move it.
+</KeyFact>
+
+## Variable importance: two tallies, two biases
+
+A forest of 500 trees ended the single tree's one readable page, 500 pages of disagreeing rules being no page at all; importance scores are the partial refund, and the two standard ones fail in different, diagnosable ways.
+
+**Mean decrease in impurity** (Gini importance) tallies, for each feature, the impurity reductions of every split made on it, summed across all trees. It is free (bookkeeping over splits already made) and it carries two biases. It is computed entirely on training-time splits, so it credits what the trees used, generalization unaudited; and it inherits the candidate-abundance bias of the greedy sweep (<Ref lesson="decision-trees">the categorical-split trap</Ref>): a feature offering many distinct thresholds gets many chances at a spuriously large drop, so many-valued features are systematically flattered.
+
+**Permutation importance** (Breiman 2001, §10) grades damage instead of usage: pass a tree's OOB points down it and record the accuracy; permute the values of feature $j$ among those points, breaking the feature's tie to the labels while preserving its distribution; record the accuracy again. Feature $j$'s importance is the average degradation over trees. A feature whose splits do not generalize degrades nothing, whatever it did during growing, because the measurement runs on data the tree never fit. The OOB points are Breiman's free supply of such data; any held-out set serves the same logic, and sklearn's `permutation_importance` runs the variant the figure below shows — the whole forest, not each tree, scored before and after permutation on a set of the caller's choosing, here the test set.
+
+<Figure
+  src="./figures/importance-duel.svg"
+  alt="Paired horizontal bars for eleven spam features, Gini decrease on the left and permutation importance on the right, each as percent of its maximum: ch-exclamation and remove and ch-dollar lead both lists, while your, free, CAPMAX and CAPTOT shrink sharply under permutation and george, hp and edu rise"
+  caption="The duel on the spam forest (m = 7, permutation measured on the test set), computed for this lesson. Bold names mark the disagreements."
+/>
+
+Each disagreement in the figure traces to one of the two biases. `your`, `free`, and the capital-run features score high on Gini and sink under permutation: dense, many-valued frequency features that supply thresholds all over every tree, much used and little needed. Moving the other way, `george`, `hp`, and `edu` rise under permutation: features consulted rarely but decisively, and the audit reflex from <Ref lesson="spam-tree">the previous lesson</Ref> applies unchanged, since two of them are the recipient's own name and employer, importance earned by leakage that will not survive deployment on anyone else's mailbox.
+
+One caveat is shared by both tallies: **correlated features split the credit**. Breiman's demonstration on the diabetes benchmark: variable 6 carries real signal by permutation, yet adding it to a model already containing variable 2 improves nothing, because the two carry overlapping information; a forest picks each with similar frequency, so noising either one alone understates the pair. Duplicate a strong feature and each copy's score drops: the trees fall back on the survivor. Importance ranks features within this fitted forest; low importance for one member of a correlated group is not evidence the group is dispensable, and no importance score is a causal claim.
+
+## The bias ledger: what averaging cannot do
+
+The module's benchmark now reads: single pruned tree 9.3% (ESL's run), bagging 5.4%, random forest 4.9% — and, quoted from the race two lessons ahead, gradient boosting 4.5%. The first two gaps are this lesson's formula at work: bagging cashes the $(1-\rho)\sigma^2/B$ term, the forest lowers the floor. The last gap is not reachable from here. The average of identically distributed trees has a single tree's expectation at every $B$ and every $m$; in fact ESL's analysis (§15.4.2) finds the forest's bias typically slightly **larger** in magnitude than an unpruned tree's, since bootstrap training sets and restricted candidate lists can only coarsen the fit. Every point of error that is bias (structure the expected tree misses) passes through the entire construction untouched.
+
+Removing bias requires what no exchangeable average can do: make the later trees *different in distribution* from the earlier ones, each grown to repair what the current ensemble still gets wrong. That is a sequential program, and it is the other half of the module.
+
+What stands established: the variance of a $B$-average of correlated trees is $\rho\sigma^2 + (1-\rho)\sigma^2/B$, derived from the covariance grid; bagging realizes it with bootstrap replicas and needs unstable, better-than-chance learners; random forests lower the floor by per-split feature subsampling, priced by the strength–correlation trade and measured on spam (5.1% → 4.8%, with two root questions becoming thirty); the out-of-bag points supply a free, convergent error estimate, and Breiman's theorem removes $B$ from the list of overfitting knobs while leaving depth and $m$ on it; and the bias term survives it all. <Ref lesson="adaboost">The next lesson</Ref> builds the sequential alternative: a reweighting scheme that turns a committee of barely-better-than-chance stumps into a strong classifier by attacking bias directly, and <Ref lesson="spam-ensembles">the module's closing lesson</Ref> runs the full race on this corpus.
+
+## Exercises
+
+<Exercise>
+The formula run backwards. A 25-tree bagged ensemble has prediction variance $28$ at a benchmark query point, estimated over repeated training draws; a single tree's variance at the same point is $\sigma^2 = 100$. (a) Infer the between-tree correlation $\rho$. (b) Compute the variance floor, and find the smallest $B$ at which the ensemble variance sits within 1% of it. (c) State what the trees between $B = 25$ and that $B$ buy, and what any tree beyond it buys.
+
+<Solution>
+(a) Solve $100\rho + (1-\rho)\,100/25 = 28$: $4 + 96\rho = 28$, so $\rho = 0.25$.
+
+(b) The floor is $\rho\sigma^2 = 25$. Within 1% of it means $(1-\rho)\sigma^2/B = 75/B \leq 0.25$, i.e. $B \geq 300$.
+
+(c) From $B = 25$ to $B = 300$ the variance falls from $28$ to $25.25$: $2.75$ of the $3$ removable units. Every tree past $300$ competes for the remaining quarter-unit, while the floor of $25$ — nine-tenths of the ensemble's variance — is unreachable at any $B$. Past a few hundred trees the budget belongs to decorrelation, not to forest size.
+</Solution>
+</Exercise>
+
+<Exercise>
+A derivation the lesson skipped: the formula as a decomposition into shared and idiosyncratic parts. (a) Let $W, \varepsilon_1, \dots, \varepsilon_B$ be independent with $\operatorname{Var}(W) = \rho\sigma^2$ and $\operatorname{Var}(\varepsilon_b) = (1-\rho)\sigma^2$, and set $Z_b = W + \varepsilon_b$. Verify that the $Z_b$ have variance $\sigma^2$ and pairwise correlation $\rho$, and compute $\operatorname{Var}(\bar Z)$ directly. (b) The construction in (a) requires $\rho \geq 0$. Show that equicorrelation itself requires $\rho \geq -1/(B-1)$, by computing $\operatorname{Var}(\sum_b Z_b)$. (c) State what (a) and (b) together say about the prospects of beating the independent case with anti-correlated trees at large $B$.
+
+<Solution>
+(a) $\operatorname{Var}(Z_b) = \rho\sigma^2 + (1-\rho)\sigma^2 = \sigma^2$; for $i \neq j$, $\operatorname{Cov}(Z_i, Z_j) = \operatorname{Var}(W) = \rho\sigma^2$, so the correlation is $\rho$. The average is $\bar Z = W + \bar\varepsilon$, a sum of independent terms: $\operatorname{Var}(\bar Z) = \rho\sigma^2 + (1-\rho)\sigma^2/B$, the formula with its two terms now visible as objects. Averaging kills the idiosyncratic noise $\bar\varepsilon$ and cannot touch the shared component $W$, which every tree carries identically: the floor is exactly the shared part of the trees' error.
+
+(b) $\operatorname{Var}(\sum_b Z_b) = B\sigma^2 + B(B-1)\rho\sigma^2 = B\sigma^2\bigl[1 + (B-1)\rho\bigr] \geq 0$ forces $\rho \geq -1/(B-1)$.
+
+(c) At the boundary $\rho = -1/(B-1)$ the formula gives variance exactly $0$, so anti-correlation would be better than independence; but (b) says the feasible anti-correlation shrinks like $1/B$, so for ensembles of hundreds of trees the attainable $\rho$ is essentially non-negative, and (a) says any $\rho > 0$ is a floor. Decorrelation can aim at zero and no lower; systematically opposed trees are not an option at scale.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probes: the two hypotheses of bagging. (a) *Stability.* Bag the sample mean: data $X_1, \dots, X_n$ iid with variance $\sigma^2$, bootstrap resamples $Z^{*b}$ with means $\bar X^{*b}$, aggregate $\tfrac{1}{B}\sum_b \bar X^{*b}$. Compute the variance of one bootstrap mean and the correlation between two of them (condition on the data, then average over it, for both), identify what the aggregate converges to as $B \to \infty$, and conclude what bagging bought. Use $\hat\sigma^2 \approx \sigma^2$ for the within-resample variance. (b) *Better than chance.* Three independent classifiers are each correct with probability $0.4$. Compute the accuracy of their majority vote, and name the hypothesis of the wisdom-of-crowds argument that fails.
+
+<Solution>
+(a) Condition on the data: a bootstrap draw is uniform on the $n$ observed values, so $\mathbb{E}[\bar X^{*b} \mid X] = \bar X$ and $\operatorname{Var}(\bar X^{*b} \mid X) = \hat\sigma^2/n \approx \sigma^2/n$. Unconditionally, $\operatorname{Var}(\bar X^{*b}) = \operatorname{Var}(\bar X) + \mathbb{E}[\hat\sigma^2/n] \approx 2\sigma^2/n$. Two bootstrap means are conditionally independent given the data, so their covariance is $\operatorname{Var}(\mathbb{E}[\bar X^{*b}\mid X]) = \operatorname{Var}(\bar X) = \sigma^2/n$, giving $\rho \approx \tfrac{1}{2}$ (ESL Ex. 15.4's 50%). The formula then puts the ensemble's floor at $\rho \cdot 2\sigma^2/n = \sigma^2/n$, exactly $\operatorname{Var}(\bar X)$, and indeed as $B \to \infty$ the aggregate converges to $\mathbb{E}[\bar X^{*}\mid X] = \bar X$ itself. Bagging created bootstrap noise ($\sigma^2/n$ of it), then averaged away precisely that noise: net zero. The shared component $W$ of the previous exercise is here the sample mean itself, which is the whole estimator: the formal content of "bagging needs instability."
+
+(b) The vote is correct when at least 2 of 3 are: $3(0.4)^2(0.6) + (0.4)^3 = 0.288 + 0.064 = 0.352 < 0.4$. Voting made the committee **worse**, and the body's randomized-rule case is the extreme (individual error 0.6, bagged error 1.0). The failed hypothesis is that each voter beats chance: majority voting amplifies the majority tendency, whichever direction it points. Averaging concentrates an ensemble on its expected behavior; only when the expected behavior is right is concentration a gain.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute, with a theorem and an experiment: "Random forests overfit if you keep adding trees — at some point the ensemble becomes too complex for the data." Then state what genuinely can make a random forest overfit, and name the knobs that control it.
+
+<Solution>
+The refutation. Theorem: Breiman's convergence result (Thm. 1.2): as $B \to \infty$ the generalization error converges almost surely to a limit; the error-versus-$B$ curve flattens and cannot turn back up, because each tree is an iid draw of one fixed randomized predictor and the vote is a Monte Carlo estimate of that predictor's expectation. $B$ buys estimation accuracy of an average, not model capacity: the step that fails in the claim is "more trees = more complex." Experiment, from this lesson's spam run: between $B = 200$ and $B = 2{,}500$ the test error stays inside 4.6–4.8% and the OOB error declines from 5.2% to 4.9%: twelve times the trees, no upturn.
+
+What can overfit is the limit itself: it is a property of the randomized tree-growing procedure, and fully grown, single-point-leaf trees on a noisy target converge to a limit that has fit the noise, with small $m$ unable to save it and ESL §15.3.4 reporting measurable gains from depth control in exactly that regime. The knobs are tree depth, minimum leaf size, and $m$ (the shape of the individual predictor), while $B$ only decides how precisely the forest estimates that predictor's expectation. "More trees never overfit" is a statement about $B$ alone, and blurring it into "forests cannot overfit" is the error the exercise's claim smuggles in.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review with module 5's arithmetic. A forest is grown on the spam training set, $n = 3{,}065$, with $B = 100$ trees. (a) Compute the probability that a fixed training point is out of bag for one given tree. (b) Compute the expected size of its OOB committee, and the probability the point is OOB for at least 30 of the 100 trees (normal approximation with continuity correction). (c) Compute the probability the point has *no* OOB committee at all, and reconcile with the OOB curve's behavior at small $B$ in the lesson.
+
+<Solution>
+(a) $(1 - 1/3065)^{3065} \approx e^{-1} = 0.368$: module 5's identity, at an $n$ where the limit is exact to three decimals.
+
+(b) The committee size is $X \sim \operatorname{Bin}(100, 0.368)$: mean $36.8$, standard deviation $\sqrt{100 \times 0.368 \times 0.632} \approx 4.82$. $\Pr(X \geq 30) \approx \Pr\bigl(Z \geq (29.5 - 36.8)/4.82\bigr) = \Pr(Z \geq -1.51) \approx 0.93$: over nine in ten training points are graded by a committee of thirty-plus trees already at $B = 100$.
+
+(c) $\Pr(X = 0) = (0.632)^{100} \approx 10^{-20}$: at $B = 100$, coverage is not the issue. The small-$B$ pessimism in the lesson's curve has a different mechanism: at $B = 10$ each point's committee averages only $3$–$4$ trees, and a 4-tree forest is a genuinely worse classifier than the 100-tree forest whose error the estimate is meant to track. (At $B = 5$, $\Pr(X = 0) \approx 0.10$, and in the lesson's run 291 of 3,065 training points had no committee at all.) OOB error estimates the forest a third the size of the one in hand; only convergence of the error curve makes that distinction free.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the Breiman-style $m$-sweep on the spam corpus. Protocol: the standard 3,065/1,536 split; $B = 500$ unpruned trees per forest; $m \in \{1, 7, 28, 57\}$ (i.e. $1$, $\lfloor\sqrt{p}\rfloor$, $p/2$, $p$); report test error, mean single-tree test error, and the mean correlation between tree-pair prediction vectors on the test set. State the qualitative pattern you expect before running — which curves should be monotone, and where the ensemble minimum should sit.
+
+<Solution>
+Expected pattern, stated in advance: single-tree error should fall monotonically with $m$ (more candidates, stronger trees) but flatten; pair correlation should rise monotonically all the way to $m = p$; ensemble error should be minimized at small $m$, with $m = p$ (bagging) worst.
+
+Measured for this lesson (sklearn, seeds fixed): single-tree error $13.2\%,\ 11.2\%,\ 10.2\%,\ 10.0\%$ (falling, flat past the middle); pair correlation $0.64,\ 0.70,\ 0.75,\ 0.77$ (climbing throughout); ensemble error $4.1\%,\ 4.8\%,\ 4.7\%,\ 5.1\%$ (best at $m = 1$, worst at bagging). All three predictions hold, and the published anchors agree: ESL reports 5.4% for bagging and 4.88% for the default forest on this split, and Breiman's suite-wide finding was $m = 1$ within a point of tuned. The one departure worth noting in a write-up: the ensemble minimum at $m = 1$ rather than $\sqrt{p}$ is within fold-noise of the $m = 7$–$28$ plateau, so the honest claim is "small $m$ wins; the exact argmin is not resolved at this test-set size": <Ref lesson="cross-validation-bootstrap">module 5's</Ref> standard-error discipline applied to a hyperparameter sweep.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Generate $n = 100$ training points uniform on $[-1,1]^2$ with labels $y = \mathbf{1}\{x_1 + x_2 > 0\}$ (no label noise), and a large test set from the same process. (a) Fit one depth-1 tree (a *stump*: one split, two leaves) and report its test error. (b) Bag 50 stumps and report the vote's test error. Predict the size of the improvement before running, using this lesson's ledger: is a stump's error mostly bias or mostly variance? (c) The same 50 stumps, combined by a different rule, can reach a few percent error on this problem. Explain what the rule must do that bagging by construction does not.
+
+<Solution>
+(a)–(b) Computed for this lesson, averaged over 20 draws: single stump 27.6%, bagged 50 stumps 23.4%. The prediction from the ledger: a stump on a diagonal boundary is almost all *bias* (one axis-aligned split cannot represent $x_1 + x_2 > 0$, whichever split it is), and averaging identically distributed stumps preserves expectation, so bagging can refund only the small variance component. Four points of improvement out of a 27-point error is the ledger's verdict in numbers. (ESL Fig. 8.12 is the published version of the same experiment: the bagged single-split classifier's boundary fails to track the diagonal.)
+
+(c) The combining rule must make successive stumps different in distribution: each new stump must be pushed toward the part of the data the current committee still gets wrong, so that the committee's expectation itself moves toward the truth. Reweighting the training points after each round does exactly that, and the same 50 stumps so grown reach 7.8% in this lesson's run (ESL's version of the experiment reports 6.5% for the boosted rule against 16.6% bagged): sequential, bias-attacking combination. That algorithm, and why it is stagewise loss minimization rather than a heuristic, is <Ref lesson="adaboost">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §8.7: bagging, the population-aggregation inequality (Eq. 8.52), the 0–1-loss counterexample and the wisdom-of-crowds discussion, the eleven bootstrap trees (Fig. 8.9) and the bagged-stump failure (Fig. 8.12); Ch. 15: the correlated-average formula (Eq. 15.1), the random-forest algorithm and $m$ defaults (Alg. 15.1, §15.3), the spam ensemble errors (§15.2), OOB samples and the OOB-versus-test curve (§15.3.1, Fig. 15.4), variable importance (§15.3.2, Fig. 15.5), overfitting and the noise-variables regime (§15.3.4), and the analysis chapter behind this lesson's $\rho$ remark, bias discussion, and ridge analogy (§15.4). Free online: https://hastie.su.domains/ElemStatLearn/
+2. L. Breiman, "Random Forests," *Machine Learning* 45, 2001, pp. 5–32 — the definition (1.1), the convergence theorem (1.2), the strength–correlation bound (2.3), out-of-bag estimates (§3.1), Forest-RI with the $F = 1$ results and the zip-code timing (§4, Tables 1–2), the strength/correlation sweeps (§6, Figs. 1–3), and permutation importance with the diabetes masking example (§10). https://doi.org/10.1023/A:1010933404324
+3. L. Breiman, "Bagging Predictors," *Machine Learning* 24, 1996, pp. 123–140 — the original bagging paper, including the instability argument for which learners benefit. https://doi.org/10.1007/BF00058655
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §8.2.1–8.2.2: bagging and OOB error with the LOOCV equivalence, the dominant-predictor argument for $m = \sqrt{p}$, and the 15-class gene-expression comparison (Fig. 8.10). Free online: https://www.statlearning.com/
+5. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §18.2–18.3: the majority-vote binomial computation (0.51 voters at $M = 10^3$ and $10^4$), bagging, and out-of-bag instances. Free online: https://probml.github.io/pml-book/book1.html
+6. F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," *JMLR* 12, 2011, pp. 2825–2830 — the implementation behind every number "computed for this lesson" (`BaggingClassifier`, `RandomForestClassifier`, `permutation_importance`) on the standard spam split. https://scikit-learn.org/
+</References>

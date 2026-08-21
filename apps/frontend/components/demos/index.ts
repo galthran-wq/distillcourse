@@ -94,4 +94,8 @@ export const demos: Record<
     import("./classical-ml-interview/PerplexityExplorer"),
   EmStepper: () => import("./classical-ml-interview/EmStepper"),
   SbgFitLab: () => import("./quantitative-mba/SbgFitLab"),
+  SmootherRobustnessExplorer: () =>
+    import("./classical-ml/SmootherRobustnessExplorer"),
+  NeighborEmbeddingExplorer: () =>
+    import("./classical-ml/NeighborEmbeddingExplorer"),
 };

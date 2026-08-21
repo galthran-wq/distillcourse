@@ -1,0 +1,406 @@
+An ensemble of a thousand trees is accurate and opaque; three tools — permutation importance, partial dependence, and Shapley attributions — recover different, precisely stated summaries of what it learned.
+
+This module built the ensembles that ended the single tree's readability: <Ref lesson="bagging-random-forests">the forest</Ref> traded the one auditable page of rules for five hundred disagreeing ones, and <Ref lesson="gradient-boosting">boosting</Ref> and <Ref lesson="xgboost">its second-order refinement</Ref> made the trade pay in accuracy. What stands open is reading what the winner learned. This lesson supplies the reading tools and, more importantly, the discipline of matching each tool to the question it actually answers; it is an off-path lesson, and nothing later depends on it.
+
+The route: the three questions and the three mathematical objects that answer them; permutation importance recalled from <Ref lesson="bagging-random-forests">the forest lesson</Ref> and pushed to its correlated-feature failure; partial dependence, with the argument for marginal rather than conditional averaging and a real geochemical discovery made by the plot; the attribution problem posed as a cooperative game, the three axioms, and the uniqueness theorem they force; Kernel SHAP as the weighted regression that computes the unique answer; and the honesty section on what none of these numbers say.
+
+<Task>
+Three retrievals before the new material, closed book. (1) From <Ref lesson="bagging-random-forests">the forest lesson</Ref>: name the two variable-importance tallies and the bias each carries. (2) From <Ref lesson="gradient-boosting">the boosting lesson</Ref>: state what a fitted booster's output $\hat f(x)$ is for binary classification, and the scale it lives on before any probability is produced. (3) From <Ref lesson="spam-filter">the spam corpus lesson</Ref>: state why the word `george` is the corpus's strongest ham evidence and worthless for any other mailbox. All three are load-bearing below.
+</Task>
+
+## Three questions, three objects
+
+"Interpret the model" is not one request. Applied to a fitted ensemble $\hat f$, it resolves into three questions with different answers, different mathematical objects, and different failure modes:
+
+1. **Which features does the model rely on?** A global ranking: one number per feature, for the whole model. Answered by *permutation importance*.
+2. **How does the model's output move with one feature?** A response curve: $\hat f$'s average prediction as $x_j$ sweeps its range. Answered by *partial dependence*.
+3. **Why did this input get this output?** A local attribution: one number per feature, for one prediction. Answered by *Shapley values*.
+
+<Figure
+  src="./figures/three-questions.svg"
+  alt="A fitted-ensemble box fanning out to three panels: a bar ranking labeled with the reliance question, a response curve labeled with the feature-response question, and a waterfall labeled with the single-prediction question"
+  caption="One fitted model, three interrogations. Each tool answers exactly one of the questions; the standard failure is asking one tool another tool's question."
+/>
+
+The three are not interchangeable summaries of one underlying truth. A feature can rank high globally while contributing nothing to a particular prediction; a flat response curve can hide a strong interaction; a large attribution on one input says nothing about the model's average behaviour. Each section below states its tool's question first, because every documented misuse of these tools is a question mismatch.
+
+<KeyFact>
+All three objects are functionals of the fitted model $\hat f$, not of the world. They describe what this model does; that is what makes them honest about leakage and silent about causation, the two facts the closing section returns to.
+</KeyFact>
+
+## Permutation importance: reliance measured by damage
+
+The first question is inherited from <Ref lesson="bagging-random-forests">the forest lesson</Ref>, which introduced both importance tallies. Gini importance sums the split improvements a feature earned during training; permutation importance (Breiman 2001, §10) breaks one feature's link to the labels (shuffle its column, keeping the distribution and destroying the pairing) and charges the feature the resulting rise in error, measured on data the model never fit.
+
+The recipe is model-agnostic, which the OOB version obscured: it needs only predictions, a held-out set, and a metric. Nothing in it is tied to trees.
+
+<FigureSequence
+  name="permutation"
+  alt="Three frames: an intact hp column feeding the frozen booster at 5.0 percent test error; the same column shuffled with crossing lines and the error rising to 9.0 percent; the resulting 4-point bar landing at the top of the importance ranking"
+  caption="Permutation importance on our spam booster (400 trees, depth 3, test error 5.0%), computed for this lesson. One column is shuffled, the model is not refitted, and the damage is the score."
+/>
+
+<Task>
+Step through the three frames and track what changes: first the column's values scramble while their histogram stays fixed, then the frozen model's test error moves from 5.0% to 9.0%, then the difference lands as a bar. Note what never changes: the model. Permutation importance interrogates a fixed $\hat f$; no refitting occurs anywhere.
+</Task>
+
+### What the number means, and what it does not
+
+The score answers "how much does *this model's* accuracy lean on *this feature's* pairing with the labels", and nothing else. Two consequences follow, both documented in the sources.
+
+**Reliance is not indispensability.** On the Pima diabetes benchmark (768 patients, 8 clinical features), Breiman's permutation scores flag variable 2 (plasma glucose) far first, with variables 8 (age) and 6 (body mass index) next. Yet a forest refitted on variable 2 alone tests at 29.7%, and adding variable 8 moves it only to 29.4%: a feature carrying a large permutation score added 0.3 points, because it duplicates information the model can get from variable 2. Permuting one column tells you what happens when that link breaks *and every other column stands*; it does not tell you what a model built without the feature would do, since a refit finds surrogates.
+
+**Correlated features split and mask credit.** The same mechanism runs in reverse: when several columns carry one signal, each column's score understates the group, because the others cover for it during the permutation. The forest lesson's caveat (duplicate a strong feature and both copies' scores drop) is the mild form; an exercise below constructs the extreme form, a model whose every individual permutation score is exactly zero while the features jointly carry everything.
+
+<KeyFact>
+The broken-link score and the refit-without-it experiment agree only when a feature is uncorrelated with the rest of the table: then no surrogate exists, and a near-zero permutation score genuinely licenses dropping the feature. Correlation — the norm in real tables — is what pries the two apart; the audit exercise below measures both on the spam booster and gets answers differing by a factor of nearly six.
+</KeyFact>
+
+## Partial dependence: the model's average response
+
+Ranking answered *whether* the model uses a feature; the second question is *how*. The object is due to [Friedman's gradient-boosting paper](https://doi.org/10.1214/aos/1013203451) (§8.2), built for exactly the situation this module created: an accurate $\hat f$ made of hundreds of trees, no closed form to read.
+
+<Definition title="partial dependence">
+Split the features into a target set $S$ (usually one or two features) and its complement $C$. The **partial dependence** of $\hat f$ on $x_S$ is the marginal average
+$$
+\bar f_S(x_S) = \mathbb{E}_{X_C}\!\left[\hat f(x_S, X_C)\right]
+\;\approx\; \frac{1}{N}\sum_{i=1}^{N} \hat f(x_S, x_{iC}),
+$$
+where the estimate pairs the chosen value $x_S$ with every training row's complement values $x_{iC}$.
+</Definition>
+
+Read the estimator concretely: to get one point of the curve at $x_j = v$, overwrite column $j$ with $v$ in every training row, predict, and average. The pairing is deliberate and blunt: $v$ is combined with complement values as they occur *marginally*, including combinations $(v, x_{iC})$ that never co-occur in the data.
+
+### Marginal, not conditional: the recovery argument
+
+The obvious-looking alternative is the conditional average $\tilde f_j(v) = \mathbb{E}[\hat f(X) \mid X_j = v]$: average the model's predictions over the data points that actually have $x_j \approx v$. Friedman's argument for rejecting it is a recovery property. If the model is additive in the target feature, $\hat f(x) = h_1(x_j) + h_2(x_C)$, the marginal average returns $h_1$ exactly, up to a constant; if it is multiplicative, $\hat f = h_1 \cdot h_2$, it returns $h_1$ up to a factor. The conditional average recovers neither, because it entangles the feature's role in the model with the feature's correlations in the data.
+
+<Example title="the conditional average doubles a slope and invents an effect">
+Let $X_1$ and $X_2$ be standardized with $\mathbb{E}[X_2 \mid X_1 = v] = 0.9\,v$: strongly correlated inputs.
+
+**Case 1: the model uses both, additively.** $\hat f(x) = x_1 + x_2$. Marginal: $\bar f_1(v) = v + \mathbb{E}[X_2] = v$. Slope 1, the model's actual coefficient. Conditional: $\tilde f_1(v) = v + \mathbb{E}[X_2 \mid X_1 = v] = 1.9\,v$. Slope 1.9: the feature's own effect plus its correlate's, unseparated.
+
+**Case 2: the model ignores the feature.** $\hat f(x) = x_2$. Marginal: $\bar f_1(v) = \mathbb{E}[X_2] = 0$, flat. Correct: the model has no dependence on $x_1$. Conditional: $\tilde f_1(v) = 0.9\,v$, a strong slope for a feature the model never reads.
+</Example>
+
+<Figure
+  src="./figures/marginal-vs-conditional.svg"
+  alt="Left: a correlated point cloud with a vertical evaluation grid line and the never-observed corner regions shaded; right: the flat marginal partial-dependence line against the sloped conditional average for a model that ignores x1"
+  caption="Case 2 drawn. The marginal grid honestly evaluates the model at unobserved corners (shaded): the price of the flat, correct answer on the right. The conditional average stays on the data and manufactures a slope."
+/>
+
+The price is printed in the left panel: the marginal average queries $\hat f$ at feature combinations the data never produced, where an ensemble's behaviour is extrapolation. The balance to keep: partial dependence measures the effect of $x_S$ *after accounting for the average effects* of the other features, not the effect of $x_S$ ignoring them, which is what the conditional average computes and what a reader naively wants.
+
+<Exercise>
+The same correlated inputs ($X_1, X_2$ standardized, $\mathbb{E}[X_2 \mid X_1 = v] = 0.9\,v$), a third model: $\hat f(x) = x_1 - x_2$, both features used, opposite signs. Compute the marginal average $\bar f_1(v)$ and the conditional average $\tilde f_1(v)$, and name the failure this case adds to the example's two.
+
+<Solution>
+Marginal: $\bar f_1(v) = v - \mathbb{E}[X_2] = v$, slope 1 — the model's coefficient on $x_1$. Conditional: $\tilde f_1(v) = v - \mathbb{E}[X_2 \mid X_1 = v] = v - 0.9\,v = 0.1\,v$, nearly flat. The example's cases showed the conditional average inflating a real slope (1 to 1.9) and inventing one where the model has none (0 to 0.9); here the correlate's entangled effect *cancels* the feature's own, and the conditional average all but erases a dependence the model genuinely has. One mechanism, three corruptions: the conditional curve mixes the model's use of the feature with the data's correlations, so it can exaggerate, fabricate, or hide the response — and which of the three it does depends on signs it does not report.
+</Solution>
+</Exercise>
+
+### Trees evaluate it exactly, and a plot made a discovery
+
+For tree ensembles the $N$-fold averaging is unnecessary. A weighted traversal computes $\bar f_S$ from the trees alone: start at the root with weight 1; at a node splitting on a target feature, follow the branch $x_S$ dictates; at a node splitting on a complement feature, send the weight down *both* children in proportion to the training fractions that went each way; $\bar f_S(x_S)$ is the weight-averaged value of the leaves reached, averaged over the ensemble. One pass per tree, no data access, which is why every boosting package ships the plot.
+
+The payoff Friedman chose to demonstrate with is a real one. His §9.1 fits a boosted model to **13,317 garnets** (mantle minerals sampled worldwide), predicting titanium concentration from ten other element concentrations plus tectonic setting. Importance ranks gallium and zirconium far ahead of the rest; the two-variable partial dependence surface on the pair then shows the structure a coefficient table never could: the fitted $\hat f$ is nearly flat in either element while the other is low, and the dependence on each is amplified as the other rises: a strong Ga×Zr interaction in mantle chemistry, read directly off the mesh.
+
+<Figure
+  src="./figures/garnet-pdp.png"
+  alt="Six panels. Top row: partial dependence of TiO2 on Ga rising from 1 to 5.5, on Zr rising from 1 to 3.9 then flattening, on MnO falling from 3.0 to 1.8. Bottom row: three perspective mesh surfaces for the pairs Zr–Ga, MnO–Ga and MnO–Zr; the Zr–Ga surface is nearly flat wherever either element is low and climbs steeply only where both are high"
+  caption="The garnet payoff: 13,317 mantle garnets, TiO2 predicted from ten element concentrations. The single-variable curves give the marginal story, and the Zr–Ga mesh gives the one they cannot: flat in either element while the other is low, each dependence amplified as the other rises. Note the different vertical scale on every panel."
+/>
+
+<KeyFact>
+The recovery property is the reason the definition survives: if the model's dependence on the target features is additive or multiplicative, the marginal average returns that component exactly, and the closer the truth is to that form, the more completely one curve summarizes hundreds of trees. Under strong interactions, a single curve is an average over heterogeneous responses, and the two-variable plot is the honest replacement.
+</KeyFact>
+
+## The attribution game: three axioms force one answer
+
+Both tools so far are global; the third question is about one prediction, and it is harder than it looks, because features earn credit jointly. The clean statement of the difficulty is a two-feature model from [Lundberg and Lee's SHAP paper](https://arxiv.org/abs/1705.07874) (§5.2): a sickness score that outputs **2** when fever and cough are both present, **5** when exactly one is, and **0** when neither is. Explain the prediction for a patient with both symptoms. Per-feature reasoning stalls immediately: each symptom alone would have *raised* the score to 5, yet together they produce 2. Whatever "fever's contribution" means, it cannot be read off fever's column alone.
+
+### Coalitions: price every subset, then average the orderings
+
+Shapley's 1953 device from cooperative game theory is to price every *subset* of features. Fix the input $x$ and define, for each subset $S$ of features, the coalition value $v(S)$: the model's expected output when the features in $S$ are pinned to their values in $x$ and the rest vary over a background distribution. $v(\varnothing)$ is the model's overall average, the *base value*, and $v(\text{all})$ is the actual prediction $\hat f(x)$.
+
+<Example title="the sickness score, priced and split">
+Take the four symptom states equally likely as background, so the base value is $v(\varnothing) = \tfrac{1}{4}(0 + 5 + 5 + 2) = 3$. Pin the patient's values (fever = 1, cough = 1) one subset at a time:
+$$
+v(\{\text{fever}\}) = \tfrac{1}{2}(5 + 2) = 3.5,
+\qquad
+v(\{\text{cough}\}) = \tfrac{1}{2}(5 + 2) = 3.5,
+\qquad
+v(\{\text{fever},\text{cough}\}) = 2.
+$$
+Now credit each feature with its **marginal contribution**, the change in $v$ when it joins, averaged over the two possible joining orders. Fever first: it adds $3.5 - 3 = +0.5$; cough then adds $2 - 3.5 = -1.5$. Cough first: symmetric. So
+$$
+\phi_{\text{fever}} = \tfrac{1}{2}\left[(+0.5) + (-1.5)\right] = -0.5,
+\qquad
+\phi_{\text{cough}} = -0.5,
+$$
+and the sum checks: $3 - 0.5 - 0.5 = 2 = \hat f(x)$. Each present symptom gets $-0.5$: alone it would raise the score, but completing the pair costs more than joining first gains, and the averaging splits that interaction penalty equally.
+</Example>
+
+<Figure
+  src="./figures/lattice.svg"
+  alt="The four-coalition lattice from the empty set at value 3.0 through the two singletons at 3.5 to the full coalition at 2.0, with the two joining orders drawn as amber and blue paths and the averaged Shapley values printed below"
+  caption="The whole computation is this diamond: four coalition values, two paths from bottom to top, and each feature's value is its average step size along the paths."
+/>
+
+<Exercise>
+The same computation on a different table, before the general formula. A two-feature model has coalition values $v(\varnothing) = 1$, $v(\{1\}) = 4$, $v(\{2\}) = 2$, $v(\{1,2\}) = 6$. Write the marginal contributions of each feature in both orderings, average them, and verify that base value plus attributions equals the prediction.
+
+<Solution>
+Feature 1 first: it adds $4 - 1 = 3$; feature 2 then adds $6 - 4 = 2$. Feature 2 first: it adds $2 - 1 = 1$; feature 1 then adds $6 - 2 = 4$.
+$$
+\phi_1 = \tfrac{1}{2}(3 + 4) = 3.5, \qquad \phi_2 = \tfrac{1}{2}(1 + 2) = 1.5.
+$$
+Check: $1 + 3.5 + 1.5 = 6 = v(\{1,2\})$. The interaction here is positive ($6 - 4 - 2 + 1 = +1$): each feature contributes more when it joins second, and the average hands each half of the surplus.
+</Solution>
+</Exercise>
+
+### The axioms, and the uniqueness theorem
+
+The averaging-over-orderings recipe looks like one reasonable choice among many. The SHAP paper's contribution is to show it is the *only* choice, given four requirements on any additive explanation. An **additive feature attribution** explains a prediction as $\hat f(x) = \phi_0 + \sum_i \phi_i$: a base value plus one signed contribution per present feature. The form was already in use before the SHAP paper unified it (its Definition 1): *LIME* explains one prediction by fitting a small weighted linear model to $\hat f$'s outputs near that input, and *DeepLIFT* explains a neural network's output by comparing the network's activations against those on a single fixed reference input and propagating the differences back to the features. Four properties are then asked of the $\phi_i$:
+
+- **Local accuracy.** The contributions sum exactly to the prediction: $\phi_0 + \sum_i \phi_i = \hat f(x)$. No leftover, no fudge term.
+- **Missingness.** A feature absent from the input gets $\phi_i = 0$.
+- **Consistency.** If the model changes so that a feature's marginal contribution never decreases, for any coalition, its attribution does not decrease. Credit tracks the model.
+- **Symmetry.** Relabeling the features relabels the attributions and changes nothing else; in particular, two features with identical marginal contributions to every coalition receive equal credit.
+
+<Theorem title="uniqueness of the Shapley attribution (Lundberg & Lee, Thm 1; Shapley 1953; Young 1985)">
+Exactly one additive feature attribution satisfies local accuracy, missingness, consistency, and symmetry:
+$$
+\phi_i = \sum_{S \subseteq F \setminus \{i\}} \frac{|S|!\,(|F| - |S| - 1)!}{|F|!}\,\bigl[v(S \cup \{i\}) - v(S)\bigr],
+$$
+the **Shapley value**: feature $i$'s marginal contribution averaged over all $|F|!$ orderings, the weight of each subset $S$ being the fraction of orderings in which exactly the features of $S$ precede $i$.
+</Theorem>
+
+The two-feature computations above are this formula at $|F| = 2$, where the weights are $\tfrac12, \tfrac12$. Symmetry belongs in the hypothesis list even though Lundberg & Lee's Theorem 1 states only the first three properties: consistency compares one player's credit across two models and never compares two players, so without symmetry nothing forces interchangeable players to share equally. Young's 1985 characterization, which the paper's proof rests on, states it explicitly alongside efficiency and marginal-contribution monotonicity (the paper relegates it to a redundancy claim in its supplement). An exercise below proves the two-player case from scratch, naming every assumption where it is used.
+
+The theorem cuts both ways: any additive attribution that is *not* the Shapley value must violate one of the axioms on some model: a checkable statement about the earlier methods in the class. The paper's user studies add an empirical verdict: for small games with known structure, the most common human credit allocations agree with the Shapley split and not with LIME's or DeepLIFT's.
+
+<Example title="the max game: a null player and an insurance premium">
+The paper's second human-judgment game exposes what averaging over orderings buys. Three men earn a shared profit equal to the *maximum* number of quiz questions any of them answered: man 1 got 5 right, man 2 got 4, man 3 got 0, profit \$5. The naive attribution gives man 1 everything. The coalition values are $v(S) = \max_{i \in S}(\text{score}_i)$ with $v(\varnothing) = 0$; running all six orderings:
+
+| ordering | m1 joins | m2 joins | m3 joins |
+|---|---|---|---|
+| 1,2,3 | +5 | 0 | 0 |
+| 1,3,2 | +5 | 0 | 0 |
+| 2,1,3 | +1 | +4 | 0 |
+| 2,3,1 | +1 | +4 | 0 |
+| 3,1,2 | +5 | 0 | 0 |
+| 3,2,1 | +1 | +4 | 0 |
+
+$$
+\phi_1 = \tfrac{18}{6} = 3, \qquad \phi_2 = \tfrac{12}{6} = 2, \qquad \phi_3 = 0.
+$$
+Man 2's \$2 is an insurance premium: in half the orderings he arrives before man 1 and raises the coalition's max by 4. Man 3 changes no coalition's value and gets exactly zero. Max functions are precisely where single-reference methods break: DeepLIFT's comparison against its one reference (nobody answers anything) hands man 1 the entire \$5, while the most common allocation among the 52 human subjects was \$3, \$2, \$0 (Fig. 4B), the Shapley split exactly.
+</Example>
+
+## Kernel SHAP: the unique answer, by weighted regression
+
+The theorem names the right answer; computing it is the obstacle. The formula sums over $2^{|F|}$ subsets, each requiring an estimate of $v(S)$, itself an average of model evaluations over a background sample. At 57 spam features, $2^{57}$ coalitions is not a computation.
+
+LIME's regression supplies the computational template: sample coalitions $z'$, evaluate the model, and fit a weighted linear regression of $\hat f$ on feature presence, with a heuristic locality kernel deciding each coalition's weight. The form is right; the kernel is not, and with LIME's kernel the fitted coefficients violate local accuracy or consistency. The uniqueness theorem guarantees it, since they are not the Shapley values.
+
+<Theorem title="the Shapley kernel (Lundberg & Lee, Thm 2)">
+In LIME's weighted-regression objective, take no regularization, squared loss, and the weighting
+$$
+\pi_{x}(z') = \frac{M - 1}{\binom{M}{|z'|}\,|z'|\,(M - |z'|)},
+$$
+where $M$ is the number of features and $|z'|$ the coalition's size. Then the regression's solution is exactly the Shapley values.
+</Theorem>
+
+<Figure
+  src="./figures/shapley-kernel.svg"
+  alt="The Shapley kernel weight plotted against coalition size for ten features: a symmetric U shape on a log scale, smallest at half-full coalitions, with infinite weight marked at the empty and full coalitions"
+  caption="The Shapley kernel for M = 10. The infinite endpoint weights are imposed as exact constraints (the regression must hit the base value and the prediction); half-full coalitions, which say the least about any single feature, weigh least."
+/>
+
+The kernel's shape carries the intuition: a coalition of size 1 or $M-1$ isolates a single feature's effect almost perfectly and gets a large weight; a half-full coalition confounds many features and gets the smallest. Because the Shapley value is a difference of means and a mean is a least-squares fit, a regression *can* recover it; the theorem exhibits the one kernel that does. Sampling coalitions under this kernel estimates all $M$ attributions jointly, with far fewer model evaluations than subset-by-subset sampling of the classic formula.
+
+Model structure buys more. For linear models the whole computation collapses to a formula (an exercise below derives it), and for tree ensembles the **TreeSHAP** algorithm (Lundberg et al. 2020) computes exact Shapley values in polynomial time by the same trick partial dependence used: traversals that push coalition weights down the trees. Exact per-prediction attributions for a 400-tree booster cost milliseconds, which is why the waterfall below could be computed rather than sketched.
+
+### Reading an attribution: the waterfall
+
+The display convention comes from the paper's Figure 1: start at the base value $\phi_0 = v(\varnothing)$, add one feature's $\phi_i$ at a time, end at $\hat f(x)$. Local accuracy is what makes the picture legitimate: the bars *must* land on the prediction.
+
+<Figure
+  src="./figures/waterfall.svg"
+  alt="A waterfall from base log-odds minus 1.18 down to the prediction minus 9.41 for one ham message: bars for george, hp, edu, re, 1999, meeting, lab and the fifty remaining features grouped, with george and hp flagged amber as leakage"
+  caption="Exact Shapley attributions for one test ham message under our spam booster, computed for this lesson: seven features as individual players, the remaining fifty as one grouped player, coalition values averaged over 200 background training messages, all 256 coalitions evaluated exactly."
+/>
+
+<Task>
+Verify local accuracy from the figure: sum the eight printed contributions and add the base value; the total must land on $\hat f(x) = -9.41$ within the $\pm 0.01$ the printed rounding allows. Then rank the bars: the two largest belong to `george` and `hp`; recall from <Ref lesson="spam-filter">the spam corpus lesson</Ref> what those features encode.
+</Task>
+
+The message is a work email mentioning `george` (1.12% of its words), `hp`, `edu`, `re`, `1999`, `meeting`, and `lab`. The booster starts at base log-odds $-1.18$ (a 24% spam probability before any feature is revealed against this background), and the features drive it to $-9.41$, a probability of about $10^{-4}$. Every bar is hamward, and the attribution is specific: this message is ham, says the model, *chiefly because it names the mailbox's owner and his employer*.
+
+## What the attributions do not say
+
+The waterfall's verdict — ham chiefly because the message names the mailbox's owner — is the tools working perfectly on a model that should not ship. Three limits govern all three tools, and each is a question-discipline failure when ignored.
+
+### Properties of the model, not causes in the world
+
+Every object in this lesson is computed from $\hat f$ alone. A partial-dependence slope is the model's response, not the effect of intervening on the feature in reality; the refutation exercise below builds the confounded case where the two diverge completely. The marginal-vs-conditional figure already showed the converse: even as a *model* summary, the conditional variant manufactures effects, which is why the causal reading fails at both levels.
+
+### Leakage gets confident attributions
+
+The waterfall's top credits, `george` and `hp`, are <Ref lesson="spam-filter">the mailbox fingerprint</Ref>: real signal in this corpus, worthless for any other deployment. On the booster, permutation importance ranks them first and second of 57 (+4.0 and +2.3 points of test error). The attribution tools cannot flag this: they faithfully report the model, and the model's reliance is real. Composing them with <Ref lesson="imbalance-leakage">the leakage audit habit</Ref> is what turns "the model's top feature" into "the model's top feature, which must not survive review": interpretability output is audit *input*, not a certificate.
+
+### Correlated features split credit non-uniquely
+
+When several features carry one signal, there is no fact of the matter about the split, and the methods disagree by design. The extreme case — three exact copies of one perfectly predictive feature, the construction an exercise below completes — collects three defensible answers to "how important is each copy":
+
+| procedure | verdict on each copy | what forces it |
+|---|---|---|
+| permutation importance | exactly $0$ | the intact copies cover every single broken link |
+| Shapley attribution | exactly $\tfrac13$ of the credit | local accuracy fixes the sum; symmetry splits it equally |
+| refit with one copy deleted | accuracy unchanged | the surviving copies absorb the whole signal |
+
+None is wrong; each answers its own question about a quantity the data does not determine. Which copies could be dropped is a refitting question, how a fixed model's credit divides is Shapley's, and whether any single link is load-bearing is permutation's.
+
+What is established: permutation importance answers global reliance; partial dependence gives the model's marginal response with its additive-recovery guarantee; Shapley attributions are the unique additive per-prediction explanation under local accuracy, missingness, and consistency, computable by the Shapley kernel or by tree traversal; and all three describe the fitted model, so their findings feed audits rather than causal claims. This lesson is off the core path: <Ref lesson="spam-ensembles">the next core lesson</Ref> races the module's three ensembles on the spam corpus, and the course's closing benchmark, <Ref lesson="tabular-showdown">the tabular showdown</Ref>, returns to what fitted-model interrogation shows at scale.
+
+## Exercises
+
+<Exercise>
+A gradient booster is trained, and feature $x_7$ is never chosen by any split in any tree. Show that all three tools return exactly zero for it: (a) permutation importance, (b) partial dependence (flat), (c) the Shapley value for every input. Name, for each, the step in its definition that forces the zero.
+
+<Solution>
+(a) Predictions are computed by tree traversals, and no traversal reads $x_7$; permuting the column changes no prediction, so the error change is exactly zero for every resampling, not merely zero on average.
+
+(b) In the estimator $\bar f_7(v) = \tfrac{1}{N}\sum_i \hat f(v, x_{iC})$, the first argument is never read, so every summand is constant in $v$: the curve is exactly flat. The tree-traversal form shows it structurally: no node splits on a target feature, so the traversal and its weights are identical for every $v$.
+
+(c) For any coalition $S$, pinning $x_7$ changes no prediction, so $v(S \cup \{7\}) = v(S)$: every marginal contribution in the Shapley sum is zero, hence $\phi_7 = 0$. This is the null-player behaviour the max-game example showed for man 3: a player who changes no coalition's value gets exactly nothing, whatever the other players do.
+
+The three zeros are one fact (the model does not read the feature) reported through three definitions. The transferable move: checking a claimed interpretation tool on a feature the model provably ignores is the cheapest correctness test it can face.
+</Solution>
+</Exercise>
+
+<Exercise>
+Construct the masking failure in its extreme form. Let $x_1 = x_2 = x_3$ be three exact copies of one perfectly predictive binary feature, and let the classifier be a majority vote of three trees, each a single split on a different copy. (a) Show that the permutation importance of *each* copy is exactly zero, while permuting all three columns at once collapses the model to chance. (b) Show that the Shapley attribution gives each copy exactly one third of the credit. (c) Name the property each method is exercising: what did permutation importance lose, and what forced Shapley's answer?
+
+<Solution>
+(a) Permute copy $j$'s column alone. On each test row, the tree reading copy $j$ now sees an unrelated value and errs on roughly half the rows, but the other two trees still read the intact copies and agree on the correct label; the majority vote is therefore correct on every row, the error does not move, and copy $j$'s score is exactly zero. By symmetry all three scores are zero. Permuting all three columns at once breaks every tree's link: the vote is now among three noise trees, and the error is chance-level. Three exact zeros over a group worth everything: the score for a group is not the sum, or any function, of the members' scores.
+
+(b) The copies are interchangeable: $v(S)$ depends only on how many of them $S$ pins, so swapping the labels of any two copies leaves every coalition value unchanged. *Symmetry* — the uniqueness theorem's fourth hypothesis, not a consequence of the other three — then forces $\phi_1 = \phi_2 = \phi_3$: relabeling must permute the attributions, and here it permutes them over an unchanged game, so they are equal. Local accuracy forces $\phi_1 + \phi_2 + \phi_3 = \hat f(x) - \phi_0$. Each copy gets exactly one third of the total credit.
+
+(c) Permutation importance probes one link at a time against a model whose redundancy backstops every single break; it satisfies no summation constraint, so its scores can all be zero while the model works: it lost local accuracy, which it never claimed. Shapley's answer is forced by exactly that axiom: the credit must add up to the prediction, and symmetry distributes it. Neither number is wrong; "which copies could I drop?" is answered by neither, only by refitting without them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "The partial-dependence plot of $x_j$ shows the causal effect of $x_j$ on the outcome: if the curve rises, increasing $x_j$ increases $y$." Use the marginal-vs-conditional analysis, produce a concrete counterexample, and state precisely what the plot does show.
+
+<Solution>
+The claim fails because $\bar f_j$ is a functional of the fitted model, and a model fits associations. Counterexample: let a hidden variable $u$ drive both the feature and the outcome (say monthly temperature driving both ice-cream sales $x_1$ and drowning deaths $y$), with no causal path from $x_1$ to $y$. A booster trained on $(x_1, \dots)$ without $u$ will use $x_1$ as a proxy, so $\hat f$ genuinely rises in $x_1$, and the partial-dependence curve rises: the plot is a *correct* description of the model and a false causal claim about the world. Intervening on $x_1$ (subsidizing ice cream) would move the curve's input and not the drowning rate.
+
+The step that fails is the substitution of $\hat f$ for the world: no averaging scheme, marginal or conditional, can extract from $\hat f$ information the training objective never put into it. What the plot legitimately shows is the model's response surface, marginally averaged over the other features' distribution, with the additive-recovery guarantee (exact recovery of $h_1$ when $\hat f = h_1(x_j) + h_2(x_C)$) and the known cost that the average visits feature combinations the data never contained. That statement is about $\hat f$, and it is the only statement the plot makes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove the two-player uniqueness theorem the lesson only stated. Setting $\phi_0 = v(\varnothing)$, show that local accuracy, consistency, and symmetry (relabeling the players relabels the attributions: swap the players' roles in the game and the two $\phi_i$ swap) force
+$$
+\phi_1 = \tfrac{1}{2}\bigl[v(\{1\}) - v(\varnothing)\bigr] + \tfrac{1}{2}\bigl[v(\{1,2\}) - v(\{2\})\bigr]
+$$
+for every two-player game $v$, and symmetrically for $\phi_2$. Hint: first use consistency in both directions to show $\phi_1$ can depend only on player 1's two marginal contributions; use symmetry to make both players' dependence the same function; then exploit local accuracy across all games at once.
+
+<Solution>
+**Step 1: attributions are functions of marginals.** Player 1's marginal contributions are $m_\varnothing = v(\{1\}) - v(\varnothing)$ and $m_2 = v(\{1,2\}) - v(\{2\})$. Take two games $v, v'$ with the same pair $(m_\varnothing, m_2)$. Consistency applied with $v'$ in the role of the improved model gives $\phi_1(v') \ge \phi_1(v)$; applied the other way, $\phi_1(v) \ge \phi_1(v')$. Hence $\phi_1$ is a function $g(m_\varnothing, m_2)$ of the marginals alone, and by the same argument $\phi_2 = h(n_\varnothing, n_1)$ of *its* marginals $n_\varnothing = v(\{2\}) - v(\varnothing)$, $n_1 = v(\{1,2\}) - v(\{1\})$. Setting $h = g$ is exactly where symmetry enters: consistency constrains each player's function separately and cannot compare the two, but under a label-invariant attribution player 2's credit in $v$ equals player 1's credit in the role-swapped game, whose marginals are $(n_\varnothing, n_1)$ — so $h = g$. Local accuracy and consistency alone would leave the functional equation below with one function per player and no unique solution.
+
+**Step 2: the functional equation.** Parametrize a game by $a = v(\{1\}) - v(\varnothing)$, $b = v(\{2\}) - v(\varnothing)$, $t = v(\{1,2\}) - v(\varnothing)$; then $m_\varnothing = a$, $m_2 = t - b$, $n_\varnothing = b$, $n_1 = t - a$. Local accuracy with $\phi_0 = v(\varnothing)$ reads
+$$
+g(a,\, t - b) + g(b,\, t - a) = t \qquad \text{for all } a, b, t.
+$$
+
+**Step 3: solve it.** Fix any $(u, s)$ and choose $a = u$, $b = u$, $t = u + s$. The first term is $g(a, t - b) = g(u, s)$ and the second is $g(b, t - a) = g(u, s)$: both arguments coincide, so $2\,g(u, s) = u + s$ and
+$$
+g(u, s) = \frac{u + s}{2}.
+$$
+So $\phi_1 = \tfrac{1}{2}(m_\varnothing + m_2)$: the average of the two orderings' marginal contributions, which is the Shapley value, and no other attribution satisfies the axioms. Missingness was not needed for the two present players; it fixes the attributions of absent features at zero. The transferable move: consistency converts an inequality axiom into an invariance ("equal marginals, equal credit" for one player), symmetry equates the players' rules, and the single linear constraint of local accuracy then leaves one solution.
+</Solution>
+</Exercise>
+
+<Exercise>
+Theorem 2 at the smallest scale. For $M = 2$ features, evaluate the Shapley kernel at every coalition size, then solve the weighted regression it defines: fit $g(z') = \phi_0 + \phi_1 z'_1 + \phi_2 z'_2$ to the coalition values of a general game $v$, treating the infinite endpoint weights as exact constraints. Show the solution is the average-of-orderings formula from the body's examples, and check it on the game $v(\varnothing) = 1$, $v(\{1\}) = 4$, $v(\{2\}) = 2$, $v(\{1,2\}) = 6$.
+
+<Solution>
+The kernel at $M = 2$: for $|z'| = 1$, $\pi_x(z') = \frac{2-1}{\binom{2}{1}\cdot 1 \cdot 1} = \tfrac12$, the same for both singletons; at $|z'| = 0$ and $|z'| = 2$ the factor $|z'|(M - |z'|)$ vanishes, so the empty and full coalitions carry infinite weight — the constraints $\phi_0 = v(\varnothing)$ and $\phi_0 + \phi_1 + \phi_2 = v(\{1,2\})$.
+
+Write $a = v(\{1\}) - v(\varnothing)$, $b = v(\{2\}) - v(\varnothing)$, $t = v(\{1,2\}) - v(\varnothing)$. With $\phi_0$ pinned and $\phi_2 = t - \phi_1$, the objective is the two singleton residuals at equal weight:
+$$
+\tfrac12\,(\phi_1 - a)^2 + \tfrac12\,(t - \phi_1 - b)^2.
+$$
+Setting the derivative to zero gives $(\phi_1 - a) = (t - \phi_1 - b)$, so
+$$
+\phi_1 = \tfrac12\,a + \tfrac12\,(t - b) = \tfrac{1}{2}\bigl[v(\{1\}) - v(\varnothing)\bigr] + \tfrac{1}{2}\bigl[v(\{1,2\}) - v(\{2\})\bigr]:
+$$
+the average of feature 1's marginal contributions in the two joining orders — the two-player Shapley value, produced by least squares with no enumeration of orderings anywhere. On the numeric game: $a = 3$, $b = 1$, $t = 5$, so $\phi_1 = \tfrac12(3) + \tfrac12(4) = 3.5$ and $\phi_2 = 5 - 3.5 = 1.5$, matching the in-body exercise's ordering-by-ordering computation. At $M = 2$ the regression is a reformulation; at $M = 57$ it is the algorithm, because coalitions sampled under the kernel estimate the same least-squares solution without visiting $2^{57}$ subsets.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the paper's human-intuition result on the sickness score, at the asymmetric query point. Same model (score 2 with both symptoms, 5 with exactly one, 0 with neither), same uniform background over the four states, but the patient now has *fever only*. Compute both Shapley values, verify local accuracy, and explain the sign of the cough attribution — the feature whose observed value is zero. Then reconcile the body example's $-0.5$ / $-0.5$ split with the equal $+1$ bars in the paper's Figure 4A.
+
+<Solution>
+Base value $v(\varnothing) = 3$ as before. Pinning fever $= 1$: $v(\{\text{fever}\}) = \tfrac{1}{2}(5 + 2) = 3.5$. Pinning cough $= 0$: $v(\{\text{cough}\}) = \tfrac{1}{2}(0 + 5) = 2.5$. Full coalition: $v(\{\text{f},\text{c}\}) = \hat f(1, 0) = 5$.
+
+Fever first: $+0.5$, then cough adds $5 - 3.5 = +1.5$. Cough first: $2.5 - 3 = -0.5$, then fever adds $5 - 2.5 = +2.5$.
+$$
+\phi_{\text{fever}} = \tfrac{1}{2}(0.5 + 2.5) = 1.5,
+\qquad
+\phi_{\text{cough}} = \tfrac{1}{2}(1.5 - 0.5) = 0.5,
+$$
+and $3 + 1.5 + 0.5 = 5$: local accuracy holds.
+
+Cough's $+0.5$ is the average of two orderings with opposite signs. Joining first, "no cough" *lowers* the expectation, $3 \to 2.5$: it removes cough-only (score 5) along with the pair (score 2), and the two states that remain average 2.5. Joining after fever is pinned, it *raises* the expectation, $3.5 \to 5$: with fever certain, "no cough" rules out the both-symptoms state whose score is only 2. The average $\tfrac12(-0.5 + 1.5) = +0.5$ is positive because the gain once fever is known outweighs the loss when it is not. Either way, an observed value of zero is information, not absence: missingness governs features excluded from the explanation, not features whose value happens to be zero.
+
+Comparison with the paper's bars (Fig. 4A) requires one adjustment: the paper explains the both-symptoms output of 2 against the *no-symptom baseline*, where $v(\varnothing) = \hat f(0,0) = 0$, $v(\{\text{fever}\}) = v(\{\text{cough}\}) = 5$, $v(\text{full}) = 2$, giving $\phi = +1$ each. The most common human allocation matches: equal positive credit of about 1 per symptom, and approximately zero for a third symptom the model ignores, while LIME's bars are unequal and do not sum to the output. Our $-0.5$ each and the paper's $+1$ each are the same equal split against different backgrounds: an attribution answers "why this prediction rather than the background average", and the base value is part of the explanation.
+</Solution>
+</Exercise>
+
+<Exercise>
+The module-5 audit, run with this lesson's toolkit. Using the booster from the figures (400 trees, depth 3, ESL train/test split, 5.0% test error) or your own refit of it: (a) compute test-set permutation importance for all 57 spam features and report the top two with their error increases; (b) refit the booster with `george` and `hp` deleted and report the new test error; (c) the two permutation scores sum to 6.3 points, yet the refit costs only about 1.1 — reconcile the two numbers, and state which one a deployment review should quote.
+
+<Solution>
+(a) Computed for this lesson (averages over 10 permutations): `hp` +4.0 points (5.0% → 9.0%) and `george` +2.3 points. The mailbox fingerprint holds ranks 1 and 2 of 57, ahead of every genuine spam marker (`remove` +1.4, `edu` +1.4, `ch$` +1.1, `ch!` +1.1).
+
+(b) Refitting without the two features: test error moves from 4.95% to 6.05%, about **+1.1 points**.
+
+(c) The numbers answer different questions, which is this lesson's spine. Permutation importance holds the model fixed: break `hp`'s link while every correlated column stands, and this model, which leaned on `hp` heavily, loses 4 points. The refit lets a new model find surrogates (`hpl`, `650`, `857`, `labs`, `telnet`: the rest of the fingerprint family <Ref lesson="spam-filter">the spam corpus lesson</Ref> catalogued), so most of the pair's apparent value is recovered through its correlates. Neither number is the "true importance": one measures this model's reliance, the other the feature set's marginal value under refitting. A deployment review should quote (b)-style numbers for the *whole* leakage family, not per-feature scores; deleting all eleven fingerprint features is the audit that estimates what ships. The persistence of large, confident scores on leakage features is the review's finding, not its refutation: the tools report the model, and the model is the problem. The ranking in (a) is also the doorstep of <Ref lesson="spam-ensembles">the module's closing race</Ref>: it reads exactly this importance list for each of its finishers, with the `george`/`hp` echo standing between every error number and a deployment claim.
+</Solution>
+</Exercise>
+
+<Exercise>
+Compute the exact Shapley attribution of every feature in the linear model $\hat f(x) = 2x_1 - x_2 + 0.5x_3 + 4$ with independent features and background means $\mathbb{E}[x_1] = 1$, $\mathbb{E}[x_2] = 0$, $\mathbb{E}[x_3] = 2$, at the input $x = (3, 2, 2)$. Work from coalition values, then look for the pattern: all $3! = 6$ orderings should agree.
+
+<Solution>
+With independent features, pinning a subset $S$ gives $v(S) = 4 + \sum_{j \in S} w_j x_j + \sum_{j \notin S} w_j \mathbb{E}[x_j]$. When feature $j$ joins any coalition, the value changes by exactly
+$$
+v(S \cup \{j\}) - v(S) = w_j\,x_j - w_j\,\mathbb{E}[x_j] = w_j\,(x_j - \mathbb{E}[x_j]),
+$$
+independent of $S$: linearity kills every interaction, so all six orderings deliver the same marginal contribution, and the average is that constant. Numerically: base value $\phi_0 = 4 + 2(1) - 0 + 0.5(2) = 7$, and
+$$
+\phi_1 = 2\,(3 - 1) = 4, \qquad \phi_2 = -1\,(2 - 0) = -2, \qquad \phi_3 = 0.5\,(2 - 2) = 0.
+$$
+Check: $7 + 4 - 2 + 0 = 9 = \hat f(3,2,2)$. Feature 3 sits at its background mean and gets zero: present, but uninformative against this background.
+
+The pattern $\phi_j = w_j(x_j - \mathbb{E}[x_j])$ is the paper's Corollary 1 (Linear SHAP): on models we can already read, the elaborate game-theoretic machinery collapses to the coefficient times the deviation from the mean, exactly what anyone would have written down. That reduction is the acceptance test to carry to every interpretability tool: a method must recover the known answer on models simple enough to read directly, or its output on a forest cannot be trusted either.
+</Solution>
+</Exercise>
+
+<References>
+1. J. H. Friedman, "Greedy Function Approximation: A Gradient Boosting Machine," *Annals of Statistics* 29(5), 2001, pp. 1189–1232 — §8.1: relative importance (Eqs. 44–45) with the linear-target calibration (Table 2); §8.2: partial dependence (Eqs. 50–57), the marginal-vs-conditional argument, and the weighted tree traversal; §9.1: the garnet study (N = 13,317; Figs. 10–11, the Ga×Zr interaction). https://doi.org/10.1214/aos/1013203451
+2. S. M. Lundberg, S.-I. Lee, "A Unified Approach to Interpreting Model Predictions," *NeurIPS* 2017 — additive feature attributions (Def. 1), the three properties, the uniqueness theorem (Thm. 1), the Shapley kernel (Thm. 2), Linear SHAP (Cor. 1), the base-value-to-prediction framing (Fig. 1), and the sickness-score and max-game user studies (§5.2, Fig. 4). https://arxiv.org/abs/1705.07874
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §10.13: importance and partial dependence for boosted trees, including the conditional-expectation caution (Eq. 10.49); §15.3.2: Gini vs. permutation importance on the spam forest and the surrogate caveat. Free online: https://hastie.su.domains/ElemStatLearn/
+4. L. Breiman, "Random Forests," *Machine Learning* 45, 2001, pp. 5–32 — §10: permutation importance and the diabetes reliance-vs-indispensability demonstration (variables 2, 6, 8). https://doi.org/10.1023/A:1010933404324
+5. L. S. Shapley, "A Value for n-Person Games," in *Contributions to the Theory of Games II*, Princeton, 1953, pp. 307–317 — the original axioms and the value.
+6. H. P. Young, "Monotonic Solutions of Cooperative Games," *International Journal of Game Theory* 14, 1985, pp. 65–72 — the marginality characterization behind the uniqueness theorem.
+7. S. M. Lundberg, G. Erion, H. Chen, et al., "From Local Explanations to Global Understanding with Explainable AI for Trees," *Nature Machine Intelligence* 2, 2020, pp. 56–67 — TreeSHAP: exact polynomial-time Shapley values for tree ensembles. https://doi.org/10.1038/s42256-019-0138-9
+8. M. T. Ribeiro, S. Singh, C. Guestrin, "'Why Should I Trust You?': Explaining the Predictions of Any Classifier," *KDD* 2016 — LIME, the additive explanation with the heuristic kernel that Kernel SHAP replaces. https://doi.org/10.1145/2939672.2939778
+9. F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," *JMLR* 12, 2011, pp. 2825–2830 — the implementation behind every number "computed for this lesson" (`GradientBoostingClassifier` on the standard ESL spam split; permutation and exact grouped-coalition computations scripted on top). https://scikit-learn.org/
+</References>
