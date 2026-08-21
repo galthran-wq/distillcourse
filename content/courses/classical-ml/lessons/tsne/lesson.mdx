@@ -1,0 +1,388 @@
+t-SNE matches neighbor distributions between the original space and a 2D map; a heavy-tailed kernel in the map is what keeps moderate-distance points from crushing into the center — and the maps it draws are routinely misread.
+
+This module has organized unlabeled data by centers, densities, subspaces, and graphs, and its two embeddings so far were built for other purposes: <Ref lesson="pca">PCA's</Ref> two-component window on the digits kept under 29% of the variance and stacked all ten classes into one mass, and <Ref lesson="spectral-clustering">the spectral embedding</Ref> drew nonconvex clusters faithfully but collapsed each one to a point, discarding every metric detail on purpose. What neither provides is a two-dimensional *picture* of high-dimensional data in which nearby points stay nearby: the standard first act of exploratory analysis. This lesson builds the two methods that provide it, t-SNE and UMAP, and then teaches the skill the methods make necessary: reading their maps without believing what the maps do not say.
+
+## The objective changes: keep neighbors, not variance
+
+Every embedding so far has optimized a global functional of all pairwise geometry at once. [Stochastic Neighbor Embedding](https://papers.nips.cc/paper/2276-stochastic-neighbor-embedding) (SNE; Hinton and Roweis, 2002), the method t-SNE repairs, makes a different commitment: only each point's *local neighborhood* must survive the trip to 2-D, and "neighborhood" is made precise as a probability distribution.
+
+Center a Gaussian on point $x_i$ and ask it to pick a neighbor at random, with density deciding the odds:
+
+<Definition title="conditional neighbor probabilities">
+For data $x_1, \dots, x_n$ and a per-point bandwidth $\sigma_i$, the probability that $x_i$ picks $x_j$ as its neighbor is
+
+$$
+p_{j|i} \;=\; \frac{\exp\!\bigl(-\lVert x_i - x_j \rVert^2 / 2\sigma_i^2\bigr)}{\sum_{k \neq i} \exp\!\bigl(-\lVert x_i - x_k \rVert^2 / 2\sigma_i^2\bigr)}, \qquad p_{i|i} = 0 .
+$$
+
+The distribution $P_i = (p_{j|i})_j$ is $x_i$'s **neighbor distribution**. The map points $y_1, \dots, y_n \in \mathbb{R}^2$ define counterpart distributions $Q_i$ by the same formula with a fixed bandwidth.
+</Definition>
+
+Concretely: three points on a line at positions $0, 1, 3$, with $\sigma_1 = 1$ at the first point. The unnormalized weights from $x_1$ are $e^{-1/2} = 0.607$ to the point at distance 1 and $e^{-9/2} = 0.011$ to the point at distance 3, so $p_{2|1} = 0.982$ and $p_{3|1} = 0.018$: the near point owns the distribution, the far point is almost invisible. Distances enter only through these ratios; once $P_i$ is computed, the original coordinates are never consulted again.
+
+### Perplexity: one dial that sets every $\sigma_i$
+
+The bandwidths are not free parameters, one per point; they are all set by a single user choice. Each $\sigma_i$ controls how fast $P_i$'s entropy grows: tiny $\sigma_i$ puts all mass on the single nearest point, large $\sigma_i$ spreads it toward uniform. SNE fixes the *entropy* rather than the bandwidth: the user names a target **perplexity**
+
+$$
+\operatorname{Perp}(P_i) \;=\; 2^{H(P_i)}, \qquad H(P_i) = -\sum_j p_{j|i} \log_2 p_{j|i},
+$$
+
+and each point binary-searches for the $\sigma_i$ that attains it. Perplexity reads as a smooth *effective neighbor count*: a uniform distribution over exactly $k$ neighbors has $H = \log_2 k$ and perplexity $k$, and every other distribution interpolates. Typical values run 5 to 50.
+
+<Example title="perplexity as an effective count">
+A point whose neighbor distribution puts mass $0.45, 0.45, 0.10$ on three points and zero elsewhere has
+
+$$
+H = -(0.45 \log_2 0.45)\cdot 2 - 0.10 \log_2 0.10 = 0.5184\cdot 2 + 0.3322 = 1.369 \text{ bits},
+$$
+
+so $\operatorname{Perp} = 2^{1.369} \approx 2.58$: two full neighbors plus a marginal third, counted fractionally. Doubling every distance and rescaling $\sigma_i$ to match leaves $P_i$, and with it the perplexity, unchanged: the count is about *structure*, not scale.
+</Example>
+
+<Exercise>
+The paired problem: a point's neighbor distribution is $(0.7, 0.2, 0.1)$. Compute $H(P_i)$ and the perplexity, and state without computing whether a distribution $(0.34, 0.33, 0.33)$ over the same three points has higher or lower perplexity. Work the logarithms before opening.
+
+<Solution>
+$H = -(0.7 \log_2 0.7 + 0.2 \log_2 0.2 + 0.1 \log_2 0.1) = 0.7\cdot 0.5146 + 0.2 \cdot 2.3219 + 0.1 \cdot 3.3219 = 0.360 + 0.464 + 0.332 = 1.157$ bits, so $\operatorname{Perp} = 2^{1.157} \approx 2.23$. The near-uniform $(0.34, 0.33, 0.33)$ has entropy just under $\log_2 3 = 1.585$ bits, perplexity just under 3: higher, because entropy is maximal at uniform. The transferable reading: perplexity counts how many neighbors matter *effectively*, and it tops out at the number that get any mass at all.
+</Solution>
+</Exercise>
+
+The search adapts to density automatically: in a dense region a small $\sigma_i$ already reaches the target count, in a sparse region the same target forces a wide Gaussian. Each point gets a bandwidth matched to its own surroundings: one number from the user, $n$ calibrated bandwidths in the data.
+
+<FigureSequence
+  name="neighbor-probs"
+  alt="Four frames on one two-group point cloud: a small sigma concentrating neighbor probability on the closest points, a large sigma spreading it across both groups, the binary search landing on the sigma attaining perplexity 6, and the same target at a sparse point requiring a visibly larger sigma"
+  caption="The neighbor-distribution construction on one cloud: σ sets the effective neighbor count 2^H, and fixing the count per point makes σ adapt to local density."
+/>
+
+<Task>
+Step through the four frames watching only two things: the edge opacities (the distribution $P_i$) and the readout $2^H$. Frames 1–2 change $\sigma$ at one point and the count moves from 2.7 to 13.6; frames 3–4 fix the count at 6 and move the point: the dense point needs $\sigma = 0.27$, the sparse one $\sigma = 0.67$ for the same six effective neighbors.
+</Task>
+
+### The cost: a KL divergence that prices errors asymmetrically
+
+A good map makes each $Q_i$ match its $P_i$. SNE scores the mismatch with the sum of Kullback–Leibler divergences, the same divergence <Ref lesson="mle-map">the MLE lesson</Ref> showed maximum likelihood minimizing against the empirical distribution:
+
+$$
+C \;=\; \sum_i \operatorname{KL}(P_i \,\|\, Q_i) \;=\; \sum_i \sum_j p_{j|i} \log \frac{p_{j|i}}{q_{j|i}} .
+$$
+
+KL is not symmetric, and here the asymmetry is the design. A true neighbor placed far away in the map ($p$ large, $q$ small) costs $p \log(p/q)$, which grows without bound as $q \to 0$: with $p = 0.2$ and $q = 0.001$ the term is $0.2 \log_2 200 \approx 1.5$ bits. Two strangers placed side by side ($p$ small, $q$ large) cost almost nothing: with the roles reversed, $0.001 \log_2 0.005 \approx -0.008$ bits, two hundred times smaller in magnitude. The map is fined heavily for tearing neighborhoods apart and barely at all for inventing proximity between distant points.
+
+<KeyFact>
+The KL asymmetry is a budget decision, made before any optimizer runs: t-SNE spends its accuracy on keeping true neighbors together, and buys it by letting large distances mean almost nothing. Every misreading in this lesson's catalogue reads a quantity off the part of the budget that was never funded.
+</KeyFact>
+
+## The crowding problem: 2-D has no room for the middle distances
+
+Minimizing $C$ over the $y_i$ by gradient descent is the whole algorithm, and on real data plain SNE produces a characteristic failure: the map's clusters all crush together toward the center, with no gaps between them. The mechanism is geometric, and it is <Ref lesson="knn-curse">module 1's shell-volume computation</Ref> running in reverse.
+
+### One simplification first: the joint form
+
+In place of $n$ conditional divergences, t-SNE uses a single joint distribution over pairs and minimizes $C = \operatorname{KL}(P \| Q)$. The obvious joint definition (one Gaussian normalization over all pairs at once) has an edge case: an outlier, far from everything, gets vanishingly small $p_{ij}$ with every partner, so its map position barely enters the cost and ends up unconstrained. t-SNE instead sets $p_{ij} = (p_{j|i} + p_{i|j})/2n$, the symmetrized average of the conditionals; each conditional row sums to 1, so $\sum_j p_{ij} > 1/2n$ for every point, and everyone's position matters.
+
+### The volume argument
+
+Take data whose intrinsic dimension is around $d = 10$ (about right for handwritten digits) and stand at one point. Its mid-range neighbors, the points at moderate distance, live in shells whose volume grows like $r^d$: the shell from $r$ to $2r$ holds $2^{10} - 1 = 1023$ times the volume of the inner ball. The 2-D map has only $r^2$ to offer: the same shell holds 3 times the inner disk. Equivalently, $d+1$ points can sit mutually equidistant in $d$ dimensions, so ten dimensions accommodate 11 points that are all "moderately far" from each other at once; the plane accommodates 3. There is no arrangement of map points that gives the mid-range its true distances: honest small distances leave far too little area for the mid-range to stand in.
+
+Something must give, and in SNE what gives is the gaps. Each mid-range pair placed too far apart exerts a small attractive force; the number of such pairs is enormous; the sum of many small attractions crushes the map inward, closing the spaces between natural clusters.
+
+<Figure
+  src="./figures/crowding.svg"
+  alt="Left: concentric circles showing the shell from r to 2r, which holds 3 times the inner disk in two dimensions against 1023 times the inner ball in ten. Right: the Gaussian and Student-t map kernels on a log scale with the tail gap shaded and a dashed line marking that the weight a Gaussian assigns at distance 2 is assigned by the t kernel at distance 7.3"
+  caption="The crowding problem and its repair: mid-range volume that exists in d = 10 has no 2-D counterpart (left), so the map kernel gets a heavy tail that lets mid-range pairs sit far apart at realistic probability (right)."
+/>
+
+<KeyFact>
+The crowding problem is a theorem about area, not a bug in an optimizer: no 2-D map can honor small and moderate distances from a 10-dimensional space simultaneously. Every method in this lesson resolves it by *deliberately inflating* moderate distances; that is exactly why those distances must never be read back off the map as measurements.
+</KeyFact>
+
+## Heavy tails: the Student-t map kernel
+
+The fix, from [van der Maaten and Hinton's 2008 paper](https://www.jmlr.org/papers/volume9/vandermaaten08a/vandermaaten08a.pdf), is one line: keep the Gaussian on the data side, but convert map distances to probabilities with a heavy-tailed kernel.
+
+<Definition title="t-SNE">
+t-SNE minimizes $\operatorname{KL}(P \| Q)$ over map positions $y_1, \dots, y_n$, where $P$ is the symmetrized joint of the perplexity-calibrated Gaussians and
+
+$$
+q_{ij} \;=\; \frac{\bigl(1 + \lVert y_i - y_j \rVert^2\bigr)^{-1}}{\sum_{k \neq l} \bigl(1 + \lVert y_k - y_l \rVert^2\bigr)^{-1}} ,
+$$
+
+a Student-t distribution with one degree of freedom (a Cauchy) in the map.
+</Definition>
+
+The change is entirely in the tail. A Gaussian's weight dies like $e^{-r^2}$; the t kernel's dies like $1/r^2$, slowly enough that a pair can sit far apart in the map while keeping a non-negligible $q_{ij}$.
+
+<Example title="where the mid-range gets parked">
+A pair at map distance 2 under the Gaussian kernel has relative weight $e^{-4} = 0.018$. For the t kernel to assign that same weight requires $(1 + d^2)^{-1} = 0.018$, i.e. $d = \sqrt{1/0.018 - 1} \approx 7.3$. A "moderately similar" pair that SNE would hold at distance 2, contributing to the central crush, can sit at distance 7.3 in a t-SNE map at no cost in probability. The mid-range moves out; the gaps between clusters survive; small distances, where both kernels agree, are untouched.
+</Example>
+
+### The gradient: springs with a heavy-tailed leash
+
+The gradient of the t-SNE cost has a closed form (the closing exercises derive it):
+
+$$
+\frac{\partial C}{\partial y_i} \;=\; 4 \sum_j \,(p_{ij} - q_{ij})\,\bigl(1 + \lVert y_i - y_j \rVert^2\bigr)^{-1} (y_i - y_j) .
+$$
+
+Read it as springs. Each pair contributes a force along $y_i - y_j$ whose sign is the mismatch $p_{ij} - q_{ij}$: attraction where the map underestimates similarity, repulsion where it overestimates. Its size depends on two distances at once — how far apart the pair sits in the data, which fixes $p_{ij}$, and how far apart the map currently puts it, which fixes $q_{ij}$ — so the entire force law fits in one square, and swapping the map kernel redraws it.
+
+<Figure
+  src="./figures/gradient-forces.svg"
+  alt="Two side-by-side heat maps over data distance (horizontal, 0 to 5) and map distance (vertical, 0 to 5), one for SNE's Gaussian map kernel and one for t-SNE's Student-t kernel. Amber cells mark attraction, blue cells repulsion, opacity the strength. SNE's attraction grows toward the top-left corner without limit, reaching about 20 at the plot edge, while its repulsion band at small map distance and large data distance peaks at about 1.7. In the t-SNE panel the attraction peaks at 1.3 at map distance 1.73 and fades above it, and the repulsion at large data distance peaks at the same 1.3."
+  caption="One pair's force as both distances vary — amber pulls together, blue pushes apart, computed for a single pair with p = exp(−d²/2) on the data side. t-SNE's strongest push equals its strongest pull; SNE's is a twelfth of it."
+/>
+
+Two features of the t-SNE panel matter. Dissimilar points squeezed together in the map ($p \approx 0$ at small map distance, so $q$ is large) feel a repulsion that peaks at 1.3, exactly the strength of the strongest attraction anywhere in the same panel. In the SNE panel the strongest push, 1.7, is about a twelfth of the strongest pull, 20; the paper's own version of these plots reports the same imbalance, roughly 1 against 19 (§3.3). Attraction outweighing repulsion by an order of magnitude is the central crush seen from the optimizer's side, and evenly matched forces are what pry clusters apart. Second, the $(1+\lVert y_i - y_j\rVert^2)^{-1}$ factor caps both forces: t-SNE's pull rises to its maximum at map distance $\sqrt{3}$ and fades above it, so no pair is ever flung to infinity, while SNE's pull keeps growing with map distance past the edge of the plot. The paper credits this balance with letting plain gradient descent find good optima; SNE needed simulated annealing to reach comparable maps.
+
+Two optimization devices complete the standard recipe; neither changes the model. *Early exaggeration* multiplies every $p_{ij}$ by a constant (4 in the paper, 12 in later implementations) for the first phase of optimization: with the targets inflated, the optimizer forms tight, widely separated proto-clusters that can still move past each other, and the map's global arrangement is settled while there is empty space to rearrange in. *Momentum* and an adaptive learning rate speed up the descent. The cost is non-convex; different runs give different maps, a fact the misreading section returns to.
+
+<Remark title="settings that travel">
+The paper's own settings (perplexity 30 to 50, 1,000 iterations, exaggeration for the first 50) remain the defaults of most implementations, and the naive $O(n^2)$ pairwise computation is replaced in practice by the Barnes–Hut approximation at $O(n \log n)$, which is what `scikit-learn` runs. One preprocessing step is also standard and easy to forget: the paper first reduces the data to 30 dimensions with PCA, suppressing noise and speeding up the distance computations before the neighbor distributions are ever formed.
+</Remark>
+
+## What success looks like: MNIST islands and COIL-20 loops
+
+When high-dimensional structure is real, the repaired objective renders it, and the genre's canonical figure is the evidence: the paper's map of 6,000 digits from MNIST, the handwritten-digit benchmark of 28×28 grayscale scans (784 dimensions).
+
+### MNIST: ten islands, and a number to back them
+
+<Figure
+  src="./figures/tsne-mnist.png"
+  alt="A two-dimensional t-SNE map of 6,000 MNIST digits, each point drawn as the handwritten digit it is. Ten well-separated islands form: 4s, 9s and 7s in one upper group, then 6s, 5s, 3s, 8s and a long slanted band of 1s across the middle, with 0s and 2s below. Within islands the glyphs vary smoothly — the 1s shift in slant along the band, the 2s in loopiness. A small inset at bottom right shows the same map as a plain scatterplot colored by true class, ten colored blobs in the same arrangement."
+  caption="Six thousand MNIST digits, each drawn as the digit it actually is at the position t-SNE gave it. Ten islands separate, and no label was ever shown to the algorithm — the inset recolors the same map by true class afterwards, purely to check it. Look inside an island and the variation is smooth: the 1s order themselves by slant, the 2s by loopiness."
+/>
+
+Ten islands, one per digit class, with no label ever shown to the algorithm: the coloring in the inset is applied after the fact, purely to check the map. Within islands the arrangement is meaningful too (the 1s order themselves by slant, the 2s by loopiness), because within a class the data really does vary along a few smooth directions, and those directions are local structure, which is the thing the objective protects. The quality has a number attached: a 1-nearest-neighbor classifier scores 5.13% ten-fold cross-validated error on the two map coordinates against 5.75% on the raw 784 pixels. Two dimensions, chosen with no labels, carry the neighborhood structure that <Ref lesson="knn-curse">1-NN</Ref> runs on as well as the original space does.
+
+### COIL-20: circles of viewpoints drawn as circles
+
+<Figure
+  src="./figures/coil20-loops.png"
+  alt="t-SNE map of COIL-20: eighteen or so small closed loops and rings scattered across an otherwise empty plane, each drawn in its own colour and marker — magenta, red, blue and black — plus, at the lower left, a tangle of four long arcs running parallel to one another instead of closing."
+  caption="t-SNE on COIL-20: 72 turntable views per object, most objects drawn as their own closed loop. The four toy cars (lower left) merge into aligned strips."
+  float="right"
+  width="m"
+/>
+
+The second showcase reads topology. COIL-20 photographs 20 household objects on a turntable, one image every 5°, 72 views per object (1,024 pixels each). Each object's images form a closed one-dimensional loop in pixel space, and the t-SNE map draws most of the 20 as exactly that: separate closed loops. The failure inside the success is as instructive: the four toy cars, near-identical from matching angles, merge into aligned strips, because to the neighbor distributions two cars at the same orientation genuinely are neighbors. The map reports the metric it was given, not the labels a human has in mind.
+
+<KeyFact>
+When high-dimensional structure is real, a neighbor embedding renders it legibly: MNIST's ten classes become ten islands (with 1-NN error on the 2-D map, 5.13%, *better* than on all 784 pixels), and COIL-20's turntable circles become drawn circles. The catalogue that follows is not evidence the tool is broken; it is what the same tool draws when the structure is not there.
+</KeyFact>
+
+## Reading the maps: the misreading catalogue
+
+Everything below is a documented, prevalent misreading, catalogued with live examples in [Wattenberg, Viégas and Johnson's 2016 Distill article](https://distill.pub/2016/misread-tsne/), the study this section reproduces with fresh runs. The mechanisms are not new: each one is the perplexity calibration, the KL asymmetry, or the crowding repair, seen from the consumer's side.
+
+### Cluster sizes in the map mean nothing
+
+The reading: "the left cluster is drawn larger, so that group is more variable." The counterexample: two Gaussian clusters whose spreads differ by a factor of 9 in the data emerge in the map as two blobs of *identical* size (in this run, map spreads matching to three decimal places).
+
+<Figure
+  src="./figures/misread-sizes.svg"
+  alt="Two clusters with spreads differing ninefold in the data drawn as equal-sized blobs in the t-SNE map"
+  caption="The Distill size example recomputed at perplexity 30: data spreads 1 : 9, map spreads 1 : 1. The map equalizes density by construction."
+/>
+
+The mechanism is the perplexity calibration itself. Dense regions get small $\sigma_i$, sparse regions large ones, so every point ends up with the same effective neighbor count and the map, which only ever sees the $p_{ij}$, renders every region at roughly the same density. Expanding dense clusters and contracting sparse ones is not distortion by accident; it is the construction. What survives is *which points belong together*, not how much room they occupied.
+
+### Distances between clusters mean little
+
+The reading: "these two islands are drawn close, so those classes are similar." The counterexample: three clusters on a line with gaps in ratio 1 : 5. At perplexity 5 the map draws them roughly equidistant, the true 5× gap erased entirely; at perplexity 50 the ordering returns but the drawn ratio is about 2, not 5.
+
+<Figure
+  src="./figures/misread-distances.svg"
+  alt="Three clusters with gaps in ratio one to five rendered as equidistant at perplexity 5 and with ratio roughly two at perplexity 50"
+  caption="Gaps of 10 and 50 in the data: equidistant at perplexity 5; ordered but compressed (≈ 13 : 27) at perplexity 50. Between-cluster distance is an artifact of the perplexity."
+/>
+
+The mechanism is the funding decision of the KL asymmetry plus the crowding repair: between-cluster distances are exactly the moderate-to-large distances the objective barely prices and the heavy tail deliberately inflates. Whether any perplexity recovers global geometry depends on cluster sizes: with 200 points per cluster instead of 50, the Distill authors found *no* tested perplexity that did. And perplexity is one global dial, so data with clusters at several scales has no correct setting.
+
+### Pure noise can look convincingly clustered
+
+The flagship case. The reading: "the map shows clumps, so the data has cluster structure." The counterexample: 500 points drawn from an isotropic 100-dimensional Gaussian — noise by construction, no structure to find.
+
+<FigureSequence
+  name="noise-two-ways"
+  alt="Two t-SNE maps of the same 500 points of pure 100-dimensional Gaussian noise: at perplexity 2 the points collapse into dozens of tight, well-separated clumps and short strands with empty lanes between them; at perplexity 30 the same points spread into one even, featureless disc."
+  caption="Distill's flagship case recomputed: one fixed draw of 500 points of 100-D Gaussian noise, embedded twice (scikit-learn, seed 0, 1,000 steps). Perplexity 2 (frame 1) manufactures convincing clusters; perplexity 30 (frame 2) draws the even disc the data actually is. Same points — only the perplexity differs."
+/>
+
+<Task>
+Compare the two frames on two counts and nothing else: how many separated clumps each shows, and whether empty lanes run between them. Frame 1 (perplexity 2) has dozens of clumps with lanes wide enough to trace; frame 2 (perplexity 30) has one even disc with no lane anywhere in it. Then count what changed in the data between the frames: nothing — the same 500 coordinates were embedded twice.
+</Task>
+
+At perplexity 2 the map shows dramatic, well-separated clumps that an analyst tuning hyperparameters "to bring out structure" would accept as a discovery. The mechanism: at perplexity 2 each point's distribution funds only its two or three nearest neighbors, and in any finite sample of noise, nearest-neighbor chains exist by chance; the objective renders those chance chains as tight clumps. At perplexity 30 the same data draws as an even disc. The disc is itself a finding about high dimensions: a 100-D Gaussian's mass concentrates near a thin spherical shell, nearly uniform, with roughly equal spacing between points, and the perplexity-30 map reports that shape more faithfully than any linear projection could.
+
+<KeyFact>
+Visible clusters in a neighbor embedding are not evidence of cluster structure: 500 points of pure 100-dimensional noise produce convincing clumps at perplexity 2. A map can *suggest* structure; only a statistic computed in the original space can support it.
+</KeyFact>
+
+### Shapes bow, and runs disagree
+
+Shapes distort even when topology survives: two parallel lines of 75 points emerge bowed apart, the mid-line gap about three times the end gap at perplexity 20, because a line's middle has denser surroundings than its ends and density equalization inflates it. Reading curvature, axes, or orientation off a t-SNE map reads the optimizer, not the data: the map's axes have no meaning at all.
+
+<Figure
+  src="./figures/misread-lines.svg"
+  alt="Two parallel lines of points rendered as outward-bowed arcs in the t-SNE map with the middle gap about three times the end gap"
+  caption="Parallel lines bow apart at perplexity 20: the dense middles inflate. The bend is the algorithm's, not the data's."
+/>
+
+And the cost is non-convex, so runs from different random starts can disagree structurally, not just up to rotation: on 3-D trefoil-knot data at perplexity 2, the Distill authors' five runs produced a circle twice and three differently-broken arcs: the same data, the same settings, three different apparent topologies. Any claimed feature that does not survive a re-run with a different seed, and a sweep over perplexity, was never a feature.
+
+<Demo
+  name="NeighborEmbeddingExplorer"
+  caption="Precomputed t-SNE maps of one labeled dataset at perplexities 2, 5, 30, 100 beside its PCA projection, plus a pure-noise dataset at perplexities 2 and 30."
+/>
+
+<Task>
+Two tasks, in order. First, on the labeled dataset, sweep the perplexities and find the setting where the class structure is clearest; compare against the PCA preset to see what the nonlinear map buys. Then switch to the noise dataset at perplexity 2 and apply the catalogue: the clumps you see are chance neighbor chains in 100-D noise; check perplexity 30 to watch the same points render as an even, structureless disc.
+</Task>
+
+## UMAP: the same move on an explicit graph
+
+t-SNE's construction hides a graph: after the perplexity calibration, each point effectively distributes its probability over a handful of near neighbors, and everything farther contributes nothing. [UMAP](https://arxiv.org/abs/1802.03426) (McInnes, Healy and Melville, 2018) builds that graph explicitly, replaces the probability normalizations with fuzzy set operations, and swaps the global KL for a cross-entropy that an edge-sampling optimizer can attack without ever computing a normalizing constant. The paper derives the construction from manifold topology; its own presentation offers the computational view as self-contained, and that is the view here.
+
+{/* fig UmapConstructionStrip: a four-stage left-to-right pipeline strip with arrows, one stage per box. Stage 1 "kNN graph": a small scatter (~10 dots) with directed amber edges from one focal point to its k = 3 nearest neighbors. Stage 2 "local calibration": the two formulas in KaTeX, \rho_i = \min_j d(x_i, x_j) ("distance to the nearest neighbor") and \sum_j \exp\bigl(-\max(0, d(x_i,x_j) - \rho_i)/\sigma_i\bigr) = \log_2 k with an underbrace on \log_2 k labeled "the effective-neighbor target — perplexity's role"; blue for the \rho_i, \sigma_i symbols. Stage 3 "fuzzy union": the same scatter with undirected edges at varying opacity and the formula v_{ij} = v_{j|i} + v_{i|j} - v_{j|i} v_{i|j} labeled "P(at least one direction)". Stage 4 "cross-entropy layout": the formula \sum_{ij} \bigl[ v_{ij} \log\tfrac{v_{ij}}{w_{ij}} + (1 - v_{ij}) \log\tfrac{1 - v_{ij}}{1 - w_{ij}} \bigr] with the first term underbraced "attraction on edges" (amber) and the second "repulsion on non-edges" (blue). At the far right a boxed callout: w_{ij} = \bigl(1 + a\lVert y_i - y_j\rVert^{2b}\bigr)^{-1}, and beneath it "a = b = 1 \Rightarrow t-SNE's kernel". Colors: amber = the focal point/attraction role, blue = calibration quantities/repulsion role. */}
+<Figure
+  name="UmapConstructionStrip"
+  alt="UMAP's pipeline in four stages: kNN graph, per-point rho and sigma calibration with the log2 k target, fuzzy union of directed edges, and the cross-entropy layout with attraction and repulsion terms, ending in the boxed a equals b equals 1 identity recovering t-SNE's kernel"
+  caption="UMAP's computational view: build the kNN graph, calibrate a metric per point, union the directed edges, lay out by cross-entropy. Setting a = b = 1 in the map kernel recovers t-SNE's Student-t."
+/>
+
+**The graph.** For each point, find its $k$ nearest neighbors (approximately, via nearest-neighbor descent; the same construction choice <Ref lesson="spectral-clustering">the spectral lesson</Ref> made, now with $k$ named `n_neighbors`). Weight the directed edge from $x_i$ to neighbor $x_j$ as
+
+$$
+v_{j|i} = \exp\!\Bigl(-\max\bigl(0,\, d(x_i, x_j) - \rho_i\bigr)\big/\sigma_i\Bigr),
+$$
+
+where $\rho_i$ is the distance to $x_i$'s nearest neighbor and $\sigma_i$ solves $\sum_j v_{j|i} = \log_2 k$. Both calibrations restate t-SNE's moves: the $\rho_i$ shift gives every point at least one full-weight edge (each point's *nearest* neighbor is a certain neighbor, whatever the absolute distance: a local-connectivity guarantee that keeps very high-dimensional data, where all distances are large, from producing an edgeless graph), and the $\sigma_i$ search targets an effective neighbor count exactly as the perplexity search does. The paper describes the pair as giving each point its own local metric.
+
+**The union.** The directed weights disagree ($v_{j|i} \neq v_{i|j}$); UMAP symmetrizes by the probabilistic OR:
+
+$$
+v_{ij} = v_{j|i} + v_{i|j} - v_{j|i}\,v_{i|j},
+$$
+
+the probability that at least one of the two directed edges exists, reading each weight as an edge's existence probability. Unlike t-SNE's $p_{ij}$, the result is *not* normalized into a distribution over pairs (each edge keeps its own strength), and dropping that global normalization is what unlocks the optimizer below.
+
+**The layout.** Map similarities use the kernel $w_{ij} = \bigl(1 + a\lVert y_i - y_j \rVert^{2b}\bigr)^{-1}$, and the cost is the edgewise binary cross-entropy between the two weighted graphs: each pair contributes $v_{ij} \log(v_{ij}/w_{ij}) + (1 - v_{ij}) \log\bigl((1-v_{ij})/(1-w_{ij})\bigr)$. The first term is attraction along real edges; the second, absent from t-SNE's KL, is an explicit repulsion on *non*-edges, punishing the map for drawing an edge the graph does not have. Because no term needs a global $Z$, stochastic gradient descent applies directly: sample an edge, pull its endpoints together, push a few negative-sampled non-neighbors away. Initialization is not random: UMAP starts from the eigenvectors of the graph's normalized Laplacian — a spectral embedding, precisely <Ref lesson="spectral-clustering">the previous lesson's</Ref> construction serving as the warm start.
+
+$a$ and $b$ are fitted so the kernel tracks a target curve set by the `min_dist` parameter (defaults give $a \approx 1.93$, $b \approx 0.79$), and Appendix C of the paper records the unification in one line: setting $a = b = 1$ makes $w_{ij}$ **exactly t-SNE's kernel**. The two methods are one family: a perplexity-like local calibration, a symmetrized neighbor graph, attraction–repulsion layout under a heavy-tailed kernel; they differ in normalization, in the loss, and in the initialization.
+
+<KeyFact>
+UMAP is not a different kind of object from t-SNE: at $a = b = 1$ its map kernel *is* t-SNE's, and its $\rho_i, \sigma_i$ calibration is the perplexity search restated. The working differences are speed (edge-sampled SGD with no normalizing constant, empirically about $O(n^{1.14})$ against Barnes–Hut's $O(n \log n)$ per iteration), the explicit repulsion term, and the spectral initialization.
+</KeyFact>
+
+### What the map inherits, and the honest caveats
+
+The paper's five-algorithm comparison shows what the changes buy. It runs on four datasets: COIL-20 and MNIST as above, Fashion-MNIST (70,000 28×28 grayscale photographs of clothing, footwear and bags — MNIST's format and size, harder classes, 784 dimensions), and the GoogleNews word vectors (3 million words and phrases embedded in 300 dimensions by word2vec and compared under cosine distance). Across all four, UMAP matches t-SNE's local cluster quality while keeping more of the large-scale arrangement that Laplacian eigenmaps and PCA preserve: more of COIL-20's loops stay intact, and MNIST's digit clusters land in a stable global configuration rather than a run-dependent scatter.
+
+<Figure src="./figures/umap-comparison-grid.png" float="right" width="m" alt="A five-row by four-column grid of 2-D embeddings. Rows are UMAP, t-SNE, LargeVis, Laplacian eigenmaps and PCA; columns are COIL20, MNIST, Fashion-MNIST and GoogleNews word vectors. The UMAP and t-SNE rows both show crisply separated clusters, but UMAP's MNIST and Fashion-MNIST panels place those clusters in an arrangement echoing the Laplacian-eigenmaps and PCA rows below, where t-SNE's are scattered without that correspondence. The Laplacian-eigenmaps row collapses to thin spikes meeting at a point, PCA to overlapping smears; the eigenmaps cell for word vectors reads N/A." caption="Five algorithms, four datasets. UMAP keeps t-SNE's local clusters and, unlike t-SNE, arranges them roughly as the spectral and PCA rows do." />
+
+Two honesty notes temper the comparison, both acknowledged in the paper itself. First, [Kobak and Linderman](https://doi.org/10.1038/s41587-020-00809-z) showed that much of the global-structure advantage is the *initialization*, not the loss: t-SNE started from the same spectral or PCA layout, instead of its default random start, preserves global arrangement about as well on their measures. The practical lesson generalizes: informative initialization is a hyperparameter as consequential as perplexity, and defaults differ between libraries. Second, UMAP assumes manifold structure exists, so it finds some in anything: in the paper's own words, it can find structure in noise the way "the human mind finds structured constellations among the stars." Its Figure 1 sweep makes the effect visible on data with no structure to find (uniform samples from a solid RGB color cube), where small `n_neighbors` shatters the smooth cube into spurious fine clusters.
+
+<Figure
+  src="./figures/umap-colorcube.png"
+  alt="A 4-by-4 grid of UMAP embeddings of uniform random samples from a 3-D RGB color cube, each point colored by its own coordinates. Columns vary n_neighbors across 5, 20, 80 and 320; rows vary min_dist across 0.0125, 0.05, 0.2 and 0.8. The n_neighbors = 5 column breaks into dozens of small disconnected clumps of points; the 80 and 320 columns show one continuous sheet across which color varies smoothly. Down the rows, points go from tight stringy filaments to an even, loosely packed disc."
+  caption="Sixteen UMAP maps of the same structureless data. Left column (n_neighbors = 5): the cube shatters into fine clusters that are not in the data. Right columns: one smooth color sheet, the truth. Down the rows, min_dist only packs the points tighter or looser."
+/>
+
+The two dials read as follows. `n_neighbors` is the scale at which the manifold is approximated as locally flat: small values resolve fine structure and lose the big picture (and, per the constellation effect, resolve fine structure that does not exist); large values capture global shape and average away detail. `min_dist` is packing, "essentially aesthetic" per the authors: how close map points may sit, with no counterpart in the data. One warning: `n_neighbors` and perplexity are *not* interchangeable numbers. Perplexity is a soft effective count on a full probability distribution, and implementations consult roughly $3\times$ that many neighbors; `n_neighbors` is a hard cutoff on a graph whose nearest edge is pinned to weight 1 by the $\rho_i$ shift. Matching the two one-for-one changes the neighborhood each method actually sees, so a t-SNE map at perplexity 30 and a UMAP map at `n_neighbors` 30 are not the same lens on the data.
+
+Every entry of the misreading catalogue transfers: UMAP equalizes density (sizes mean nothing), inflates mid-range distances (between-cluster distances mean little), and manufactures clusters from noise at small `n_neighbors` (the constellation effect is the noise gotcha under a new name). The speed and the steadier global layout change none of the epistemics.
+
+## The discipline: maps generate hypotheses, statistics test them
+
+What the two methods deliver, and what they withhold, is now explicit, and it condenses to one working rule. A neighbor embedding is a *hypothesis generator*: it proposes groupings, gradients, and outliers worth investigating. It is not a measurement instrument: sizes, distances, densities, shapes, and axes in the map are artifacts of density equalization, tail inflation, and a non-convex optimizer. Any structure the map suggests must be re-established in the original space with tools that do not pass through the embedding: <Ref lesson="hierarchical-dbscan">the silhouette statistic</Ref> computed on the original coordinates, cluster assignments re-derived by <Ref lesson="kmeans">k-means</Ref> or <Ref lesson="spectral-clustering">spectral clustering</Ref> and checked for stability across seeds and hyperparameters, and, where labels or outcomes exist, validated downstream error under <Ref lesson="cross-validation-bootstrap">module 5's protocols</Ref>. The map that survives this treatment is the exhibit; the checks are the argument. Running the noise example through exactly this pipeline is the closing research exercise.
+
+What stands established: neighbor embeddings preserve calibrated local neighborhoods (perplexity and `n_neighbors` fixing each point's effective neighbor count) at the deliberate price of everything global; the crowding argument shows the price is unavoidable in 2-D and the Student-t tail is how it is paid; the misreading catalogue (sizes, distances, noise clumps, bowed shapes, unstable runs) is that price itemized; and UMAP is the same construction on an explicit fuzzy graph, faster, spectrally initialized, with its kernel reducing to t-SNE's at $a = b = 1$. <Ref lesson="tumor-microarray">The next lesson</Ref> takes this module's full toolkit (clustering, PCA, dendrograms, and these maps) onto real tumor gene-expression data, where the structure recovered without labels meets pathologists' diagnoses, and the discipline of this section decides which findings survive.
+
+## Exercises
+
+<Exercise>
+The binary search for $\sigma_i$ assumes what the lesson never proved: that $\operatorname{Perp}(P_i)$ is monotone in $\sigma_i$. Prove it. Fix $x_i$, write $d_j = \lVert x_i - x_j \rVert^2$ (not all equal), and set $\beta = 1/2\sigma_i^2$, so that $p_{j|i} = e^{-\beta d_j} / Z(\beta)$ with $Z(\beta) = \sum_{k \neq i} e^{-\beta d_k}$. **(a)** Using the natural-log entropy $H_e = -\sum_j p_{j|i} \ln p_{j|i}$, show $H_e = \beta \langle d \rangle + \ln Z$, where $\langle d \rangle = \sum_j p_{j|i}\, d_j$. **(b)** Show $\frac{d \ln Z}{d\beta} = -\langle d \rangle$ and $\frac{d\langle d \rangle}{d\beta} = -\operatorname{Var}(d)$, the variance of $d_j$ under $P_i$. **(c)** Conclude $\frac{dH_e}{d\beta} = -\beta \operatorname{Var}(d) < 0$ and state what this gives the binary search.
+
+<Solution>
+**(a)** $-\ln p_{j|i} = \beta d_j + \ln Z$, so $H_e = \sum_j p_{j|i} (\beta d_j + \ln Z) = \beta \langle d \rangle + \ln Z$, since the $p_{j|i}$ sum to 1.
+
+**(b)** $\frac{d \ln Z}{d\beta} = \frac{Z'}{Z} = \frac{-\sum_k d_k e^{-\beta d_k}}{Z} = -\langle d \rangle$. For the second identity, $\langle d \rangle = \sum_j d_j e^{-\beta d_j} / Z$; the quotient rule gives $\frac{d\langle d \rangle}{d\beta} = \frac{-\sum_j d_j^2 e^{-\beta d_j}}{Z} - \langle d \rangle \cdot \frac{Z'}{Z} = -\langle d^2 \rangle + \langle d \rangle^2 = -\operatorname{Var}(d)$.
+
+**(c)** $\frac{dH_e}{d\beta} = \langle d \rangle + \beta \frac{d\langle d \rangle}{d\beta} + \frac{d \ln Z}{d\beta} = \langle d \rangle - \beta \operatorname{Var}(d) - \langle d \rangle = -\beta \operatorname{Var}(d)$, and $\operatorname{Var}(d) > 0$ because the $d_j$ are not all equal. So $H_e$ is strictly decreasing in $\beta$, and since $\beta = 1/2\sigma_i^2$ is strictly decreasing in $\sigma_i$, the entropy — and with it $\operatorname{Perp} = 2^{H} = e^{H_e}$ — is strictly increasing in $\sigma_i$. As $\sigma_i \to 0$ the distribution collapses onto the nearest neighbor ($\operatorname{Perp} \to 1$); as $\sigma_i \to \infty$ it flattens toward uniform ($\operatorname{Perp} \to n-1$). Perplexity therefore maps $(0, \infty)$ one-to-one onto $(1, n-1)$: every target in that range is attained by exactly one $\sigma_i$, which is what makes the binary search correct — and the endpoints are the next exercise's boundary cases.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two boundary probes for the perplexity dial. **(a)** The user requests perplexity $\ge n - 1$ on a dataset of $n$ points. Show that the binary search for $\sigma_i$ has no solution beyond $n-1$, state what value the search chases as $\sigma_i \to \infty$, and reconcile with the Distill article's practical warning (added in a post-publication correction) that perplexity must be smaller than the number of points. **(b)** The user requests perplexity $\to 1$. State what $P_i$ converges to, what graph the objective then effectively embeds, and which catalogued failure this extreme produces.
+
+<Solution>
+**(a)** $P_i$ is a distribution over the other $n - 1$ points, so $H(P_i) \le \log_2(n-1)$, with equality only at uniform; hence $\operatorname{Perp}(P_i) \le n - 1$ for every $\sigma_i$. As $\sigma_i \to \infty$ the Gaussian flattens, $P_i \to$ uniform, and by the monotonicity just proved the perplexity increases toward its supremum $n-1$ without ever exceeding it: a target at or above $n-1$ leaves the binary search running against an unreachable bound, and what an implementation returns is undefined behavior. That is the content of the Distill correction: the article's perplexity-100 panels ran the perplexity into the neighborhood of the cluster sizes, and the merged, misshapen outputs are implementation artifacts, not embeddings. **(b)** As the target approaches 1, $H \to 0$ and $P_i$ converges to a point mass on the single nearest neighbor. The objective then embeds (a soft version of) the directed 1-NN graph: chains of nearest neighbors and nothing else. That is the perplexity-2 regime of the noise example (chance NN chains rendered as dramatic clumps) and the fragmented low-perplexity panels throughout the catalogue. The two extremes optimize different things, neither of them "the structure": $\to 1$ optimizes chance chains, $\to n-1$ optimizes a uniform blur in which every point is everyone's neighbor.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "In our t-SNE map the patient cluster on the left is drawn twice as spread out as the one on the right, so that patient group is more heterogeneous." Name the mechanism that breaks the inference, cite the discriminating example from the lesson, and state what property of the two clusters the map *does* approximately preserve.
+
+<Solution>
+The inference fails at the assumption that map area tracks data variance. The perplexity calibration assigns each point a bandwidth matched to its local density (small $\sigma_i$ in dense regions, large in sparse ones), so every point carries the same effective neighbor count into the objective, and the optimizer renders all regions at roughly equal density: dense clusters are expanded, diffuse ones contracted, *by construction*. The discriminating example: two Gaussians with true spread ratio 1 : 9 drawn as blobs with map spreads 1 : 1 (the lesson's rerun of the Distill size case). Drawn spread therefore carries no information about heterogeneity; if anything must be concluded about spread, compute it in the original space (a variance, or mean within-cluster distance, per the closing discipline). What the map approximately preserves is *neighbor identity* (which points sit in the same small neighborhood): cluster membership, not cluster geometry.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the t-SNE gradient. Write $C = \operatorname{KL}(P\|Q)$ with $q_{ij} = w_{ij}/Z$, $w_{ij} = (1 + \lVert y_i - y_j \rVert^2)^{-1}$, $Z = \sum_{k \neq l} w_{kl}$. **(a)** Using $\sum_{ij} p_{ij} = 1$, show $C = \text{const} - \sum_{k \neq l} p_{kl} \log w_{kl} + \log Z$. **(b)** Compute $\partial w_{ij} / \partial y_i$. **(c)** Differentiate the two non-constant terms with respect to $y_i$ (mind that both orderings $(i,j)$ and $(j,i)$ involve $y_i$) and assemble $\partial C / \partial y_i = 4 \sum_j (p_{ij} - q_{ij})\, w_{ij}\, (y_i - y_j)$. Write the three pieces before opening.
+
+<Solution>
+**(a)** $C = \sum p_{kl} \log p_{kl} - \sum p_{kl} \log q_{kl}$. The first sum does not depend on $Y$. In the second, $\log q_{kl} = \log w_{kl} - \log Z$, and $\sum_{kl} p_{kl} \log Z = \log Z$ since the $p_{kl}$ sum to 1. Hence $C = \text{const} - \sum_{k\neq l} p_{kl} \log w_{kl} + \log Z$.
+
+**(b)** With $u = \lVert y_i - y_j \rVert^2$, $w_{ij} = (1+u)^{-1}$ and $\partial u/\partial y_i = 2(y_i - y_j)$, so $\partial w_{ij}/\partial y_i = -(1+u)^{-2} \cdot 2 (y_i - y_j) = -2\, w_{ij}^2 (y_i - y_j)$.
+
+**(c)** Attraction term: the pairs involving $y_i$ are $(i,j)$ and $(j,i)$ for each $j$, and $w$, $p$ are symmetric, so
+$$
+\frac{\partial}{\partial y_i}\Bigl(-\sum_{k\neq l} p_{kl} \log w_{kl}\Bigr) = -2 \sum_j p_{ij}\, \frac{1}{w_{ij}}\, \frac{\partial w_{ij}}{\partial y_i} = 4 \sum_j p_{ij}\, w_{ij}\, (y_i - y_j).
+$$
+Repulsion term: $\displaystyle \frac{\partial \log Z}{\partial y_i} = \frac{1}{Z}\cdot 2\sum_j \frac{\partial w_{ij}}{\partial y_i} = -\frac{4}{Z} \sum_j w_{ij}^2 (y_i - y_j) = -4 \sum_j q_{ij}\, w_{ij}\, (y_i - y_j)$, using $q_{ij} = w_{ij}/Z$. Summing:
+$$
+\frac{\partial C}{\partial y_i} = 4 \sum_j (p_{ij} - q_{ij})\, \bigl(1 + \lVert y_i - y_j \rVert^2\bigr)^{-1} (y_i - y_j),
+$$
+the stated form. The anatomy falls out of the two terms separately: the data's $p_{ij}$ funds only attraction, the map's own $q_{ij}$ funds only repulsion, and the shared factor $w_{ij}$ is the heavy-tailed leash that caps both at long range — the three features the gradient-reading section read off the force plots.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. Take the two-concentric-rings dataset (100 points near radius 1, 100 near radius 3) that defeated k-means and the Gaussian mixture. Embed it two ways: **(a)** the spectral embedding (rows of the bottom nontrivial eigenvectors of $L_{\mathrm{rw}}$ on the 10-NN graph, as in the previous lesson); **(b)** t-SNE at a moderate perplexity (say 20). For each, state what the picture shows, which properties of the rings it preserves, and which it discards or invents. Then say which embedding you would hand to a collaborator asking "is this data two nested circles?"
+
+<Solution>
+**(a)** With the 10-NN graph (near-)disconnected into the two rings, the spectral embedding collapses each ring's 100 rows to one tight point-stack: two clumps. It preserves *connectivity* (which points belong to which ring) perfectly, and discards everything else: radii, the nesting, even the fact that each cluster is a loop. It abstains visibly (a point-stack has no shape to misread). **(b)** t-SNE's calibrated neighborhoods see the same near-disconnection, so the rings separate; each ring, being a genuine 1-D closed manifold, is typically drawn as a closed loop (COIL-20's situation), though low perplexity can break a loop into arcs, as with the trefoil runs. It preserves the local topology, each ring reading as a circle, but invents the rest: the two loops' drawn sizes are equalized (the true radius ratio 1 : 3 is erased), their separation is an optimizer equilibrium, and the nesting is gone, since two disjoint loops side by side satisfy the objective exactly as well. Neither embedding shows "nested"; nesting is global geometry, which both methods deliberately discard. For the collaborator: t-SNE answers "two circles?" (two closed loops appear); *no* 2-D neighbor embedding answers "nested?"; that claim needs the original space, e.g. comparing ring radii computed from the raw coordinates. The composed picture (spectral for membership, t-SNE for local shape, original-space statistics for geometry) is the division of labor this module has been assembling.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the flagship noise case end to end. Draw 500 points from $\mathcal{N}(0, I_{100})$; run t-SNE at perplexity 2 and at perplexity 30 (any library; fix the seed and iterate to stability). **(a)** Before running, write down what a naive reader would conclude from each map. **(b)** Run, and check both predictions against the pictures. **(c)** Now apply the closing discipline: cluster the perplexity-2 map's visible clumps (k-means on the *map* coordinates with $k$ set by eye), carry those labels back to the original 100-D coordinates, and compute the silhouette there. State the criterion you fixed in advance for "no real structure," and the verdict.
+
+<Solution>
+**(a)** Predictions from the catalogue: the perplexity-2 map will show well-separated clumps a naive reader would call clusters; the perplexity-30 map will show an even disc a naive reader would call structureless; the second reading is approximately correct (a 100-D Gaussian concentrates near a thin shell, nearly uniformly). **(b)** A typical run confirms both; the clump count and arrangement at perplexity 2 change under a new seed, which is already disqualifying under the stability rule. **(c)** Criterion fixed in advance: mean silhouette in the *original* space near zero (say $|\bar s| < 0.1$) means the labels do not mark real cohesion/separation structure. Typical result: k-means on the map coordinates formalizes the visible clumps (silhouette computed *on the map* is high; the map is genuinely clumpy), but the same labels scored on the 100-D coordinates give $\bar s \approx 0$: points are no closer to their own "cluster" than to the others, because in the original space no such groups exist. The general lesson, stated as the discipline requires: the embedding proposed a hypothesis; the original-space statistic rejected it; and the two computations answer different questions, which is why the second can never be skipped.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Run UMAP on the 1,797 scikit-learn digits (8×8 grayscale, 64 dimensions) at `n_neighbors = 5` and `n_neighbors = 200`, default `min_dist`, coloring by class. **(a)** Describe what each map renders well and what it sacrifices, and state which assumption of UMAP's the dial is setting. **(b)** Make the disagreement a number: run k-means with $k = 10$ on each map's two coordinates, match the two labelings by the assignment that maximizes agreement, and count the points whose group changes; also score each labeling against the true digits with the adjusted Rand index. **(c)** State what those numbers license, what they do not, and name the computation that would settle which of the two groupings is right.
+
+<Solution>
+**(a)** At `n_neighbors = 5` the map resolves fine local structure: tight class islands, often fragmented into multiple islets per digit, with sub-variants (slants, styles) separated, and the arrangement of islands across the canvas close to arbitrary. At `n_neighbors = 200` the graph averages over an eighth of the dataset per point: classes merge into broader continents whose *relative positions* are stable and meaningful (similar digits adjacent), while within-class detail is averaged away; spurious fine structure is also suppressed, per the constellation effect. The dial sets the scale at which the data is assumed to be a locally flat manifold: small $k$ trusts tiny neighborhoods (fine detail, plus noise promoted to structure), large $k$ trusts only coarse ones (global shape, no detail). No setting delivers both, because the assumption is a scale, not a knob for "more structure."
+
+**(b)** One run (umap-learn 0.5.12, `random_state = 0`, k-means seeded at 0): the adjusted Rand index against the true digits is 0.90 for the `n_neighbors = 5` map and 0.86 for the `n_neighbors = 200` map, and the index *between the two map labelings* is 0.86. Under the best matching, 121 of 1,797 points — 7% — land in a different group depending on the dial. The disagreement is not diffuse: the same 27 images of the digit 1 sit inside the 0 group at `n_neighbors = 5` and inside the 2 group at 200. Exact values move with library version and seed; what is stable is that both indices sit below 1 and neither setting dominates the other.
+
+**(c)** The numbers license this: the two maps disagree about which points are one class, and the disagreement is large enough to change a conclusion about 7% of the data. They license nothing about which map is right — both are internally coherent pictures at their own scale, and their agreement with the labels is close enough that no visible feature separates them. Only a computation in the original 64-dimensional space can settle it: the silhouette of each labeling on the raw pixels, or each labeling's agreement with an outcome no embedding touched. That is exactly the next lesson's situation with real stakes and the labels in doubt instead of the map: <Ref lesson="tumor-microarray">tumor gene-expression data</Ref>, where the grouping recovered without labels puts two samples recorded as breast cancer among the melanomas, and re-deriving that grouping in the original space and weighing it against the pathologists' diagnoses — not redrawing the picture — is what decides which of the two is wrong.
+</Solution>
+</Exercise>
+
+<References>
+1. L. van der Maaten, G. Hinton, "Visualizing Data using t-SNE," *JMLR* 9, 2008 — the lesson's backbone: §2 SNE, perplexity, and the KL asymmetry; §3.1 the symmetrized joint form; §3.2 the crowding problem; §3.3 the Student-t kernel and the gradient (Fig. 1); §3.4 early exaggeration and the optimization recipe; §4–5 the MNIST (Figs. 2, 7) and COIL-20 (Fig. 5) results and the 5.13% 1-NN number; Appendix A, the gradient derivation of the exercise. https://www.jmlr.org/papers/volume9/vandermaaten08a/vandermaaten08a.pdf
+2. M. Wattenberg, F. Viégas, I. Johnson, "How to Use t-SNE Effectively," *Distill*, 2016 — the misreading catalogue this lesson's battery reproduces: hyperparameters (§1), cluster sizes (§2), distances (§3), random noise (§4), bowed shapes (§5), topology and the trefoil runs (§6); CC-BY, with the interactive versions of every example. https://doi.org/10.23915/distill.00002
+3. L. McInnes, J. Healy, J. Melville, "UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction," arXiv:1802.03426, 2018 — §3 the computational view (graph construction, ρ/σ calibration, fuzzy union, cross-entropy layout); §4.3 `n_neighbors` and `min_dist` (Fig. 1, the color-cube sweep); §5.1 the five-algorithm comparison (Fig. 4); §6 the weaknesses, including the constellation effect; Appendix C, the t-SNE/LargeVis/UMAP unification and the a = b = 1 identity. https://arxiv.org/abs/1802.03426
+4. D. Kobak, G. C. Linderman, "Initialization is critical for preserving global data structure in both t-SNE and UMAP," *Nature Biotechnology* 39, 2021 — the initialization caveat of the UMAP section. https://doi.org/10.1038/s41587-020-00809-z
+5. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §20.4.10: a compact t-SNE treatment cross-checking this lesson's presentation, with the Barnes–Hut and parametric extensions. Free online: https://probml.github.io/pml-book/book1.html
+6. D. Kobak, P. Berens, "The art of using t-SNE for single-cell transcriptomics," *Nature Communications* 10, 2019 — a field guide to running t-SNE honestly at scale (perplexity, exaggeration, initialization), for the reader taking these tools to real biological data. https://doi.org/10.1038/s41467-019-13056-x
+</References>

@@ -1,0 +1,394 @@
+Drop the global formula entirely: estimate f(x) by averaging the training points near x, and the weighting kernel plus its bandwidth replace every parametric assumption.
+
+The course's argument reaches its sixth move here. Module 3 bought flexibility inside the linear model by choosing basis functions in advance, and priced every fit in effective degrees of freedom; <Ref lesson="knn-curse">the nearest-neighbor lesson</Ref> showed that pure locality earns a factor-of-two guarantee with no model at all, and that dimension is what revokes it; module 5 built the machinery that measures any of these honestly. What stands open is the estimator between those extremes: no basis, no global form, yet a smooth curve with a single complexity dial that cross-validation can turn. This lesson constructs that estimator three times over, each version repairing the last's named failure: the kernel-weighted average, the local line that removes its boundary bias, and Cleveland's LOESS, which survives outliers. The next lesson replaces sliding windows with recursive partitions.
+
+## The local average: from hard windows to kernel weights
+
+<Task>
+Three retrievals before the new material, closed book; check against the named lessons only after writing all three down. (1) From <Ref lesson="knn-curse">the nearest-neighbor lesson</Ref>: write the $k$-NN regression prediction at a query $x$, and its effective degrees of freedom $n/k$ from <Ref lesson="splines-gams">the splines lesson's</Ref> ruler. (2) From <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>: write the weighted least-squares objective $\sum_i w_i (y_i - x_i^\top\beta)^2$ and what the weights meant there. (3) From <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: write the leave-one-out shortcut for a linear smoother, $y_i - \hat f^{(-i)}(x_i) = r_i/(1 - S_{ii})$. All three are load-bearing below.
+</Task>
+
+The starting point is the estimator the course already owns. The $k$-NN regressor of <Ref lesson="knn-curse">the nearest-neighbor lesson</Ref> averages the $k$ responses nearest the query: a running mean over a hard window. Its flaw is visible in any plot of the fitted curve: as the query slides along the axis, the neighbor set stays fixed until one point drops out and another drops in, and at that instant the average jumps. The fitted function is discontinuous at every changeover, and the jumps are pure artifact, since nothing about the underlying regression function changes there.
+
+The repair is to let membership in the neighborhood fade instead of switching. Each training point gets a weight that is largest at zero distance and dies smoothly to nothing at the window's edge; the estimate is the weighted average.
+
+<Example title="a kernel-weighted average at one point">
+Five training pairs: $(1, 2.1)$, $(2, 2.9)$, $(3, 4.2)$, $(4, 4.9)$, $(5, 6.0)$. Target $x_0 = 2.6$, window half-width $\lambda = 1.5$, and the *tricube* weight function $W(u) = (1 - |u|^3)^3$ for $|u| < 1$, zero outside.
+
+Scaled distances $u_i = |x_i - x_0|/\lambda$: the points at $x = 1$ and $x = 5$ have $u > 1$ and weight zero. For the rest:
+
+$$
+w_2 = W(0.4) = (1 - 0.064)^3 = 0.820, \quad
+w_3 = W(0.267) = 0.944, \quad
+w_4 = W(0.933) = 0.007.
+$$
+
+The estimate is the weighted mean:
+
+$$
+\hat f(2.6) = \frac{0.820 \cdot 2.9 + 0.944 \cdot 4.2 + 0.007 \cdot 4.9}{0.820 + 0.944 + 0.007} = \frac{6.38}{1.771} = 3.60 .
+$$
+
+The unweighted mean of the same three in-window responses is $4.0$. The kernel leans the estimate toward the two points nearest $x_0$ and all but ignores the third, which sits at the window's rim.
+</Example>
+
+<Exercise>
+Same five points, same $\lambda = 1.5$ and tricube weights, target $x_0 = 4.2$. Compute the three nonzero weights and the estimate. Write the scaled distances before opening.
+
+<Solution>
+In-window points: $x = 3, 4, 5$ with distances $1.2, 0.2, 0.8$, so $u = 0.8, 0.133, 0.533$.
+
+$$
+w_3 = (1 - 0.512)^3 = 0.116, \quad
+w_4 = (1 - 0.00237)^3 = 0.993, \quad
+w_5 = (1 - 0.152)^3 = 0.610 .
+$$
+
+$$
+\hat f(4.2) = \frac{0.116 \cdot 4.2 + 0.993 \cdot 4.9 + 0.610 \cdot 6.0}{0.116 + 0.993 + 0.610} = \frac{9.02}{1.720} = 5.24 ,
+$$
+
+against an unweighted three-point mean of $5.03$. The transferable move: the estimate at any target is one weighted mean, recomputed from scratch at every target.
+</Solution>
+</Exercise>
+
+### The formula, and where it comes from
+
+The general form names what the example computed. It was proposed independently by Nadaraya and by Watson, both in 1964.
+
+<Definition title="kernel smoother (Nadaraya–Watson)">
+Given training pairs $(x_1, y_1), \dots, (x_n, y_n)$, a *kernel* $K_\lambda(x_0, x) = W\!\big(|x - x_0| / \lambda\big)$ with $W$ nonnegative, symmetric, and nonincreasing on $[0, \infty)$, the **Nadaraya–Watson kernel smoother** estimates the regression function at any target $x_0$ by
+
+$$
+\hat f(x_0) = \frac{\sum_{i=1}^n K_\lambda(x_0, x_i)\, y_i}{\sum_{i=1}^n K_\lambda(x_0, x_i)} .
+$$
+
+The *bandwidth* $\lambda$ sets the width of the neighborhood.
+</Definition>
+
+The formula is not an ad hoc recipe: it is the solution of a least-squares problem. Fit a **local constant** at $x_0$ by minimizing $\sum_i w_i (y_i - c)^2$ with $w_i = K_\lambda(x_0, x_i)$; setting the derivative to zero gives $c = \sum w_i y_i / \sum w_i$, exactly the display above. The smoother is <Ref lesson="ols">module 3's machinery</Ref> run pointwise with the poorest possible local model, a horizontal line. With a Gaussian kernel the weights are a softmax in $-(x_i - x_0)^2/2\lambda^2$; the same weighted-average form, with learned similarity in place of distance, is the attention mechanism of modern sequence models.
+
+<FigureSequence
+  name="nw-build"
+  alt="Five frames on one noisy scatter: a target point marked, a tricube kernel centered on it, point sizes proportional to kernel weights, the weighted average plotted as one blue point, and the full curve traced as the window slides"
+  caption="One estimate, built in four steps, then repeated everywhere: center the kernel, weight the points, average, slide."
+/>
+
+<Task>
+Step through the five frames. In frame 3, find the two large dots straddling $x_0$ and the shrunken dots at the window rim; in frame 4, check the blue point sits at the height the big dots vote for; in frame 5, confirm the curve is smooth everywhere, with none of the running mean's jumps: points enter the sliding window at weight zero.
+</Task>
+
+Three kernels cover practice. The *Epanechnikov* kernel $W(u) = \tfrac34(1 - u^2)$ on $|u| \le 1$ is the smooth parabolic bump; the *tricube* $(1 - |u|^3)^3$ is flatter on top and differentiable at the rim of its support; the *Gaussian* $\phi(u)$ never reaches zero, with the standard deviation playing the bandwidth's role. The choice among them changes the fitted curve far less than any change of $\lambda$ does: the kernel's shape is a detail and its width is everything.
+
+One structural choice does matter: what $\lambda$ indexes. A **metric window** uses a fixed physical width $h_\lambda(x_0) = \lambda$, so bias stays roughly constant across the axis while variance grows wherever data thins, since fewer points fall in the window. A **nearest-neighbor window** adapts, taking the span out to the $k$-th nearest point, $h_k(x_0) = |x_0 - x_{[k]}|$, usually quoted as the *span* $f = k/n$; variance then stays roughly constant and bias grows where data thins, because the window must reach farther. Cleveland's method below runs on spans; the bias analysis of the next section runs on metric widths; everything else transfers unchanged.
+
+## Boundary bias: the failure the local line removes
+
+The kernel average fixed the running mean's discontinuity, and inherited a subtler defect that no kernel shape fixes. The data model is the one the course has carried since <Ref lesson="ols">module 3</Ref>: $y_i = f(x_i) + \varepsilon_i$ with the design points $x_i$ fixed and the noise mean-zero, so $\mathbb{E}\,y_i = f(x_i)$ and the smoother's average value at a target $x_0$ is $\mathbb{E}\hat f(x_0) = \sum_i l_i\, f(x_i)$, writing $l_i = w_i / \sum_j w_j$ for the normalized weights. Taylor-expanding the true $f$ (assumed smooth near $x_0$) around $x_0$:
+
+$$
+\mathbb{E}\hat f(x_0) = \sum_i l_i f(x_i)
+= f(x_0) + f'(x_0) \underbrace{\textstyle\sum_i l_i (x_i - x_0)}_{\bar{x}_w - x_0} + \tfrac{1}{2} f''(x_0) \sum_i l_i (x_i - x_0)^2 + \cdots
+$$
+
+The first-order term is $f'(x_0)$ times the gap between the *weighted mean location* of the window and the target itself. In the interior of a dense, evenly spread sample the window is symmetric, points to the left and right cancel, and the gap is near zero. At the left boundary there are no points to the left: every observation in the window sits at $x_i > x_0$, so $\bar{x}_w - x_0 > 0$, and wherever $f$ is increasing the average is dragged above the truth by a full first-order term. The same mechanism operates in the interior wherever the design is uneven, only less severely.
+
+The size of the effect is not small. On this lesson's running dataset (60 points, $f(x) = \sin 4x$, tricube, $\lambda = 0.25$), the *average* fit at $x = 0$, computed exactly as $Sf$ since the smoother is linear, is $0.35$ where the truth is $0$: a bias of a third of the function's amplitude, before any noise is added.
+
+<Figure
+  src="./figures/boundary-bias.svg"
+  alt="Two panels, same scatter: the Nadaraya–Watson average curve lies well above the dashed true function inside the shaded left-boundary zone, while the local-linear curve tracks the truth through the same zone"
+  caption="The same data, the same bandwidth, the exact average fit E[f̂] = Sf: the weighted average is dragged up at the left edge; the local line is not."
+/>
+
+### Fit a line where you fit a constant
+
+The repair follows from the least-squares reading of the smoother. A weighted average is a locally fitted *constant*, and a constant cannot represent the trend that the asymmetric window exposes. So fit a locally weighted *line* at each target instead, by exactly the weighted least squares of <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>, and read off its value at the target:
+
+$$
+\min_{\alpha,\, \beta}\; \sum_{i=1}^n K_\lambda(x_0, x_i)\, \big[y_i - \alpha - \beta\,(x_i - x_0)\big]^2 ,
+\qquad
+\hat f(x_0) = \hat\alpha(x_0).
+$$
+
+This is *local linear regression*. The whole line is discarded except its value at $x_0$; a fresh line is fitted at every target. Solving the two normal equations gives $\hat f(x_0) = \sum_i l_i(x_0)\, y_i$ with weights $l_i(x_0)$ that depend on the $x$'s and the kernel but never on $y$: the vector $l(x_0)$ is the fit's *equivalent kernel*, since it is what the fit effectively averages with. The estimator is still a linear smoother.
+
+<Example title="the local line at a boundary target, on numbers">
+The five pairs from the first example again — $(1, 2.1)$, $(2, 2.9)$, $(3, 4.2)$, $(4, 4.9)$, $(5, 6.0)$, data lying near the line $y = 1 + x$. Target the left boundary, $x_0 = 1$, tricube weights, $\lambda = 2.5$: wide enough that three points enter the window (with only two, any fitted line interpolates them and there is nothing to compare). Scaled distances $u_i = |x_i - 1| / 2.5$ are $0,\ 0.4,\ 0.8$ for the first three points and exceed $1$ for the rest, so
+
+$$
+w_1 = 1, \qquad w_2 = (1 - 0.064)^3 = 0.820, \qquad w_3 = (1 - 0.512)^3 = 0.116 .
+$$
+
+**The weighted average first.** Nadaraya–Watson gives
+
+$$
+\hat f_{\mathrm{NW}}(1) = \frac{1 \cdot 2.1 + 0.820 \cdot 2.9 + 0.116 \cdot 4.2}{1.936} = \frac{4.965}{1.936} = 2.56
+$$
+
+where the trend of the data puts the value near $2.1$. The mechanism is the first-order term of the expansion above: with offsets $d_i = x_i - 1 = 0, 1, 2$, the window's weighted mean location is $\sum_i (w_i / 1.936)\, d_i = 1.052/1.936 = 0.54$ to the right of the target, and $0.54$ times a slope near $1$ is the excess.
+
+**The local line.** The weighted moments are $s_0 = 1.936$, $s_1 = 0.820 + 2(0.116) = 1.052$, $s_2 = 0.820 + 4(0.116) = 1.284$, and the right-hand sides are $\sum_i w_i y_i = 4.965$ and $\sum_i w_i d_i y_i = 0.820 \cdot 2.9 + 0.232 \cdot 4.2 = 3.352$. The two normal equations of the weighted line fit,
+
+$$
+1.936\,\alpha + 1.052\,\beta = 4.965, \qquad 1.052\,\alpha + 1.284\,\beta = 3.352 ,
+$$
+
+solve to $\hat\beta = 0.92$ — the fit has caught the local slope — and $\hat f(1) = \hat\alpha = 2.07$, on the trend where the weighted average sat $0.5$ above it.
+
+**The weights it used.** The solution is linear in the responses, so $\hat f(1) = \sum_i l_i\, y_i$; re-solving the system with each unit response in turn reads the coefficients off one at a time:
+
+$$
+l = (0.931,\; 0.138,\; -0.069), \qquad \textstyle\sum_i l_i = 1.000, \qquad \sum_i l_i\, d_i = 0.138 - 2 \cdot 0.069 = 0.000 .
+$$
+
+The two sums are the moment identities the theorem below proves in general. The third weight is *negative*: the line fit does not merely reweight the lopsided window, it votes against the far point to cancel the window's asymmetry, and $0.931 \cdot 2.1 + 0.138 \cdot 2.9 - 0.069 \cdot 4.2 = 2.07$ checks the fit.
+</Example>
+
+<Theorem title="local linear regression kills first-order bias">
+Assume the fixed-design model above, $y_i = f(x_i) + \varepsilon_i$ with $\mathbb{E}\,\varepsilon_i = 0$, and let $f$ be three times continuously differentiable on an interval around $x_0$ containing every point with nonzero kernel weight. Suppose at least two distinct $x_i$ carry nonzero kernel weight at $x_0$ — equivalently, writing $s_j = \sum_i w_i (x_i - x_0)^j$ for the weighted moments, $s_0 s_2 - s_1^2 > 0$ — so that the weighted line fit at $x_0$ exists and is unique. Then, for every kernel, the local linear weights satisfy $\sum_i l_i(x_0) = 1$ and $\sum_i (x_i - x_0)\, l_i(x_0) = 0$. Consequently
+
+$$
+\mathbb{E}\hat f(x_0) = f(x_0) + \tfrac{1}{2} f''(x_0) \sum_i (x_i - x_0)^2 l_i(x_0) + R,
+$$
+
+with $R$ involving only third and higher derivatives: the bias starts at the curvature term, at the boundary as everywhere else.
+
+<Proof>
+The moment identities follow from one observation: a weighted least-squares fit of a line reproduces any response that already lies on a line, exactly. Feed the fit the constant response $y_i = 1$ for all $i$; the minimizer is $\alpha = 1, \beta = 0$ with zero residual, so $\hat f(x_0) = \sum_i l_i(x_0) \cdot 1 = 1$, which is the first identity. Feed it $y_i = x_i - x_0$; the minimizer is $\alpha = 0, \beta = 1$, so $\hat f(x_0) = \sum_i l_i(x_0)(x_i - x_0) = 0$, the second. Substituting both into the Taylor expansion of $\sum_i l_i f(x_i)$ makes the $f(x_0)$ term come through with coefficient 1 and the $f'(x_0)$ term vanish identically. $\;$ (The Nadaraya–Watson weights satisfy the first identity but not the second, which is precisely the boundary computation above.)
+</Proof>
+</Theorem>
+
+The historical route to this fix was the hard one: boundary bias in kernel averages was attacked for years by hand-modifying the kernel near the edges, with corrections that were asymptotic, tedious, and approximate at any finite $n$. Fitting a local line does the modification automatically and exactly to first order, a phenomenon dubbed *automatic kernel carpentry*: the equivalent kernel reshapes itself at the boundary, growing negative lobes on the data side — the example's $-0.069$ — without anyone designing it.
+
+Local polynomials of higher degree continue the pattern: degree-$d$ fits leave bias of order $d + 1$, so local quadratics also remove the curvature bias that makes local lines trim hills and fill valleys in the interior. The price is variance: $\operatorname{Var}\hat f(x_0) = \sigma^2 \lVert l(x_0)\rVert^2$, and the equivalent kernel's norm grows with degree, sharply so near the boundaries. Asymptotic analysis favors odd degrees over even ones, and practice settles the matter bluntly: local linear is the default, and the application, not the interior asymptotics, dictates any departure.
+
+<KeyFact>
+Local linear regression is not one more smoother but the boundary-corrected form of the kernel average: the two coincide in a symmetric interior window and diverge by a full first-order term wherever the window is lopsided, which includes every edge of every domain, and in higher dimensions nearly everywhere, since the curse pushes all points toward the boundary.
+</KeyFact>
+
+## Bandwidth: the one dial, and its price in effective df
+
+With the estimator's form settled, one number remains free, and everything about the fit's quality lives in it. A narrow window averages few responses: the estimate at $x_0$ has variance close to that of a single observation, and almost no bias, since every point used sits near $x_0$. A wide window averages many: variance falls as the noise cancels, and bias grows as the window imports points whose $f(x_i)$ has drifted away from $f(x_0)$. This is <Ref lesson="bias-variance">the bias–variance dial</Ref> in its purest mechanical form, and both poles are estimators the course has already met. As $\lambda \to 0$ the fit interpolates the training data, the memorizer of <Ref lesson="statistical-learning">the first lesson</Ref> returned; as $\lambda \to \infty$ every window contains all of the data with flat weights, and local linear regression becomes the one global least-squares line of <Ref lesson="ols">the OLS lesson</Ref>.
+
+<Figure
+  src="./figures/bandwidth-sweep.svg"
+  alt="Three local-linear fits on the same scatter at bandwidths 0.06, 0.15, and 0.8, with effective df 19.2, 7.5, and 2.6, above a curve of training error falling monotonically while LOOCV error is U-shaped with its minimum near df 8"
+  caption="One dataset, three bandwidths, and the honest readout: training error rewards the memorizer; leave-one-out error turns back up."
+/>
+
+Both the tuning and the pricing of $\lambda$ come from machinery already built, because the fitted values are linear in $y$: stacking $\hat f(x_i) = \sum_j l_j(x_i) y_j$ over the training points gives $\hat{\mathbf f} = S_\lambda\, y$ with $\{S_\lambda\}_{ij} = l_j(x_i)$. Two consequences follow at once.
+
+**The complexity price is $\operatorname{tr}(S_\lambda)$.** <Ref lesson="splines-gams">The splines lesson</Ref> defined effective degrees of freedom as the trace of the smoother matrix, and the definition applies verbatim. On this lesson's 60-point dataset, local linear fits at $\lambda = 0.8, 0.2, 0.1, 0.06$ price out at $2.6, 5.9, 10.6, 19.2$ effective parameters, sliding from just above the global line's 2 toward the interpolant's 60. Two smoothers at equal $\operatorname{tr}(S)$ are comparable fits regardless of machinery: a local linear fit at span $0.4$ (df $5.86$) and a smoothing spline calibrated to the same df have nearly indistinguishable equivalent kernels. Different formalisms, same estimator, one ruler.
+
+<Figure
+  src="./figures/df-ruler.svg"
+  alt="A logarithmic effective-df axis with module-3 marks below (LS line 2, OLS 8, smoothing spline 12, k-NN n/k, interpolation) and this lesson's local-linear bandwidths marked above at 2.6, 5.9, 10.6, 19.2, and 60"
+  caption="The module-3 ruler, re-inked: every bandwidth is an address on the same complexity axis."
+/>
+
+**The tuning is one fit per candidate $\lambda$.** The leave-one-out identity of <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>, $y_i - \hat f^{(-i)}(x_i) = r_i / (1 - S_{ii})$, holds for these smoothers, so the full LOOCV curve over a bandwidth grid costs one smoothing pass per grid point and no refitting. On the running data the LOOCV curve reaches its minimum near df $\approx 8$, while training error falls monotonically to the interpolant, exactly the two curves the sweep figure shows.
+
+<KeyFact>
+The LOOCV minimum is a shallow basin, not a point: on the running data every $\lambda$ between roughly $0.13$ and $0.25$ produces nearly the same leave-one-out error, so the selected bandwidth is weakly identified and neighbouring values are statistically indistinguishable. What cross-validation rejects decisively is the two poles; within the basin, the honest report is the interval, not the argmin.
+</KeyFact>
+
+## LOESS: robustness by residual reweighting
+
+The estimator now handles boundaries and has a tuned dial, and it still inherits least squares' oldest vulnerability. Each local fit minimizes squared error, and <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> priced that choice: the mean has breakdown value zero, so a single wild response inside a window can drag the local fit arbitrarily far. Worse than in the global case, a local smoother concentrates the damage: the outlier owns every window that contains it and leaves the rest of the curve untouched, producing a spurious local bump that looks exactly like structure.
+
+[Cleveland's 1979 paper](https://sites.stat.washington.edu/courses/stat527/s13/readings/Cleveland_JASA_1979.pdf), written at Bell Labs, closed this gap with the procedure that made local regression a production tool: *robust locally weighted regression*, shipped in essentially every statistics package since under the names lowess and loess. The recipe wraps the local linear fit of the previous sections in an outer loop that demotes outliers by their residuals.
+
+1. **Distance weights.** At each $x_i$, take the span's $r = \lceil fn \rceil$ nearest neighbors and give point $x_k$ the tricube weight $w_k(x_i) = W\!\big((x_k - x_i)/h_i\big)$, where $h_i$ is the distance to the $r$-th nearest neighbor.
+2. **Local fit.** Fit a degree-$d$ polynomial at each $x_i$ by weighted least squares with these weights; take the fitted values $\hat y_i$.
+3. **Robustness weights.** Compute residuals $e_i = y_i - \hat y_i$ and their median absolute size $s = \operatorname{median} |e_i|$. Give each *observation* the bisquare weight
+$$
+\delta_k = B\!\left(\frac{e_k}{6s}\right), \qquad B(u) = (1 - u^2)^2 \text{ for } |u| < 1, \; 0 \text{ otherwise.}
+$$
+4. **Refit and repeat.** Redo step 2 with weights $\delta_k\, w_k(x_i)$, then recompute $\delta$ and refit, $t$ times in all.
+
+<Figure
+  src="./figures/loess-loop.svg"
+  alt="Flowchart of the LOESS loop: tricube distance weights feed a weighted linear fit, residuals and their median feed bisquare robustness weights, and the refit multiplies the two weight systems, repeated twice; inset shows the bisquare curve reaching zero at six medians"
+  caption="Two weight systems, multiplied: the tricube knows where a point is, the bisquare knows how badly it fits."
+/>
+
+The composition in step 4 is the part implementations get wrong: the fit at $x_i$ uses the *product* $\delta_k \cdot w_k(x_i)$, one factor per weight system. The tricube factor depends only on the $x$-distance to the target and is recomputed for every target; the bisquare factor depends only on the point's own residual and is shared by every window that sees the point. A residual beyond $6s$, about four standard deviations when the errors are Gaussian, gets $\delta_k = 0$ exactly: the point keeps its place on the axis and loses its vote everywhere.
+
+The robustness is sometimes credited to the tricube kernel, as though the taper itself were protective. It is not, and cannot be: the tricube weight is a function of $x$-distance alone, so an outlier sitting near the target's own $x$ receives close to the *maximum* distance weight, and a nonrobust local fit follows it. Steps 3 and 4 are the entire defense, because only the residuals know which points are deviant. Run the algorithm with $t = 0$ and the abrasion figure below is what happens.
+
+<Figure
+  src="./figures/cleveland-abrasion.png"
+  alt="Scatterplot of abrasion-loss regression residuals against tensile-strength residuals for 30 rubber specimens, with two LOESS smooths overlaid. The curves coincide from the middle rightward, both flattening near minus 55. At the left end they split: the solid robust curve climbs to about plus 88, while the dotted nonrobust curve stays flat near plus 57, bent down toward a single low point at roughly minus 45 horizontal, minus 18 vertical."
+  caption="One point, the whole disagreement. The dotted curve is the same procedure with the robustness iterations switched off: at the left edge the lone low outlier drags it some thirty units below the solid robust fit, which holds the trend of the other twenty-nine."
+/>
+
+The data behind that figure are residuals from a linear regression of abrasion loss on hardness for 30 rubber specimens, plotted against the corresponding tensile-strength residuals, with $f = 0.5$, $d = 1$, $t = 2$. One point in the lower left is the entire disagreement between the two curves: the dotted nonrobust fit bends down to meet it, the solid robust fit refuses. The smooth also does what the original analysis could not, exposing a clearly nonlinear effect that disqualifies the linear model the data came from.
+
+Cleveland's parameter guidance has survived four decades essentially unedited. **Degree:** $d = 1$; a local constant serves worse for the same reason it lost the boundary argument, and $d = 2$ buys flexibility that computation and variance mostly eat. **Kernel:** tricube, chosen because it sharpens a chi-squared approximation to the error-variance estimate. **Iterations:** $t = 2$; experimentation across many datasets found more iterations change nothing visible. **Span:** $f \in [0.2, 0.8]$, starting at $0.5$, chosen by eye when the smooth only guides perception, and by cross-validation when the curve will be used as an estimate. For the complexity of the result, the paper defines an equivalent number of parameters $\nu$ (the trace form $\operatorname{tr}(SS^\top)$ of the df currency) and shows that for $d = 1$ and tricube it is approximated by
+
+$$
+\nu \approx 2\left(1 + \frac{1}{f}\right):
+$$
+
+a span of half the data behaves like a six-parameter regression, a full-data span like a cubic-sized one.
+
+<Demo name="SmootherRobustnessExplorer" caption="Three smoothers on one draggable scatter, refit on every change: dashed Nadaraya–Watson, the local line, and robust LOESS with two bisquare iterations." />
+
+<Task>
+Falsify the claim "one point cannot move the curve", then find its limit. (1) Drag one mid-curve point far off the trend and watch the readout: Nadaraya–Watson and the local line follow the point, and the instant its residual passes $6s$ the bisquare weight reads $0.00$ and the LOESS curve refuses to move further. (2) Drag the same point to the left edge: Nadaraya–Watson now fails twice, boundary bias plus the outlier, while the local line fails only once. (3) Press "reset points" and step the narrow/default/wide presets on the clean data to find which one makes the fits track noise: at $h = 0.05$ each window holds a handful of points and all three curves wiggle with them.
+</Task>
+
+## The lead study: the smoother as the instrument
+
+The set pieces so far ran on artificial data with known truth. The paper's closing example is the reason the method exists, and it is worth reading as a template for when a smoother is not a convenience but the only instrument available. Bell Labs statisticians were analyzing the lead exposure of 158 workers in lead-smelting plants, screened two ways: the traditional assay, blood lead measured by atomic absorption spectrophotometry, and a newer, far simpler one, a hematofluorometer reading of zinc protoporphyrin (ZPP), a heme precursor that accumulates in red cells when lead blocks the insertion of iron into heme, leaving zinc in iron's place. The question is what a ZPP reading says about the blood-lead value it might replace.
+
+<Figure
+  src="./figures/cleveland-lead-zpp.png"
+  alt="Scatterplot from Cleveland 1979: blood lead in micrograms per deciliter on the vertical axis, 20 to 120, against ZPP in the same units on the horizontal axis, 0 to 800. About 158 star-shaped points spread widely, densest below ZPP 300. A single smooth curve is drawn through them, rising steeply from about 40 at ZPP 0 to about 79 at ZPP 450, then running flat to the right edge of the plot."
+  caption="The deliverable is the curve. Blood lead against ZPP for the 158 smelter workers, both in µg/dl, with the robust locally weighted fit chosen by leave-one-out prediction error (d = 1, f = .49, tricube, two robustness iterations): quadratic-like up to about 400 µg/dl of ZPP, flat above it — past that point the cheap assay has stopped discriminating."
+  float="right"
+  width="m"
+/>
+
+No parametric family is available to fit: relating the two assays would require physiological modeling at a level of knowledge that, as the paper states plainly, did not exist. A single low-order polynomial visibly cannot describe the relationship either. So the smoothed curve itself is the deliverable, a typical blood-lead value for each ZPP reading, determined empirically or not at all.
+
+Because the curve would be used as a regression function rather than a visual aid, the span was chosen by data, not by eye: Allen's PRESS criterion, the leave-one-out prediction error this course met as LOOCV, minimized over $f$, alternating with the robustness reweighting. The iteration converged immediately: $f_0 = 0.48$, $f_1 = 0.49$, $f_2 = 0.49$. The resulting curve, fitted with $d = 1$, tricube, $t = 2$, rises quadratic-like from 0 to about 400 µg/dl of ZPP and is flat above 400: at high intoxication the cheap assay stops discriminating, which is exactly the kind of finding a screening protocol needs and no global formula would have volunteered.
+
+### The second instrument: smoothing the residuals themselves
+
+The same paper contributes a diagnostic that belongs beside <Ref lesson="regression-diagnostics">the residual-plot toolkit</Ref>, because it corrects a failure of the unaided eye. The standard check for heteroscedasticity is to plot residuals against fitted values and look for a widening funnel. The check is unreliable: where the points are dense, the *range* of the residuals is large simply because more draws fill out the tails, and the eye reads range as scale. A residual plot whose density grows to the right therefore reports a funnel even when the true scale is constant.
+
+<Figure
+  src="./figures/funnel-illusion.svg"
+  alt="Left panel: residuals against fitted values with density increasing rightward and constant true scale, with dashed amber lines marking the apparent funnel; right panel: absolute residuals against fitted values with a robust local-linear smooth that is flat"
+  caption="Constant scale, increasing density: the raw plot shows a funnel that is not there; the smoothed absolute residuals report the truth."
+/>
+
+The repair is to smooth $|e_i|$ against the fitted values, robustly, and read the level of the curve instead of the silhouette of the cloud. In the figure the smooth is flat within a few hundredths across the axis: constant scale, as constructed. The general lesson transfers beyond residuals: a scatterplot's visual impression confounds density with level, and a superimposed smooth is the cheap instrument that separates them.
+
+## ★ The same kernels estimate densities
+
+Kernel weights predate kernel regression, and the older use returns twice later in the course. To estimate a density $p(x)$ from draws $x_1, \dots, x_n$, put a kernel bump of width $\lambda$ on each observation and average:
+
+$$
+\hat p(x_0) = \frac{1}{n\lambda} \sum_{i=1}^n K_\lambda(x_0, x_i),
+$$
+
+the *Parzen window* estimate (Parzen, 1962): a smoothed histogram with the bin edges integrated out, equivalently the empirical distribution convolved with the kernel. The bandwidth plays the identical bias–variance role, and for Gaussian data and a Gaussian kernel it even has a closed-form answer, $h = \sigma \left(\tfrac{4}{3n}\right)^{1/5}$, paired in practice with the robust scale estimate $\hat\sigma = 1.4826\,\operatorname{MAD}$. No such formula exists for regression bandwidths; the difference is that density estimation of a Gaussian is a fully specified problem, while regression smoothing is not.
+
+Densities turn into classifiers through <Ref lesson="naive-bayes">Bayes' rule</Ref>: estimate one density $\hat p(x \mid y = c)$ per class by KDE, plug in the class priors, and classify by the largest posterior. In one or two dimensions this *kernel density classification* is a serious method; in high dimensions per-class KDE inherits the curse in full, and the classical escape is the one module 4 already made precise: assume the features independent within each class and estimate $p$ one-dimensional marginal KDEs instead of one $p$-dimensional joint. That is exactly naive Bayes with the Gaussian marginals replaced by kernel estimates, and it stays competitive for the decision-versus-estimation reason established in <Ref lesson="naive-bayes">the naive Bayes lesson</Ref>: biased densities can still order the posteriors correctly near the boundary. The construction also closes a loop from <Ref lesson="knn-curse">the nearest-neighbor lesson</Ref>, whose starred section derived the $k$-NN vote as Bayes' rule over a *balloon* density estimate, the same formula with the bandwidth inflating per query instead of fixed.
+
+## What locality costs
+
+The family is now complete: a smooth local average, its boundary-corrected linear form, a robust production version with forty years of service, and a real study where the smoother was the science. The closing ledger records what was paid, because the next two modules are built on the unpaid balance.
+
+**The curse, undiminished.** Every window argument above was one-dimensional. In $p$ dimensions the kernel becomes radial, local linear fits a hyperplane per target, and the boundary correction generalizes seamlessly; what does not survive is the data supply. <Ref lesson="knn-curse">The curse lesson's</Ref> arithmetic applies verbatim to fixed windows: a neighborhood holding a useful fraction of the sample must span most of every axis; localness and a sizable in-window sample cannot be maintained simultaneously as dimension grows without the total sample growing exponentially, and local regression stops being useful much beyond two or three dimensions.
+
+**No formula comes out.** The fitted object is a curve, or a surface, evaluable anywhere and stateable nowhere: there is no coefficient to interpret, no term to test, no equation to transport to the next dataset. Module 3 traded flexibility for interpretability; this lesson made the opposite trade in full.
+
+<KeyFact>
+**The model is the training set.** These are *memory-based* methods: nothing is compressed at training time, and every prediction rereads all $n$ points, so real-time prediction at scale must carry, index, and scan the data the fit never digested into parameters. The estimators of the next two modules pay training-time computation to escape exactly this — a fitted tree keeps only its splits, and prediction never touches the sample again.
+</KeyFact>
+
+What stands established: the Nadaraya–Watson smoother is locally fitted constants, local linear regression is the same machinery with the first-order boundary bias removed by its own moment conditions, the bandwidth is the single dial, priced by $\operatorname{tr}(S_\lambda)$ on the module-3 ruler and tuned by the LOOCV shortcut, and LOESS makes the result robust by multiplying bisquare residual weights into the kernel weights, twice. The costs are the curse, the absence of a global form, and memory-based prediction. <Ref lesson="decision-trees">The decision-tree lesson</Ref> attacks the first cost directly: instead of a window of fixed shape everywhere, it learns where to put the neighborhood boundaries, one split at a time, and pays for the adaptivity in a new currency, instability.
+
+## Exercises
+
+<Exercise>
+For local linear regression at $x_0$ with weights $w_i = K_\lambda(x_0, x_i)$, take the weighted moments $s_j = \sum_i w_i (x_i - x_0)^j$ for $j = 0, 1, 2$ as in the theorem. (a) Solve the two normal equations to show
+
+$$
+\hat f(x_0) = \sum_i l_i(x_0)\, y_i,
+\qquad
+l_i(x_0) = \frac{w_i \big[ s_2 - (x_i - x_0)\, s_1 \big]}{s_0 s_2 - s_1^2},
+$$
+
+and verify $\sum_i l_i = 1$ and $\sum_i (x_i - x_0) l_i = 0$ directly from the formula. (b) Show that deleting the slope from the model collapses $l_i$ to the Nadaraya–Watson weights, and identify exactly which of the two moment identities the collapsed weights lose. Write both normal equations before opening.
+
+<Solution>
+(a) With the model $y_i \approx \alpha + \beta (x_i - x_0)$, the weighted normal equations are
+
+$$
+\alpha\, s_0 + \beta\, s_1 = \textstyle\sum_i w_i y_i,
+\qquad
+\alpha\, s_1 + \beta\, s_2 = \textstyle\sum_i w_i (x_i - x_0) y_i .
+$$
+
+Solving the $2 \times 2$ system for $\alpha$ (Cramer's rule) gives
+
+$$
+\hat\alpha = \frac{s_2 \sum_i w_i y_i - s_1 \sum_i w_i (x_i - x_0) y_i}{s_0 s_2 - s_1^2}
+= \sum_i \frac{w_i \big[s_2 - (x_i - x_0) s_1\big]}{s_0 s_2 - s_1^2}\, y_i ,
+$$
+
+which is the claimed $l_i$. Sums: $\sum_i l_i = (s_2 s_0 - s_1 s_1)/(s_0 s_2 - s_1^2) = 1$, and $\sum_i (x_i - x_0) l_i = (s_2 s_1 - s_1 s_2)/(s_0 s_2 - s_1^2) = 0$. The denominator is positive whenever at least two distinct $x_i$ carry weight, by Cauchy–Schwarz with strict inequality.
+
+(b) Deleting the slope sets the model to a constant; the single normal equation is $\alpha s_0 = \sum w_i y_i$, so $l_i = w_i / s_0$: Nadaraya–Watson. Then $\sum l_i = s_0/s_0 = 1$ still holds, but $\sum (x_i - x_0) l_i = s_1 / s_0$, the weighted mean offset of the window, which is zero only when the window is symmetric about $x_0$. That surviving first moment multiplies $f'(x_0)$ in the bias expansion: it is the boundary bias, in one fraction. The transferable move: reproduction identities of a fitted family are exactly the bias orders it cancels, one identity per polynomial degree.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the bandwidth to its two poles and examine each separately. (a) For $\lambda \to \infty$ (every weight tends to the same positive value), state what the Nadaraya–Watson smoother converges to, what local linear regression converges to, and the effective df of each limit. (b) For $\lambda \to 0$ with distinct $x_i$, state what both become at the training points and the effective df. (c) Name the module-1 predictor that pole (b) resurrects and the module-3 estimators pole (a) recovers, and state in one sentence why every smoother in this lesson lives strictly between two objects the course already analyzed.
+
+<Solution>
+(a) With all weights equal, the local constant fit is the unweighted global mean $\bar y$: NW becomes the null model, $S = \tfrac1n \mathbf{1}\mathbf{1}^\top$, $\operatorname{tr}(S) = 1$. The local linear fit with equal weights is ordinary least squares of $y$ on $(1, x)$, the same line at every target: the global OLS line of <Ref lesson="ols">the OLS lesson</Ref>, $S$ its hat matrix, $\operatorname{tr}(S) = 2$. (This is the smoothing-spline $\lambda \to \infty$ limit from <Ref lesson="splines-gams">the splines lesson</Ref> reached by a different road: there the penalty's null space was the affine functions, here the local model is.)
+
+(b) As $\lambda \to 0$, each training point's window eventually contains only itself, so $\hat f(x_i) = y_i$: $S \to I$, $\operatorname{tr}(S) = n$, training error zero.
+
+(c) Pole (b) is the memorizer of <Ref lesson="statistical-learning">the statistical learning lesson</Ref>, zero training error and no generalization; pole (a) is the one- or two-parameter global fit. Every bandwidth in between is an address on the df ruler connecting them, which is why one dial suffices: the family is a continuous path from the course's most rigid estimator to its most vacuous one, and model selection is the choice of milepost.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "LOESS resists outliers because the tricube kernel down-weights points far from the target; a smoothly decaying kernel is what robustness means." Name the step that fails, state what each of the two weight systems actually responds to, and predict concretely what the algorithm run with $t = 0$ does on the abrasion data.
+
+<Solution>
+The failing step is the substitution of $x$-distance for deviance. The tricube factor $w_k(x_i)$ is a function of $|x_k - x_i|$ only: it encodes *where a point is*, not *how well it fits*, and it is largest, not smallest, for an outlier lying near the target's own abscissa. A wild response at the center of the window receives close to full distance weight from every nearby target, and a squared-error fit, which the local fit is, follows it. The bisquare factor $\delta_k = B(e_k/6s)$ is a function of the point's residual only: it is the sole part of the algorithm that can distinguish a deviant response from a sound one, and it exists only if the robustness iterations run.
+
+With $t = 0$ on the abrasion data, the algorithm is plain locally weighted regression, and the result is the dotted curve in Cleveland's Figure D: dragged visibly toward the single lower-left outlier through every span that contains it, while the $t = 2$ solid curve holds the trend of the other 29 specimens. Robustness is a property of the residual loop, not of the kernel; the kernel's decay buys smoothness of the fitted curve, a different good. (The same distinction appeared globally in <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>: weighting by precision and refusing outliers are different repairs for different failures.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Price two smoothers on <Ref lesson="splines-gams">the effective-df ruler</Ref>. Take $n = 10$ equispaced points $x_i = 0, \tfrac19, \dots, 1$ and the Nadaraya–Watson smoother with tricube kernel. (a) At bandwidth $\lambda = \tfrac29$, each point's window reaches only its immediate neighbors, at scaled distance $u = \tfrac12$. Compute the tricube weight at $u = \tfrac12$, then $S_{ii}$ for an interior point and for an endpoint, and assemble $\operatorname{tr}(S)$. (b) At $\lambda = \tfrac49$ the computed trace is $2.55$. Place both fits on the df ruler. (c) A metric window of half-width $\tfrac29$ holds about half the data, span $f \approx 0.5$; Cleveland's rule of thumb gives $2(1 + 1/f) = 6$ equivalent parameters. Reconcile the gap with your answer to (a).
+
+<Solution>
+(a) Tricube at $u = \tfrac12$: $\big(1 - \tfrac18\big)^3 = \big(\tfrac78\big)^3 = \tfrac{343}{512} \approx 0.670$. An interior point's window holds itself (weight 1) and two neighbors (weight 0.670 each), so $S_{ii} = 1/(1 + 2 \cdot 0.670) = 0.427$; an endpoint has one neighbor, $S_{ii} = 1/1.670 = 0.599$. Trace: $8(0.427) + 2(0.599) = 4.62$.
+
+(b) The two fits sit at df $4.6$ and $2.55$: the first between the OLS-line mark and mid-ruler, the second nearly on the global-line mark, even though both "use all 10 points". Doubling the bandwidth roughly halved the effective parameters, the dial moving along the ruler.
+
+(c) Cleveland's rule prices a *local linear* fit, and each local line spends two local parameters (level and slope) where the local constant spends one; on these 10 points the local-linear trace at $\lambda = \tfrac29$ comes out at $5.4$ against NW's $4.6$, and Cleveland's own complexity measure is the variance form $\operatorname{tr}(SS^\top)$ of <Ref lesson="cross-validation-bootstrap">the resampling lesson's</Ref> df family, computed for nearest-neighbor spans rather than metric windows, with the $6$ an asymptotic approximation. The reconciliation is that all these numbers agree to their first digit once like is compared with like: half-the-data windows behave like 4–6 parameter regressions under every definition, and the rule of thumb is a serviceable ruler mark, not an identity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the abrasion set piece. The 30-specimen rubber dataset behind Cleveland's Figure D is published (Davies, ed., *Statistical Methods in Research and Production*, 1957, p. 210) and ships with R as `MASS::Rubber` (columns `loss`, `hard`, `tens`). Protocol: regress `loss` on `hard` and `tens` on `hard` by OLS; plot the first residuals against the second; smooth the scatter twice with span $0.5$ and local lines, once with no robustness iterations and once with two or three (Python: `statsmodels.api.nonparametric.lowess` with `frac=0.5`, `it=0` versus `it=3`; R: `lowess` with `iter`). State before running what counts as reproduction.
+
+<Solution>
+What counts as reproduction: the two curves nearly coincide over the right-hand two-thirds of the plot and separate near the lower-left outlier, the nonrobust curve pulled toward it and the robust curve staying with the remaining points, and both curves show a bend that no straight line fits.
+
+Expected outcome in detail: the outlying specimen sits at large negative abrasion-loss residual; with `it=0` the smooth dips toward it across the spans containing it, and with `it≥2` the point's bisquare weight is at or near zero (its residual far exceeds six median absolute residuals), so the dip disappears. Deleting the outlier and re-running `it=0` should approximately reproduce the robust curve, which is the cleanest check that the iterations are doing deletion's work continuously. The visible curvature in either robust curve is Cleveland's second finding: the original linear-in-the-explanatory-variables regression is misspecified, which is a conclusion the residual smooth supports without fitting any alternative parametric model, the same instrument-not-convenience role the lead study played.
+</Solution>
+</Exercise>
+
+<Exercise>
+Local linear regression in $p$ dimensions uses a product kernel: point $x_i$ gets weight $\prod_{j=1}^p W\!\big(|x_{ij} - x_{0j}|/\lambda\big)$, so only points within $\lambda$ of the target *in every coordinate* have nonzero weight. Take $n = 1000$ points uniform on $[0,1]^p$ and a window of half-width $0.15$ per axis at the cube's center. (a) Compute the expected number of points with nonzero weight at $p = 2$ and $p = 8$. (b) Find the per-axis half-width needed to recover the $p = 2$ count at $p = 8$, and say what the window has become. (c) State the conclusion for local methods with fixed window shapes.
+
+<Solution>
+(a) The window is a sub-cube of edge $0.3$, capturing fraction $0.3^p$ of a uniform sample. At $p = 2$: $0.09 \cdot 1000 = 90$ points, a healthy neighborhood. At $p = 8$: $0.3^8 = 6.6 \times 10^{-5}$, an expected $0.07$ points: the window is empty, and the local fit at the center does not exist.
+
+(b) Matching 90 points needs edge $e$ with $e^8 = 0.09$, so $e = 0.09^{1/8} = 0.74$: half-width $0.37$, a "neighborhood" spanning three-quarters of every axis, which is <Ref lesson="knn-curse">the curse lesson's</Ref> edge-length formula $r^{1/d}$ arriving from inside a kernel. The window is no longer local in any sense; the fit is a lightly reweighted global regression wearing local notation.
+
+(c) A fixed window shape must choose between emptiness and globality in high dimension; no bandwidth setting escapes, because the trade is geometric, not statistical. The way out is to let the *data* place the neighborhood boundaries, spending splits only along coordinates where the response actually changes, so that a "neighborhood" can be wide in irrelevant directions and narrow in relevant ones. That object, a neighborhood defined by recursive axis-aligned splits rather than by a distance, is the decision tree, and it is <Ref lesson="decision-trees">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §6.1: the Nadaraya–Watson smoother (Eq. 6.2), the kernel comparison (Fig. 6.2), metric versus nearest-neighbor widths; §6.1.1: local linear regression (Eqs. 6.7–6.9), equivalent kernels, the bias expansion (Eq. 6.10) and "automatic kernel carpentry"; §6.1.2: local polynomials and the odd-degree advantage; §6.2: bandwidth selection, the smoother matrix, and the df-matched spline comparison (Fig. 6.7); §6.3: the dimensionality verdict; §6.6: kernel density estimation, kernel density classification, and naive Bayes with KDE marginals. Free online: https://hastie.su.domains/ElemStatLearn/
+2. W. S. Cleveland, "Robust Locally Weighted Regression and Smoothing Scatterplots," *Journal of the American Statistical Association* 74(368), 1979, pp. 829–836 — the LOESS paper: the algorithm (§2), the abrasion and residual-scale examples (§3.1–3.2, Figs. D–F), the lead study (§3.3, Fig. G), parameter guidance and PRESS span selection (§4), and the equivalent number of parameters with the $2(1+1/f)$ approximation (§6). https://sites.stat.washington.edu/courses/stat527/s13/readings/Cleveland_JASA_1979.pdf
+3. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §16.3: Parzen density estimation, the $h = \sigma(4/(3n))^{1/5}$ rule of thumb with the MAD scale estimate, and KDE-to-KNN connections; §15.4.2: kernel regression as nonparametric attention. Free online: https://probml.github.io/pml-book/book1.html
+4. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §7.6: local regression at textbook pace, with the span as the tuning parameter. Free online: https://www.statlearning.com/
+5. O. L. Davies (ed.), *Statistical Methods in Research and Production*, 3rd ed., Oliver and Boyd, 1957 — p. 210: the 30-specimen abrasion-loss experiment behind Cleveland's Figure D, shipped as `Rubber` in R's MASS package.
+6. D. M. Allen, "The Relationship Between Variable Selection and Data Augmentation and a Method for Prediction," *Technometrics* 16(1), 1974, pp. 125–127 — the PRESS criterion Cleveland adapted for span selection.
+</References>

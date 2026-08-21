@@ -1,0 +1,310 @@
+Sixty-four tumor samples, 6,830 genes, no labels used — and the dendrogram finds coarse structure that survives resampling, flags two samples the pathologists had mislabeled, and demonstrates every failure mode this module warned about, on one dataset.
+
+This module built the machinery for structure without labels: <Ref lesson="kmeans">centroids</Ref>, <Ref lesson="hierarchical-dbscan">linkage hierarchies and the scoring toolkit</Ref>, <Ref lesson="gmm-em">mixtures</Ref>, <Ref lesson="pca">eigenvector directions</Ref>, and <Ref lesson="tsne">neighbor maps with a discipline for reading them</Ref>. Each was derived on data chosen to expose it. This lesson is the module's application: the toolkit runs on the NCI human tumor microarray panel, the canonical dataset of unsupervised classical ML, with every choice documented and every published number checked against our own rerun. The route: the data and what it measures; PCA at $p \gg n$; three linkages on one matrix; the agreement and stability audits; the tools that do not apply; and the ledger of what the analysis did and did not establish.
+
+<Task>
+Three retrievals before touching the data, closed book. (1) From <Ref lesson="hierarchical-dbscan">the hierarchy lesson</Ref>: what a dendrogram's fusion heights encode, and what its left-to-right leaf order encodes. (2) From <Ref lesson="pca">the PCA lesson</Ref>: why $XX^\top$ (64×64) has the same nonzero eigenvalues as $X^\top X$ (6,830×6,830). (3) From <Ref lesson="kmeans">the k-means lesson</Ref>: what restarts buy, and what they cannot. All three are graded against real output below.
+</Task>
+
+## The artifact: a matrix 107 times wider than it is tall
+
+A *DNA microarray* measures gene *expression*, how actively each gene is being transcribed in a sample of cells, by hybridizing the sample's RNA against thousands of gene sequences printed on a glass slide and reading off a log intensity ratio per gene, roughly $-6$ to $6$, positive where the gene is more active than in a reference sample. One experiment produces one column of numbers; a panel of experiments produces a matrix.
+
+<Figure
+  src="./figures/nci-heatmap.jpg"
+  alt="A tall red-and-green heat map: 100 gene rows by 64 tumor-sample columns, every cell a measured log expression ratio — bright green where a gene is under-expressed, bright red where it is over-expressed, scattered gray cells where the measurement is missing. Gene identifiers such as SIDW299104, RASGTPASE and PTPRC run down the right edge; tumor-type labels — BREAST, RENAL, MELANOMA, LEUKEMIA, COLON, UNKNOWN — run along the bottom. Rows and columns are in random order, so no block or band stands out."
+  caption="The raw artifact: a random 100 of the 6,830 genes against all 64 samples, rows and columns in random order. Green is under-expressed, red over-expressed, gray missing. No structure is visible yet — finding it is the rest of the lesson."
+/>
+
+### The panel and its labels
+
+The panel here is the NCI human tumor dataset carried by both of this course's source texts: expression values for $p = 6{,}830$ genes in $n = 64$ tumor samples, collected at the National Cancer Institute. Each sample is one patient's cancer grown in the laboratory, and each carries a pathologist's type label (melanoma, leukemia, colon, renal, and ten more) which the analysis below never shows to any algorithm. The labels exist only to audit, afterwards, what the unlabeled machinery found.
+
+Two facts about the shape govern everything downstream. First, $p \gg n$: each sample is a point in 6,830-dimensional space, and there are 64 of them, so the data matrix is 107 times wider than it is tall. In genomics this is the normal case, not a pathology: measuring is cheap per gene and expensive per patient.
+
+Second, $n = 64$ is small enough that every conclusion must survive a resampling check before it deserves belief; that audit closes the analysis.
+
+### Protocol, stated in advance
+
+Samples are rows; each gene column is standardized to mean 0, variance 1 (the ISLP lab's convention; defensible either way, since the genes share units, and the standardize-or-not decision is itself audited below); distances are Euclidean; hierarchical clustering follows <Ref lesson="hierarchical-dbscan">the linkage definitions</Ref> exactly; k-means runs Lloyd's algorithm with 20 restarts, best distortion kept. Published numbers are labeled ESL's or ISLP's; everything else is our rerun, and the two disagree in places the text will flag.
+
+## PCA at p ≫ n: the whole spectrum from a 64 × 64 matrix
+
+The first look at any high-dimensional dataset in this module's toolkit is a projection, and this dataset is why <Ref lesson="pca" id="the-svd-what-code-computes">the PCA lesson's computational section</Ref> bothered with the $d \gg n$ case.
+
+### The Gram route: 33 KB instead of 373 MB
+
+The covariance matrix of these samples is $6{,}830 \times 6{,}830$: 46.6 million entries, 373 MB in double precision, before a single eigenvector is computed. The Gram matrix $XX^\top$ is $64 \times 64$: 33 KB. Its nonzero eigenvalues equal the squared singular values of $X$ exactly, and mapping its eigenvectors through $X^\top$ recovers every principal direction the data can support: at most 63 of them, since 64 centered points span at most a 63-dimensional subspace no matter how many coordinates they are written in.
+
+On this machine the Gram eigendecomposition takes 6 milliseconds; the top five eigenvalues agree with the direct SVD's squared singular values to fifteen significant digits (the review exercise makes you reproduce this check). Six-thousand-dimensional PCA is a laptop operation, and the reason is arithmetic, not hardware.
+
+### The score plot, blind and then audited
+
+<Figure
+  src="./figures/pca-scores.svg"
+  alt="Two scatter panels of the 64 samples on PC1 and PC2. Left: all points gray, with a visibly detached group at the bottom. Right: the same points colored by cancer type — melanoma amber, leukemia blue, colon green — with two amber open circles marking breast-labeled samples inside the melanoma group."
+  caption="The first two principal-component scores, computed blind (left), then audited against the type labels (right). The detached group is the melanomas — plus two samples labeled breast."
+/>
+
+<Task>
+Read the left panel before the right one. Count the groupings you would report from the gray panel alone; then check each against the colored panel. The detached lower group is real structure found without labels; the two open circles inside it are the anomaly the rest of the lesson pursues.
+</Task>
+
+The left panel is the module's founding claim, now at $p = 6{,}830$: structure is visible with no labels in the loss, none in the fit, none in the plot. The right panel is the audit. Samples of one cancer type sit near each other (melanomas detached at the bottom, leukemias right, colons upper right), which is <Ref lesson="statistical-learning">module 1's</Ref> point that the input distribution alone carries usable organization. And the audit already surfaces one discrepancy: two samples whose label says *breast* sit at the extreme of PC2, deep inside the melanoma group.
+
+### Reading the spectrum
+
+The spectrum, read honestly: PC1 carries 11% of the variance, and the first seven components together carry 38.5% (ISLP reports about 40% on its scaling; the couple-of-points difference is preprocessing detail). There is no dominant direction; the structure is spread across many weak ones, which is exactly when a two-axis picture must be treated as <Ref lesson="tsne">a hypothesis generator</Ref>, not a measurement.
+
+## Three linkages, one matrix: the tree is a joint product
+
+The tree-building machinery of <Ref lesson="hierarchical-dbscan">the hierarchy lesson</Ref> established that the data does not determine the dendrogram; the pair (data, linkage) does. On five toy points that was a demonstration. Here is the same fact on real clinical data.
+
+<Figure
+  src="./figures/linkage-triptych.svg"
+  alt="Three 64-leaf dendrograms of the same data under average, complete, and single linkage. Leaf ticks mark the eight melanomas in blue and the two breast-labeled samples in amber; the amber pair sits inside the melanoma run in all three trees. Cut sizes at K=4 are annotated: 54/8/1/1 for average, 40/9/8/7 for complete, 61/1/1/1 for single."
+  caption="One distance matrix, three trees. The K = 4 cut sizes differ wildly, yet the amber pair of breast-labeled leaves sits against the melanomas in every panel."
+/>
+
+### Where the trees disagree
+
+The three trees disagree exactly as the linkage artifacts predict. **Single linkage chains**: its K = 4 cut is one 61-sample blob plus three singletons peeled off.
+
+**Average linkage spends clusters on outliers**: its first split separates the 8 leukemia-branch samples — six labeled LEUKEMIA plus K562A and K562B, two replicate cultures of the K562 leukemia cell line that carry their own labels in the panel — from the other 56. Its next two cuts each remove a single sample (one lung, one renal), so the K = 4 cut reads 54 | 8 | 1 | 1.
+
+**Complete linkage crowds toward balance**: 40 | 9 | 8 | 7, the only cut of the three that resembles four groups. ISLP's lab, run with complete linkage for this reason, finds the same structure ours does: all leukemias in one cluster, the breast samples scattered over three.
+
+<KeyFact>
+Cutting a dendrogram at $K$ is not the same as finding $K$ groups. On this data the average tree's K = 4 cut assigns two of its four clusters to single outlier samples; the honest reading is that the tree found one strong split (leukemia versus everything) and two outliers, and the analyst's $K$ manufactured the rest.
+</KeyFact>
+
+### Where they agree
+
+What the trees agree on is more interesting than what they dispute. The leukemia branch appears in all three. And in all three, the two breast-labeled samples fuse with each other first, then join a small all-melanoma node: under average and single linkage they enter a 7-sample node of five melanomas plus the pair; under complete linkage they attach to a melanoma directly.
+
+## The agreement audit: methods against methods, methods against labels
+
+<Figure
+  src="./figures/wss-curve.svg"
+  alt="Within-cluster sum of squares for k-means at K from 1 to 10, falling smoothly from 437,000 to 289,000 with no visible kink."
+  caption="Our rerun of ESL's Fig 14.8: the distortion falls smoothly. ESL's verdict on the same curve: no clear indication."
+  float="right"
+  width="s"
+/>
+
+With three tree cuts and a centroid method in hand, the module's referee toolkit gets its field test.
+
+### The K question: every criterion comes back flat
+
+The within-cluster sum of squares for k-means falls smoothly from $K=1$ to $K=10$ with no kink. Our curve reproduces the shape of ESL's Figure 14.8, whose caption-level verdict the book states outright: no clear indication, $K = 3$ chosen for illustration.
+
+The mean <Ref lesson="hierarchical-dbscan" id="scoring-a-clustering-silhouette-rand-and-the-honesty-clause">silhouette</Ref> concurs from the other side: it peaks at $K = 2$ at a value of 0.09 and never exceeds it at any $K$. On a scale where well-separated clusters score above 0.5, this data supports no confident cluster count at all.
+
+### Scoring the partitions against each other
+
+With $K = 4$ fixed by fiat (following the ISLP lab, so the comparison has a published anchor), the partitions can be scored against each other with the adjusted Rand index, the chance-corrected agreement score <Ref lesson="hierarchical-dbscan">the hierarchy lesson</Ref> computed by hand on 17 objects.
+
+<Figure
+  src="./figures/agreement-ari.svg"
+  alt="A lower-triangle matrix of adjusted Rand indices with bootstrap standard errors: k-means versus complete cut 0.16, k-means versus average cut 0.10, complete versus average cut 0.36, and against the type labels 0.20, 0.13, and 0.05 respectively."
+  caption="The agreement audit at K = 4. Every number is far from 1: the partitions are cousins, not copies, and none of them is the label partition."
+/>
+
+### Three readings
+
+The two tree cuts agree with each other most (ARI 0.36): they share the leukemia branch and the outlier structure. K-means agrees with either tree only weakly (0.16, 0.10): its isotropic objective refuses the giant-cluster-plus-singletons shape the trees prefer.
+
+And *every* method's agreement with the 14 type labels is modest (0.20 at best), partly because 4 clusters cannot express 14 classes (pushing $K$ up to 12 raises k-means' ARI only to 0.28), and partly because expression similarity genuinely does not respect the pathology taxonomy: the breast samples, in particular, scatter across the space in every method's output. A one-line conclusion would be false in both directions; the numbers support "coarse agreement, far from identity," and nothing stronger.
+
+## The catch: two samples that were in the wrong taxonomy
+
+Every view so far has flagged the same pair: samples s57 and s58, labeled breast cancer. In the PCA scores they are the two most extreme points on PC2, inside the melanoma group. In all three dendrograms they fuse with each other and then with melanomas. In k-means at ESL's $K = 3$, our rerun puts them in a cluster containing exactly seven melanomas and nothing else.
+
+ESL's own Table 14.2 shows the same signature in the published run (its melanoma-heavy cluster carries two breast samples), though the book's third cluster groups the melanomas with the leukemias where ours separates them: same headline, different partition, which is what 20 restarts on 64 points buys in a landscape of local optima.
+
+### What the later record says
+
+ESL §14.3.8 resolves the anomaly in one sentence: "the two breast cancers in the second cluster were later found to be misdiagnosed and were melanomas that had metastasized." *Metastasis* is a cancer's spread from its original organ to another; a melanoma that migrates to the breast is still, in its gene expression, a melanoma.
+
+The two samples are the NCI60 cell lines MDA-MB-435 and its derivative MDA-N, and the instrument that did the settling was later cell-line and pathology work: melanocyte-marker profiling (Ellison et al. 2002), then a genetic match to the M14 melanoma line (Rae et al. 2007). That reading is still disputed — the match itself argues a specimen mix-up rather than a metastasis, and Chambers (2009) argues the identity between the two lines could even run the other way, back toward breast. What every party to the dispute accepts is what the clustering found: the pair's expression is melanocytic, and the BREAST labels do not describe it.
+
+### A flag is not a finding
+
+The order of operations is the module's closing law, enacted. The dendrogram did not diagnose anything. It selected 2 samples out of 64 as worth re-examination, and instruments entirely outside the clustering — pathology review, marker panels, line-identity genetics — did whatever establishing there is, over years and without unanimity. This is <Ref lesson="tsne" id="the-discipline-maps-generate-hypotheses-statistics-test-them">the discipline the embedding lesson closed on</Ref>: unsupervised structure generates hypotheses; something that is not the structure must test them.
+
+The same data shows the law's other half: one of the eight melanomas sits far from its seven kin in every tree (visible in ESL's published dendrogram too), and no re-examination overturned *its* label. A flag is a flag, not a finding: some flags are mislabeled samples, and some are just unusual tumors.
+
+<KeyFact>
+What made this pair worth years of external testing was not that one view flagged it but that every view did — the score plot, all three trees, k-means — and that the flag survives resampling (98% of bootstraps, next section). A single method's outlier, like the lone melanoma above, warrants a note in the margin; concordant, stable flags are what warrant an instrument.
+</KeyFact>
+
+## The stability audit: what survives 50 resamplings
+
+<Ref lesson="hierarchical-dbscan">The hierarchy lesson's</Ref> honesty clause said the unlabeled-data check is stability: perturb the data, recluster, and see what dissolves. At $n = 64$ this is not optional hygiene; it is the only thing separating structure from sampling noise. The protocol: draw 50 bootstrap resamples of the 64 samples, rebuild the average-linkage tree on each, cut at $K = 8$ (deep enough that types can separate), and for each cancer type record how often two samples of that type land in the same cluster.
+
+<Figure
+  src="./figures/stability-bars.svg"
+  alt="Horizontal bars of within-type co-clustering rates over 50 bootstraps: melanoma and ovarian 0.93, colon 0.80, renal 0.75, NSCLC 0.65, CNS 0.56, leukemia 0.45, breast 0.32; below, an amber bar showing the flagged breast pair co-clustering with the melanoma core in 98% of resamples."
+  caption="What survives resampling: the melanoma, ovarian, and colon groupings, and above everything else the flagged pair's membership in the melanoma branch."
+/>
+
+### Reading the bars
+
+The bars rank the module's findings by how much belief each deserves. Melanoma, ovarian, and colon samples co-cluster in 80–93% of resamples: reproducible coarse structure. Breast co-clusters at 0.32, barely above what scattering would produce, so "the breast cluster" was never a real object in this data, consistent with two of its members not being breast cancer at all and the rest spreading across three clusters in every partition above.
+
+Leukemia's low 0.45 is an artifact worth understanding rather than believing: its six samples form a *branch* with internal structure, and a $K = 8$ cut slices inside the branch, splitting pairs that are in fact each other's neighbors. The statistic inherits every choice the analysis made; it audits the pipeline, not the platonic clusters.
+
+### Two more perturbations
+
+Rerunning everything on unstandardized (centered-only) genes moves the average-linkage cut to a partition with ARI 0.73 against the standardized run, and k-means to 0.79: the same coarse picture, a visibly different fine partition. That is <Ref lesson="kmeans">the k-means lesson's</Ref> warning that scaling is a modeling choice, delivered on real data; ESL §14.3.3 adds the converse warning that equal-weighting all features can just as easily *obscure* real groups as reveal them.
+
+And the flagged pair rides above all of it: across resamples, a flagged sample and a core melanoma land in the same cluster 98% of the time. The catch is the most stable object in the analysis, more stable than most of the clusters.
+
+## The tools that do not apply: mixtures and neighbor maps at n = 64
+
+Two module tools are absent from the protocol, and both omissions are results, not oversights.
+
+### The mixture: degenerate from the first iteration
+
+A <Ref lesson="gmm-em">Gaussian mixture</Ref> with full covariances needs $p(p+1)/2 + p$ parameters per component: at $p = 6{,}830$, that is 23.3 million parameters per component, or about 365,000 parameters for every data point available. The failure is not just statistical extravagance. Any single Gaussian fitted to $n < p + 1$ points has a singular sample covariance, so the likelihood the EM algorithm climbs is degenerate from the first iteration: the $\sigma \to 0$ spike pathology <Ref lesson="gmm-em">the EM lesson</Ref> derived, now not as a corner case but as the certain outcome. Diagonal covariances cut the bill to 13,660 parameters per component, still 200-fold beyond the sample count.
+
+### The embedding: no work to do at n = 64
+
+The other absentee is the <Ref lesson="tsne">neighbor embedding</Ref>, ruled out not by degeneracy but by having no work to do. At $n = 64$ the perplexity is capped near 21 (it must stay below $(n-1)/3$), so the map would be calibrated to neighborhoods a third of the dataset wide — coarser than the type groups it would be asked to show. And 64 points are already fully legible in the PC1/PC2 scatter: every within-type adjacency and both flagged samples are visible in the linear projection, which additionally preserves the global geometry a t-SNE map would deliberately spend. t-SNE's entire payoff is faithful *local* structure at scales a scatterplot cannot resolve, and this dataset has no such scales. Declining to run the tool is the misreading discipline applied one step earlier than usual.
+
+<Remark title="what is lost with the likelihood">
+The mixture was the one clustering tool whose objective is a genuine density, and the module's <Ref lesson="gmm-em" id="choosing-k-the-objective-is-finally-a-density">only principled route to choosing $K$</Ref> (held-out likelihood, BIC) rides on that density. At $p \gg n$ the route closes: no density model, no likelihood, no BIC. That is why this lesson's $K$ question fell back on the elbow, the silhouette, and stability, and why all three declined to name a $K$. Recognizing which tool a regime forbids is as much a part of the toolkit as running the ones it permits.
+</Remark>
+
+## The ledger
+
+<Figure
+  src="./figures/ledger.svg"
+  alt="A two-column verdict card. Established: coarse structure is real (leukemia splits first; melanoma, ovarian, colon cohere at 0.80 to 0.93 across bootstraps); the two breast-labeled samples belong with the melanomas (every method, 98% of resamples; later cell-line work concurs, though its own reading is disputed); p much greater than n is no computational obstacle. Not established: a number of clusters; cluster equals cancer type; any subtype or causal claim."
+  caption="The application lesson's verdict: three claims earned, three refused, each tied to the computation that decides it."
+/>
+
+### Three claims earned
+
+The analysis established three things. Coarse structure in these expression profiles is real: it appears without labels, in every method, and survives resampling. Two specific samples were flagged as inconsistent with their labels by every method, and the outside instruments that took the flag up agree the labels were wrong — even while disputing, to this day, what the right story is. And the module's $p \gg n$ machinery (the Gram trick above all) makes the computation trivial where the naive route would be a 373 MB eigenproblem.
+
+### Three claims refused
+
+It refused three things. No number of clusters: every criterion the module owns came back flat, and $K = 4$ was imported from a textbook lab, not from the data. No "cluster = cancer type": agreement with the labels tops out at ARI 0.28, the linkage alone reshapes the tree, and the breast samples never formed a group at all. And no biology beyond the flags: 64 laboratory-grown samples from one platform, where standardizing or not moves the partition, license hypotheses and nothing further. Where the labels and the structure disagreed, the later record sided with the structure; the audit machinery, not the vindication, is what transfers to the next dataset.
+
+### What carries forward
+
+That closes the module's argument: means, likelihoods, and eigenvectors organize unlabeled data; their failure modes are geometric; and their findings are hypotheses until something external tests them. <Ref lesson="clustering-lab">The module's lab</Ref> now rebuilds k-means and EM from scratch, with the convergence proofs as executable checks. Then the course changes direction: eight modules have produced methods that work, and module 9 finally asks why any of them is *guaranteed* to: what turns a finite sample into a statement about data never seen.
+
+## Exercises
+
+<Exercise>
+Warm-up on real numbers. The table gives Euclidean distances (standardized genes, rounded to integers) between eight of the 64 samples: A, B are leukemias; C, D melanomas; E, F the two breast-labeled samples; G, H colons. Run average-linkage agglomeration by hand, writing each merge with its height and the updated average distances, and give the $K = 3$ cut. Do all seven merges before checking.
+
+| | A | B | C | D | E | F | G | H |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **A** | 0 | 111 | 124 | 109 | 118 | 117 | 119 | 110 |
+| **B** | 111 | 0 | 134 | 120 | 131 | 128 | 111 | 110 |
+| **C** | 124 | 134 | 0 | 81 | 103 | 100 | 128 | 115 |
+| **D** | 109 | 120 | 81 | 0 | 97 | 93 | 114 | 104 |
+| **E** | 118 | 131 | 103 | 97 | 0 | 49 | 125 | 118 |
+| **F** | 117 | 128 | 100 | 93 | 49 | 0 | 122 | 114 |
+| **G** | 119 | 110 | 128 | 114 | 125 | 122 | 0 | 91 |
+| **H** | 110 | 110 | 115 | 104 | 118 | 114 | 91 | 0 |
+
+<Solution>
+**Merge 1:** the smallest entry is $d_{EF} = 49$: the two breast-labeled samples fuse first, at height 49. Averaged rows: $d(EF,A) = (118{+}117)/2 = 117.5$, $d(EF,B) = 129.5$, $d(EF,C) = 101.5$, $d(EF,D) = 95$, $d(EF,G) = 123.5$, $d(EF,H) = 116$.
+
+**Merge 2:** smallest remaining is $d_{CD} = 81$: the melanomas, at 81. $d(CD,A) = 116.5$, $d(CD,B) = 127$, $d(CD,EF) = (103{+}100{+}97{+}93)/4 = 98.25$, $d(CD,G) = 121$, $d(CD,H) = 109.5$.
+
+**Merge 3:** $d_{GH} = 91$: the colons, at 91. $d(GH,A) = 114.5$, $d(GH,B) = 110.5$, $d(GH,CD) = 115.25$, $d(GH,EF) = 119.75$.
+
+**Merge 4:** the smallest is $d(CD, EF) = 98.25$: the breast pair joins the melanomas: the catch, reproduced by hand in an 8-sample extract.
+
+**Merge 5:** candidates now involve A, B, GH, and CDEF; the smallest is $d(B, GH) = 110.5$. Note what this merge shows: the two leukemias do *not* pair up ($d_{AB} = 111$ is beaten), and B is on average closer to the colons. Even hand-picked samples refuse to be tidy.
+
+**Merge 6:** $d(A, BGH) = (111{+}119{+}110)/3 = 113.33$.
+
+**Merge 7:** the final merge joins $\{C,D,E,F\}$ and $\{A,B,G,H\}$ at the average of the 16 cross distances, $120.06$.
+
+The $K = 3$ cut (removing the last two merges): $\{C, D, E, F\}$, $\{B, G, H\}$, $\{A\}$: melanomas-plus-flagged-pair, a colon group that absorbed a leukemia, and a leukemia singleton. In miniature, this is the full analysis: one strong reproducible group, and the rest sensitive to every choice.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe on the referee. (a) Compute the adjusted Rand index between the type labels and each degenerate partition of the 64 samples: all-singletons ($K = 64$) and one-cluster ($K = 1$). (b) Compute the *unadjusted* Rand index for both, using the fact that the label partition has 183 same-class pairs out of $\binom{64}{2} = 2{,}016$. (c) The module replaced held-out likelihood with stability and (evaluation-only) external labels on this dataset; state why held-out likelihood was unavailable in the first place.
+
+<Solution>
+**(a)** Both ARIs are exactly 0. For all-singletons, the clustering places no pair together, so the summand $\sum_{ij}\binom{n_{ij}}{2} = 0$ and the row-marginal term $\sum_i \binom{a_i}{2} = 0$; the ARI numerator is $0 - 0 = 0$. For one-cluster, the contingency table is a single row equal to the class counts, so $\sum_{ij}\binom{n_{ij}}{2} = 183$; the clustering marginal is one cluster of 64, giving $\sum_i \binom{a_i}{2} = 2016$, and the expected index is $2016 \cdot 183 / 2016 = 183$, and the numerator is $183 - 183 = 0$ again. The chance correction is engineered to zero out exactly the partitions that carry no information.
+
+**(b)** The unadjusted Rand index is agreement over pairs. One-cluster: agrees on the 183 same-class pairs, disagrees on the rest: $R = 183/2016 = 0.09$. All-singletons: agrees on the $2016 - 183 = 1833$ different-class pairs: $R = 0.91$. An uncorrected referee awards 91% agreement to the partition that refused to cluster anything: the inflation the hierarchy lesson computed on 17 toy objects, now at full scale, and the reason every score in this lesson is adjusted.
+
+**(c)** Held-out likelihood requires a fitted density to evaluate on held-out samples. Neither k-means (an objective, not a density) nor a linkage tree (an algorithm's merge history, not even an objective) defines one, and the one density model in the toolkit (the Gaussian mixture) cannot be fitted at $n = 64 \ll p = 6{,}830$ because every component's covariance is singular there. With the likelihood route closed, stability under resampling is the only internal check left, and the type labels can serve only as a post-hoc audit, never as a fitting signal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "The dendrogram proves there are four types of cancer in this panel: cut it at $K = 4$ and there they are."
+
+<Solution>
+Three independent failures, any one of which is fatal.
+
+*The cut manufactures the count.* Cutting at $K = 4$ produces four clusters for every dataset, including pure noise; the count was an input. On this data the average tree's $K=4$ cut is 54 | 8 | 1 | 1 (two "types" are single samples) while complete linkage's is 40 | 9 | 8 | 7. Same data, same $K$, incompatible "findings."
+
+*The tree is a joint product of data and linkage.* The three linkages produce three different trees (the triptych figure), so any statement of the form "the dendrogram shows..." is underspecified until the linkage is quoted; no linkage is the neutral one.
+
+*The count that exists came from elsewhere.* The panel carries fourteen distinct labels — thirteen named (the count includes the K562 and MCF7 replicate-culture lines, which are labeled as themselves) plus one unknown — because pathologists and lab records assigned them, and every internal criterion run in the lesson (distortion elbow, silhouette, ARI across $K$) declined to nominate any cluster count.
+
+What the dendrogram *did* contribute survives all three objections: a reproducible coarse grouping hypothesis (leukemia branch; melanoma, ovarian, colon coherence) and two specific samples flagged as inconsistent with their labels: one hypothesis per flag, each testable only by instruments outside the clustering — which is exactly where the flagged pair's case went.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the catch. The data is public: `https://hastie.su.domains/ElemStatLearn/datasets/nci.data.csv` (6,830 gene rows × 64 sample columns; the type labels, in column order, are in the adjacent `nci.info.txt`). Transpose, standardize each gene, and cluster the samples with average linkage. Then report every sample whose label disagrees with its surroundings: for each sample, find the smallest dendrogram node containing it and at least one sample of a *different* type, and flag samples whose first such companion set is dominated by a single other type. Check whether the two breast-labeled samples in columns 57–58 appear among your flags.
+
+<Solution>
+The protocol in code: read the CSV skipping the header row and gene-id column; transpose to 64×6,830; subtract each column's mean and divide by its standard deviation; compute Euclidean distances; run average linkage (`scipy.cluster.hierarchy.linkage(..., method="average")`); then walk the merge tree bottom-up per sample.
+
+What our run finds, for calibration: the breast samples in columns 57 and 58 fuse with each other at the lowest height of any cross-checkable pair in their region, and their first merge with any other sample joins them to a node of five melanomas: a 7-sample node of composition $\{5 \text{ melanoma}, 2 \text{ breast}\}$. They are the clearest label-versus-branch disagreement in the dataset and should top any reasonable flagging rule. Expect secondary flags too: one melanoma (column 23) whose nearest companions are non-melanomas, and one or two breast samples adjacent to colon groups (real heterogeneity, not bugs). Your exact heights will differ from ours if your standardization convention (population vs sample variance) differs; the branch memberships should not.
+
+The two flagged samples are the ones ESL §14.3.8 reports as "later found to be misdiagnosed... melanomas that had metastasized" — the MDA-MB-435/MDA-N pair whose contested provenance the lesson body describes. What your reproduction establishes is the flag; whatever settles it — pathology, marker panels, cell-line genetics — lies outside the clustering, and no rerun can supply it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review: the Gram trick, tested at $p = 6{,}830$. With the standardized matrix $X \in \mathbb{R}^{64 \times 6830}$: (a) state the relationship between the eigenvalues of $B = XX^\top$ and the singular values of $X$, and why $B$ has at most 63 nonzero eigenvalues; (b) run both routes, `eigh` on $B$ and `svd` on $X$, and verify the top five eigenvalues of $B$ equal the top five squared singular values; (c) state how a principal *direction* $v_j$ is recovered from an eigenvector $\tilde{u}_j$ of $B$, including the normalization.
+
+<Solution>
+**(a)** If $X = UDV^\top$, then $B = XX^\top = UD^2U^\top$: the eigenvalues of $B$ are exactly the squared singular values $d_j^2$. The rank of $X$ is at most 63 because the 64 rows were centered (each gene column sums to zero, so the rows satisfy one linear constraint); hence at most 63 of the $d_j$ are nonzero, and PCA on these samples can produce at most 63 directions regardless of $p$.
+
+**(b)** On our run the top five values from both routes are 49,652.2, 29,532.7, 25,142.4, 18,566.9, 16,326.3, agreeing to a maximum relative difference of $2 \times 10^{-15}$: machine precision. The $64\times 64$ eigendecomposition takes about 6 ms; the equivalent computation via the $6{,}830 \times 6{,}830$ covariance would need 373 MB just to store the matrix.
+
+**(c)** $v_j = X^\top \tilde{u}_j / d_j$: multiply the small eigenvector back through the data and divide by the singular value, which restores unit length since $\lVert X^\top \tilde{u}_j \rVert = d_j$. This is <Ref lesson="pca" id="the-svd-what-code-computes">the PCA lesson's</Ref> $d \gg n$ construction, verified where it matters.
+</Solution>
+</Exercise>
+
+<Exercise>
+Error diagnosis: the first five principal components of this data carry 31.8% of the variance in 5 numbers per sample instead of 6,830: an appealing input for a *supervised* model predicting, say, treatment response. Suppose 64 outcome values existed. State the protocol error in "compute the top 5 PCs of all 64 samples, then cross-validate a classifier on the 5 scores," and give the corrected protocol.
+
+<Solution>
+The PCs were computed from all 64 samples, so every held-out fold's test samples helped choose the directions the classifier is evaluated on: information from the test rows leaks into the features. The corrected protocol fits the PCA inside each fold: compute directions on the training rows only, project the held-out rows onto *those* directions, and only then score. PCA has no access to the outcome, which makes the leak subtle: with these dimensions the damage is real but bounded, whereas outcome-using feature selection under the same protocol error produces catastrophically optimistic estimates. This is precisely the blunder <Ref lesson="wrong-way-cv">module 5 reproduced</Ref> (3% reported on a problem whose true error is 50%) and the rule it fixed: every fitted step, unsupervised ones included, goes inside the fold. The module's analysis arc ends here (the closing lab, <Ref lesson="clustering-lab" />, rebuilds its engines from scratch); when $p \gg n$ features meet labels again, module 5's discipline is the bridge.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: what a stability number is a statement about. The audit reported melanoma samples co-clustering in 93% of $B = 50$ bootstrap resamples, and the flagged pair with the melanoma core in 98%. Given the original 64 samples, the resamples are independent draws, so treat a type's rate as an empirical frequency $\hat{p}$ of a Bernoulli event with some fixed probability $p$. (a) Compute the standard error of $\hat{p} = 0.93$ at $B = 50$, and use it to say which differences between the stability figure's bars deserve belief. (b) State exactly what population that $p$ describes, and why it is *not* "tumors of this type in general." Name what would have to be true for an empirical frequency computed from a finite sample to yield a guarantee about data never seen.
+
+<Solution>
+**(a)** $\mathrm{SE}(\hat{p}) = \sqrt{0.93 \times 0.07 / 50} \approx 0.036$; at 0.80 it is $\sqrt{0.80 \times 0.20/50} \approx 0.057$, and for rates near 0.5 (CNS at 0.56, leukemia at 0.45) it grows to $\approx 0.07$. A difference between two bars must be judged against the SE of the *difference*, $\sqrt{\mathrm{SE}_1^2 + \mathrm{SE}_2^2}$. Melanoma/ovarian (0.93) versus colon (0.80): the gap of 0.13 against an SE of $\approx 0.067$ is about 1.9 standard errors — marginal, not established at $B = 50$. Melanoma/ovarian versus breast (0.32, SE $\approx 0.066$): a gap of 0.61 against $\approx 0.075$, more than 8 standard errors — decisive. So the figure's coarse verdict (coherent types near the top, breast far below) stands, while its fine ranking — melanoma versus colon, colon versus renal — is within bootstrap noise. Fifty resamples resolve the audit to roughly $\pm 0.07$ per bar, and any reading finer than that overreads the figure.
+
+**(b)** The resamples are drawn from the empirical distribution of *these* 64 samples, so $p$ is the probability that *this pipeline, rerun on a bootstrap draw of this dataset*, co-clusters the pair: a property of the data in hand and every choice the analysis made. Increasing $B$ shrinks the standard error toward that $p$ and moves it not one step toward a claim about a 65th tumor. Converting a frequency measured on a finite sample into a statement about unseen data requires a concentration theorem — a bound on how far an empirical average can sit from its true expectation, holding uniformly over everything the analyst was free to pick. That is the machinery <Ref lesson="learning-theory">module 9 opens with</Ref>: Hoeffding's inequality for a single empirical frequency, and the union bound to make it survive selection. This lesson computed estimates and audited them; module 9 is where estimates become guarantees.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — Fig 1.3 introduces the 6,830 × 64 matrix; §14.3.8 runs K-means on it (Fig 14.8 elbow, Table 14.2, the misdiagnosis sentence quoted here); §14.3.12 the linkage comparison (Figs 14.12–14.14); §14.3.3 the feature-weighting discussion behind the standardize-or-not audit. Free online: https://hastie.su.domains/ElemStatLearn/
+2. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §12.5.4 is the NCI60 lab whose protocol (gene standardization, complete-linkage cut at 4, K-means comparison) this lesson's rerun follows; Fig 1.4 is its PCA-scores exhibit. Free online: https://www.statlearning.com
+3. D. T. Ross et al., "Systematic Variation in Gene Expression Patterns in Human Cancer Cell Lines," *Nature Genetics* 24, 2000, pp. 227–235 — the source study of the NCI60 expression panel; its clustering already places the two breast-labeled lines among the melanomas and discusses their melanoma-like expression.
+4. NCI microarray data, ESL companion site — the exact files used for every computed number in this lesson: https://hastie.su.domains/ElemStatLearn/datasets/nci.data.csv and nci.info.txt (labels in column order).
+5. The MDA-MB-435 provenance record behind ESL's "misdiagnosed" sentence — G. Ellison et al., "Further evidence to support the melanocytic origin of MDA-MB-435," *Molecular Pathology* 55(5), 2002, pp. 294–299 (melanocyte markers, no breast markers); J. M. Rae et al., "MDA-MB-435 cells are derived from M14 melanoma cells — a loss for breast cancer, but a boon for melanoma research," *Breast Cancer Research and Treatment* 104, 2007, pp. 13–19 (the genetic match to M14); A. F. Chambers, "MDA-MB-435 and M14 cell lines: identical but not M14 melanoma?" *Cancer Research* 69(13), 2009, pp. 5292–5293 (the counter-reading). Uncontested across all three: the pair's expression is not breast-like.
+</References>

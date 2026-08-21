@@ -1,0 +1,407 @@
+Training error is a biased estimate of test error, and the size of that bias — the optimism — can be computed; resampling is how classical ML measures generalization honestly.
+
+The evaluation module opened with the vocabulary: <Ref lesson="classification-metrics">the metrics lesson</Ref> established what each number a classifier can be graded by actually answers, and closed by conceding that every number in it was computed on data the model had already seen. Its final exercise measured the consequence: a training AUC systematically above the holdout AUC, a one-signed gap it named the *optimism*. This lesson supplies the estimation theory of error estimates themselves: a theorem giving the optimism an exact formula, the resampling protocols that estimate risk without it, and the bias and variance those protocols carry in turn. It also pays two debts on module 3's account: the leave-one-out identity <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> proved, and the tenfold-CV black box <Ref lesson="prostate-study">the prostate study</Ref> used without audit. The route: the optimism theorem and the analytic corrections it licenses; hold-out, $k$-fold, and leave-one-out protocols with the choice of $k$ argued; the bootstrap, its 63.2% arithmetic, and its error estimators; nested CV and the one-standard-error rule; and an honest statement of what the CV number estimates.
+
+## The optimism of training error: a theorem, not a slogan
+
+<Ref lesson="statistical-learning">The opening lesson</Ref> showed by counterexample that training error can be zero while risk sits at chance. This section computes the gap: the expected difference between training error and honest error is a covariance, in closed form for every linear smoother this course has fit.
+
+<Task>
+Three retrievals before the theorem, closed book. (1) From <Ref lesson="bias-variance">the decomposition lesson</Ref>: write what expected test error averages over (the noise, and retrainings of the procedure on fresh samples). (2) From <Ref lesson="splines-gams">the splines lesson</Ref>: write the effective degrees of freedom of a linear smoother $\hat{y} = Sy$, and ridge's $\operatorname{df}(\lambda) = \sum_j d_j^2/(d_j^2+\lambda)$. (3) From <Ref lesson="regression-diagnostics">the diagnostics lesson's</Ref> forward exercise: write the deleted-residual identity $y_i - \hat{y}_{(-i),i} = r_i/(1-h_{ii})$. All three are load-bearing below.
+</Task>
+
+### Four error quantities, kept distinct
+
+Error-rate estimation stays confusing until the random and the fixed are separated. Fix the training inputs $x_1, \dots, x_n$ and write $\mathcal{T} = \{(x_1, y_1), \dots, (x_n, y_n)\}$ for the training set, $\hat{f}$ for the model fitted to it, and $L$ for the loss.
+
+<Definition title="training, conditional, expected, and in-sample error">
+The **training error** is the average loss on the data that built the model, $\overline{\operatorname{err}} = \tfrac{1}{n} \sum_i L(y_i, \hat{f}(x_i))$. The **conditional test error** $\operatorname{Err}_{\mathcal{T}} = \mathbb{E}\bigl[L(Y^0, \hat{f}(X^0)) \mid \mathcal{T}\bigr]$ is the risk of *this* fitted model on a fresh draw $(X^0, Y^0)$; averaging it over training sets gives the **expected test error** $\operatorname{Err} = \mathbb{E}_{\mathcal{T}}[\operatorname{Err}_{\mathcal{T}}]$, the risk of the *procedure*. The **in-sample error** replaces fresh inputs with the training inputs and redraws only the responses: $\operatorname{Err}_{\text{in}} = \tfrac{1}{n} \sum_i \mathbb{E}_{Y'}\bigl[L(Y_i', \hat{f}(x_i)) \mid \mathcal{T}\bigr]$, where $Y_i'$ is a new response at $x_i$.
+</Definition>
+
+In-sample error is the cleanest target for analysis: it isolates the single defect of training error. The same points $x_i$ are used, the same fitted values $\hat{f}(x_i)$ are graded; the only change is that the responses doing the grading are no longer the responses that steered the fit. Define the *optimism* as the gap $\operatorname{op} = \operatorname{Err}_{\text{in}} - \overline{\operatorname{err}}$, and its average over response draws (inputs still fixed) as $\omega = \mathbb{E}_y[\operatorname{op}]$.
+
+<Theorem title="the optimism formula (ESL 7.21, Ex. 7.4)">
+For squared error loss (and, with $\hat{y}_i$ read as the fitted probability or class, for 0–1 and entropy loss as well),
+
+$$
+\omega \;=\; \frac{2}{n} \sum_{i=1}^{n} \operatorname{Cov}(\hat{y}_i, y_i).
+$$
+
+Training error underestimates in-sample error by exactly twice the average covariance between each response and its own fitted value.
+
+<Proof>
+The plan, for squared loss: expand both errors around the true mean $f(x_i) = \mathbb{E}[y_i]$ and watch every term cancel except one covariance.
+
+**In-sample error.** The fresh response $Y_i'$ is independent of $\hat{y}_i$ (the fit saw only the old responses), so the cross term vanishes:
+
+$$
+\mathbb{E}\bigl[(Y_i' - \hat{y}_i)^2\bigr] = \mathbb{E}\bigl[(Y_i' - f(x_i))^2\bigr] + \mathbb{E}\bigl[(f(x_i) - \hat{y}_i)^2\bigr] = \sigma^2 + \mathbb{E}\bigl[(f(x_i) - \hat{y}_i)^2\bigr].
+$$
+
+**Training error.** The old response $y_i$ is *not* independent of $\hat{y}_i$; the same expansion keeps its cross term:
+
+$$
+\mathbb{E}\bigl[(y_i - \hat{y}_i)^2\bigr] = \sigma^2 + \mathbb{E}\bigl[(f(x_i) - \hat{y}_i)^2\bigr] - 2\,\mathbb{E}\bigl[(y_i - f(x_i))(\hat{y}_i - f(x_i))\bigr],
+$$
+
+and the last expectation is $\operatorname{Cov}(y_i, \hat{y}_i)$, since $y_i - f(x_i)$ has mean zero.
+
+**The gap.** Subtracting, each point contributes $2\operatorname{Cov}(\hat{y}_i, y_i)$; averaging over $i$ gives $\omega$. The step where fitting enters is the surviving cross term: a procedure whose $\hat{y}_i$ ignores $y_i$ has $\operatorname{Cov}(\hat{y}_i, y_i) = 0$ and no optimism at all.
+</Proof>
+</Theorem>
+
+<Figure
+  name="OptimismFormulaAnatomy"
+  alt="The optimism identity annotated term by term: expected in-sample error equals expected training error plus twice the average covariance of each fitted value with its own response, with the linear-smoother special case stated below"
+  caption="The identity term by term: the honest target, the measured quantity, and the covariance the fit conceals."
+/>
+
+For a linear smoother the covariance is explicit. With $\hat{y} = Sy$ and independent noise of variance $\sigma_\varepsilon^2$, $\operatorname{Cov}(\hat{y}_i, y_i) = S_{ii}\sigma_\varepsilon^2$, so the sum is $\operatorname{trace}(S)\,\sigma_\varepsilon^2 = d\,\sigma_\varepsilon^2$ with $d$ the effective degrees of freedom, and
+
+$$
+\omega = \frac{2d}{n}\,\sigma_\varepsilon^2 .
+$$
+
+This closes a loop left open in <Ref lesson="splines-gams">the splines lesson</Ref>, which defined effective degrees of freedom as $\operatorname{tr}(S)$, the sum of the self-influences $S_{ii}$. ESL's general definition is the covariance form, $\operatorname{df}(\hat{y}) = \sum_i \operatorname{Cov}(\hat{y}_i, y_i)/\sigma_\varepsilon^2$, meaningful for any fitting procedure, linear or not; the computation above shows the two agree on linear smoothers, where the covariance sum is exactly $\operatorname{tr}(S)\,\sigma_\varepsilon^2$. The trace was the linear special case all along: effective degrees of freedom *are* self-influence, and self-influence is what training error hides.
+
+<Figure
+  src="./figures/optimism-two-smoothers.svg"
+  alt="The same twenty noisy points fitted by a df-2 line and a df-16 kernel smoother, each with bars for expected training error and expected in-sample error, the gap marked as 0.20 sigma-squared and 1.60 sigma-squared"
+  caption="Same data, two smoothers: the fit that chases every point buys its low training error by inflating the covariance term, and the wedge is exactly 2dσ²/n."
+/>
+
+### C_p and AIC: adding the optimism back
+
+The theorem licenses an analytic repair: estimate the optimism and add it back. For a fit with $d$ effective parameters under squared loss this is the $C_p$ statistic, $C_p = \overline{\operatorname{err}} + 2\tfrac{d}{n}\hat{\sigma}_\varepsilon^2$, with $\hat{\sigma}_\varepsilon^2$ taken from a low-bias fit; the [Akaike information criterion](https://doi.org/10.1109/TAC.1974.1100705) is the same correction for log-likelihood loss, $\mathrm{AIC} = -\tfrac{2}{n}\operatorname{loglik} + 2\tfrac{d}{n}$, and BIC replaces the factor 2 with $\log n$, a heavier penalty that serves model identification rather than prediction. The reading that survives this lesson: each effective degree of freedom charges the same *rent* — a fixed price of $2\sigma_\varepsilon^2/n$ added to the training error — before a model may claim it.
+
+<Example title="C_p on the prostate ridge family">
+The prostate training set of <Ref lesson="prostate-study">module 3's study</Ref>: $n = 67$ patients, eight standardized predictors, centered response. OLS gives residual sum of squares $29.43$, so $\overline{\operatorname{err}} = 29.43/67 = 0.439$ and $\hat{\sigma}_\varepsilon^2 = 29.43/(67-9) = 0.507$.
+
+**OLS** spends $d = 8$ df: $\;C_p = 0.439 + 2 \cdot \tfrac{8}{67} \cdot 0.507 = 0.439 + 0.121 = 0.560$.
+
+**Ridge at $\lambda = 5.1$** spends $d = \operatorname{df}(\lambda) = \sum_j d_j^2/(d_j^2 + \lambda) = 6.93$ df and raises training error to $0.448$: $\;C_p = 0.448 + 2 \cdot \tfrac{6.93}{67} \cdot 0.507 = 0.448 + 0.105 = 0.553$.
+
+Ridge pays $0.009$ more training error, saves $0.016$ in the penalty term, and wins the corrected comparison. Minimizing $C_p$ over the whole $\lambda$ grid selects this region: $\lambda \approx 5$, about seven effective df.
+</Example>
+
+<Exercise>
+Continue the example: at $\lambda \approx 50$ the ridge fit spends $\operatorname{df} = 3.74$ and has training error $0.563$. Compute its $C_p$ and rank the three fits. The one-standard-error rule later in this lesson will choose *this* heavily shrunk fit; state, in one sentence, what $C_p$ optimizes that the rule deliberately does not.
+
+<Solution>
+$C_p = 0.563 + 2 \cdot \tfrac{3.74}{67} \cdot 0.507 = 0.563 + 0.057 = 0.620$: worst of the three ($0.553 < 0.560 < 0.620$). $C_p$ estimates in-sample prediction error and nothing else, so it ranks by estimated error alone; the one-SE rule accepts a *statistically indistinguishable* error in exchange for parsimony, an objective $C_p$ does not encode. The two tools answer different questions and there is no contradiction in their disagreeing.
+</Solution>
+</Exercise>
+
+The correction has a boundary. The formula prices only the df of the *final* fit. A procedure that searched before fitting (chose the best 3 of 8 predictors, picked the best split point, screened features by correlation) consumed degrees of freedom the final model does not show, and its optimism exceeds $2d\sigma_\varepsilon^2/n$. Trees, $k$-NN searches, and multi-stage pipelines have no honest $d$ to plug in.
+
+<KeyFact>
+Optimism costs $2\sigma_\varepsilon^2/n$ per effective degree of freedom. The formula fails exactly where the df is unaccountable (adaptive, searching, multi-stage fits), and those are the fits that need error estimates most. That failure, not fashion, is why the field resamples.
+</KeyFact>
+
+## Resampling protocols: hold-out, k-fold, leave-one-out
+
+Direct estimation drops the accounting problem entirely: hold data out of the fit and measure on it, a strategy indifferent to what the model is. The estimates it produces have their own bias and their own variance, and this section prices both.
+
+### Hold-out and its variance, on the Auto data
+
+The running dataset is [ISLP's Auto data](https://www.statlearning.com/): 392 cars from the 1970s and early 80s, fuel economy `mpg` against engine `horsepower`. The relationship is visibly curved, and the live question is the dial from <Ref lesson="bias-variance">the decomposition lesson</Ref>: which polynomial degree the regression should use, and in particular whether a cubic term improves on the quadratic. The *hold-out* (validation-set) protocol answers by splitting the 392 cars at random into 196 training and 196 validation cars, fitting every degree on the first half, and scoring on the second.
+
+<FigureSequence
+  name="cv-variance"
+  alt="Three frames on shared axes of held-out MSE against polynomial degree: a single split's error curve; ten random splits giving ten curves with a 4.3-MSE spread at degree 2; the 10-fold CV curve with a standard-error band, flat past degree 2"
+  caption="One split answers; ten splits give ten answers; 10-fold CV extracts one stable curve from the same 392 cars."
+/>
+
+<Task>
+Step through the frames. Frame 1: read off the single-split verdict (quadratic 20.0, cubic 20.2, no cubic gain). Frame 2: before advancing, predict whether ten fresh splits will agree on that verdict; then count the curves whose minimum lies at degree 2. The spread at any fixed degree is about 4 MSE, twice the entire quadratic-versus-linear improvement being judged. Frame 3: check that the 10-fold curve lands at 19.3 for degree 2 and stays within half an MSE of it through degree 10.
+</Task>
+
+The ten-split experiment exposes both defects of hold-out at once. The estimate is *volatile*: which cars land in the validation half moves the curve by several MSE, so a conclusion drawn from one split partly reports the split. And it is *biased upward*: the scored model was trained on 196 cars, but the model actually shipped will be trained on all 392, and procedures trained on less data do worse. Cross-validation repairs the waste by rotation.
+
+<Definition title="k-fold cross-validation">
+Partition the $n$ observations at random into $k$ near-equal folds via an assignment $\kappa: \{1,\dots,n\} \to \{1,\dots,k\}$. For each fold in turn, fit on the other $k-1$ folds and predict the held-out fold; write $\hat{f}^{-\kappa(i)}$ for the fit that did not see observation $i$. The **cross-validation estimate** is
+
+$$
+\operatorname{CV}_{(k)} = \frac{1}{n} \sum_{i=1}^{n} L\bigl(y_i,\, \hat{f}^{-\kappa(i)}(x_i)\bigr).
+$$
+
+Every observation validates exactly once and trains $k-1$ times. The case $k = n$ is **leave-one-out cross-validation** (LOOCV): $n$ fits, each deprived of a single point.
+</Definition>
+
+<Figure
+  src="./figures/protocol-gallery.svg"
+  alt="Row-of-boxes diagrams for hold-out, 5-fold CV, and LOOCV with train cells in blue and validation cells in amber, each protocol annotated with its bias and variance verdict"
+  caption="The protocol gallery. Every scheme trades the same two currencies: how much data the scored models train on (bias) and how correlated the held-out scores are (variance)."
+/>
+
+### The leave-one-out shortcut, for linear smoothers only
+
+LOOCV appears to cost $n$ refits. For linear smoothers it costs one. <Ref lesson="regression-diagnostics">The diagnostics lesson</Ref> proved the deleted-residual identity $y_i - \hat{y}_{(-i),i} = r_i/(1 - h_{ii})$ for least squares, where $h_{ii}$ is the leverage; summing its square gives the entire LOOCV estimate from the single full-data fit:
+
+$$
+\operatorname{CV}_{(n)} = \frac{1}{n} \sum_{i=1}^{n} \left[\frac{y_i - \hat{y}_i}{1 - h_{ii}}\right]^2 .
+$$
+
+Each ordinary residual is inflated by $1/(1-h_{ii})$: high-leverage points, whose residuals the fit artificially deflates by chasing them, get their honesty restored by exactly the right factor. The shortcut is exact for least squares on any basis (hence for the polynomial fits above), and it holds for the broad class of linear smoothers $\hat{y} = Sy$ whose deleted fit obeys a self-consistency condition, with $S_{ii}$ in place of $h_{ii}$ (the second exercise derives it). It does *not* hold for general procedures; a tree or a $k$-NN classifier must genuinely refit $n$ times. Replacing every $S_{ii}$ by the average $\operatorname{trace}(S)/n$ gives *generalized cross-validation* (GCV), a trace-only approximation that reconnects to $C_p$: expanding $1/(1-x)^2 \approx 1 + 2x$ turns GCV into training error plus the familiar correction $2\,\overline{\operatorname{err}}\,d/n$.
+
+### Choosing k: a learning-curve argument
+
+LOOCV trains on $n-1$ points, so its estimate of $\operatorname{Err}$ is nearly unbiased, and a plausible conclusion follows: leave-one-out is the gold standard, and $k$-fold is a computational compromise. The conclusion is wrong, and it is wrong on variance. The $n$ training sets of LOOCV are nearly identical, so the $n$ fitted models are nearly identical, so the $n$ held-out errors are strongly positively correlated; the variance of a mean of correlated terms is dominated by the covariances, which averaging cannot remove. Five- or ten-fold CV averages fewer but *less correlated* scores, and typically ends up with the more accurate estimate (ISLP §5.1.4 gives this argument; [Kohavi 1995](https://www.ijcai.org/Proceedings/95-2/Papers/016.pdf) and Breiman & Spector 1992 measured it, and their experiments are the source of the standard $k = 5$–$10$ recommendation).
+
+The bias side of the choice is read off the learning curve — the error-against-training-size plot from <Ref lesson="bias-variance">the decomposition lesson</Ref>, whose falling segments mark variance still being bought down by data. $k$-fold CV scores models trained on $(1-1/k)\,n$ observations, so it estimates the procedure's error *at that training size*; the estimate is biased upward for the full-data model exactly as much as the learning curve still rises between $(1-1/k)\,n$ and $n$. Concretely, take a classifier whose accuracy climbs steeply up to about 100 training cases and flattens by 200: with $n = 200$, fivefold CV trains on 160 cases, on the flat part, and the bias is negligible; with $n = 50$ it trains on 40, on the steep part, and CV substantially overstates the error. Small datasets, the ones that most need honest measurement, are the ones where the folds cost most.
+
+<KeyFact>
+$k$-fold CV estimates the expected error of the procedure at training size $(1-1/k)\,n$: its bias is the learning curve's remaining slope, its variance the correlation structure of the folds. LOOCV minimizes the bias and maximizes the correlation; $k = 5$–$10$ is the measured compromise, not a decree.
+</KeyFact>
+
+## The bootstrap: a sampling distribution from one sample
+
+Cross-validation answers one question, the risk of a procedure. The evaluation module keeps needing a broader one: the variability of an arbitrary statistic, whether a coefficient, a chosen $\alpha$, or the CV estimate itself, which carried error bars in <Ref lesson="prostate-study">the prostate study</Ref>. The classical answer requires fresh datasets; the bootstrap manufactures them.
+
+<Definition title="the bootstrap">
+Given data $Z = (z_1, \dots, z_n)$ drawn from an unknown distribution $F$, a **bootstrap sample** $Z^{*b}$ is $n$ draws *with replacement* from $Z$: a sample from the empirical distribution $\hat{F}$ that puts mass $1/n$ on each observation. Drawing $B$ such samples and recomputing the statistic $S$ on each, the spread of $S(Z^{*1}), \dots, S(Z^{*B})$ estimates the sampling variability of $S(Z)$; in particular $\widehat{\operatorname{SE}}_B = \bigl[\tfrac{1}{B-1}\sum_b (S(Z^{*b}) - \bar{S}^*)^2\bigr]^{1/2}$ estimates the standard error of $S$.
+</Definition>
+
+The substitution being made is $\hat{F}$ for $F$: the world is unavailable, so the sample impersonates it, and every bootstrap quantity is a Monte-Carlo calculation under that impersonation. The substitution is honest where the statistic depends smoothly on the distribution and the data are independent draws; it fails where either clause fails. For the sample maximum the impersonation is poor in principle, since no resample can exceed the observed maximum while fresh data can; for dependent data (time series, clustered rows) resampling single rows destroys the dependence that the true sampling variability lives in, and block or group variants are required. The bootstrap is an estimator with assumptions, not a license.
+
+<Example title="the two-asset allocation, worked (ISLP §5.2)">
+Invest fraction $\alpha$ in asset $X$ and $1-\alpha$ in asset $Y$. Minimizing $\operatorname{Var}(\alpha X + (1-\alpha)Y)$ (expand, differentiate in $\alpha$, set to zero) gives
+
+$$
+\alpha = \frac{\sigma_Y^2 - \sigma_{XY}}{\sigma_X^2 + \sigma_Y^2 - 2\sigma_{XY}},
+$$
+
+estimated by plugging in sample variances and covariance from $n = 100$ observed return pairs. The number that qualifies $\hat{\alpha}$ is its standard error. In ISLP's simulation the truth is available ($\sigma_X^2 = 1$, $\sigma_Y^2 = 1.25$, $\sigma_{XY} = 0.5$, so $\alpha = 0.75/1.25 = 0.6$), and 1,000 *fresh* datasets of 100 pairs give estimates whose standard deviation is $0.083$: the true standard error. The bootstrap sees only one dataset of 100 pairs, resamples it 1,000 times, and reports $\widehat{\operatorname{SE}}_B = 0.087$. One sample, no access to the truth, and the variability estimate lands within 5% of it.
+</Example>
+
+### 63.2% of the data is in each bag
+
+Everything quantitative about bootstrap error estimation descends from one piece of arithmetic. A fixed observation $i$ escapes one draw with probability $1 - 1/n$, hence escapes all $n$ independent draws of one bootstrap sample with probability
+
+$$
+\Pr(i \notin Z^{*b}) = \Bigl(1 - \frac{1}{n}\Bigr)^{n} \;\xrightarrow{\;n\to\infty\;}\; e^{-1} = 0.368,
+$$
+
+so each bootstrap sample contains, in expectation, a fraction $1 - (1-1/n)^n \approx 0.632$ of the distinct observations. The convergence is fast and monotone from above: $0.672$ at $n=5$, $0.642$ at $n=20$, $0.634$ at $n=100$.
+
+<Figure
+  src="./figures/bootstrap-632.svg"
+  alt="A ten-point sample with six in-bag points drawn one to three times and four never-drawn out-of-bag points, beside a plot of the in-bag probability converging from 0.75 at n equal 2 down to the 0.632 asymptote"
+  caption="One bootstrap sample splits the data into an in-bag majority and an out-of-bag remainder; the split ratio converges to 1 − 1/e."
+/>
+
+The 36.8% left out of each bag are called *out-of-bag*: fresh data the resample never touched, free of charge. <Ref lesson="bagging-random-forests">Module 7</Ref> builds an entire error-estimation scheme on them.
+
+### Bootstrap estimates of prediction error, and the .632 repair
+
+The direct transplant of the bootstrap to prediction error fails. Fit the model to each bootstrap sample and score it on the original data:
+
+$$
+\widehat{\operatorname{Err}}_{\text{boot}} = \frac{1}{B}\frac{1}{n} \sum_{b=1}^{B}\sum_{i=1}^{n} L\bigl(y_i, \hat{f}^{*b}(x_i)\bigr).
+$$
+
+The training and test roles overlap: about 63.2% of the scoring points sit inside the very sample that trained $\hat{f}^{*b}$, so memorization is graded as skill.
+
+<Example title="the 1-NN breakdown case (ESL §7.11)">
+Take a 1-nearest-neighbor classifier on two equal classes whose labels are *independent* of the inputs — a problem whose true error is exactly $0.5$. Whenever point $i$ is in bag $b$, its contribution to $\widehat{\operatorname{Err}}_{\text{boot}}$ is $0$: it is its own nearest neighbor, and memorization scores perfectly. Only the out-of-bag encounters, a $0.368$ fraction, score honestly at $0.5$, so $\mathbb{E}[\widehat{\operatorname{Err}}_{\text{boot}}] \approx 0.368 \times 0.5 = 0.184$ against a truth of $0.5$.
+</Example>
+
+The repair mimics cross-validation: score each point only under bags that excluded it. The *leave-one-out bootstrap* $\widehat{\operatorname{Err}}^{(1)}$ averages $L(y_i, \hat{f}^{*b}(x_i))$ over the bags $b$ with $i \notin Z^{*b}$. Overlap is gone, but the training-size bias returns: each bag holds about $0.632\,n$ distinct points, so $\widehat{\operatorname{Err}}^{(1)}$ behaves like twofold CV, biased upward wherever the learning curve still rises at half the sample. [Efron's .632 estimator](https://www.jstor.org/stable/2288636) splits the difference with weights taken from the in-bag rate:
+
+$$
+\widehat{\operatorname{Err}}^{(.632)} = 0.368 \cdot \overline{\operatorname{err}} + 0.632 \cdot \widehat{\operatorname{Err}}^{(1)} .
+$$
+
+The weights are calibrated for lightly fitted models, and hard overfitting breaks them. Run the label-independent 1-NN problem through the formula: $\overline{\operatorname{err}} = 0$ and $\widehat{\operatorname{Err}}^{(1)} = 0.5$, so the estimator reports $0.632 \times 0.5 = 0.316$ for a problem whose error is $0.5$ — the fixed weight still credits a training error that is pure memorization.
+
+The **.632+ estimator** (Efron & Tibshirani 1997) repairs the repair by measuring how overfit the model is, from two quantities. The *no-information error rate* $\hat{\gamma}$ scores the model against all $n^2$ input–label pairings: the error it would commit if inputs said nothing about labels. The *relative overfitting rate* $\hat{R} = (\widehat{\operatorname{Err}}^{(1)} - \overline{\operatorname{err}})/(\hat{\gamma} - \overline{\operatorname{err}})$ then places the fit on a 0-to-1 scale — $0$ when the honest estimate matches training error, $1$ when their gap is as wide as no-information allows.
+
+<Figure
+  src="./figures/w632-weight-dial.svg"
+  alt="The .632+ weight plotted against the relative overfitting rate: a rising curve from 0.632 at R-hat zero to 1 at R-hat one, endpoints marked as plain .632 weights and all weight to the out-of-bag term"
+  caption="The weight ŵ = 0.632/(1 − 0.368R̂): at R̂ = 0 the plain .632 split, at R̂ = 1 nothing left for training error."
+/>
+
+The weight follows that dial. Replacing the constant $0.632$ by $\hat{w} = 0.632/(1 - 0.368\hat{R})$ leaves light fits untouched ($\hat{R} = 0$ recovers plain .632) and slides toward $\hat{w} = 1$ as $\hat{R} \to 1$, handing everything to $\widehat{\operatorname{Err}}^{(1)}$ exactly when training error has become fiction. On the breakdown case, $\hat{\gamma} = 0.5$ gives $\hat{R} = (0.5 - 0)/(0.5 - 0) = 1$, hence $\hat{w} = 1$ and the honest estimate $0.5$.
+
+<Figure
+  src="./figures/point-632-breakdown.svg"
+  alt="Horizontal bars for four error estimates on the label-independent 1-NN problem: training error 0, leave-one-out bootstrap 0.5, .632 estimate 0.316, and .632+ estimate 0.5, against a dashed line at the true error 0.5"
+  caption="The breakdown case as a tally: .632's fixed weight averages an honest 0.5 with a fictional 0; .632+ detects maximal overfitting and returns the whole weight to the honest term."
+/>
+
+<KeyFact>
+Every naive resampling estimate of prediction error fails in a computable direction: train–test overlap biases it down (by the 63.2% in-bag arithmetic), shrunken training sets bias it up (by the learning curve). The .632 and .632+ estimators are explicit bias accounting, and the 1-NN breakdown shows the accounting itself has assumptions. For error estimation, cross-validation remains the default; the bootstrap's home ground is the sampling distribution of statistics.
+</KeyFact>
+
+## Selection spends the estimate: nested CV and the one-SE rule
+
+<Ref lesson="prostate-study">The prostate study</Ref> used tenfold CV to set every complexity dial. Using an error estimate to *choose* is precisely the adaptive fitting the optimism section flagged, and it has the same consequence one level up: the chosen model's CV score is no longer an honest estimate of its error. $\operatorname{CV}(\lambda)$ is the truth plus noise at every grid point, and picking the minimum picks, in part, the most favorable noise; the more settings searched, the further below the truth the winning score sits. Reporting $\operatorname{CV}(\hat{\lambda})$ as the expected error repeats, on the grid, exactly what training error does on the sample: a minimized quantity is presented as an unbiased measurement of the minimizer.
+
+The repair separates the two jobs. An outer cross-validation measures; an inner one, run entirely inside each outer training set, selects.
+
+<Definition title="nested cross-validation">
+Split the data into $K$ outer folds. For each outer fold $k$: run a full inner cross-validation *on the other $K-1$ folds only* to choose the tuning parameter $\hat{\lambda}_k$; refit at $\hat{\lambda}_k$ on those $K-1$ folds; score the refit model on outer fold $k$, giving $e_k$. Report $\tfrac{1}{K}\sum_k e_k$. The reported number estimates the error of the *entire procedure*, search included, and no observation it scores on ever influenced any choice made along the way.
+</Definition>
+
+<Figure
+  src="./figures/nested-cv.svg"
+  alt="Schematic of nested cross-validation: five outer folds with one sealed-off test fold, an inner five-fold loop selecting lambda inside the outer training blocks, five outer errors feeding the single circled reportable average"
+  caption="Outer loop measures, inner loop selects. Each outer round may choose a different λ; the circled average grades the procedure, and is the only number that leaves the protocol."
+/>
+
+The inner choices $\hat{\lambda}_k$ may disagree across outer rounds, and that is not a defect: the report grades the procedure "tune by CV, then fit", which is the thing that will actually be run on the full data. [Varma and Simon (2006)](https://doi.org/10.1186/1471-2105-7-91) measured the gap being repaired: on small genomic classification problems, the inner CV score of the selected model was optimistic by up to 15 percentage points, while the nested estimate stayed nearly unbiased. The full anatomy of the worst version of this failure, screening features on all the data before cross-validating, is <Ref lesson="wrong-way-cv">two lessons ahead</Ref>; the final exercise here walks into it deliberately.
+
+### The one-standard-error rule, opened
+
+Selection has a second, subtler interaction with fold noise, and it is the one the prostate study handled with a rule this course had not yet justified. The CV curve is an estimate, so the *location of its minimum* is partly noise: near a flat minimum, many settings are statistically indistinguishable, and choosing the literal argmin rewards whichever setting drew the luckiest folds, with complexity as the prize. The scatter of the $k$ per-fold errors supplies a scale for "indistinguishable": their standard deviation over $\sqrt{k}$ is the standard error bar the curves carry (a heuristic bar, since the folds share training data and are not independent, but a serviceable one). The **one-standard-error rule**, restated from <Ref lesson="prostate-study">the prostate study</Ref>: among all settings whose CV estimate lies within one standard error of the minimum, take the least complex.
+
+<Figure
+  src="./figures/one-se-rule.svg"
+  alt="Tenfold CV error for ridge on the prostate data plotted against effective degrees of freedom with standard-error bars: the minimum 0.555 at df 7.1, the threshold line at 0.666, and the chosen point at df 3.7"
+  caption="Tenfold CV (deterministic folds) for ridge on the 67 prostate training cases. Everything right of df ≈ 3.5 is a statistical tie; the rule takes the leftmost member."
+/>
+
+On the ridge family from the earlier example the rule's arithmetic reads directly off the figure: the minimum is $0.555$ at $\operatorname{df} = 7.1$ with standard error $0.111$, so every setting with $\operatorname{CV} \le 0.666$ is a tie, and the tie extends leftward all the way to $\operatorname{df} \approx 3.7$. The rule spends less than one standard error of estimated accuracy to halve the model's effective size. Across the lesson's three selectors: $C_p$ chose $\operatorname{df} \approx 6.9$ and CV's minimum $\operatorname{df} \approx 7.1$ — two estimates of the same in-sample target, agreeing closely — while the one-SE rule chose $\operatorname{df} \approx 3.7$ because it optimizes a different objective, parsimony subject to statistical indistinguishability.
+
+<KeyFact>
+A CV score consumed by selection is spent: the minimum of noisy estimates is biased below the truth, so the tuning curve's winning value may not be reported as the error estimate. Nested CV buys the report back with an outer loop; the one-SE rule spends the same fold noise in the opposite direction, as a margin that licenses choosing simpler models.
+</KeyFact>
+
+## What the number means
+
+A CV number invites two readings it does not support: that it estimates the error of the specific model about to ship, and that randomizing rows into folds is always legitimate. Both readings fail, each in a measurable way.
+
+### Expected error, not your model's error
+
+The quantity a practitioner wants is $\operatorname{Err}_{\mathcal{T}}$: the risk of the specific fitted model about to ship. The quantity cross-validation delivers is $\operatorname{Err}$: the average risk of the procedure over training sets. Intuition suggests LOOCV, whose folds nearly reproduce the actual training set, should track $\operatorname{Err}_{\mathcal{T}}$.
+
+ESL §7.12 tested the intuition directly, running 10-fold and leave-one-out CV on 100 simulated training sets and comparing each estimate against that training set's own conditional error. Both variants tracked the expected error $\operatorname{Err}$ approximately without bias, and neither tracked $\operatorname{Err}_{\mathcal{T}}$: across training sets the correlation between the CV estimate and the conditional error was near zero and in most scenarios *negative*.
+
+<Figure
+  src="./figures/cv-vs-conditional.svg"
+  alt="Scatter of CV estimate against conditional test error across simulated training sets: an uncorrelated cloud around a horizontal line at the expected error, far from the diagonal that perfect tracking would follow"
+  caption="ESL §7.12's finding, schematically: the dots hug the horizontal (the average over training sets), not the diagonal (this training set's own error)."
+/>
+
+The honest reading of a CV number is therefore a claim about the recipe, not the artifact: "pipelines built this way on samples like this average 8% error", not "this model's error is 8%". For most decisions (choosing between procedures, reporting a method's accuracy) the recipe-level claim is the one needed; the point is to stop believing the stronger claim was purchased.
+
+### Folds must respect provenance
+
+Every protocol in this lesson randomized observations into folds, which is legitimate exactly when observations are exchangeable independent draws. Two common structures break that premise.
+
+**Grouped rows.** When several rows share a source (repeated measurements of one patient, multiple frames of one video, the 485 bone-density measurements on 261 adolescents in <Ref lesson="splines-gams">the splines lesson</Ref>), random folds put the same patient on both sides of the split, and the model is silently graded on recognizing individuals rather than generalizing across them. The fix is to assign *groups*, not rows, to folds.
+
+**Time order.** When data arrive as a series, random folds train on the future to predict the past, an arrow no deployment reverses. The fix is forward-chaining: train on an expanding past, validate on the next block, so every split respects causality.
+
+<Figure
+  src="./figures/provenance-folds.svg"
+  alt="Left: ten rows from five patients split randomly, with patient A on both sides of the split, then grouped folds holding patient C out whole; right: forward-chaining blocks where the validation block always follows its training data in time"
+  caption="Assign what the deployment treats as a unit: groups to folds, and the future never to training."
+/>
+
+Both failures are previews of the same disease: information the deployment will not have leaking into the evaluation. That disease in full, including the metric side of imbalance, is <Ref lesson="imbalance-leakage">the next lesson's</Ref> subject.
+
+What stands established: training error's optimism is a covariance with an exact linear-smoother form $2d\sigma_\varepsilon^2/n$, which prices $C_p$ and AIC and grounds the effective-df scale; hold-out, $k$-fold, and LOOCV occupy a bias–variance spectrum read off the learning curve and the fold correlations, with $k = 5$–$10$ the measured compromise; the bootstrap estimates the sampling distribution of any statistic from one sample, and its prediction-error variants are exercises in explicit bias accounting; selection must be nested inside measurement, and the one-SE rule converts fold noise into a principled preference for simplicity; and the resulting number estimates the procedure's expected error under exchangeable folds. <Ref lesson="imbalance-leakage">The next lesson</Ref> takes up the two ways honestly measured pipelines still fail in the wild, and <Ref lesson="validation-lab">the module's lab</Ref> turns this lesson's protocols into the referee code every later lab runs under.
+
+## Exercises
+
+<Exercise>
+Produce a bootstrap standard error and check it against a formula, parallel to the two-asset example. Ten cars from the Auto data have `mpg` values $14, 15, 18, 21, 24, 26, 28, 31, 33, 40$, with mean $\bar{x} = 25.0$. (a) Compute the textbook standard error of the mean, $s/\sqrt{n}$ with $s^2 = \sum_i (x_i - \bar{x})^2/(n-1)$. (b) Draw $B = 1{,}000$ bootstrap samples of size 10, compute each sample's mean, and report $\widehat{\operatorname{SE}}_B$ from the definition. (c) The mean is the one statistic whose *ideal* ($B \to \infty$) bootstrap standard error has a closed form; derive it before comparing, and predict which side of $s/\sqrt{n}$ the estimate from (b) should land on.
+
+<Solution>
+(a) The squared deviations from $25.0$ sum to $622$, so $s^2 = 622/9 = 69.1$, $s = 8.31$, and $s/\sqrt{10} = 2.63$.
+
+(b) Computed for this lesson (five independent runs at $B = 1{,}000$): $\widehat{\operatorname{SE}}_B = 2.46$, $2.53$, $2.52$, $2.51$, $2.57$ — about $2.5$, wobbling by a few hundredths from the finite $B$.
+
+(c) A bootstrap draw $x^*$ is uniform on the ten observed values, so $\operatorname{Var}_*(x^*) = \tfrac{1}{n}\sum_i (x_i - \bar{x})^2 = \hat{\sigma}^2$, the plug-in variance with divisor $n$, and the bootstrap mean of $n$ independent draws has standard error $\hat{\sigma}/\sqrt{n} = \sqrt{(n-1)/n}\; s/\sqrt{n}$. Here that is $\sqrt{62.2/10} = 2.49$: the estimates in (b) scatter around $2.49$, *below* the textbook $2.63$ by the factor $\sqrt{9/10} \approx 0.95$. The gap is not Monte-Carlo noise but the substitution the bootstrap always makes — $\hat{F}$ in place of $F$ carries the $n$-divisor variance of the sample, not the unbiased $n-1$ estimate — visible here only because $n = 10$ is small enough for a 5% factor to show.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson only cited. (a) Let $\hat{y} = Sy$ be a linear smoother with the *self-consistency property*: the model fitted without observation $i$, evaluated at $x_i$, satisfies $\hat{f}_{(-i)}(x_i) = \sum_{j \ne i} S_{ij} y_j + S_{ii}\,\hat{f}_{(-i)}(x_i)$ (fitting the modified response vector that replaces $y_i$ by the deleted prediction reproduces the deleted fit — the property proved for OLS in <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref>). Derive $\operatorname{CV}_{(n)} = \tfrac{1}{n}\sum_i \bigl[(y_i - \hat{y}_i)/(1 - S_{ii})\bigr]^2$. (b) Replace each $S_{ii}$ by $\operatorname{trace}(S)/n$ to get GCV, and use $1/(1-x)^2 \approx 1 + 2x$ to show GCV is approximately $C_p$ with $\hat{\sigma}_\varepsilon^2$ estimated by the training error. Write the self-consistency equation for the case $S_{ii} = 1$ before opening the solution.
+
+<Solution>
+Strategy hint: solve the self-consistency equation for $\hat{f}_{(-i)}(x_i)$, then subtract from $y_i$.
+
+(a) Rearranging $\hat{f}_{(-i)}(x_i) = \sum_{j\ne i} S_{ij}y_j + S_{ii}\hat{f}_{(-i)}(x_i)$:
+
+$$
+(1 - S_{ii})\,\hat{f}_{(-i)}(x_i) = \sum_{j\ne i} S_{ij} y_j = \hat{y}_i - S_{ii} y_i ,
+$$
+
+so $\hat{f}_{(-i)}(x_i) = (\hat{y}_i - S_{ii}y_i)/(1 - S_{ii})$ and
+
+$$
+y_i - \hat{f}_{(-i)}(x_i) = \frac{y_i(1 - S_{ii}) - \hat{y}_i + S_{ii}y_i}{1 - S_{ii}} = \frac{y_i - \hat{y}_i}{1 - S_{ii}} .
+$$
+
+Averaging the squares gives the formula: all $n$ deleted residuals from one fit. At $S_{ii} = 1$ the equation pins $\hat{y}_i = y_i$ regardless of the deleted fit and the ratio is $0/0$: a point the smoother reproduces exactly carries no leave-one-out information, the same degenerate case the diagnostics lesson met at leverage 1.
+
+(b) With every $S_{ii}$ replaced by $d/n$ where $d = \operatorname{trace}(S)$:
+
+$$
+\operatorname{GCV} = \frac{1}{n}\sum_i \frac{(y_i - \hat{y}_i)^2}{(1 - d/n)^2} = \frac{\overline{\operatorname{err}}}{(1 - d/n)^2} \approx \overline{\operatorname{err}}\Bigl(1 + \frac{2d}{n}\Bigr) = \overline{\operatorname{err}} + \frac{2d}{n}\,\overline{\operatorname{err}} ,
+$$
+
+which is $C_p$ with the noise variance estimated by the training error itself. The transferable move: LOOCV, GCV, and $C_p$ are one estimator at three levels of approximation, each charging training error a correction proportional to self-influence.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. A 1-nearest-neighbor classifier is trained on $n$ points with distinct inputs, two equal classes, and labels *independent* of the inputs (true error rate $0.5$). (a) Compute its training error and its LOOCV error estimate, and state which one is honest. (b) Run the same problem through the .632 estimator, taking $\widehat{\operatorname{Err}}^{(1)} = 0.5$, and through .632+, computing $\hat{\gamma}$ and $\hat{R}$ from their definitions. Name the clause in the .632 weighting that the case violates.
+
+<Solution>
+(a) Training error is $0$: each point's nearest neighbor in the training set is itself. In LOOCV, the left-out point is classified by its nearest *other* point, whose label is an independent fair coin relative to the left-out label, so each fold errs with probability $\tfrac12$ and the LOOCV estimate has expectation $0.5$ (up to a vanishing imbalance correction from removing one label). LOOCV is honest; the training error is pure memorization.
+
+(b) .632: $\;0.368 \times 0 + 0.632 \times 0.5 = 0.316$, wrong by $0.184$ on a problem whose answer is $0.5$. For .632+: with equal classes $\hat{p}_1 = \tfrac12$, and 1-NN predicts each class in the sample's proportion, so $\hat{q}_1 = \tfrac12$ and $\hat{\gamma} = \hat{p}_1(1-\hat{q}_1) + (1-\hat{p}_1)\hat{q}_1 = 0.5$. Then $\hat{R} = (0.5 - 0)/(0.5 - 0) = 1$: maximal relative overfitting. The weight becomes $\hat{w} = 0.632/(1 - 0.368 \cdot 1) = 1$, and the estimate is $1 \cdot \widehat{\operatorname{Err}}^{(1)} = 0.5$: correct. The violated clause: the constant $0.632$ weighting presumes a *light-fitting* regime in which training error is informative about generalization; at $\overline{\operatorname{err}} = 0$ with no signal, training error carries no information at all, and any positive weight on it is a bias.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "My 10-fold CV error is an unbiased estimate of the test error of the model I then fitted on all my data." There are two independent failures; name both, and state for each the direction of the error it induces.
+
+<Solution>
+Failure one: training size. Ten-fold CV scores models trained on $0.9n$ observations, so it estimates the procedure's error at training size $0.9n$, not $n$. Wherever the learning curve still rises between $0.9n$ and $n$, the estimate is biased *upward* for the full-data model: pessimistic, and largest for small samples. Failure two: the conditional–expected gap. Even with the size bias removed, CV estimates $\operatorname{Err}$, the average over training sets, not $\operatorname{Err}_{\mathcal{T}}$, the error of the one model actually fitted; ESL's §7.12 simulations show the CV estimate is roughly uncorrelated (often negatively correlated) with the realized conditional error across training sets, so as an estimate of *your model's* error it is not merely biased but nearly uninformative about the fluctuation that distinguishes your model from the procedure's average. The claim survives only in its weakened form: 10-fold CV approximately unbiasedly estimates the expected error of the procedure at 90% of the sample size. (A third failure lurks if the CV score was also used to tune: then it is additionally biased *downward* by selection, the nested-CV point.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review, composing this lesson with <Ref lesson="ridge-lasso">the penalties lesson</Ref> and <Ref lesson="splines-gams">the df scale</Ref>. On the standardized prostate training data ($n = 67$, singular values $d_j$ of the centered, standardized design), compute the ridge $C_p$ curve $C_p(\lambda) = \overline{\operatorname{err}}(\lambda) + 2\operatorname{df}(\lambda)\hat{\sigma}_\varepsilon^2/n$ with $\operatorname{df}(\lambda) = \sum_j d_j^2/(d_j^2+\lambda)$ and $\hat{\sigma}_\varepsilon^2$ from the OLS fit, and compare its chosen $\lambda$ against tenfold CV's (deterministic folds, row $i$ to fold $i \bmod 10$). Report both chosen df values and both minimum scores, and state what the agreement or disagreement means.
+
+<Solution>
+Protocol: standardize the eight predictors on the 67 training rows (population $\sigma$), center the response; from the OLS fit, $\operatorname{RSS} = 29.43$, $\overline{\operatorname{err}} = 0.439$, $\hat{\sigma}_\varepsilon^2 = 29.43/58 = 0.507$. Sweep $\lambda$ on a log grid, computing the ridge fit from one SVD.
+
+Expected results (computed for this lesson): $C_p$ is minimized near $\lambda \approx 5$, at $\operatorname{df} \approx 6.9$, with $C_p \approx 0.553$; tenfold CV is minimized near $\lambda \approx 4$, at $\operatorname{df} \approx 7.1$, with $\operatorname{CV} \approx 0.555 \pm 0.11$. Agreement to two decimals in the score and to $0.2$ df in the chosen complexity. The meaning: for a fixed-basis linear smoother, whose effective df is fully accountable, the analytic optimism correction and the resampling estimate are measuring the same quantity, and neither is worth the other's cost difference: $C_p$ from one fit, CV from seventy. Resampling earns its tenfold price only where the df accounting fails (trees, searches, pipelines), which is the boundary drawn in the first section. The one-SE rule, by contrast, walks to $\operatorname{df} \approx 3.7$, not because either estimate moved but because its objective did.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. Reproduce ISLP's Auto experiment: for polynomial degrees 1–10 in `horsepower` predicting `mpg` (392 cars after dropping missing values), compute the LOOCV curve via the leverage shortcut and a 10-fold CV curve, and report whether the cubic-term verdict agrees between protocols. State the agreement criterion in advance.
+
+<Solution>
+Protocol: standardize `horsepower`, build the degree-$d$ polynomial design, fit by least squares; LOOCV from the single fit via $\tfrac{1}{n}\sum [r_i/(1-h_{ii})]^2$; 10-fold CV with one random fold assignment. Criterion stated in advance: the protocols agree if both curves drop by more than 4 MSE from degree 1 to 2 and change by less than 0.5 MSE from degree 2 to 3.
+
+Computed for this lesson: LOOCV gives $24.23, 19.25, 19.33, 19.42, 19.03, 18.98, 18.83, 18.96, 19.07, 19.49$ for degrees 1–10; a 10-fold run gives $24.28, 19.32, 19.36, \dots$, minimum $18.91$ at degree 7. Both drop about 5 MSE at degree 2, then move within a 0.7-MSE band; the cubic changes LOOCV by $+0.08$. Verdict, agreed by both protocols: the quadratic term is essential, the cubic buys nothing, and the nominal minima (degree 7 by both) sit within fold noise of degree 2 — a one-SE argument in miniature. The literal argmin would select a degree-7 polynomial to harvest 0.4 MSE of noise.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Simulate $n = 50$ observations with $p = 1{,}000$ pure-noise features (iid Gaussian) and fair-coin labels. Screen: keep the 10 features most correlated with the labels, *computed on all 50 observations*. Then run honest-looking 5-fold CV of a 1-NN classifier on the 10 survivors. Record the CV error and compare it with the only defensible number for this problem, 50%.
+
+<Solution>
+Computed for this lesson over 50 replications: the "cross-validated" error averages about **20%, on a problem whose true error is exactly 50%**, with lucky replications reporting 6%. Every ingredient was individually correct: the folds were disjoint, the 1-NN was refit per fold, no test label was touched during fitting. The blunder is that the *screening* step saw all 50 labels, including those of every future validation fold, so the 10 survivors were selected precisely for their chance correlation with the labels the folds would later grade; the folds are no longer independent of a choice made upstream of them. This is the nested-CV lesson violated at the feature-selection stage: every fitting step, screening included, must live inside the fold. The full anatomy of this blunder (ESL's version reports 3% with $p = 5{,}000$) and the audit checklist for real pipelines are the subject of <Ref lesson="wrong-way-cv" />.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.4 (the optimism definitions and formula; Ex. 7.4 is the theorem's proof), §7.5–7.6 ($C_p$/AIC and effective degrees of freedom via $\sum\operatorname{Cov}(\hat{y}_i,y_i)$), §7.10 ($k$-fold CV, the learning-curve argument for $k$, GCV), §7.11 (bootstrap error estimates, the 63.2% arithmetic, .632 and .632+, the 1-NN breakdown), §7.12 (conditional versus expected test error, the simulation behind the honesty section). Free online: https://hastie.su.domains/ElemStatLearn/
+2. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §5.1 (the Auto validation experiment, Figs. 5.2/5.4 recreated here from the source data; the LOOCV shortcut eq. 5.2; the bias–variance argument for $k$), §5.2 (the two-asset bootstrap example with the 0.083/0.087 comparison). Free online: https://www.statlearning.com/
+3. B. Efron, R. Tibshirani, *An Introduction to the Bootstrap*, Chapman & Hall, 1993 — Ch. 6 (the bootstrap estimate of standard error), Ch. 17 (cross-validation and other estimates of prediction error, including .632).
+4. B. Efron, "Estimating the Error Rate of a Prediction Rule: Improvement on Cross-Validation," *JASA* 78(382), 1983 — the .632 estimator's source. https://www.jstor.org/stable/2288636
+5. B. Efron, R. Tibshirani, "Improvements on Cross-Validation: The .632+ Bootstrap Method," *JASA* 92(438), 1997 — the overfitting-adjusted weights.
+6. M. Stone, "Cross-Validatory Choice and Assessment of Statistical Predictions," *JRSS-B* 36(2), 1974 — the foundational treatment of cross-validation, including the choice-versus-assessment distinction this lesson's nested-CV section formalizes.
+7. R. Kohavi, "A Study of Cross-Validation and Bootstrap for Accuracy Estimation and Model Selection," *IJCAI*, 1995 — the experiments behind the $k = 10$ recommendation; with L. Breiman, P. Spector, "Submodel Selection and Evaluation in Regression: The X-Random Case," *International Statistical Review* 60(3), 1992, the measured case for $k = 5$–$10$ over leave-one-out.
+8. S. Varma, R. Simon, "Bias in Error Estimation When Using Cross-Validation for Model Selection," *BMC Bioinformatics* 7:91, 2006 — the measured optimism of tuned CV scores and the nested-CV repair. https://doi.org/10.1186/1471-2105-7-91
+9. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §4.7.3: the bootstrap as an approximation to the sampling distribution, the reading behind this lesson's honesty paragraph. Free online: https://probml.github.io/pml-book/book1.html
+</References>

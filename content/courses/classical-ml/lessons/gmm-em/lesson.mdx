@@ -1,0 +1,524 @@
+Replacing k-means' hard assignments with posterior probabilities gives the Gaussian mixture model; EM alternates computing those responsibilities with weighted maximum likelihood, and each iteration provably increases the likelihood.
+
+This module has so far clustered by declared geometry: <Ref lesson="kmeans">k-means</Ref> minimized a distortion it could not defend against anisotropy, unequal weights, or the choice of $K$, and <Ref lesson="hierarchical-dbscan">the previous lesson</Ref> traded those failures for linkage and density thresholds with prices of their own. The remaining road is likelihood: give each cluster a shape, a weight, and a density, and let <Ref lesson="mle-map">module 2's estimation machinery</Ref> do the fitting. This lesson builds that model, hits the wall that blocks direct maximization, derives the algorithm that steps around the wall, and proves the guarantee the module has lacked: no iteration ever decreases the likelihood. The route there: the mixture density and its latent variable; why the log-likelihood has no closed-form maximizer; the E and M steps, derived and then run by hand; and the bound decomposition $\ln p = \mathcal{L} + \mathrm{KL}$ that carries the monotonicity proof. Past the theorem: k-means recovered as a limit; the three pathologies the guarantee does not exclude, priced by the 1977 paper that named the algorithm; and the selection of $K$, the one choice clustering can finally make honestly.
+
+## From indicator to posterior: the mixture as a density
+
+The flaw this lesson repairs is a single bit. k-means' assignment variable $r_{nk} \in \{0,1\}$ commits every point wholly to one cluster, and <Ref lesson="kmeans" id="exercises">the k-means lesson's closing exercise</Ref> measured the cost: a point whose two squared distances differ by $4\%$ is handed over entirely, and the quantity $0.51$ that recorded the ambiguity had no place in the model. A probabilistic model keeps that number, and the way to get one is to stop partitioning points and start modeling their density.
+
+A concrete density first. In one dimension,
+
+$$
+p(x) = 0.6\,\mathcal{N}(x \mid -1,\ 1) + 0.4\,\mathcal{N}(x \mid 2.5,\ 0.25)
+$$
+
+says: $60\%$ of the data comes from a broad Gaussian at $-1$, $40\%$ from a tight one at $2.5$. Evaluated at $x = 1$, the two terms contribute $0.6 \times 0.0540 = 0.0324$ and $0.4 \times 0.0089 = 0.0035$: a density of $0.036$, most of it the left component's. Every point gets a probability; no point gets a verdict.
+
+<Figure
+  src="./figures/mixture-density.svg"
+  alt="The two weighted Gaussian components as dashed curves and their sum as a solid curve over the x axis, with the crossover of the components marked at x ≈ 1.29 and the responsibility of the left component read off at x = 1 (0.901) and x = 1.5 (0.196)"
+  caption="The running density. Left of the crossover the broad component's weighted density is the larger share of p(x); half a unit past it, at x = 1.5, the tight component already claims 80%."
+/>
+
+<Definition title="Gaussian mixture model">
+A **Gaussian mixture model** with $K$ components is the density
+
+$$
+p(x) = \sum_{k=1}^{K} \pi_k\, \mathcal{N}(x \mid \mu_k, \Sigma_k),
+\qquad \pi_k \ge 0,\quad \sum_{k=1}^{K} \pi_k = 1,
+$$
+
+with mixing weights $\pi_k$, means $\mu_k$, and covariances $\Sigma_k$. Equivalently: draw a label $z \in \{1, \dots, K\}$ with $p(z = k) = \pi_k$, then draw $x \sim \mathcal{N}(\mu_k, \Sigma_k)$; marginalizing $z$ out recovers the sum.
+</Definition>
+
+The label $z$ is a *latent variable*: present in the sampling story, absent from the data. Its posterior given an observed point is one application of Bayes' rule, and it is the object k-means' single bit could not hold.
+
+<Definition title="responsibility">
+The **responsibility** of component $k$ for point $x_n$ is the posterior probability of its latent label,
+
+$$
+\gamma_{nk} \;=\; p(z_n = k \mid x_n)
+\;=\; \frac{\pi_k\, \mathcal{N}(x_n \mid \mu_k, \Sigma_k)}
+{\sum_{j=1}^{K} \pi_j\, \mathcal{N}(x_n \mid \mu_j, \Sigma_j)} .
+$$
+
+For each $n$ the responsibilities are nonnegative and sum to $1$ over $k$: a distribution over clusters, not a membership.
+</Definition>
+
+In the running density, the point $x = 1$ gets $\gamma_{1} = 0.0324 / (0.0324 + 0.0035) = 0.901$: mostly the left component's, with a recorded $9.9\%$ doubt. The point $x = 1.5$, nearer the crossover, gets $\gamma_1 = 0.196$. The soft assignment is not a heuristic softening of k-means; it is the exact posterior of a generative model, and everything below is ordinary maximum likelihood applied to that model.
+
+## Why maximum likelihood stalls: the sum inside the logarithm
+
+Module 2's recipe is to write the log-likelihood and set its derivative to zero, and for every model so far the recipe produced a closed form. For $N$ i.i.d. points the mixture's log-likelihood is
+
+$$
+\ell(\pi, \mu, \Sigma) \;=\; \sum_{n=1}^{N} \ln \Bigl( \sum_{k=1}^{K} \pi_k\, \mathcal{N}(x_n \mid \mu_k, \Sigma_k) \Bigr),
+$$
+
+and the trouble is the sum sitting inside the logarithm: $\ln$ no longer reaches the Gaussians, so nothing cancels the exponentials, and the $K$ components stay coupled inside every term.
+
+{/* fig LogSumApart: formula dissection, two stacked panels. Top panel, title "one Gaussian (module 2)": the log-likelihood \sum_n \ln \mathcal{N}(x_n \mid \mu, \Sigma) with an arrow annotation "ln reaches the exponential" and the simplification \ln \mathcal{N} = -\tfrac12 (x_n-\mu)^\top \Sigma^{-1} (x_n-\mu) + \text{const} shown collapsing to a quadratic — label "derivative linear in μ: closed form". Bottom panel, title "a mixture": \sum_n \ln \bigl( \sum_k \pi_k \mathcal{N}(x_n \mid \mu_k, \Sigma_k) \bigr) with the inner sum underbraced in amber, label "the sum blocks the logarithm", and the gradient shown beside it: \partial \ell / \partial \mu_k = \sum_n \gamma_{nk} \Sigma_k^{-1} (x_n - \mu_k), with \gamma_{nk} underbraced in blue, label "the weight depends on every parameter — no closed form". Layout: two rows, KaTeX via <M>, amber = the blocking sum, blue = the parameter-dependent weight. */}
+<Figure
+  name="LogSumApart"
+  alt="Two-panel formula dissection: a single Gaussian's log-likelihood collapses to a quadratic with a closed-form maximizer, while the mixture's log of a sum leaves a gradient whose weights are responsibilities depending on all parameters"
+  caption="The log of a sum is the whole difficulty: the gradient exists, but its weights are the responsibilities, which depend on every parameter."
+/>
+
+The stall is visible in the gradient itself. Differentiating $\ell$ with respect to $\mu_k$, the outer $\ln$ contributes one over the inner sum, and the chain rule through $\mathcal{N}(x_n \mid \mu_k, \Sigma_k)$ contributes $\mathcal{N}(x_n \mid \mu_k, \Sigma_k)\, \Sigma_k^{-1} (x_n - \mu_k)$:
+
+$$
+\frac{\partial \ell}{\partial \mu_k}
+= \sum_{n=1}^{N}
+\underbrace{\frac{\pi_k\, \mathcal{N}(x_n \mid \mu_k, \Sigma_k)}{\sum_j \pi_j\, \mathcal{N}(x_n \mid \mu_j, \Sigma_j)}}_{=\ \gamma_{nk}}
+\;\Sigma_k^{-1} (x_n - \mu_k).
+$$
+
+The responsibilities appear uninvited: they are the gradient's weights. Setting the derivative to zero and multiplying by $\Sigma_k$ gives
+
+$$
+\mu_k \;=\; \frac{1}{N_k} \sum_{n=1}^{N} \gamma_{nk}\, x_n,
+\qquad N_k = \sum_{n=1}^{N} \gamma_{nk},
+$$
+
+a weighted mean with the responsibilities as weights and $N_k$ as the *effective count* of points component $k$ claims. The same computation for $\Sigma_k$ yields the $\gamma$-weighted covariance, and a Lagrange multiplier on $\sum_k \pi_k = 1$ (the same constraint device <Ref lesson="mle-map">the categorical MLE</Ref> needed) yields $\pi_k = N_k / N$; both derivations are exercises below. These are exactly the stationarity conditions of $\ell$, but they are **not a solution**: each $\gamma_{nk}$ on the right depends on all the parameters on the left. The equations are a fixed point, not a formula.
+
+### If the labels were known, the problem would already be solved
+
+Suppose for a moment the latent labels were data: each point arrives with its $z_n$. The likelihood of the *complete* data $(X, Z)$ factorizes, its logarithm reaches every Gaussian, and the MLE is the estimate <Ref lesson="lda-gda">the LDA lesson</Ref> computed in closed form: each class's sample mean, each class's sample covariance, and class fractions for the weights. Fitting a mixture with known labels is fitting a Gaussian per class.
+
+The fixed-point equations above are that known-labels solution with one substitution: the hard indicator $\mathbb{1}[z_n = k]$ replaced by its posterior expectation $\gamma_{nk}$. This reading suggests the algorithm: guess parameters, compute the responsibilities the guess implies, refit as if those soft labels were data, repeat.
+
+<KeyFact>
+As motivated, the loop is a heuristic: the refit step maximizes a surrogate (the known-labels objective with guessed weights), and nothing said so far obliges the actual likelihood $\ell$, which never sees labels, to follow the surrogate upward. Closing that gap, exactly, is the convergence theorem's job.
+</KeyFact>
+
+## The algorithm, stated and run
+
+The loop has a name for each half: the *expectation step* computes the responsibilities under the current parameters, and the *maximization step* refits the parameters under the current responsibilities.
+
+1. **Initialize** $\pi_k, \mu_k, \Sigma_k$ (in practice: a k-means run, with covariances from its clusters).
+2. **E step.** For every $n, k$ compute $\gamma_{nk} = \dfrac{\pi_k\, \mathcal{N}(x_n \mid \mu_k, \Sigma_k)}{\sum_j \pi_j\, \mathcal{N}(x_n \mid \mu_j, \Sigma_j)}$.
+3. **M step.** With $N_k = \sum_n \gamma_{nk}$, set
+$$
+\mu_k^{\text{new}} = \frac{1}{N_k} \sum_n \gamma_{nk} x_n, \qquad
+\Sigma_k^{\text{new}} = \frac{1}{N_k} \sum_n \gamma_{nk} (x_n - \mu_k^{\text{new}})(x_n - \mu_k^{\text{new}})^\top, \qquad
+\pi_k^{\text{new}} = \frac{N_k}{N}.
+$$
+4. **Repeat** from step 2 until $\ell$ or the parameters stop moving.
+
+<Example title="one full EM cycle in one dimension">
+Data: $x = \{-2, -0.5, 1, 1.5, 3\}$. Current parameters: $\pi = (0.6, 0.4)$, $\mu = (-1, 2.5)$, $\sigma^2 = (1, 0.25)$, the running density above, with log-likelihood $\ell = -11.38$.
+
+**E step.** Weighted densities $\pi_k \mathcal{N}(x_n \mid \mu_k, \sigma_k^2)$ and their normalization:
+
+| $x_n$ | $\pi_1 \mathcal{N}_1$ | $\pi_2 \mathcal{N}_2$ | $\gamma_{n1}$ | $\gamma_{n2}$ |
+|---|---|---|---|---|
+| $-2$ | $0.1452$ | $0.0000$ | $1.000$ | $0.000$ |
+| $-0.5$ | $0.2112$ | $0.0000$ | $1.000$ | $0.000$ |
+| $1$ | $0.0324$ | $0.0035$ | $0.901$ | $0.099$ |
+| $1.5$ | $0.0105$ | $0.0432$ | $0.196$ | $0.804$ |
+| $3$ | $0.0001$ | $0.1936$ | $0.000$ | $1.000$ |
+
+The two left points and the right point are certain; the two middle points split, exactly where the densities cross.
+
+**M step.** Effective counts: $N_1 = 1.000 + 1.000 + 0.901 + 0.196 + 0.000 = 3.098$, $N_2 = 1.902$. Weighted means:
+
+$$
+\mu_1^{\text{new}} = \frac{(-2) + (-0.5) + 0.901 \cdot 1 + 0.196 \cdot 1.5 + 0}{3.098} = -0.421,
+\qquad
+\mu_2^{\text{new}} = \frac{0.099 \cdot 1 + 0.804 \cdot 1.5 + 3}{1.902} = 2.262 .
+$$
+
+Weighted variances about the new means give $\sigma_1^{2,\text{new}} = 1.63$, $\sigma_2^{2,\text{new}} = 0.61$; weights become $\pi^{\text{new}} = (3.098/5,\ 1.902/5) = (0.620, 0.380)$. Recomputing the log-likelihood at the new parameters: $\ell = -9.64$, up from $-11.38$. One cycle, one guaranteed improvement, and the theorem below is the guarantee.
+</Example>
+
+<Exercise>
+Under the *original* parameters of the example (before the M step), compute the responsibility $\gamma_1$ for a sixth point at $x = 1.25$. Write both weighted densities before dividing.
+
+<Solution>
+$\mathcal{N}(1.25 \mid -1, 1) = \frac{1}{\sqrt{2\pi}} e^{-(2.25)^2/2} = 0.0317$ and $\mathcal{N}(1.25 \mid 2.5, 0.25) = \frac{1}{\sqrt{2\pi}\cdot 0.5} e^{-(1.25)^2/0.5} = 0.0351$. Weighted: $0.6 \times 0.0317 = 0.0190$ and $0.4 \times 0.0351 = 0.0140$. So
+
+$$
+\gamma_1 = \frac{0.0190}{0.0190 + 0.0140} = 0.576 .
+$$
+
+The point sits almost exactly at the crossover: the broad component's head start in weight ($0.6$ vs $0.4$) is nearly cancelled by the tight component's higher density. A hard assignment would report only "component 1" and discard the $0.42$ of doubt that the next M step will use.
+</Solution>
+</Exercise>
+
+<FigureSequence
+  name="em-run"
+  alt="Five frames of EM on two elongated 2D clusters: circular initial ellipses with unlabeled points; the first E step coloring every point by responsibility with blended colors between the clusters; the first M step moving and tilting the ellipses onto the clusters with the log-likelihood jumping from −212 to −82; a second cycle tightening the fit; and convergence at log-likelihood −78.6 with boundary points still visibly blended, over a monotone staircase of log-likelihood values"
+  caption="One EM run: ℓ climbs −212 → −82 → −80 → −78.6 and never dips. Colors are responsibilities; the in-between points never fully commit."
+/>
+
+<Task>
+Step through the five frames watching two things: the staircase under the frames, which rises at every M step and only at M steps, and the handful of points between the clusters, which hold blended colors from the first E step to convergence. Those blends are the posterior uncertainty k-means' indicator variable threw away.
+</Task>
+
+<Demo
+  name="EmStepper"
+  caption="EM one half-step at a time on Old-Faithful-shaped data; the readout is the log-likelihood, and the toggle compares k-means' hard assignment on the same points."
+/>
+
+The demo also exposes what the theorem will *not* rule out. Select the **spike on one point** preset — one component starts centered on a single data point with a small radius — and step: the log-likelihood climbs, and keeps climbing, while the fit degenerates into a spike plus a blanket. Nothing malfunctions: the objective genuinely scores the spike higher, and the pathologies section quantifies by how much.
+
+## The convergence theorem: a bound that touches
+
+The claim to prove: every E-step-plus-M-step cycle satisfies $\ell(\theta^{\text{new}}) \ge \ell(\theta^{\text{old}})$, where $\theta$ collects all parameters $(\pi, \mu, \Sigma)$. The proof route is a decomposition of the log-likelihood that holds for *any* distribution over the latent labels, turning the two steps into two exact maximizations of one quantity. Proof mode: direct, via one identity and one inequality; the only fact imported is that a KL divergence is nonnegative with equality iff its arguments agree, established in <Ref lesson="mle-map">the estimation module</Ref>.
+
+<Remark title="notation: γ versus q">
+Two objects must not blur. $q(Z)$ is a *free* distribution over the latent labels, a variable the proof manipulates. The responsibilities $\gamma_{nk}$ are the *values* of one particular choice, $q = p(Z \mid X, \theta^{\text{old}})$: the posterior the E step computes. The decomposition below holds for every $q$; the E step is the act of choosing the best one.
+</Remark>
+
+<Theorem title="the ELBO decomposition (Bishop 9.70)">
+For any distribution $q(Z)$ over the latent labels with $q(Z) > 0$ wherever $p(Z \mid X, \theta) > 0$,
+
+$$
+\ln p(X \mid \theta) \;=\; \mathcal{L}(q, \theta) \;+\; \mathrm{KL}\bigl(q \,\|\, p(Z \mid X, \theta)\bigr),
+$$
+
+where
+
+$$
+\mathcal{L}(q, \theta) = \sum_{Z} q(Z) \ln \frac{p(X, Z \mid \theta)}{q(Z)},
+\qquad
+\mathrm{KL}(q \,\|\, p) = -\sum_{Z} q(Z) \ln \frac{p(Z \mid X, \theta)}{q(Z)} \;\ge\; 0 .
+$$
+
+Consequently $\mathcal{L}(q, \theta) \le \ln p(X \mid \theta)$ for every $q$, with equality iff $q = p(Z \mid X, \theta)$. The functional $\mathcal{L}$ is the **evidence lower bound** (ELBO).
+
+<Proof>
+Start from the product rule, $\ln p(X, Z \mid \theta) = \ln p(Z \mid X, \theta) + \ln p(X \mid \theta)$, and substitute it into $\mathcal{L}$:
+
+$$
+\mathcal{L}(q, \theta)
+= \sum_Z q(Z) \ln \frac{p(Z \mid X, \theta)\, p(X \mid \theta)}{q(Z)}
+= \sum_Z q(Z) \ln \frac{p(Z \mid X, \theta)}{q(Z)} \;+\; \ln p(X \mid \theta) \sum_Z q(Z).
+$$
+
+The first sum is $-\mathrm{KL}(q \| p(Z \mid X, \theta))$ by definition; the second factor is $1$ because $q$ is a distribution. Rearranging gives the decomposition. Nonnegativity of KL, with equality exactly at $q = p(Z \mid X, \theta)$, is Gibbs' inequality.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="elbo-bar"
+  alt="Three frames of the decomposition drawn as a bar of fixed height ln p split into an amber ELBO segment and a blue KL segment: first a generic q with both segments visible; then the E step collapsing the KL segment to zero so the bound touches ln p at the frozen θ; then the M step raising the whole bar, with the old ln p left as a dashed line, the ELBO maximized, and a fresh KL gap opened above it"
+  caption="The proof as accounting: ln p is always ℒ plus KL. The E step spends the KL; the M step raises ℒ, and ln p must rise by at least as much."
+/>
+
+<Task>
+Track the amber segment across the three frames and confirm the two claims the proof needs: in frame 2 it grows only by eating the blue segment (the height $\ln p$ is frozen because $\theta$ is), and in frame 3 the new height exceeds the old by the amber gain *plus* the reopened blue gap.
+</Task>
+
+<Theorem title="monotonicity of EM (Dempster, Laird & Rubin 1977, Thm. 1)">
+Let $\theta^{\text{new}}$ be produced from $\theta^{\text{old}}$ by one E step ($q \leftarrow p(Z \mid X, \theta^{\text{old}})$) followed by one M step ($\theta^{\text{new}} = \arg\max_\theta \mathcal{L}(q, \theta)$, $q$ held fixed). Then
+
+$$
+\ln p(X \mid \theta^{\text{new}}) \;\ge\; \ln p(X \mid \theta^{\text{old}}),
+$$
+
+with equality only if $\theta^{\text{old}}$ is already a stationary point of $\mathcal{L}(q, \cdot)$.
+
+<Proof>
+**After the E step.** With $q$ set to the posterior at $\theta^{\text{old}}$, the KL term vanishes and the decomposition reads $\mathcal{L}(q, \theta^{\text{old}}) = \ln p(X \mid \theta^{\text{old}})$: the bound is tight at the current parameters.
+
+**After the M step.** The M step maximizes $\mathcal{L}(q, \cdot)$ over $\theta$ with $q$ frozen, so $\mathcal{L}(q, \theta^{\text{new}}) \ge \mathcal{L}(q, \theta^{\text{old}})$. Applying the decomposition at $\theta^{\text{new}}$, where $q$ is now stale and the KL term is some $\Delta \ge 0$:
+
+$$
+\ln p(X \mid \theta^{\text{new}})
+= \mathcal{L}(q, \theta^{\text{new}}) + \Delta
+\;\ge\; \mathcal{L}(q, \theta^{\text{old}})
+= \ln p(X \mid \theta^{\text{old}}) .
+$$
+
+The likelihood gains everything the bound gained, plus the freshly reopened KL gap. Equality forces the M step to have moved nothing.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/tangent-bound.svg"
+  alt="The log-likelihood as a curve over the parameter, with a blue lower bound touching it tangentially at the old parameter value, the maximum of that bound defining the new parameter value, and a green bound tangent at the new value, illustrating one EM cycle as maximizing a touching bound"
+  caption="In parameter space: each E step builds a bound tangent to ℓ at the current θ; each M step jumps to that bound's peak, which ℓ must exceed."
+/>
+
+One connection closes the loop back to the algorithm. Substituting the posterior into $\mathcal{L}$ splits it as $\mathcal{L}(q, \theta) = Q(\theta, \theta^{\text{old}}) + \text{const}$, where the constant is $q$'s entropy (no $\theta$ in it) and
+
+$$
+Q(\theta, \theta^{\text{old}}) = \sum_Z p(Z \mid X, \theta^{\text{old}}) \ln p(X, Z \mid \theta)
+= \sum_{n,k} \gamma_{nk} \bigl( \ln \pi_k + \ln \mathcal{N}(x_n \mid \mu_k, \Sigma_k) \bigr)
+$$
+
+is the *expected complete-data log-likelihood*: the known-labels objective with $\gamma$ in place of the indicators. Maximizing it in $\theta$ is a weighted single-Gaussian fit per component, and the maximizers are precisely the M-step formulas of the previous section. The algorithm stated there and the bound-climber proved here are the same procedure.
+
+<KeyFact>
+The guarantee is monotone ascent to a stationary point, and nothing more: no rate, no finite termination, no global optimality. It is <Ref lesson="kmeans">Lloyd's two-block descent</Ref> with the finite state space removed, and exactly the conclusions that depended on finiteness (termination in finitely many steps) are the ones lost.
+</KeyFact>
+
+## ★ A second proof: the Jensen route
+
+The decomposition proof conceals where the inequality comes from; a one-line alternative shows it. For any positive weights $q(z)$ summing to one, write the log-likelihood of a single point as the log of an expectation and apply Jensen's inequality to the concave logarithm:
+
+$$
+\ln p(x \mid \theta)
+= \ln \sum_z q(z)\, \frac{p(x, z \mid \theta)}{q(z)}
+\;\ge\; \sum_z q(z) \ln \frac{p(x, z \mid \theta)}{q(z)}
+= \mathcal{L} ,
+$$
+
+because $\ln \mathbb{E}[Y] \ge \mathbb{E}[\ln Y]$. Equality in Jensen requires the random variable to be constant: $p(x, z \mid \theta)/q(z) = c$ for all $z$, which after normalizing forces $q(z) = p(z \mid x, \theta)$, the posterior. The E step is thus re-derived as "the choice of $q$ that makes Jensen tight", and monotonicity follows as before: tighten, maximize, repeat. The derivation generalizes without change to any latent-variable model, which is the form in which the 1977 paper proved it.
+
+## k-means recovered: the small-variance limit
+
+The two algorithms of this module's first and third lessons are one algorithm at different temperatures. Constrain the mixture to shared spherical covariances $\Sigma_k = \epsilon I$ with $\epsilon$ fixed (not fitted), and the responsibilities become
+
+$$
+\gamma_{nk} = \frac{\pi_k \exp\bigl(-\lVert x_n - \mu_k \rVert^2 / 2\epsilon\bigr)}
+{\sum_j \pi_j \exp\bigl(-\lVert x_n - \mu_j \rVert^2 / 2\epsilon\bigr)} .
+$$
+
+As $\epsilon \to 0$, the term with the smallest $\lVert x_n - \mu_j \rVert^2$ decays slowest, so after normalization it swallows the whole distribution: $\gamma_{nk} \to 1$ for the nearest center and $0$ for the rest, whatever the (nonzero) weights $\pi_k$. The E step hardens into nearest-center assignment; the weighted mean over $\{0,1\}$ weights is the plain cluster mean, so the M step becomes Lloyd's update; and the expected complete-data log-likelihood collapses to $-\tfrac{1}{2\epsilon} J + \text{const}$, so maximizing it is minimizing <Ref lesson="kmeans">the distortion</Ref>. Lloyd's algorithm is EM run at zero temperature.
+
+<Figure
+  src="./figures/kmeans-limit.svg"
+  alt="A boundary point with squared distances 1.00 and 1.44 to two centers, and its responsibility for the nearer component shown as stacked bars at shared variance 1, 0.1, and 0.01: the split hardens from 0.55/0.45 through 0.90/0.10 to 0.9999, with the k-means limit row showing the hard assignment 1"
+  caption="One boundary point, three temperatures: σ² = 1 keeps the 0.55/0.45 doubt, σ² = 0.01 has already erased it, and the limit is k-means' indicator."
+/>
+
+The limit also explains the iteration counts: at finite $\epsilon$ every point pulls every center a little, so EM's steps are smaller and more numerous than Lloyd's, and in practice a k-means run *is* the standard initializer for EM, with each k-means cluster's sample covariance seeding $\Sigma_k$.
+
+## What the theorem does not promise
+
+A monotone algorithm invites a false conclusion: *EM maximizes the likelihood, so it finds the MLE*. The reading has enough currency that the CS229 notes interrupt their derivation with a footnote against it — even for Gaussian mixtures, EM "can either converge to a global optimum or get stuck, depending on the properties of the training data." It does not find the MLE, three separate ways, and each failure is worth pricing rather than merely naming.
+
+### Singularities: the supremum is infinite
+
+For a mixture the "global maximum of the likelihood" does not even exist. Center one component on a data point, $\mu_j = x_1$, with $\Sigma_j = \sigma^2 I$, and that point's contribution to the density is
+
+$$
+\mathcal{N}(x_1 \mid x_1, \sigma^2 I) = \frac{1}{(2\pi)^{d/2} \sigma^d} \;\longrightarrow\; \infty
+\quad \text{as } \sigma \to 0 .
+$$
+
+With a single Gaussian this cannot inflate the likelihood: the other points' densities collapse exponentially fast and the product goes to zero. With two or more components the second one covers the rest of the data at finite variance, so the collapsing component adds an unbounded term while costing nothing: the log-likelihood diverges like $d \ln(1/\sigma)$, and it does so along a ridge of configurations no one would call a fit. Unregularized maximum likelihood for mixtures is an ill-posed problem, and EM finding "good" solutions in practice means finding well-behaved *local* maxima while avoiding the infinite ones.
+
+<Figure
+  src="./figures/singularity.svg"
+  alt="Two panels: the mixture log-likelihood as a function of a collapsing component's sigma, rising without bound like log of one over sigma as sigma goes to zero; and the MAP objective with a prior on the variance, which plunges to minus infinity at zero and has a finite interior maximum"
+  caption="The collapse priced: ℓ(σ) grows like ln(1/σ), every tenfold shrink adding ln 10 ≈ 2.3. A prior on σ² contributes −b/σ², which wins the race and restores an interior maximum."
+/>
+
+The repairs act on the M step. A **MAP version of EM** maximizes $Q(\theta, \theta^{\text{old}}) + \ln p(\theta)$ instead of $Q$ alone, with the E step unchanged; the monotonicity proof survives verbatim with $\ln p(X \mid \theta) + \ln p(\theta)$ as the ascending quantity, and an inverse-Wishart prior on $\Sigma_k$ contributes a $-b/\sigma^2$ term (in the spherical case) that outruns $\ln(1/\sigma)$ and makes the objective well-posed. The engineering substitutes are a floor on eigenvalues of $\Sigma_k$, or detect-and-reset: a component whose variance collapses is reseeded at random with a large covariance. The boundary-probe exercise makes the divergence rate, and the repair, quantitative.
+
+### Label switching: K! copies of every optimum
+
+Permuting the component indices leaves the density untouched, so every (nondegenerate) parameter setting has $K! - 1$ twins with identical likelihood: for $K = 3$, six copies of every optimum. For density estimation this *identifiability* failure is harmless, since any copy is as good as any other. It bites when the labels are read as meaning: "the parameters of cluster 3" is not a well-defined quantity, two EM runs can converge to the same fit with the names swapped, and averaging parameters across runs, or doing Bayesian inference over them, produces multimodal nonsense unless the symmetry is broken (an ordering constraint on the means is the standard device).
+
+### Local optima and speed: the 1977 accounting
+
+Beyond the symmetric copies there are genuinely bad stationary points: initialize both means inside one true cluster and EM can converge to a split-and-merge fit exactly analogous to <Ref lesson="kmeans">k-means' local optima</Ref>, which is why restarts and k-means seeding remain standard.
+
+<Figure
+  src="./figures/dlr-table1.png"
+  float="right"
+  width="m"
+  alt="A typeset table from a 1977 journal page, headed 'TABLE 1' with the italic subtitle 'The EM algorithm in a simple case'. Four columns, ruled above and below: p, pi^(p), pi^(p) minus pi-star, and the ratio (pi^(p+1) minus pi-star) divided by (pi^(p) minus pi-star). Nine rows, p = 0 to 8. The iterates climb from 0.500000000 to 0.626821484, converging on the last digits. The deviation column falls from 0.126821498 to 0.000000014, losing about one significant figure per step. The ratio column reads 0.1465, 0.1346, 0.1330, then 0.1328 for three consecutive rows, after which the last three entries are em-dashes — the deviations have grown too small to divide."
+  caption="The first published EM trace: from π⁽⁰⁾ = 0.5, each iteration removes all but 13.28% of the remaining error."
+/>
+
+The algorithm's speed was priced in the paper that named it. Dempster, Laird and Rubin's 1977 *Maximum Likelihood from Incomplete Data via the EM Algorithm* (JRSS-B) coined "E step" and "M step", proved the monotonicity theorem in full generality, and showed the pattern had been alive for years without a name: geneticists had been running the same impute-then-count loop to estimate allele frequencies since the 1950s, and the Baum–Welch procedure (1970), which fits hidden Markov models — sequence models whose latent variable is an unobserved chain of states — is the identical two steps; missing data, censored observations, and factor analysis fill out the paper's own gallery of instances. Their opening example is a multinomial, not a mixture: 197 animals in four genetic categories with cell probabilities $\bigl(\tfrac12 + \tfrac{\pi}{4},\ \tfrac{1-\pi}{4},\ \tfrac{1-\pi}{4},\ \tfrac{\pi}{4}\bigr)$, where splitting the first cell into two latent subcells makes the complete-data MLE a one-line count ratio. The generality is the point: EM needs a latent completion, not a Gaussian.
+
+Their Table 1 runs the loop from $\pi^{(0)} = 0.5$ and prints, beside each iterate, the ratio of successive deviations from the limit $\pi^* = 0.62682$. The ratio is essentially constant from the third step on, settling at $0.1328$: each iteration removes all but $13.28\%$ of the remaining error. The paper then computes, from the theorem's machinery, what that constant *is*: the derivative of the EM update map at the fixed point, $0.132778$, which equals the **fraction of information about the parameter carried by the unobserved data**. The first published EM trace is thus also the first published statement of its convergence law: EM is linearly convergent, with rate equal to the missing-information fraction.
+
+The law has a sharp edge for mixtures. When components overlap heavily, the labels are nearly unrecoverable from the data, the missing-information fraction approaches $1$, and the rate constant with it. In the paper's printed discussion, Sundberg, whose formulae underlie the theory, reported mixture fits with rates above $0.98$, slow enough that he judged the method impracticable there and advocated Newton's method instead. The diagnosis is worth keeping: a slow EM run is a measurement, the algorithm reporting that the data barely distinguish the components.
+
+<KeyFact>
+EM's error shrinks per iteration by exactly the fraction of missing information: $0.1328$ in the 1977 genetics example (roughly one decimal digit gained per step), against rates above $0.98$ for heavily overlapping mixtures, where one digit costs about $114$ iterations.
+</KeyFact>
+
+## Choosing K: the objective is finally a density
+
+<Ref lesson="kmeans">The k-means lesson</Ref> proved a structural failure: held-out distortion decreases monotonically in $K$, so resampling cannot select the number of clusters for a centroid model. $K$ spikes claim no volume, and a fresh point only ever gains a nearer center. The mixture repairs exactly this, and the repair is the constraint that made it a density in the first place: $\int p(x)\,dx = 1$ makes probability a conserved budget, so any mass a fit spends covering one training accident is mass withdrawn from everywhere else.
+
+### Held-out log-likelihood has a maximum
+
+A fitted mixture assigns every fresh point $x$ the score $\ln p(x \mid \hat\theta)$, and the average score over held-out points estimates <Ref lesson="mle-map">module 2's log-loss risk</Ref>: the supervised machinery, running without labels. Both failure directions now register. A $K$ too small merges components and puts too little density where one of the merged groups lives; held-out score is low. A $K$ too large wraps extra components around training accidents, and the conservation law charges for it: the density thins exactly where fresh points land, and the held-out score *falls*. Between the two, cross-validated log-likelihood has a genuine interior maximum: the peaked curve that distortion could never produce, because distortion pays no price for complexity.
+
+<Figure
+  src="./figures/heldout-k.svg"
+  alt="Two panels over the number of clusters K from 1 to 8 on data drawn from three components: k-means' held-out distortion falls at every K with nothing to select, while the mixture's held-out log-likelihood rises to a maximum at K equal to 3 and then declines"
+  caption="The same data, two criteria: held-out distortion falls at every K; held-out log-likelihood peaks at the true K = 3, because an overfit density must thin somewhere fresh points land."
+/>
+
+The selection protocol is <Ref lesson="cross-validation-bootstrap">the resampling lesson's</Ref>: k-fold the data, average $\ln p$ per held-out point, pick $K$ by the one-standard-error rule. Nothing about the recipe is new; what is new is that a clustering objective finally supports it.
+
+### BIC: the covariance bill, counted
+
+The in-sample shortcut is **BIC**, $\ell(\hat\theta) - \tfrac{p}{2} \ln N$, which replaces the held-out evaluation with an explicit charge per parameter. For a full-covariance mixture the count is
+
+$$
+p \;=\; \underbrace{(K-1)}_{\text{weights}} \;+\; \underbrace{Kd}_{\text{means}} \;+\; \underbrace{K\,\tfrac{d(d+1)}{2}}_{\text{covariances}},
+$$
+
+and the third term dominates: in $d = 2$, a $K = 2$ mixture costs $1 + 4 + 6 = 11$ parameters, but in $d = 10$, a $K = 4$ mixture costs $3 + 40 + 220 = 263$, of which $220$ — five-sixths of the bill — are covariance entries. Each additional component in $d = 10$ adds $1 + 10 + 55 = 66$ parameters, so at $N = 1000$ (where $\ln N \approx 6.9$) it must buy about $228$ nats of extra log-likelihood to survive; in $d = 2$ the same step needs only $21$. The $O(Kd^2)$ covariance bill is why constrained families (diagonal or shared $\Sigma_k$) are selection candidates in their own right, not just cheaper fits; full Bayesian selection over $K$ is the fuller treatment (Murphy §21.4.1.3).
+
+### What the selection still cannot promise
+
+Three caveats survive, all inherited from this lesson's own theorems. The fitted $\hat\theta$ behind every score is one EM run's local optimum, so the comparison across $K$ inherits initialization noise; restart per $K$ and keep each $K$'s best fit before comparing. Singularity control must be active, because a spiked component adds unbounded training log-likelihood, and BIC's finite penalty cannot outbid an infinite score. And "number of well-supported components" is a statement about density, not semantics: two overlapping Gaussians can jointly model one visual blob, so the selected $K$ is the number of Gaussian shapes the data support, which is not always the number of clusters a human meant.
+
+What stands established: clusters as Gaussian components with weights, responsibilities as exact posteriors, EM as alternating posterior computation and weighted refitting, the ELBO decomposition proving each cycle raises the likelihood, k-means as the zero-temperature limit, the guarantee's boundaries priced — infinite suprema, $K!$ symmetry, local optima, and a convergence rate that equals the missing-information fraction — and, for the first time in the module, a defensible selection of $K$. The ELBO itself outlives this lesson: the same decomposition prices marginal likelihoods in the course's Bayesian module. <Ref lesson="pca">The next lesson</Ref> moves from densities to directions: the eigenvectors of the covariance matrix organize unlabeled data by variance rather than by membership. The shapes no mixture of ellipses can wrap, rings and moons, are the opening problem of <Ref lesson="spectral-clustering">the spectral clustering lesson</Ref>, and the final exercise below walks to its doorstep.
+
+## Exercises
+
+<Exercise>
+Two one-dimensional components: $\pi_1 = \pi_2 = 0.5$, $\mu_1 = 0$, $\mu_2 = 4$, $\sigma_1^2 = \sigma_2^2 = 4$. (a) Compute the responsibilities of both components for the point $x = 1$. (b) Three points $x = \{1, 2, 6\}$ carry responsibilities $\gamma_{n1} = \{0.88, 0.62, 0.02\}$ for component 1. Compute the M-step updates $N_1$, $\mu_1^{\text{new}}$, and $\pi_1^{\text{new}}$.
+
+<Solution>
+**(a)** Equal weights and variances cancel, leaving the exponentials: $\gamma_1 = \dfrac{e^{-1/8}}{e^{-1/8} + e^{-9/8}} = \dfrac{1}{1 + e^{-1}} = 0.731$, so $\gamma_2 = 0.269$. (With equal $\pi$ and $\sigma^2$ the responsibility is a logistic function of the difference of squared distances, the same structure as the hardening figure.)
+
+**(b)** $N_1 = 0.88 + 0.62 + 0.02 = 1.52$;
+
+$$
+\mu_1^{\text{new}} = \frac{0.88 \cdot 1 + 0.62 \cdot 2 + 0.02 \cdot 6}{1.52} = \frac{2.24}{1.52} = 1.474 ;
+\qquad
+\pi_1^{\text{new}} = \frac{1.52}{3} = 0.507 .
+$$
+
+The transferable move: every M-step quantity is a weighted version of the known-labels estimate, with $N_k$ playing the role of the class count.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the two M-step formulas the body stated without proof, starting from $Q(\theta, \theta^{\text{old}}) = \sum_{n,k} \gamma_{nk} \bigl( \ln \pi_k + \ln \mathcal{N}(x_n \mid \mu_k, \Sigma_k) \bigr)$ with the $\gamma_{nk}$ fixed. (a) Maximize over the weights subject to $\sum_k \pi_k = 1$ using a Lagrange multiplier. (b) Maximize over $\Sigma_k$, using the single-Gaussian covariance MLE as the template, and state the resulting formula.
+
+<Solution>
+**(a)** Only the $\ln \pi_k$ terms involve the weights. The Lagrangian is $\sum_{n,k} \gamma_{nk} \ln \pi_k + \lambda \bigl( \sum_k \pi_k - 1 \bigr)$; stationarity in $\pi_k$ gives $N_k / \pi_k + \lambda = 0$, i.e. $\pi_k = -N_k/\lambda$. Summing over $k$ and imposing the constraint: $1 = -\sum_k N_k / \lambda = -N/\lambda$ (the responsibilities of each point sum to one, so $\sum_k N_k = N$), hence $\lambda = -N$ and
+
+$$
+\pi_k = \frac{N_k}{N} .
+$$
+
+This is <Ref lesson="mle-map">the categorical MLE's Lagrange computation</Ref> with soft counts $N_k$ in place of hard ones.
+
+**(b)** Fix $k$ and collect its terms: $-\tfrac12 \sum_n \gamma_{nk} \bigl( \ln \det \Sigma_k + (x_n - \mu_k)^\top \Sigma_k^{-1} (x_n - \mu_k) \bigr) + \text{const}$. This is the single-Gaussian log-likelihood with each point counted $\gamma_{nk}$ times; the single-Gaussian MLE (sample covariance about the mean) therefore applies with weights, replacing $\tfrac1n \sum_i$ by $\tfrac{1}{N_k} \sum_n \gamma_{nk}$:
+
+$$
+\Sigma_k^{\text{new}} = \frac{1}{N_k} \sum_{n=1}^N \gamma_{nk}\, (x_n - \mu_k^{\text{new}})(x_n - \mu_k^{\text{new}})^\top .
+$$
+
+Formally: setting the matrix derivative to zero uses $\partial \ln \det \Sigma / \partial \Sigma^{-1} = -\Sigma$ and $\partial\, \mathrm{tr}(\Sigma^{-1} S) / \partial \Sigma^{-1} = S$, giving $\Sigma_k = S_k / N_k$ with $S_k$ the $\gamma$-weighted scatter, the formula above.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. In one dimension, take $N$ data points, set $\mu_1 = x_1$ and $\sigma_1 = \sigma$, and let component 2 hold any fixed parameters giving every point density at least $c > 0$. (a) Show $\ell(\sigma) \ge \text{const} + \ln(1/\sigma)$ and give the increase in $\ell$ per tenfold shrink of $\sigma$. (b) Explain why the same construction with $K = 1$ sends the likelihood to zero instead. (c) Show that adding a log-prior term $-b/\sigma^2$ ($b > 0$) to the objective restores an interior maximum.
+
+<Solution>
+**(a)** The first point's mixture density is at least $\pi_1 \mathcal{N}(x_1 \mid x_1, \sigma^2) = \pi_1 / (\sqrt{2\pi}\,\sigma)$, and every other point's is at least $\pi_2 c$. So
+
+$$
+\ell(\sigma) \;\ge\; \ln \pi_1 - \tfrac12 \ln 2\pi - \ln \sigma + (N-1) \ln (\pi_2 c),
+$$
+
+which diverges as $\sigma \to 0$ like $\ln(1/\sigma)$: each tenfold shrink adds at least $\ln 10 \approx 2.30$ nats. (In $d$ dimensions with $\Sigma_1 = \sigma^2 I$ the rate is $d \ln 10$ per decade.)
+
+**(b)** With one component there is no second density to hold the floor: every other point's density is $\mathcal{N}(x_n \mid x_1, \sigma^2) \le e^{-(x_n - x_1)^2 / 2\sigma^2} / (\sqrt{2\pi}\sigma)$, and the exponential factor drives the product to zero faster than the $1/\sigma^{N}$ prefactor grows. The singularity is a mixture phenomenon: it needs one component free to collapse while another holds every remaining point's density away from zero.
+
+**(c)** Write $F(\sigma) = \ell(\sigma) - b/\sigma^2$, continuous on $(0, \infty)$. As $\sigma \to 0$: only the first point's term grows, so $\ell(\sigma) \le \text{const} + \ln(1/\sigma)$, and $b/\sigma^2 \to \infty$ polynomially while $\ln(1/\sigma)$ grows only logarithmically, so $F \to -\infty$. At the other end $F$ does **not** fall to $-\infty$: component 2 holds every point's density at $\pi_2 c$ or better, so $\ell(\sigma) \ge N \ln(\pi_2 c)$ for every $\sigma$; as $\sigma \to \infty$ component 1's density fades and $F(\sigma) \to L := \sum_n \ln\bigl(\pi_2\, p_2(x_n)\bigr)$, a finite limit. The interior maximum comes from a comparison against $L$ instead. At large finite $\sigma$, component 1 still adds $\pi_1 \mathcal{N}(x_n \mid x_1, \sigma^2) \ge a/\sigma$ to every point's density (once $\sigma$ exceeds the data's spread, the Gaussian's exponential factor is at least $e^{-1/2}$), so each log term exceeds its limit by order $1/\sigma$, while the penalty subtracts only $b/\sigma^2$: for all large $\sigma$, $F(\sigma) \ge L + a'/\sigma - b/\sigma^2 > L$, and $F$ approaches its right-end limit *from above*. Fix one such $\sigma_1$. Since $F \to -\infty$ at $0$ and $F \to L < F(\sigma_1)$ at $\infty$, there is a compact interval $[s, S] \ni \sigma_1$ outside which $F < F(\sigma_1)$; continuity attains the maximum on $[s, S]$, and it is the global one. The supremum of the penalized objective is reached at an interior $\sigma$. This is MAP-EM's guarantee: an inverse-gamma (inverse-Wishart in general) prior's $-b/\sigma^2$ term makes the estimation problem well-posed, and the E step never changes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "EM converges to the maximum-likelihood estimate; that is what the monotonicity theorem says." Name every step at which the claim fails, and state precisely what is guaranteed.
+
+<Solution>
+Three failures. **First**, for Gaussian mixtures "the MLE" need not exist: the likelihood's supremum is $+\infty$ along the singular collapses of the previous exercise, so the object the claim points at is undefined without regularization. **Second**, even among finite stationary points, monotone ascent does not select the best one: a poor initialization (both means in one true cluster) converges to a genuinely inferior local maximum, exactly as Lloyd's algorithm does, and the theorem is satisfied all the way there. **Third**, "the" maximizer is never unique anyway: label switching gives $K!$ parameter settings with identical likelihood, so even a globally optimal run only reaches *an* optimum, determined by initialization.
+
+What is guaranteed: $\ell(\theta^{(t)})$ is non-decreasing, and, under mild regularity — continuity of the surrogate $Q$ in both arguments suffices — limit points of the iterates are stationary points of $\ell$: maxima, saddles, or ridges, with saddles unstable under perturbation. The stationarity statement belongs to Wu (1983), not to the 1977 paper: Dempster, Laird and Rubin's own convergence theorems (their Theorems 2–3, §3) claimed it first, but their proof was flawed, and Wu supplies the corrected conditions and proof. The failing step in the claim is the substitution of "never decreases the likelihood" for "maximizes the likelihood": the same gap as k-means' "converges" versus "is optimal", <Ref lesson="kmeans">refuted in that lesson's exercises</Ref>, now with the extra hazard that the global supremum is not even a fit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the small-variance limit formally. Fix $\Sigma_k = \epsilon I$ for all $k$, with $\epsilon$ constant. (a) Show that as $\epsilon \to 0$ the responsibilities converge to k-means' indicator variables (assume distinct distances and all $\pi_k > 0$). (b) Show the two EM steps converge to Lloyd's two steps, and identify what happens to the $\pi_k$ updates. (c) State which of this lesson's three pathologies k-means inherits in the limit and which it escapes, with the mechanism.
+
+<Solution>
+**(a)** Divide numerator and denominator of $\gamma_{nk}$ by the largest term, the one with minimal $d_{nj} = \lVert x_n - \mu_j \rVert^2$ (say $j^*$):
+
+$$
+\gamma_{nk} = \frac{(\pi_k/\pi_{j^*}) \exp\bigl( -(d_{nk} - d_{nj^*})/2\epsilon \bigr)}
+{1 + \sum_{j \ne j^*} (\pi_j/\pi_{j^*}) \exp\bigl( -(d_{nj} - d_{nj^*})/2\epsilon \bigr)} .
+$$
+
+Every exponent with $j \ne j^*$ is strictly negative and scales like $1/\epsilon$, so all such terms $\to 0$; hence $\gamma_{nj^*} \to 1$ and $\gamma_{nk} \to 0$ otherwise. The weights $\pi$ only shift the crossover at finite $\epsilon$ and are annihilated in the limit.
+
+**(b)** With $\gamma \to r \in \{0,1\}$, the E step is nearest-center assignment and the weighted mean is the assigned points' mean: Lloyd's two steps. The weight update $\pi_k = N_k / N$ becomes the fraction of points in cluster $k$, but since (a) showed the limit assignments ignore $\pi$, the weights become passengers: computed, never consulted. The objective follows suit: $\mathbb{E}[\ln p(X, Z)] = -\tfrac{1}{2\epsilon} \sum_{n,k} r_{nk} \lVert x_n - \mu_k \rVert^2 + \text{const}$, so maximizing it is minimizing the distortion $J$.
+
+**(c)** *Inherited:* local optima (monotone descent to a fixed point, initialization-dependent) and label switching (relabeling clusters permutes nothing observable). *Escaped:* the singularity, twice over: the covariances are frozen at $\epsilon I$ rather than fitted, so no component can collapse, and the limiting objective $J$ is bounded below by $0$, so no configuration scores infinitely well. The singularity was the price of estimating shapes; k-means never estimates one.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce Dempster, Laird and Rubin's Table 1. Their model: $197$ animals in four categories, $y = (125, 18, 20, 34)$, cell probabilities $\bigl(\tfrac12 + \tfrac{\pi}{4},\ \tfrac{1-\pi}{4},\ \tfrac{1-\pi}{4},\ \tfrac{\pi}{4}\bigr)$. The latent completion splits the first cell into a $\tfrac12$ subcell and a $\tfrac{\pi}{4}$ subcell of unknown occupancies $x_1 + x_2 = 125$. The two steps are
+
+$$
+\text{E:}\quad x_2^{(p)} = 125 \cdot \frac{\pi^{(p)}/4}{\tfrac12 + \pi^{(p)}/4},
+\qquad
+\text{M:}\quad \pi^{(p+1)} = \frac{x_2^{(p)} + 34}{x_2^{(p)} + 34 + 18 + 20}.
+$$
+
+Run eight iterations from $\pi^{(0)} = 0.5$, report the deviations $\pi^{(p)} - \pi^*$ and their successive ratios, and check the ratio against the published $0.1328$. (The fixed point is the positive root of $197\pi^2 - 15\pi - 68 = 0$, obtained by setting $\pi^{(p+1)} = \pi^{(p)}$: $\pi^* = 0.6268214979$.)
+
+<Solution>
+The E step imputes the latent split of the first cell in expectation; the M step is the complete-data MLE, a count ratio (animals in $\pi$-cells over animals in all $\pi$-dependent cells). Iterating:
+
+| $p$ | $\pi^{(p)}$ | $\pi^{(p)} - \pi^*$ | ratio |
+|---|---|---|---|
+| 0 | 0.500000000 | $-0.126821498$ | |
+| 1 | 0.608247423 | $-0.018574075$ | 0.1465 |
+| 2 | 0.624321050 | $-0.002500448$ | 0.1346 |
+| 3 | 0.626488879 | $-0.000332619$ | 0.1330 |
+| 4 | 0.626777322 | $-0.000044176$ | 0.1328 |
+| 5 | 0.626815632 | $-0.000005866$ | 0.1328 |
+| 6 | 0.626820719 | $-0.000000779$ | 0.1328 |
+| 7 | 0.626821394 | $-0.000000103$ | 0.1328 |
+| 8 | 0.626821484 | $-0.000000014$ | 0.1328 |
+
+The ratio reads $0.1330$ at $p = 3$ and holds at $0.1328$ from $p = 4$ on, matching the paper's analytically computed rate $DM(\pi^*) = 0.132778$: linear convergence with rate equal to the missing-information fraction. The iterate column reproduces Table 1 to the printed precision, no better: expect last-digit rounding differences (the 1977 printing has $0.624321051$ and $0.626777323$ where this trace rounds to $\ldots 050$ and $\ldots 322$), and the original's ratio column is dashed over its last three rows because the deviations had become too small to divide meaningfully. A trace that drifts by more than the last digit usually means $\pi$ was updated before $x_2$ was imputed within the cycle.
+</Solution>
+</Exercise>
+
+<Exercise>
+A full-covariance GMM is fit to $N = 500$ points in $d = 2$, once for each $K$ from $1$ to $5$; the maximized training log-likelihoods come out $\hat\ell = (-1420,\ -1250,\ -1195,\ -1188,\ -1183)$. (a) Give the parameter count $p(K)$ for each fit. (b) Compute $\mathrm{BIC} = \hat\ell - \tfrac{p}{2} \ln N$ for each $K$ and select. (c) The $\hat\ell$ column increases at every step, and it will for any data set whatsoever: prove that in one sentence. Then explain why the same argument does not carry over to held-out log-likelihood — and what, physically, makes held-out distortion keep falling for k-means where held-out log-likelihood turns down.
+
+<Solution>
+**(a)** Per the count in the BIC section, $p(K) = (K-1) + 2K + 3K = 6K - 1$: $p = 5, 11, 17, 23, 29$.
+
+**(b)** With $\ln 500 = 6.215$, the penalties $\tfrac{p}{2} \ln N$ are $15.5,\ 34.2,\ 52.8,\ 71.5,\ 90.1$, so
+
+$$
+\mathrm{BIC} = (-1435.5,\ -1284.2,\ -1247.8,\ -1259.5,\ -1273.1),
+$$
+
+maximized at $K = 3$. The accounting behind the peak: the step $2 \to 3$ buys $55$ nats of fit against $18.6$ of added penalty; the step $3 \to 4$ buys $7$ against the same $18.6$.
+
+**(c)** Any $K$-component mixture is a $(K{+}1)$-component mixture with $\pi_{K+1} = 0$, so the larger family contains the smaller and its maximized training likelihood cannot be lower — the same nesting that forced $J^*_{K+1} \le J^*_K$ in <Ref lesson="kmeans">the k-means lesson</Ref>. The argument needs the freedom to optimize on the data being scored, which held-out evaluation removes: the extra component was placed to cover a training accident, and normalization forces the mass it spends there to come out of regions where fresh points land, so the held-out score can fall, and past the supported $K$ it does. k-means' held-out distortion has no such conservation: extra centers only tile the space more finely, every fresh point's nearest-center distance keeps shrinking, and no term ever pays for the added complexity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Generate two concentric rings: 100 points at radius $1$ and 100 at radius $3$ (small radial noise). (a) Fit a 2-component GMM and describe the fitted components and the resulting responsibility split; explain from the shape of a Gaussian's level sets why no fit can assign one ring per component. (b) Build the 10-nearest-neighbor graph on the same points, form the graph Laplacian $L = D - W$ (degree matrix minus adjacency), and compute the eigenvector of the second-smallest eigenvalue. Describe its sign pattern across the two rings.
+
+<Solution>
+**(a)** The fit converges to two overlapping ellipses near the center, or to two half-plane-ish components splitting the figure left/right: the responsibility boundary between two Gaussians is always a quadric (the log-density difference is quadratic in $x$), and every Gaussian's level sets are convex ellipsoids. An annulus is not convex and cannot be a Gaussian's high-density region, so no 2-component mixture separates ring from ring, at any likelihood. The failure is representational, not algorithmic: more restarts fit the wrong shape better.
+
+**(b)** Points on the same ring are mutual near neighbors; across rings, distances are at least the ring gap, so the 10-NN graph is (near) disconnected into two ring-shaped components. For a graph with two connected components, the Laplacian's null space is spanned by the two component indicators, and with weak cross-links the second eigenvector is a smoothed signed indicator: approximately constant and positive on one ring, constant and negative on the other. Thresholding it at zero separates the rings that defeated the mixture. That eigenvector is precisely the embedding coordinate of <Ref lesson="spectral-clustering">spectral clustering</Ref>, which replaces "clusters are ellipsoids" with "clusters are weakly connected pieces of a graph".
+</Solution>
+</Exercise>
+
+<References>
+1. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §9.2: the mixture, responsibilities, the singularity argument (Fig. 9.7) and the K! identifiability remark; §9.2.2: the stationarity derivation this lesson carries (Eqs. 9.16–9.22) and the Old Faithful run (Fig. 9.8); §9.3: the complete-data view and §9.3.2's k-means limit; §9.4: the decomposition (Eqs. 9.70–9.74) and the bound pictures (Figs. 9.11–9.14) recreated here, plus MAP-EM and the GEM variants. Free online: https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+2. A. P. Dempster, N. M. Laird, D. B. Rubin, "Maximum Likelihood from Incomplete Data via the EM Algorithm," *JRSS-B* 39(1), 1977, pp. 1–38 — §1: the 197-animal example and Table 1; §3: Theorem 1 (monotonicity) and the rate-equals-missing-information computation (DM(π*) = 0.132778) — its further convergence claims (Thms. 2–3) rested on a flawed proof, corrected by Wu (item 5); §4: the gallery of instances (missing data, censoring, mixtures, variance components, factor analysis); the printed discussion includes Sundberg's slow-mixture warning. https://web.mit.edu/6.435/www/Dempster77.pdf
+3. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — ch. 11: the Jensen-inequality derivation of the starred section, the ELBO naming, and the footnote warning against reading EM as a global-optimum method. https://cs229.stanford.edu/main_notes.pdf
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §8.7: EM as bound optimization (the MM view of this lesson's tangent figure); §21.4.1.2: label switching and the ordering-constraint fix; §21.4.1.3: Bayesian selection of K. Free online: https://probml.github.io/pml-book/book1.html
+5. C. F. J. Wu, "On the Convergence Properties of the EM Algorithm," *The Annals of Statistics* 11(1), 1983, pp. 95–103 — the corrected convergence theory the refutation exercise states: continuity of $Q$ in both arguments guarantees that limit points of the EM iterates are stationary points of $\ell$ and that $\ell(\theta^{(t)})$ converges to a stationary value; fixes the flawed proof behind the 1977 paper's Theorem 2. https://doi.org/10.1214/aos/1176346060
+</References>

@@ -1,0 +1,470 @@
+checkpoints:
+  kfold-indices:
+    kind: exact
+    seed: 111
+    atol: 1.0e-9
+    inputs_code: |
+      # Imbalanced on purpose: 15 vs 8 with k=5 makes the stratification
+      # and the remainder-dealing both visible in the output.
+      y = np.repeat([0.0, 1.0], [15, 8])
+      rng.shuffle(y)
+      inputs = (y, 5, 11)
+    wrong:
+      - hint: "One permutation over all rows ignores the classes — where the positives land is luck. Permute and deal each class separately, in np.unique(y) order."
+        code: |
+          def f(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              perm = rng.permutation(len(y))
+              folds = np.empty(len(y), dtype=np.int64)
+              folds[perm] = np.arange(len(y)) % k
+              return folds
+      - hint: "Dealing each class in blocks of n_c // k piles the remainder into the last fold — here it ends up with half the positives. The j-th shuffled row of a class goes to fold j % k."
+        code: |
+          def f(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  size = max(len(rows) // k, 1)
+                  folds[perm] = np.minimum(np.arange(len(rows)) // size, k - 1)
+              return folds
+      - hint: "Re-creating np.random.default_rng(seed) inside the per-class loop restarts the random stream for every class, so each class is shuffled by the same draws and the assignment silently changes. The contract creates the generator ONCE, before the loop; every class then consumes the one stream in np.unique(y) order."
+        code: |
+          def f(y, k, seed):
+              import numpy as np
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rng = np.random.default_rng(seed)
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+  cv-score:
+    kind: exact
+    seed: 222
+    atol: 1.0e-6
+    inputs_code: |
+      # A deterministic least-squares fit-callable: the checkpoint grades
+      # the protocol around it, not the model inside it.
+      def fit_ls(Xtr, ytr):
+          A = np.column_stack([np.ones(len(Xtr)), Xtr])
+          coef = np.linalg.lstsq(A, ytr, rcond=None)[0]
+          return lambda Xv: np.column_stack([np.ones(len(Xv)), Xv]) @ coef
+      def mse_in(y_true, y_pred):
+          return float(np.mean((y_true - y_pred) ** 2))
+      X = rng.normal(size=(40, 3))
+      y = X @ np.array([1.0, -2.0, 0.5]) + rng.normal(size=40)
+      folds = rng.permutation(np.arange(40) % 5)
+      inputs = (fit_ls, X, y, folds, mse_in)
+    wrong:
+      - hint: "The roles are swapped: fold f is the VALIDATION set. Fit on every row outside fold f, score on fold f — not the reverse."
+        code: |
+          def f(fit_fn, X, y, folds, err):
+              import numpy as np
+              k = int(folds.max()) + 1
+              out = np.empty(k)
+              for fold in range(k):
+                  tr, va = folds == fold, folds != fold
+                  predict = fit_fn(X[tr], y[tr])
+                  out[fold] = err(y[va], predict(X[va]))
+              return out
+      - hint: "Fold f's error must be computed on rows the fit never saw: predict on X[folds == f]. Scoring the fit on its own training rows is the optimism this module opened with."
+        code: |
+          def f(fit_fn, X, y, folds, err):
+              import numpy as np
+              k = int(folds.max()) + 1
+              out = np.empty(k)
+              for fold in range(k):
+                  tr = folds != fold
+                  predict = fit_fn(X[tr], y[tr])
+                  out[fold] = err(y[tr], predict(X[tr]))
+              return out
+  bootstrap-se:
+    kind: exact
+    seed: 333
+    atol: 1.0e-6
+    inputs_code: |
+      mpg = np.loadtxt("data/auto.csv", delimiter=",", skiprows=1)[:, 0]
+      inputs = (mpg, np.median, 500, 7)
+    wrong:
+      - hint: "The replicates' spread is the ddof=1 standard deviation — numpy's std defaults to ddof=0."
+        code: |
+          def f(x, stat, B, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              n = len(x)
+              stats = np.array([stat(x[rng.integers(0, n, size=n)]) for _ in range(B)])
+              return float(stats.std())
+      - hint: "A full-size draw WITHOUT replacement is the whole sample reordered — every replicate statistic is identical and the SE collapses to zero. rng.integers(0, n, size=n) draws with replacement."
+        code: |
+          def f(x, stat, B, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              n = len(x)
+              stats = np.array([stat(x[rng.permutation(n)]) for _ in range(B)])
+              return float(stats.std(ddof=1))
+      - hint: "The SE is the replicates' spread about their OWN mean, std(ddof=1) — not the root-mean-square distance from the full-sample statistic."
+        code: |
+          def f(x, stat, B, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              n = len(x)
+              stats = np.array([stat(x[rng.integers(0, n, size=n)]) for _ in range(B)])
+              return float(np.sqrt(np.mean((stats - stat(x)) ** 2)))
+  one-se-rule:
+    kind: exact
+    seed: 401
+    atol: 1.0e-9
+    inputs_code: |
+      # A U-shaped truth under uneven fold noise: the argmin sits in the
+      # complex half, the band reaches well back toward simplicity, and
+      # the per-column scatter varies enough to expose a mis-anchored band.
+      base = 0.55 + 0.25 * np.linspace(-1.0, 0.5, 12) ** 2
+      scale = rng.uniform(0.05, 0.16, size=12)
+      tbl = base + rng.normal(0.0, 1.0, size=(10, 12)) * scale
+      inputs = (tbl,)
+    wrong:
+      - hint: "Within the one-SE band you take the SIMPLEST setting — the smallest index that clears it, not the last one inside the band."
+        code: |
+          def f(fold_errors):
+              import numpy as np
+              k = fold_errors.shape[0]
+              mean = fold_errors.mean(0)
+              se = fold_errors.std(0, ddof=1) / np.sqrt(k)
+              i_min = int(np.argmin(mean))
+              i_pick = int(np.flatnonzero(mean <= mean[i_min] + se[i_min])[-1])
+              return mean, se, i_min, i_pick
+      - hint: "The band is one number, anchored at the minimum: mean[i_min] + se[i_min]. Testing each column against its own SE moves the bar per column."
+        code: |
+          def f(fold_errors):
+              import numpy as np
+              k = fold_errors.shape[0]
+              mean = fold_errors.mean(0)
+              se = fold_errors.std(0, ddof=1) / np.sqrt(k)
+              i_min = int(np.argmin(mean))
+              i_pick = int(np.flatnonzero(mean <= mean[i_min] + se)[0])
+              return mean, se, i_min, i_pick
+      - hint: "The standard error of a mean over k folds is sd/sqrt(k), not sd/k."
+        code: |
+          def f(fold_errors):
+              import numpy as np
+              k = fold_errors.shape[0]
+              mean = fold_errors.mean(0)
+              se = fold_errors.std(0, ddof=1) / k
+              i_min = int(np.argmin(mean))
+              i_pick = int(np.flatnonzero(mean <= mean[i_min] + se[i_min])[0])
+              return mean, se, i_min, i_pick
+  screen-then-cv:
+    kind: exact
+    seed: 8
+    atol: 1.0e-9
+    inputs_code: |
+      # The ESL referee problem: pure noise, so the truth is 50% and the
+      # expected output is the size of the leak.
+      X = rng.normal(size=(50, 5000))
+      y = np.repeat([1.0, -1.0], 25)
+      inputs = (X, y, 100, 5, 8)
+    wrong:
+      - hint: "np.argsort ascends: [:n_keep] keeps the hundred most ANTI-correlated columns. The largest signed correlations sit at the END of the order."
+        code: |
+          def _kfold(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+          def f(X, y, n_keep, k, seed):
+              import numpy as np
+              Xc = X - X.mean(0)
+              yc = y - y.mean()
+              r = (Xc.T @ yc) / (np.sqrt((Xc ** 2).sum(0)) * np.sqrt((yc ** 2).sum()))
+              kept = np.argsort(r)[:n_keep]
+              Xk = X[:, kept]
+              folds = _kfold(y, k, seed)
+              out = np.empty(k)
+              for fold in range(k):
+                  tr, va = folds != fold, folds == fold
+                  d2 = ((Xk[va][:, None, :] - Xk[tr][None, :, :]) ** 2).sum(-1)
+                  out[fold] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return float(out.mean())
+      - hint: "\"Keep the strongest\" read as |r| keeps the most anti-correlated columns too — a legitimate screen in general, and the exact ambiguity the wrong-way lesson's reproduction had to bracket (its |r| variant reports ~1% where the signed one reports ~5%). This lab's contract is the lesson's protocol: the n_keep largest SIGNED correlations, np.argsort(r)[-n_keep:] with no absolute value."
+        code: |
+          def _kfold(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+          def f(X, y, n_keep, k, seed):
+              import numpy as np
+              Xc = X - X.mean(0)
+              yc = y - y.mean()
+              r = (Xc.T @ yc) / (np.sqrt((Xc ** 2).sum(0)) * np.sqrt((yc ** 2).sum()))
+              kept = np.argsort(np.abs(r))[-n_keep:]
+              Xk = X[:, kept]
+              folds = _kfold(y, k, seed)
+              out = np.empty(k)
+              for fold in range(k):
+                  tr, va = folds != fold, folds == fold
+                  d2 = ((Xk[va][:, None, :] - Xk[tr][None, :, :]) ** 2).sum(-1)
+                  out[fold] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return float(out.mean())
+  screen-within-cv:
+    kind: exact
+    seed: 5
+    atol: 1.0e-9
+    inputs_code: |
+      # Same construction as screen-then-cv, fresh draw: the honest report
+      # should sit near the 50% truth.
+      X = rng.normal(size=(50, 5000))
+      y = np.repeat([1.0, -1.0], 25)
+      inputs = (X, y, 100, 5, 5)
+    wrong:
+      - hint: "The kept set was computed from all 50 rows before the folds existed — the held-out labels are inside those correlations, and the report collapses back to the bogus number. Screen on the training rows, inside the fit-callable."
+        code: |
+          def _kfold(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+          def f(X, y, n_keep, k, seed):
+              import numpy as np
+              Xc = X - X.mean(0)
+              yc = y - y.mean()
+              r = (Xc.T @ yc) / (np.sqrt((Xc ** 2).sum(0)) * np.sqrt((yc ** 2).sum()))
+              kept = np.argsort(r)[-n_keep:]
+              Xk = X[:, kept]
+              folds = _kfold(y, k, seed)
+              out = np.empty(k)
+              for fold in range(k):
+                  tr, va = folds != fold, folds == fold
+                  d2 = ((Xk[va][:, None, :] - Xk[tr][None, :, :]) ** 2).sum(-1)
+                  out[fold] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return float(out.mean())
+      - hint: "One fold's screen reused everywhere still leaks: a kept set chosen on fold 0's training rows has read the labels that folds 1..k-1 hold out. Re-screen inside every fold."
+        code: |
+          def _kfold(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+          def f(X, y, n_keep, k, seed):
+              import numpy as np
+              folds = _kfold(y, k, seed)
+              tr0 = folds != 0
+              Xc = X[tr0] - X[tr0].mean(0)
+              yc = y[tr0] - y[tr0].mean()
+              r = (Xc.T @ yc) / (np.sqrt((Xc ** 2).sum(0)) * np.sqrt((yc ** 2).sum()))
+              kept = np.argsort(r)[-n_keep:]
+              Xk = X[:, kept]
+              out = np.empty(k)
+              for fold in range(k):
+                  tr, va = folds != fold, folds == fold
+                  d2 = ((Xk[va][:, None, :] - Xk[tr][None, :, :]) ** 2).sum(-1)
+                  out[fold] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return float(out.mean())
+  nested-cv:
+    kind: exact
+    seed: 7
+    atol: 1.0e-9
+    inputs_code: |
+      # The referee problem once more: the fully nested report should
+      # straddle the 50% truth, and the picks expose the inner selection.
+      X = rng.normal(size=(50, 5000))
+      y = np.repeat([1.0, -1.0], 25)
+      inputs = (X, y, [10, 25, 50, 100, 200], 5, 7)
+    wrong:
+      - hint: "The inner choice is the argmin, not the one-SE pick: the contract selects with YOUR one_se_pick — the smallest grid size whose inner CV mean clears the band anchored at the minimum — and the picks in your output disagree."
+        code: |
+          def _kfold(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+          def _screen(Xtr, ytr, n_keep):
+              import numpy as np
+              Xc = Xtr - Xtr.mean(0)
+              yc = ytr - ytr.mean()
+              r = (Xc.T @ yc) / (np.sqrt((Xc ** 2).sum(0)) * np.sqrt((yc ** 2).sum()))
+              return np.argsort(r)[-n_keep:]
+          def _fold_errs(X, y, n_keep, folds, k):
+              import numpy as np
+              out = np.empty(k)
+              for f_ in range(k):
+                  tr, va = folds != f_, folds == f_
+                  kept = _screen(X[tr], y[tr], n_keep)
+                  Xtr_k, Xva_k = X[tr][:, kept], X[va][:, kept]
+                  d2 = ((Xva_k[:, None, :] - Xtr_k[None, :, :]) ** 2).sum(-1)
+                  out[f_] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return out
+          def f(X, y, grid, k, seed):
+              import numpy as np
+              outer = _kfold(y, k, seed)
+              errors = np.empty(k)
+              picks = np.empty(k)
+              for f_ in range(k):
+                  tr, va = outer != f_, outer == f_
+                  inner = _kfold(y[tr], k, seed)
+                  tbl = np.column_stack([_fold_errs(X[tr], y[tr], nk, inner, k)
+                                         for nk in grid])
+                  i = int(np.argmin(tbl.mean(0)))
+                  picks[f_] = grid[i]
+                  kept = _screen(X[tr], y[tr], int(grid[i]))
+                  Xtr_k, Xva_k = X[tr][:, kept], X[va][:, kept]
+                  d2 = ((Xva_k[:, None, :] - Xtr_k[None, :, :]) ** 2).sum(-1)
+                  errors[f_] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return errors, picks
+      - hint: "The inner assignment must be a FRESH deal of the training rows — kfold_indices(y[tr], k, seed) — not the outer assignment's own entries restricted to them (outer[tr]). Reusing the outer entries is a different protocol: the inner CV runs on the outer deal's leftover folds, and the picks drift."
+        code: |
+          def _kfold(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+          def _screen(Xtr, ytr, n_keep):
+              import numpy as np
+              Xc = Xtr - Xtr.mean(0)
+              yc = ytr - ytr.mean()
+              r = (Xc.T @ yc) / (np.sqrt((Xc ** 2).sum(0)) * np.sqrt((yc ** 2).sum()))
+              return np.argsort(r)[-n_keep:]
+          def _fold_errs_ids(X, y, n_keep, folds):
+              import numpy as np
+              ids = np.unique(folds)
+              out = np.empty(len(ids))
+              for i, fid in enumerate(ids):
+                  tr, va = folds != fid, folds == fid
+                  kept = _screen(X[tr], y[tr], n_keep)
+                  Xtr_k, Xva_k = X[tr][:, kept], X[va][:, kept]
+                  d2 = ((Xva_k[:, None, :] - Xtr_k[None, :, :]) ** 2).sum(-1)
+                  out[i] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return out
+          def f(X, y, grid, k, seed):
+              import numpy as np
+              outer = _kfold(y, k, seed)
+              errors = np.empty(k)
+              picks = np.empty(k)
+              for f_ in range(k):
+                  tr, va = outer != f_, outer == f_
+                  inner = outer[tr]
+                  tbl = np.column_stack([_fold_errs_ids(X[tr], y[tr], nk, inner)
+                                         for nk in grid])
+                  mean = tbl.mean(0)
+                  se = tbl.std(0, ddof=1) / np.sqrt(tbl.shape[0])
+                  i_min = int(np.argmin(mean))
+                  i = int(np.flatnonzero(mean <= mean[i_min] + se[i_min])[0])
+                  picks[f_] = grid[i]
+                  kept = _screen(X[tr], y[tr], int(grid[i]))
+                  Xtr_k, Xva_k = X[tr][:, kept], X[va][:, kept]
+                  d2 = ((Xva_k[:, None, :] - Xtr_k[None, :, :]) ** 2).sum(-1)
+                  errors[f_] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return errors, picks
+      - hint: "The size was chosen by one CV over ALL fifty rows — so every outer fold grades a choice its own labels voted for, and the picks come out identical across folds. The choice must be re-made inside each outer fold, by an inner CV on that fold's training rows alone."
+        code: |
+          def _kfold(y, k, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              folds = np.empty(len(y), dtype=np.int64)
+              for c in np.unique(y):
+                  rows = np.flatnonzero(y == c)
+                  perm = rng.permutation(rows)
+                  folds[perm] = np.arange(len(perm)) % k
+              return folds
+          def _screen(Xtr, ytr, n_keep):
+              import numpy as np
+              Xc = Xtr - Xtr.mean(0)
+              yc = ytr - ytr.mean()
+              r = (Xc.T @ yc) / (np.sqrt((Xc ** 2).sum(0)) * np.sqrt((yc ** 2).sum()))
+              return np.argsort(r)[-n_keep:]
+          def _fold_errs(X, y, n_keep, folds, k):
+              import numpy as np
+              out = np.empty(k)
+              for f_ in range(k):
+                  tr, va = folds != f_, folds == f_
+                  kept = _screen(X[tr], y[tr], n_keep)
+                  Xtr_k, Xva_k = X[tr][:, kept], X[va][:, kept]
+                  d2 = ((Xva_k[:, None, :] - Xtr_k[None, :, :]) ** 2).sum(-1)
+                  out[f_] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return out
+          def f(X, y, grid, k, seed):
+              import numpy as np
+              folds = _kfold(y, k, seed)
+              tbl = np.column_stack([_fold_errs(X, y, nk, folds, k) for nk in grid])
+              mean = tbl.mean(0)
+              se = tbl.std(0, ddof=1) / np.sqrt(k)
+              i_min = int(np.argmin(mean))
+              i = int(np.flatnonzero(mean <= mean[i_min] + se[i_min])[0])
+              pick = int(grid[i])
+              errors = np.empty(k)
+              for f_ in range(k):
+                  tr, va = folds != f_, folds == f_
+                  kept = _screen(X[tr], y[tr], pick)
+                  Xtr_k, Xva_k = X[tr][:, kept], X[va][:, kept]
+                  d2 = ((Xva_k[:, None, :] - Xtr_k[None, :, :]) ** 2).sum(-1)
+                  errors[f_] = np.mean(y[tr][np.argmin(d2, axis=1)] != y[va])
+              return errors, np.full(k, float(pick))
+  leakage-gap:
+    kind: metric
+    metric: rmse
+    threshold: -0.02
+    labels_code: |
+      # The reference study's own thirty reports — wrong-way, tuned
+      # shortcut, nested; ten seeds each — frozen at authoring time.
+      # Data-dependent per seed, so the bar cannot be met by typing the
+      # three protocols' typical values: block-constant guesses score
+      # near 0.03 RMSE against these, above the 0.02 bar, while a study
+      # run through correct checkpointed functions reproduces them
+      # report for report.
+      labels = np.loadtxt("private/reports.csv")
+  why-the-gap:
+    kind: review
+    rubric: |
+      The question: the wrong-way pipeline used disjoint folds and refit
+      the classifier every round, yet reported ~3-5% on a problem whose
+      true error is 50%. Name the assumption honest cross-validation makes
+      about the held-out fold, how the full-data screen violates it, and
+      why disjoint folds do not restore it.
+
+      Pass if the answer states, in some phrasing, that CV's validity
+      requires the held-out fold to be independent of (exchangeable with a
+      fresh draw, conditional on) the FITTED RULE, that the rule includes
+      the screening step's kept feature set, and that screening on all
+      rows makes the kept set a function of the held-out fold's labels —
+      so conditional on the kept features the held-out labels are no
+      longer fresh (they correlate with the kept columns although the
+      population correlations are zero). Accept equivalent phrasings:
+      "selection is fitting and ran outside the folds", "the hypothesis
+      was chosen after seeing the validation data", exchangeability of
+      folds conditional on the selection.
+      The answer must also convey why row-disjointness is not enough: the
+      dependence enters through the label-dependent selection, not
+      through shared rows.
+
+      Fail if the answer only invokes "overfitting", "data leakage", or
+      "double dipping" without naming what became dependent on what; if it
+      attributes the gap to the classifier choice, the fold count, or
+      small n; or if it claims the folds shared rows.

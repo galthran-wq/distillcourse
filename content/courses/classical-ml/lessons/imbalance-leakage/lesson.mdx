@@ -1,0 +1,344 @@
+The two most common ways a good-looking model fails in production are class imbalance handled with the wrong metric and information leaking from the future into training.
+
+The evaluation module has built the two halves of honest measurement: <Ref lesson="classification-metrics">the metrics lesson</Ref> established what each number a classifier is graded by actually answers, and <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> established the protocols that estimate those numbers without optimism, closing on the warning that folds must respect time and groups. What stands open is the gap between an honest protocol and an honest result: a pipeline can follow every rule so far and still report fiction, because the data was mishandled before any protocol ran. This lesson supplies the two disciplines that close the gap: an imbalance playbook whose every move is derived rather than folklore, and a leakage taxonomy with the audit that catches each type. The two are one mismatch read in both directions — resampling shifts the training distribution away from deployment's deliberately, leakage imports information deployment will not have accidentally, and each makes an offline number describe a world the deployed model never sees. The route: the four imbalance moves ordered by cost; the calibration debt the model-side moves incur, with the correction derived; the balance-first reflex refuted; the four leakage carriers, each with a documented case; the detection checklist; and what one badly built benchmark did to a published table.
+
+## The imbalance playbook: four moves, ordered by cost
+
+The two previous lessons each met imbalance once — the metrics lesson priced its effect on precision, the resampling lesson stratified folds to preserve it — and neither supplied a decision procedure: which intervention, in what order, at what cost.
+
+<Task>
+Three retrievals before the playbook, closed book; write each answer down before opening the fold below. (1) From <Ref lesson="classification-metrics">the metrics lesson</Ref>: a fixed operating point has $TPR = 0.8$, $FPR = 0.1$. Compute its precision on balanced data and at 1:100, and name the term that moved. (2) From the same lesson: a false alarm costs $a$ and a miss costs $c$. State the Bayes flagging rule, and say what the default threshold $\tfrac12$ asserts about the two costs. (3) From <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: state what a cross-validated score estimates, and where every fitted step of the pipeline must run.
+</Task>
+
+<Aside>
+Answers. (1) $\mathrm{Prec} = TPR/(TPR + FPR/r)$ with $r$ the positive-to-negative ratio: 0.89 balanced, 0.074 at 1:100 — the $FP$ count scales with the negatives while $TP$ does not. (2) Flag when $p > a/(a+c)$; the threshold $\tfrac12$ asserts the two costs are equal. (3) The error of the whole fitting procedure on fresh data; inside the folds, on training rows only.
+</Aside>
+
+### The defaults that break, and the four responses
+
+Nothing about rare positives breaks estimation: a logistic regression fitted to a 1:99 problem is still the maximum-likelihood fit, and its probabilities are still consistent. What breaks is a set of **defaults** that silently assume balance: accuracy's baseline $\max(\pi, 1-\pi)$ sits at the ceiling when the positive fraction $\pi$ is small; the threshold $\tfrac12$ asserts equal error costs; and precision, written in truth-conditioned rates as
+
+$$
+\mathrm{Prec} = \frac{TPR}{TPR + FPR/r}, \qquad r = \frac{\pi}{1-\pi},
+$$
+
+collapses as $r \to 0$ at any fixed operating point with $FPR > 0$ — only a classifier that literally never false-alarms holds its precision as positives thin out. The problem named this way is a mismatch between defaults and deployment, and the standard responses sort by what they touch: the *evaluation* (report PR curves and expected cost instead of accuracy), the *objective* (weight the loss), the *data* (resample it), and the *decision* (move the threshold).
+
+<Figure
+  src="./figures/playbook-strip.svg"
+  alt="Four boxes in a row: fix the metric, weight the loss, resample, move the threshold; the metric and threshold boxes are marked free in green, one amber tax stamp reading b minus delta spans both the weighting and resampling boxes, and a dashed arc notes that for the decision, moves 2 and 3 reduce to move 4"
+  caption="The playbook. The tax stamp and the dashed arc are the next two sections: both invasive moves carry the same calibration bill, and for the decision they reduce to a threshold."
+/>
+
+### The deciding quantity: absolute minority count
+
+How much of this machinery a problem needs is decided by one quantity, and it is not the ratio. Learning difficulty tracks the **absolute minority count**: 1% prevalence over $10^7$ rows leaves 100,000 positives, plenty to estimate a class; the same 1% over 20,000 rows leaves 200, and no reweighting scheme manufactures the information those 200 do not carry. With enough positives and the right metric, the correct amount of intervention is frequently zero.
+
+<KeyFact>
+Fixing the metric changes nothing but the report, and moving the threshold changes nothing but the decision; both are free. Weights and resampling change what the model estimates, and the next section shows that what they change is, exactly, the intercept.
+</KeyFact>
+
+## What the model-side moves actually do
+
+The free moves were established in the two previous lessons. This section derives the other two, and both derivations end at the same place: a constant added to the log-odds.
+
+### Class weights: cost-sensitive likelihood in one line
+
+Weighting multiplies each example's loss by a class-dependent factor. For logistic regression with $p_i = \sigma(w^\top x_i + b)$, the weighted negative log-likelihood and its gradient are
+
+$$
+\mathcal{L} = -\sum_i c_{y_i}\bigl[y_i \log p_i + (1-y_i)\log(1-p_i)\bigr],
+\qquad
+\nabla_w \mathcal{L} = \sum_i c_{y_i}\,(p_i - y_i)\,x_i,
+$$
+
+one line from <Ref lesson="glm">the universal GLM gradient</Ref> $(y-\mu)x$: each term keeps its direction and is scaled by its class's weight, so a minority example with $c_+ = 50$ pulls the boundary fifty times harder. For any batch-minimized loss, duplicating every positive $k$ times produces literally the same objective as $c_+ = k$: duplication *is* weighting. The equivalence breaks only where an algorithm sees rows rather than objectives: SGD visits a duplicated point more often instead of scaling its gradient, and tree learners count copies as distinct evidence in split and leaf-size rules.
+
+### Resampling: three names, one distortion
+
+Changing the training set itself comes in three standard forms. *Undersampling* discards majority rows until the target ratio is reached; *oversampling* duplicates minority rows; *SMOTE* interpolates instead of duplicating, placing synthetic positives at random points on segments between minority nearest neighbors. SMOTE's synthetic points are convex combinations of the real ones, so for a linear model they add little that weights do not, and interpolation degrades in high dimensions, where <Ref lesson="knn-curse">nearest neighbors are barely nearer than average points</Ref>; benchmark comparisons find no consistent advantage over weighting and thresholding for properly tuned learners. All three forms share one property, and it is the subject of the theorem: they change the class prior the model is fitted to.
+
+### The prior shift, derived
+
+A model trained on rebalanced data learns, correctly for its training world, that positives are common. The distortion this induces is not vague; it is a single number, computable in two lines of Bayes' rule.
+
+<Theorem title="resampling shifts the log-odds by a constant">
+Let the training set be resampled so that each positive is retained (or duplicated) at rate $s_+$ and each negative at rate $s_-$, with the rates depending on the label only. Writing $\tilde{p}$ for probabilities under the resampled distribution,
+
+$$
+\frac{\tilde{p}(y{=}1 \mid x)}{\tilde{p}(y{=}0 \mid x)}
+= \frac{s_+}{s_-}\cdot\frac{p(y{=}1 \mid x)}{p(y{=}0 \mid x)}:
+$$
+
+every posterior odds is multiplied by $s_+/s_-$, i.e. every log-odds is shifted by $\delta = \log(s_+/s_-)$. If the resampling takes class counts $(n_+, n_-)$ to $(n_+', n_-')$, then $\delta = \log\dfrac{n_+'\,n_-}{n_+\,n_-'}$.
+
+<Proof>
+Let $S$ be the event that a row survives the resampling. By assumption $\Pr(S \mid y, x) = s_y$, free of $x$. Conditioning on survival,
+
+$$
+\tilde{p}(y \mid x) = p(y \mid x, S) = \frac{\Pr(S \mid y, x)\,p(y \mid x)}{\Pr(S \mid x)} = \frac{s_y\,p(y \mid x)}{\Pr(S \mid x)}.
+$$
+
+Taking the ratio of the two classes cancels $\Pr(S \mid x)$ and leaves the factor $s_+/s_-$. The rates in terms of counts are $s_+ = n_+'/n_+$ and $s_- = n_-'/n_-$, giving the count form of $\delta$. The step where the hypothesis works is $\Pr(S \mid y, x) = s_y$: a resampling rule that looks at $x$ (SMOTE, which manufactures new $x$ values, or informed undersampling) changes the class-conditionals too, and the shift is then only approximate.
+</Proof>
+</Theorem>
+
+For logistic regression the theorem's consequence is confined to one parameter: the true log-odds under the resampled distribution is $w^\top x + b + \delta$, so a well-specified fit moves its **intercept** by $\delta$ and nothing else. The repair is to subtract it back: report $\sigma(w^\top x + b_{\text{fit}} - \delta)$, or equivalently divide the stated odds by $e^{\delta}$. The ranking and the ROC curve are untouched, because the map is monotone; only the calibration contract of <Ref lesson="classification-metrics">the metrics lesson</Ref> was being violated, and only it is repaired.
+
+<Example title="correcting a stated 90%">
+A screening problem has prevalence $\pi = 1/11$, so $n_- = 10\,n_+$. Upsampling positives tenfold balances the classes and gives $\delta = \log\frac{10\,n_+ \cdot 10\,n_+}{n_+ \cdot 10\,n_+} = \log 10 \approx 2.30$. The balanced-trained model states $\tilde{p} = 0.9$ for a case. Stated odds: $0.9/0.1 = 9$. Corrected odds: $9/10 = 0.9$. Corrected probability:
+
+$$
+p = \frac{0.9}{1.9} = 0.474.
+$$
+
+A "90% positive" score is a 47% probability. Lower scores are hit harder: stated $0.5$ corrects to odds $1/10$, probability $0.091$, which is exactly the prevalence, an identity the next section derives and prices.
+</Example>
+
+<Exercise>
+Same setup, but the positives were upsampled fivefold rather than tenfold (so training runs at 5:10, not 10:10). Correct a stated $\tilde{p} = 0.6$, and state what threshold on the *stated* scores reproduces the decision "flag when the honest probability exceeds $1/4$". Write $\delta$ before opening the solution.
+
+<Solution>
+$\delta = \log 5 \approx 1.61$. Stated odds $0.6/0.4 = 1.5$; corrected odds $1.5/5 = 0.3$; corrected probability $0.3/1.3 = 0.231$.
+
+For the threshold: honest odds $\ge 1/3$ corresponds to stated odds $\ge 5/3$, i.e. stated probability $\ge (5/3)/(1 + 5/3) = 0.625$. The transferable move: a threshold on honest probabilities is a threshold on stated ones, shifted through the same $\delta$; decisions never require undoing the resampling, only knowing it happened.
+</Solution>
+</Exercise>
+
+<Figure
+  src="./figures/resampling-reliability.svg"
+  alt="Three reliability diagrams: a model trained at prevalence one-eleventh sits on the diagonal; after tenfold upsampling its stated probabilities sag far below the diagonal, with stated 0.9 observed at 0.47; after subtracting log 10 from the intercept the points return to the diagonal"
+  caption="The calibration bill, computed exactly for the worked example: honest at the true prevalence, wrong by e^δ in odds after upsampling, honest again after the intercept correction."
+/>
+
+The same bill arrives with class weights. The weighted likelihood is the resampled one with $c_+/c_-$ in the role of $s_+/s_-$ (duplication is weighting), so a well-specified weighted fit shifts its intercept by $\log(c_+/c_-)$ and its probabilities need the identical correction. When the model is misspecified, or the resampler touched $x$ (SMOTE), the analytic correction is approximate, and the robust repair is empirical: Platt or isotonic recalibration from <Ref lesson="classification-metrics">the metrics lesson</Ref>, fitted on *unresampled* held-out data. And in every variant, the resampling itself is a fitted, data-dependent step, so it runs inside the cross-validation folds and never touches a test set: a test set rebalanced to 1:1 answers a question deployment will never ask.
+
+<KeyFact>
+The unpaid debt is priced in decisions, not cosmetics: the Bayes threshold $p > a/(a+c)$, the expected size of a review queue, and every cost or risk budget are computed *from* the stated probabilities, so each inherits the full $e^{\delta}$ odds error until the debt is repaid.
+</KeyFact>
+
+## The balance-first reflex, refuted
+
+The base rate is information. A model trained at the deployment prevalence carries $p(y)$ where it belongs, in its intercept, and its stated probabilities can be consumed directly by the cost-derived threshold. That is the correct account. Against it stands a prevalent reflex: *class imbalance is a defect in the data, to be corrected by balancing the classes before modeling*. The reflex fails on two counts, and the two preceding sections supply both.
+
+### First count: the probabilities come back wrong
+
+Balancing without recalibration produces probabilities that are systematically wrong by $\delta$: for a prevalence-$\pi$ problem balanced to 1:1, $\delta = \log\frac{1-\pi}{\pi}$, which at $\pi = 3\%$ is a factor of 32 in odds on every single score. A calibrated screening model's average stated probability sits near the prevalence, 3%; its balanced-trained version's average sits near 50%, an implied prevalence seventeen times the truth, and any queue, budget, or expected-cost computation fed those scores inherits the fiction.
+
+### Second count: the decision was available for free
+
+Thresholding the balanced-trained model at $\tfrac12$ is, by the theorem, thresholding honest odds at $\pi/(1-\pi)$: flagging every case whose honest probability exceeds the prevalence. That is the Bayes rule $p > a/(a+c)$ at the implicit cost ratio $c/a = (1-\pi)/\pi \approx 32$: an operating point the reflex chose silently, paid for with retraining, and delivered with corrupted probabilities.
+
+<Figure
+  src="./figures/threshold-map.svg"
+  alt="Two horizontal probability axes joined by chords: scores stated by a balanced-trained model on top, honest probabilities below, every chord the same log-odds shift of about 3.5; the amber chord sends the stated threshold one half to the prevalence 0.03, and the stated score 0.97 lands on an honest one half"
+  caption="The equivalence at π = 3%. One δ moves every score, so the balanced model's default threshold ½ is the honest model's threshold π — and a stated 0.97 is the honest coin flip."
+/>
+
+The replacement is the playbook's order: metric, then threshold, and the model-side moves only when the minority fit itself is demonstrably poor, with the recalibration bill paid.
+
+<KeyFact>
+There is one boundary case where the reflex lands the right decision: when a miss genuinely costs $(1-\pi)/\pi$ times a false alarm — a screen whose review is cheap and whose missed case is catastrophic — balancing then thresholding at $\tfrac12$ is a defensible way to reach the correct operating point, at the price of a retrain and of probabilities that still owe the $\delta$ correction. Even at its best, the reflex is a threshold move executed as the playbook's most expensive item.
+</KeyFact>
+
+## Leakage: one failure, four carriers
+
+The playbook assumed the only problem was rarity; the second failure family is worse, because it makes every number look better. <Ref lesson="spam-filter">The spam chapter</Ref> met it informally when the corpus's best ham feature turned out to be the recipient's own first name; this section gives the failure its definition and its taxonomy.
+
+<Definition title="data leakage">
+**Data leakage** is the use, during training or evaluation, of information that will not be available at prediction time, causing offline performance estimates to exceed anything deployment can deliver. The formal treatment is due to [Kaufman, Rosset, Perlich, and Stitelman (2012)](https://doi.org/10.1145/2382577.2382579); systematic reviews across 17 scientific fields have since traced reproducibility failures in hundreds of published papers to it ([Kapoor and Narayanan, 2023](https://doi.org/10.1016/j.patter.2023.100804)).
+</Definition>
+
+One definition, four carriers. Classified by *what carries the illegitimate information across the train–test boundary*, the practical cases are: a feature, the clock, an identity, or a fitted transform.
+
+<FigureSequence
+  name="leakage-taxonomy"
+  alt="Four frames of one pipeline schematic, raw rows to features to a train and test split to fit and score; in each frame an amber dashed arrow crosses the split at a different point: from the labels into the features, from test rows into training, an entity id appearing on both sides, and from test rows into the feature-building transform"
+  caption="One pipeline, four leaks. The amber arrow is the only thing that changes: where the illegitimate information crosses the line."
+/>
+
+<Task>
+Step through the four frames and, before reading the subsections below, name for each arrow the single question that would have caught it at design time. Compare against the audit checklist in the next section.
+</Task>
+
+### Target leakage: a feature caused by the label
+
+The carrier is a feature whose value is set or changed by the outcome being predicted. The documented industrial case comes from Kaufman et al.: an IBM system predicting which companies would buy a product used words found on prospects' websites, and the strongest predictor was the product's own name — the sites had been crawled *after* the purchases, so the feature was a consequence of the sale, not a cause. The medical version is the standard pattern of treatment fields: a record's medication or procedure codes are populated after, and because of, the diagnosis the model is supposed to predict, so the feature is nearly perfect offline and empty at prediction time. The one-line audit, applied per feature: whether the event being predicted can set or change the value.
+
+### Temporal leakage: the future trains the past
+
+The carrier is the clock. A shuffled split on time-stamped rows trains on the future of the rows it tests on, an arrow no deployment reverses; <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> already required forward-chaining for the split itself. The subtler instance hides inside features: an aggregate such as a customer's mean transaction amount, computed over the *whole* history, includes transactions later than the row being scored, so each training row contains a summary of its own future. The fix is the as-of rule: every feature is computed from data strictly earlier than the row's prediction time.
+
+<Figure
+  src="./figures/asof-timeline.svg"
+  alt="A timeline of one customer's transactions with a dashed marker at the row's prediction time; arrows feed every transaction into a mean-amount feature box, the arrows from transactions after the marker drawn in amber crossing the line, and a green bracket marks the as-of window strictly before the prediction time"
+  caption="One aggregate feature for one row. Computed over the whole history, it ingests transactions later than the row's own prediction time (amber); the as-of rule admits only the green span."
+/>
+
+### Group leakage: one entity on both sides
+
+The carrier is an identity. When several rows share a source (transactions per customer, images per patient), a random split puts the same entity in train and test, and the model is graded partly on recognizing individuals it memorized. The benchmark-assembly version is documented in the 2008 KDD Cup breast-cancer competition, where the patient ID itself carried predictive power: the data had been pooled from sites with different malignancy rates, and IDs were assigned in per-site ranges, so an integer key encoded the label's base rate. The fix is the group fold from <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: entities, not rows, are assigned to folds, with duplicated and near-duplicated rows deduplicated first.
+
+### Preprocessing leakage: a transform fitted on everything
+
+The carrier is a fitted transform. No single feature is illegitimate; the protocol is: a scaler's $\mu$ and $\sigma$, an imputer's fill values, or a feature screen's chosen columns are computed from all rows, test rows included, and the evaluation then treats those rows as unseen. The extreme case is screening thousands of features against the labels before cross-validating the survivors, which reports 3% error on a problem whose true error is 50% (ESL §7.10.2); that blunder is reproduced end to end in <Ref lesson="wrong-way-cv">its own lesson</Ref>, and the final exercise here walks into it deliberately. The fix was stated by the resampling lesson and covers every instance at once: every data-dependent step runs inside the fold, on training rows only.
+
+### The boundary case: leakage by deployment shift
+
+The `george` feature closes the taxonomy by testing its definition. In the spam corpus, the recipient's first name averaged 0.00% of words in spam against 1.27% in ham: genuinely predictive, honestly measured, on both sides of every split. It is leakage anyway, because the deployment question is a *different distribution*, someone else's mailbox, where the feature encodes nothing but the training corpus's identity; deleting it and its employer twin `hp` moved test error from 5.9% to 7.0%, and the corpus's own documentation says such indicators must be blinded. Leakage is defined relative to what deployment will know and mean, not relative to the corpus's internal bookkeeping; that is why a feature can pass every split-hygiene rule and leak anyway.
+
+<KeyFact>
+All four types are one failure, offline access to information deployment will not have, distinguished by the carrier: a feature, the clock, an identity, or a fitted transform. Naming the carrier names the fix: audit the feature's causal timing, build features as-of, assign groups to folds, fit transforms inside them. And the `george` case adds the fifth check no split can perform: ask what each feature will mean where the model is going.
+</KeyFact>
+
+## Detection: tells and their tests
+
+The taxonomy is only useful if leaks can be found, and they are found by symptom. Each tell below is a hypothesis generator; each is paired with the rerun that confirms or clears it, and with the taxonomy row it usually catches.
+
+### Four tells, four reruns
+
+Each row pairs the symptom with the taxonomy row it usually convicts and the rerun that decides; a suspicion becomes a verdict only through the rerun.
+
+| Tell | Usual carrier | Deciding rerun |
+|---|---|---|
+| **The score is too good** — AUC 0.99 where the published state of the art is 0.75, or error below what the base rates make plausible | Target leakage (a feature) | Rank the features by importance; audit the top ones' provenance and timing; rebuild them as-of prediction time and refit |
+| **One feature dominates** — several times the importance of the next | Target leakage (a label proxy) | Drop it and refit: a legitimate strong feature degrades the model, a leak collapses it |
+| **The score collapses on a time split** | Temporal leakage (the clock), plus any drift the shuffled protocol hid | Forward-chain the split; the shuffled-versus-forward gap is the measurement |
+| **Rows repeat across the split** — exact or near duplicates, or one entity's rows on both sides | Group leakage (an identity) | Deduplicate, assign entities to folds, rerun |
+
+The importance rankings the first two reruns lean on are <Ref lesson="bagging-random-forests">Module 7</Ref>'s machinery, and the simplest form of the fourth tell — asking why an integer key has any importance at all — would have caught the KDD Cup 2008 patient-ID leak at assembly time.
+
+### Reading the time-split gap
+
+<Figure
+  src="./figures/time-split-gap.svg"
+  alt="Paired bars of test accuracy for a stationary and a drifting synthetic dataset: shuffled and forward splits agree at 88 and 84 percent on stationary data, but read 87 versus 65 percent on drifting data, with the 22-point gap bracketed as the diagnostic"
+  caption="The time-split test on a synthetic pair (5-NN, n = 2,000, a class boundary that drifts with time). The control column is the point: the gap, not the forward number alone, is the diagnostic."
+/>
+
+The stationary control in the figure matters as much as the collapse: forward splits are always somewhat pessimistic (less training data, and any genuine drift is charged to the model), so the verdict is the *gap between the paired bars*, read against a stationary or known-clean baseline. A suspicious score is convicted by reruns, never by inspection; and the complementary error (declaring leakage because a problem turned out to be easy) is also a wrong answer.
+
+## Benchmark fragility: the KDDCUP99 numbers
+
+Every audit so far ran on a single team's pipeline; the failure with the widest reach is a benchmark a whole field shared. The KDDCUP99 intrusion-detection dataset (4.9 million network-connection records derived from a 1998 DARPA simulation, for years the standard large-scale classification benchmark) is grossly redundant: attack packets were generated in bulk, so near-identical rows saturate the data.
+
+### What one footnote records
+
+A footnote in [Rahimi and Recht's random-features paper (2007)](https://papers.nips.cc/paper/3182-random-features-for-large-scale-kernel-machines) records what that construction does to published numbers. Training on **50 random rows**, 0.001% of the training set, consistently yields about 8% test error, so the benchmark's difficulty is nearly zero. Against that baseline, a state-of-the-art solver's published 6.2% could be reproduced only with the authors' exact training-set ordering: **reshuffling the rows gave 18%**, and perturbing the regularization parameter by 15% gave **49%** (Loosli and Canu's replication). The published table entry, read honestly, measured ordering luck and tuning fragility on a nearly information-free task.
+
+<Figure
+  src="./figures/kddcup-fragility.svg"
+  alt="Dot plot of test error on KDDCUP99: 6.2 percent as published, 8 percent for least squares trained on 50 random rows, 18 percent for the same published method after shuffling the training rows, and 49 percent after nudging its regularization parameter by 15 percent"
+  caption="Four numbers, one benchmark. The 50-random-rows baseline (blue) brackets the published result; the two perturbations show what the 6.2 was made of."
+/>
+
+### Reading tables, building benchmarks
+
+The moral generalizes past one dataset. A published comparison table inherits every property of its benchmark's construction: redundancy that makes tiny subsamples sufficient, assembly artifacts that encode labels (the KDD Cup 2008 IDs), prevalences that make accuracy vacuous. Reading such a table starts with the same audit this lesson applies to pipelines (the trivial baseline's score, the behavior under perturbation), and building a benchmark is leakage-thinking in reverse. The tabular benchmark of Grinsztajn et al. (2022), which the course's final module leans on, spends a full section excluding datasets before any model runs: deterministic targets out, stream-like and time-series data out (the folds would violate independence), datasets a default linear model nearly solves out. Benchmark construction and pipeline hygiene are the same discipline applied at different radii.
+
+<Aside>
+The Grinsztajn exclusion list is worth reading as an audit checklist in its own right (§3 of the paper): heterogeneous real-world columns only; dimension-to-sample ratio below 1/10; no undocumented datasets; i.i.d. data only; nothing a default logistic regression gets within 5% of tuned tree ensembles on; no targets that are deterministic functions of the inputs (the poker and chess datasets, on which "learning" is memorizing a rulebook). Each clause is a leak or triviality mode the authors chose to rule out by construction rather than detect after the fact.
+</Aside>
+
+What stands established: imbalance is handled in cost order, metric and threshold before weights or resampling, because the model-side moves' entire effect on a well-specified fit is an intercept shift of $\delta = \log(s_+/s_-)$ that must be subtracted back before the probabilities mean anything; leakage is one failure with four carriers, each with a documented case, a named audit, and a fix; and both disciplines extend from private pipelines to the published record, where benchmark construction decides what a table's numbers can mean. <Ref lesson="feature-engineering">The next lesson</Ref> works the feature side of the same contract (encodings, scalings, and selections, and where each one leaks); <Ref lesson="wrong-way-cv">the lesson after it</Ref> reproduces the canonical preprocessing leak end to end; and <Ref lesson="validation-lab">the module's lab</Ref> builds the harness that referees every later lab against exactly these failures.
+
+## Exercises
+
+<Exercise>
+A 1:99 screening problem runs on 10,000 cases. The classifier has recall 0.7 and precision 0.2. Reconstruct the confusion matrix, compute the classifier's accuracy, and compare it against the all-negative rival.
+
+<Solution>
+Positives: 100; negatives: 9,900. Recall 0.7 gives $TP = 70$, $FN = 30$. Precision 0.2 means flags $= TP/0.2 = 350$, so $FP = 280$ and $TN = 9{,}900 - 280 = 9{,}620$.
+
+$$
+\text{accuracy} = \frac{70 + 9{,}620}{10{,}000} = 96.9\%,
+$$
+
+against the all-negative rival's 99.0%. The rival "wins" accuracy while detecting nothing; the classifier catches 70 of 100 positives at a queue that is one-fifth real. Every number that matters here (recall, precision, the queue composition) is invisible in the accuracy comparison: the metric move of the playbook, in four counts.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson compressed. (a) Show that for a *well-specified* logistic model (the true log-odds is $w^\top x + b$), the population minimizer of the log-loss on the resampled distribution is exactly $(w,\, b + \delta)$: the slope is untouched and the intercept absorbs the whole distortion. (b) Verify at finite sample on a saturated 2×2 case: one binary feature with counts $n_{00} = 80$, $n_{10} = 10$ (at $x=0$) and $n_{01} = 20$, $n_{11} = 40$ (at $x=1$), positives then upsampled threefold. Compute both fitted models by counts.
+
+<Solution>
+(a) By the theorem, the resampled true log-odds is $w^\top x + b + \delta$, which lies inside the logistic family. Log-loss is a strictly proper scoring rule (<Ref lesson="classification-metrics">the metrics lesson</Ref>), so its population expectation over any distribution is uniquely minimized by the true conditional probabilities of that distribution; when the truth is representable, the minimizer over the family is the truth itself. Hence the resampled-population minimizer is $(w, b + \delta)$.
+
+(b) With one binary feature the MLE is saturated: the fitted log-odds at each $x$ equals the empirical log-odds. Original fit: $\hat{b} = \log\frac{n_{10}}{n_{00}} = \log\frac{10}{80} = \log\tfrac18$, and $\hat{w} = \log\frac{n_{11}}{n_{01}} - \hat{b} = \log\frac{40}{20} - \log\tfrac18 = \log 16$. After tripling every positive: $\hat{b}' = \log\frac{30}{80} = \log\tfrac18 + \log 3$ and $\hat{w}' = \log\frac{120}{20} - \hat{b}' = \log 6 - \log\tfrac38 = \log 16$. The slope is identical; the intercept moved by exactly $\delta = \log 3$. The correction formula is confirmed with no asymptotics: subtract $\log 3$ and the original model reappears.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. A problem has $n = 3{,}000$ rows at 1% prevalence: 30 positives, 2,970 negatives. A colleague downsamples the majority to 1:1, leaving 60 rows. (a) Quantify the variance cost: by what factor does the standard error of a quantity estimated from the negatives inflate? (b) Argue when class weighting strictly dominates downsampling, and name the situations where downsampling is still the right call.
+
+<Solution>
+(a) Estimates built on the negative class scale like $1/\sqrt{n_-}$. Cutting $n_- = 2{,}970$ to 30 inflates their standard error by $\sqrt{2{,}970/30} \approx 10$: a hundredfold variance increase, from throwing away 99% of the data. The fit's effective sample is 60 rows.
+
+(b) For a convex batch-trained loss, weighting with $c_+/c_- = 99$ has the same population objective as balancing (the duplication–weighting equivalence plus the theorem), but the downsampled fit adds a second randomness: *which* 30 negatives survived. The downsampled estimator is the weighted estimator computed on a random subsample, so its variance is the weighted one's plus the between-subsample component; averaging many downsampled fits would only claw back what weighting had for free. Weighting therefore strictly dominates whenever the algorithm accepts weights and compute is not binding. Downsampling earns its place on two grounds: compute (a $10^8$-row majority that is grossly redundant, where the discarded information is nearly zero and the training-cost saving is real), and algorithms without a weight interface. In both cases the intercept correction still applies.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Our screening model's AUC is 0.99, so the model is excellent." Name the three taxonomy rows most likely to manufacture 0.99 on a screening problem, the audit that would catch each, and the circumstance under which the claim survives all three.
+
+<Solution>
+The claim's failing step is treating the score as evidence about the *model* before establishing it is evidence about the *problem*.
+
+Row 1, target leakage: a post-outcome field (treatment code, follow-up count, an updated status flag) rides in the features. Audit: importance ranking, provenance and timing check on the top features, as-of rebuild and refit; collapse convicts.
+
+Row 2, group leakage: the same patient (or duplicated row) on both sides of the split, so the model is graded on recognition. Audit: deduplicate, group-fold by entity, rerun.
+
+Row 3, preprocessing leakage: a transform (scaler, imputer, feature screen) fitted on all rows before the split. Audit: rebuild as a strict pipeline with every fitted step inside the folds and compare.
+
+The claim survives if all three reruns leave 0.99 standing *and* the problem is independently plausible at 0.99: an operational definition that makes the label nearly a function of available inputs. Then the honest conclusion is "the problem is easy," which is still not "the model is excellent"; the comparison that matters is then against the trivial baseline that easiness implies, the lesson's KDDCUP99 point at pipeline scale.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review, composing this lesson with <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>. Standardization is a fitted transform: $z = (x - \mu)/\sigma$. For the training values $\{0, 2, 4\}$ and one held-out value $10$, compute the held-out $z$-score two ways: with $(\mu, \sigma)$ fitted on the training rows only (population $\sigma$), and with $(\mu, \sigma)$ fitted on all four values. State which taxonomy row the second computation instantiates and what it does to the held-out point.
+
+<Solution>
+Train-only: $\mu = 2$, $\sigma^2 = (4 + 0 + 4)/3 = 8/3$, $\sigma = 1.633$, so $z(10) = 8/1.633 = 4.90$.
+
+All four rows: $\mu = 4$, $\sigma^2 = (16 + 4 + 0 + 36)/4 = 14$, $\sigma = 3.742$, so $z(10) = 6/3.742 = 1.60$.
+
+The second computation is preprocessing leakage: the held-out point contributed to the very $\mu$ and $\sigma$ that then normalize it, and the outlier partially normalized *itself*: a five-sigma point reports as a one-and-a-half-sigma point. On this toy the effect is dramatic because $n = 3$; at realistic $n$ the per-point effect is small, which is exactly why the pattern survives review while its aggregate effect (across imputation, scaling, encoding, and selection) does not stay small. The general rule is the pipeline contract <Ref lesson="feature-engineering">the next lesson</Ref> builds its encodings and selections around: every fitted preprocessing step lives inside the fold, learned on training rows and applied to the rest.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. A production model's score improved three points after adding the feature `days_since_last_contact`, which the team suspects is populated partly *after* the outcome it predicts. Design the experiment that distinguishes "the model got better" from "the leak got bigger." State the protocol and, in advance, the result pattern that indicts the feature.
+
+<Solution>
+Protocol, two arms sharing one frozen pipeline. Arm A: the current evaluation (shuffled or whatever the team runs) with and without the feature. Arm B: a prospective evaluation with the feature rebuilt *as-of* prediction time (computed only from contacts time-stamped strictly before each row's prediction moment) and scored on a forward-chained split; where infrastructure allows, the gold standard is a true prospective run, scoring frozen models on data that did not exist when they were trained.
+
+Indicting pattern, stated in advance: the feature's three-point gain appears in Arm A and shrinks to noise (or reverses) in Arm B, and its importance rank collapses under the as-of rebuild. That pattern says the gain lives exactly in the information the rebuild removed, the post-outcome portion, which deployment will not have. Exonerating pattern: the gain survives Arm B intact, which says the contact signal genuinely precedes the outcome. The experiment's design principle is the lesson's detection section run forward: convert the audit (as-of rebuild, time split) from a post-hoc check into the acceptance test a new feature must pass before it ships.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prediction before computation. <Ref lesson="cross-validation-bootstrap">The resampling lesson</Ref>'s closing exercise already ran the screen-outside-the-folds leak once and read an impossible error rate. This rerun measures the leak along two new axes; commit to both predictions before running anything. (a) The rerun records both the misclassification error and the AUC. Model the pooled cross-validated scores of the two classes as unit-variance Gaussians whose means are $d$ apart, express both metrics as functions of $d$, and predict which one lands further from its no-information value ($50\%$ error, $0.5$ AUC). (b) The screen keeps the $k$ features most label-correlated out of $p = 1{,}000$ pure-noise features; predict whether growing $k$ from 5 to 100 amplifies the leak or dilutes it across weaker survivors. Then check both: $n = 100$ rows, fair-coin labels, 5-fold cross-validation of an L2 logistic regression on the $k$ survivors with the screen computed on all rows, at $k \in \{5, 20, 100\}$, plus the same runs with the screen moved inside the folds as the control.
+
+<Solution>
+(a) With unit-variance Gaussian scores separated by $d$, the midpoint threshold errs at rate $\Phi(-d/2)$, while $\mathrm{AUC} = \Pr(\text{positive's score} > \text{negative's score}) = \Phi(d/\sqrt{2})$, because the difference of an independent positive and negative score is Gaussian with mean $d$ and variance $2$. Both metrics read the same separation, but AUC evaluates the normal CDF at $d/\sqrt{2}$ and error at $d/2$: for every $d > 0$, AUC sits further from $0.5$ than error sits from $50\%$. The leak manufactures $d$, and AUC, which grades every pair in the ranking, converts $d$ into visible inflation faster than error, which only counts crossings of one threshold.
+
+(b) Amplifies. Under the null, each feature's sample correlation with the labels is roughly Gaussian with standard deviation $1/\sqrt{n} = 0.1$, and even the 100th-largest of 1,000 absolute correlations still sits well above zero, so every additional survivor hands the fold-fit model more chance signal to reuse; the separation $d$ grows with $k$. Dilution would require $k$ to approach $p$, where the screen stops selecting at all.
+
+Computed for this lesson over 20 replications, screen outside the folds (AUC / error): $0.82\,/\,25\%$ at $k=5$, $0.91\,/\,18\%$ at $k=20$, $0.98\,/\,7\%$ at $k=100$ — monotone in $k$, and at every $k$ the AUC has covered the larger fraction of its range (at $k=20$: 82% of the way to perfect ranking, against 65% of the way to zero error). The control with the screen inside the folds reads $0.50$ and $50\%$ at every $k$: the truth. Why the survivors carry exactly this much chance signal — the order-statistics distribution of their correlations, the scaling in $k$ and $p$, and how the published record fell for it — is <Ref lesson="wrong-way-cv">the next-but-one lesson's</Ref> entire subject.
+</Solution>
+</Exercise>
+
+<References>
+1. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §5.1.3.3: ROC's insensitivity to class imbalance; §5.1.4.4: the precision identity $\mathrm{Prec} = TPR/(TPR + FPR/r)$ and the PR/F-score imbalance analysis behind the playbook's first move. Free online: https://probml.github.io/pml-book/book1.html
+2. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §1.5.4: compensating for artificially balanced training priors: divide out the training fractions, multiply by the deployment priors, renormalize — the multiclass form of this lesson's correction.
+3. C. Elkan, "The Foundations of Cost-Sensitive Learning," *IJCAI*, 2001 — the theorem family connecting cost-derived thresholds, class weights, and changed base rates; the source for "the model-side moves reduce to a threshold."
+4. N. V. Chawla, K. W. Bowyer, L. O. Hall, W. P. Kegelmeyer, "SMOTE: Synthetic Minority Over-sampling Technique," *JAIR* 16, 2002 — the interpolation construction. https://doi.org/10.1613/jair.953
+5. Y. Elor, H. Averbuch-Elor, "To SMOTE, or not to SMOTE?," arXiv:2201.08528, 2022 — the benchmark comparison finding no consistent advantage of resampling over weighting and thresholding for tuned learners.
+6. S. Kaufman, S. Rosset, C. Perlich, O. Stitelman, "Leakage in Data Mining: Formulation, Detection, and Avoidance," *ACM TKDD* 6(4), 2012 — the formal definition, the IBM website-crawl target leak, and the KDD Cup 2008 patient-ID case. https://doi.org/10.1145/2382577.2382579
+7. S. Kapoor, A. Narayanan, "Leakage and the Reproducibility Crisis in Machine-Learning-Based Science," *Patterns* 4(9), 2023 — the leakage taxonomy applied to the published record across 17 fields. https://doi.org/10.1016/j.patter.2023.100804
+8. A. Rahimi, B. Recht, "Random Features for Large-Scale Kernel Machines," *NeurIPS*, 2007 — footnote 1: the KDDCUP99 fragility numbers (50-row baseline ≈ 8%, published 6.2% → 18% under reshuffling) quoted in the benchmark section; the paper's main result returns in <Ref lesson="random-features">module 11</Ref>. https://papers.nips.cc/paper/3182-random-features-for-large-scale-kernel-machines
+9. G. Loosli, S. Canu, "Comments on the 'Core Vector Machines: Fast SVM Training on Very Large Data Sets'," *JMLR* 8, 2007 — the replication behind the 49%-after-a-15%-regularization-nudge figure.
+10. L. Grinsztajn, E. Oyallon, G. Varoquaux, "Why Do Tree-Based Models Still Outperform Deep Learning on Tabular Data?," *NeurIPS*, 2022 — §3: the benchmark-construction exclusion criteria read here as prophylactic leakage-thinking.
+11. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.10.2: the wrong way to do cross-validation, taxonomized here as preprocessing leakage and reproduced in full two lessons ahead. Free online: https://hastie.su.domains/ElemStatLearn/
+12. M. Hopkins, E. Reeber, G. Forman, J. Suermondt, "Spambase," UCI Machine Learning Repository, 1999 — the corpus documentation whose own warning ("one would either have to blind such non-spam indicators…") grounds the deployment-shift boundary case. https://archive.ics.uci.edu/dataset/94/spambase
+</References>

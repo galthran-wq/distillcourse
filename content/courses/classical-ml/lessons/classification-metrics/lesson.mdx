@@ -1,0 +1,475 @@
+Accuracy fails on exactly the problems that matter — a 99.9%-accurate rare-disease screen can be useless — so classifier evaluation is a menu of metrics, each correct for a different question.
+
+Four modules of this course built classifiers; none of them yet measured one honestly. The module that just closed left the ingredients on the table: <Ref lesson="logreg-lab">the lab</Ref> ended it with a fitted classifier and a rank-based AUC scorer built before this course ever defined AUC, and <Ref lesson="spam-filter">the spam chapter</Ref> before it named the debts — a model whose stated probabilities were fiction, a threshold priced by one hand-picked cost ratio, and an error rate that called the cheaper operating point worse. This lesson opens the evaluation module by paying the vocabulary debt: for every number a classifier can be graded by, the question that number answers.
+
+## Accuracy against the base rate
+
+The opening claim needs only arithmetic. At a disease prevalence of 1 in 1,000, the classifier that declares everyone healthy is 99.9% accurate and detects nothing: accuracy's baseline is the majority-class rate $\max(\pi, 1-\pi)$, where $\pi$ is the fraction of positives, and at small $\pi$ that baseline is already at the ceiling.
+
+<Task>
+Three retrievals before the data, closed book. (1) From <Ref lesson="statistical-learning">the opening lesson</Ref>: with a false alarm costing $a$ and a miss costing $c$, the Bayes rule flags when $p > a/(a+c)$; the familiar threshold $\tfrac12$ is the special case $a = c$. (2) From <Ref lesson="logistic-regression">the logistic lesson</Ref>: a fitted classifier outputs a probability $p(y{=}1 \mid x)$, and a hard decision requires a threshold on it. (3) From <Ref lesson="spam-filter">the spam chapter</Ref>: naive Bayes ranked messages almost as well as logistic regression while its stated probabilities were off by a factor of seventeen in the bottom bin.
+</Task>
+
+The running data makes the failure concrete. The **Default data**, the simulated credit-card dataset from [*An Introduction to Statistical Learning*](https://www.statlearning.com/) (10,000 customers with their card balance and student status), has 333 defaulters: a prevalence of 3.33%. LDA, <Ref lesson="lda-gda">the shared-covariance Gaussian classifier of module 4</Ref>, fitted to these customers and thresholded at $\tfrac12$, misclassifies 2.75% of them. The null classifier that predicts "pays" for everyone misclassifies 3.33%. Two percentage points of training error, half a point better than doing nothing; the model's actual behavior on the class it exists to find is this:
+
+| | truth: defaulted (333) | truth: paid (9,667) | total |
+| --- | --- | --- | --- |
+| **predicted: default** | 81 | 23 | 104 |
+| **predicted: no default** | 252 | 9,644 | 9,896 |
+
+Of the 333 customers who defaulted, the model flagged 81 and missed 252: **75.7% of defaulters pass undetected** through a classifier whose accuracy is 97.25%. Nothing is wrong with the fit. LDA approximates the Bayes classifier for symmetric zero–one loss, and under that loss the cheapest way to be right is to be right about the 9,667: the accuracy number is dominated by the class nobody is asking about. The failure is in the metric, and the repair is a set of numbers that keep the two classes and the two error types separate.
+
+<KeyFact>
+Accuracy compresses four counts into one number by pricing both error types equally and weighting each class by its frequency. It is informative only when classes are roughly balanced and both mistakes cost the same; every metric in this lesson exists because at least one of those conditions usually fails.
+</KeyFact>
+
+## The confusion matrix: four counts, two denominators
+
+The table above is the master object, and every metric in this lesson is a ratio of its entries.
+
+<Definition title="confusion matrix">
+For a binary classifier and a labeled sample, the **confusion matrix** is the $2 \times 2$ table counting each (prediction, truth) pair: *true positives* $TP$ and *false positives* $FP$ (flagged, truth positive or negative), *false negatives* $FN$ and *true negatives* $TN$ (passed, truth positive or negative). Write $n_1 = TP + FN$ for the positives and $n_0 = FP + TN$ for the negatives.
+</Definition>
+
+The derived rates come in exactly two families, distinguished by the denominator. **Truth-conditioned rates** divide by a truth column: they answer "given the customer *is* a defaulter, what does the model do?" and their values are properties of the model alone. **Prediction-conditioned rates** divide by a prediction row: they answer "given the model *flagged* this customer, what is the truth?" and their values depend on the class mix. Reading any rate begins with locating its denominator.
+
+<Figure
+  src="./figures/confusion-map.svg"
+  alt="The Default confusion matrix at threshold 0.5 with each derived rate bracketed to the row or column it divides by: recall and miss rate under the defaulted column, FPR and specificity under the paid column, precision and FDR beside the flagged row, NPV and FOR beside the passed row"
+  caption="The map. Each rate is a cell divided by a bracket's total: amber brackets condition on truth, blue on prediction."
+/>
+
+<Example title="all eight rates on the Default matrix">
+Truth-conditioned, dividing by the 333 defaulters or the 9,667 payers:
+
+$$
+TPR = \frac{TP}{TP+FN} = \frac{81}{333} = 0.243, \qquad
+FNR = \frac{FN}{TP+FN} = \frac{252}{333} = 0.757,
+$$
+
+$$
+FPR = \frac{FP}{FP+TN} = \frac{23}{9{,}667} = 0.0024, \qquad
+TNR = \frac{TN}{FP+TN} = 0.9976.
+$$
+
+Prediction-conditioned, dividing by the 104 flags or the 9,896 passes:
+
+$$
+PPV = \frac{TP}{TP+FP} = \frac{81}{104} = 0.779, \qquad
+FDR = \frac{FP}{TP+FP} = \frac{23}{104} = 0.221,
+$$
+
+$$
+NPV = \frac{TN}{TN+FN} = \frac{9{,}644}{9{,}896} = 0.975, \qquad
+FOR = \frac{FN}{TN+FN} = \frac{252}{9{,}896} = 0.025.
+$$
+
+Read for the credit-card company: the model catches 24.3% of defaulters ($TPR$), almost never bothers a customer who would have paid ($FPR = 0.0024$), and when it does flag someone it is right 78% of the time ($PPV$). The fit is *conservative*: precise flags, terrible coverage.
+</Example>
+
+The same eight numbers travel under different names in medicine, information retrieval, and machine learning; the table is the reference, and the three names in bold are the ones this course uses.
+
+| rate | cells | Default value | also called |
+| --- | --- | --- | --- |
+| $TPR$ | $TP/(TP{+}FN)$ | 0.243 | **recall**, sensitivity, hit rate, power |
+| $FNR$ | $FN/(TP{+}FN)$ | 0.757 | miss rate, type II error rate |
+| $FPR$ | $FP/(FP{+}TN)$ | 0.0024 | fall-out, type I error rate, $1-$specificity |
+| $TNR$ | $TN/(FP{+}TN)$ | 0.9976 | **specificity** |
+| $PPV$ | $TP/(TP{+}FP)$ | 0.779 | **precision** |
+| $FDR$ | $FP/(TP{+}FP)$ | 0.221 | false discovery rate |
+| $NPV$ | $TN/(TN{+}FN)$ | 0.975 | negative predictive value |
+| $FOR$ | $FN/(TN{+}FN)$ | 0.025 | false omission rate |
+
+<KeyFact>
+Truth-conditioned rates (recall, specificity, $FPR$) are unchanged if the class mix changes, because each is computed inside one class. Prediction-conditioned rates (precision, $NPV$) mix the classes in their denominator and move with prevalence. This single fact generates the entire ROC-versus-PR contrast two sections from here.
+</KeyFact>
+
+<Exercise>
+ISLP's Table 4.5 lowers the threshold to 0.2 on the same fit: predicted default (235 payers, 195 defaulters), predicted no default (9,432 payers, 138 defaulters). Compute recall, $FPR$, precision, and the overall error rate, and state in one sentence what the threshold change bought and what it cost.
+
+<Solution>
+Flags total $235 + 195 = 430$; the class totals are unchanged (333 and 9,667).
+
+$$
+\text{recall} = \frac{195}{333} = 0.586, \qquad
+FPR = \frac{235}{9{,}667} = 0.0243,
+$$
+
+$$
+\text{precision} = \frac{195}{430} = 0.453, \qquad
+\text{error} = \frac{235 + 138}{10{,}000} = 3.73\%.
+$$
+
+The move bought recall (0.243 to 0.586: the model now catches most defaulters) and paid in precision (0.779 to 0.453: most of a tenfold-larger false-alarm count) and in overall error (2.75% to 3.73%). Whether that trade is good is not a question these numbers answer; it is a question about costs, taken up in the final section.
+</Solution>
+</Exercise>
+
+## The threshold sweep: one score, a curve of matrices
+
+The two matrices just computed differ only in the threshold, which exposes the general fact: a confusion matrix is a property of a classifier *and* a threshold. Every classifier in this course scores before it decides (<Ref lesson="logistic-regression">logistic regression</Ref> and LDA output a posterior probability, an SVM a margin distance), and each threshold $t$ on the score $s(x)$ prints one matrix. The whole family is the object to study.
+
+A ten-point sample makes the sweep computable by hand: positives score $\{0.9, 0.8, 0.7, 0.55, 0.4\}$, negatives $\{0.6, 0.45, 0.3, 0.2, 0.1\}$.
+
+<FigureSequence
+  name="threshold-sweep"
+  alt="Three frames: ten scores on a line with a dashed threshold at 0.75, then 0.5, then 0.25; the first two frames show the induced confusion counts and plot each threshold's FPR-TPR point, and the third reveals the full ten-step ROC staircase with the three sampled thresholds marked as vertices"
+  caption="Each threshold prints one confusion matrix and one (FPR, TPR) point; the full sweep is a staircase — one up-step per positive, one right-step per negative — with the three sampled thresholds as vertices."
+/>
+
+<Task>
+Step through the three frames and verify the middle one by hand: at $t = 0.5$ the flagged set is $\{0.9, 0.8, 0.7, 0.55\} \cup \{0.6\}$, so $TP = 4$, $FP = 1$, giving the point $(0.2, 0.8)$. Then predict frame 3's point before opening it: which scores cross at $t = 0.25$?
+</Task>
+
+<Definition title="ROC curve and AUC">
+The **ROC curve** (receiver operating characteristic) of a scoring classifier on a sample is the piecewise-linear path through the points $(FPR(t), TPR(t))$ as $t$ sweeps from above the largest score to below the smallest. The **AUC** is the area under this path.
+</Definition>
+
+The curve runs from $(0,0)$ (flag nothing) to $(1,1)$ (flag everything). A scorer that ranks randomly stays on the diagonal $TPR = FPR$; a perfect ranker passes through the corner $(0,1)$. On the Default data the LDA score's ROC has **AUC 0.95**, and the two matrices of the previous sections are two points on that one curve: the sweep is what Figure 4.7 of ISLP plots as error rates against threshold, folded into a single graphic with the threshold now implicit.
+
+### AUC is a ranking probability
+
+AUC compresses the whole sweep into one number, and the number has an exact meaning. <Ref lesson="logreg-lab">The lab</Ref> already built this quantity as code (an AUC computed from averaged ranks, never constructing the curve), and the theorem is why that implementation is correct.
+
+<Theorem title="AUC counts concordant pairs (Wilcoxon–Mann–Whitney)">
+For scores on a sample with $n_1$ positives and $n_0$ negatives,
+
+$$
+\mathrm{AUC} \;=\; \frac{\#\{(i,j) : s^+_i > s^-_j\} \;+\; \tfrac12\,\#\{(i,j) : s^+_i = s^-_j\}}{n_1 n_0},
+$$
+
+the fraction of positive–negative pairs the scorer orders correctly, ties counted half. Equivalently, for $S^+, S^-$ drawn uniformly from the two groups, $\mathrm{AUC} = \Pr(S^+ > S^-) + \tfrac12 \Pr(S^+ = S^-)$.
+
+<Proof>
+The plan: read the ROC path as a lattice walk, compute the area column by column, then handle ties.
+
+**The path as a walk.** Process the points in decreasing score order. Each positive passed moves the path up by $1/n_1$ (recall rises); each negative moves it right by $1/n_0$ ($FPR$ rises). With no ties, the ROC is a staircase of $n_1$ up-steps and $n_0$ right-steps.
+
+**Area by columns.** The area under a staircase is the sum, over right-steps, of the path's height when that step is taken. When negative $j$'s right-step of width $1/n_0$ is taken, the height is the fraction of positives already passed, which is exactly $\#\{i : s^+_i > s^-_j\}/n_1$. Summing,
+
+$$
+\mathrm{AUC} = \sum_{j} \frac{1}{n_0} \cdot \frac{\#\{i : s^+_i > s^-_j\}}{n_1}
+= \frac{\#\{(i,j) : s^+_i > s^-_j\}}{n_1 n_0}.
+$$
+
+**Ties.** A group of $a$ positives and $b$ negatives sharing one score value enters the path together: the sweep jumps diagonally across an $\tfrac{a}{n_1} \times \tfrac{b}{n_0}$ rectangle, and the trapezoidal area under the diagonal is the height below the rectangle plus half the rectangle itself. The half-rectangle is $\tfrac12 ab / (n_1 n_0)$: each tied pair contributes one half. This is the same convention as averaging the ranks of tied scores, which is what the lab's implementation does.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/auc-grid.svg"
+  alt="A five-by-five grid of positive scores against negative scores with the twenty-two concordant cells shaded amber and the three discordant cells marked with crosses, annotated AUC equals twenty-two twenty-fifths"
+  caption="The proof's picture on the ten-point sample: 22 of 25 pairs concordant, AUC = 0.88; each column's shaded fraction is the ROC height at that negative's right-step."
+/>
+
+On the ten-point sample the count is direct: 0.9, 0.8, and 0.7 each beat all five negatives, 0.55 beats four, 0.4 beats three, so $\mathrm{AUC} = 22/25 = 0.88$; the trapezoid area under the frame-3 curve gives the same 0.88. The one-sentence reading of "AUC 0.95" on the Default data: draw a random defaulter and a random payer, and LDA scores the defaulter higher 95 times in 100.
+
+<KeyFact>
+AUC is a pure ranking quantity: it is invariant to any strictly increasing transformation of the scores, is built entirely from truth-conditioned rates, and never mentions a threshold. Each invariance is also a blindness: AUC cannot see calibration, prevalence, or where a usable operating point sits, which is what the next two sections exploit.
+</KeyFact>
+
+The Default data already hints at the blindness. At threshold 0.2 the false-positive *rate* is 0.0243, a number that reads as negligible, yet the flag queue holds 235 false alarms against 195 real defaulters: more than half the queue is noise. $FPR$'s denominator is the 9,667 payers, so thousands of false alarms barely move it. The rate family that divides by the *flags* instead is the subject of the next section.
+
+## Precision–recall: the curve that feels prevalence
+
+Sweeping the threshold and plotting the prediction-conditioned pair (precision against recall) gives the **PR curve**, and its geometry differs from ROC's in one deliberate way: its baseline moves. A random flagger has precision $\pi$ at every recall, so the floor of the plot *is* the prevalence: 0.5 on balanced data, 0.033 on the Default data. Height on a PR plot means beating the base rate, not beating a coin.
+
+<Example title="one classifier, two prevalences">
+Fix a classifier's operating point at $TPR = 0.8$, $FPR = 0.1$: truth-conditioned, so these two numbers do not depend on the class mix.
+
+**Balanced, 1,000 positives and 1,000 negatives:** $TP = 800$, $FP = 100$,
+
+$$
+\text{precision} = \frac{800}{800 + 100} = 0.89.
+$$
+
+**Imbalanced 1:100, 1,000 positives and 100,000 negatives:** $TP = 800$ still, but the same 10% false-positive rate now applies to 100,000 negatives, so $FP = 10{,}000$:
+
+$$
+\text{precision} = \frac{800}{800 + 10{,}000} = 0.074.
+$$
+
+The ROC point $(0.1, 0.8)$ has not moved. The alert queue went from nine-in-ten real to one-in-fourteen real, because precision's $FP$ term scales with the negative population while $TP$ does not.
+</Example>
+
+<Figure
+  src="./figures/roc-vs-pr.svg"
+  alt="Two panels: one ROC curve identical at both prevalences on the left; on the right the same classifier's PR curves, the balanced curve high and the one-to-one-hundred curve collapsed near its prevalence floor, with precision 0.89 against 0.074 marked at recall 0.8"
+  caption="The imbalance stress test: same classifier, same ROC, and the PR curve collapses toward its floor."
+/>
+
+A common inference runs: ROC and AUC are invariant to imbalance, so they are the safe summary for imbalanced problems. The record shows the opposite. The invariance means ROC *cannot display* the quantity that deteriorates: under heavy imbalance the whole practical difference between classifiers lives in the extreme left of the ROC plot, compressed against the axis, while the alert queue's composition collapses invisibly. The failure is documented across the applied literature: [Saito and Rehmsmeier (2015)](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0118432) survey it in bioinformatics, and [Davis and Goadrich (2006)](https://www.biostat.wisc.edu/~page/rocpr.pdf) prove the two curve spaces order classifiers differently. The correct rule: ROC and AUC answer ranking questions; when positives are rare and the flags get acted on, report the PR curve or precision at the operating point, where the denominator is the queue someone must work through.
+
+<Demo
+  name="ThresholdMetricsExplorer"
+  caption="Two score histograms with a draggable threshold; live confusion matrix, precision, recall, F₁, and the current point traced on the ROC and PR curves."
+/>
+
+<Task>
+Two tasks, in order. First, on the balanced preset, drag the threshold until precision reaches 0.9 and note the best recall you can hold there. Then switch to the 1:100 preset and watch both curve panels: the ROC curve is *the same curve* — it is built from truth-conditioned rates, so the preset cannot touch it — while the PR curve drops toward its floor and the precision at your threshold falls roughly tenfold. That pair of observations is the falsification of "a strong AUC means the classifier is deployable."
+</Task>
+
+### F-scores: why the mean is harmonic
+
+A report often needs precision and recall as one number, and the combining rule must not let one component hide the other. The arithmetic mean fails: flag *everything* and recall is 1 while precision equals the prevalence, so at $\pi = 10^{-4}$ the average is $(1 + 10^{-4})/2 \approx 0.5$, a respectable-looking score for a degenerate strategy. The harmonic mean of the same pair is $\approx 2 \times 10^{-4}$: it sits near the *minimum* of its arguments, so a single weak component sinks it.
+
+$$
+F_\beta \;=\; \Bigl(\text{weighted harmonic mean of } P, R\Bigr) \;=\; \frac{(1+\beta^2)\,P R}{\beta^2 P + R},
+$$
+
+where recall carries $\beta^2$ times precision's weight: $F_1$ weights them equally, $F_2$ favors recall (screening), $F_{0.5}$ favors precision. Expanding in counts, $F_1 = 2TP/(2TP + FP + FN)$: the two error types enter symmetrically and $TN$ does not appear at all. That blindness is a feature exactly when the negative class is a vast, uninteresting background; it also means $F_1$, like precision, moves with prevalence.
+
+<KeyFact>
+$F_1$ inherits precision's prevalence dependence: the fixed operating point of the Example above scores $F_1 = 0.84$ on the balanced corpus and $0.14$ at 1:100, with nothing about the classifier changed. $F_1$ and precision are therefore not comparable across datasets of different prevalence — a leaderboard ranking models by $F_1$ on different corpora measures the corpora as much as the models.
+</KeyFact>
+
+## Calibration: the third axis
+
+Everything so far grades decisions and rankings. A probabilistic classifier claims more than an ordering: logistic regression outputs $p(y{=}1 \mid x)$, and downstream consumers (the cost-based thresholds of the next section, a triage queue, anything that multiplies a probability by a dollar amount) consume the *values*. Whether those values mean what they say is a third property, independent of the other two.
+
+<Definition title="calibration">
+A probabilistic classifier is **calibrated** if, among the cases it assigns probability $p$, the fraction of positives is $p$, for every $p$. A **reliability diagram** estimates this by binning the predictions and plotting each bin's observed positive rate against its mean stated probability; a calibrated model tracks the diagonal.
+</Definition>
+
+The canonical instances are already in the course. <Ref lesson="spam-filter">The spam chapter</Ref> binned two of module 4's classifiers on the same test set: logistic regression tracks the diagonal, while naive Bayes states 0.005 on a bin whose observed spam rate is 0.085 and 0.994 on a bin that delivers 0.925: <Ref lesson="naive-bayes">the saturation its factorization predicts</Ref>, since correlated words are counted as independent evidence once per copy. The degenerate case calibrates trivially: a "model" that states the prevalence $\pi$ for every input is perfectly calibrated and perfectly useless. And the near-miss is naive Bayes itself: AUC 0.951 and an ordering nearly intact, so calibration, not ranking, is the clause it violates.
+
+<Figure
+  src="./figures/reliability-two-models.svg"
+  alt="Reliability diagram overlaying the spam corpus fits: logistic regression's bins near the diagonal, naive Bayes' bins forming a flattened S far off it, with the bottom bin of 926 messages at stated 0.005 but observed 0.085 annotated"
+  caption="Module 4's two spam fits on one reliability diagram. Same data, similar ranking; only one model's probabilities mean anything."
+/>
+
+### Proper scoring rules
+
+Grading probabilities needs a loss whose minimizer is honesty. A loss $\ell(q, y)$ on a stated probability $q$ is a **proper scoring rule** if its expectation under $y \sim \mathrm{Bernoulli}(p)$ is minimized at $q = p$, strictly proper if the minimizer is unique; a model then cannot improve its grade by hedging or exaggerating. Accuracy at a fixed threshold is not proper: stating 0.51 and 0.99 grade identically.
+
+The two standard rules are the **log-loss** $-[y \log q + (1-y)\log(1-q)]$ (the cross-entropy that <Ref lesson="logistic-regression">trained logistic regression</Ref>, reused as a grade) and the **Brier score** $(q - y)^2$, squared error on probabilities, bounded by 1.
+
+<Theorem title="the Brier score is strictly proper (Brier 1950)">
+For $y \sim \mathrm{Bernoulli}(p)$ and any stated $q \in [0,1]$,
+$\mathbb{E}\,(q - y)^2 = (q - p)^2 + p(1-p)$,
+so the expectation is uniquely minimized at $q = p$.
+
+<Proof>
+$\mathbb{E}(q-y)^2 = q^2 - 2q\,\mathbb{E}y + \mathbb{E}y^2 = q^2 - 2qp + p$, and completing the square gives $(q-p)^2 + p(1-p)$. The first term is the model's penalty for miscalibration; the second, $p(1-p)$, is the irreducible noise of the outcome itself: the same split as <Ref lesson="bias-variance">the bias–variance decomposition</Ref>, at a single point.
+</Proof>
+</Theorem>
+
+Log-loss is strictly proper by the same one-line check: $\tfrac{d}{dq}\,[-p\log q - (1-p)\log(1-q)] = -p/q + (1-p)/(1-q)$, which vanishes only at $q = p$. The difference between the two rules is the tails: one prediction of $q = 10^{-9}$ on an actual positive costs about 20.7 nats of log-loss (hundreds of correct predictions cannot buy it back), while Brier caps the same mistake at 1.
+
+<Figure
+  src="./figures/scoring-tails.svg"
+  alt="Penalty on a case whose true label is positive as a function of the stated probability q: the Brier curve falls from its cap of 1 at q equals 0 to 0 at q equals 1, while the log-loss curve diverges without bound as q approaches 0, annotated with the 20.7-nat cost of stating one in a billion"
+  caption="One actual positive, two prices for the same stated q. Brier never charges more than 1; log-loss has no ceiling, so a single confident wrong-side prediction can dominate an evaluation."
+/>
+
+<Aside>
+The Brier score decomposes (A. H. Murphy, 1973) into **reliability** $-$ **resolution** $+$ **uncertainty**: a calibration term that is exactly the bin-weighted squared gap visible in a reliability diagram, a discrimination term rewarding bins whose observed rates differ from the base rate, and the constant $\pi(1-\pi)$. The constant-prevalence forecaster has zero reliability penalty and zero resolution: the decomposition is the formal statement that the diagram and the ranking measure different failures. Evaluation code also clips $q$ into $[\varepsilon, 1-\varepsilon]$ before taking logs, so that a single hard 0 or 1 does not return an infinite log-loss.
+</Aside>
+
+### Recalibration, and where Platt scaling fails
+
+A model that ranks well but states nonsense is repairable, because ranking is the hard part. [Platt scaling](https://www.researchgate.net/publication/2594015) (Platt, 1999) fits a two-parameter sigmoid $\hat{p} = \sigma(a f(x) + b)$ from the raw score $f$ to the labels: a one-dimensional logistic regression, fitted on held-out data, never on the training set. The map is monotone, so AUC is untouched while the stated values move. *Isotonic regression* replaces the sigmoid with an arbitrary monotone step function: more flexible, more data-hungry.
+
+<Example title="a Bayes-optimal SVM that no sigmoid can calibrate (Murphy §17.3.5)">
+Let $p(x \mid y{=}0) = \mathrm{Unif}(0,1)$ and $p(x \mid y{=}1) = \mathrm{Unif}(0.5, 1.5)$ with equal priors. The true log-odds of class 1 is $-\infty$ below $x = 0.5$, exactly $0$ on the overlap $[0.5, 1]$, and $+\infty$ above. An RBF-SVM fitted to 1,000 draws puts its boundary in the right place and attains the Bayes error of 25%: its decisions and its ranking are optimal. But its score $f(x)$ rises smoothly through the overlap, and Platt's $\sigma(a f + b)$ is a smooth monotone squash of it: no choice of $(a, b)$ produces a function that is flat at $\tfrac12$ across $[0.5, 1]$ and saturated outside. The scaled probabilities miss the true log-odds badly *after* calibration, because nothing in margin training makes $f$ an affine image of the log-odds. The SVM was never asked to estimate probabilities, and Platt scaling can only relabel its score, not reshape it.
+</Example>
+
+<Figure
+  src="./figures/platt-mismatch.svg"
+  alt="True probability of class 1 in the uniform-overlap construction as a three-level step — zero below 0.5, one half on the overlap from 0.5 to 1, one above — with a Platt sigmoid of the SVM score climbing smoothly through the overlap instead of sitting flat at one half"
+  caption="The Example drawn: the truth is a three-level step, and a sigmoid is smooth and strictly increasing wherever the score is — no (a, b) makes it flat at ½ on the overlap and saturated outside."
+/>
+
+<KeyFact>
+Ranking and calibration are orthogonal: any strictly increasing transform of the scores preserves AUC exactly while moving log-loss and Brier arbitrarily. The two extreme cases both occur in practice: the constant-prevalence forecaster (calibrated, AUC $\tfrac12$) and spam naive Bayes (AUC 0.951, probabilities off seventeenfold). Grade the axis the application consumes, and remember that only one of the two failures is cheap to repair.
+</KeyFact>
+
+## The metric follows the question
+
+The menu is now assembled, and choosing from it is not taste: each metric answers a stated question, and the deployment asks a specific one. The sharpest case is the threshold itself, because there the answer was derived in module 1 and can finally be cashed.
+
+<Example title="the Default threshold, priced">
+<Ref lesson="statistical-learning">The opening lesson's exercise</Ref> derived the Bayes rule under asymmetric loss: with a false alarm costing $a$ and a miss costing $c$, flag when $p > a/(a+c)$. Suppose the credit-card company prices a missed default at four times a needless intervention: $c = 4$, $a = 1$, threshold $1/(1+4) = 0.2$, which is exactly ISLP's lowered threshold, now derived from a loss matrix rather than chosen by inspection.
+
+The two published matrices price out directly, in cost units per 10,000 customers ($FP + 4\,FN$):
+
+$$
+t = 0.5:\;\; 23 + 4 \times 252 = 1{,}031, \qquad
+t = 0.2:\;\; 235 + 4 \times 138 = 787.
+$$
+
+At equal costs the ordering reverses: $275$ against $373$, and $t = 0.5$ wins. The error rate (which is exactly the $c = 1$ cost divided by $n$) called $t = 0.2$ worse, 3.73% against 2.75%, because it silently asserted equal costs.
+</Example>
+
+<Figure
+  src="./figures/cost-thresholds.svg"
+  alt="Bar chart of expected cost per ten thousand customers for the two Default thresholds under equal costs and under a four-to-one miss cost, with the winner flipping from threshold 0.5 to threshold 0.2"
+  caption="The same two confusion matrices under two loss matrices. The winner follows the costs; the Bayes threshold 1/(1+c) names it in advance."
+/>
+
+The rest of the menu organizes the same way, by the question asked:
+
+| the deployment asks | report |
+| --- | --- |
+| "is the ordering right?" (triage, top-$k$ review) | ROC-AUC: pairwise ranking accuracy, threshold-free |
+| "are the flags worth acting on?" (rare positives, worked queue) | PR curve; precision at the operating point or recall at a fixed precision |
+| "are the stated probabilities true?" (probabilities consumed downstream) | log-loss or Brier, with a reliability diagram; recalibrate before trusting |
+| "what should we do, at known costs?" | expected cost at the threshold $a/(a+c)$, which presumes calibration |
+| "balanced classes, equal costs, one number?" | accuracy, with the majority-class baseline stated beside it |
+
+<Remark title="multiclass: micro vs macro">
+With $K$ classes, each class gets one-vs-rest counts. *Macro* averaging computes the metric per class and averages the results, weighting a rare class equally with a common one; *micro* averaging pools the counts first, weighting every example equally; for single-label problems micro-$F_1$ collapses to plain accuracy. The choice is the imbalance question again, one level up: macro exposes minority-class failure, micro hides it.
+</Remark>
+
+One caution closes the module's opening move. Every number in this lesson was computed on data the model saw: ISLP's confusion matrices are *training* matrices, flagged as optimistic in the source itself, and the spam figures come from one fixed split. The vocabulary is now in place: what each metric answers, and that ranking, decisions, and calibration are three separate contracts. The numbers themselves are not yet honest estimates of anything. Estimating them on data the model never touched, and measuring how optimistic the training versions are, is <Ref lesson="cross-validation-bootstrap">the next lesson's</Ref> subject; what resampling for imbalance does to calibration, and how leakage manufactures good-looking metrics, follows in <Ref lesson="imbalance-leakage">the lesson after it</Ref>.
+
+## Exercises
+
+<Exercise>
+A screening model runs on $n = 1{,}000$ cases at prevalence 5%, with recall 0.8 and precision 0.4. Reconstruct the full confusion matrix and read off the $FPR$.
+
+<Solution>
+Positives: $n_1 = 0.05 \times 1{,}000 = 50$; negatives $n_0 = 950$.
+
+Recall 0.8 gives $TP = 0.8 \times 50 = 40$, so $FN = 10$. Precision 0.4 means $TP$ is 40% of the flags, so flags $= 40/0.4 = 100$ and $FP = 60$. The remainder: $TN = 950 - 60 = 890$.
+
+$$
+FPR = \frac{60}{950} = 0.063.
+$$
+
+Check the denominators: recall divided by the 50 positives, precision by the 100 flags, $FPR$ by the 950 negatives. Three rates, three different denominators, one matrix.
+</Solution>
+</Exercise>
+
+<Exercise>
+<Ref lesson="logreg-lab">The lab's scorer</Ref> computes AUC as $\bigl(\sum_{i \in \text{pos}} r_i - n_1(n_1+1)/2\bigr) / (n_1 n_0)$, where $r_i$ are ranks in the pooled sample with tied scores given the average of their positions. Derive this formula from the theorem's pair count $U = \#\{s^+ > s^-\} + \tfrac12\#\{s^+ = s^-\}$. Write the definition of an averaged rank before opening the solution.
+
+<Solution>
+Strategy: expand each positive's averaged rank into pair counts, then separate the pairs by the partner's class.
+
+The averaged rank of point $i$ is $r_i = 1 + \#\{j \neq i : s_j < s_i\} + \tfrac12\#\{j \neq i : s_j = s_i\}$ (with no ties this is the ordinary position; averaging positions within a tied block gives exactly the $\tfrac12$ per tied partner). Summing over the positives:
+
+$$
+\sum_{i \in \text{pos}} r_i = n_1 + B + \tfrac12 T,
+$$
+
+where $B$ counts ordered pairs (any $j$ strictly below a positive $i$) and $T$ counts ordered tied pairs. Split each by the class of $j$: $B = B^- + B^0$ and $T = T^- + T^0$, where the minus terms have $j$ negative and the zero terms have $j$ positive. The negative parts are the target: $U = B^- + \tfrac12 T^-$.
+
+The positive parts are a constant. Among the $\binom{n_1}{2}$ unordered positive–positive pairs, each contributes either 1 to $B^0$ (one strictly below the other) or 1 to $\tfrac12 T^0$ (tied, counted once in each direction). So $B^0 + \tfrac12 T^0 = n_1(n_1-1)/2$ regardless of the scores. Therefore
+
+$$
+U = \sum_{i \in \text{pos}} r_i - n_1 - \frac{n_1(n_1-1)}{2} = \sum_{i \in \text{pos}} r_i - \frac{n_1(n_1+1)}{2},
+$$
+
+and dividing by $n_1 n_0$ gives the lab's formula. The transferable move: a rank is a disguised pair count, so rank-sum statistics and pairwise-comparison statistics are interconvertible.
+</Solution>
+</Exercise>
+
+<Exercise>
+Consider the classifier that ignores $x$ entirely. (a) The randomized version flags each case with probability $p$: show that as $p$ sweeps over $[0,1]$ its operating points trace exactly the ROC diagonal, and its precision is the prevalence $\pi$ at every $p$. (b) The probabilistic version states the constant $\pi$ for every case: show it is perfectly calibrated, and compute its AUC under the tie convention. (c) Name which metric from this lesson catches each version, and which metrics are blind to them.
+
+<Solution>
+(a) Flagging independently of everything at rate $p$ gives $TPR = \Pr(\text{flag} \mid \text{pos}) = p$ and $FPR = p$: the point $(p, p)$, the diagonal. Precision $= \pi\,p / (\pi p + (1-\pi)p) = \pi$: the PR curve is the horizontal floor.
+
+(b) Every case sits in one "bin" with stated probability $\pi$, and the observed positive rate over that bin is $\pi$: calibrated by construction, with Brier score $\pi(1-\pi)$, exactly the irreducible term in the properness theorem. All scores are tied, so every positive–negative pair counts half: $\mathrm{AUC} = \tfrac12 n_1 n_0 / (n_1 n_0) = \tfrac12$.
+
+(c) Both versions are caught by any discrimination measure: AUC $\tfrac12$, PR flat at the floor, resolution zero in the Brier decomposition. Both are *missed* by calibration alone: the reliability diagram of (b) is a single point on the diagonal. This is the orthogonality KeyFact run to its boundary: calibration certifies honesty, not usefulness, and a metric that only checks the diagonal cannot tell a forecaster from the base rate.
+</Solution>
+</Exercise>
+
+<Exercise>
+A model states probabilities on ten cases: $q = 0.2$ on five cases of which two turn out positive, and $q = 0.9$ on five cases of which three turn out positive. (a) Build the two-bin reliability table: count, mean stated probability, and observed positive rate per bin. (b) Compute the Brier score and the log-loss (natural log). (c) Compute the reliability and resolution terms of the Murphy decomposition from the Aside and verify that reliability $-$ resolution $+$ uncertainty reproduces the Brier score. (d) Recalibrate: replace each bin's stated value by its observed rate, recompute the Brier score, and identify what the improvement equals.
+
+<Solution>
+(a) The table, with the base rate $\pi = 5/10 = 0.5$ for reference:
+
+| bin | $n_k$ | stated $\bar{q}_k$ | observed $\bar{o}_k$ |
+| --- | --- | --- | --- |
+| A | 5 | 0.2 | $2/5 = 0.4$ |
+| B | 5 | 0.9 | $3/5 = 0.6$ |
+
+Both bins lie off the diagonal: A under-states, B over-states.
+
+(b) Brier, summed by bin: A contributes $2(0.2-1)^2 + 3(0.2-0)^2 = 1.28 + 0.12 = 1.40$; B contributes $3(0.9-1)^2 + 2(0.9-0)^2 = 0.03 + 1.62 = 1.65$. Total $3.05/10 = 0.305$. Log-loss:
+
+$$
+\frac{2(-\ln 0.2) + 3(-\ln 0.8) + 3(-\ln 0.9) + 2(-\ln 0.1)}{10}
+= \frac{3.219 + 0.669 + 0.316 + 4.605}{10} = 0.881 \text{ nats},
+$$
+
+and log-loss's heavy tail is visible in the terms: the two negatives told $q = 0.9$ supply 4.605 of the 8.809 — over half the total from two cases.
+
+(c) With bin weights $n_k/n = 0.5$ each:
+
+$$
+\text{reliability} = 0.5(0.2-0.4)^2 + 0.5(0.9-0.6)^2 = 0.020 + 0.045 = 0.065,
+$$
+
+$$
+\text{resolution} = 0.5(0.4-0.5)^2 + 0.5(0.6-0.5)^2 = 0.010, \qquad
+\text{uncertainty} = \pi(1-\pi) = 0.25.
+$$
+
+Check: $0.065 - 0.010 + 0.25 = 0.305$, the Brier score of (b) exactly.
+
+(d) Stating 0.4 and 0.6 instead: A contributes $2(0.36) + 3(0.16) = 1.20$, B contributes $3(0.16) + 2(0.36) = 1.20$, total $2.40/10 = 0.240$. The improvement is $0.305 - 0.240 = 0.065$ — exactly the reliability term. Mapping each bin to its observed rate zeroes reliability and, being monotone here ($0.2 < 0.9 \mapsto 0.4 < 0.6$), leaves resolution and uncertainty untouched: $0.240 = 0.25 - 0.010$. The remaining score says what recalibration cannot buy: resolution 0.010 means the bins barely separate from the base rate, so the repaired forecaster is honest and only slightly informative.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Model B has the higher AUC, so B is the better choice for deployment at any threshold." Construct two ROC curves that cross, compute both AUCs, and name what AUC integrates away.
+
+<Solution>
+Take two piecewise-linear ROC curves. Model A: $(0,0) \to (0.05, 0.6) \to (1,1)$. Model B: $(0,0) \to (0.3, 0.9) \to (1,1)$. By trapezoids:
+
+$$
+\mathrm{AUC}_A = 0.05 \times 0.3 + 0.95 \times 0.8 = 0.775, \qquad
+\mathrm{AUC}_B = 0.3 \times 0.45 + 0.7 \times 0.95 = 0.800.
+$$
+
+B wins on AUC. Now fix a deployment that tolerates $FPR \le 0.05$, a fraud queue with a strict review budget. There A delivers $TPR = 0.6$ while B, interpolating its first segment, delivers $0.9 \times (0.05/0.3) = 0.15$: A catches four times as much at the budget. The claim's failing step is "at any threshold": AUC integrates $TPR$ over *all* values of $FPR$, weighting operating regions the deployment will never visit, and B's advantage lives entirely at false-positive rates above 0.05. A scalar built by integrating over thresholds cannot rank classifiers at a threshold; when the operating region is known, compare the curves there, or use partial AUC over the admissible $FPR$ range.
+</Solution>
+</Exercise>
+
+<Exercise>
+A two-person consultancy routes its client inbox through <Ref lesson="spam-filter">the spam chapter's</Ref> logistic filter, which published two test-set operating points: $t = 0.5$ with $(TP, FP, FN, TN) = (544, 39, 51, 902)$ and $t = 10/11$ with $(433, 6, 162, 935)$, on 595 spam and 941 ham. The partners never open the spam folder, so a flagged client mail is effectively lost, and they price that loss at five times the annoyance of a spam in the inbox: $a = 5$, $c = 1$. Decide which single number their monthly filter report should lead with; state what each of accuracy, AUC, recall alone, and $F_1$ would hide about this deployment; and explain why neither published point is their optimum but the two together bracket it.
+
+<Solution>
+**The metric.** The deployment states its costs, so the closing table's fourth row applies: report expected cost per message at the Bayes threshold $a/(a+c) = 5/6 \approx 0.833$ — a number the report can trust only because the spam chapter's reliability diagram showed this filter is calibrated; the same recipe on naive Bayes would price fiction.
+
+**What each alternative hides.** *Accuracy* silently reprices the errors at 1:1, and at these two points that reverses the ordering: error 5.9% against 10.9% says $t = 0.5$ wins, while the 5:1 costs run $(5 \times 39 + 51)/1536 = 0.160$ against $(5 \times 6 + 162)/1536 = 0.125$ per message, so $t = 10/11$ wins. *AUC* is a property of the scorer, not of an operating point — it is the same number whichever threshold is run, so it cannot inform this choice at all, and it is blind to the calibration the cost recipe presumes. *Recall alone* (0.914 against 0.728) sees only the spams let through and hides the $39 \to 6$ collapse in lost client mail, the error type priced at 5. *$F_1$* trades precision against recall at an implicit exchange rate that is not the partners' 5:1, and it moves with the corpus's 39% spam share: a different month's mail mix shifts $F_1$ with no change in the filter.
+
+**The bracket.** The partners' threshold $5/6$ lies strictly between the published $0.5$ and $10/11 \approx 0.909$: one published point prices the errors too cheaply for them (equal costs), the other too dearly (a 10:1 user's threshold). Raising $t$ only shrinks the flag set, so the sweep is monotone and the operating point at $5/6$ sits between the two published matrices on the curve — recall between 0.728 and 0.914, lost client mails between 6 and 39 per test set. Restricted to the two published points they run $t = 10/11$, and its 0.125 per message is an upper bound on the cost at their own threshold; the gap between that bound and the sweep's minimum near $5/6$ is what re-thresholding is worth.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce ISLP's Default numbers. The dataset ships with the `ISLP` Python package (`load_data('Default')`; also distributed with the R `ISLR2` package): 10,000 rows with `default`, `student`, `balance`, `income`. Fit LDA on `balance` and `student`, and report the confusion matrices at thresholds 0.5 and 0.2 on the training data. State in advance what will count as agreement with Tables 4.4–4.5.
+
+<Solution>
+Protocol: encode `student` as 0/1, fit `LinearDiscriminantAnalysis` (default settings estimate class priors from the data, matching ISLP), take posterior probabilities of the `Yes` class, and threshold at 0.5 and 0.2.
+
+What counts as agreement: the published matrices exactly, $(TP, FP, FN, TN) = (81, 23, 252, 9{,}644)$ at 0.5 and $(195, 235, 138, 9{,}432)$ at 0.2, since the fit is a closed-form estimator on a fixed dataset with no randomness. Small deviations (a handful of counts) indicate an implementation difference worth locating: a standardized `balance`, a different prior convention, or thresholding the discriminant score instead of the posterior. Derived checks: training error 2.75% at 0.5 and 3.73% at 0.2; 252/333 = 75.7% of defaulters missed at 0.5, falling to 41.4% at 0.2. The exercise's real product is the habit: state the agreement criterion before running anything.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take your fitted logistic model from <Ref lesson="logreg-lab">the lab</Ref> (or any scoring classifier and dataset you have): hold out 30% of the data, fit on the rest, and compute the rank-based AUC twice: once on the training 70%, once on the holdout. Repeat with the training set cut to a quarter of its size. Report the two gaps.
+
+<Solution>
+The training AUC exceeds the holdout AUC, and the gap widens as the training set shrinks. Typical magnitudes on the Wisconsin data: a gap of a few thousandths at full size, growing to a few hundredths at quarter size. The gap is small on this easy, well-separated dataset, but it is systematically one-signed across repeated random splits.
+
+The one-signed gap has a name: the *optimism* of a training-set estimate. The model was chosen to fit the very sample the first number is computed on, so the training score is biased upward as an estimate of performance on fresh data — the same reason ISLP flags its Default matrices as training matrices. Everything about this bias is quantifiable: its expected size, how to estimate risk without it, and how much variance the estimate itself carries. That machinery, cross-validation and the bootstrap, is where the course goes next: <Ref lesson="cross-validation-bootstrap" />.
+</Solution>
+</Exercise>
+
+<References>
+1. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §4.4.2: the Default data worked case, Tables 4.4–4.5 (the two confusion matrices reproduced here), Figure 4.7 (error rates against threshold), Figure 4.8 (the ROC curve, AUC 0.95). Free online: https://www.statlearning.com/
+2. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §5.1.2: cost-sensitive thresholds; §5.1.3: ROC, the two normalization tables behind this lesson's rate families; §5.1.4: PR curves, F-scores, and the imbalance analysis; §5.1.6: proper scoring rules and the Brier score; §17.3.5: Platt scaling and the uniform-overlap failure case. Free online: https://probml.github.io/pml-book/book1.html
+3. T. Fawcett, "An Introduction to ROC Analysis," *Pattern Recognition Letters* 27(8), 2006 — the standard ROC tutorial: curve construction from the sorted sample, AUC as ranking probability, class-skew invariance. https://doi.org/10.1016/j.patrec.2005.10.010
+4. J. Davis, M. Goadrich, "The Relationship Between Precision-Recall and ROC Curves," *ICML*, 2006 — the dominance correspondence between the two curve spaces and why they order classifiers differently under imbalance.
+5. T. Saito, M. Rehmsmeier, "The Precision-Recall Plot Is More Informative than the ROC Plot When Evaluating Binary Classifiers on Imbalanced Datasets," *PLoS ONE* 10(3), 2015 — the documented record of ROC misuse under heavy imbalance. https://doi.org/10.1371/journal.pone.0118432
+6. G. W. Brier, "Verification of Forecasts Expressed in Terms of Probability," *Monthly Weather Review* 78(1), 1950 — the original probability score; A. H. Murphy, "A New Vector Partition of the Probability Score," *Journal of Applied Meteorology* 12(4), 1973 — its reliability–resolution–uncertainty decomposition.
+7. J. Platt, "Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods," in *Advances in Large Margin Classifiers*, MIT Press, 1999 — sigmoid recalibration on held-out data.
+8. A. Niculescu-Mizil, R. Caruana, "Predicting Good Probabilities with Supervised Learning," *ICML*, 2005 — reliability diagrams and Platt versus isotonic recalibration benchmarked across model families.
+</References>

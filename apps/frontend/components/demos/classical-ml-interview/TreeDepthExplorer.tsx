@@ -8,9 +8,12 @@
  * chosen depth. Test error bottoms at depth 3 (0.226), climbs to 0.324 by
  * depth 10; train error falls monotonically to exactly 0. Guided task
  * (lesson): slide 1→10 and find where test error turns back up.
+ * The remove-one-point switch refits on 149 points: the ringed class-0
+ * point holds a depth-2 split in place, and without it the depth-3
+ * partition redraws — the instability ensembles average away.
  */
 import { useState } from "react";
-import { Panel, PresetGroup, Slider, Readout } from "@/components/ui";
+import { Panel, PresetGroup, Slider, Readout, Switch } from "@/components/ui";
 
 const AMBER = "#e2903a";
 const BLUE = "#4c8dd6";
@@ -91,6 +94,13 @@ function build(pts: Pt[], depth: number): TreeNode {
 const { train: TRAIN, test: TEST } = makeData(7);
 const ROOT = build(TRAIN, 0);
 
+// Instability witness: this class-0 point props up the depth-2 split
+// y<0.034 in the lower-right region; refit without it and the tree asks
+// x<0.757 there instead, redrawing the depth-3 partition.
+const REMOVED = 96;
+const TRAIN2 = TRAIN.filter((_, i) => i !== REMOVED);
+const ROOT2 = build(TRAIN2, 0);
+
 function collectLeaves(
   node: TreeNode, d: number, box: Box, out: { box: Box; cls: 0 | 1 }[],
 ): void {
@@ -106,35 +116,41 @@ function collectLeaves(
   collectLeaves(node.right, d, rBox, out);
 }
 
-function predict(p: Pt, d: number): 0 | 1 {
-  let node = ROOT;
+function predict(root: TreeNode, p: Pt, d: number): 0 | 1 {
+  let node = root;
   while (node.left !== undefined && node.right !== undefined && node.depth < d)
     node = p[node.feat as Feat] <= (node.thr as number) ? node.left : node.right;
   return node.cls;
 }
 
-// Every depth is precomputed once at module load; the slider just indexes.
-const STATS = Array.from({ length: MAX_DEPTH }, (_, i) => {
-  const d = i + 1;
-  const rects: { box: Box; cls: 0 | 1 }[] = [];
-  collectLeaves(ROOT, d, [0, 1, 0, 1], rects);
-  const err = (pts: Pt[]) =>
-    pts.reduce((s, p) => s + (predict(p, d) !== p.c ? 1 : 0), 0) / pts.length;
-  return { rects, trainErr: err(TRAIN), testErr: err(TEST) };
-});
+// Every depth of both trees is precomputed at module load; slider and
+// switch just index.
+const makeStats = (root: TreeNode, train: Pt[]) =>
+  Array.from({ length: MAX_DEPTH }, (_, i) => {
+    const d = i + 1;
+    const rects: { box: Box; cls: 0 | 1 }[] = [];
+    collectLeaves(root, d, [0, 1, 0, 1], rects);
+    const err = (pts: Pt[]) =>
+      pts.reduce((s, p) => s + (predict(root, p, d) !== p.c ? 1 : 0), 0) / pts.length;
+    return { rects, trainErr: err(train), testErr: err(TEST) };
+  });
+const STATS = [makeStats(ROOT, TRAIN), makeStats(ROOT2, TRAIN2)];
 
 const sx = (x: number) => x * W;
 const sy = (y: number) => (1 - y) * H;
 const rx = (d: number) => CX0 + ((d - 1) / (MAX_DEPTH - 1)) * (CX1 - CX0);
 const ry = (e: number) => CY1 - (e / 0.5) * (CY1 - CY0);
-const trace = (key: "trainErr" | "testErr", d: number) =>
-  STATS.slice(0, d).map((s, i) => `${rx(i + 1)},${ry(s[key])}`).join(" ");
+const trace = (stats: (typeof STATS)[0], key: "trainErr" | "testErr", d: number) =>
+  stats.slice(0, d).map((s, i) => `${rx(i + 1)},${ry(s[key])}`).join(" ");
 
 export default function TreeDepthExplorer() {
   // D3: open on the depth-10 preset — sliver rectangles around single noise
   // points plus train error 0.000 vs test 0.324 is the memorization hook.
   const [depth, setDepth] = useState(10);
-  const { rects, trainErr, testErr } = STATS[depth - 1];
+  const [dropped, setDropped] = useState(false);
+  const stats = STATS[dropped ? 1 : 0];
+  const { rects, trainErr, testErr } = stats[depth - 1];
+  const nTrain = dropped ? N_TRAIN - 1 : N_TRAIN;
   const activePreset = PRESETS.findIndex((p) => p.d === depth);
 
   return (
@@ -154,8 +170,16 @@ export default function TreeDepthExplorer() {
         display={String(depth)}
         ariaLabel="Maximum tree depth"
       />
+      <div className="mt-2 flex min-h-11 items-center gap-3">
+        <Switch
+          on={dropped}
+          label="Remove the ringed training point and refit"
+          onToggle={() => setDropped((v) => !v)}
+        />
+        <span className="text-sm">remove the ringed point, refit on {N_TRAIN - 1}</span>
+      </div>
       <Readout>
-        {rects.length} leaves · train error = <strong>{trainErr.toFixed(3)}</strong> ({N_TRAIN} points) ·
+        {rects.length} leaves · train error = <strong>{trainErr.toFixed(3)}</strong> ({nTrain} points) ·
         test error = <strong>{testErr.toFixed(3)}</strong> ({N_TEST} held-out points)
       </Readout>
       <div className="mt-2 flex flex-wrap items-start justify-center gap-4">
@@ -163,7 +187,7 @@ export default function TreeDepthExplorer() {
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full max-w-80 select-none"
           role="img"
-          aria-label={`CART partition at max depth ${depth}: ${rects.length} axis-aligned rectangles over a two-class scatter`}
+          aria-label={`CART partition at max depth ${depth}: ${rects.length} axis-aligned rectangles over a two-class scatter${dropped ? ", refit with one training point removed" : ""}`}
         >
           {rects.map((r, i) => (
             <rect
@@ -178,9 +202,23 @@ export default function TreeDepthExplorer() {
               strokeOpacity="0.35"
             />
           ))}
-          {TRAIN.map((p, i) => (
-            <circle key={i} cx={sx(p.x)} cy={sy(p.y)} r="3" fill={p.c ? AMBER : BLUE} />
-          ))}
+          {TRAIN.map((p, i) =>
+            i === REMOVED ? (
+              // The removable point: ringed while in the fit, hollow once out.
+              <circle
+                key={i}
+                cx={sx(p.x)}
+                cy={sy(p.y)}
+                r="4.5"
+                fill={dropped ? "none" : BLUE}
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeDasharray={dropped ? "2 2" : undefined}
+              />
+            ) : (
+              <circle key={i} cx={sx(p.x)} cy={sy(p.y)} r="3" fill={p.c ? AMBER : BLUE} />
+            ),
+          )}
           <text x="8" y="16" fontSize="11" fontWeight="bold" fill={BLUE}>class 0</text>
           <text x="8" y="30" fontSize="11" fontWeight="bold" fill={AMBER}>class 1</text>
           <text x="8" y="44" fontSize="10" fill="currentColor" opacity="0.65">shading = predicted class</text>
@@ -196,8 +234,8 @@ export default function TreeDepthExplorer() {
           <line x1={CX0} y1={CY1} x2={CX1} y2={CY1} stroke="currentColor" opacity="0.5" />
           <line x1={CX0} y1={CY0} x2={CX0} y2={CY1} stroke="currentColor" opacity="0.5" />
           <line x1={rx(depth)} y1={CY0} x2={rx(depth)} y2={CY1} stroke="currentColor" opacity="0.3" strokeDasharray="3 3" />
-          <polyline points={trace("trainErr", depth)} fill="none" stroke={BLUE} strokeWidth="2" />
-          <polyline points={trace("testErr", depth)} fill="none" stroke={AMBER} strokeWidth="2.5" />
+          <polyline points={trace(stats, "trainErr", depth)} fill="none" stroke={BLUE} strokeWidth="2" />
+          <polyline points={trace(stats, "testErr", depth)} fill="none" stroke={AMBER} strokeWidth="2.5" />
           <circle cx={rx(depth)} cy={ry(trainErr)} r="3.5" fill={BLUE} />
           <circle cx={rx(depth)} cy={ry(testErr)} r="3.5" fill={AMBER} />
           <text x={CX0 - 6} y={CY1 + 4} textAnchor="end" fontSize="10" fill="currentColor" opacity="0.7">0</text>

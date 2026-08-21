@@ -1,0 +1,410 @@
+AdaBoost turns a learner barely better than chance into a strong classifier by reweighting mistakes; the algorithm is exactly stagewise minimization of an exponential loss.
+
+<Ref lesson="bagging-random-forests">The previous lesson</Ref> settled the variance half of the ensemble resolution and closed on a measured failure: fifty bagged stumps scored 23.4% on a diagonal boundary where a single stump scored 27.6%, because averaging identically distributed learners preserves their expectation, and a stump's problem is bias. Its final exercise then combined the same fifty stumps by a different rule, reweighting the training points after each round, and reached 7.8%. This lesson is that rule: the algorithm, its arithmetic run by hand, a proof that its training error collapses exponentially, and the later discovery that the whole procedure is greedy minimization of one specific loss. What the lesson leaves deliberately open is the test error's behavior after the training error reaches zero: the course's second standing debt, paid in <Ref lesson="margin-bounds">module 9</Ref>.
+
+The route: the weak-learning premise and the bet behind it; the algorithm; two rounds computed in full on ten points; the training-error theorem with its telescoping proof; the reinterpretation as forward-stagewise additive modeling under exponential loss; that loss's character under label noise; and the experiment the classical theory cannot explain.
+
+## The premise: a coin-grade edge is enough
+
+<Task>
+Three retrievals before the new material, closed book. (1) From <Ref lesson="decision-trees">the trees lesson</Ref>: what a decision stump is, and how the best split is found by a sorted scan. (2) From <Ref lesson="bagging-random-forests">the bagging lesson</Ref>: which term of the error decomposition averaging attacks, and why bagged stumps stay stump-shaped. (3) From <Ref lesson="svm-max-margin">the margin lesson</Ref>: what the product $y f(x)$ is called, and which losses were drawn as functions of it. All three carry weight below.
+</Task>
+
+The opening promised strength assembled from learners barely better than chance; the first step is to make "barely better than chance" a definition rather than a slogan. A *weak learner* is a classifier guaranteed only to beat a coin toss: on the distribution it is trained on, its error is at most $\tfrac{1}{2} - \gamma$ for some fixed *edge* $\gamma > 0$, however small. The canonical instance is the **decision stump**, a one-split tree from <Ref lesson="decision-trees" />: one feature, one threshold, two constant leaves, fitted by the same sorted threshold scan, now with each point's contribution to the error multiplied by a weight.
+
+### The weak-learning question
+
+Whether such a learner is worth anything was a real question, posed by Kearns and Valiant in the late 1980s: does the existence of an efficient weak learner imply the existence of an efficient strong one, or are there problems learnable only up to $49\%$ error? [Schapire (1990)](https://doi.org/10.1007/BF00116037) proved the two notions coincide, by an explicit construction that converts any weak learner into a strong one; Freund and Schapire's [AdaBoost](https://doi.org/10.1006/jcss.1997.1504) (published in final form in 1997) made the conversion practical. The mechanism is sequential: fit a stump, increase the weight of the points it got wrong, fit the next stump on the reweighted data, and combine all stumps by a weighted vote. Each stump needs an edge only on its own weighted distribution; the combination compounds the edges.
+
+### Boosting in the module's ledger
+
+This settles where *boosting* sits in the module's ledger. Bagging averages low-bias, high-variance trees and attacks the variance term; boosting combines high-bias, low-variance learners into a sum whose expressive power grows with every round, and attacks the bias term: the half of the decomposition <Ref lesson="bagging-random-forests">averaging provably cannot touch</Ref>.
+
+<KeyFact>
+Any persistent edge $\gamma > 0$ over chance, however small, is enough: boosting compounds it into arbitrarily low training error at a provably exponential rate, the content of the theorem this lesson proves.
+</KeyFact>
+
+## The algorithm: reweight the mistakes, vote by accuracy
+
+The premise fixed, the algorithm is four lines per round.
+
+<Definition title="AdaBoost">
+Given $(x_1, y_1), \dots, (x_n, y_n)$ with $y_i \in \{-1, +1\}$, initialize weights $w_i = 1/n$. For $t = 1, \dots, T$:
+
+1. Fit a weak learner $h_t$ minimizing the **weighted error** $\varepsilon_t = \sum_i w_i \,\mathbf{1}\{h_t(x_i) \ne y_i\}$.
+2. If $\varepsilon_t \ge \tfrac{1}{2}$, stop. Otherwise set the vote weight $\alpha_t = \tfrac{1}{2}\ln\tfrac{1-\varepsilon_t}{\varepsilon_t}$.
+3. Update $w_i \leftarrow w_i\, e^{-\alpha_t y_i h_t(x_i)}$ and divide every weight by the normalizer $Z_t$ so the weights again sum to $1$.
+
+Output $F(x) = \sum_{t=1}^{T} \alpha_t h_t(x)$; classify by $\operatorname{sign} F(x)$.
+</Definition>
+
+### The update and the normalizer
+
+The update in step 3 is a single expression covering both cases, because $y_i h_t(x_i) = \pm 1$: a **misclassified** point is multiplied by $e^{\alpha_t} > 1$, a correct one by $e^{-\alpha_t} < 1$. The normalizer has a closed form,
+
+$$
+Z_t \;=\; \varepsilon_t\, e^{\alpha_t} + (1 - \varepsilon_t)\, e^{-\alpha_t} \;=\; 2\sqrt{\varepsilon_t\,(1-\varepsilon_t)},
+$$
+
+by substituting $e^{\alpha_t} = \sqrt{(1-\varepsilon_t)/\varepsilon_t}$. One consequence is worth stating now: after normalization, the points $h_t$ just missed carry total weight $\varepsilon_t e^{\alpha_t}/Z_t = \tfrac{1}{2}$ exactly. The stump just used therefore scores precisely $50\%$ on the new weights: useless by construction, so round $t+1$ must find something new (a closing exercise derives this in two lines). The stop condition in step 2 fires when nothing beats chance anymore.
+
+### The vote weight's three regimes
+
+<Figure
+  src="./figures/alpha-curve.svg"
+  alt="The vote weight alpha equals one half log of (1 minus epsilon) over epsilon, decreasing through zero at epsilon equal one half, with the worked example's three epsilon values marked and the negative region shaded"
+  caption="The vote weight α(ε): unbounded say as ε → 0, zero say at ε = ½, a flipped vote beyond."
+  float="right"
+  width="m"
+/>
+
+The vote weight $\alpha_t$ is half the log-odds that $h_t$ is right on its own weighted distribution, and its three regimes are all meaningful. At $\varepsilon \to 0$, $\alpha \to \infty$: a perfect weak learner takes over the vote. At $\varepsilon = \tfrac{1}{2}$, $\alpha = 0$: a chance-level learner gets no say, and the update multiplies every weight by $1$; the algorithm stalls, which is what step 2's condition detects. At $\varepsilon > \tfrac{1}{2}$, $\alpha < 0$: the vote flips, and a stump wrong $90\%$ of the time is used exactly as its negation with error $0.1$ would be. The boundary-probe exercise at the end of the lesson connects the first two regimes to the training-error bound.
+
+<Remark title="the 1997 notation">
+Freund and Schapire's original statement uses different conventions: labels in $\{0,1\}$, a multiplier $\beta_t = \varepsilon_t/(1-\varepsilon_t)$ applied to the *correctly* classified points, and a final vote weighted by $\ln(1/\beta_t)$. Since $\ln(1/\beta_t) = 2\alpha_t$, every vote weight is doubled and the sign of the combined classifier is unchanged: the same algorithm. This lesson uses the $\pm 1$ convention of ESL's Algorithm 10.1 throughout, because it makes the update a single exponential and the coming equivalence proof one line shorter.
+</Remark>
+
+## Two rounds by hand on ten points
+
+The four lines of the definition earn trust by being executed once in full, every number checkable by hand; this section runs them on the smallest dataset that exercises all three steps. Ten points in the plane, five per class; the weak learners are all stumps on $x_1$ or $x_2$:
+
+| point | $x_1$ | $x_2$ | $y$ |   | point | $x_1$ | $x_2$ | $y$ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A | 1 | 3 | $+1$ |   | F | 4 | 3 | $-1$ |
+| B | 2 | 2 | $+1$ |   | G | 5 | 1 | $-1$ |
+| C | 4 | 8 | $+1$ |   | H | 6 | 4 | $-1$ |
+| D | 5 | 6 | $+1$ |   | I | 9 | 7 | $-1$ |
+| E | 6 | 9 | $+1$ |   | J | 8 | 2 | $-1$ |
+
+### Rounds 1 and 2, computed
+
+<Example title="round 1: fit, score, reweight">
+**Fit.** All weights are $1/10$. Scanning every threshold on both features, no stump beats $3$ mistakes, and six distinct mistake sets tie at exactly $3$: sliding the cut on $x_1$ rightward through the data misses $\{C,D,E\}$, then $\{D,E,F\}$, $\{E,F,G\}$, $\{F,G,H\}$; cuts on $x_2$ miss $\{A,B,I\}$ or $\{A,B,D\}$. Take the first of the ties, $h_1(x) = +1$ if $x_1 < 3$, else $-1$.
+
+**Score.** $\varepsilon_1 = 0.30$, so $\alpha_1 = \tfrac{1}{2}\ln\tfrac{0.7}{0.3} = \tfrac{1}{2}\ln\tfrac{7}{3} \approx 0.424$.
+
+**Reweight.** $e^{\alpha_1} = \sqrt{7/3} \approx 1.528$ and $e^{-\alpha_1} \approx 0.655$. Unnormalized: C, D, E each $0.1 \times 1.528 = 0.1528$; the seven correct points each $0.1 \times 0.655 = 0.0655$. The normalizer is $Z_1 = 3(0.1528) + 7(0.0655) = 0.9165 = 2\sqrt{0.3 \times 0.7}$, as the closed form promised. Normalized: **C, D, E $= 1/6$ each**, the three misses now holding half the total mass, and the other seven $= 1/14$ each.
+</Example>
+
+<Example title="round 2: the reweighted data changes the argmin">
+**Fit.** On the new weights $h_1$ itself scores $3 \times \tfrac{1}{6} = \tfrac{1}{2}$: useless, exactly as the normalizer arithmetic said. The reweighting also breaks round 1's six-way tie: any mistake set containing one of the inflated points C, D, E now costs at least $\tfrac{1}{6} + \tfrac{2}{14} \approx 0.31$, so the best stumps are the two that miss only deflated points — $x_1 < 7$ (misses F, G, H) and $x_2 > 5$ (misses A, B, I), each at $\varepsilon = 3/14$. Take $h_2(x) = +1$ if $x_1 < 7$, else $-1$.
+
+**Score.** $\varepsilon_2 = 3/14 \approx 0.214$, so $\alpha_2 = \tfrac{1}{2}\ln\tfrac{11}{3} \approx 0.650$: a cleaner stump earns a bigger vote.
+
+**Reweight.** $e^{\alpha_2} = \sqrt{11/3} \approx 1.915$, $e^{-\alpha_2} \approx 0.522$, and $Z_2 = 2\sqrt{\tfrac{3}{14}\cdot\tfrac{11}{14}} \approx 0.821$. The exact new weights: **F, G, H $= 1/6$** (the fresh mistakes, again holding half the mass), **C, D, E $= 7/66$**, **A, B, I, J $= 1/22$**. Check: $3 \cdot \tfrac{1}{6} + 3 \cdot \tfrac{7}{66} + 4 \cdot \tfrac{1}{22} = \tfrac{1}{2} + \tfrac{21}{66} + \tfrac{12}{66} = 1$.
+
+**The two-stump vote.** $\operatorname{sign}(0.424\, h_1 + 0.650\, h_2)$ takes three values: $+1.07$ for $x_1 < 3$, $-0.424 + 0.650 = +0.23$ for $3 \le x_1 < 7$, and $-1.07$ beyond. It predicts $+1$ wherever $x_1 < 7$, so F, G, H are still wrong: training error $0.30$, unchanged from one stump.
+</Example>
+
+<FigureSequence
+  name="rounds"
+  alt="Five frames on the ten-point scatter: stump one at x1 equals 3 with three circled misses; dot sizes reweighted with the epsilon and alpha arithmetic beside; stump two at x1 equals 7 with its three misses; the second reweighting; the combined two-stump vote's regions with three points still wrong"
+  caption="Two rounds on ten points. Dot area tracks weight: each round inflates the fresh mistakes to half the total mass, and the next stump is fit to that distribution."
+/>
+
+<Task>
+Step through the five frames and reproduce frame 2's arithmetic: multiply the three misses by $e^{\alpha_1} = 1.528$ and the rest by $0.655$, sum to $Z_1 = 0.9165$, and confirm the normalized weights $1/6$ and $1/14$. Then check in frame 5 that the middle region's sign comes out positive because $\alpha_2 > \alpha_1$.
+</Task>
+
+### Round 3, and where the progress is stored
+
+After two rounds the $0/1$ training error has not moved: $0.30$ from one stump, $0.30$ from two. The progress is stored elsewhere, in the weights and in the real-valued score $F(x)$; round 3, run as the exercise below, converts it into zero training error.
+
+<Exercise>
+Run round 3 yourself before opening the solution; the weights entering it are F, G, H $= 1/6$, C, D, E $= 7/66$, A, B, I, J $= 1/22$. The best stump is $h_3(x) = +1$ if $x_2 > 5$, else $-1$. Compute $\varepsilon_3$ and $\alpha_3$, the updated weights of all four groups, and the prediction of $\operatorname{sign}(\alpha_1 h_1 + \alpha_2 h_2 + \alpha_3 h_3)$ on every point.
+
+<Solution>
+Strategy first: identify which points $h_3$ misses and read their current weights off the table; everything else is the round-1 template.
+
+**Error and vote.** $h_3$ misclassifies A and B (label $+1$, below the line) and I (label $-1$, above it), each carrying weight $1/22$: $\varepsilon_3 = 3/22 \approx 0.136$ and $\alpha_3 = \tfrac{1}{2}\ln\tfrac{19}{3} \approx 0.923$.
+
+**Reweight.** $e^{\alpha_3} = \sqrt{19/3} \approx 2.517$, $Z_3 = 2\sqrt{\tfrac{3}{22}\cdot\tfrac{19}{22}} \approx 0.686$. A miss's weight becomes $\tfrac{1}{22} \cdot e^{\alpha_3}/Z_3 = 1/6$ (the fresh mistakes hold half the mass, for the third time); a correct point's weight is multiplied by $e^{-\alpha_3}/Z_3 = 11/19$, giving F, G, H $= 11/114$, C, D, E $= 7/114$, J $= 1/38$. Check: $\tfrac{3}{6} + \tfrac{33}{114} + \tfrac{21}{114} + \tfrac{3}{114} = 1$.
+
+**The three-stump vote.** $F = 0.424\, h_1 + 0.650\, h_2 + 0.923\, h_3$ over the six cells cut by $x_1 = 3$, $x_1 = 7$, $x_2 = 5$: A, B sit at $0.424 + 0.650 - 0.923 = +0.15$ (correct); C, D, E at $-0.424 + 0.650 + 0.923 = +1.15$ (correct); F, G, H at $-0.424 + 0.650 - 0.923 = -0.70$ (correct); I at $-0.424 - 0.650 + 0.923 = -0.15$ (correct); J at $-2.00$ (correct). All ten points are right: training error $0$ at $T = 3$, though every individual stump errs on three points.
+</Solution>
+</Exercise>
+
+## The training-error theorem: any edge forces exponential collapse
+
+From the update rule one might expect the rounds to cycle, each fix undoing the previous round's work on the points it deflates. The original paper proved the opposite, and the proof is three steps: bound the $0/1$ error by the exponential of $-y_i F(x_i)$; show that the average of that exponential is *exactly* the product $Z_1 Z_2 \cdots Z_T$, by telescoping; then bound each factor using the edge. Write $\gamma_t = \tfrac{1}{2} - \varepsilon_t$ throughout.
+
+<Theorem title="training-error bound (Freund &amp; Schapire 1997, Thm. 6; proof after Shalev-Shwartz &amp; Ben-David, Thm. 10.2)">
+After $T$ rounds of AdaBoost,
+
+$$
+\frac{1}{n} \sum_{i=1}^n \mathbf{1}\{\operatorname{sign} F(x_i) \ne y_i\}
+\;\le\; \prod_{t=1}^{T} 2\sqrt{\varepsilon_t (1 - \varepsilon_t)}
+\;=\; \prod_{t=1}^{T} \sqrt{1 - 4\gamma_t^2}
+\;\le\; \exp\!\Big(\!-2 \sum_{t=1}^{T} \gamma_t^2\Big).
+$$
+
+<Proof>
+**Step 1: the loss dominates the error.** $\mathbf{1}\{\operatorname{sign} F(x_i) \ne y_i\} \le e^{-y_i F(x_i)}$: the left side is $1$ only when $y_i F(x_i) \le 0$, and there the right side is $\ge 1$. So it suffices to bound the average exponential loss $L_T = \tfrac{1}{n}\sum_i e^{-y_i F_T(x_i)}$, where $F_t = \sum_{s \le t} \alpha_s h_s$.
+
+**Step 2: the average loss telescopes into the normalizers.** Unrolling step 3 of the algorithm by induction, the weight of point $i$ after $t$ rounds is its accumulated multipliers over the accumulated normalizers:
+
+$$
+w_i^{(t+1)} \;=\; \frac{1}{n} \cdot \frac{\prod_{s \le t} e^{-\alpha_s y_i h_s(x_i)}}{\prod_{s \le t} Z_s}
+\;=\; \frac{e^{-y_i F_t(x_i)}}{n \prod_{s \le t} Z_s}.
+$$
+
+The weights sum to $1$ at every round, so summing over $i$ gives $L_t = \prod_{s \le t} Z_s$, i.e. $L_t / L_{t-1} = Z_t$: **each round multiplies the average exponential loss by exactly its normalizer.** In particular $L_T = Z_1 Z_2 \cdots Z_T$, with equality, not inequality.
+
+**Step 3: each factor is small because of the edge.** The closed form already computed gives $Z_t = 2\sqrt{\varepsilon_t(1-\varepsilon_t)}$, and with $\varepsilon_t = \tfrac{1}{2} - \gamma_t$ this is $\sqrt{(1-2\gamma_t)(1+2\gamma_t)} = \sqrt{1 - 4\gamma_t^2}$. Since $1 - a \le e^{-a}$, each factor is at most $e^{-2\gamma_t^2}$; multiplying over $t$ finishes the proof. The hypothesis $\varepsilon_t < \tfrac{1}{2}$ is what makes each $\gamma_t^2 > 0$: a chance-level round contributes a factor of exactly $1$ and no progress.
+</Proof>
+</Theorem>
+
+### Reading the bound
+
+<Figure
+  src="./figures/bound-anatomy.svg"
+  alt="The product of the normalizers over the three worked rounds, falling by factors 0.917, 0.821, 0.686 under the dashed exponential envelope, with the actual zero-one training error of 0.3, 0.3, 0 below both"
+  caption="The bound's anatomy on the worked example: the product Π Zₜ is the mean exponential loss, exactly; the 0/1 error rides underneath and hits 0 at T = 3, while the bound stands at 0.516."
+/>
+
+Rounds 1–3 multiply the average exponential loss by $0.917$, $0.821$, $0.686$ (product $0.516$) while the actual training error goes $0.3,\ 0.3,\ 0$: the bound is loose pointwise, and its content is the guaranteed *rate*. A persistent edge $\gamma_t \ge \gamma$ makes the bound $e^{-2T\gamma^2}$, which drops below $1/n$ after $T > \ln n \,/\, 2\gamma^2$ rounds; the training error, a multiple of $1/n$, is then forced to be exactly zero. Zero training error in $O(\log n)$ rounds, from learners barely better than coins.
+
+<Task>
+Three comprehension checks on the proof. (1) Name the exact step where the algorithm's choice of $\alpha_t$ enters (only the closed form $Z_t = 2\sqrt{\varepsilon_t(1-\varepsilon_t)}$ uses it; steps 1 and 2 hold for any $\alpha_t$). (2) Verify $L_2 = Z_1 Z_2$ on the worked example directly: the ten values of $e^{-y_i F_2(x_i)}$ are $e^{-1.073}$ (A, B), $e^{-0.226}$ (C, D, E), $e^{+0.226}$ (F, G, H), $e^{-1.073}$ (I, J); their mean is $0.752 = 0.9165 \times 0.821$. (3) State what the theorem concludes if some round has $\varepsilon_t = \tfrac{1}{2}$ exactly.
+</Task>
+
+<Remark title="why this update and not another (Freund &amp; Schapire §4.2)">
+The 1997 paper runs the derivation in the opposite direction, and the direction is instructive. It first proves the error bound $\prod_t Z_t$ for an *arbitrary* multiplier $\beta_t$, then chooses $\beta_t$ to minimize each factor separately: setting the derivative of the $t$-th factor to zero yields $\beta_t = \varepsilon_t/(1-\varepsilon_t)$, the update of the 1997 pseudocode, equal to $e^{-2\alpha_t}$ in this lesson's convention. The multiplicative reweighting is not a heuristic that happens to admit a bound; it is the minimizer of the bound. The next section shows it is simultaneously the minimizer of something else.
+</Remark>
+
+<KeyFact>
+$\frac{1}{n}\sum_i \mathbf{1}\{\operatorname{sign}F(x_i) \neq y_i\} \le e^{-2\sum_t \gamma_t^2}$: a persistent edge drives training error to exactly zero in $O(\log n)$ rounds. The theorem says nothing whatsoever about test error: every generalization claim in this lesson's figures is empirical until module 9.
+</KeyFact>
+
+## ★ Ancestry: the gambler and the Hedge algorithm
+
+The 1997 paper spends its first half on a different problem, and AdaBoost occupies its second half as an application. A gambler wants to bet on horse races by combining the advice of $N$ experts, none of whom he trusts in advance; the paper's Hedge($\beta$) algorithm keeps a weight per expert, follows the weighted majority, and multiplies each expert's weight by $\beta^{\text{loss}}$ after every race, guaranteeing total loss close to the best single expert's in hindsight. AdaBoost is Hedge under a reversed reduction: the "experts" become the $n$ training examples, the "trials" become the weak hypotheses, and the loss inverts. An example's weight *grows* when the current hypothesis handles it badly, because hard examples are the ones the next hypothesis must attend to. The adaptive per-round $\beta_t$ (rather than Hedge's fixed $\beta$) is what the "Ada" abbreviates. The online-learning lineage is why the weights are multiplicative and why the analysis telescopes so cleanly; the full correspondence is §§2–4 of the paper.
+
+## The reinterpretation: stagewise minimization of a loss nobody wrote down
+
+Nothing in the algorithm's statement mentions a loss function: weights, votes, and errors, but no objective. Three years after the JCSS paper, [Friedman, Hastie, and Tibshirani (2000)](https://doi.org/10.1214/aos/1016218223) showed that the procedure had been minimizing one all along, and the proof is a short computation. Two definitions set it up.
+
+### Two definitions
+
+<Definition title="forward-stagewise additive modeling">
+An *additive model* over a base class $\mathcal{H}$ is $F_T(x) = \sum_{t=1}^{T} \alpha_t h_t(x)$ with $h_t \in \mathcal{H}$ and $\alpha_t \in \mathbb{R}$. *Forward-stagewise* fitting builds it greedily: at stage $t$, with all earlier terms frozen, solve
+
+$$
+(\alpha_t, h_t) \;=\; \arg\min_{\alpha,\, h} \; \sum_{i=1}^{n} L\bigl(y_i,\; F_{t-1}(x_i) + \alpha\, h(x_i)\bigr),
+$$
+
+and never revisit earlier terms. The same template with squared loss fits each new term to the current residuals, the seed of <Ref lesson="gradient-boosting">the next lesson</Ref>.
+</Definition>
+
+<Definition title="exponential loss">
+The *exponential loss* of a real-valued score $f$ on a label $y \in \{-1,+1\}$ is $L(y, f) = e^{-y f}$. Like the hinge and logistic losses of <Ref lesson="svm-max-margin">the margin lesson</Ref>, it is a decreasing function of the margin $m = y f$: exponentially small for confidently correct scores, exponentially large for confidently wrong ones.
+</Definition>
+
+### The derivation, in three moves
+
+The claim: forward-stagewise fitting under exponential loss, with $\mathcal{H}$ the weak-learner class, reproduces AdaBoost exactly — weights, weak-learner objective, and $\alpha$, all three.
+
+**Move 1: the frozen part becomes the weights.** Substitute the exponential loss into the stage objective and factor the exponential of a sum:
+
+$$
+\sum_{i} e^{-y_i (F_{t-1}(x_i) + \alpha h(x_i))}
+\;=\; \sum_{i} \underbrace{e^{-y_i F_{t-1}(x_i)}}_{w_i^{(t)}} \, e^{-\alpha\, y_i h(x_i)}.
+$$
+
+The factor $w_i^{(t)}$ involves neither $\alpha$ nor $h$: it is a constant per point, the exponential loss the frozen model already suffers there. Unwinding, $w_i^{(t)} = \prod_{s<t} e^{-\alpha_s y_i h_s(x_i)}$, which is AdaBoost's multiplicative update up to the normalization by $\prod Z_s$, a positive constant that changes no argmin. The reweighting is not a design choice; it falls out of the algebra.
+
+**Move 2: the best $h$ is the weighted-error minimizer.** Since $y_i h(x_i) = \pm 1$, the sum splits over correct and incorrect points (weights normalized to sum to $1$):
+
+$$
+e^{-\alpha}(1 - \varepsilon) + e^{\alpha}\, \varepsilon,
+\qquad
+\varepsilon = \sum_i w_i^{(t)}\, \mathbf{1}\{h(x_i) \ne y_i\},
+$$
+
+which for any fixed $\alpha > 0$ is increasing in $\varepsilon$. The optimal $h$ minimizes the weighted $0/1$ error, precisely what step 1 of the algorithm asks the weak learner to do.
+
+**Move 3: solving for $\alpha$ reproduces the formula.** Differentiate $g(\alpha) = e^{-\alpha}(1-\varepsilon) + e^{\alpha}\varepsilon$:
+
+$$
+g'(\alpha) = -e^{-\alpha}(1-\varepsilon) + e^{\alpha}\varepsilon = 0
+\;\;\Longrightarrow\;\;
+e^{2\alpha} = \frac{1-\varepsilon}{\varepsilon}
+\;\;\Longrightarrow\;\;
+\alpha = \frac{1}{2}\ln\frac{1-\varepsilon}{\varepsilon},
+$$
+
+with $g'' > 0$ everywhere, so this is the global minimum. At the minimum, $g(\alpha) = 2\sqrt{\varepsilon(1-\varepsilon)} = Z$: the stage's minimized loss is the theorem's per-round factor, the two analyses meeting in one number. The new frozen model $F_t = F_{t-1} + \alpha_t h_t$ hands the next stage the update $w_i^{(t+1)} = w_i^{(t)} e^{-\alpha_t y_i h_t(x_i)}$: step 3 of the algorithm.
+
+{/* fig AdaboostStagewiseCrosswalk: a two-column crosswalk proving the equivalence line by line. Left column header "the algorithm (1997)", right column header "stagewise exponential loss (2000)". Three rows, each an equation pair joined by an "=" badge on the center line: row 1: left: KaTeX w_i \propto \prod_{s<t} e^{-\alpha_s y_i h_s(x_i)} labeled "step 3: multiplicative reweighting", right: e^{-y_i F_{t-1}(x_i)} labeled "the frozen model's loss at point i"; row 2: left: \arg\min_h \sum_i w_i \mathbf{1}\{h(x_i) \ne y_i\} labeled "step 1: weak learner's target", right: \arg\min_h \sum_i w_i e^{-\alpha y_i h(x_i)} labeled "stage argmin at fixed alpha > 0"; row 3: left: \alpha_t = \tfrac12 \ln\frac{1-\varepsilon_t}{\varepsilon_t} labeled "step 2: the vote weight", right: \arg\min_\alpha\, [\,e^{-\alpha}(1-\varepsilon) + e^{\alpha}\varepsilon\,] labeled "stage argmin over alpha". Colors: amber for the algorithm column's lead symbols, blue for the stagewise column, currentColor labels; the three "=" badges bold. Bottom line spanning both columns: "three design decisions = one greedy minimization". Layout: aligned grid, KaTeX via <M>, no SVG needed. */}
+<Figure
+  name="AdaboostStagewiseCrosswalk"
+  alt="Two-column crosswalk: AdaBoost's reweighting, weak-learner objective, and vote weight on the left, the corresponding pieces of one stagewise exponential-loss minimization on the right, joined line by line by equality badges"
+  caption="The equivalence, line by line: each of the algorithm's three moving parts is a piece of one stagewise minimization."
+/>
+
+<Theorem title="AdaBoost is stagewise exponential-loss minimization (ESL §10.4)">
+AdaBoost, with the weak learner returning the weighted-error minimizer, coincides at every round with forward-stagewise additive modeling under $L(y, f) = e^{-yf}$: the fitted $h_t$, the vote weight $\alpha_t = \tfrac{1}{2}\ln\tfrac{1-\varepsilon_t}{\varepsilon_t}$, and the induced weight update are the stagewise solution.
+</Theorem>
+
+### What the score estimates
+
+The reinterpretation also answers what the score $F$ *estimates*. Minimizing the exponential loss over all functions at the population level gives
+
+$$
+f^*(x) \;=\; \arg\min_{f(x)}\; \mathbb{E}_{Y|x}\,\bigl[e^{-Y f(x)}\bigr] \;=\; \frac{1}{2}\,\ln \frac{\Pr(Y = +1 \mid x)}{\Pr(Y = -1 \mid x)},
+$$
+
+half the log-odds (set the derivative $-p\,e^{-f} + (1-p)\,e^{f}$ to zero). So $\operatorname{sign} f^*$ is exactly the Bayes classifier of <Ref lesson="statistical-learning">module 1</Ref>, and AdaBoost targets the same population object as <Ref lesson="logistic-regression">the logistic model</Ref>: the two losses share their minimizer and part company only in how they treat being wrong, which is the next section's subject. In Mohri's account (§7.2.2) the same algorithm is coordinate descent on the exponential loss over the span of the weak learners, a third reading with the same conclusion.
+
+<KeyFact>
+AdaBoost's three moving parts — weak-learner objective, vote weight, weight update — are not three design decisions but one: greedy stagewise minimization of $\sum_i e^{-y_i F(x_i)}$, whose population minimizer is half the log-odds. The algorithm was estimating a probability model no one had written down.
+</KeyFact>
+
+## The character of exponential loss
+
+Equivalence in the population minimizer is not equivalence in behavior; the two losses weight mistakes very differently on the way there, and the difference is measurable.
+
+<Figure
+  src="./figures/loss-zoo.svg"
+  alt="Exponential loss, binomial deviance, hinge, and zero-one loss plotted against the margin, all passing through one at margin zero; on the negative side the exponential curve leaves the frame while the deviance grows linearly, and the mistake side is shaded"
+  caption="The margin losses through (0, 1). Left of zero, deviance and hinge grow linearly; the exponential loss (equivalently, the boosting weight e^{−yF}) grows without bound."
+/>
+
+For a correctly classified point, all the curves agree that more margin is mildly better. For a *misclassified* point the deviance $\log_2(1 + e^{-2m})$ grows linearly in $|m|$, while $e^{-m}$ grows exponentially. By the telescoping identity, a training point's boosting weight *is* its exponential loss, normalized; a point the ensemble confidently gets wrong therefore accumulates weight geometrically, round after round.
+
+### Label noise, measured
+
+On clean data the concentration is productive: weight accumulates on the hard points until some stump handles them. On mislabeled data the same mechanism turns against the fit. A point with a flipped label is unfixable: the true pattern votes against it, its margin stays negative, and its weight grows like $e^{|F|}$, so late rounds are spent fitting stumps to corrupted labels. Breiman's random-forests paper measured the damage directly: flip $5\%$ of training labels, rerun, and report each method's *relative* increase in test error — the growth of the error itself, not percentage points added. Averaged over the nine benchmark datasets of the experiment, AdaBoost's test error grew by about $21\%$ of itself against the forest's $2\%$. The concrete scale: on breast cancer, where AdaBoost's clean-data error is $3.2\%$, the noise run's $+43\%$ means roughly $3.2\% \to 4.6\%$ — half again the error from twenty flipped labels per four hundred (Table 4 of the paper). His diagnosis is the mechanism above: the forest never concentrates weight on any subset of the training points; AdaBoost does, and noise is where the concentration lands. Boosting a linearly growing loss instead, the deviance, degrades far more gracefully, which is one motive for the general-loss framework of <Ref lesson="gradient-boosting">the next lesson</Ref>.
+
+<Figure
+  src="./figures/noise-damage.svg"
+  alt="Paired horizontal bars for the nine datasets of Breiman's 5-percent-label-noise experiment: AdaBoost's relative test-error increase reaches 49 percent on votes and 43 percent on breast cancer, while the random forest's stays within eight percent everywhere and is negative on sonar and liver"
+  caption="Breiman's Table 4: relative growth in test error after flipping 5% of training labels. The forest's bars hug zero on every dataset; AdaBoost's damage is dataset-dependent and reaches half the original error."
+/>
+
+### The module's division of labor
+
+This fixes the module's division of labor in its final form, one clause per method. Bagging is a **variance** tool: it needs unstable, low-bias learners, leaves their shared bias untouched, and its ensemble size $B$ is a Monte-Carlo parameter that <Ref lesson="bagging-random-forests">provably cannot overfit</Ref>. Boosting is a **bias** tool: it needs weak, stable learners, grows expressive power with every round, and its round count $T$ is a genuine complexity parameter (the additive model at $T = 400$ contains the one at $T = 100$), tuned, like any other, by <Ref lesson="cross-validation-bootstrap">validation</Ref>. The full three-way race on the spam corpus is <Ref lesson="spam-ensembles">four lessons ahead, at the module's close</Ref>.
+
+## The mystery: test error after zero training error
+
+Everything so far is training-set arithmetic; what made boosting famous is a test-set experiment. ESL's benchmark (Figure 10.2) draws ten standard Gaussian features, labels a point $+1$ when $\sum_j x_j^2$ exceeds the $\chi^2_{10}$ median $9.34$, and boosts stumps on $2{,}000$ points: a single stump has $45.8\%$ test error, barely under chance; a $244$-node tree has $24.7\%$; the boosted stumps reach $5.8\%$ after $400$ rounds. Breiman, seeing results of this kind, called AdaBoost with trees "the best off-the-shelf classifier in the world" (NIPS workshop, 1996, as reported in ESL §10.1). The same ladder runs on the course's own data: on the spam corpus, $400$ boosted stumps reach $6.0\%$ test error where <Ref lesson="spam-tree">the pruned tree</Ref> scored $8.3\%$, and the stumps are still improving — $5.8\%$ by round $1{,}000$ (computed for this lesson: ESL's 3,065/1,536 split, one stump per round, nothing tuned). That score sits *above* the previous lesson's bagging ($5.1\%$) and forest ($4.8\%$) results, and the gap is structural: a sum of stumps is an additive function of the features — no term ever consults two features at once — while every bagged tree models interactions. Boosting attacks bias only down to the floor its base class sets.
+
+### The classical prediction
+
+The classical account of <Ref lesson="bias-variance">module 1</Ref> makes a firm prediction about such a machine. Each round adds a term to the additive model; the ensemble's capacity grows with $T$ (Shalev-Shwartz and Ben-David §10.3 bound the VC dimension of the $T$-term class by roughly $T$ times the stumps'; growth is linear); so once the training error reaches zero, further rounds should buy pure variance, and the test error should turn back up. The U-curve says: stop early.
+
+### The record
+
+<Figure
+  src="./figures/mystery.svg"
+  alt="Training and test error versus boosting rounds for depth-four trees on the chi-squared problem: training error reaches zero at round 105, test error continues falling from about eleven percent toward nine percent through round 1000, with a zoomed inset and a question mark"
+  caption="The debt's portrait (computed for this lesson: depth-4 trees, the χ²₁₀ problem, 2,000/10,000 split). Training error is identically zero from round 105; test error keeps improving for the next 895 rounds. Module 9's margin bounds pay this debt."
+/>
+
+The record shows the opposite. In this lesson's run, with depth-4 trees as the weak learner so that zero training error is reachable, the training error is identically zero from round $105$; the test error at that round is $10.9\%$, and it keeps *falling*: $9.3\%$ by round $200$, $9.0\%$ by round $1{,}000$, never turning back up. Every one of those $895$ rounds changes a model that already classifies every training point correctly, adds capacity to a class whose VC dimension grows linearly in $T$, and, on this clean data, helps. ESL's Figure 10.3 shows the companion fact: the misclassification error flatlines at zero while the exponential loss keeps decreasing, so the algorithm demonstrably still has an objective to push on. But a falling surrogate loss is not an explanation of falling *test* error; nothing proved in this lesson, and nothing in the classical U-curve, accounts for the figure above.
+
+<Task>
+Read the two curves against the theorem. Locate round 105 and confirm the bound's promise (zero training error, delivered early); then read the test curve to its right and state which classical claim it violates. Write the one-sentence prediction the U-curve makes at round 105 before looking at the inset.
+</Task>
+
+### The debt, stated
+
+This is the course's second standing debt, and it is now precisely stated. The first, from <Ref lesson="svm-dual-kernels">module 4</Ref>, asked why a kernel machine in an infinite-dimensional feature space does not overfit; the two have the same shape: a model class whose measured capacity says *overfit* and whose test error says otherwise. Module 9 pays both at once, with bounds that depend on the *margin distribution* rather than on the round count or the dimension (<Ref lesson="margin-bounds" />); the closing exercise computes the quantity those bounds live on, on this lesson's own run.
+
+What stands established: weak learnability amplifies, through an algorithm whose training error any persistent edge collapses exponentially; and AdaBoost is forward-stagewise minimization of $e^{-yF}$, targeting half the log-odds, noise-sensitive exactly where that loss's tail says it is. <Ref lesson="gradient-boosting">The next lesson</Ref> keeps the stagewise template and swaps the loss: fit each new tree to the negative gradient of *any* differentiable loss, and boosting becomes gradient descent in function space.
+
+## Exercises
+
+<Exercise>
+Warm-up on the vote formula. A weak learner reports weighted error $\varepsilon = 0.3$. (a) Compute $\alpha$, the two weight multipliers, and the normalizer $Z$. (b) Show that after the update the misclassified points carry total weight exactly $\tfrac{1}{2}$. (c) Recompute all three quantities for $\varepsilon = 0.45$ and compare: which changes more, $\alpha$ or $Z$?
+
+<Solution>
+(a) $\alpha = \tfrac{1}{2}\ln\tfrac{0.7}{0.3} = 0.424$; multipliers $e^{\alpha} = 1.528$ (misses) and $e^{-\alpha} = 0.655$ (correct); $Z = 2\sqrt{0.3 \times 0.7} = 0.917$.
+
+(b) The misses' total unnormalized weight is $\varepsilon\, e^{\alpha} = 0.3 \times 1.528 = 0.458$, and $0.458 / 0.917 = \tfrac{1}{2}$. In general $\varepsilon e^{\alpha} = \varepsilon\sqrt{(1-\varepsilon)/\varepsilon} = \sqrt{\varepsilon(1-\varepsilon)} = Z/2$: half the mass, for every $\varepsilon$.
+
+(c) $\alpha = \tfrac{1}{2}\ln\tfrac{0.55}{0.45} = 0.100$, multipliers $1.106$ and $0.905$, $Z = 2\sqrt{0.45 \times 0.55} = 0.995$. The vote weight collapsed by a factor of four; the normalizer barely moved. But that small gap is everything, since the theorem's guarantee per round is precisely $Z < 1$: here one round shrinks the loss by only $0.5\%$, against $8.3\%$ at $\varepsilon = 0.3$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The derivation the lesson used but did not prove in general: show that AdaBoost's reweighting makes the *just-used* weak learner exactly chance-level, i.e. that $h_t$'s weighted error on the round-$(t{+}1)$ weights is $\tfrac{1}{2}$ for every $\varepsilon_t \in (0, \tfrac{1}{2})$. Two lines suffice.
+
+<Solution>
+The points $h_t$ missed have total weight $\varepsilon_t$ before the update; each is multiplied by $e^{\alpha_t}$, so their new total is $\varepsilon_t e^{\alpha_t}/Z_t$. Substituting $e^{\alpha_t} = \sqrt{(1-\varepsilon_t)/\varepsilon_t}$ and $Z_t = 2\sqrt{\varepsilon_t(1-\varepsilon_t)}$:
+
+$$
+\frac{\varepsilon_t\, e^{\alpha_t}}{Z_t} = \frac{\sqrt{\varepsilon_t (1-\varepsilon_t)}}{2\sqrt{\varepsilon_t(1-\varepsilon_t)}} = \frac{1}{2}.
+$$
+
+$h_t$'s error on the new distribution is its misses' total weight: exactly $\tfrac{1}{2}$. The transferable move: the update is calibrated to *cancel the last hypothesis's advantage completely* (Freund and Schapire note exactly this in the 1997 paper), which is why the same stump is never fitted twice in a row and why each round is forced to extract new information.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probes, both edges of the theorem. (a) A round returns $\varepsilon_t = \tfrac{1}{2}$: compute $\alpha_t$, the weight update, and the round's factor $Z_t$; state what the algorithm and the bound each do, and which hypothesis of the theorem this case violates. (b) A round returns $\varepsilon_t = 0$: compute the same three objects and describe the resulting ensemble. (c) Reconcile (b) with the bound.
+
+<Solution>
+(a) $\alpha_t = \tfrac{1}{2}\ln 1 = 0$: zero say. The update multiplies every weight by $e^{0} = 1$, so the distribution does not move; every later round faces the identical problem and returns the identical answer, and the algorithm stalls, which is why step 2 terminates instead. The round's factor is $Z_t = 2\sqrt{\tfrac{1}{4}} = 1$: no progress, consistent with $\gamma_t = 0$. The violated hypothesis is weak learnability itself: the guarantee $\varepsilon_t \le \tfrac{1}{2} - \gamma$ with $\gamma > 0$ is exactly what rules this case out, and the proof's last step ($Z_t \le e^{-2\gamma_t^2} < 1$) is where it is spent.
+
+(b) $\alpha_t \to \infty$: the perfect weak hypothesis receives unbounded say, and $\operatorname{sign} F$ is $h_t$ regardless of every other term; the ensemble degenerates to a single classifier. The weight update sends all mass to the (empty) set of misses, which is ill-defined; implementations cap $\alpha$ or smooth $\varepsilon$ away from $0$.
+
+(c) $Z_t = 2\sqrt{0 \cdot 1} = 0$, so the bound $\prod_s Z_s$ is $0$: zero training error after this round, which is true, since $h_t$ alone classifies the training set perfectly. The bound handles the degenerate case gracefully; only the reweighting does not. Both edges confirm the reading of $\gamma$ as the theorem's fuel: no edge, no progress; infinite edge, instant finish.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute, separate, or repair: "AdaBoost overfits quickly, because its exponential loss explodes on hard points." The claim mixes two genuine phenomena into one false statement. Separate them, with this lesson's numbers, and name what each actually depends on.
+
+<Solution>
+"Quickly" is false, and on clean data "overfits" is false too. In this lesson's run, every round from 106 to 1,000 modified a model whose training error was already zero, and the test error *fell*, $10.9\%$ to $9.0\%$, with no upturn; ESL's stump benchmark shows the same shape. Whatever rounds do past interpolation, on clean data it is not classical overfitting, and the classical capacity argument (VC of the ensemble class growing linearly in $T$) predicts the record wrongly. What that behavior depends on is unresolved in this lesson: it is the module-9 debt, and the margin distribution is the quantity that will carry the explanation (<Ref lesson="margin-bounds" />).
+
+The true part is the mechanism: a boosting weight equals a (normalized) exponential loss, so a point the ensemble confidently misclassifies accumulates weight geometrically. On *mislabeled* points that mechanism is destructive (they are unfixable, so they end up owning the distribution), and the damage is measured: $5\%$ flipped labels grew AdaBoost's test error by about $21\%$ of itself on average across Breiman's nine datasets ($+49\%$ on votes, i.e. an error one and a half times its clean-data value), against roughly $+2\%$ for the random forest. What noise sensitivity depends on is the loss's left tail (linear for deviance, exponential here) and the label-noise rate, not the round count.
+
+Repaired claim: AdaBoost is fragile to *label noise* through its exponential tail, at any $T$; on clean data its test error can improve for hundreds of rounds after training error is exhausted, and the classical U-curve does not describe it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review, weak learners and their limits. Take the XOR configuration from <Ref lesson="decision-trees">the trees lesson</Ref>: $(0,0)$ and $(1,1)$ labeled $-1$, $(0,1)$ and $(1,0)$ labeled $+1$, uniform weights. (a) Compute round 1 of AdaBoost with stumps as the weak-learner class: what is $\varepsilon_1$, and what happens? (b) Compute round 1 with depth-2 trees as the class. (c) State the general lesson about the premise "boosting turns weak learners into strong ones."
+
+<Solution>
+(a) Every stump fails identically. A split on $x_1$ at $\tfrac{1}{2}$ puts one $+1$ and one $-1$ point on each side, so either leaf labeling gets exactly two of four points: $\varepsilon = \tfrac{1}{2}$. The same holds for splits on $x_2$ and for the trivial stumps (all-$+1$, all-$-1$). So $\varepsilon_1 = \tfrac{1}{2}$ exactly, $\alpha_1 = 0$, the weights never move, and AdaBoost terminates at round 1 with nothing: the $\varepsilon = \tfrac{1}{2}$ boundary case of the earlier probe, realized by a four-point dataset.
+
+(b) A depth-2 tree splits on $x_1$, then on $x_2$ within each branch, and labels all four cells correctly: $\varepsilon_1 = 0$, $\alpha_1 \to \infty$, and the "ensemble" is that single tree, the probe's other boundary case.
+
+(c) Boosting amplifies an edge; it cannot create one. Weak learnability is a joint property of the hypothesis class and the data distribution: stumps are $\gamma$-weak learners for some problems (Shalev-Shwartz and Ben-David's Example 10.1 proves it for one-dimensional three-piece classifiers) and not for XOR, where every stump is blind by the same concavity failure the trees lesson diagnosed: no single split changes the class proportions. When the premise fails, the theorem's product is a product of ones. The practical reading: the weak-learner class sets the floor of what boosting can express, which is why boosted *trees*, not boosted stumps, became the workhorse; <Ref lesson="gradient-boosting">the next lesson</Ref> makes tree depth an explicit knob.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the mystery on your own machine. Generate the χ²₁₀ problem ($X \in \mathbb{R}^{2000 \times 10}$ standard Gaussian, $y = +1$ iff $\sum_j x_j^2 > 9.34$, a $10{,}000$-point test set from the same recipe) and boost depth-4 trees for $1{,}000$ rounds (`sklearn.ensemble.AdaBoostClassifier` with a `max_depth=4` base estimator, or your own loop over weighted tree fits). Report the test error at $T = 1, 10, 100, 400, 1000$, the round at which training error reaches zero, and whether the test error rises afterward. Keep the fitted model: <Ref lesson="bounds-vs-practice">module 9's closing lesson</Ref> reuses runs like this one.
+
+<Solution>
+Reference values from this lesson's run (a loop over weighted depth-4 gini trees with the lesson's $\alpha$ formula, numpy seed 0; yours will differ by a few rounds and a few tenths of a percent): test error $38.3\%$, $23.1\%$, $11.1\%$, $9.1\%$, $9.0\%$ at $T = 1, 10, 100, 400, 1000$; training error identically zero from round $105$; no upturn (from round 400 on the test error wiggles inside a quarter-point band, $8.8$–$9.2\%$, with its minimum $8.7\%$ near round 550). What would count as agreement: zero training error somewhere near round $100$, and a test curve that is flat-to-falling, not rising, over the following several hundred rounds. If your test error *does* turn up, check for label noise in your generator first; the refutation exercise above says why that changes the outcome qualitatively.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. For the run of the reproduction exercise above (or this lesson's own), define each training point's *normalized margin* at round $T$ as $y_i F_T(x_i) / \sum_{t \le T} \alpha_t \in [-1, 1]$. Compute it for the ten training points with the smallest margin at $T = 200$, then recompute for the same ten points at $T = 1000$. Also compute the minimum margin over all $2{,}000$ points, and the median, at both rounds. Describe what the extra $800$ rounds did.
+
+<Solution>
+From this lesson's run: the ten smallest margins at $T = 200$ lie between $0.039$ and $0.046$; by $T = 1000$ the same ten points sit between $0.080$ and $0.091$: every one has roughly doubled. The overall minimum rises from $0.040$ to $0.080$, while the *median* margin actually slips, from $0.130$ to $0.107$. So the extra rounds did not lift the whole distribution: they concentrated on its lower tail, spending margin the easy points did not need to raise the confidence of the hardest ones. That is what "training on data you already classify perfectly" buys: every margin is positive from round 105 on, but the *sizes* of the smallest margins keep growing.
+
+The quantity you just computed is the margin distribution, and the tail behavior you just observed is exactly what <Ref lesson="margin-bounds">module 9's margin bounds</Ref> depend on: a generalization guarantee in terms of the fraction of training points below a small margin threshold $\theta$ and the weak-learner class's capacity, with no dependence on $T$. The median's slip costs those bounds nothing — only the low tail enters them — so trading median for minimum is exactly the shift they reward. Computing it here is the first half of that lesson's argument.
+</Solution>
+</Exercise>
+
+<References>
+1. Y. Freund, R. E. Schapire, "A Decision-Theoretic Generalization of On-Line Learning and an Application to Boosting," *Journal of Computer and System Sciences* 55(1), 1997, pp. 119–139 — the AdaBoost paper: Hedge(β) and the horse-racing framing (§§1–2), the algorithm (Fig. 2), the training-error bound with the factor-by-factor choice of β (Thm. 6 and §4.2), and the observation that the update exactly cancels the last hypothesis's advantage. https://doi.org/10.1006/jcss.1997.1504
+2. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §10.1: Algorithm 10.1, the stump benchmark (Fig. 10.2), and the Breiman quote; §§10.2–10.4: forward-stagewise additive modeling and the exponential-loss equivalence (Eqs. 10.8–10.16); §10.5: the population minimizer; §10.6: loss functions and robustness (Fig. 10.4); Fig. 10.3: exponential loss falling after misclassification error is zero. Free online: https://hastie.su.domains/ElemStatLearn/
+3. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — §10.1: γ-weak-learnability and the stump ERM procedure (Def. 10.1, Ex. 10.1); §10.2: the telescoping-normalizer proof followed here (Thm. 10.2); §10.3: the VC dimension of the ensemble class growing linearly in T. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+4. J. Friedman, T. Hastie, R. Tibshirani, "Additive Logistic Regression: A Statistical View of Boosting," *Annals of Statistics* 28(2), 2000, pp. 337–407 — the paper that discovered the stagewise-exponential-loss identity and the half-log-odds population minimizer. https://doi.org/10.1214/aos/1016218223
+5. R. E. Schapire, "The Strength of Weak Learnability," *Machine Learning* 5(2), 1990, pp. 197–227 — the proof that weak and strong PAC learnability coincide, answering Kearns and Valiant's question and originating boosting. https://doi.org/10.1007/BF00116037
+6. M. Kearns, L. Valiant, "Cryptographic Limitations on Learning Boolean Formulae and Finite Automata," *Journal of the ACM* 41(1), 1994, pp. 67–95 — the source of the weak-versus-strong learnability question. https://doi.org/10.1145/174644.174647
+7. L. Breiman, "Random Forests," *Machine Learning* 45, 2001, pp. 5–32 — §8 and Table 4: the 5%-label-noise experiment quoted in this lesson, with Breiman's weight-concentration diagnosis. https://doi.org/10.1023/A:1010933404324
+8. T. G. Dietterich, "An Experimental Comparison of Three Methods for Constructing Ensembles of Decision Trees: Bagging, Boosting, and Randomization," *Machine Learning* 40(2), 2000, pp. 139–157 — the earlier noise experiments Breiman's Table 4 follows. https://doi.org/10.1023/A:1007607513941
+9. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — §7.2.2: AdaBoost as coordinate descent on the exponential loss. Free online: https://cs.nyu.edu/~mohri/mlbook/
+10. R. E. Schapire, Y. Freund, P. Bartlett, W. S. Lee, "Boosting the Margin: A New Explanation for the Effectiveness of Voting Methods," *Annals of Statistics* 26(5), 1998, pp. 1651–1686 — the margin-distribution analysis that module 9 develops; cited here only as the destination of the debt. https://doi.org/10.1214/aos/1024691352
+</References>

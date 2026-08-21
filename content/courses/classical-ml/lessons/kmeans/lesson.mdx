@@ -1,0 +1,324 @@
+k-means alternates two moves — assign each point to its nearest center, recompute each center as the mean of its points — and each move can only decrease the same objective, so the algorithm converges.
+
+Seven modules of this course fitted models to labeled data, and every verdict rested on the same instrument: risk against a target, estimated honestly on labels the fit never touched. This module drops the labels, and the instrument goes with them: there is no target to be wrong about, so an objective must be built from something else, and the two candidates are geometry (this lesson) and likelihood (<Ref lesson="gmm-em">the Gaussian mixture lesson</Ref>). k-means is the geometric answer, and it comes with the module's first theorem: a two-line proof that its iteration cannot fail to converge, and an equally short demonstration that converging is not the same as being right.
+
+## Learning without labels: what the objective can no longer be
+
+Every objective so far has compared a prediction with a recorded truth. <Ref lesson="statistical-learning">The statistical learning lesson</Ref> defined risk as expected loss against $y$ on a fresh draw, and everything since (the Bayes floor, cross-validated error, every benchmark ladder) was a version of that comparison. A clustering task supplies inputs $x_1, \dots, x_N$ and no $y$: there is no floor to approach, no held-out error against truth, and no way to score a proposed grouping by asking how often it is "wrong".
+
+The loss is deeper than a missing metric. Grouping "similar points together, dissimilar points apart" is two demands, and they can contradict each other: similarity is not transitive (a chain of pairwise-similar points can connect two very dissimilar ends), while sharing a cluster is. The same point set can support two incompatible groupings, each defensible: split by horizontal bands, or by left and right halves. No computation on the unlabeled data can arbitrate, because the "right" answer depends on what the clusters are for. Validation in this module is therefore intrinsically weaker than in the supervised modules: internal scores exist and are useful, but nothing plays the role held-out risk played. <Ref lesson="hierarchical-dbscan">The next lesson</Ref> sharpens this into a theorem of Kleinberg's: no clustering function satisfies three natural axioms at once.
+
+### The objective k-means declares
+
+What remains possible is to *declare* an objective and optimize it. k-means declares squared Euclidean distance to a set of $K$ representative points, and a concrete evaluation shows the bookkeeping. Six points in the plane, $a=(1,1)$, $b=(1,2)$, $c=(2,1)$, $d=(6,5)$, $e=(7,5)$, $f=(6,6)$, with $K=2$ centers placed at $\mu_1 = (1,1)$ and $\mu_2 = (2,1)$. Assign each point to its nearer center: $\{a, b\}$ go with $\mu_1$, $\{c, d, e, f\}$ with $\mu_2$, and the total squared distance from each point to its assigned center is $0 + 1 + 0 + 32 + 41 + 41 = 115$. That number is the objective, and the definition only adds notation for who is assigned where.
+
+<Definition title="distortion">
+Given data $x_1, \dots, x_N \in \mathbb{R}^d$, centers $\mu_1, \dots, \mu_K \in \mathbb{R}^d$, and binary indicators $r_{nk} \in \{0, 1\}$ with $\sum_k r_{nk} = 1$ (point $n$ belongs to exactly one cluster), the **distortion** is
+$$
+J(r, \mu) = \sum_{n=1}^{N} \sum_{k=1}^{K} r_{nk}\, \lVert x_n - \mu_k \rVert^2 ,
+$$
+the total squared distance from each point to the center of its cluster. The k-means problem is to minimize $J$ jointly over the assignments $r$ and the centers $\mu$.
+</Definition>
+
+In the six-point computation, a different assignment can only match or raise $115$; different centers can lower it, and $115$ is nowhere near the best this data allows.
+
+Minimizing $J$ exactly is a combinatorial search: the number of ways to partition $N$ points into $K$ non-empty groups is a Stirling number that reaches $S(10,4) = 34{,}105$ for ten points and roughly $10^{10}$ by $N = 19$ (ESL Eq. 14.30). Enumeration is out at any realistic size, and no efficient exact algorithm is known. What the structure of $J$ offers instead is two coordinate directions in which the minimization is easy.
+
+## Lloyd's algorithm: each half-step is an exact minimization
+
+$J$ depends on two blocks of variables, the assignments $r$ and the centers $\mu$, and fixing either block makes minimizing over the other trivial. Alternating the two exact block-minimizations is *Lloyd's algorithm*, formulated by Stuart Lloyd at Bell Labs in 1957 for quantizing telephone signals (published only in 1982); the name *k-means* is MacQueen's (1967). Initialize the centers somehow, then repeat:
+
+1. **Assignment step.** With $\mu$ fixed, set $r_{nk} = 1$ for $k = \arg\min_j \lVert x_n - \mu_j \rVert^2$: each point joins its nearest center.
+2. **Update step.** With $r$ fixed, set each $\mu_k$ to the mean of the points assigned to it.
+
+Neither step is a heuristic, and the convergence proof rests on establishing exactly that.
+
+<Theorem title="each step minimizes J in its block (Bishop 9.1)">
+Step 1 minimizes $J(r, \mu)$ over all valid assignments $r$ with $\mu$ fixed. Step 2 minimizes $J(r, \mu)$ over all centers $\mu$ with $r$ fixed.
+
+<Proof>
+**The assignment block.** $J$ is a sum over $n$, and the constraint (one $k$ per point) couples nothing across points, so each term $\sum_k r_{nk} \lVert x_n - \mu_k \rVert^2$ is minimized separately: point $n$ contributes $\lVert x_n - \mu_k \rVert^2$ for whichever single $k$ it selects, and the smallest available value is the distance to the nearest center. Choosing anything else raises that term and touches no other.
+
+**The center block.** With $r$ fixed, $J = \sum_k \sum_{n: r_{nk}=1} \lVert x_n - \mu_k \rVert^2$ splits into one quadratic per center, and each is the residual-sum-of-squares problem whose minimizer is the mean: setting the gradient $2 \sum_n r_{nk} (\mu_k - x_n)$ to zero gives $\mu_k = \sum_n r_{nk} x_n / \sum_n r_{nk}$. This is the same one-line lemma that made leaf means optimal in <Ref lesson="decision-trees">the decision trees lesson</Ref>, reused verbatim.
+</Proof>
+</Theorem>
+
+<Exercise>
+Practice the assignment half of the theorem on the six points of the worked computation, with the centers moved to $\mu_1 = (1, 1.5)$ and $\mu_2 = (5.25, 4.25)$: find the minimizing assignment and the resulting $J$. Write all six nearer-center decisions before summing any squares.
+
+<Solution>
+Squared distances to $(\mu_1, \mu_2)$: $a$: $(0.25,\ 28.6)$; $b$: $(0.25,\ 23.1)$; $c$: $(1.25,\ 21.1)$; $d$: $(37.25,\ 1.125)$; $e$: $(48.25,\ 3.625)$; $f$: $(45.25,\ 3.625)$. The minimizing assignment is $\{a, b, c\}$ to $\mu_1$ and $\{d, e, f\}$ to $\mu_2$ (the point $c$ that the old centers sent right now goes left), and
+$$
+J = 0.25 + 0.25 + 1.25 + 1.125 + 3.625 + 3.625 = 10.125 .
+$$
+Any other assignment replaces at least one of the six chosen entries by the larger member of its pair, so $10.125$ is the block minimum, which is the lemma's whole content.
+</Solution>
+</Exercise>
+
+<FigureSequence
+  name="lloyd"
+  alt="Seven frames of Lloyd's algorithm on two-cluster Old-Faithful-shaped data: two seeds in a corner, the first nearest-seed assignment with its bisector, centers jumping to their means, a second assignment with 38 points switching, a second update, a third assignment in which the last 13 points switch, and the final update after which no assignment changes, with the distortion falling from 809 to 45"
+  caption="One run of Lloyd's algorithm, distortion under each frame: 809 → 254 → 181 → 95 → 56 → 45."
+/>
+
+<Task>
+Step through the seven frames and check the theorem against each caption: every assignment frame and every update frame reports a $J$ no larger than the frame before. Then read frame 4 closely: 38 points switch sides, and the dashed bisector shows why the assignment step for $K = 2$ is a line: nearest-of-two-centers is decided by which side of the perpendicular bisector a point falls on.
+</Task>
+
+Convergence is now an accounting fact.
+
+<Theorem title="Lloyd's algorithm converges in finitely many iterations">
+Break assignment ties toward the point's current cluster. Then $J$ never increases, and the algorithm reaches an iteration that changes nothing, a partition that is a fixed point of both steps, after finitely many iterations.
+
+<Proof>
+Each assignment step and each update step minimizes $J$ over its own block while the other is held fixed, and the current configuration is one of the candidates in that minimization, so neither step can raise $J$: the sequence of $J$ values is non-increasing, and it is bounded below by $0$.
+
+Monotonicity alone does not force termination in finitely many steps; the finiteness of the state space does. After an update step the centers are determined by the assignment (they are its cluster means), so the algorithm's trajectory is a sequence of assignments, and there are at most $K^N$ of them. If an assignment step changes any point's cluster, the tie-breaking rule means the change was a strict improvement, so $J$ strictly decreases and no earlier assignment (each with a $J$ at least as large) can ever recur. A strictly decreasing sequence over a finite set halts: some assignment step changes no point, the following update recomputes the same means, and the configuration repeats forever. Without the tie-break, a point equidistant between two centers could in principle oscillate between equal-$J$ states; the rule costs nothing and closes the gap.
+</Proof>
+</Theorem>
+
+{/* fig TwoBlockDescent: formula dissection of the two-block descent plus the measured staircase. Top: the objective in KaTeX, J(r, \mu) = \sum_{n=1}^{N}\sum_{k=1}^{K} r_{nk}\,\lVert x_n - \mu_k\rVert^2, with two underbraces: under r_{nk} (amber) the label "assignment block — one 1 per point", under \mu_k (blue) the label "center block". Middle: two stacked rows, one per half-step, each row an inequality in KaTeX with a short label to its left: row 1 (amber accent) "assignment step: minimize over r, \mu frozen" with J(r^{(t+1)}, \mu^{(t)}) \le J(r^{(t)}, \mu^{(t)}); row 2 (blue accent) "update step: minimize over \mu, r frozen" with J(r^{(t+1)}, \mu^{(t+1)}) \le J(r^{(t+1)}, \mu^{(t)}). Bottom: a small staircase plot of the measured run from the lloyd FigureSequence: J values 809, 254, 181, 95, 56, 45 on the y axis against half-step index 1..6, drawn as a descending step function with each step colored by which half-step produced it (amber = assignment, blue = update), y axis labeled J, x axis labeled "half-steps"; a one-line annotation "each half-step minimizes one block, so the staircase can only go down". Layout: three tiers stacked vertically, KaTeX via <M>, SVG only for the staircase. */}
+<Figure
+  name="TwoBlockDescent"
+  alt="The distortion J with its two argument blocks marked, the two half-step inequalities each freezing one block, and the measured staircase of J values 809, 254, 181, 95, 56, 45 descending across alternating assignment and update half-steps"
+  caption="The proof in one picture: two blocks, two inequalities, and the measured staircase they force."
+/>
+
+<KeyFact>
+The convergence proof never mentions the data: any alternation of exact block-minimizations of any objective that is bounded below and has finitely many states must terminate. The same skeleton returns as EM's monotone likelihood in <Ref lesson="gmm-em">the Gaussian mixture lesson</Ref>, with the finite state space gone, and exactly the conclusions that depend on it weakened.
+</KeyFact>
+
+<Remark title="k-means is not k-NN">
+The two share a letter and a distance computation and nothing else. $k$-NN (<Ref lesson="knn-curse">the nearest-neighbor lesson</Ref>) is a supervised predictor: $k$ counts the labeled neighbors that vote on a query, and there is nothing to optimize. k-means is unsupervised: $K$ counts the clusters being fitted, the "means" are fitted parameters, and the algorithm is an optimizer. A useful tell in either direction: if there is a training label anywhere, it is not k-means; if something iterates to convergence, it is not k-NN.
+</Remark>
+
+### The implementation wrinkle: a cluster can empty
+
+Nothing in the assignment step guarantees every center attracts at least one point; a center seeded far from the data, or crowded out as others move, can end an assignment step with no members, and its mean is then undefined. The two standard repairs are to drop the cluster and continue with $K-1$ centers, or to reseed it at the point currently farthest from its own center. Both preserve the convergence argument: an empty center contributes nothing to $J$, so dropping it changes nothing, and reseeding at a data point can only give the next assignment step a better option than it had.
+
+## Convergence is not optimality
+
+The theorem guarantees a fixed point, not the minimum: which fixed point Lloyd's algorithm reaches depends entirely on the seeds. The three runs below are the same 150 points under $K = 3$, differing only in initialization. The first finds the three visible clusters at $J = 149$. The second seeds two centers in the left cluster and converges to $J = 907$: the left cluster is split in two, and one center serves the top and right clusters from a point between them. The third splits the top cluster and merges left with right, at $J = 1045$ — every assignment locally correct, every center the exact mean of its points, and the answer visibly wrong.
+
+<Figure
+  src="./figures/local-optima.svg"
+  alt="The same 150 points clustered three times with K = 3 from three seedings: the global optimum at J = 149 with one center per cluster, a local optimum at J = 907 splitting the left cluster, and a local optimum at J = 1045 splitting the top cluster while merging left and right"
+  caption="Three seedings, three fixed points: J = 149, 907, 1045. Each run satisfies the convergence theorem."
+/>
+
+<Demo
+  name="KMeansStepper"
+  caption="Lloyd's algorithm one half-step at a time, K = 3; the readout is J, and reseed restarts from new random centers on the same data."
+/>
+
+<Task>
+On the well-separated preset, reseed and step to convergence ten times, recording the final $J$ each time. Most runs land on the same lowest value; find at least one run that converges to a visibly worse partition with a higher final $J$: a two-centers-in-one-blob split like the figure's middle panel. That run is a proof by example that the algorithm's guarantee is monotone descent to *a* fixed point, nothing more. Then switch to the elongated preset, where bad fixed points are the common case: reseeding scatters the final $J$ across a dozen distinct values, and the lowest of them turns up in fewer than a quarter of runs.
+</Task>
+
+## Restarts, and seeding by construction
+
+The standard defense costs only compute: run Lloyd's algorithm from many random seedings and keep the run with the lowest final $J$. The selection is legitimate because $J$ is computable from the data alone: no labels are needed to compare two runs, which is exactly the comparison held-out risk performed in the supervised modules. On the easy geometry above, random data points as seeds reach the global optimum in about $87\%$ of runs, so a handful of restarts all but guarantees it; harder geometries shift the odds toward the bad fixed points, and restarts stop being cheap insurance.
+
+Seeding can also be engineered rather than repeated. The failure mode of uniform seeding is two seeds in one cluster; the fix is to make the next seed avoid the territory existing seeds already cover. *k-means++* (Arthur and Vassilvitskii, 2007) draws seeds sequentially: the first uniformly at random, and each next seed equal to data point $x$ with probability proportional to $D(x)^2$, the squared distance from $x$ to its nearest already-chosen seed.
+
+<FigureSequence
+  name="kmeanspp"
+  alt="Three frames of D-squared seeding on three-cluster data: the first seed in the left cluster with every point shaded by its squared distance to it, the second seed sampled far away in a lit-up cluster, and the third seed landing in the last uncovered cluster"
+  caption="k-means++: shade is sampling weight D². Covered clusters go dark; uncovered ones stay lit."
+/>
+
+<Task>
+Watch the shading, which is the sampling distribution itself. After the first seed lands in the left cluster, that cluster holds under $2\%$ of the total $D^2$ mass while the other two hold $42\%$ and $56\%$; after the second seed, the one uncovered cluster holds $84\%$. The rule spreads seeds not by forbidding anything but by making a wasted seed improbable.
+</Task>
+
+The construction carries a guarantee that restarts lack. Arthur and Vassilvitskii prove that the seeding alone, before Lloyd's algorithm runs a single step, achieves $\mathbb{E}[J] \le 8(\ln K + 2)\, J_{\text{opt}}$, an expected distortion within a factor $O(\log K)$ of the global optimum, for every data set. Lloyd iterations started from those seeds only lower $J$ further, so the bound survives. The guarantee is in expectation, the factor grows (slowly) with $K$, and it bounds distortion, not agreement with any intended grouping. When an exact optimum is out of reach, a randomized construction with a provable approximation ratio is the honest substitute.
+
+<KeyFact>
+k-means' guarantees stack as: any seeding converges (finitely many strict improvements); k-means++ seeding converges to an expected distortion within $8(\ln K + 2)$ of optimal. No efficient algorithm guarantees the optimum itself, and none is likely: minimizing $J$ exactly is NP-hard even for $K = 2$ (Aloise et al., 2009).
+</KeyFact>
+
+## Vector quantization: the objective's operational meaning
+
+Distortion was declared, not derived, and the declaration has a defense: $J$ is exactly the cost of using the centers as a compressed code for the data. Store, for each of $N$ points, only the index of its nearest center, plus the $K$ centers themselves; reconstruct each point as its center. The reconstruction error is $\sum_n \lVert x_n - \mu_{c(n)} \rVert^2 = J$, so minimizing distortion is minimizing the damage of this compression scheme at a fixed budget of $K$ code vectors. In signal processing the scheme is called *vector quantization*, the centers are the *codebook*, and Lloyd's 1957 telephone-signal setting was exactly this.
+
+A $240 \times 180$ color image has $N = 43{,}200$ pixels, each a point in $\mathbb{R}^3$ (red, green, blue at 8 bits apiece): stored raw, $24N = 1{,}036{,}800$ bits. Run k-means on the pixels with $K = 10$ and store indices instead: each pixel needs $\lceil \log_2 10 \rceil = 4$ bits to name its center, plus $24$ bits for each of the ten codebook entries, totalling $24 \cdot 10 + 43{,}200 \cdot 4 = 173{,}040$ bits, $16.7\%$ of the original (Bishop §9.1.1). The ceiling means $K = 10$ pays the same index cost as $K = 16$, so on this ledger $K$ might as well be a power of two:
+
+<Figure
+  src="./figures/bit-ledger.svg"
+  alt="Three storage bars: the original image at 1,036,800 bits, the K = 4 encoding at 86,496 bits split into a sliver of codebook and 2 index bits per pixel, and the K = 16 encoding at 173,184 bits with 4 index bits per pixel"
+  caption="The VQ ledger for a 240 × 180 image: 24K codebook bits + N·log₂K index bits against 24N raw."
+/>
+
+<Figure
+  src="./figures/kmeans-photo-vq.jpg"
+  alt="A four-column grid of two photographs of children: each row shows the K-means reconstruction at K = 2 (two flat colours, only silhouettes survive), K = 3, K = 10, and the original photograph"
+  caption="The same pixels coded by K colours: at K = 2 the photograph is a two-colour poster, at K = 10 it is nearly the original."
+/>
+
+What the percentages buy is visible in Bishop's own photographs: at $K = 2$ the image is a two-color poster, at $K = 3$ the large regions are recognizable, and at $K = 10$ the reconstruction is close to photographic at a sixth of the bits.
+
+Quantizing single pixels ignores that neighboring pixels are correlated; production VQ quantizes small blocks instead, and ESL's demonstration of it compresses a photograph of Ronald Fisher, the geneticist-statistician who, from 1912 onward, developed maximum likelihood (<Ref lesson="mle-map">the estimation module's</Ref> engine). The $1024 \times 1024$ grayscale image is cut into $2 \times 2$ blocks, each a vector in $\mathbb{R}^4$; k-means with $K = 200$ builds a codebook of block patterns, and each of the $512^2$ blocks stores a $\log_2 200 \approx 7.6$-bit index: $1.91$ bits per pixel against 8 raw, a compression to $23.9\%$ with barely visible loss. At $K = 4$ the rate falls to $0.50$ bits per pixel and the loss is heavy.
+
+<FigureSequence
+  name="fisher-vq"
+  alt="Three frames from ESL Figure 14.9: the original 1024 × 1024 grayscale photograph of Ronald Fisher; the 2 × 2-block vector quantization with 200 codewords at 1.9 bits per pixel, barely distinguishable from the original; and the 4-codeword version at 0.50 bits per pixel, posterized to a few flat gray levels with heavy blocking"
+  caption="ESL Fig. 14.9 stepped through: the original at 8 bits/pixel, K = 200 blocks at 1.91 bits/pixel, K = 4 at 0.50 bits/pixel."
+/>
+
+<Task>
+Step from frame 1 to frame 2 and hunt for the compression: at $1.91$ bits per pixel the damage hides in the blurred background, not the face. Frame 3 is the same codebook machinery at $K = 4$: the rate is a quarter of frame 2's, and every smooth gradient has collapsed to one of a handful of block patterns.
+</Task>
+
+<KeyFact>
+Coding by $K$ prototypes fixes the rate at $\log_2 K$ bits per point no matter how badly the centers fit the data: $J$ measures the distortion side of the trade only. Which operating point to occupy — $1.91$ bits with invisible loss or $0.50$ with heavy loss — is a rate–distortion judgment the objective prices but cannot make.
+</KeyFact>
+
+## Choosing K: the one thing the objective cannot do
+
+Every run so far took $K$ as given, and the objective itself cannot supply it. The training distortion is trivially monotone: an optimal set of $K{+}1$ centers can always place $K$ centers where the optimal $K$-run put them and spend the extra one anywhere a point stands off-center, so $J^*_{K+1} \le J^*_K$, all the way down to $J^*_N = 0$ with every point its own center, a perfect score for a clustering that says nothing.
+
+The supervised reflex is to evaluate on held-out data and let the U-curve pick the complexity, as <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref> did for every hyperparameter in the course. It fails here, and the failure is structural (Murphy §21.3.7): a set of centers is a degenerate density model, $K$ spikes with no notion of how much space a cluster claims. More spikes cover the input space more finely, so a fresh point's distance to its nearest center also shrinks as $K$ grows, and held-out distortion decreases monotonically too: no minimum, no elbow guaranteed, nothing to select. Overfitting in the supervised sense never registers, because no term in $J$ ever pays a price for complexity.
+
+### What practice uses instead
+
+The tools that survive are honest heuristics and one principled exit. The *elbow method* plots $J^*_K$ against $K$ and picks the bend where the curve's decrease flattens; since a convex decreasing curve always bends somewhere, the method is a judgment call dressed as a procedure, and on real data the bend is frequently ambiguous or plural. The *silhouette score*, which compares each point's within-cluster distances against its distances to the nearest other cluster, actually peaks rather than decreasing, and <Ref lesson="hierarchical-dbscan">the next lesson</Ref> computes it in full. The *gap statistic* (Tibshirani, Walther and Hastie, 2001) calibrates the $J^*_K$ curve against the same curve on reference data with no clusters, which turns the bend into a testable excess. And the principled exit is to stop pretending $K$ spikes are a model: give each cluster a shape and a weight, and marginal likelihood or BIC can select $K$ the way this course selects everything else. That is <Ref lesson="gmm-em">the Gaussian mixture lesson's</Ref> opening argument.
+
+## Failure geometry: what squared Euclidean distance assumes
+
+The objective scores every direction and every cluster with the same ruler: $\lVert x_n - \mu_k \rVert^2$ is isotropic (a unit of error north costs the same as a unit east) and shared (every cluster pays into the same sum, so a cluster with more points casts more votes). Both properties are assumptions about what clusters look like, and data that violates them defeats the *objective*, not just the optimizer: the failures below are global optima.
+
+<Figure
+  src="./figures/anisotropy.svg"
+  alt="Two panels of k-means failures: on two elongated horizontal clusters the best K = 2 solution cuts vertically through both bands at J = 1138, beating the band-respecting split at J = 1885; on one dense and two sparse clusters the best K = 3 solution splits the dense cluster and merges the two sparse ones at J = 344, beating the intended clustering at J = 419"
+  caption="Both panels show the best solution found over many restarts: the distortion-optimal answer is the wrong one."
+/>
+
+Read the left panel's numbers: cutting *across* the two elongated bands costs $J = 1138$, while the split any eye would draw costs $1885$. The bands are long, so their far ends are expensive under an isotropic ruler, and the objective prefers two compact halves to two correct stripes. On the right, splitting the dense cluster in two and serving both sparse clusters with one center costs $344$ against the intended clustering's $419$: two hundred dense points outvote forty sparse ones, so the objective spends its centers where the mass is. No amount of reseeding fixes either panel; the minimum itself is wrong, and a model that lets clusters own shapes and weights is the repair <Ref lesson="gmm-em">the Gaussian mixture lesson</Ref> supplies.
+
+### Scaling changes the answer, in both directions
+
+The ruler is also unit-dependent, and this cuts opposite ways. <Ref lesson="knn-curse">The nearest-neighbor lesson</Ref> showed a distance owned by whichever feature has the biggest numbers (income in dollars burying age in years), and standardizing to unit variance was mandatory hygiene there. For clustering the same operation can destroy the answer (ESL §14.3.3, the idea of its Fig. 14.5): below, feature 2 separates two real groups cleanly, while feature 1 records an irrelevant nuisance (say, which of two instruments measured the sample). On raw features k-means recovers the real groups exactly; standardizing shrinks the informative direction's real separation and leaves the nuisance direction's spurious one, wide gap against tight subgroups, and the best k-means solution flips to splitting along the nuisance axis, at chance agreement with the truth.
+
+<Figure
+  src="./figures/standardize-flip.svg"
+  alt="The same data clustered twice, real group shown by marker shape and k-means assignment by color: on raw features the two colors match the two real groups exactly; after standardizing both features the colors split along the nuisance batch axis, cutting across both real groups"
+  caption="Standardization is a modeling decision: here it hands the nuisance direction the same vote as the real one, and the partition flips."
+/>
+
+There is no neutral choice: raw units weight features by the accident of their scales, standardized units weight them by the assumption that each deserves an equal vote, and <Ref lesson="feature-engineering">the feature engineering lesson's</Ref> verdict, that scaling is a modeling decision encoding what "similar" means, binds harder here than anywhere in the supervised half, because no held-out target will catch a wrong choice.
+
+What stands established: clustering has no risk to minimize, so k-means declares one, distortion, and Lloyd's algorithm descends it by exact block-minimization, converging in finitely many steps to a fixed point that need not be, and often is not, the minimum; k-means++ seeding bounds the expected gap by $8(\ln K + 2)$; the objective's operational meaning is vector quantization, its blind spots are $K$, anisotropy, unequal density, and units. <Ref lesson="hierarchical-dbscan">The next lesson</Ref> takes up the shapes k-means cannot see, replacing distance-to-center with linkage and density; <Ref lesson="gmm-em">the lesson after it</Ref> softens the hard assignment $r_{nk} \in \{0,1\}$ into a probability, and inherits this lesson's convergence proof with the finite state space knocked out.
+
+## Exercises
+
+<Exercise>
+Run one full Lloyd iteration by hand on the six points of the first section ($a=(1,1)$, $b=(1,2)$, $c=(2,1)$, $d=(6,5)$, $e=(7,5)$, $f=(6,6)$) with $K=2$ and seeds $\mu_1 = (1,1)$, $\mu_2 = (2,1)$. Report the assignment, $J$ after the assignment step, both updated centers, and $J$ after the update step. Then state, without computing further, whether the algorithm has converged, and why.
+
+<Solution>
+**Assignment.** Squared distances to $(\mu_1, \mu_2)$: $a$: $(0, 1)$; $b$: $(1, 2)$; $c$: $(1, 0)$; $d$: $(41, 32)$; $e$: $(52, 41)$; $f$: $(50, 41)$. Nearest centers: $\{a, b\} \to \mu_1$, $\{c, d, e, f\} \to \mu_2$, and
+$$
+J = 0 + 1 + 0 + 32 + 41 + 41 = 115 .
+$$
+
+**Update.** $\mu_1 = \operatorname{mean}\{a, b\} = (1, 1.5)$; $\mu_2 = \operatorname{mean}\{c, d, e, f\} = \bigl(\tfrac{21}{4}, \tfrac{17}{4}\bigr) = (5.25, 4.25)$. Recomputing the six terms under the same assignment: $0.25 + 0.25 + 21.125 + 1.125 + 3.625 + 3.625 = 30$. One iteration took $J$ from $115$ to $30$.
+
+**Not converged.** Point $c = (2,1)$ now sits at squared distance $1 + 0.25 = 1.25$ from $\mu_1$ and $21.125$ from $\mu_2$: the next assignment step will move it, so the assignment changes and the theorem's stopping condition is not met. (Carrying on: $c$ switches, the means become $(\tfrac43, \tfrac43)$ and $(\tfrac{19}{3}, \tfrac{16}{3})$, and the run converges at the natural partition with $J = \tfrac83 \approx 2.67$.)
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove the two lemmas the convergence theorem cites, from scratch: (a) with centers fixed, nearest-center assignment minimizes $J$ over all valid assignments; (b) with assignments fixed, the cluster means minimize $J$ over all centers; show that any $\mu_k$ satisfies $\sum_{n: r_{nk}=1} \lVert x_n - \mu_k \rVert^2 = \sum_{n: r_{nk}=1} \lVert x_n - \bar{x}_k \rVert^2 + N_k \lVert \bar{x}_k - \mu_k \rVert^2$ where $\bar{x}_k$ and $N_k$ are cluster $k$'s mean and size. (c) Conclude termination, stating exactly where finiteness enters.
+
+<Solution>
+**(a)** $J = \sum_n \bigl( \sum_k r_{nk} \lVert x_n - \mu_k \rVert^2 \bigr)$ and the constraint $\sum_k r_{nk} = 1$, $r_{nk} \in \{0,1\}$ binds each $n$ separately, so the minimization decomposes over points. Point $n$'s term equals $\lVert x_n - \mu_k \rVert^2$ for its chosen $k$; the choice minimizing a finite set of numbers is the smallest, the nearest center. Summing pointwise minima minimizes the sum.
+
+**(b)** Expand around the mean. With $S_k = \{n : r_{nk} = 1\}$ and $\bar{x}_k = \tfrac{1}{N_k}\sum_{n \in S_k} x_n$,
+$$
+\sum_{n \in S_k} \lVert x_n - \mu_k \rVert^2
+= \sum_{n \in S_k} \lVert (x_n - \bar{x}_k) + (\bar{x}_k - \mu_k) \rVert^2
+= \sum_{n \in S_k} \lVert x_n - \bar{x}_k \rVert^2 + N_k \lVert \bar{x}_k - \mu_k \rVert^2 ,
+$$
+because the cross term $2(\bar{x}_k - \mu_k)^\top \sum_{n \in S_k} (x_n - \bar{x}_k)$ vanishes: deviations from a mean sum to zero. The first term does not involve $\mu_k$ and the second is minimized, uniquely, at $\mu_k = \bar{x}_k$. This is <Ref lesson="decision-trees">the decision trees lesson's</Ref> leaf-mean lemma, and the same add-and-subtract-the-mean move that opened <Ref lesson="bias-variance">the bias–variance decomposition</Ref>.
+
+**(c)** By (a) and (b), neither step increases $J$, and a step that changes the assignment strictly decreases it under the incumbent tie-break. The trajectory is determined by the assignment sequence (centers are its means), assignments number at most $K^N$ (this is the only place finiteness enters), and a strictly decreasing $J$ forbids revisiting any of them. A process that must keep visiting new states of a finite set halts.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe, on the six points of the hand iteration above. (a) Compute the converged $J$ at $K = 6$ and at $K = 1$ (give the $K=1$ value exactly), and state what each end of the range says about using $J^*_K$ to choose $K$. (b) Now run $K = 2$ on the 1-D data $\{0, 1, 10\}$ from seeds $\mu_1 = 4$, $\mu_2 = 20$: show that a cluster empties, apply each of the two standard repairs, and say which part of the convergence proof each repair has to re-establish.
+
+<Solution>
+**(a)** At $K = 6$ each point is its own center and $J^*_6 = 0$: a perfect score carrying no information, the degenerate end of the monotone $J^*_K$ curve. At $K = 1$ the single optimal center is the grand mean $\bar{x} = (\tfrac{23}{6}, \tfrac{20}{6})$ and $J^*_1 = \sum_n \lVert x_n \rVert^2 - 6\lVert \bar{x} \rVert^2 = 219 - \tfrac{929}{6} = \tfrac{385}{6} \approx 64.2$, the data's total scatter. The whole curve from $64.2$ down to $0$ is achievable, is decreasing at every step, and contains no signal that $2$ is the natural value: the objective ranks every $K$ against $K{-}1$ the same way, in favor.
+
+**(b)** Assignment from $(4, 20)$: distances of $0, 1, 10$ to $\mu_1$ are $16, 9, 36$; to $\mu_2$ are $400, 361, 100$. All three points join $\mu_1$; cluster 2 is empty and its mean is $\tfrac{0}{0}$. *Repair 1, drop:* continue with $K = 1$; the empty center contributed no term to $J$, so $J$ is unchanged and the monotone-descent argument continues verbatim; only the state space shrinks. *Repair 2, reseed at the farthest point:* the costliest point is $10$ (contribution $36$ to its center at $4$); set $\mu_2 = 10$. Moving a center no point is assigned to leaves $J$ unchanged, and the next assignment step now has a strictly better option for point $10$, so descent resumes. What each repair must re-establish is strictness: both do, because neither ever increases $J$ and any subsequent assignment change is still a strict improvement over a configuration whose $J$ was not raised in between.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "k-means finds the $K$-partition minimizing $J$; that is what the convergence theorem says." Use the five 1-D points $\{0, 1, 8, 9, 20\}$ with $K = 2$: run Lloyd's algorithm from seeds $(9, 20)$ and from seeds $(0, 12)$, name the step of the claim that fails, and state what is actually guaranteed: by the theorem, and by k-means++ seeding.
+
+<Solution>
+**Seeds $(9, 20)$.** Assignment: $0, 1, 8, 9$ join the seed at $9$; $20$ stands alone. Means: $4.5$ and $20$. Re-assignment changes nothing ($9$ is $4.5$ from its center, $11$ from the other), so this is the fixed point $\{0,1,8,9\}, \{20\}$ with $J = 20.25 + 12.25 + 12.25 + 20.25 + 0 = 65$.
+
+**Seeds $(0, 12)$.** Assignment: $0, 1$ join $0$; $8, 9, 20$ join $12$. Means: $0.5$ and $\tfrac{37}{3} \approx 12.33$. Re-assignment changes nothing ($8$ is $7.5$ from the left center, $4.33$ from the right), so this is the fixed point $\{0,1\}, \{8,9,20\}$ with $J = 0.5 + \tfrac{169 + 100 + 529}{9} \approx 89.2$.
+
+Both runs converged; they disagree. A minimizing partition can be taken to assign every point to a nearest center (reassigning a point to a strictly nearer center would lower $J$), so on the line some optimum splits at the midpoint of its two centers: only the four contiguous splits are candidates. The runs above found two of them; the remaining two, $\{0\},\{1,8,9,20\}$ at $J = 185$ and $\{0,1,8\},\{9,20\}$ at $J = 98.5$, score worse, so $65$ is the global optimum and the second run converged to a non-minimum. The claim's failing step is the substitution of "reaches a fixed point of both block-minimizations" for "reaches the joint minimum": the theorem proves monotone descent to the former only. What k-means++ adds is a guarantee about the *seeding*, in expectation over its randomness: $\mathbb{E}[J] \le 8(\ln K + 2) J_{\text{opt}}$ before any Lloyd step, preserved by descent afterwards; an approximation ratio, not optimality, and not a per-run promise.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce ESL's compression figures for the Fisher photograph from the bit ledger: $1024 \times 1024$ pixels at 8 bits, cut into $2 \times 2$ blocks and coded with $K = 200$ block patterns. Compute bits per pixel and the compression ratio, ignoring the codebook, and check them against the published $1.91$ bits/pixel and $0.239$. Then compute the codebook's actual share (each codeword is 4 components at 8 bits) and say whether ignoring it was fair. Finally, compute the same two numbers for $K = 4$ and check against $0.50$ bits/pixel and $0.0625$.
+
+<Solution>
+Each $2 \times 2$ block covers 4 pixels and stores one index of $\log_2 200 \approx 7.644$ bits, so the rate is $7.644 / 4 = 1.911$ bits per pixel, matching the published $1.91$. Against 8 raw bits per pixel the ratio is $1.911 / 8 = 0.2389 \approx 0.239$. ✓
+
+The codebook holds $200$ codewords of $4 \times 8 = 32$ bits: $6{,}400$ bits total, against $512^2 \times 7.644 \approx 2.0 \times 10^6$ index bits: a $0.3\%$ overhead, fairly ignored. (Contrast the tiny-image ledger in the chapter, where $N$ is small enough that the $24K$ codebook term is worth printing.)
+
+For $K = 4$: $\log_2 4 = 2$ bits per block, $2/4 = 0.50$ bits per pixel, ratio $0.50 / 8 = 0.0625$. ✓ The two operating points bracket the trade: $0.239$ of the storage at barely visible loss, $0.0625$ at heavy loss, and the choice between them is a rate–distortion judgment the objective $J$ prices but cannot make.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review, from the supervised half. <Ref lesson="knn-curse">The nearest-neighbor lesson</Ref> scored customers described by (age in years, income in dollars): query $q = (30, 60000)$, candidates $A = (31, 61000)$ and $B = (55, 60500)$. Over the customer base, age has standard deviation $12$ years and income $8000$ dollars. (a) Rank $A$ and $B$ by raw squared Euclidean distance to $q$, then by standardized distance, and state which feature owns each ranking. (b) That lesson called standardizing before any distance computation mandatory hygiene, while this lesson's standardization figure shows the same operation destroying a correct clustering. Identify what the supervised setting has that licenses the word "mandatory", and why its absence here downgrades the same operation to a judgment call.
+
+<Solution>
+**(a)** Raw: $d^2(q, A) = 1^2 + 1000^2 \approx 10^6$ and $d^2(q, B) = 25^2 + 500^2 \approx 2.5 \times 10^5$, so $B$ ranks nearer, and income owns the ranking: a 500-dollar gap outweighs 25 years. Standardized (each coordinate difference divided by its feature's deviation): $d^2(q, A) = (1/12)^2 + (1000/8000)^2 \approx 0.022$ and $d^2(q, B) = (25/12)^2 + (500/8000)^2 \approx 4.34$, so $A$ ranks nearer by a factor of about two hundred in squared distance, and age owns the ranking.
+
+**(b)** The supervised setting has a label, so a metric choice is answerable to held-out error: if standardizing worsened $k$-NN's predictions, <Ref lesson="cross-validation-bootstrap">cross-validated</Ref> risk would report it, and "mandatory" was shorthand for "raw units fail that audit, reliably". Clustering has no label and no held-out risk (this lesson's opening section), so whether the informative direction or the nuisance direction deserves the vote cannot be read off the data: standardizing encodes the assumption that every feature deserves an equal vote, raw units encode the accident of measurement scales, and no instrument catches a wrong choice. The same operation is hygiene where an audit exists and a modeling decision where none does.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. Generate three clusters in the plane: $200$ points from a unit-variance Gaussian at the origin, and $20$ points each from tight Gaussians (spread $0.5$) at $(6, 1.25)$ and $(6, -1.25)$. Run $K = 3$ k-means from $20$ random-data-point seedings and record, for each run, the final $J$ and whether the dense cluster was split across two centers. Report the split fraction. Before running, write down which outcome the anisotropy section predicts, and what would distinguish "the optimizer gets stuck" from "the objective prefers the split".
+
+<Solution>
+**Prediction.** The dense cluster casts $200$ of $240$ votes in $J$, so centers migrate toward it; the section predicts most restarts end with two centers in the dense cluster and the two sparse clusters sharing one.
+
+**A reference run** (the chapter's own, seeds drawn as random data points): $19$ of $20$ restarts split the dense cluster; final $J$ ranged from $344.5$ to $419.3$. Your counts will differ with the draw, but the fraction should be large.
+
+**The diagnostic.** Compare the best $J$ found against the $J$ of the intended clustering (assign by true generating component, centers at the component means). Here the split solution's $J = 344.5$ *beats* the intended clustering's $419.3$: the split is not an optimizer failure but the objective's genuine preference. Splitting $200$ tight points saves more squared distance than keeping $40$ far-flung ones apart costs. If instead the intended clustering had the lower $J$ and restarts still missed it, the fault would be local optima, and more restarts or k-means++ would fix it. Distinguishing the two failure modes matters because only the first survives infinite compute.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. A converged $K = 2$ run on 1-D-in-the-plane data has centers $\mu_1 = (1, 3)$ and $\mu_2 = (3, 3)$. (a) For the point $x = (1.98, 3)$, compute both squared distances and the assignment $r$. (b) The two distances differ by about $4\%$, yet $r$ commits fully. Compute the quantity $\sigma_1 = e^{-d_1^2/2} / (e^{-d_1^2/2} + e^{-d_2^2/2})$ for this point and for a point at $(2, 3)$, and describe what it does that $r$ cannot.
+
+<Solution>
+**(a)** $d_1^2 = (0.98)^2 = 0.9604$ and $d_2^2 = (1.02)^2 = 1.0404$. The nearest center is $\mu_1$, so $r_{n1} = 1$, $r_{n2} = 0$: a full commitment decided by a margin of $0.08$.
+
+**(b)** For $x = (1.98, 3)$: $\sigma_1 = 1 / (1 + e^{(d_1^2 - d_2^2)/2}) = 1/(1 + e^{-0.04}) \approx 0.510$: the point is treated as $51\%$ cluster 1, $49\%$ cluster 2, recording exactly the ambiguity the hard assignment erased. For $x = (2, 3)$, on the perpendicular bisector of the two centers: $d_1^2 = d_2^2 = 1$, so $\sigma_1 = 0.5$ exactly — a point the hard assignment must still hand wholly to one side by tie-break is claimed by neither. The quantity is a *responsibility*, the posterior probability that a Gaussian centered at $\mu_1$ (unit variance, equal weights) generated $x$, and replacing $r_{nk}$ with it is precisely the move from k-means to the Gaussian mixture model, where <Ref lesson="gmm-em">the EM lesson</Ref> re-derives both of this lesson's steps with responsibilities in place of indicators.
+</Solution>
+</Exercise>
+
+<References>
+1. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §9.1: the distortion objective, both steps as exact block-minimizations (Eqs. 9.1–9.4), the Old Faithful run and its J-staircase (Figs. 9.1–9.2); §9.1.1: image segmentation and the 24K + N log₂K compression arithmetic (Fig. 9.3). Free online: https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+2. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — Ch. 10: k-means as coordinate descent on J, the convergence discussion including the equal-J oscillation caveat, and the canonical six-panel walkthrough (Fig. 10.1) this lesson's sequence recreates. https://cs229.stanford.edu/main_notes.pdf
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §14.3.5: the partition count (Eq. 14.30); §14.3.6: K-means via the within-cluster scatter identity; §14.3.3, Fig. 14.5: the standardization counterexample recreated here; §14.3.9: the Fisher-photograph vector quantization with the 1.91 bits/pixel and 0.239 figures. Free online: https://hastie.su.domains/ElemStatLearn/
+4. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §21.3: the algorithm, vector quantization rates (§21.3.3), k-means++ with the O(log K) statement (§21.3.4), K-medoids (§21.3.5), and why held-out reconstruction error decreases monotonically in K (§21.3.7.1). Free online: https://probml.github.io/pml-book/book1.html
+5. D. Arthur, S. Vassilvitskii, "k-means++: The Advantages of Careful Seeding," *Proceedings of SODA*, 2007 — the D² seeding rule and the E[J] ≤ 8(ln K + 2)·J_opt guarantee (their Theorem 1.1). http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf
+6. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Ch. 22: the two-objectives contradiction and the no-ground-truth discussion behind this lesson's opening section. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+7. S. P. Lloyd, "Least Squares Quantization in PCM," *IEEE Transactions on Information Theory* 28(2), 1982, pp. 129–137 — the 1957 Bell Labs memorandum, published 25 years later: the algorithm in its original signal-quantization setting.
+8. J. MacQueen, "Some Methods for Classification and Analysis of Multivariate Observations," *Proceedings of the Fifth Berkeley Symposium*, 1967 — the name "k-means" and the first convergence analysis.
+9. R. Tibshirani, G. Walther, T. Hastie, "Estimating the Number of Clusters in a Data Set via the Gap Statistic," *JRSS-B* 63(2), 2001 — the reference-distribution calibration of the elbow named in the choosing-K section.
+10. D. Aloise, A. Deshpande, P. Hansen, P. Popat, "NP-hardness of Euclidean Sum-of-Squares Clustering," *Machine Learning* 75, 2009, pp. 245–248 — the hardness result behind the seeding section's key fact.
+</References>

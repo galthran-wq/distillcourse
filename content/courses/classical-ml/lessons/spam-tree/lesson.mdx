@@ -1,0 +1,219 @@
+The tree this lesson fits and prunes on the spam corpus has 23 leaves, reads as a page of if-then rules a human can audit, scores 8.3% test error — a point better than ESL's published 17-leaf run of the same recipe at 9.3%, three points worse than the additive model — and changes shape when a handful of training messages change; all three facts are the point.
+
+This lesson closes the module that gave up the global formula. <Ref lesson="kernel-smoothing">Local smoothers</Ref> replaced the formula with a moving average; <Ref lesson="decision-trees">the previous lesson</Ref> replaced the fixed window with a fitted partition and built the full CART toolkit: greedy concave-impurity growth, cost-complexity pruning with cross-validated $\alpha$, the monotone-invariance and readability assets, the axis-bias and instability costs. What the toolkit has not yet touched is the course's benchmark: the 4,601-message corpus on which <Ref lesson="spam-filter">module 4</Ref> fixed a 3,065/1,536 train/test split and posted its linear numbers. This lesson runs the machinery end to end on that corpus, reads the fitted tree line by line, prices it against the error ladder, and measures the instability the previous lesson demonstrated on a ten-point table, this time on real mail.
+
+## The fit: one α-path, ten folds, 23 leaves
+
+<Task>
+Three retrievals before the fit, closed book. (1) From <Ref lesson="decision-trees">the trees lesson</Ref>: write the cost-complexity criterion $C_\alpha(T) = \sum_m N_m Q_m(T) + \alpha|T|$ and state what weakest-link pruning produces from it. (2) From <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: state the one-standard-error rule. (3) From <Ref lesson="spam-filter">the benchmark lesson</Ref>: the two linear rungs to beat: ESL's published linear logistic at 7.6%, and 5.9% for the same model on log-transformed features.
+</Task>
+
+### The protocol: every dial stated
+
+The protocol is the previous lesson's machinery with nothing left implicit. Grow a deviance (entropy) tree on the 3,065 training messages with a floor of 5 messages per leaf; run weakest-link pruning to get the full $\alpha$-path of nested subtrees; score every $\alpha$ by 10-fold cross-validation on the training set; choose by the one-standard-error rule.
+
+The features enter **raw**: no $\log(x+0.1)$, no standardization. The split sweep depends only on feature order, so the transform decision that was worth 1.7 points to logistic regression is provably a no-op here (<Ref lesson="decision-trees">the monotone-invariance proof</Ref>).
+
+<Figure
+  src="./figures/alpha-path.svg"
+  alt="Two aligned panels over the complexity price alpha on a log scale: the top panel steps the pruned subtree's leaf count down from 120 to 2, and the bottom panel shows the 10-fold CV misclassification curve with its standard-error band and the test-error curve, flat near 8 percent until about 20 leaves and rising steeply below 10, with the one-SE choice marked at alpha 0.0054 and 23 leaves"
+  caption="The α-path on the training set. The CV curve is flat from 120 leaves down to about 20, then climbs; the one-SE rule stops at the 23-leaf subtree."
+/>
+
+### The choice: 23 leaves, within a point of ESL's 17
+
+The grown tree has 120 leaves and 3.1% training error. The CV minimum sits at 55 leaves (8.06% CV error), and the one-SE rule (take the smallest subtree whose CV error is within one standard error of that minimum) lands at $\alpha = 0.0054$: **23 leaves**, test error 8.3% ± 0.7 (127 of 1,536 test messages, with the binomial standard error).
+
+ESL's own run of the same recipe prunes to 17 leaves at 9.3%. The two numbers are labeled separately because the runs differ in detail: ESL prunes on misclassification, our implementation ([scikit-learn's minimal cost-complexity pruning](https://scikit-learn.org/stable/modules/tree.html#minimal-cost-complexity-pruning)) prunes on the deviance it grew with, and the CV folds are different draws. They agree within a point, which is what agreement means at this test-set size.
+
+### The flat stretch: pruning buys size, not error
+
+The shape of the CV curve is a result in itself. From 120 leaves down to about 20 the curve moves within one standard error; below 17 it climbs, and by 5 leaves it has lost five points.
+
+Pruning on this corpus does not buy test error: the flat stretch says a 120-leaf tree and a 23-leaf tree predict about equally well. What the one-SE rule buys is the object of the next section: a model small enough to print on a page and read.
+
+## Reading the tree: five questions decide most messages
+
+### The top splits are the known spam vocabulary
+
+Reading the tree is the payoff the accuracy column will not show, and the top of the page holds the corpus's spam vocabulary exactly as <Ref lesson="spam-filter">the weight-reading section</Ref> ranked it. The root tests whether more than about one character in 1,800 is a `$` sign (`ch$ < 0.0555`, in percent of characters): the 771 training messages answering yes go right, and nine in ten of them are spam. That single comparison drops the training labels' entropy from 0.97 bits to 0.71, a quarter of the total; no other candidate among the 57 features buys as much.
+
+The second tier continues the vocabulary. On the `$`-light side, `remove < 0.06` peels off 218 messages carrying unsubscribe language, again nine-tenths spam; `ch! < 0.191` then divides the 2,076 that remain into a 1,663-message region that is 92% email and a 413-message region that is a coin flip (207 email, 206 spam), the region where most of the tree's remaining depth is spent. On the `$`-heavy side the same move runs hamward: `hp < 0.405` recovers 48 messages that mention dollar figures *and* the employer's name, six of seven of them email — the company's own invoices and quotes.
+
+Those top questions do most of the sorting: a quarter of the training messages reach their leaf in three questions, two-thirds within five, and none needs more than nine. ESL's 17-leaf tree opens with the same questions at nearly the same thresholds (its root is also `ch$ < 0.0555`), so the vocabulary at the top is a property of the corpus, not of one run.
+
+<Figure
+  src="./figures/spam-tree.svg"
+  alt="The fitted 23-leaf spam tree drawn left to right: internal nodes carry split rules such as ch$ < 0.0555, remove < 0.06, ch! < 0.191, hp < 0.405 and george < 0.005; each leaf shows a spam-fraction bar and its email/spam training counts; an amber path traces a spam message through three questions to a 487-of-495 spam leaf, and a blue path traces a ham message through nine questions to a 103-email, 54-spam leaf"
+  caption="The fitted tree, whole, root at the left. A condition that holds sends the message to the node's left child, drawn as the upper branch; a condition that fails sends it right, drawn lower. Each leaf shows its training counts as email/spam; the amber and blue paths are the two traces worked in the text."
+/>
+
+### Two traces: three questions, then nine
+
+<Task>
+Walk one message down the drawn tree yourself before reading the traces: a message with `ch$` $= 0$, `remove` $= 0.8$, `george` $= 0$. It should land in the 11/197 leaf (left at the root, which the figure draws as the upper branch; right at `remove < 0.06`; left at `george < 0.15`) and be flagged spam with $\hat p = 0.95$.
+</Task>
+
+<Example title="The amber trace: an obvious spam, three questions">
+A test message in which 0.18% of characters are `$` signs, the word `hp` never appears, and the average run of capital letters is 9.8 characters long.
+
+Root: $\texttt{ch\textdollar} = 0.184 \geq 0.0555$, go right. Second: $\texttt{hp} = 0 < 0.405$, go left. Third: $\texttt{CAPAVE} = 9.8 \geq 2.907$, go right, into a leaf holding 495 training messages, 487 of them spam. Verdict: spam, $\hat p = 0.98$.
+
+Read aloud, the classification is one sentence: dollar signs, no employer vocabulary, shouting capitals. Every ingredient of the decision is on the page.
+</Example>
+
+<Example title="The blue trace: a borderline ham, nine questions">
+A genuine work message whose only tracked features are generic words (`all`, `will`, `your`) and a 16-character run of capitals.
+
+It answers *no*, feature absent, to eight questions in a row: no `$`, no `remove`, no `!`, no `george`, no `hp`, no `edu`, no `our`, no `money`. The one *yes* is $\texttt{CAPMAX} = 16 \geq 10.5$.
+
+It lands in a leaf of 157 training messages, 103 email and 54 spam: verdict email, $\hat p = 0.34$, the least confident leaf on its side of the tree. The trace shows exactly why the tree is unsure (the message carries none of the fingerprint that identifies George's mail, and just enough capitals to look promotional) and shows what evidence would flip it.
+</Example>
+
+No other model in the course states its uncertainty as a legible list of the questions it asked. The RBF-SVM that beats this tree by three points answers the same query with a weighted sum over <Ref lesson="spam-filter">607 support vectors</Ref>.
+
+<KeyFact>
+A classification tree is the one model in this course whose every prediction is its own explanation: a conjunction of explicit tests, checkable by the person the decision affects. The price appears in the same figure: deciding any single message consults at most nine of the 57 features, and most messages are decided by three to six.
+</KeyFact>
+
+## The ladder: three points lost, zero preprocessing decisions
+
+Placing the tree on the benchmark ladder is the module's honest accounting. The strongest rung: <Ref lesson="splines-gams">the additive logistic model</Ref> gives each of the 57 features its own fitted one-dimensional curve and sums them on the log-odds scale; ESL reports 5.3% test error for it on this split, the best number the corpus has seen so far in this course.
+
+<Figure
+  src="./figures/ladder.svg"
+  alt="Dot plot of test errors on the common split: module 4's naive Bayes 11.0, ESL's linear logistic 7.6, LDA 6.6, logistic on log features 5.9, RBF-SVM 5.2; the additive logistic model at 5.3 and the pruned tree at 9.3 (ESL) and 8.3 with error bar (ours); grayed rungs for module 7 at 5.4, 4.9 and 4.5"
+  caption="The benchmark ladder after module 6. Hollow markers are ESL's published numbers; the filled amber dot is this lesson's fit (±2 SE). The gray rungs are module 7's, quoted from ESL Ch. 15."
+/>
+
+### The gap: additive data, exponential imitation
+
+The tree **loses**: 8.3% against logistic's 5.9% on our fits, 9.3% against 5.3% on ESL's; the additive model's error is roughly half the tree's. The gap has a mechanism, not just a scoreboard. Most spam features act additively and marginally: the probability of spam jumps when a word's frequency moves off zero and changes little after that, feature by feature, with no strong interactions. An additive model represents 57 such effects at a cost of one smooth curve each and consults all of them for every message.
+
+A tree must build each additive effect out of nested splits: representing $k$ independent effects costs depth $k$ and about $2^k$ leaves, the previous lesson's additive-structure complaint made concrete. A 23-leaf budget therefore forces the tree to pick the five or six strongest features and ignore the remaining fifty.
+
+The two traces above showed the consequence: three to nine features consulted per message, everything else discarded. On a corpus whose structure is additive, discarding fifty mostly-useful features costs three points of error.
+
+<KeyFact>
+Reverse the structure, to a target that is an interaction of two features rather than a sum of marginal effects, and the ranking reverses with it; the refutation exercise at the end constructs that reversal from this same corpus.
+</KeyFact>
+
+### The other column: what the tree paid nothing for
+
+Accuracy is one column of the comparison; the other is what each rung had to decide before fitting. Every other model on the ladder embeds preprocessing decisions: the $\log(x+0.1)$ transform, worth 1.7 points to logistic regression by <Ref lesson="spam-filter">the benchmark lesson's</Ref> own measurement; standardization for the penalized fits and the SVM; an event-model choice for naive Bayes. Each is a dial somebody set by looking at this corpus. The tree consumed the raw table, and the <Ref lesson="decision-trees">monotone-invariance proof</Ref> says those dials do not exist for it: any order-preserving transform of any feature leaves every fitted split, and every prediction, identical.
+
+The corpus exercises only part of that asset, and the accounting should say so. All 57 spam features are frequencies on a common scale and no cell of the table is empty, so the other two data-shaped assets <Ref lesson="decision-trees">the previous lesson</Ref> priced (native handling of mixed feature types, and of missing values routed past by surrogate splits, the backup questions that mimic the primary split for points lacking its feature) never come into play here. This benchmark understates the tree's practical case.
+
+On a table of word frequencies, "no preprocessing" is a convenience. On the mixed, unscaled, hole-riddled tables of <Ref lesson="decision-trees">the buy list</Ref>, hospital records and loan applications, it is the difference between running and not running, which is why the accuracy column alone never explains where trees are deployed.
+
+## The audit: refit ten times, the story changes
+
+The previous lesson demonstrated instability on a ten-point table, where a near-tie at the root let one duplicated point redraw the tree. The benchmark version of that experiment: draw 10 bootstrap resamples of the 3,065 training messages, rerun the entire protocol on each (grow, prune, choose $\alpha$ by CV), and record what came back.
+
+<Task>
+Predict before reading the figure. The root contest is between `ch$` and `ch!`, the corpus's two punctuation features; <Ref lesson="spam-filter">the weight tables</Ref> ranked them nearly even. Write down how many of 10 resamples you expect to keep the `ch$` root, and what spread of test errors you expect around the single tree's 8.3%.
+</Task>
+
+<Figure
+  src="./figures/instability.svg"
+  alt="Table of ten bootstrap refits showing each resample's root split, leaf count, and test error as a strip plot: six roots are ch$ at thresholds 0.0455 to 0.0555 and four flip to ch! at thresholds 0.0515 to 0.0785, highlighted amber; leaf counts range from 24 to 70; test errors scatter from 8.2 to 10.7 percent around the single tree's 8.3 percent marked by a dashed green line"
+  caption="Ten bootstrap refits of the full protocol. The root feature flips in four resamples, the tree size ranges from 24 to 70 leaves, and the test error spreads over 2.5 points. This table is module 7's raw material."
+/>
+
+### Three readings, in order of severity
+
+**The error is the stable part**: 8.2% to 10.7%, a 2.5-point spread, real but recognizably the same model class doing the same job.
+
+**The size is not**: 24 to 70 leaves, a factor of three, from resamples of one dataset. "The spam tree has 23 leaves" is a fact about one draw, not about spam.
+
+**The structure is least stable of all**: the root (the single most consequential decision, conditioning every split below it) flips from `ch$` to `ch!` in four resamples of ten, and even where the feature survives, its threshold moves. Each of the ten trees prints as a page of clean, confident if-then rules; the ten pages tell materially different stories about which questions matter. A reader shown any one of them would have no way to know.
+
+<KeyFact>
+A single tree is a low-bias, high-variance estimator whose interpretation varies more across refits than its error does: over these ten resamples the test error moved 2.5 points while the root question, the tree's headline claim about what matters, changed identity four times.
+</KeyFact>
+
+The previous lesson asserted this on a ten-point table; the figure above measures it on the benchmark. <Ref lesson="bagging-random-forests">Module 7</Ref> opens with exactly the objects in this figure, ten bootstrap trees, and asks what happens to the variance when their predictions are averaged; the closing exercise computes the answer a module early.
+
+### The leak sits in the upper splits
+
+The audit has a second finding, and the tree's readability is what surfaces it. The personalized features run through the upper half of the printed page: `hp < 0.405` at depth two, `george < 0.15` at depth three, `george < 0.005` and `hp < 0.03` at depths four and five, `650 < 0.23` eight questions deep — the recipient's first name, his employer, and his area code, the features <Ref lesson="spam-filter">the benchmark lesson's audit</Ref> flagged as leakage: predictive for this mailbox, meaningless or harmful for any other.
+
+The largest of those splits states the leak as one printed conjunction. Among the 1,663 training messages that clear the three spam-vocabulary tests (`ch$`, `remove`, and `ch!` all below threshold), a single mention of `george` closes the case: 471 training messages, not one of them spam, and the 209 test messages reaching the same leaf are all email as well. That rule is the personalized filter compressed to a line, and it is exactly the rule the corpus's own documentation warns must be blinded before the filter ships.
+
+<Figure
+  src="./figures/leak-rules.svg"
+  alt="Three if-then rules read off the fitted tree, each a chain of condition boxes ending in an email verdict with its training counts: 471/0, 372/4, and 10/0; in each chain the decisive final test, on george or hp, is highlighted amber"
+  caption="Three of the tree's email verdicts, printed as rules. Each is a conjunction of ordinary vocabulary tests whose decisive final test is the recipient's name or his employer — a rule portable to no other mailbox."
+/>
+
+The point is not that trees leak: every model on the ladder fit these features, and <Ref lesson="imbalance-leakage">module 5</Ref> showed the failure is in the data, not the fitter. The point is what interpretability does and does not buy.
+
+An auditor reading this page catches `george` in under a minute; the same auditor given the SVM's dual coefficients catches nothing. But the tree fit the leak as happily as any black box, and its 8.3% carries the same optimism about deployment on anyone else's mail. Auditability **finds** bugs; it does not prevent them.
+
+A model that displays its reasoning invites a trust its error rate has to earn separately, and the resampling table above says even the displayed reasoning is one draw from a distribution.
+
+<Aside>
+The audit extends to unequal costs. Sweeping the loss ratio $L_{01}/L_{10}$ through the leaves of the published 17-leaf tree traces a ROC curve with area 0.95, against 0.98 for the additive model: the GAM dominates at every operating point, so the accuracy gap is not an artifact of the ½ threshold. Demanding specificity near 100% (almost no real mail flagged) drags the tree's sensitivity to about 50%: half the spam passes. The better repair than re-thresholding a fitted tree is to put the losses into the growing itself by weighting observations, which moves the whole tree, not just its leaf votes. The cost-machinery exercise at the end works the re-thresholding version.
+</Aside>
+
+What stands established: the module's toolkit, run end to end on the benchmark, produces a 23-leaf tree at 8.3% ± 0.7 test error (ESL's run: 17 leaves, 9.3%); the tree reads as a page of auditable rules and its top questions match the corpus's known spam vocabulary; it loses three to four points to the additive model because the corpus's structure is additive and a tree pays exponentially to imitate sums; and refitting on bootstrap resamples flips its root in four cases of ten while moving its error by at most 2.5 points.
+
+The instability table is a debt this module cannot pay. <Ref lesson="bagging-random-forests">The next lesson</Ref> pays it: average the ten refits instead of choosing one, and derive exactly how much variance the average removes, and what correlation between trees leaves behind.
+
+## Exercises
+
+<Exercise>
+Warm-up on the drawn tree. A message has `ch$` $= 0.02$, `remove` $= 0$, `ch!` $= 0.35$, `CAPAVE` $= 1.9$, `free` $= 0.3$, and every other tracked feature zero. Trace it down the figure: list the questions asked in order, name the leaf, report its training spam fraction, and give the decision at threshold ½.
+
+<Solution>
+Root: $\texttt{ch\textdollar} = 0.02 < 0.0555$, left. Next: $\texttt{remove} = 0 < 0.06$, left. Next: $\texttt{ch!} = 0.35 \geq 0.191$, right. Next: $\texttt{CAPAVE} = 1.9 < 2.7505$, left. Next: $\texttt{free} = 0.3 \geq 0.065$, right: a leaf, five questions in. Its training counts are 11 email / 32 spam: spam fraction $\hat p = 32/43 \approx 0.74$. At threshold ½ the message is flagged spam. The transferable check: a trace is complete only when every comparison cites the message's value against the printed threshold; the tree's audit trail is exactly this list.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: run the pruning dial to its ends. (a) At $\alpha = 0$, which subtree minimizes $C_\alpha$, and what are its size and errors on our fit? Explain why its training error is 3.1% rather than the 0% <Ref lesson="statistical-learning">the memorizer</Ref> achieves. (b) As $\alpha \to \infty$, what does the tree become, and what is its test error on this corpus? (c) One step before that limit, the subtree is the root stump. Using the stump's training partition (left child 1,762 email / 532 spam, right child 85 email / 686 spam), compute its training error and compare with its 21.6% test error.
+
+<Solution>
+(a) At $\alpha = 0$ the criterion is pure training loss, so the smallest minimizer is the fully grown tree: 120 leaves, 3.1% training error, 7.9% test error. Training error is not zero because growth kept a floor of 5 messages per leaf: leaves like 8/8 remain mixed, and their majority votes err on the minority. Remove the floor and the tree becomes the memorizer, at the usual price. (b) $\alpha \to \infty$ prices every leaf beyond one as unaffordable: the tree collapses to the root leaf, predicting the majority class (email) everywhere. Its test error is the test-set spam fraction, $595/1536 = 38.7\%$: the base rate, the floor any model must beat. (c) The stump splits on $\texttt{ch\textdollar} < 0.0555$ and votes email left, spam right. Training errors: 532 spam missed on the left, 85 email flagged on the right, $(532+85)/3065 = 20.1\%$; the 21.6% test figure sits about a point and a half above, ordinary optimism at this sample size. One split, chosen from $57$ features, halves the base-rate error; the remaining 22 leaves of the chosen tree buy the next 13 points. The endpoint pair brackets what pruning navigates: memorization at one end, the base rate at the other.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute, after conceding what is true: "The tree scores 9.3% where logistic regression scores 7.6% — so trees are the wrong tool for text-frequency data." Test the generalization on this same corpus: construct the target $z = \mathbf{1}\{(\texttt{ch\textdollar} > 0) \oplus (\texttt{CAPAVE} > 2.907)\}$, the exclusive-or of "mentions \$" and "shouts in capitals", and fit both models on the two features $\log(\texttt{ch\textdollar}+0.1)$, $\log(\texttt{CAPAVE}+0.1)$ with the standard split. Predict both test errors before running, given that $z$'s base rate is 28.8%. Name what actually decides the ranking, and reconcile the greedy grower's behavior at depth 2 with <Ref lesson="decision-trees">the XOR configuration</Ref>.
+
+<Solution>
+The concession first: on the real labels the tree genuinely loses, and not by luck: the corpus's structure is additive (jump-at-zero effects, feature by feature), which is the one structure a sum-of-effects model represents cheaply and a partition represents expensively. The generalization is what fails. On the constructed target, logistic regression tests at 28.3%, indistinguishable from the 29.2% achieved by always predicting the majority: no linear function of the two features separates an exclusive-or, because $z$ is high where exactly one feature is high, and any additive score must rank the both-high corner above the one-high corners. A tree with 8 leaves tests at **0.0%**: the concept is literally four rectangles, and rectangles are what trees emit. Two instructive footnotes from the run. A *depth-2* tree manages only 24.3%, the XOR trap in the wild: no single split improves impurity much, so the greedy root is nearly arbitrary, and the fix is the previous lesson's grow-deep-then-prune, not a better first split. And adding one product feature to logistic regression drops it to 2.7%, confirming the diagnosis. What decides the ranking is the match between the data's structure and the model's bias (additive versus interaction), not the fact that the features are text frequencies. The same wall appeared from the other side in <Ref lesson="splines-gams">the additive model's forward exercise</Ref>, where a GAM could not represent $x_1 x_2$ and a tree's nested splits could.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: what the published point estimate hides. Rerun the full protocol (grow, prune, 10-fold CV, one-SE) on five fresh random 3,065/1,536 splits of the corpus. Before running, state which of the two published quantities ("17 leaves" and "9.3%") you expect to reproduce more stably, and why. Five measured runs for comparison: chosen sizes $\{27, 45, 50, 41, 33\}$ leaves, test errors $\{9.6, 8.5, 7.9, 7.9, 8.1\}\%$.
+
+<Solution>
+Prediction the lesson supports: the error should be the stable quantity and the size should not, because the CV curve is nearly flat over sizes 20–120: many sizes are statistically indistinguishable, so the one-SE rule's choice rides on fold noise, while every choice in the flat region predicts about equally well. The measured runs confirm both halves: errors span 7.9–9.6%, consistent with the ±0.7 SE plus split-to-split variation, and the ESL-split numbers (ours 8.3%, ESL's 9.3%) sit inside that spread; sizes span 27–50 and never once land on 17 or 23. The conclusion for reading published tables: "a 17-node tree, 9.3%" is one draw from a distribution whose error component has a ±1-point spread and whose size component has no meaningful precision at all. A reproduction that gets 41 leaves and 8.5% is an agreement, not a discrepancy; a claim like "the method needs about 17 leaves" would not survive a second seed. The general habit is <Ref lesson="cross-validation-bootstrap">module 5's</Ref>: never compare point estimates whose standard errors you have not computed.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review with module 5's cost machinery. The corpus documentation prices a false positive (real mail flagged) at ten times a false negative, giving the Bayes threshold $p > 10/11 \approx 0.909$ from <Ref lesson="spam-filter">the threshold-economics argument</Ref>. The fitted tree's test-set confusion matrices: at threshold ½, (TP, FP, FN, TN) $= (529, 61, 66, 880)$; at $10/11$, $(380, 17, 215, 924)$. (a) Compute both error rates and both expected costs per message at 10:1 prices. (b) The tree's leaves take only 17 distinct probability values; state what that implies about the set of achievable operating points, and which leaves are still flagging at $10/11$. (c) The logistic model at the same threshold commits 6 false positives to the tree's 17. Diagnose the difference using what each model's probability outputs are.
+
+<Solution>
+(a) Threshold ½: error $(61+66)/1536 = 8.3\%$, cost $(10 \cdot 61 + 66)/1536 = 0.44$ per message. Threshold $10/11$: error $(17+215)/1536 = 15.1\%$, nearly double, but cost $(10 \cdot 17 + 215)/1536 = 0.25$, a 43% saving. As in module 5: under asymmetric costs, error rate is the wrong number to minimize, and the "worse" matrix is the better filter. (b) A tree's score is piecewise constant: every message in a leaf gets that leaf's training fraction, so the threshold sweep has at most 17 distinct operating points, and any threshold between adjacent leaf values (here, anywhere in $(0.889, 0.947]$) produces the identical classifier. At $10/11$ the flagging leaves are those with $\hat p > 0.909$: the 0.947 leaf (`george`-free `remove` messages), the amber trace's 0.984 leaf, and the handful of pure leaves; the 0.889, 0.843, 0.78 and 0.744 leaves all stop flagging. (c) Logistic regression outputs a continuum of calibrated scores, so raising the threshold peels off exactly the least-confident positives; the tree can only drop whole leaves, and its 0.947 leaf keeps 11 training-set hams' worth of false-positive risk flagged because the next available operating point below it drops 197 spams too. Coarse probability grids make cost-sensitive thresholding blunt, which is why the better repair puts the losses into the growing itself, not just the leaf votes (the Aside above).
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. The audit section fitted 10 bootstrap trees; each produces a probability $\hat p_b(x)$ for every test message. Average them, $\bar p(x) = \tfrac{1}{10}\sum_b \hat p_b(x)$, classify at $\bar p > \tfrac12$, and compare with the single pruned tree's 8.3%. Predict the direction of the change and its rough size before computing; the measured answer is in the solution.
+
+<Solution>
+The averaged trees test at **5.9%**: a 2.4-point improvement over the single tree, from nothing but the ten refits the audit already ran, and level with the tuned logistic model on this split. The direction was predictable from the audit's own table: the ten trees disagree (different roots, different structures), their errors are therefore partly independent, and averaging cancels the independent part of the fluctuation while leaving the shared part, and the bias, untouched. This procedure has a name: *bagging*, bootstrap aggregation, and this exercise has just reproduced the module-7 opening result that a variance-dominated model gains points of test error from averaging alone. What the average costs is exactly what this lesson valued: $\bar p$ is a vote over ten different rule pages, and no single trace explains a decision any more. The arithmetic of how much variance survives (the correlation floor $\rho\sigma^2$ that averaging cannot cross, and the feature-subsampling trick that attacks $\rho$) is <Ref lesson="bagging-random-forests">the next lesson's</Ref> first derivation.
+</Solution>
+</Exercise>
+
+<References>
+1. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §9.2.5: the spam tree, the CV-versus-size curve (Fig. 9.4), the 17-leaf tree itself (Fig. 9.5), the 9.3% confusion matrix (Table 9.3), and the unequal-loss and ROC discussion (Fig. 9.6); §9.1.2: the additive logistic model on the same split, its 5.3% error and significant-feature table (Tables 9.1–9.2), and the partial plots behind the additive-structure diagnosis in the ladder section; §9.2.4: the lack-of-smoothness and additive-structure limitations; Ch. 15 (Fig. 15.1): the bagging/random-forest/boosting numbers on this corpus, grayed in the ladder figure. Free online: https://hastie.su.domains/ElemStatLearn/
+2. M. Hopkins, E. Reeber, G. Forman, J. Suermondt, "Spambase," UCI Machine Learning Repository, 1999 — the corpus, the feature definitions, the 10:1 cost warning ("false positives are very undesirable"), and the creators' instruction to blind the personalized non-spam indicators. https://archive.ics.uci.edu/dataset/94/spambase (ESL's mirror of the data and the fixed train/test split: https://hastie.su.domains/ElemStatLearn/datasets/)
+3. L. Breiman, J. Friedman, R. Olshen, C. Stone, *Classification and Regression Trees*, Wadsworth, 1984 — Ch. 3: minimal cost-complexity pruning and cross-validated selection, the procedure run in this lesson.
+4. L. Breiman, "Heuristics of Instability and Stabilization in Model Selection," *Annals of Statistics* 24(6), 1996, pp. 2350–2383 — instability of tree-structured predictors under data perturbation, the phenomenon the audit section measures, and its repair by aggregation.
+5. F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," *Journal of Machine Learning Research* 12, 2011, pp. 2825–2830 — the implementation used for this chapter's fits (`DecisionTreeClassifier` with minimal cost-complexity pruning). https://scikit-learn.org/stable/modules/tree.html
+</References>
