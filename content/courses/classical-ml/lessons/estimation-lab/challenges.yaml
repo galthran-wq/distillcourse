@@ -1,0 +1,340 @@
+checkpoints:
+  loglik:
+    kind: exact
+    seed: 1337
+    atol: 1.0e-8
+    inputs_code: |
+      # A family the notebook never defines: Gamma with known shape 2,
+      # parameterized by its MEAN m. p(y | m) = r^2 y e^{-r y} with r = 2/m,
+      # so T(y) = y, eta = -2/m, A(eta) = -2 log(-eta), h(y) = y.
+      from types import SimpleNamespace
+      gamma2 = SimpleNamespace(
+          name="Gamma(2, mean)",
+          T=lambda y: y,
+          A=lambda e: -2.0 * np.log(-e),
+          dA=lambda e: -2.0 / e,
+          d2A=lambda e: 2.0 / e**2,
+          log_h=lambda y: np.log(y),
+          eta=lambda m: -2.0 / m,
+          d_eta=lambda m: 2.0 / m**2,
+          d2_eta=lambda m: -4.0 / m**3,
+      )
+      y = rng.gamma(2.0, 1.5, size=40)
+      inputs = (gamma2, np.array([1.2, 3.0, 5.5]), y)
+    wrong:
+      - hint: "The log base measure is missing: sum(log h(y_i)) is part of the log-likelihood. It is free of theta and cannot move the maximizer, which is exactly why it is easy to drop — but the checkpoint compares values."
+        code: |
+          def f(fam, theta, y):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              e = fam.eta(th)
+              return e * np.sum(fam.T(y)) - len(y) * fam.A(e)
+      - hint: "A(eta) is subtracted once per observation, not once per sample: the term is n A(eta). Check your answer against n times the one-observation log-likelihood on a constant sample."
+        code: |
+          def f(fam, theta, y):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              e = fam.eta(th)
+              return e * np.sum(fam.T(y)) - fam.A(e) + np.sum(fam.log_h(y))
+  score:
+    kind: exact
+    seed: 4242
+    atol: 1.0e-8
+    inputs_code: |
+      # Another family the notebook never defines: the geometric of the GLM
+      # lesson's rewriting exercise, p(y | phi) = (1-phi)^{y-1} phi on
+      # y = 1, 2, 3, ... — so eta = log(1-phi) and A(eta) = eta - log(1-e^eta).
+      from types import SimpleNamespace
+      geom = SimpleNamespace(
+          name="Geometric(phi)",
+          T=lambda y: y,
+          A=lambda e: e - np.log1p(-np.exp(e)),
+          dA=lambda e: 1.0 / (1.0 - np.exp(e)),
+          d2A=lambda e: np.exp(e) / (1.0 - np.exp(e)) ** 2,
+          log_h=lambda y: np.zeros_like(np.asarray(y, dtype=float)),
+          eta=lambda p: np.log1p(-p),
+          d_eta=lambda p: -1.0 / (1.0 - p),
+          d2_eta=lambda p: -1.0 / (1.0 - p) ** 2,
+      )
+      y = rng.geometric(0.3, size=50).astype(float)
+      inputs = (geom, np.array([0.15, 0.3, 0.55]), y)
+    wrong:
+      - hint: "The sign is flipped: the bracket is observed total MINUS expected total, sum(T(y_i)) - n A'(eta), not the other way round. A central finite difference of your own loglik catches this in one line."
+        code: |
+          def f(fam, theta, y):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              e = fam.eta(th)
+              return (len(y) * fam.dA(e) - np.sum(fam.T(y))) * fam.d_eta(th)
+      - hint: "The chain-rule factor deta/dtheta is missing, so this is the score in the NATURAL parameter, not in theta. Both vanish at the same estimate, which is why the omission survives every root-finding test and fails every variance computation."
+        code: |
+          def f(fam, theta, y):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              e = fam.eta(th)
+              return np.sum(fam.T(y)) - len(y) * fam.dA(e)
+  expected-information:
+    kind: exact
+    seed: 909
+    atol: 1.0e-9
+    inputs_code: |
+      # The Gamma(2, mean) family again, so the reparameterization is not
+      # the identity: eta = -2/m, and I(m) is not A''(eta).
+      from types import SimpleNamespace
+      gamma2 = SimpleNamespace(
+          name="Gamma(2, mean)",
+          T=lambda y: y,
+          A=lambda e: -2.0 * np.log(-e),
+          dA=lambda e: -2.0 / e,
+          d2A=lambda e: 2.0 / e**2,
+          log_h=lambda y: np.log(y),
+          eta=lambda m: -2.0 / m,
+          d_eta=lambda m: 2.0 / m**2,
+          d2_eta=lambda m: -4.0 / m**3,
+      )
+      inputs = (gamma2, np.array([0.8, 3.0, 7.25]))
+    wrong:
+      - hint: "The chain-rule factor is squared: information transforms with the SQUARE of deta/dtheta, because it is the variance of a score and a variance picks up the square of a scale factor."
+        code: |
+          def f(fam, theta):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              return fam.d2A(fam.eta(th)) * fam.d_eta(th)
+      - hint: "A''(eta) is the information in the NATURAL parameter. The floor below is stated for theta, and the two differ by exactly the reparameterization factor the information lesson derived on the Bernoulli."
+        code: |
+          def f(fam, theta):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              return fam.d2A(fam.eta(th))
+  observed-information:
+    kind: exact
+    seed: 5150
+    atol: 1.0e-8
+    inputs_code: |
+      from types import SimpleNamespace
+      gamma2 = SimpleNamespace(
+          name="Gamma(2, mean)",
+          T=lambda y: y,
+          A=lambda e: -2.0 * np.log(-e),
+          dA=lambda e: -2.0 / e,
+          d2A=lambda e: 2.0 / e**2,
+          log_h=lambda y: np.log(y),
+          eta=lambda m: -2.0 / m,
+          d_eta=lambda m: 2.0 / m**2,
+          d2_eta=lambda m: -4.0 / m**3,
+      )
+      # Parameter values deliberately away from this sample's estimate: at the
+      # estimate the score term vanishes and half the formula is untested.
+      y = rng.gamma(2.0, 1.5, size=45)
+      inputs = (gamma2, np.array([1.6, 4.5, 6.0]), y)
+    wrong:
+      - hint: "The sign is inverted: observed information is MINUS the second derivative, so that it is positive at a maximum and a standard error is its reciprocal square root rather than the square root of a negative number."
+        code: |
+          def f(fam, theta, y):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              e = fam.eta(th)
+              return -(len(y) * fam.d2A(e) * fam.d_eta(th) ** 2
+                       - (np.sum(fam.T(y)) - len(y) * fam.dA(e)) * fam.d2_eta(th))
+      - hint: "This is n I(theta), the EXPECTED information. It is what remains when the score term is dropped, and at theta-hat that is the whole answer — but this checkpoint evaluates away from theta-hat, where the score is not zero and the second product-rule term survives."
+        code: |
+          def f(fam, theta, y):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              return len(y) * fam.d2A(fam.eta(th)) * fam.d_eta(th) ** 2
+      - hint: "The sample factor n is missing from the curvature term: every one of the n observations contributes its own curvature, and only the score term already carries the sum over the sample."
+        code: |
+          def f(fam, theta, y):
+              import numpy as np
+              th = np.asarray(theta, dtype=float)
+              e = fam.eta(th)
+              return (fam.d2A(e) * fam.d_eta(th) ** 2
+                      - (np.sum(fam.T(y)) - len(y) * fam.dA(e)) * fam.d2_eta(th))
+  mle-newton:
+    kind: exact
+    seed: 2718
+    atol: 1.0e-9
+    inputs_code: |
+      from types import SimpleNamespace
+      gamma2 = SimpleNamespace(
+          name="Gamma(2, mean)",
+          T=lambda y: y,
+          A=lambda e: -2.0 * np.log(-e),
+          dA=lambda e: -2.0 / e,
+          d2A=lambda e: 2.0 / e**2,
+          log_h=lambda y: np.log(y),
+          eta=lambda m: -2.0 / m,
+          d_eta=lambda m: 2.0 / m**2,
+          d2_eta=lambda m: -4.0 / m**3,
+      )
+      y = rng.gamma(2.0, 1.5, size=60)
+      inputs = (gamma2, y, 1.0)
+    wrong:
+      - hint: "This steps by the EXPECTED information, n I(theta) — Fisher scoring, not Newton. It reaches the same estimate (in one step, for this family), so the returned theta is right and the step count is not: the two methods differ in the path, and this checkpoint grades the path."
+        code: |
+          def f(fam, y, theta0, tol=1.0e-10, max_iter=100):
+              import numpy as np
+              n, total = len(y), np.sum(fam.T(y))
+              theta = float(theta0)
+              for step in range(1, max_iter + 1):
+                  e = fam.eta(theta)
+                  sc = (total - n * fam.dA(e)) * fam.d_eta(theta)
+                  move = sc / (n * fam.d2A(e) * fam.d_eta(theta) ** 2)
+                  theta = theta + move
+                  if abs(move) <= tol:
+                      return theta, float(step)
+              return theta, float(max_iter)
+      - hint: "The convergence test fires one step late: it checks the step that is about to be taken rather than the one just taken, so the loop runs an extra round and the step count is one too high. Stop on the move you just made."
+        code: |
+          def f(fam, y, theta0, tol=1.0e-10, max_iter=100):
+              import numpy as np
+              n, total = len(y), np.sum(fam.T(y))
+              theta, previous = float(theta0), None
+              for step in range(1, max_iter + 1):
+                  e = fam.eta(theta)
+                  sc = (total - n * fam.dA(e)) * fam.d_eta(theta)
+                  obs = (n * fam.d2A(e) * fam.d_eta(theta) ** 2
+                         - (total - n * fam.dA(e)) * fam.d2_eta(theta))
+                  if previous is not None and abs(previous) <= tol:
+                      return theta, float(step)
+                  previous = sc / obs
+                  theta = theta + previous
+              return theta, float(max_iter)
+  crlb-study:
+    kind: exact
+    seed: 31337
+    atol: 1.0e-9
+    inputs_code: |
+      # Exponential with mean 2, estimated by the sample mean: I(m) = 1/m^2,
+      # so the floor is m^2/n and this estimator sits exactly on it. A study
+      # needs no family, only something to draw with and something to run.
+      def sampler(n, rng):
+          return rng.exponential(2.0, n)
+      def estimator(y):
+          return float(np.mean(y))
+      inputs = (sampler, estimator, 2.0, 0.25, 30, 500, 99)
+    wrong:
+      - hint: "The replicate variance is computed with ddof=1. The floor bounds the population variance E[(W - EW)^2], so the study reports that one; the Bessel correction estimates a different target and biases every ratio upward by R/(R-1)."
+        code: |
+          def f(sampler, estimator, theta0, info, n, reps, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              est = np.array([estimator(sampler(n, rng)) for _ in range(reps)])
+              var = float(est.var(ddof=1))
+              floor = 1.0 / (n * info)
+              return est, np.array([float(est.mean()), var, floor, var / floor])
+      - hint: "The floor divides where it should multiply: information ADDS over observations, so a sample of n carries n I(theta) and the floor is 1/(n I). Writing n/I inverts the sample-size dependence and makes every ratio wrong by a factor n^2."
+        code: |
+          def f(sampler, estimator, theta0, info, n, reps, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              est = np.array([estimator(sampler(n, rng)) for _ in range(reps)])
+              var = float(est.var())
+              floor = n / info
+              return est, np.array([float(est.mean()), var, floor, var / floor])
+      - hint: "The spread is measured around theta0 rather than around the estimates' own mean, which makes it a mean squared error, not a variance. The two agree only for an unbiased estimator — and the row this report card exists to explain is a biased one."
+        code: |
+          def f(sampler, estimator, theta0, info, n, reps, seed):
+              import numpy as np
+              rng = np.random.default_rng(seed)
+              est = np.array([estimator(sampler(n, rng)) for _ in range(reps)])
+              var = float(np.mean((est - theta0) ** 2))
+              floor = 1.0 / (n * info)
+              return est, np.array([float(est.mean()), var, floor, var / floor])
+  asymptotic-normality:
+    kind: exact
+    seed: 8675
+    atol: 1.0e-9
+    inputs_code: |
+      def sampler(n, rng):
+          return rng.exponential(2.0, n)
+      def estimator(y):
+          return float(np.mean(y))
+      inputs = (sampler, estimator, 2.0, 0.25, [20, 200], 800, 7)
+    wrong:
+      - hint: "The standardization is missing its sample size: the estimate's standard deviation is 1/sqrt(n I), not 1/sqrt(I), so dividing by the wrong one leaves a z whose spread shrinks like 1/sqrt(n) instead of settling at 1 — and the KS distance then RISES with n."
+        code: |
+          def f(sampler, estimator, theta0, info, ns, reps, seed):
+              import math
+              import numpy as np
+              erf = np.vectorize(math.erf, otypes=[float])
+              out = np.empty(len(ns))
+              for j, n in enumerate(ns):
+                  rng = np.random.default_rng(seed)
+                  est = np.array([estimator(sampler(n, rng)) for _ in range(reps)])
+                  z = np.sort(np.sqrt(info) * (est - theta0))
+                  cdf = 0.5 * (1.0 + erf(z / np.sqrt(2.0)))
+                  out[j] = max(np.max(np.arange(1, reps + 1) / reps - cdf),
+                               np.max(cdf - np.arange(reps) / reps))
+              return out
+      - hint: "Standardizing by the replicates' own standard deviation instead of by the theoretical 1/sqrt(n I) hides exactly what the check exists to see: it forces the spread to 1 whatever the estimator's real variance is, so a scale that misses the floor still scores as normal."
+        code: |
+          def f(sampler, estimator, theta0, info, ns, reps, seed):
+              import math
+              import numpy as np
+              erf = np.vectorize(math.erf, otypes=[float])
+              out = np.empty(len(ns))
+              for j, n in enumerate(ns):
+                  rng = np.random.default_rng(seed)
+                  est = np.array([estimator(sampler(n, rng)) for _ in range(reps)])
+                  z = np.sort((est - theta0) / est.std())
+                  cdf = 0.5 * (1.0 + erf(z / np.sqrt(2.0)))
+                  out[j] = max(np.max(np.arange(1, reps + 1) / reps - cdf),
+                               np.max(cdf - np.arange(reps) / reps))
+              return out
+  irregular-family:
+    kind: review
+    rubric: |
+      The question: the harness reports an UNBIASED estimator of theta for
+      Uniform(0, theta) whose variance, theta^2/(n(n+2)), sits below the
+      mechanical Cramer-Rao value theta^2/n by a factor n+2 that grows with
+      n. Name the violated hypothesis, say where in the derivation it
+      bites, and say what that makes of the number theta^2/n.
+
+      Pass if the answer states, in some phrasing, all three of:
+      (1) the support [0, theta] depends on the parameter, which is the
+      regularity condition (R2) — equivalently, "the density's positive
+      region moves with theta", "the family is not an exponential family
+      because its support is parameter-dependent";
+      (2) the consequence in the derivation: differentiation under the
+      integral sign is not licensed (a boundary/Leibniz term appears), so
+      the score's zero-mean identity fails — accept naming E[s] = -1/theta
+      != 0, or naming the covariance identity Cov(W, l') = tau'(theta) as
+      the step that collapses;
+      (3) that theta^2/n is therefore not a valid bound at all — not a
+      floor that this estimator legitimately beats. An answer that says
+      "the theorem does not apply, so the number bounds nothing" satisfies
+      this clause.
+
+      Fail if the answer attributes the result to bias in the estimator
+      (it is exactly unbiased, and saying so is the point), to the sample
+      maximum being a non-smooth function of the data, to small n, to
+      Monte-Carlo error, or to the Cramer-Rao theorem being false. Fail if
+      it only says "the regularity conditions fail" without naming which
+      one or what breaks. Superefficiency is not the answer here and an
+      answer resting on it fails clause (1).
+  claims-standard-errors:
+    kind: metric
+    metric: rmse
+    threshold: -0.03
+    labels_code: |
+      # Build-time only: the reference standard errors, recomputed from the
+      # shipped data by the same route the task asks for — fit the Poisson
+      # GLM with the exposure offset, form the observed information at the
+      # fit, invert it, take the square roots of the diagonal.
+      claims = np.loadtxt("data/claims.csv", delimiter=",", skiprows=1)
+      y, expo = claims[:, 0], claims[:, 1]
+      X = np.column_stack([np.ones(len(claims)), claims[:, 2:]])
+      w = np.zeros(X.shape[1])
+      w[0] = np.log(y.sum() / expo.sum())
+      for _ in range(50):
+          mu = expo * np.exp(X @ w)
+          z = X @ w + (y - mu) / mu
+          root = np.sqrt(mu)
+          nxt = np.linalg.lstsq(root[:, None] * X, root * z, rcond=None)[0]
+          converged = np.max(np.abs(nxt - w)) < 1e-12
+          w = nxt
+          if converged:
+              break
+      mu = expo * np.exp(X @ w)
+      labels = np.sqrt(np.diag(np.linalg.inv(X.T @ (X * mu[:, None]))))
