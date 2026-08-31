@@ -1,0 +1,309 @@
+The ranking stage predicts a probability — click, watch, purchase — for each retrieved candidate, and because that probability is multiplied by money in an auction or an expected-value ranker, it must be calibrated, not merely ordered correctly.
+
+<Ref lesson="recommender-funnel">The funnel lesson</Ref> built the shape this stage sits in and handed it two open problems: whether a predicted 0.31 means 31 clicks per hundred shows, and the fact that the click labels it trains on were bent by where the previous ranking placed things. The course's evaluation module built the general calibration machinery in <Ref lesson="offline-evaluation">the offline-evaluation lesson</Ref>; this lesson applies it where a miscalibration has a price per request, and adds the corrections that are specific to ranking.
+
+## The ranker's number is consumed, not just sorted
+
+Stage 2 receives what stage 1 retrieved: on the order of 500 candidates and roughly 100 ms of the page budget, per <Ref lesson="recommender-funnel">the funnel's arithmetic</Ref>. Its job can be formulated three ways, and the choice is not cosmetic.
+
+A *pointwise* ranker is a binary classifier over one (user, candidate) pair: each impression is a training row, the click is the label, and the output is $\hat{P}(\text{click})$; the page is produced by sorting. A *pairwise* ranker learns preferences between two candidates: which of these should sit higher. A *listwise* ranker scores whole orderings against a list metric. All three can produce the same page order; they differ in what else their output means.
+
+<Figure
+  src="./figures/ranking-formulations.svg"
+  alt="Three panels score the same three items A, B, C: the pointwise panel outputs per-item probabilities 0.62, 0.11, 0.24 that sort to A, C, B and carry checkable magnitudes; the pairwise panel outputs three pair preferences that stitch into the same order but leave the list free to slide, since adding 10 to every score in this list changes nothing in the loss; the listwise panel outputs the permutation A C B directly; a bottom band notes only pointwise states rates a consumer can multiply by money."
+  caption="One 3-item example, three formulations: identical order, different claims. Only the pointwise column's numbers survive multiplication by a bid."
+/>
+
+### Pairwise orders well and prices nothing
+
+The canonical pairwise method, [RankNet (Burges et al., ICML 2005)](https://www.microsoft.com/en-us/research/publication/learning-to-rank-using-gradient-descent/), scores each item with a learned $s_i = f(x_i)$ and models the probability that item $i$ belongs above item $j$ as
+
+$$
+P(i \triangleright j) = \frac{1}{1 + e^{-(s_i - s_j)}},
+$$
+
+trained by cross-entropy against observed preferences. The pairs are cheap to mine (within one query's result list, any clicked item over any skipped one) and need not form a complete or even consistent ranking, which is why the formulation is attractive for search.
+
+The consequence is structural. The loss touches the scores only through differences $s_i - s_j$ between items in the same list, so nothing in the objective fixes where a list's scores sit: add the same constant to every score in one query's list and every pair probability for that query is unchanged, and with it that query's whole contribution to the loss. Each list floats on an offset of its own, and that is what defeats a post-hoc repair. A calibration layer is one monotone map applied to every score the model emits: it can absorb one offset shared by all lists, not a different offset per list. The matching production observation: pairwise-trained rankers score well on AUC, the pair-ordering metric they optimize, and estimate the click probability badly, even after a calibration layer is applied.
+
+From an information-retrieval standpoint the expectation runs the other way: ranking is an ordering problem, so the formulation that optimizes ordering directly should own the ranking stage. Production recommenders went pointwise almost uniformly, YouTube's Watch Next ranker among them, because the stage's output is consumed downstream as a probability three separate ways: an ads **auction** multiplies it by a bid into an expected value, a feed multiplies several of them by business weights into one score (the last section of this lesson), and pacing and threshold logic compares it against fixed cutoffs. Every consumer reads the magnitude.
+
+<KeyFact>
+Pointwise won where something multiplies the score, which is not everywhere. Where the output is consumed as an order and nothing else, an objective over score differences is sufficient and cheaper to supervise: the retrieval encoders of <Ref lesson="embedding-based-search">the next lesson</Ref> are trained on exactly that contrast, one positive against its sampled negatives, and are judged by ordering metrics rather than by calibration.
+</KeyFact>
+
+## Normalized cross-entropy: dividing out the base rate
+
+A pointwise CTR model trains on log loss, so log loss looks like the natural offline metric. It has a flaw that matters precisely in ranking's home regime. For a dataset with base rate $\bar{p}$ (the empirical CTR), the best *constant* predictor is $\bar{p}$ itself, and its log loss is the entropy of the base rate,
+
+$$
+H(\bar{p}) = -\bigl(\bar{p}\ln\bar{p} + (1-\bar{p})\ln(1-\bar{p})\bigr),
+$$
+
+which falls toward zero as $\bar{p}$ leaves $0.5$. At a 1–2% CTR, the regime of every ads system, the know-nothing floor is around $0.05$–$0.10$ nats: a raw log loss that would look superb on balanced data is available for free, to a model that learned nothing.
+
+<Example title="the flip (Pham, ML Design Interview Ch. 1)">
+Two models on two traffic slices, ten impressions each.
+
+**Constant model, ads slice.** Base rate 10% (1 click, 9 skips); the model predicts 0.2 on every impression. Log loss:
+
+$$
+-\tfrac{1}{10}\bigl(\ln 0.2 + 9\ln 0.8\bigr) = \tfrac{1.609 + 9 \times 0.223}{10} = 0.362 .
+$$
+
+**Informed model, feed slice.** Base rate 50% (5 clicks, 5 skips); the model predicts 0.3 on clicks and 0.1 on skips, higher where the label is positive, so it has learned something real. Log loss:
+
+$$
+-\tfrac{1}{10}\bigl(5\ln 0.3 + 5\ln 0.9\bigr) = \tfrac{5 \times 1.204 + 5 \times 0.105}{10} = 0.655 .
+$$
+
+Raw log loss declares the constant model better, 0.362 against 0.655. Divide each by its slice's base-rate entropy: $H(0.10) = 0.325$ and $H(0.50) = \ln 2 = 0.693$. The constant model scores $0.362/0.325 = 1.11$: *worse* than predicting its own base rate (it predicts 0.2 where the rate is 0.1). The informed model scores $0.655/0.693 = 0.945$: better than any constant. The verdict flips.
+</Example>
+
+<FigureSequence
+  name="nce-flip"
+  alt="Three frames: first, ten impressions per slice with the constant model predicting 0.2 on a 10 percent base rate and the informed model predicting 0.3 on clicks and 0.1 on skips at a 50 percent base rate; second, raw log losses 0.362 and 0.655 computed, the constant model winning; third, each divided by its base-rate entropy 0.325 and 0.693, giving NCE 1.11 versus 0.945 and flipping the verdict."
+  caption="Raw log loss rewards the easy base rate; dividing by the base-rate entropy makes the comparison honest."
+/>
+
+<Task>
+Step through the three frames and recompute one cell yourself: verify $H(0.10) = 0.1\ln 10 + 0.9\ln\tfrac{10}{9} = 0.325$, then check that 1.11 exceeding 1 says the constant model would have done better predicting 0.1 than its chosen 0.2.
+</Task>
+
+<Definition title="normalized cross-entropy">
+For a model with average log loss $L$ on a dataset with base rate $\bar{p}$, the **normalized cross-entropy** is
+
+$$
+\mathrm{NCE} = \frac{L}{H(\bar{p})},
+$$
+
+the model's log loss divided by the log loss of always predicting the base rate.
+</Definition>
+
+The denominator is the best score achievable while ignoring every feature, so NCE measures the model against the strongest featureless competitor on its own data. $\mathrm{NCE} < 1$ means the features taught the model something; $\mathrm{NCE} > 1$ means the model is worse than knowing nothing; 0 is perfection, and there is no upper bound. The ratio is also unit-free: switching from natural to base-2 logarithms rescales numerator and denominator by the same factor. This is the offline headline metric Facebook adopted for ad CTR in [He et al. (ADKDD 2014)](http://quinonero.net/Publications/predicting-clicks-facebook.pdf), exactly because it stays comparable while the background CTR moves between campaigns, countries, and weeks.
+
+<Exercise>
+Your CTR model reports an average log loss of $0.054$ nats on a slice whose base rate is 4%, and $H(0.04) = 0.168$ nats. Compute the NCE, and state in one sentence what the number claims that the raw $0.054$ does not.
+
+<Solution>
+$\mathrm{NCE} = 0.054 / 0.168 \approx 0.32$. The raw $0.054$ looks impressive but is mostly the base rate's doing: a featureless model already achieves $0.168$ on this slice. The NCE states the part that is the model's own work: its loss is about a third of the featureless floor, a strong model, and that claim would survive being compared against a model evaluated on a slice with a different CTR.
+</Solution>
+</Exercise>
+
+<KeyFact>
+NCE is one average over the slice it is computed on, and that is its blind spot. Log loss is minimized by the truth, so NCE punishes miscalibration in aggregate, but a model that over-predicts on one campaign and under-predicts on another by amounts that cancel posts an excellent NCE while both campaigns' auctions are mispriced. The live monitor introduced later in this lesson is therefore the calibration ratio computed per campaign, country, and device, never one number over all traffic.
+</KeyFact>
+
+## Architectures: the crosses learn themselves
+
+The metric is fixed; the model comes next, and the productive way to read CTR architectures is as automated feature engineering. <Ref lesson="features-at-scale">The features lesson</Ref> established that a cross of categoricals buys a linear model its interaction terms, and that a hand-built cross plus a linear model matched a deep network at a fraction of the training cost on the natality benchmark. The limit of that approach is the hand: an ads model sees thousands of sparse features, and the useful crosses among them cannot be enumerated by people.
+
+[Wide & Deep (Cheng et al., 2016)](https://arxiv.org/abs/1606.07792), Google Play's app recommender, runs a hand-crossed model and a deep one in parallel. The **wide** path is a linear model over hand-named crosses (`installed_app × impression_app` is the paper's own example): it *memorizes* specific co-occurrences that history has already priced. The **deep** path feeds embeddings of the same categoricals through an MLP: it *generalizes* to feature combinations that never co-occurred in training. The two paths sum into one sigmoid, one pointwise probability.
+
+[DCN v2 (Wang et al., WWW 2021)](https://arxiv.org/abs/2008.13535) removes the hand from the wide path. Its cross network stacks layers of the form
+
+$$
+x_{l+1} = x_0 \odot (W_l\, x_l + b_l) + x_l,
+$$
+
+each layer multiplying the running representation against the raw input $x_0$, so the maximum polynomial degree of the learned crosses rises by one per layer; a parallel MLP handles what crosses do not capture. The paper's production notes are unusually concrete: inserting the cross layers between input and hidden layers (stacked) worked best, **two cross layers** was the sweet spot, and a low-rank $W_l$ at rank (input size)/4 preserved accuracy while cutting cost.
+
+<Figure
+  src="./figures/crossing-machines.svg"
+  alt="Two panels: Wide and Deep shows sparse features feeding a wide linear path over hand-named crosses such as installed app times impression app and a deep path of embeddings through an MLP, summed into a sigmoid; DCN v2 shows embedded input feeding two stacked cross layers computing x1 equals x0 elementwise-times W0 x0 plus b0 plus x0 with polynomial degree rising per layer, in parallel with an MLP, combined into a sigmoid."
+  caption="The same job, two generations: Wide & Deep memorizes crosses an engineer names; DCN v2's cross layers learn them, degree by degree."
+/>
+
+The honest scale of the wins: against a fully tuned production model, DCN v2 improved *AUCLoss*, defined as $1 - \mathrm{AUC}$, by 0.6% relative.
+
+<KeyFact>
+The paper states that for that model a 0.1% AUCLoss gain is considered significant, the calibration constant for every claim in this literature. The denominator explains the accounting: an ads platform serves on the order of 100 billion requests per month, so a delta invisible at classroom scale moves revenue worth shipping.
+</KeyFact>
+
+<Remark title="DLRM">
+Facebook's [DLRM (Naumov et al., 2019)](https://arxiv.org/abs/1906.00091) is the same idea with the crossing made literal: categorical features become embeddings, dense features pass through an MLP into a vector of the same length, all pairs interact by dot product, and a top MLP feeds one sigmoid. Beyond these three families the deep-CTR literature is large (DeepFM, xDeepFM, and successors) and belongs in the references, not the design: the crossing idea is what carries.
+</Remark>
+
+## Calibration for money: the auction chain
+
+NCE says the model learned; the auction asks a harder question of the same numbers. Calibration, established in <Ref lesson="offline-evaluation">the offline-evaluation lesson</Ref>, is the agreement between predicted probabilities and observed frequencies: the reliability curve bins predictions against outcome rates, the one-number summary is $\sum \text{predictions} / \sum \text{labels}$, and Platt or isotonic scaling repairs a curve that has drifted off the diagonal. That lesson also recorded the decoupling in measured form: an SVM with AUC 0.97 and an S-shaped reliability curve against a logistic regression at 0.858 that was nearly diagonal.
+
+Ordering metrics cannot certify a model that feeds an auction. The persistent belief that they can, that a +0.02 AUC gain is a shipping argument, fails for a stated reason: AUC is invariant under every monotone transform of the scores, and the auction is not. An ads auction ranks candidates by expected value, $\hat{P}(\text{click}) \times \mathrm{bid}$, and because different advertisers bid different amounts, magnitude errors reorder the auction even when the item ordering is perfect.
+
+<Figure
+  src="./figures/auction-chain.svg"
+  alt="Top row, as predicted: ad X with predicted probability 0.31 times bid one dollar gives expected value 0.310 and wins over ad Y at 0.22 times 1.30 equals 0.286. A middle note reports the reliability curve finding that predictions near 0.31 click 25 percent of the time. Bottom row, with honest probabilities: X at 0.25 times 1.00 gives 0.250, Y at 0.286 becomes the true winner; a footer notes the item ordering never changed but the auction winner did."
+  caption="The auction chain: one over-confident prediction flips the winner. The model mis-priced, not mis-ranked, and only a calibration check can see it."
+/>
+
+One over-confident prediction hands X an auction that Y honestly wins. Predicted at 0.31 where the reliability curve reports 0.25, X takes the slot at an apparent \$0.310 against Y's \$0.286 and then delivers \$0.250 of expected value: on every such request the platform shows the lower-value ad and charges against a probability wrong by a fifth, while AUC, blind to magnitudes, reports nothing. The offline pair for ad CTR is therefore **NCE plus a calibration plot**, never an ordering metric alone.
+
+### The correction the training pipeline owes the auction
+
+One miscalibration in this stack is manufactured deliberately. At a 1–2% CTR, training data is overwhelmingly negative and enormous, on the order of 50 TB of impressions per month, so CTR pipelines downsample negatives, commonly keeping around one in ten. A model trained on the downsampled data honestly learns click rates roughly ten times too high for the world. The exact repair, derived in <Ref lesson="offline-evaluation">the offline-evaluation lesson</Ref> from Bayes' rule, is applied at serving:
+
+$$
+q = \frac{p}{p + (1-p)/w},
+$$
+
+with $p$ the raw prediction and $w$ the negative sampling rate. At $w = 0.1$, a raw 0.5 becomes an honest $0.5/(0.5 + 5) \approx 0.09$: the worked number from that lesson, now sitting in the request path of every ads system that downsamples. Skip it and the auction overprices everything; the exercises quantify what it also does to NCE.
+
+### The ratio as a production alarm
+
+Calibration is also the cheapest thing to monitor live. Click labels arrive within minutes of the impression (the short feedback loop from <Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>), so $\sum \text{predictions} / \sum \text{labels}$ can be computed hourly, sliced by campaign, country, or device, with no human labeling. A ratio drifting off 1 is a direct revenue alarm, and wiring it into the prediction-layer monitoring of <Ref lesson="monitoring-and-observability">the monitoring lesson</Ref> is standard practice: it is the prediction-bias check Sculley et al.'s technical-debt paper names a monitoring starting point, with a dollar sign attached.
+
+<Remark title="the waterfall's latency budget">
+An ad request reaches the CTR model through a waterfall: publishers sell inventory to direct buyers at high CPM first, then pass the unsold impression down a chain of ad networks until someone takes it. The model's 50–100 ms window sits inside that chain over a candidate set that can reach 50–100 thousand ads, which is why ads serving leans on aggregator fan-out over model replicas, and why a slow prediction is not degraded quality but an unsold impression.
+</Remark>
+
+## Position bias: labels that reward the slot
+
+Everything above trusted the labels. They are corrupted in a specific, mechanical way: users click the top of the page regardless of quality, and ads platforms measure engagement rate falling steeply as a function of position alone. A click is therefore evidence of quality *and* of placement, entangled. A model trained on raw clicks learns that whatever the previous ranker put first is relevant, which is the degenerate feedback loop of <Ref lesson="failures-and-drift">the drift lesson</Ref> running through the label channel: the system's own past output, laundered into training data.
+
+### The standard repair, completed
+
+<Ref lesson="training-serving-skew" id="skew-by-design-the-positional-feature">The skew lesson</Ref> already established the transform discipline as Rule #36: give the model `position` as a training feature so the click's positional component drains into a term of its own, keep that term **additive**, $\text{score} = f(\text{doc}) + g(\text{position})$, never crossed with a document feature, and serve with position set to one constant, because candidates are scored before any order exists. What this lesson adds is the justification and the variants. Dropping $g$ at serving is safe precisely because every candidate receives the same constant: a shared shift cannot reorder a sort, so the served ordering is the ordering by $f$ alone, the position-free relevance. Cross position into any document feature and the shift is no longer shared; the exercise below constructs the reordering that results. The production variant in YouTube's Watch Next ranker is a *shallow tower*: a small side network takes position and the other presentation features as its only inputs, and its output adds to the main logit, additivity by architecture. Instagram's Stories and Feed rankers do the same job with a sparse position feature fed into the last fully connected layer.
+
+<Figure
+  src="./figures/position-bias.svg"
+  alt="Left panel, training: rows of document features with a real position column holding 1, 2, 3, 7 and click labels, annotated that the click's positional share drains into g. Right panel, serving: candidate rows all carrying position equals 1 as a constant, annotated that candidates are scored before any order exists. A band states score equals f of doc plus g of position, additive and never crossed; a bottom band gives the IPS alternative where a click at position 5 with propensity 0.2 counts five times in the loss."
+  caption="Two corrections for one corruption: absorb position into an additive term served constant, or leave the features alone and reweight the labels by inverse propensity."
+/>
+
+### Reweighting the labels buys the same correction, at the price of measuring propensities
+
+*Inverse propensity scoring* (IPS) attacks the labels instead of the features. Model the corruption as an examination probability: an item at position $k$ is actually looked at with propensity $P(\text{examined} \mid k)$, measured to fall steeply in $k$. Weight each clicked training example by $1/P(\text{examined} \mid k)$: a click earned at position 5, examined 20% of the time, counts five times, compensating for all the equally good items at position 5 that were never seen. In expectation this recovers the loss the model would have had on position-free data. The propensities themselves must come from somewhere, which is the method's real cost, and small propensities make the estimator noisy; [Wang et al. (WSDM 2018)](https://dl.acm.org/doi/10.1145/3159652.3159732) is the standard treatment of estimating them in a production search system.
+
+The ground truth behind both corrections is the same instrument: a small slice of traffic served in randomized order. On that slice, click rate against position *is* the propensity curve, directly measured, and evaluation on it is the one ranking measurement position bias cannot flatter. It is the ranking-stage instance of the exploration budget the drift lesson priced: a system that never randomizes cannot even measure what its labels are doing to it.
+
+<KeyFact>
+The shared-shift guarantee covers the order and nothing else. The served score $f(x) + g(c)$ is a logit, and what the sigmoid turns it into is the click probability *conditional on position $c$*, so the choice of constant moves every magnitude while leaving every comparison alone. A stage that only sorts can pick any $c$; a stage that also prices is quoting the auction of the previous section a rate for the slot it set $c$ to, not for the slot the ad will occupy, and owes it a per-slot correction.
+</KeyFact>
+
+## Many heads, one score
+
+A feed does not sort by clicks; clicking is one of many reactions, and not the most valuable. The production pattern is one ranker with several *heads*: a shared representation (shared bottom layers; gated variants such as MMoE exist and are named here only) feeding one calibrated sigmoid per reaction: click, like, comment, share, hide, block. The page needs a single ordering, so the heads are blended into one number.
+
+<Example title="the engagement score (Aminian & Xu, Fig. 10.4)">
+One candidate post's seven predicted probabilities, each multiplied by a business-assigned weight:
+
+| head | $\hat{P}$ | weight | term |
+|---|---|---|---|
+| click | 0.23 | 1 | 0.23 |
+| like | 0.48 | 5 | 2.40 |
+| comment | 0.12 | 10 | 1.20 |
+| share | 0.04 | 20 | 0.80 |
+| friend request | 0.001 | 30 | 0.03 |
+| hide | 0.00005 | −20 | −0.001 |
+| block | 0.000003 | −50 | −0.00015 |
+
+The sum, $0.23 + 2.40 + 1.20 + 0.80 + 0.03 - 0.001 - 0.00015 = 4.65885$, is the post's **engagement score**, and the feed sorts by it. The like head dominates this post; the two negative heads are dormant at these probabilities.
+</Example>
+
+<Figure
+  src="./figures/engagement-score.svg"
+  alt="A table of seven heads with predicted probability, weight, and term columns, each positive term drawn as a blue bar: click 0.23, like 2.40, comment 1.20, share 0.80, friend request 0.03; hide and block appear as thin amber negative ticks with a note that a 2 percent hide rate would subtract 0.4; the total row reads engagement score 4.65885."
+  caption="Seven predictions, one ordering score. The weights are business policy; the guardrail heads are dormant until a post earns them."
+/>
+
+<Task>
+Recompute the total after the business doubles the share weight to 40: only the share term moves, and no model is retrained. The exercises push the same move until an ordering flips.
+</Task>
+
+Three properties of this construction carry the design. **The weights are not learned.** They encode what the business currently values (a share worth twenty clicks, a friend request worth thirty) and they are tuned by online experiments, not by gradient descent. This is <Ref lesson="requirements-and-metrics">the requirements lesson's</Ref> objective decoupling operating at scale: each objective gets its own head trained on its own labels, and the blend lives in serving configuration, so a strategy shift is a config change with no retraining. **The negative heads are guardrails.** At $5 \times 10^{-5}$ a hide costs this post nothing, but the weights are sized so that trouble is expensive: a post provoking hides at 2% loses $0.4$, a full like-tier of score, before any human reviews it. **The sum presumes honest terms.** Adding $0.48 \times 5$ to $0.04 \times 20$ is meaningful only because each factor is a calibrated probability; a head that over-predicts by 2× silently doubles its own vote. That precondition, where the weights come from in practice and how sensitive the ordering is to them, is extended with fresh numbers in <Ref lesson="design-feed-ranking">the feed-ranking design</Ref>.
+
+<Remark title="blending across content types">
+The sum also presumes the terms are on one scale, which fails as soon as the feed mixes formats: the like head's predictions on videos and on photos have differently shaped distributions, so the two content types' weighted terms are not comparable even when each is calibrated on its own traffic. Instagram's repair is to fit a map from each head's output distribution onto a well-behaved reference distribution, a Gaussian, and blend the mapped scores.
+</Remark>
+
+What is established: the ranking stage is a pointwise probability model because its output is consumed as a probability; NCE judges it against the featureless floor of its own base rate (0.362 versus 0.655 raw becoming 1.11 versus 0.945 normalized); the architectures automate feature crossing, with 0.1% AUCLoss the honest unit of progress; calibration is priced by the auction chain and monitored as $\sum \text{pred}/\sum \text{label}$; position bias is corrected by an additive position feature served constant, or by inverse propensity weights, with randomized traffic as ground truth; and multi-task heads blend into one business-weighted score, worked here to 4.65885. <Ref lesson="design-ad-click-prediction">The ads design lesson</Ref> later assembles the full ads system around this machinery. Next the module turns to search-shaped problems, where the query is a query rather than a user: <Ref lesson="embedding-based-search">embedding-based retrieval</Ref>, the contrastive training that builds its space, and the metrics that respect order.
+
+## Exercises
+
+<Exercise>
+Boundary probe: evaluate NCE at the two ends of the base-rate axis. (a) Show that at $\bar{p} = 0.5$ the normalizer is maximal and NCE is exactly log loss divided by $\ln 2$, so the normalization changes nothing but units. (b) Compute the featureless floor at $\bar{p} = 0.01$ and state why a raw log loss of $0.056$ nats means opposite things on the two datasets. (c) Conclude where NCE earns its keep.
+
+<Solution>
+(a) $H(\bar{p})$ is the binary entropy, maximized at $\bar{p} = 0.5$ with $H(0.5) = \ln 2 \approx 0.693$; there $\mathrm{NCE} = L/\ln 2$, a fixed rescaling. On balanced data raw log loss was already a fair comparison, and NCE preserves it.
+
+(b) $H(0.01) = -(0.01\ln 0.01 + 0.99\ln 0.99) = 0.046 + 0.010 = 0.056$ nats. A model with $L = 0.056$ on the 1% dataset has $\mathrm{NCE} = 1.0$: it learned exactly nothing beyond the base rate. The same $0.056$ on the balanced dataset gives $\mathrm{NCE} = 0.081$: a spectacular model. One raw number, two opposite verdicts.
+
+(c) NCE matters most where $H(\bar{p})$ is small, which is the extreme-base-rate regime, and ads CTR at 1–2% lives exactly there: every raw log loss looks good, comparisons across campaigns and weeks move with the background CTR, and dividing by $H(\bar{p})$ is what makes any of those numbers comparable at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this launch argument: "the new ranker's AUC is up 0.02 over the incumbent; ship it to the auction." Construct a concrete way the new model can be better on AUC and lose auction revenue, using two ads with honest click rates 0.30 (bid \$1.00) and 0.20 (bid \$1.40), and name the two offline checks that catch the failure.
+
+<Solution>
+The failing step is treating AUC as evidence about magnitudes: AUC is invariant under every monotone transform of the scores, so a model whose ordering genuinely improved (+0.02 is possible from better ordering alone) can simultaneously have its probabilities compressed toward 0.5, for instance $s' = 0.5 + (s - 0.5)/3$ from an under-trained final layer or a lost calibration step.
+
+Priced honestly: ad X is worth $0.30 \times 1.00 = \$0.300$, ad Y $0.20 \times 1.40 = \$0.280$; X should win. The compressed model predicts $0.5 - 0.2/3 \approx 0.43$ for X and $0.5 - 0.3/3 = 0.40$ for Y. Its *ordering* of the two ads is still correct (0.43 > 0.40), but the auction ranks by expected value: $0.43 \times 1.00 = 0.43$ against $0.40 \times 1.40 = 0.56$, so Y wins, and the platform delivers \$0.28 of expected value instead of \$0.30 on every such request while charging against probabilities inflated by up to 2×.
+
+The two checks: the reliability curve, which shows the compression as a slope far below 1 (predictions near 0.43 clicking at 0.30), and NCE against the incumbent, which degrades because log loss punishes the miscalibrated magnitudes that AUC cannot see. The offline pair for an auction-feeding model is NCE plus calibration, with AUC at most advisory.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the two halves of Rule #36's fine print. (a) Show that if the trained model is $\text{score}(x, k) = f(x) + g(k)$ for document features $x$ and position $k$, serving every candidate with the same constant position $c$ produces exactly the ordering of $f$, for any $c$ and any learned $g$. (b) Show by counterexample that one position×feature cross breaks the guarantee: take $f(A) = 1.0$, $f(B) = 1.1$, and a learned interaction term $-0.05 \cdot k \cdot x^{(1)}$ with $x^{(1)}_A = 2$, $x^{(1)}_B = 10$. What ordering does serving at $c = 1$ produce, and what should it have produced?
+
+<Solution>
+(a) At serving, candidate $i$ scores $f(x_i) + g(c)$. For any two candidates, $f(x_i) + g(c) > f(x_j) + g(c) \iff f(x_i) > f(x_j)$: the term $g(c)$ is a shift shared by every candidate, and a shared shift cannot change any comparison, so the served sort is the sort by $f$ alone. This is why the positional term can be "dropped" at serving at all: additivity makes the position-free relevance $f$ recoverable by construction.
+
+(b) With the cross, the served score at $c = 1$ is $f(x) - 0.05 \, x^{(1)}$: candidate A scores $1.0 - 0.1 = 0.9$, candidate B scores $1.1 - 0.5 = 0.6$, so A is ranked above B. But the position-free relevance says B is better ($1.1 > 1.0$). The interaction term differs per candidate, so setting position to a constant no longer shifts everyone equally, and no choice of $c$ fixes it: the gap $f(B) - f(A) = 0.1$ is overwhelmed by the interaction gap $0.05 c \,(10 - 2) = 0.4c$ for every $c > 0.25$. Worse, with a cross there is no well-defined "position-free" score to recover, because the click's positional component was never confined to a term of its own. That is the content of "never cross the positional features": additivity is not a stylistic preference but the condition under which serving-time removal is sound.
+</Solution>
+</Exercise>
+
+<Exercise>
+The business doubles the share weight (20 → 40) and introduces a report head with weight −100. Two candidate posts predict:
+
+| head (weight before → after) | post A | post B |
+|---|---|---|
+| click (1 → 1) | 0.30 | 0.10 |
+| like (5 → 5) | 0.20 | 0.35 |
+| share (20 → 40) | 0.02 | 0.08 |
+| report (— → −100) | 0.001 | 0.04 |
+
+Compute both posts' scores before and after the change, and state which post the feed shows first in each regime and why the flip happens despite the share weight, B's strongest head, doubling.
+
+<Solution>
+Before (share at 20, report unscored): $A = 0.30 + 0.20 \times 5 + 0.02 \times 20 = 0.30 + 1.00 + 0.40 = 1.70$; $B = 0.10 + 1.75 + 1.60 = 3.45$. B ranks first, on the strength of shares.
+
+After: $A = 0.30 + 1.00 + 0.02 \times 40 - 0.001 \times 100 = 0.30 + 1.00 + 0.80 - 0.10 = 2.00$. $B = 0.10 + 1.75 + 0.08 \times 40 - 0.04 \times 100 = 0.10 + 1.75 + 3.20 - 4.00 = 1.05$. A ranks first.
+
+Doubling the share weight helped B four times more than A ($+1.60$ against $+0.40$), and B still fell: its 4% predicted report rate, at weight −100, costs 4.0, dwarfing everything else in either column. This is the guardrail pattern doing its job: content whose shares and reports rise together (engagement bait) is exactly what a share-heavy score would otherwise promote, and the negative head lets the business veto it in the same sum. Both re-rankings are serving-config changes, no retraining, which is the operational payoff of decoupled heads; and the veto is only as sound as the report head's calibration, since a head over-predicting reports by 2× would wrongly bury posts at $-2.0$ a time.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review: your CTR trainer downsamples negatives, keeping one in ten ($w = 0.1$). At serving, the raw model outputs $p = 0.35$ for an impression. (a) Compute the corrected probability. (b) The correction is accidentally dropped from the serving path. Directionally, what happens to the calibration ratio and to NCE measured on live traffic, and roughly how large is the NCE damage if raw predictions like this one face a true click rate near the corrected value?
+
+<Solution>
+(a) $q = \dfrac{0.35}{0.35 + 0.65/0.1} = \dfrac{0.35}{0.35 + 6.5} \approx 0.051$: the honest probability is about 5%, seven times below the raw output, exactly the distortion a 10× negative diet builds in (the formula is the Bayes correction from <Ref lesson="offline-evaluation">the offline-evaluation lesson</Ref>).
+
+(b) The calibration ratio $\sum \text{pred}/\sum \text{label}$ lands near 7: predictions average ~0.35 where clicks arrive at ~0.05. NCE blows past 1: crediting the simplification that impressions like this one are predicted at a constant 0.35 against a true rate of 0.051, the per-impression log loss is $-(0.051\ln 0.35 + 0.949\ln 0.65) \approx 0.462$ nats against a base-rate floor $H(0.051) \approx 0.20$, an NCE around 2.3. The model's *ordering* is untouched (the correction is monotone), so AUC looks fine while the system is, by its own offline pair, worse than predicting the base rate; the auction meanwhile overbids everything by ~7×. One dropped post-processing step, visible in every honest metric and invisible to the ordering ones.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: product asks for "similar listings to this one" on every listing page. The ranking machinery of this lesson scores a (user, candidate) pair; here the anchor is a *listing*, and the candidate pool is the entire corpus, so the heavy ranker cannot touch it. State what object must be learned so that listing-to-listing relevance can be computed at retrieval scale, and what supervision a marketplace's logs offer for learning it.
+
+<Solution>
+The object is an embedding space over listings in which similarity is a cheap operation (dot product or cosine), so that "similar to this one" becomes a nearest-neighbor lookup in the ANN index machinery of <Ref lesson="recommender-funnel">the funnel lesson</Ref>, with the anchor listing's own vector as the query. The supervision is already in the logs: listings co-clicked within a browsing session are behaviorally similar, giving positive pairs, with sampled non-clicked listings as negatives. Training an encoder so that positives score high and negatives low against the anchor is contrastive learning, and it is the core of <Ref lesson="embedding-based-search">the next lesson</Ref>, which builds exactly this system, Airbnb's listing embeddings included, and the ranking metrics (nDCG among them) that judge the ordered results.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Pham, *Machine Learning Design Interview*, 2022 — Ch. 1 (loss functions and the NCE worked example; Wide & Deep, DCN v2, multitask and DLRM architectures); Ch. 2 (ranking formulations, RankNet and the AUC-versus-calibration observation, position bias and calibration in recommenders); Ch. 6 (ad click prediction: the waterfall, NCE plus calibration as the offline pair, scale estimates).
+2. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023 — Ch. 8 (ad click prediction end to end, with its own NCE computation); Ch. 10 (the personalized feed's multi-task heads and the engagement-score table, Fig. 10.4, p. 215).
+3. X. He et al., "Practical Lessons from Predicting Clicks on Ads at Facebook," ADKDD 2014 — the source of normalized cross-entropy, the calibration ratio, and the downsampling correction $q = p/(p + (1-p)/w)$. http://quinonero.net/Publications/predicting-clicks-facebook.pdf
+4. C. J. C. Burges et al., "Learning to Rank Using Gradient Descent," ICML 2005 — RankNet: the pairwise probability and its training objective. https://www.microsoft.com/en-us/research/publication/learning-to-rank-using-gradient-descent/
+5. H.-T. Cheng et al., "Wide & Deep Learning for Recommender Systems," 2016 — memorization and generalization, Google Play. https://arxiv.org/abs/1606.07792
+6. R. Wang et al., "DCN V2: Improved Deep & Cross Network and Practical Lessons for Web-scale Learning to Rank Systems," WWW 2021 — learned cross layers, the 0.6% AUCLoss production result and the 0.1%-is-significant calibration of scale. https://arxiv.org/abs/2008.13535
+7. M. Naumov et al., "Deep Learning Recommendation Model for Personalization and Recommendation Systems," 2019 — DLRM. https://arxiv.org/abs/1906.00091
+8. Z. Zhao et al., "Recommending What Video to Watch Next: A Multitask Ranking System," RecSys 2019 — YouTube's pointwise multi-task ranker and the shallow-tower position-bias treatment. https://dl.acm.org/doi/10.1145/3298689.3346997
+9. X. Wang et al., "Position Bias Estimation for Unbiased Learning to Rank in Personal Search," WSDM 2018 — propensity estimation and inverse-propensity-weighted training in production search. https://dl.acm.org/doi/10.1145/3159652.3159732
+10. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018 — Rule #36 (positional features: train with, serve constant, keep additive, never cross). https://developers.google.com/machine-learning/guides/rules-of-ml
+11. D. Sculley et al., "Hidden Technical Debt in Machine Learning Systems," NeurIPS 2015 — §7, prediction bias as a monitoring starting point.
+12. T. Bredillet, "Lessons Learned at Instagram Stories and Feed Machine Learning," Instagram Engineering, 2018 — the sparse position feature in the last fully connected layer, and the mapping of each head's predictions onto a Gaussian so photo and video scores can be blended. https://instagram-engineering.com/lessons-learned-at-instagram-stories-and-feed-machine-learning-54f3aaa09e56
+</References>

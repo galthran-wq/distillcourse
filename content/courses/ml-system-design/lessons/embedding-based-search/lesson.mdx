@@ -1,0 +1,333 @@
+Search over things that are not text — images, listings, videos — reduces to one mechanism: embed query and item into one space where similarity is dot product, then rank by the metrics that respect order.
+
+<Ref lesson="recommender-funnel">The funnel lesson</Ref> built the serving side of this mechanism, two towers feeding a dot product and an ANN index, and <Ref lesson="ranking-and-ctr">the ranking lesson</Ref> calibrated the probabilities of the stage behind it. Both took the embedding space itself as given: something trained on engagement, consumed as geometry. What stands open is where that space comes from when the query is an image, a listing, or a typed phrase rather than a user, and how to judge a system whose output is an ordered list rather than a probability. This lesson supplies both: the contrastive training signal that shapes the space, the metric ladder that ends at nDCG, and the two production pipelines that serve the result. The next lesson assembles these parts into a complete search system.
+
+## One space, three query types
+
+Three query types, one mechanism. Pinterest's visual search takes a user's crop of one image, a chair in a living-room photo, and returns a rail of visually similar items; the query is pixels. Airbnb, the marketplace for renting homes, shows "similar listings" on every listing page; the query is another listing, the object <Ref lesson="ranking-and-ctr">the previous lesson's forward exercise</Ref> ended on. The third case is a reference design rather than a shipped system: video search in the style of YouTube, the canonical worked answer in Aminian and Xu's interview text, takes a typed phrase and returns videos whose *visual content* matches it; the query is text, the corpus is not.
+
+<Figure src="./figures/pinterest-visual-search.jpg" alt="A Pinterest visual-search screen. On the left, a living-room photo of a wooden pallet wall and a grey sofa, with a white moulded-plastic chair on wire legs boxed in red, the user's crop. A red arrow runs from that box across to a highlighted result on the right, a near-identical white chair pinned as 'Fine Mod Imports Wire Leg Dining Side Chair White'. Between them, a grid of pins of similar chairs, rockers, dining chairs, a teal shell chair, under a row of refinement tags reading eames, chair, rocking chairs, rockers, side chairs, dining chairs, mold plastic, dsw." caption="The crop is the query. Pinterest embeds the boxed region and returns the nearest items in the same space; the arrow marks the top match. Nothing typed, nothing tagged: the whole request is pixels." />
+
+### One machine, two design surfaces
+
+All three run the same machine: an encoder (or a pair of encoders) maps query and item into one $\mathbb{R}^d$, similarity is the dot product $s(q,x) = \langle \mathrm{enc}(q), \mathrm{enc}(x)\rangle$, and retrieval is the precomputed-index lookup <Ref lesson="recommender-funnel">the funnel lesson</Ref> already priced: item vectors embedded offline, ANN search at request time, nothing re-taught here. Where query and item are the same kind of object — a crop against photos, a listing against listings — the pair collapses to one encoder used twice. Where they are not, as with a typed phrase against a video corpus, two encoders land in one space only because they are trained jointly under one contrastive loss (the InfoNCE objective of the next section) on cross-modal pairs — a typed query and the video the user watched after issuing it — which is the only thing that makes a phrase's coordinates comparable to a video's. What actually differs across the three cases, and what this lesson designs, is two things: the **training signal** that decides what "similar" means in the space, and the **evaluation** that decides whether one trained space is better than another.
+
+<Figure
+  src="./figures/one-space-three-queries.svg"
+  alt="Four lanes converging into one box. An image crop feeds an image encoder and a listing feeds a listing encoder, the two bracketed together and labelled 'one encoder, query and item'; below, a typed phrase feeds a text encoder and a video feeds a video encoder, the two enclosed in a dashed box labelled 'two encoders, trained jointly on (typed query, watched video) pairs: one contrastive loss is what puts them in one space'. All four encoder outputs join a single bus that enters a box labelled 'one embedding space', holding scattered points and the formula s equals the inner product of enc of q and enc of x."
+  caption="Three query types, one space. Where query and item are the same kind of object the encoder is literally reused; text against video needs two, and nothing but joint training on matched pairs makes their coordinates comparable."
+/>
+
+### Dot product or cosine
+
+The similarity function itself is a smaller choice with one real consequence. Since $\langle q, v\rangle = \lVert q\rVert\,\lVert v\rVert \cos\theta$, the dot product rewards norm as much as angle, and norms are not neutral: items that appear in many training pairs receive many gradient updates and grow long vectors, so raw dot-product retrieval carries a built-in popularity prior, the geometric cousin of the sampling bias <Ref lesson="recommender-funnel">the funnel lesson</Ref> corrected with $-\log p_j$. Cosine similarity divides the norms out, and with them any use, legitimate or not, the model made of them; the exercises construct a two-item ranking that flips between the two. Production systems also go past both: LinkedIn's job-matching model feeds the *Hadamard* (elementwise) product of the two embeddings into a logistic regression, "to give the model flexibility to learn its own distance function" without paying a full crossing layer's serving latency.
+
+## Contrastive training: one positive against the batch
+
+The training signal has one canonical shape, and every product in this lesson is a variation on it. A training example is a *query*, one *positive* (an item the space should place near the query), and a set of *negatives* (items it should place far). The encoder scores all of them; the scores go through a softmax; the loss is cross-entropy against the one-hot vector marking the positive. Training the encoder this way is *contrastive learning*, and the specific softmax form is the **InfoNCE** loss:
+
+$$
+\mathcal{L} \;=\; -\log \frac{e^{s(q,\,p)}}{e^{s(q,\,p)} + \sum_{j=1}^{n-1} e^{s(q,\,n_j)}} .
+$$
+
+The construction turns representation learning into an $n$-way classification problem (find the positive among $n$ candidates), which is why the machinery is ordinary: dot products, a softmax, cross-entropy.
+
+<Example title="one training example, computed">
+A query image, its positive, and three negatives, with encoder similarities $s(q,p) = 5.0$ and $s(q,n_j) = 2.0,\ 1.0,\ -1.0$.
+
+Exponentials: $e^{5.0} = 148.41$, $e^{2.0} = 7.39$, $e^{1.0} = 2.72$, $e^{-1.0} = 0.37$; the denominator is $148.41 + 7.39 + 2.72 + 0.37 = 158.89$.
+
+Softmax probabilities: the positive gets $148.41 / 158.89 = 0.934$; the negatives get $0.047$, $0.017$, $0.002$.
+
+Loss: $\mathcal{L} = -\ln 0.934 = 0.068$. The gradient of this loss moves the encoder so that $\mathrm{enc}(p)$ shifts toward $\mathrm{enc}(q)$ and every $\mathrm{enc}(n_j)$ shifts away, in proportion to the probability mass each negative wrongly claimed.
+</Example>
+
+<FigureSequence
+  name="contrastive-step"
+  alt="Three frames: first, a query point with one positive and three negatives in an embedding space, each connected to the query by a dashed line labeled with its dot-product similarity 5.0, 2.0, 1.0, minus 1.0; second, a table appears computing softmax probabilities 0.934, 0.047, 0.017, 0.002 against the one-hot target and the loss minus natural log of 0.934 equals 0.068; third, one gradient step moves the positive toward the query and pushes the three negatives outward from their ghosted old positions."
+  caption="The contrastive step: similarities → softmax → cross-entropy, and one update pulls the positive in while pushing the negatives out."
+/>
+
+<Task>
+Step through the three frames and predict, before frame 3, which of the three negatives moves furthest. Check against the softmax column: the update budget each negative receives is the probability it wrongly claimed, so the 2.0-similarity negative moves most and the −1.0 one barely moves.
+</Task>
+
+<Exercise>
+Same query, harder batch: $s(q,p) = 3.0$ and two negatives at $3.0$ and $0.0$. Compute the softmax probability of the positive and the loss, and compare against the worked example's 0.068. Write the exponentials before opening the solution.
+
+<Solution>
+$e^{3.0} = 20.09$, $e^{0.0} = 1$; denominator $20.09 + 20.09 + 1 = 41.17$. The positive's probability is $20.09/41.17 = 0.488$, and $\mathcal{L} = -\ln 0.488 = 0.718$, more than ten times the worked example's loss, from one hard negative in place of three easy ones.
+
+The transferable observation: the loss is concentrated on the negatives the model cannot yet distinguish from the positive. One *hard* negative (similarity equal to the positive's) caps the positive's probability at $1/2$ no matter how many easy negatives surround it, so the loss can never fall below $\ln 2 \approx 0.693$ until the tie is broken. Easy negatives spend the batch teaching nothing.
+</Solution>
+</Exercise>
+
+### Where positives come from: engagement or augmentation
+
+The loss needs positive pairs, and nobody hand-labels "similar" at corpus scale. Production systems mine positives from two places. The first is **user co-engagement**: two listings clicked in the same browsing session, two pins saved in sequence, a query and the video the user watched after issuing it. The labels are free, arrive at product scale, and encode what users, not annotators, treat as substitutable; their cost is every bias the log carries, position bias included. The next section runs this route end to end on Airbnb.
+
+<Figure
+  src="./figures/augmentation-grid.jpg"
+  alt="A four-row, three-column grid of the same photograph of a lion's face, each panel labelled with the transformation applied to it. Row one: 'Original', a front-on lion resting with a white paw at the bottom of the frame; 'Horizontal flip', the same face mirrored left-to-right; 'Vertical flip', the face upside down so the muzzle sits above the eyes. Row two: '+90 rotation' and '-90 rotation', the face turned onto its side in each direction; '+60 rotation', the frame turned by sixty degrees so black wedges of empty canvas fill the corners. Row three: 'Resize (500x500 -> 100x100)' and 'Rescale (10:1)', both visibly soft and blocky where the downscale destroyed the fur detail; 'Crop', a tall narrow slice holding only the lion's right eye, cheek and half its nose. Row four: 'Brighter', washed almost to white with the mane's colour nearly gone; 'Darker', sunk to browns and blacks; 'Noise addition', the whole face speckled with fine random grain."
+  caption="Eleven positives manufactured from one photograph. Every panel is the same lion after a single transformation, and self-supervised training declares each one a positive pair with the original: no user, no click, no annotator anywhere in the process, which is the whole argument for it. Note also that not one panel is a different lion, which is the whole caveat."
+  float="right"
+  width="m"
+/>
+
+The second is **self-supervised augmentation**, the route visual search takes when no engagement log exists yet: distort the query image (crop, flip, rotate, shift brightness, add noise) and declare the distorted copy the positive. The pair costs nothing and can be manufactured for billions of images, which is exactly the argument for it; the caveat is that an augmented copy is a weaker stand-in for "genuinely similar" than a real co-engaged pair: a cropped lion is the same lion, not a different photo a user would call similar. This is the SimCLR/MoCo recipe from the 2020 self-supervision literature, transplanted whole into product search stacks.
+
+Negatives come cheapest from the training batch itself: the other examples' items, embeddings already computed. In-batch negatives and their popularity bias (items enter batches in proportion to engagement, so popular items absorb outsized negative gradient) were established with the $-\log p_j$ logit correction in <Ref lesson="recommender-funnel">the funnel lesson</Ref>; everything there applies unchanged here.
+
+<KeyFact>
+Contrastive loss is spent almost entirely on hard negatives: a single negative the model scores level with the positive bounds the loss below by $\ln 2$, while any number of easy negatives contribute almost nothing. Where the negatives come from is therefore a design decision, not an implementation detail: it is the lever Airbnb's second fix pulls below.
+</KeyFact>
+
+## The metric ladder: what an ordered list is worth
+
+Training produces a space; hyperparameters, augmentation choices, and negative-sampling schemes produce several candidate spaces, and choosing among them needs an offline number. The evaluation object here is harder than anything the course has scored so far: <Ref lesson="ranking-and-ctr">the ranking lesson's</Ref> NCE judged per-item probabilities, but retrieval's output is an ordered list, relevance comes in grades, and position matters. The standard metrics form a ladder, and the honest way to climb it is by counterexample: each rung is introduced by the failure of the one below.
+
+### MRR: only the first hit counts
+
+The *reciprocal rank* of one result list is $1/\mathrm{rank}$ of the highest-placed relevant item; **MRR** averages it over queries:
+
+$$
+\mathrm{MRR} = \frac{1}{|Q|} \sum_{q \in Q} \frac{1}{\mathrm{rank}_q}.
+$$
+
+The blind spot is in the definition: nothing after the first relevant item exists. Two models answer a query with five results each; model A returns relevant items at ranks 2, 3, and 4, model B returns exactly one, at rank 2. Both score $\mathrm{RR} = 1/2$, leaving a model that returns three times the relevant results indistinguishable from its competitor. MRR is the right metric for exactly one world, the one where a query has a single correct answer; the exercises make that precise.
+
+### Precision@k: counts hits, ignores order
+
+*Precision@k*, the fraction of the top $k$ that is relevant, repairs the first flaw by counting every hit. It introduces its own: it is order-blind within the window. List C places its two relevant items at ranks 1 and 2; list D places them at ranks 4 and 5. Both score $\mathrm{precision@5} = 2/5$, and a user who reads top-down experiences two very different pages. Shrinking $k$ can separate this pair, but at any fixed $k$ the metric cannot see *where* in the window the hits sit.
+
+### Recall@k: the denominator explodes, the cutoff blinds
+
+*Recall@k* divides hits in the top $k$ by the **total** number of relevant items in the corpus, and both parts of that fraction fail in retrieval's home regime. The denominator first: for "similar images of a dog" over a billion-image corpus, the relevant set is millions, so $\mathrm{recall@10} \le 10/\text{millions} \approx 0$ for a perfect system: the metric reports failure no matter what the ranker does. The cutoff second, in the regime where the denominator behaves: with exactly one relevant video, a model that ranks it 15th and a model that ranks it 50th both score $\mathrm{recall@10} = 0$. The first model is 35 positions better and the metric cannot say so.
+
+### nDCG: graded, discounted, normalized
+
+<Definition title="DCG, IDCG, nDCG">
+For a result list whose item at position $i$ has graded relevance $\mathrm{rel}_i \ge 0$, the **discounted cumulative gain** at depth $p$ is
+
+$$
+\mathrm{DCG}_p = \sum_{i=1}^{p} \frac{\mathrm{rel}_i}{\log_2(i+1)},
+$$
+
+each item's gain divided by a discount that grows with its position. **IDCG** is the DCG of the ideal list (the same items sorted by descending relevance), and
+
+$$
+\mathrm{nDCG}_p = \frac{\mathrm{DCG}_p}{\mathrm{IDCG}_p} \in [0, 1],
+$$
+
+with 1 attained exactly when the list is already ideally ordered.
+</Definition>
+
+<Example title="nDCG, every step (Aminian & Xu Fig. 2.17–2.18)">
+A 5-item result list with ground-truth relevances $[0, 5, 1, 4, 2]$ in ranked order. Discounts: $\log_2 2 = 1$, $\log_2 3 = 1.585$, $\log_2 4 = 2$, $\log_2 5 = 2.322$, $\log_2 6 = 2.585$.
+
+$$
+\mathrm{DCG}_5 = \frac{0}{1} + \frac{5}{1.585} + \frac{1}{2} + \frac{4}{2.322} + \frac{2}{2.585} = 0 + 3.155 + 0.500 + 1.723 + 0.774 = 6.151 .
+$$
+
+The ideal ordering sorts the relevances to $[5, 4, 2, 1, 0]$:
+
+$$
+\mathrm{IDCG}_5 = \frac{5}{1} + \frac{4}{1.585} + \frac{2}{2} + \frac{1}{2.322} + \frac{0}{2.585} = 5 + 2.524 + 1.000 + 0.431 + 0 = 8.954 .
+$$
+
+$$
+\mathrm{nDCG}_5 = \frac{6.151}{8.954} = 0.687 .
+$$
+
+The number reads directly: this list realizes 69% of the value its own items could deliver. The loss is located, too: a zero-relevance item holds the cheapest slot while the 5 sits one position down, paying the $1 \to 1.585$ discount.
+</Example>
+
+<FigureSequence
+  name="metric-ladder"
+  alt="Four frames climbing a metric ladder. Frame 1: two five-slot result lists both with first relevant at rank 2, one holding three relevant items and one holding a single relevant item, both scoring reciprocal rank one half. Frame 2: two lists both scoring precision at 5 of two fifths, one with hits at ranks 1 and 2, the other at ranks 4 and 5. Frame 3: a rank axis with a cutoff at 10 and a single relevant item at rank 15 for one model and rank 50 for the other, recall at 10 equal to zero for both. Frame 4: bar chart of discounted gains 0, 3.15, 0.5, 1.72, 0.77 for relevances 0, 5, 1, 4, 2 summing to DCG 6.15, ideal bars summing to 8.95, nDCG 0.687."
+  caption="The ladder by counterexample: each metric is introduced by the failure of the one below it, and nDCG is the rung that sees both grade and order."
+/>
+
+<Task>
+In frame 4, recompute the position-2 term yourself ($5/\log_2 3 = 5/1.585 = 3.155$), then price the swap of positions 1 and 2: the reordered list $[5,0,1,4,2]$ has $\mathrm{DCG} = 5 + 0 + 0.5 + 1.723 + 0.774 = 7.997$, so the swap is worth $1.845$ and lifts nDCG to $7.997/8.954 = 0.893$. One swap, visible in the metric: the property the whole ladder was climbed for, and one no rung below could see.
+</Task>
+
+Two honest footnotes on the chosen rung. Web-search variants sharpen the gain to $2^{\mathrm{rel}_i} - 1$, which rewards putting a grade-5 result first far more than the linear form; the mechanics are identical. And nDCG's own price is its labels: it needs *graded* relevance judgments for the items it scores, which is exactly what a raw engagement log does not hand over; the next section's metric resolves the point from the business side, and <Ref lesson="design-search-ranking">the search design lesson</Ref> resolves it from the label side.
+
+<KeyFact>
+Each rung fails one way: MRR sees only the first hit, precision@k counts hits but not their order, recall@k divides by a denominator the corpus controls and reports 0 across real quality gaps. nDCG survives because every relevant item, its grade, and its position all move the number, at the cost of needing graded labels to exist.
+</KeyFact>
+
+## Airbnb's listing embeddings: engineering the signal
+
+The machinery is assembled; what remains is what production does with it, and the best-documented case is Airbnb's listing embeddings: the KDD 2018 paper behind the "similar listings" carousel, and a study in how far the *training signal* can be engineered while the loss stays fixed. The raw material is click sessions: sequences of listings a user viewed in one sitting. Treat a session as a sentence and each listing as a word, and the skip-gram machinery of word2vec, familiar from classical NLP and transplanted here without modification, trains an embedding per listing so that co-clicked listings score high. Airbnb ran this over roughly 800 million click sessions and got 32-dimensional vectors for millions of listings; the loss is skip-gram's sigmoid form,
+
+$$
+\max \;\; \sum_{(c,\,p)\, \in\, \mathcal{D}_p} \log \sigma\!\left(E_p^\top E_c\right) \;+\; \sum_{(c,\,n)\, \in\, \mathcal{D}_n} \log \sigma\!\left(-E_n^\top E_c\right),
+$$
+
+with $c$ the central listing of a sliding window, $p$ its in-window context listings, and $n$ sampled negatives. This is the same pull-positives, push-negatives shape as the softmax loss above, with each candidate judged by its own sigmoid.
+
+The naive transplant trained; two engineered changes made it work, and each one repairs a named failure.
+
+**Fix 1: the booked listing as global context.** A session that ends in a booking contains the strongest signal a marketplace has, and the sliding window mostly wastes it: the booking is the last event, so it appears in the context of only the final few windows, and listings clicked early in a long session are never pulled toward it. The fix declares the booked listing a *global context*: it is added to every window's context as the window slides, so every listing on the path to a booking receives gradient toward the listing that ended in money. The objective stops optimizing pure browsing coherence and starts encoding conversion.
+
+**Fix 2: same-market hard negatives.** Negatives sampled from the whole catalog are overwhelmingly cross-market: a Paris central listing draws negatives from Rome, Tokyo, and Ohio, and the model can push those away using coarse geography alone. By the hard-negative arithmetic of the contrastive section, those negatives are easy, teach nothing, and starve the distinction the product actually needs: users search *within* a market, so the model must separate similar-looking Paris listings from each other. The fix adds negatives sampled from the central listing's own market, forcing within-market discrimination.
+
+<FigureSequence
+  name="airbnb-fixes"
+  alt="Three frames over one click session of six listings ending in a booked listing. Frame 1: a skip-gram context window around a central listing with positive edges to its neighbors, and a negatives box sampling random listings from other markets. Frame 2: green edges added from the booked listing to every central listing as the window slides, the global-context fix. Frame 3: the negatives box now also samples from the central listing's own market, the hard-negative fix."
+  caption="One session, two engineered fixes: the booked listing joins every context window, and negatives come from the market where discrimination is actually needed."
+/>
+
+<Task>
+In frame 2, count which listings receive gradient toward the booked listing under the naive window (context size 2) versus under the global-context fix, for the drawn six-click session. Naive: only the last two clicks. Fixed: all six.
+</Task>
+
+### The offline metric: average rank of the booked listing
+
+Each fix needs a number to validate against, and Airbnb's choice is the module's cleanest example of a metrics-hierarchy decision (<Ref lesson="requirements-and-metrics">the requirements lesson</Ref>): align the offline metric with the terminal business event. Take held-out sessions that ended in a booking. Replay each one: given the listings clicked so far, rank the candidate listings the user was shown by embedding similarity, and record where the *eventually booked* listing lands. Average that rank over sessions; lower is better. A model that places the booked listing at average rank 5 needs no story connecting it to revenue: the metric is denominated in the business event itself, and the paper validates each fix by exactly this number moving.
+
+Note what the metric quietly is: a single relevant item per session, the booking, which is the one world where the ladder's lower rungs are honest. Rank-of-the-booked-listing is MRR's world, and the exercises show that within one session nDCG carries no more information than the rank itself. What is left over is how to average across sessions, and that is a real choice: mean rank, mean reciprocal rank and mean nDCG discount a session ranked 100th very differently, and can disagree about which model won.
+
+<KeyFact>
+The metric has a boundary the replay procedure sets silently: the average runs only over sessions that ended in a booking, so sessions the model lost outright never enter it, and the candidate set it re-ranks is the one the incumbent system chose to show. It therefore inherits the log's exposure bias — the same circularity the recall@100 exercise below dismantles. Inside that boundary, the denomination in bookings holds.
+</KeyFact>
+
+## Two pipelines, two clocks
+
+Everything so far trains and evaluates; serving splits into two pipelines that run on different clocks, and most operational failures of embedding retrieval live at their seam.
+
+### The indexing pipeline: the batch clock
+
+The **indexing pipeline** runs on the batch clock. New and changed items flow to storage; an embedding-generation job runs the item encoder over them; an index build turns the vectors into the ANN structure <Ref lesson="recommender-funnel">the funnel lesson</Ref> priced; the finished index swaps into serving. This is the item side of the two-tower asymmetry as an operational system. In <Ref lesson="feature-platform">the feature platform's</Ref> terms, the index is a precomputed feature store for the entire corpus, with the same freshness accounting: whatever was uploaded after the last build does not exist in the index, which is why the funnel's fresh-pool source and exploration slot are not optional decoration but the coverage for this pipeline's blind window.
+
+### The query pipeline: the request clock
+
+The **query pipeline** runs on the request clock. A query arrives; preprocessing normalizes it (resize and normalize pixels, or the text pipeline the next lesson details); the *same* encoder produces the query embedding in one forward pass; the ANN index returns top-$k$ item ids; re-ranking applies the business rules. Milliseconds end to end, with the encoder forward pass and the ANN probe splitting the budget.
+
+<Figure
+  src="./figures/two-pipelines.svg"
+  alt="Two lanes: an indexing pipeline on a nightly batch clock runs corpus items through embedding generation with encoder v7 into an ANN index build and swap, annotated that items added after the build do not exist in the index; a query pipeline on a millisecond request clock runs a query through preprocessing and the same encoder v7 to an ANN top-k lookup and re-ranking; an arrow connects the built index to the lookup, with a seam note that a v8 query against a v7 index compares coordinates from two different spaces."
+  caption="Two pipelines, two clocks, one encoder: the index is a batch artifact of the model, so deploying a new encoder means rebuilding the index it must be queried against."
+/>
+
+### The seam: one encoder version
+
+The seam discipline: both pipelines must run the **same encoder version**. An embedding space has no meaning outside the model that produced it: retrain the encoder and every coordinate moves. A query embedded by v8 probing an index built with v7 vectors is therefore comparing positions from two different spaces, and the similarities are noise that no monitor of either pipeline alone will flag. The consequence is operational: a model rollout here is an *index* rollout. The new encoder ships only after the corpus is re-embedded and the index rebuilt, and the swap of encoder and index is atomic. This is <Ref lesson="training-serving-skew">the transform problem</Ref> again: two consumers of one learned transform, and correctness lives in keeping them identical.
+
+## The boundary: one space, one notion of relevance
+
+Both pipelines serve one space, and that space carries exactly one notion of relevance: whatever the training pairs declared "similar" to mean. The typed video query makes the ceiling visible. Embedding similarity handles paraphrase and pixels, and soft-matches every constraint the user meant as hard — the year in "World Cup 2018" is a token whose nearest neighbours are the other years, and nothing in the geometry stops the space from answering with 2014. An inverted index over titles and tags — the Elasticsearch pattern, matching the query's literal tokens — has the complementary profile: exact on entity names, numbers and rare terms, blind to every paraphrase. Neither defect is a training bug the other space could be retrained out of; each is the price of the notion of relevance its own signal encodes. Production therefore retrieves twice and combines the results, which is *hybrid search*. The architecture that fuses a term path with this lesson's embedding path is designed next, and <Ref lesson="retrieval-augmented-generation">the RAG lesson</Ref> reuses it when the same front half is bolted onto a language model.
+
+The video corpus makes one more demand on the item side of that space: the index holds exactly one vector per item, and a video is a sequence.
+
+<Remark title="video-level vs frame-level">
+There are two ways to get that one vector: a video-level model (a 3D architecture consuming the clip whole, motion included) or a frame-level model that samples $N$ frames, embeds each with an image model, and averages into one vector. The standard reference design picks frame-level for training and serving cost, and pays in lost temporal understanding: a video of a door opening and one of a door closing average to nearly the same vector.
+</Remark>
+
+What is established: the reduction of non-text search to one geometric mechanism, with the training signal and the evaluation as the actual design surface; contrastive training mechanically (similarities → softmax → cross-entropy, loss concentrated on hard negatives), with positives from engagement or augmentation and in-batch negatives inherited from the funnel; the metric ladder climbed by counterexample to nDCG, worked to $6.151/8.954 = 0.687$; Airbnb's two signal-engineering fixes and their business-denominated offline metric; and the indexing/query pipeline split with its version-consistency seam. <Ref lesson="design-search-ranking">The next lesson</Ref> runs the module's first end-to-end dissection on exactly this ground: a full search system, from query understanding through fused retrieval to graded relevance labels and the serving split.
+
+## Exercises
+
+<Exercise>
+Compute $\mathrm{DCG}_5$, $\mathrm{IDCG}_5$, and $\mathrm{nDCG}_5$ for a result list with relevances $[3, 0, 2, 0, 1]$ in ranked order, writing every discount and every term. Then state, from the terms alone, which single swap of two adjacent items would raise nDCG most.
+
+<Solution>
+Discounts: $\log_2 2 = 1$, $\log_2 3 = 1.585$, $\log_2 4 = 2$, $\log_2 5 = 2.322$, $\log_2 6 = 2.585$.
+
+$$
+\mathrm{DCG}_5 = \frac{3}{1} + \frac{0}{1.585} + \frac{2}{2} + \frac{0}{2.322} + \frac{1}{2.585} = 3 + 0 + 1 + 0 + 0.387 = 4.387 .
+$$
+
+Ideal ordering $[3, 2, 1, 0, 0]$:
+
+$$
+\mathrm{IDCG}_5 = \frac{3}{1} + \frac{2}{1.585} + \frac{1}{2} + 0 + 0 = 3 + 1.262 + 0.5 = 4.762 .
+$$
+
+$$
+\mathrm{nDCG}_5 = \frac{4.387}{4.762} = 0.921 .
+$$
+
+Best adjacent swap: positions 2 and 3 (relevances $0 \leftrightarrow 2$). The 2 moves from discount 2 to discount 1.585: new terms $2/1.585 = 1.262$ and $0$, a gain of $0.262$. The alternative adjacent swap, positions 4 and 5 ($0 \leftrightarrow 1$), gains only $1/2.322 - 1/2.585 = 0.044$. The discount denominator grows fastest across the top positions ($1 \to 1.585$, against $2.322 \to 2.585$ four slots down), so the same relevance moved one position buys six times more nDCG at the head of the list.
+</Solution>
+</Exercise>
+
+<Exercise>
+A query has exactly one relevant item, with binary relevance, ranked at position $r$. (a) Write reciprocal rank and $\mathrm{nDCG}$ as functions of $r$ and show that on a single query they order any two systems identically — then exhibit two systems and two queries whose *averages* disagree. (b) Show that $\mathrm{precision@k}$ can never exceed $1/k$, whatever the system does. (c) Conclude which metric to report in this world and why it was designed for it.
+
+<Solution>
+(a) $\mathrm{RR} = 1/r$. For nDCG: $\mathrm{DCG} = 1/\log_2(r+1)$, and the ideal list puts the one relevant item first, so $\mathrm{IDCG} = 1/\log_2 2 = 1$ and $\mathrm{nDCG} = 1/\log_2(r+1)$. Both are strictly decreasing functions of $r$ and of nothing else, so on this one query, whichever system ranks the item higher wins under both metrics: they carry the same information up to the choice of decay ($1/r$ versus $1/\log_2(r+1)$).
+
+The equivalence is per query and does not survive averaging, because the two decays price a deep rank differently. Two queries; system X ranks the item at 1 and at 100, system Y at 2 and 2. MRR: $(1 + 0.01)/2 = 0.505$ for X against $0.500$ for Y, so MRR prefers X. Mean nDCG: $\left(1 + 1/\log_2 101\right)/2 = (1 + 0.150)/2 = 0.575$ for X against $1/\log_2 3 = 0.631$ for Y, so nDCG prefers Y. The arithmetic of the disagreement: moving rank 2 to rank 1 is worth $0.5$ of reciprocal rank but only $1 - 0.631 = 0.369$ of nDCG, while dropping rank 2 to rank 100 costs $0.49$ of reciprocal rank and $0.481$ of nDCG. The hyperbolic decay pays more for the top slot than the log decay does, relative to what each charges for the tail, so a slice average can rank two systems either way.
+
+(b) At most one of the top $k$ is relevant, so $\mathrm{precision@k} \le 1/k$, with equality whenever $r \le k$. The metric's ceiling depends on $k$, not on quality; at $k=1$ it is the only $k$ where a perfect system scores 1, and at any larger $k$ a perfect and a mediocre-but-lucky system can tie.
+
+(c) Report MRR. It was built for the single-answer world of known-item search ("did we find *the* result, and how far down"), where its blind spot of ignoring everything after the first hit is vacuous because there is nothing after the first hit. This is also why Airbnb's average-rank-of-the-booked-listing metric is sound despite being a "low rung": a booked session has exactly one terminal relevant item, so within a session the lower rungs and nDCG carry the same information, and the simplest one wins on interpretability. What part (a) adds is that the choice is not free even then — averaging raw rank, reciprocal rank or nDCG across sessions weighs a session ranked 100th differently, so the aggregate must be fixed before two models are compared, not after.
+</Solution>
+</Exercise>
+
+<Exercise>
+A launch review argues: "Our new embedding model's recall@100 against last quarter's click logs is 0.99. Retrieval is essentially solved; remaining quality work belongs to the ranker." Name two independent ways the argument breaks.
+
+<Solution>
+Break one: presence is not position. Recall@100 says relevant items are *somewhere* in the candidate set; the user sees an ordered page. If the clicked items sit at ranks 60–100 of the retrieval ordering, $\mathrm{nDCG@100}$ can be poor while recall@100 is 0.99; the 0.99 silently transfers the entire quality burden to the ranker, and where retrieval's own score feeds the page directly (a similar-items rail with no separate ranking stage), nothing downstream exists to absorb it. The claim needs an order-respecting metric on the same candidate set before "solved" means anything.
+
+Break two: the labels are the system's own exhaust. Click logs record engagement with items the *current* system retrieved and exposed; measuring the new model's recall against them asks whether it can find what the old system already surfaced. Items users would have clicked but never saw generate no labels and no misses. This is the circular recall measurement <Ref lesson="recommender-funnel">the funnel lesson</Ref> dismantled: recall against logged engagements lands near 1 by construction, and the honest estimate needs exposure the system did not choose (exploration traffic).
+</Solution>
+</Exercise>
+
+<Exercise>
+(a) Using $\langle q, v \rangle = \lVert q \rVert \lVert v \rVert \cos\theta$, explain in two sentences why dot-product retrieval favors popular items while cosine retrieval does not. (b) Construct a query and two items where the two similarity functions rank the items oppositely, and verify both rankings numerically. (c) Connect the phenomenon to the funnel's $-\log p_j$ correction: are they the same fix?
+
+<Solution>
+(a) The dot product multiplies angular agreement by the item's norm, and norms are trained quantities: an item appearing in many positive pairs accumulates many gradient updates and grows a long vector, so frequently-engaged (popular) items score high on dot product even at mediocre angles. Cosine divides both norms out, leaving angle alone, so norm-encoded popularity cannot move a cosine ranking.
+
+(b) Query $q = (1, 0)$; popular item $A = (2, 2)$, niche item $B = (0.9, 0)$. Dot products: $\langle q, A\rangle = 2.0 > \langle q, B \rangle = 0.9$, so A wins. Cosines: $\cos(q, A) = 2 / (1 \cdot 2.83) = 0.707 < \cos(q, B) = 0.9/0.9 = 1.0$, so B wins. Same vectors, opposite orderings.
+
+(c) They are different fixes for different mechanisms with the same symptom. The $-\log p_j$ logit correction (<Ref lesson="recommender-funnel">the funnel lesson</Ref>) repairs a *sampling* bias at training time: in-batch negatives over-punish popular items, and the correction restores the uniform-negative objective. The norm effect is a *representation* bias at serving time: whatever the objective, the learned norms carry popularity into the score. Cosine deletes that channel entirely, including any legitimate use of it (a well-calibrated popularity prior is sometimes wanted in retrieval), while the logit correction leaves the norm channel intact and fixes only the training pressure. A system can need both, or want dot product precisely because the norm prior helps.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reconstruct Airbnb's two fixes as a causal argument a design review would accept. For each fix (booked-listing global context, same-market negatives) state (i) the failure of the naive skip-gram transplant it addresses, (ii) the mechanism by which the fix repairs it, and (iii) the offline observation, in terms of average rank of the booked listing, that would validate the fix. State also how the two validations must be run to be attributable.
+
+<Solution>
+Global context. (i) Failure: the objective optimizes co-click coherence only; the session's terminal booking appears in few windows, so listings clicked early are never pulled toward the listing that converted, and the embeddings encode browsing similarity rather than conversion relevance. (ii) Mechanism: adding the booked listing to every window's context routes gradient from the booking to every listing in the session, tilting the space toward what books. (iii) Validation: on held-out booked sessions, the average rank of the booked listing (ranked by similarity to the clicked-so-far listings) drops versus the naive baseline; because the metric is denominated in bookings, the improvement claim needs no proxy chain.
+
+Same-market negatives. (i) Failure: random negatives are mostly cross-market and thus easy, separable by coarse geography alone, so by the hard-negative concentration property the loss spends nothing on within-market discrimination, which is where the product competes. (ii) Mechanism: negatives drawn from the central listing's own market are hard, forcing the space to separate substitutable listings in the same city. (iii) Validation: average rank of the booked listing improves specifically when the candidate set is the same-market listings the user was actually choosing among; a cross-market evaluation would barely move.
+
+Attribution requires a cumulative ablation: naive, then +global context, then +market negatives, each trained identically otherwise and scored on the same held-out sessions. One fix is added per step, so each metric delta has one cause. This is the structure of the paper's own ablation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Your marketplace's image-embedding index rebuilds nightly, and sellers upload 50,000 new listings per day. A newly uploaded listing is therefore invisible to embedding retrieval for up to 24 hours, and has no engagement history even after it appears. Name the funnel components that cover the gap, and the monitoring consequence of not covering it.
+
+<Solution>
+Coverage comes from the candidate-source portfolio of <Ref lesson="recommender-funnel">the funnel lesson</Ref>: a **fresh pool**, an index-free, recency-keyed candidate source that surfaces new listings without waiting for any embedding or index build, unioned into retrieval alongside the ANN source, plus the **exploration slot** in re-ranking that guarantees fresh-pool items real impressions. The exploration half matters as much as the retrieval half: a new listing that appears in the index but never earns impressions generates no engagement labels, so every learned model in the funnel starves it, which is the degenerate feedback loop from <Ref lesson="failures-and-drift">the drift lesson</Ref>. (Incremental index insertion, which HNSW supports, shrinks the 24-hour blind window but does not remove the label-starvation problem; the exploration slice is still required.)
+
+The monitoring consequence of skipping this: nothing alarms. New listings simply never surface, generate no impressions, no labels, and no error term in any log-derived metric, the same invisible-by-construction failure as the funnel's retrieval misses. The observable proxy to watch is the age distribution of served items, or directly the fraction of day-old listings receiving zero impressions.
+</Solution>
+</Exercise>
+
+<Exercise>
+Your listing search must now serve a typed query: "loft with a garden near Lisbon". Embedding similarity alone returns lofts without gardens in Porto (constraints soft-matched away); term matching alone misses every listing described as an "open-plan apartment with a private yard" (paraphrase invisible). Sketch the retrieval design that serves this query, and name the new preprocessing the query needs before either retriever can fire.
+
+<Solution>
+The design is a union of two retrievers over one candidate set: a **term/structured path**, an inverted index over listing text plus hard filters extracted from the query (geography: near Lisbon; amenity: garden), and the **embedding path** of this lesson, the query's text embedding probing the listing index via ANN, which is what catches "open-plan apartment with a private yard" as a loft-with-garden paraphrase. The union is deduplicated and handed to ranking; the hard constraints are applied as filters rather than similarity terms, because "near Lisbon" is not a matter of degree the way "loft-ness" is.
+
+The new preprocessing is *query understanding*: before either path can fire, the raw string must be normalized and tokenized, entities and constraints extracted ("Lisbon" resolved to a geo constraint, "garden" to an amenity filter), and the residual intent embedded. None of this existed in the image-query or listing-query systems of this lesson, where the query arrived already structured. <Ref lesson="design-search-ranking">The next lesson</Ref> designs exactly this stage and the fused retrieval behind it, end to end; the term-versus-embedding complementarity you just used returns once more as hybrid search in <Ref lesson="retrieval-augmented-generation">the RAG lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023. Ch. 2, pp. 31–51 (visual search: contrastive training Figs. 2.6–2.11, the metric counterexamples Figs. 2.14–2.15, the nDCG worked example Figs. 2.17–2.18, the indexing and prediction pipelines Figs. 2.19–2.20); Ch. 4, pp. 71–91 (the video-search reference design: the text-versus-visual complementarity, the recall@10 rank-15-vs-50 counterexample p. 87, frame-level vs video-level representation); Ch. 9, pp. 195–210 (the Airbnb listing-embeddings reconstruction, including the skip-gram loss and both fixes).
+2. K. Pham, *Machine Learning Design Interview*, 2022. Ch. 1 (similarity measures, the dot-product norm caveat, the LinkedIn Hadamard-product quote, embedding evaluation via downstream tasks); Ch. 7 (Airbnb rental search ranking, nDCG as the offline search metric).
+3. M. Grbovic, H. Cheng, "Real-time Personalization using Embeddings for Search Ranking at Airbnb," KDD 2018. The primary source: click-session skip-gram, booked-listing global context, in-market negatives, and the average-rank ablation. https://dl.acm.org/doi/10.1145/3219819.3219885
+4. K. Järvelin, J. Kekäläinen, "Cumulated Gain-Based Evaluation of IR Techniques," *ACM Transactions on Information Systems* 20(4), 2002. The original formulation of DCG and nDCG. https://dl.acm.org/doi/10.1145/582415.582418
+5. A. van den Oord, Y. Li, O. Vinyals, "Representation Learning with Contrastive Predictive Coding," 2018. InfoNCE, the softmax contrastive loss. https://arxiv.org/abs/1807.03748
+6. T. Chen, S. Kornblith, M. Norouzi, G. Hinton, "A Simple Framework for Contrastive Learning of Visual Representations," ICML 2020. SimCLR: augmentations as positives. https://arxiv.org/abs/2002.05709
+7. K. He, H. Fan, Y. Wu, S. Xie, R. Girshick, "Momentum Contrast for Unsupervised Visual Representation Learning," CVPR 2020. MoCo. https://arxiv.org/abs/1911.05722
+</References>

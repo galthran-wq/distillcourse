@@ -1,0 +1,276 @@
+A search system answers a query the user just typed, and that changes every stage of the funnel: retrieval is conditioned on the query rather than the user, relevance is judged per query–item pair, and the offline metric must respect order within each result page.
+
+The module has now built every part such a system needs: the three-stage funnel and its budget arithmetic (<Ref lesson="recommender-funnel">the funnel lesson</Ref>), a calibrated ranking stage (<Ref lesson="ranking-and-ctr">the ranking lesson</Ref>), and the embedding machinery, the nDCG ladder, and the indexing/query pipeline split (<Ref lesson="embedding-based-search">the previous lesson</Ref>). What no lesson has done is run those parts as one design under the course's full template: requirements → metrics → data → model → serving → monitoring. This lesson is the module's first end-to-end dissection, on a rental-marketplace search system in the shape of the documented Airbnb design, with the fused text-plus-embedding retrieval of the standard video-search reference design. Four lessons follow it in this module: the same dissection run on the feed shape, on ad click prediction, and on harmful-content detection, and then a synthesis design that carries the whole template onto a video recommender.
+
+## The numbers before the boxes: requirements and scale
+
+A design begins with what the system must do, at what scale, inside what budget; the boxes come after the numbers. The product: a user types a query (a place, dates, free text), the system returns a ranked page of listings, and the terminal business event is a booking. The requirement that binds everything downstream is the page: **200 ms at p99**, with the ranking service itself allotted 50–100 ms of it.
+
+<Example title="scale estimation, template discipline">
+Assumptions, each with its consequence attached:
+
+- **100 million monthly users, 10 million listings.** The corpus is two orders of magnitude smaller than a video platform's: small enough that no index shards for size.
+- **50 million searches per day.** Average load $50 \times 10^6 / 86{,}400 \approx 580$ requests per second; travel search is strongly diurnal, so peak is taken at $3\times$ average: **~1,700 QPS** is what the fleet must hold at p99.
+- **~30 listings shown per search.** Logging every impression as a training row: $50\text{M} \times 30 = 1.5$ billion rows per day, at ~500 bytes per row roughly **750 GB of training log per day**. The training data is a data-engineering object before any model exists, and the label section below inherits this number: most of those rows will be grade-0 impressions, and keeping all of them is a choice, not a default.
+- **Roughly one search in three produces a click.** ~17 million clicked searches a day against 1.5 billion impression rows: about 1% of the log carries any engagement at all. Clicks are the only signal dense enough to order results with, and the label ladder below is built around that fact.
+- **5 bookings per user per year.** $500$ million bookings a year is ~1.4 million per day: one search in ~36 ends in the event the business is denominated in, an order of magnitude rarer than a click. The sparsity of the terminal label is a design input, not a nuisance.
+</Example>
+
+### The flip: the query takes the live tower
+
+Every system in this module so far was *user-conditioned*: the request arrives carrying a user, the live tower encodes that user, and the corpus side is precomputed (<Ref lesson="recommender-funnel">the two-tower asymmetry</Ref>). Search flips the live side. The query exists only at request time, so the request-path encoder is the *query* encoder; the user does not vanish but demotes to features of the ranking stage (price sensitivity, past bookings), consumed after retrieval has already happened. Two structural consequences follow, and they organize the rest of the design.
+
+**First, a new pipeline stage.** A user arrives as structured IDs and features; a query arrives as a raw string. Something must turn `"Loft   with garden, LISBOA"` into the two forms retrieval consumes: tokens for a term index, a vector for an ANN index. That conversion runs on the request path, inside the 200 ms. The next section designs it.
+
+**Second, queries repeat.** No two requests share a user-context vector, but millions of requests a day share the string `paris apartment`. Query-log frequencies fall off roughly as a power law: the rank-$r$ query appears with frequency proportional to $1/r$, the Zipf shape. That skew splits the query stream into a *head* of a few thousand strings carrying a large share of traffic and a *tail* of millions of strings seen a handful of times each. What the split buys: **cache the head, model the tail**. The serving section works the arithmetic.
+
+### Two failures, two prices
+
+The requirements also fix what "bad" means, and for search it means two different things. An *empty page* is a visible product failure: the user leaves with nothing, and (worse for the system) the session produces no clicks, no dwell, no signal of any kind for the ranker's training data. A *bad first result* on a full page is invisible in the moment: the page renders, the user scrolls or leaves, and the cost is a slower or lost booking that no error log records.
+
+The two failures move different numbers. A *null-result rate* is a product alarm; nDCG at the top of the page is a ranking metric. The design must carry both, because neither can see the other's failure.
+
+<Figure src="./figures/failure-asymmetry.svg" alt="Two mock result pages side by side: the left shows a search bar and zero results, labeled a visible failure that also yields no training signal, watched by the null-result rate; the right shows a full page whose first row is an irrelevant grade-0 listing with the best grade-3 listing at rank 4, labeled an invisible failure watched by nDCG@1, which is 0 for this page." caption="An empty page and a bad first hit cost differently and are watched by different numbers; a design that tracks only one is blind to the other." />
+
+<KeyFact>
+The funnel's conditioning splits mid-pipeline. Retrieval depends on the query string alone, which is why one string's unfiltered candidate set can be shared by every user who types it; the dates and the availability check make the filtered set request-specific again, and ranking, which depends on the (query, user) pair, makes the page shareable with nobody. Every caching decision in this design falls out of where those conditionings begin.
+</KeyFact>
+
+## Query understanding: the stage a recommender never needed
+
+The flip put a raw string on the request path; *query understanding* is the stage that turns it into retrievable form, and it is a pipeline with failure modes of its own, not a preprocessing footnote.
+
+<Figure src="./figures/query-two-forms.svg" alt="A raw query string, Loft with garden, LISBOA, is normalized to loft with garden lisboa and then split into the two forms retrieval consumes: tokenized into token IDs bound for the inverted term index, and encoded by one forward pass of the query encoder into a 128-dimensional vector that probes the ANN index." caption="One string in, two retrieval forms out: the token stream for the term index and the query vector for the ANN index, produced per request." />
+
+**Normalization** first: lowercase, strip punctuation and redundant whitespace, decompose Unicode and strip accents (`Màlaga` → `malaga`), lemmatize (`gardens` → `garden`). Each rule is trivial; skipping any one of them silently splits the query stream: `Lisbon` and `lisbon` become two different head queries with two different caches and two different learned behaviors.
+
+**Tokenization and IDs** next. The token stream must become model inputs, and the two mechanisms trade exactly the way <Ref lesson="features-at-scale">the features lesson</Ref> priced for Amazon's brand vocabulary: a lookup table is fast and reversible but fixed at training time, so every token minted after the vocabulary was built (new neighborhoods, event names, this week's typo) maps to `UNKNOWN`; the hashing trick has no out-of-vocabulary case at all, at the price of collisions whose cost that lesson measured to be small. Query vocabularies are unbounded for the same reason catalog vocabularies are, plus one: users type them. The rate at which tokens miss the vocabulary, the *unknown-token rate*, is this stage's own health metric, and the monitoring section wires it to an alarm.
+
+**Embedding** last: one forward pass of the query encoder per request, producing the vector the ANN index will be probed with, under the version discipline <Ref lesson="embedding-based-search">the previous lesson</Ref> fixed: the query encoder and the index it probes must come from the same training run, or the similarities are noise.
+
+<Remark title="spelling, expansion, and what this lesson does not design">
+Mature stacks run more here: a spelling corrector, synonym and locale expansion ("apartment" ∪ "flat"), and entity extraction that resolves "Lisbon" into a geographic filter rather than a similarity term. A constraint like location is not a matter of degree and is applied as a hard filter downstream. Each is its own subsystem; this design states where they sit and leaves their internals to the search-specific literature.
+</Remark>
+
+<Remark title="classical text representations">
+Bag-of-words, TF-IDF, and word2vec are assumed from classical NLP and not re-derived. The design uses a trained encoder end to end; the classical machinery survives inside the term path's scoring (TF-IDF-family term weighting) rather than as the query's representation.
+</Remark>
+
+## Fused retrieval: two indexes with opposite blind spots
+
+Tokens and a vector in hand, retrieval fires twice, because the two retrievers this stage runs fail in complementary places.
+
+<Figure src="./figures/search-system.svg" alt="The search system as one pipeline with numbers: a raw query passes query understanding at about 5 milliseconds, whose tokens feed an inverted index over ten million listings and whose vector feeds an ANN index over ten million listing vectors, each returning a top 500 in about 15 milliseconds in parallel; the roughly 800 distinct candidates are deduplicated to 500 and cut by the hard filters for dates and availability, a ranker costing 100 milliseconds at 0.2 milliseconds per candidate scores them, and a 10-millisecond re-ranking pass for near-duplicates and diversity produces the top 20 for the page, all inside a 200 millisecond p99 budget." caption="The design in one diagram: understanding ~5 ms, two retrievers in parallel ~15 ms, 500 filtered then ranked in ~100 ms, 10 ms of rules, top 20 to the page; the funnel's 130 ms ML budget, re-spent for search." />
+
+The **term path** is an inverted index: for every token, a postings list of the listings whose title, description, or tags contain it; a query intersects its tokens' lists and scores matches by term weighting (the TF-IDF/BM25 family: rare terms count for more, long documents for less). The machinery is exact on what it sees: `Casa Batlló` matches listings that say Casa Batlló, and nothing else.
+
+The **embedding path** is the previous lesson's machinery unchanged: the query vector probes the ANN index over 10 million listing vectors (index families and their four-way tradeoff priced in <Ref lesson="recommender-funnel">the funnel lesson</Ref>). It retrieves the listing described as "open-plan apartment with a private yard" for the query "loft with garden," because the trained space put paraphrases near each other.
+
+Each is blind exactly where the other is sharp: term match cannot see paraphrase; embedding similarity soft-matches away constraints and rare proper names that should be hard. The complementarity has a name, *hybrid search*, and <Ref lesson="retrieval-augmented-generation">the RAG lesson</Ref> develops it fully when the same front half feeds a language model instead of a page. A third, cheaper source rides along in production: engagement priors such as most-booked-in-market (the portfolio habit from the funnel), feeding the same union.
+
+<Figure src="./figures/blind-spots.svg" alt="A two-by-two grid crossing two queries with the two retrieval paths: the exact-name query casa batlló hits the term index through its postings list but misses on the embedding path, where the rare name blurs among lookalikes; the paraphrase query loft with garden, against a listing titled open-plan apartment with private yard, misses the term index, which shares no tokens with it, but hits the embedding path, where paraphrases are neighbors." caption="Opposite blind spots, cell by cell: each path fails exactly where the other is sharp, which is what the union buys." />
+
+The **fusing layer** merges: union the candidate sets, dedupe the listings both paths returned (with two top-500 lists and typical overlap, ~800 distinct survive), and cut to the ranking budget by per-source quotas, for the reason the funnel established: a postings score and a dot product live on different scales, and no cheap normalization makes them one ordering.
+
+Where the reference video-search design needs one relevance score *before* ranking, it takes a weighted sum of the two paths' scores, an explicit choice over a second learned model because a weighted sum costs nothing at serving time. In this design the fusing stays structural: the union feeds the ranker, and each path's score survives as a *feature* of it.
+
+## Labels from sessions: grades 0–3, and the metric they fix
+
+The ranker needs a relevance label per (query, listing) pair, and nobody annotates ten million listings against millions of queries. The label source is the session: the same booking sessions <Ref lesson="embedding-based-search">the previous lesson</Ref> mined for listing embeddings, read here for the ranker instead. A session's events are not equally strong evidence, and the design's move is to stop flattening them: order them into *graded relevance*, impression $<$ click $<$ long stay $<$ booking, as grades 0 to 3.
+
+<Figure src="./figures/session-grades.svg" alt="A session timeline for the query sea view apartment Barcelona: a page of 12 impressions, a 20-second click on listing L7, a 3-minute stay on L4, and a click on L9 that becomes a booking two days later; below, the event-to-grade ladder impression 0, click 1, long stay 2, booking 3, and the 12 training rows the session yields: L9 at grade 3, L4 at 2, L7 at 1, nine impressed-only listings at 0." caption="One session becomes twelve training rows. The grades encode that a booking outweighs a stay outweighs a click outweighs being scrolled past: evidence strength, made ordinal." />
+
+<Example title="one session, one row set">
+Query $q$ = "sea view apartment, Barcelona"; 12 listings shown. The user clicks L7 and backs out after 20 seconds, clicks L4 and reads for 3 minutes, clicks L9, and books it two days later. The rows: $(q, \text{L9}, 3)$, $(q, \text{L4}, 2)$, $(q, \text{L7}, 1)$, and nine rows at grade 0 for the impressed-only listings. Two production details ride along: the *long stay* grade needs a dwell threshold (a config choice, tens of seconds), and the booking label arrives days after the impression. That is the delayed natural-label join from <Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>, where any fixed window undercounts.
+</Example>
+
+<Exercise>
+Map a second session to rows: same query, 12 listings shown, the user clicks L2 (90 seconds, above the dwell threshold), clicks L11 (10 seconds), and leaves without booking. Write the row set, then state what an all-impression session (no clicks at all) contributes to the training data and why the requirements section already gave those sessions a different job.
+
+<Solution>
+Rows: $(q, \text{L2}, 2)$, $(q, \text{L11}, 1)$, and ten grade-0 rows. No grade 3 exists: the ladder's top rung is simply absent from sessions that do not convert, which is most of them (one booking per ~36 searches, from the estimation).
+
+An all-impression session yields twelve grade-0 rows: labels with no contrast, which teach a pointwise model only that these listings, shown for this query, produced nothing. That is weak ranking signal, but the requirements section already assigned no-click and no-result sessions their real role: they are what the null-result rate and session-success metrics count. Not every session's information enters through the loss function.
+</Solution>
+</Exercise>
+
+### The label choice fixes the metric
+
+The grades are not decoration; they are what makes the offline metric computable. nDCG consumes exactly a graded list, a relevance per position, and it is the rung of the ladder that survives when relevance comes in degrees and order matters. <Ref lesson="embedding-based-search">The previous lesson</Ref> climbed to it by counterexample, and one reminder suffices: recall@10 scores a model that ranks the one relevant item 15th and a model that ranks it 50th identically, at zero.
+
+Choose a different label set and the metric follows. Had the design kept only bookings as labels, each session would carry a single relevant item, and the honest metric would collapse to MRR: the single-answer world the previous lesson's exercises mapped, where nDCG on any one query is a function of that item's rank and nothing else. The label ladder is chosen *first*; the metric is a consequence.
+
+The grades inherit one boundary worth stating: every graded row is conditioned on exposure. Grades exist only for listings the incumbent system chose to show, so the training data carries the same circularity the funnel dismantled for recall measurement; the exploration traffic that breaks it is bought at re-ranking, not here.
+
+<KeyFact>
+No label ladder escapes exposure, and the consequence lands on the gate, not on the model: because graded rows exist only for pairs the incumbent showed, an offline nDCG comparison can score nothing but re-orderings of the incumbent's own candidate sets. A retrieval change whose entire value is surfacing listings that were never shown generates no graded rows for them and reads as neutral or worse offline — the gate is structurally blind exactly where this design's second retriever is supposed to pay. That class of win is visible only in exploration traffic and the online experiment.
+</KeyFact>
+
+## The ranker, read against the negative results
+
+Stage 2 receives ~500 candidates and ~100 ms. Each (query, user, listing) triple becomes a feature vector, and the features are where the earlier stages hand their work forward: the term path's match score enters *as a feature*, so exact-match evidence is not lost at the union; alongside it, listing quality (rating, historical booking rate), freshness, price fit against the user's history, and geography, where the documented design's note is that raw latitude/longitude is too noisy to learn from and enters as distance from the query's resolved location.
+
+The scoring model in the reference design is a two-tower network over query-plus-user and listing inputs, trained on the graded rows; at 500 candidates the budget also affords the crossing architectures of <Ref lesson="ranking-and-ctr">the ranking lesson</Ref>, and the choice between them is a cost/quality knob, not doctrine.
+
+From the module's arc one would expect the model choice to be where the quality lives; the record says otherwise. When Airbnb migrated this exact system from gradient-boosted trees to deep networks (2018, the team's own published account), the belief under test was that a better model class would move the metric. The first neural ranker that reached production moved neither the offline number nor the online one, and shipped regardless.
+
+<Figure src="./figures/airbnb-divergence.svg" alt="A five-row card of Airbnb's 2018 deep-learning migration: the drop-in GBDT-to-deep-network swap showed no offline gain and was booking-neutral online, shipped for the pipeline rather than the metric; dropout slightly degraded offline metrics and was rejected; the hand-shaped feature noise that replaced it showed plus one percent offline nDCG and nothing significant online; all-zero initialization did not train until Xavier initialization with uniform minus-one-to-one embeddings; LazyAdam gave faster training on large embedding tables. Only one row moved an offline metric, and that row moved nothing online." caption="Five interventions, both verdicts each. The one offline win, +1% nDCG from hand-shaped feature noise, bought exactly nothing online." />
+
+Read as evidence, each row lands on a lesson this course has already built. The **drop-in swap** — one hidden layer of 32 ReLU units, fed the trees' own features and trained on the trees' own regression objective — produced no offline gain and proved booking-neutral online. It was launched anyway, and what it bought was not quality but a validated path from training to serving for neural models, which every later architecture in the migration ran on. Model-class complexity is not a feature; the discipline that says so before months of migration is delta-evaluation against the incumbent baseline (<Ref lesson="offline-evaluation">the offline-evaluation lesson</Ref>): measure the difference between models, not each model's score. When that difference is zero on both clocks, whatever justifies shipping is infrastructure, and the decision record has to say so.
+
+The **all-zero initialization** did not train at all until Xavier initialization for weights and uniform $[-1,1]$ draws for embeddings replaced it, and **LazyAdam** bought faster training on large embedding tables: ordinary engineering results, of a piece with <Ref lesson="ml-in-production">the course's opening count</Ref> that most production ML failures are not ML.
+
+The **two regularization rows** are the exhibit. Dropout itself failed on this system: every flavor tried degraded the offline metrics slightly, and what shipped in its place was noise hand-shaped to each feature's own distribution. That moved offline nDCG by ~1%, a real improvement on the gating metric, and produced no statistically significant online movement. The prevalent belief this refutes is precise: *a better offline number means a better system, so an offline win is a launch argument.* It is not, and the mechanism is the metrics chain from <Ref lesson="requirements-and-metrics">the requirements lesson</Ref>: every link (loss to offline metric, offline to online, online to business) has a named gap, and the offline–online link can absorb a +1% whole. The replacement discipline: offline metrics *gate* candidates (a model that loses offline does not proceed), and online experiments *decide* launches, sized to detect effects of the magnitude offline promised (<Ref lesson="deployment-and-online-experiments">the deployment lesson</Ref>).
+
+<KeyFact>
+An offline delta predicts an online one only as far as the system's own launch record says so: plot past launches' offline deltas against their online outcomes, and trust a +1% offline nDCG only if history shows deltas that size moving the online metric. Absent that audit, the offline number gates the candidate and the experiment decides.
+</KeyFact>
+
+## Serving and operations: two clocks, a head cache, three alarms
+
+The boxes now need clocks. The previous lesson's two-pipeline split carries over whole, with one search-specific addition per lane: the **indexing lane**, on the batch clock, embeds changed listings and rebuilds the ANN index, and now also rebuilds the inverted index from the same listing text, so both retrieval structures share one refresh and one blind window for listings uploaded after the build. The **query lane**, on the request clock, is the diagram above: understand, retrieve twice, union, filter, rank, re-rank, render.
+
+<FigureSequence
+  name="two-clocks"
+  alt="Three frames over a fixed two-lane layout. Frame 1: the nightly indexing lane runs listings through the listing encoder into an ANN index and through tokenization into an inverted index, with a note that uploads after the build are invisible; the query lane is dimmed. Frame 2: a request arrives in the query lane; the raw string is normalized and tokenized, token IDs are looked up or hashed, and the query encoder produces the vector q, while the built indexes persist from the night before. Frame 3: both retrievers fire against the persisted indexes, the two top-500 lists union and dedupe, and the ranker orders the survivors for the page."
+  caption="Two lanes, two clocks, one encoder version: the indexes are last night's batch artifacts, and everything the request does in milliseconds is a lookup against them."
+/>
+
+<Task>
+Step through the three frames and mark every artifact frame 3 consumes that frame 2 did not produce. There are exactly two, both built in frame 1, and that is the whole operational content of the split: a request computes nothing about the corpus, ever.
+</Task>
+
+### The head cache: Zipf arithmetic
+
+Because retrieval is query-conditioned, the object `query string → deduped candidate set` is identical for every user who types the string, and therefore cacheable. Two qualifications are what make that true rather than nearly true. First, the key is the string alone: a request carries a place, dates, and free text, and only the place-and-text part enters the cache key. Second, the cached set is **pre-filter** — the union of the two retrievers before any hard constraint is applied. Availability is the reason it must be: a listing booked a minute ago has to vanish from every page for those dates, a turnover measured in minutes against an index the batch lane rebuilds nightly, so it cannot be baked into an object meant to outlive a request. Both the dates and the availability check are applied to the ~500 IDs the cache hands back, before the ranker spends 100 ms on them.
+
+That places the stage this design had so far left implicit. The funnel's stage 3 is a rules layer, and in a search system it runs on both sides of the ranker: the hard filters — dates, availability, and the location constraint query understanding resolved — cut the candidate set before scoring, so the budget's scarcest resource is spent only on listings that can actually be booked; near-duplicate suppression (one property listed twice, two rooms of the same building) and diversity caps re-order what comes out, so the 20 rendered rows are not 20 near-copies. Together they are the 10 ms <Ref lesson="recommender-funnel">the funnel lesson</Ref> reserved for rules over the surviving items, and the budget derivation in the exercises spends. Because ranking is (query, user)-conditioned and the filters are date-conditioned, nothing downstream of the cache is shareable at all. The cache sits exactly at the seam the first section's KeyFact drew: after fusion, before filtering and ranking.
+
+<Figure src="./figures/zipf-cache.svg" alt="A log-log plot of daily query frequency against query rank, falling as a straight one-over-rank line across ten million distinct queries; a dashed vertical line at rank one hundred thousand marks the cache cutoff, the shaded head to its left is labeled roughly 72 percent of traffic served from cache, and the tail to its right roughly 28 percent computed per request; a footnote names the cached object as the query string's deduped candidate set before any filter, with dates and availability applied per request after the lookup and the entry flushed on index refresh." caption="The Zipf split, drawn: a 100,000-entry head of pre-filter candidate sets covers roughly seven requests in ten, and the once-only tail is what the model must handle." />
+
+<Example title="what a 100,000-entry cache buys">
+Model the day's 50 million searches as draws over $N = 10^7$ distinct query strings — the cache key, dates excluded — with Zipf frequencies $\propto 1/r$. The share of traffic carried by the top $k$ queries is a ratio of harmonic numbers, $H_k / H_N$ with $H_n \approx \ln n + 0.577$:
+
+$$
+\frac{H_{1{,}000}}{H_{10^7}} = \frac{7.49}{16.70} \approx 45\%, \qquad
+\frac{H_{100{,}000}}{H_{10^7}} = \frac{12.09}{16.70} \approx 72\%.
+$$
+
+A cache of the top 100,000 queries (at ~2 KB per entry for 500 listing IDs and scores, some 200 MB, negligible) answers roughly seven retrieval requests in ten without touching either index. Real logs have fatter once-only tails than a clean Zipf, so treat 72% as the model's ceiling; measured production hit rates for search-result caches sit in the 50–70% band, which is what makes the head cache standard practice. The tail, millions of queries seen a handful of times, is exactly what cannot be memorized and must be modeled, which is why the embedding path earns its serving cost.
+</Example>
+
+<Exercise>
+The cache budget is cut to 10,000 entries. Compute the traffic share the Zipf model predicts it serves, and state what the shrinking marginal return between 1,000, 10,000, and 100,000 entries says about where cache memory stops being the binding constraint. Write the harmonic-number ratio before opening.
+
+<Solution>
+$H_{10{,}000} \approx \ln 10^4 + 0.577 = 9.79$, so the share is $9.79 / 16.70 \approx 59\%$. The ladder reads 45% → 59% → 72% for $1{,}000 \to 10^4 \to 10^5$ entries: each tenfold spend of memory buys about 13–14 points of hit rate, a constant increment per decade, because under Zipf each decade of ranks carries equal traffic ($H_{10k} - H_k \approx \ln 10$). Memory is never the binding constraint (even $10^6$ entries is ~2 GB). The binding constraint is *staleness*: every cached set dies at the next index refresh, so entries deep in the head repeat often enough to be re-warmed between refreshes while deep-tail entries would be built and flushed unused. The cache size is chosen against the refresh cadence, not against RAM.
+</Solution>
+</Exercise>
+
+Invalidation is the cache's one subtlety, and the two-clock split answers it: a cached candidate set is a snapshot of both indexes, so it is valid precisely until they refresh. The index swap and the cache flush are one operational event, the same atomicity discipline as the encoder/index version rule, extended one component further.
+
+### Three alarms the shape adds
+
+Monitoring for this design starts from the standard four-layer stack (<Ref lesson="monitoring-and-observability">the monitoring lesson</Ref>) and adds three search-specific instruments, one per layer boundary:
+
+- **Unknown-token rate** (input layer). The query stream is the system's $P(X)$, and it drifts with the world, not with the product: a news event or a new destination mints tokens the vocabulary has never seen. A spike in unknown-token rate is covariate shift (<Ref lesson="failures-and-drift">the drift lesson's</Ref> $P(X)$ decomposition) made visible at the cheapest possible layer, days before any business number moves.
+- **Null-result rate** (product layer). The requirements section's visible failure, counted per query slice. It doubles as a drift detector: new-entity queries fail term match first, so query drift often surfaces here before anywhere else.
+- **Session success** (online layer). Click-through is trackable but weak (a click does not verify relevance); the reference designs grade online metrics upward from CTR through dwell to the session-level event, and this design's terminal number is the documented one: bookings per search session. It is the online face of the same business event the grade-3 label and the offline metric already share, which is what keeps the metrics chain short.
+
+What is established, requirements to monitoring: a query-conditioned funnel whose live tower is the query encoder, with a request-path understanding stage and a Zipf head worth caching; fused retrieval as two indexes with opposite blind spots feeding one deduped union; graded session labels (0–3) that make nDCG the offline gate and would collapse to MRR under bookings-only labels; a ranker whose documented migration supplies the module's clearest offline–online divergence, +1% nDCG against zero; and a two-clock serving split whose head cache is pre-filter by necessity, invalidated with the index refresh, with the date and availability filters and the rest of the rules layer applied per request around the ranker.
+
+<Ref lesson="design-feed-ranking">The next lesson</Ref> runs the same dissection on the feed shape, where the inventory is small, fresh, and partly exhausted per session, and the hard problems move downstream into multi-objective ranking; the fused term-plus-embedding retriever built here returns as hybrid search in <Ref lesson="retrieval-augmented-generation">the RAG lesson</Ref>.
+
+## Exercises
+
+<Exercise>
+Run the estimation template on the stated scale: 10 million listings, 50 million searches/day, embeddings at $d = 128$ in FP16. Compute (a) peak QPS with the $3\times$ diurnal factor, (b) the raw ANN index memory, and (c) whether one node holds it; then state which component of this design shards first as the system grows, and along which axis (data size or traffic).
+
+<Solution>
+(a) $50 \times 10^6 / 86{,}400 \approx 580$ QPS average; $\times 3 \approx 1{,}700$ QPS peak.
+
+(b) $10^7 \times 128 \times 2$ bytes $= 2.56$ GB.
+
+(c) Comfortably one node: with the graph overhead of an HNSW-style index, still single-digit GB against a serving node's RAM. Nothing in this design shards for *size*; the ANN index, the inverted index, and the query cache all fit one machine at $10^7$ listings. Traffic is the axis that grows first: 1,700 QPS of ranking forward passes exceeds one node long before 2.56 GB does, so the stateless compute (ranker replicas, then whole read-only index replicas behind a load balancer) scales out first. The component that genuinely outgrows a single node earliest is not on the request path at all: the impression log, at 750 GB/day, which is why the documented scale design's first addition is shipping logs through a Kafka-style broker to the lake. Replication for throughput, sharding for size, and at this corpus scale only the logs have a size problem.
+</Solution>
+</Exercise>
+
+<Exercise>
+Navigational queries ("casa batlló apartments barcelona", typed to find one specific listing the user already knows) have exactly one right answer. (a) For a session with a single grade-1 item at rank $r$, write what nDCG evaluates to and name the metric it becomes equivalent to; then test whether the equivalence survives averaging, by scoring a system that ranks the answer at $\{1, 100\}$ on two queries against one that ranks it at $\{2, 2\}$. (b) State what happens to the ranker's job on this query slice, and what re-ranking still owes the page. (c) Your offline dashboard reports one aggregate nDCG over all queries; 30% of traffic is navigational. Name the evaluation discipline this violates and the failure it can hide.
+
+<Solution>
+(a) With one relevant item, $\mathrm{DCG} = 1/\log_2(r+1)$ and $\mathrm{IDCG} = 1$, so $\mathrm{nDCG} = 1/\log_2(r+1)$: a strictly decreasing function of $r$ alone, which on any *single* query orders systems exactly as reciprocal rank does. This is the single-answer world <Ref lesson="embedding-based-search">the previous lesson's exercises</Ref> mapped.
+
+The equivalence is per query and does not survive averaging, which is what the slice aggregate is made of: $1/\log_2(r+1)$ and $1/r$ discount deep ranks at different speeds, so the two means can disagree. Two navigational queries, system A placing the answer at ranks $\{1, 100\}$ and system B at $\{2, 2\}$: A scores MRR $(1 + 0.01)/2 = 0.505$ against B's $0.500$, while mean nDCG gives A $(1 + 0.150)/2 = 0.575$ against B's $1/\log_2 3 = 0.631$. Reciprocal rank prefers A, nDCG prefers B, from the identical input. Per query the metrics are interchangeable; as slice aggregates they are two different tolerances for a catastrophic miss, and the dashboard has to say which one gates.
+
+(b) Ranking collapses into retrieval: the entire quality question is whether the one listing enters the candidate set and surfaces at rank 1, which is the term path's exact-match strength, not the learned ranker's. What the rules layer still owes the page runs on both sides of the idle ranker: the hard filters (dates, availability, location) cut the candidate set before scoring, and near-duplicate suppression — the same listing arriving from both paths, or two rooms of one property — cleans what comes out. A right answer that is unavailable for the requested dates is still a wrong page.
+
+(c) Slice-based evaluation (<Ref lesson="offline-evaluation">the offline-evaluation lesson</Ref>). The aggregate blends two regimes with different ceilings and different responsible stages: a regression that tanks navigational queries (a term-path outage, say) can hide inside a modest aggregate dip that reads as ranker noise, and a ranker win on browsy queries can mask it entirely. The dashboard needs nDCG per query class before the aggregate means anything.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this data-committee proposal: "Bookings are the business event; clicks are noise. Train the ranker on booked-versus-not-booked labels only." Use the lesson's own estimation numbers for the sparsity argument, name the bias that bookings-only labels inherit more severely than graded labels, and state the fix.
+
+<Solution>
+**Sparsity.** From the estimation: one search in ~36 ends in a booking, so bookings-only labeling yields ~28 positives per 1,000 searches, against a graded set where clicks (roughly one search in three) contribute hundreds of nonzero rows per 1,000 searches, plus the intermediate dwell grade. The proposal throws away an order of magnitude of ordinal signal and trains a needle-in-haystack classifier on 750 GB/day of logs that are almost entirely identical negatives. The metric collapses with the labels: one positive per session is MRR's world, and the offline gate loses the ability to see improvements in the rest of the page.
+
+**The bias.** Exposure bias, compounded. All session labels are conditioned on what was shown, but a booking is additionally conditioned on the *whole* funnel succeeding: the listing was shown, clicked, dwelt on, priced right, and available. Listings the incumbent ranks low almost never accumulate bookings even when clicked and liked, so bookings-only labels encode the incumbent's ordering more strongly than click labels do; the model learns yesterday's ranker with extra confidence. The step that fails in the proposal is treating "closest to money" as "least biased": the terminal event is the *most* filtered label in the system.
+
+**The fix** is the lesson's ladder: keep the graded rows so the dense, weaker events carry the ordering signal while the rare, strong event anchors the top grade, and let bookings dominate where they belong: in the offline metric's gain structure and in the online session-success metric, not as the sole training signal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive the union budget the lesson asserted. The page budget is 200 ms with 70 ms reserved for network and rendering, query understanding costs 5 ms, each retriever 15 ms (parallel), re-ranking 10 ms, and the ranker scores candidates at the diagram's 0.2 ms per candidate, unbatched. (a) Compute the maximum candidate count the ranker can score. (b) Two retrievers each return 500 candidates with overlap fraction $\omega$ (of 500). Write the union size and show why the dedupe stage is forced. (c) Compute the overlap at which the second retriever contributes fewer than 25 distinct candidates, and state what that threshold means for keeping it in the design.
+
+<Solution>
+(a) Ranking gets $200 - 70 - 5 - 15 - 10 = 100$ ms, so at 0.2 ms per candidate the union must be cut to **500 candidates**, per-source quotas of, say, 250/250 after dedupe. This is the diagram's Stage 2 input, re-derived: 500 is the ceiling the budget allows, and the date and availability filters remove some fraction of it before the ranker ever sees it.
+
+(b) $|A \cup B| = 500(2 - \omega)$: 1,000 candidates at $\omega = 0$, 800 at the diagram's $\omega = 0.4$. Without dedupe, the ~200 listings both paths returned can enter the quotas twice: with blind 250/250 cuts, up to $0.4 \times 250 = 100$ of the 500 ranking slots re-score listings the other quota already carries, a direct waste of the budget's scarcest resource. Dedupe is forced by the arithmetic, not by tidiness.
+
+(c) The second retriever's distinct contribution is $500(1 - \omega)$; it falls below 25 when $\omega > 0.95$. At that overlap the entire second index, its build pipeline, and its slice of the 15 ms buy fewer than 25 candidates the first retriever did not already supply, and fusion has stopped paying unless those few are systematically the ones the first path is blind to (the paraphrase-vs-exact-match complementarity). The honest check is therefore not the overlap rate alone but the *win rate of the unique candidates*: measure how often B-only candidates reach the final page. High overlap plus a near-zero unique win rate is the signal to retire a retriever; high overlap with unique candidates that keep winning pages says the second path earns its cost precisely on the queries where the paths disagree.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: for each of Airbnb's published negative results, design the check that would have surfaced it before or without a full launch, and name the course lesson each check comes from. (a) The GBDT→deep swap that moved neither the offline nor the online metric. (b) The feature-noise experiment's +1% offline / 0 online. (c) The all-zero initialization that did not train. (d) LazyAdam's faster training on large embeddings.
+
+<Solution>
+(a) **Delta evaluation against the incumbent, gated early.** Before committing to a migration, train the candidate class on the same data and measure the model-to-model delta (the disagreement set and the per-slice differences, not two aggregate scores), with a pre-registered minimum offline gain for proceeding. A zero delta after the first faithful reproduction ends the project in weeks, not quarters — or, as here, forces the decision to be restated out loud as what it actually is: a launch bought for the pipeline, at metric parity. From <Ref lesson="offline-evaluation">offline evaluation</Ref>.
+
+(b) **An offline–online correlation audit, then a properly sized experiment.** First check history: plot past launches' offline nDCG deltas against their online session-success deltas; if the correlation at the +1% scale is absent, a +1% offline result predicts nothing and should not raise expectations. Then the A/B itself: compute the sample size for the *online* effect the offline delta optimistically implies, run A/A tests to calibrate the harness, and pre-commit the launch decision to the online metric. The +1%/0 outcome then arrives as a cheap, expected possibility instead of a surprise. From <Ref lesson="deployment-and-online-experiments">deployment and online experiments</Ref>.
+
+(c) **A training smoke test in CI.** A pipeline-level check that fits a tiny batch and asserts the loss decreases and gradients are nonzero per layer catches a degenerate initialization in minutes on every change, long before a full run on a month of logs. From <Ref lesson="pipelines-and-orchestration">pipelines and orchestration</Ref> (CI for ML).
+
+(d) Nothing to *catch*: it is a cost finding, not a quality risk. The instrument that makes it visible and reproducible is per-run logging of training speed and system metrics alongside hyperparameters, so an optimizer swap shows its throughput delta on the tracking dashboard with everything else held fixed. From <Ref lesson="experiment-tracking-and-versioning">experiment tracking</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review: a major sporting event is announced in a city your marketplace serves lightly. Within days, the unknown-token rate of query tokenization triples and the null-result rate spikes for queries mentioning the event. (a) Classify the shift in the taxonomy of <Ref lesson="failures-and-drift">the drift lesson</Ref>. (b) Name the monitoring layer that caught it and why it fired before any business KPI moved. (c) State the two remediations, one per retrieval path.
+
+<Solution>
+(a) Covariate shift: $P(X)$, the query distribution, has moved, while $P(Y \mid X)$, what makes a listing relevant to a query, has not. The event minted new query strings; relevance semantics are unchanged.
+
+(b) The input layer of <Ref lesson="monitoring-and-observability">the monitoring stack</Ref>: unknown-token rate is computed on raw queries with no labels and no delay, so it fires within hours. Bookings-per-session would eventually dip for the affected slice, but that number needs sessions to complete and labels to land; the input-layer alarm exists precisely because the business KPI is the slowest possible detector.
+
+(c) Term path: refresh the vocabulary (or rely on hashing, which has no OOV case: the tokens-to-IDs choice from <Ref lesson="features-at-scale">the features lesson</Ref> is exactly what is being stress-tested) and let the indexing lane pick up new listing text mentioning the event. Embedding path: the query encoder has never seen the event's tokens, so its vectors for them are unanchored; retraining the encoder (and, by the version discipline, rebuilding the index) is the durable fix, with the term path covering the gap in the meantime. The two paths failing at different speeds is the portfolio argument, again.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: replace the listings with your company's documentation paragraphs and the searcher with a chatbot — the fused term-plus-embedding retriever now feeds the top-$k$ paragraphs to a text generator instead of a ranked page to a person. State what changes in the retrieval metric: which property of nDCG stops mattering, and what property starts mattering that no metric in this lesson measures.
+
+<Solution>
+nDCG's discount, the position weighting that made rank 1 worth more than rank 4, stops mattering: the generator reads all $k$ retrieved paragraphs as one context, and no human scans top-down, so order *within* the retrieved set is close to irrelevant (with a caveat this course meets later: long contexts are not read uniformly either). What starts mattering is *containment*: whether the answer to the question is present anywhere in the $k$ paragraphs at all, because the generator cannot produce grounded facts the context lacks; a recall-shaped property per query, judged against the answer rather than against engagement grades. This is exactly the hybrid retriever of <Ref lesson="retrieval-augmented-generation">the RAG lesson</Ref>, where the fused design built here returns, and the evaluation shifts to context precision and recall.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Pham, *Machine Learning Design Interview*, 2022 — Ch. 7 (Airbnb rental search ranking: the problem statement, nDCG as the offline metric and conversion per search session online, the calculation-and-estimation template this lesson's numbers follow, the two-tower ranker and its feature notes, the high-level and scaled designs); Ch. 2 (the "Deep Learning is NOT a drop-in replacement" lessons, p. 128).
+2. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023 — Ch. 4, pp. 71–91 (the fused text+visual search architecture and its weighted-sum fusing layer, the text preprocessing pipeline with the lookup-vs-hashing trade-off table, the CTR/completion/watch-time online-metric ladder).
+3. M. Grbovic, H. Cheng, "Real-time Personalization using Embeddings for Search Ranking at Airbnb," KDD 2018 — the booking sessions this lesson reads as the ranker's label source, including click/booking session structure and the search-ranking features built from them. https://dl.acm.org/doi/10.1145/3219819.3219885
+4. M. Haldar et al., "Applying Deep Learning to Airbnb Search," KDD 2019 — the primary account, and the one to read against any secondary compression of it: §2.1 (the single-hidden-layer NN that was booking-neutral against the GBDT and launched anyway, to validate the pipeline), the hyperparameters section (dropout degrading offline metrics, the hand-shaped feature noise that replaced it at +1% offline nDCG and no significant online gain, Xavier initialization, LazyAdam). https://arxiv.org/abs/1810.09591
+5. R. Baeza-Yates, A. Gionis, F. Junqueira, V. Murdock, V. Plachouras, F. Silvestri, "The Impact of Caching on Search Engines," SIGIR 2007 — measured query-log skew and result-cache hit rates on production search logs, the empirical ground under the head-cache arithmetic. https://dl.acm.org/doi/10.1145/1277741.1277775
+</References>
