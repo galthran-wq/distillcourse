@@ -98,4 +98,8 @@ export const demos: Record<
     import("./classical-ml/SmootherRobustnessExplorer"),
   NeighborEmbeddingExplorer: () =>
     import("./classical-ml/NeighborEmbeddingExplorer"),
+  TailLatencyExplorer: () =>
+    import("./ml-system-design/TailLatencyExplorer"),
+  ReshardingExplorer: () =>
+    import("./ml-system-design/ReshardingExplorer"),
 };

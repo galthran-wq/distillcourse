@@ -1,0 +1,305 @@
+A production system is specified by numbers — p99 latency, sustained throughput, availability — and a model is judged by a chain of metrics that ends in a business quantity, not in ROC-AUC.
+
+<Ref lesson="ml-in-production">The previous lesson</Ref> established that the model is roughly 5% of a production ML system and that most recorded failures live in the other 95%. What stands open is what that 95% must satisfy: "fast", "reliable", and "better than the old model" are not requirements until they are numbers with units. This lesson supplies the specification language (load parameters, latency percentiles, throughput, availability, SLOs) and the metrics chain that connects a training loss to a business quantity, the chain every later evaluation in this course hangs on.
+
+The route: describing load with the Twitter fan-out numbers; latency as a distribution and the tail amplification fan-out inflicts on it; the batching tradeoff that breaks the latency–throughput reciprocal; availability arithmetic and the four system requirements; the metrics chain with a named gap at each link; and the decoupling pattern that keeps multiple objectives tunable without retraining.
+
+## Load before performance: the numbers that describe a system
+
+A requirement like "the system must scale" is empty until the load it must survive is written down. Load is described by *load parameters*, whichever numbers the architecture makes decisive: requests per second to an endpoint, the read/write ratio of a store, the hit rate of a cache, the number of simultaneously active users.
+
+The canonical worked case is Twitter's timeline delivery, from data the company published in November 2012. Two operations dominate. Posting a tweet ran at 4.6k requests/s on average and 12k/s at peak; reading the home timeline ran at 300k requests/s. The peak write rate alone would be easy to handle. The challenge is *fan-out*: one incoming request generating many internal ones, here because every tweet must reach every follower.
+
+<Figure
+  src="./figures/twitter-fanout.svg"
+  alt="Two panels comparing Twitter timeline architectures: joining tweets at read time (cheap writes, 300k expensive joined reads per second) versus fanning out at write time (4.6k posts per second becoming 345k timeline-cache writes, cheap reads)"
+  caption="The same two operations, with the work placed at read time (left) or at write time (right). The load parameters decide: 300k reads/s against 4.6k posts/s."
+/>
+
+Two implementations bracket the design space. *Join at read*: store each tweet once, and assemble a timeline on request by collecting the tweets of everyone the reader follows. *Fan out on write*: keep a precomputed timeline cache per user, and on each post insert the tweet into every follower's cache. The load parameters decide between them: reads outnumber posts by nearly two orders of magnitude, so moving the work to write time pays. The price is visible in the same numbers: at about 75 followers per tweet on average, 4.6k posts/s become 345k cache writes/s.
+
+The average hides the parameter that actually governs the design: the distribution of followers. A handful of accounts have over 30 million followers, so a single celebrity tweet is 30 million cache writes against Twitter's five-second delivery target. The production system is therefore a hybrid: fan-out on write for most users, join at read for the celebrities, merged when the timeline is read.
+
+<KeyFact>
+The decisive load parameter is usually a distribution, not a mean: Twitter's design is fixed by the 75-follower average *and* the 30-million-follower outliers together. The same skew returns as the hot-key problem when <Ref lesson="partitioning">partitioning</Ref> spreads data across machines.
+</KeyFact>
+
+Aggregate numbers alone do not describe load. A system serving 100,000 requests/s of 1 kB each and one serving 3 requests/min of 2 GB each move the same bytes per second and share no design decisions. A specification therefore opens with load parameters; the next sections give the units in which targets on top of them are written.
+
+## Latency is a distribution, and the mean is the wrong summary
+
+The first target written on top of load is response time. This course uses *latency* the way the ML community does: the time from sending a request to receiving the response, including network and queueing time (Kleppmann reserves "latency" for the queueing wait alone and calls the client-visible time "response time"; the distinction matters when reading systems literature, not in this course's usage).
+
+Take ten measured requests: 100, 102, 100, 100, 99, 104, 110, 90, 3,000, and 95 ms. The mean is 390 ms, a summary that describes none of the ten: nine requests sat near 100 ms and one, perhaps a lost packet or a garbage-collection pause, took three seconds. The honest summary is the distribution's shape, reported as *percentiles*: sort the values, and read p50 (the median: half the requests are faster), p95, p99, and p99.9, the thresholds that 95%, 99%, and 99.9% of requests beat. High percentiles are the *tail*, and the tail is exactly the information the mean destroys.
+
+<Figure
+  src="./figures/latency-histogram.svg"
+  alt="A right-skewed latency histogram with p50 at 110 ms, p95 at 400 ms and p99 at 1,200 ms marked as dashed lines; the mean at 180 ms lands in a low-density region where few requests actually occur"
+  caption="A typical latency distribution. The mean lands where almost no request does; the percentiles say what fractions of users experience what."
+/>
+
+### Why the tail gets a budget of its own
+
+Amazon writes internal service requirements at p99.9, a threshold only 1 request in 1,000 crosses, because of who is behind those requests: the slowest requests belong to the customers with the most data on their accounts, the heaviest buyers. The same accounting made the stakes concrete: Amazon measured that **100 ms of added response time cost about 1% of sales**, and [Booking.com reported](https://dl.acm.org/doi/10.1145/3292500.3330744) in 2019 that a roughly 30% latency increase cost about 0.5% in conversion, "a relevant cost for our business." The budget also has a top: p99.99 was judged not worth chasing, because each further nine costs more and pays back less.
+
+Targets on these percentiles have standard names. A *service-level objective* (SLO) is the target a team sets for itself: "p50 under 200 ms and p99 under 1 s, measured at the client." A *service-level agreement* (SLA) is the same statement made contractual: miss it and customers are owed remedies. Both are written in percentiles, never in means.
+
+<KeyFact>
+The SLO percentile has an economic top as well as a bottom: below p99.9 the tail is priced traffic (the heaviest accounts), but past it the slowest requests stop being the service's code and start being the environment — garbage-collection pauses, TCP retransmissions, page faults — which no amount of application work removes. That is why Amazon wrote requirements at p99.9 and refused p99.99: the next nine buys mostly noise, at rising cost.
+</KeyFact>
+
+<Aside>
+Two measurement traps. First, measure at the client: a server can only process a few requests in parallel, so one slow request delays the queued fast ones behind it (head-of-line blocking), and server-side timers never see that queue. Second, percentiles do not average: the "mean p99" of two machines is a meaningless number. Aggregate by adding the underlying histograms, then reading the percentile off the sum.
+</Aside>
+
+## Tail amplification: p99 belongs to the page, not to a backend
+
+Fan-out already appeared as a load phenomenon; combined with percentiles it produces this lesson's central number. A user request that fans out to $N$ backends in parallel finishes when the slowest reply arrives, so one slow call makes the whole page slow. If each backend call is slow with probability $p$, independently, the page is fast only when all $N$ calls are fast:
+
+$$
+P(\text{page slow}) \;=\; 1 - (1-p)^N .
+$$
+
+<Example title="the 1% backend at fan-out 100">
+Let each backend exceed its latency threshold on 1% of calls, $p = 0.01$.
+
+With $N = 1$, the page is slow 1% of the time: the backend's rate, unchanged.
+
+With $N = 10$: $1 - 0.99^{10} = 1 - 0.904 = 9.6\%$.
+
+With $N = 100$: $0.99^{100} = e^{100 \ln 0.99} \approx e^{-1.005} \approx 0.366$, so $1 - 0.366 = 63.4\%$.
+
+Every backend honors "99% of calls fast." The page built from 100 of them is slow for 63 users in 100.
+</Example>
+
+<FigureSequence
+  name="tail-amplification"
+  alt="Three frames with a fixed layout: a user request calling 1, then 10, then 100 parallel backends, each backend slow on 1% of calls; a gauge shows the fraction of slow user requests rising from 1% to 9.6% to 63%"
+  caption="Tail amplification. Only the fan-out changes between frames; the per-backend slow rate stays 1% throughout."
+/>
+
+<Task>
+Step through the three frames and track the gauge: same backends, same 1%; only $N$ changes. Before the next paragraph, estimate where between frames 2 and 3 the gauge crosses one half.
+</Task>
+
+<KeyFact>
+With 1-in-100 slow backend calls, a 100-call fan-out makes about 63% of user requests slow. The percentile you must budget at each backend is set by the fan-out, not by the user-facing target: a p99 page over 100 backends needs far better than p99 components.
+</KeyFact>
+
+<Exercise>
+The backends are improved tenfold: each is now slow on 0.1% of calls ($p = 0.001$). At $N = 100$, what fraction of user requests is slow, and by what factor did the page improve?
+
+<Solution>
+$1 - 0.999^{100} = 1 - e^{100 \ln 0.999} \approx 1 - e^{-0.1} \approx 9.5\%$.
+
+The page went from 63.4% slow to 9.5% slow, a factor of about 6.6, not 10. Improvement factors do not survive the fan-out either: the exponent compresses them. To make the *page* ten times better, the backends must improve by more than ten.
+</Solution>
+</Exercise>
+
+<Demo name="TailLatencyExplorer" caption="Tail amplification, live: set the per-backend slow rate p and the fan-out N; the plot shows the fraction of user requests that hit at least one slow call." />
+
+<Task>
+Two targets, by hand or with the amplification formula. First, with a 1% slow backend, find the fan-out at which more than half of user requests are slow: solve $0.99^N < 0.5$ (it lands just under $N = 70$). Second, fix $N = 100$ and find the per-backend slow rate that keeps the page under 5%; you should land near one slow call in 2,000.
+</Task>
+
+This arithmetic covers parallel calls, where the page waits for the maximum. Serial call chains behave differently: durations add, and percentiles do not add with them; the serial-chain exercise at the end of the lesson probes exactly where the formula stops applying.
+
+## Latency and throughput are not reciprocals
+
+For a server that processes one query at a time, throughput is the reciprocal of latency: 10 ms per query is 100 queries/s, and any latency increase costs throughput one-for-one. From this one would expect a latency increase to always cost throughput. Batching breaks the reciprocal, because hardware that can vectorize (a GPU above all) processes a batch in nearly the time of a single item.
+
+Process 10 queries as one batch that takes 10 ms: per-query latency is still 10 ms, and throughput is now 1,000 queries/s. Process 50 as one batch taking 20 ms: latency has doubled to 20 ms, and throughput has risen to 2,500 queries/s. Latency and throughput went **up together**.
+
+<Figure
+  src="./figures/batching.svg"
+  alt="Two timelines: ten queries processed sequentially at 10 ms each giving 100 queries per second, versus one batch of 50 queries taking 20 ms giving 2,500 queries per second at doubled per-query latency"
+  caption="Batching: per-query latency doubles, throughput rises 25-fold. The reciprocal relation only holds for one-at-a-time processing."
+/>
+
+The tradeoff's cost hides in the queue: an online batch must fill before it runs, so batching adds waiting time to every query it groups. Production serving therefore treats batch size as a dial between the latency SLO and hardware utilization: research turns it all the way toward throughput; a serving system backs it off until p99 fits the budget. The dial returns twice: <Ref lesson="model-servers-and-scaling">dynamic batching</Ref> bounds the wait explicitly, and <Ref lesson="llm-inference">continuous batching</Ref> rebuilds the batch at every generated token.
+
+<KeyFact>
+A latency SLO is also a cost decision: meeting p99 usually means running hardware below its throughput capacity, so tightening the SLO raises the price of every prediction served.
+</KeyFact>
+
+## Availability: series spends nines, parallel buys them
+
+A latency target presumes the service answers at all; the fraction of time it can is its *availability*, counted in nines. Three nines (99.9%) allows about 8.8 hours of downtime a year; four nines (99.99%), about 53 minutes. Each added nine divides the allowance by ten and, like the latency percentiles, costs progressively more to buy.
+
+Availability composes by two rules. A request that needs a feature store *and* a model server, each 99.9% available, succeeds only when both are up: $0.999 \times 0.999 = 0.998$. Components in **series multiply availabilities down**, so every dependency in the request path spends nines. Mirror a component instead (two replicas, either of which can answer) and the pair fails only when both fail: $1 - 0.001^2 = 0.999999$. Components in **parallel multiply failure probabilities down**: two three-nine boxes buy six nines, priced at double hardware plus the load balancer in front (which sits in series and spends nines of its own).
+
+<Figure
+  src="./figures/availability.svg"
+  alt="Two components of 99.9% availability composed in series giving 99.8%, versus the same two composed in parallel giving 99.9999%, with the multiplication written on the figure"
+  caption="The one worked pair to remember: series 0.999 × 0.999 = 99.8%; parallel 1 − 0.001² = 99.9999%."
+/>
+
+An availability SLO also reads as permission. A 99.9% target leaves 0.1% of tolerated failure, about 43 minutes a month: the *error budget*, spent deliberately on deploys, migrations, and experiments. A team that has exhausted the budget freezes releases; one that never spends it is shipping too slowly. The budget is what connects this section to the staged-rollout policies of <Ref lesson="deployment-and-online-experiments">deployment</Ref>.
+
+### The four requirements behind the numbers
+
+The numeric targets instantiate four properties production ML systems are asked for, and each names the modules that deliver it. **Reliability**: correct function under hardware, software, and human faults; the ML twist is that failure is silent (`model.predict()` returns cleanly and the predictions are wrong), which turns reliability into the monitoring problem of <Ref lesson="monitoring-and-observability">module 6</Ref>. **Scalability**: graceful growth in traffic, in model size, and in model count (one startup served 8,000 enterprise customers with 8,000 models), by scaling up (bigger machines) or out (more machines), with <Ref lesson="model-servers-and-scaling">autoscaling</Ref> for resources and <Ref lesson="experiment-tracking-and-versioning">artifact management</Ref> for the model fleet. **Maintainability**: versioned code, data, and models, reproducible by people who did not build them. **Adaptability**: absorbing shifting data and shifting requirements without downtime, the subject of <Ref lesson="continual-learning">continual learning</Ref>.
+
+## The metrics chain: four links, three gaps
+
+The requirements above act as constraints; they say when a model is *rejected*. Production evaluation splits metrics accordingly: a *gating metric* states an operational bound (p99 latency under 200 ms, model size under what the device holds), and any model that misses it is out, regardless of accuracy. An *optimizing metric* is the one pushed as far as the gates allow. The gates were the first half of this lesson. The optimizing side is not one number but a chain of four, and judging a model means knowing which link a given number sits on.
+
+<Figure
+  src="./figures/metrics-chain.svg"
+  alt="Four boxes in a chain (training loss, offline metric, online proxy metric, business metric) with three annotated gaps between them: the surrogate gap, the deployment gap, and the attribution gap"
+  caption="The metrics chain. Every arrow is a hypothesis: each link can improve while the next one stands still."
+/>
+
+The four links, anchored: the *training loss* is the differentiable objective the optimizer minimizes (log loss); the *offline metric* is the held-out score the team tracks (F1, WAPE, nDCG); the *online proxy* is a behavioral number on live traffic (click-through rate, Netflix's take-rate); the *business metric* is what the company banks (revenue, retention). Each adjacent pair has a documented way of coming apart.
+
+### The surrogate gap: log loss falls, F1 stands still
+
+The loss is chosen for differentiability, not fidelity. A model can spend its capacity sharpening probabilities on examples it already classifies correctly: log loss improves steadily while no decision flips and F1 does not move. The gap is closed by measurement, not assumption: track the loss and the offline metric together and expect them to decouple as training converges.
+
+### The deployment gap: the data will not hold still
+
+The offline metric is computed on a frozen sample of the past; the model serves the moving present, and its own predictions select part of the next training set. The ads walkthrough of <Ref lesson="ml-in-production">the previous lesson</Ref> hit this link when the model aced a two-month-old test set and failed on yesterday's traffic. The shift taxonomy that formalizes this gap is <Ref lesson="failures-and-drift">module 6's opening subject</Ref>, and crossing the gap deliberately, by measuring a model on live traffic, is what <Ref lesson="deployment-and-online-experiments">online experiments</Ref> exist for.
+
+### The attribution gap: clicks are not money
+
+The proxy occupies its link because it is fast and plentiful, not because it is true. The arithmetic that earns it the place, on an e-commerce recommender: about 3% of shown offers are clicked and about 3% of clicks convert, so 10,000 offers yield roughly 9 purchases: too few positives to train on and far too few for a fast A/B test. Clicks are 33 times more plentiful, and for a fixed relative effect $\delta$ the sample a test needs scales as $1/(p\,\delta^2)$ in the event rate $p$, so on the same traffic experiments on clicks converge about 33 times faster than experiments on purchases. But a proxy must be validated against the link above it: Netflix built *take-rate* (quality plays per recommendation shown) and then checked, before trusting it, that higher take-rate moved total streaming hours up and subscription cancellations down.
+
+Google's [Rules of ML, Rule #13](https://developers.google.com/machine-learning/guides/rules-of-ml) sorts what may occupy the proxy link. Train on behavior that is *directly observed and attributable* to one system action: was this ranked link clicked, this object downloaded, this item marked as spam. Keep *indirect effects* (did the user return tomorrow, daily active users) as A/B evaluation metrics, never training objectives: the causal path from one prediction to them is too long to learn. And never task the model with the true objective itself (is the user happy, is the product improving their life), which no log records; connecting the chain's top to those questions is human judgment, not modeling.
+
+### Identical aggregate error, opposite sign
+
+<Example title="the airline forecast (Babushkin & Kravchenko, §12.1.2)">
+An airline forecasts daily ticket demand for one flight and prices seats from the forecast each morning; a day's sales are capped by both demand and the forecast, $\text{sold} = \min(\text{forecast}, \text{actual})$. Over four days, actual demand is $[120, 90, 110, 80]$ at prices of \$200, \$220, \$230, and \$210.
+
+Model A predicts 90 every day; model B predicts 110 every day. Both miss by a total of 60 tickets on 400, so both have $\text{WAPE} = \sum|\hat{y}-y| \,/\, \sum y = 15\%$; their biases, $\sum(\hat{y}-y)/\sum y$, are equal in magnitude and opposite in sign: $-10\%$ for A, $+10\%$ for B.
+
+Applying the $\min$ rule day by day: model A earns \$75,300, model B \$83,900. That is an **\$8,600 gap in four days on one flight**, from two models any symmetric error report calls identical. Underforecasting forfeits sellable seats; overforecasting only discounts. The business is asymmetric, and WAPE cannot see sign.
+</Example>
+
+The airline exercise at the end of the lesson runs the same mechanism on a different table, asks which model to ship, and finds the overforecast cost at which the answer flips.
+
+### A metric can move when the model does not
+
+The chain's links also differ in *stability*. A fraud model catches 95% of fraud (TPR 0.95) and flags 5% of legitimate traffic (FPR 0.05); hold the model fixed and let the class balance move, as fraud does daily: 1:100 in an outburst, 1:1,000 on an ordinary day, 1:10,000 when the fraudsters pause. Precision is $0.95P/(0.95P + 0.05N)$: at 1:100 it reads 16%, at 1:1,000 it reads 1.9%, at 1:10,000 it reads 0.19% — two orders of magnitude of movement from one unchanged model. TPR and FPR, computed within one class each, read 0.95 and 0.05 in all three worlds. A dashboard built on precision alarms every time the base rate breathes; per-class metrics on monitored links are what keep <Ref lesson="monitoring-and-observability">module 6's monitoring</Ref> quiet when nothing is actually wrong.
+
+<KeyFact>
+No link of the chain is valid by construction: log loss can fall while F1 is flat, offline can win while online loses, and clicks can rise while revenue falls. Each link is a hypothesis the system keeps testing: offline against online history, proxy against business by A/B experiment.
+</KeyFact>
+
+## Decoupling objectives: two models, one weight
+
+The chain ends in one business quantity, but real products carry several at once. A newsfeed wants engagement (predicted clicks) and quality (extreme and misleading content earns clicks it should not), and the two conflict on exactly the posts that matter. One approach trains a single model on a blended loss, $L = \alpha\, L_{\text{quality}} + \beta\, L_{\text{engagement}}$. The blend has a hidden operational cost: $\alpha$ and $\beta$ encode a product decision (how much engagement to spend on quality), and every revision of that decision means retraining the model.
+
+The pattern that removes the cost: train one model per objective, each on its own loss, and combine at serving time: rank by $\alpha \cdot \text{quality} + \beta \cdot \text{engagement}$, with $\alpha, \beta$ as serving-time constants. Retuning the tradeoff is now a configuration change, evaluated the same day, with no training run. The split pays a second dividend: the objectives age at different speeds (spam patterns turn over in days, notions of post quality in quarters), and separate models retrain each on its own schedule instead of the fastest one's.
+
+<Figure
+  src="./figures/objective-decoupling.svg"
+  alt="Side-by-side comparison: one model trained on a blended loss where changing the weight alpha requires retraining, versus a quality model and an engagement model combined at serving time by alpha, where changing alpha is a configuration change"
+  caption="Objective decoupling. Left: the tradeoff is baked into the weights at training time. Right: the tradeoff is a serving-time constant."
+/>
+
+This is the course's first named design pattern, *objective decoupling*, and it recurs at production scale: <Ref lesson="design-feed-ranking">feed ranking</Ref> orders posts by a business-weighted sum of half a dozen separately predicted reactions, which is this pattern with more terms.
+
+What is now established: a production ML system is specified by load parameters, percentile latency with its fan-out amplification, throughput with the batching dial, availability with the series/parallel arithmetic, and SLOs with error budgets; its model is judged along the chain loss → offline → proxy → business, with a named gap at every link; and competing objectives decouple into separate models weighted at serving time. What the specification leaves open is the task itself: the same business need can be framed as classification, regression, or ranking, and the framing — not the model — fixes label availability, retraining cost, and failure modes. <Ref lesson="problem-framing-and-baselines">The next lesson</Ref> takes up framing, and the ladder of baselines every model must climb before earning its complexity.
+
+## Exercises
+
+<Exercise>
+A page assembles responses from 30 backends called in parallel; each backend call is slow on 0.5% of calls, independently. What fraction of page loads hits at least one slow call? And to what per-backend rate must the 0.5% fall to keep slow page loads under 2%?
+
+<Solution>
+Slow fraction: $1 - 0.995^{30} = 1 - e^{30 \ln 0.995} \approx 1 - e^{-0.1504} \approx 14\%$. A backend rate of one call in 200 became a page rate of one load in seven.
+
+For the target, solve $1-(1-p)^{30} \le 0.02$: $(1-p)^{30} \ge 0.98$, so $1-p \ge 0.98^{1/30} = e^{\ln 0.98 / 30} \approx e^{-0.000673} \approx 0.99933$, giving $p \le 0.067\%$: about one slow call in 1,500, a 7.4× tightening of every backend to move the page number from 14% to 2%.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two boundary probes on the amplification formula. (a) Show what $1-(1-p)^N$ says at $N=1$, and why that is the right degenerate answer. (b) The formula is for parallel calls; serial chains add durations instead. Three services are called in sequence, each independently taking 10 ms with probability 90%, 50 ms with probability 9%, and 200 ms with probability 1%. Compute the p99 of one call, the sum of the three p99s, and the p99 of the chain's total time. Is the total's p99 the sum of the p99s?
+
+<Solution>
+(a) At $N=1$: $1-(1-p) = p$. With no fan-out there is nothing to amplify: the page's slow rate is the backend's slow rate, and the user-facing percentile equals the backend percentile. The amplification is entirely a property of $N > 1$.
+
+(b) One call: the cumulative distribution reaches 90% at 10 ms and 99% at 50 ms, so p99 = 50 ms, and the sum of three p99s is 150 ms.
+
+The chain's total: the probability that no call takes 200 ms is $0.99^3 = 97.03\%$, already below 99%, so the 99th percentile of the total lies among outcomes containing at least one 200 ms call. Enumerate cumulative probability in order of total time: totals without any 200 ms call reach at most $150$ ms and carry mass $0.9703$; adding the cheapest 200 ms outcomes, $200+10+10 = 220$ ms with mass $3 \times 0.01 \times 0.9^2 = 0.0243$, brings the cumulative to $0.9946$, which crosses the $0.99$ threshold inside this group: **p99 of the total is 220 ms**, against a sum-of-p99s of 150 ms.
+
+Percentiles are not additive: the chain's tail is dominated by whether *any* single call hits its own 1% tail (probability $\approx 3\%$ here), an event each individual p99 excludes. Budgeting a serial pipeline by adding stage p99s undercounts the tail, the point the pipeline-budget exercise below turns into a design rule.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim with a construction: "We improved mean latency by 20%, so users are better off." Exhibit a before/after pair of latency distributions in which the mean falls 20% and p99 rises, and name what the mean hides.
+
+<Solution>
+Before: every request takes 100 ms, so mean 100 ms, p99 100 ms.
+
+After a cache is added: 90% of requests hit it and take 50 ms; 10% miss and now take 350 ms (the cache lookup plus the original path plus contention). Mean: $0.9 \times 50 + 0.1 \times 350 = 80$ ms, down 20%. p99: the slowest 10% all take 350 ms, so p99 = 350 ms, up 3.5×.
+
+The mean hides the distribution's shape: a majority speedup can pay for a minority slowdown at any exchange rate the mean cannot see. It also hides *who* is in the minority: cache misses are biased toward the largest, least-cacheable accounts, the same population Amazon's p99.9 argument identifies as the most valuable. The claim's failing step is treating a distribution as a scalar; the repair is stating the improvement at fixed percentiles ("p50 fell 50 ms, p99 rose 250 ms") and letting the SLO decide.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson composed availability in series and in parallel. Derive the third structure: a quorum that stays up while any 2 of 3 nodes are up, each node independently 99% available. Compute the quorum's availability and place it against the two extremes, all-3-in-series and any-1-of-3.
+
+<Solution>
+Let $a = 0.99$. The quorum is up when all three nodes are up or exactly two are:
+
+$$
+a^3 + 3a^2(1-a) = 0.9703 + 3 \times 0.9801 \times 0.01 = 0.9703 + 0.0294 = 0.9997.
+$$
+
+The extremes: series requires all three, $a^3 = 97.03\%$ (about 11 days of downtime a year); parallel requires any one, $1-(1-a)^3 = 99.9999\%$ (about half a minute a year). The 2-of-3 quorum sits at 99.97%, about 2.6 hours a year, buying most of parallel's protection while still guaranteeing that any two live nodes overlap, the property <Ref lesson="replication">quorum replication</Ref> needs for consistency. Availability structures are not binary: "how many failures survive" is a design parameter, and each step from series toward parallel trades hardware and coordination for nines.
+</Solution>
+</Exercise>
+
+<Exercise>
+A different route, same pricing mechanism as the airline example: revenue $= \sum \min(\text{forecast}, \text{actual}) \times \text{price}$. Actual demand is $[100, 130, 70, 100]$ at prices \$220, \$200, \$240, \$180. Model A predicts 85 every day; model B predicts 115 every day. (a) Confirm the two models are indistinguishable by WAPE, and decide which one to ship. (b) The airline now attaches a cost of $c$ dollars to every overforecast seat (catering, ground handling, and fuel are provisioned per forecast seat, and an unsold provisioned seat is a pure loss). At what $c$ does the shipping decision flip, and what does the size of that threshold say about the $\min$-rule business?
+
+<Solution>
+(a) WAPE: model A's absolute errors are $15, 45, 15, 15$, summing to 90 on 400 actual: 22.5%. Model B's are $15, 15, 45, 15$: also 90/400 = 22.5%. Biases: A forecasts 340 against 400 actual, $-15\%$; B forecasts 460, $+15\%$.
+
+Revenue, day by day with $\min(\text{forecast}, \text{actual})$:
+Model A: $85 \times 220 + 85 \times 200 + 70 \times 240 + 85 \times 180 = 18{,}700 + 17{,}000 + 16{,}800 + 15{,}300$, i.e. \$67,800.
+Model B: $100 \times 220 + 115 \times 200 + 70 \times 240 + 100 \times 180 = 22{,}000 + 23{,}000 + 16{,}800 + 18{,}000$, i.e. \$79,800.
+
+Ship model B: \$12,000 more over four days, about 18% of A's revenue, from a model whose WAPE report is identical. The asymmetry runs the same way as in the worked example: underforecasting caps sales at the forecast, overforecasting only wastes on the one day demand falls short.
+
+(b) Overforecast seats (forecast minus actual, where positive): model A only on day 3, 15 seats; model B on days 1, 3, and 4: $15 + 45 + 15 = 75$ seats. B keeps the lead while $79{,}800 - 75c \ge 67{,}800 - 15c$, i.e. $60c \le 12{,}000$: the decision flips at $c > 200$ — \$200 per overforecast seat, as much as a full ticket. Under the $\min$ rule, overforecasting is cheap to a striking degree: only a per-seat cost on the order of the ticket price itself makes the conservative model the right one. The shipping decision lives entirely in the business's cost structure, which no symmetric error metric encodes; the report needs the **signed bias** alongside WAPE to even pose the question.
+</Solution>
+</Exercise>
+
+<Exercise>
+The ads walkthrough of <Ref lesson="ml-in-production">the previous lesson</Ref> ran: (1) choose impressions as the metric; (2) collect data and labels; (3) engineer features; (4) train; (5) find wrong labels in error analysis, relabel; (6) retrain; (7) discover the model always predicts "don't show" because 99.99% of examples are negative; (8) collect more positives, retrain; (9) ace the two-month-old test set, fail on yesterday's data; (10) update on recent data; (11) deploy; (12) watch revenue fall because ads are shown but not clicked, and switch the objective to CTR. Assign each numbered step to a link, or a gap, of the metrics chain.
+
+<Solution>
+Steps 2–3 sit below the chain: data and features are preconditions, not metrics. Steps 4, 6, and 8's training runs live at the **loss** link. Step 5 is label quality, the ground the offline metric stands on; bad labels invalidate the offline link from below. Step 7 is the **surrogate gap**: the loss converged to a model whose offline metric (anything sensitive to the positive class) is worthless; an aggregate accuracy of 99.99% here measures the class balance, not the model. Step 9 is the **deployment gap**: offline (frozen, two months old) diverging from online (yesterday's traffic), distribution shift inside the development loop. Steps 10–11 cross that gap by refreshing data and going live. Step 12 is the **attribution gap** closing the loop from the top: impressions was a proxy with no causal claim on revenue (ads shown but not clicked earn nothing), so the proxy link is re-chosen (CTR, a directly attributable action per Rule #13) and the whole chain restarts.
+
+The trace visits every gap in the chain exactly once, which is why the lesson before this one could run it without the vocabulary.
+</Solution>
+</Exercise>
+
+<Exercise>
+A results page must render in 200 ms at p99, and its ML portion is a three-stage serial pipeline: retrieve candidates from a corpus of 10 million items, rank the survivors with a heavy model, re-rank the top of the list with business rules. Propose a per-stage latency budget, state what each stage's budget implies about the model class it can run, and reconcile your split with the serial-chain exercise's warning about adding percentiles.
+
+<Solution>
+A defensible split of the 200 ms: reserve ~40 ms for network, assembly, and rendering, leaving ~160 ms for the pipeline; then, for example, retrieval 40 ms, ranking 90 ms, re-ranking 30 ms.
+
+What the budgets force. Retrieval at 40 ms over 10 million items allows well under a microsecond per item: no learned model can *run per item* at that price; the stage must be a precomputed-index lookup (inverted index, approximate nearest neighbors over embeddings) that never touches most of the corpus. Ranking at 90 ms is affordable only because retrieval cut 10 million to a few hundred: at a few hundred candidates, even ~100 ms of GPU-batched heavy-model inference fits. Re-ranking at 30 ms over tens of items can afford anything, including rules and diversity logic.
+
+Percentile caution from the serial-chain exercise: the stages are serial, so their p99s do not add to the pipeline's p99; budgeting each stage at its own p99 undercounts the tail (any one stage hitting its tail blows the total). The honest budget sets stage targets strictly *below* the naive split, or budgets the end-to-end p99 directly and measures each stage's contribution.
+
+The shape this forces, a cascade of stages whose cost per item rises as the candidate count falls, is not one option among many; it is the only architecture that fits the budget, and it is the funnel every recommender, search, and ads system shares: <Ref lesson="recommender-funnel">the recommender funnel</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017 — Ch. 1: load parameters and the Twitter fan-out case (the November 2012 numbers are from R. Krikorian, "Timelines at Scale," QCon SF 2012), percentiles and tail-latency amplification, the Amazon p99.9 and 100 ms figures, SLOs/SLAs, scaling up vs out.
+2. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 1 (latency vs throughput under batching, Fig. 1-4; the ten-request mean example), Ch. 2 (business vs ML objectives, the Netflix take-rate, the four requirements, decoupling objectives).
+3. V. Babushkin, A. Kravchenko, *Machine Learning System Design*, Manning, 2023 — Ch. 5 §5.2 (the hierarchy of offline/online/proxy metrics, the CTR-vs-conversion arithmetic, consistency of metrics under class-balance shift), Ch. 12 §12.1.2 (the airline WAPE/bias example).
+4. L. Bernardi, T. Mavridis, P. Estevez, "150 Successful Machine Learning Models: 6 Lessons Learned at Booking.com," *KDD* 2019 — the 30%-latency / 0.5%-conversion measurement. https://dl.acm.org/doi/10.1145/3292500.3330744
+5. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google — Rule #13, the observable-and-attributable objective taxonomy. https://developers.google.com/machine-learning/guides/rules-of-ml
+6. R. Crowe, H. Hapke, E. Caveness, D. Zhu, *Machine Learning Production Systems*, O'Reilly, 2024 — Ch. 11 (optimizing vs gating metrics, the 200 ms gate).
+7. D. Martin, *The System Design Primer* — "Availability in numbers": the nines tables and the series/parallel composition rules. https://github.com/donnemartin/system-design-primer
+</References>

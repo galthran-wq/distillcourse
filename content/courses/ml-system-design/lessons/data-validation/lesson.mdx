@@ -1,0 +1,390 @@
+Google Play's ranking team compared the statistics of serving logs against training data and found features that were always present in training and always missing live; fixing that one class of bug measurably raised installs 2%.
+
+Module 3 built the manufacturing line one station at a time: <Ref lesson="labels-and-feedback-loops">labels</Ref> with their sources priced, <Ref lesson="data-leakage-and-splitting">splits</Ref> that keep the offline metric honest, <Ref lesson="features-at-scale">features</Ref> hardened for production, and <Ref lesson="training-serving-skew">skew</Ref> repaired by architecture. Every station so far is verified by a human reading dashboards, and the skew lesson left two debts open: its repairs buy consistency rather than correctness, and its final exercise met a feature no single presence value can describe. This lesson is the module's application: the data-validation component of [TFX](https://storage.googleapis.com/gweb-research2023-media/pubtools/4795.pdf), Google's production ML platform, read end to end as the automated watchdog, together with the incident that measured what the watchdog is worth.
+
+The route: the statistics computed over every dataset; the schema as a per-feature contract; one detector with two opposite verdicts; the skew and drift comparators and their two distances; schema environments; the Google Play incident from stats diff to measured lift; the same suite built outside TFX; and the boundary of what data validation can certify.
+
+## The gate in front of the trainer
+
+A system retrained daily has no analyst between the data and the trainer. Training data reaches the pipeline from ad hoc upstreams spanning products, services, and usage logs, and faults can enter at any point of that generation process; the TFX paper's position is that anomalies in the data are "not an exception, but more the norm." The failures worth engineering against are not the loud ones: a catastrophic break announces itself, while a small data bug degrades model quality gradually, over weeks, in a way that is hard to detect and harder to attribute. The four silent months of <Ref lesson="training-serving-skew">the Spotify postmortem</Ref> were exactly this shape.
+
+The response is a *data validation pipeline*: an automated stage between ingestion and training that computes statistics over every incoming dataset, checks them against a stated contract, compares datasets against each other, and returns a verdict: pass, alert for triage, or block the training run. It sits as a gate in front of the trainer, in the path of every run, not as a notebook someone remembers to open.
+
+<Figure
+  src="./figures/validation-gate.svg"
+  alt="A pipeline flow: ingestion feeds statistics, then a schema check, then comparators, arriving at a gate before the trainer. The gate has three outgoing verdicts: pass into the trainer, alert down to human triage, and block."
+  caption="The validation stage as a gate: statistics, schema check, comparators, then three verdicts, only one of which reaches the trainer."
+/>
+
+### What gets computed
+
+The first stage is descriptive, not judgmental. For each feature of each dataset the component computes: **presence**, the number and fraction of examples carrying the feature; **valency**, the distribution of values per example; for continuous features, quantiles, equi-width histograms, mean, and standard deviation; for categorical features, the top-K values by frequency. Statistics can additionally be computed on configured slices (positive versus negative examples) and across features (correlation, covariance). At the scale of continuous training (Google Play's ranking model trains on hundreds of billions of examples) exact computation is off the table, and the component uses distributed streaming algorithms that return approximate results.
+
+The first payoff arrives before any expectation is written down: the statistics surface facts nobody thought to ask for. Loading a spam-detection dataset into [TensorFlow Data Validation](https://www.tensorflow.org/tfx/guide/tfdv) (TFDV, the open-source release of the component) and reading the label histogram takes three lines:
+
+```python
+import tensorflow_data_validation as tfdv
+stats = tfdv.generate_statistics_from_csv(data_location="messages.csv")
+print(stats.datasets[0].features[0].string_stats.rank_histogram)
+```
+
+The output for one real dataset: 747 examples labeled `spam` against 4,827 labeled `ham`, a 13% positive class. No contract is violated and nothing upstream is broken; whether the imbalance is a problem is a modeling question. The point is that the question got raised at all: the fact surfaced on arrival, computed for every dataset by default, not because an analyst went looking.
+
+## The schema is the contract: presence, type, valency, domain
+
+Statistics describe what arrived; nothing yet states what should have arrived. The second ingredient is a *data schema*: a versioned, succinct description of the data's expected properties, held per feature. The entry TFX's own worked example uses, for an app-store `category` feature:
+
+```
+feature {
+  name: "category"
+  presence: REQUIRED
+  type: STRING
+  domain {
+    value: "GAMES"
+    value: "BUSINESS"
+  }
+}
+```
+
+Four clause families carry the contract. **Presence**: a minimum count and fraction of examples that must contain the feature. **Type**: string, integer, float. **Valency**: the minimum and maximum number of values per example (a single-valued feature that arrives as a list is a bug the type check alone misses). **Domain**: the value universe for a string feature, or the range for a numeric one. Richer properties are expressible, such as a constraint on a feature's distribution or an instruction to read `"TRUE"`/`"FALSE"` strings as booleans, but they involve thresholds that are hard to tune, and the paper is candid that some churn in the data is expected in any real deployment.
+
+Nobody writes the first schema by hand. TFDV infers one from the statistics of a sample (`infer_schema()`), and a human curates it: inference has seen only one dataset, so its initial domain list is a floor, not the truth. From then on the schema is versioned like code, and its history reads as the data's own changelog: which categories appeared when, which features were retired.
+
+This is the artifact <Ref lesson="features-at-scale">the feature lesson's</Ref> lifecycle discipline was missing. Coverage, ownership, and expected shape lived there as prose and habit; the schema makes each of them a clause a machine checks on every dataset, every day.
+
+## One detector, two opposite verdicts
+
+A checker that only finds violations is half a tool; what matters is what happens next, and the correct response is not a function of the anomaly. TFX's Figure 2 works one example through the schema above, an incoming record with `category: "EDUCATION"` and `num_impressions: "NULL"`, and the two anomalies it raises demand opposite actions.
+
+<Figure
+  src="./figures/tfx-schema-anomalies.png"
+  alt="A training example on the upper left lists category with value EDUCATION and num_impressions with value NULL. Below it, a schema declares category as a required STRING with a domain of GAMES and BUSINESS, and num_impressions as INT. Arrows carry both into a Data Validation Component box, which emits two panels on the right. The first reports, in red, that category has the unexpected feature value EDUCATION, and proposes Fix: Add value to domain, showing the domain block with a new red line adding the value EDUCATION. The second reports that num_impressions expected an INT value but found the string NULL, and proposes Fix: Deprecate feature, showing the feature block with a new red line setting deprecated to true."
+  caption="TFX's worked example: one record, one schema, two anomalies, and two machine-suggested fixes that point in opposite directions. Widening the domain accepts a change in the world; deprecating the feature blocks training until a broken producer is fixed."
+/>
+
+The first anomaly: `"EDUCATION"` is outside `category`'s domain of `{GAMES, BUSINESS}`. But the store had added an app category: the **world changed**, legitimately, and the data is telling the truth about it. The correct response is to widen the schema: add `EDUCATION` to the domain, and the anomaly becomes part of the normal state of the data. The second anomaly: the string `"NULL"` in `num_impressions`, an integer feature. No upstream legitimately writes the word `"NULL"` into a count; a producer is serializing missing values as text, and the **pipeline broke**. The correct response is the reverse of the first: mark the feature `deprecated: true`, which blocks training on it, and fix the producer. Widening the schema here would teach the contract to accept the bug.
+
+<Figure
+  src="./figures/triage-panel.svg"
+  alt="A triage flow: an anomaly report leads to the question, did the world change or did the pipeline break. The left branch, world changed, leads to evolve the schema, with the EDUCATION domain value as the riding example. The right branch, pipeline broke, leads to block training and fix upstream, with the NULL string in num_impressions as the riding example."
+  caption="Two anomalies, two opposite verdicts. Detection is mechanical; the branch taken is a human judgment about the world."
+/>
+
+### Anomalies are designed, not just detected
+
+The component's design principles concede that the human is part of the loop and engineer for it. An anomaly must be understandable at a glance, with a simple description that says how to debug it: "feature value out of range" qualifies; the paper's own anti-example, "the KL divergence between expected and actual distributions exceeded a threshold," does not. Every anomaly ships with the machine-generated schema change that would legalize it, so accepting evolution is one click. And anomalies are filed, tracked, and resolved like software bugs, because the stated goal is that teams treat data errors with the rigor they already give code errors.
+
+The economics behind the politeness are stated from experience: users who receive spammy or opaque alerts switch the checks off. A validator's false-alarm rate is not a nicety: it is the property that decides whether the validator is running at all six months later.
+
+<KeyFact>
+The suggested-fix design makes accepting schema evolution one click precisely so that blocking training is a deliberate act, never a default the triage falls into.
+</KeyFact>
+
+## Comparators: skew and drift as per-feature distances
+
+Everything above checks one dataset against the contract. The Google Play finding required something else: comparing two datasets against each other. The production vocabulary, following TFDV: *skew* is a difference between training data and serving data (two sources, same period); *drift* is a difference across successive iterations of one source (today's training data against yesterday's). Skew detection comes in three types.
+
+**Schema skew**: the two datasets do not conform to the same schema, as when a feature is a float in training and an integer in serving. This is the single-dataset machinery run on both sides. **Feature skew**: values that should be identical differ. TFDV joins training and serving examples on an identifier feature and compares the pairs value by value; this is <Ref lesson="training-serving-skew">the skew lesson's</Ref> single-example equality test, no longer run by hand on a handful of examples but over the fleet, continuously. **Distribution skew**: the joint check fails not on any pair but in aggregate; the distributions of a feature's values differ between the datasets, measured as a distance between the two statistics summaries.
+
+### Two distances, and why each population needs its own
+
+<Example title="an L∞ alert, computed">
+The `channel` feature of a retail order stream takes values in $\{\text{store}, \text{online}\}$. Training statistics: store 0.70, online 0.30. Today's serving statistics: store 0.59, online 0.41. The **L∞ distance** is the largest per-value share change:
+
+$$
+d_\infty = \max_v \left| p_{\text{train}}(v) - p_{\text{serve}}(v) \right| = |0.30 - 0.41| = 0.11.
+$$
+
+The alert this produces names a value and a movement: *online's share moved 11 points*. That is a sentence a debugging engineer can act on, which is exactly the actionability principle above; the same shift reported as a divergence score would say only "something moved."
+</Example>
+
+<Example title="a Jensen–Shannon alert, computed">
+`basket_value`, the order's total in euros, is numeric: no short list of named values, only a shape. Binned three ways (under €20, €20–50, over €50), training statistics give $P = (0.60, 0.30, 0.10)$ and today's serving statistics give $Q = (0.40, 0.30, 0.30)$. The **Jensen–Shannon divergence** compares each side against the midpoint histogram $M = \tfrac12(P+Q) = (0.50, 0.30, 0.20)$:
+
+$$
+\mathrm{JS}(P \,\|\, Q) = \tfrac12\,\mathrm{KL}(P \,\|\, M) + \tfrac12\,\mathrm{KL}(Q \,\|\, M),
+\qquad
+\mathrm{KL}(P \,\|\, M) = \sum_b p_b \log_2 \frac{p_b}{m_b}.
+$$
+
+The two halves, bin by bin:
+
+$$
+\mathrm{KL}(P \,\|\, M) = 0.60\log_2\tfrac{0.60}{0.50} + 0.30\log_2\tfrac{0.30}{0.30} + 0.10\log_2\tfrac{0.10}{0.20} \approx 0.158 + 0 - 0.100 = 0.058,
+$$
+
+$$
+\mathrm{KL}(Q \,\|\, M) = 0.40\log_2\tfrac{0.40}{0.50} + 0 + 0.30\log_2\tfrac{0.30}{0.20} \approx -0.129 + 0.175 \approx 0.047,
+$$
+
+so $\mathrm{JS}(P \,\|\, Q) \approx \tfrac12(0.058 + 0.047) = 0.052$: mass has moved toward larger baskets. Averaging against the midpoint makes the score symmetric, which a skew verdict requires (swapping which dataset is called "training" cannot be allowed to change the answer, and KL alone fails this), and with base-2 logarithms it is bounded in $[0,1]$: 0 for identical histograms, 1 for non-overlapping ones, so a threshold of 0.05 means the same thing on every numeric feature.
+</Example>
+
+For categorical features TFDV uses L∞; for numeric features it uses the Jensen–Shannon divergence over binned histograms. The split follows the populations: a categorical feature has a small set of named values whose shares can be compared one by one, so the alert can name the value that moved; a numeric feature has only a shape, and the distance has to aggregate movement across the whole histogram into one bounded score. The comparison is armed per feature in the schema itself, via `skew_comparator` and `drift_comparator` fields holding the alert thresholds, and a `num_examples_drift_comparator` bounds the day-over-day ratio of row counts: the check that catches a partition that failed to land.
+
+The admission owed here: the thresholds are hand-set. Nothing in the schema knows the cost of a missed skew or of a false page; teams tune until the pager is quiet and the incidents stop. <Ref lesson="drift-detection-in-practice">Module 6's drift lesson</Ref> puts statistical tests and cost models under this choice; this lesson's machinery is the vehicle those tests ride in.
+
+One property makes the train-versus-serve comparator the workhorse: it needs **no labels**. Rule #37's gap 3 (next-day versus live, <Ref lesson="training-serving-skew" id="measure-before-repairing-the-three-gaps">the skew lesson's instrument</Ref>) measures the performance cost of a pipeline discrepancy, but only after labels mature. The stats comparator sees the input-side discrepancy the day the data arrives and names the feature carrying it. One localizes the loss; the other localizes the cause, immediately.
+
+## Schema environments: one schema, two presences
+
+The skew lesson's final exercise ended against a wall this schema language cannot yet climb: the `position` feature is required in every training example and must be absent from every serving request, and a single global presence clause can state only one of those. The label has the same shape: present in training by definition, impossible at serving by definition.
+
+The resolution is *schema environments*. The schema declares named environments; by default every feature belongs to all of them, and `not_in_environment` / `in_environment` clauses restrict a feature to a subset. Validation of any dataset names the environment it should be judged in:
+
+```
+default_environment: "TRAINING"
+default_environment: "SERVING"
+
+feature {
+  name: "clicked_install"        # the label
+  type: INT
+  presence { min_fraction: 1.0 }
+  not_in_environment: "SERVING"
+}
+feature {
+  name: "position"
+  type: INT
+  presence { min_fraction: 1.0 }
+  not_in_environment: "SERVING"
+}
+```
+
+Under this schema, a training batch missing the label fails validation: the <Ref lesson="labels-and-feedback-loops">natural-label join</Ref> broke. And a serving request *carrying* the label fails validation too: something upstream has started joining the outcome into the request, which is <Ref lesson="data-leakage-and-splitting">leakage</Ref> caught not in a notebook audit but live, as a schema violation on production traffic. The presence check that would have paged forever on `position` is now a correct contract stated once.
+
+<Figure
+  src="./figures/schema-environments.svg"
+  alt="One schema card listing four features: store_id and avg_sales_28d required everywhere, and clicked_install and position carrying a not-in-serving clause. Two environment overlays read the card differently: the training overlay requires all four; the serving overlay requires the first two and forbids the last two."
+  caption="One schema, two environments: the same contract requires the label and position in training and forbids both at serving."
+/>
+
+## Google Play, end to end: from stats diff to +2%
+
+The machinery assembled, the incident that names this lesson can be read in full. Google Play's recommender serves the store's homepage: over a billion active users, a corpus of over a million apps, first cut down by a retrieval stage and then ordered by a ranking model, the funnel shape module 7 dissects. The ranking model trains continuously as fresh data arrives, on a dataset of hundreds of billions of examples, and fresh models ship daily behind a latency budget of tens of milliseconds.
+
+The team ran the skew comparator of "Comparators: skew and drift as per-feature distances": statistics of the serving logs against statistics of the training data, computed **on the same day**. Same-day matters: it rules out the world having moved between the two snapshots, so any disagreement is a pipeline property, <Ref lesson="training-serving-skew">the pipeline test</Ref> answered by construction. The finding: a few features were present in essentially every training example and missing from essentially every serving log. The model had learned weights on features that, live, silently fell back to defaults; every request was scored by a model partially blind in a way no offline metric could see, because offline evaluation ran on the training-side pipeline, where the features exist.
+
+Note what the instrument presupposed: serving logs with features in them, which is <Ref lesson="training-serving-skew">repair 1's</Ref> logging machinery; statistics over both sides, the descriptive machinery of "The gate in front of the trainer"; and a per-feature comparison, the comparator just named. The watchdog is the module's prior results composed, not a new idea.
+
+<FigureSequence
+  name="google-play"
+  alt="Three frames sharing one layout: a training-data panel and a serving-logs panel, each showing presence bars for four features — ctx_country, app_rating, installs_7d, dev_id — with an A/B readout strip along the bottom. Frame 1: ctx_country and dev_id match on both sides, app_rating nearly matches at 98% training against 97% serving, but installs_7d shows 100% presence in training against 0% in serving, labelled always missing live and highlighted; the A/B strip is empty. Frame 2: the fix computes installs_7d at request time, its serving bar rises to 100%, and the A/B strip reads running. Frame 3: the A/B strip resolves to control at index 100 against treatment at 102, a +2% install-rate lift on the main landing page."
+  caption="The incident in three moves: a same-day presence diff finds features training has and serving lacks, the fix closes the gap, and an online A/B converts the fix into a measured +2% install rate."
+/>
+
+<Task>
+Step through the three frames and state, at frame 1, why no offline metric had flagged the problem; name the pipeline the metric is computed on. At frame 3, name what the A/B experiment establishes that the frame-1 diff alone cannot.
+</Task>
+
+The team fixed the skew and measured the fix as an online A/B experiment: the app install rate on the store's main landing page rose 2%. At Play's traffic, a two-percent install lift is a product-line result, purchased by a data-plumbing repair with no change to the model: data quality measured as revenue, not as hygiene.
+
+As the module's closing application, the artifact's dependency list is worth stating explicitly. The schema is <Ref lesson="features-at-scale">the feature lifecycle</Ref> made checkable. The comparator is <Ref lesson="training-serving-skew">Rule #37's gap measurement</Ref> industrialized, running on repair 1's serving logs. The environments clause is <Ref lesson="data-leakage-and-splitting">the leakage guard</Ref> stated as a contract. Nothing in the component exists that the module did not build by hand first; the component's contribution is that no hand is needed.
+
+<KeyFact>
+A presence diff proves that a discrepancy exists; it cannot price one. A feature missing from every serving request costs nothing if the model learned negligible weight on it, so until an experiment runs, the damage is an inference from the mechanism, not a measurement. That is why the incident ends in an online A/B and not in the diff.
+</KeyFact>
+
+## The same contract without TFX: an expectation suite
+
+Nothing in the pattern is TensorFlow's. [Great Expectations](https://github.com/great-expectations/great_expectations) implements the same idea as executable assertions: an *expectation* is a schema clause as a function call, a *suite* is the schema, and a validation run over a new batch is the gate. The suite for Supermegaretail's nightly `fact_sales` increment, the roughly three million order lines a day that feed <Ref lesson="the-design-document">the demand forecast</Ref>:
+
+```python
+df.expect_table_columns_to_match_ordered_list(column_list=COLUMNS)       # schema adherence
+df.expect_table_row_count_to_be_between(2_600_000, 3_400_000)            # daily volume
+df.expect_column_values_to_not_be_null(column="store_id")                # presence
+df.expect_column_values_to_be_of_type(column="units_sold", type_="int")  # type
+df.expect_column_values_to_be_between("units_sold", 0, 5_000)            # domain (range)
+df.expect_column_values_to_be_in_set("channel", {"store", "online"})     # domain (set)
+df.expect_compound_columns_to_be_unique(
+    column_list=["store_id", "sku_id", "sale_date"])                     # duplicates
+df.expect_column_values_to_be_between("sale_date",
+    min_value=run_date - ONE_DAY, max_value=run_date)                    # freshness
+```
+
+Each line maps onto a clause from "The schema is the contract" (presence, type, domain) plus the two table-level checks the `num_examples` comparator covered: volume and freshness. The uniqueness expectation is the duplicate guard <Ref lesson="data-leakage-and-splitting">the leakage lesson</Ref> motivated: a doubled ingestion run puts identical rows on both sides of a split.
+
+Two of TFX's ideas the library does not carry natively. There are no environments, so the training table and the serving payload get two suites rather than one schema with overlays. And the bounds are constants rather than relative comparators: a day-over-day distribution comparison means feeding yesterday's statistics in as this run's parameters. The contract idea transfers whole; the continuous-training conveniences are what the platform added.
+
+<Figure
+  src="./figures/ge-checklist.svg"
+  alt="A checklist card titled fact_sales nightly validation, listing eight expectations with pass ticks on seven, and a failure mark on the row-count expectation, which reads 1.9 million observed against a 2.6 to 3.4 million bound, annotated as a missing store partition."
+  caption="One night's run of the suite: seven passes and a row-count failure, 1.9M rows against a 2.6–3.4M bound, the signature of a partition that failed to land."
+/>
+
+## What validation certifies, and who turns it on
+
+The boundary of the machine's promise has to be drawn exactly, because the module's own material supplies the counterexample. TFX's paper draws it with a label leak: training data that accidentally contains the label produces a model with excellent offline metrics (it passes every quality gate, since the holdout carries the leak too) and fails in production, where the label does not exist. The Play variant of the leak (feature present in training, absent live) is caught by this lesson's presence comparator. The <Ref lesson="training-serving-skew">as-of-now join's</Ref> variant is not: the leaked feature is present on both sides, correctly typed, in domain, its distributions nearly identical; every check in this lesson passes, and the model is still learning from its own future. Data validation certifies that inputs conform to a stated contract and that two datasets agree; it cannot certify that the mapping learned from those inputs generalizes. Gating the data is necessary and insufficient: the trained model needs a gate of its own, which is module 4's subject.
+
+### The adoption finding: on by default, or not at all
+
+Given the measured lift, one would expect product teams to have demanded validation. The paper's §5.5 records the opposite: when the component was first built, **no product team requested it**, and when it was explained, few teams activated it. The asymmetry is structural. The costs land immediately and on the adopter: configuration, compute, and above all the blocked push. A failed check means the system serves yesterday's model, a visible regression in freshness charged against an invisible risk. The value appears only when an incident that validation would have caught actually occurs; after their first such incident, the same teams activated everything. The conclusion TFX drew is the engineering-culture result of this lesson: ship validation **on by default**, configuration-free, because a protective system that must be opted into is adopted only after the damage it exists to prevent.
+
+<Remark title="the monitoring cousins (Sculley et al. §7)">
+The hidden-technical-debt paper's monitoring prescriptions are the same stance one layer up. *Prediction bias*: in a healthy system the distribution of predicted labels approximately matches the distribution of observed labels, a crude invariant (a null model passes it) but a cheap and surprisingly effective tripwire, sliceable for automated alerting. *Upstream producer SLAs*: every process feeding the learner should carry a service-level objective that accounts for the downstream ML system's needs, with upstream alerts propagated to the ML system's own control plane. In production these checks widen into a four-layer monitoring stack (software health, then raw inputs and features, then predictions, then accuracy), which is <Ref lesson="monitoring-and-observability">module 6's</Ref> subject.
+</Remark>
+
+What is established: the module's manufacturing line now ends in an automated gate. Streaming statistics run over every dataset; a versioned per-feature contract states presence, type, valency, and domain, with per-environment presence; skew and drift comparators carry the L∞ and Jensen–Shannon distances; a triage discipline separates the world changing from the pipeline breaking. Its measured worth is Google Play's install lift, and its honest limits are hand-tuned thresholds, schemas that lag reality, and a promise that stops at the data. Training data is gated; training itself is still a hand-run process. Module 4 industrializes it, with every model traceable to its code, data, and configuration, evaluated on slices behind validation gates, the whole loop orchestrated as a pipeline, beginning with <Ref lesson="experiment-tracking-and-versioning">tracking and versioning</Ref>.
+
+## Exercises
+
+<Exercise>
+Five anomaly reports arrive from the Supermegaretail validation gate overnight. For each, give the verdict (evolve the schema, or block and fix the pipeline) and name the check that caught it: (a) `payment_method` contains the unseen value `"BNPL"`, one week after the company launched buy-now-pay-later; (b) `unit_price`'s null fraction jumps from 0% to 22% overnight; (c) `store_id` arrives typed STRING where the schema says INT; (d) the nightly increment's row count drops 40% day over day; (e) duplicate `(store_id, sku_id, sale_date)` rows surge from none to 8% of the batch.
+
+<Solution>
+(a) **Evolve the schema.** Caught by the domain check on a categorical feature. The world changed: a payment method now exists that did not, and the data reports it truthfully; add `"BNPL"` to the domain. Blocking here would fight reality.
+
+(b) **Block and fix.** Caught by the presence clause (`min_fraction` on non-null values). Prices do not legitimately vanish from a fifth of order lines overnight; an upstream producer stopped populating the column. Training on 22% missing prices teaches the model an imputation artifact.
+
+(c) **Block and fix, then confirm intent.** Caught by the type clause (equivalently: schema skew between the new batch and the contract). An unannounced type change is a producer-side export change until proven otherwise. If the producing team confirms a deliberate migration, the verdict flips to schema evolution; the triage is a conversation with the owner, not a statistic.
+
+(d) **Block and fix.** Caught by the `num_examples` drift comparator on day-over-day row-count ratio. A 40% single-day drop is the signature of a partition that failed to land, not of demand; the ge-checklist figure's failing row is this case at 1.9M against a 2.6M floor.
+
+(e) **Block and fix.** Caught by the uniqueness check on the compound key. Duplicates mean an ingestion ran twice, and they are also a split hazard: identical rows land on both sides of a train/test split, the duplication leakage of <Ref lesson="data-leakage-and-splitting">the leakage lesson</Ref>.
+
+The pattern: of five detections, four are pipeline breaks and one is legitimate evolution, and nothing in the anomaly reports themselves says which is which. Each verdict required knowing something about the world (a product launch, a migration plan) that no statistic contains.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two comparators are armed in the Supermegaretail schema. `channel` (categorical) carries a `skew_comparator` with an L∞ threshold of 0.05. `basket_value` (numeric, binned as in the worked example: under €20, €20–50, over €50) carries a `skew_comparator` with a Jensen–Shannon threshold of 0.05. Training statistics: `channel` store 0.70, online 0.30; `basket_value` bins $(0.50, 0.40, 0.10)$. Today's serving statistics: `channel` store 0.62, online 0.38; `basket_value` bins $(0.35, 0.45, 0.20)$. Compute both distances and state which comparator pages.
+
+<Solution>
+`channel`: the L∞ distance is the largest per-value share change,
+
+$$
+d_\infty = \max\left(|0.70 - 0.62|,\; |0.38 - 0.30|\right) = 0.08.
+$$
+
+Against the 0.05 threshold the comparator trips: online's share moved 8 points, and the alert names the value.
+
+`basket_value`: the midpoint histogram is $M = \tfrac12(P+Q) = (0.425, 0.425, 0.15)$. The two halves:
+
+$$
+\mathrm{KL}(P \,\|\, M) = 0.50\log_2\tfrac{0.50}{0.425} + 0.40\log_2\tfrac{0.40}{0.425} + 0.10\log_2\tfrac{0.10}{0.15} \approx 0.117 - 0.035 - 0.058 = 0.024,
+$$
+
+$$
+\mathrm{KL}(Q \,\|\, M) = 0.35\log_2\tfrac{0.35}{0.425} + 0.45\log_2\tfrac{0.45}{0.425} + 0.20\log_2\tfrac{0.20}{0.15} \approx -0.098 + 0.037 + 0.083 = 0.022,
+$$
+
+so $\mathrm{JS} \approx \tfrac12(0.024 + 0.022) = 0.023$, below the 0.05 threshold: no page. One anomaly report goes out overnight, for `channel`.
+
+The quiet verdict is worth reading: `basket_value`'s largest single-bin change is 0.15, nearly twice `channel`'s movement, yet the JS score stays low. The two distances are different functionals on different scales. L∞ reads a raw share change directly, so 0.08 means eight points moved. JS is built from per-bin log ratios against the midpoint $M$, and those ratios stay mild here — the 0.15 move out of the 0.50 bin puts $p_b/m_b$ at only $0.50/0.425 \approx 1.18$ — while the positive and negative terms of each KL half partly cancel (0.117 against $-0.035 - 0.058$ above). A threshold of 0.05 therefore does not name the same magnitude of movement under the two distances; each threshold has to be read against its own distance's scale, which is why the schema arms one per comparator rather than one global constant.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. `units_sold` per store is heavy-tailed and strongly weekly-seasonal: weekend distributions sit far from weekday ones. A drift comparator is configured naively: Jensen–Shannon divergence between today's batch and yesterday's, fixed threshold. Show what this comparator does every Monday, propose the comparison baseline that behaves, and state what the repair admits about drift thresholds in general.
+
+<Solution>
+Every Monday the comparator compares Monday's distribution against Sunday's. Under weekly seasonality those are the two most dissimilar days of the week: the JS divergence spikes to roughly the same value every Monday, the threshold trips, and the pager fires on schedule, a false alarm with perfect attendance. By the alert-quality economics of the triage section, the check is then muted within a month, which is worse than never having armed it.
+
+The behaving baseline compares like with like: today's batch against the same weekday one week back (or against a pooled distribution of the last $k$ same-weekdays), so the comparison is Monday-versus-Monday and the seasonal component cancels. The threshold is then set from the historical spread of same-weekday distances: alarm when today's distance is extreme against that reference, not against an absolute constant.
+
+The admission: the detector's output depends on a modeling choice (the baseline window) that encodes what variation the team has decided is normal, and the threshold encodes tolerance, not cost. Nothing here knows what a missed drift costs the business or what a false page costs the on-call. Drift detection with actual statistical tests and explicit cost reasoning is <Ref lesson="drift-detection-in-practice">module 6's drift lesson</Ref>; this exercise is the reason it needs to exist.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Our data validation suite passes on every batch, so the model built from those batches is safe to ship." Use the label-leak boundary case to state precisely what data validation certifies, and what only model-side validation can.
+
+<Solution>
+The counterexample is the module's as-of-now join: a training set assembled with `spend_90d` joined from the current table rather than as of each label's timestamp. Every clause passes: the feature is present, correctly typed, in range; its distribution differs negligibly from the serving store's values; no comparator fires. The offline metrics are excellent, because the feature contains the label's own future. Live, the online store serves as-of-now values that contain no future, the signal evaporates, and the model underperforms every number that certified it. Data validation passed; the model was not safe.
+
+What data validation certifies: that inputs conform to a stated per-feature contract (presence, type, valency, domain, per-environment presence) and that two datasets agree in distribution. The step the claim skips: safety of the *model* depends on properties of the feature–label relationship across time (leakage, generalization) that per-feature statistics cannot see, since each feature is individually unremarkable.
+
+The complement is a gate on the trained artifact itself: evaluation against a baseline on held-out and next-day data, on slices, with a safe-to-serve check, the model validation of module 4's <Ref lesson="offline-evaluation">evaluation lesson</Ref>. TFX runs both gates precisely because each catches what the other structurally cannot: corrupted data can produce a model that passes model validation (the leak), and clean data can still produce a bad model (a training bug), so neither gate substitutes for the other.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped. Reconstruct the Google Play incident as a numbered six-step argument from first measurement to business result. Mark which step is correlational (a discrepancy observed, damage inferred) and state where the online A/B closes the inferential loop.
+
+<Solution>
+1. Serving-time features are logged per request (repair 1's machinery), so a serving-side dataset with features exists at all.
+2. Descriptive statistics are computed over both the serving logs and the training data for the same day: same world, two pipelines.
+3. The per-feature presence comparison finds a small set of features at ~100% presence in training and ~0% in the serving logs.
+4. Inference: the model, trained with real values on those features, receives defaults live, so its serving-time predictions are degraded relative to its offline evaluation. **This is the correlational step**: the diff proves the discrepancy of step 3, but the damage is inferred from the mechanism, not measured; a feature can be always-missing live and cost nothing (the model may have learned negligible weight on it).
+5. The skew is removed: the features are made available on the serving path (or excluded from training), so the trained and served input distributions agree.
+6. An online A/B experiment compares the fixed system against the incumbent on live traffic: +2% app-install rate on the main landing page. **This is where the loop closes**: randomized assignment converts step 4's inference into a measured causal effect of the fix; the discrepancy was not merely present but was costing installs.
+
+The order matters: steps 2–3 are cheap, label-free, and run daily; step 6 is expensive and runs once per fix. The validation pipeline's role is to make step 3 automatic so that step 6 is only ever spent on discrepancies that exist.
+</Solution>
+</Exercise>
+
+<Exercise>
+Write the schema. Give full entries (type, presence, valency, domain, and environment clauses where needed) for four features of the Supermegaretail demand-forecast training data: `store_id`; `avg_sales_28d`; the label `units_sold_next_7d`; and `flyer_slot`, the position a SKU occupied in the weekly promotional flyer, known for past weeks but undecided at forecast time.
+
+<Solution>
+```
+default_environment: "TRAINING"
+default_environment: "SERVING"
+
+feature {
+  name: "store_id"
+  type: INT
+  presence { min_fraction: 1.0 }     # every row names its store
+  value_count { min: 1 max: 1 }      # single-valued
+  int_domain { min: 1 max: 3000 }    # the chain's store range
+}
+feature {
+  name: "avg_sales_28d"
+  type: FLOAT
+  presence { min_fraction: 0.95 }    # new SKUs lack 28 days of history
+  value_count { min: 1 max: 1 }
+  float_domain { min: 0.0 }          # a mean of nonnegative sales
+}
+feature {
+  name: "units_sold_next_7d"         # the label
+  type: INT
+  presence { min_fraction: 1.0 }
+  value_count { min: 1 max: 1 }
+  int_domain { min: 0 }
+  not_in_environment: "SERVING"      # exists only after the target week
+}
+feature {
+  name: "flyer_slot"
+  type: INT
+  presence { min_fraction: 1.0 }
+  value_count { min: 1 max: 1 }
+  int_domain { min: 1 max: 24 }      # slots in the weekly flyer
+  not_in_environment: "SERVING"      # undecided at forecast time
+}
+```
+
+Two judgment calls carry the content. `avg_sales_28d`'s presence floor is deliberately below 1.0: requiring full presence would page on every new SKU, the false-alarm pattern that gets validators switched off. And `flyer_slot` is this domain's positional feature: real in training, absent at forecast time, the same per-environment asymmetry as the label, and usable only under <Ref lesson="training-serving-skew">the skew lesson's</Ref> confinement discipline, additive and never crossed with the features the forecast depends on.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. Rule #37 decomposes training–serving skew into three gaps. Which gap does the same-day serving-versus-training statistics comparison instrument, which gap does it structurally miss, and what standard practice already measures the missed one?
+
+<Solution>
+The comparison instruments **gap 3**, next-day versus live: the pipeline-discrepancy gap. It measures the input side of that gap: features whose presence, values, or distributions differ between what training consumed and what serving computed, on the same day, so the world's movement is controlled for. It does so without labels, which is why it can run daily while gap 3's performance reading waits for labels to mature.
+
+It structurally misses **gap 1**, train versus holdout. Both of those datasets are produced by the same pipeline from the same distribution, so a statistics comparison between them passes by construction, no matter how badly the model overfits, because overfitting is a property of the model's fit, not of the data's distribution. (Gap 2, holdout versus next-day, it sees partially: the drift comparator watches the same input distributions move day over day, though the performance cost of staleness still needs labeled next-day evaluation.)
+
+The missed gap is already measured by the oldest tool in the course's inventory: ordinary offline evaluation, the train and holdout metrics every training run reports, from classical practice long before any of this module existed. The moral is the two-gate conclusion of the closing section: data-side instruments and model-side instruments partition the failure space, and neither covers the other's half.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward. This lesson's gate blocks bad data from reaching the trainer. A production pipeline gates two further artifacts downstream of the data. Name both, and state what each gate would check.
+
+<Solution>
+The **trained model** is the first. Its gate, model validation, checks that the candidate is safe to serve (loads without crashing, tolerates malformed inputs, fits its resource budget) and that its prediction quality clears both a fixed threshold and the live baseline model, evaluated on slices rather than only in aggregate so that a win on average cannot hide a loss on a subgroup. That gate is the subject of <Ref lesson="offline-evaluation">module 4's evaluation lesson</Ref>.
+
+The **deployment** is the second. Its gate checks the push itself: the new model rolls out to a bounded slice of traffic first, is compared against the incumbent on live metrics, and is promoted or rolled back automatically, with the pipeline that produced it tested and versioned like any other software, so a failed gate is reproducible rather than a mystery. The pipeline-and-CI/CD half is <Ref lesson="pipelines-and-orchestration">module 4's orchestration lesson</Ref>.
+
+The three gates in sequence (data in, model out, deployment live) are the skeleton of the platform this module's watchdog belongs to; module 4 assembles them, and its closing lesson reads the original TFX pipeline as exactly this gate sequence.
+</Solution>
+</Exercise>
+
+<References>
+1. D. Baylor et al., "TFX: A TensorFlow-Based Production-Scale Machine Learning Platform," KDD 2017: §3.1 (streaming descriptive statistics), §3.3 (the schema, Figure 2's anomaly pair, the actionable-anomaly design principles), §5.5 (the adoption finding), §7 (the Google Play case study and the +2% install result). https://storage.googleapis.com/gweb-research2023-media/pubtools/4795.pdf
+2. R. Crowe, H. Hapke, E. Caveness, D. Zhu, *Machine Learning Production Systems*, O'Reilly, 2024. Ch. 2 (pp. 15–19): TFDV, the three skew types, L∞ and Jensen–Shannon distances, the spam/ham statistics example; Ch. 4 (pp. 46–47): schema environments, `skew_comparator`/`drift_comparator`, `num_examples_drift_comparator`.
+3. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018: Rule #37 (the three-gap decomposition this lesson's comparator instruments), Rules #29–#32 (the serving-feature logs the comparison runs on). https://developers.google.com/machine-learning/guides/rules-of-ml
+4. G. Mohandas, *Made With ML*, the "Testing" lesson: expectation suites in Great Expectations, including the schema, type, null, uniqueness, and leak expectations the Supermegaretail suite adapts. https://madewithml.com/courses/mlops/testing/
+5. D. Sculley et al., "Hidden Technical Debt in Machine Learning Systems," NeurIPS 2015: §7, prediction bias and upstream-producer SLAs as monitoring starting points.
+6. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022: Ch. 8 (pp. 251–255), the four monitorable artifact families (accuracy metrics, predictions, features, raw inputs) that module 6 takes up.
+</References>

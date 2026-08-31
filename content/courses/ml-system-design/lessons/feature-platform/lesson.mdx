@@ -1,0 +1,248 @@
+A feature platform is the module's material assembled into one system: a columnar warehouse for training reads, a replicated key-value store for millisecond serving reads, and a stream pipeline keeping the two in step.
+
+The module's substrate is complete: engines matched to their access patterns (<Ref lesson="storage-and-data-models">the storage lesson</Ref>), copies that disagree by bounded lag (<Ref lesson="replication">replication</Ref>), keys that decide ownership (<Ref lesson="partitioning">partitioning</Ref>), logs that replay (<Ref lesson="queues-and-logs">queues and logs</Ref>), and the two computation machines whose output split, static versus streaming features, closed <Ref lesson="batch-and-stream-processing">the previous lesson</Ref>. What stands open is the storage lesson's fourth placement: at serving time a model needs an OLTP-shaped read of warehouse-shaped data, and no single engine provides it. The system that closes it is [Feast](https://docs.feast.dev/), the open-source feature store, every component of which is one of this module's mechanisms wearing a product name; Uber's Michelangelo and Airbnb's Zipline are the same assembly with different names in the boxes.
+
+The route: the read–write skew that forces the two-store split; Feast's boxes mapped one-to-one onto the module's lessons; the precomputation hierarchy that decides who computes each feature and when; the catalog that turns features into governed products; and the two seams where the assembly falls short of the ideal it is sold on.
+
+## The read–write skew: one feature table, two request shapes
+
+Supermegaretail, the grocery chain of about 3,000 stores whose demand forecast <Ref lesson="the-design-document">the design document</Ref> specified, touches its feature data in exactly two ways, and the two ways have nothing in common. The first is the training read. Assembling a training set means fetching the feature history for every store over two years: $3{,}000 \times 730 \approx 2.19$ million store-day rows, 60 features wide, about 0.5 GB in columnar form. The read is enormous, it happens a few times a day at most, and nobody is waiting on a spinner: minutes are acceptable. Throughput is the only requirement.
+
+The second is the serving read. A prediction request needs the *current* feature vector for one store: 60 values, roughly 300 bytes. The budget was derived in <Ref lesson="storage-and-data-models">the storage lesson</Ref>'s closing exercise: with 25 parallel feature reads per request and at most 5% of requests allowed to exceed 20 ms, the amplification formula $1-(1-p)^{25} \le 0.05$ forces each read to hold 20 ms at roughly its p99.8. Latency is the only requirement; the bytes are trivial.
+
+### Each store fails the other's request
+
+Aim each request at the wrong engine and the mismatch is quantitative, not aesthetic. The warehouse serves the training read natively: a columnar scan over 0.5 GB is seconds of work, which is why <Ref lesson="storage-and-data-models">the storage lesson</Ref> put training-set assembly there. Aimed at the serving read, the same engine misses the budget by two to three orders of magnitude: an analytical engine locates rows by scanning, not by key, and its planner and distributed execution machinery cost hundreds of milliseconds before any byte is read.
+
+A key-value store fails the opposite way. A Redis-class store answers a point read in under a millisecond, but it holds one value per key, the latest, so two years of history is simply not in it. Even a KV store that kept history would answer the training read one key at a time: 2.19 million point reads at half a millisecond each is eighteen minutes of sequential fetching to move what the warehouse scans in seconds. No single database does terabyte-scale scans and millisecond point reads; every engine in the storage lesson bought one by giving up the other.
+
+<Figure
+  src="./figures/read-write-skew.svg"
+  alt="Two request cards and two store boxes. The training read, 2.19 million store-day rows in bulk with minutes acceptable, connects with a check mark to the columnar warehouse and with a crossed-out arrow to the key-value store, annotated that only latest values are held and bulk fetch runs key by key. The serving read, one store's 60-value vector in 20 milliseconds at p99.8, connects with a check mark to the key-value store and with a crossed-out arrow to the warehouse, annotated seconds per query, no key index."
+  caption="The read–write skew: each request shape has exactly one store that can serve it, and it is not the same store."
+/>
+
+This asymmetry is the *read–write skew*, and it is the feature platform's design driver. The split into an offline and an online store is not a vendor convention; it follows from the physics of the module's storage engines the way the two broker families followed from delivery semantics.
+
+<KeyFact>
+The two stores are the assembly's easy half: each is a stock engine doing exactly what this module said it does. The discipline of keeping them in step is where the failures live: both consistency seams in this lesson's closing section open in the copying between the stores, not inside either engine.
+</KeyFact>
+
+## Feast, component by component: every box is a module lesson
+
+The two-store conclusion names an architecture; Feast is the concrete instance this lesson reads. Feast was open-sourced in January 2019 by Google Cloud and Gojek, the Indonesian ride-hailing and delivery platform, and its original architecture is three named technologies: BigQuery as the offline store, Redis as the online store, and ingestion jobs on Apache Beam, a processing framework in which one pipeline definition runs as either a batch or a streaming job. Each box answers to a lesson of this module.
+
+<Figure
+  src="./figures/feast-architecture.svg"
+  alt="Feast's architecture with each component color-tagged by the module lesson that explains it. On the left, two sources: a Kafka events topic and warehouse batch tables. Both feed an ingestion job, tagged as the batch and stream lesson's machine, which forks into two writes: one into the offline store, BigQuery, tagged as the storage lesson's columnar warehouse, and one into the online store, Redis, tagged as the replication and partitioning lessons' key-value store. Below, a training job reads the offline store via get_batch_features and a prediction service reads the online store via get_online_features. A registry box holds FeatureSet declarations of entities, features, and sources. The fork from ingestion into two stores is bracketed and labeled as the seam: one declaration, two writes."
+  caption="Feast's stack read against module 2: warehouse = storage lesson, Redis = replication + partitioning, ingestion = the stream machine, and the fork between the stores is the seam the last section examines."
+/>
+
+### The offline store is the warehouse, unchanged
+
+Feast's offline half is BigQuery: the columnar, append-mostly analytical store of <Ref lesson="storage-and-data-models">the storage lesson</Ref>, holding the full history of every feature value ever ingested. What Feast adds is a retrieval contract, not an engine: `get_batch_features` takes a frame of entities and timestamps and returns the joined training set, executed as the OLAP scans the warehouse exists for. The join is documented as *point-in-time correct*: each row receives feature values as of its own timestamp, never later ones. Why the as-of join is a correctness requirement rather than a convenience is the next module's opening subject.
+
+### The online store is a replicated, partitioned KV
+
+Feast's online half is Redis, holding, per entity, only the *latest* value of each feature: a serving read is a point fetch of one small row, which is what makes the p99.8 budget holdable. Everything the module established about such stores applies literally. The keyspace is partitioned by hashed entity key (Redis Cluster's 16,384 hash slots are <Ref lesson="partitioning">the partitioning lesson</Ref>'s fixed partitions), so a viral entity is a hot key, and the mitigation bill from that lesson stands. Reads are served by replicas, so the store's consistency posture is the one <Ref lesson="replication">the replication lesson</Ref> ended on: eventual, with lag anomalies priced in, which a feature read tolerates easily because its values are already minutes old by construction.
+
+### Ingestion is one declared computation, written to both stores
+
+Data enters through a `FeatureSet`: a registered declaration naming the entities (the lookup keys: `store_id`, `customer_id`), the features, and the source, which is either a batch table or a Kafka topic. Registration starts a Beam job that populates *both* stores from that one declaration. This is <Ref lesson="batch-and-stream-processing">the previous lesson</Ref>'s unification argument enforced by a platform: the two-pipeline bug, one feature logic maintained by two teams in two codebases, becomes unwritable for stored values, because there is exactly one computation of each and both stores receive its output. The *entity* is simultaneously the join key for training-set assembly and the partition key for serving, one column doing both lessons' jobs.
+
+<Remark title="the vendor landscape, once">
+The pattern predates Feast. Uber's Michelangelo, described publicly in September 2017, is its origin: Spark and Hive computing offline features, Cassandra serving online ones, with the offline store synced into the online store once or several times a day. Airbnb's Zipline (Spark and Flink over Hive) and the open-source Hopsworks (Hive offline, MySQL Cluster online) vary the stack, never the shape: a processing engine, dual stores, a metadata layer, an API. Feast itself has since been rebuilt as a much thinner layer: the built-in Beam engine was dropped, a *materialization* job now copies offline values into whatever online store is plugged in, and the two-store shape survived the rewrite intact, the strongest evidence that the shape, not any stack, is the pattern.
+</Remark>
+
+## The precomputation hierarchy: freshness is bought per level
+
+The architecture fixes where values live; it says nothing about when a value is computed, or from what. Computing every feature from raw events is the naive reading, and its cost is concrete. Supermegaretail books about 3 million order lines a day across its 3,000 stores, the storage lesson's `fact_sales` volume. A 30-day spend feature per store, recomputed nightly from raw events, rescans 90 million rows every night to refresh 3,000 numbers.
+
+The production answer is a hierarchy of *preaggregation*: raw events are aggregated once into per-entity, per-day sums, and windowed features are computed from those sums, never from raw data.
+
+<Example title="the reuse arithmetic">
+Level 1 materializes store-day aggregates nightly: for each of 3,000 stores, yesterday's revenue, order count, and item count. That is 3,000 new rows per night, computed from the 3 million raw lines exactly once. Level 2 then computes `spend_30d` per store by summing 30 daily rows: $3{,}000 \times 30 = 90{,}000$ rows read, against 90 million from raw, a factor of 1,000. The siblings come almost free: the 7-, 30-, and 90-day windows all sum the *same* level-1 rows over different ranges, so adding a window adds a query over 3,000 × window-length rows, not another pass over raw events.
+</Example>
+
+<Exercise>
+Two years after launch, a new feature `spend_90d` is added and must be backfilled over the full two-year history so training sets can use it. Compute the rows read to backfill from level-1 daily sums versus from raw events, using the volumes above, and state the additional condition on level 1 that the backfill silently relies on.
+
+<Solution>
+From level 1: each of the 730 backfill dates needs, per store, the trailing 90 daily rows, but a single ordered scan of the store-day table suffices: $3{,}000 \times 730 \approx 2.19$ million rows read once, with a running 90-day sum per store. From raw: the same scan runs over $730 \times 3 \times 10^6 \approx 2.2$ billion order lines, the same factor of 1,000. The silent condition: level 1 must itself have been retained for the full two years. Preaggregates are derived data, cheap to keep and expensive to regret; a platform that expires them loses the ability to backfill any new window cheaply, and falls back to the raw-event scan, which works only as long as the raw events are retained in the lake or the log.
+</Solution>
+</Exercise>
+
+### The streaming level: features that cannot wait for tonight
+
+The nightly cadence has a floor: no level-1 feature is ever fresher than the last batch run. A feature like `orders_30min` per store, the serving-time signal <Ref lesson="storage-and-data-models">the storage lesson</Ref>'s exercise found no engine for, needs the stream machine: the hopping-window job built in <Ref lesson="batch-and-stream-processing">the previous lesson</Ref>'s closing exercise, six 5-minute buckets per store, writing the online store on every 5-minute emission. Its training-time history does not come from the stream job at all: the raw order events land in the warehouse anyway, and the offline value for any past timestamp is recomputed there from retained events. One serving request then reads both populations in a single `get_online_features` call: batch-computed features and stream-computed features are written on different cadences by different machines, and consumed identically.
+
+<FigureSequence
+  name="hierarchy"
+  alt="Three frames of one layout: three hierarchy columns, raw order events, store-day aggregates, and windowed features, with the offline and online stores at the right edge. Frame 1 shows only raw order lines flowing into the events log and lake. Frame 2 adds the nightly batch path: raw lines aggregate into store-day rows, windows of 7, 30, and 90 days sum the daily rows, and the results are written to both stores. Frame 3 adds the streaming path: a 30-minute hopping window computed directly from the event stream writes the online store every 5 minutes, and the layout shows both paths landing in the stores together."
+  caption="The precomputation hierarchy over Supermegaretail's orders: raw events aggregated once, windows computed from the aggregates, and the streaming level bypassing the nightly cadence for the freshest features."
+/>
+
+<Task>
+Step through the three frames and assign each of `spend_30d`, `avg_basket_7d`, and `orders_30min` its computing machine, its refresh cadence, and the store or stores it lands in.
+</Task>
+
+<KeyFact>
+A feature's place in the hierarchy is set by its staleness budget, not by its formula: what may be a day old is summed nightly from shared per-day aggregates at a thousandth of the raw-scan cost, and what must be minutes old is a stream job's window writing the online store directly. The same feature table therefore has two producers on two cadences, which is exactly where the last section's consistency seam opens.
+</KeyFact>
+
+## The second product: a catalog, not a database
+
+With storage and computation placed, the remaining work looks like plumbing. The record of running platforms shows the opposite: by 2017 Uber counted roughly 10,000 features in Michelangelo's store across its teams, and at that scale the binding constraint is no longer computing features but knowing what exists, what it means, and who answers for it. The platform's second product is management, and it is the harder one.
+
+The economics are the before/after of duplicated work. Without a platform, three teams (demand forecasting, churn, fraud) each need "customer spend over 90 days," each implement it from the same raw tables, and the three implementations differ in ways nobody chose: one uses calendar days, one a rolling window, one excludes refunds. Three pipelines run, three definitions drift, three teams debug the same logic separately. With a platform, one owned feature is computed once and consumed three times, and a fourth team starts its model by *searching the catalog* instead of writing ingestion code.
+
+<Figure
+  src="./figures/before-after.svg"
+  alt="Two panels. Before: three team boxes, forecast, churn, and fraud, each with its own pipeline computing a variant of customer 90-day spend from the same raw orders data, annotated with their divergent definitions: calendar days, rolling window, excludes refunds. After: the same raw data feeds one governed feature, spend_90d version 3 with a named owner, consumed by all three models. A tally line reads three pipelines, three definitions, three bug surfaces, versus one pipeline, one definition, N consumers."
+  caption="The platform's economic argument: compute once, govern once, consume N times, and every consumer is on record."
+/>
+
+### What a governed feature carries
+
+A feature in the catalog is a documented artifact, not a column. The working definition has four parts: a **name** (`spend_90d`), a **description** in natural language, **metadata** (owner, update schedule, entity key, input and output types, whether it is served online), and the **definition** itself, the versioned code that computes it. Google's Rules of ML makes the ownership half a named rule (Rule #11: give feature columns owners and documentation), for the plain reason that features outlive the person who built them. The catalog surfaces the rest: value distributions, lineage, and the list of models consuming each feature.
+
+Two of those fields carry the correctness load. **Versioning:** a change to a feature's calculation (a new data source, a fixed bug, an "improvement") must become a new version, backfilled over history into its own column, never an in-place overwrite. Otherwise every training set assembled across the change silently mixes two definitions of one column, and no offline metric will say so. **Lineage:** the hierarchy of the previous section makes features depend on other features, so each one carries its dependency graph — which level-1 aggregates feed it, which children consume it. A changed parent triggers a wave of child reversions, and the lineage graph is what makes the wave enumerable instead of discovered in production.
+
+<Figure
+  src="./figures/lineage-wave.svg"
+  alt="A dependency graph in three columns. Level-1 daily aggregates on the left: store_day_revenue, marked as changed to version 2, and store_day_orders, unchanged. Level-2 windows in the middle: spend_7d, spend_30d, and spend_90d, all fed by the changed revenue aggregate and highlighted for re-versioning; orders_30d, fed by the unchanged aggregate, stays unhighlighted. Consumers on the right: a forecast model reading spend_30d and orders_30d, and a fraud model reading spend_90d, both flagged to retrain on version-2 inputs. An annotation names the highlighted nodes as the wave: everything reachable from the change."
+  caption="One changed level-1 aggregate re-versions every descendant — three windows and both consuming models — and the lineage edges make that wave an enumerable list instead of a production discovery."
+/>
+
+The catalog also prices what sharing costs. <Ref lesson="ml-in-production">The debt taxonomy</Ref> named undeclared consumers and CACE (changing anything changes everything) as system-level risks; a shared feature is both at once. Compute-once converts three duplicated pipelines into one, and converts three independent models into three coupled consumers of a single definition: improving `spend_90d` for the forecast team changes the fraud model's input distribution the same night. The consumer list does not remove that coupling. It makes it visible before a change ships instead of after, which is the difference between a migration and an incident.
+
+## Where the assembly leaks: two consistency seams
+
+Read this far, the platform looks like it closes the module's consistency story: one declaration, one computation of each value, two synchronized stores. It narrows the story. Two seams stay open, and both are module-2 mechanisms wearing feature-store clothes; both are points where the artifact departs from the idealisation.
+
+### Seam one: two stores, one truth, eventually
+
+Ingestion writes two systems. That is the shape <Ref lesson="queues-and-logs">the queues lesson</Ref> named the dual write, softened (one writer, one computation) but not dissolved: a job can fail between its two writes, and the pattern's own documentation concedes that ingestion must handle "partial failure or race conditions that might cause some data to be in one storage but not the other." The routine case needs no failure at all: the two stores refresh on different cadences by design. The online store takes a stream job's emission within minutes; the offline store takes the nightly load. In Michelangelo the offline store syncs into the online one once or several times a day, and modern Feast's materialization job is the same scheduled copy.
+
+The consequence is precise: at one wall-clock moment, the same (entity, feature) pair can answer differently online and offline. `orders_30min(store 17)` reads 412 from the online store while the warehouse's freshest value is last night's; a data scientist debugging a live misprediction against the warehouse is not reading what the service read, and a skew monitor comparing serving traffic against warehouse data sees phantom drift inside the window.
+
+<Figure
+  src="./figures/consistency-seam.svg"
+  alt="A wall-clock timeline with two step-function lanes for one feature, orders_30min for store 17. The online lane, updated every five minutes by the stream job, steps frequently and reads 412 at a marked instant. The offline lane, updated once at the nightly batch load, holds last night's value 396 at the same instant. The band between the two lanes after the online update and before the next batch load is shaded and labeled as the eventual-consistency window: same feature, same moment, two answers. The nightly load tick closes the gap."
+  caption="The seam, drawn: between refreshes the two stores answer differently for the same feature at the same moment. The window is bounded by ingestion lag, and it never closes permanently: it reopens at the next emission."
+/>
+
+Against the module's ideal the departure is exact. <Ref lesson="queues-and-logs">CDC's promise</Ref> was that every derived store follows one ordered truth; the feature platform implements the shape (both stores are downstream of the same events) but not the guarantee, because the two follow at different offsets and nothing orders a read across them. The window is bounded by ingestion lag, minutes to a day, and bounded is the most that can be said.
+
+### Seam two: consistent storage is not consistent transformation
+
+The platform guarantees that training and serving fetch the same stored values. The prevalent conclusion, that a feature store therefore makes training–serving skew impossible, is false, and the failure is worth stating causally. Skew lives wherever two implementations of one computation exist. The store eliminates the duplicated *feature pipeline*; it does nothing about computation applied after the fetch. A training job that normalizes `spend_90d` by the training set's mean, beside a service that normalizes by a constant from a config file, has reintroduced the two-pipeline bug one layer up: same stored value, two model inputs, and no offline metric can see it, because the offline pipeline is the wrong one of the pair. The store shrinks the skew surface from "every feature" to "every post-fetch transform"; shrinking is not closing. The closing moves (baking transforms into the model artifact, logging the features serving actually used) belong to <Ref lesson="training-serving-skew">module 3's skew lesson</Ref>, and the exercises below construct the counterexample.
+
+<Figure
+  src="./figures/post-fetch-fork.svg"
+  alt="One feature store box holding spend_90d equal to 412 forks into two lanes past a dashed line labeled as where the store's guarantee ends. The training lane standardizes 412 with mean 350 and deviation 80 computed from the training frame, producing model input 0.78. The serving lane standardizes the same 412 with constants 300 and 60 from a months-old config, producing model input 1.87. A green annotation marks the two fetches as byte-identical; the mismatched inputs are annotated as skew no offline metric sees."
+  caption="Seam two, drawn: both sides fetch the identical stored 412, and the two post-fetch transforms turn it into 0.78 for training and 1.87 for serving — the two-pipeline bug rebuilt one layer above the store."
+/>
+
+The same module owns the platform's remaining promise. `get_batch_features` joins features *as of* each training row's timestamp; join as of now instead, and features absorb events from after the label. <Ref lesson="data-leakage-and-splitting">The next module's leakage lesson</Ref> gives that bug its name.
+
+What is established: the read–write skew forces every feature platform into an offline columnar store and an online partitioned KV; Feast's boxes (BigQuery, Redis, Beam ingestion, entity keys) are the module's storage, replication-plus-partitioning, and stream lessons instantiated; the precomputation hierarchy sets each feature's level by its staleness budget and pays raw-scan cost exactly once; and the catalog turns features into owned, versioned, lineage-tracked products whose consumers are declared. The substrate's account is complete: data at rest, data in motion, and both assembled into the component every later serving decision reads from. What the platform cannot certify is that the values flowing through it are *right*: that labels mean what the loss assumes, that splits do not leak the future, that transforms are one implementation across the train/serve boundary. Manufacturing correct training data is module 3: it opens with labels — where they come from and what feedback loops they close — and then takes up the leakage and the train/serve transform boundary that this lesson's two seams point at.
+
+## Exercises
+
+<Exercise>
+Place each feature at its level of the hierarchy and name the store or stores it must occupy: (a) customer age; (b) customer 90-day spend; (c) contents of the customer's cart right now; (d) store's median order-assembly time over the last month; (e) a pretrained item embedding; (f) clicks on an item in the last 10 minutes.
+
+<Solution>
+(a) An entity attribute, not an aggregate: level 1 at most (copied nightly from the OLTP profile table). Both stores: online for serving; offline so training sets see the age *as of* each historical row.
+
+(b) Level 2: a window summed from level-1 customer-day spend rows, refreshed nightly. Both stores.
+
+(c) Current state, no window: the streaming level, maintained from cart events. Online only: its training-time counterpart is reconstructed from the event history in the warehouse, not stored as it happens.
+
+(d) Level 2 over level-1 store-day values, with the batch-and-stream caveat that medians are not mergeable from sub-aggregates without approximation, so the nightly job computes it from the month's retained daily detail (or an approximate sketch). Both stores.
+
+(e) Not in the event hierarchy at all: an expensive model output, computed when the item changes, versioned like code (the model that produced it is part of the lineage). Both stores: online for serving lookups, offline for training joins.
+
+(f) The streaming level: a 10-minute hopping window writing the online store. Online for serving; offline values recomputed from the retained click events when training needs them.
+
+The two discriminators, used six times: how stale may the value be (level), and which request shapes read it (stores).
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a Supermegaretail model uses only batch features (all level 1–2, refreshed nightly) and is itself retrained nightly. Show that the online store can be deleted from this system's architecture, name what replaces it, and state exactly which product requirement forces it back in.
+
+<Solution>
+With every feature frozen between nightly runs, a prediction's inputs for a given store change only once a day, so the predictions themselves can be precomputed in the same nightly batch, for all 3,000 stores, and written to a plain table. The serving path becomes a lookup of a precomputed prediction: no feature fetch, no online store, no model in the request path at all. (This is batch prediction, and <Ref lesson="batch-and-online-prediction">module 5's opening lesson</Ref> makes it the first of its three serving architectures.)
+
+What forces the online store back is any requirement that a prediction reflect the world *fresher than the batch period*: the moment the product needs `orders_30min` (a demand spike this afternoon, not yesterday's), the input can no longer be enumerated in advance, the prediction must be computed at request time, and a sub-20 ms feature read reappears with the store that serves it. The online store is not part of the feature-platform definition; it is the price of the first streaming feature.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "We moved every feature into the feature store, so training–serving skew is impossible now: both sides read the same values by construction." Construct a concrete counterexample in which every stored value is identical on both sides and the model is still served different inputs than it trained on, and name the module-3 lesson that closes the gap.
+
+<Solution>
+Let `spend_90d` live in the store, correct and identical on both sides. The training pipeline, before fitting, standardizes it: subtract the training set's mean and divide by its standard deviation, computed from the assembled frame. The serving code standardizes too, using mean and deviation constants pasted into the service's config six months ago. The stored value 412 becomes $\,(412-\mu_{\text{train}})/\sigma_{\text{train}}$ in training and $(412-\mu_{\text{cfg}})/\sigma_{\text{cfg}}$ in serving; as the spend distribution drifts, the two inputs diverge while every fetch remains byte-identical. The refuted claim's failing step is the scope of "the same values": the store guarantees consistency of *storage*, and skew is a property of the whole computation ending at the model's input, which here has two implementations one layer above the fetch. The gap is closed by making the post-fetch transform single-sourced: baked into the model artifact, or eliminated by logging what serving computed. Both moves belong to <Ref lesson="training-serving-skew">the training–serving skew lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Specify the feature-platform entry for the Supermegaretail demand forecast of <Ref lesson="the-design-document">the design document</Ref>: choose four features, and for each give its hierarchy level, refresh cadence, store placement, and the staleness it tolerates before the forecast degrades. One of the four must be streaming.
+
+<Solution>
+One defensible specification (the reasoning is the answer; the exact features may vary):
+
+1. `sales_28d(store, sku_group)`: level 2, summed from level-1 store-day-SKU sums; nightly; both stores; tolerates ~24 h staleness, since it encodes seasonality and trend, not the current hour.
+2. `price_current(sku)`: an attribute synced from the OLTP pricing table; hourly; online (with dated history offline for training); tolerates ~1 h: a repricing that the forecast ignores for a day misprices the whole shelf.
+3. `promo_calendar(store, week)`: known-in-advance attribute; loaded when the merchandising system publishes; both stores; tolerates staleness up to the publishing lead time, since the future values are known exactly.
+4. `orders_30min(store)`: streaming, the hopping-window job; 5-minute emissions to the online store, history recomputed offline; tolerates ~10 minutes: its entire value is intraday demand signal, and at an hour old it is worse than absent because it reports the wrong hour.
+
+The pattern the four illustrate: cadence and placement follow the staleness budget, and the budget comes from the product argument (what decision the feature feeds), not from what the pipeline finds convenient: the design-document discipline applied per feature.
+</Solution>
+</Exercise>
+
+<Exercise>
+The online store is Redis Cluster: 16,384 slots over 12 nodes, entity key `store_id`. A franchise partner operates 150 of the 3,000 stores (5%) but generates 60% of prediction traffic at a 5,000 requests/second peak, each request one point read. (a) Estimate the load on the most loaded node and decide whether the franchise's concentration breaks the hash partitioning. (b) The modeling team now adds franchise-level features keyed by `franchise_id` — one key — fetched by every one of the franchise's requests as a second read. Redo the estimate and name the failure. (c) Propose the fix, with arithmetic.
+
+<Solution>
+(a) Hashing spreads the 150 hot keys uniformly: about $150/12 \approx 12$ per node, each node carrying $\approx 60\%/12 = 5\%$ of franchise traffic plus its share of the rest, so every node lands near the fair $5{,}000/12 \approx 420$ reads/s. A hot *group* is harmless once its key count far exceeds the node count; <Ref lesson="partitioning">the partitioning lesson</Ref>'s danger case is a single dominant key, not a popular population.
+
+(b) The franchise key is one key, so it lives in one slot on one node. Reads: $0.6 \times 5{,}000 = 3{,}000$/s on that key, plus the node's fair share of store reads ($\approx 420$/s): the hot node serves $\approx 3{,}400$/s against others' 420, an 8× imbalance, and the system's p99 becomes that node's p99 for 60% of all requests. This is the partitioning lesson's boundary case exactly: a population of one cannot be spread.
+
+(c) Don't fetch a slow-moving shared row 3,000 times a second. The franchise features refresh on the batch or 5-minute cadence, so cache the row in the prediction service with a TTL matching the refresh: with 200 service replicas and a 60 s TTL, reads on the key drop to $200/60 \approx 3$/s, a thousandfold reduction with no key redesign. The alternative from the partitioning lesson, suffix-splitting the key 100 ways, also works but taxes every read with a gather; caching wins here because the value is identical for all readers and its staleness budget is generous. The general rule: entity keys whose fan-in is the whole traffic stream (chain-, region-, "global"-level features) are hot keys by construction, and they are also the most cacheable objects in the system.
+</Solution>
+</Exercise>
+
+<Exercise>
+Training-set assembly for a new model: label = "did the customer place an order within 7 days after time $T$," one row per (customer, $T$) with $T$ drawn from last year. Write the join that attaches `spend_90d` to each row (SQL or precise pseudocode), then state concretely what goes wrong if the join instead attaches each customer's *current* `spend_90d`, the value as of now.
+
+<Solution>
+The correct join is as-of:
+
+```sql
+SELECT l.customer_id, l.T, l.ordered_within_7d,
+       f.spend_90d
+FROM   labels l
+JOIN   features_history f
+  ON   f.customer_id = l.customer_id
+ AND   f.ts = (SELECT MAX(ts) FROM features_history
+               WHERE customer_id = l.customer_id AND ts <= l.T)
+```
+
+Each row sees the newest feature value dated at or before its own $T$, which is exactly what `get_batch_features` computes against the offline store.
+
+Join as-of-now instead, and every feature value contains the label window and everything after it. A customer whose label is positive because they ordered on $T+3$ carries that order *inside* today's `spend_90d`: the feature has absorbed the outcome it is supposed to predict. Offline, the model looks excellent: it has learned to read the label out of the feature. In production, where features genuinely stop at prediction time, the signal does not exist and performance collapses. The bug's name is *temporal leakage*, and it is the opening subject of <Ref lesson="data-leakage-and-splitting">the next module's leakage lesson</Ref>; the platform-side guarantee that training joins respect each row's timestamp is the point-in-time correctness that <Ref lesson="training-serving-skew">the skew lesson</Ref> builds into the store.
+</Solution>
+</Exercise>
+
+<References>
+1. V. Lakshmanan, S. Robinson, M. Munn, *Machine Learning Design Patterns*, O'Reilly, 2020 — Ch. 6, "Design Pattern 26: Feature Store": the ad-hoc feature problem, Feast's BigQuery/Redis/Beam architecture, FeatureSets and entities, batch vs online retrieval, the no-single-database argument, alternative stacks (Michelangelo, Hopsworks, Zipline), and the Transform-pattern tradeoff.
+2. V. Babushkin, A. Kravchenko, *Machine Learning System Design: With End-to-End Examples*, Manning, 2023 — Ch. 11, §11.4 (pp. 221–229): read–write skew, the precalculation hierarchy, feature versioning, dependency graphs and lineage, feature bundles, and the feature catalog.
+3. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 10, "Feature Store" (pp. 325–327): the three problems a feature store addresses — management, computation, consistency — and the survey finding on adoption.
+4. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020 — Ch. 4, §4.11.2: the four-part feature definition (name, description, metadata, definition) and the Michelangelo-inspired dual-store pipeline diagram.
+5. J. Hermann, M. Del Balso, "Meet Michelangelo: Uber's Machine Learning Platform," Uber Engineering Blog, September 2017 — the original public description of the dual online/offline feature store and the ~10,000 shared features. https://www.uber.com/blog/michelangelo-machine-learning-platform/
+6. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018 — Rule #11: give feature columns owners and documentation. https://developers.google.com/machine-learning/guides/rules-of-ml
+7. Feast documentation — the current, post-rewrite architecture: registry, offline/online stores, and materialization. https://docs.feast.dev/
+</References>

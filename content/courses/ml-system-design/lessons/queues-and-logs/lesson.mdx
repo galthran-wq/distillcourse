@@ -1,0 +1,257 @@
+Two services can exchange data three ways — a shared database, a synchronous call, or a message through a broker — and the third is what keeps N services from becoming an N² mesh of calls.
+
+The module so far has fixed the substrate at rest: <Ref lesson="storage-and-data-models">storage engines</Ref> matched to their access patterns, <Ref lesson="replication">replication</Ref> keeping copies agreeing within a measurable lag, <Ref lesson="partitioning">partitioning</Ref> deciding which machine owns which keys. Every system in those lessons exchanged data by reading another system's store, or by calling it and waiting. This lesson sets the data itself in motion, and it establishes three things: a real design fork between two broker families, the arithmetic that makes a log broker's history replayable, and change data capture, the mechanism that keeps every derived store consistent with one ordering authority. <Ref lesson="batch-and-stream-processing">The next lesson</Ref> computes over the moving data.
+
+The route: the three modes of dataflow and the mesh that motivates brokers; ack-and-delete versus log-based brokers; the disk-as-buffer computation and replay; lag, backpressure, and delivery guarantees; dual writes and change data capture; and the state/stream duality the whole design rests on.
+
+## Three modes of dataflow: the mesh is the flaw
+
+Process A can hand data to process B through a shared database: A writes a row, B polls for new rows. This works between batch jobs, and fails on the request path twice over: both processes must reach the same store, coupling them to one schema and one deployment, and a database round trip per exchange is too slow for a latency-budgeted user request. Polling has inverted economics besides: the lower the delay required, the more polls return nothing.
+
+### The request mesh: every pair a call path
+
+The second mode is a direct synchronous call: B exposes a service, A sends a request and waits for the response. This is *request-driven* dataflow, and it is how a microservice architecture passes data by default. A ride-sharing platform makes the failure mode concrete with just three services: driver management predicts available drivers per area, ride management predicts requested rides, and price optimization needs both predictions to price each ride. The moment driver management also wants predicted prices (to set surge incentives) and ride management wants driver forecasts, each service calls the other two: 3 services, 6 directed request paths. In general N services that all need each other's data maintain $N(N-1)$ paths, and companies run hundreds of services.
+
+<Figure
+  src="./figures/mesh-vs-broker.svg"
+  alt="Two panels with the same four services. Left: every service calls every other service, twelve directed request paths. Right: each service connects only to a central broker, four connections."
+  caption="The same four services, request-driven and broker-mediated: 12 request paths collapse to 4 connections."
+/>
+
+The path count is the visible cost; the coupling is the expensive one. A synchronous call requires the callee to be up at the instant of the call, so a downed service stalls every service that needs its data, and those stalls propagate to *their* callers. Latency couples the same way: <Ref lesson="requirements-and-metrics">the requirements lesson</Ref> computed that a request fanning out to 100 backends, each slow 1% of the time, is slow on about 63% of user requests. The mesh is that fan-out drawn as an architecture.
+
+### The broker decouples in time and topology
+
+A *message broker* is the third mode: a server that producers write messages to and consumers read messages from, grouped into named *topics*. The broker decouples the two sides in time: a producer publishes whether or not any consumer is currently up, and the broker holds the message until consumers take it. It decouples them in topology too: a producer names a topic, never a recipient, so consumers can be added or removed without any producer changing. Delivery becomes asynchronous; the producer waits only for the broker's confirmation that the message is buffered, not for anyone to process it.
+
+<KeyFact>
+Topology decoupling is what lets ML systems tap production data without touching product code: the service that publishes click events to a topic does not know, and never needs to know, that a feature pipeline and a training-data job were added as consumers a year later.
+</KeyFact>
+
+## Two broker families: ack-and-delete versus the log
+
+A broker answers the mesh; it does not yet say what happens to a message after delivery, and on that question broker designs split into two families with different guarantees.
+
+### Ack-and-delete: the broker as a transient queue
+
+The older family is standardized in JMS and AMQP (the messaging protocols of the 2000s) and implemented by [RabbitMQ](https://www.rabbitmq.com/) and its peers. The broker holds a queue of messages, often only in memory, and supports two delivery patterns: *load balancing*, where each message goes to exactly one consumer in a group so the group shares the work, and *fan-out*, where every message goes to every subscriber. Because a consumer can crash mid-message, the broker keeps each message until the consumer sends an *acknowledgment* that processing finished; on ack the message is deleted, and on a lost connection it is *redelivered* to another consumer. Consuming is destructive: an acked message is gone from the broker forever.
+
+Delivery order in this family is not a property to build on. The expectation is reasonable: JMS and AMQP both require brokers to preserve message order, and a queue with a single consumer does deliver in order. The combination of load balancing and redelivery breaks it anyway. Let consumers 1 and 2 share a queue carrying m1 through m5. Consumer 2 crashes while processing m3, at the same time as consumer 1 processes m4; the broker redelivers the unacked m3 to consumer 1, which therefore processes m4, then m3, then m5. No component misbehaved, and the order the producer wrote is gone.
+
+### The log: messaging as an append-only file
+
+The second family stores messages the way databases store writes. A *log* is an append-only sequence of records on disk: the same structure as the replication log that <Ref lesson="replication">the replication lesson</Ref> shipped from leader to followers. A producer appends to the log's tail; a consumer reads it sequentially and waits at the end for more. To exceed one disk's throughput the log is partitioned exactly as <Ref lesson="partitioning">the partitioning lesson</Ref> partitioned tables: a topic is a group of partitions on different machines, each an independent append-only file. Within a partition the broker stamps every message with a monotonically increasing *offset*, so messages in one partition are totally ordered; across partitions there is no order at all. [Apache Kafka](https://kafka.apache.org/) (built at LinkedIn, open-sourced 2011) and Amazon Kinesis are this design, and they reach millions of messages per second by partitioning, with fault tolerance by replication.
+
+<Figure
+  src="./figures/two-broker-families.svg"
+  alt="Left panel: an ack-and-delete queue where acked messages are deleted, and a crashed consumer's message m3 is redelivered to consumer 1 after m4, losing order. Right panel: a partitioned log with offsets 0 to 7, appended at the tail, with consumer group A reading at offset 7 and group B at offset 3, deleting nothing."
+  caption="The fork: a queue that deletes on ack and reorders on redelivery, against a log that appends, orders per partition, and lets each consumer group be nothing but an offset."
+/>
+
+Consumption changes shape with the storage. Instead of assigning individual messages, the broker assigns whole partitions to the nodes of a *consumer group*: each node reads its partitions sequentially, and the broker records only one number per group per partition, the committed offset, everything below which is processed. There are no per-message acks to track, which is part of why log brokers sustain their throughput. Fan-out is free: a second group is just a second set of offsets over the same unchanged log. The costs are the mirror image of the queue's flexibility: parallelism is capped at the partition count, and one slow message holds up everything behind it in its partition (head-of-line blocking).
+
+The fork is a genuine design decision, not a version history: public tech-stack listings count about 1,200 companies reporting Kafka and about 1,800 reporting RabbitMQ, with names like Robinhood appearing under both. Work that is expensive per message, where order is irrelevant and each message should go to whichever worker is free, wants ack-and-delete with per-message load balancing: video transcodes, email sends, the classic task queue. High-throughput streams of small events, where order matters and several independent systems read the same data, want the log: click streams, database change events, anything that will become training data. The choice is per workload, not per era.
+
+<Example title="keying a click topic">
+A platform publishes click events to a log topic with 8 partitions, partitioned by `hash(user_id) mod 8`. The partition count is fixed for the topic's lifetime (changing it would re-map keys, the `hash mod N` trap <Ref lesson="partitioning">the partitioning lesson</Ref> flagged), so every one of a user's clicks lands in the same partition, in click order. Any consumer therefore sees each user's session as a correctly ordered subsequence: sessionization and per-user counters work without coordination. What no consumer sees is a global order: whether user 17's click preceded user 41's is undefined, because the two live in different partitions. The closing exercise on the two-user transfer probes when that loss matters.
+</Example>
+
+<KeyFact>
+Consuming is destructive in one family and read-only in the other. An acked message is deleted; a log consumer's only side effect is its own offset advancing. Every replay workflow later in the course exists because the log family made reading non-destructive: backfilling a corrected feature, rebuilding an index, regenerating training data.
+</KeyFact>
+
+## The disk is the buffer: 11 hours at full throttle
+
+Non-destructive reading is only useful if the log keeps history, and how much history a disk holds is worth computing once. Appending forever fills the disk, so the log is divided into segments and old segments are deleted: a bounded circular buffer, but a buffer on disk rather than in memory.
+
+<Example title="how long a disk buffers (DDIA Ch. 11)">
+A large 2017-era hard drive holds 6 TB and sustains sequential writes at 150 MB/s. Writing messages at the disk's full rate, the time to fill it is
+
+$$
+\frac{6 \times 10^{12}\ \text{B}}{1.5 \times 10^{8}\ \text{B/s}} = 4 \times 10^{4}\ \text{s} \approx 11\ \text{hours}.
+$$
+
+The ratio is what matters, and it survives scaling: ten machines with ten disks have ten times the capacity and ten times the write rate, so the buffer is still 11 hours. Real deployments rarely write at full bandwidth: at a 10–20% average duty cycle the same hardware buffers roughly 2 to 5 days, which is why retaining a week of messages is a routine Kafka configuration, not an extravagance.
+</Example>
+
+<Exercise>
+Your cluster's log disks are 12 TB with 300 MB/s sustained sequential writes. Compute the retention window at full throttle, then at a realistic 10% duty cycle. Write both divisions before opening.
+
+<Solution>
+Full throttle: $12 \times 10^{12} / (3 \times 10^{8}) = 4 \times 10^{4}$ s $\approx$ 11 hours: the same window as the worked example, because capacity and throughput both doubled and retention is their ratio. At 10% duty cycle the effective write rate is 30 MB/s, so the window is $4 \times 10^{5}$ s $\approx$ 111 hours $\approx$ 4.6 days.
+
+The transferable move: retention is capacity over write rate, a ratio, and hardware generations tend to move both terms together. Estimating it tells you whether "reprocess last week" is available before anyone asks for it.
+</Solution>
+</Exercise>
+
+### Replay: the offset belongs to the consumer
+
+Because the log does not change when read, the committed offset is the consumer's only state, and the consumer may set it anywhere in the retained window. Start a copy of a consumer at yesterday's offsets and write its output somewhere new: the last day of messages is reprocessed under different code, repeatably, without disturbing the production consumer or the log. Batch jobs were safe for the same reason: read-only input, recomputable output. The log carries that property into messaging.
+
+For ML systems replay is the difference between a bug and a catastrophe. A feature pipeline that computed `sessions_7d` wrong for three weeks is, on an ack-and-delete broker, three weeks of corrupted training data with no raw material left to fix it: the events were deleted at ack. On a log with sufficient retention it is a code fix, a rewind to the offset where the bug shipped, and a recomputation; the events are still there, in order. The same rewind backfills a newly invented feature over history it never saw live.
+
+<KeyFact>
+Retention is a boundary, not just a budget: a consumer whose lag exceeds the retention window loses data silently. Deleting the oldest segment is the broker's routine housekeeping, so nothing raises an error when deletion overtakes a group's committed offset; the consumer resumes at the earliest offset still on disk, and everything between is unrecoverable. The operational rule follows: measure lag in time as well as messages, and treat lag approaching retention as an emergency, not a backlog.
+</KeyFact>
+
+## Falling behind: backpressure, lag, and at-least-once
+
+The retention boundary just established gives falling behind a deadline: a lagging consumer has until segment deletion overtakes its committed offset, and no longer. This section covers the mechanics of that race — what a broker can do when producers outrun consumers, the subtraction that measures the gap, and what a crash mid-message does to the delivery contract.
+
+### Overload has three answers: drop, buffer, backpressure
+
+A producer can outrun its consumers, and a messaging system has exactly three responses: drop messages, buffer them, or apply [*backpressure*](https://github.com/donnemartin/system-design-primer#back-pressure), blocking or refusing the producer until consumers catch up, the way a full TCP connection or Unix pipe blocks its writer. Ack-and-delete brokers buffer, usually without bound: queues grow, spill from memory to disk, and per-message cost rises exactly when the system is busiest. The log is buffering with a large, fixed-size buffer (the retention window just computed), and a consumer that falls behind loses nothing until its offset falls off the horizon.
+
+### Consumer lag: the subtraction to monitor
+
+Falling behind is also directly measurable. Per partition, the head position minus a group's committed offset is that group's *consumer lag* in messages. It is the same subtraction that gave <Ref lesson="replication">the replication lesson</Ref> its replication lag, and the single most useful health number this layer exposes. Lag climbing means the consumer is losing ground; with days of retention there are hours to fix it before data loss begins. Alerting on lag is the first entry in the monitoring stack <Ref lesson="monitoring-and-observability">the monitoring lesson</Ref> builds, and the closing diagnosis exercise practices reading its patterns.
+
+<Figure
+  src="./figures/consumer-lag-patterns.svg"
+  alt="Three panels plotting offset against time for one consumer group. In each, blue lines are the log head rising steadily and amber lines are committed offsets per partition. Panel one: all committed offsets stop and stay flat. Panel two: one committed offset freezes while the others track the head. Panel three: all committed offsets keep rising but at a shallower slope, with the gap to the head marked as growing lag."
+  caption="Committed offset per partition over time, three ways to fall behind: frozen on all, frozen on one, advancing but slower than the head. Frozen versus advancing, one partition versus all, is the discriminating instrument."
+/>
+
+### At-least-once, made harmless by idempotence
+
+Crashes set the delivery guarantee. In both families, a consumer that dies after processing a message but before acknowledging it (or before committing its offset) gets that message again on recovery: delivery is *at-least-once*, and duplicates are the price of losing nothing. The production posture is to keep it and make duplicates harmless: consumers are written to be *idempotent*, meaning processing a message twice has the effect of processing it once. An upsert keyed by event ID replaces an increment; the closing overcount exercise quantifies what a non-idempotent consumer gets wrong. A stronger contract, *exactly-once*, does exist by binding processing and offset commit into one atomic step; its machinery belongs to <Ref lesson="batch-and-stream-processing">stream processing</Ref> and waits until then.
+
+## Dual writes diverge; CDC restores one leader
+
+The events so far were born as events: clicks, orders, sensor readings. Much of what an ML system consumes was not: the product catalog, user profiles, and account state live as rows in an OLTP database. The same data is needed in several stores at once, each shaped for its access pattern per <Ref lesson="storage-and-data-models">the storage lesson</Ref>: a cache for hot reads, a search index for text queries, a warehouse for analytics, an online store for serving features. Whenever the database row changes, every copy must follow. A nightly ETL dump keeps the warehouse eventually honest; nothing serving users can wait a night.
+
+### The dual-write race
+
+The obvious mechanism is *dual writes*: application code writes the database, then writes the search index, then invalidates the cache. It is also the mechanism that quietly corrupts the copies, two ways.
+
+<FigureSequence
+  name="dual-write"
+  alt="Four frames. Client 1 writes X=A to the database; client 2 writes X=B to the database, which now holds B; client 2's index write lands, index holds B; client 1's delayed index write lands last, index holds A while the database holds B, permanently inconsistent with no error."
+  caption="The dual-write race, after DDIA Fig. 11-4: two clients, two stores, and no ordering authority. Each store applies the writes in the order it received them."
+/>
+
+<Task>
+Step through the frames and name the moment divergence becomes permanent: identify the write order the database saw, the order the index saw, and verify that every individual operation succeeded.
+</Task>
+
+The race: clients 1 and 2 concurrently set X to A and to B. The database receives A then B and settles on B; the index receives B then A and settles on A. Four writes, four successes, two stores that now disagree forever, and no error was raised or ever will be. The second failure needs no concurrency at all: client 1 writes the database and crashes before writing the index, and the two stores again disagree until something happens to overwrite X. Making the pair atomic is the distributed atomic-commit problem, which is expensive machinery to buy for every write.
+
+### The diagnosis: multi-leader by accident
+
+<Ref lesson="replication">The replication lesson</Ref> supplies the diagnosis. The database has a leader and the index has a leader, but neither follows the other: dual writes are multi-leader replication with no conflict resolution, run by accident. The fix is not to reconcile the two leaders; it is to remove one.
+
+### CDC: demote every store but one
+
+*Change data capture* (CDC) makes the database the leader and every other store a follower. The database already produces an ordered stream of its committed writes, the replication log its own followers consume. CDC extracts that stream and publishes it: a connector parses the log ([Debezium](https://debezium.io/) does this for MySQL's binlog and PostgreSQL's write-ahead log) and appends each change to a log-based broker. The broker's per-partition ordering is why the log family is the right transport here: an ack-and-delete broker would reintroduce the redelivery reorder from the crash scenario above, scrambling the leader's order. The index, the cache, the warehouse, and the online feature store each consume the change stream at their own pace and apply the changes in the leader's order.
+
+<Figure
+  src="./figures/cdc-topology.svg"
+  alt="An OLTP database labeled leader emits an ordered change log, which fans out to four followers: search index, cache, warehouse, and online feature store, each applying the same changes in the same order."
+  caption="CDC: one leader, one ordered change log, and every derived store a follower. Followers can lag; they cannot disagree."
+/>
+
+Followers can lag: CDC is asynchronous, so everything the replication lesson established about lag applies, staleness budget included. They cannot diverge: there is one write order and everyone applies it. Bootstrapping a new follower reuses the new-replica recipe from that lesson, a consistent snapshot plus the log position it corresponds to; the next section adds a second option that needs no snapshot at all.
+
+### How the serving path learns about the world
+
+For an ML platform this is not one integration pattern among many; it is how the serving path learns about the world. A user edits their profile: the row changes, the change enters the log, and the online feature store, a follower, reflects it within seconds, with the warehouse ingesting the same ordered stream for training reads. Both sides of the train/serve divide follow the same truth, a property <Ref lesson="feature-platform">the module's closing application</Ref> depends on and <Ref lesson="training-serving-skew">a later module</Ref> shows the cost of losing.
+
+<KeyFact>
+CDC's ordering guarantee is exactly the log's: per partition. Partition the change topic by primary key and every follower applies each row's changes in the leader's order — but a consumer joining the change streams of two tables sees no cross-table order, and a transaction that atomically touched both tables in the leader arrives downstream as separate events with nothing marking them as one commit. Followers converge row by row; an invariant that spans rows is not preserved in flight.
+</KeyFact>
+
+## The log is the truth: state and stream are one thing twice
+
+CDC works because a table and its change stream carry the same information in two forms. Every piece of mutable state is the result of the events that mutated it: an account balance is the sum of its credits and debits, a shopping cart is the net of its additions and removals, a database table is its changelog applied in order. Integrate a change stream over time and the table appears; differentiate the table by time and the stream reappears.
+
+<Figure
+  src="./figures/state-stream-duality.svg"
+  alt="A four-event change stream, k1 gets A, k2 gets B, k1 gets C, k2 gets D, is applied in order to produce a two-row table with k1 C and k2 D. Beside it, log compaction strikes the superseded writes and keeps only the latest write per key."
+  caption="The table is the integral of the change stream. Compaction keeps the latest write per key, so the compacted log carries the whole table."
+/>
+
+### The database is a cache of the log
+
+Pat Helland, a database architect whose career spans Tandem, Amazon, and Microsoft, states the resulting priority in the paper "Immutability Changes Everything" (CIDR 2015):
+
+> Transaction logs record all the changes made to the database. High-speed appends are the only way to change the log. From this perspective, the contents of the database hold a caching of the latest record values in the logs. The truth is the log. The database is a cache of a subset of the log.
+
+### Log compaction dissolves the snapshot
+
+*Log compaction* is the duality made operational. If every change event carries a key and the full new value for that key, then old values are dead weight: a background process discards every write superseded by a later write to the same key (a null value, a *tombstone*, marks deletion). The compacted log's size depends on the number of live keys, not on the write history, so it can be kept forever. It still contains the latest value of every key, which is the table. Kafka supports this natively, and it dissolves the snapshot requirement from the previous section: to build a new follower, consume the compacted CDC topic from offset 0 and the full current state arrives, in order, from the broker alone.
+
+One log, then, can feed any number of read-optimized views: the index, the cache, the feature store are all "caches of the log" in Helland's sense, each materializing the subset and shape its readers need. Adding a view is adding a consumer at offset 0; retiring one is deleting its offsets. The write path stays a single append.
+
+<Remark title="event sourcing is not CDC">
+Event sourcing, a design pattern from the domain-driven-design community, also stores an append-only event log, but at a different level: events record user intent ("student cancelled enrollment"), not row changes ("row deleted from `enrollments`"). The distinction has teeth. A CDC event carries the full new value of its key, so later events supersede earlier ones and compaction applies; intent events do not supersede each other, so the full history is needed to reconstruct state and compaction in the latest-per-key sense is impossible. CDC retrofits the log onto an application that thinks in mutable rows; event sourcing rebuilds the application to think in events. This course uses CDC and leaves event sourcing here.
+</Remark>
+
+What is established: a broker decouples producers from consumers in time and topology, collapsing the N² mesh; the broker fork is real, ack-and-delete load-balancing queues for tasks against partitioned, offset-addressed, replayable logs for event streams; a log's retention is capacity over write rate, about 11 hours per 6 TB disk at full throttle and days in practice, which makes replay a routine tool; at-least-once delivery plus idempotent consumers is the default correctness posture, with lag as the monitorable; dual writes diverge for want of an ordering authority, and CDC restores one by making the database the leader and every derived store a follower; and beneath all of it, the table is the integral of the change stream. What the module still owes is computation over the flow: counting clicks in a window, joining one stream to another, and doing both correctly when events arrive late or are replayed, which requires distinguishing when an event happened from when the system processed it. That machinery, batch and stream processing with their two clocks, is <Ref lesson="batch-and-stream-processing">the next lesson</Ref>.
+
+## Exercises
+
+<Exercise>
+A click topic has 8 partitions keyed by `hash(user_id) mod 8`, as in the worked example. (a) State precisely which ordering guarantee survives and which is lost. (b) Construct a two-user scenario where cross-user order is visibly lost and nothing breaks. (c) Construct a scenario involving a transfer of credits between two users where the loss does break a consumer, name the anomaly from an earlier lesson that this reproduces, and give the fix.
+
+<Solution>
+(a) Survives: per-user total order, since all of one user's events share a partition and a partition is totally ordered by offset. Lost: any ordering between events of different users on different partitions; "user 17 clicked before user 41" is not a question the log can answer.
+
+(b) User A clicks at 10:00:01 (partition 3), user B at 10:00:02 (partition 5). A consumer group's node for partition 5 happens to run ahead, so downstream systems record B's click first. Per-user counters, sessions, and funnels are all computed within one user's ordered subsequence, so every consumer's output is correct.
+
+(c) A transfer emits `debit(A, 50)` keyed by A into partition 3 and `credit(B, 50)` keyed by B into partition 5. A balance-maintaining consumer processes the credit first: for an interval, B has spendable money that A still also holds, and an invariant checker summing balances sees money created from nothing. This is the consistent-prefix anomaly of <Ref lesson="replication">the replication lesson</Ref> (causally ordered writes observed out of order because they traveled different paths), reproduced by partitioning. The fix is the one that lesson named: route causally related events through one ordered channel, here by keying the transfer's two legs with a single `transfer_id` so both land in one partition, in order.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "We write each feature value to both the warehouse and Redis in the application code, wrapped in a try/except, so the two stay consistent." Name the exact step where the reasoning fails, demonstrate it with a two-writer interleaving, and state the fix plus the new component it requires.
+
+<Solution>
+The failing step is the unstated assumption that the two stores see writes in the same order. The try/except handles a *reported* failure of one write; the divergence mechanisms report nothing. Interleaving: writers 1 and 2 update the same feature to values A and B. The warehouse receives A then B; Redis receives B then A. All four writes succeed (no except branch runs) and the stores disagree permanently. The try/except also fails its own case: if the Redis write throws after the warehouse write committed, the handler can neither un-commit the warehouse nor guarantee its retry wins any race, so the stores disagree until the next update.
+
+The fix is change data capture: designate one system of record (the transactional database feeding the warehouse), capture its ordered change log, and make Redis a follower of that log. The new components are a CDC connector (Debezium-class, reading the database's replication log) and a log-based broker to carry the stream in order. Application code goes back to writing one store, once.
+</Solution>
+</Exercise>
+
+<Exercise>
+A dashboard shows a consumer group's total lag growing linearly from 14:00 onward. Three hypotheses: (i) the consumer is crash-looping; (ii) a poison message is being redelivered forever; (iii) a code deploy at 14:00 regressed per-message processing time. For each hypothesis, state the committed-offset pattern, per partition, that confirms it and distinguishes it from the other two.
+
+<Solution>
+(i) Crash-loop: committed offsets are frozen on **all** partitions of the group, and group-membership metrics show repeated rebalances as the process dies and rejoins. Lag on every partition grows at that partition's full production rate.
+
+(ii) Poison message: committed offset is frozen at one specific value on **one** partition, with the consumer fetching the same offset repeatedly and per-message error counts spiking, while the group's other partitions advance normally. Total lag grows at roughly one partition's production rate, and the stuck offset identifies the exact message.
+
+(iii) Throughput regression: committed offsets **advance on all partitions**, but slower than production; lag grows at (production rate − consumption rate) uniformly, and per-message processing time stepped up at 14:00 in the deploy's metrics.
+
+The discriminating instrument is the same in all three, and it is the one the lag-patterns figure plots: committed offset per partition over time, advancing versus frozen, one partition versus all. This is the data-layer floor of the monitoring stack <Ref lesson="monitoring-and-observability">a later lesson</Ref> assembles.
+</Solution>
+</Exercise>
+
+<Exercise>
+A consumer counts clicks per item with `UPDATE counters SET clicks = clicks + 1` per message, committing offsets periodically. Model redelivery as each message being independently processed twice with probability $p$ (a crash between processing and offset commit). (a) Derive the expected relative overcount. (b) Evaluate it for $p = 10^{-3}$ and $5\times10^{7}$ clicks/day. (c) Rewrite the consumer so the overcount is exactly zero under the same redeliveries, using the message's partition and offset.
+
+<Solution>
+(a) Message $i$ contributes $1 + D_i$ increments, $D_i \sim \text{Bernoulli}(p)$. Expected total over $n$ messages: $\mathbb{E}\left[\sum_i (1+D_i)\right] = n(1+p)$, so the expected overcount is $np$ and the relative overcount is $p$.
+
+(b) $np = 5\times10^{7} \times 10^{-3} = 5\times10^{4}$: fifty thousand phantom clicks per day, biased toward whatever items were being processed when consumers crashed. The result is a drifting, non-uniform corruption of a training signal.
+
+(c) Replace the increment with an idempotent write keyed by the message's identity: `INSERT (partition, offset, item) ... ON CONFLICT DO NOTHING`, with the counter defined as the count of rows per item (or maintained transactionally with the insert). A redelivered message writes the key it already wrote; the second write is a no-op by construction, so the count equals the number of distinct log positions processed, exact regardless of $p$. The move: idempotence is achieved by naming each effect after its cause, and the log's (partition, offset) pair is a ready-made unique name.
+</Solution>
+</Exercise>
+
+<Exercise>
+Clicks arrive on a log topic, and a ranking model needs "clicks in the last 30 minutes, per item," continuously updated in the online feature store. Sketch the consumer that maintains this feature: its state, its update on each event, and how the value leaves it. Then name the two different clocks your sketch quietly uses, and describe one ordinary situation in which they disagree by more than 30 minutes.
+
+<Solution>
+Sketch: a consumer subscribes to the click topic; its state is, per item, a structure holding recent click timestamps (a ring of per-minute buckets suffices). On each event it appends the click to the item's window and evicts entries older than 30 minutes; on a cadence, or on change, it writes the current count to the online store under the item's key. Partitioning the topic by `item_id` lets the state shard cleanly across the group.
+
+The two clocks: the timestamp *in* the event (event time, when the click happened) and the consumer's own clock when it processes the event (processing time). "Older than 30 minutes" and "the last 30 minutes" silently mix them. They disagree by more than the whole window in completely ordinary operation: a consumer restarted after an hour's outage, or a replay rewound to yesterday's offsets to backfill the feature, processes at 15:00 events that happened at 14:00 or last Tuesday. A processing-time window then computes garbage, counting a day of replayed clicks as one 30-minute burst. Windows defined on event time, and the machinery that makes them tractable (watermarks, window types, late-event handling), are exactly the subject of <Ref lesson="batch-and-stream-processing">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017 — Ch. 11: messaging systems, load balancing vs fan-out, acknowledgments and the redelivery reorder (pp. 440–446); partitioned logs, offsets, the disk-buffer calculation, and replay (pp. 446–451); keeping systems in sync, the dual-write race, and change data capture (pp. 451–457); event sourcing (pp. 457–459); state, streams, and log compaction (pp. 459–465).
+2. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 3, "Modes of Dataflow" (pp. 72–78): dataflow through databases, services, and real-time transports; the request mesh and broker figures this lesson's opening pair recreates; pubsub vs message-queue vocabulary.
+3. P. Helland, "Immutability Changes Everything," *CIDR*, 2015 — the source of the log-is-truth passage quoted above, and the broader argument for append-only designs. https://www.cidrdb.org/cidr2015/Papers/CIDR15_Paper16.pdf
+4. J. Kreps, "The Log: What every software engineer should know about real-time data's unifying abstraction," LinkedIn Engineering, 2013 — the practitioner essay from Kafka's author on logs as the integration backbone: ordering, replay, and derived data. https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying
+5. D. Martin, *The System Design Primer* — the asynchronism section: message queues, task queues, and the back-pressure definition used here. https://github.com/donnemartin/system-design-primer#asynchronism
+</References>

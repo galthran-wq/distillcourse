@@ -1,0 +1,344 @@
+The model is roughly 5% of a production ML system; the other 95% — data collection, feature pipelines, serving, monitoring, configuration — is where the engineering effort, the cost, and the failures live.
+
+This is the opening move of the course's argument: a production ML system is a data system with a model inside, designed layer by layer. The reader this course assumes has trained and validated classical models but never operated one; everything after the validation score stands open. This lesson establishes the 5% claim with the field's own accounting, supplies the hidden-technical-debt taxonomy the whole course uses to name system-level failure, and lays out the lifecycle map the remaining modules walk.
+
+The route: the accounting that shrinks the model to a twentieth of the system, five axes on which production differs from research, the debt taxonomy with one concrete failure per term, the conditions under which ML is the right tool at all, and the lifecycle loop.
+
+## The accounting: one small box among nine large ones
+
+In 2015, ten Google engineers published [Hidden Technical Debt in Machine Learning Systems](https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf) (Sculley et al., NeurIPS 2015), a paper whose single figure has become the field's standard self-portrait: a small black box labeled "ML code" surrounded by nine much larger boxes of required infrastructure.
+
+The paper's estimate: a mature system may be at most **5%** machine learning code and at least 95% supporting code. A decade later the estimate is unchanged: about 5% of the code that puts an ML application into production is the model.
+
+<Figure
+  src="./figures/sculley-fig1.png"
+  alt="Ten rectangles of wildly unequal size. A tiny black square labeled 'ML Code' sits at the centre, roughly one twentieth the area of its neighbours. Around it, nine much larger boxes: Configuration, Data Collection, Feature Extraction, Data Verification, Machine Resource Management, Analysis Tools, Process Management Tools, Serving Infrastructure, Monitoring."
+  caption="Sculley et al.'s Figure 1. The black square in the middle is the machine learning. Everything else — configuration, data collection, feature extraction, data verification, machine resource management, analysis tools, process management tools, serving infrastructure, monitoring — is the system it has to live in, and the areas are drawn to scale with the code."
+/>
+
+### Where the failures land: the 96-outage audit
+
+The 95% is not passive scaffolding; it is where the failures concentrate. In 2020, Daniel Papasian and Todd Underwood, two ML engineers at Google, audited [96 outages of one large Google ML pipeline](https://www.usenix.org/conference/opml20/presentation/papasian) spanning fifteen years of incident records.
+
+**60 of 96** failures had causes not directly related to ML: a workflow scheduler misfiring, data from multiple sources joined incorrectly, the wrong data structure in a pipeline step. The model was innocent in nearly two thirds of the cases; the system around it was not.
+
+<KeyFact>
+A design review that examines only the model has reviewed about 5% of the system, and has skipped the part where nearly two thirds of recorded failures originate. The remaining modules of this course are a review of the other 95%.
+</KeyFact>
+
+### The projects that never ship
+
+The stakes of getting the 95% wrong are visible at the project level too. Estimates made between 2017 and 2020 put the fraction of ML projects that fail or never reach production at **74–87%**. The range is wide because the surveys define failure differently, but even the low end says that shipping the model is the exception, not the rule.
+
+The documented reasons are system reasons: missing data infrastructure, research and engineering roles that do not talk, scope no pipeline can serve, models that move no business metric.
+
+This course is organized around that figure: each infrastructure box carries the module of this course that covers it, and the two remaining modules dissect how the boxes assemble into the canonical system shapes (module 7) and how foundation models rearrange them (module 8).
+
+<Figure
+  src="./figures/course-map.svg"
+  alt="Nine infrastructure boxes (configuration, data collection, data verification, feature extraction, machine resource management, analysis tools, process management, serving infrastructure, monitoring) each tagged with a course module, surrounding a small amber ML-code box"
+  caption="Sculley's nine boxes as this course's table of contents: each large box carries the module that covers it; the small box is the part you already know."
+/>
+
+## Research and production: five axes of difference
+
+The accounting explains a pattern every team meets: a model that wins offline and fails in production. The failure is rarely a modeling error; it is a change of discipline. ML as practiced on benchmarks and ML as operated in products differ on five axes, and a leaderboard winner is optimized for exactly one column of the comparison.
+
+<Figure
+  src="./figures/research-vs-production.svg"
+  alt="Two-column comparison of research and production ML across five axes: objective, compute priority, data, fairness, interpretability"
+  caption="Five axes of difference. A benchmark model is tuned for the left column only."
+/>
+
+The middle rows carry consequences the course returns to. Production latency is a distribution with a misleading mean and expensive tails; the arithmetic of percentiles and fan-out is <Ref lesson="requirements-and-metrics">the next lesson's subject</Ref>. And because production data shifts under the model, a system trained once and left alone degrades by default, the finding <Ref lesson="failures-and-drift">module 6</Ref> quantifies.
+
+### Objective: one metric versus stakeholders who disagree
+
+The top row is the deepest difference. A research project aligns on one number, benchmark performance; a production project has stakeholders, and their objectives produce different models.
+
+Consider a restaurant-recommendation app that charges restaurants a 10% service fee per order. The ML engineers want the model that maximizes the chance a user orders; the sales team wants the model that surfaces expensive restaurants, because fees scale with order value.
+
+The product team has measured that added latency costs orders and demands answers in under 100 ms; the platform team, paged at night by scaling incidents, wants a freeze on model updates. If the 100 ms bound is a hard requirement, it can exclude every candidate the offline metric preferred. <Ref lesson="requirements-and-metrics">Requirements, latency, and the metrics hierarchy</Ref> shows how such conflicts are settled by decoupling objectives instead of blending them.
+
+### Stakes: a small bias, deployed at scale
+
+The bottom two rows are about stakes. A production model makes judgments about millions of people in seconds, so a bias that costs little aggregate accuracy (a loan model keying on zip code, a resume ranker keying on names) discriminates at scale, and users, regulators, and the engineers debugging the model all need to know why a decision was made.
+
+Amazon scrapped an ML resume screener in 2017 after it was found to penalize women's resumes; the screening logic was learned from a decade of male-dominated hiring data, and no offline metric had flagged it.
+
+<Aside>
+One symptom of the research–production gap is ensembling. Combining many models is standard among competition winners (it is the technique behind the $1M Netflix Prize of 2009), yet it is rare in production: an ensemble multiplies serving cost, latency, and maintenance surface for a small metric gain, and, as the next section shows, it entangles its components so that improving one can degrade the whole. The technique is not wrong; it is priced differently in the two disciplines.
+</Aside>
+
+## The debt taxonomy: names for what goes wrong
+
+If most failures live in the 95%, they need names. Sculley et al. supply them through the metaphor of *technical debt*, Ward Cunningham's 1992 term for the long-term cost of moving fast in software. Ordinary technical debt is paid down by refactoring, tests, and documentation.
+
+ML systems carry all of that plus a second kind of debt those tools cannot reach, because it lives at the **system level**: it is created by data flowing between components, and it is invisible in any code review. The taxonomy below is the course's shared vocabulary; each term comes with the concrete failure that motivates it and the module that addresses it.
+
+### Entanglement: changing anything changes everything
+
+A model consuming features $x_1, \dots, x_n$ is not a sum of $n$ independent parts. Shift the input distribution of $x_1$ and the learned weights on all remaining $n-1$ features move at the next retrain; add a feature $x_{n+1}$ or delete one, and the same happens.
+
+Sculley et al. name this the **CACE principle**: *Changing Anything Changes Everything*. The principle applies beyond features, to hyperparameters, sampling choices, convergence thresholds, and every other setting.
+
+<KeyFact>
+CACE is the reason "we only changed one thing" is never true of an ML system: one shifted input distribution reweights every other feature at the next retrain, whether or not those features changed.
+</KeyFact>
+
+Since entanglement cannot be removed, it is detected: monitoring prediction behavior slice by slice, the machinery of <Ref lesson="offline-evaluation">slice-based evaluation</Ref> and <Ref lesson="monitoring-and-observability">production monitoring</Ref>.
+
+### Correction cascades: the improvement deadlock
+
+Entanglement between features has a between-models counterpart. A model $m_a$ solves task $A$; a slightly different task $A'$ appears, and the fastest solution is a small model $m'_a$ that takes $m_a$'s output and learns a correction. Then $A''$ arrives, and $m''_a$ stacks on top. The cascade works until someone improves $m_a$.
+
+<FigureSequence
+  name="correction-cascade"
+  alt="Four frames: a model for task A; a correction model stacked on it for task A-prime; a second correction stacked for task A-double-prime; then the deadlock: improving the base model breaks both corrections"
+  caption="A correction cascade forming, one layer per frame. The last frame is the deadlock: each correction was fitted to the errors below it."
+/>
+
+<Task>
+Step through the four frames and state, before reading on, why frame 4's retrain hurts.
+</Task>
+
+Each correction model was fitted not to its task directly but to the errors of the model beneath it, so improving $m_a$ moves exactly the thing $m'_a$ was trained to cancel.
+
+The deadlock is that improving any single component makes the system worse, so nothing gets improved. The escape routes are structural, decided at design time: add features to $m_a$ that distinguish the cases, or pay for a separate model per task.
+
+### Undeclared consumers
+
+A model's predictions rarely stay private: they are returned at runtime, written to logs, dumped to files. Without access controls, another team's system starts reading them as an input, silently.
+
+<Figure
+  src="./figures/undeclared-consumer.svg"
+  alt="A model writes predictions to logs; a dashed arrow shows another team's system reading them without a contract, and a second dashed arrow shows that system's actions flowing back into the model's next training data"
+  caption="An undeclared consumer. Nothing in the model's code names the coupling, and the consumer's actions can return as training data."
+/>
+
+Such an *undeclared consumer* couples its behavior to the model without the model's owners knowing, so an ordinary model update can break a system its owners have never heard of. Worse, the consumer's actions can flow back into the model's own training data, forming a feedback loop nobody designed.
+
+In classical software engineering this is visibility debt, and the mitigation is the same: access barriers and explicit service agreements, because under deadline pressure engineers will always consume the most convenient signal available.
+
+### Data dependencies: the dependency graph nobody can compile
+
+Code dependencies are found by compilers and linkers; data dependencies have **no static analysis**, which is why they accumulate unseen. Two kinds carry the debt.
+
+An *unstable* dependency is an input signal that changes behavior over time: typically it is itself the output of another model, or a data-derived lookup table, or a signal owned by a different team that ships updates on its own schedule. The treacherous case is an upstream improvement: if a signal was miscalibrated and your model fit to the miscalibration, the silent fix breaks you.
+
+An *underutilized* dependency is a signal that could be deleted at no cost but was not. Sculley et al.'s example: during a migration to a new product-numbering scheme, both old and new numbers are kept as features; old products keep their old numbers, and the model keeps using them. A year later, the code populating the old numbers is deleted, and the model, still depending on them, fails.
+
+<Figure
+  src="./figures/data-dependencies.svg"
+  alt="Two panels. Left: an upstream signal owned by another team ships a silent fix, breaking the model that fit to its old miscalibrated version. Right: old and new product-number features both feed a model; the old feature's pipeline is deleted a year later and the model fails"
+  caption="The two dependency debts: an unstable signal changes under the model; an underutilized one outlives its use and fails when finally deleted."
+/>
+
+Legacy features, features added in bundles under deadline, features kept for an $\epsilon$ of accuracy: all of them widen the failure surface for nothing. The countermeasures are regular leave-one-feature-out evaluations, versioned (frozen) copies of upstream signals, and lineage tooling that can answer "what does this model transitively depend on?", built in <Ref lesson="experiment-tracking-and-versioning">the versioning lesson</Ref> and <Ref lesson="data-validation">the data-validation lesson</Ref>.
+
+### Feedback loops: the system feeds itself
+
+A live ML system influences the world that generates its next training set. In the *direct* loop, a model selects its own future data: a recommender shows the items it scores highly, users can only click what is shown, and the clicks become the next labels, so the model's current preferences are amplified into its future training set.
+
+In the *hidden* loop, two systems couple through the world without any shared code or data. Sculley et al.'s example is two stock-market prediction models at two different firms: an improvement (or a bug) in one changes prices, which changes the other's inputs, which changes its trades, which changes the first one's inputs.
+
+<Figure
+  src="./figures/feedback-loops.svg"
+  alt="Two panels: a direct loop where a recommender's shown items produce the clicks that become its training labels, and a hidden loop where two firms' trading models influence each other through market prices"
+  caption="Direct and hidden feedback loops. In the hidden case neither team knows the other exists."
+/>
+
+Hidden loops are the harder case because no dependency audit can find them: the coupling runs through user behavior or market prices, not through any system either team controls. The loop taxonomy, its degenerate cases, and the exploration tricks that break them are the subject of <Ref lesson="failures-and-drift">the drift lesson</Ref> and <Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>.
+
+### Glue code, pipeline jungles, and dead codepaths
+
+Three anti-patterns account for most of the 95% by volume. *Glue code* is the mass of supporting code written to get data into and out of a general-purpose ML package; it freezes the system to that package's peculiarities and makes testing any alternative prohibitively expensive.
+
+*Pipeline jungles* are glue code's data-preparation form: signals get added one scrape, join, and sampling step at a time until the preparation system is a jungle with intermediate files everywhere, testable only by expensive end-to-end runs. Jungles are not refactored away incrementally; the fix Sculley et al. endorse is the expensive one, scrapping the jungle and redesigning holistically. Treating the pipeline as a first-class engineered artifact is <Ref lesson="pipelines-and-orchestration">module 4's subject</Ref>.
+
+*Dead experimental codepaths* are the conditional branches left behind by quick experiments inside production code; each one is cheap, and together they make the codepath interactions untestable.
+
+<Figure
+  src="./figures/dead-codepath.svg"
+  alt="Eight server boxes: seven blue ones running new routing code and one amber one still carrying an obsolete codepath; a config push with a reused flag points at the amber server, reactivating the dead branch, with the outcome labeled as minus 460 million dollars in about 45 minutes"
+  caption="The Knight Capital mechanism: a dead codepath plus a reused flag equals untested behavior live on one of eight servers."
+/>
+
+On August 1, 2012, Knight Capital, then one of the largest US equity market makers, deployed new order-routing code to seven of its eight servers; the eighth still ran an obsolete experimental codepath, which the new deployment's reused configuration flag reactivated. The dead code sent millions of erroneous orders, and Knight lost more than **$460 million** in about 45 minutes (SEC, 2013). The firm did not survive as an independent company.
+
+### Configuration debt
+
+In a mature, actively developed system, the lines of configuration can **exceed the lines of code**.
+
+Which features are on, how data is selected and sampled, per-feature date ranges ("feature A was logged incorrectly from 9/14 to 9/17"), pre- and post-processing switches: each line can be wrong, and configuration is usually reviewed by nobody.
+
+Sculley et al.'s prescription is to treat configuration as code: diffable against the previous version, automatically validated, code-reviewed, checked into the repository. The reviewable-config discipline is developed in <Ref lesson="experiment-tracking-and-versioning">experiment tracking and versioning</Ref>.
+
+<Aside>
+The paper also lists three ML-specific *design smells*, weaker signals than the debts above. Plain-old-data smell: model parameters and predictions passed around as bare floats, carrying no metadata about what they are or how to consume them. Multiple-language smell: each pipeline stage in whatever language was convenient, multiplying testing and ownership cost. Prototype smell: a team that routinely ships from its prototyping environment, which means the production system is too rigid to experiment in; and small-scale results rarely survive contact with full scale.
+</Aside>
+
+## When ML is the right tool
+
+The taxonomy prices the decision to use ML at all: adopting a model buys predictive power and takes on every liability above. So the adoption question is asked before any model exists, and it has a checklist.
+
+### Four conditions to apply
+
+ML earns its debt when the problem has **learnable, complex patterns**, when **data exists** to learn them from, when the need is genuinely **predictive**, and when future inputs **share the training distribution**.
+
+Each clause excludes real cases: sorting Airbnb listings into US states by zip code has a pattern, but a simple one. The zip-to-state mapping is a finite, exact, static table, and a lookup table beats any model on cost, latency, and correctness. A tax-owed predictor fails the data clause: without income records there is nothing to learn from.
+
+### Four conditions to shine
+
+Four further conditions decide whether ML shines rather than merely applies: the task is **repetitive** (patterns recur, so example-hungry learners get their examples), a **wrong prediction is cheap** (a bad recommendation costs the user a few seconds; a bad diagnosis costs a patient), the task runs **at scale** (millions of predictions amortize the up-front investment and generate training data as a side effect), and the **patterns change** (spam vocabulary, tastes, prices: hand-written rules rot, while a model retrains).
+
+When one wrong prediction is catastrophic, ML is not automatically excluded, but the burden shifts: the case for self-driving systems rests on the average benefit outweighing the cost of rare failures, argued statistically against human drivers, not on the model being right every time.
+
+<KeyFact>
+Google's Rules of ML, [Rule #1](https://developers.google.com/machine-learning/guides/rules-of-ml): don't be afraid to launch a product without machine learning. If ML would give a 100% boost, a heuristic gets you 50% of the way: ranking apps by install rate, filtering publishers that spammed before, ranking contacts by recency. The heuristic ships months earlier, generates the training data, and becomes the baseline every later model must beat.
+</KeyFact>
+
+Rule #1 is planted here and cashed out in <Ref lesson="problem-framing-and-baselines">the baseline lesson</Ref>, where the heuristic takes its place on a ladder of baselines that every model has to climb before earning its complexity.
+
+## ★ Mind versus data
+
+The taxonomy treats data as the system's dominant input, and that position has a live opposition. Judea Pearl, the Turing Award laureate behind causal inference, titles the introduction to *The Book of Why* "Mind over Data" and delivers the verdict "data is profoundly dumb": without causal structure, no volume of observations answers the questions that matter.
+
+The opposite camp holds [Richard Sutton's Bitter Lesson](http://www.incompleteideas.net/IncIdeas/BitterLesson.html) (2019): seventy years of AI research show that general methods leveraging computation and data ultimately beat human-designed structure, by a large margin. Peter Norvig's version, on Google Search: "We don't have better algorithms. We just have more data."
+
+The dispute is about sufficiency, whether finite data can ever be enough without structure, not about necessity; on necessity there is no dispute, and production practice follows it: the observable trend of the last decade is companies improving their data, not their algorithms.
+
+## The lifecycle is a loop
+
+The map that organizes the rest of the course is the ML lifecycle, and its defining property is that it is a cycle, not a pipeline with an exit. Six stages: **project scoping** (objectives, constraints, stakeholders), **data engineering** (sources, storage, labels), **model development** (features, training, evaluation), **deployment**, **monitoring and continual learning**, and **business analysis**, whose verdict feeds the next scoping round.
+
+<Figure
+  src="./figures/lifecycle-loop.svg"
+  alt="Six lifecycle stages arranged in a loop with module tags, plus dashed backward arrows from model development to data engineering and from monitoring back to model development"
+  caption="The lifecycle loop, each stage tagged with the module that owns it. The dashed arrows are where real projects spend their time."
+/>
+
+### A worked trace: twelve steps, four backward arrows
+
+The backward arrows are not decoration; a realistic project crosses them constantly. A worked trace, condensed from an ads model that predicts whether to show an ad for a search query: choose a metric (impressions); collect data and labels; engineer features; train.
+
+Error analysis finds wrong labels, so relabel and retrain. The model now predicts "don't show" always, because 99.99% of the examples are negative, so collect more positives and retrain. The model then aces the test set, which is two months old, and fails on yesterday's data: stale, so update on recent data and deploy.
+
+Finally the business asks why revenue is falling: ads are shown but not clicked, so the metric itself was wrong; switch the objective to click-through rate, and return to step one. Twelve steps, four backward arrows, and the last arrow restarts the whole loop.
+
+### The staleness myth
+
+A common expectation is false: *if we deploy the model and change nothing, its performance stays the same*. It does not. The claim would hold if the input distribution held, and the input distribution is the one thing production data never holds still: the ads model above lost to staleness inside its own development cycle, before any deploy.
+
+The replacement model is this loop: deployment is a stage the system passes through repeatedly, not a finish line, and a system design is judged by how cheaply it goes around. Later modules put numbers on the loop's period, from quarterly retraining down to hourly, in <Ref lesson="continual-learning">the continual-learning lesson</Ref>.
+
+## The first audit: five questions
+
+Debt has no gauge to read; Sculley et al. close by measuring it with questions, and the questions work as a checklist the reader can run against any ML system today:
+
+1. How easily can an entirely new algorithmic approach be tested at full scale?
+2. What is the transitive closure of all data dependencies?
+3. How precisely can the impact of a new change to the system be measured?
+4. Does improving one model or signal degrade others?
+5. How quickly can new team members be brought up to speed?
+
+Each question targets one region of the taxonomy: question 1 prices glue code and jungles, question 2 the data-dependency graph, question 3 the monitoring and experiment infrastructure, question 4 entanglement and cascades, question 5 everything at once.
+
+<KeyFact>
+A team that "moves fast" can pass every code review and still fail all five audit questions: the taxonomy's debts live between components, not in any diff, and their cost becomes visible only over time.
+</KeyFact>
+
+What is established: production ML is a systems discipline. The model is about 5% of the artifact, most failures are systems failures, and the ML-specific failure modes have names, from CACE to configuration debt. The lifecycle loop is the course's map, with each module owning a stage.
+
+What a system design needs next is precision: a system is specified by numbers (latency percentiles, throughput, availability), and a model is judged by a chain of metrics ending in a business quantity. <Ref lesson="requirements-and-metrics">The next lesson</Ref> builds that specification.
+
+## Exercises
+
+<Exercise>
+A subscription-software company describes its churn-prediction setup: "A data scientist exports last quarter's usage data from the warehouse each month, trains a gradient-boosted model in a notebook, and writes churn scores to object storage; a bot posts the 100 highest-risk accounts to the retention team's channel. A cron job reruns the notebook monthly." Against Sculley's nine infrastructure components (configuration, data collection, data verification, feature extraction, machine resource management, analysis tools, process management, serving infrastructure, monitoring), list which are present in any form and which are silently missing.
+
+<Solution>
+Present, at least minimally: **data collection** (the warehouse export), **feature extraction** (inside the notebook, unmanaged), **serving infrastructure** (degenerate but real: batch scores in object storage plus the bot are the serving path), **process management** (the monthly cron job).
+
+Missing: **data verification** (nothing checks that this month's export has the same schema, ranges, or completeness as last month's, so a silently broken export trains a silently broken model); **configuration** (the notebook's parameters, feature list, and label window live in code cells with no versioned, reviewable config); **machine resource management** (acceptable at this scale, absent as a component); **analysis tools** (no slice-level evaluation or comparison against the previous month's model before scores ship); **monitoring** (nothing tracks whether the scores remain accurate, whether their distribution drifts, or whether the retention team's actions feed back into the labels: an account contacted because of a high score and thereby retained looks like a false positive, which is a direct feedback loop through the label).
+
+The transferable check: a system description that names only "train" and "score" steps has, at best, four of the nine boxes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Our model is isolated: we only consume features from the data warehouse, so upstream changes can't break us."
+
+<Solution>
+Two mechanisms break it, and the warehouse blocks neither.
+
+First, **unstable data dependencies**: a warehouse column is not a contract. If a feature is the output of another team's model or a data-derived table (a TF-IDF vocabulary, a semantic mapping, a calibration), its meaning changes when that team ships, with no schema change at all. The hard case is an upstream *fix*: if the signal was miscalibrated and the model fit to the miscalibration, correcting it upstream breaks the model downstream while every pipeline stays green.
+
+Second, **CACE**: even a change confined to one feature does not stay confined. Shift $x_1$'s distribution and, at the next retrain, the learned weights on all other features move too, because the model balances signals jointly. So "the changed feature had low importance" is no defense: the change propagates through the features that did not change.
+
+The step that fails in the claim is the equation of *physical* isolation (we read from one store) with *statistical* isolation (our function of the data is stable). The warehouse isolates the bytes, not the distributions. Minimal repairs: versioned/frozen copies of upstream signals, and per-feature distribution checks between training sets, the machinery of <Ref lesson="data-validation">data validation</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Construct a problem for which ML is strictly the wrong tool: specify inputs, outputs, and the correct non-ML solution, and name which "when to use ML" condition fails. Then state the smallest change to your problem that would flip the verdict.
+
+<Solution>
+One admissible construction: map a vehicle identification number's tenth character to the car's model year. Inputs: one character from a fixed 30-symbol set; outputs: a year; the mapping is published, exact, finite, and static. The correct solution is a 30-entry lookup table: zero latency, zero training data, zero wrong predictions, zero maintenance. The failing condition is **complex patterns**: the pattern exists but is simple and fully known, so learning it approximately from data replaces an exact rule with an estimated one and adds the entire debt taxonomy for negative value. (The **changing patterns** condition fails too: the mapping is fixed by standard.)
+
+The verdict flips when either failure repairs itself: make the input space unbounded or the mapping unwritable (predict a car's *price* from its listing, not its year from a character), or make the pattern drift (the relationship changes monthly). Then no exact table exists, examples are plentiful, and approximate predictions at scale are worth their maintenance cost: all four "shine" conditions return.
+</Solution>
+</Exercise>
+
+<Exercise>
+Classify each incident into the debt taxonomy, naming the specific term: (a) a model's quality drops every March; investigation finds a config entry excluding a date range of bad logging from 2019 that nobody has revisited since; (b) a team copies another team's data-preparation pipeline, deletes a join it believes is unused, and ships; three weeks later a different team's dashboard, which read that pipeline's intermediate files, is empty; (c) a spam filter is retrained monthly on the mail that reached inboxes, and its measured recall keeps rising while users report more spam; (d) a ranking experiment from last year is still reachable behind an `if experiment_47` flag, and a config push meant for another service turns it on in production.
+
+<Solution>
+(a) **Configuration debt.** A stale config line is live logic that no code review sees; the 2019 exclusion now silently drops a month of valid data every year. The fix is Sculley's config discipline: diffable, validated, reviewed, versioned.
+
+(b) A **pipeline jungle** with an **undeclared consumer**. The copied pipeline's intermediate files were an implicit interface; the dashboard team consumed them without declaring the dependency, so the deletion broke a system its owners could not see. Both terms apply: the jungle produced the intermediate files, the undeclared consumer made deleting them dangerous.
+
+(c) A **direct feedback loop**. The filter's own decisions select its training data: spam it wrongly delivers is the only spam it ever sees labeled by user reports, while spam it correctly blocks vanishes from the training set, so measured recall on its own selected data rises even as real-world performance falls. The offline metric is computed inside the loop.
+
+(d) A **dead experimental codepath**, the Knight Capital pattern in miniature: an obsolete branch plus a reused configuration flag equals untested behavior in production. The mitigation is periodic re-examination and deletion of experimental branches, not more careful flag pushes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Apply Sculley's five audit questions to a system you know, or, failing that, to the notebook-and-cron churn system from the component-inventory exercise above. Write one honest line per question.
+
+<Solution>
+Model answers for the churn system; yours should have the same shape.
+
+1. *New approach at full scale?* Days: the notebook is self-contained, so swapping the model is easy, but there is no way to compare against the incumbent on live data, only on the same offline export.
+2. *Transitive closure of data dependencies?* Unknown: the warehouse tables the export reads are fed by upstream jobs nobody on the ML side has enumerated; the true answer requires lineage tooling that does not exist here.
+3. *Impact of a change, measured?* Not measurable: scores ship monthly with no holdout, no A/B structure, and no record of which flagged accounts the retention team actually contacted.
+4. *Does improving one model degrade others?* Only one model exists, but its scores drive retention outreach that rewrites the churn labels, so the model degrades *itself*: question 4's answer is yes, through the feedback loop.
+5. *New team member up to speed?* Weeks: the system is one person's notebook; feature logic, label definition, and the cron job's assumptions live in that person's head.
+
+A system can be small and still fail four of five questions; the questions measure structure, not scale.
+</Solution>
+</Exercise>
+
+<Exercise>
+Return to the ads walkthrough in the lifecycle section. For each stage of that trace (labeling, training, deployment, and the final business review), name the number you would watch to decide the stage "worked." Then order your numbers by how close each is to what the company cares about, and note what changes between adjacent numbers in your ordering.
+
+<Solution>
+Stage by stage. Labeling: a label-quality number, such as agreement rate on an audited sample (it caught the relabeling round). Training: the offline metric on held-out data, log loss or ROC-AUC (it caught the all-negative model, once the evaluation looked past accuracy). Deployment: an online behavioral number, click-through rate on live traffic (the offline metric could not see the staleness that yesterday's data exposed, and it cannot see clicks at all). Business review: revenue per query (the number that revealed that optimizing impressions was optimizing the wrong thing).
+
+The ordering is: offline metric → online proxy metric → business metric, with label quality as a precondition underneath all three. What changes between adjacent numbers is a *validity gap*: a better offline score need not move click-through (the data the model was scored on is not the traffic it serves), and higher click-through need not move revenue (clicks are a proxy the business does not bank). Naming these gaps, and engineering each link so the chain ends in money, is exactly the metrics hierarchy of <Ref lesson="requirements-and-metrics">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. D. Sculley, G. Holt, D. Golovin, E. Davydov, T. Phillips, D. Ebner, V. Chaudhary, M. Young, J.-F. Crespo, D. Dennison, "Hidden Technical Debt in Machine Learning Systems," *NeurIPS* 2015 — §2 entanglement and cascades, §3 data dependencies, §4 feedback loops, §5 anti-patterns, §6 configuration, §9 the audit questions; Figure 1 is the nine-box diagram. https://papers.nips.cc/paper_files/paper/2015/file/86df7dcfd896fcaf2674f757a2463eba-Paper.pdf
+2. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 1 (when to use ML; Table 1-1, research vs production), Ch. 2 (the iterative process and the ads walkthrough), Ch. 7 (the myths about model deployment, including the staleness myth), Ch. 8 (the Papasian–Underwood failure audit).
+3. D. Papasian, T. Underwood, "How ML Breaks: A Decade of Outages for One Large ML Pipeline," USENIX OpML, 2020 — the 96-outage audit. https://www.usenix.org/conference/opml20/presentation/papasian
+4. R. Crowe, H. Hapke, E. Caveness, D. Zhu, *Machine Learning Production Systems*, O'Reilly, 2024 — Ch. 1 (the 5%-of-the-code accounting; pipeline benefits; the Amazon resume-screener case).
+5. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020 — §2.5, the 74–87% project-failure estimates and the documented failure reasons. http://www.mlebook.com
+6. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google — Rule #1 on launching without ML. https://developers.google.com/machine-learning/guides/rules-of-ml
+7. U.S. Securities and Exchange Commission, "SEC Charges Knight Capital With Violations of Market Access Rule," press release 2013-222, October 16, 2013 — the $460M/45-minute loss. https://www.sec.gov/news/press-release/2013-222
+8. C. Huyen, "Machine Learning Systems in Production," CS 329S: Machine Learning Systems Design, Lecture 1 note, Stanford, 2022 — the mind-versus-data positions quoted in the starred section, including the Norvig quote. https://docs.google.com/document/d/1C3dlLmFdYHJmACVkz99lSTUPF4XQbWb_Ah7mPE12Igo/edit
+9. J. Pearl, D. Mackenzie, *The Book of Why: The New Science of Cause and Effect*, Basic Books, 2018 — Introduction, "Mind over Data": the source of "data is profoundly dumb" and the case that observation without causal structure cannot answer interventional questions.
+10. R. Sutton, "The Bitter Lesson," 2019 — the essay arguing that general methods leveraging computation ultimately beat human-designed structure. http://www.incompleteideas.net/IncIdeas/BitterLesson.html
+</References>
