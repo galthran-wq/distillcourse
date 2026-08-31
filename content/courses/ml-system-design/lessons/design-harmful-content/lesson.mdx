@@ -1,0 +1,268 @@
+A harmful-content system classifies on the order of half a billion posts a day into violation categories where positives are rare, adversarial, and expensive to mislabel in either direction — and its output is an enforcement action against a person, not a ranking.
+
+This is the module's fourth dissection, and the first that is not a funnel. <Ref lesson="design-search-ranking">Search</Ref>, <Ref lesson="design-feed-ranking">feed</Ref>, and <Ref lesson="design-ad-click-prediction">ads</Ref> all ended in an ordering some consumer reads top-down; here there is no corpus to narrow and no list to sort: every post gets a verdict, and the verdict acts on its author. The recalled machinery changes accordingly: the PR operating points and slice discipline of <Ref lesson="offline-evaluation">offline evaluation</Ref>, the label suppliers and the 1% holdout of <Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>, the shift taxonomy of <Ref lesson="failures-and-drift">the drift lesson</Ref>, and the serving-mode split of <Ref lesson="batch-and-online-prediction">the serving module</Ref>. What this lesson contributes is the integrity shape: two errors priced separately, one multimodal multi-task classifier under extreme imbalance, and a human review queue whose headcount is a term in the model's threshold.
+
+The route: requirements price the two errors and fix the operating contract; the framing decision is a maintenance decision; fusion is decided by a meme; four label sources with four biases; the review queue and its capacity arithmetic; operations against an adversary that adapts to every ship.
+
+## Requirements: two errors with different victims
+
+The product surface: users publish posts (text, images, video, links, usually several at once), and the platform's guidelines prohibit categories of content: violence, hate speech, nudity, self-harm, harassment, dangerous-organization material. That six-way vocabulary matches the published taxonomies the industry converged on (OpenAI's moderation endpoint, Meta's Llama Guard); this design takes the categories as given policy and never litigates them. The system's job is to find violating posts and act: remove, restrict, or send to a human reviewer, with an appeal path behind every action.
+
+The two ways to be wrong have different victims, so they carry different prices. A **missed violation** stays up and harms in proportion to its views: the cost falls on the audience and on whoever the content targets, and it compounds as the post spreads. A **wrongful takedown** costs the author: legitimate speech suppressed, an account penalized, an appeal filed, and platform trust spent. The prices also differ *by class*: a missed credible threat of violence and a missed borderline-nudity repost are not the same failure, and a wrongful takedown for terrorism is a graver accusation than one for spam.
+
+No single accuracy number can hold this structure, and at this prevalence accuracy is not merely coarse but degenerate: with roughly 5 violating posts in 10,000, the zero-rule classifier from <Ref lesson="problem-framing-and-baselines">the baseline ladder</Ref> (predict *benign* always) scores 99.95% while catching nothing. The contract that does hold the structure:
+
+<Definition title="recall at a fixed precision">
+For each violation class, fix a **precision floor**, the largest tolerable fraction of wrongful flags among flags, set by the cost of wrongful enforcement and the capacity of the appeal pipeline, and report the model's **recall at that floor**: the fraction of true violations caught while precision stays at or above it. The operating point is per class; the floor prices the false positive, the recall reports what that price buys.
+</Definition>
+
+<KeyFact>
+The contract forbids a global threshold by arithmetic, not by preference: at a fixed score threshold, precision is $r\pi / (r\pi + f(1-\pi))$ for recall $r$, false-positive rate $f$, and prevalence $\pi$, so the same threshold that yields precision 0.9 on a class with $\pi = 2\times10^{-4}$ yields precision under 0.01 on a class a thousand times rarer. Every class carries its own threshold, tuned to its own floor.
+</KeyFact>
+
+### Scale, and what it forces
+
+<Example title="scale estimation, template discipline">
+Assumptions with their consequences:
+
+- **~500 million posts published per day**: about 6,000 per second on average, and every per-post cost multiplies by $5\times10^8$. This number returns twice: it makes the joint-representation learning problem of the fusion section feasible, and it makes every percentage in this design a large absolute number.
+- **Prevalence near 0.05% of posts** (a design assumption; the true value is what operations must measure): about **250,000 violating posts per day** across all classes. The zero rule's 99.95% accuracy is this line restated.
+- **A reviewer decides roughly 250 cases per working day.** Human review of even 1% of daily posts, 5 million of them, would need about 20,000 reviewers; review is therefore a scarce resource the model must ration, which the queue section turns into arithmetic.
+- **Posts are multimodal**, so the per-post inference cost is dominated by the media encoders, not the classifier heads, a fact the framing section exploits.
+</Example>
+
+### One scorer, two invocation paths
+
+The action changes with the class, and so does the moment of scoring. For the worst classes, where a single view is already a failure, the model runs as a **synchronous gate**: the post is scored inside the publish path, before anyone can see it, which puts the encoder stack under a request-latency budget and makes this an online-prediction problem in <Ref lesson="batch-and-online-prediction">the serving module's</Ref> terms. Everything else runs through an **asynchronous sweep**: posts are scored within minutes of publication and re-scored when new evidence arrives (user reports, comment patterns, a spike in shares), which is throughput-optimized work with no user waiting on it. Same model, two paths; the severity of the class decides which path a post's score must clear before exposure.
+
+<Figure
+  src="./figures/integrity-system.svg"
+  alt="The integrity system in one diagram: a post flows into a multimodal backbone fusing text and image encoders into a joint representation, then per-class heads produce per-class scores, then a threshold router sends the post to auto-remove, to the human review queue, or to publication with a sampled sweep; human review leads to enforcement and appeals; dashed return arrows carry user reports, reviewer verdicts, appeal outcomes, and the one-percent unfiltered holdout back into the training store."
+  caption="The design in one diagram. Every solid path is a section of this lesson; every dashed return path is a label source, and the holdout is the only one the filter never touches."
+/>
+
+## Framing: the price of the next violation class
+
+Requirements fixed, the task must be framed, and <Ref lesson="problem-framing-and-baselines">the framing lesson's</Ref> rule applies with force: the framing decides the maintenance bill, not the launch. There are N violation classes and three ways to own them.
+
+| design | training | serving cost | thresholds | onboarding class N+1 |
+| --- | --- | --- | --- | --- |
+| one binary model per class | N independent jobs, N schedules | N full models per post | independent per class | a new model from scratch, on scarce positives, with no transfer |
+| one multi-label model | one job, jointly labeled data | one model | one shared output space | full retrain; improving one class can degrade others |
+| multi-task heads on a shared backbone | one backbone job + N cheap heads | one backbone pass + N heads | independent per class | a new head on the existing backbone |
+
+Per-class binary models buy isolation (each class retrains on its own cadence and tunes its own threshold) and pay N times for everything, including N passes of the expensive media encoders per post. A single multi-label model collapses the serving cost but welds the classes together in one output space. The production answer, and the one Meta's WPIE ("whole post integrity embeddings") system embodies, is **multi-task heads on a shared multimodal backbone**: the backbone, the expensive part per the scale estimate, is computed once per post; each class keeps its own head and its own threshold; and the classes share representation.
+
+### Transfer to class N+1, and the CACE bill for it
+
+Sharing is what makes the rare classes viable. A newly prohibited category arrives with dozens to hundreds of labeled positives: hopeless for a from-scratch model at $\pi \approx 10^{-6}$, workable for a small head on a backbone that already encodes violence, hate, and their neighborhoods. The coupling also has a price, and it is CACE from <Ref lesson="ml-in-production">the first lesson</Ref>: changing anything changes everything, so a backbone retrain moves every class's score distribution at once, and every per-class threshold must be re-tuned against its precision floor on every ship.
+
+## Fusion: the meme decides
+
+The backbone's input is a bundle of modalities, and there are two ways to combine them. *Late fusion* runs one classifier per modality (a text model, an image model) and merges their scores. *Early fusion* fuses the modality **representations** first and runs one classifier over the joint vector.
+
+<Figure
+  src="./figures/fusion-meme.svg"
+  alt="Two panels on the same meme, a harmless sentence over a harmless photo. Left, late fusion: the text classifier scores 0.04, the image classifier scores 0.07, and the merge of two low scores stays low, missing the violation. Right, early fusion: text and image encoders feed one joint representation whose classifier scores 0.93, catching the harm that exists only in the combination."
+  caption="One meme, two architectures. The merge sees two numbers; the joint classifier sees the combination."
+/>
+
+The case that decides between them is the meme: a sentence that is harmless alone, over an image that is harmless alone, whose *combination* is a slur, a threat, or a celebration of violence. Late fusion is structurally blind to it: each unimodal classifier, scoring honestly, reports a low score, and no merge function can recover an interaction its inputs no longer contain.
+
+### What the joint space costs, and what pays for it
+
+Early fusion can represent the combination, at the cost of a much harder learning problem: the joint input space is the product of the modality spaces, and covering it takes data. At 500 million posts a day, data is the abundant resource, which is why the scale argument and the meme argument land on the same side. The encoders themselves (a text transformer, an image encoder, a fusion block) are treated here as given components with a serving cost, not as an architecture decision this design reopens.
+
+<KeyFact>
+A meme is harmless text over a harmless image: early fusion — one classifier over a joint representation — catches what two unimodal classifiers cannot, because the violation exists only in the combination their merge never sees. Late fusion still keeps what the joint model gives up: attribution (a per-modality score says *which* modality fired, which reviewers and appeals want), reuse (the text scorer serves comments, messages, and usernames unchanged), and graceful degradation when a modality is missing. Production systems therefore feed the unimodal scores into the joint model as inputs and keep them beside it as debugging surfaces.
+</KeyFact>
+
+## Data: four label sources, four biases
+
+The classifier needs labels for events that are five-in-ten-thousand rare and adversarially disguised, and no annotation budget covers 500 million posts a day. Production integrity systems assemble labels from four sources, each covering a different region of the space with a different bias.
+
+**User reports** are the high-volume source and the most biased one: only content that was published, surfaced, and *seen by someone inclined to report it* generates a report. Reporting propensity varies by class: explicit nudity is reported at a far higher rate than coded hate speech that only its targets recognize. A model trained on reports therefore learns that harm is what gets reported, which is <Ref lesson="labels-and-feedback-loops">the labeling lesson's</Ref> self-selection bias operating on the label itself. **Reviewer verdicts** are the gold standard and the scarce one: every verdict costs reviewer minutes, and the queue only contains what the model flagged, so verdicts sample the model's own positives. **Appeal outcomes** are a second human opinion concentrated exactly on the enforcement positives: an overturned appeal is a confirmed false positive with lineage, the most direct measurement of precision failures the system owns.
+
+### The 1% that is deliberately let through
+
+None of those three sources can measure what the filter misses, because all three are conditioned on the system's own behavior. The unbiased source is the one <Ref lesson="labels-and-feedback-loops" id="unbiased-negatives-at-a-price-the-1-holdout">Rule #34's holdout</Ref> constructs: mark a small uniform fraction of traffic (Rule #34 uses 1%) as held out and deliver it **unfiltered**, then label that slice with dedicated review rather than organic reports. The holdout is a uniform sample of the pre-enforcement distribution, untouched by the filter, so it estimates true prevalence and true recall where every other source estimates the system's shadow. The holdout's price: the filter's block rate is multiplied by 0.99, a 1% fall, and a measured trickle of violating content reaches real users. Legal bounds still hold: content that is illegal to distribute can never be held out and keeps a fully filtered path. The system ships harm deliberately, in a small measured dose, because that dose is the only unbiased estimate of the harm it fails to catch.
+
+<Remark title="imbalance machinery, recalled">
+At training time the imbalance itself is handled by the classical toolkit unchanged (negative downsampling, class weights, focal loss), and nothing in this design modifies it. The system-level point is the one this section makes: at $\pi \approx 5\times10^{-4}$ the binding constraint is label *supply and bias*, not loss shaping, and no reweighting scheme repairs a training set that never contained the harms nobody reports.
+</Remark>
+
+Every label carries lineage: source (report, verdict, appeal, holdout), reviewer pool, and **policy version**. The last matters because guidelines change: a post labeled benign under policy v7 may be violating under v8, which is concept shift by decree. $P(Y \mid X)$ moved because the definition of $Y$ moved, and retraining across a policy boundary without re-labeling mixes two ground truths.
+
+## The review queue is a component, not an afterthought
+
+The model's scores now exist; the design question is what acts on them, and the answer is a **router with three bands** per class. Above a high threshold, calibrated so that measured precision clears the class's auto-action floor, the system removes without a human. Below the review threshold, the post publishes and stays eligible for the async sweep. Between the two lies the band where the model is not trusted to act alone, and that band feeds the human review queue.
+
+<Definition title="human review loop">
+The model serves as **triage** for human decision-makers: it ranks a review queue, reviewers issue verdicts that are both enforcement decisions and gold labels, and appeal outcomes audit the verdicts. Reviewer capacity, measured in decisions per day, is a hard constraint of the system, and the queue's admission threshold must be set so that inflow does not exceed it.
+</Definition>
+
+The queue is ordered by **severity × uncertainty**: a review is worth most where the class is grave and the model is undecided, since a certain score (either way) gains little from confirmation. That rule is margin sampling from <Ref lesson="labels-and-feedback-loops" id="active-learning-spend-the-label-budget-where-the-model-is-unsure">the labeling lesson's active-learning section</Ref>, promoted from a labeling economy to the production serving path: the same ordering that maximizes enforcement value per review also maximizes label value per review, and the verdicts flow back into training with lineage attached.
+
+<Figure
+  src="./figures/review-queue.svg"
+  alt="The review queue as a ranked list: flagged posts ordered by severity times uncertainty, a capacity cut-line at the day's reviewer budget, items above the line reviewed with verdicts flowing back to the training store with lineage tags, items below the line routed to the asynchronous sweep for re-scoring."
+  caption="Triage: the queue admits by severity × uncertainty, the cut-line is headcount, and every verdict is also a label."
+/>
+
+### The capacity backpropagates into the threshold
+
+<Example title="queue sizing for one class">
+Hate speech, at 1 violating post in 5,000: about **100,000 true positives per day**. The measured PR curve gives four candidate operating points: recall 0.90 at precision 0.20; 0.75 at 0.45; 0.60 at 0.65; 0.45 at 0.80. Flags per day is caught divided by precision:
+
+- recall 0.90 → $90{,}000 / 0.20 = 450{,}000$ flags/day
+- recall 0.75 → $75{,}000 / 0.45 \approx 167{,}000$ flags/day
+- recall 0.60 → $60{,}000 / 0.65 \approx 92{,}000$ flags/day
+- recall 0.45 → $45{,}000 / 0.80 \approx 56{,}000$ flags/day
+
+The class's review budget is 240 reviewers × 250 decisions = **60,000 reviews per day**. If every flag is reviewed, only the last operating point fits: capacity has pushed recall from 0.90 down to 0.45, and more than half the catchable violations of the class are priced away by headcount. The repair is the router's top band. If the top of the score distribution alone delivers recall 0.25 at measured precision 0.95, auto-removing it catches 25,000 violations a day with no reviewer, out of $25{,}000 / 0.95 \approx 26{,}300$ auto-removed posts: roughly 1,300 wrongful removals a day flow into the appeal pipeline as the stated price, and the freed capacity moves the review band's threshold back down. The three-band router is not a policy preference; it is what the arithmetic forces.
+</Example>
+
+<KeyFact>
+The capacity number is not a constant the threshold is solved against once: appeals are worked by the same reviewer pool the queue budget spends. The Example's auto-action band frees review capacity and returns part of it as appeal load: its ~1,300 wrongful removals a day are all appealable, and an appeal is a second decision by a reviewer, drawn from the same 60,000 a day. Raising recall raises flags, flags raise enforcement, and enforcement raises the appeal volume that eats the budget the next threshold is solved against: the capacity a threshold assumes is itself a function of the last threshold, so solving once and freezing the number understates what every recall gain costs.
+</KeyFact>
+
+<FigureSequence
+  name="operating-point"
+  alt="Three frames on one per-class precision-recall curve. Frame one: the curve alone, precision against recall. Frame two: a horizontal fixed-precision line at the class's floor, with the intersection marking the recall the floor buys. Frame three: a reviewer-capacity constraint line overlaid, pushing the operating point to lower recall, with the queue drawn overflowing at the infeasible point where capacity was ignored."
+  caption="The operating point in three constraints: the curve, the precision floor, the headcount. The last one is the one offline evaluation never shows."
+/>
+
+<Task>
+Step through the three frames and track the operating point. In frame two, read the recall the precision floor buys; in frame three, read what the capacity line does to it. Then restate the Example's conclusion in one sentence: name the quantity that moved the threshold and does not appear anywhere on a PR curve.
+</Task>
+
+<Exercise>
+Self-harm content, at 1 violating post in 20,000: 25,000 true positives per day. Measured operating points: recall 0.85 at precision 0.10; 0.70 at 0.30; 0.50 at 0.55. The class's budget is 100 reviewers × 250 decisions = 25,000 reviews per day, and every flag in the review band is reviewed. (a) Compute flags per day at each operating point and find the highest recall the budget sustains. (b) Compute the headcount needed to run at recall 0.70 instead. Write the flags-per-day formula before opening.
+
+<Solution>
+(a) Flags/day = (recall × 25,000) / precision: recall 0.85 → $21{,}250/0.10 = 212{,}500$; recall 0.70 → $17{,}500/0.30 \approx 58{,}300$; recall 0.50 → $12{,}500/0.55 \approx 22{,}700$. Only the last fits under 25,000 reviews/day: the sustainable operating point is **recall 0.50**, and half the class's catchable harm is beyond the budget.
+
+(b) Recall 0.70 needs ~58,300 reviews/day → $58{,}300 / 250 \approx 234$ reviewers: **134 more** than the current 100. The design decision this exposes is exactly the severity argument: for a class where a miss can precede a death, the case for paying 134 salaries, or for an auto-action band despite its wrongful-removal price, is made from this arithmetic, not from the PR curve alone. The transferable move: reviewer capacity enters the threshold the same way the precision floor does, as a constraint line drawn onto the curve.
+</Solution>
+</Exercise>
+
+## Operations: prevalence, slices, and an adversary
+
+The system is live; what operations must measure first is **prevalence**, and its denominator is views, not posts. A violating post seen by a million people is a thousand times the harm of one seen by a thousand, so the online metric is the violating fraction of *views*, and it is measured by **sampled human review of traffic the model did not flag**, never by the model's own flag counts. A model grading itself sees precisely everything except its misses; the flag rate confounds model changes with world changes; only an independent sample, the 1% holdout chief among them, estimates what is actually getting through. This is the operational face of a rule <Ref lesson="monitoring-and-observability">the monitoring lesson</Ref> builds in general: model-quality metrics need ground truth the system must go and buy.
+
+<Remark title="the cross-lingual gap">
+Aggregate metrics hide the worst slices, and for integrity systems the slices are above all *languages*. NewsGuard's April 2023 probe of ChatGPT-3.5 asked for misinformation articles in three languages: the model refused 6 of 7 prompts in English and complied with all 7 in both simplified and traditional Chinese. A moderation stack has the same failure surface: per-class recall at fixed precision is reported **per language and per format**, in the discipline of <Ref lesson="offline-evaluation">slice-based evaluation</Ref>, or the English number becomes the system's number while another language's users get the zero rule.
+</Remark>
+
+### Drift here is a response, not a weather pattern
+
+<Ref lesson="failures-and-drift">The drift lesson's</Ref> taxonomy treats shift as something the world does; here the sharpest shift is something the adversary does *to this model*. Posters who profit from violating content probe the filter and adapt to whatever ships: obfuscated spellings and character substitutions against the text encoder, crops, filters, and re-encodings against image matching, the offending text moved into the image where the text path cannot read it. Each deployment is followed by adaptation, so per-class recall decays over weeks: faster than benign drift, and in proportion to how much the blocked content was worth to its senders. Retraining cadence is therefore a **security parameter**: a stale integrity model is not a slightly worse ranker but an open, published hole, and the holdout plus the report stream are what keep fresh evasions flowing into training.
+
+<Figure
+  src="./figures/adversarial-clock.svg"
+  alt="Recall for one class over sixteen weeks: after each model ship, the adversarial curve decays steeply within weeks as evasion adapts, then resets at the next retrain, forming a sawtooth; a dashed benign-drift curve on the same axes declines much more slowly. Obfuscation examples are sketched at the decay points."
+  caption="The adversarial clock: evasion adapts to each ship, so recall decays in weeks and the retrain resets it. Benign drift, dashed, is the slow curve this module's other systems face."
+/>
+
+One more loop must be declared, because this system perturbs its own data twice. Beyond report bias, **enforcement removes exactly the content that would have been tomorrow's positives**: as the system succeeds, the surviving stream, and any training data drawn from it, shows falling $P(Y)$, a label shift the system itself manufactured. Read naively, the falling flag rate says the problem is shrinking; the holdout, sampled before enforcement touches anything, is the instrument that says whether it actually is.
+
+<Remark title="the adjacent layer: bad actors, not bad content">
+This design scores content; a sibling system scores *behavior*. Rate limits, account-reputation scores, and normal-versus-abnormal behavior classifiers suppress the fake accounts, spam rings, and coordinated operations that manufacture violating content at volume: the other half of the integrity split, and the first line of defense that keeps this classifier's traffic from being mostly machine-generated probing. Enforcement rates across demographic and language slices are also a fairness surface in their own right; the audit machinery for that lives in <Ref lesson="privacy-and-fairness">the responsible-ML lesson</Ref> and is not duplicated here.
+</Remark>
+
+What is established, requirements to operations: the two errors are priced separately and the operating contract is per-class recall at a fixed precision, with a per-class threshold forced by prevalence arithmetic; the framing is multi-task heads on a shared multimodal backbone, chosen for what class N+1 costs; fusion is early, because the meme's harm exists only in the joint representation and 500M posts a day can pay for learning it; labels come from reports, verdicts, appeals, and a deliberate 1% unfiltered holdout that alone measures the misses; the review queue is ranked by severity × uncertainty and its headcount backpropagates into the threshold; and operations track view-weighted prevalence by sampled review, per language, against an adversary who adapts within weeks and an enforcement loop that eats its own positives. This closes the module's single-shape dissections. <Ref lesson="design-video-recommendations">The synthesis lesson</Ref> composes the funnel shapes into one full design at video scale; the operating contract built here returns in module 8, wrapped around a model's own outputs as a guardrail, and the last exercise walks to its doorstep.
+
+## Exercises
+
+<Exercise>
+The warm-up the whole design rests on. Take the violating stream as a single aggregate operating point — 500M posts/day at the scale estimate's 0.05% prevalence across all classes, scored by one model at recall 0.90 and precision 0.60 (the per-class thresholds of the operating contract are collapsed into one number here, so the arithmetic is the system's total, not a class's). Compute: (a) true violations caught per day; (b) total flags per day; (c) false positives per day; (d) reviewer-days per day if every flag is human-reviewed, at the scale estimate's 250 decisions per reviewer-day; (e) wrongful actions per day if flags are instead auto-actioned with no review.
+
+<Solution>
+True positives in the stream: $5\times10^8 \times 5\times10^{-4} = 250{,}000$/day.
+
+(a) Caught: $0.90 \times 250{,}000 = 225{,}000$/day.
+(b) Flags: caught / precision $= 225{,}000 / 0.60 = 375{,}000$/day.
+(c) False positives: $375{,}000 - 225{,}000 = 150{,}000$/day.
+(d) $375{,}000 / 250 = 1{,}500$ reviewer-days per day: a standing staff of roughly 1,500 reviewers to review every flag the system raises, before vacation, appeals work, or quality audit.
+(e) Auto-actioning everything wrongly removes the 150,000 false positives per day: at precision 0.60, four in ten enforcement actions hit innocent authors. The pair (d)/(e) is the design space in miniature: review capacity, auto-action harm, or a higher-precision (lower-recall) threshold, the three quantities the router's bands trade against each other.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: the rarest class has 50 true positives per day ($\pi = 10^{-7}$ of 500M). Policy demands precision 0.99 for auto-action. (a) Using $\text{precision} = r\pi/(r\pi + f(1-\pi))$, compute the false-positive *rate* $f$ the classifier must hold at recall 0.5, and the resulting false positives per day. (b) Show what the same score threshold that achieves precision 0.9 on a class with $\pi = 2\times10^{-4}$ yields here, and state what that does to the idea of one global threshold. (c) Exhibit the degenerate case where modeling for precision is the wrong design entirely.
+
+<Solution>
+(a) Solve for $f$: precision 0.99 means $f = \frac{r\pi(1-0.99)}{0.99(1-\pi)} \approx \frac{0.5 \times 10^{-7}}{99} \approx 5\times10^{-10}$. Over $\sim 5\times10^8$ negatives a day, that is **0.25 false positives per day**: the classifier may wrongly fire once every four days while catching 25 real cases. No learned classifier on adversarial content holds a false-positive rate of $5\times10^{-10}$; the precision floor is unreachable on the model side.
+
+(b) At a threshold with, say, $f = 10^{-6}$ and $r = 0.9$: on the common class, precision $= \frac{0.9 \times 2\times10^{-4}}{0.9 \times 2\times10^{-4} + 10^{-6}} \approx 0.995$; on the rare class, precision $= \frac{0.9\times10^{-7}}{0.9\times10^{-7} + 10^{-6}} \approx 0.08$. The identical threshold is excellent on one class and garbage on the other, purely through $\pi$: a global threshold is not suboptimal but meaningless.
+
+(c) Drop the model-side precision requirement. At recall 0.95 and precision 0.01, flags $= 47.5/0.01 = 4{,}750$/day: **nineteen reviewers** (at 250 decisions a day) can review *every* flag, and the humans supply the precision the model cannot. For a class this rare, the model's job is recall-only triage and the review of 100% of flags is cheaper than any attempt at model-side precision: the boundary where the human review loop stops being a queue behind the model and becomes the classifier itself.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "the classifier is 99.95% accurate; ship it." Use the baseline ladder, then rebuild the evaluation the way this lesson's contract requires, and state concretely what accuracy hid.
+
+<Solution>
+At prevalence 0.05%, the zero-rule baseline (predict benign always) is itself 99.95% accurate: the claim's number is the bottom rung of <Ref lesson="problem-framing-and-baselines">the baseline ladder</Ref> restated, and it is consistent with a system that catches *nothing* (recall 0, no false positives). The warm-up's working model (recall 0.90, precision 0.60) makes $25{,}000 + 150{,}000 = 175{,}000$ errors a day, for accuracy $1 - 175{,}000/5\times10^8 = 99.965\%$: it does score above the zero rule, by 0.015 percentage points. The useful system and the useless one are separated in the fourth decimal, which is inside the noise of any A/B readout and below the resolution of any dashboard the number is reported on.
+
+Accuracy also cannot rank two working models against each other. A recall-0.30 / precision-0.99 model catches 75,000 violations, raises $75{,}000/0.99 \approx 75{,}760$ flags, and so makes $175{,}000$ misses plus $\approx 760$ false positives $\approx 175{,}760$ errors a day — against the recall-0.90 / precision-0.60 model's 175,000. Accuracy 99.9648% against 99.9650%: equal to five significant figures. The two are opposite products — one leaves seven violations in ten standing and almost never touches an innocent author, the other catches nine in ten and wrongly flags 150,000 authors a day — and the metric that is supposed to choose between them cannot tell them apart.
+
+The rebuilt evaluation: per class, report (1) recall at the class's fixed precision floor, (2) the prevalence estimate from sampled review, and (3) the slice breakdown by language and format. What accuracy hid is the entire job: all 250,000 daily violations live inside accuracy's last 0.05%, so the metric is 99.95% about the part of the distribution the system exists to ignore.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson skipped. (a) Show that training only on user-reported content selects on the label's visibility: write the training distribution in terms of the report propensity, and state which harms are never learned. (b) Explain why Rule #34's 1% uniform pass-through yields an unbiased prevalence estimator for the unfiltered stream. (c) Compute the estimator's 95% confidence interval for one day: 1% of 500M posts, true prevalence 0.05%.
+
+<Solution>
+(a) A reported example is one that was published, surfaced, seen, and reported: the training positives are drawn from $P(x \mid \text{report}) \propto \rho(x)\, P(x, y{=}1)$, where $\rho(x)$ is the report propensity, the probability a violating post like $x$ gets reported at all. Classes and styles with $\rho(x) \approx 0$ (coded hate speech legible only to its targets, harms in low-reporting communities or languages) contribute almost no positives, so the model's learned notion of "harmful" converges on "reportable". This is selection on the label's visibility, not on the label.
+
+(b) The holdout is a uniform 1% sample of *all* traffic, chosen before the filter or any surfacing logic acts, so every post has the same inclusion probability regardless of $y$, of $\rho$, or of the model's score. The sample mean of dedicated-review verdicts over the holdout is then an unbiased estimator of $\pi$ for the full pre-enforcement stream, including the content the filter would have blocked and the content nobody would have reported.
+
+(c) $n = 0.01 \times 5\times10^8 = 5\times10^6$ posts/day; expected positives $= n\pi = 2{,}500$. Standard error: $\sqrt{\pi(1-\pi)/n} = \sqrt{5\times10^{-4} \times 0.9995 / 5\times10^6} \approx 10^{-5}$. The 95% CI is $\hat\pi \pm 1.96\times10^{-5}$, i.e. $(5.0 \pm 0.2)\times10^{-4}$: about **±4% relative, daily**. One percent of traffic buys a prevalence estimate precise enough to detect a 10% shift in a day, which is exactly the instrument the operations section aims at the enforcement loop and at evasion.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: design the experiment that shows the joint representation, and not either unimodal signal, is what separates harmful pairs from benign ones. Specify the test set, the controls, and the two accuracy patterns — one that confirms early fusion, one that indicts it.
+
+<Solution>
+**Test set**: pairs $(t_i, v_i)$ of text and image that are harmful *only jointly*, each $t_i$ benign alone, each $v_i$ benign alone, verified by human raters on the components separately.
+
+**Controls**: (1) *scrambled pairs* $(t_i, v_j)$, $i \neq j$: the same texts and images recombined so no pair carries the joint harm; (2) the components alone; (3) a late-fusion baseline (the production unimodal scorers plus their merge) run on the identical sets.
+
+**Confirming pattern**: the early-fusion model scores matched pairs high and scrambled pairs, texts, and images low; it separates $(t_i, v_i)$ from $(t_i, v_j)$, which only the interaction can do. The late-fusion baseline scores matched and scrambled pairs identically low, its structural blindness made visible.
+
+**Indicting pattern**: the early-fusion model scores matched and scrambled pairs *the same* (high or low). Then it is not reading the interaction but keying on unimodal features (particular texts or images that happen to correlate with harm in training data), and its meme performance is memorization wearing fusion's architecture; equivalently, if early and late fusion tie on this set, the joint representation earns nothing and the simpler system should ship. What counts as success is the gap between matched and scrambled, not the raw accuracy.
+</Solution>
+</Exercise>
+
+<Exercise>
+Enforcement feeds back: takedowns remove exactly the content that would have been tomorrow's positives, so the positive rate in the training stream falls as the system succeeds. (a) Classify this with the shift taxonomy of <Ref lesson="failures-and-drift">the drift lesson</Ref> — which of $P(X)$, $P(Y)$, $P(Y \mid X)$ moved, and who moved it? (b) Name the monitoring signal that distinguishes it from a real prevalence drop.
+
+<Solution>
+(a) In the observed (post-enforcement) stream, $P(Y)$ falls while $P(Y \mid X)$ is untouched: the same meme is exactly as harmful; it is merely absent. That is **label shift**, and it is system-induced: a degenerate feedback loop running through enforcement rather than through ranking exposure. The model's outputs (takedowns) select the next training distribution, the moderation counterpart of the ads system's the-model-picks-its-own-training-data loop. (If evasion is also underway, $P(X \mid Y{=}1)$ moves too, because the positives that remain look different, which is why the loop and the adversary must be monitored separately.)
+
+(b) The divergence between the **holdout prevalence estimate and the flag rate**. The holdout samples traffic before enforcement touches it: a real prevalence drop (the adversaries left) lowers both the holdout estimate and the flag rate together; the enforcement loop lowers the flag rate and the training stream's positive rate while the holdout holds steady. One number moving without the other is the loop's signature, and a holdout that holds steady while flags *fall* is also the first symptom of evasion, which is the triage the operations section leaves to sampled review.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: your platform now ships an LLM assistant, and policy requires that no generated reply reaching a user violates the same six harm categories. Specify the checking layer as this lesson would: the classifier's contract, its serving mode, and its latency constraint, for a reply budget of 2 seconds end-to-end.
+
+<Solution>
+The contract is this lesson's, unchanged: per-category **recall at a fixed precision**. A missed harmful generation reaches a user (recall failure), a wrongful block eats a legitimate answer and the user's time (precision failure), and the floors differ by category severity. The serving mode is forced: there is no async sweep for content the user is already reading, so the checker is a **synchronous gate** on the model's own output. Every generation is scored against the categories before display, inside the response's latency budget, which means the checker's inference cost is a line item inside the 2 seconds (and with streamed output, the gate must either buffer or check incrementally and retract).
+
+What you have specified is an **output guardrail**: a classification layer wrapped around a generative model's outputs, with the integrity system's operating contract and the gate's serving economics. It is one standard layer of the reference architecture that closes this course — <Ref lesson="ai-application-architecture">the AI application lesson</Ref> assembles it alongside input guardrails, routing, and caches, and prices the latency it adds.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023 — Ch. 5, "Harmful Content Detection" (pp. 93–114): the multimodal post framing, late-versus-early fusion (Fig. 5.5) with the ~500M-posts-per-day scale argument, per-class binary versus multi-label versus multi-task heads (Fig. 5.11) and the WPIE pointer, user reports and appeals as data sources, and severe class imbalance driving recall-at-fixed-precision evaluation.
+2. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018 — Rule #34: the held-out unfiltered traffic construction for filtering tasks, its sampling-bias rationale, and its block-rate price. https://developers.google.com/machine-learning/guides/rules-of-ml
+3. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 4: class imbalance, why it makes learning hard, and the resampling and loss-level toolkit (weights, focal loss) this design recalls rather than re-teaches.
+4. C. Huyen, *AI Engineering*, O'Reilly, 2025 — Ch. 4, pp. 169–171: the harm-category taxonomies (OpenAI's moderation endpoint, Llama Guard) used here as the policy vocabulary; Ch. 2: the NewsGuard cross-lingual finding (ChatGPT-3.5 refusing 6/7 misinformation prompts in English and complying 7/7 in Chinese).
+5. H. Inan et al., "Llama Guard: LLM-based Input-Output Safeguard for Human-AI Conversations," 2023 — the published safety-risk taxonomy behind the category vocabulary. https://arxiv.org/abs/2312.06674
+6. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020 — §9.4.4, "Monitor for Abuse": rate limiting, reputation scores, and behavior classification, the adjacent bad-actor layer, and the observation that attackers adapt so models must be updated regularly. http://www.mlebook.com
+</References>

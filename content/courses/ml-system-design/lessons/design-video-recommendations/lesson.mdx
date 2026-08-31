@@ -1,0 +1,279 @@
+This lesson runs the whole course once, as a single design: a video-recommendation system taken from requirements and scale estimates through data, models, serving, experiments, and monitoring.
+
+The module has dissected four shapes on the machinery of <Ref lesson="recommender-funnel">the funnel</Ref>, <Ref lesson="ranking-and-ctr">ranking</Ref>, and <Ref lesson="embedding-based-search">embedding</Ref> lessons: a search system, a feed, an ads system, an integrity system, each keeping one shape's difficulty in focus. What stands open is the composition claim the module was built to test: that the course's layers assemble into one complete design at a scale that needs all of them at once. This lesson makes that design. It introduces no new mechanism; every component carries a reference to the lesson that built it. The one skill it adds is the last one: reading the finished design against the interview templates and the documented systems it descends from, and naming where they disagree.
+
+The route: the numbers, the framing and labels, the design assembled in stages, the freshness and serving plan, the measurement and retraining plan, and the critique.
+
+## The numbers before the boxes
+
+Every dissection in this module started from scale arithmetic, because the numbers decide which architectures are even admissible (<Ref lesson="design-search-ranking">the search dissection</Ref> set the pattern). The product here: a logged-in user opens the homepage of a video platform and receives a personalized page of videos; the terminal business event is time spent watching, subject to guardrails the operations section defines. The page budget is the standard **200 ms at p99**, with the ML pipeline allotted ~130 ms in <Ref lesson="recommender-funnel">the funnel lesson's</Ref> 20/100/10 split across retrieval, ranking, and re-ranking.
+
+<Example title="the back-of-envelope, worked once">
+Assumptions first, each with its consequence attached.
+
+- **2 billion daily active users**, ~2 homepage loads each: $4 \times 10^9$ requests/day. A day is $8.64 \times 10^4$ s, so the average is ~46,000 requests/s; at a 2× peak-to-mean ratio, the system is sized for **~10⁵ QPS at peak**.
+- **Corpus: $10^9$ videos**, growing by roughly 4 million a day (the platform's published upload rate, 500 hours of video per minute, at a ~10-minute average). The funnel's per-request volumes carry over (retrieval returns ~5,000 candidates, the ranker scores ~500, the page shows ~20) because retrieval is sublinear: a 10× larger corpus changes the index, not the request path.
+- **Ranking compute:** $500 \times 10^5 = 5 \times 10^7$ forward passes per second at peak. At the funnel lesson's ~0.2 ms amortized per item, that is $10^4$ device-seconds of inference per wall-clock second: ranking alone occupies the equivalent of **ten thousand accelerators** at peak, which is why per-item model cost is a hardware budget line, not a tuning detail.
+- **Retrieval index:** $10^9$ items × 128 dimensions × 2 bytes (FP16) = $2.56 \times 10^{11}$ bytes ≈ **256 GB**. No serving node holds it: the index is sharded (~16 ways at 16 GB each), and every query fans out to all shards and merges. That is scatter/gather, with the tail amplification <Ref lesson="partitioning">the partitioning lesson</Ref> priced and the funnel lesson's sharding exercise computed.
+- **The label log:** ~20 video tiles seen per load × $4 \times 10^9$ loads = $8 \times 10^{10}$ impressions/day; at ~1.5 watches per load, $6 \times 10^9$ positives/day against ~$7.4 \times 10^{10}$ negatives, a watch rate near 7%. At ~500 bytes per feature row, the training log runs **~40 TB/day**, over a petabyte a month; keeping six months in the lake is a storage commitment made here, in the requirements, not discovered by the data team later.
+</Example>
+
+<Figure
+  src="./figures/estimation-card.svg"
+  alt="A computation card in four chained rows plus a verdict band: 2 billion DAU times 2 loads per day yields 4 billion requests per day and about 100,000 peak QPS; the funnel volumes 10^9 corpus to 5,000 retrieved to 500 ranked to 20 shown, with 500 times 100k equals 50 million forward passes per second equals about 10,000 accelerators; the index sizing 10^9 times 128 dimensions times 2 bytes equals 256 GB, sharded 16 ways; the label log 80 billion impressions per day times 500 bytes equals about 40 TB per day; and the three decisions the numbers force — a deep funnel, a sharded index, and per-item ranker cost as the fleet bill."
+  caption="The estimate as a chain: each row's output is the next row's input, and every number lands on a design decision (fleet size, shard count, storage commitment)."
+/>
+
+The estimate already made three architecture decisions. The corpus size forces the full three-stage funnel; this is the scale <Ref lesson="design-feed-ranking">the feed dissection's</Ref> closing exercise showed the shallow join cannot survive. The index size forces sharding and its tail arithmetic. And the accelerator count makes the ranker's per-item cost the design's most expensive constant: halving it (the compression toolkit of <Ref lesson="model-compression">the serving module</Ref>) halves a ten-thousand-device fleet.
+
+<Exercise>
+The item tower is widened to 256 dimensions and the embeddings stored in FP32. Recompute the index size, the per-shard size at 16 shards, and state the operational consequence for the serving fleet. Write the multiplication before opening.
+
+<Solution>
+$10^9 \times 256 \times 4$ B $= 1.024 \times 10^{12}$ B ≈ **1 TB**, a 4× growth; at 16 shards, 64 GB per shard. The consequence is that each shard no longer fits comfortably in one node's RAM beside its serving process, so the choice is more shards (more fan-out, worse tail amplification per <Ref lesson="recommender-funnel">the funnel lesson's</Ref> sharding exercise) or compression of the vectors themselves: product quantization, the IVF+PQ configuration the funnel lesson assigned to exactly this regime. Embedding width is a serving-cost parameter, not just a model-quality parameter.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The estimate's outputs are not equally fragile. The architecture selection survives a 3× error in any assumption: at 700 million DAU or a $3 \times 10^9$ corpus, the funnel, the sharding, and the retraining clocks all stand, only rescaled. The hardware bill does not: the peak fleet is the product of DAU, candidates ranked, and per-item cost, so a 3× error in any factor triples a ten-thousand-accelerator line item, which makes the ~0.2 ms per-item cost the assumption to verify first. The architecture itself changes shape only far below these numbers, in the $10^7$-item regime the mid-size redesign in the exercises computes.
+</KeyFact>
+
+## Framing and labels: decided on paper, before any pipeline
+
+The framing step comes next in the template (<Ref lesson="the-design-document">the design-document lesson's</Ref> skeleton: problem definition, then metrics, then data), and for a recommender the framing question is what the ranker should predict. The naive answer is documented, wrong, and worth refuting in full.
+
+The correct objective is **expected engagement value**, with watch behavior at its core, not click probability. The tempting framing is to predict clicks and sort, since the click is the cleanest observable. It fails for a causal reason: a click is paid *before* the content is consumed, so the click-maximizing item is the thumbnail that overpromises. YouTube's own ranking paper states the production lesson directly: ranking by click-through rate promotes deceptive videos the user does not finish, while watch time captures engagement. The discriminating pair: video A with $\hat{P}(\text{click}) = 0.40$ and a median watch of 20 seconds against video B at $0.15$ and 9 minutes. A CTR ranker shows A everywhere; a watch-weighted objective ranks B above it. The replacement model is not "predict watch time" either. It is the multi-head decomposition below, and the exercises push the refutation one level further, to watch time itself.
+
+### The label table, fixed at design time
+
+Labels are natural here (<Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>: product mechanics produce them), and the design's job is to write down the grading before any pipeline exists:
+
+- **Skip**: shown, not clicked within the session. The negative, ~93% of impressions.
+- **Click-and-abandon**: clicked, watched under 30 seconds. Recorded as its own grade, because it is the clickbait signature, evidence *against* the item.
+- **Watch** (≥ 30 s), **long watch** (≥ 50% of duration), **finish**: the graded positives.
+- **Like, share, save**: explicit positives, rarer and stronger.
+- **Hide, "not interested", report**: explicit negatives, the guardrail labels.
+
+Two clauses in the table do more work than the grades. First, **every impression logs its position**, because the design corrects position bias the standard way: position as an additive training feature served constant, <Ref lesson="ranking-and-ctr">the ranking lesson's</Ref> Rule #36 discipline, declared at data-design time rather than retrofitted after the first bent model ships. Second, **autoplay is not choice**: autoplay continuation fires the watch event without any decision on a thumbnail, so the click and watch heads train only on impressions the user chose, or the model learns that whatever autoplay serves is what users select.
+
+<Figure
+  src="./figures/label-panel.svg"
+  alt="One homepage load and its grades: five tiles, each impression logged with its position; tile 1 and tile 3 are skips, tile 2 is clicked at minute one and its watch bar runs to 62 percent past the 30-second and 50-percent markers, tile 4 is hidden as an explicit negative, tile 5 is the unranked 1 percent exploration slice. A note marks a stop before 30 seconds as click-and-abandon. Below, a loop-length table: skip and click resolve within the load in seconds, the watch grades from 30 seconds to the end of the video, like and hide immediately; the attribution window is 10 minutes from impression."
+  caption="One load as the label factory. The grades, the position log, and the exploration slice are all decided here; the model that consumes them does not exist yet."
+/>
+
+Loop lengths close the framing (<Ref lesson="labels-and-feedback-loops">the labeling lesson's</Ref> axis): every label above resolves within the session, minutes at most, which is what makes the daily retraining cadence of the operations section possible at all. The window follows from those resolution times. Skip and click are settled in seconds, the 30-second watch grade one video-start later, likes and hides on the tap; a window of **10 minutes from impression** therefore closes after all of them and before the log is written. What falls outside it is the watch-later queue opened tomorrow, counted as a skip — the attribution-window caveat from that lesson, which no fixed window escapes and every fixed window must state.
+
+The last design-time declaration is the loop itself. Every label in the table is conditioned on what the system chose to show. That is the degenerate feedback loop of <Ref lesson="failures-and-drift">the drift lesson</Ref>, running through both the label channel (position, corrected above) and the exposure channel (items never shown produce no evidence, <Ref lesson="recommender-funnel">the funnel lesson's</Ref> invisible-miss argument). The design's answer is the same instrument both those lessons reached: a fixed **exploration slice** of impressions serving candidates the ranking did not choose, budgeted here at ~1%. Downstream it is consumed three ways: cold-start distribution for new videos, unbiased propensity and recall measurement, and the randomized traffic every position-bias correction is validated against.
+
+<KeyFact>
+Framing, labels, position handling, and the exploration budget are one decision made at one time. Retrofitting any of them means months of logs that lack the position column, the grade, or the unbiased slice — data that cannot be regenerated, because the traffic that would have produced it was never served.
+</KeyFact>
+
+## The design core: the funnel assembled in stages
+
+The parts are now specified; what remains is assembly, and each stage names the lesson it comes from.
+
+<FigureSequence
+  name="design-assembly"
+  alt="Five frames assembling one system diagram. Frame 1: the requirements panel alone (10^5 peak QPS, 10^9 corpus, 200 ms page with a 20/100/10 ML split, 256 GB index) above an empty dashed pipeline skeleton. Frame 2 adds four candidate sources with quotas: subscriptions, co-watch lists, fresh pool, popular-in-region, feeding a union of about 5,000. Frame 3 adds the learned source: the user tower at request time, the item tower offline into a 16-shard ANN index that is a batch artifact. Frame 4 adds the multi-task ranker with five heads blended into an engagement score, the re-ranker with filters, near-duplicate spacing and the exploration slot, and the 20-video homepage. Frame 5 adds the operations overlay: the label return path to daily stateful retraining, the weekly tower-and-index rebuild, and the monitoring taps on calibration, watch time and popularity-diversity, and index age."
+  caption="The module's capstone. Every box was built by an earlier lesson; this lesson wires them and prices the wiring."
+/>
+
+<Task>
+Step through the five frames. For each layer as it appears, name the lesson that built it and the requirement in frame 1 that forces it into the design: sources and quotas, two-tower and ANN, multi-task heads and the blend, re-ranking rules, and the clocks and taps of the last frame. The section confirms each answer in order.
+</Task>
+
+### Stage 1: retrieval as a portfolio with quotas
+
+Candidate generation is <Ref lesson="recommender-funnel">the funnel lesson's</Ref> portfolio, instantiated for video: **subscriptions**, the in-network join and the one corner of this system that works like <Ref lesson="design-feed-ranking">the feed's</Ref> shallow inventory; **co-watch lists**, collaborative co-occurrence precomputed per video by a daily batch job; **two-tower retrieval**, the learned source, its user tower run per request and its item tower offline, trained with the in-batch-negative popularity correction and served through the sharded ANN index; the **fresh pool**, index-free and recency-keyed, covering the index's blind window and supplying the exploration budget; and **popular-in-region**, the cold-start floor and, later, the degraded mode. Each source has a quota; the quotas sum to what ranking affords; no shared score across sources exists, for the funnel lesson's scale-incommensurability reason.
+
+### Stage 2: ranking with five heads, one blended score
+
+The ranker is the multi-task machinery of <Ref lesson="ranking-and-ctr">the ranking lesson</Ref> with the label table's grades as its heads, blended exactly as <Ref lesson="design-feed-ranking">the feed dissection</Ref> established: business-assigned weights in serving configuration, per-head calibration as the precondition, per-head downsampling corrections in the request path. One candidate, worked small:
+
+| head | $\hat{P}$ | weight | term |
+|---|---|---|---|
+| watch ≥ 30 s | 0.22 | 2 | 0.44 |
+| finish | 0.06 | 8 | 0.48 |
+| like | 0.025 | 12 | 0.30 |
+| share | 0.006 | 20 | 0.12 |
+| hide / not interested | 0.0008 | −50 | −0.04 |
+
+Score: $0.44 + 0.48 + 0.30 + 0.12 - 0.04 = 1.30$. The negative head is the product-safety mechanism carried over from the feed: dormant at $8 \times 10^{-4}$, but priced so that a video provoking hides at 2% loses $1.0$, more than its watch and finish terms combined, before any human reviews it. Position enters as the additive feature and is served constant; the shallow-tower variant from YouTube's published ranker is the production form of the same additivity.
+
+<Exercise>
+Calibration drift moves one head: the finish head begins predicting $1.3\times$ its calibrated value, and no weight in the serving configuration changes.
+
+(a) Recompute the score for the candidate in the table above. (b) A 40-minute documentary scores $\hat{P} = 0.30$ watch, $0.01$ finish, $0.03$ like, $0.008$ share, $0.0006$ hide — compute its blended score before and after the drift. (c) Name the class of candidate the drift promotes, and the monitoring tap that catches it. Write both blends out before opening the solution.
+
+<Solution>
+**(a)** The finish head now reads $0.06 \times 1.3 = 0.078$, so its term is $0.078 \times 8 = 0.624$ in place of $0.48$; the other four terms are untouched. Score: $0.44 + 0.624 + 0.30 + 0.12 - 0.04 = 1.444$, up from $1.30$.
+
+**(b)** The documentary before the drift: $0.30 \times 2 = 0.60$, $0.01 \times 8 = 0.08$, $0.03 \times 12 = 0.36$, $0.008 \times 20 = 0.16$, $0.0006 \times (-50) = -0.03$, total $1.17$. After: the finish head reads $0.013$, its term is $0.104$, total $1.194$. The short candidate gained $0.144$, the documentary $0.024$; the gap between them widened from $0.13$ to $0.25$.
+
+**(c)** The drift promotes candidates whose score is carried by the finish head — short, finishable videos — against long ones that earn their score through the watch, like, and share terms. A weight change would have produced the same reordering, but no weight changed: the multiplier sits inside a model, where the serving configuration cannot show it. The tap that catches it is the per-head calibration ratio — predicted rate over observed rate, hourly and sliced, the model-layer alarm the operations section installs: the finish head reads $1.3$ while the other four read $1.0$. Nothing above it in the stack catches this — the blend arithmetic is exactly as configured, the ranker's loss moves imperceptibly, and watch time per DAU can rise while the page shortens.
+</Solution>
+</Exercise>
+
+### Stage 3: re-ranking, the rules layer
+
+The re-ranker is <Ref lesson="recommender-funnel">the funnel lesson's</Ref> roster unchanged: filters (watched, disliked, policy-restricted), near-duplicate spacing (the top of a similarity-retrieved candidate set is self-similar by construction), freshness boosts, and the **exploration slot** where the 1% slice of the framing section actually ships. Watched-video dedup does most of what the feed needed impression discounting for: at a $10^9$ corpus the system never runs out of unseen high-scorers, the exhaustion-arithmetic contrast the feed lesson drew.
+
+<KeyFact>
+Per stage at peak: retrieval, five sources to ~5,000 candidates in 20 ms with the two-tower path fanning out to 16 index shards; ranking, ~500 candidates through five calibrated heads in 100 ms on a fleet sized in the thousands of accelerators; re-ranking, rules over ~20 survivors in 10 ms. The composition is the module: no stage is new, and no stage could be removed at this corpus size.
+</KeyFact>
+
+## Serving and freshness: every component on its own clock
+
+The diagram is static; the system is not, and the serving plan is a freshness decision per component (<Ref lesson="batch-and-online-prediction">the serving module's</Ref> three architectures, chosen per part rather than once).
+
+### Online prediction, features on two clocks
+
+Prediction itself is **online**. Precomputing pages for two billion users spends most of its compute on users who behave differently by the time they arrive, and the binding argument is the product's core loop: a homepage that cannot react to the video watched two minutes ago fails it. The features split by clock, the pattern <Ref lesson="feature-platform">the feature platform</Ref> was built for: profile and history aggregates are batch-computed daily into the online store; session features (last watches, current session length) stream in seconds-fresh through <Ref lesson="batch-and-stream-processing">the stream machinery</Ref>.
+
+<Figure
+  src="./figures/freshness-map.svg"
+  alt="A staleness axis from seconds to a week across the top, and one row per component below it, each row's dot sitting on the clock it is allowed: session features at seconds, refreshed by the streaming pipeline; seen-state and popular-in-region lists at minutes, near-line counters; new-video embeddings at hours, a nightly incremental embed job, with a note that the fresh pool covers the gap; profile aggregates and ranker weights at one day, batch sync and stateful warm-start; the two-tower encoder and ANN index together at one week, retrain then re-embed then atomic swap. A box below the axis holds the engagement weights, which are serving configuration moved per experiment and never retrained."
+  caption="The freshness map: one clock per component. The two slowest clocks, encoder and index, are one clock, because they must swap atomically."
+/>
+
+### Three placements that carry the reasoning
+
+**New-video embeddings** run on a nightly incremental job, so a fresh upload is invisible to the learned retriever for up to a day; that is the blind window the fresh pool exists to cover, per <Ref lesson="embedding-based-search">the embedding lesson's</Ref> indexing-pipeline account. **Encoder and index** share one weekly clock because they are one artifact: a retrained item tower moves every coordinate, so encoder rollout is index rollout. Rolling out means re-embedding the corpus ($10^9$ forward passes, the batch bill that makes weekly rather than daily the economic cadence) and swapping encoder and index atomically, the version seam that lesson made a rule. **The engagement weights** sit off the map entirely: serving configuration moved by experiments, the feed dissection's decoupling, so a strategy change never costs a retrain.
+
+### Caches and the fallback ladder
+
+Caching follows the keys. Item-keyed artifacts cache well (co-watch lists, metadata, the popular-in-region pages) because millions of requests share them; user-keyed responses cache badly, two loads a day with fresh session state between them. The fallback ladder is written into the serving path, one rung per failure: a ranker timeout serves the retrieval union under re-ranking rules alone; an index shard down serves the union minus that shard's candidates, at the recall those candidates would have added; an upstream failure past the load balancer serves the popular-in-region page, a precomputed heuristic that is always warm. A degraded page beats an error page, and the degraded modes are designed, not improvised.
+
+## Measurement and operations: the loop closed before launch
+
+The design is not done until it says how it will be judged and refreshed; this section is <Ref lesson="the-design-document">the design document's</Ref> validation and risk sections, filled with the machinery of modules 4–6.
+
+### Offline and online gates
+
+Offline, per candidate model: each head is gated on NCE against the incumbent plus the calibration ratio (<Ref lesson="ranking-and-ctr">the ranking lesson's</Ref> offline pair), sliced by surface and region per <Ref lesson="offline-evaluation">the evaluation module's</Ref> slice discipline; the ordering is checked as nDCG over the graded labels of the framing section, whose grade ladder was designed to be nDCG's input (<Ref lesson="embedding-based-search">the metric-ladder lesson</Ref>). The gate is the champion/challenger comparison every refresh passes, not a launch-week ceremony.
+
+Online, in two tiers: ranker iterations run through **interleaving** first (team-draft merging of champion and challenger orderings, the sample-efficient preference test from <Ref lesson="deployment-and-online-experiments">the deployment lesson</Ref>), and surviving candidates graduate to an **A/B test** whose decision metric is watch time per DAU with guardrails that can veto it: hide and report rates, and next-day return. The guardrails are Rule #13's indirect-effect tier as the feed dissection placed them: measured in every experiment, trained on never.
+
+### Monitoring, four layers down
+
+The stack of <Ref lesson="monitoring-and-observability">the monitoring lesson</Ref>, instantiated: pipeline lag and index age (software); feature schema and serving/training skew comparisons (<Ref lesson="data-validation">the validation pipeline</Ref>); per-head calibration ratios, hourly and sliced, each an always-on revenue-grade alarm because the labels arrive in minutes (model); and the loop-health pair on top. **Popularity-diversity** tracks the impression share of the top 1% of videos, because engagement rising while exposure concentrates is the spiral's signature, per the feed dissection's audit. **Time-to-first-distribution** for new uploads is the creator-side gauge a platform that depends on uploads cannot skip.
+
+### Retraining, per component, priced by measurement
+
+| component | cadence | mechanism | what sets the cadence |
+|---|---|---|---|
+| ranker heads | daily | stateful warm-start from the champion checkpoint, periodic full reset | labels arrive in minutes, so staleness is expensive; warm-starting makes daily affordable |
+| two-tower encoder + ANN index | weekly, one shared clock | full retrain, re-embed $10^9$ items, atomic swap | the $10^9$-forward-pass re-embedding bill |
+| co-watch lists, popularity counters | daily batch / near-line | recount | counting is cheap and virality is fast |
+| engagement blend weights | per experiment | serving-configuration change | never retrained; moved by A/B results |
+
+The daily warm-start is the stateful economics <Ref lesson="continual-learning">the continual-learning lesson</Ref> prices with Grubhub's measured 45× compute cut, and the periodic full reset bounds accumulated bias. The cadences are not taste: the freshness-value experiment from that lesson (train on staggered windows, evaluate all on today) is the standing measurement that prices a day of staleness for each component, and each cadence sits where that price crosses the retraining cost.
+
+## The design against the record: where the template breaks
+
+The design above follows the interview canon's template (problem, metrics, data, model, serving, scale, the fixed shape both reference texts teach), and the module's exit skill is to read that template critically. Set the produced design beside the two published reference designs for this exact system and beside the documented production record, and the disagreements sort into four rows.
+
+<Figure
+  src="./figures/template-vs-reality.svg"
+  alt="A two-column comparison, template versus record, in four rows. Row 1, retrieval: one candidate-generation model (matrix factorization or a single two-tower) versus a portfolio of algorithms each capturing one similarity aspect, as YouTube's documented retrieval stack runs. Row 2, time: a single-pass design frozen at ship versus cadence as part of the design, with a daily stateful ranker, weekly tower and index, and measured freshness value. Row 3, exploration: a requirements bullet saying balance exploration and exploitation versus a priced budget of about 1 percent of impressions with pools, slots, and the measurement that depends on them. Row 4, ownership: one diagram with one implied owner versus team seams at every stage boundary, where score contracts and entanglement live."
+  caption="Four disagreements between the template and the record. The produced design sided with the record on the first three; the fourth no diagram can show."
+/>
+
+### Retrieval: one model versus a portfolio
+
+The canon's video chapter designs a single candidate-generation model: matrix factorization in one text, a two-tower in the other. The documented record, including the survey chapter of the *same* text that designed the single model, says YouTube's retrieval stack runs multiple algorithms in parallel, each capturing one aspect of similarity: topic match, watched-together frequency, collaborative embeddings. The portfolio is not a refinement. It is the recall-engineering argument of <Ref lesson="recommender-funnel">the funnel lesson</Ref>, and the template hides its real cost: every source is one more freshness clock, one more quota, one more thing the monitoring section owns.
+
+### Time: single-pass versus continual
+
+The template is a snapshot: one diagram, produced once, correct at ship. Its own requirements bullet (retrain several times a day, because videos go viral overnight) is never carried into the design: no lineage, no gates, no champion/challenger appears in the diagrams. A design without its clocks sits at level zero of <Ref lesson="continual-learning">the retraining ladder</Ref> — retrained by hand, when someone notices — however finished its diagram looks, and the freshness map and cadence table above are exactly the pages the template omits.
+
+### Exploration: mentioned versus priced
+
+Both reference texts name the exploration–exploitation balance as a requirement; neither budgets it. The record prices it: TikTok-style pools that guarantee new items unbiased impressions, the feed dissection's arithmetic showing a 1% slot evaluates only a fraction of daily supply, and the measurement circularity of the funnel lesson, where recall, propensities, and loop health are all unmeasurable without traffic the optimal policy would never serve. An unpriced exploration requirement is an unfunded one.
+
+### Ownership: one diagram versus team seams
+
+The template's deepest omission has no box to point at. At production scale, retrieval, ranking, and the policy layer are separate teams, and the interfaces between them (the semantics of a candidate score, the calibration contract a blend depends on, the embedding a downstream team quietly consumes as a feature) are where <Ref lesson="ml-in-production">the debt taxonomy's</Ref> entanglement and undeclared consumers live. CACE does not respect the stage boundaries the diagram draws; a two-tower retrain that moves every embedding is a breaking change for consumers no diagram lists.
+
+What is established: the module's composition claim, made good. One design runs from requirements to retraining policy, every component referenced to the lesson that built it, with the estimate ($10^5$ peak QPS, a 256 GB sharded index, 40 TB of labels a day) doing the architecture selection, the label table and exploration budget fixed at design time, the funnel assembled with per-stage numbers, a freshness clock per component, and a measurement and retraining plan that closes the loop before launch. Where the design departs from the published templates is itself part of the design, stated in four rows. This closes the classical story: model, data system, pipelines, serving, operations, shapes. Module 8 reruns the discipline once more with the workflow inverted: <Ref lesson="foundation-models-in-production">the model is a foundation model someone else trained</Ref>, adaptation replaces training, and every layer of this design returns under a new name.
+
+## Exercises
+
+<Exercise>
+Redo the back-of-envelope for a mid-size product: 20 million DAU at 2 loads/day, a 10-million-item corpus, embeddings at $d = 64$ in FP16. Compute average and peak QPS, the retrieval index size, and the daily label log at 20 impressions per load and 500 bytes per row. Then state which parts of the big design collapse at this scale and which survive.
+
+<Solution>
+Requests: $2 \times 10^7 \times 2 = 4 \times 10^7$/day ÷ $8.64 \times 10^4$ s ≈ **460 QPS average, ~1,000 at 2× peak**, one hundredth of the big design. Index: $10^7 \times 64 \times 2$ B $= 1.28 \times 10^9$ B ≈ **1.3 GB**: one shard, one node, no scatter/gather, no tail-amplification arithmetic. Label log: $4 \times 10^7 \times 20 \times 500$ B $= 4 \times 10^{11}$ B ≈ **400 GB/day**: a large table, not a lake-scale commitment.
+
+What collapses: sharding and its fan-out math; the ten-thousand-accelerator fleet (at 500 candidates × 1,000 QPS × 0.2 ms ≈ 100 device-seconds/second, a rack, not a fleet); most caching tiers. What survives: the funnel itself, because by <Ref lesson="recommender-funnel">the funnel lesson's</Ref> boundary arithmetic $10^7$ items × 0.2 ms is still ~30 minutes per request, so retrieval remains mandatory even though one ANN shard suffices; and everything that never depended on scale: the label table, position handling, the exploration slice, per-head calibration, and the retraining clocks. Scale removed the distributed-systems layer, not the ML-systems discipline.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a day-one product — the corpus exists (say $10^5$ licensed videos with metadata), but there are zero users and zero engagement events. Walk the design stage by stage: which components can be built at all, which are unbuildable, and in what order does the full design become constructible? Sequence the bootstrap.
+
+<Solution>
+**Buildable on day one:** content-based retrieval (topic, tags, metadata similarity; no engagement needed), popular/editorial lists (seeded by editors or external signals), and the fresh pool (trivially: everything is fresh). **Unbuildable:** co-watch lists (no co-watches exist), the two-tower (its training signal is engagement pairs), every ranking head (no labels), and the engagement blend (nothing to weigh). The degenerate feedback loop is the one component that exists from the first impression: whatever the day-one heuristic shows is what generates the first labels.
+
+The bootstrap sequence: (1) launch without ML, on content-based retrieval ranked by popularity and recency, the heuristic rung of <Ref lesson="problem-framing-and-baselines">the baseline ladder</Ref>, which also becomes the benchmark every later model must beat; (2) from the first impression, log the full label table (positions, grades, the exploration slice), because that data cannot be regenerated and every later model is built from it (<Ref lesson="labels-and-feedback-loops">natural labels</Ref> start accruing immediately); (3) at the first few million labeled impressions, a simple watch-probability classifier over content features replaces the popularity sort; (4) with co-engagement accumulating, co-watch lists and then the two-tower become trainable; (5) the ANN index, the multi-head ranker, and the full blend arrive last, when the corpus and traffic cross the funnel boundary. The design document for day one is the same document as this lesson's, with most sections honestly marked "stub until data exists," which is what the stubs are for.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this objective-setting claim: "Optimize watch time directly — it is the business metric, so there is no proxy gap." Name the step that fails, exhibit the failure mode, redesign the objective, and name the online instrument that audits the residual gap.
+
+<Solution>
+The failing step is "watch time is the business metric." It is not. It is the **online proxy** one link below the business quantity in <Ref lesson="requirements-and-metrics">the metrics chain</Ref>: the business runs on long-term retention and advertiser value, and watch time is the observable stand-in with a named gap. The gap's failure mode is documented in the platform's own history: pure watch-time optimization rewards whatever holds eyes (sensational and borderline content, autoplay-driven session padding), exactly as click optimization rewarded clickbait one level down. Maximizing the proxy widens its gap to the target, the same structural move as the clickbait refutation in the lesson body, one rung up the chain.
+
+The redesign is the lesson's scoring stage read as the mitigation: decompose the objective into heads (watch grades *and* explicit satisfaction signals — likes, shares, survey responses where collected) with negative guardrail heads (hide, "not interested", report) whose weights make trouble expensive, and keep the weights in serving configuration so the business can move the blend without retraining, per <Ref lesson="design-feed-ranking">the feed dissection's</Ref> decoupling. YouTube's public account of its recommender describes this exact evolution: clicks, then watch time (2012), then satisfaction signals and surveys folded into the objective.
+
+The audit instrument is the guardrail tier of every A/B test: hide/report rates and next-day (and longer-horizon) return, measured in each experiment and empowered to veto a watch-time win. A proxy cannot audit itself; the gap is measured only by metrics outside the objective.
+</Solution>
+</Exercise>
+
+<Exercise>
+Production task: write the design document — two pages maximum, using <Ref lesson="the-design-document">the six-section skeleton</Ref> — for "People You May Know" on a professional network of 300 million DAU. State what replaces the two-tower, what replaces the watch labels, and where the loop hides. (A genuine attempt fills all six sections before opening the solution.)
+
+<Solution>
+A model answer, compressed to its decisions:
+
+**Problem definition.** Link prediction on the member graph: recommend members this member is likely to connect with; the business event is formed connections (invitations sent *and accepted*, since sent-only rewards spam). **Metrics.** Offline: rank of the eventually-formed connection among shown suggestions (the single-relevant-item world, so MRR-family metrics are honest per <Ref lesson="embedding-based-search">the metric ladder</Ref>); online: accepted invitations per suggestion shown, guarded by invitation-decline and report rates. **Data.** Graph snapshots: features at time $t$ (mutual connections, shared employers/schools with overlap durations, profile-visit counts), labels = edges that exist at $t+1$ but not $t$, the snapshot-to-snapshot construction, which respects <Ref lesson="data-leakage-and-splitting">point-in-time discipline</Ref> by design. **What replaces the two-tower:** graph candidate generation (friends-of-friends within two hops, plus shared-affiliation candidates), because at 300M members scoring all pairs is $\sim 10^{16}$ and the graph prunes it to hundreds per member; the scorer over pruned candidates consumes pairwise edge features (a GNN where warranted, a GBDT over edge features as the baseline rung). **Serving.** Batch is defensible here, unlike the video homepage: the candidate graph changes slowly, so nightly precomputation per active member with near-line invalidation on new connections, the mode choice argued from staleness tolerance per <Ref lesson="batch-and-online-prediction">the serving module</Ref>. **Where the loop hides, in two places.** First, exposure: suggestions cause the connections that become positive labels, so the graph increasingly looks like the model's past output. Second, and specific to this shape: well-connected members appear in more candidate sets, gain connections faster, and appear in still more, a rich-get-richer spiral on the graph itself. The audits: an exploration slice of suggestions, and impression discounting (the documented PYMK mechanism), since an ignored suggestion otherwise keeps its score and resurfaces forever. **Risks/antigoals.** No suggestion from private profile visits alone (a privacy risk the risk section must record); no optimization of invitations sent.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: set this lesson's design against the published YouTube-recommendation template in Pham's *Machine Learning Design Interview*, Ch. 4. Find three points where the designs disagree and adjudicate each with a course lesson: state which design is right, or under what conditions each is.
+
+<Solution>
+Three defensible disagreements, adjudicated:
+
+**1. Candidate generation: matrix factorization alone versus a portfolio.** The template's candidate model is collaborative matrix factorization. <Ref lesson="recommender-funnel">The funnel lesson</Ref> adjudicates: every cheap source has a recall blind spot (pure collaborative retrieval has nothing for new items and new users, the exact cold-start the template's own exploration requirement worries about), so production stacks run portfolios, as the same book's own survey chapter reports of YouTube. Verdict: portfolio, with the single-model version admissible only as the bootstrap rung.
+
+**2. Offline metrics: precision/recall/log loss versus an order-respecting, calibration-aware pair.** The template evaluates with precision, recall, and log loss. <Ref lesson="embedding-based-search">The metric ladder</Ref> rules out order-blind metrics for a ranked page (precision@k cannot see where in the window hits sit), and <Ref lesson="ranking-and-ctr">the ranking lesson</Ref> shows raw log loss flatters models at low base rates; the fix is NCE plus a calibration plot, with nDCG over graded labels for ordering. Verdict: the template's metric set cannot distinguish the models it needs to distinguish, and the conditions under which it would suffice do not hold at this design's base rates, a 7% watch rate at the top of the grade ladder and sub-1% rates for the heads below it.
+
+**3. The ranking objective: sort by one watch probability versus a multi-head blend.** The template's ranker predicts $P(\text{watch})$ and sorts. The clickbait argument recurs one level up: a single started-watch head rewards videos that get started, not finished, and provides no guardrail channel; a video with high watch probability and a high hide rate outranks everything. <Ref lesson="design-feed-ranking">The feed dissection</Ref> adjudicates: graded heads with business weights and negative guardrails, calibrated per head. Verdict: multi-head, though the single-head version is the correct *first* model in the bootstrap sequence. The honest reading of the template is that it documents a starting point and presents it as the design.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: product adds a conversational assistant, and your re-ranker must now insert the assistant's answer card above the video grid. Name the two component classes this course has not yet built that the card requires, and state which part of the existing design each one most resembles.
+
+<Solution>
+The card needs **(1) a generative model served behind an API**, a component nobody on the team trained, whose failure modes (sampling variance, fabricated answers) and per-token serving economics are unlike any classifier in this design, and **(2) retrieval over documents rather than items**: the answer must be grounded in searchable text, which means an indexing-and-query pipeline over passages, not a candidate generator over videos.
+
+Each has a cousin in the existing design: the document retriever is this module's embedding machinery pointed at text chunks, with the same contrastive spaces, ANN indexes, and freshness seams; the generative model enters the architecture the way every model here did, behind a latency budget with guardrails on its output. That stack is module 8: <Ref lesson="foundation-models-in-production">foundation models as system components</Ref> opens it, and <Ref lesson="retrieval-augmented-generation">retrieval-augmented generation</Ref> builds exactly the retriever the answer card consumes.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023. Ch. 6, "Video Recommendation System" (pp. 115–144): the reference design this lesson follows and critiques (the candidate-generation/ranking/re-ranking funnel, two-tower retrieval, multi-task engagement ranking, and positional-bias handling); Ch. 1 (the seven-step template); Ch. 11 (People You May Know: graph candidate generation and snapshot labels, the source behind the design-doc exercise).
+2. K. Pham, *Machine Learning Design Interview*, 2022. Ch. 4, "YouTube Video Recommendations" (pp. 155–169): the second reference design, with the fixed template, the retrain-several-times-daily requirement, the 100 ms–200 ms latency requirement, and the estimation section; Ch. 2 (the YouTube multi-algorithm retrieval stack the critique row cites against Ch. 4's single model).
+3. P. Covington, J. Adams, E. Sargin, "Deep Neural Networks for YouTube Recommendations," RecSys 2016: the two-stage production funnel and the stated reason ranking optimizes watch time rather than clicks. https://dl.acm.org/doi/10.1145/2959100.2959190
+4. Z. Zhao et al., "Recommending What Video to Watch Next: A Multitask Ranking System," RecSys 2019: the production multi-task video ranker and the shallow-tower position-bias treatment this design's scoring stage recalls. https://dl.acm.org/doi/10.1145/3298689.3346997
+5. C. Goodrow, "On YouTube's Recommendation System," YouTube Official Blog, September 2021: the platform's own account of the objective's evolution from clicks to watch time to satisfaction signals. https://blog.youtube/inside-youtube/on-youtubes-recommendation-system/
+6. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022. Ch. 8 (degenerate feedback loops, exploration traffic pools); Ch. 9 (stateless versus stateful retraining, the Grubhub economics, the freshness-value experiment the cadence decisions cite).
+7. D. Martin, *The System Design Primer*: the powers-of-two table and latency numbers behind the estimation discipline. https://github.com/donnemartin/system-design-primer
+8. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020. Ch. 9 (the real-world serving flowchart: validating model output and falling back to a simpler model or handcrafted heuristic). http://www.mlebook.com
+</References>
