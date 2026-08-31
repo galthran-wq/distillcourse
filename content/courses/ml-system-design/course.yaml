@@ -1,0 +1,1200 @@
+schema_version: 1
+slug: ml-system-design
+title: ML System Design
+tagline: "From trained model to production system: data infrastructure, pipelines, serving, monitoring — and the LLM stack"
+status: planned
+audience: >
+  Engineers who already know classical ML — logistic regression, boosting,
+  the standard metrics — and now have to ship it: design the system around
+  the model, keep it correct under load, and keep it useful as the world
+  drifts. Practical register throughout; no basic-ML definitions, no
+  proofs for their own sake. Comfort with Python, SQL, and the shape of a
+  backend service is assumed.
+tone: >
+  Dry, precise, engineering register. Declarative statements of fact; no
+  rhetorical questions, no teasers. Numbers carry their denominators; case
+  studies are named and dated. Second person only in instructions.
+intro: >
+  A model that wins offline routinely fails in production, and the failure
+  is almost never the model: it is the stale join table, the feature
+  computed two different ways, the feedback loop the system feeds itself,
+  the p99 latency nobody budgeted. This course answers one question — what
+  does it take to build the system around a model so that its predictions
+  stay useful — and the answer is a discipline, not a trick: a production
+  ML system is a data system with a model inside, and it is designed layer
+  by layer.
+
+
+  The layers are the course. First the framing: business objective to ML
+  task, a metrics chain that ends in money, a baseline that must be beaten,
+  a design document that survives review. Then the substrate every ML
+  system stands on — storage, replication, partitioning, queues, batch and
+  stream processing — because feature freshness and serving latency are
+  decided there, not in the model. Then the manufacturing of training
+  data (labels, leakage, features, the train/serve boundary), training as
+  an industrial pipeline, the model as a service under a latency budget,
+  and the loop that keeps it alive: monitoring, drift, retraining. The
+  course closes with the canonical system shapes — the retrieval–ranking
+  funnel behind every recommender, search, feed, and ads system,
+  dissected end to end on the canon's named designs — and with AI
+  engineering, where foundation models invert the workflow (adaptation
+  replaces training) but every prior layer returns: context construction
+  is a data pipeline, evals are the metrics chain, inference optimization
+  is the serving budget, and the reference architecture is the whole
+  course in one diagram.
+prerequisites:
+  - text: "Classical ML at working level: linear/logistic regression, gradient boosting, train/validation/test splits, precision/recall/ROC-AUC"
+    course: classical-ml
+  - text: "Python and SQL at working-engineer level; comfort reading backend architecture diagrams"
+  - text: "Basic probability: distributions, expectation, conditional probability"
+key_results:
+  - text: "The model is roughly 5% of a production ML system, and the surrounding 95% carries the debt: CACE — changing anything changes everything"
+    lesson: ml-in-production
+  - text: "Latency is a distribution, not a number: with 1-in-100 slow backend calls, a 100-call fan-out makes ~63% of user requests slow"
+    lesson: requirements-and-metrics
+  - text: "A heuristic gets you halfway to ML's value at a fraction of the cost — and defines the baseline every model must beat"
+    lesson: problem-framing-and-baselines
+  - text: "Hash partitioning spreads load but destroys range scans, and $hash(key) \\bmod N$ is the rebalancing anti-pattern: adding one node moves almost every key"
+    lesson: partitioning
+  - text: "A log-based broker makes messages replayable and ordered; change data capture makes one database the leader and every derived store a follower"
+    lesson: queues-and-logs
+  - text: "Random splits leak the future into training: split by time and by hash of a correlated key, or the offline number lies"
+    lesson: data-leakage-and-splitting
+  - text: "Training–serving skew decomposes into three measurable gaps — train vs holdout, holdout vs next-day, next-day vs live — and logging serving-time features closes them"
+    lesson: training-serving-skew
+  - text: "Comparing serving-log statistics against training statistics found silently missing features and bought Google Play a measured +2% install rate"
+    lesson: data-validation
+  - text: "A model can beat another on every slice and lose overall — Simpson's paradox makes slice-based evaluation mandatory, not optional"
+    lesson: offline-evaluation
+  - text: "A Thompson-sampling bandit reached the same confidence in under 12,000 samples that an A/B test needed 630,000 for"
+    lesson: deployment-and-online-experiments
+  - text: "Covariate, label, and concept shift are three decompositions of $P(X,Y)$: a change in $P(X)$, in $P(Y)$, or in $P(Y|X)$ itself"
+    lesson: failures-and-drift
+  - text: "Switching daily stateless retraining to daily stateful training cut Grubhub's compute cost 45× and raised purchase-through 20%"
+    lesson: continual-learning
+  - text: "The recommender funnel is a compute budget: millions of candidates retrieved cheaply, hundreds ranked expensively, tens re-ranked for the page"
+    lesson: recommender-funnel
+  - text: "Two ad variants sharing one campaign budget cannibalize each other mid-experiment; budget-split testing gives each arm its own spend so the revenue lift is measurable"
+    lesson: design-ad-click-prediction
+  - text: "A meme is harmless text over a harmless image: early fusion — one classifier over a joint representation — catches what two unimodal classifiers cannot"
+    lesson: design-harmful-content
+  - text: "RAG's index is swappable non-parametric memory: exchanging a 2016 for a 2018 Wikipedia index flips factual answers with zero retraining"
+    lesson: retrieval-augmented-generation
+  - text: "The KV cache for Llama-2-13B at batch 32 is 54 GB — larger than the weights; paging it like virtual memory lifts utilization from ~20–38% to 96%"
+    lesson: llm-inference
+  - text: "Per-step accuracy of 95% compounds to 60% over ten agent steps — the arithmetic that shapes every agentic architecture"
+    lesson: ai-application-architecture
+sources:
+  - D. Sculley et al., "Hidden Technical Debt in Machine Learning Systems," NeurIPS 2015
+  - M. Kleppmann, Designing Data-Intensive Applications, O'Reilly, 2017
+  - C. Huyen, Designing Machine Learning Systems, O'Reilly, 2022
+  - C. Huyen, AI Engineering, O'Reilly, 2025
+  - "M. Zinkevich, Rules of Machine Learning: Best Practices for ML Engineering, Google, 2018"
+  - "D. Baylor et al., \"TFX: A TensorFlow-Based Production-Scale Machine Learning Platform,\" KDD 2017"
+  - V. Lakshmanan, S. Robinson, M. Munn, Machine Learning Design Patterns, O'Reilly, 2020
+  - A. Burkov, Machine Learning Engineering, True Positive Inc., 2020
+  - R. Crowe, H. Hapke, E. Caveness, D. Zhu, Machine Learning Production Systems, O'Reilly, 2024
+  - V. Babushkin, A. Kravchenko, Machine Learning System Design, Manning, 2023
+  - A. Aminian, A. Xu, Machine Learning System Design Interview, ByteByteGo, 2023
+  - K. Pham, Machine Learning Design Interview, 2022
+  - "C. Huyen et al., CS 329S: Machine Learning Systems Design, Stanford, Winter 2022"
+  - P. Lewis et al., "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks," NeurIPS 2020
+  - W. Kwon et al., "Efficient Memory Management for Large Language Model Serving with PagedAttention," SOSP 2023
+  - D. Martin, The System Design Primer, github.com/donnemartin/system-design-primer
+  - G. Mohandas, Made With ML (MLOps Course), madewithml.com
+
+spine:
+  - step: >-
+      A trained model is the small part: production ML differs from
+      research in objectives, data, and time, and the surrounding system —
+      framing, metrics, baselines, the written design — is where projects
+      succeed or die.
+    label: The model is the easy part
+    years: "2015–2022"
+    caption: >-
+      Google's own accounting: the ML code is ~5% of the system, 60 of 96
+      pipeline failures were not ML at all — and a heuristic gets you
+      halfway before any model exists.
+    lessons: [ml-in-production, requirements-and-metrics, problem-framing-and-baselines, the-design-document]
+  - step: >-
+      Every ML system stands on a data substrate — storage engines,
+      replication, partitioning — whose tradeoffs decide what queries,
+      what freshness, and what scale are even possible.
+    label: The substrate at rest
+    years: "2004–2017"
+    caption: >-
+      A column store scans a billion rows in seconds where a row store
+      cannot; a stale replica promoted to leader leaked GitHub's private
+      data; one hot celebrity key melts an even hash partition.
+    lessons: [storage-and-data-models, replication, partitioning, consistency-and-transactions]
+  - step: >-
+      Data in motion: queues and logs decouple producers from consumers,
+      change data capture keeps derived stores honest, and batch and
+      stream processing are the two ways features get computed — a split
+      every later module inherits.
+    label: The substrate in motion
+    years: "2004–2017"
+    caption: >-
+      A 6 TB disk buffers eleven hours of full-throttle writes, which is
+      why Kafka can replay a week; the same duality — offline warehouse,
+      online key-value store — is exactly a feature platform.
+    lessons: [queues-and-logs, batch-and-stream-processing, feature-platform]
+  - step: >-
+      Training data is manufactured, not given: labels come from product
+      mechanics or programmatic supervision, leakage enters through
+      splits and preprocessing, features must survive unbounded
+      vocabularies — and the train/serve boundary is where quality is
+      silently lost.
+    label: Data is manufactured
+    caption: >-
+      One radiologist writing labeling functions for 8 hours matched a
+      year of hand labels; one differently-implemented transform degraded
+      Spotify's recommendations for four undetected months.
+    lessons: [labels-and-feedback-loops, data-leakage-and-splitting, features-at-scale, training-serving-skew, data-validation]
+  - step: >-
+      Training becomes an industrial process: every model traceable to its
+      code, data, and config; parallelism chosen from a memory budget;
+      evaluation on slices with calibration and validation gates; the
+      whole loop orchestrated as a tested pipeline.
+    label: Training as a pipeline
+    years: "2015–2019"
+    caption: >-
+      TFX retrains on hundreds of billions of examples by warm-starting
+      instead of from scratch, and blocks any model that fails its
+      validation gate — the pattern every ML platform since has copied.
+    lessons: [experiment-tracking-and-versioning, distributed-training, offline-evaluation, pipelines-and-orchestration, inside-tfx]
+  - step: >-
+      A model becomes a service: batch or online prediction, compressed to
+      its latency budget, behind a model server with dynamic batching and
+      caches, rolled out in stages and measured by online experiments —
+      because offline metrics cannot see production.
+    label: The model becomes a service
+    caption: >-
+      Roblox went from 100 to 3,015 inferences per second on the same CPUs
+      — distillation, dynamic shapes, INT8 — and a bandit found the better
+      variant with 2% of the samples an A/B test burns.
+    lessons: [batch-and-online-prediction, model-compression, model-servers-and-scaling, deployment-and-online-experiments, serving-bert-at-scale]
+  - step: >-
+      Deployment is the beginning, not the end: distributions shift, the
+      system feeds its own inputs, and models fail silently — so the loop
+      is closed with layered monitoring, drift detection, and a retraining
+      policy with explicit triggers.
+    label: Closing the loop
+    caption: >-
+      A cumulative accuracy metric reads 93.7 while the true last-day
+      value has fallen to 88.6; Grubhub's stateful daily retrain cut
+      compute 45× — and Microsoft's Tay showed what retraining on live
+      data can do in 16 hours.
+    lessons: [failures-and-drift, monitoring-and-observability, continual-learning, drift-detection-in-practice, privacy-and-fairness]
+  - step: >-
+      The standard shapes: recommendation, search, feed, ads, and
+      integrity systems assemble the same parts — cheap retrieval over
+      millions, expensive ranking over hundreds, re-ranking for the page —
+      and each shape is dissected end to end before the whole course
+      composes into a single design.
+    label: The canonical shapes
+    caption: >-
+      Two towers and a dot product retrieve from a hundred-million-item
+      corpus in milliseconds; a CTR model that ranks perfectly but
+      calibrates badly loses money on every ad auction it wins; a feed's
+      one ordering score is a business-weighted sum of seven predicted
+      reactions.
+    lessons: [recommender-funnel, ranking-and-ctr, embedding-based-search, design-search-ranking, design-feed-ranking, design-ad-click-prediction, design-harmful-content, design-video-recommendations]
+  - step: >-
+      Foundation models invert the workflow — adaptation replaces training
+      — but the discipline transfers: prompts and context are versioned
+      system components, and retrieval turns a frozen model's knowledge
+      into a swappable index.
+    label: The foundation-model inversion
+    years: "2020–2025"
+    caption: >-
+      Swapping a 2016 Wikipedia index for a 2018 one changes who the model
+      says is prime minister — no retraining; repeating the word "poem"
+      forever made ChatGPT leak its training data.
+    lessons: [foundation-models-in-production, prompting-and-context, retrieval-augmented-generation, finetuning-and-adaptation]
+  - step: >-
+      Trust and cost at scale: open-ended outputs need an evaluation
+      pipeline with judges whose biases are known; autoregressive decoding
+      needs memory-bound serving economics; and the reference architecture
+      assembles context, guardrails, routing, and caches into the course's
+      final system.
+    label: Trust and cost at scale
+    years: "2022–2025"
+    caption: >-
+      GPT-4 prefers its own outputs by +10%; a 13B model's KV cache
+      outweighs its weights; prompt caching cuts time-to-first-token 79% —
+      and 95% per-step accuracy still compounds to 60% over ten steps.
+    lessons: [llm-evaluation, llm-inference, ai-application-architecture]
+
+outcomes:
+  - id: co-frame
+    text: >-
+      Frame a business problem as an ML system — task formulation, metrics
+      hierarchy ending in a business number, baseline ladder, and a design
+      document that survives review
+    bloom: analyze
+  - id: co-substrate
+    text: >-
+      Choose storage, replication, partitioning, queueing, and
+      batch/stream processing for stated load, freshness, and consistency
+      requirements — and state what each choice forfeits
+    bloom: analyze
+  - id: co-data
+    text: >-
+      Design labeling, splitting, and feature pipelines that are leak-free
+      and provably identical between training and serving
+    bloom: create
+  - id: co-train
+    text: >-
+      Operate training as an industrial process — tracked, versioned,
+      distributed within a memory budget, evaluated on slices behind
+      validation gates, orchestrated as a pipeline
+    bloom: apply
+  - id: co-serve
+    text: >-
+      Design a serving path — prediction mode, compression, model servers,
+      staged rollout, online experiments — that meets stated latency,
+      throughput, and cost budgets
+    bloom: evaluate
+  - id: co-operate
+    text: >-
+      Diagnose production failures — drift types, feedback loops, silent
+      degradation — and design the monitoring stack and retraining policy
+      that catch them
+    bloom: analyze
+  - id: co-design
+    text: >-
+      Produce complete end-to-end designs for the canonical system shapes
+      — recommendation, search, and ads — from requirements through
+      monitoring
+    bloom: create
+  - id: co-ai
+    text: >-
+      Design an LLM application stack — context construction and RAG, an
+      evaluation pipeline, inference serving economics, and the guarded
+      reference architecture — with cost/latency/quality tradeoffs made
+      explicit
+    bloom: create
+
+modules:
+  - slug: production-ml
+    title: "The production ML problem"
+    outcomes: [co-frame]
+    lessons:
+      - slug: ml-in-production
+        title: "ML systems versus ML models"
+        type: core
+        status: drafted
+        key_image: figures/course-map.svg
+        goal: "Explain why a production ML system is mostly not the model, using the hidden-technical-debt taxonomy and the research-versus-production contrast"
+        opening: "The model is roughly 5% of a production ML system; the other 95% — data collection, feature pipelines, serving, monitoring, configuration — is where the engineering effort, the cost, and the failures live."
+        est_minutes: 28
+        prerequisites: []
+        concepts:
+          introduces: [hidden-technical-debt, cace-principle, ml-lifecycle]
+          reinforces: []
+        key_ideas:
+          - "Sculley's small-black-box diagram: ML code dwarfed by nine infrastructure components"
+          - "Research vs production: objectives, throughput vs latency, static vs shifting data, stakes"
+          - "The debt taxonomy: CACE, correction cascades, undeclared consumers, feedback loops, pipeline jungles, glue code"
+          - "When ML — and when a heuristic, a lookup table, or nothing: the cost of a wrong prediction decides"
+          - "The lifecycle is a loop, not a line: scoping → data → model → deploy → monitor → business analysis → repeat"
+        demo: null
+      - slug: requirements-and-metrics
+        title: "Requirements, latency, and the metrics hierarchy"
+        type: core
+        status: drafted
+        key_image: figures/metrics-chain.svg
+        goal: "Derive system requirements and a metrics chain from a business objective — percentile latency, throughput, availability, and the offline-proxy → online → business hierarchy"
+        opening: "A production system is specified by numbers — p99 latency, sustained throughput, availability — and a model is judged by a chain of metrics that ends in a business quantity, not in ROC-AUC."
+        est_minutes: 34
+        prerequisites: [ml-in-production]
+        concepts:
+          introduces: [percentile-latency, throughput, slo, metrics-hierarchy, objective-decoupling]
+          reinforces: [ml-lifecycle]
+        key_ideas:
+          - "Latency is a distribution: p50/p99, tail amplification under fan-out, why means lie"
+          - "Latency vs throughput: batching raises both at once — the counterintuitive tradeoff"
+          - "Availability arithmetic: components in series multiply failure, in parallel multiply the nines"
+          - "The metrics chain: loss → offline metric → online proxy → business metric, with a named gap at each link"
+          - "Decoupling objectives: separate models per objective, weighted at serving time, beats one blended loss"
+        demo:
+          component: TailLatencyExplorer
+          spec: >
+            Reader sets per-backend p99 slowness (e.g. 1% of calls exceed 1s)
+            and the fan-out N of one user request; live plot of the fraction
+            of user requests that hit at least one slow call, 1-(1-p)^N.
+            Task line: find the fan-out at which more than half of user
+            requests are slow with a 1% slow backend, then find the
+            per-backend rate needed to keep a 100-call page under 5%.
+            Presets: single call, microservice page (N=30), feature fan-out
+            (N=100).
+      - slug: problem-framing-and-baselines
+        title: "Problem framing and the baseline ladder"
+        type: core
+        status: drafted
+        key_image: figures/baseline-ladder.svg
+        goal: "Formulate a business problem as an ML task and select the baseline that must be beaten before any model earns its complexity"
+        opening: "The same product need can be framed as classification, regression, or ranking, and the framing — not the model — decides label availability, retraining cost, and how the system can fail."
+        est_minutes: 34
+        prerequisites: [requirements-and-metrics]
+        concepts:
+          introduces: [problem-framing, baseline-ladder]
+          reinforces: [metrics-hierarchy]
+        key_ideas:
+          - "Reframing changes maintenance: the next-app recommender as N-way classifier vs (user, app) regression"
+          - "Objectives must be observable and attributable: clicks and purchases train models; 'satisfaction' does not"
+          - "The baseline ladder: random, zero-rule, heuristic, human, existing system — an F1 of 0.90 can be exactly majority-class"
+          - "Rule #1: launch without ML — a heuristic captures half the value and becomes the benchmark"
+          - "The four phases of ML development, and why cost grows superlinearly as the accuracy target approaches 100%"
+        demo: null
+      - slug: the-design-document
+        title: "The design document"
+        type: core
+        status: drafted
+        key_image: figures/doc-skeleton.svg
+        goal: "Produce a design document for a concrete ML system — problem definition, metrics, risks, baselines — and review one against a checklist"
+        opening: "A design document is the cheapest place an ML system can fail: framing, metrics, risks, and rollout are decided on paper, before any pipeline exists."
+        est_minutes: 32
+        prerequisites: [problem-framing-and-baselines]
+        concepts:
+          introduces: [design-document]
+          reinforces: [problem-framing, baseline-ladder, metrics-hierarchy]
+        key_ideas:
+          - "The document's skeleton: problem definition, metrics and losses, data, validation, baselines, risks and antigoals"
+          - "Worked end to end on retail demand forecasting: an $800M/year delivered-vs-sold gap as the problem statement"
+          - "Risks surface on paper: price-discrimination law and a 6-hour repricing cadence killed an elegant bandit design"
+          - "Reviewing a design doc: what a reviewer checks, and why the doc is a living artifact"
+        demo: null
+
+  - slug: data-systems
+    title: "Data systems fundamentals"
+    outcomes: [co-substrate]
+    lessons:
+      - slug: storage-and-data-models
+        title: "Storage engines and analytical processing"
+        type: core
+        status: drafted
+        key_image: figures/row-vs-column.svg
+        goal: "Select between row and column storage, transactional and analytical engines, and warehouse versus lake architectures for a given ML workload"
+        opening: "Reading one user's row and scanning one column over a billion rows are opposite access patterns, and every storage engine is built for one of them at the expense of the other."
+        est_minutes: 36
+        prerequisites: [ml-in-production]
+        concepts:
+          introduces: [column-storage, oltp-olap, data-warehouse-lake, etl-elt]
+          reinforces: []
+        key_ideas:
+          - "Row-major vs column-major: CSV vs Parquet, write path vs scan path, compression from sorted columns"
+          - "OLTP vs OLAP: the access patterns, and why one database cannot serve both well"
+          - "Under the hood in one section: log-structured (LSM) vs update-in-place (B-tree), write vs read amplification"
+          - "Warehouse vs lake: schema-on-write vs schema-on-read, and where training data actually comes from"
+          - "ETL → ELT: storage/compute decoupling moved the transform after the load"
+        demo: null
+      - slug: replication
+        title: "Replication and consistency"
+        type: core
+        status: drafted
+        key_image: figures/quorum-overlap.svg
+        goal: "Explain leader-based replication, its lag anomalies, and the failover risks that asynchronous replication creates"
+        opening: "Copying the same data to several nodes buys read throughput and fault tolerance, and pays for it with a new problem: the copies disagree, and the disagreement is visible to users."
+        est_minutes: 36
+        prerequisites: [storage-and-data-models]
+        concepts:
+          introduces: [replication-lag, read-your-writes, quorum, cap-theorem]
+          reinforces: [slo]
+        key_ideas:
+          - "Leader-based replication: sync vs async followers, and what failover can silently destroy (GitHub 2012: a stale follower promoted to leader reissued primary keys)"
+          - "Lag anomalies as guarantees: read-your-writes, monotonic reads, consistent prefix — each with its user-visible symptom"
+          - "Multi-leader conflicts: last-write-wins loses data (Amazon's cart resurrected deleted items)"
+          - "Leaderless quorums: w + r > n overlap, sloppy quorums, why quorum ≠ linearizable"
+          - "CAP stated honestly — consistent or available when partitioned — and why ML systems mostly pick eventual consistency"
+        demo: null
+      - slug: partitioning
+        title: "Partitioning and sharding"
+        type: core
+        status: drafted
+        key_image: figures/rebalancing-strip.svg
+        goal: "Design a partitioning scheme — key range or hash, with rebalancing and hot-key mitigation — for a dataset that outgrows one node"
+        opening: "When data outgrows one machine, some key must decide which machine owns which records, and every choice of that key trades scan ability against load balance."
+        est_minutes: 34
+        prerequisites: [replication]
+        concepts:
+          introduces: [sharding, hot-key, rebalancing, consistent-hashing]
+          reinforces: [replication-lag]
+        key_ideas:
+          - "Range vs hash partitioning: the encyclopedia-volume intuition vs even spread that kills range queries"
+          - "Hot keys: a celebrity user melts a hash partition; the random-suffix mitigation and its read-side fan-out cost"
+          - "hash mod N is the anti-pattern: adding a node moves almost everything; fixed partitions and consistent hashing move only what must move"
+          - "Secondary indexes: document-partitioned (scatter/gather reads) vs term-partitioned (multi-partition writes)"
+          - "Request routing: any-node-forwards, routing tier, partition-aware client — and where the assignment lives (ZooKeeper)"
+        demo:
+          component: ReshardingExplorer
+          spec: >
+            A ring of N nodes and 200 keys, colored by owning node under
+            three schemes selectable as tabs: hash mod N, fixed partitions
+            (32 partitions assigned to nodes), consistent hashing with
+            virtual nodes. Buttons add or remove a node; readout shows the
+            percentage of keys that moved. Task line: add one node under
+            each scheme and record the moved fraction — find the scheme
+            that keeps it near 1/N; then remove a node and check the claim
+            still holds.
+      - slug: consistency-and-transactions
+        title: "Transactions, linearizability, and consensus"
+        type: extra
+        status: drafted
+        key_image: figures/linearizability.svg
+        goal: "Explain what isolation levels, linearizability, and consensus actually guarantee — and what they cost — for the rare ML-adjacent cases that need them"
+        opening: "ACID's four letters make four different promises, and most systems quietly break the I: the anomalies that weak isolation permits are precise, reproducible, and occasionally catastrophic."
+        est_minutes: 38
+        prerequisites: [partitioning]
+        concepts:
+          introduces: [acid-isolation, linearizability, fencing-token]
+          reinforces: [quorum, cap-theorem]
+        key_ideas:
+          - "ACID unpacked: atomicity is abortability, consistency is the application's job, isolation is the negotiable one"
+          - "The anomaly zoo by example: dirty reads, read skew (Alice's $500), lost updates, write skew (the on-call doctors)"
+          - "Unreliable clocks and process pauses: why a lease can expire mid-write, and fencing tokens as the general fix"
+          - "Linearizability and the honest CAP; two-phase commit as a system of promises that blocks"
+          - "What ZooKeeper actually sells: linearizable ops + total order + failure detection + notifications"
+        demo: null
+      - slug: queues-and-logs
+        title: "Message queues and event logs"
+        type: core
+        status: drafted
+        key_image: figures/two-broker-families.svg
+        goal: "Contrast acknowledgment-based brokers with log-based brokers and use change data capture to keep derived systems consistent"
+        opening: "Two services can exchange data three ways — a shared database, a synchronous call, or a message through a broker — and the third is what keeps N services from becoming an N² mesh of calls."
+        est_minutes: 36
+        prerequisites: [replication]
+        concepts:
+          introduces: [message-broker, event-log, change-data-capture, backpressure]
+          reinforces: [replication-lag]
+        key_ideas:
+          - "Two broker families: AMQP-style (ack, delete, load-balance) vs log-based (Kafka: partition offsets, ordered, replayable)"
+          - "The disk is the buffer: a 6TB drive holds ~11 hours of full-throughput writes — why Kafka retains days"
+          - "Dual writes race and diverge; CDC makes the database the leader and search/cache/warehouse its followers"
+          - "State/stream duality: the log is the truth, the table is a cache of the log"
+          - "Backpressure and redelivery: what happens when a consumer falls behind or crashes mid-message"
+        demo: null
+      - slug: batch-and-stream-processing
+        title: "Batch and stream processing"
+        type: core
+        status: drafted
+        key_image: figures/event-vs-processing.svg
+        goal: "Select between batch and stream processing for a feature pipeline, handling event time, windows, and reprocessing correctly"
+        opening: "A feature computed over yesterday's data and a feature computed over the last thirty seconds are produced by two different machines — batch and stream processing — and most production failures at this layer come from confusing their clocks."
+        est_minutes: 38
+        prerequisites: [queues-and-logs, storage-and-data-models]
+        concepts:
+          introduces: [batch-processing, stream-processing, event-time, windowing, lambda-architecture, streaming-features]
+          reinforces: [event-log, etl-elt]
+        key_ideas:
+          - "MapReduce's four steps generalize a Unix pipeline; dataflow engines (Spark/Flink) drop the materialization"
+          - "Event time vs processing time: the Star Wars release-order analogy, stragglers, and windowing bugs"
+          - "Window types: tumbling, hopping, sliding, session — one worked feature per type"
+          - "Lambda architecture and its two-codebase tax; unifying batch and stream (batch as bounded stream)"
+          - "Static vs streaming features: restaurant mean prep time (batch) vs current queue depth (stream) — the split every serving decision inherits"
+        demo: null
+      - slug: feature-platform
+        title: "Feast and the online–offline split"
+        type: core
+        status: drafted
+        key_image: figures/feast-architecture.svg
+        goal: "Analyze a real feature platform — Feast's warehouse-plus-Redis architecture — as an application of the module's storage, replication, and streaming tradeoffs"
+        opening: "A feature platform is the module's material assembled into one system: a columnar warehouse for training reads, a replicated key-value store for millisecond serving reads, and a stream pipeline keeping the two in step."
+        est_minutes: 30
+        prerequisites: [batch-and-stream-processing, partitioning]
+        concepts:
+          introduces: [feature-store]
+          reinforces: [column-storage, oltp-olap, streaming-features, sharding, change-data-capture]
+        key_ideas:
+          - "The read-write skew: training reads years of history in bulk; serving reads one entity's row in ~10ms — no single store does both"
+          - "Feast's concrete stack: BigQuery offline, Redis online, Beam ingestion — each choice mapped to a module lesson"
+          - "Precomputation hierarchy: raw events → daily aggregates → windowed features, and who pays the computation"
+          - "Where the idealisation leaks: eventual consistency between the two stores, and the point-in-time problem deferred to the next module"
+        demo: null
+
+  - slug: training-data
+    title: "Training data and features in production"
+    outcomes: [co-data]
+    lessons:
+      - slug: labels-and-feedback-loops
+        title: "Labeling strategies and natural labels"
+        type: core
+        status: drafted
+        key_image: figures/loop-length-axis.svg
+        goal: "Design a labeling strategy — natural labels, weak supervision, or active learning — and account for the feedback-loop length it imposes"
+        opening: "Labels are the most expensive input to a supervised system, and production systems get them from three places: paid annotators, the product's own feedback mechanics, or programmatic rules that label at scale."
+        est_minutes: 36
+        prerequisites: [problem-framing-and-baselines]
+        concepts:
+          introduces: [natural-labels, weak-supervision, active-learning, reservoir-sampling]
+          reinforces: [problem-framing]
+        key_ideas:
+          - "Hand labels: cost, privacy, label multiplicity across annotators, and data lineage"
+          - "Natural labels and feedback-loop length: clicks arrive in minutes, fraud labels in months — and any fixed window undercounts (Twitter's ad-click delay study)"
+          - "Weak supervision: labeling functions, denoising, the radiologist who matched a year of labels in 8 hours"
+          - "Active learning: label where the model is uncertain — margin sampling doubles label efficiency on a toy task"
+          - "Sampling from streams without knowing n: reservoir sampling, and the selection biases of convenience samples"
+        demo: null
+      - slug: data-leakage-and-splitting
+        title: "Data leakage and repeatable splitting"
+        type: core
+        status: drafted
+        key_image: figures/leakage-taxonomy.svg
+        goal: "Identify and prevent data leakage — temporal, preprocessing, duplication, group — with time-based and hash-based repeatable splits"
+        opening: "Leakage is label information reaching features that will not exist at prediction time, and it produces the most dangerous artifact in ML: a validation score that is precisely, confidently wrong."
+        est_minutes: 38
+        prerequisites: [labels-and-feedback-loops]
+        concepts:
+          introduces: [data-leakage, repeatable-splitting, adversarial-validation]
+          reinforces: [natural-labels]
+        key_ideas:
+          - "The leakage taxonomy with a case per class: future-in-features, scaling before splitting, duplicates (CIFAR's 10-year-old 3.3%), group leakage (COVID scans keyed on the scanner)"
+          - "Time-based splits: why random splits leak the future for any time-correlated signal"
+          - "Hash-based repeatable splits: fingerprint a correlated key; the nested-modulo gotcha that silently biases the sample"
+          - "Detection: single-feature predictive power, ablation, and suspiciously large gains"
+          - "Adversarial validation: a classifier that distinguishes train from test finds the leak (or the shift) for you"
+        demo: null
+      - slug: features-at-scale
+        title: "Feature engineering at scale"
+        type: core
+        status: drafted
+        key_image: figures/amazon-escalation-3.svg
+        goal: "Design features that survive production — hashing for unbounded vocabularies, crosses, embeddings, and generalization checks"
+        opening: "Production features face conditions offline notebooks never do: categorical vocabularies that grow hourly, missing values from upstream schema changes, and the requirement that every transform be computable at serving time."
+        est_minutes: 36
+        prerequisites: [data-leakage-and-splitting]
+        concepts:
+          introduces: [hashing-trick, feature-cross, embeddings-as-features]
+          reinforces: [data-leakage, streaming-features]
+        key_ideas:
+          - "The unbounded-vocabulary escalation: Amazon's 2M brands — integer encoding crashes, UNKNOWN starves new sellers, hashing fixes both"
+          - "Booking.com's measured curve: 50% hash collisions cost under 0.5% log-loss"
+          - "Feature crosses buy a linear model nonlinearity: the natality benchmark (cross + linear ≈ DNN at 1/100th the training time)"
+          - "Embeddings as features: co-trained vs pretrained, dimension rules of thumb, similarity structure one-hot destroys"
+          - "Features have lifecycles: coverage, train/serve distribution overlap, ownership, and deleting the unused (Rules #22)"
+        demo: null
+      - slug: training-serving-skew
+        title: "Training–serving skew and the transform problem"
+        type: core
+        status: drafted
+        key_image: figures/three-gaps.svg
+        goal: "Design the transform architecture that eliminates training–serving skew — log serving-time features, bake transforms into the model, or serve from a feature store"
+        opening: "Training–serving skew is a difference between the features a model was trained on and the features it is served — and it is invisible to every offline metric, because the offline pipeline is the one that is wrong."
+        est_minutes: 34
+        prerequisites: [features-at-scale, feature-platform]
+        concepts:
+          introduces: [training-serving-skew, transform-pattern, point-in-time-correctness]
+          reinforces: [feature-store, data-leakage]
+        key_ideas:
+          - "The canonical postmortem: Spotify's podcast model — one transform, two implementations, four months of silent degradation"
+          - "Skew decomposed into three measurable gaps (Rules #37): train vs holdout, holdout vs next-day, next-day vs live"
+          - "Fix 1 — log and wait: capture serving-time features as the next training set (Rules #29)"
+          - "Fix 2 — the Transform pattern: bake the transform graph into the model artifact so there is one implementation"
+          - "Fix 3 — the feature store as single source, and point-in-time correctness: joining features as of the label's timestamp"
+        demo: null
+      - slug: data-validation
+        title: "Data validation pipelines"
+        type: core
+        status: drafted
+        key_image: figures/validation-gate.svg
+        goal: "Build a schema-driven data-validation pipeline — statistics, drift comparators, anomaly triage — and reproduce the reasoning behind the Google Play skew fix"
+        opening: "Google Play's ranking team compared the statistics of serving logs against training data and found features that were always present in training and always missing live; fixing that one class of bug measurably raised installs 2%."
+        est_minutes: 32
+        prerequisites: [training-serving-skew]
+        concepts:
+          introduces: [data-schema, data-validation-pipeline]
+          reinforces: [training-serving-skew, data-leakage, feature-store]
+        key_ideas:
+          - "The schema as contract: presence, type, valency, domain — TFX's worked anomaly pair ('EDUCATION': widen the domain; NULL count: fix the pipeline)"
+          - "Two different anomaly verdicts: the data evolved (update schema) vs the data broke (block training)"
+          - "Skew detection as stats comparison: same-day serving logs vs training set, per-feature distance alerts"
+          - "Schema environments: the label exists in training and must not exist in serving"
+          - "The adoption finding: nobody wants validation until the first incident — which is why it ships on by default"
+        demo: null
+
+  - slug: training-pipelines
+    title: "Training pipelines and offline evaluation"
+    outcomes: [co-train]
+    lessons:
+      - slug: experiment-tracking-and-versioning
+        title: "Experiment tracking, versioning, and reproducibility"
+        type: core
+        status: planned
+        goal: "Implement experiment tracking and data/model versioning so any production model is traceable to its exact code, data, and configuration"
+        opening: "A production model that cannot be traced to the code, data, and configuration that produced it cannot be debugged, rolled back, or legally accounted for — and by default, nothing in a training script records any of that."
+        est_minutes: 32
+        prerequisites: [data-leakage-and-splitting]
+        concepts:
+          introduces: [experiment-tracking, data-versioning, model-lineage, configuration-debt]
+          reinforces: [repeatable-splitting]
+        key_ideas:
+          - "What to log per run: metrics curves, samples, speed, system metrics, hyperparameters — and what teams actually forget"
+          - "Why data versioning is hard: line diffs are meaningless, merges are undefined, GDPR forbids immutability — pointer-based versioning (DVC)"
+          - "The model store's eight artifact types, motivated by a real 3 a.m. debugging scenario"
+          - "Lineage as a graph: artifacts, executions, and the query 'which models trained on this bad dataset?'"
+          - "Configuration debt: config lines outnumber code lines; the six principles of a reviewable config system"
+        demo: null
+      - slug: distributed-training
+        title: "Distributed training"
+        type: core
+        status: planned
+        goal: "Select a parallelism strategy — data, model, or pipeline — from the memory and communication budget of a training job"
+        opening: "A training job outgrows one device in two different ways — the data takes too long, or the model does not fit — and the two failure modes have two different families of fixes."
+        est_minutes: 36
+        prerequisites: [experiment-tracking-and-versioning]
+        concepts:
+          introduces: [data-parallelism, model-parallelism, pipeline-parallelism, checkpointing, warm-starting]
+          reinforces: [experiment-tracking]
+        key_ideas:
+          - "Training memory anatomy: weights + gradients + optimizer states — Adam triples the bill; the 13B-model 78GB worked example"
+          - "Data parallelism: synchronous all-reduce vs asynchronous parameter servers — stragglers vs stale gradients"
+          - "Large batches need scaled learning rates: the ImageNet 8k→64k degradation curve, and LAMB's 3-days-to-76-minutes result"
+          - "Model and pipeline parallelism: splitting layers, micro-batches filling the bubble (GPipe)"
+          - "Checkpoints and warm-starting: full training state vs exported model; virtual epochs; retraining without starting over"
+        demo: null
+      - slug: offline-evaluation
+        title: "Offline evaluation beyond aggregate accuracy"
+        type: core
+        status: planned
+        goal: "Evaluate a model the way production requires — against baselines, on slices, calibrated, and under behavioral and invariance tests"
+        opening: "An aggregate metric answers one question — average performance on one distribution — and production asks several others: on which subgroups, with what probability meaning, under what perturbations, compared to what baseline."
+        est_minutes: 38
+        prerequisites: [problem-framing-and-baselines, data-leakage-and-splitting]
+        concepts:
+          introduces: [slice-based-evaluation, calibration, behavioral-testing, model-validation-gate]
+          reinforces: [baseline-ladder, metrics-hierarchy]
+        key_ideas:
+          - "Slice-based evaluation and Simpson's paradox: winning every subgroup and losing overall — the worked table, twice real (kidney stones, Berkeley admissions)"
+          - "Calibration: sum of predictions over sum of labels; Platt and isotonic; the exact correction for negative downsampling $q = p/(p + (1-p)/w)$"
+          - "Behavioral tests: perturbation (robustness), invariance (protected attributes), directional expectation — the mortgage-race case"
+          - "Model comparison in practice: measure the delta between models, not just the scores (Rules #24)"
+          - "Validation gates: safe-to-serve vs prediction quality; blessing a candidate against the live baseline"
+        demo: null
+      - slug: pipelines-and-orchestration
+        title: "Pipelines, orchestration, and MLOps maturity"
+        type: core
+        status: planned
+        goal: "Compose training into an orchestrated DAG of tested components and place a team on the MLOps maturity ladder"
+        opening: "A notebook retrained by hand is MLOps level 0, and every level above it replaces one manual step with a tested, triggered, versioned component in a DAG."
+        est_minutes: 34
+        prerequisites: [experiment-tracking-and-versioning, data-validation]
+        concepts:
+          introduces: [ml-pipeline, orchestration, mlops-maturity]
+          reinforces: [data-validation-pipeline, configuration-debt, hidden-technical-debt]
+        key_ideas:
+          - "From notebook to pipeline: why statefulness and hidden execution order make notebooks untestable"
+          - "The six-step pipeline cycle and component anatomy: driver → executor → publisher against a metadata store"
+          - "Scheduler vs orchestrator; Airflow vs Kubeflow vs TFX-style task DAGs — what actually differs"
+          - "CI/CD for ML: PR-triggered training with results as review comments; push-triggered deployment; the continual loop"
+          - "MLOps maturity levels 0/1/2 — and the honest question of which level a given product needs"
+        demo: null
+      - slug: inside-tfx
+        title: "TFX: the production pipeline pattern"
+        type: core
+        status: planned
+        goal: "Analyze the original TFX paper as a system design — continuous training over hundreds of billions of examples, warm starts, validation gates, and the serving fixes behind Google Play"
+        opening: "TFX is the paper the modern ML-platform pattern descends from: one pipeline — ingestion, validation, transform, training, evaluation, serving — run continuously, with a machine deciding whether each new model may ship."
+        est_minutes: 30
+        prerequisites: [pipelines-and-orchestration, offline-evaluation]
+        concepts:
+          introduces: []
+          reinforces: [ml-pipeline, model-validation-gate, warm-starting, training-serving-skew, data-validation-pipeline]
+        key_ideas:
+          - "Figure 1 read component by component, each mapped to the lesson that taught it"
+          - "Continuous training at Google Play scale: warm-starting embeddings instead of retraining from scratch on O(100B) examples"
+          - "The validation gate in production: safe-to-serve checks, canary against the live model, auto-block on regression"
+          - "Two serving numbers: the threadpool isolation fix (p99.9 from ~1500ms to ~150ms) and the 2–5× lazy-parse speedup"
+          - "Where the pattern departs from the ideal: TF-only assumptions, and what Kubeflow/Vertex generalized later"
+        demo: null
+
+  - slug: serving
+    title: "Serving and deployment"
+    outcomes: [co-serve]
+    lessons:
+      - slug: batch-and-online-prediction
+        title: "Batch and online prediction"
+        type: core
+        status: planned
+        goal: "Select among batch prediction, online prediction with batch features, and online prediction with streaming features for a given product"
+        opening: "Every serving architecture is one of three: predictions precomputed in batch, predictions computed on request from precomputed features, or predictions computed on request from features no more than seconds old."
+        est_minutes: 34
+        prerequisites: [batch-and-stream-processing, training-serving-skew]
+        concepts:
+          introduces: [batch-prediction, online-prediction]
+          reinforces: [streaming-features, lambda-architecture, training-serving-skew]
+        key_ideas:
+          - "The three architectures as three diagrams, with the feature-freshness axis underneath"
+          - "Batch waste: precomputing for every user when ~2% log in daily (DoorDash); staleness: the blue-socks recommender"
+          - "What moving batch → online actually requires: a streaming feature pipeline plus a model fast enough for the request path"
+          - "Two pipelines, two teams, one bug: unification as the skew fix at serving scale"
+          - "Keyed predictions: matching unordered parallel outputs back to inputs"
+        demo: null
+      - slug: model-compression
+        title: "Model compression and inference optimization"
+        type: core
+        status: planned
+        goal: "Apply quantization, distillation, and pruning to fit a model into its latency budget, and compile it to the target hardware"
+        opening: "Inference cost is a design variable: the same accuracy can be served at a fraction of the latency and memory by trading model form — precision, size, architecture — for speed."
+        est_minutes: 36
+        prerequisites: [batch-and-online-prediction]
+        concepts:
+          introduces: [quantization, distillation, pruning, model-compilation]
+          reinforces: [percentile-latency]
+        key_ideas:
+          - "Quantization: post-training vs quantization-aware; INT8's measured accuracy/latency/size tradeoffs on MobileNet-class models"
+          - "Distillation: DistilBERT's 40% smaller / 60% faster / 97% retained — and why the ensemble-to-one-model transfer works"
+          - "Pruning and the lottery-ticket aside; low-rank factorization (depthwise convolutions, 8–9× parameter cuts)"
+          - "Compilation and lowering: IRs, operator fusion, autotuned kernels — the 23×-slower-than-optimized finding"
+          - "Cloud vs edge: latency, privacy, offline capability — what forces computation onto the device"
+        demo: null
+      - slug: model-servers-and-scaling
+        title: "Model servers and serving infrastructure"
+        type: core
+        status: planned
+        goal: "Design the serving path — stateless serving functions, model servers, dynamic batching, caching, autoscaling — for a stated load"
+        opening: "A trained model becomes a service by being exported as a stateless function and placed behind a server that must solve four problems the model knows nothing about: batching, scaling, caching, and hot-swapping versions."
+        est_minutes: 36
+        prerequisites: [batch-and-online-prediction, requirements-and-metrics]
+        concepts:
+          introduces: [model-server, dynamic-batching, prediction-caching, autoscaling]
+          reinforces: [percentile-latency, throughput, slo]
+        key_ideas:
+          - "The stateless serving function: export (SavedModel/ONNX), no training state, multiple signatures"
+          - "Model server anatomy: TF Serving's source → loader → manager lifecycle; Triton/TorchServe as the same shape"
+          - "Dynamic batching as the latency/throughput dial; GPU vs CPU inference economics (the 33× throughput benchmark)"
+          - "Caching layers for ML: prediction caching (cache-aside, write-through) and feature caching, with invalidation costs"
+          - "Scaling and reliability: horizontal scaling, load balancers across failure domains, SLOs and error budgets"
+        demo: null
+      - slug: deployment-and-online-experiments
+        title: "Deployment strategies and online experiments"
+        type: core
+        status: planned
+        goal: "Design a staged rollout — shadow, canary, blue-green — and measure it with A/B tests, interleaving, or bandits"
+        opening: "Offline evaluation cannot answer the question that matters — is the new model better for the business — because acting on a model's predictions destroys the data that would have measured the old one."
+        est_minutes: 38
+        prerequisites: [offline-evaluation, model-servers-and-scaling]
+        concepts:
+          introduces: [shadow-deployment, canary-release, ab-testing, minimum-detectable-effect, bandits]
+          reinforces: [model-validation-gate, metrics-hierarchy]
+        key_ideas:
+          - "The rollout ladder: shadow (no user impact, no feedback signal), canary (bounded blast radius), blue-green (instant rollback)"
+          - "A/B mechanics that practitioners get wrong: hypothesis, MDE, the sample-size formula, splitting units, A/A tests"
+          - "Switchback and budget-split designs for marketplace and ads interference"
+          - "Interleaving: team-draft merging detects ranking preferences with far fewer users"
+          - "Bandits: Thompson sampling's 12,000 samples vs A/B's 630,000 — and the engineering price (online updates, logging)"
+        demo:
+          component: BanditRace
+          spec: >
+            Two ad variants with hidden CTRs (~4% and ~5%). Left panel: the
+            reader allocates the next batch of 100 impressions with a
+            split slider and clicks "run batch"; right panel: Thompson
+            sampling allocates automatically, same random seed. Score is
+            cumulative clicks lost vs always-best (regret), updated per
+            batch. Task line: beat Thompson's regret over 20 batches; a
+            reset button reshuffles the hidden CTRs. Presets: close arms
+            (4.8% vs 5%), far arms (2% vs 5%).
+      - slug: serving-bert-at-scale
+        title: "BERT at a billion requests: the Roblox serving stack"
+        type: core
+        status: planned
+        goal: "Analyze Roblox's path to serving BERT at over a billion daily requests on CPUs, mapping each step to the module's compression and serving tradeoffs"
+        opening: "Roblox served a BERT text classifier at more than a billion requests per day on CPUs, and the path there — DistilBERT, dynamic shapes, INT8 quantization — raised throughput 30× while cutting p50 latency from 330ms to 10ms."
+        est_minutes: 30
+        prerequisites: [model-compression, model-servers-and-scaling]
+        concepts:
+          introduces: []
+          reinforces: [distillation, quantization, dynamic-batching, percentile-latency, throughput]
+        key_ideas:
+          - "The optimization stack replayed step by step, each with its measured throughput/latency delta"
+          - "Quantization alone: 7× latency and 8× throughput — why INT8 dominates the wins on CPU"
+          - "Capacity arithmetic: from measured single-core throughput to a fleet size for 1B requests/day with headroom"
+          - "What the case study does not report — the quality cost — and how to read published optimization numbers critically"
+          - "The same playbook on the PyTorch side: compile → INT8 → INT4 → speculative decoding as a preview of LLM serving"
+        demo: null
+
+  - slug: operations
+    title: "Monitoring and continual learning"
+    outcomes: [co-operate]
+    lessons:
+      - slug: failures-and-drift
+        title: "Failure modes and data distribution shift"
+        type: core
+        status: planned
+        goal: "Classify production ML failures and formalize distribution shift — covariate, label, and concept — as decompositions of $P(X,Y)$"
+        opening: "Most production ML failures are ordinary software failures — 60 of 96 in Google's own audit of a large ML pipeline — and the remainder fail silently: the system keeps serving predictions that have stopped being true."
+        est_minutes: 36
+        prerequisites: [training-serving-skew, labels-and-feedback-loops]
+        concepts:
+          introduces: [covariate-shift, label-shift, concept-drift, degenerate-feedback-loop]
+          reinforces: [training-serving-skew, natural-labels]
+        key_ideas:
+          - "The failure taxonomy: dependency/deployment/hardware vs ML-specific — and why ML failures don't throw exceptions"
+          - "Edge case vs outlier: a property of the data vs a property of the model's performance"
+          - "The shift taxonomy from $P(X,Y)$: covariate $P(X)$, label $P(Y)$, concept $P(Y|X)$ — one worked example each"
+          - "Degenerate feedback loops: recommender popularity spirals, resume screeners entrenching their own bias"
+          - "Breaking the loop: randomized exploration (TikTok's traffic pools) and position features held constant at serving"
+        demo: null
+      - slug: monitoring-and-observability
+        title: "Monitoring and observability"
+        type: core
+        status: planned
+        goal: "Design the monitoring stack for an ML system — what to watch at each pyramid layer, which statistical tests detect drift, and how to alert without fatigue"
+        opening: "An ML system is monitored in four layers — software health, data quality, model quality, business KPIs — and each layer catches failures the layers above it cannot see in time."
+        est_minutes: 38
+        prerequisites: [failures-and-drift, data-validation]
+        concepts:
+          introduces: [monitoring-pyramid, two-sample-test, observability]
+          reinforces: [covariate-shift, concept-drift, data-validation-pipeline, slo]
+        key_ideas:
+          - "The four monitorable artifacts by transformation depth: accuracy metrics, predictions, features, raw inputs — easier to monitor vs closer to root cause"
+          - "Prediction bias as the cheap invariant: predicted distribution should track observed labels, sliceable (Rules #37)"
+          - "Two-sample tests honestly: KS is one-dimensional, MMD needs dimensionality reduction first, all need a window choice"
+          - "The window trap: cumulative metrics hide the dip (93.7 cumulative vs 88.6 sliding); the base-window choice changes the verdict"
+          - "The response loop: logs and traces, alert policy with runbooks, alert fatigue as the primary failure of monitoring itself"
+        demo: null
+      - slug: continual-learning
+        title: "Continual learning and retraining policy"
+        type: core
+        status: planned
+        goal: "Formulate a retraining policy — stateless versus stateful, trigger design — and assess the evaluation risks of learning from live data"
+        opening: "Every deployed model has a retraining policy, even if the policy is never; the design questions are how often, from which checkpoint, on which window of data, and gated by what evaluation."
+        est_minutes: 34
+        prerequisites: [monitoring-and-observability, deployment-and-online-experiments]
+        concepts:
+          introduces: [continual-learning, stateful-training, retraining-trigger]
+          reinforces: [checkpointing, ab-testing, model-validation-gate]
+        key_ideas:
+          - "Stateless retrain vs stateful fine-tune: Grubhub's 45× compute cut and 20% purchase-through gain from going stateful daily"
+          - "The four maturity stages: manual → automated retraining → automated stateful → trigger-driven continual learning"
+          - "How often is worth it: the data-freshness experiment — train on staggered windows, test on today (Facebook's 1% CTR-loss answer)"
+          - "The champion/challenger loop and its evaluation risks: adversarial data (Tay), delayed labels, runaway feedback"
+          - "Model iteration vs data iteration: where the next unit of engineering effort actually pays"
+        demo: null
+      - slug: drift-detection-in-practice
+        title: "Drift detection in practice"
+        type: core
+        status: planned
+        goal: "Apply drift detection to a real text stream — KS, chi-squared, and MMD on embeddings — and read detector outputs against the module's taxonomy"
+        opening: "Drift detection in practice is three concrete tests on one real text stream: a KS test on a scalar feature, a chi-squared test on token counts, and an MMD test on embedding vectors — each returning a p-value that must then be interpreted."
+        est_minutes: 30
+        prerequisites: [monitoring-and-observability]
+        concepts:
+          introduces: []
+          reinforces: [two-sample-test, covariate-shift, concept-drift, monitoring-pyramid]
+        key_ideas:
+          - "The worked pipeline from Made With ML: reference window vs test window on a production tagging service's inputs"
+          - "KS on text length: p=0.39 on normal traffic, p≈7×10⁻³⁵ under an induced shift — what the magnitude does and does not mean"
+          - "Multivariate drift honestly: reduce (PCA/embeddings) then test (MMD), after the Failing-Loudly recipe"
+          - "Detection is not diagnosis: an is_drift=1 flag names no cause; the triage path from flag to root cause"
+          - "Where the idealisation leaks: thresholds without a cost model, seasonality confounds, and the missing-label gap"
+        demo: null
+      - slug: privacy-and-fairness
+        title: "Privacy, fairness, and responsible ML"
+        type: extra
+        status: planned
+        goal: "Assess an ML system's privacy and fairness obligations — anonymization limits, differential privacy, federated learning, model cards — against documented failures"
+        opening: "Strava published an anonymized heatmap of a billion workouts and revealed the locations of secret military bases: aggregation is not anonymization, and this module's failure cases are all systems that worked as designed."
+        est_minutes: 38
+        prerequisites: [offline-evaluation, monitoring-and-observability]
+        concepts:
+          introduces: [differential-privacy, federated-learning, model-card, demographic-parity]
+          reinforces: [slice-based-evaluation, behavioral-testing]
+        key_ideas:
+          - "Three audits: Strava's heatmap, Ofqual's grading algorithm (wrong objective, coarse evaluation, no transparency), PULSE's selection bias"
+          - "Fairness metrics from the confusion matrix: demographic parity vs equality of opportunity — and the proxy-bias trap (deleting the race column hides bias, doesn't remove it)"
+          - "The anonymity spectrum: pseudonymization → de-identification → anonymization; GDPR's right to be forgotten vs trained weights"
+          - "Differential privacy by mechanism: randomized response worked, epsilon as a budget, DP-SGD in one paragraph"
+          - "Federated learning (Gboard) and model cards as the operational deliverables"
+        demo: null
+
+  - slug: canonical-designs
+    title: "Canonical system designs"
+    outcomes: [co-design]
+    lessons:
+      - slug: recommender-funnel
+        title: "The retrieval–ranking funnel"
+        type: core
+        status: planned
+        goal: "Design the candidate-generation → ranking → re-ranking funnel and justify each stage from the compute budget"
+        opening: "No model can score a hundred million items in a hundred milliseconds, so every production recommender is a funnel: cheap retrieval narrows millions to hundreds, an expensive model ranks hundreds, and business logic re-orders the top few."
+        est_minutes: 38
+        prerequisites: [features-at-scale, batch-and-online-prediction]
+        concepts:
+          introduces: [candidate-generation, two-tower, ann-search, reranking]
+          reinforces: [embeddings-as-features, online-prediction, percentile-latency]
+        key_ideas:
+          - "The funnel as latency arithmetic: per-item scoring cost × corpus size at each stage against the page's budget"
+          - "Candidate sources: collaborative co-occurrence, content similarity, graph walks — real systems run several in parallel"
+          - "Two-tower retrieval: user tower, item tower, dot product; in-batch negatives and the sampled-softmax popularity correction"
+          - "ANN search: HNSW/IVF/hashing in one section — recall vs QPS vs index build time; precompute the item side, index it"
+          - "Re-ranking is where the product lives: diversity, freshness, fairness; cold start via exploration traffic (TikTok's pools)"
+        demo: null
+      - slug: ranking-and-ctr
+        title: "Ranking models and CTR prediction"
+        type: core
+        status: planned
+        goal: "Design the ranking stage — pointwise CTR prediction with calibration, position-bias correction, and normalized cross-entropy evaluation"
+        opening: "The ranking stage predicts a probability — click, watch, purchase — for each retrieved candidate, and because that probability is multiplied by money in an auction or an expected-value ranker, it must be calibrated, not merely ordered correctly."
+        est_minutes: 38
+        prerequisites: [recommender-funnel, offline-evaluation]
+        concepts:
+          introduces: [ctr-prediction, normalized-cross-entropy, position-bias]
+          reinforces: [calibration, feature-cross, two-tower]
+        key_ideas:
+          - "Pointwise vs pairwise vs listwise; why pairwise ranks well (AUC) yet calibrates badly — and pointwise won production"
+          - "Architectures as feature engineering: wide-and-deep (memorize + generalize), crosses learned instead of hand-built"
+          - "NCE worked in full: the fixed-0.2 model beats the informative model on raw log loss and loses on NCE — normalizing by the base rate"
+          - "Position bias: position as a training feature served constant; inverse propensity weighting in one paragraph"
+          - "Multi-task heads to one score: the worked engagement-score table (click 23%×1 + like 48%×5 − block 0.0003%×50 = 4.66)"
+        demo: null
+      - slug: embedding-based-search
+        title: "Embedding-based retrieval and search ranking"
+        type: core
+        status: planned
+        goal: "Design an embedding-based retrieval system — contrastive training, the ranking-metric ladder, and the production indexing pipeline"
+        opening: "Search over things that are not text — images, listings, videos — reduces to one mechanism: embed query and item into one space where similarity is dot product, then rank by the metrics that respect order."
+        est_minutes: 36
+        prerequisites: [recommender-funnel]
+        concepts:
+          introduces: [contrastive-learning, ndcg]
+          reinforces: [embeddings-as-features, ann-search, two-tower]
+        key_ideas:
+          - "Contrastive training: query, positive, in-batch negatives → softmax over similarities; augmentation as free positives (visual search)"
+          - "The metric ladder by counterexample: MRR ignores the list, precision@k ignores order, recall@k hides gaps — nDCG worked to 0.587"
+          - "Airbnb's listing embeddings: skip-gram over click sessions, the booked-listing global context, same-market hard negatives"
+          - "Average rank of the booked listing: an offline metric aligned with the business event"
+          - "The two pipelines: offline indexing (embed corpus, build index, refresh) vs online query path — and their different freshness"
+        demo: null
+      - slug: design-search-ranking
+        title: "End-to-end design: search ranking"
+        type: worked-practice
+        status: planned
+        goal: "Produce a complete design for a search-ranking system — query understanding, fused multimodal retrieval, graded-relevance labels from sessions, and the indexing/query serving split"
+        opening: "A search system answers a query the user just typed, and that changes every stage of the funnel: retrieval is conditioned on the query rather than the user, relevance is judged per query–item pair, and the offline metric must respect order within each result page."
+        est_minutes: 34
+        prerequisites: [embedding-based-search, ranking-and-ctr]
+        concepts:
+          introduces: [query-understanding]
+          reinforces: [two-tower, ndcg, contrastive-learning, ann-search, natural-labels, metrics-hierarchy]
+        key_ideas:
+          - "Requirements and scale first: query volume, corpus size, the latency budget of a results page — and how a query-conditioned funnel differs from a user-conditioned one"
+          - "Query understanding: normalization, tokenization, text embedding — and fusing text match with visual/content similarity into one candidate set (YouTube search's fused architecture)"
+          - "Labels from sessions: clicks vs stays vs bookings as graded relevance; Airbnb's booking sessions revisited as the label source; the label choice fixes the metric"
+          - "Ranking for search: two-tower scoring per query–listing pair, business-asymmetric costs (an empty page vs a bad first result), nDCG as the offline gate and session success online"
+          - "Serving and operations: the indexing pipeline vs the query path, caching head queries, monitoring query drift and the null-result rate"
+        demo: null
+      - slug: design-feed-ranking
+        title: "End-to-end design: feed ranking"
+        type: worked-practice
+        status: planned
+        goal: "Produce a complete design for a personalized feed — multi-task reaction prediction, engagement-score aggregation, impression discounting, and feedback-loop monitoring"
+        opening: "A feed ranks a small, fresh, mostly in-network inventory rather than a hundred-million-item corpus, so its hard problems move downstream: predicting many reaction types at once, blending them into one ordering score, and not showing the same post twice."
+        est_minutes: 34
+        prerequisites: [ranking-and-ctr, labels-and-feedback-loops]
+        concepts:
+          introduces: [engagement-score, impression-discounting]
+          reinforces: [position-bias, natural-labels, degenerate-feedback-loop, objective-decoupling, calibration]
+        key_ideas:
+          - "Requirements: freshness dominates — a feed's inventory is hours old and partly exhausted per session; scale estimation for a professional-network-sized graph"
+          - "Inventory and retrieval: in-network posts plus injected out-of-network candidates — a shallow funnel, and why feed retrieval is cheap where video retrieval is not"
+          - "Multi-task reaction heads on a shared backbone: click, like, comment, share, hide, block — and the engagement score recalled from ranking-and-ctr, extended with where the weights come from and how experiments tune them"
+          - "Impression discounting: a post seen and ignored is evidence — LinkedIn's decay factor, and the re-ranking layer that enforces variety across a session"
+          - "The loop declared upfront: engagement labels come from what was shown; position features, exploration slots, and popularity-diversity monitoring as the design's own audit"
+        demo: null
+      - slug: design-ad-click-prediction
+        title: "End-to-end design: ad click prediction"
+        type: worked-practice
+        status: planned
+        goal: "Produce a complete design for an ads CTR system — auction context, delayed-click labels, downsampled training with calibrated serving, and budget-aware experiments"
+        opening: "An ads system multiplies a predicted click probability by a bid inside an auction, which makes it the most numerically accountable ML system in production: every miscalibration is priced, and every millisecond of serving latency is a lost impression."
+        est_minutes: 36
+        prerequisites: [ranking-and-ctr, deployment-and-online-experiments]
+        concepts:
+          introduces: [ad-auction, budget-split-testing]
+          reinforces: [ctr-prediction, normalized-cross-entropy, calibration, feature-cross, natural-labels, ab-testing]
+        key_ideas:
+          - "Requirements from the auction: expected value $P(\\text{click}) \\times \\text{bid}$, the waterfall serving model's brutal latency budget, and scale estimation from impressions per day"
+          - "Data: the impression–click join, the delayed-click window (most clicks in five minutes, some hours later — any fixed window undercounts CTR), and negative downsampling as a pipeline decision that owes serving a correction"
+          - "Features and model: crosses at ads scale recalled, hashing for campaign/creative vocabularies; NCE plus the calibration plot as the offline metric pair"
+          - "The hidden feedback loop: the model picks which ads are shown, which picks the next training set — exploration budget and position features as loop-breakers"
+          - "Experiments under interference: budget-split A/B so arms don't compete for one campaign budget; monitoring calibration drift as a direct revenue alarm"
+        demo: null
+      - slug: design-harmful-content
+        title: "End-to-end design: harmful content detection"
+        type: worked-practice
+        status: planned
+        goal: "Produce a complete design for a harmful-content system — multimodal fusion, multi-task classification under extreme imbalance, a human review queue, and enforcement with appeals"
+        opening: "A harmful-content system classifies on the order of half a billion posts a day into violation categories where positives are rare, adversarial, and expensive to mislabel in either direction — and its output is an enforcement action against a person, not a ranking."
+        est_minutes: 36
+        prerequisites: [offline-evaluation, labels-and-feedback-loops]
+        concepts:
+          introduces: [multimodal-fusion, human-review-loop]
+          reinforces: [slice-based-evaluation, natural-labels, active-learning, concept-drift, metrics-hierarchy]
+        key_ideas:
+          - "Requirements price the two errors separately: a missed harm and a wrongful takedown have different costs, so the operating contract is recall at a fixed precision, not accuracy"
+          - "Framing choices with maintenance consequences: one binary model per violation class vs multi-label vs multi-task heads on a shared multimodal backbone"
+          - "Fusion: early vs late — a meme is harmless text over a harmless image, and at ~500M posts/day there is enough data to learn the joint representation late fusion cannot"
+          - "Data under extreme imbalance: user reports and appeal verdicts as label sources, imbalance handling recalled from classical ML, and the model as triage — ranking a human review queue by severity and uncertainty"
+          - "Operations: enforcement and appeals as audited labels, prevalence as the online metric, and drift that is adversarial — evasion adapts to whatever ships, so retraining cadence is a security parameter"
+        demo: null
+      - slug: design-video-recommendations
+        title: "End-to-end design: video recommendation"
+        type: synthesis
+        status: planned
+        goal: "Produce a complete system design for video recommendation — requirements through monitoring — exercising the full course template"
+        opening: "This lesson runs the whole course once, as a single design: a video-recommendation system taken from requirements and scale estimates through data, models, serving, experiments, and monitoring."
+        est_minutes: 36
+        prerequisites: [ranking-and-ctr, embedding-based-search, continual-learning]
+        concepts:
+          introduces: []
+          reinforces: [candidate-generation, two-tower, ann-search, natural-labels, position-bias, engagement-score, ab-testing, degenerate-feedback-loop, continual-learning]
+        key_ideas:
+          - "Requirements and back-of-envelope scale: users, corpus, QPS, latency budget — numbers before boxes"
+          - "Framing and labels: watch/skip as natural labels, implicit-signal pitfalls, the feedback loop declared upfront"
+          - "The design: multi-source candidate generation, two-tower retrieval with ANN, multi-task ranker, re-ranking layer"
+          - "Serving and freshness: index refresh cadence, feature freshness split, caching; experimentation and interleaving plan"
+          - "Where real systems depart from the template: YouTube's multi-algorithm retrieval, continual training, exploration traffic"
+        demo: null
+
+  - slug: ai-engineering
+    title: "AI engineering"
+    outcomes: [co-ai]
+    lessons:
+      - slug: foundation-models-in-production
+        title: "Foundation models as system components"
+        type: core
+        status: planned
+        goal: "Analyze what changes when the model is a foundation model — sampling and hallucination as system properties, per-token economics, and the model-selection workflow"
+        opening: "A foundation model enters a system as a component nobody on the team trained: adaptation replaces training as the core activity, and the model's failure modes — sampling variance, hallucination, drift under provider updates — become system-design inputs."
+        est_minutes: 36
+        prerequisites: [requirements-and-metrics]
+        concepts:
+          introduces: [foundation-model-adaptation, hallucination, token-economics, model-selection-workflow]
+          reinforces: [metrics-hierarchy, ml-lifecycle]
+        key_ideas:
+          - "The inversion: product-first iteration on a fixed model; the three-layer AI engineering stack"
+          - "Sampling as a system property: temperature, top-p, logprobs — inconsistency is configured, not fixed"
+          - "Hallucination's two working hypotheses (self-delusion, mismatched knowledge) and what each implies for mitigation"
+          - "Token economics: cost per request, TTFT vs total latency, the API-vs-self-host cost crossover"
+          - "Model selection: hard vs soft attributes, the filter→benchmark→experiment→monitor workflow, benchmark contamination (the Gemini CoT@32 comparison trap)"
+        demo: null
+      - slug: prompting-and-context
+        title: "Prompting and context engineering"
+        type: core
+        status: planned
+        goal: "Design prompts and context as versioned system components — in-context learning, context-window limits, decomposition, and injection defenses"
+        opening: "A prompt is production configuration: it is versioned, tested, and attacked like any other interface the system exposes — and the context window it fills is a scarce resource with measurable failure modes."
+        est_minutes: 36
+        prerequisites: [foundation-models-in-production]
+        concepts:
+          introduces: [in-context-learning, context-window, prompt-injection, instruction-hierarchy]
+          reinforces: [configuration-debt, foundation-model-adaptation]
+        key_ideas:
+          - "Prompt anatomy and in-context learning: zero/few-shot; the one-example flip (Santa Claus) — examples are behavior configuration"
+          - "Context efficiency: needle-in-a-haystack, lost-in-the-middle — position in context is a ranking decision"
+          - "Decomposition beats accretion: GoDaddy's 1,500-token prompt split into subtasks — better and cheaper"
+          - "Prompt attacks: extraction, jailbreaks, indirect injection through retrieved data (the malicious-username SQL case), the divergence attack"
+          - "Defenses in layers: instruction hierarchy (+63% robustness), isolation, approval gates — measured by violation rate AND false-refusal rate"
+        demo: null
+      - slug: retrieval-augmented-generation
+        title: "Retrieval-augmented generation"
+        type: core
+        status: planned
+        goal: "Design a RAG system — retriever choice, chunking, reranking — treating the index as swappable non-parametric memory"
+        opening: "RAG bolts a retrieval system onto a frozen model so that knowledge lives in an index instead of in weights — which makes knowledge updatable, inspectable, and swappable at the cost of a second system to design."
+        est_minutes: 38
+        prerequisites: [prompting-and-context, embedding-based-search]
+        concepts:
+          introduces: [rag, chunking, hybrid-search]
+          reinforces: [ann-search, ndcg, contrastive-learning, context-window]
+        key_ideas:
+          - "The original result: retrieval + generation beats extraction, and swapping the 2016 index for 2018 changes the answers — memory without retraining"
+          - "Term-based vs embedding-based retrieval: BM25 and inverted indexes vs vector search — when the entity-heavy query wins for BM25"
+          - "Chunking is where RAG quality is lost: sizes, overlap ('I left my wife a note'), contextual augmentation of chunks"
+          - "Hybrid search and reranking: reciprocal rank fusion $\\sum 1/(k + r_i)$, two-stage retrieve-then-rerank"
+          - "Evaluating the retriever separately: context precision/recall, nDCG revisited; and the finetune-vs-RAG decision — form vs facts"
+        demo: null
+      - slug: finetuning-and-adaptation
+        title: "Fine-tuning and parameter-efficient adaptation"
+        type: extra
+        status: planned
+        goal: "Judge when to fine-tune and how — memory math, LoRA and QLoRA, multi-adapter serving — after prompting and RAG have been exhausted"
+        opening: "Fine-tuning is the last resort on the adaptation ladder, and the reasons are economic: it buys form — structured output, style, domain register — at the price of training infrastructure, base-model churn, and a model you now own."
+        est_minutes: 36
+        prerequisites: [retrieval-augmented-generation, distributed-training]
+        concepts:
+          introduces: [peft, lora]
+          reinforces: [data-parallelism, quantization, distillation]
+        key_ideas:
+          - "The cautionary tale: BloombergGPT's $1.3M+ domain pretrain decisively beaten by zero-shot GPT-4 on its own benchmarks"
+          - "The adaptation ladder: prompt → few-shot → RAG → fine-tune → combine, each step gated by an eval"
+          - "Memory math revisited: full fine-tuning's optimizer bill vs LoRA's $W + (\\alpha/r)AB$ at 0.0027% of trainable parameters"
+          - "QLoRA: 4-bit base + trained adapters — a 65B fine-tune on one 48GB GPU, with Guanaco's Elo receipts"
+          - "Multi-LoRA serving arithmetic: 100 customer models as 1.68B parameters merged vs 23.3M as adapters"
+        demo: null
+      - slug: llm-evaluation
+        title: "Evaluating LLM systems"
+        type: core
+        status: planned
+        goal: "Build an evaluation pipeline for open-ended outputs — exact metrics where possible, AI judges with known biases, and comparative ranking"
+        opening: "Open-ended generation breaks the evaluation toolkit this course has used so far: there is no single reference answer, the benchmarks are contaminated, and the cheapest capable grader is another model with measurable biases."
+        est_minutes: 38
+        prerequisites: [foundation-models-in-production, offline-evaluation]
+        concepts:
+          introduces: [ai-judge, pass-at-k, comparative-evaluation]
+          reinforces: [slice-based-evaluation, metrics-hierarchy, baseline-ladder]
+        key_ideas:
+          - "Exact evaluation where it exists: functional correctness and pass@k; the exact-match trap (the Anne Frank date)"
+          - "AI-as-judge: prompt design (criteria + discrete scale), and the measured biases — self-preference (+10–25%), position, verbosity"
+          - "Comparative evaluation: win rates → Elo/Bradley-Terry; Chatbot Arena's messy reality (180 'hello' prompts) and the transitivity assumption"
+          - "The pipeline: tie criteria to the business metric, slice, size the sample (3× smaller effect ≈ 10× more examples), evaluate the evaluator"
+          - "Contamination: n-gram overlap and perplexity checks — 'a benchmark stops being useful the day it becomes public'"
+        demo: null
+      - slug: llm-inference
+        title: "LLM inference optimization"
+        type: core
+        status: planned
+        goal: "Apply the LLM serving toolkit — KV-cache budgeting, continuous batching, PagedAttention, quantization, speculative decoding — against TTFT and TPOT budgets"
+        opening: "LLM inference is two different workloads in one request: a parallel, compute-bound prefill and a sequential, memory-bandwidth-bound decode — and nearly every serving optimization is an attack on the decode's memory traffic."
+        est_minutes: 40
+        prerequisites: [foundation-models-in-production, model-compression]
+        concepts:
+          introduces: [prefill-decode, kv-cache, continuous-batching, paged-attention, speculative-decoding]
+          reinforces: [quantization, dynamic-batching, percentile-latency, token-economics]
+        key_ideas:
+          - "The metrics: TTFT (prefill), TPOT (decode), goodput vs throughput, MFU/MBU — what nvidia-smi does not tell you"
+          - "KV cache sizing worked: $2 \\cdot B \\cdot S \\cdot L \\cdot H \\cdot bytes$ — Llama-2-13B at batch 32 needs 54GB, more than its weights"
+          - "PagedAttention: fragmentation wastes 62–80% of cache memory; paging blocks like virtual memory reaches 96% utilization and 2–4× throughput"
+          - "Batching evolution: static → dynamic → continuous (the bus that never waits); prompt caching's 79% TTFT / 90% cost cut"
+          - "Attacking the decode: GQA/MQA (Character.AI's 20× cache cut), quantized KV, speculative decoding's draft-and-verify"
+        demo:
+          component: KVCacheBudget
+          spec: >
+            Inputs: model preset (Llama-2-7B/13B/70B — layers, heads, dims
+            prefilled), batch size, context length, precision (FP16/INT8),
+            attention mode (MHA/GQA-8/MQA). Live stacked bar: weights vs KV
+            cache vs headroom against a selectable GPU (A100-40GB/80GB,
+            H100). Readout of max batch that fits. Task line: fit
+            Llama-2-13B at 4k context on one A100-80GB — find the max
+            batch under MHA, then under GQA-8, then with INT8 KV; record
+            the three numbers.
+      - slug: ai-application-architecture
+        title: "The AI application reference architecture"
+        type: synthesis
+        status: planned
+        goal: "Assemble the reference architecture for an LLM application — context construction, guardrails, router and gateway, caches, agent patterns — and instrument it for feedback"
+        opening: "The reference architecture for an AI application is built by adding one layer per failure: context for missing knowledge, guardrails for bad outputs, a router for cost, caches for latency, and agents last — because their errors compound."
+        est_minutes: 38
+        prerequisites: [retrieval-augmented-generation, llm-evaluation, llm-inference]
+        concepts:
+          introduces: [guardrails, model-router, semantic-caching, agent-pattern]
+          reinforces: [rag, ai-judge, kv-cache, prompt-injection, monitoring-pyramid, degenerate-feedback-loop]
+        key_ideas:
+          - "The incremental build: bare model call → +context (RAG lesson) → +guardrails (evals lesson, inline) → +router/gateway → +caches (inference lesson) → +agents"
+          - "Guardrails both ways: input (PII masking with a reverse map, injection screens) and output (quality, safety) — each adds latency the budget must absorb"
+          - "Routing economics: RouteLLM-style small-vs-large routing at 2× cost cut; exact vs semantic caching and its false-hit risk"
+          - "Agents last: the 95%-per-step → 60%-over-ten arithmetic; plan validation and write-action gates"
+          - "Instrumentation: LLM-specific drift (system prompt, user behavior, provider model), implicit feedback done right (Midjourney) and wrong (Luma's reversed emojis)"
+        demo: null

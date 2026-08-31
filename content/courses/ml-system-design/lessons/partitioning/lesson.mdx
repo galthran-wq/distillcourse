@@ -1,0 +1,319 @@
+When data outgrows one machine, some key must decide which machine owns which records, and every choice of that key trades scan ability against load balance.
+
+<Ref lesson="replication">The previous lesson</Ref> bought read throughput and fault tolerance by copying the entire dataset to every replica, and closed on the limit of copying: a replica is the whole dataset, so replication multiplies read capacity and multiplies storage not at all. *Partitioning* (most products say *sharding*) is the other half of the substrate at rest: break the dataset into pieces, give each piece to a node, and the cluster's capacity becomes the sum of its nodes instead of the size of the smallest one.
+
+The split raises four engineering questions this lesson answers in turn: which key decides the split and what that choice costs, why the load can concentrate even under a perfect split, how the split survives nodes joining and leaving, and how a request finds the node that owns its key. The lesson closes by composing partitioning with replication into the picture every production store actually runs.
+
+## The problem in numbers: 10 TB against 64 GB nodes
+
+An online feature store, the kind <Ref lesson="replication">the previous lesson</Ref> ended on, serves feature rows from memory at millisecond latency; suppose the feature set has grown to 10 TB. A well-provisioned serving node carries 64 GB of RAM, so the dataset alone demands on the order of 160 nodes before a single request has been served, and the request load demands its own share.
+
+Some rule must therefore assign every record to a node, and the rule must be **computable from the record's key**. The alternative, assigning records to nodes at random, spreads data perfectly and destroys reads, because a client looking for one key would have to ask every node.
+
+### Skew and hot spots: the two failure modes
+
+Two words name the failure modes the rule must avoid. The split is *skewed* when some partitions carry much more data or traffic than others, and a partition with disproportionate load is a *hot spot*. Skew is not a rounding error: in the extreme, all load lands on one partition of ten, nine nodes idle, and the cluster's throughput is one node's. The ideal is the even split, where 10 nodes carry 10 times the data and 10 times the read and write throughput of one.
+
+<Remark title="a partition is not a network partition">
+A partition here is a piece of a dataset, deliberately made. It has nothing to do with the *network* partition of the CAP discussion, which is a fault. The two uses collide in every systems text, and this course keeps them apart by context.
+</Remark>
+
+## Key-range partitioning: scans kept, load concentrated
+
+<Figure
+  src="./figures/encyclopedia.svg"
+  alt="Ten encyclopedia volumes on a shelf, each spine labeled with a letter range from A–B to T–Z, with a lookup for the word sharding pointing at the S volume; volume widths differ because the ranges adapt to the data"
+  caption="Key-range partitioning is how a print encyclopedia ships: spine labels are partition boundaries, and a lookup goes straight to one volume."
+  float="right"
+  width="m"
+/>
+
+The first computable rule assigns each partition a continuous range of keys, the way a print encyclopedia assigns each volume a range of headwords. Knowing the boundaries, a client computes the owning partition directly: an entry starting with S is in the S volume, no other volume consulted. The ranges are not evenly spaced, because keys are not evenly distributed; boundaries adapt to the data, manually or automatically, so volumes come out roughly equal even though A–B and T–Z cover different amounts of alphabet. Bigtable, Google's wide-column store from 2006, its open-source descendant HBase, and MongoDB in its default mode all partition this way.
+
+### The payoff: a range scan reads one partition
+
+Within a partition, keys are kept in sorted order, in exactly the SSTable layout <Ref lesson="storage-and-data-models">the storage lesson</Ref> described for LSM-tree engines. Sorting is what the scheme is for: a *range scan* reads one contiguous stretch of one partition. A sensor table keyed by measurement timestamp answers "all readings from March" by scanning one range; an events table keyed by user answers "this user's history" the same way.
+
+### The cost: the newest keys are neighbors
+
+The cost is where the load lands. If the key is a timestamp, the partitions are ranges of time, and every write that happens today lands in today's partition: one node absorbs the entire write throughput while the partitions holding last month sit idle. The sort order that makes scans cheap is the same order that makes the newest keys neighbors, and neighbors live together. The concentration is structural, not bad luck, and it is the reason the second scheme exists.
+
+## Hash partitioning: load spread, ranges destroyed
+
+The fix for range partitioning's concentration is to break the neighborhood: run every key through a hash function and assign each partition a range of *hashes*. A good hash turns similar keys into uniformly scattered values across its output range, so today's timestamps land everywhere. Cryptographic strength is unnecessary; Cassandra and MongoDB use MD5, and the property that matters is determinism across processes, which is why a language's built-in object hash (randomized per process in Java and Ruby) cannot be the partitioning hash.
+
+<Figure
+  src="./figures/range-vs-hash.svg"
+  alt="Two panels over the same twelve keys a through l split into three partitions. Left, key-range partitions hold contiguous keys and a range query for e through h goes to exactly one partition. Right, hash partitions hold scattered keys and the same range query must ask all three partitions."
+  caption="The same 12 keys, the same query, two rules. Range partitioning answers the scan from one partition; hashing scatters the scan across all of them."
+/>
+
+The scatter that balances the load is the scatter that kills the scan. Keys that were adjacent are now on different partitions, so a range query has no partition to go to: MongoDB in hash mode sends every range query to every partition, and Riak, Couchbase, and Voldemort simply refuse range queries on the primary key. The choice as stated is binary, scans or balance, and production data models want both.
+
+### The compound key: hash the prefix, sort the rest
+
+Cassandra's compromise, and the pattern ML event tables copy, is a *compound primary key*: only the first column is hashed to pick the partition; the remaining columns order rows within it. Ranges within one value of the first column survive; ranges across values of it do not.
+
+<Example title="keying a click-events table">
+A feature pipeline needs "articles user 31 read in the last 7 days" for every scoring request. Key the events table with the compound key $(\texttt{user\_id}, \texttt{timestamp})$: the partition is chosen by $\mathrm{hash}(\texttt{user\_id})$, and within it the user's events sit sorted by time.
+
+- **Per-user history scan** (the feature read): one partition, one range scan from $t - 7\mathrm{d}$ to $t$. This is the hot-path query, and it is as cheap as pure range partitioning would make it.
+- **Point fetch** of one event: exact key, one partition, one lookup.
+- **Daily backfill** ("all events of August 30"): the date is buried behind the hash, so the job must read every partition. The backfill is a batch job that runs against the warehouse copy anyway, where <Ref lesson="storage-and-data-models">columnar scans</Ref> are the right tool, so the online table does not pay for it.
+
+Write load spreads across partitions as long as many users are active, which is the assumption the next section breaks.
+</Example>
+
+## Hot keys survive hashing
+
+Hashing balances keys, and the expectation it invites is balanced load. The expectation fails on one documented case: load is not attached to keys uniformly. The distribution of per-key traffic has the same shape as the follower counts that broke the mean in <Ref lesson="requirements-and-metrics">the requirements lesson</Ref>, where a handful of accounts carried 30 million followers against an average of 75. When a celebrity posts, the storm of writes and reads all carry the same key, the celebrity's ID, and the hash of one ID is one value. Every request routes to one partition by construction. Hashing spreads the key *population*; it does nothing for the single key everyone wants.
+
+<FigureSequence
+  name="hot-key"
+  alt="Three frames over four partitions with load bars: first, hashed writes produce even load; second, one celebrity key's traffic swells partition P2 while the others idle; third, the key is split into a hundred suffixed keys that spread the writes, while a read must now gather from all partitions"
+  caption="A hot key forms and gets split. The split spreads the write storm and converts every read of that key into a fan-out."
+/>
+
+<Task>
+Step through the three frames and state, before reading on, what the third frame's read arrows cost: with the amplification formula $1-(1-p)^N$ from the requirements lesson, price a read that must gather 100 sub-keys when 1 read in 100 is slow.
+</Task>
+
+### The mitigation: split the key, move the bill to reads
+
+Today's data systems do not compensate for a hot key automatically; the application does. The standard mitigation is to split the key: append a two-digit random suffix, so the celebrity's key becomes 100 keys, `31·00` through `31·99`, which the hash then scatters across partitions. The write storm divides by 100.
+
+The bill moves to the read path: a read of key 31 must now fetch all 100 sub-keys and combine them, and a 100-way fan-out is exactly the tail-amplification setting of the requirements lesson. With 1 read in 100 slow, a gather over 100 sub-keys is slow $1 - 0.99^{100} \approx 63\%$ of the time; with a one-digit suffix, ten sub-keys, the figure drops to about $10\%$. The suffix width is a dial trading write spreading against read tail.
+
+The technique also demands bookkeeping: splitting every key would tax the vast majority that are cold, so only known-hot keys are split, and something must track which keys those are.
+
+<KeyFact>
+A hot spot is one key's load, not many keys' count, so it survives every scheme in this lesson: range, hash, or ring, one key maps to one partition. Watch for it wherever a popularity distribution rides on a key — user IDs, item IDs, and the feature rows of whatever went viral this hour.
+</KeyFact>
+
+## Rebalancing: judged by the fraction of keys that move
+
+A cluster's membership changes: query load grows and wants more CPUs, the dataset grows and wants more disks, a node dies and its responsibilities must land somewhere. Moving load between nodes is *rebalancing*, and any scheme for it owes three things: a fair share per node afterwards, uninterrupted reads and writes during, and no more data moved than necessary. The third requirement is the discriminating one, because moving data costs network, disk I/O, and time, and the schemes differ on it by an order of magnitude.
+
+### How not to do it: hash mod N
+
+The assignment rule every programmer writes first is $\mathrm{hash}(key) \bmod N$ for $N$ nodes. It is uniform, it is one line, and it fails the moment $N$ changes. Take $\mathrm{hash}(key) = 123456$: with 10 nodes the key lives on node 6 ($123456 \bmod 10$), with 11 nodes on node 3 ($123456 \bmod 11$), with 12 nodes on node 0. The key moves on every resize.
+
+The fraction that moves is computable. Growing from 10 to 11 nodes, a key stays put only when $h \bmod 10 = h \bmod 11$. Both congruences fix the same remainder $r \in \{0,\dots,9\}$, and by the Chinese remainder theorem each such $r$ pins $h$ to one residue out of the $\operatorname{lcm}(10,11) = 110$: ten favorable residues in 110, so 1 key in 11 stays and $10/11 \approx 91\%$ of all keys change nodes. Adding one node to a ten-node cluster re-ships nine-tenths of the dataset across the network to gain one-eleventh more capacity.
+
+<Exercise>
+The same cluster shrinks instead: a node is decommissioned, 5 nodes to 4, still under $\mathrm{hash}(key) \bmod N$. Compute the fraction of keys that move. Write the congruence condition before opening.
+
+<Solution>
+A key stays when $h \bmod 5 = h \bmod 4 = r$, which requires $r \in \{0,1,2,3\}$ and, by the same residue count, pins $h$ to 4 residues out of $\operatorname{lcm}(5,4)=20$. So $4/20 = 1/5$ of keys stay and $80\%$ move — for a change that should have moved exactly the departing node's $20\%$. Shrinking is as expensive as growing: the mod operator reshuffles everyone whenever $N$ changes in either direction.
+</Solution>
+</Exercise>
+
+### Fixed partitions: move whole partitions, never keys
+
+The production fix is a level of indirection: create far more partitions than nodes, up front, and assign several partitions to each node. A 10-node cluster split into 1,000 partitions carries about 100 per node. The key-to-partition map is a pure hash function and never changes; only the partition-to-node map does.
+
+When node 11 joins, it steals roughly 91 whole partitions, a few from every existing node, until shares are even again: about $9\%$ of the data moves, the new node's fair share and nothing else, and it moves as whole partitions, large sequential transfers rather than a shuffle of scattered keys.
+
+Riak, Elasticsearch, Couchbase, and Voldemort run this scheme, and so does the Redis Cluster behind a typical online feature store, whose 16,384 hash slots are exactly fixed partitions under another name.
+
+The scheme's one hard decision is the partition count, fixed at setup. It is the ceiling on cluster size, so it must exceed any future node count; but every partition carries management overhead, so thousands, not millions. The count is painful to choose when the dataset's future size is unknown, since each partition holds a fixed fraction of whatever the total turns out to be.
+
+### Dynamic partitioning: the count adapts
+
+Range-partitioned databases cannot fix a partition count up front, because fixed boundaries on an unknown key distribution can put all the data in one range. HBase instead splits any partition that exceeds a threshold (10 GB by default) into two halves and merges shrunken neighbors, the same top-level move as the B-trees of <Ref lesson="storage-and-data-models">the storage lesson</Ref>. The partition count then tracks the data volume. The caveat is the cold start: an empty table is one partition on one node until it grows enough to split, which is why HBase and MongoDB allow *pre-splitting*, an initial set of boundaries configured from what the operator knows about the coming key distribution.
+
+### Consistent hashing: virtual nodes on a ring
+
+The third scheme dispenses with the central partition map. Picture the hash output range bent into a ring. Each node is hashed onto the ring at many positions, its *virtual nodes* (Cassandra defaulted to 256 per node before version 4.0, and to 16 since, paired with an algorithm that places the tokens deliberately instead of at random), and each key belongs to the first virtual node clockwise from the key's own hash.
+
+Membership changes are local by construction: a joining node drops its virtual nodes onto the ring, and each one claims only the arc immediately counterclockwise, taking about $1/(N{+}1)$ of the keyspace in total, in slivers from every existing node. A leaving node's arcs are absorbed the same way.
+
+The many virtual nodes are what make the shares fair: single-token rings come out badly uneven, and one of the closing exercises derives exactly how badly. This is the scheme [Karger's 1997 paper](https://dl.acm.org/doi/10.1145/258533.258660) introduced for web caches and Amazon's Dynamo carried into storage; Cassandra runs it today.
+
+<Remark title="a name to distrust">
+"Consistent hashing" is used loosely in database documentation, often meaning nothing more than hash partitioning. The term properly names the Karger ring construction with its randomized boundaries; wherever the ring machinery is not actually present, *hash partitioning* is the accurate name. This course uses the term only for the ring.
+</Remark>
+
+<Figure
+  src="./figures/rebalancing-strip.svg"
+  alt="Three columns comparing the fraction of keys that move when a 10-node cluster grows to 11: hash mod N moves about 91 percent, 1,000 fixed partitions move about 9 percent, and consistent hashing with virtual nodes moves about 9 percent"
+  caption="One membership change, three bills. The indirection schemes move the new node's fair share; mod N moves nearly everything."
+/>
+
+<Task>
+In the resharding explorer, add one node under each of the three schemes and record the moved fraction the readout reports; find the scheme that keeps it near $1/N$. Then remove a node and check that the same ranking holds when a node leaves.
+</Task>
+
+<Demo name="ReshardingExplorer" caption="Rebalancing, live: the same 200 keys under hash mod N, 32 fixed partitions, and a consistent-hash ring with virtual nodes; add or remove a node and read off the fraction of keys that moved." />
+
+### One operational judgment: never fully automatic
+
+Whether rebalancing fires automatically is the topic's closing judgment. Fully automatic rebalancing composes badly with automatic failure detection, and the composition is the same trap as <Ref lesson="replication">replication's</Ref> failover timeout: a node that is merely overloaded responds slowly, gets declared dead, and the cluster responds by moving its partitions, which loads the network and the surviving nodes, which slows more health checks. Rebalancing is expensive enough that Couchbase, Riak, and Voldemort generate the new assignment automatically but wait for an operator to commit it.
+
+<KeyFact>
+Judge a rebalancing scheme by the fraction of keys that move when membership changes by one node: $\mathrm{hash} \bmod N$ moves $N/(N{+}1)$ of them, about 91% at ten nodes, while fixed partitions and consistent hashing move about $1/(N{+}1)$, the joining node's fair share and no more. The order-of-magnitude gap is the entire reason the indirection exists.
+</KeyFact>
+
+## Secondary indexes: either the read pays or the write pays
+
+Everything so far routes by primary key. Production queries also arrive by attribute: all cars whose color is red, all actions by one user, all documents containing a word. A secondary index answers these, and it does not map neatly onto partitions, because the rows matching a value are scattered wherever their primary keys sent them. Two constructions exist, and they tax opposite ends of the request path.
+
+<Figure
+  src="./figures/secondary-indexes.svg"
+  alt="Two panels on a used-car table. Left, document-partitioned local indexes: each partition indexes only its own cars, a read for red cars fans out to every partition, a write touches one. Right, term-partitioned global index: index entries are partitioned by term, a read for red cars hits one index partition, a write to one car updates one index partition per indexed term."
+  caption="Local indexes tax reads with scatter/gather; a global index taxes writes with one update per term. The same query, opposite bills."
+/>
+
+### Local indexes: writes cheap, reads scatter
+
+A *document-partitioned* (local) index gives each partition its own index over its own rows only. Writes stay cheap: adding a car touches exactly the one partition that owns it, index included. Reads pay: red cars live on every partition, so the query must go to all partitions and combine the answers, a pattern called *scatter/gather*, and a scatter over $N$ partitions is one more instance of the fan-out whose p99 the amplification formula governs. The pattern is nevertheless the common default: MongoDB, Cassandra, Elasticsearch, and SolrCloud all partition secondary indexes by document.
+
+### Global indexes: reads cheap, writes fan out and lag
+
+A *term-partitioned* (global) index inverts the deal. The index itself is partitioned, by the indexed value: `color:red` lives on one index partition regardless of where the red cars are, so a read consults exactly one partition. Writes pay: a single car's insert must update one index partition per indexed term, several partitions on several nodes, and doing that atomically would need a distributed transaction. In practice the updates run asynchronously, and the consequence is a familiar one: a global index is a follower of its base table, complete with <Ref lesson="replication">replication lag</Ref>. DynamoDB documents its global secondary indexes as catching up in a fraction of a second normally, and longer under faults.
+
+### The ANN instance: a local index over vectors
+
+The local form is how embedding retrieval serves. An ANN index over item embeddings is sharded like a local index: each shard indexes only its own vectors, every query fans out to all shards and merges the per-shard top-$k$, and the serving cost is scatter/gather cost. The closing exercise prices it, and <Ref lesson="recommender-funnel">the recommender funnel</Ref> builds the system around it.
+
+<KeyFact>
+The choice rule: take a local index when a read cannot name its matching partitions in advance, or when writes must stay single-partition; take a global index when reads must hit one partition and can tolerate index lag. Freshness is the hidden term of the trade: a just-inserted row is findable immediately under a local index, and only after the asynchronous update lands under a global one.
+</KeyFact>
+
+## Request routing: who knows where a key lives
+
+A client holding a key must reach the node that owns it, while rebalancing changes the answer underneath. Production systems place the routing knowledge in one of three places, and the three differ in where complexity sits, not in the problem they solve.
+
+### Three homes for the routing map
+
+**Any node.** The client contacts any node; that node serves the request or forwards it to the owner. Cassandra and Riak route this way, with cluster changes spread by *gossip* among the nodes, so every node eventually holds the whole map.
+
+**A routing tier.** A partition-aware proxy that owns no data and only forwards: MongoDB's `mongos`. Clients stay simple; the proxy alone tracks the assignment.
+
+**The client itself.** A partition-aware client library connects straight to the owning node, saving a hop at the price of pushing the map, and its updates, into every client.
+
+### Where the map itself lives: ZooKeeper, then DNS
+
+Whichever component holds the map must learn, promptly and consistently, that a partition changed nodes, and getting distributed components to agree is the consensus problem <Ref lesson="consistency-and-transactions">the module's extra lesson</Ref> examines. Many systems sidestep it by delegating the map to *ZooKeeper*, a small replicated coordination service that holds the authoritative partition-to-node assignment and notifies subscribers when it changes; HBase, SolrCloud, and Kafka all track partition assignment this way.
+
+The last hop runs over plain DNS: clients find node IP addresses through it, which suffices because machine addresses change far slower than partition assignment.
+
+### The combined picture: leader for some, follower for others
+
+Partitioning and replication compose into the deployment every production store runs: each partition is replicated as its own small leader-follower group, and the assignments interleave across nodes, so every node is leader for some partitions and follower for others.
+
+<Figure
+  src="./figures/partition-replica-grid.svg"
+  alt="A grid of 8 partitions by 4 nodes where each partition has one leader cell and one follower cell on different nodes; each node is leader for two partitions and follower for two; losing node 3 fails over only partitions 3 and 7"
+  caption="Replication and partitioning as one picture: per-partition leader-follower groups, interleaved so every node carries both roles."
+/>
+
+Everything the replication lesson established now applies per partition. Failover is per partition: when node 3 dies, only the two partitions it led need promotions, and their followers on nodes 1 and 4 take over while the other six partitions serve on, so a node failure degrades a fraction of the keyspace rather than the whole system. Replication lag is per partition too, which is why the consistent-prefix anomaly, the one <Ref lesson="replication">the previous lesson</Ref> traced to "different data lagging differently", is native to partitioned stores: two causally linked writes on two partitions have no shared write order, and an observer can see the second without the first.
+
+<KeyFact>
+In a partitioned, replicated store, blast radius is a fraction of the keyspace: a failed node takes down only the partitions it led, until their followers are promoted. The price is that every replication risk now exists $\times$ partitions: more leaders means more failovers, each smaller.
+</KeyFact>
+
+What is established: a dataset that outgrows one node is split by key, with range partitioning keeping scans at the cost of concentrated load, hash partitioning reversing the trade, and the compound key hashing the prefix and sorting the rest. Hot keys defeat every scheme because one key's load is indivisible, and splitting the key moves the cost to a read fan-out.
+
+Rebalancing schemes are ranked by moved fraction, with $\mathrm{hash} \bmod N$ at $\sim\!N/(N{+}1)$ and both indirection schemes at $\sim\!1/(N{+}1)$; secondary indexes tax reads (local) or writes-plus-freshness (global); and the running system interleaves per-partition leader-follower groups across nodes.
+
+Two threads continue. What a write that spans two partitions guarantees, and what stronger consistency than eventual actually costs, is the module's extra lesson, off the core path. On the core path, data at rest is now stored, replicated, and placed; what remains of the substrate is data *in motion* between systems, the queues, logs, and change streams of <Ref lesson="queues-and-logs">the next lesson</Ref>.
+
+## Exercises
+
+<Exercise>
+A 6-node cluster assigns keys by $\mathrm{hash}(key) \bmod 6$ and grows to 7 nodes; by the congruence argument of the rebalancing section, $6/7 \approx 86\%$ of its keys move. The cluster instead runs 60 fixed partitions assigned 10 per node. Compute the fraction of data that moves when the 7th node joins, and name the second, less obvious advantage of how it moves.
+
+<Solution>
+Key-to-partition assignments never change; the new node takes its fair share of partitions, $60/7 \approx 8.6$, so 8 or 9 partitions move: $8.6/60 \approx 14\%$ of the data, about six times less than mod N. The second advantage is the unit of movement: whole partitions transfer as large sequential copies while the old assignment keeps serving, instead of a keyspace-wide shuffle of individually rehashed keys.
+</Solution>
+</Exercise>
+
+<Exercise>
+A metrics service stores one global counter, `requests_total`, incremented on every request to the product. Traffic melts the node that owns it. Show that no partitioning scheme in this lesson helps as stated, and give the two fixes that actually work.
+
+<Solution>
+Every scheme in the lesson, range, hash, and ring, is a map from keys to partitions, and the unit it distributes is the key. This workload has exactly one key, so every scheme maps 100% of the load to one partition; adding nodes adds idle nodes. The boundary case isolates what partitioning does: it spreads a key *population*, and a population of one cannot be spread.
+
+Fix one is the hot-key split with aggregation: shard the counter into $K$ sub-keys (`requests_total·00` … `requests_total·K-1`), increment one at random (write load drops $K$-fold), and read by summing all $K$, paying a $K$-way gather on the rare read. This fits a counter well because reads are infrequent and the combine function (sum) is trivial.
+
+Fix two changes the data's shape: stop storing a mutable counter and emit increment *events* into a partitioned log, letting a downstream consumer maintain the running total. Appending to a log spreads and batches naturally, and counting becomes stream processing. That move, from state to a stream of changes, is the subject of <Ref lesson="queues-and-logs">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "We hash-partition, so load is balanced across the 8 partitions, and each partition's p99 is the system's p99 — we're safe." Use a toy workload: 8 keys whose request shares follow Zipf's law with exponent 1 (key $k$ receives share proportional to $1/k$), hashed perfectly evenly, one key per partition. Compute the hottest partition's share of total load and name the step of the claim that fails.
+
+<Solution>
+The normalizing constant is $H_8 = 1 + \tfrac12 + \dots + \tfrac18 \approx 2.718$, so key 1's share is $1/H_8 \approx 36.8\%$ of all requests, against a fair share of $12.5\%$: the hottest partition carries $2.9\times$ its fair load even though every partition holds exactly one key. The failing step is "keys balanced $\Rightarrow$ load balanced": hashing equalizes key counts (and bytes), but load is popularity-weighted, and popularity is heavy-tailed. The hot partition saturates at roughly a third of the cluster's nominal capacity, its queues grow first, and its p99 becomes the system's p99 for every request that touches it — all of them, once a scatter/gather read fans out over all partitions. Perfect key balance with an 80/20 popularity skew is the normal case in production, not a corner: this is the celebrity problem in miniature, with 8 celebrities of diminishing fame.
+</Solution>
+</Exercise>
+
+<Exercise>
+An events table records user actions for an ML platform. Three queries matter: (1) one user's last-30-days history at serving time, p99 under 10 ms; (2) a nightly backfill reading all of yesterday's events; (3) a point fetch of one known event. Compare the candidate keys (`timestamp`), (`user_id`), and the compound (`user_id`, `timestamp`); pick one and defend it, naming what your choice gives up and the residual risk it keeps.
+
+<Solution>
+Key = `timestamp` (range-partitioned): the backfill is a single contiguous range scan, but all of today's writes land on today's partition — the lesson's structural hot spot — and query (1) scatters across 30 days of partitions. Disqualified by the write path alone.
+
+Key = `user_id` (hashed): writes spread, and one user's events colocate, but nothing orders them within the partition; query (1) must read the user's entire event blob and filter by time, and query (3) has no direct address.
+
+Compound (`user_id`, `timestamp`), hash the prefix, sort the rest: query (1) is a single-partition range scan (the worked example's hot path); query (3) is an exact-key lookup; writes spread across active users. What it gives up is query (2): the date is invisible to the partitioner, so the backfill reads every partition — acceptable, because a nightly batch job cares about throughput, not latency, and properly runs against the warehouse copy anyway. The residual risk is the hot *user*: a bot or a headline account writing millions of events concentrates its partition, and the fix is this lesson's suffix split applied within the key, e.g. (`user_id`, `day`) as the partition prefix. Pick the compound key.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson asserted that a consistent-hash ring without virtual nodes balances badly. Quantify it: $N = 8$ nodes hashed to single random points on the ring. Derive the expected size of the largest arc, compare it to the fair share $1/8$, and explain what virtual nodes change.
+
+<Solution>
+Fix the arcs as the $N$ gaps between $N$ uniform random points on a circle of circumference 1; the gaps are exchangeable, each marginally with $P(\text{gap} > x) = (1-x)^{N-1}$, because the other $N-1$ points must all avoid an arc of length $x$. The same argument covers any fixed set of $k$ gaps: all $k$ exceed $x$ exactly when the remaining points avoid $k$ disjoint arcs of total length $kx$, so the probability is $(1-kx)_+^{N-1}$. Inclusion–exclusion over which gaps exceed $x$ then gives
+
+$$
+P(\text{largest arc} > x) = \sum_{k=1}^{N} (-1)^{k+1} \binom{N}{k} (1-kx)_+^{N-1}.
+$$
+
+Integrate over $x \in [0,1]$ term by term, using $\int_0^{1/k} (1-kx)^{N-1}\,dx = \tfrac{1}{Nk}$:
+
+$$
+\mathbb{E}[\text{largest arc}] = \frac{1}{N} \sum_{k=1}^{N} \frac{(-1)^{k+1}}{k} \binom{N}{k} = \frac{H_N}{N}, \qquad H_N = \sum_{i=1}^{N} \frac{1}{i},
+$$
+
+the last step by the classical identity $\sum_{k=1}^{N} (-1)^{k+1} \binom{N}{k}/k = H_N$.
+
+For $N=8$: $H_8/8 \approx 2.718/8 \approx 0.34$. The unluckiest node owns about a third of the keyspace, $2.7\times$ its fair share, from randomness alone — comparable to the Zipf imbalance of the refutation exercise, with no skewed workload required.
+
+Virtual nodes average the luck away: with $v$ tokens per node, a node's share is the sum of $v$ of the $Nv$ arcs, with mean $1/N$ and relative spread shrinking like $1/\sqrt{v}$. At $v = 256$, Cassandra's default before 4.0, random placement lands shares within a few percent of fair; at the 4.0 default of $v = 16$, the $1/\sqrt{v}$ spread would still be roughly $25\%$, which is why the smaller count ships together with a token-allocation algorithm that chooses positions to even the shares instead of trusting randomness. Either way the lesson stands: one token per node is off by a factor of $H_N$, and the demo's ring, like every production ring, hashes each node to many positions.
+</Solution>
+</Exercise>
+
+<Exercise>
+Recall the GitHub 2012 incident from <Ref lesson="replication">the replication lesson</Ref>: a stale MySQL follower was promoted to leader, reissued auto-increment primary keys, and a Redis store that still mapped the old keys served users other users' private data. Restate the incident's blast radius if the same failure instead strikes one partition of a cluster of 8 nodes, each node leading $1/8$ of the keyspace with per-partition failover and per-partition key allocation. What does partitioning change, and what does it not change?
+
+<Solution>
+The failed leader led one partition, so the stale promotion can reissue only identifiers from that partition's slice of the keyspace, and only rows living there can be shadowed by the Redis mapping. The incident statement becomes: "entities whose keys hash to partition 3, roughly 1 in 8, may transiently resolve to other users' data; the other seven partitions are unaffected" — the same bounded-blast-radius sentence the replication lesson's sharded-Redis exercise practiced, now derived from the combined grid: failover, and therefore failover's data loss, is per partition.
+
+What partitioning does not change: the probability and mechanism of the failure. Eight leaders mean eight chances of a leader dying and eight failovers to get right, each carrying the full asynchronous-replication risk; the per-incident radius shrinks $8\times$ while the incident rate rises. Partitioning bounds damage; only the replication-side fixes (semi-synchronous acks, promoting the caught-up follower) reduce it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Your ANN index must answer top-10 queries over 100 million 128-dimensional float32 item embeddings within a 20 ms p99 budget. (a) Show the corpus cannot live on one 64 GB node and propose a partitioning. (b) State the query path and argue its result is exact with respect to the per-shard searches. (c) With 20 shards, compute the per-shard slow-rate needed to keep at most 5% of queries over budget, and name what this scheme is in this lesson's vocabulary.
+
+<Solution>
+(a) $10^8 \times 128 \times 4\,\mathrm{B} \approx 51\,\mathrm{GB}$ of raw vectors; graph-index overhead (HNSW-class structures roughly double it) pushes past 64 GB, and the query throughput would not fit one node's CPU regardless. Shard the corpus: 20 shards of 5 M vectors, each shard building its own index over only its own vectors.
+
+(b) Broadcast the query to all 20 shards in parallel; each returns its local top-10 with scores; merge the $20 \times 10 = 200$ candidates and keep the global top-10. The global top-10 is a subset of the union of per-shard top-10s (any globally top item is top-10 within its own shard), so the merge loses nothing relative to what the shards found.
+
+(c) The query is slow if any shard is slow: $1-(1-p)^{20} \le 0.05$ requires $p \le 1 - 0.95^{1/20} \approx 0.26\%$, so each shard must hold the 20 ms bound at roughly its p99.7, a $4\times$ tighter percentile than the naive per-shard p99 — the requirements lesson's amplification arithmetic, now pricing a retrieval system.
+
+In this lesson's vocabulary, the design is a document-partitioned (local) index with scatter/gather reads: each shard indexes its own documents, and every query fans out and merges. This is not a workaround; it is how embedding retrieval serves at scale, and <Ref lesson="recommender-funnel">the recommender funnel</Ref> makes it the first stage of every recommendation, search, and feed system in the course's final module.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017 — Ch. 6: key-range and hash partitioning with the compound-key compromise (pp. 201–205), skewed workloads and hot-spot relief (p. 205), document- vs term-partitioned secondary indexes (pp. 206–209), rebalancing strategies including the mod-N analysis, fixed and dynamic partitions, and proportional-to-nodes (pp. 209–214), request routing and coordination (pp. 214–216); the consistent-hashing terminology caution (p. 204).
+2. D. Karger, E. Lehman, T. Leighton, R. Panigrahy, M. Levine, D. Lewin, "Consistent Hashing and Random Trees: Distributed Caching Protocols for Relieving Hot Spots on the World Wide Web," *STOC*, 1997 — the original ring construction, defined for CDN caches; the source of the term. https://dl.acm.org/doi/10.1145/258533.258660
+3. G. DeCandia, D. Hastorun, M. Jampani, et al., "Dynamo: Amazon's Highly Available Key-Value Store," *SOSP*, 2007 — §4.2: consistent hashing with virtual nodes in a production store; §6.2: the operational move to equal-size fixed partitions after experience with the pure ring. https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf
+4. A. Lakshman, P. Malik, "Cassandra — A Decentralized Structured Storage System," *ACM SIGOPS Operating Systems Review* 44(2), 2010 — the ring partitioner and gossip-based membership behind the routing section's any-node design.
+5. D. Martin, *The System Design Primer* — the sharding section: the practitioner's summary of benefits, the lopsided-shard (power-user) caveat, and rebalancing complexity. https://github.com/donnemartin/system-design-primer#sharding
+</References>

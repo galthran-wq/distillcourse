@@ -1,0 +1,299 @@
+A design document is the cheapest place an ML system can fail: framing, metrics, risks, and rollout are decided on paper, before any pipeline exists.
+
+The module's three lessons each produced a tool and used it alone: <Ref lesson="ml-in-production">the first</Ref> priced the model at roughly 5% of the system and named the debt the other 95% carries; <Ref lesson="requirements-and-metrics">the second</Ref> built the chain of metrics that ends in a business number; <Ref lesson="problem-framing-and-baselines">the third</Ref> chose the task framing and the ladder of baselines a model must climb. This lesson is the module's application: the three tools assembled into the one artifact that exists before any code, a complete, reviewable design document. The case is Supermegaretail, a fictional grocery chain drawn at real scale: thousands of stores, perishable stock, and an $800 million-a-year reason to forecast demand better.
+
+The route: what the document is for and the four myths against it; antigoals as the cheapest scope control; the six-section skeleton; the Supermegaretail document written section by section; the pricing-system postmortem that fills the risk section; the review, worked on a real draft; and why the document never finishes.
+
+## The document's job: fail on paper first
+
+A *design document* is a written statement of what will be built and why, circulated for review before implementation: the problem and its origin, the metrics, the data, the validation scheme, the baselines, the risks. Its purpose is the inverse of most documents. The author's task is not to convince readers the design is right; it is to expose as many weak points as possible and to provoke the reviewers into finding more, so that after several iterations a document exists that development can safely start from.
+
+From that job description one would expect a good document to end in a launched project. The record shows the opposite: a good design document frequently leads to **no ML project at all**, and that outcome is a success. The alternatives on the table are six months of work on models, features, and datasets that ends on the shelf, where most ML projects end, or two to four weeks of writing that answers five questions first: why are we doing this, how, do we have what we need, would a cruder solution capture most of the value, and is the desired result achievable. Discovering that 90% of the result comes from two `if` statements is deflating on paper and ruinous in month five.
+
+<Figure
+  src="./figures/fail-on-paper.svg"
+  alt="Two timelines to the same do-not-build verdict: a build-first bar spanning six months of models, features, and datasets with the verdict arriving in month six, and a write-first bar of two to four weeks reaching the same verdict, followed by a dashed outline marking five months not spent"
+  caption="The same stop verdict, priced at two points on the calendar. The document buys it for roughly a tenth of the build that would otherwise deliver it."
+/>
+
+Four myths recur whenever a team debates writing one, and each fails the same way:
+
+- **"Design documents are for big companies."** The value per page runs the other way: a small team has the most blind spots per reviewer, and a short note that puts every collaborator on the same page already counts as the document. What corporations add is process, not the benefit.
+- **"Only complex projects justify one."** Small projects get a proportionally small document, and it still buys the two cheap goods: risks surfaced early, and scope creep resisted when every stakeholder wants one more feature.
+- **"You need the company template."** Templates that serve every goal at once bloat until nobody writes or reads them. The core stays minimal; sections are added where the system's context demands them.
+- **"A document must lead to a deployed system."** A justified stop is a paid-for outcome: two to four weeks of writing that cancel six months of shelf-bound building are the document succeeding, not failing.
+
+<KeyFact>
+The stop verdict is itself an estimate, wrong exactly when the pre-data numbers behind it are wrong — which is why the document marks every such number for review instead of defending it. The gate then recurs with better evidence each time: <Ref lesson="offline-evaluation">offline evaluation</Ref> before the A/B test, the A/B test before the rollout.
+</KeyFact>
+
+## Goals and antigoals: scope written as refusals
+
+The first thing review destroys in a weak document is its goal list. The rookie version enumerates every good property at once: the system should do X, Y, and Z, run fast, be precise, be cheap to build, easy to maintain, and intuitive. No system attains all of these, so a list like that fixes nothing. The counterweight is the *antigoal*: an inverse statement recording what the system deliberately will not do or optimize.
+
+The canonical instance is a recommendation engine for a boutique store with under a thousand items and low traffic. Scalability in catalog size, scalability in concurrent users, support for new goods categories: all three go on the antigoal list, because almost any technology handles this load, and every hour spent on scale is an hour taken from the goal that matters, conversion from view to basket. An antigoal costs one line and cancels weeks. A cousin device does the same for technology choices: a single recorded counterexample, "cloud storage X fits technically, but customer Y's privacy rules forbid cloud", sets a limitation and immediately suggests the next question (is there a self-hosted X?).
+
+<Figure
+  src="./figures/antigoals.svg"
+  alt="Two columns for Supermegaretail's demand forecast: a goals column listing narrowing the delivered-versus-sold gap, keeping out-of-stock within an SLA, and weekly per-item-per-store forecasts, with one goal, equal accuracy on every SKU, struck out; an antigoals column listing intraday forecast updates, per-customer prediction, pricing decisions, and cold-start for unreleased products, each with the reason for the refusal"
+  caption="Goals and antigoals for the demand forecast. Each antigoal is a refusal with a reason; the struck-out goal is one review found impossible to keep."
+/>
+
+The goals themselves need the same scrutiny, because an optimizer will satisfy a goal as written, not as meant. One dynamic-pricing experiment stated its goal as maximizing gross merchandise volume with margin held within limits, negative margin permitted as part of the task. The model found the optimum: it priced one boombox speaker below purchase cost and sold more of them in 24 hours than in the previous 90 days, every constraint technically respected, no other speakers sold at all. The goal the team actually meant surfaced only afterwards: raise revenue while maintaining margin, touching at most a stated share of categories and SKUs, with cannibalization bounded. The goals-and-antigoals section is where "as written" gets tightened into "as meant", while the optimizer is still hypothetical.
+
+## The skeleton: six sections, six questions
+
+With goals set, the rest of the document answers six questions in a fixed order. There is no canonical template (myth three), but the six questions are stable, and the Supermegaretail document answers them in six sections.
+
+<Figure
+  src="./figures/doc-skeleton.svg"
+  alt="A one-page outline of the Supermegaretail design document: six stacked sections, problem definition and origin, metrics and losses, data, validation, baselines, and risks-limitations-antigoals, each connected to the question it answers in the margin; sections one, two, five, and six are marked as filled by this module's lessons, sections three and four as stubs for modules two and three"
+  caption="The skeleton. Four of the six sections are this module's lessons written down; two are stubs the document must still open honestly."
+/>
+
+Four of the six sections are material this module already supplies; the other two, data and validation, can only be opened as stubs, and opening them honestly, with owners, known coverage, and explicit open questions, is itself part of the document's job, because review needs to see what is not known. The mapping, with the comment each section most often draws in review:
+
+| Section | Filled by | Commonest review comment |
+| --- | --- | --- |
+| Problem definition & origin | <Ref lesson="problem-framing-and-baselines">framing</Ref> | "Where does this number come from? Link the report." |
+| Metrics & losses | <Ref lesson="requirements-and-metrics">the metrics chain</Ref> | "Why this target level, and which online metric reads it?" |
+| Data | module 3 (stub for now) | "What coverage, what quality, who owns the pipeline?" |
+| Validation | module 3 (stub for now) | "'Details TBD' — why should the offline number be believed?" |
+| Baselines | <Ref lesson="problem-framing-and-baselines">the ladder</Ref> | "What does the current process score? The incumbent is missing." |
+| Risks, limitations, antigoals | the <Ref lesson="ml-in-production">debt taxonomy</Ref> + this lesson | "No antigoals. What will this system deliberately not do?" |
+
+## Problem definition: the $800 million gap
+
+The section's question is why the project exists and what the status quo costs. For Supermegaretail the origin is the purchasing loop: goods are bought from manufacturers under year-long deals (adjustable 90 days ahead), flow through 47 distribution centers, and reach stores by truck about every two days; most stores have no warehouse beyond a loading bay that holds items two or three days, and much of the stock is perishable: sold or wasted. Each of these facts enters the document because it bounds the design: the truck cadence caps useful forecast freshness, the deal horizon demands a yearly forecast alongside the operational weekly one, and perishability prices overstock.
+
+The quantity to be decided is how many units of each item to send to each store, and three scenarios span the outcomes for a store that received 1,000 units of an item:
+
+<Figure
+  src="./figures/scenarios.svg"
+  alt="Three outcomes for a store that bought 1,000 units: selling 999 leaves 0.1 percent over, near optimal; selling 100 leaves 900 unsold, a visible overstock loss; selling all 1,000 is marked worst of the three because true demand at or above 1,000 is unobserved and customers who found empty shelves went to competitors"
+  caption="Bought 1,000: three ways it ends. The full-sellout row is the trap: the loss is real, unmeasured, and compounding."
+/>
+
+Selling 999 of 1,000 is near-optimal. Selling 100 is the visible failure: 900 units of margin destroyed on the shelf. From those two one would expect selling all 1,000 to be the success case; the document classifies it as the **worst** of the three. A sellout censors the data (demand was 1,000, or 2,000, or 10,000; nobody knows), and it sends customers to competitors who do have the item, a loss that repeats on their next trip. Both failure directions cost money, and only one of them is easy to measure.
+
+That asymmetry shapes the section's one number. Overstock loss is computable from write-offs and expired stock; out-of-stock loss is not, and the document estimates it by expert opinion, the cheap substitute for the A/B tests that could measure it. The sum for the preceding year: **about $800 million**. The framing discipline from <Ref lesson="requirements-and-metrics">the metrics lesson</Ref> applies to this number too: it is the ceiling, the value of a perfect and unachievable forecast, not the project's promise. The document names the ceiling and leaves the claimed share to review, flagged "estimate at review time", because before data contact the claimable share is one of the unknowns the risk section will list.
+
+The problem statement then fits in one sentence: forecast demand per item, per store, per period, to narrow the delivered-versus-sold gap while keeping out-of-stock within a service-level agreement still to be specified. A *previous work* subsection closes the section: Supermegaretail already orders stock somehow (a rolling window, an expert committee, a rule of thumb), so the document asks how well the incumbent does per category and proposes starting where the existing gap is widest, which bounds the blast radius if the new system misbehaves, a fact the risk section will reuse.
+
+## Metrics and losses: the chain, written down
+
+The metrics section instantiates <Ref lesson="requirements-and-metrics">the chain</Ref> for this problem, and it is where [Rule #2](https://developers.google.com/machine-learning/guides/rules-of-ml) of Google's Rules of ML, design and implement metrics before formalizing what the ML will do, gets enforced: a document whose metrics section is empty cannot pass review, so instrumentation is specified before any model work is approved.
+
+The offline metric has to survive the data's shape. Demand per (item, store, day) is count data, integer series full of zeros, and the standard menu fails on it one entry at a time: MAPE divides by the actual and is undefined the first day an item sells zero units; absolute-error metrics (MAE, WAPE) are minimized by the median, which for the skewed distributions of low-volume items sits below the mean, so a WAPE-optimal forecast is biased low; squared error is unbiased but ruled by the rare large miss. What survives is the observation that the business question is a quantile question: "how much to deliver so we run out on at most 5% of days" asks for the 95th percentile of demand, not its center. The document picks **quantile metrics at the 1.5th, 25th, 50th, 75th, 95th, and 99th percentiles**, optionally weighted by SKU price, with signed bias reported alongside, because the airline example of <Ref lesson="requirements-and-metrics">the metrics lesson</Ref> showed symmetric error hiding the sign the business pays for.
+
+<Figure
+  src="./figures/metrics-blowup.svg"
+  alt="The metrics chain instantiated for demand forecasting as three linked boxes: an offline box with pinball loss equal to the quantile metric at six quantiles, price-weighted with signed bias alongside; an online A/B box with revenue up, margin up, stock level down; and a business box with the delivered-versus-sold gap of about 800 million dollars a year; the arrows are labeled with the deployment gap and the attribution gap"
+  caption="The chain for Supermegaretail. The loss and the offline metric coincide; the two gaps that remain are crossed by A/B tests, not assumptions."
+/>
+
+No surrogate loss is needed: the pinball (quantile) loss is differentiable and *is* the quantile metric, so the plan is six models, one per quantile, each trained on the loss it is scored by, with the Tweedie loss (a family covering zero-inflated count-like distributions) as the second line of experimentation. The online metrics an A/B test will read: revenue up, margin up, stock level down or flat.
+
+<KeyFact>
+A metrics section must declare which of the chain's gaps it closes and which it leaves open. Here the surrogate gap is closed by construction; the deployment and attribution gaps stay open until the A/B test, and a section that leaves that unsaid invites review to assume they are closed too.
+</KeyFact>
+
+## Data, validation, baselines: two stubs and a ladder
+
+The metrics chain is closed; what it consumes is exactly what the skeleton table marked as stubs before data contact: data the loss can be computed on, and a split that makes the offline number believable. Opening the stubs honestly, with coverage and open questions stated, is what lets review price the unknowns instead of discovering them; the third section here, baselines, this module can fill outright.
+
+### Data: sources, with coverage stated
+
+The atomic record is (date, product, store) with units sold as the target. The document inventories sources rather than pipelines: three-plus years of transaction history as the source of truth; stock history, which decides what *could* have sold and what expired; the promo calendar; product, store, and transaction metadata; purchased weather and foot-traffic data; and manually gathered competitor prices, which cover about 25% of SKUs, with gaps. That last clause is the stub discipline in action: coverage and known quality issues are stated so that review can price them, and the machinery that turns sources into training data, labels, leakage-free splits, features, is deferred to module 3, starting with <Ref lesson="labels-and-feedback-loops">labeling strategies</Ref>.
+
+### Validation: the split, pinned in four facts
+
+The first draft said "time-based split, details TBD" and was flagged in review, exactly the vague sentence the skeleton table predicts. The revised section pins the scheme in four facts: rolling time-based cross-validation, two years of training data predicting four weeks ahead, a three-day gap between train and validation because data arrives up to 48 hours late, and splits that refresh as the assortment churns 15% a month. Why a random split would lie here, and how leakage enters through splits in general, is <Ref lesson="data-leakage-and-splitting">module 3's leakage lesson</Ref>; the document's job is only to commit to a scheme review can attack.
+
+<Figure
+  src="./figures/rolling-origin.svg"
+  alt="Three rolling-origin folds on a shared calendar-time axis: each fold is a two-year training bar, a narrow dashed gap, and an amber four-week scoring bar; each fold's windows sit further right than the last, a dashed diagonal through the scoring windows marks the rolling origin, and the gap is annotated as three days because data arrives up to 48 hours late"
+  caption="The pinned scheme: train on two years, skip three days, score four weeks ahead, roll the origin forward. The gap writes the 48-hour data delay into the split."
+/>
+
+### Baselines: the ladder, instantiated
+
+The rungs come from <Ref lesson="problem-framing-and-baselines">the framing lesson</Ref>. The constant baseline is the same item, same store, **one week back**, not one day: weekly seasonality plus the 48-hour data delay makes yesterday both wrong and possibly unavailable. An advanced constant computes the six target quantiles over a yearly window. Above them: linear quantile regression on lagged and rolling aggregates of sales, price, and customer counts, then seasonal ARIMA or Prophet as the time-series-specific rung. This is the rung family the previous lesson's demand exercise priced at 2.2% WAPE on a toy series, and the same lesson's top rung applies unchanged: the number to beat is whatever the incumbent ordering process scores, measured, not assumed.
+
+## Risks, limitations, antigoals: constraints are unwritten requirements
+
+The section's question is what can kill the system, and the honest answer is usually not "a bad model". Risks are the nonfunctional requirements gathered early, and the cornerstone is a risk model: a stakeholder-aligned answer to "what are we protecting from", in which "incorrect predictions" is not an admissible entry. The failures that matter cross team boundaries, in the way a fraud detector that bans an ad campaign's incoming users (unknown traffic source, therefore suspicious) costs marketing more than the fraud it stops.
+
+The risk section's centerpiece is a postmortem. A pricing system at a large e-commerce marketplace was designed as a contextual bandit that priced at the level of the individual user, in real time, balancing exploration against exploitation, adapting to behavior within hours, fast to train and to serve; the working title was "Double Bayesian Universal Contextual Bandits for Dynamic Pricing", and an article about it was half-planned. Then two facts surfaced, neither of them about the model.
+
+<FigureSequence
+  name="bandit-redesign"
+  alt="Three frames with a fixed layout of user context flowing into a contextual bandit that serves a price, the bandit carrying two capability tags, per-user prices and real-time repricing; frame two stamps two discovered constraints onto the tags, a legal constraint that the same item in the same city must have the same price and a backend constraint that prices change at most every six hours; frame three replaces the tags with segment-level prices and six-hour batch repricing on a visibly simpler system"
+  caption="The pricing system, before and after contact with its constraints. Only the stamped elements change; everything the constraints did not touch survives."
+/>
+
+<Task>
+Step through the three frames. After frame 2, state which of the design's two headline capabilities each stamp invalidates, then check frame 3: the redesign should change exactly those two elements and nothing else.
+</Task>
+
+The first was legal: the same item, in the same city, sold online, must carry the same price for everyone. Per-user pricing is price discrimination, and running it invites customers to sue and the company to lose money and reputation at a scale no margin optimization recovers. The second was infrastructural: the backend could change a price at most **every six hours**, so the system's real-time repricing, the property much of the design existed to deliver, could never reach production. The design survived only because it aggregated cleanly (user-level atomicity meant segment-level pricing was a rollup, not a rewrite), and the final system was simpler: segment-level prices, six-hour batch repricing, a modest ability to adapt.
+
+<KeyFact>
+Constraints are requirements that were not written down. The risk section exists so they get written down by the author, in week two on paper, instead of by the legal department or the backend, in month five.
+</KeyFact>
+
+### Limitations: what cannot be known yet
+
+The risk half of the section records what can kill the system; the limitations half records what the document cannot yet promise, and it exists because uncertainty left unstated gets read as commitment.
+
+Before data contact, five quantities are close to unknowable: whether the required quality is attainable at all, how much data reaching it needs, which features suffice, how large the model must be, and how long one experiment takes. Every schedule and quality promise upstream of this section is built from those five, so the document states them as estimates with the conditions that would revise them; the alternative is a reviewer treating a guess as a commitment and the project inheriting it as a deadline.
+
+The section's one dynamic claim concerns what happens after data contact: progress is nonlinear. Error falls fast in the first rounds of experimentation, then plateaus, sometimes for weeks, while new features or labels are being prepared and no metric moves at all.
+
+<Figure
+  src="./figures/progress-plateau.svg"
+  alt="An error-versus-weeks curve that drops steeply, flattens into a long plateau annotated as the stretch where features and labels are in preparation and no metric moves, then declines slightly; a dashed straight line marks the linear expectation, and a vertical marker labels the expectation gap between the two; a note reads 80 percent of the progress in the first 20 percent of the effort"
+  caption="The progress curve the limitations section predicts. The gap between the plateau and the linear expectation is where projects get cancelled."
+/>
+
+A product owner who expects the dashed line reads the plateau as failure and escalates exactly when the project is behaving normally; the limitations section is where that expectation is corrected in week two, on paper, instead of in the plateau's third week.
+
+The last limitation survives even a shipped system. A deployed model keeps three permanent "cannots": an individual error cannot always be explained, cannot be reliably predicted, and cannot always be fixed on demand. They bound what operations may promise, and they force the first Supermegaretail entry: a documented fallback path for the days the system misbehaves and nobody can diagnose the error on the spot. The remaining entries each disarm a specific review objection: the asymmetric costs of the two failure directions restate the sellout trap from the problem definition as a modeling constraint, so no reviewer can later claim symmetric error was agreed; the note that fixing out-of-stock will itself raise traffic warns that the demand distribution shifts the moment the system works; and prediction granularity and cadence are listed as open questions rather than silently defaulted.
+
+## The review: adversarial reading
+
+A design document is done when it has been reviewed, not when it has been written: no single-author first draft is complete enough to implement, because a complex system needs more kinds of expertise than one person has. The author's duties are therefore structural: an outline reviewers can navigate (the natural response to ten unstructured pages is to close them), visibility to as many people as possible, and a stated list of concerns that aims reviewers at the weakest parts. The most popular failure mode of the genre, writing too generically, is usually a context gap, and the fix is to mark the thin sections and ask for the missing pieces by name.
+
+The reviewer's craft is adversarial reading: find the unstated assumption. A comment must add something (an infrastructure limit the author did not know, "we can't do real-time, but batch runs every 60 seconds — does that break the flow?"; a staffing fact, "nobody here can maintain technology B"); and "looks good to me" on a first iteration is a non-review, worth answering with a direct request to attack the part the author trusts least.
+
+The craft is easiest to show on a deliberately weak draft. PhotoStock Inc. is a stock-photo marketplace: photographers upload images, customers buy licenses, and 90% of users reach images through the search bar, currently a fuzzy Elasticsearch query with a weekly index rebuild. The draft under review proposes replacing that query with an ML search system.
+
+<Task>
+Before reading the panel, review the draft's three claims yourself: "many users are not happy with the search quality, proven by interviews"; "goal: increase search-to-purchase conversion by 100%"; "risk: a defective release loses revenue". Write one comment per claim, then compare.
+</Task>
+
+<Example title="review comments on the PhotoStock draft, each naming its module concept">
+**Draft:** "Only a small portion of search sessions leads to a purchase."
+**Review:** How many exactly? Link the dashboards. — *A specification is numbers with denominators (<Ref lesson="requirements-and-metrics">requirements</Ref>); an unlinked quantity cannot be re-derived or audited.*
+
+**Draft:** "Increase search-to-purchase conversion by 100%."
+**Review:** Why 100%? And conversion is a function of many variables; decompose the funnel and estimate the revenue attributable to relevance alone. — *The attribution gap: a business metric many causes away from the model cannot be a target without decomposition.*
+
+**Draft:** "Users are unhappy, proven by customer interviews."
+**Review:** How is user happiness measured? Add specific criteria. — *Rule #13's tiers (<Ref lesson="problem-framing-and-baselines">framing</Ref>): the true objective is unobservable; the document must name the observed, attributable behavior that stands in for it.*
+
+**Draft:** "Risk: if we release defective software, we lose a significant source of revenue."
+**Review:** Blue-green deployment and the A/B platform already exist; plan a gradual rollout and this risk shrinks to a bounded canary. — *Rollout is a designed stage, not a leap; the ladder arrives in <Ref lesson="deployment-and-online-experiments">deployment</Ref>.*
+
+**Draft:** (no antigoals anywhere)
+**Review:** Which zones are explicitly out of focus? — *Antigoals, this lesson: absent refusals, every reviewer's pet feature is in scope.*
+</Example>
+
+The pattern across all five: legitimate questions raised as early as possible, and missing parts supplied as questions or statements, never as verdicts. Feedback at this stage is measured in weeks saved later.
+
+## A living document
+
+The document survives its own review, and then keeps changing. The typical life of a design document runs: first draft; peer feedback; 60% rewritten; feedback again; 30% rewritten; feedback again; 10% rewritten; implementation starts; and three months later, input from the real world rewrites another 30%. The pricing-bandit story is that last arrow with names attached: legal and the backend rewrote the risk section and, with it, the design. The only moment a design document could be called complete is when the system it describes is finished, and even that is not guaranteed, because new legislation, new features, new infrastructure, and new team members all route their changes through the document, or through nobody.
+
+<Figure
+  src="./figures/review-loop.svg"
+  alt="The life of a design document drawn as a loop: draft flows to peer review, review to rewrite with the sequence 60 then 30 then 10 percent marked on the returning arrows, rewrite to build and ship, and an amber production-contact node feeds back into rewrite with the label another 30 percent after three months"
+  caption="The loop the document lives in. Production contact is a reviewer that always shows up, three months late."
+/>
+
+For a system that promises to be complex, Ousterhout's *design it twice* applies: produce two radically different designs before committing, on the grounds that nobody's first design of a large system is good enough. The practice is cheap exactly where this lesson lives, on paper, and it is the document that makes the two candidates comparable.
+
+What is established: a design document is the module's three tools written into six reviewable sections — framing and the $800M problem definition, the metrics chain closed down to a quantile loss, the baseline ladder with its constant rung, and risks, limitations, and antigoals that record constraints before production discovers them; the document is reviewed adversarially and rewritten for as long as the system lives. Where the artifact departs from the idealisation is stated inside it: every number is written before data contact and marked "estimate at review time", and the two stub sections cannot be filled honestly yet. Filling them is the next two modules' work: the data section needs the storage, replication, and processing substrate that decides what freshness and scale are even possible, beginning with <Ref lesson="storage-and-data-models">storage engines</Ref>, and the validation section needs module 3's account of how training data is manufactured without leaking the future.
+
+## Exercises
+
+<Exercise>
+Assign each statement to the design-document section it belongs in (problem definition & origin, metrics & losses, data, validation, baselines, risks & limitations, antigoals).
+
+1. "Prices for the same item in the same city must be equal."
+2. "Predict units sold per (item, store, day)."
+3. "Same item, same store, one week back."
+4. "We do not update forecasts intraday."
+5. "Pinball loss at the 95th percentile, weighted by SKU price."
+6. "Competitor price monitoring covers about 25% of SKUs, with gaps."
+7. "Three-day gap between training and evaluation windows."
+8. "Delivery trucks connect distribution centers to stores every two days."
+
+<Solution>
+1 — risks & limitations (a legal constraint; in the bandit story it forced the redesign). 2 — problem definition (the framing: task, granularity, target). 3 — baselines (the constant rung, seasonal by construction). 4 — antigoals (a refusal, justified by the two-day truck cadence: fresher forecasts change no decision). 5 — metrics & losses (offline metric and loss, here identical). 6 — data (source inventory with coverage stated). 7 — validation (the late-data accommodation in the split scheme). 8 — problem definition & origin (a flow fact that bounds freshness and granularity).
+
+The transferable check: a statement's section is decided by the question it answers, not by its vocabulary. Statement 4 mentions forecasts and statement 7 mentions training, but one is a refusal and the other a trust argument.
+</Solution>
+</Exercise>
+
+<Exercise>
+The previous lesson's exercises framed a food-delivery ETA task (point regression versus quantile prediction). Write the problem-definition and metrics sections of its design document in at most half a page. Requirements: one business number (invent a plausible one and mark it the way this lesson's discipline demands), one offline metric, one online proxy, and the goal in a single sentence.
+
+<Solution>
+A possible answer, in document register:
+
+**Problem definition.** Customers see an estimated arrival time before ordering and after ordering. Late deliveries against the shown estimate drive support contacts and churn; internal reporting attributes roughly 30% of support tickets to "order later than promised" (*estimate at review time — link the support-ticket dashboard and re-derive*). The current estimate is a per-restaurant average prep time plus a routing-service drive time; it carries no load- or weather-awareness. Goal: predict the arrival-time distribution per order such that the displayed time is late for at most 10% of deliveries, without inflating displayed times so far that conversion drops.
+
+**Metrics and losses.** Offline: pinball loss at the 90th percentile of actual arrival time (the loss is the metric, per the quantile argument in this lesson), with signed bias tracked alongside so systematic early/late drift is visible. Online proxy, read in an A/B test: rate of deliveries later than the displayed time (target ≤10%), conversion on the order screen as the guardrail metric. Business: support tickets in the "later than promised" category, and retention of customers who experienced a late order.
+
+Graded against the requirements: the business number (30% of tickets) is present and flagged as an estimate with its source named; the offline metric (p90 pinball) and the online proxy (late-rate plus the conversion guardrail) both trace to the goal sentence. The move worth keeping: the guardrail metric is what turns "don't inflate the estimates" from a hope into a number, the same role the margin constraint failed to play in the boombox story until it was tightened.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "The design document is done when the model ships." Name what changes after production contact and which sections absorb each change.
+
+<Solution>
+The claim fails on the document's own life cycle: the recorded evolution runs 60%, 30%, and 10% rewrites before implementation, and then another ~30% rewrite roughly three months *after* implementation starts, when the real world reports in. Shipping is step 8 of 10, not the last step.
+
+What production contact changes, section by section: discovered constraints (legal, infrastructural) land in **risks and limitations**; in the bandit story they arrived after the design was finished and rewrote it, per-user pricing to segment-level, real-time to a six-hour batch. Proxy metrics that turn out not to track the business number are revised in **metrics and losses** (the attribution gap is only ever tested live). Leakage or drift found in the offline/online mismatch tightens **validation**. And the shipped model itself moves into **baselines**: it becomes the incumbent, the top rung the next model must beat. A document that stopped at ship time would describe a system that no longer exists; the step that fails in the claim is treating the document as a launch artifact rather than the system's description, which lives exactly as long as the system does.
+</Solution>
+</Exercise>
+
+<Exercise>
+A draft design document for a demand forecast reads, in full: "Metric: accuracy of predicting the demand bin (low / medium / high; 92% of items are 'low'). Validation: random 80/20 split. Goal: beat state-of-the-art accuracy." There is no baseline section and no antigoal section. Write three review comments, each naming the module concept the draft violates.
+
+<Solution>
+Three comments a reviewer owes this draft:
+
+1. *"92% of items are 'low', so a model that always answers 'low' scores 92% accuracy. What does the zero rule score on your metric, and why is accuracy on bins the right offline metric for a quantity the ordering process consumes as units?"* — the baseline ladder and the base-rate trap (<Ref lesson="problem-framing-and-baselines">framing</Ref>): an accuracy target on imbalanced classes is unevaluable without its zero rule, and binning a count discards the number the business actually orders against.
+2. *"Demand is a time series; a random split trains on Friday and validates on the Thursday before it. What does the offline number mean for next week?"* — time-correlated data leaks the future through random splits, the mechanism <Ref lesson="data-leakage-and-splitting">the leakage lesson</Ref> formalizes; the offline metric is precisely, confidently wrong.
+3. *"'Beat state-of-the-art' is a claim about a benchmark, not about this business. Which number, on which chain, improves?"* — the metrics hierarchy (<Ref lesson="requirements-and-metrics">requirements</Ref>): the goal names no online metric and no business quantity, so no A/B test could ever confirm success; and the state-of-the-art trap from the framing lesson applies to the model choice it implies.
+
+A fourth is free: no antigoals means no recorded refusals, so scope is whatever the loudest stakeholder says it is.
+</Solution>
+</Exercise>
+
+<Exercise>
+Construct the degenerate case: a project for which writing a design document is overhead with no return. Specify the project, check it against the four myths, and state which myth the case actually validates and why the validation does not generalize.
+
+<Solution>
+One admissible construction: a one-off analysis, a single analyst pulls a quarter's transactions, fits whatever model answers "did the loyalty campaign shift basket size", presents one slide, and deletes the notebook. No deployment, no recurring decision, no second stakeholder, no lifetime.
+
+Check against the myths. Myths 1 and 4 stay refuted even here: company size is irrelevant, and "no deployed system" was never the objection. Myth 3 is untouched. The case validates a *bounded* form of **myth 2** ("only complex projects justify one"): the document's three value channels are alignment across people, memory across time, and review, and this project has one person, no future, and no reviewer, so every channel's return is zero while the cost stays positive.
+
+Why it does not generalize: the channels reappear the moment any dimension leaves its degenerate point. A second consumer of the result restores alignment; a request to "rerun it next quarter" restores memory; a decision that commits money restores review. And myth 2's own refutation still governs the interior: between this degenerate point and a full system, the document scales down (a half-page note) rather than switching off. The construction marks the boundary of the practice, not an exception inside it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Suppose the Supermegaretail validation section had survived review as written in the first draft: "time-based split, details TBD." Write the two risks you would flag, as review comments, if it shipped that vague.
+
+<Solution>
+Both risks are leakage mechanisms hiding inside "details TBD":
+
+1. *"Data arrives up to 48 hours late. If the split leaves no gap between training and evaluation windows, the model trains on features computed from records that would not have existed at prediction time, and the offline number overstates production quality."* The fix the revised section adopted: a three-day gap between train and validation sets, mirrored at serving time by only using features computable from 3-day-old data.
+2. *"'Time-based' underdetermines the evaluation unit. If folds are drawn per-row rather than per-period, or if preprocessing (scalers, aggregates, the assortment list) is fit on the full range before splitting, future statistics contaminate the past even though the split is nominally temporal."* The fix: rolling-origin evaluation with all preprocessing fit inside each training window, refreshed as the assortment churns 15% a month.
+
+Both mechanisms, future-in-features and preprocessing-before-splitting, are named, classified, and fixed in <Ref lesson="data-leakage-and-splitting">the leakage lesson</Ref>: this exercise is its doorstep. The reviewer's general move stands on its own: a vague validation section is not a missing detail but an unpriced risk, because the offline number is the only evidence the document offers, and these are the two ways it lies.
+</Solution>
+</Exercise>
+
+<References>
+1. V. Babushkin, A. Kravchenko, *Machine Learning System Design*, Manning, 2023 — Ch. 4 (the four myths, goals and antigoals, the Supermegaretail problem definition and the $800M estimate, the PhotoStock review, "a design doc is a living thing"), Ch. 2 §2.3 (the pricing-bandit story: the legal and backend constraints; the boombox goal-misspecification story in Ch. 4's sidebar), Ch. 5 §5.3, Ch. 6 §6.7, Ch. 7 §7.5, Ch. 8 §8.6 (the same document's metrics, dataset, validation, and baseline sections).
+2. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google — Rule #1 (launch without ML), Rule #2 (metrics before ML), Rule #13 (observable, attributable objectives). https://developers.google.com/machine-learning/guides/rules-of-ml
+3. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020 — §2.2 (the unknowns, simplifying to estimate, nonlinear progress), §9.3.1 (the three "cannots"). http://www.mlebook.com
+4. S. Kolassa, "Evaluating Predictive Count Data Distributions in Retail Sales Forecasting," *International Journal of Forecasting* 32(3), 2016 — the count-data metric survey the Supermegaretail metrics section is built on.
+5. V. Lakshmanan, S. Robinson, M. Munn, *Machine Learning Design Patterns*, O'Reilly, 2020 — Ch. 7, Design Pattern 28 "Heuristic Benchmark": the cookbook behind the document's baseline rungs.
+6. J. Ousterhout, *A Philosophy of Software Design*, Yaknyam Press, 2018 — the design-it-twice principle quoted in the living-document argument.
+</References>

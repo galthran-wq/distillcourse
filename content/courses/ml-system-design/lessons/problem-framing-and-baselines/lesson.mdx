@@ -1,0 +1,378 @@
+The same product need can be framed as classification, regression, or ranking, and the framing — not the model — decides label availability, retraining cost, and how the system can fail.
+
+<Ref lesson="ml-in-production">The first lesson</Ref> put the model at roughly 5% of a production system; <Ref lesson="requirements-and-metrics">the second</Ref> supplied the specification language and the chain of metrics that ends in a business quantity. Both assume something neither provides: an ML task. A business request contains no inputs, no outputs, and no objective, and turning it into all three is *problem framing*, the highest-leverage decision in the project and the cheapest to revise, because it is made before any code exists. This lesson establishes how a framing is chosen, the observability test its objective must pass, and the ladder of baselines a model must climb before its complexity is paid for.
+
+The route: what a framing supplies that a request lacks; the next-app recommender, where two framings of one need differ in maintenance rather than accuracy; the objective tiers; the baseline ladder with every rung computed; launch-without-ML as doctrine, with its exit condition; and the superlinear cost of an accuracy target.
+
+## The request names a problem; the framing names a task
+
+A bank's ML lead is told that a rival bank reportedly processes customer requests twice as fast using ML, and is ordered to do the same. Slow customer support is a real problem, but it is not an ML problem: an ML problem is defined by inputs, outputs, and an objective function, and the order names none of them.
+
+Investigation finds the actual bottleneck, routing each incoming request to one of four departments (accounting, inventory, HR, IT), and only then does a framing exist:
+
+- **Input:** the customer request text.
+- **Output:** one of the four departments.
+- **Objective:** minimize the disagreement between predicted and actual department.
+
+### Problem space before solution space
+
+The investigation runs on *problem-space* questions (what breaks, why, for whom, what would count as fixed) before any *solution-space* question (which classifier, which library, which API). An engineer who starts from the solution space produces an answer to the wrong question with high confidence.
+
+<Figure
+  src="./figures/problem-space.svg"
+  alt="A pipeline from a business request to a working system with two labeled stages: problem-space questions turn the request into a framing of input, output, and objective, and only then do solution-space questions pick the model and tools"
+  caption="Two question spaces, in order. The framing is what the first produces and the second consumes."
+/>
+
+The questions that produce a framing are the "what" and "why" chains that locate the bottleneck the model must remove. One useful device: imagine a flawless oracle that answers any well-posed question, and write down the question you would ask it. "Is this request for accounting, inventory, HR, or IT?" is a question a model can approximate; "make support faster" is not a question at all.
+
+### Task types are chosen, not given
+
+<KeyFact>
+Task types do not partition the world: a regression becomes a classification by bucketing its output, a classification becomes a regression by thresholding a score. Which type a need lands on is a design decision with system consequences, not a property of the need.
+</KeyFact>
+
+Since a need does not determine its task type, the working question is never "what type of problem is this" but "which framing produces the better system". The next section works the canonical case.
+
+## Two framings, two systems: the next-app recommender
+
+The framing decision has consequences no offline metric reports, and the cleanest demonstration is a task where two framings have comparable accuracy and incomparable maintenance. The task: predict which app a phone user opens next, given the user and the context (time, location, recently used apps).
+
+**Framing A, multiclass classification.** Input: user and context features. Output: a probability distribution over all $N$ apps. One prediction per moment, a vector of size $N$.
+
+**Framing B, per-app scoring.** Input: user features, context features, and one app's features. Output: a single number in $[0,1]$, the probability that this app is opened in this context. $N$ predictions per moment, each a scalar; rank the apps by score.
+
+<FigureSequence
+  name="next-app"
+  alt="Three frames comparing an N-way classifier with a (user, app) scorer: both serve a four-app catalog, then app E is added, then the classifier requires an output-layer rebuild and retraining while the scorer serves E as one more input row"
+  caption="One catalog change, two framings. The classifier's output layer is sized to the catalog; the scorer's inputs are not."
+/>
+
+<Task>
+Step through the three frames. After frame 2, state what each framing must do before it can recommend app E, then check frame 3 against your answer.
+</Task>
+
+### The catalog is a condition, not an event
+
+Offline, the two framings score similarly. Then the catalog changes, which for an app store is not an event but a condition: apps are added daily.
+
+Framing A's output dimension equals the catalog size, so every addition invalidates the model, and it must be retrained from scratch, or at least every component whose parameter count depends on $N$ must be.
+
+Framing B never encoded the catalog: a new app is a new input row, scored by the existing model the moment its features exist. The new app's scores start poorly calibrated, since no interaction data exists for it, but the system degrades gracefully instead of refusing to answer.
+
+### The label budget, and the hierarchical escape
+
+The classification framing also loses on data arithmetic when $N$ is large. A working rule of thumb is on the order of 100 labeled examples per class for a model to learn it, so 1,000 classes need roughly 100,000 examples, and the rare classes stay starved however much total data arrives.
+
+<Figure
+  src="./figures/hierarchical-classification.svg"
+  alt="A flat 1,000-way classifier whose label bill is 100,000 examples and whose rare classes starve, next to a hierarchical alternative where one classifier picks among three coarse groups and a second classifies only within the chosen group"
+  caption="One 1,000-way head, or a hierarchy of small ones. Each hierarchical head faces a class count its data can feed."
+/>
+
+Where a many-class framing is unavoidable, *hierarchical classification* splits it: one classifier picks the coarse group (electronics, fashion, pet supplies), a second picks within it, and each model faces a class count its data can feed.
+
+<KeyFact>
+Framing is a maintenance decision: catalog churn cost, label budget, and the retraining trigger are all fixed before a single model exists. That is why the framing heads <Ref lesson="the-design-document">the design document</Ref>: it is reviewed first, while reversing it still costs a paragraph rather than a retrain.
+</KeyFact>
+
+## The objective must be observed and attributable
+
+A framing's third component, the objective, has a test of its own: the quantity the model is trained to predict must actually be recorded, per prediction, by the product. <Ref lesson="requirements-and-metrics">The metrics chain</Ref> already used [Rule #13](https://developers.google.com/machine-learning/guides/rules-of-ml) of Google's Rules of ML to sort what may occupy the proxy link; at framing time the same three tiers decide whether a candidate objective can head a training set at all.
+
+### Rule #13's three tiers
+
+<Figure
+  src="./figures/objective-tiers.svg"
+  alt="Three stacked tiers of candidate objectives ordered by causal distance from one system action: directly observed and attributable behaviors that can be trained on, indirect effects usable only as A/B evaluation metrics, and unmeasurable true objectives left to human judgment"
+  caption="Rule #13's three tiers. Only the bottom tier can label a training set; the causal path from one prediction grows too long above it."
+/>
+
+The bottom tier is behavior **directly observed and attributable to one system action**: was this ranked link clicked, this object downloaded, this message marked as spam. Each event names the prediction that caused it, so it can be a label.
+
+The middle tier is **indirect effects**: did the user return the next day, how long was the visit, daily active users. These are real product goals and good A/B metrics, but the causal path from a single prediction to them is too long to learn; a model trained on "returned tomorrow" is being asked to model everything that happened in between.
+
+The top tier is the **true objective**: is the user happy, is the product improving their life. No log records it, and connecting the trained tiers to it is human judgment, not modeling.
+
+### Natural labels, and how carefully to choose
+
+Both next-app framings pass the test, because the opened app is logged with its context on every session: the label is manufactured by the product's own mechanics, at zero labeling cost, seconds after the prediction. Labels of this kind are called *natural labels*, and the length of the loop that delivers them (seconds for a click, months for a loan default) becomes a design constraint of its own in <Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>.
+
+Rule #12 of the same document adds the calibration for how carefully to choose within the bottom tier: early in a system's life, not very. The first models move every metric at once, so an imperfect observable objective (clicks, when the goal is purchases) is the right starting point, revised when the optimized metric rises while launch reviews keep saying no.
+
+## The baseline ladder: five rungs, each with a number
+
+Framing fixed and objective observable, the next artifact is not a model; it is the number a model must beat. An evaluation metric in isolation is unevaluable. Every framing therefore comes with a ladder of baselines, from free to expensive. The running example: a support-inbox spam flag, 1,000 messages of which 100 are spam (10% positive).
+
+<Figure
+  src="./figures/baseline-ladder.svg"
+  alt="The baseline ladder for a 10-percent-positive spam task, six rows from bottom to top: uniform random (accuracy 50%, F1 0.17), base-rate random (accuracy 82%, F1 0.10), zero rule (accuracy 90%, F1 0), a one-rule heuristic (accuracy about 96%, F1 0.73), human review (measured, priced in expert-hours), and the existing solution as the rung that must actually be beaten"
+  caption="The ladder on the 10%-spam inbox. Every rung below the top is free or nearly free; the model's complexity is priced against the highest rung, not the lowest."
+/>
+
+### Rungs 1 and 2: random predictions
+
+<Example title="random baselines on the 10%-spam inbox">
+**Uniform random** predicts spam with probability $\tfrac12$, ignoring the input. Of 1,000 messages it flags 500; of the 100 spam it catches 50. Precision $= 50/500 = 0.10$, recall $= 0.50$, so
+
+$$
+F_1 = \frac{2 \cdot 0.10 \cdot 0.50}{0.10 + 0.50} = 0.167,
+\qquad \text{accuracy} = 0.5 \cdot 0.9 + 0.5 \cdot 0.1 = 0.50.
+$$
+
+**Base-rate random** predicts spam with probability $0.1$, matching the label distribution. It flags 100 messages, of which $0.1 \times 100 = 10$ are truly spam: precision $= 0.10$, recall $= 0.10$, $F_1 = 0.10$, and accuracy $= 0.9 \cdot 0.9 + 0.1 \cdot 0.1 = 0.82$. The accuracy went up by 32 points and the model still knows nothing: base-rate guessing converts class imbalance into free accuracy.
+</Example>
+
+### Rung 3: the zero rule
+
+The *zero rule* predicts the most common class, always. On the inbox it answers "not spam" 1,000 times: accuracy 0.90 for free, and $F_1 = 0$, since it never flags anything. The general form of the accuracy is just the majority share: a training set with an 80/20 split hands any constant predictor 80%, which is why an accuracy figure quoted without its base rate says nothing.
+
+The same rung reads differently with the imbalance inverted. A team building a classifier whose *positive* class covered 90% of labels reported an initial $F_1$ of 0.90 as progress. On that task, predicting positive at random 90% of the time expects the confusion matrix below.
+
+<Figure
+  src="./figures/f1-trap.svg"
+  alt="Confusion matrix for a base-rate random predictor on a 90-percent-positive task with 1,000 examples: 810 true positives, 90 false negatives, 90 false positives, 10 true negatives, yielding precision 0.90, recall 0.90, F1 0.90, accuracy 0.82"
+  caption="The F1 trap. The predictor ignores its input; the 0.90 is the base rate, not evidence of a model."
+/>
+
+Precision and recall both read $810/900 = 0.90$, so $F_1 = 0.90$: the celebrated score, achieved by a predictor that never looks at the input. $F_1$ is computed on the positive class, so a large positive base rate inflates it exactly as a large negative base rate inflates accuracy.
+
+<Exercise>
+(a) On the inbox, the zero rule's accuracy (0.90) beat base-rate random's (0.82). Decide whether that ordering is a fact about the 10% base rate or about the rules: for an arbitrary positive base rate $p$, determine which of the two constant-strategy baselines has the higher accuracy, and find every $p$ at which they tie. (b) A team reports $F_1 = 0.947$ on a task whose positive class covers 90% of labels. Write the confusion matrix showing that a predictor which ignores its input achieves exactly this score, and name the rung it stands on.
+
+<Solution>
+(a) The zero rule's accuracy is the majority share, $\max(p, 1-p)$; base-rate random's is $p^2 + (1-p)^2$. For $p \le \tfrac12$ the difference is $(1-p) - p^2 - (1-p)^2 = p(1-2p) \ge 0$, with equality only at $p = 0$ and $p = \tfrac12$; the case $p \ge \tfrac12$ mirrors it (ties at $\tfrac12$ and $1$). So the ordering is a fact about the rules: matching the label distribution never buys accuracy over predicting the majority outright, at any base rate. What randomness buys is nonzero recall (0.10 against the zero rule's 0 on the inbox), and it pays 8 accuracy points for it.
+
+(b) On the 90%-positive task, *always predicting positive* (the zero rule for that task, since positive is the majority class) gives TP $= 900$, FP $= 100$, FN $= 0$: precision $= 0.90$, recall $= 1.0$,
+
+$$
+F_1 = \frac{2 \cdot 0.90 \cdot 1.0}{0.90 + 1.0} = \frac{1.8}{1.9} = 0.947.
+$$
+
+The same rule scores $F_1 = 0$ on one task and $0.947$ on the other; the score moved 0.947 while the rule learned nothing. An $F_1$ is uninterpretable until it is placed against its task's zero rule.
+</Solution>
+</Exercise>
+
+### Rung 4: the simple heuristic
+
+Above the constant predictors sit rules that use the input. Rule #1 of the same Rules of ML — *don't be afraid to launch a product without machine learning*, planted in <Ref lesson="ml-in-production">the first lesson</Ref> — names its own instances: rank apps by install rate, filter publishers that sent spam before, rank contacts by most recently used, or even alphabetically.
+
+<Example title="a one-rule filter on the inbox">
+On the running inbox, the rule "flag mail whose sender was previously flagged" is a measurement, not a formula; suppose it measures recall 0.60 at precision 0.95. Recall 0.60 catches 60 of the 100 spam; precision 0.95 puts those 60 among $60/0.95 \approx 63$ flags, so about 3 legitimate messages are flagged.
+
+The errors are 40 missed spam plus 3 false alarms, so accuracy $= 957/1000 \approx 0.96$, and
+
+$$
+F_1 = \frac{2 \cdot 0.95 \cdot 0.60}{0.95 + 0.60} \approx 0.73,
+$$
+
+from one `if` statement — against the zero rule's $F_1 = 0$ and base-rate random's $0.10$.
+</Example>
+
+Choosing the heuristic is a solved problem for most task shapes. The Heuristic Benchmark design pattern exists because decision-makers ask "is an MAE of 1,200 seconds good?", and the only honest answer is a comparison; its cookbook, condensed:
+
+| Task shape | Heuristic benchmark | Worked instance |
+| --- | --- | --- |
+| Regression, features not well understood | Mean or median label (median under outliers) | Time to first answer on Stack Overflow: always predict 2,120 s, the training median |
+| Binary classification | Base rate as the constant predicted probability | "Will this answer be edited?": always 0.36 |
+| Regression with one dominant numeric feature | A per-unit rate on that feature | Taxi fare: \$4.64 per kilometer of trip distance |
+| One or two well-understood key features | Lookup table of per-cell averages | Bicycle-rental duration by station × peak/off-peak |
+| Time-series forecasting | Persistence, or seasonal persistence | Next week's sales = this week's; or same week last year |
+| Recommendation | Most popular item in the user's category | Most popular sci-fi title the user hasn't watched |
+| Anomaly detection | Percentile threshold from history | Flag any minute above the historical 99th percentile of requests |
+
+**Never use a trained model as the benchmark**, not even a linear regression. The moment the benchmark itself needs defending or debugging, it has stopped being a benchmark; constants, rules of thumb, and bulk statistics are the whole menu.
+
+The "important features" in the table are ones the business already accepts as decisive (distance for taxi fares), not the output of a feature-importance study: the benchmark must be legible to the people who will read the comparison.
+
+### Rung 5: humans, and the system already in place
+
+For tasks humans perform today, the human is a rung: for medical images, a panel of three or more physicians with the majority vote as truth, the model then ranked among the panelists. The rung is priced in expert-hours (three physician reads per image) or bought more cheaply and noisily from crowd workers, and it is not always the top rung: on tasks whose data is a behavioral event log (ad targeting, fraud, finance), models routinely beat humans, so human parity is a floor there, not a target.
+
+The top rung is whatever currently makes the decision: a rules engine, a third-party service, a spreadsheet. This is the rung that decides shipping, and the comparison is total, not metric-only: a model slightly worse than the incumbent can still win by being cheaper or faster to run, and a model clearly better on $F_1$ can lose by costing more than it recovers.
+
+The distinction is between a *good* system and a *useful* one. A self-driving system better than every previous self-driving system is good, and useless until it beats a human driver; a next-word suggester far worse than any native speaker is bad, and useful every time it saves a few keystrokes.
+
+<KeyFact>
+"Better than nothing" is a comparison no production decision ever makes, because nothing is not what is currently running. The boundary case, a product where nothing runs yet, does not survive long: the next section's heuristic launch fills the top rung before any model exists.
+</KeyFact>
+
+## Launch without ML: phase 1 ships the benchmark
+
+The ladder's fourth rung is not only a comparison; on a new product it is the launch. Rule #1, cashed out, says the heuristic is the first version of the system: if ML would eventually give a 100% boost, the heuristic gets 50% of the way there, and it ships months earlier.
+
+Predicting the next letter a user types by always offering "e", "t", "a" is correct about 30% of the time, and it ships as a working suggestion feature on day one.
+
+The heuristic phase is also when instrumentation gets built (Rule #2: design and implement metrics before formalizing what the ML will do), so by the time a model exists, the benchmark is a measured number in a dashboard, not a memory.
+
+<Figure
+  src="./figures/four-phases.svg"
+  alt="Four phases of ML development on a horizontal timeline: before ML with heuristics, simplest ML models, optimizing simple models, and complex models, each phase annotated with the condition for moving to the next and each phase's solution serving as the next phase's baseline"
+  caption="The four phases. Each phase's solution is the next phase's baseline; each transition has a stated condition, not a schedule."
+/>
+
+The heuristic launch is phase 1 of four. **Phase 2, simplest ML**: logistic regression, gradient-boosted trees, k-nearest neighbors, chosen for visibility, because their job is to validate the framing and the data and to force the pipeline from ingestion to deployment into existence.
+
+**Phase 3, optimizing simple models**: objective variants, hyperparameter search, feature engineering, more data, ensembles. **Phase 4, complex models**, entered when the simple ones plateau and the use case pays for the difference; this is also where measuring how fast the model decays in production sets the retraining cadence that <Ref lesson="continual-learning">continual learning</Ref> automates.
+
+The phases are a description of how value arrives, not a maturity scale to be climbed for its own sake.
+
+Phase 1 has an exit condition, and Rule #3 states it: choose ML over a *complex* heuristic. A simple heuristic ships the product; a heuristic that has grown to hundreds of interacting rules is unmaintainable, and at that point a trained model is easier to update than the rule pile. The argument for ML at this point is maintainability, not accuracy. The doctrine is therefore not "heuristics forever": it is heuristic first, model when the data exists and the rules have started to rot.
+
+### The state-of-the-art trap
+
+A model that has climbed the ladder has earned its complexity. The prevalent belief runs the other way: start from the strongest published model for the task, since anything less leaves accuracy on the table.
+
+The belief is wrong, and documented as a trap practitioners fall into repeatedly. "State of the art" certifies one fact, the best score on a static benchmark dataset, which is the research column of <Ref lesson="ml-in-production">the research-versus-production contrast</Ref>: it promises nothing about latency, cost, or performance on your data.
+
+Starting there also skips every artifact the early phases produce (the measured benchmark, the trusted pipeline, the validated framing), so when the big model underdelivers, there is no number saying by how much and no simple system to fall back to.
+
+### Super Bill: complexity buys its way in
+
+The replacement model: complexity enters rung by rung, and the discriminating case is the Super Bill project. In 2019, a receipt-cashback app needed receipt strings matched to catalog items, where "Mars small", "M. bar small", and "Mars bar small" all name one product.
+
+The proposed solution was a deep semantic search model, receipt string as query, product as document, with the data collection, labeling, and training that implies.
+
+The shipped solution used no trained model at all. Receipt-name frequencies follow Zipf's law (a few names cover most receipts), so hand-labeling the most popular name–product pairs once each covers a large share of the traffic; predicted brand and category narrowed the candidates for the rest, Levenshtein distance ranked them, and crowd workers verified. It went to production in under three weeks.
+
+<Figure
+  src="./figures/super-bill-pipeline.svg"
+  alt="The Super Bill matching pipeline: a receipt string first hits a hand-labeled table of the most popular names, which resolves most receipts; misses flow through a brand-and-category filter, Levenshtein ranking of the candidates, and a crowd-worker check before the match is emitted"
+  caption="The shipped pipeline: a Zipf-head lookup plus filtered edit-distance ranking, verified by crowd workers. No trained model in the loop."
+/>
+
+The postscript completes the argument rather than undercutting it. Years later, on a catalog of tens of millions of items, a deep semantic model did replace the final matching layer: complexity arriving exactly when the scale justified it, into a system whose simpler rungs had already been measured.
+
+## The accuracy target prices the project
+
+The ladder says what a model must beat; the remaining scoping question is how far past it the model is required to go, and that number is where projects get expensive.
+
+Of an ML project's three cost drivers (problem difficulty, data, and the accuracy requirement), the third compounds the other two: each increment of required accuracy demands more data, more labeling, and more model, so **cost grows superlinearly in the accuracy target**.
+
+Past 99%, expect the labeled-data supply itself to become the blocker; on plenty of problems, 95% is already hard.
+
+<Figure
+  src="./figures/cost-curve.svg"
+  alt="Cost of an ML project as a superlinear curve over the accuracy requirement, flat through 80 and 90 percent, bending sharply between 95 and 99 percent, and near-vertical at 99.9 percent where an annotation marks the requirement as one to renegotiate"
+  caption="Cost against the accuracy requirement. The knee sits near 95–99%; a 99.9% requirement is a stakeholder conversation, not an engineering task."
+/>
+
+### Negotiating the target
+
+Stakeholders routinely open with a requirement close to 100%, so the curve's knee is where framing discipline returns as negotiation. Two questions locate the real requirement:
+
+- what one wrong prediction costs (a mis-routed support ticket costs a forward; a mis-flagged transaction costs a customer);
+- the lowest accuracy at which the system still pays for itself.
+
+A stated 99.9% that survives neither question is a red flag on the requirement, not on the team.
+
+### Pricing by pilot
+
+When the target is real and the project is large, the estimate comes from a pilot, not a spreadsheet: **simplify the problem until it can be measured**. For a 1,000-topic document classifier, run 10 topics first: label 11 classes (the 10 real ones plus "Other", a set a human labeler can actually hold in mind), solve that, and time every stage.
+
+The pilot proves the problem solvable and yields per-stage costs. Scaling the estimate is still nonlinear, since the data needed to separate classes grows superlinearly with the class count, so the multiplied number is a floor; but a measured floor beats an argued guess.
+
+What is established: a framing is chosen for its system properties (catalog churn, label supply, failure shape), not its offline score; an objective must be directly observed and attributable before it can label a training set; every model is priced against a ladder whose top rung is the existing solution.
+
+The heuristic launches first and becomes the benchmark, with Rule #3 as the exit, and the accuracy target, not the model, prices the project.
+
+Framing, metrics, and baseline are three sections of the same artifact, the one written before anything is built. <Ref lesson="the-design-document">The next lesson</Ref> assembles that artifact: the design document, with data, validation, and risks joining the three sections this module has already filled in.
+
+## Exercises
+
+<Exercise>
+A rare-event classifier faces a 95/5 split: 950 negatives, 50 positives per 1,000 examples. Compute accuracy, precision, recall, and $F_1$ for (a) uniform random prediction, (b) base-rate random prediction, and (c) the zero rule. State which metric makes the zero rule look best, and which exposes it.
+
+<Solution>
+(a) **Uniform random** flags 500 of 1,000, catching $0.5 \times 50 = 25$ positives. Precision $= 25/500 = 0.05$, recall $= 0.50$, $F_1 = 2(0.05)(0.5)/0.55 = 0.091$. Accuracy $= 0.5 \cdot 0.95 + 0.5 \cdot 0.05 = 0.50$.
+
+(b) **Base-rate random** flags 50, catching $0.05 \times 50 = 2.5$ in expectation. Precision $=$ recall $= 0.05$, so $F_1 = 0.05$. Accuracy $= 0.95^2 + 0.05^2 = 0.905$.
+
+(c) **Zero rule** (always negative): accuracy $= 0.95$; no positive predictions, so recall $= 0$ and $F_1 = 0$.
+
+Accuracy makes the zero rule look best: 95% for free, better than either random baseline and better than many real models' headline numbers. $F_1$ (or recall) exposes it: on the minority class the rule does literally nothing. The pairing generalizes: on imbalanced tasks, always quote the zero rule's accuracy next to the model's, and the minority-class metric next to both.
+</Solution>
+</Exercise>
+
+<Exercise>
+A fraud team reports: "our model's $F_1$ is 0.91, so it works." On 10,000 transactions with 200 fraudulent, the model scores TP 174, FN 26, FP 8. The rule-based system it would replace scores TP 184, FN 16, FP 30, and when the model's threshold is lowered until its precision matches the rule system's, its recall reaches 0.89. Evaluate the claim, and name the ladder rung the report skipped.
+
+<Solution>
+First the two systems as reported. Model: precision $= 174/182 = 0.956$, recall $= 174/200 = 0.87$, $F_1 = 2(0.956)(0.87)/1.826 = 0.911$. Rules: precision $= 184/214 = 0.860$, recall $= 184/200 = 0.92$, $F_1 = 2(0.860)(0.92)/1.780 = 0.889$.
+
+The model wins on $F_1$, 0.91 to 0.89, but the two systems sit at different operating points, and $F_1$ averages away exactly the difference that matters. The model buys its higher $F_1$ with precision; on recall it loses, 0.87 to 0.92, missing 26 frauds where the rules miss 16. At matched precision (0.86), its recall is 0.89: still below the rules' 0.92, so the gap is not a threshold artifact. In fraud, a missed fraud is a chargeback and recall carries the money, so at every comparable operating point the incumbent catches more fraud.
+
+The skipped rung is the **existing solution**. The report compared the model to nothing ($F_1$ in isolation), and against the rung that decides shipping, the model loses. The claim's failing step is treating a scalar metric as a verdict when the comparison it needs (same task, same operating point, against the incumbent) was never run.
+</Solution>
+</Exercise>
+
+<Exercise>
+A food-delivery product wants "estimated arrival times users trust." Propose two framings, a point regression and a quantile (or interval) prediction, and give one concrete system consequence of each: what each framing trains on, and what each gets wrong by construction.
+
+<Solution>
+**Framing 1: point regression.** Predict the expected arrival time; train on logged actual arrivals with a symmetric loss (MAE or RMSE). The label is natural and arrives within the hour. The construction error: a symmetric loss prices five minutes early and five minutes late identically, and the business does not: a late delivery breaks trust, an early one is a pleasant surprise. The model with the best MAE will be late about half the time, which is the same asymmetry the airline example in <Ref lesson="requirements-and-metrics">the metrics lesson</Ref> exposed: identical symmetric error, opposite business value by sign.
+
+**Framing 2: quantile prediction.** Predict the 90th percentile of arrival time (pinball loss), and display that: the shown time is now late only one delivery in ten, by construction. The construction error is operational: the displayed times are systematically longer, which costs conversions, and the promise level (p90 versus p80) is baked into the training loss, so changing the product's trust/speed tradeoff means retraining. Predicting two quantiles (or the distribution) and choosing the displayed one at serving time recovers the flexibility; it is the same move as <Ref lesson="requirements-and-metrics">objective decoupling</Ref>, applied inside one model's output.
+
+Either framing can be shipped; what the exercise shows is that "times users trust" is not an objective until a framing decides what, precisely, is being promised, and that the decision is visible in the loss function, not the architecture.
+</Solution>
+</Exercise>
+
+<Exercise>
+Construct a case where the heuristic is the *final* system: Rule #3's exit condition never triggers, and no phase beyond 1 is ever justified. Specify the task and the rule set, explain why the rules never grow complex, and name which of the "when ML shines" conditions from <Ref lesson="ml-in-production">the first lesson</Ref> stays false.
+
+<Solution>
+One admissible construction: routing internal expense reports to the right approver. The rule set: amounts under \$500 go to the line manager, \$500–\$10,000 to the department head, above that to finance; a fixed list of a dozen expense categories overrides by policy (travel to the travel desk, hardware to IT procurement). The rules come from written company policy, they are exact, and they number about fifteen.
+
+Rule #3's exit condition is a heuristic that grows *complex and unmaintainable*. Here it cannot: the rule count is bounded by the policy's own size, the policy changes a few times a year by explicit announcement (so updates are edits, not archaeology), and every rule is exact rather than statistical: there is no residual error for added rules to chase, which is the usual growth mechanism.
+
+The "shine" condition that stays false is **patterns change**: the mapping is fixed by policy, not drifting behavior, so hand-written rules never rot. (Scale is typically absent too: thousands of reports a month, not millions of predictions a second, so the amortization argument also fails.) The general form: when the pattern is enumerable, exact, and static, the heuristic is not a phase, it is the solution; ML would replace a correct rule with an estimate of it and take on the whole debt taxonomy for negative value.
+</Solution>
+</Exercise>
+
+<Exercise>
+A demand forecaster must predict daily orders. Four weeks of history (Mon–Sun):
+
+| | Mon | Tue | Wed | Thu | Fri | Sat | Sun |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Week 1 | 100 | 104 | 98 | 102 | 96 | 140 | 150 |
+| Week 2 | 102 | 106 | 100 | 104 | 98 | 144 | 154 |
+| Week 3 | 104 | 108 | 102 | 106 | 100 | 148 | 158 |
+| Week 4 | 106 | 110 | 104 | 108 | 102 | 152 | 162 |
+
+Implement the cookbook's time-series rung: seasonal persistence, $\hat{y}_t = y_{t-7}$, evaluated over weeks 2–4. Report its WAPE ($\sum|\hat y - y| / \sum y$) and approximate MAPE, and compare against naive persistence $\hat{y}_t = y_{t-1}$ over the same days. State the number a trained model must beat.
+
+<Solution>
+**Seasonal persistence.** Each day's error is the week-over-week growth: $+2$ on every weekday, $+4$ on every weekend day, in all three evaluated weeks. Absolute error sum: $3 \times (5 \cdot 2 + 2 \cdot 4) = 54$. Actual demand over weeks 2–4: $808 + 826 + 844 = 2{,}478$. WAPE $= 54/2478 = 2.2\%$; the per-day ratios average out slightly lower, MAPE $\approx 2.1\%$.
+
+**Naive persistence** on the same 21 days steps into the weekend cliff every week: the Friday→Saturday jump alone contributes an error of 46–50, Sunday→Monday of 48–52. Summing the absolute day-over-day changes gives $124 + 128 + 132 = 384$, so WAPE $= 384/2478 = 15.5\%$: seven times worse, from an almost identical-sounding rule. The cookbook's "take seasonality into account" clause is the entire difference.
+
+The number to beat is **2.2% WAPE**. That is a demanding bar: the series is nearly deterministic (trend plus weekly cycle), so most of what a model could learn, the one-line rule already captures; a model earns its keep here only on what the rule cannot see (holidays, promotions, weather). Publishing the wrong rung, 15.5%, would make any model look strong, which is exactly the failure the ladder exists to prevent.
+</Solution>
+</Exercise>
+
+<Exercise>
+For the demand-forecast task above, suppose the pilot is approved. Before building anything, you owe the team a document. Draft its six section headings, the skeleton of what must be settled on paper, and state in one line what each section fixes.
+
+<Solution>
+A defensible skeleton, in order:
+
+1. **Problem definition**: the business gap the forecast closes (over-ordering waste vs. stockouts), who consumes the prediction, and the framing: per-day, per-item regression.
+2. **Metrics and losses**: the chain from training loss to business number: pinball or weighted loss, WAPE with signed bias alongside (the asymmetry exercise above says why), and the revenue metric the A/B test will read.
+3. **Data**: sources, history depth, label definition (ordered vs. delivered vs. demanded), and the natural-label loop length.
+4. **Validation**: how the offline number is trusted: time-based splits, the evaluation window, slices that matter (weekends, holidays, new items).
+5. **Baselines**: the ladder as measured: seasonal persistence at 2.2% WAPE as the floor, the current human planner or spreadsheet as the incumbent rung.
+6. **Risks and antigoals**: what the system must not do (systematic under-forecasting of perishables), failure modes, and the conditions under which the project stops.
+
+These six headings are this module's three lessons written down in order (framing, metrics chain, ladder), plus the data, validation, and risk sections that complete them. The artifact has a name: it is the design document, and <Ref lesson="the-design-document">the next lesson</Ref> writes one end to end.
+</Solution>
+</Exercise>
+
+<References>
+1. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 2 (framing ML problems: the bank routing case, task types, high-cardinality and hierarchical classification, the next-app reframing of Figs. 2-5/2-6), Ch. 6 (the four phases of ML development; baselines pp. 179–181, including the F1-at-the-base-rate case).
+2. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google — Rule #1 (launch without ML, the heuristic examples), Rule #2 (metrics before ML), Rule #3 (ML over a complex heuristic), Rules #12–#13 (objective choice and the observable/attributable tiers). https://developers.google.com/machine-learning/guides/rules-of-ml
+3. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020 — §2.1–2.2 (the three cost drivers, the superlinear cost-vs-accuracy curve of Fig. 1, simplifying the problem to estimate it), §5.1.4 (choosing the right baseline; the zero-rule arithmetic). http://www.mlebook.com
+4. V. Lakshmanan, S. Robinson, M. Munn, *Machine Learning Design Patterns*, O'Reilly, 2020 — Ch. 7, Design Pattern 28 "Heuristic Benchmark": Table 7-1 (the benchmark cookbook), the warning against trained-model benchmarks, and the expert-panel construction.
+5. V. Babushkin, A. Kravchenko, *Machine Learning System Design*, Manning, 2023 — Ch. 2 (problem space vs. solution space, the oracle device, and the Super Bill case with its postscript).
+6. C. Huyen, "Model Development" lecture note, CS 329S: Machine Learning Systems Design, Stanford, 2022 — the state-of-the-art trap among the model-selection tips, and the four-phases sidebar. https://docs.google.com/document/d/1UqrR4QP_RMZErC7uLMoLvPtzLys6ikgeUXiylS1WWPE/
+</References>

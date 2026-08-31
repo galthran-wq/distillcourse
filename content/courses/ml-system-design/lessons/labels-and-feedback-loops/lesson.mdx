@@ -1,0 +1,332 @@
+Labels are the most expensive input to a supervised system, and production systems get them from three places: paid annotators, the product's own feedback mechanics, or programmatic rules that label at scale.
+
+<Ref lesson="feature-platform">Module 2's closing lesson</Ref> left the substrate complete: events stored, moved, and assembled into features a model can read at training and serving time. What none of that machinery supplies is the label column, and <Ref lesson="the-design-document">the design document</Ref>'s data section named it as an unfilled field: a label definition and its loop length, with no procedure behind either. This lesson opens module 3's claim, that training data is manufactured rather than given, with the label supply itself: which supplier to use, at what latency, and with what bias attached.
+
+The route: the hand-label bill (time, privacy, disagreement, lineage); natural labels and the implicit-negative trap; feedback-loop length and the labeling window it forces; weak supervision with its measured headline case; active learning; and reservoir sampling, plus the biases that no sampler removes.
+
+## The supply chain: three suppliers, three bills
+
+The three suppliers named in the opening differ on four axes: cost per label, latency until the label exists, the bias each mechanism imports, and how far each scales. Every labeling strategy in this lesson is a position in this table, and the design question is never "which is best" but which bill the product can pay. It is a recurring bill, not a purchase: labels keep arriving for as long as predictions keep being served, and every change to the task or the data reopens it — which is why Tesla staffed labeling as a permanent in-house team rather than a project phase.
+
+<Figure
+  src="./figures/label-suppliers.svg"
+  alt="A three-column comparison of label suppliers: paid annotators (high cost, days-to-months latency, disagreement bias, scales linearly in people), the product's natural labels (near-zero cost, latency equal to the feedback loop, implicit-negative bias, scales with every prediction), and programs via weak supervision (expert hours once then free reruns, minutes of latency, heuristic-noise bias, scales to the whole unlabeled pool)."
+  caption="The label supply chain. Each supplier's row of bills is this lesson's outline: hand labels first, then the product, then programs."
+/>
+
+## Hand labels: the bill is time, privacy, and disagreement
+
+The default supplier is a person with an annotation tool, and the first bill is time. Labeling a comment as spam takes seconds and any crowdworker can do it after fifteen minutes of training; labeling a chest X-ray requires a board-certified radiologist whose hours are scarce and expensive. Transcribing speech at the phonetic level takes about **400 times the utterance duration**: one hour of audio is three months of one person's work.
+
+<Figure
+  src="./figures/labeling-cost-photo.jpg"
+  alt="A nadir aerial photograph of a container port, overlaid with more than a hundred hand-drawn segmentation polygons in flat opaque colour. Red patches cover a long warehouse and a cluster of shed roofs; long blue strips cover rows of shipping containers stacked in a yard and a queue of heavy trucks curving along a service road; dozens of small yellow blocks cover cars and light trucks scattered across two loading aprons; one magenta row covers containers at the right edge; and green shapes cover nine slender boats moored in the water at bottom left. The roads, bare ground, vegetation and cranes between the polygons are left as unpainted photograph."
+  caption="One training example, and thirty minutes of one person's mouse work. Every flat patch is a polygon traced by hand into one of six classes — building, container, heavy truck, car or light truck, boat, other — and adding 'motorcycle', 'tree' and 'road' as classes would have cost longer still."
+  float="right"
+  width="m"
+/>
+
+The cost is concrete even for non-expert tasks. Segmenting one aerial photograph of a port into six classes (heavy truck, car or light truck, boat, building, container, other) takes **about 30 minutes** of polygon-drawing, for a single training example; a segmentation dataset of 10,000 such images is 5,000 hours of this. The second bill is privacy: hand labeling means a person reads the data, which medical records and financial documents often forbid, forcing on-premises annotators at on-premises prices. The third is adaptivity: when a deployed sentiment model needs a third class (`ANGRY`, because the PR team triages angry mentions first), every existing example must be revisited by hand, and the model degrades while the relabeling queue drains.
+
+### Label multiplicity: three annotators, three answers
+
+Multiple annotators do not produce one dataset; they produce a disagreement to resolve. Asked to mark all entities in the sentence "Darth Sidious, known simply as the Emperor, was a Dark Lord of the Sith…", three annotators returned three, six, and four entities respectively, each defensible. A model trained on annotator 1's convention and evaluated against annotator 2's is being graded by a different definition of the task.
+
+The countermeasure is procedural, not statistical: a *written labeling guideline* that resolves the known ambiguities in advance (here: "always pick the longest qualifying substring"), annotator training against that guideline, and a stated tie-breaking protocol (majority vote, or escalation to a senior annotator) for the disagreements that remain. Disagreement rises with the expertise a task demands, which is exactly where labels cost the most to redo.
+
+### Lineage: every label remembers where it came from
+
+Labels from different sources have different error rates, and mixing them irreversibly is a self-inflicted debugging failure. The canonical incident: a model trained on 100K carefully labeled samples improves steadily, the team buys a million crowdsourced labels of quieter provenance, and performance *drops*, with no way to tell the new data from the old. *Data lineage*, recording per example which source, which annotator pool, and which guideline version produced its label, is what turns "the model got worse" into "the March batch from vendor B is 4× noisier". It is the same discipline <Ref lesson="feature-platform">the feature catalog</Ref> applied to features, and <Ref lesson="experiment-tracking-and-versioning">module 4's versioning lesson</Ref> extends it to whole datasets.
+
+## Natural labels: the product labels its own predictions
+
+The second supplier costs nothing per label, because the product was already logging the outcome. A trip-time estimator learns whether its ETA was right when the trip ends; a stock-price model is graded two minutes after each prediction; a recommender reads a click as a grade on the recommendation that earned it. These are *natural labels*: outcomes the product's own mechanics record, attached to the prediction that produced them.
+
+<Ref lesson="problem-framing-and-baselines">The framing lesson</Ref> already used their existence as a test a training objective must pass; this section prices what they deliver. They are also common: in a survey of 86 companies in Chip Huyen's network, 63% worked on tasks with natural labels, less because most tasks have them than because tasks that have them get built first.
+
+A task without inherent labels can often be re-engineered to produce some. Google Translate's "suggest a better translation" control and a feed's reaction buttons exist substantially to manufacture feedback; the label mechanism is part of the product design, not an afterthought of the ML team.
+
+### The implicit negative is a presumption, not an observation
+
+Positive natural labels are observed events: the click happened. The negatives are different in kind. A recommendation with no click after ten minutes is *presumed* bad: an *implicit label*, inferred from the absence of a positive, unlike an *explicit* one (a downvote, a low rating) where the user stated the judgment. The presumption fails in mundane ways: the user never scrolled to the item, was interrupted, clicked nothing that session. Training on "no click = negative" trains on a mixture of true negatives and unseen positives, and every natural-label system carries some version of this asymmetry.
+
+## Feedback-loop length: a parameter of the system, not of the model
+
+For a task with natural labels, the time from serving a prediction to receiving its label is the *feedback-loop length*, and it varies by five orders of magnitude across ordinary products. A click on a related-product widget lands within minutes. Whether a recommended article was read takes hours; whether mailed clothes fit, in the try-on loop of Stitch Fix (a US styling service that ships clothes for customers to keep or return), takes weeks. A fraud label waits on the cardholder: a transaction is presumed legitimate only after the dispute window, typically **one to three months**, closes with no dispute.
+
+<Figure
+  src="./figures/loop-length-axis.svg"
+  alt="A log-time axis from minutes to months with tasks placed on it: ad clicks near five minutes, ETA arrival within hours, long-form content hours, clothing try-on and returns at weeks, fraud disputes at one to three months. A bracket underneath states that the loop length bounds failure-detection speed and retraining cadence."
+  caption="Feedback-loop lengths across tasks. The position on this axis is set by product mechanics, before any model exists."
+/>
+
+The loop length is decided by the product and the label definition, not by the model, and two later parts of the course inherit it directly. It bounds **failure detection**: a fraud model gone wrong in January is provably wrong in April, after a quarter of bad decisions. And it bounds **retraining cadence**: fresh labels are the input to any retraining loop, so a system whose labels take a month cannot meaningfully retrain on last week.
+
+<KeyFact>
+Choosing the label definition chooses the loop length, and two consequences follow. A drift alarm can be *raised* from inputs alone, but *confirmed* as an accuracy drop only once labels arrive — so a one-month loop means every alarm waits a month for its verdict. And a loop longer than the product can wait forces a proxy label that exists sooner than the real one; the labeling window below is the standard construction, and it always undercounts. <Ref lesson="continual-learning">Module 6's retraining policies</Ref> and <Ref lesson="recommender-funnel">module 7's recommender designs</Ref> both start from a number fixed in this lesson.
+</KeyFact>
+
+### The labeling window: every finite choice undercounts
+
+An implicit negative needs a deadline: "no click within $W$" for some window $W$. The choice of $W$ is a speed–accuracy trade, and the key empirical fact is that no window is neutral. Twitter's ads team measured the delay between an ad impression and its click ([Ktena et al., 2019](https://arxiv.org/abs/1907.06558)): the majority of clicks arrive within the **first five minutes**, but a tail of clicks arrives hours after the impression. Any finite window converts that tail into false negatives, so windowed CTR systematically underestimates true CTR, and a shorter window underestimates more.
+
+<Example title="the window sets the measured CTR">
+A campaign serves 10,000 impressions. Its 180 eventual clicks arrive as: 120 within 5 minutes, 30 more by 1 hour, 18 more by 24 hours, 12 across the following week. True CTR is $180/10{,}000 = 1.80\%$. The window determines what the labels say:
+
+| window | clicks counted | measured CTR | label latency |
+| --- | --- | --- | --- |
+| 5 min | 120 | 1.20% | 5 min |
+| 1 h | 150 | 1.50% | 1 h |
+| 24 h | 168 | 1.68% | 24 h |
+
+The 5-minute window loses a third of the positives and delivers labels almost immediately; the 24-hour window loses 7% of them and delivers labels a day late. There is no window in the table, or off it, that measures 1.80%.
+</Example>
+
+<FigureSequence
+  name="labeling-window"
+  alt="Four frames over one timeline of click arrivals after 10,000 impressions: first the raw arrival pattern with a dense early burst and a long tail, then a 5-minute window counting 120 clicks for a measured CTR of 1.20 percent, then the window widened to 1 hour counting 150 clicks for 1.50 percent, then widened to 24 hours counting 168 clicks with the conclusion that every finite window undercounts and wider windows pay in label latency."
+  caption="The labeling-window undercount, one widening at a time."
+/>
+
+<Task>
+Step through the four frames and track two numbers per frame: the measured CTR and the label latency. State the direction each moves as the window widens; the fourth frame should confirm both.
+</Task>
+
+<Exercise>
+Using the same 10,000-impression cohort, the ads team requires measured CTR within 10% (relative) of the true value. Find the smallest window in the example that meets the requirement, and state what that window does to (a) label latency and (b) the earliest time a model can be retrained on a day's own traffic.
+
+<Solution>
+Within 10% of true means at least $0.9 \times 180 = 162$ clicks captured. The 1-hour window captures 150 (83%, fails); the 24-hour window captures 168 (93.3%, passes). So the smallest qualifying window is **24 hours**. (a) Every impression's label becomes final 24 hours after serving, so the freshest usable training example is a day old. (b) A day's traffic is fully labeled only at the end of the *next* day, so retraining on complete labels runs at best on a one-day lag, and any faster cadence trains on provisionally negative labels that the tail will partially overturn. The residual 6.7% undercount never closes at any practical window; teams that need calibrated CTR under delay model the delay distribution itself, which is what the Ktena et al. paper is about.
+</Solution>
+</Exercise>
+
+### Unbiased negatives at a price: the 1% holdout
+
+Filtering tasks add a sharper bias, because the model censors its own future training data. A spam filter that blocks 75% of negative examples shows users only what it passed; the tempting label source, messages users then mark as spam, samples exclusively from the filter's false negatives. Retraining on that stream looks free and is not: the model never again sees the spam it already catches, and the training distribution drifts away from the serving distribution by exactly the filter's own behavior. This is the feedback-loop debt item from <Ref lesson="ml-in-production">the debt taxonomy</Ref> operating at the label layer.
+
+[Rule #34](https://developers.google.com/machine-learning/guides/rules-of-ml) of Google's Rules of ML states the repair and its price: mark **1% of traffic as held out** and deliver it unfiltered. Those impressions carry unbiased labels for the whole distribution, at the cost of the filter now blocking $75\% \times 99\% = 74.25\%$ of negatives instead of 75%. The trade is explicit, small, and deliberate; and it stops being viable when the filter blocks 95%+, where even 1% of exposures is a user-visible flood. For measurement alone, a far smaller holdout suffices: about ten thousand examples estimate serving performance accurately.
+
+## Weak supervision: expertise compiled into functions
+
+Hand labels are slow, private data cannot be shown to annotators, and every task change triggers relabeling. The third supplier attacks all three at once by encoding what annotators actually do. A doctor triaging nurses' notes applies heuristics ("a note mentioning pneumonia is emergent"); *weak supervision* writes those heuristics down as code and runs them over the whole unlabeled pool. The dominant tool is [Snorkel](https://www.snorkel.org/), an open-source system from the Stanford AI Lab (2016), built around the *labeling function* (LF): a function that votes a label or abstains.
+
+```python
+from snorkel.labeling import labeling_function
+
+@labeling_function()
+def lf_contains_my(x):
+    # spam comments often say "my channel", "my video"
+    return SPAM if "my" in x.text.lower() else ABSTAIN
+
+@labeling_function()
+def lf_short_comment(x):
+    # legitimate comments are often short ("cool video!")
+    return NOT_SPAM if len(x.text.split()) < 5 else ABSTAIN
+```
+
+LFs encode keyword tests, regular expressions, database lookups (is the sender on a blocklist), or the verdicts of existing models. Each is noisy, several fire on the same example, and they conflict. The denoising step is what makes the paradigm work: a *label model* learns, from the pattern of agreements and conflicts alone, how accurate each LF is, reweights their votes accordingly, and emits one *probabilistic* label per covered example. The final classifier is then trained on those labels, and it matters that there is one: the trained model generalizes to the examples **no LF covers**, which the rule set by itself never can.
+
+<Figure
+  src="./figures/weak-supervision-pipeline.svg"
+  alt="Pipeline from unlabeled examples through three labeling functions that vote SPAM, NOT_SPAM, or ABSTAIN, into a label model that learns each function's accuracy from agreements and conflicts, producing probabilistic labels used to train the final model, with a small hand-labeled validation set attached to the label model."
+  caption="Programmatic labeling: noisy votes in, denoised probabilistic labels out, and a trained model to cover what no function fires on."
+/>
+
+### The measured case: eight hours against a year
+
+The headline evidence is a Stanford Medicine study ([Dunnmon et al., *Patterns*, 2020](https://doi.org/10.1016/j.patter.2020.100019)): classifiers for chest and extremity X-rays trained on programmatic labels from **a single radiologist's eight hours** of LF writing (20 LFs for chest, 18 for extremity) matched the performance of models trained on roughly **a year of hand labeling**. Two secondary findings carry design weight: the weakly supervised models kept improving as more *unlabeled* data was added, with no new LFs, and six LFs transferred unchanged between the two tasks, because encoded expertise is versionable and reusable in a way an annotator's judgment is not.
+
+<Figure
+  src="./figures/weak-supervision-cxr.png"
+  alt="Two line plots of mean ROC-AUC against number of datapoints. Left panel, labeled A, CXR with 20 labeling functions: the black fully-supervised FS curve runs from 0.885 at 2000 datapoints to 0.953 at 50000, while the blue programmatic-label DP curve starts lower at 0.825 and climbs more steeply to 0.935, nearly meeting FS at the right edge. Right panel, labeled B, EXR with 18 labeling functions: FS runs from 0.855 at 3000 datapoints to 0.906 at 30000, while DP starts far lower at 0.685, rises sharply, crosses FS at 10000 and finishes slightly above it at 0.926. Shaded blue bands around DP and dotted black lines around FS mark 95% confidence intervals."
+  caption="Adding unlabeled data instead of labels: the programmatic-label curve (DP) climbs toward the hand-labeled one (FS) and meets it at the right edge of both tasks. Bands and dotted lines are 95% confidence intervals over five training runs."
+/>
+
+<KeyFact>
+Weak supervision replaces hand labeling, not expertise: the LFs require exactly the domain knowledge they encode, and the small hand-labeled gold set that tells the pipeline which functions to trust is its one non-programmatic part.
+</KeyFact>
+
+The caveats are part of the method. Where no compact heuristics exist, LF labels come out too noisy to use, though a failed weak-supervision attempt is cheap enough to be a reasonable first probe of a task. The privacy advantage is real and specific: experts write LFs against a small cleared subsample, and the functions then label the rest of the data with no human reading it.
+
+### The neighbors: semi-supervision and transfer learning
+
+Two adjacent techniques stretch a small labeled set rather than replace it. *Semi-supervision* starts from seed labels and structural assumptions: self-training promotes the model's own high-confidence predictions to labels; label propagation spreads labels through a similarity graph, so hashtags sharing a profile with `#AI` inherit its topic. *Transfer learning* imports a model pretrained on a label-cheap task (language modeling above all) and fine-tunes it, cutting the labels a new task needs, sometimes to zero. The four methods differ most usefully in one column:
+
+| method | how it labels | ground truth required |
+| --- | --- | --- |
+| weak supervision | heuristic LFs, denoised | no, but a small validation set is strongly advised |
+| semi-supervision | structural assumptions extend seeds | yes, a small seed set |
+| transfer learning | none; imports a pretrained model | none for zero-shot; a little for fine-tuning |
+| active learning | humans label, chosen examples only | yes |
+
+## Active learning: spend the label budget where the model is unsure
+
+The fourth row of the table keeps human annotators and changes what they are shown. When labels must be human (no natural source, no encodable heuristics) and the budget is fixed, the remaining lever is *which* examples get labeled, and random choice is the wasteful default. *Active learning* runs a loop: train on the current labeled set, have the model select the unlabeled examples it would learn most from, label those, retrain. The workhorse selection rule is *uncertainty sampling*, in its two-class form *margin sampling*: label the points closest to the decision boundary, where the model's two top class probabilities are nearly tied, because a label there moves the boundary and a label deep inside a cluster confirms what is already known.
+
+<Figure
+  src="./figures/margin-sampling.svg"
+  alt="A scatter plot of two labeled classes separated by a dashed decision boundary with a shaded uncertainty band around it. Unlabeled points inside the band are ringed as the ones margin sampling selects for labeling; unlabeled points deep inside either cluster are left unringed."
+  caption="Margin sampling on Settles's two-Gaussian toy task: the ringed points are worth labeling; the cluster interiors are not."
+/>
+
+<Task>
+Before reading on, pick the one ringed point you would label first and say why.
+</Task>
+
+Any answer near the band's center is right for the same reason: that is the point whose label the current boundary predicts worst. The measured toy result: on a 400-point two-Gaussian dataset, 30 labels chosen by uncertainty reach 90% accuracy where 30 random labels reach 70% (Burr Settles, *Active Learning*, 2012). Given enough labels the two converge; the technique buys label *efficiency*, not a higher ceiling.
+
+Query-by-committee generalizes the idea, labeling where an ensemble of models disagrees most. The economics decide adoption: active learning pays when labels are expensive and the unlabeled pool is cheap, the radiologist regime, and it costs a loop, since labeling now waits on retraining between batches.
+
+The selection can run over a static pool or over a live stream, and the stream case exposes the problem the last section solves: on an unbounded stream, even an *unbiased* sample has to be constructed.
+
+## Sampling the stream: uniform is a construction, not a default
+
+Every supplier labels a sample, and the sample decides what the labels mean. In production the population is usually a stream: the click events flowing through <Ref lesson="feature-platform">the feature platform's</Ref> topics, with unknown total length and no option to hold everything in memory. "Take 10,000 uniformly at random" is not directly executable when $n$ is unknown and still growing; executed naively ("keep the first 10,000", "keep this morning's"), it silently becomes a convenience sample.
+
+*Reservoir sampling* constructs the uniform sample in one pass. To keep $k$ items from a stream:
+
+1. Put the first $k$ items into the reservoir.
+2. For the $n$-th arriving item, draw $i$ uniformly from $\{1, \dots, n\}$.
+3. If $i \le k$, replace the $i$-th reservoir item with item $n$; otherwise discard item $n$.
+
+<FigureSequence
+  name="reservoir"
+  alt="Three frames of a stream feeding a three-slot reservoir: the first three items fill the slots; item four draws i equals two from one to four and replaces slot two; item five draws i equals five and is discarded, with the invariant stated that after n items each is in the reservoir with probability k over n."
+  caption="Reservoir sampling with k = 3. One pass, constant memory, and a sample that is uniform at every stopping point."
+/>
+
+<Task>
+Run the algorithm mentally one step past the last frame: item 6 arrives and draws $i$ uniformly from $\{1,\dots,6\}$. Write the probability it enters the reservoir, and — starting from the frame's reservoir of items 1, 4, 3 — the probability that item 1 survives the step. They should come out $3/6 = 1/2$ and $1 - \frac{1}{2}\cdot\frac{1}{3} = 5/6$.
+</Task>
+
+<Remark title="the reservoir invariant">
+After $n \ge k$ items, every item seen so far is in the reservoir with probability exactly $k/n$; stopping the stream at any moment therefore leaves a uniform sample. Half of the argument is immediate: item $n$ enters if and only if its draw satisfies $i \le k$, which has probability $k/n$ by construction. The other half, that the items already in the reservoir are each still there with the same $k/n$, is a two-line induction on survival probabilities, and the closing set's proof exercise has you write it.
+</Remark>
+
+### What convenience samples smuggle in
+
+The algorithm removes one bias, the arbitrary choice of which stream slice to keep, and none of the others; three from the standard taxonomy recur constantly in label pipelines. **Selection bias**: the data source is chosen for availability, so early self-driving datasets came from Phoenix and the Bay Area (lax regulation, company headquarters) and were overwhelmingly sunny; a model's world is its sample's world. **Self-selection bias**: the individuals volunteer themselves into the sample.
+
+<Figure
+  src="./figures/self-selection-ratings.svg"
+  alt="A U-shaped bar chart of star-rating shares: tall bars at one star and five stars, small bars at two through four, annotated that the furious and the thrilled rate while the satisfied middle stays silent."
+  caption="Self-selection in one chart: ratings are written mostly by the thrilled and the furious, so 'the average review' describes the extremes, not the customers."
+  float="right"
+  width="m"
+/>
+
+Product-review corpora are its canonical exhibit: people rate mostly when the experience was very good or very bad, so a sentiment model trained on reviews learns the extremes and mislabels the middle. **Sampling bias** in the narrow sense: the training proportions differ from production's. A document classifier trained on an evenly balanced set of several hundred topics showed 5% error offline and about 30% in production, where one or two frequent topics dominated the traffic the balanced set had suppressed. The labeling biases of the hand-label section (annotators skimming for keyphrases, skipping boring documents) are the same phenomenon inside the annotation step itself.
+
+What is established: labels are supplied by annotators, by the product, or by programs, and each supplier carries a bill that is measurable in advance: hours per label, a feedback-loop length with a window that always undercounts, or heuristic noise plus a gold set.
+
+The loop length is a system parameter that module 6's retraining cadence and module 7's recommender labels will consume as given, and reservoir sampling plus the bias taxonomy govern which events become training candidates at all.
+
+All of it yields a dataset; none of it certifies that the offline metrics computed on that dataset can be trusted. The next lesson takes up the ways a dataset lies, label information leaking into features and splits, and the time- and hash-based splitting discipline that stops it: <Ref lesson="data-leakage-and-splitting">data leakage and repeatable splitting</Ref>.
+
+## Exercises
+
+<Exercise>
+For each of five products, name the natural label if one exists, its approximate feedback-loop length, and the implicit-label bias it carries: (a) an email spam filter; (b) a delivery-ETA predictor; (c) a credit-default model; (d) a song recommender; (e) a content-moderation classifier.
+
+<Solution>
+(a) **Spam filter**: user marks message as spam / not spam, plus "rescued from spam folder" as a correction signal. Loop: hours to days. Bias: the filter censors its own training data; only messages it *passed* can be reported, so the labels sample its false negatives (the Rule #34 case).
+
+(b) **ETA**: the actual arrival time, logged automatically. Loop: minutes to hours (the trip's own duration). Bias: mild but real; predictions influence behavior (a long ETA diverts the order or reroutes the driver), so some labels are conditioned on the prediction itself.
+
+(c) **Credit default**: repayment or default over the loan term. Loop: months to years, the longest on this list. Bias: labels exist only for *approved* applicants; the rejected majority contributes no outcome, so the training population is the previous policy's accepted slice.
+
+(d) **Song recommender**: play, skip, completion, like. Loop: minutes. Bias: implicit negatives; an unplayed song may be unseen rather than disliked, and position in the list confounds everything.
+
+(e) **Moderation**: user reports. Loop: hours to days. Bias: double, only surfaced content can be reported, and reporting propensity varies by audience, which the refutation exercise below takes apart.
+
+The pattern: loop length ranges from minutes (d) to years (c), and every implicit negative is a presumption about why nothing happened.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a rare-disease triage model has no natural label (the product records no outcome that equals the diagnosis) and hand labels are unaffordable at scale (each requires a specialist reviewing a full case file). Which supplier remains, what two things does it require to work here, and what specifically breaks if the second of them is skipped?
+
+<Solution>
+The remaining supplier is **weak supervision**: programs. It requires, first, LF authors with genuine domain expertise, here clinicians who can state heuristics over case files ("mentions of symptom X plus lab value Y above threshold suggests the disease"); encoding expertise does not remove the expert, it changes the deliverable from labels to functions. Second, a **small hand-labeled gold set**, a few hundred specialist-reviewed cases, to validate the LFs.
+
+Skip the gold set and the label model still runs: it estimates each LF's accuracy from agreement patterns alone. What breaks is any external check on those estimates. A systematic error shared by several LFs (clinicians encoding the same folklore rule that is wrong for an atypical presentation) is invisible to agreement statistics, which read correlated error as reliable consensus; the label model then *upweights* the shared mistake. The pipeline delivers confident probabilistic labels, the final model reproduces the bias, and the first ground-truth contact is a deployed misdiagnosis. The gold set is small precisely because its job is auditing accuracies, not training, and it is the one part of the paradigm that cannot be programmatic.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "User reports give us free moderation labels; a report is a positive, no report on a viewed item is a negative." Name the two distinct biases in this label source and state the Rule #34-style fix together with its explicit cost.
+
+<Solution>
+**Bias 1: the system censors the sample.** Only content the ranking and moderation stack *surfaced* can be viewed, hence reported. Content the current system already suppresses generates no reports at all, so "no report" labels concentrate on what the system chose to show: the spam-folder loop. Retraining on this teaches the model its own blind spots as ground truth.
+
+**Bias 2: reporters are self-selected.** Reporting propensity varies by user group, topic familiarity, and how offended versus fatigued an audience is; harmful content shown to an audience that rarely reports yields clean-looking negatives. This is self-selection bias in the labels rather than in the items: the annotator population recruited itself.
+
+**The fix**: a deliberate exposure holdout. Route a small fraction of traffic (Rule #34's 1%) past the moderation filter unfiltered (within legal bounds; truly illegal content cannot be held out and keeps a hand-labeled path), and label that slice with a dedicated review process rather than organic reports. **The cost is explicit and twofold**: the held-out slice delivers the harmful content the filter would have blocked to real users, a stated product harm accepted at 1% scale; and the dedicated review of the slice is paid hand-labeling, no longer free. The claim's word "free" is the step that fails: unbiased moderation labels are purchasable, not free.
+</Solution>
+</Exercise>
+
+<Exercise>
+Prove the reservoir invariant: after $n$ items of a stream have been seen ($n \ge k$), each of the $n$ items is in the size-$k$ reservoir with probability $k/n$. Show the induction step fully.
+
+<Solution>
+**Base case** $n = k$: the first $k$ items all enter and none has been evicted, so each is present with probability $1 = k/k$.
+
+**Induction step**: assume that after $n-1$ items, each of them is in the reservoir with probability $k/(n-1)$. Item $n$ arrives and draws $i$ uniform on $\{1,\dots,n\}$.
+
+*Item $n$ itself*: it enters iff $i \le k$, so $\Pr[n \text{ in reservoir}] = k/n$. ✓
+
+*Any earlier item $j$*: for $j$ to be in the reservoir after step $n$, it must have been there before (probability $k/(n-1)$ by hypothesis) and must survive step $n$. It is evicted only if item $n$ enters **and** the eviction slot is $j$'s: probability $\frac{k}{n} \cdot \frac{1}{k} = \frac{1}{n}$. So the survival probability is $1 - \frac{1}{n} = \frac{n-1}{n}$, and
+
+$$
+\Pr[j \text{ in reservoir after } n] \;=\; \frac{k}{n-1} \cdot \frac{n-1}{n} \;=\; \frac{k}{n}.
+$$
+
+Both cases give $k/n$, completing the induction. The transferable move: the two factors are set up so the unknown stream length cancels at every step, which is exactly why the algorithm can stop at any time with a uniform sample.
+</Solution>
+</Exercise>
+
+<Exercise>
+From the Dunnmon et al. chest X-ray panel (ROC-AUC vs number of datapoints, DP = programmatic labels from 20 LFs, FS = fully supervised), read off approximately how many hand-labeled examples the fully supervised model needs to match the DP curve's endpoint at 50,000 unlabeled datapoints. Then estimate the labeling-hours ratio between the two approaches, assuming a radiologist labels a chest X-ray in about 90 seconds. State what would count as agreement with the paper's headline claim.
+
+<Solution>
+Reading the CXR panel: the DP curve reaches roughly 0.93–0.94 ROC-AUC at 50,000 datapoints. The FS curve passes about 0.91 at 10,000 hand labels and about 0.95 at 50,000, so it crosses 0.93–0.94 somewhere in the **low-to-mid tens of thousands of hand labels**, call it 20,000–30,000.
+
+Hours: $25{,}000 \times 90\,\text{s} \approx 625$ hours of radiologist labeling, against **8 hours** of LF writing (plus the gold validation set, a few hundred labels ≈ 10 hours): a ratio on the order of **50–80×**. At a working year of roughly 1,500–2,000 hours, 625 hours of a specialist's undivided labeling time is credibly "almost a year" of the calendar time such labeling actually takes around clinical duties, which is the paper's phrasing.
+
+Agreement means order-of-magnitude consistency, not equality: any reading of the plot that puts FS-to-match in the tens of thousands of labels and the hours ratio in the tens-to-hundreds confirms the 8-hours≈1-year claim; a reading that put it at hundreds of labels would refute it. The exercise's real content is that the claim is checkable from the published figure.
+</Solution>
+</Exercise>
+
+<Exercise>
+The click events for a recommender flow through the event log into <Ref lesson="feature-platform">the feature platform</Ref> of module 2. The data science team wants a standing 100,000-event uniform sample of the click stream for offline analysis and labeling experiments. Where in that architecture does reservoir sampling attach, and which of the platform's two stores receives the sampled dataset? Justify both placements.
+
+<Solution>
+Reservoir sampling attaches as a **stream consumer of the click topic**: a small stream-processing job that subscribes to the log (alongside the feature-ingestion job, not inside it) and maintains the $k = 100{,}000$ reservoir in its state. It must sit on the stream because that is where the population is unbounded and single-pass; note that with a partitioned topic the job must sample the merged stream (or run per-partition reservoirs sized by partition throughput), since a uniform sample of one partition is not a uniform sample of the stream.
+
+The sampled dataset lands in the **offline store** (the warehouse/lake side). Both discriminators from the feature-platform lesson point there: the read shape is analytical, bulk scans by analysts and training jobs, not point reads by key; and no serving path ever fetches "a random sampled event" at request time, so the online store has no claim on it. The online store holds each entity's latest feature values; a uniform historical sample is the opposite kind of object, and putting it in Redis would spend millisecond-read capacity on a dataset nobody reads by key.
+</Solution>
+</Exercise>
+
+<Exercise>
+Your ad-click training set is defined as "all impressions from the last 30 days; positive if a click arrived within 10 minutes, negative otherwise", split randomly 80/20 into train and validation. The labeling window is handled correctly. Describe two distinct ways information from an example's future can nevertheless end up available to the model at training time, one through the features and one through the split.
+
+<Solution>
+**Through the features**: if training features are joined *as of now* rather than as of each impression's timestamp, every feature aggregate (user's 7-day click count, ad's running CTR) silently includes events from after the impression, including the very click being predicted; the model reads its own label out of a feature. This is the as-of-join requirement <Ref lesson="feature-platform">the feature platform</Ref> stated as point-in-time correctness, now with the label at stake.
+
+**Through the split**: a random 80/20 split scatters near-duplicate and correlated rows across the boundary. The same user seeing the same ad twice in one evening straddles the split, so the validation set contains events whose near-copies were trained on; and with time ignored, training rows postdate validation rows, letting the model exploit trends (a campaign going viral in week 3) that at serving time lie in the unknowable future.
+
+Both are the same defect: the training-time world contains information that the serving-time world will not have. The defect's name is **data leakage**, and <Ref lesson="data-leakage-and-splitting">the next lesson</Ref> classifies its forms and builds the time-based and hash-based splitting discipline that prevents exactly these two routes.
+</Solution>
+</Exercise>
+
+<References>
+1. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 4, "Training Data": sampling families and reservoir sampling (pp. 82–88), hand labels, multiplicity, and lineage (pp. 88–90), natural labels, implicit labels, and feedback-loop length including the Twitter delay finding (pp. 91–94), weak supervision and the radiologist study (pp. 94–97), semi-supervision, transfer learning, and active learning (pp. 98–102), with Table 4-2 summarizing the four methods.
+2. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020 — Ch. 3: the aerial-photo segmentation cost (§3.2.1, Fig. 3) and the bias taxonomy with its avoidance checklist (§3.2.4). http://www.mlebook.com
+3. R. Crowe, H. Hapke, E. Caveness, D. Zhu, *Machine Learning Production Systems*, O'Reilly, 2024 — Ch. 5, "Advanced Labeling": label propagation, the active-learning cycle and margin sampling (Figs. 5-2–5-4), and the Snorkel labeling-function example.
+4. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018 — Rule #34: the held-out-traffic construction for filtering tasks, with its 75%→74% arithmetic. https://developers.google.com/machine-learning/guides/rules-of-ml
+5. S. I. Ktena et al., "Addressing Delayed Feedback for Continuous Training with Neural Networks in CTR Prediction," RecSys 2019 — the ad-click delay distribution behind the labeling-window discussion, and the delay-modeling losses that go beyond windowing. https://arxiv.org/abs/1907.06558
+6. J. A. Dunnmon, A. J. Ratner, K. Saab, et al., "Cross-Modal Data Programming Enables Rapid Medical Machine Learning," *Patterns* 1(2), 2020 — the eight-hours-of-LFs versus a-year-of-hand-labels result and the ROC-AUC-vs-datapoints curves. https://doi.org/10.1016/j.patter.2020.100019
+7. A. Ratner, S. H. Bach, H. Ehrenberg, J. Fries, S. Wu, C. Ré, "Snorkel: Rapid Training Data Creation with Weak Supervision," *Proceedings of the VLDB Endowment* 11(3), 2017 — the labeling-function abstraction and the generative label model.
+8. B. Settles, *Active Learning*, Morgan & Claypool, 2012 — the uncertainty-sampling toy comparison (30 labels: 90% vs 70%) and the survey of selection heuristics.
+9. C. Huyen, "Training Data" lecture, CS 329S: Machine Learning Systems Design, Stanford, Winter 2022 — the Karpathy labeling-team anecdote and the lecture-form treatment of this chapter's material. https://stanford-cs329s.github.io/syllabus.html
+</References>

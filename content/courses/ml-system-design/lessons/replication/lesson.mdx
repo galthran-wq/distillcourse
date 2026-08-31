@@ -1,0 +1,279 @@
+Copying the same data to several nodes buys read throughput and fault tolerance, and pays for it with a new problem: the copies disagree, and the disagreement is visible to users.
+
+<Ref lesson="storage-and-data-models">The previous lesson</Ref> fixed the substrate at rest on one machine: which engine shape serves which access pattern, and where training data physically lives. Production runs many machines, for three reasons no single machine can deliver: read throughput beyond one node's capacity, low latency for users far from the datacenter, and survival when a node fails. All three are bought the same way, by keeping copies, and every copying scheme must then answer one question: between the moment a write lands on one copy and the moment it reaches the others, what do the others say? This lesson answers it for the three schemes production databases use: single-leader, multi-leader, and leaderless. It closes with the tradeoff none of them escapes. <Ref lesson="partitioning">The next lesson</Ref> splits data that has outgrown any single copy.
+
+The route: the leader-based mechanism and its synchronous/asynchronous choice; failover, where that choice collects its price; the three lag anomalies and the guarantees named after them; conflicts under multiple leaders; quorums under no leader; and CAP stated honestly, with the posture ML infrastructure takes toward it.
+
+## Leader-based replication: one write path, many read paths
+
+Each node holding a copy of the database is a *replica*, and the immediate problem is keeping the replicas identical under change: every write must reach every replica, in an order they agree on. The most common answer is *leader-based replication*. One replica is designated the *leader*; clients send all writes to it. The leader applies each write locally, then ships the change to the other replicas, the *followers*, through a *replication log*: an ordered stream of changes that each follower applies in the leader's order. Reads can go to the leader or to any follower; writes go only to the leader. The design ships inside PostgreSQL, MySQL, and MongoDB, and beyond databases: Kafka partitions and Redis replicate the same way, so the product database of Supermegaretail — the fictional grocery chain of about 3,000 stores whose demand forecast <Ref lesson="the-design-document">the design document</Ref> scoped and whose storage the previous lesson laid out — and the Redis that will hold its serving features are both leader-based systems.
+
+### The acknowledgment point decides durability
+
+The one open design choice is when the leader tells the client the write succeeded. With a *synchronous* follower, the leader waits for that follower's confirmation before reporting success: the follower is then guaranteed current, and the write survives the leader's death. With an *asynchronous* follower, the leader ships the change and moves on.
+
+<Figure
+  src="./figures/leader-replication.svg"
+  alt="Timeline of a write through a leader with one synchronous and one asynchronous follower: the client's write reaches the leader, the leader replicates to both followers, waits for the synchronous follower's ack before reporting ok, and the asynchronous follower applies the change later"
+  caption="One write, two follower contracts. Success is reported after the synchronous ack; the asynchronous follower's delay is the replication lag."
+/>
+
+Fully synchronous replication does not survive contact with operations: if every follower must confirm, any one crashed or unreachable node blocks all writes, and the more followers, the likelier one is down. The practical compromise is *semi-synchronous*: exactly one follower is synchronous and the rest are asynchronous, so every confirmed write exists on at least two nodes; if the synchronous follower goes slow, an asynchronous one is promoted into its role. Fully asynchronous replication is nevertheless common, especially with many or geographically spread followers, because the leader never waits.
+
+<KeyFact>
+Under fully asynchronous replication, a confirmed write is not durable: if the leader dies before shipping it, the write is gone, even though the client was told it succeeded. Every failover risk and every lag anomaly in this lesson descends from that one fact.
+</KeyFact>
+
+### A follower is a snapshot plus a log position
+
+New followers are created without stopping writes, and the recipe explains what the log really is. Take a consistent snapshot of the leader; copy it to the new node; the node then connects to the leader and requests every change since the snapshot's exact position in the replication log (PostgreSQL calls it the log sequence number). When the backlog is applied, the follower is caught up and consumes the stream live. The same recipe is follower crash recovery: a restarted follower knows its last applied position and requests what it missed. The position is also what makes lag measurable: leader position minus follower position is the replication lag, as a number the database exposes.
+
+## Failover trades confirmed writes for availability
+
+A dead follower costs little: it recovers by catch-up, as above. A dead leader forces *failover*: promote a follower to leader, repoint clients' writes, repoint the other followers' log streams. Automatic failover is three steps, each with a documented way to go wrong. Detecting the death is a timeout, commonly around 30 seconds of silence, because no test distinguishes a crashed leader from a slow one. Choosing the new leader means getting the surviving nodes to agree on one, ideally the most caught-up follower; agreement among unreliable nodes is consensus, which <Ref lesson="consistency-and-transactions">the module's extra lesson</Ref> treats properly. Reconfiguring means the old leader, if it returns, must accept that it is no longer the leader.
+
+### Promotion discards confirmed writes
+
+The step that loses data is the promotion. Under asynchronous replication the promoted follower is missing the old leader's last writes: writes that were confirmed to clients. The common resolution when the old leader rejoins is to discard them. Discarding is worst when other systems already consumed the lost writes, and the canonical case is [GitHub's incident of September 2012](https://github.blog/news-insights/the-library/github-availability-this-week/).
+
+<FigureSequence
+  name="github-failover"
+  alt="Four-frame sequence of the GitHub 2012 failover: a healthy leader four writes ahead of its follower, the leader dying, the stale follower being promoted and reissuing primary key 4567, and Redis still mapping 4567 to the old user's data so private data is served to the wrong user"
+  caption="The GitHub 2012 failover, schematically: a stale follower promoted over the dead leader's last confirmed writes. The damage came from a key living on in a second system."
+/>
+
+<Task>
+Step through the four frames and name, at frame 3, the invariant that breaks: which value exists in two places with two meanings, and which system still holds the old meaning.
+</Task>
+
+The mechanics: an out-of-date MySQL follower was promoted to leader. MySQL assigned primary keys from an auto-increment counter, and the promoted node's counter lagged the old leader's, so it reassigned keys the old leader had already given to other rows. Those keys were also referenced in a Redis store, which still mapped them to the old rows: the same key now named two different records, and requests resolved through Redis served some users' private data to other users. Nothing malfunctioned. Asynchronous replication delivered exactly its contract, and the promotion decision converted the lag into disclosure.
+
+### Split brain and the timeout dilemma
+
+Two further failure modes round out the catalog. *Split brain*: two nodes each believe they are the leader and both accept writes; with no conflict resolution between them, data is lost or corrupted, and the safety mechanisms that shut one node down have, badly configured, shut down both. The timeout dilemma: a long timeout means a long outage before recovery, while a short one triggers failovers on load spikes and network glitches, adding a failover to a system already struggling. These risks are why experienced operations teams often keep failover manual even when the software automates it.
+
+<KeyFact>
+Failover under asynchronous replication is not a recovery procedure with a bug; it is a forced choice between availability and someone's confirmed writes. The GitHub incident is what choosing availability looks like when a second system has already consumed the writes being discarded.
+</KeyFact>
+
+## Replication lag: three anomalies, named as guarantees
+
+Failover is rare; lag is constant. Read scaling works by adding asynchronous followers and spreading reads across them, and a read hitting a follower that has not yet applied a write returns the old state. Stop writing and wait, and all followers converge: this property is *eventual consistency*, and "eventually" is deliberately unbounded. In normal operation lag is a fraction of a second; near capacity, or across a struggling network, it reaches seconds to minutes, and the anomalies below stop being theoretical. Each has a user-visible symptom, a named guarantee that forbids it, and a cheap implementation of that guarantee.
+
+### Read-your-writes: your own action ignored
+
+A user posts a comment; the write goes to the leader. They reload; the read goes to a lagging follower; the comment is gone, and to the user their submission was lost.
+
+<Figure
+  src="./figures/lag-anomaly-ryw.svg"
+  alt="A user writes a comment to the leader, then refreshes and reads from a lagging follower, which is missing the comment"
+  caption="Write to the leader, read from a lagging follower: the user's own write is invisible to them."
+  float="right"
+  width="m"
+/>
+
+The guarantee forbidding this is *read-your-writes* (also read-after-write) consistency: a client's reads reflect its own earlier writes, with no promise about anyone else's. Implementations pick reads to route to the leader: read anything the user themselves may have modified from the leader (a user's own profile is only editable by them, so "own profile → leader" suffices); or have the client carry the timestamp of its last write and require the serving replica to be caught up to it; or track follower lag and stop routing reads to any replica more than a minute behind.
+
+The ML instantiation is the same anomaly one layer down. A Supermegaretail shopper marks their account vegetarian; the preference feature is written to the online store's leader; the next page's recommendation request reads a lagging replica and ranks ham highly. The user's own action appears ignored by the very model it was supposed to steer, and the fix is identical: reads that feed a user's own next prediction follow that user's writes.
+
+### Monotonic reads: time runs backwards
+
+A reader refreshing a page is routed to a different replica each time. The first read hits a caught-up replica and shows a comment; the second hits a replica twenty seconds behind and the comment has vanished. The database moved backwards in front of the reader.
+
+<Figure
+  src="./figures/lag-anomaly-monotonic.svg"
+  alt="One reader makes two reads: the first from a caught-up replica shows a comment, the second from a replica twenty seconds behind shows it gone"
+  caption="Two refreshes, two replicas, one impossible history: the second read observes an earlier state than the first."
+  float="right"
+  width="m"
+/>
+
+*Monotonic reads* forbids it: a client that has seen some state never observes an earlier one. It is weaker than reading fresh data and stronger than eventual consistency, and it is bought with session stickiness: route each user's reads to one replica chosen by a hash of the user ID, rerouting only if that replica fails. In ML infrastructure the symptom is a quantity that cannot decrease, decreasing: a dashboard's order counter dropping between refreshes, or an `orders_today` feature that shrinks between two scoring calls for the same store, handing the model a negative delta no real history could produce.
+
+### Consistent prefix: the answer before the question
+
+The third anomaly violates causality rather than freshness.
+
+<Example title="consistent prefix (Kleppmann, DDIA Ch. 5)">
+One user posts a question in a comment thread; a second user, having read it, posts the answer. The two writes are causally ordered: the answer exists because its author saw the question. But the question's write propagates through a lagging replica path and the answer's through a fast one, so a third user reading through those replicas receives the answer before the question it responds to. Both writes arrive intact; only their order is destroyed, and the destroyed order is exactly the causal one.
+</Example>
+
+<Figure
+  src="./figures/lag-anomaly-prefix.svg"
+  alt="A question travels through a slow replica path and an answer through a fast one, so an observer receives the answer before the question"
+  caption="Different lag on different paths reorders causally linked writes for the observer."
+/>
+
+*Consistent prefix reads* forbids it: writes made in a certain order are observed in that order. The anomaly needs different data to lag differently, which is exactly what happens once a database is partitioned across nodes, each partition applying writes independently with no global order. The standard fix is structural: writes that are causally related go to the same partition, where a single write order exists. In an ML pipeline the symptom is an event stream yielding "refund issued" before "order placed"; a fraud feature computed over that prefix records a refund against a nonexistent order. The per-key ordering that log-based brokers guarantee within a partition, taken up in <Ref lesson="queues-and-logs">the queues lesson</Ref>, is this guarantee industrialized.
+
+<KeyFact>
+Each guarantee is a property of a read path, not of a database: the same cluster can serve the writing user leader-pinned reads, everyone else session-sticky follower reads, and analytics arbitrarily lagging reads, paying for exactly the consistency each consumer needs.
+</KeyFact>
+
+## Multi-leader replication: conflicts are the price of writing anywhere
+
+A single leader is a single place to write, and when it is unreachable (a cut inter-datacenter link, a phone in airplane mode) writes stop. *Multi-leader replication* removes the bottleneck by letting several nodes accept writes, each acting as leader locally and as follower to the others. The configurations that justify it: one leader per datacenter, so every write commits locally and crosses the internet asynchronously; and offline-capable clients, where every device is a leader and syncing is replication with hours of lag. Collaborative editors are the same architecture at keystroke granularity.
+
+### Every convergent rule discards writes or resurrects them
+
+The price is that two leaders can accept writes to the same record concurrently, and both succeed locally before either hears of the other. The conflict is detected only asynchronously, too late to reject either write, and the replicas must still converge to one value. The simplest convergent rule is *last write wins* (LWW): attach a timestamp to every write, keep the largest, discard the rest. LWW converges, and it converges by silently deleting confirmed writes; it is the only conflict resolution Cassandra offers, and the closing exercises construct the clock-skew case where it drops the write that happened last.
+
+Amazon's Dynamo, whose [2007 paper](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) (DeCandia et al.) is the founding document of the leaderless designs in the next section, chose the opposite policy for its shopping carts precisely to avoid LWW's deletions: conflicting cart versions merge as the union of their additions, so no "add to cart" is ever lost. The union has its own semantics: a removal concurrent with an addition loses, and customers watched items they had deleted reappear in their carts. The pair of policies is the real lesson: every automatic conflict rule either discards writes or resurrects them, the choice is which, and users see the result. Practical systems therefore mostly avoid conflicts instead of resolving them: route all writes for a given record through one designated "home" leader (a user's home datacenter), which is single-leader operation per record, and breaks down exactly when the home datacenter fails or the user moves.
+
+<Figure
+  src="./figures/conflict-rules.svg"
+  alt="Two panels. Under last write wins, concurrent writes to one card record, raise limit stamped 12:00:00 and freeze card stamped 11:59:55 by a clock ten seconds slow, converge to the raised limit, with the freeze discarded. Under union merge, remove A and add B on a cart starting at {A} converge to {A, B}, resurrecting the deleted item."
+  caption="One record, two leaders, two convergent rules. LWW keeps the larger stamp and silently discards the freeze; the union keeps every addition and resurrects the deleted item. Both converge; each loses a write, differently."
+/>
+
+<Remark title="version vectors">
+Any policy smarter than LWW must first decide whether two writes conflict at all: whether one *happened before* the other (the later one legitimately overwrites) or the two were *concurrent* (neither knew of the other; a real conflict). Timestamps cannot decide this; *version vectors* can: each value carries a counter per replica, a write that read version $v$ supersedes $v$, and a write that did not is concurrent and is stored alongside it as a sibling for the application to merge. The machinery is off this course's path; DDIA pp. 184–191 develops it fully.
+</Remark>
+
+## Leaderless replication: quorums instead of failover
+
+The third scheme abandons the leader entirely. In Dynamo-style stores (Riak, Cassandra, Voldemort) the client sends a write to all $n$ replicas in parallel and counts acknowledgments; there is no failover, because there is no role to fail over. A node that was down during a write simply misses it, and two repair mechanisms fill the hole: *read repair*, where a client reading from several nodes notices a stale response by its version number and writes the fresh value back, and an *anti-entropy* background process diffing replicas. The design question is how many acknowledgments make an operation valid.
+
+### Quorum overlap is set intersection
+
+<Example title="quorum arithmetic on the online feature store">
+Supermegaretail's online store keeps each feature row on $n = 3$ replicas. Configure writes to require $w = 2$ acknowledgments and reads to query $r = 2$ replicas. Any two-element subset of three nodes shares at least one node with any other two-element subset, so every read includes at least one replica that saw the latest completed write, and version numbers pick it out of the two responses. One replica can be down, and both reads and writes proceed.
+
+The general condition: with $n$ replicas, $w$ acks per write, and $r$ replicas per read, a read overlaps every completed write when
+
+$$
+w + r > n.
+$$
+
+The count is a pigeonhole: if the write set (size $w$) and read set (size $r$) were disjoint, the cluster would hold $w + r$ distinct nodes, contradicting $w + r > n$. With $n = 5$, $w = 3$, $r = 3$, the arithmetic tolerates two dead nodes: writes still gather 3 acks from the living, reads still query 3, and $3 + 3 = 6 > 5$ keeps the overlap.
+</Example>
+
+<Figure
+  src="./figures/quorum-overlap.svg"
+  alt="Left panel: five nodes with a write reaching three and a read asking three, sharing node 3, labeled w plus r greater than n so the sets must overlap. Right panel: a sloppy quorum where the write landed on three stand-in nodes while the read asks three home nodes, so the counters hold but the sets do not intersect"
+  caption="The quorum guarantee is set intersection. Sloppy quorums keep the counters and move the sets: the overlap silently disappears."
+/>
+
+<Exercise>
+The operations team wants reads as cheap as possible on a 5-replica cluster: $r = 1$, one response per read. State the $w$ the overlap condition forces, and the single event that now stops all writes. Write the inequality before opening the solution.
+
+<Solution>
+$w + r > n$ with $r = 1$ and $n = 5$ forces $w > 4$, so $w = 5$: every write must be acknowledged by all five replicas. Any one replica down or slow blocks every write in the system: the configuration trades write availability for single-read freshness. It is the leaderless rendering of fully synchronous replication, and it is chosen only for read-dominated data where writes are rare and losable delays are acceptable.
+</Solution>
+</Exercise>
+
+### Sloppy quorums keep the counters and move the sets
+
+The overlap guarantee is weaker than it looks, in two documented ways. First, *sloppy quorums*: when a network fault cuts a client off from a value's designated $n$ "home" nodes, the store can accept the write on $w$ reachable stand-in nodes rather than refuse it, handing the data to its home nodes when the fault heals (*hinted handoff*). Until the handoff completes, a read of $r$ home nodes can miss the write entirely: $w + r > n$ still holds as arithmetic while the sets it was counting no longer intersect. Second, even strict quorums admit timing edge cases (concurrent writes with undefined order, writes that succeeded on fewer than $w$ nodes and were not rolled back), so quorum overlap does not add up to linearizability, the strong guarantee that the system behaves like one copy; <Ref lesson="consistency-and-transactions">the module's extra lesson</Ref> draws that line precisely. Operationally, leaderless staleness is also harder to see: leader-based lag is a subtraction of two log positions, while a leaderless store has no positions to subtract, only probabilistic staleness estimates.
+
+<KeyFact>
+A sloppy quorum is a durability guarantee wearing a consistency guarantee's clothes: the write exists on $w$ nodes somewhere, but no read is promised to find it until hinted handoff completes. A staleness budget over such a store can therefore bound only how long handoff is allowed to run; it cannot promise what reads return while it does.
+</KeyFact>
+
+## CAP, stated honestly
+
+The three schemes differ in who accepts writes; none escapes the network. When a partition, a network fault that leaves nodes alive but unable to reach each other, separates replicas, a request arriving on one side meets a forced choice: refuse service until the partition heals, staying consistent at the price of availability, or answer from the local copy, staying available while the copies diverge or the answer goes stale.
+
+<Figure
+  src="./figures/cap-choice.svg"
+  alt="Two replicas on one side of a network partition and one on the other; a write arrives on the isolated side, with two labeled options: refuse it and stay consistent but unavailable, or accept it locally and stay available while the copies diverge"
+  caption="CAP as it actually presents: a per-request choice during a fault, not a menu of three properties."
+/>
+
+This is the CAP theorem's entire practical content, and the popular phrasing (consistency, availability, partition tolerance: pick two of three) misstates it. Partitions are faults, not options: they happen whether or not they were picked, so "P" is not on the menu, and while the network works a system can be both consistent and available. The honest phrasing is **either consistent or available when partitioned**. The formal theorem is narrower still: it addresses one consistency model (linearizability) and one fault (partitions), and says nothing about latency, dead nodes, or any other tradeoff, which is why it has been superseded by more precise results and functions today mostly as a warning against slogans.
+
+<KeyFact>
+CAP does not classify databases; it names one choice one fault forces. A system is not "CP" or "AP" as an identity: each operation, on each side of each partition, either waits for coordination or answers from what it has.
+</KeyFact>
+
+### The posture ML serving takes
+
+ML-serving infrastructure almost uniformly answers from what it has. The comparison that decides it: a prediction computed from a feature five seconds stale is a slightly degraded prediction; a prediction request refused because the freshest copy is unreachable is a timeout, a fallback to no model at all, and a user-visible failure. Staleness degrades gracefully and unavailability does not, so the replicated systems inside an ML platform (the online feature store, the model registry serving artifacts to a fleet, the caches in front of both) run eventually consistent by default. They are replicated systems whether anyone designed them as such or not, and <Ref lesson="feature-platform">the module's closing application</Ref> reads one of them (Feast's replicated Redis) against this lesson.
+
+The judgment has a failure mode, and it is the module's recurring one: silence. It is tempting to conclude that since replicas converge, any anomaly is temporary and therefore harmless. The conclusion is false, and the step that fails is the tense: the reads happen *during* the lag, predictions act on them, and the actions stand after the replicas agree. A fraud approval issued on a stale feature is not revoked when the replica catches up, and no exception marks it, because a stale read is a successful read. This is the silent-failure property that distinguishes ML systems from ordinary software, where breakage announces itself.
+
+<KeyFact>
+The engineering posture is not "eventual consistency is fine" but "eventual consistency within a stated budget": a per-feature bound on tolerable staleness, treated as an SLO like the latency targets of <Ref lesson="requirements-and-metrics">the requirements lesson</Ref>, with measured lag monitored against it — the machinery of <Ref lesson="monitoring-and-observability">the monitoring lesson</Ref>. A budget of zero is a demand for synchronous replication and its unavailability; an unstated budget is a fraud approval waiting to happen. The fraud exercise below prices one violation exactly.
+</KeyFact>
+
+What is established: leader-based replication is a log shipped from one write path to many read paths, and the synchronous/asynchronous choice decides whether confirmed writes are durable; failover under asynchronous replication is a forced trade of someone's writes for availability, and GitHub 2012 is what the trade costs when another system holds the discarded keys; lag anomalies come in three named, purchasable guarantees; multi-leader and leaderless schemes buy write availability at the price of conflicts, with quorum overlap as set intersection and sloppy quorums as its quiet failure; and CAP, honestly stated, is the per-partition choice ML serving resolves toward availability under a monitored staleness budget. Everything here still copies the entire dataset to every replica. When the dataset outgrows any one machine, some key must decide which machine owns which records, and that decision has its own failure modes: <Ref lesson="partitioning">partitioning</Ref> is next.
+
+## Exercises
+
+<Exercise>
+A semi-synchronous cluster: leader $L$, synchronous follower $S$, asynchronous followers $A_1$ and $A_2$. $L$ dies mid-traffic. At the moment of death, $L$ has applied writes 1–107, clients have received confirmations for writes 1–104, $S$ holds 1–104, $A_1$ holds 1–101, and $A_2$ holds 1–99. (a) Explain why $S$ holding exactly the confirmed set is no coincidence, and state which follower must be promoted to preserve every confirmed write. (b) The automation instead promotes $A_1$, the first follower to answer its health check. Which confirmed writes are lost, and what would make the loss worse than lost data? (c) $L$ is repaired and rejoins as a follower of the correctly promoted $S$. Which of its writes must it discard, and why is the discard safe?
+
+<Solution>
+(a) Under semi-synchronous replication the leader confirms a write only after the synchronous follower acknowledges it, so every confirmed write is on $S$ by construction: confirmation and presence-on-$S$ are the same event. Writes 105–107 were applied on $L$ but never confirmed, which is why $S$ can lawfully lack them. Promoting $S$ preserves all of 1–104; it is the only replica guaranteed to.
+
+(b) $A_1$ ends at write 101, so confirmed writes 102–104 are discarded even though clients were told they succeeded. This is the GitHub 2012 promotion in miniature: an out-of-date follower chosen over a caught-up one. The loss becomes worse than lost data if any of 102–104 minted identifiers that a second system already stored, because the new leader will reissue those identifiers and the second system still maps them to the old records, turning lag into disclosure.
+
+(c) $L$ returns holding 1–107, three writes ahead of the point where $S$'s history took over; $S$ assigns its own new writes to positions 105 onward, so $L$'s tail and $S$'s log are two different histories for the same positions. $L$ must discard 105–107 and rewind to 104 before consuming $S$'s stream, or the cluster holds a split-brain state reached by another route. The discard is safe because those writes were never confirmed, so no client was promised them. Under fully asynchronous replication the same rewind discards *confirmed* writes, since no follower is guaranteed to match the confirmed set: the acknowledgment-point KeyFact made operational.
+</Solution>
+</Exercise>
+
+<Exercise>
+Push the write quorum to the boundary: $w = n$, $r = 1$ (every replica acknowledges every write). Which class of anomalies from this lesson disappears, and, using the tail arithmetic of <Ref lesson="requirements-and-metrics">the requirements lesson</Ref>, why does the slowest replica now set the p99 write latency? Take $n = 7$ and a 1% chance that any given replica is slow on any given write.
+
+<Solution>
+Disappears: the entire stale-read class. Every completed write is on every replica, so any single-replica read returns it: read-your-writes, monotonic reads, and (given a single write order) consistent prefix all hold for acknowledged writes. The price is the one the in-body exercise computed: a single dead node blocks every write.
+
+Tail arithmetic: a write is slow if *any* of the 7 acknowledgments is slow. With per-replica slow probability $p = 0.01$, $P(\text{write slow}) = 1 - (1-p)^7 = 1 - 0.99^7 \approx 6.8\%$. A 1-in-100 per-node event becomes a 1-in-15 per-write event: the write path inherits the maximum of seven latencies, so the p99 of the write is governed by the worst replica's tail, exactly the fan-out amplification the requirements lesson derived for parallel backend calls.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Our replicas are eventually consistent, so any read anomaly is temporary and therefore harmless." Use this case: a fraud model reads `account_txn_count_1h` for a card. The card makes a suspicious transaction at 12:00:00, which the feature pipeline writes to the online store's leader; the fraudster immediately makes a second transaction at 12:00:20, and the model's feature read lands on a replica 30 seconds behind. Name the step of the claim that fails and the guarantee that would have prevented the loss.
+
+<Solution>
+The stale replica still shows `account_txn_count_1h = 0`: the 12:00:00 transaction has not reached it. The model scores the second transaction as a first offense and approves it. Two minutes later the replica converges, the feature reads 2, and nothing changes: the approval was issued, the money moved, and no error was ever raised, because a stale read is a successful read.
+
+The failing step is "temporary implies harmless": the anomaly is temporary, but the decision made during it is permanent. Eventual consistency bounds when replicas agree; it says nothing about what acted on them while they disagreed.
+
+The preventing guarantee is read-your-writes, applied to the pipeline as the client: the fraud system's feature reads must reflect the fraud system's own recent feature writes for the same entity. Implementation per the lesson: pin feature reads for entities with writes in the last $T$ seconds to the leader, or carry the entity's last-write position and require the serving replica to have reached it. The residual exposure is then the staleness budget $T$, which is a number to monitor, not an accident.
+</Solution>
+</Exercise>
+
+<Exercise>
+Three incident reports. For each, name the anomaly (or state that none of the lesson's guarantees is violated) and the cheapest fix: (a) a user edits their review, refreshes, and sees the old text; (b) an operations dashboard's "orders today" figure drops by 40 between two refreshes ten seconds apart; (c) user A updates a delivery preference and sees it immediately, but user B, viewing A's public profile, still sees the old preference for another minute.
+
+<Solution>
+(a) Read-your-writes violation: the user's read missed their own write. Cheapest fix: route reads of self-editable data (the user's own reviews) to the leader; no timestamps, no session state, just a routing rule on data the user alone can modify.
+
+(b) Monotonic-reads violation: the two refreshes hit replicas with different lag, and the second was further behind, so a monotone counter appeared to decrease. Cheapest fix: session stickiness. Hash the session to one replica so successive reads never move backward. The count may be stale; it will no longer regress.
+
+(c) No named guarantee is violated. Read-your-writes covers A's reads of A's writes, which worked; it promises nothing to B, and monotonic reads is not implicated since B never saw the new value. This is eventual consistency operating as designed. If the product genuinely requires B's immediate visibility, that is a freshness requirement above the lag guarantees, purchasable as leader reads for that data class at leader-read cost; the cheapest correct fix is nothing.
+</Solution>
+</Exercise>
+
+<Exercise>
+Show that last-write-wins can discard a write that is unambiguously *last* by wall-clock truth, not merely a concurrent one. Construct the scenario: two nodes accepting writes for the same key, one node's clock skewed, two writes issued in sequence by parties who each saw the previous state. Then state what the failure implies about the word "last" in a system without synchronized clocks.
+
+<Solution>
+Node $N_1$ has a correct clock; node $N_2$'s clock runs 10 seconds slow. At true time 12:00:00, an analyst raises a card's limit: the write goes through $N_1$ and is stamped 12:00:00. At true time 12:00:05, a fraud responder who saw the raised limit and is reacting to it (so the writes are causally ordered, not concurrent) freezes the card: the write goes through $N_2$ and is stamped 11:59:55.
+
+LWW keeps the largest timestamp: 12:00:00 beats 11:59:55, so every replica converges to the raised limit and the freeze is discarded on all of them. The write that happened last by wall-clock truth, and that causally depended on the first, loses to clock skew, silently: both clients were told their writes succeeded.
+
+The implication: "last" presupposes an order, and wall clocks across machines do not supply one; 10 seconds of skew is well within what unsynchronized clocks exhibit. An order that respects causality must be built from what nodes actually observed (the happens-before relation the version-vector Remark gestured at), not from timestamps. Clock unreliability and the machinery that replaces clock order are taken up in <Ref lesson="consistency-and-transactions">the module's extra lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Your feature store's online tier is a Redis cluster of 16 shards, each shard a leader with two replicas, the keyspace divided among shards by key hash. During a failover, one shard's promoted replica turns out to lag by 30 seconds. Write the one-sentence blast-radius statement an incident channel needs: which users, which features, how stale, and who is unaffected.
+
+<Solution>
+"For the duration of the catch-up, features for the roughly 1-in-16 entities whose keys hash to shard 11 may read up to 30 seconds stale; the other 15 shards, and therefore all other entities, are serving normally."
+
+The statement's precision comes entirely from the keyspace division: the lag is bounded to the keys the failed shard owns, so the blast radius is a fraction of entities, not a fraction of requests or a global degradation. Reasoning about which keys live on which node (how the division is made, what it costs range queries, and what happens when a shard must move) is exactly <Ref lesson="partitioning">partitioning</Ref>, the next lesson.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017 — Ch. 5: leaders and followers, sync/async replication, and follower setup (pp. 151–161); replication lag and the three guarantees (pp. 161–167); multi-leader replication and conflict handling (pp. 168–177); leaderless replication, quorums, and sloppy quorums (pp. 177–184); detecting concurrent writes and version vectors (pp. 184–191). Ch. 9 (pp. 335–337): "The Unhelpful CAP Theorem" sidebar, the source of this lesson's honest phrasing.
+2. J. Newland, "GitHub Availability This Week," The GitHub Blog, September 14, 2012 — the incident report behind the failover sequence: the stale MySQL follower promotion, the reused auto-increment keys, and the Redis inconsistency.
+3. G. DeCandia, D. Hastorun, M. Jampani, et al., "Dynamo: Amazon's Highly Available Key-Value Store," *SOSP*, 2007 — §4.4: the shopping-cart merge semantics (additions preserved, concurrent removals lost); §4.5–4.6: the quorum and hinted-handoff machinery the leaderless section describes. https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf
+4. D. B. Terry, A. J. Demers, K. Petersen, et al., "Session Guarantees for Weakly Consistent Replicated Data," *PDIS*, 1994 — the original formulation of read-your-writes and monotonic reads as per-session guarantees.
+5. M. Kleppmann, "A Critique of the CAP Theorem," arXiv:1509.05393, 2015 — the full argument that CAP's definitions do not support the "pick 2 of 3" usage, with the more precise results that supersede it. https://arxiv.org/abs/1509.05393
+6. D. Martin, *The System Design Primer* — the consistency patterns (weak/eventual/strong) and availability patterns (fail-over, active-passive/active-active) sections: the practitioner's compressed map of this lesson's territory. https://github.com/donnemartin/system-design-primer#consistency-patterns
+7. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 2, "Reliability" (pp. 29–30): ML systems fail silently, the property that makes staleness budgets a monitoring obligation rather than a nicety.
+</References>

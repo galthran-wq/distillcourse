@@ -1,0 +1,568 @@
+concepts:
+  # ── Module 1: the production ML problem ──────────────────────────────
+  - id: hidden-technical-debt
+    name: Hidden technical debt
+    definition: "The ML-specific maintenance costs — entanglement, data dependencies, feedback loops, glue code — that accrue at the system level, invisible to code review"
+    introduced_in: ml-in-production
+  - id: cace-principle
+    name: CACE principle
+    definition: "Changing Anything Changes Everything: no input signal, hyperparameter, or setting of an ML model is independent of the others"
+    introduced_in: ml-in-production
+  - id: ml-lifecycle
+    name: ML lifecycle loop
+    definition: "The iterative cycle scoping → data → model → deployment → monitoring → business analysis, with backward arrows at every stage"
+    introduced_in: ml-in-production
+  - id: percentile-latency
+    name: Percentile latency
+    definition: "Latency reported as distribution quantiles (p50/p95/p99); tail percentiles amplify under fan-out to parallel backends"
+    introduced_in: requirements-and-metrics
+  - id: throughput
+    name: Throughput
+    definition: "Requests or predictions processed per unit time; batching can raise throughput and latency simultaneously"
+    introduced_in: requirements-and-metrics
+  - id: slo
+    name: SLO / availability budget
+    definition: "A service-level objective: a target on latency or availability (the 'nines'), with error budget as its complement"
+    introduced_in: requirements-and-metrics
+  - id: metrics-hierarchy
+    name: Metrics hierarchy
+    definition: "The chain loss → offline metric → online proxy metric → business metric, with a validity gap at each link"
+    introduced_in: requirements-and-metrics
+  - id: objective-decoupling
+    name: Objective decoupling
+    definition: "Serving multiple objectives with separate models combined by tunable weights at serving time, instead of one blended training loss"
+    introduced_in: requirements-and-metrics
+  - id: problem-framing
+    name: Problem framing
+    definition: "Casting a business need as a specific ML task (classification / regression / ranking, input/output choice) — the choice that fixes labels, retraining cost, and failure modes"
+    introduced_in: problem-framing-and-baselines
+  - id: baseline-ladder
+    name: Baseline ladder
+    definition: "The comparison sequence every model must beat: random, zero-rule (majority), heuristic, human, existing system"
+    introduced_in: problem-framing-and-baselines
+  - id: design-document
+    name: ML design document
+    definition: "The written artifact fixing problem definition, metrics, data, validation, baselines, and risks before implementation"
+    introduced_in: the-design-document
+
+  # ── Module 2: data systems fundamentals ──────────────────────────────
+  - id: column-storage
+    name: Column-oriented storage
+    definition: "Storing values of one column contiguously (Parquet/ORC) so analytical scans read only needed columns and compress well"
+    introduced_in: storage-and-data-models
+  - id: oltp-olap
+    name: OLTP vs OLAP
+    definition: "Transactional access (many small reads/writes by key) versus analytical access (bulk scans and aggregates) — opposite engine designs"
+    introduced_in: storage-and-data-models
+  - id: data-warehouse-lake
+    name: Data warehouse and data lake
+    definition: "Schema-on-write structured analytical store versus schema-on-read raw-object store; where training data is assembled"
+    introduced_in: storage-and-data-models
+  - id: etl-elt
+    name: ETL / ELT
+    definition: "Extract-transform-load versus extract-load-transform: whether transformation happens before or after landing in the analytical store"
+    introduced_in: storage-and-data-models
+  - id: replication-lag
+    name: Replication lag
+    definition: "The delay between a write on the leader and its visibility on followers; the source of user-visible read anomalies"
+    introduced_in: replication
+  - id: read-your-writes
+    name: Read-your-writes consistency
+    definition: "The guarantee that a client sees its own committed writes; one of the lag guarantees with monotonic reads and consistent prefix"
+    introduced_in: replication
+  - id: quorum
+    name: Quorum
+    definition: "Requiring w writers and r readers of n replicas with w + r > n so read and write sets overlap"
+    introduced_in: replication
+  - id: cap-theorem
+    name: CAP tradeoff
+    definition: "Under a network partition, a system chooses consistency or availability — 'consistent or available when partitioned'"
+    introduced_in: replication
+  - id: sharding
+    name: Partitioning (sharding)
+    definition: "Splitting a dataset across nodes by key range or key hash; range keeps scans, hash spreads load"
+    introduced_in: partitioning
+  - id: hot-key
+    name: Hot key
+    definition: "A single key receiving disproportionate load that defeats even partitioning; mitigated by key splitting at a read-side cost"
+    introduced_in: partitioning
+  - id: rebalancing
+    name: Rebalancing
+    definition: "Moving partitions when nodes join or leave; schemes are judged by how little data moves (hash mod N moves nearly everything)"
+    introduced_in: partitioning
+  - id: consistent-hashing
+    name: Consistent hashing
+    definition: "Assigning keys to nodes on a hash ring (with virtual nodes) so membership changes move only ~1/N of keys"
+    introduced_in: partitioning
+  - id: acid-isolation
+    name: ACID and isolation levels
+    definition: "Atomicity as abortability, isolation as protection from concurrency anomalies (dirty reads, lost updates, write skew), graded in levels"
+    introduced_in: consistency-and-transactions
+  - id: linearizability
+    name: Linearizability
+    definition: "The single-copy illusion: every operation appears to take effect atomically at one point between its start and end"
+    introduced_in: consistency-and-transactions
+  - id: fencing-token
+    name: Fencing token
+    definition: "A monotonically increasing token checked by the resource itself, defeating writes from clients holding expired leases"
+    introduced_in: consistency-and-transactions
+  - id: message-broker
+    name: Message broker
+    definition: "An intermediary decoupling producers from consumers; ack-and-delete brokers load-balance, log-based brokers preserve order and allow replay"
+    introduced_in: queues-and-logs
+  - id: event-log
+    name: Partitioned event log
+    definition: "An append-only, partitioned, replayable sequence of records (Kafka-style) consumed by offset"
+    introduced_in: queues-and-logs
+  - id: change-data-capture
+    name: Change data capture
+    definition: "Publishing a database's change stream so derived systems (index, cache, warehouse) follow the same ordered truth"
+    introduced_in: queues-and-logs
+  - id: backpressure
+    name: Backpressure
+    definition: "The mechanism by which a slow consumer slows producers instead of being buried; buffering, dropping, or blocking"
+    introduced_in: queues-and-logs
+  - id: batch-processing
+    name: Batch processing
+    definition: "Computation over a bounded input that reruns from scratch (MapReduce lineage, dataflow engines); output is a pure function of input"
+    introduced_in: batch-and-stream-processing
+  - id: stream-processing
+    name: Stream processing
+    definition: "Incremental computation over unbounded event streams with managed state and windows"
+    introduced_in: batch-and-stream-processing
+  - id: event-time
+    name: Event time vs processing time
+    definition: "When an event happened versus when the system saw it; conflating them corrupts windows under lag and replay"
+    introduced_in: batch-and-stream-processing
+  - id: windowing
+    name: Windowing
+    definition: "Grouping a stream for aggregation: tumbling, hopping, sliding, and session windows"
+    introduced_in: batch-and-stream-processing
+  - id: lambda-architecture
+    name: Lambda architecture
+    definition: "Running batch and stream paths in parallel and merging results — and the two-codebase tax that motivates unifying them"
+    introduced_in: batch-and-stream-processing
+  - id: streaming-features
+    name: Static vs streaming features
+    definition: "Features computed in batch over history versus features computed online over recent events — the split behind every serving choice"
+    introduced_in: batch-and-stream-processing
+  - id: feature-store
+    name: Feature store
+    definition: "A dual store — offline warehouse for training reads, online key-value for serving reads — computing each feature once for both"
+    introduced_in: feature-platform
+
+  # ── Module 3: training data and features ─────────────────────────────
+  - id: natural-labels
+    name: Natural labels
+    definition: "Labels produced by product mechanics (click, purchase, arrival time), each with a feedback-loop length that bounds retraining speed"
+    introduced_in: labels-and-feedback-loops
+  - id: weak-supervision
+    name: Weak supervision
+    definition: "Programmatic labeling: many noisy heuristic labeling functions combined and denoised into probabilistic labels"
+    introduced_in: labels-and-feedback-loops
+  - id: active-learning
+    name: Active learning
+    definition: "Choosing which examples to label by model uncertainty (margin sampling, query-by-committee) to maximize labels' value"
+    introduced_in: labels-and-feedback-loops
+  - id: reservoir-sampling
+    name: Reservoir sampling
+    definition: "Maintaining a uniform fixed-size sample over a stream of unknown length in one pass"
+    introduced_in: labels-and-feedback-loops
+  - id: data-leakage
+    name: Data leakage
+    definition: "Label information reaching features or splits that will not exist at prediction time, inflating offline metrics"
+    introduced_in: data-leakage-and-splitting
+  - id: repeatable-splitting
+    name: Repeatable splitting
+    definition: "Deterministic splits by hashing a correlated key (and by time for temporal data) so correlated rows never straddle the boundary"
+    introduced_in: data-leakage-and-splitting
+  - id: adversarial-validation
+    name: Adversarial validation
+    definition: "Training a classifier to distinguish two datasets; AUC near 0.5 certifies they are indistinguishable, higher locates the leak or shift"
+    introduced_in: data-leakage-and-splitting
+  - id: hashing-trick
+    name: Feature hashing
+    definition: "Mapping unbounded categorical vocabularies into a fixed hash space, trading collisions for out-of-vocabulary robustness"
+    introduced_in: features-at-scale
+  - id: feature-cross
+    name: Feature cross
+    definition: "A synthetic feature from the cartesian product of categoricals, giving linear models interaction terms"
+    introduced_in: features-at-scale
+  - id: embeddings-as-features
+    name: Embeddings as features
+    definition: "Dense learned vectors representing high-cardinality entities, co-trained with the task or pretrained and reused"
+    introduced_in: features-at-scale
+  - id: training-serving-skew
+    name: Training–serving skew
+    definition: "Any difference between features at training and serving time; decomposes into train/holdout, holdout/next-day, next-day/live gaps"
+    introduced_in: training-serving-skew
+  - id: transform-pattern
+    name: Transform pattern
+    definition: "Baking feature transforms into the exported model artifact so training and serving share one implementation"
+    introduced_in: training-serving-skew
+  - id: point-in-time-correctness
+    name: Point-in-time correctness
+    definition: "Joining features as of each label's timestamp so training never sees values from the label's future"
+    introduced_in: training-serving-skew
+  - id: data-schema
+    name: Data schema (for validation)
+    definition: "A versioned contract per feature — presence, type, valency, domain — that production data is checked against"
+    introduced_in: data-validation
+  - id: data-validation-pipeline
+    name: Data validation pipeline
+    definition: "Automated statistics, schema checks, and skew/drift comparators between datasets, with anomalies triaged as schema-evolution or data-bug"
+    introduced_in: data-validation
+
+  # ── Module 4: training pipelines and offline evaluation ──────────────
+  - id: experiment-tracking
+    name: Experiment tracking
+    definition: "Recording per-run metrics, parameters, artifacts, and environment so results are comparable and reproducible"
+    introduced_in: experiment-tracking-and-versioning
+  - id: data-versioning
+    name: Data and model versioning
+    definition: "Pointer-based versioning of datasets and model artifacts alongside code, since line diffs and merges are undefined for data"
+    introduced_in: experiment-tracking-and-versioning
+  - id: model-lineage
+    name: Model lineage
+    definition: "The traceable graph of artifacts and executions answering which data, code, and config produced a given model"
+    introduced_in: experiment-tracking-and-versioning
+  - id: configuration-debt
+    name: Configuration debt
+    definition: "The accumulated risk of config outgrowing code; countered by diffable, validated, reviewed configuration"
+    introduced_in: experiment-tracking-and-versioning
+  - id: data-parallelism
+    name: Data parallelism
+    definition: "Replicating the model and splitting batches across workers; synchronous all-reduce vs asynchronous parameter servers"
+    introduced_in: distributed-training
+  - id: model-parallelism
+    name: Model parallelism
+    definition: "Splitting a model's parameters across devices when it does not fit on one"
+    introduced_in: distributed-training
+  - id: pipeline-parallelism
+    name: Pipeline parallelism
+    definition: "Splitting a model by layers across devices and filling the idle bubble with micro-batches"
+    introduced_in: distributed-training
+  - id: checkpointing
+    name: Checkpointing
+    definition: "Saving full training state — weights, optimizer, schedule, RNG — for resumption, selection, and fine-tuning"
+    introduced_in: distributed-training
+  - id: warm-starting
+    name: Warm-starting
+    definition: "Initializing a new model version from the previous one's parameters to trade training cost against freshness"
+    introduced_in: distributed-training
+  - id: slice-based-evaluation
+    name: Slice-based evaluation
+    definition: "Computing metrics on critical data subsets, because aggregates can hide or even reverse subgroup performance (Simpson's paradox)"
+    introduced_in: offline-evaluation
+  - id: calibration
+    name: Calibration
+    definition: "Agreement between predicted probabilities and observed frequencies; measured by reliability curves, repaired by Platt/isotonic scaling"
+    introduced_in: offline-evaluation
+  - id: behavioral-testing
+    name: Behavioral testing
+    definition: "Perturbation, invariance, and directional-expectation tests that probe model behavior beyond aggregate metrics"
+    introduced_in: offline-evaluation
+  - id: model-validation-gate
+    name: Model validation gate
+    definition: "An automated pre-deployment check: safe to serve, and better than the live baseline on threshold and delta"
+    introduced_in: offline-evaluation
+  - id: ml-pipeline
+    name: ML pipeline
+    definition: "Training expressed as a DAG of tested, containerized components — ingestion, validation, transform, train, evaluate, push"
+    introduced_in: pipelines-and-orchestration
+  - id: orchestration
+    name: Orchestration
+    definition: "Scheduling and executing pipeline DAGs with retries, resources, and triggers (Airflow/Kubeflow-class tooling)"
+    introduced_in: pipelines-and-orchestration
+  - id: mlops-maturity
+    name: MLOps maturity levels
+    definition: "Level 0 manual, level 1 automated continuous training, level 2 CI/CD of the pipeline itself"
+    introduced_in: pipelines-and-orchestration
+
+  # ── Module 5: serving and deployment ─────────────────────────────────
+  - id: batch-prediction
+    name: Batch prediction
+    definition: "Precomputing predictions asynchronously for later lookup; high throughput, bounded staleness"
+    introduced_in: batch-and-online-prediction
+  - id: online-prediction
+    name: Online prediction
+    definition: "Computing predictions on request, from precomputed (batch) or fresh (streaming) features, under a latency budget"
+    introduced_in: batch-and-online-prediction
+  - id: quantization
+    name: Quantization
+    definition: "Reducing numeric precision (FP32→INT8/INT4) of weights and activations to cut memory and latency, post-training or in training"
+    introduced_in: model-compression
+  - id: distillation
+    name: Knowledge distillation
+    definition: "Training a small student on a large teacher's outputs, keeping most quality at a fraction of the cost"
+    introduced_in: model-compression
+  - id: pruning
+    name: Pruning
+    definition: "Zeroing or removing low-value weights to sparsify a network"
+    introduced_in: model-compression
+  - id: model-compilation
+    name: Model compilation
+    definition: "Lowering a model through intermediate representations to fused, tuned kernels for the target hardware"
+    introduced_in: model-compression
+  - id: model-server
+    name: Model server
+    definition: "A process serving exported models behind RPC/REST: versioned loading, hot swap, batching, multi-model management"
+    introduced_in: model-servers-and-scaling
+  - id: dynamic-batching
+    name: Dynamic batching
+    definition: "Accumulating concurrent requests into one batched inference call, trading bounded queueing delay for throughput"
+    introduced_in: model-servers-and-scaling
+  - id: prediction-caching
+    name: Prediction and feature caching
+    definition: "Cache-aside/write-through caching of predictions or features, with invalidation and staleness costs"
+    introduced_in: model-servers-and-scaling
+  - id: autoscaling
+    name: Autoscaling and load balancing
+    definition: "Horizontal replica scaling behind load balancers across failure domains, driven by SLOs"
+    introduced_in: model-servers-and-scaling
+  - id: shadow-deployment
+    name: Shadow deployment
+    definition: "Running the candidate on live traffic without acting on its output; safe, but blind to feedback effects"
+    introduced_in: deployment-and-online-experiments
+  - id: canary-release
+    name: Canary release
+    definition: "Routing a small, growing traffic share to the candidate with automatic rollback on regression"
+    introduced_in: deployment-and-online-experiments
+  - id: ab-testing
+    name: A/B testing
+    definition: "Randomized controlled comparison on live traffic: hypothesis, splitting unit, significance, and pre-sized samples"
+    introduced_in: deployment-and-online-experiments
+  - id: minimum-detectable-effect
+    name: Minimum detectable effect
+    definition: "The smallest lift an experiment is powered to detect; drives the sample-size formula"
+    introduced_in: deployment-and-online-experiments
+  - id: bandits
+    name: Multi-armed bandits
+    definition: "Adaptive traffic allocation (Thompson sampling, UCB) trading exploration against exploitation; far more sample-efficient than fixed splits"
+    introduced_in: deployment-and-online-experiments
+
+  # ── Module 6: monitoring and continual learning ──────────────────────
+  - id: covariate-shift
+    name: Covariate shift
+    definition: "P(X) changes while P(Y|X) holds — the inputs move, the relationship does not"
+    introduced_in: failures-and-drift
+  - id: label-shift
+    name: Label shift
+    definition: "P(Y) changes while P(X|Y) holds — the outcome base rate moves"
+    introduced_in: failures-and-drift
+  - id: concept-drift
+    name: Concept drift
+    definition: "P(Y|X) itself changes — the same input now means a different outcome; gradual, sudden, or recurring"
+    introduced_in: failures-and-drift
+  - id: degenerate-feedback-loop
+    name: Degenerate feedback loop
+    definition: "System outputs shaping future inputs that retrain the system, amplifying initial biases (popularity spirals)"
+    introduced_in: failures-and-drift
+  - id: monitoring-pyramid
+    name: Monitoring pyramid
+    definition: "Four monitored layers: software health, data quality, model quality, business KPIs — each catching what the layer above misses"
+    introduced_in: monitoring-and-observability
+  - id: two-sample-test
+    name: Two-sample drift tests
+    definition: "Statistical tests (KS, chi-squared, MMD) comparing a reference window to a test window, after dimensionality reduction where needed"
+    introduced_in: monitoring-and-observability
+  - id: observability
+    name: Observability
+    definition: "Instrumentation sufficient to diagnose unforeseen failures from outputs — logs, traces, sliceable metrics — beyond fixed dashboards"
+    introduced_in: monitoring-and-observability
+  - id: continual-learning
+    name: Continual learning
+    definition: "Updating models on fresh data as a policy — champion/challenger evaluation, staged maturity, trigger-driven retraining"
+    introduced_in: continual-learning
+  - id: stateful-training
+    name: Stateful training
+    definition: "Fine-tuning the previous model on new data instead of retraining from scratch; cheaper and fresher, needs lineage discipline"
+    introduced_in: continual-learning
+  - id: retraining-trigger
+    name: Retraining trigger
+    definition: "The condition that fires retraining: schedule, performance drop, data volume, or detected drift"
+    introduced_in: continual-learning
+  - id: differential-privacy
+    name: Differential privacy
+    definition: "A noise budget (epsilon) bounding how much any individual's data can change a computation's output"
+    introduced_in: privacy-and-fairness
+  - id: federated-learning
+    name: Federated learning
+    definition: "Training across devices that never share raw data, aggregating only model updates"
+    introduced_in: privacy-and-fairness
+  - id: model-card
+    name: Model card
+    definition: "A standardized disclosure of a model's intended use, evaluation slices, training data, and limitations"
+    introduced_in: privacy-and-fairness
+  - id: demographic-parity
+    name: Demographic parity and equal opportunity
+    definition: "Fairness criteria on the confusion matrix: equal positive rates vs equal true-positive rates across groups"
+    introduced_in: privacy-and-fairness
+
+  # ── Module 7: canonical system designs ───────────────────────────────
+  - id: candidate-generation
+    name: Candidate generation
+    definition: "The funnel's first stage: cheap retrieval narrowing millions of items to hundreds, usually from several parallel sources"
+    introduced_in: recommender-funnel
+  - id: two-tower
+    name: Two-tower retrieval
+    definition: "Separate query and item encoders scored by dot product, enabling precomputed item embeddings and ANN lookup"
+    introduced_in: recommender-funnel
+  - id: ann-search
+    name: Approximate nearest-neighbor search
+    definition: "Sublinear similarity search over embedding corpora (HNSW, IVF, hashing), trading recall for QPS"
+    introduced_in: recommender-funnel
+  - id: reranking
+    name: Re-ranking
+    definition: "The funnel's last stage: business logic over the top candidates — diversity, freshness, fairness, dedup"
+    introduced_in: recommender-funnel
+  - id: ctr-prediction
+    name: CTR prediction
+    definition: "Pointwise probability-of-engagement modeling for ranking and auctions, where calibration carries money"
+    introduced_in: ranking-and-ctr
+  - id: normalized-cross-entropy
+    name: Normalized cross-entropy
+    definition: "Log loss divided by the log loss of always predicting the base rate; comparable across datasets with different CTRs"
+    introduced_in: ranking-and-ctr
+  - id: position-bias
+    name: Position bias
+    definition: "Higher-ranked items get clicked for their position, not their quality; corrected by position features or propensity weighting"
+    introduced_in: ranking-and-ctr
+  - id: contrastive-learning
+    name: Contrastive representation learning
+    definition: "Training embeddings by pulling query–positive pairs together against in-batch negatives through a softmax over similarities"
+    introduced_in: embedding-based-search
+  - id: ndcg
+    name: nDCG and the ranking-metric ladder
+    definition: "Discounted cumulative gain normalized by the ideal ordering — the metric that survives MRR's and precision@k's counterexamples"
+    introduced_in: embedding-based-search
+  - id: query-understanding
+    name: Query understanding
+    definition: "Turning a raw query into retrievable form — normalization, tokenization, embedding — and fusing text match with content similarity into one candidate set"
+    introduced_in: design-search-ranking
+  - id: engagement-score
+    name: Engagement score
+    definition: "One ordering score from many predicted reactions: a business-weighted sum of per-head probabilities, with negative weights as guardrails"
+    introduced_in: design-feed-ranking
+  - id: impression-discounting
+    name: Impression discounting
+    definition: "Decaying a candidate's score with each exposure the user saw and ignored, so a feed does not re-serve what was already rejected"
+    introduced_in: design-feed-ranking
+  - id: ad-auction
+    name: Ad auction serving
+    definition: "Ranking ads by expected value $P(\\text{click}) \\times \\text{bid}$ inside an auction, where calibration errors are directly priced"
+    introduced_in: design-ad-click-prediction
+  - id: budget-split-testing
+    name: Budget-split testing
+    definition: "An A/B design that splits each campaign's budget into independent halves so treatment and control do not compete for the same spend"
+    introduced_in: design-ad-click-prediction
+  - id: multimodal-fusion
+    name: Early vs late multimodal fusion
+    definition: "Combining text, image, and metadata either as one joint representation before the classifier (early) or as separate per-modality predictions merged after (late)"
+    introduced_in: design-harmful-content
+  - id: human-review-loop
+    name: Human review loop
+    definition: "A model as triage for human decision-makers: ranking a review queue by severity and uncertainty, with reviewer verdicts and appeals feeding back as labels"
+    introduced_in: design-harmful-content
+
+  # ── Module 8: AI engineering ─────────────────────────────────────────
+  - id: foundation-model-adaptation
+    name: Foundation-model adaptation
+    definition: "Building on a model trained by someone else: prompt, retrieve, fine-tune — evaluation-gated at each rung"
+    introduced_in: foundation-models-in-production
+  - id: hallucination
+    name: Hallucination
+    definition: "Fluent, confident, false generation; leading accounts are self-delusion (snowballing own tokens) and mimicking knowledge the model lacks"
+    introduced_in: foundation-models-in-production
+  - id: token-economics
+    name: Token economics
+    definition: "Cost and latency accounting per token: input vs output pricing, TTFT vs total latency, API-vs-self-host crossover"
+    introduced_in: foundation-models-in-production
+  - id: model-selection-workflow
+    name: Model-selection workflow
+    definition: "Filter by hard attributes → public benchmarks → own evals → production monitoring, iterated"
+    introduced_in: foundation-models-in-production
+  - id: in-context-learning
+    name: In-context learning
+    definition: "Steering a frozen model with instructions and examples in the prompt; zero- and few-shot"
+    introduced_in: prompting-and-context
+  - id: context-window
+    name: Context window as a resource
+    definition: "The bounded, position-sensitive input budget; models attend unevenly (lost in the middle), so placement is a ranking decision"
+    introduced_in: prompting-and-context
+  - id: prompt-injection
+    name: Prompt injection
+    definition: "Adversarial instructions entering via user input or retrieved data to override system intent"
+    introduced_in: prompting-and-context
+  - id: instruction-hierarchy
+    name: Instruction hierarchy
+    definition: "Model-level privilege ordering — system > user > model output > tool output — as an injection defense"
+    introduced_in: prompting-and-context
+  - id: rag
+    name: Retrieval-augmented generation
+    definition: "Per-query context construction from an external index, making knowledge updatable and inspectable without retraining"
+    introduced_in: retrieval-augmented-generation
+  - id: chunking
+    name: Chunking
+    definition: "Splitting documents into retrievable units; size, overlap, and added context decide what retrieval can ever find"
+    introduced_in: retrieval-augmented-generation
+  - id: hybrid-search
+    name: Hybrid search and rank fusion
+    definition: "Combining term-based and embedding-based retrieval, merged by reciprocal rank fusion, often followed by a reranker"
+    introduced_in: retrieval-augmented-generation
+  - id: peft
+    name: Parameter-efficient fine-tuning
+    definition: "Adapting a model by training a small fraction of (added) parameters instead of all weights"
+    introduced_in: finetuning-and-adaptation
+  - id: lora
+    name: LoRA
+    definition: "Low-rank adapters: $W' = W + (\\alpha/r) AB$ with only A, B trained; quantized bases (QLoRA) and multi-adapter serving"
+    introduced_in: finetuning-and-adaptation
+  - id: ai-judge
+    name: AI-as-judge
+    definition: "Using a model to grade open-ended outputs against criteria; biased judges (self-preference, position, verbosity) that must be calibrated"
+    introduced_in: llm-evaluation
+  - id: pass-at-k
+    name: pass@k
+    definition: "Functional-correctness metric: probability that at least one of k sampled generations passes all tests"
+    introduced_in: llm-evaluation
+  - id: comparative-evaluation
+    name: Comparative evaluation
+    definition: "Ranking models from pairwise win rates via Elo/Bradley-Terry, with transitivity and scale caveats"
+    introduced_in: llm-evaluation
+  - id: prefill-decode
+    name: Prefill / decode split
+    definition: "LLM inference's two phases: parallel compute-bound prompt processing, then sequential memory-bandwidth-bound token generation"
+    introduced_in: llm-inference
+  - id: kv-cache
+    name: KV cache
+    definition: "Cached attention keys/values per token; memory grows as $2 \\cdot B \\cdot S \\cdot L \\cdot H \\cdot$ bytes and dominates serving memory"
+    introduced_in: llm-inference
+  - id: continuous-batching
+    name: Continuous batching
+    definition: "Admitting and retiring requests at token granularity so the batch never drains — the serving-throughput workhorse"
+    introduced_in: llm-inference
+  - id: paged-attention
+    name: PagedAttention
+    definition: "Managing the KV cache in fixed-size non-contiguous blocks like OS pages, eliminating fragmentation and enabling sharing"
+    introduced_in: llm-inference
+  - id: speculative-decoding
+    name: Speculative decoding
+    definition: "A small draft model proposes tokens the large model verifies in parallel, accepting the agreeing prefix"
+    introduced_in: llm-inference
+  - id: guardrails
+    name: Guardrails
+    definition: "Input and output checks around the model call — PII masking, injection screens, quality and safety filters — each buying safety with latency"
+    introduced_in: ai-application-architecture
+  - id: model-router
+    name: Model router and gateway
+    definition: "Routing requests across models by intent, difficulty, and cost behind one gateway interface"
+    introduced_in: ai-application-architecture
+  - id: semantic-caching
+    name: Semantic caching
+    definition: "Serving cached responses for similar (not identical) queries by embedding match, trading cost for false-hit risk"
+    introduced_in: ai-application-architecture
+  - id: agent-pattern
+    name: Agent patterns
+    definition: "Models planning and invoking tools in loops; error compounds per step, so plans are validated and write actions gated"
+    introduced_in: ai-application-architecture

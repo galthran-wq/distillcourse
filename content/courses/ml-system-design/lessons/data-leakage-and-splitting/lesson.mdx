@@ -1,0 +1,329 @@
+Leakage is label information reaching features that will not exist at prediction time, and it produces the most dangerous artifact in ML: a validation score that is precisely, confidently wrong.
+
+<Ref lesson="labels-and-feedback-loops">The labeling lesson</Ref> closed the first step of module 3's claim, that training data is manufactured rather than given, with a dataset: labels bought from annotators, harvested from the product, or computed by programs, each bill priced. What it left open, and said so, is whether any offline metric computed on that dataset can be trusted. This lesson supplies the trust discipline: a taxonomy of the routes label information takes into training, the time- and hash-based splitting rules that close the routes running through the split, and the instruments that detect the rest. Cross-validation itself is assumed known; the production questions are different ones: *what unit* the data is split on, and *when*.
+
+The route: why a leaked score is worse than a bad one; six routes in, one worked case each; time-based splits for anything time-correlated; hash-based repeatable splits and the nested-modulo trap; detection, with adversarial validation as the general instrument; and the procedure for updating a split as the data ages.
+
+## The failure mode: a precise number for the wrong question
+
+In July 2021, MIT Technology Review ran an audit under the headline ["Hundreds of AI tools have been built to catch covid. None of them helped."](https://www.technologyreview.com/2021/07/30/1030329/machine-learning-ai-failed-covid-hospital-diagnosis-pandemic/) The models predicted COVID-19 risk from medical scans, evaluated well, and failed in hospitals. The mechanisms recovered by the underlying reviews are instructive. One model was trained on a mix of scans taken lying down and standing up; since seriously ill patients are scanned lying down, it learned to predict severity from body position. Others keyed on the text font particular hospitals stamped on their scans: fonts from harder-hit hospitals became risk predictors. A systematic review of 62 published COVID-prediction models ([Roberts et al., 2021](https://www.nature.com/articles/s42256-021-00307-0)) concluded that **none** were fit for clinical use.
+
+Every one of these models had a validation score, and the score was not noisy or optimistic in some vague way. It was exact, reproducible, and computed correctly — on data that contained the answer. Body position and hospital font are label information wearing a feature's clothes: available in the training tables, absent (or differently distributed) at the bedside where the prediction is made.
+
+### Why the score survives review
+
+This is what makes leakage worse than a weak model. A weak model fails validation and dies in review. A leaky model passes validation, passes review, and passes every offline gate, because all of them are computed on the same contaminated data; it fails only in production, where nobody is computing metrics on the decisions it just got wrong. The reviews above could reconstruct the failure only because researchers went looking years later.
+
+<Figure
+  src="./figures/one-sided-score.svg"
+  alt="Two bars comparing the same model's scores. The offline validation bar stacks a blue real-signal portion and an amber portion labelled inflation, the leaked channel, body position and hospital font; its top is marked reported score, and an amber arrow beside it reads one-sided, up never down. The production bar at a new hospital reaches barely above the dashed chance line, with a dashed amber outline above it marking where the leaked contribution would sit, labelled channel absent at the bedside."
+  caption="One model, two scores. The leaked channel exists only in the offline tables, so everything it contributes is inflation — extra label information moves an offline score in one direction only."
+/>
+
+<KeyFact>
+Leakage's error is one-sided: extra label information can only inflate an offline score, never deflate it. This asymmetry is the basis of every detection technique later in the lesson: a surprisingly large gain is audited as a suspected leak before it is celebrated as a win.
+</KeyFact>
+
+<Aside>
+Leakage operates at competition scale too, where the incentive to find it is maximal. In 2020 the University of Liverpool ran the [Ion Switching competition](https://www.kaggle.com/c/liverpool-ion-switching) on Kaggle: predict the number of open ion channels at each time point. The test data had been synthesized from the training data, and competitors reverse-engineered the construction well enough to recover test labels. The two winning teams were exactly the two teams that exploited the leak. Thousands of skilled people attacking one dataset for months will find any leak it contains; a production team gets no such adversarial audit for free, which is what the detection section substitutes for.
+</Aside>
+
+## Six routes in: a taxonomy by pipeline stage
+
+The definition names what leaks; prevention needs to know where. Each route enters at a specific stage of the data pipeline (collection, preprocessing, or the split itself), and each has a guard specific to that stage.
+
+<Figure
+  src="./figures/leakage-taxonomy.svg"
+  alt="A map of six leakage routes organized under the three pipeline stages where they enter. Under collection: the label hidden in a feature (GDP equals population times GDP per capita) and the generation process (the scanner encodes the diagnosis). Under preprocessing: statistics fit across the split boundary (scaler fit before splitting). Under the split: duplicates straddling the boundary (CIFAR's test-train duplicates), groups cut apart (one patient's two scans), and time ignored (future days in the training set)."
+  caption="Six routes, three doors. The first five are treated below; the sixth, time, owns the next section."
+/>
+
+### The label hidden in a feature
+
+The crudest route is a feature that restates the target. Take the task of predicting a country's GDP from attributes such as area, population, region, and GDP per capita. GDP per capita is *defined* as GDP divided by population, so two of the features multiply back into the label exactly: for the United States in 2020, a population of 331 million times a GDP per capita of about \$63,500 reproduces the \$21.0 trillion target to the precision of the inputs. A model trained on this table learns one multiplication, scores near-perfectly, and knows nothing about economies.
+
+The same route runs through format changes (a monthly-salary column left in a table whose target is yearly salary) and, more dangerously, through **features from the future**. A loan-repayment dataset with a `late_payment_reminders` column looks legitimate: the column exists, it is populated, and it predicts default superbly. But the model scores applicants *before* the loan is issued, when reminders are always zero. The feature is an artifact of the label having already happened. Catching this class requires no statistics, only one audit applied to every column: check that the value exists, with the same meaning, at the moment of prediction.
+
+### The generation process encodes a human's prior
+
+Some leaks are stamped into the data before any table exists. A cancer classifier trained on hospital A's lung CT scans performed well on hospital A's test data and poorly at hospital B. The cause: at hospital A, doctors route patients they already suspect of cancer to a more advanced scanner, and the two machines produce subtly different images. The model had learned to read the machine's signature, which encodes the referring doctor's prior, not the lungs. Hospital B assigns machines at random, so the signal vanished there.
+
+There is no mechanical guard for this class. The mitigations are provenance and preprocessing: record which source produced each example, normalize away source signatures where possible (resampling all scans to one resolution makes the machine harder to identify), and put the people who understand the collection process in the room when features are designed.
+
+### Preprocessing: statistics fit across the boundary
+
+Scaling features requires global statistics, a mean and a variance; imputing missing values requires a mean or median. Computing either on the **full dataset before splitting** hands the model a summary of the test set: the test rows' means and variances are folded into the constants every training row is transformed with. The guard is mechanical and absolute: split first, fit every statistic on the training split only, then apply those training-set constants to all splits. The same discipline extends to exploratory analysis: a feature idea born from staring at the full dataset is a small leak of the test set into the design.
+
+<Figure
+  src="./figures/preprocessing-leakage.svg"
+  alt="Two pipelines compared. Left, the leaky order: the full dataset feeds a scaler fit, whose mean and variance then transform both the training and test splits; an arrow from the test rows into the fitted statistics is highlighted as the leak. Right, the correct order: the data is split first, the scaler is fit on the training split only, and the resulting constants are applied to train and test alike."
+  caption="One reordering closes the route: split, then fit. The constants that transform the test set are allowed to know only the training set."
+/>
+
+<Remark title="the same constants, shipped">
+The constants this guard produces (the training-set mean, the imputation value, the vocabulary) become deployment artifacts: serving must apply exactly these, not recompute its own. The failure mode of forgetting this is real: one production model began emitting garbage when the app's frontend stopped collecting user age and the serving path imputed the missing values with 0, a value the training data had never contained. <Ref lesson="features-at-scale">The next lesson</Ref> designs transforms that survive this, and <Ref lesson="training-serving-skew">the skew lesson</Ref> treats the train/serve boundary in full.
+</Remark>
+
+### Duplicates straddle any random split
+
+If an example appears twice, a random split puts the copies on both sides with high probability, and the test set then partially measures memorization. The humbling case is not an obscure dataset: CIFAR-10 and CIFAR-100, released in 2009 and cited in thousands of vision papers, were found in 2019 ([Barz and Denzler](https://arxiv.org/abs/1902.00423)) to have **3.3% and 10%** of their test images duplicated or near-duplicated in their training sets. The field benchmarked itself against partially-leaked test sets for a decade without noticing.
+
+Duplication enters through data collection, through merging sources (several public COVID imaging datasets turned out to contain one another as components), and through processing: oversampling a minority class *before* splitting manufactures cross-split copies out of clean data. The guards follow: deduplicate before splitting, check again after, and oversample only after the split.
+
+### Groups: the correlated rows are one unit
+
+A patient has two lung CTs taken a week apart; a self-driving car logs ten frames of the same pedestrian milliseconds apart. The labels inside such a group are near-identical, and the examples are near-duplicates by construction rather than by accident. Scatter a group across the split and the model is tested on questions whose answers it saw: it can recognize *this patient's* anatomy in the training set and emit that patient's training label, no medicine required.
+
+<Figure
+  src="./figures/group-leakage.svg"
+  alt="Two panels of the same three patients, each patient contributing three scans drawn as dots in a cluster. Left panel: a random split assigns scans to train and test within the same patient, and one straddling patient cluster is highlighted; the model meets patient B in training and again in test. Right panel: group partitioning assigns each patient's whole cluster to one side, so every test patient is genuinely unseen."
+  caption="The split unit is the patient, not the scan. Left: the split cuts through groups. Right: it runs along them."
+/>
+
+The guard is **group partitioning**: identify the unit within which labels are correlated (patient, user, session, physical object) and assign whole units to one side. Recognizing the unit requires knowing how the data was generated, which is why this class, like the generation-process class, cannot be delegated entirely to tooling.
+
+## Random splits leak the future
+
+The sixth route is the widest, and it owns the rest of the lesson. For genuinely independent rows, a random split is exactly correct: that is the case the shuffle-and-split reflex was built for, and the boundary exercise below makes the conditions precise. The reflex is also how splitting is taught in most courses and reported in most research papers. Production data breaks its premise: most production signals are **time-correlated** (the time an example was generated affects its label's distribution), and for such data a random split places the future in the training set.
+
+### Trend is label information
+
+The stock market is the obvious case: prices of related stocks move together, so a model trained on a random 80% of days has seen the market conditions of the very days it is tested on. The non-obvious cases are the dangerous ones. Whether a listener clicks a recommended song depends on taste, but also on that day's trend: the day an artist dies, everyone streams that artist. A random split feeds the model samples from every day, so at test time it "predicts" a day's clicks with the day's trend already in its weights. At serving time tomorrow's trend is unknowable, and the offline gain evaporates.
+
+<FigureSequence
+  name="time-split"
+  alt="Three frames over one five-week timeline of events whose positive-label rate drifts upward week by week. Frame one shows the raw events in arrival order with the drift visible. Frame two applies a random split: within every week, some events are marked train and some test, and week five's test events share their week's trend with week-five training events. Frame three applies a time split: a cut after week four makes weeks one to four the training set and week five the evaluation set, split into validation and test."
+  caption="The same five weeks under two disciplines. Random splitting trains on the future of every test example; the time split makes evaluation a forecast."
+/>
+
+<Task>
+Step through the three frames and track week 5. In frame 2, count its events on each side of the split and state what the train-side ones carry into the model; in frame 3, name the only information about week 5 available at training time. The answers are "week 5's trend" and "none".
+</Task>
+
+### The time split: evaluation as a forecast
+
+The replacement discipline is the **time split**: train on the past, evaluate on the future, because that is the question production asks every day. With five weeks of data: train on weeks 1–4, then split week 5 randomly into validation and test. The evaluation now simulates a deployment, a *prospective* evaluation, instead of an interpolation.
+
+Three refinements from practice. **Adversarial domains force it even without forecasting.** A fraud model does not predict a time series, but fraudsters adapt to the deployed model, so the only honest question is whether training on the past catches next month's behavior; the split must be sequential for the evaluation to ask it. **Seasonality is stratified, not ignored.** Weather-like signals need all seasons on both sides: one working scheme trains on the first 20 days of every month, validates on the next 5, tests on the last 5, keeping the order within each month. **A gap absorbs boundary correlation.** Leaving 2–3 days unused between train and test both weakens the correlation across the cut and simulates the label and feature lag a live system experiences: <Ref lesson="labels-and-feedback-loops">the labeling window</Ref> means the freshest labels do not exist yet at retraining time, and the split can be honest about that.
+
+<KeyFact>
+A time split certifies exactly one forecast: from the training window to the evaluation window, across whatever shift happened between them. Deployment stretches that certificate — it assumes the shift from the training period to next month is no larger than the one the split measured, and no offline number can check that assumption. Watching it live is <Ref lesson="failures-and-drift">module 6's</Ref> drift monitoring.
+</KeyFact>
+
+## Repeatable splits: hash the unit of correlation
+
+A time split decides *when*; the remaining decision is *what unit*, and the standard tool decides both deterministically. The baseline to beat is this familiar idiom:
+
+```python
+rnd = np.random.rand(len(df))
+train = df[rnd < 0.8]
+```
+
+It has two defects. The split is different on every run, and pinning the seed only pins it for one library in one language, useless when the training pipeline is Python and the data pipeline is SQL. And it splits at the wrong granularity: rows, when the correlated unit is almost never the row. Flights on the same day share that day's weather and congestion, so a row-level split of flight-delay data puts January 2 partly in train and partly in test, leaking the day's conditions across the boundary. The same defect survives seeding, storing the split to disk, and every other fix that keeps the unit wrong.
+
+**Hash-based splitting** repairs both defects with one move: apply a deterministic fingerprint hash to the column that captures the correlation, and split on the hash value.
+
+```sql
+SELECT airline, departure_airport, departure_schedule,
+       arrival_airport, arrival_delay
+FROM flights
+WHERE ABS(MOD(FARM_FINGERPRINT(date), 10)) < 8   -- 80% train
+```
+
+`FARM_FINGERPRINT` (an open-source hash with wrappers in most languages) returns the same value for the same input on every run, in every language, with no seed. Changing `< 8` to `= 8` yields the 10% validation set, `= 9` the test set. Every flight on a given date lands on the same side, because the hash saw only the date.
+
+The split column carries the whole design, and it must satisfy four conditions. Rows sharing its value are the correlated ones: that is the point. It is **not itself a model input**: split on an input column and the trained model never sees 20% of that input's values (day-of-week *extracted* from the date is a legal feature; the raw date is not). It has **enough distinct values**, with 3–5× the modulo denominator as the rule of thumb, so 40-odd distinct dates for a mod-10 split. And the **label is well distributed across its values**: if all delays happened on one date, no assignment of dates balances the splits. Correlation across several columns is handled by hashing their concatenation; hashing a unique row ID is legal but is just a reproducible *random* split, with every time and group defect intact.
+
+<Exercise>
+A review-classification dataset has columns `review_id`, `user_id`, `review_text`, `stars`, `label`. The same person's reviews are strongly correlated (vocabulary, rating habits). Choose the split column, write the training-set `WHERE` clause, and state one column that this choice forbids as a model input and one derived feature that remains legal.
+
+<Solution>
+The correlated unit is the person, so split on `user_id`:
+
+```sql
+WHERE ABS(MOD(FARM_FINGERPRINT(user_id), 10)) < 8
+```
+
+All of one user's reviews land on the same side, so the model cannot recognize a training-set author at test time. Forbidden as an input: `user_id` itself (the model would never see the held-out 20% of users; as an opaque ID it would not generalize anyway, and the same ban covers any per-user embedding learned on this split key). Still legal: features *derived from* the user that take repeated values across users, such as the user's review count bucket or account-age bucket, exactly as day-of-week is legal when the split key is the date. Splitting on `review_id` would be the wrong-unit error: reproducible, and leaky.
+</Solution>
+</Exercise>
+
+### The nested-modulo trap: two filters that silently agree
+
+Hash splitting invites composition (sample a subset, then split the sample), and the obvious composition is broken. Suppose the flights table holds 70 million rows and local development wants roughly a million: pick 1 date in 70, then take 80% of those for training.
+
+```sql
+WHERE ABS(MOD(FARM_FINGERPRINT(date), 70)) = 0    -- 1 in 70
+  AND ABS(MOD(FARM_FINGERPRINT(date), 10)) < 8    -- "80%" of those
+```
+
+Work the arithmetic. Every hash the first filter accepts is divisible by 70, hence divisible by 10, hence `MOD(hash, 10) = 0`, which is always `< 8`. The second filter accepts everything. The "80%" training sample is **100%** of the sample, and the validation (`= 8`) and test (`= 9`) queries return **empty sets**. Nothing errors; the bug announces itself only as a suspiciously large training set and mysteriously empty holdouts, or, with a less lucky choice of ranges, as silently skewed ones.
+
+<Figure
+  src="./figures/nested-modulo.svg"
+  alt="Top: a number line with multiples of 10 ticked in blue and multiples of 70 marked in amber, annotated that every multiple of 70 is a multiple of 10, so hash mod 10 is always zero and the less-than-8 filter passes 100 percent. Bottom: the fix, showing that among multiples of 70 the value of hash mod 700 takes the ten values 0, 70, 140 through 630, of which the first eight (less than 560) are kept, an exact 80 percent."
+  caption="Divisible by 70 implies divisible by 10: the second filter never fires. Scaling the second modulus to 700 restores ten distinguishable classes."
+/>
+
+The fix keeps both filters but makes the second modulus a multiple of the first:
+
+```sql
+WHERE ABS(MOD(FARM_FINGERPRINT(date), 70)) = 0
+  AND ABS(MOD(FARM_FINGERPRINT(date), 700)) < 560   -- 700 = 70·10, 560 = 70·8
+```
+
+Among hashes divisible by 70, `MOD(hash, 700)` takes exactly the ten values $0, 70, 140, \dots, 630$, uniformly for a well-mixed hash; keeping values below $560 = 70 \times 8$ keeps eight of the ten. The general rule: chained modulo filters on the same hash compose only when the moduli are chosen for it. The derivation exercise below shows the clean condition is coprimality; the safe engineering recipe is the one above, second modulus equal to the product.
+
+One check closes the section, and it applies to every scheme in this lesson: after splitting, compare the label distribution across the three splits. Plot the three cumulative distribution functions and read off the maximum vertical distance between each pair: the Kolmogorov–Smirnov statistic. A small maximum distance certifies the splits are exchangeable where it matters most; a visible gap means the split column violated the well-distributed-label condition. The next section turns this idea, *measuring* whether two datasets differ rather than hoping, into a general instrument.
+
+## Detection: instruments that do not trust the score
+
+Prevention assumed the leak was in a known place. Detection is for the rest, and its tools share one stance: the headline metric is the one number that cannot be trusted, because leakage inflates exactly that number.
+
+- **Screen features individually.** Measure each feature's solo predictive power against the label (a one-feature model's AUC, or a correlation). A feature that predicts the label suspiciously well alone is either the discovery of the year or a leak; investigate how it is generated before believing either. Pairs matter too: in an employee-tenure model, start date and end date are individually innocent and jointly *are* the label.
+
+- **Ablate.** Remove a feature (or a suspect group of features) and retrain. A drop far out of proportion to the feature's plausible information content marks a channel worth auditing. Ablations are embarrassingly parallel and can run on idle capacity; with a thousand features, ablate the suspects, not the power set.
+
+- **Audit windfalls.** When a newly added feature jumps the offline metric, the one-sidedness rule from the first section applies: large sudden gains are treated as suspected leaks until the feature's provenance clears them.
+
+- **Guard the test split.** Every use of the test set beyond the final report (browsing it for feature ideas, tuning against it, evaluating on it twice and keeping the better run) moves information from the evaluation into the design. The test set is read once, at the end, by a process that can no longer change anything.
+
+<Remark title="hyperparameter search leaks too">
+Selecting hyperparameters by validation score and then reporting that same score overstates the model: the search optimized the number it reports. The repair is *nested validation*: an inner split inside each training fold chooses the hyperparameters, and the outer fold, untouched by the search, produces the estimate. The cost is one extra layer of training runs; the leak it closes is real but modest next to this lesson's others, which is why it earns a remark and not a section.
+</Remark>
+
+### Adversarial validation: a classifier as a measuring device
+
+The general instrument tests, for any two datasets, whether a model can tell them apart. If train and test are exchangeable, nothing can distinguish them better than chance; if something can, whatever it keys on is a leak, a shift, or a broken split.
+
+The procedure, in full:
+
+1. Drop the label column from both datasets.
+2. Tag every training row `0` and every test row `1`; concatenate.
+3. Fit any classifier with feature importances to predict the tag.
+4. Score it by cross-validated ROC-AUC.
+5. Read the number: **≈ 0.5** means the sets are indistinguishable and the split is representative; **above ~0.6** means they are separable, so rank the classifier's feature importances and inspect the top features, which name what differs.
+
+<Figure
+  src="./figures/adversarial-validation.svg"
+  alt="A pipeline diagram: the train set tagged 0 and the test set tagged 1, labels dropped, are concatenated and fed to a classifier that predicts each row's origin. The output is a cross-validated ROC-AUC gauge with 0.5 marked in green as indistinguishable, split representative, and 0.9 marked in amber with an arrow to the instruction: rank feature importances, the top features name the leak or the shift."
+  caption="Adversarial validation. The classifier is not a model to deploy; it is a meter, and its feature importances are the needle."
+/>
+
+Calibrate the reading: an adversarial AUC of 0.9 is not a good result attached to the wrong task; it is the meter pinned: the two datasets differ so systematically that a model told them apart nine times in ten. The diagnosis is in step 5's feature list: a timestamp-adjacent feature at the top means the split ignored time; an ID-adjacent feature means a group straddles the boundary; a single dominant feature with no business meaning is a generation-process artifact of the CT-scanner kind.
+
+The instrument is deliberately generic: nothing in the five steps mentions splits. The same procedure run on *this month's training data* versus *this week's serving traffic* measures distribution shift, which is how Uber productionized it for drift monitoring ([Pan et al., 2020](https://arxiv.org/abs/2004.03045)) and how <Ref lesson="failures-and-drift">module 6</Ref> will reuse it. One tool, two readings: before deployment it certifies the split; after deployment it watches the world move.
+
+<Aside>
+The duplication class returns at foundation-model scale, and the same measure-then-filter logic handles it. DeepMind's RETRO ([Borgeaud et al., 2021](https://arxiv.org/abs/2112.04426)), a language model that retrieves nearest-neighbor text chunks from a trillion-token corpus, would trivially "win" evaluation by retrieving near-copies of test passages from its training data. The authors quantified the leak instead of denying it: for each evaluation chunk, retrieve its nearest training chunks, compute token overlap (a Jaccard-style score from 0 to 1), and filter training chunks above a threshold. Leakage there is a continuous quantity to be measured and budgeted, not a binary to be assumed away.
+</Aside>
+
+## Test sets age: updating the split without losing the baseline
+
+Detection's instruments certify a split at the moment they run; the remaining work is maintenance, because the dataset under the split keeps growing and drifting after the certificate is issued. "We spend as much time on test data as on training data" — Andrej Karpathy's line describes that recurring cost, not a setup step. A split frozen at launch gradually measures a world that no longer arrives; a split refreshed carelessly destroys the ability to compare this month's model with last month's. Three standard policies manage the trade.
+
+### Fixed shift: freshest, noisiest
+
+The validation set is always the most recent window (the last two weeks, say), sliding forward as data arrives. Freshest possible evaluation, and the noisiest: one dynamic-pricing team found their daily-sliding validation week fluctuated so much (the product assortment churned 15% week over week) that model improvements were invisible under the movement of the measuring stick. Their repair, a *delayed shift*, updated the window monthly instead of daily: metrics stayed at most a month stale and became comparable within each month.
+
+### Fixed ratio: the hash extends itself
+
+New labeled data is split in the standing proportions and extends both sides. This is the natural policy for data without strong recency structure, and a hash-based split implements it with zero ceremony: new rows fall deterministically into their splits by their key's hash, so the 80/20 boundary extends itself run over run.
+
+### Fixed set: the frozen baseline
+
+A frozen "golden set", sampled at a chosen moment or curated to hold the known hard cases, is never updated by design. It is the only policy under which a March model and an August model are measured by the same instrument, so it anchors long-baseline comparisons and release gates. Extending it is forbidden; when it no longer represents the traffic, it is retired and a *new* benchmark is commissioned, so that no number is ever quietly redefined.
+
+<Figure
+  src="./figures/split-updating.svg"
+  alt="Three timeline bars, one per update policy. Fixed shift: the validation window is the most recent two weeks and slides forward with time, annotated freshest but noisy. Fixed ratio: the bar grows as data arrives and the eighty-twenty boundary extends proportionally, annotated the hash split does this automatically. Fixed set: a dark block frozen at a fixed date range while the bar grows past it, annotated the only policy under which two models months apart share a measuring stick."
+  caption="Three refresh policies. Most production systems run two at once: a moving window for freshness and a frozen golden set for comparability."
+/>
+
+Whichever policy runs, two things are versioned as rigorously as the model: the split *logic* (the hash expression, the moduli, the cut date), because changing it changes every number downstream and must bump the model version with it; and the evaluation *datasets* themselves, because comparing two models honestly means being able to reconstruct what each was measured on. <Ref lesson="experiment-tracking-and-versioning">Module 4's versioning lesson</Ref> builds the machinery; this lesson supplies the reason.
+
+What is established: leakage is label information crossing into training through six routes (a feature restating the label, the generation process, cross-boundary statistics, duplicates, split groups, and time), and the split discipline that closes the last three is deterministic and checkable: split by time for anything time-correlated, hash the unit of correlation for everything, verify with a KS check, and meter any two datasets against each other with adversarial validation. The splits are now honest. The features flowing through them are not yet safe: production vocabularies grow without bound, upstream schemas drop columns mid-flight, and every transform must be computable twice, offline and at serving time. <Ref lesson="features-at-scale">The next lesson</Ref> takes up feature engineering under those conditions.
+
+## Exercises
+
+<Exercise>
+Classify each dataset description into the six-route taxonomy, or mark it clean. (a) A churn model's features include `days_since_last_login`, computed at data-export time rather than at each row's snapshot date. (b) A pneumonia classifier's training set merges three public chest-X-ray collections. (c) A house-price model's features are scaled with the mean and variance of the full dataset, computed before the 80/20 split. (d) A speech-emotion dataset holds ten clips per speaker, split randomly by clip. (e) A demand forecaster is trained on a uniform random 80% of the last two years of daily sales. (f) A spam model's features are the message text's token counts, split by a hash of `message_id`, deduplicated, one message per sender.
+
+<Solution>
+(a) **Feature from the future** (the label-hidden-in-a-feature route): computed at export time, the feature counts logins that happened *after* the snapshot; for churned users it embeds the churn itself. (b) **Duplication risk**: merged public collections are the documented mechanism by which one dataset contains another; deduplicate across the merge before splitting. (c) **Preprocessing leakage**: test-set statistics enter the training transform. (d) **Group leakage**: the correlated unit is the speaker; a random clip split tests speaker recognition, not emotion recognition. (e) **Time leakage**: daily sales are time-correlated (trend, seasonality); the random 80% trains on the future of every test day. (f) **Clean, as far as the description goes**: the split key (`message_id`) is unusual but the data is deduplicated with one message per sender, so no group or duplicate straddles; text tokens exist at prediction time. The residual check a reviewer should still run is whether spam campaigns make same-day messages correlated, which would move it to the time route.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a handwritten-digit dataset holds ten thousand images collected in one sitting, each from a different, randomly recruited writer, photographed under one protocol, deduplicated. Show that a uniform random split is exactly correct here, by naming the taxonomy route each stated property closes. Then perturb one property: each writer now contributes 40 digits instead of 1. State what breaks, what the correct split becomes, and what happens to a model evaluated under the old split.
+
+<Solution>
+Route by route: one image per writer closes the group route; deduplication closes the duplicate route; one sitting under one protocol closes both the time route (no label trend can ride on an instant) and the generation-process route (no source signature separates subsets); pixel features exist identically at prediction time, closing the label-in-a-feature route; and provided any normalization statistics are fit on the training split, the preprocessing route is closed too. With every route closed, the rows are exchangeable, and a random split is not a compromise but the correct construction: this is the world the shuffle-and-split reflex was built in.
+
+Perturb: 40 digits per writer creates groups. Handwriting is a strong writer signature, so the 40 labels-plus-styles form a correlated unit; a random split now puts each writer on both sides, and the model can match test digits to training digits by penmanship. The correct split hashes `writer_id`, assigning whole writers to one side. Under the old split the measured accuracy overstates performance on new writers, the production question, by the margin of writer recognition; the honest number appears only when the split unit matches the correlation unit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "We dropped the timestamp column from the feature set, so there is no temporal leakage and a random split is fine." Construct a concrete counterexample and name the taxonomy route.
+
+<Solution>
+Counterexample: a CTR dataset over one quarter in which baseline click-through drifts downward (ad fatigue) and the features include `item_7day_rolling_ctr`, a rolling mean. No timestamp is among the features. A random split still trains the model on rows from every week, including the future weeks of each test row. The rolling-mean feature is a clock: its value drifts with the quarter's trend, so the model learns the mapping "rolling CTR at this level ⇒ click rates of that era" from training rows that come *after* the test rows they are matched against. Offline, the model looks well calibrated in every era; deployed, it faces an era whose level it has never seen, and the calibration is gone.
+
+The step that fails in the claim: temporal leakage is a property of the *joint distribution* (the label distribution moving with generation time), not of any column. Removing the timestamp removes the label of the axis, not the axis; any feature correlated with time (rolling aggregates, cumulative counts, prices, model-version indicators) carries it, and the label's own trend needs no feature at all to make a random split leak. The route is the time route, and the guard is unchanged: split by time whether or not time is a feature.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation: for a well-mixed hash $h$, consider sampling with $h \bmod K = 0$ followed by the split filter $h \bmod 10 < 8$. (a) Compute the fraction of the sample the split filter keeps for $K = 70$ and for $K = 7$. (b) State and prove the general condition on $K$ under which the chained filter keeps exactly $8/10$. (c) Verify that the production fix, $h \bmod 700 < 560$, keeps exactly $8/10$ of the $K = 70$ sample.
+
+<Solution>
+(a) $K = 70$: $h \equiv 0 \pmod{70}$ implies $h \equiv 0 \pmod{10}$ (since $10 \mid 70$), so $h \bmod 10 = 0 < 8$ always: the filter keeps $100\%$. $K = 7$: multiples of 7 have $h \bmod 70 \in \{0, 7, 14, 21, 28, 35, 42, 49, 56, 63\}$, and reducing these mod 10 gives $\{0, 7, 4, 1, 8, 5, 2, 9, 6, 3\}$: each residue mod 10 exactly once. A well-mixed hash is uniform over these classes, so $h \bmod 10 < 8$ keeps exactly $8/10$.
+
+(b) The condition is $\gcd(K, 10) = 1$. Proof: the sampled hashes are the multiples of $K$, i.e. $h = Kt$. As $t$ ranges over residues mod 10, the map $t \mapsto Kt \bmod 10$ is a bijection on $\mathbb{Z}_{10}$ iff $K$ is invertible mod 10, iff $\gcd(K,10)=1$. Bijection means the sample is uniform over all ten residues mod 10, so any 8 of them capture $8/10$. If $d = \gcd(K,10) > 1$, then $Kt \bmod 10$ only hits multiples of $d$ (for $K=70$, $d=10$: only residue 0), and the kept fraction is whatever share of those $10/d$ residues lies below 8, not $8/10$ in general.
+
+(c) Among $h \equiv 0 \pmod{70}$, write $h = 70t$; then $h \bmod 700 = 70\,(t \bmod 10) \in \{0, 70, \dots, 630\}$, ten equally likely values. The threshold $560 = 70 \times 8$ keeps $\{0, \dots, 490\}$: exactly 8 of the 10, i.e. $80\%$, with validation `BETWEEN 560 AND 629` and test `BETWEEN 630 AND 699` each getting one class. The engineering moral: the fix works for *any* $K$ (second modulus $10K$, threshold $8K$), which is why it, and not a coprimality audit, is the recipe to standardize.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: run adversarial validation by hand. A training set (January–May) and a test set (June) have two features; the ten training rows have `price` values $\{8.1, 8.7, 9.0, 9.3, 9.6, 10.2, 10.4, 10.8, 11.1, 12.3\}$ and the ten test rows $\{11.5, 12.8, 13.1, 13.5, 13.9, 14.2, 14.6, 15.0, 15.3, 16.0\}$; the second feature, `weight`, is statistically identical across the sets. Using `price` alone as the score that ranks rows, compute the adversarial ROC-AUC exactly, name the top distinguishing feature, and state the conclusion about the split.
+
+<Solution>
+For a single ranking feature, ROC-AUC equals the fraction of (train, test) pairs in which the test row scores higher. There are $10 \times 10 = 100$ pairs. Every test price exceeds every train price except one pair: train $12.3$ vs test $11.5$. So $99/100$ pairs are ordered correctly and $\text{AUC} = 0.99$ (no ties). The top distinguishing feature is `price` by construction: `weight` cannot rank the sets, `price` separates them almost perfectly.
+
+Conclusion: the meter is pinned. Train and test are trivially distinguishable, and the feature that does it drifts with time (prices in June sit ~4 units above winter's), so this is the time route: either the split ignored time-correlation the task cares about, or the world shifted between the periods. If June is meant to simulate deployment, the split is *correct* and the reading is a shift warning: the model will face inputs outside its training range, and `price`-dependent behavior deserves a slice of its own in evaluation. AUC ≈ 0.5 would have certified the two sets exchangeable. Either way the instrument did its job: one classifier, one number, one named feature.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review: <Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref> defined an ad-click training set as "all impressions from the last 30 days; positive if a click arrived within 10 minutes". Its forward exercise found two leaks under a random 80/20 split. Write the full split specification that closes them (the split key or keys, the time boundaries including any gap, and the point-in-time rule for feature joins), and state which taxonomy route each element blocks.
+
+<Solution>
+Specification: (1) **Time split**: train on impressions from days 1–23, evaluate on days 25–30, leaving day 24 as a gap; within days 25–30, split into validation and test by the hash rule below. The gap exceeds the 10-minute labeling window by a wide margin, so every training label is final and no training example's label window overlaps the evaluation period. Blocks the *time* route: no evaluation-period trend (a campaign going viral in week 3) is available at training. (2) **Hash split by `user_id`** within each side (and for the validation/test division): `ABS(MOD(FARM_FINGERPRINT(user_id), 10))`. One user's correlated impressions (same tastes, same evening, near-duplicate contexts) never straddle a boundary. Blocks the *group* route (and, since repeated identical impressions to one user land together, most of the *duplication* route; an explicit dedup pass before splitting closes the rest). (3) **Point-in-time joins**: every feature aggregate (user's 7-day click count, ad's running CTR) is joined *as of the impression's timestamp*, per <Ref lesson="feature-platform">the feature platform's</Ref> as-of rule. Blocks the *feature-from-the-future* route: without it, the ad's running CTR includes the very click being predicted.
+
+Note what the specification does not need: dropping the timestamp column (irrelevant, per the refutation exercise) or any change to the labeling window itself, which the labeling lesson already sized. Time and unit are the two dials, and each blocks routes the other cannot.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: following this lesson's preprocessing guard, you fit a standard scaler on the training split only and train the model on scaled features. The model ships. List what must be deployed alongside the model weights for serving predictions to be correct, and describe the failure if serving instead computes fresh statistics over recent live traffic.
+
+<Solution>
+The model's inputs are defined as $(x - \mu_{\text{train}})/\sigma_{\text{train}}$, so serving must apply *those constants*. Shipped alongside the weights: the fitted scaler parameters ($\mu_{\text{train}}, \sigma_{\text{train}}$ per feature), plus every other transform artifact the training pipeline fit: imputation values, category vocabularies and their index mapping, hash seeds and bucket counts, and the exact version of the transform code that applies them in the same order. The model artifact is really a pair: weights and the transform state that defines the space the weights live in.
+
+If serving recomputes statistics on live traffic: the transform now depends on the serving window. Predictions for the same input change as traffic drifts, every feature is shifted relative to the space the model was trained in, and no offline metric registers any of it, because offline evaluation uses the training-side pipeline, which is the *correct* one. This silent divergence between the training and serving feature pipelines has a name, training–serving skew, and its architectural fixes (shipping transforms inside the model artifact as the transform pattern, or serving both sides from one feature store) are the subject of <Ref lesson="training-serving-skew">the skew lesson</Ref>, after <Ref lesson="features-at-scale">the next lesson</Ref> builds the transforms themselves.
+</Solution>
+</Exercise>
+
+<References>
+1. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 5, "Data Leakage" (pp. 135–141): the COVID and CT-scanner cases, the six causes including Fig. 5-7's time split, the detection techniques, and the Ion Switching sidebar; the age-0 imputation incident is p. 125.
+2. V. Lakshmanan, S. Robinson, M. Munn, *Machine Learning Design Patterns*, O'Reilly, 2020 — Ch. 6, "Design Pattern 22: Repeatable Splitting": the Farm Fingerprint recipe, the split-column conditions, the nested-modulo trap and its fix, sequential and stratified splits, and the Kolmogorov–Smirnov check.
+3. A. Burkov, *Machine Learning Engineering*, True Positive Inc., 2020 — Ch. 3, §3.5–3.6: the leakage typology (target as a function of a feature, feature hiding the target, feature from the future), the partitioning conditions, and group partitioning. http://www.mlebook.com
+4. V. Babushkin, A. Kravchenko, *Machine Learning System Design*, Manning, 2023 — Ch. 7, "Validation schemas": time-series validation and the gap, nested validation, adversarial validation, the RETRO leakage quantification, and §7.4's split-updating policies with the Karpathy epigraph.
+5. B. Barz, J. Denzler, "Do We Train on Test Data? Purging CIFAR of Near-Duplicates," *Journal of Imaging* 6(6):41, 2020 — the 3.3%/10% duplicate rates. https://arxiv.org/abs/1902.00423
+6. M. Roberts, D. Driggs, M. Thorpe, et al., "Common Pitfalls and Recommendations for Using Machine Learning to Detect and Prognosticate for COVID-19 Using Chest Radiographs and CT Scans," *Nature Machine Intelligence* 3, 2021, pp. 199–217 — the 62-model review behind the COVID cases, including the duplication-by-merged-datasets finding. https://www.nature.com/articles/s42256-021-00307-0
+7. W. D. Heaven, "Hundreds of AI Tools Have Been Built to Catch Covid. None of Them Helped," *MIT Technology Review*, July 30, 2021 — the audit that opens the lesson. https://www.technologyreview.com/2021/07/30/1030329/machine-learning-ai-failed-covid-hospital-diagnosis-pandemic/
+8. J. Pan, V. Pham, M. Dorairaj, H. Chen, J.-Y. Lee, "Adversarial Validation Approach to Concept Drift Problem in User Targeting Automation Systems at Uber," 2020 — the production formalization of adversarial validation for shift detection. https://arxiv.org/abs/2004.03045
+9. S. Borgeaud et al., "Improving Language Models by Retrieving from Trillions of Tokens," 2021 — §2.6's evaluation-leakage quantification for retrieval models. https://arxiv.org/abs/2112.04426
+</References>
