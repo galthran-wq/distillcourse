@@ -1,0 +1,334 @@
+No model can score a hundred million items in a hundred milliseconds, so every production recommender is a funnel: cheap retrieval narrows millions to hundreds, an expensive model ranks hundreds, and business logic re-orders the top few.
+
+The course has now built every layer such a system needs: a latency budget and a metrics chain (<Ref lesson="requirements-and-metrics">the requirements lesson</Ref>), the stores and streams that move features (module 2), manufactured training data (module 3), and a gated training pipeline, a serving path, and a monitoring loop (modules 4–6). What no layer fixed is the shape those layers compose into when the product is "choose twenty items from a hundred million, per user, per request." This module dissects the canonical system shapes, and this lesson establishes the one they all share: the retrieval–ranking funnel, with each stage justified by compute arithmetic rather than by convention.
+
+The route: the arithmetic that forces three stages; candidate generation as a portfolio of cheap sources; two-tower retrieval and the serving asymmetry it is built on; approximate nearest-neighbor search priced against the exact scan, and its four-way tradeoff; re-ranking as the product layer; and the failures each stage hides from the others.
+
+## The arithmetic that forces the funnel
+
+Start from the model the product wants to run. A production ranker consumes hundreds of features per (user, item) pair: hashed crosses, precomputed aggregates, and the <Ref lesson="features-at-scale">embeddings built as features</Ref>. A forward pass costs on the order of a millisecond per item. Scoring a YouTube-scale corpus with it is one multiplication: $10^8$ items × 1 ms = $10^5$ s ≈ **28 hours**, for one page load. A model a thousand times cheaper still needs 100 seconds. No admissible per-item model, at any compression level, closes the six orders of magnitude between $10^5$ s and a ~100 ms page; the corpus must be cut before any heavy model runs.
+
+<KeyFact>
+What forces the funnel is one product, corpus size $N$ times per-item model cost $c$, measured against the ranking budget; every system where $N c$ exceeds it converges on the same three stages, which is why recommendation, search, feed, and ads look alike. The condition also cuts the other way: at $N = 10^4$ and $c = 10\ \mu\text{s}$ the whole corpus fits the budget, and a funnel built there buys nothing while costing an index, a refresh cadence, and a recall ceiling nothing can measure.
+</KeyFact>
+
+The <Ref lesson="requirements-and-metrics" id="exercises">requirements lesson's closing exercise</Ref> already derived this for a 10-million-item corpus: retrieval must be a precomputed-index lookup that never touches most of the corpus, because no learned model can run per item at under a microsecond. This lesson takes that budget to production scale and fills in what the boxes contain.
+
+### Splitting 130 ms across three stages
+
+<Example title="A 200 ms page, budgeted">
+The page must render in 200 ms at p99. Reserve ~70 ms for network, assembly, and rendering; the ML pipeline gets ~130 ms, split by stage cost:
+
+- **Retrieval, 20 ms.** Several index lookups in parallel over $10^8$ items, returning ~5,000 candidates after deduplication. Sublinear by construction: the indexes were built offline.
+- **Ranking, 100 ms.** The heavy model, amortized to ~0.2 ms per item by batching requests onto an accelerator, scores $100 \text{ ms} / 0.2 \text{ ms} = 500$ candidates. The cut from 5,000 to 500 is made per source — each retrieval lookup keeps only its own top items, with the per-source counts sized so the union fits the ranking budget; why no single ordering of the union exists is the next section's point.
+- **Re-ranking, 10 ms.** Rules over the top ~20 that survive: filters, diversity, slotting.
+
+Reading the same budget per item: retrieval spends $20\,\text{ms}/5{,}000 \approx 4$ µs per item returned, ranking $100/500 = 200$ µs, re-ranking $10/20 = 500$ µs. Across the funnel, per-item spend rises two orders of magnitude while the count falls from $10^8$ to 20; the one sharp step, 50× from 4 µs to 200 µs, is the retrieval→ranking seam, where index lookups give way to forward passes.
+</Example>
+
+<Figure
+  src="./figures/funnel-numbers.svg"
+  alt="The three-stage funnel with numbers: a corpus of ten to the eighth items passes a 20 millisecond multi-source retrieval gate to about five thousand candidates, a 100 millisecond heavy-model ranking gate to 500 scored items, and a 10 millisecond rules gate to 20 items on the page; per-item cost annotations rise from 4 microseconds to 200 to 500 microseconds."
+  caption="The funnel as a compute budget: the count falls from 10⁸ to 20 while per-item spend rises two orders of magnitude, with the 50× step at the retrieval→ranking seam."
+/>
+
+<Exercise>
+Verify the ranking stage's 500 from the stated costs, then compute the fraction of the corpus the heavy ranker ever sees. State which stage owns the quality risk for everything the ranker never sees.
+
+<Solution>
+$100 \text{ ms} \div 0.2 \text{ ms/item} = 500$ candidates. The ranker sees $500 / 10^8 = 5 \times 10^{-6}$ of the corpus, five items per million. For the other 99.9995%, quality is decided entirely by retrieval: an item the first stage does not return cannot be ranked, however good the ranker. The last section of the lesson returns to this asymmetry.
+</Solution>
+</Exercise>
+
+## Candidate generation: a portfolio of blind spots
+
+Stage 1 has 20 ms and no per-item model, so everything it does must be a lookup into a structure computed offline. *Candidate generation* is the collective name for those lookups. Two classical families anchor the space. *Content-based filtering* indexes items by their attributes and looks up items similar to what this user already engaged with; it needs no other users' data and serves niche tastes, but it never leaves the user's existing interests. *Collaborative filtering* recommends what behaviorally similar users engaged with, which does expand interests but has nothing to say about a user or item without interaction history.
+
+<Remark title="matrix factorization">
+Collaborative filtering's classical machinery, factoring the user–item interaction matrix into user and item embedding matrices, is prerequisite material from the classical-ml course and is not re-taught here. Production retrieval consumes its output the same way it consumes any embedding table: precomputed, then indexed by the machinery of the next two sections.
+</Remark>
+
+### The documented stacks: Pinterest and YouTube
+
+No single source survives contact with a real catalog, and the documented stacks say so by their structure. Pinterest, where users save images ("pins") onto themed boards, generates candidates three ways in parallel. The first counts *board co-occurrence*: pins saved to the same boards are treated as semantically related, and the counting is a <Ref lesson="batch-and-stream-processing">MapReduce job</Ref>, the bounded batch computation of module 2 that reads the whole save log and terminates. It starves rare pins, which appear on too few boards to accumulate counts. The second is a *random walk* over the pin–board graph, which reaches exactly those rare pins by following edges out of the boards they do sit on. The third is *Pins2Vec*, embeddings trained on user sessions in the word2vec style that <Ref lesson="features-at-scale">the features lesson</Ref> named as the pretrained-embedding case, and it captures within-session intent that broad, long-lived boards blur away.
+
+YouTube's retrieval stack has the same shape with different sources: topic match, watched-together frequency, and a learned embedding retriever, the next section's subject. The pattern to take is not the specific three. It is that both teams shipped a union of sources whose failure modes do not overlap, in a stage whose budget would have paid for exactly one of them run harder.
+
+### Cold-start sources: popularity and the fresh pool
+
+Two more sources are standard because the learned ones cannot supply them: **popular-in-cohort**, the fallback for users with no history, and a **fresh pool**, a guaranteed slice for the newest items. The fresh pool is the retrieval-side face of the exploration device from <Ref lesson="failures-and-drift">the drift lesson</Ref>: a recommender trained on its own logs never learns about items it never showed, and TikTok-style traffic pools that give every new item a batch of unbiased impressions are how the loop is broken. Cold-start items enter the funnel here or not at all.
+
+<Figure
+  src="./figures/source-portfolio.svg"
+  alt="Five parallel candidate sources, each labeled with its blind spot: co-occurrence blind to rare and new items, content similarity never leaving current interests, graph walks blind to nodes without edges, popular-in-cohort blind to niche tastes, and a fresh pool with no relevance signal by design; all feed a union-and-dedupe node emitting five thousand candidates to ranking."
+  caption="A portfolio, because every cheap source has a recall blind spot; the union is cheap, and a miss is unrecoverable."
+/>
+
+### Recall engineering: quotas, not a shared score
+
+The union is cheap to take and cheap to be wrong in: a bad candidate costs 200 µs of ranking, while a missing one is invisible forever. Stage 1 is therefore engineered for **recall**, not precision, and ordering the survivors against each other is the next stage's job — it could not be stage 1's even in principle. A board co-occurrence count, a walk visit frequency, a dot product, and a popularity rank live on four different scales; no cheap normalization makes them comparable, so no single ordering of the union exists. The cut to the ranking budget is instead made *within* sources. Each lookup already returns its own top items, so each source gets a quota, a configured per-source count, and the quotas sum to what ranking can afford. All a source owes the funnel is that its best items sit inside its own quota.
+
+## Two-tower retrieval: train a dot product, serve a lookup
+
+The learned source in both stacks above deserves its own mechanics: the item side of the score is computable offline, so the request path holds one forward pass, and that is what fits learned retrieval into 20 ms. Frame retrieval as extreme classification: given user-and-context input $x$, pick items $y$ from the corpus under
+
+$$
+P(y \mid x) = \frac{e^{s(x,y)}}{\sum_{i=1}^{M} e^{s(x, y_i)}},
+$$
+
+with $M \approx 10^8$ and $s(x,y)$ a learned score trained on engagement. If $s$ were an arbitrary network over the pair, the ranker's shape, evaluating it would need a forward pass per item: the 28-hour multiplication again. The *two-tower* architecture constrains the score to a dot product,
+
+$$
+s(x, y) = \langle u(x),\, v(y) \rangle,
+$$
+
+where the **user tower** $u(\cdot)$ encodes user and context features and the **item tower** $v(\cdot)$ encodes item features, trained jointly so that the dot product tracks engagement.
+
+The constraint is what makes serving possible, because $v(y)$ depends on the item alone. All $10^8$ item embeddings are computed offline in a batch job and loaded into an index; at request time the system computes $u(x)$ once, a single forward pass, and asks the index for the top-$k$ items by inner product, a query known as *maximum inner-product search* (MIPS). In the vocabulary of <Ref lesson="batch-and-online-prediction">the serving module</Ref>, the item side is a batch-computed feature and only the user side runs on the request path.
+
+<FigureSequence
+  name="two-tower-serving"
+  alt="Four frames split by a dashed offline/online boundary: first the item tower embeds the whole corpus offline; second an ANN index is built from the embeddings; third a request arrives and the user tower computes the user embedding live; fourth the user embedding queries the index and top-k item ids return to ranking."
+  caption="The two-tower serving asymmetry: everything expensive happens offline, and the request path is one forward pass plus one index query."
+/>
+
+<Task>
+Step through the four frames and mark which artifacts go stale when the catalog changes. Decide which frame is the first that a video uploaded after the last index build can never reach, whatever the user tower computes. The ANN section prices the refresh that fixes this.
+</Task>
+
+### In-batch negatives, and the correction that un-biases them
+
+Training the softmax is its own scaling problem: the denominator sums over $10^8$ items. The standard cut is to sample a few negatives per example, and the cheapest sampler is the training batch itself: in a batch of $n$ (user, engaged-item) pairs, the other $n-1$ items serve as this user's negatives, with their embeddings already computed for the forward pass. These are *in-batch negatives*, and they are free but biased. An item enters batches exactly as often as users engage with it, so a popular item $j$ is drawn as a negative with probability $p_j$, its engagement frequency, rather than uniformly. Popular items absorb far more negative gradient than their share, and the model learns to understate their scores.
+
+The production fix, from [YouTube's retrieval system (Yi et al., RecSys 2019)](https://research.google/pubs/sampling-bias-corrected-neural-modeling-for-large-corpus-item-recommendations/), corrects the logit inside the training softmax:
+
+$$
+s^{c}(x, y_j) = s(x, y_j) - \log p_j .
+$$
+
+The corrected term contributes $e^{s - \log p_j} = e^{s}/p_j$ to the denominator. Item $j$ occupies $n\,p_j$ negative slots per batch of $n$ in expectation. Its expected total contribution is therefore $n\,p_j \cdot e^{s}/p_j = n\,e^{s}$: popularity cancels, and every item pulls on the denominator as if it had been sampled uniformly. The frequency $p_j$ is maintained as a streaming estimate over the training data. <Ref lesson="recommender-funnel" id="exercises">The bias-derivation exercise</Ref> runs this from the other end, showing what the *uncorrected* objective converges to.
+
+<Figure
+  src="./figures/softmax-correction.svg"
+  alt="A training batch strip in which a popular item A fills half the slots, above the corrected logit s minus log p sub j with the dot-product affinity and the negative-slot share labeled, and the expectation identity n times p sub j times e to the s over p sub j equals n times e to the s showing popularity canceling."
+  caption="The batch is an accidental negative sampler weighted by popularity; subtracting log p_j from the logit makes every item's expected pull uniform."
+/>
+
+<KeyFact>
+Serving uses the raw dot product $\langle u(x), v(y)\rangle$. That number measures affinity only if training used the corrected logit $s - \log p_j$; trained uncorrected, the dot product has popularity subtracted into it implicitly, and retrieval systematically under-returns the items users engage with most.
+</KeyFact>
+
+## ANN search: buying sublinearity with recall
+
+Frames 2 and 4 of the sequence said "index" without saying what one is, and "sublinear" has been an assertion since the first section. Price the exact answer first. At 128 float32 dimensions a vector occupies 512 bytes, so $10^8$ of them occupy **51 GB**, and an exact top-$k$ touches all of it: $10^8$ dot products, $1.3 \times 10^{10}$ multiply-adds. The arithmetic is not the constraint; the reading is. A server core streams vectors of this size at roughly $3 \times 10^7$ per second, so the scan costs $10^8 / (3 \times 10^7) \approx 3.3$ s per query. The retrieval stage has 20 ms.
+
+Sharding does not close that. Splitting the corpus over 16 nodes divides the scan by 16, to 0.21 s, still ten times the whole stage budget: the deficit is a factor of 165 and fan-out buys back one order of magnitude of it. The rest has to come from not looking at most of the corpus.
+
+*Approximate nearest-neighbor* (ANN) search is the family of structures that do exactly that. Each gives up exactness, returning most of the true top-$k$ rather than all of it, and each works in the same two steps: route the query to a small candidate set $\mathcal{C}$ using a structure built offline, then score only $\mathcal{C}$ exactly.
+
+$$
+\text{query cost} \;\approx\; \underbrace{C_{\text{route}}}_{\text{find the candidates}} \;+\; \underbrace{|\mathcal{C}|}_{\text{score the candidates}},
+\qquad
+\text{recall} = \frac{|\mathcal{C} \cap \text{true top-}k|}{k}.
+$$
+
+Sublinearity is the claim that both terms grow far slower than $N$, and recall is what the routing step gives up to make that true: a true neighbor the route never reaches cannot be scored, and no later stage will discover that it existed. Three families cover the practice, and they differ only in what the route is.
+
+### Partitioning (IVF): probe a few of many cells
+
+An *inverted file index* clusters the corpus with k-means into $K$ cells, sized so each holds 100 to 10,000 vectors, and stores each cell's member list. A query scores the $K$ centroids, keeps the $n_{\text{probe}}$ nearest cells, and scans their lists. Routing costs $K$ dot products; the lists hold $N\,n_{\text{probe}}/K$ vectors.
+
+Take $N = 10^8$ with $K = 10^5$ cells of about a thousand vectors each and $n_{\text{probe}} = 32$. The lists contribute $10^8 \times 32 / 10^5 = 3.2 \times 10^4$ vectors, four orders of magnitude below the scan's $10^8$. Routing adds its own $10^5$ centroid comparisons, so the query costs about $1.3 \times 10^5$ dot products, of which routing is the larger half. That is the shape of the trade: $C(K) = K + N n_{\text{probe}}/K$ falls in its second term and rises in its first, bottoming out at $K = \sqrt{N n_{\text{probe}}} \approx 5.7 \times 10^4$, so a cell count near $10^5$ sits within a fifth of the cheapest available. Recall is bought with $n_{\text{probe}}$, at a cost linear in it: each extra cell probed recovers neighbors that fell just outside the boundary of the cells already read.
+
+*Product quantization* attacks the memory axis instead. Each 128-dimensional vector is split into 16 subvectors, and each subvector is replaced by an 8-bit code naming its nearest entry in a small learned codebook: 512 bytes become 16, a 32× shrink that takes the 51 GB of vectors to 1.6 GB, with distances computed from the codes by table lookup. IVF plus product quantization is the backbone of [Faiss](https://github.com/facebookresearch/faiss).
+
+### Graphs (HNSW): a logarithmic number of hops
+
+A *hierarchical navigable small world* index links each vector to about $M$ near neighbors ($M$ between 16 and 64 in practice) in a layered graph whose upper layers hold sparse long-range links. A query enters at the top layer and repeatedly steps to whichever neighbor of the current node is closest to it, descending a layer whenever no neighbor improves. Because the upper layers cut the remaining distance by a constant factor per step, the number of hops grows like $\log N$: about 27 hops at $N = 10^8$, against $10^8$ scored vectors for the scan.
+
+Each hop scores the current node's $M$ neighbors, putting a narrow search near $27 \times 32 \approx 10^3$ dot products; production searches keep a candidate queue of width $\mathit{ef}$ (100 is typical), which multiplies that by a constant and lands the query between $10^3$ and $10^4$. Four to five orders below the scan is why HNSW holds the strongest recall-versus-throughput curves in published measurements. Two costs pay for it. The edges are memory the vectors did not need: $M$ neighbor ids per node is $32 \times 4$ B $\times\, 10^8 \approx 13$ GB on top of the 51 GB, and the traversal's scattered reads mean the structure has to sit in RAM rather than stream off disk. And the build inserts each vector by running that same greedy search, so it costs on the order of $N$ queries, $10^{11}$ distance computations for this corpus.
+
+### Hashing (LSH): one bucket per table
+
+A *locality-sensitive hash* maps vectors to buckets so that similar vectors collide with high probability. The index is $L$ independent hash tables, each spreading the corpus over $B$ buckets; a query hashes itself once per table and scores the union of the $L$ buckets it lands in, $L\,N/B$ candidates. At $N = 10^8$, $B = 10^6$ and $L = 10$, that is $10 \times 100 = 10^3$ candidates, the same order as HNSW's.
+
+The cost matches and the recall does not, and the reason is what the routing structure knows. A true neighbor is lost whenever all $L$ hashes separate it from the query, and the hash functions are drawn without looking at the corpus. IVF's centroids and HNSW's edges are fit to where the data actually is dense; LSH's buckets are not, so it needs more tables, and therefore more memory and more candidates, to reach the recall the other two reach at $10^3$ candidates. What it keeps is the cheapest build: hashing $10^8$ vectors is one pass with no optimization inside it.
+
+<Figure
+  src="./figures/ann-cost.svg"
+  alt="Three panels under a header giving the exact scan's cost of ten to the eighth dot products and 3.3 seconds: IVF as a grid of cells with three probed and a query marker, costing ten to the fifth routing plus 3.2 times ten to the fourth list scan; HNSW as three graph layers with a greedy descent path, costing about a thousand to ten thousand; LSH as three tables of buckets with one bucket shaded per table, costing about a thousand with the weakest recall."
+  caption="Where the sublinearity comes from: each family routes to a candidate list a thousand times shorter than the corpus, and pays for the routing in a different currency."
+/>
+
+<Example title="Fitting an index query into the 20 ms stage">
+Retrieval's 20 ms covers every source in the portfolio, plus the union and dedupe. Give the learned source's index query 10 ms of it, on one core of one shard.
+
+- **The unit.** At $3 \times 10^7$ vectors scored per second per core, 10 ms buys $3 \times 10^5$ dot products.
+- **Exact.** $10^8$ needs 3.3 s, 330× the allowance; sharded 16 ways, 0.21 s, still 21× over.
+- **IVF**, $K = 10^5$, $n_{\text{probe}} = 32$: $1.3 \times 10^5$ dot products, 4.4 ms. It fits, with margin for the fan-out's slowest shard.
+- **HNSW**, $\mathit{ef} = 100$: about $10^4$ scored vectors, 0.3 ms of arithmetic. Its latency is set by the scattered memory reads along the traversal, not by the arithmetic.
+
+The budget constrains $n_{\text{probe}}$, not $K$: routing is a fixed $10^5$, each additional probe adds $N/K = 10^3$ vectors, so 10 ms allows $n_{\text{probe}} \le (3\times10^5 - 10^5)/10^3 = 200$. Practice sits at 32 rather than 200 because recall saturates long before the budget does: cells probed later are farther from the query and hold progressively fewer of its true neighbors.
+</Example>
+
+No family wins outright, and the measurement source that makes this precise is [ANN-Benchmarks](https://ann-benchmarks.com), which scores every algorithm on four axes: **recall** (fraction of true neighbors found), **queries per second**, **index build time**, and **index size**. The three cost models above are the first two axes; the 13 GB of HNSW edges and its $10^{11}$-distance build are the other two, and they are what decide real deployments as often as the curves do. The published curves all slope the same way, more recall costing throughput, and choosing an index means choosing an operating point on that surface under the other two constraints.
+
+<Figure
+  src="./figures/ann-tradeoff.svg"
+  alt="Schematic recall-versus-queries-per-second curves for three index families, HNSW highest, IVF plus product quantization in the middle, LSH lowest, all sloping down toward recall one; an operating point is marked at recall 0.95, and a legend notes the build-time and memory costs the plot does not show."
+  caption="The tradeoff surface, shapes per ANN-Benchmarks: every curve buys recall with throughput, and the plot hides two of the four axes — build time and index size."
+/>
+
+<KeyFact>
+Two different quantities are called recall here. An index's recall is measured against the exact top-$k$ over the same embeddings, so it is knowable to any decimal by running the scan offline once. The funnel's recall is measured against what the user would have engaged with, and the closing section shows it is not knowable at all. An operating point at 0.95 is a 5% shortfall on the first quantity, which then multiplies into the second.
+</KeyFact>
+
+### The index is a batch artifact with a freshness bill
+
+An ANN index is built offline, which makes retrieval freshness an index property, not a model property: an item embedded after the last build does not exist, and a query cannot return it. The operational choice is rebuild cadence versus incremental maintenance. HNSW supports inserting new vectors into the standing graph, at the same greedy-search cost per insert as a query. IVF can drop a new vector into its nearest existing cluster for free, but its centroids go stale as the corpus drifts and must be re-fit, and a k-means iteration over $10^8$ vectors against $10^5$ centroids is $10^{13}$ distance computations, which is why the centroids are fit on a sample of a few million vectors rather than on the corpus. Either way the newest items lag the index, which is part of why the fresh pool of the portfolio section exists as a separate, index-free source.
+
+Scale adds a second bill. A 51 GB index does not fit one serving node, so it is sharded, and every query fans out to all shards and merges the per-shard top-$k$: the scatter/gather pattern <Ref lesson="partitioning">the partitioning lesson</Ref> priced, with its tail amplification attached. <Ref lesson="recommender-funnel" id="exercises">The sharding exercise</Ref> computes what 16 shards do to the retrieval stage's 20 ms.
+
+## Re-ranking: the product layer
+
+Stage 2 hands over ~500 candidates ordered by predicted engagement; its internals, the CTR model and its calibration, are the next lesson's subject. The page shows 20. Between the two runs a pass of explicit rules, and the rules are where the product's judgment lives:
+
+- **Filters** remove what the score cannot know is wrong: items the user explicitly disliked or already consumed, and policy-restricted content.
+- **Diversity** breaks up near-duplicates. Candidates closest to a query embedding are close to each other; ranked raw, a video page degenerates into eight variants of the same clip. De-duplication and metadata-aware spacing fix what the score optimizes into existence.
+- **Freshness** boosts recent items whose engagement history cannot yet compete with the catalog's veterans.
+- **Fairness** constraints hold exposure floors that engagement scores would not produce on their own.
+- **Impression discounting** decays an item's score for each time this user saw it and did not act. LinkedIn's People You May Know feature is the documented case: an ignored recommendation keeps its high score and resurfaces indefinitely until a per-impression discount factor is applied. The mechanism, including how the decay is fit, belongs to <Ref lesson="design-feed-ranking">the feed-ranking design</Ref>.
+- The **exploration slot** reserves a position for fresh-pool items. This is where the loop-breaking traffic actually ships: without a guaranteed slot, a new item never collects the impressions that become the labels every model in this funnel trains on.
+
+<Figure
+  src="./figures/rerank-pass.svg"
+  alt="Two columns of eight ranked items before and after re-ranking: a near-duplicate is removed by dedupe, an item shown three times and ignored is demoted by impression discounting, a fresh-pool item is inserted into a reserved exploration slot, and the remaining items shift up."
+  caption="One re-ranking pass over the ranker's top items: dedupe, discount, exploration slot. Rules, not weights."
+/>
+
+<Task>
+Trace each of the eight before-items through the figure and name the rule (or absence of one) that produced its after-position. Classify the pass's three moves — B′ leaving, C falling, X arriving — by whether the rule acts through the item's score or ignores scores entirely, and check that removing any of the three would require no retraining, only a config change.
+</Task>
+
+### Why rules and not a second model
+
+Rules rather than a learned layer is a deliberate choice at this position in the funnel. Over tens of items the compute argument is gone; what remains is that these constraints are business policy: they must be auditable, attributable, and changeable in minutes. Removing a policy-violating category from the page cannot wait for a training run.
+
+## What each stage hides from the others
+
+The funnel's stages fail in different places, and the failures are not equally visible. Mapping them closes the lesson and opens the rest of the module.
+
+### Retrieval misses: invisible by construction
+
+Every ranking metric, offline or online, is computed over candidates that were retrieved; an item the index or the sources never return generates no impression, no label, and no error term anywhere. The obvious check, computing recall@500 against logged engagements, does not measure the gap: logged engagements exist only for items the current system exposed, so the metric asks whether retrieval can find what retrieval already surfaced, and lands near 1 by construction. This is the degenerate feedback loop of <Ref lesson="failures-and-drift">the drift lesson</Ref> operating as a measurement artifact rather than a training artifact: an item users would love but were never shown is counted as a success, not a miss.
+
+<Figure
+  src="./figures/retrieval-blind-spot.svg"
+  alt="Inside a rectangle labeled the corpus of ten to the eighth items, an amber ellipse of retrieved candidates contains a smaller ellipse of logged engagements, and a dashed blue ellipse of truly relevant items overlaps the amber one and extends well beyond it into a region labeled relevant but never retrieved, with no impression, no label and no error term; annotations state that recall at 500 against logged engagements is about 1 because the logged set is contained in the retrieved set."
+  caption="Logged engagements are a subset of what retrieval returned, so recall measured against them is near 1 whatever the index does; the region outside the amber ellipse is the recall ceiling, and no log samples it."
+/>
+
+<KeyFact>
+Retrieval recall is the hard ceiling on system quality, and no metric computed from the system's own logs can see it. The honest estimate requires exposure the funnel did not choose — the fresh pool and exploration slot again; <Ref lesson="recommender-funnel" id="exercises">the recall-measurement exercise</Ref> designs it.
+</KeyFact>
+
+### Two problems the funnel hands to stage 2
+
+**Ranking can order correctly and still be wrong.** The ranker's scores get multiplied by money in an ads auction and blended into expected-value orderings in feeds. A model whose 0.31 means "somewhere in the top third" produces the right order and the wrong prices: if predictions near 0.31 observe clicks at 0.19, every auction the model wins is bid ~60% above what the impression is worth. Whether 0.31 means 31% is *calibration*, and the forward exercise computes that gap before the next lesson makes it central.
+
+**The labels themselves are bent.** Clicks reward position as much as quality, so the training data of every model in this funnel is contaminated by where the previous ranking placed things: *position bias*, also the next lesson's problem.
+
+What is established: the funnel derived from a compute budget (28 hours per request, cut to 130 ms in three stages), candidate generation as a recall-engineered portfolio, two-tower retrieval with its offline/online asymmetry and popularity-corrected training, ANN indexing as a route-then-score cost model that turns a 3.3-second scan into a 4-millisecond query and a four-way tradeoff with a freshness bill, and re-ranking as the auditable product layer. <Ref lesson="ranking-and-ctr">The next lesson</Ref> descends into stage 2: pointwise CTR prediction, the calibration that makes its probabilities mean something, and the position-bias corrections that clean its labels.
+
+## Exercises
+
+<Exercise>
+Rebudget the funnel for a 100 ms p99 page with a ranker that costs 2 ms per item amortized. Reserve 30 ms for network and assembly, keep retrieval at 15 ms and re-ranking at 5 ms, and compute the maximum number of ranked candidates. State which stage absorbs the cut and what that demands of it.
+
+<Solution>
+The pipeline gets $100 - 30 = 70$ ms; after retrieval and re-ranking, ranking keeps $70 - 15 - 5 = 50$ ms, so it scores $50 / 2 = 25$ candidates, twenty times fewer than the lesson's 500. The cut is absorbed by stage 2's input size: the per-source quotas that sum to 500 must now sum to 25, so each source's *within-source* ordering, previously needed only to be roughly right over its top hundred-odd items, must be right in its top handful — and splitting 25 slots across five sources becomes a real allocation decision. The burden moves upstream, to precision at the top of each source. The alternative spend is to attack the 2 ms itself with module 5's compression toolkit (quantization, distillation) and buy the candidate count back.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a startup's catalog holds 10,000 items and its ranker is a gradient-boosted tree ensemble costing 10 µs per item. Show that the funnel degenerates, compute the corpus size at which retrieval becomes necessary for (a) the 10 µs model with a 100 ms ranking budget and (b) the lesson's 0.2 ms heavy model, and state what this says about building funnels early.
+
+<Solution>
+Scoring everything: $10{,}000 \times 10\ \mu\text{s} = 100$ ms. The entire corpus fits the ranking budget, so the optimal funnel is one stage: rank everything, re-rank the top. Retrieval becomes necessary when $N \times c$ exceeds the budget: (a) $N^* = 100\ \text{ms} / 10\ \mu\text{s} = 10{,}000$ items, exactly this catalog, so the startup is at the boundary and its next order of magnitude of growth forces the funnel; (b) $N^* = 100 / 0.2 = 500$ items, which is why heavy rankers never run corpus-wide.
+
+The design lesson: a funnel built before $N \times c$ demands it buys nothing and costs everything this lesson catalogued: an index with a refresh cadence, a recall ceiling that cannot be measured from logs, and a portfolio to maintain. Build the funnel when the multiplication fails the budget, not when the architecture diagram looks canonical.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson compressed: with in-batch negatives, item $j$ enters the training softmax's denominator in proportion to its popularity $p_j$. (a) Show that the uncorrected objective trains the model toward $e^{\hat{s}_j} \propto P(j \mid x)/p_j$, i.e. logits that understate popular items by exactly $\log p_j$. (b) Verify that the corrected logit $s - \log p_j$ removes the distortion. Write the expected denominator in both cases.
+
+<Solution>
+(a) In expectation over batch composition, the uncorrected denominator is $\sum_j n\,p_j\, e^{s_j}$: each item's term is weighted by its appearance rate. The training objective therefore drives the model's implied distribution $\propto p_j e^{\hat{s}_j}$ toward the data's $P(j \mid x)$, so at the optimum $p_j e^{\hat{s}_j} \propto P(j\mid x)$, i.e. $\hat{s}_j = \log P(j \mid x) - \log p_j + \text{const}$. The learned logit carries a $-\log p_j$ distortion: the more popular the item, the more its score understates the true affinity. Serving then ranks by these raw logits and under-retrieves popular items.
+
+(b) With $s^c_j = s_j - \log p_j$, each appearance contributes $e^{s_j - \log p_j} = e^{s_j}/p_j$, so the expected denominator is $\sum_j n\,p_j \cdot e^{s_j}/p_j = n \sum_j e^{s_j}$: the appearance rate cancels term by term, the objective matches the uniform-negative softmax, and the optimum is $\hat{s}_j = \log P(j\mid x) + \text{const}$, the affinity itself. The transferable move: when a sampler is biased and its bias $p_j$ is known, an importance correction inside the logit is cheaper than fixing the sampler.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Our retrieval recall@500, measured against last month's engagement logs, is 98%, so retrieval is not our bottleneck." Name the step that fails, then design an estimate of retrieval quality that does not have the defect, and state its cost.
+
+<Solution>
+The failing step is treating logged engagements as ground truth for what users want. Engagements are conditioned on exposure: users could only engage with items the current system retrieved and showed. Recall measured against that label set asks whether today's retrieval finds what yesterday's retrieval surfaced, which is close to a tautology; the misses that matter, items users would have engaged with but never saw, produce no labels and are invisible to the metric. A 98% can coexist with a large blind spot.
+
+The non-circular design uses exposure the funnel did not choose: on a small fraction of requests, inject candidates sampled independently of the retrieval stack (from the fresh pool, or popularity-stratified from the whole corpus) into the ranked slate, and compare their engagement-per-impression against retrieved candidates of the same rank position. If injected items engage at a substantial fraction of retrieved items' rate, retrieval is leaving that mass on the table; the measured ratio bounds the true recall gap. The cost is the exploration traffic itself, impressions spent on unvetted items, which is the same price the fresh pool already pays to break the training loop — this measurement rides on it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take the IVF query cost $C(K) = K + N n_{\text{probe}} / K$ dot products from the worked example. (a) Derive the $K$ that minimizes it and evaluate it at $N = 10^8$, $n_{\text{probe}} = 32$. (b) Show that the two terms are equal at that $K$, and say what an index whose routing cost is negligible is doing wrong. (c) A team keeps $K = 10^5$ and raises $n_{\text{probe}}$ from 32 to 128 chasing recall. Compute the new cost and name which of the four ANN-Benchmarks axes moved.
+
+<Solution>
+(a) $C'(K) = 1 - N n_{\text{probe}}/K^2 = 0$ gives $K^\ast = \sqrt{N n_{\text{probe}}} = \sqrt{3.2 \times 10^9} \approx 5.7 \times 10^4$, and $C(K^\ast) = 2\sqrt{N n_{\text{probe}}} \approx 1.1 \times 10^5$ dot products, against $1.3 \times 10^5$ at the lesson's $K = 10^5$.
+
+(b) At $K^\ast$, $K = N n_{\text{probe}}/K$ by construction, so the minimum splits the query evenly between routing and list-scanning. Negligible routing therefore means $K \ll K^\ast$, which means cells too large and too much scanning: at $K = 10^3$ the cost is $10^3 + 3.2 \times 10^6 = 3.2 \times 10^6$, twenty-nine times the optimum, almost all of it list scan. Cheap routing is a symptom of an unbalanced index, not a virtue of one.
+
+(c) $10^5 + 128 \times 10^3 = 2.3 \times 10^5$ dot products, 1.7× the cost at $n_{\text{probe}} = 32$: queries per second falls by that factor and recall rises. Build time and index size do not move at all, because $n_{\text{probe}}$ is read at query time and nothing about the stored structure changes. That is what makes it the one axis a team can retune between rebuilds, and the reason a production index ships with the knob exposed in serving config rather than in the build job.
+</Solution>
+</Exercise>
+
+<Exercise>
+Choose an index family, with the four ANN-Benchmarks axes as your vocabulary, for each deployment: (a) 1 million items with the catalog updated hourly; (b) 1 billion items rebuilt weekly; (c) 100,000 items on one node. Justify each choice and name the binding axis.
+
+<Solution>
+(a) The binding axis is build time relative to the update cadence: whatever is chosen must absorb hourly change. Two defensible answers: HNSW with incremental inserts (1M vectors is small enough for its RAM cost to be irrelevant, and inserts avoid rebuilds), or IVF with fast hourly rebuilds (at 1M vectors a rebuild is minutes). Full weekly-scale rebuild schemes are ruled out by cadence, not by scale.
+
+(b) The binding axis is index size: $10^9 \times 128 \times 4$ B ≈ 512 GB uncompressed, and an HNSW graph would add roughly 128 GB of edges on top and demand all of it in RAM across the fleet. IVF with product quantization compresses the vectors themselves: the body's 16-byte codes take 512 GB to $10^9 \times 16$ B = 16 GB, which shards into a handful of nodes, and the k-means build runs on a sample inside the weekly batch window. This is the Faiss-backbone configuration for exactly this regime.
+
+(c) No index. $10^5$ vectors occupy 51 MB and cost 3.3 ms to scan on one core at the body's rate, well inside the retrieval budget and faster still threaded across cores: exact top-$k$ is affordable, recall is 1.0 by definition, and there is no build time, no index size, and no staleness. The boundary-probe moral again: the approximate machinery exists for corpora where the scan fails the budget, and below that size it is pure liability.
+</Solution>
+</Exercise>
+
+<Exercise>
+The retrieval index is sharded 16 ways, and a query returns only after the slowest shard answers. With each shard exceeding its latency target on 1% of queries, compute the fraction of retrieval calls that miss the target, and the per-shard rate needed to keep retrieval misses under 1%. Name the phenomenon and where this course established it.
+
+<Solution>
+A query is slow if any shard is slow: $1 - 0.99^{16} \approx 14.9\%$ of retrieval calls miss the target, from a 1% per-shard rate. To keep the query-level rate under 1%: $1-(1-p)^{16} \le 0.01$ gives $p \le 1 - 0.99^{1/16} \approx 0.063\%$, roughly 16× tighter per shard. This is tail amplification under fan-out, $1-(1-p)^N$, established in <Ref lesson="requirements-and-metrics">the requirements lesson</Ref> and priced for scatter/gather reads in <Ref lesson="partitioning">the partitioning lesson</Ref>; the funnel's 20 ms retrieval budget is a p99 over the maximum of 16 shard latencies, which is why per-shard budgets must be set far below it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: your ranker outputs $P(\text{click}) = 0.31$ for the top item, and the ads team multiplies that number by an advertiser's bid to price an auction. Design the offline test that decides whether 0.31 means 31%, and state what an ordering metric like AUC would and would not have told you.
+
+<Solution>
+Bucket the model's predictions (for instance $[0.30, 0.35)$), and within each bucket compare the mean predicted probability against the observed click rate on held-out data; plot the pairs. If predictions near 0.31 observe clicks at, say, 0.19, every auction the model wins is priced ~60% too high, even if the *order* of ads is perfect. A one-number summary is $\sum \text{predictions} / \sum \text{labels}$, which should sit near 1. AUC would have told you the ordering is good and nothing about the prices: it is invariant to any monotone rescaling of the scores, so a model can have excellent AUC and be miscalibrated everywhere. The property being tested is calibration, and it is the core of <Ref lesson="ranking-and-ctr">the next lesson</Ref>, where predicted probabilities are multiplied by money.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Pham, *Machine Learning Design Interview*, 2022 — Ch. 2 (the candidate-generation/ranking/re-ranking pipeline, Pinterest's three retrieval sources, YouTube's multi-algorithm retrieval stack, freshness/diversity/fairness re-ranking, LinkedIn's PYMK impression discounting); Ch. 1 (two-tower training and the sampled-softmax logit correction).
+2. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023 — Ch. 6 (the video-recommendation funnel end to end); Ch. 2, pp. 47–51 (the indexing and query pipelines, ANN algorithm families, Faiss and ScaNN).
+3. C. Huyen, *AI Engineering*, O'Reilly, 2025 — Ch. 6, pp. 261–266 (vector-search algorithms: LSH, HNSW, product quantization, IVF; the ANN-Benchmarks metrics).
+4. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 8 (degenerate feedback loops and TikTok-style exploration traffic pools).
+5. X. Yi et al., "Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations," RecSys 2019 — the two-tower production system at YouTube and the $-\log p_j$ correction. https://research.google/pubs/sampling-bias-corrected-neural-modeling-for-large-corpus-item-recommendations/
+6. P. Covington, J. Adams, E. Sargin, "Deep Neural Networks for YouTube Recommendations," RecSys 2016 — the canonical two-stage funnel (candidate generation + ranking) this lesson's shape descends from. https://dl.acm.org/doi/10.1145/2959100.2959190
+7. M. Aumüller, E. Bernhardsson, A. Faithfull, "ANN-Benchmarks: A Benchmarking Tool for Approximate Nearest Neighbor Algorithms," *Information Systems* 87, 2020 — the measurement methodology behind the recall/QPS/build/size tradeoff. https://ann-benchmarks.com
+8. Y. Malkov, D. Yashunin, "Efficient and Robust Approximate Nearest Neighbor Search Using Hierarchical Navigable Small World Graphs," *IEEE TPAMI* 42(4), 2020 — the layer construction and the logarithmic hop-count argument this lesson states without proving. https://arxiv.org/abs/1603.09320
+9. H. Jégou, M. Douze, C. Schmid, "Product Quantization for Nearest Neighbor Search," *IEEE TPAMI* 33(1), 2011 — the subvector codebooks behind the 512-bytes-to-16 compression, with the distance-estimation error analysis.
+10. P. Lee, L. V. S. Lakshmanan, M. Tiwari, S. Shah, "Modeling Impression Discounting in Large-scale Recommender Systems," KDD 2014 — LinkedIn's discounting mechanism referenced in the re-ranking section.
+</References>

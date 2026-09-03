@@ -1,0 +1,270 @@
+A feed ranks a small, fresh, mostly in-network inventory rather than a hundred-million-item corpus, so its hard problems move downstream: predicting many reaction types at once, blending them into one ordering score, and not showing the same post twice.
+
+<Ref lesson="design-search-ranking">The search dissection</Ref> ran the course's full template on a query-conditioned funnel; this lesson runs it again on the feed shape. The parts are already built: the multi-head ranker and its engagement score (<Ref lesson="ranking-and-ctr">the ranking lesson</Ref>), natural labels and their loop lengths (<Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>), objective decoupling (<Ref lesson="requirements-and-metrics">the requirements lesson</Ref>). What the feed contributes to the module is a different distribution of difficulty: a funnel so shallow that retrieval is a database join, a scoring stage that answers seven questions per post, a re-ranking layer that must remember what each member has already ignored, and a feedback loop that runs through the people who write the posts as well as the people who read them.
+
+## Requirements and scale: freshness binds tighter than volume
+
+The product: a member opens the app, and the system returns a ranked page of recent activity from their network (posts, shares, job changes, comments), with the business goal of long-term engagement. The page budget is the familiar **200 ms**, but the feed's slice of it is thin: multiple services pull candidates and features before any model runs, so the ranking service itself is allotted **~50 ms**.
+
+Two freshness clauses do more design work than either latency number. First, the inventory itself is hours old: a feed showing Tuesday's posts on Thursday is a dead product, so candidates are drawn from a recent activity window, not from an archive. Second, the system must know, per member, which posts they have already seen: a feed that re-serves the same items every fetch is the failure users notice first, and the requirement forces a fast pipeline for impression data long before any model consumes it. Impression discounting, in the re-ranking section, is the mechanism this pipeline exists to feed.
+
+<Example title="scale estimation, template discipline">
+Assumptions with their consequences, on the documented LinkedIn-scale numbers:
+
+- **300 million monthly members**, ~10 visits per member per month: 3 billion feed fetches a month, ~1,150 requests per second on average, taken at $3\times$ for peak: **~3,500 QPS**.
+- **~40 activities seen per visit**: $3\text{B} \times 40 = 120$ billion impressions per month: the training log. At roughly 500 bytes per row that is **~60 TB of training data per month**; keeping six months in the lake is a storage line item, not a rounding error.
+- **CTR near 1%**: ~1 billion positive labels a month against ~119 billion negatives, the extreme-base-rate regime where <Ref lesson="ranking-and-ctr">the ranking lesson's</Ref> NCE and per-head downsampling corrections live.
+- **Candidates per fetch: hundreds to low thousands.** A member's few hundred connections produce on the order of $10^3$ unseen recent posts, not $10^8$.
+</Example>
+
+### The inversion: the funnel goes shallow
+
+The last number breaks the module's pattern. <Ref lesson="recommender-funnel">The funnel lesson</Ref> opened from the premise that no model can score a hundred-million-item corpus in a hundred milliseconds, and everything since (two towers, ANN indexes, recall engineering) followed from that impossibility. From that arc one would expect retrieval to be the feed's hard stage too. It is the opposite: the candidate inventory is the member's own network's recent activity, small enough that the heavy ranker can score all of it inside the 50 ms. Retrieval stops being a search problem and becomes a completeness-and-freshness problem, and the difficulty that the corpus size used to absorb moves downstream — into what to predict, how to blend predictions, and what to do with a post the member has already scrolled past.
+
+<KeyFact>
+The feed is the funnel run at depth zero: ~$10^3$ in-network candidates per fetch means no ANN index, no recall/precision split across stages, and a ranking model that sees the whole inventory, so feed quality is decided almost entirely in scoring and ordering, the stages a corpus-scale recommender treats as the last 1%.
+</KeyFact>
+
+## Inventory and retrieval: a join over the member's own graph
+
+The shallow funnel still has a first stage; it is just built from database machinery rather than embedding machinery. The base inventory is *in-network*: the recent activity of the member's connections and followed entities, spanning the five documented activity types — connection events, informational shares, profile changes, opinions (likes and comments on others' content), and site-specific actions like endorsements. The types matter early because their base rates differ by orders of magnitude: job changes are rare and clicky, shares are common and mostly skimmed, and any single blended "click" model would learn mostly the abundant type: the first argument for the per-reaction heads below.
+
+Producing the candidate set is a **filter-and-join**: fetch the connection list, pull each connection's activity from the item store's recent window, drop what this member has already seen, and join the features the ranker needs from the feature store, all on the request path. The engineering risks are the substrate module's, not the model's: a hot celebrity author fanning out to millions of followers, a stale impression table re-serving seen posts, a feature-store read missing its millisecond budget.
+
+<Figure
+  src="./figures/feed-system.svg"
+  alt="The feed system as one pipeline with numbers: a member's request triggers an in-network join over roughly 500 connections' recent activity yielding one to two thousand unseen candidates, merged with out-of-network injection from followed topics, a viral pool, and exploration slots at a ten to twenty percent quota; the multi-head ranker scores all of it in about 50 milliseconds producing seven calibrated probabilities blended into one engagement score; a re-ranking layer applies impression discounting, author diversity, and the exploration slot; about forty posts reach the feed inside the 200 millisecond page budget. A return path underneath logs impressions and reactions as labels feeding a daily warm-start retrain, with impression counts flowing near-line in minutes to the discounting layer."
+  caption="The design in one diagram: a join and an injection instead of a retrieval stage, all candidates scored, and two return paths on different clocks: labels daily, impression counts in minutes."
+/>
+
+A pure in-network feed starves twice over: a member with a quiet network sees an empty page, and no post can ever travel beyond its author's graph. Production feeds therefore inject **out-of-network candidates** into the same pool: posts from followed topics and pages, a platform-wide viral pool, and exploration slots for content with no track record. The injection runs on quotas, for the funnel lesson's reason: an in-network affinity score and a popularity score are not on one scale, and the blend is a product decision, enforced structurally.
+
+<Remark title="the adjacent system this design treats as given">
+The connection graph itself is maintained by a separate recommender, LinkedIn's People You May Know, which is a link-prediction problem over the social graph with its own graph-walk candidate generation. This design consumes the graph and borrows exactly one PYMK mechanism (impression discounting, below); the graph-shaped candidate generation problem belongs to the module's synthesis lesson's exercise territory.
+</Remark>
+
+## One backbone, seven verdicts: the scoring stage
+
+All candidates now face the ranker, and the feed's first scoring decision is what to predict. A feed does not sort by clicks: clicking is one of many reactions and not the most valuable, and <Ref lesson="ranking-and-ctr" id="many-heads-one-score">the ranking lesson</Ref> already built the production answer: one shared backbone with a calibrated sigmoid head per reaction (click, like, comment, share, friend request, hide, block), blended into a single **engagement score** by business-assigned weights.
+
+Which reactions earn a head is not taste; it is [Rule #13](https://developers.google.com/machine-learning/guides/rules-of-ml)'s three-tier discipline. Model only what is **directly observed and attributable** to a shown post: clicked, liked, commented, shared, hidden, reported. **Indirect effects** (did the member come back tomorrow, how long was the session) make great metrics and terrible training targets, because no single impression owns them; they live in A/B guardrails, and the operations section places them there. And the **never-predict tier**, whether the member is satisfied or the product is good for them, is not modeled at all: those are judged by humans reading the guardrail metrics, not predicted by a head.
+
+### The weights are policy: two posts, two regimes
+
+The blend's weights are the part of this design most often misread as learned parameters. They are not learned; they are the business's current statement of what an interaction is worth, set as serving configuration and tuned by online experiments. This is <Ref lesson="requirements-and-metrics" id="decoupling-objectives-two-models-one-weight">objective decoupling</Ref> operating at production scale: each head trains on its own labels on its own schedule, and because the weights live outside the model, a strategy change ships as a config change, with no retraining and an audit trail of who changed what, when, and against which experiment. The alternative, one model trained on a blended loss, re-trains on every weight tweak and entangles objectives that need different maintenance cadences (abuse signals decay in weeks; taste in years).
+
+The clearest public instance is dated: in January 2018 Facebook announced it would reweight the News Feed toward "meaningful social interactions," valuing comments and conversation between people over passive consumption of public content, as an explicit product policy, publicly stated and rolled out as a ranking change.
+
+<Example title="one reweighting, one flipped ordering">
+Two candidate posts, five heads, two weight policies. Policy 1 is the status quo (click 1, like 5, comment 10, share 20, hide −20); policy 2 is a conversation pivot (like 5 → **2**, comment 10 → **30**, others unchanged).
+
+| head | $\hat{P}$, post A (photo) | $\hat{P}$, post B (debate prompt) | policy 1 | policy 2 |
+|---|---|---|---|---|
+| click | 0.30 | 0.20 | 1 | 1 |
+| like | 0.40 | 0.15 | 5 | 2 |
+| comment | 0.01 | 0.08 | 10 | 30 |
+| share | 0.005 | 0.01 | 20 | 20 |
+| hide | 0.0002 | 0.001 | −20 | −20 |
+
+Policy 1: $S(A) = 0.30 + 2.00 + 0.10 + 0.10 - 0.004 = 2.50$ and $S(B) = 0.20 + 0.75 + 0.80 + 0.20 - 0.02 = 1.93$. A ranks first.
+
+Policy 2: $S(A) = 0.30 + 0.80 + 0.30 + 0.10 - 0.004 = 1.50$ and $S(B) = 0.20 + 0.30 + 2.40 + 0.20 - 0.02 = 3.08$. B ranks first.
+
+No model changed and no probability moved: the same two posts swap places because the business revalued a comment against a like. The ordering is a function of the weight vector, and every pair of posts has a boundary in weight space where their order flips.
+</Example>
+
+<FigureSequence
+  name="score-assembly"
+  alt="Three frames over a fixed two-post layout. Frame one: the shared backbone emits five per-head probabilities for post A, a broadly likeable photo, and post B, a debate prompt — click 0.30 versus 0.20, like 0.40 versus 0.15, comment 0.01 versus 0.08, share 0.005 versus 0.01, hide 0.0002 versus 0.001. Frame two: policy-1 weights multiply in as signed bars, hide in warning color, totaling 2.50 for A against 1.93 for B, A ranked first. Frame three: policy 2 swaps the like weight to 2 and the comment weight to 30; the bars re-stretch and the totals become 1.50 against 3.08, flipping the order with no model change."
+  caption="One post's score assembled, then reweighted: probabilities are the model's, weights are the business's, and the ordering belongs to both."
+/>
+
+<Task>
+Step through the three frames and watch only the comment bar: it is the sole large mover between frames 2 and 3. Then verify one total by hand — policy 2 on post B should give $0.20 + 0.30 + 2.40 + 0.20 - 0.02 = 3.08$.
+</Task>
+
+<Exercise>
+Hold every policy-1 weight fixed and vary only the comment weight $w$. Find the value of $w$ at which posts A and B from the worked example swap places. Write both scores as functions of $w$ before opening.
+
+<Solution>
+Strategy: each score is linear in $w$, so the flip point is where the two lines cross.
+
+$S(A)(w) = 0.30 + 2.00 + 0.01w + 0.10 - 0.004 = 2.396 + 0.01w$, and $S(B)(w) = 0.20 + 0.75 + 0.08w + 0.20 - 0.02 = 1.13 + 0.08w$. Setting them equal: $2.396 - 1.13 = (0.08 - 0.01)\,w$, so $w = 1.266/0.07 \approx 18.1$.
+
+Below a comment weight of ~18, A leads; above it, B does. The transferable move: the blend is linear in the weights, so every pairwise ordering boundary is a hyperplane in weight space, and a weight experiment is a walk across those boundaries — which is why weight changes are shipped through online experiments rather than argued from taste.
+</Solution>
+</Exercise>
+
+### Calibration: the precondition the sum imposes
+
+The sum $\sum_h w_h \hat{P}_h$ consumes magnitudes, not orderings. Adding $0.15 \times 2$ to $0.08 \times 30$ is meaningful only if each factor is an honest probability, and the feed makes that harder than a single-head CTR model, because the seven heads' base rates span five orders of magnitude, from likes near 0.5 down to blocks near $3 \times 10^{-6}$. Each head gets its own negative-downsampling diet during training, so each owes serving its own correction $q = p/(p + (1-p)/w)$: the repair <Ref lesson="ranking-and-ctr">the ranking lesson</Ref> put in the request path, now applied per head with per-head sampling rates.
+
+The failure mode is quiet and multiplicative. A comment head that over-predicts by $2\times$ turns a true 0.06 into 0.12 and, at weight 10, adds a phantom $+0.6$, a full like-tier of score, to every conversational post in every fetch, while the head's AUC reports nothing wrong. The monitoring is the same cheap ratio as before, multiplied by seven: $\sum \text{pred} / \sum \text{label}$ per head, sliced by activity type, each an always-on alarm because reactions arrive within minutes of the impression (<Ref lesson="labels-and-feedback-loops">the short natural-label loop</Ref>).
+
+<KeyFact>
+The engagement score is only as sound as its worst-calibrated head: weights amplify miscalibration linearly ($w_h$ times the head's error enters every sum), so a feed that retunes weights freely (the whole point of decoupling) must hold per-head calibration as a gate, or every weight experiment measures the miscalibration instead of the policy.
+</KeyFact>
+
+## Impression discounting: an ignored post is evidence
+
+The score just built has a memory problem. Post B's 3.08 is a function of the member and the post; the member scrolling past B changes neither input, so the next fetch computes 3.08 again and re-serves the same winner: the repetition failure the requirements section flagged as the one users notice first. The model is not wrong; it is unconditioned on the one fact the feed just observed: this member saw this post and did nothing.
+
+LinkedIn's People You May Know documented the mechanism this forces. PYMK shows three to five suggested connections; a suggestion the member sees and ignores keeps its high relevance score and resurfaces indefinitely, and the team's log analysis over roughly a billion impression tuples measured the underlying fact: **conversion rate falls as the impression count of the same item grows** — a seen-and-ignored item is not the same candidate it was, even though no feature changed.
+
+<Definition title="impression discounting">
+For a candidate with model score $S$ that a member has been shown $k$ times without acting, the served score is
+
+$$
+S' = S \cdot g(k),
+$$
+
+where $g$ is a decreasing *discounting function* fit offline from historical impression logs (candidate families include linear, inverse, exponential, and quadratic decay), chosen to maximize measured conversion-rate improvement. The mechanism is a plugin: the ranking model is untouched, and only the re-ranking layer consumes $k$.
+</Definition>
+
+<Figure
+  src="./figures/impression-discount.svg"
+  alt="A decay plot of post B's served score against ignored impressions k from zero to five under an exponential discount of 0.7 per impression: 3.08, 2.16, 1.51, 1.06, 0.74, 0.52. A dashed horizontal line at 1.50 marks the next candidate, post A. B stays above the line through k equals one, sits at parity at k equals two, and drops below at k equals three, where the plot is annotated that the post retires from the top of the feed. A reset arrow notes that new activity on the post — a comment burst — creates a new version whose counter restarts at zero."
+  caption="An exponential discount retires a seen-and-ignored winner in about three fetches; fresh activity on the post resets the clock, because a post with new comments is new information."
+/>
+
+Run it on the worked pair with $g(k) = 0.7^k$: after one ignored impression B serves at $3.08 \times 0.7 = 2.16$, still first; after two, $1.51$, parity with A's 1.50; after three, $1.06$, and A takes the top slot. Three fetches of silence retire the post, with no model retrain and no label wait. The reset clause matters as much as the decay: the counter is keyed to the version of the post the member last saw, so a post that has since gained a comment thread re-enters at full score. That is the freshness requirement's "the pipeline must know what was seen" clause, now with a consumer attached.
+
+Why feeds need this and corpus-scale recommenders mostly do not is exhaustion arithmetic. A session of three fetches shows ~120 posts against an inventory of ~$10^3$: more than a tenth of everything available, so the top of the score distribution is consumed within one session and would loop without discounting. A video recommender draws from $10^8$: it dedupes what was watched and simply never runs out of unseen high-scorers. The discount is one member of the re-ranking layer's roster from <Ref lesson="recommender-funnel">the funnel lesson</Ref>, alongside author diversity (no three consecutive posts from one connection) and the exploration slot the next section prices, but in a feed it is the load-bearing one.
+
+## The loop is two-sided: readers adapt, and so do creators
+
+Every number the model trains on was produced under the model's own choices, and this design declares that at requirements time rather than discovering it in production. The reader-side loop is the module's standard one: engagement labels are conditioned on exposure and position, so the design trains with a position feature served constant (<Ref lesson="ranking-and-ctr">Rule #36, applied unchanged</Ref>), and its labels-from-what-was-shown circularity is the degenerate feedback loop <Ref lesson="failures-and-drift">the drift lesson</Ref> formalizes: outputs becoming future training inputs, popularity compounding into a spiral. The feed aggravates it on both clock and coverage: reaction labels land in minutes and the ranker retrains multiple times a day, so the loop runs fast, and every impression the feed serves is the feed's own prior choice.
+
+The feed adds a second loop no search or video system has at this strength: **creators watch their reach and adapt what they post**. Rule #15's warning is the mechanism stated plainly — whatever signals the ranker rewards "will become obvious to those who use your system, and they will tweak their posts to have these properties." The dated exhibit runs on the weights that preceded the MSI announcement: Facebook's feed had rewarded comments and reactions for years before 2018, and by December 2017 that ranking had bred an ecosystem of engagement bait ("tag a friend who…", "LIKE if you agree"), posts optimized for the reaction heads rather than for readers. Facebook shipped an explicit demotion of the pattern that month; the January 2018 reweighting then raised the comment weight, and with it the very incentive the demotion polices. The loop closed through people, not pipelines: the weight table published itself through creator behavior, and the platform's counter-move was a policy-layer classifier, not a better engagement model.
+
+<Figure
+  src="./figures/two-sided-loop.svg"
+  alt="Two nested loops around the feed model. Inner loop in amber: the model produces a ranked feed, exposure yields reader reactions, reactions become training labels, labels retrain the model. Outer loop in blue: creators observe which posts earn reach, adapt what they post, and the changed inventory feeds back into what the model ranks. Three audit taps in green are attached where they measure: an exploration slot on the exposure edge, popularity-diversity monitoring on the model's output, and creator-side health metrics on the outer arc, with the position feature noted on the label edge."
+  caption="The reader loop closes through labels; the creator loop closes through the inventory itself. Each audit sits on the edge it measures, and all of them are in the design before launch."
+/>
+
+Because the loop is declared, its audits are components of the design, not a postmortem's recommendations:
+
+- **Exploration slots** (reader side): a reserved slice of impressions serves new posts with no track record, uniformly: the TikTok-style new-item traffic pool <Ref lesson="failures-and-drift">the drift lesson</Ref> prices as the randomization fix. This traffic is what makes unbiased quality measurable at all; a feed without it cannot even estimate what its labels are doing to it.
+- **Popularity-diversity monitoring** (output side): aggregate diversity and hit-rate by item-popularity bucket, tracked over time. Engagement rising while impressions concentrate into the popular head is the loop's signature, visible before any business metric moves.
+- **Creator-side health** (outer loop): the share of impressions reaching first-time and small creators, and time-to-first-distribution for a new post. A feed can hold reader metrics flat while quietly starving new supply — and the inventory is the product's raw material.
+
+<KeyFact>
+A feed's feedback loop is two-sided, selecting what gets read and shaping what gets posted, so the audit plan needs an instrument per side: exploration traffic and diversity metrics watch the reader loop, creator-distribution metrics watch the one that changes the inventory itself. None of the three can be reconstructed after launch, because each requires traffic the untreated system would never have served.
+</KeyFact>
+
+## Operations: three metric tiers and four retraining clocks
+
+The metrics chain assembles from Rule #13's tiers, now as an operations plan. The **trains-the-model tier** is the per-impression reactions: attributable, minutes-fresh, feeding both the seven heads' labels and their calibration ratios. The **A/B-guardrail tier** is the indirect effects: next-day return, sessions per member, time on feed. These decide launches (a weight experiment that lifts engagement score while next-day return dips is a loss) but never become training targets, because no impression owns them. The **never-predict tier** stays human: well-being and satisfaction are judged from the guardrails, not predicted.
+
+<Remark title="Rule #23: the team is not the member">
+The feed's designers are outliers in its own population — heavier users, atypical networks, emotional stakes in the content. Dogfooding catches obvious breakage; it cannot judge ranking quality, and Rule #23's arithmetic stands: an hour of nine engineers arguing about their own feeds buys thousands of crowdsourced judgments from people who resemble the members.
+</Remark>
+
+Retraining is not one decision but one per component, and the documented frame is LinkedIn's **Four Levels of Model Retraining**: level 0, train and forget; level 1, periodic cold-start retraining of the whole model; level 2, near-line, per-component asynchronous updates on streaming data; level 3, warm-start retraining of personalized components in bulk as data accumulates. The feed occupies every rung above zero at once.
+
+<Figure
+  src="./figures/retraining-ladder.svg"
+  alt="A four-rung ladder from level 0 at the bottom to level 3 at the top with the feed's components placed on their rungs and clocks. Level 0, train and forget: empty for this design, annotated that the feed's world is nonstationary. Level 1, periodic cold-start: post and author embeddings plus a full ranker reset, weekly. Level 2, near-line per-component: impression counters and per-author aggregates, minutes. Level 3, warm-start in bulk: the multi-head ranker fine-tuned daily from the champion checkpoint. A side note off the ladder states that engagement weights are serving configuration tuned by experiment, retrained never."
+  caption="One system, four clocks: the ladder is occupied per component, not chosen once, and the blend weights are not on it at all."
+/>
+
+The placements follow the material each component consumes. Impression counters and per-author aggregates update **near-line in minutes** (level 2), because the discounting layer is worthless a day late. The **multi-head ranker warm-starts daily** from the champion's checkpoint (level 3), the stateful economics <Ref lesson="continual-learning">the continual-learning lesson</Ref> priced with Grubhub's measured 45× compute cut; a **weekly cold-start reset** (level 1) alongside the embedding refresh bounds whatever bias the daily fine-tunes accumulate. And the engagement weights sit off the ladder entirely: they are serving configuration, moved by experiments, so a weight change never costs a retrain.
+
+What is established, requirements to operations: a feed's funnel is shallow (a join and an injection over ~$10^3$ candidates), so its quality lives downstream; the scoring stage is seven calibrated heads blended by weights that are business policy with an audit trail, sensitive enough that a reweighting flips orderings (2.50/1.93 to 1.50/3.08) and sound only while every head stays calibrated; impression discounting ($S \cdot g(k)$, fit from logged conversion decay) retires seen-and-ignored winners within a session; and the feedback loop is two-sided, with exploration slots, diversity metrics, and creator-health metrics designed in as its audits. <Ref lesson="design-ad-click-prediction">The next dissection</Ref> keeps the calibrated-heads discipline and raises the stakes: the multiplier on the probability becomes an advertiser's bid, and every calibration error acquires a price per impression.
+
+## Exercises
+
+<Exercise>
+A feed scores two posts under the policy (click 1, like 5, comment 10, share 20, hide −20). Post X: click 0.25, like 0.30, comment 0.03, share 0.01, hide 0.0005. Post Y: click 0.10, like 0.20, comment 0.09, share 0.03, hide 0.002. Compute both engagement scores and the ordering. Then the member ignores the winner twice; apply the discount $g(k) = 0.7^k$ with $k = 2$ and give the new ordering.
+
+<Solution>
+$S(X) = 0.25 + 0.30 \times 5 + 0.03 \times 10 + 0.01 \times 20 - 0.0005 \times 20 = 0.25 + 1.50 + 0.30 + 0.20 - 0.01 = 2.24$.
+
+$S(Y) = 0.10 + 1.00 + 0.90 + 0.60 - 0.04 = 2.56$. Y ranks first.
+
+After two ignored impressions, Y serves at $2.56 \times 0.7^2 = 2.56 \times 0.49 \approx 1.25$, while X, never shown ($k = 0$), still serves at 2.24. X now ranks first. The discount changed the feed without touching a model or waiting for a label: the member's silence was consumed as evidence within two fetches.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a brand-new member has zero connections. Walk this lesson's pipeline and state which stages produce anything at all. Then design the cold-start feed (what fills the page, ranked by what) and state the signal threshold at which personalization should take over.
+
+<Solution>
+The in-network join returns the empty set: no connections, no base inventory. Impression discounting has nothing to discount ($k = 0$ everywhere). The ranker's member-side features (affinity, interaction history, any per-member personalized component) are all missing or at priors. The only productive stages are the **out-of-network injectors**: the viral/popularity pool, followed topics and pages declared at signup, and the exploration slot.
+
+The cold-start feed is therefore those sources, ranked by a non-personalized score: popularity priors within the member's declared interests and locale, with the negative heads (hide, block, report) still active as guardrails: they need no personal history to be worth enforcing. This is the baseline-ladder discipline applied to one member: serve the strongest featureless model until features exist.
+
+The takeover threshold is a data threshold, not a time threshold. Concretely, personalization starts paying once the member has produced a few dozen attributable reactions, enough for affinity aggregates to beat the popularity prior on held-out ranking. The member's own early feed is, in effect, their personal exploration phase: the system serves broad candidates precisely to buy the unbiased interactions that make personalization possible — the same exploration-before-exploitation structure <Ref lesson="failures-and-drift">the drift lesson</Ref> prescribes for new items, applied to a new member.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this planning-meeting claim: "Comments carry weight 10 and likes only 5, so give the comment head the most capacity and train it hardest — the better its ordering, the better the feed." Identify the step that fails, and construct the two halves of the refutation: (a) what a miscalibrated comment head does to the whole feed, however well it orders; (b) why a comment head with better ordering but uncorrected magnitudes helps nothing.
+
+<Solution>
+The failing step is treating the blend as a consumer of orderings. The engagement score consumes each head's **magnitude**: post scores are $\sum_h w_h \hat{P}_h$, so a head's numeric error enters every sum it touches, scaled by its weight.
+
+(a) Suppose the comment head over-predicts by $2\times$ (say a lost downsampling correction; its training diet is the most aggressively downsampled, since comments are rare). A post with true comment probability 0.06 reads 0.12, gaining a phantom $0.06 \times 10 = 0.6$, more than a like-tier of score, and every conversational post in every fetch gains proportionally. The feed tilts wholesale toward comment-bait-shaped content, the weight experiments on top of it measure the miscalibration rather than the policy, and the head's AUC never moves, because doubling all its outputs is a monotone transform.
+
+(b) Now suppose extra capacity genuinely improves the comment head's ordering (higher AUC) but its outputs remain uncalibrated. Ordering quality is invariant under monotone transforms of that one head; the blend is not (the next exercise proves it). Without honest magnitudes, a better-ordered head still contributes wrong addends, so its ordering gains cannot reach the final feed ordering reliably. Capacity spend is judged by per-head NCE and the calibration ratio; weight size says where errors are amplified most, which argues for calibrating the comment head first — not for growing it first.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson skipped. (a) Show that a single-head ranker's ordering is invariant under any strictly increasing transform $\varphi$ of its score. (b) Show the weighted multi-head sum is not: with weights (like 5, comment 10), take post X (like 0.40, comment 0.05) and post Y (like 0.20, comment 0.16), and apply the monotone recalibration $\varphi(p) = p/2$ to the comment head only. Compute both orderings and conclude why per-head calibration is a precondition of the blend.
+
+<Solution>
+(a) For any two items, $s_i > s_j \iff \varphi(s_i) > \varphi(s_j)$ by strict monotonicity, so sorting by $\varphi(s)$ is sorting by $s$: any single sorted score is determined only up to monotone transforms, which is exactly why AUC-style ordering metrics cannot see calibration.
+
+(b) Before: $S(X) = 0.40 \times 5 + 0.05 \times 10 = 2.00 + 0.50 = 2.50$ and $S(Y) = 1.00 + 1.60 = 2.60$: Y first. Apply $\varphi(p) = p/2$ to the comment head alone (a strictly increasing map, e.g. the honest correction for a head that over-predicted $2\times$): $S(X) = 2.00 + 0.25 = 2.25$, $S(Y) = 1.00 + 0.80 = 1.80$: X first. A monotone change within one head reordered the blend, because the sum compares magnitudes across heads: monotone transforms preserve each head's internal ordering but not the exchange rate between heads.
+
+The conclusion is the precondition stated as a theorem: the blend is well-defined only when each head's outputs are pinned to a common currency, calibrated probabilities, since that is the unique representative of each head's monotone class with a cross-head meaning. The same argument returns priced in <Ref lesson="design-ad-click-prediction">the ads design</Ref>, where the blend is $\hat{P}(\text{click}) \times \text{bid}$ and the reordering is a revenue error.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: a design review proposes new heads for the ranker. For each candidate signal, assign Rule #13's tier (trains-the-model, A/B-guardrail-only, never-predict) with a justifying sentence, and for each signal you keep out of the trains-the-model tier, state concretely what goes wrong if a head is trained on it anyway: (a) dwell time on an expanded post; (b) a save-for-later tap; (c) a visit to the author's profile some time after the impression; (d) the change in a creator's follower count over the week after posting.
+
+<Solution>
+(a) **Dwell: trains the model, with a threshold.** Per-post dwell is observed and attributable (unlike session time, which no impression owns), but it is continuous and noisy, so it enters as a thresholded label, the long-stay grade <Ref lesson="design-search-ranking">the search dissection</Ref> used, rather than raw seconds. A head trained on raw seconds rewards whatever holds the eye, and confusing, dense, or slow-loading posts hold the eye as well as good ones do.
+
+(b) **Save-for-later: trains the model.** A discrete tap on a shown post, directly attributable, and a stronger quality vote than a like. Its cost is base rate: saves are rarer than comments, so this head takes the most aggressive negative downsampling and owes the most careful serving-time correction before its weight touches the blend.
+
+(c) **Profile visit: the tier depends on the join rule, which is the point.** A visit reached through the shown post's byline, within the session, is attributable and can train a head. The same event joined loosely (any visit to that author the same day) belongs in the guardrail tier at best, because famous and prolific authors collect profile visits the shown post did not cause. Train on the loose join and the head hands phantom positive labels to already-popular authors on every impression, feeding exactly the popularity spiral the diversity audit exists to catch. The signal's name does not decide its tier; the instrumentation does.
+
+(d) **Follower delta: A/B-guardrail only, on the creator side.** It aggregates a week of distribution across thousands of readers, so no single impression owns any of it; it is the creator-health family from the operations section, read in experiments. Trained as a head, it stamps every impression of a post with a label set by the creator's overall week (leakage across impressions), and the feed learns to route reach toward accounts that are already growing — a second popularity spiral, this time on the outer loop.
+</Solution>
+</Exercise>
+
+<Exercise>
+Spaced review: over a month, engagement score per impression rises 4%, while popularity-diversity collapses: the top 1% of posts' impression share grows from 35% to 60%, and hit-rate-by-popularity-bucket shows the model sharpening only on the popular head. (a) Diagnose within the shift taxonomy of <Ref lesson="failures-and-drift">the drift lesson</Ref>: is this covariate shift? (b) Size the intervention: the feed serves 4 billion impressions/day, 10 million new posts arrive daily, and a post needs ~200 unbiased impressions for a quality estimate. What does a 1% exploration slot buy, and what follows?
+
+<Solution>
+(a) The input distribution has moved — but not exogenously. Covariate shift is a change in $P(X)$ the world imposes; here the impression distribution moved because the system's own exposure policy concentrated it: outputs feeding future training inputs is the degenerate feedback loop, the popularity spiral in mid-flight. The tell is in the audits: posting volume and network composition (the world's side) are stable, while exposure concentration (the system's side) is what moved, and engagement "improving" while diversity collapses is the spiral's signature: the model gets better at exactly what it over-serves.
+
+(b) A 1% slot is 40 million unbiased impressions/day; at 200 per post that evaluates 200,000 posts/day: **2% of new supply**. The arithmetic forces a design, not just a number: either the slot grows (each point of exploration is a point of engagement deliberately spent), the per-post sample shrinks (noisier quality estimates), or pool admission is gated: a cheap pre-filter (spam/policy classifier, author history) decides which new posts earn the 200 impressions, with graduated pools thereafter, the TikTok ladder. The intervention is the exploration budget plus the admission policy, and its cost is explicit: unbiased measurement is bought with impressions the engagement-optimal feed would have spent elsewhere.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward: take this feed design to a video platform with a $10^8$-item corpus and no social graph. State which components transfer unchanged and which break, with the replacement for each break.
+
+<Solution>
+**Transfers whole:** the scoring stage and everything attached to it: shared backbone with per-reaction heads (watch, like, share, hide), the business-weighted engagement blend with weights as serving config, per-head calibration as its precondition, the position feature, Rule #13's tier discipline for metrics, the exploration slot and popularity-diversity audits, and the per-component retraining ladder.
+
+**Breaks:** the inventory stage. There is no member graph to join over: the candidate pool is the whole corpus, and "all candidates through the heavy ranker" dies at $10^8 \times$ anything. The shallow join must become the deep funnel (multi-source candidate generation, two-tower retrieval with an ANN index, recall quotas), restoring everything <Ref lesson="recommender-funnel">the funnel lesson</Ref> built and this feed got to skip. Impression discounting demotes from load-bearing to hygiene: with effectively infinite unseen supply, deduping watched items covers most of its job. Freshness moves from the activity-window join to index-refresh cadence.
+
+That composition — this lesson's scoring and loop discipline on top of the funnel's retrieval machinery — is precisely the module's synthesis, assembled end to end in <Ref lesson="design-video-recommendations">the video-recommendation design</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Pham, *Machine Learning Design Interview*, 2022 — the LinkedIn feed ranking chapter (pp. 170–183: problem statement, the 200 ms/50 ms budgets, the five activity types, the 300M-member scale estimation, training-data generation and evaluation); Ch. 2 (pp. 117–120: position bias and LinkedIn's PYMK impression discounting); Ch. 1 (pp. 41–42: the Four Levels of Model Retraining).
+2. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023 — Ch. 10, pp. 211–230 (the personalized news feed: multi-task reaction heads, Fig. 10.3, and the engagement-score table, Fig. 10.4); Fig. 1.23 (the retrieval → ranking → re-ranking pipeline this design instantiates).
+3. P. Lee, L. V. S. Lakshmanan, M. Tiwari, S. Shah, "Modeling Impression Discounting in Large-scale Recommender Systems," KDD 2014 — the impression-data analysis (conversion decay with impression count), the four discounting-function families, and the PYMK deployment. https://dl.acm.org/doi/10.1145/2623330.2623356
+4. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018 — Rule #13 (the three-tier objective taxonomy), Rule #15 (creators adapt to ranking signals), Rule #23 (you are not a typical end user), Rule #36 (positional features). https://developers.google.com/machine-learning/guides/rules-of-ml
+5. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 2, pp. 41–42 (decoupling objectives: the newsfeed's quality and engagement models with serving-time weights); Ch. 8, pp. 232–236 (degenerate feedback loops: detection by popularity-diversity metrics, correction by randomization — TikTok's traffic pools — and positional features).
+6. A. Mosseri, "News Feed FYI: Bringing People Closer Together," Facebook Newsroom, January 11, 2018 — the meaningful-social-interactions reweighting as public product policy. https://about.fb.com/news/2018/01/news-feed-fyi-bringing-people-closer-together/
+7. "News Feed FYI: Fighting Engagement Bait on Facebook," Facebook Newsroom, December 18, 2017 — the creator-side adaptation exhibit and the policy-layer demotion that answered it. https://about.fb.com/news/2017/12/news-feed-fyi-fighting-engagement-bait-on-facebook/
+</References>

@@ -1,0 +1,312 @@
+An ads system multiplies a predicted click probability by a bid inside an auction, which makes it the most numerically accountable ML system in production: every miscalibration is priced, and every millisecond of serving latency is a lost impression.
+
+This is the module's third end-to-end dissection. <Ref lesson="design-search-ranking">The search design</Ref> ran the course's template on a query-conditioned funnel and <Ref lesson="design-feed-ranking">the feed design</Ref> on a shallow multi-objective one; both ended in an ordering a user consumes. Here the consumer changes: the probability is multiplied by an advertiser's bid, so the machinery the course has built returns with money attached to every term: calibrated CTR and NCE from <Ref lesson="ranking-and-ctr">the ranking lesson</Ref>, delayed natural labels from <Ref lesson="labels-and-feedback-loops">the labeling lesson</Ref>, the stream join from <Ref lesson="batch-and-stream-processing">the processing lesson</Ref>, experiment design from <Ref lesson="deployment-and-online-experiments">the deployment lesson</Ref>. What this lesson contributes is the ads shape: requirements derived from an auction, a label pipeline racing a clock, a downsample-then-correct contract between training and serving, experiments that must not share budgets, and calibration monitoring read directly as revenue.
+
+The route: the waterfall fixes the requirements; the impression–click join and its window; negative downsampling and the correction it owes serving; features, model, and gates by recall; the feedback loop and its breakers; budget-split experiments; monitoring and retraining cadence.
+
+## Requirements from the auction: the buyer sets the clock
+
+The product transaction is one impression: a user loads a page with an ad slot, advertisers bid for it, and the platform must decide which ad to show. Under pay-per-click pricing the platform earns the bid only if the ad is clicked, so the expected revenue of showing ad $i$ is
+
+$$
+\mathrm{EV}_i = \hat{P}(\text{click}_i) \times \text{bid}_i ,
+$$
+
+and the auction ranks by it. This single line generates the system's requirements. The probability is multiplied by money, so it must be **calibrated**: <Ref lesson="ranking-and-ctr" id="calibration-for-money-the-auction-chain">the ranking lesson's auction chain</Ref> already priced one over-confident prediction handing the wrong ad a win. And the multiplication happens per impression at page-load speed, which sets the clock.
+
+### The waterfall clock
+
+The clock is harsher than a page budget, because of how ad inventory is sold. In the *waterfall* model, a publisher first tries to sell the impression directly at a high CPM (cost per thousand impressions); unsold, the impression falls through a chain of ad networks, each given a timeout to respond, until someone buys it at a lower price. A network's stage timeout runs to roughly **150 ms** from the moment the impression is offered, and the CTR model is one of four things inside it: candidate retrieval, feature fetches, scoring, and the auction. Scoring's share is **50–100 ms**, close to the ~50 ms <Ref lesson="design-feed-ranking">the feed design</Ref> allotted its ranker, but taken out of a 150 ms stage rather than a 200 ms page, and with 50–100 thousand candidates to retrieve and an auction to run in what is left. Missing the timeout does not degrade quality; the impression is simply sold to the next buyer down the chain.
+
+<KeyFact>
+Revenue in the waterfall is a step function of latency, not a slope: under the stage timeout the impression earns full price, and one millisecond over it earns nothing, because the impression falls through to a cheaper buyer. The constraint therefore binds at the tail percentile, never the mean — a p99 regression hands roughly 1% of impressions to competitors while every dashboard average stays green.
+</KeyFact>
+
+### Scale and system shape
+
+<Example title="scale estimation, template discipline">
+Assumptions with their consequences, on the documented planning numbers:
+
+- **~40,000 ad requests per second**, sustained: about **100 billion requests per month**, the denominator under every per-request cost in this design.
+- **Candidates per request: 50–100 thousand ads**, delivered by upstream targeting. At even 10 μs of scoring per candidate, one instance needs ~1 s for the set, an order of magnitude over budget, so scoring fans out over shards behind an aggregator. Fan-out revives <Ref lesson="requirements-and-metrics">the requirements lesson's</Ref> tail arithmetic: with 1 replica in 100 slow and a fan-out of 20, $1 - 0.99^{20} \approx 18\%$ of requests hit a straggler, so per-replica tail discipline must be far tighter than for a single service.
+- **~500 bytes per logged impression**, hundreds of features: $10^{11} \times 500$ B $\approx$ **50 TB of training log per month**. This number forces the downsampling decision two sections down.
+- **CTR near 1%**: about 1 billion positive labels a month against 99 billion negatives, the extreme-base-rate regime <Ref lesson="ranking-and-ctr" id="normalized-cross-entropy-dividing-out-the-base-rate">NCE</Ref> was built for.
+</Example>
+
+<Figure
+  src="./figures/ads-system.svg"
+  alt="The ads system in one diagram: an ad request enters a waterfall of buyers with per-stage timeouts; inside one stage, 50–100 thousand candidate ads flow through feature assembly with batch and streaming lanes into a fanned-out CTR model with a 50–100 ms budget, then through the downsampling correction into an auction that ranks by corrected probability times bid; the served impression and the click stream join in a window and feed a 50 TB per month training store that retrains the model daily or faster."
+  caption="Everything from candidates to served ad runs inside one 150 ms waterfall stage; the blue return path, impression to click to training store, is the only route by which the system learns anything about the ads it showed."
+/>
+
+<Remark title="where the ML system ends">
+The auction itself is mechanism design, not machine learning: second-price and generalized second-price rules, reserve prices, and the pacing algorithms that stop a campaign from spending its daily budget by 9 a.m. are all decided outside the model. This design treats them as the consumer of one number, $\hat{P}(\text{click})$, and the whole lesson is about keeping that number honest.
+</Remark>
+
+## Labels: the impression–click join and the window that cannot be neutral
+
+Requirements fixed, the data comes next, and for ads the hard half of the data is the label. A training row is an impression joined to its outcome, and the outcome arrives on a separate stream, if it arrives at all: impressions are logged at serving, clicks are logged by the client, and the two meet in a *stream–stream join* keyed by impression ID, each side held in windowed state exactly as <Ref lesson="batch-and-stream-processing">the processing lesson</Ref> built it for search-and-click pairs.
+
+### A non-click is a deadline
+
+The join's window is the design decision. A click is explicit; a non-click is a deadline: "no click within $W$" is what makes an impression a negative. The Twitter ads team measured what any choice of $W$ does ([Ktena et al., RecSys 2019](https://arxiv.org/abs/1907.06558)): the majority of clicks arrive within the **first five minutes** after the impression, but a tail of clicks arrives **hours later**. Every finite window converts that tail into false negatives, so windowed CTR is biased low, and a shorter window is biased lower. <Ref lesson="labels-and-feedback-loops">The labeling lesson</Ref> recorded that fact; this system cannot ignore it, because the bias lands on the exact quantity the auction multiplies by money.
+
+<FigureSequence
+  name="label-join"
+  alt="Three frames over a shared time-since-impression axis. Frame one: five impressions logged at time zero, one row each. Frame two: clicks arrive at 90 seconds, 4 minutes, and 11 minutes on three rows, one row stays silent, and one row's click lands at 4 hours beyond an axis break; a 15-minute labeling window is shaded on every row. Frame three: labels assigned, with three positives inside the window, one true negative, and the 4-hour click marked as a false negative outside the window, with measured CTR 3/5 against true CTR 4/5."
+  caption="The labeling window at work: three frames, one new fact each. The late click is not noise: at production scale the tail is systematic, so windowed CTR is systematically low."
+/>
+
+<Task>
+Step through the three frames. From frame three, read off the measured and the true CTR, then work out how wide $W$ would have to be to label all five rows correctly, and state what that width costs the training pipeline. Finish by naming the downstream consumer that inherits the gap between the two CTRs, and the direction it pushes auction prices.
+</Task>
+
+### Two postures toward the tail
+
+Production systems take one of two postures toward the tail, the same pair the processing lesson catalogued for stragglers. Either fix $W$, label at the deadline, and **monitor the late-click rate** as a known correction to the calibration target; or emit provisional negatives at the deadline and **re-label when a late click arrives**, which downstream training must be able to consume. Both postures also fix the evaluation split: training and validation are partitioned **by time**, never randomly, because a random split leaks tomorrow's campaigns into today's training. That is <Ref lesson="data-leakage-and-splitting">the leakage lesson's</Ref> rule, applied verbatim.
+
+<Remark title="modeling the delay instead">
+Ktena et al.'s own contribution goes one step further than either posture: treat the click delay as a random variable and train with losses that weight a provisional negative by the probability the click is still coming. The window stops being a cliff and becomes a distribution; the engineering cost is a second model to maintain.
+</Remark>
+
+<KeyFact>
+$W$ also caps how fresh training data can be: a retrain consumes only impressions whose windows have closed, so a model rebuilt every few hours needs $W$ shorter than its own cadence — and shortening $W$ raises the false-negative bias. Label completeness and model freshness are one trade, not two settings; the retraining cadence of the final section is negotiated against this window.
+</KeyFact>
+
+## Downsampled training owes serving a correction
+
+The join emits 50 TB a month, 99% of it negatives, and the pipeline decision this forces was named in the scale estimate: **downsample the negatives**. Keeping 1 negative in 10 ($w = 0.1$) cuts the training set toward 5 TB and lifts the positive rate the model sees from 1% to about 9%. A model trained on that diet *honestly* learns click rates roughly ten times the world's: downsampling shifts every log-odds by $\ln(1/w)$, a monotone distortion, invisible to AUC and priced by the auction on every request.
+
+### The correction at serving
+
+The repair is the serving-time correction <Ref lesson="offline-evaluation">the offline-evaluation lesson</Ref> derived from Bayes' rule and <Ref lesson="ranking-and-ctr">the ranking lesson</Ref> put in the request path:
+
+$$
+q = \frac{p}{p + (1-p)/w},
+$$
+
+with $p$ the raw prediction and $w$ the negative sampling rate. At $w = 0.1$, a raw 0.50 corrects to an honest 0.09.
+
+<Figure
+  src="./figures/downsample-correct.svg"
+  alt="Left, the serving distribution: one click per 99 non-clicks, CTR 1.0%. An arrow labeled keep 1 negative in 10 leads to the training distribution: one click per 9.9 non-clicks, apparent CTR 9.2%. Below, the correction formula q equals p over p plus one minus p over w, with the worked number raw 0.50 mapping to corrected 0.09, and two inset calibration sketches: raw predictions sitting far above the diagonal, corrected predictions on it."
+  caption="Downsample in the pipeline, correct at serving: the two halves of one contract. The correction is applied before the auction ever sees a probability."
+/>
+
+### Nonlinearity flips auctions
+
+A tempting reading of the distortion is that it is harmless: every prediction is inflated, so the auction's ordering should survive. The reading fails because the correction is not a uniform rescaling. A constant log-odds shift is nonlinear in probability space, compressing high predictions less than low ones, and an auction compares magnitudes across ads with different bids.
+
+<Example title="the correction flips an auction">
+Two ads, scored raw by the $w = 0.1$ model: ad X predicts 0.50 with a \$1.00 bid; ad Y predicts 0.20 with a \$3.00 bid.
+
+**Uncorrected auction.** $\mathrm{EV}_X = 0.50 \times 1.00 = \textdollar 0.50$; $\mathrm{EV}_Y = 0.20 \times 3.00 = \textdollar 0.60$. Y wins.
+
+**Corrected auction.** $q_X = 0.5/(0.5 + 0.5/0.1) = 0.5/5.5 = 0.091$ and $q_Y = 0.2/(0.2 + 0.8/0.1) = 0.2/8.2 = 0.024$. Now $\mathrm{EV}_X = \textdollar 0.091$ against $\mathrm{EV}_Y = \textdollar 0.073$: X wins.
+
+The correction divided X's raw prediction by 5.5 and Y's by 8.2 (different factors, because the map is nonlinear) and the winner changed. Priced per thousand impressions: serving Y earns $1000 \times 0.024 \times \textdollar 3.00 \approx \textdollar 73$; serving X earns $1000 \times 0.091 \times \textdollar 1.00 \approx \textdollar 91$. The uncorrected auction gives away about **\$18** per thousand impressions while reporting predictions inflated 5–8×.
+</Example>
+
+<Exercise>
+A staged rollout leaves two scoring paths live. Ad A is scored by the path that lost the correction: it reports the raw $p_A = 0.03$ from the $w = 0.1$ model, bid \$2.00. Ad B is scored by the corrected path: $p_B = 0.05$, calibrated, bid \$1.00. Run the auction as served, then correct A's prediction and run it honestly. State what the platform loses per thousand such impressions if it keeps serving the as-is auction. Write both EV computations before opening.
+
+<Solution>
+As served: $\mathrm{EV}_A = 0.03 \times 2.00 = \textdollar 0.060$ against $\mathrm{EV}_B = 0.05 \times 1.00 = \textdollar 0.050$: A wins.
+
+Honestly: $q_A = 0.03/(0.03 + 0.97/0.1) = 0.03/9.73 = 0.0031$, so $\mathrm{EV}_A = 0.0031 \times 2.00 = \textdollar 0.0062$ against B's honest \$0.050: B wins by a factor of eight.
+
+Per thousand impressions, serving A yields $1000 \times 0.0031 \times \textdollar 2.00 \approx \textdollar 6$; serving B yields $\textdollar 50$. The mixed-path auction loses about **\$44** per thousand impressions, and every one of A's wins also bills and paces against a probability inflated nearly 10×. The transferable move: a dropped correction is not a calibration blemish but a systematically wrong auction, the incident class that makes the calibration ratio, monitored per slice in the final section, the first alarm to fire.
+</Solution>
+</Exercise>
+
+<KeyFact>
+A dropped correction survives the offline calibration plot as easily as it survives AUC, and for a different reason: that plot is drawn on held-out rows from the same downsampled distribution the model trained on, where the raw predictions are honest and the curve sits on the diagonal. The correction is a serving-path transform, applied after every offline gate has already passed, so nothing before launch can test it: the sliced calibration ratio of the final section is the only detector this incident class has.
+</KeyFact>
+
+## Features, model, and gates: recalled machinery, one fresh number
+
+The model itself is the settled part of this design, which is the point of running the template on ads last: nearly every component is a recall with the stakes raised. Features are the user × ad × context crosses of <Ref lesson="features-at-scale">the features lesson</Ref>: user behavioral counters over time windows (clicks on ads in the last day, computed on the batch and streaming lanes of <Ref lesson="feature-platform">the feature platform</Ref>), ad and campaign attributes, page context, and the crosses among them.
+
+### Hashing an unbounded vocabulary
+
+Advertiser, campaign, and creative IDs form vocabularies that are unbounded and churning: campaigns are created and retired hourly, and an integer-encoded vocabulary would need rebuilding on every retrain. This is the regime the features lesson's **hashing trick** was built for, and its price is small enough to pay hourly: on Booking.com's production data, driving **half of all features into collisions cost under 0.5% of log loss** (<Ref lesson="features-at-scale" id="the-measured-cost-and-where-it-concentrates">the features lesson's measurement</Ref>). Hashing the IDs into a fixed space at that price is what lets the model retrain many times a day over a vocabulary that never stops moving.
+
+### Architecture and the offline gate
+
+The architecture is <Ref lesson="ranking-and-ctr">the ranking lesson's</Ref> crossing machinery unchanged (wide-and-deep or DCN v2, learning the crosses no engineer can enumerate), and the offline gate is that lesson's metric pair: NCE plus a calibration plot, never an ordering metric alone. One worked number anchors the scale: a model with log loss 0.273 bits against a base-rate log loss of 0.842 bits scores an NCE of about **0.32** — its loss is a third of the featureless floor.
+
+<Figure
+  src="./figures/nce-scale.svg"
+  alt="A horizontal scale of NCE from 0 to 1.5. Zero is marked no loss at all, 1.0 is marked the featureless floor of predicting the base rate, and the region above 1.0 is shaded and marked worse than knowing the CTR alone. A dot at 0.32 is labeled worked model, 0.273 over 0.842. A note below records that the denominator is the base rate's own loss, 0.842 bits on the worked dataset against 0.081 bits at a 1 percent CTR, and that raw log losses do not compare across the two regimes."
+  caption="The gate divides by the floor, not by nothing: 0.32 means a third of the featureless loss whether the base rate is 60% or 1%."
+/>
+
+The denominator is what makes the number portable. Those raw losses come from a small worked dataset whose base-rate predictor emits 0.6 on every row, a background CTR nowhere near this design's 1%; at a 1% base rate the featureless floor is only 0.081 bits, and every raw loss on that traffic shrinks with it. A gate reading raw log loss would therefore score an ads model far "better" than the worked one for no reason but rarer clicks, and would report an improvement every time the base rate fell. Dividing by the floor removes the base rate from both sides, which is what lets 0.32 be compared across weeks and countries.
+
+<Remark title="factorization machines">
+Between hand-built crosses and learned cross networks sits the *factorization machine*: give every feature a small latent vector and model each pairwise interaction as a dot product, so crosses never seen together in training still receive a score. FMs were the workhorse of ad CTR before deep crossing architectures absorbed the idea; the deep-model lineage is in the ranking lesson's references.
+</Remark>
+
+## The direct feedback loop: the model selects its own training data
+
+Everything above treats the training set as given, and in ads it is not: the model decides which ads win auctions, only shown ads can be clicked, so the model selects its own future training data. This is the *direct feedback loop* of [Sculley et al.'s technical-debt paper](https://papers.nips.cc/paper/2015/hash/86df7dcfd896fcaf2674f757a2463eba-Abstract.html) (§4), and the ads system is its textbook instance. The failure it manufactures is self-confirming: an ad whose probability the model underrates never wins, never generates an impression, and therefore never generates the evidence that would correct the estimate. No monitoring of served traffic can see it, because the error lives entirely in what was not served.
+
+<Figure
+  src="./figures/feedback-loop.svg"
+  alt="A cycle: the CTR model scores candidates, the auction picks winners, shown ads collect clicks and silences, the labels retrain the model. A dashed dead-end branch from the auction shows losing ads producing no labels ever. Three green breaker taps sit on the loop: an exploration slice on the serving edge, the additive position feature on the label edge, and importance weights where sampled traffic enters training."
+  caption="The loop and its three designed-in breakers. The dead-end branch is the failure: for an unshown ad, no evidence ever arrives."
+/>
+
+### Three breakers, each priced
+
+The design breaks the loop in three places, each a recalled mechanism with an ads-specific price:
+
+- **An exploration budget.** A small slice of impressions is served with randomization: ads that did not win on expected value get shown anyway. This is the randomization fix <Ref lesson="failures-and-drift">the drift lesson</Ref> prescribes for degenerate loops, and in ads its cost is explicit: every exploration impression forgoes the auction's revenue-optimal choice, so the slice is sized as a paid measurement, not a default.
+- **Position as an additive feature, served constant.** Clicks reward the slot as well as the ad; <Ref lesson="ranking-and-ctr" id="position-bias-labels-that-reward-the-slot">Rule #36's discipline</Ref> (train with real positions, keep the positional term additive and never crossed, serve one constant) applies unchanged, draining the slot's share of the click out of the ad's score.
+- **Importance-weight sampled data; never just drop it.** When training subsamples traffic (the negative diet above, or any per-stream sampling), Rule #30's instruction is to weight what is kept by the inverse of its sampling rate: an example kept with probability $0.3$ carries weight $10/3$. Weighting preserves exactly the calibration properties the auction consumes; silent dropping distorts them.
+
+<KeyFact>
+The three breakers do different jobs: exploration is the only one that creates evidence the auction would never produce; the position feature and the importance weights only stop the evidence that does arrive from being misread. No amount of the latter two substitutes for the first — and the exploration slice's size is a dial on discovery, because an underrated ad is found no faster than the slice pays to show it.
+</KeyFact>
+
+## Experiments under interference: two arms, one budget
+
+A new CTR model ships through an online experiment, and randomization over users (the deployment lesson's default splitting unit) carries an assumption worth stating: units must not interact through shared state. A widespread and reasonable belief is that a properly randomized user-split A/B test yields an unbiased revenue comparison. In an ads marketplace it does not, and the reason is structural: both arms bid from the same campaign budgets. A campaign's daily budget is one pool; control users' auctions and treatment users' auctions both drain it.
+
+### The mechanism: exhaustion crosses the arm boundary
+
+Suppose treatment genuinely wins auctions more efficiently. Campaign budgets now exhaust earlier each day, and a budget exhausted at 8 p.m. stops bidding in *both* arms, so control's evening auctions run with thinner demand and lower prices. Control's measured revenue is depressed by treatment's success; the difference between arms overstates the true lift because part of it is budget transferred across the arm boundary, not value created. The tell is in the time series: per-arm lift concentrated in the hours after budgets exhaust, and exhaustion times drifting earlier as the experiment runs.
+
+<Figure
+  src="./figures/budget-split.svg"
+  alt="Two panels. Left, a naive user split: control and treatment arms both drain one shared campaign budget tank; a timeline underneath shows the budget exhausted at 8 p.m., with control's evening traffic marked unmonetized and the measured difference labeled partly transfer. Right, budget split: the campaign budget is divided into two independent half tanks, one per arm, each pacing through the full day, with per-arm revenue labeled clean."
+  caption="One budget shared across arms is an interference channel; two half-budgets are two independent markets. The fix is structural, not statistical."
+/>
+
+### Budget-split and its sensitivity price
+
+<Definition title="budget-split testing">
+A **budget-split test** randomizes users into two equal arms *and* splits every campaign's budget into two independent sub-campaigns of half the original budget, assigning one sub-campaign to each arm. Each arm is then a complete, self-contained marketplace: treatment spending cannot starve control, and per-arm revenue is attributable to the model that earned it.
+</Definition>
+
+The design's price is paid in sensitivity, and it must be recomputed rather than assumed. Each sub-campaign runs at half budget, so per-arm click and conversion counts roughly halve; for count-like metrics the standard error of a relative lift scales as $1/\sqrt{N}$, so halving $N$ inflates the minimum detectable effect by about $\sqrt{2}$: the <Ref lesson="deployment-and-online-experiments">deployment lesson's</Ref> MDE arithmetic, rerun under the split. Recovering the original MDE costs about twice the experiment duration. A budget-split also forces a 50/50 population split: a 5%-traffic canary cannot be budget-split, because a campaign pacing 5% of its budget against 5% of users is a different economic object from the campaign itself. Launch decisions read the revenue lift against **guardrails** on both sides of the marketplace: advertiser return per dollar spent, and user ad-fatigue signals — hide and report rates, ads per session.
+
+<KeyFact>
+The interference bias has a sign: a shared budget always transfers spend toward the more efficient arm, so an unsplit user-split experiment can only flatter the winner — and a model shipped on that number reliably underdelivers at launch, when there is no control arm left to take budget from.
+</KeyFact>
+
+## Monitoring and cadence: calibration drift priced in revenue
+
+The experiment ships the model; monitoring keeps it honest, and the ads system owns the cheapest high-value monitor in the course. Sculley et al.'s paper (§7) names it *prediction bias*: in a working system, the distribution of predictions should track the distribution of observed labels. For ads that is one ratio, $\sum \text{predictions} / \sum \text{clicks}$, computable hourly from logs alone (click labels arrive within minutes, no human labeling anywhere) and **sliceable** by campaign, country, device, and ad format. Read through the auction, a slice whose ratio drifts to 1.3 is not a statistics anomaly: the platform is overpricing that slice by 30%, winning auctions it should lose and billing advertisers against clicks that will not come.
+
+### Reading the panel
+
+<Figure
+  src="./figures/monitoring-panel.svg"
+  alt="A line chart of the calibration ratio, sum of predictions over sum of clicks, with one point per day over 14 evenly spaced days. The overall line holds near 1.0 throughout. One slice line, campaigns in one country, tracks it until day 8, drifts upward from day 9, sits exactly on the 1.1 alarm line on day 11 — the marked crossing — and reaches 1.3 by day 14, annotated as overpricing that slice by roughly 30 percent and winning auctions it should lose. A note underneath records that the ratio is computed hourly from logs with no labeling cost."
+  caption="The one-line revenue alarm: per-slice prediction bias over two weeks. Nothing in the aggregate moves while one slice's ratio walks from 1.0 to 1.3."
+/>
+
+<Task>
+Read the excursion: count the ticks off the day axis and name the day on which the slice's ratio first reaches the 1.1 alarm line while the overall ratio still reads 1.0. Then list two failure classes from this lesson's earlier sections that would produce exactly this signature (a one-slice calibration drift under a healthy aggregate), and for each, name the log evidence that would confirm or clear it.
+</Task>
+
+### Retraining cadence
+
+Ad auctions are among the least stationary environments in production: campaigns launch and exhaust daily, and the retraining frequency is justified by measurement, not habit. In the 2014 Facebook study this module keeps returning to, moving from weekly to daily retraining cut the CTR model's loss by 1%, enough for the team to rebuild the pipeline around the daily cadence. That is <Ref lesson="continual-learning">the continual-learning lesson's</Ref> freshness-value experiment with an unusually clear verdict, and production ads systems push further, retraining several times a day — a cadence the labeling window caps, per the label section's trade. Feeding it is Rule #29, recalled from <Ref lesson="training-serving-skew">the skew lesson</Ref>: log the serving-time features and make the serving log the next training set, so the fast loop cannot reintroduce train/serve skew while it chases freshness.
+
+What is established, requirements to operations: the auction derives the requirements ($\hat{P} \times \text{bid}$, a 50–100 ms budget inside a waterfall stage, 100 billion requests and 50 TB of log a month); the labels come from a stream–stream join whose window is a revenue parameter biased low by the click-delay tail; downsampled training owes serving the nonlinear correction $q = p/(p+(1-p)/w)$, which can flip auctions when skipped; features, architecture, and the NCE-plus-calibration gate arrive by recall, with NCE ≈ 0.32 as the worked reference point; the direct feedback loop is broken by exploration, the positional feature, and importance weights; experiments are budget-split against cannibalization; and the calibration ratio, sliced, is the revenue alarm that watches all of it. <Ref lesson="design-harmful-content">The next dissection</Ref> changes what the probability is for one last time: the classifier's output becomes an enforcement action against a person, the positives are rare and adversarial, and the system must be designed around a human review queue.
+
+## Exercises
+
+<Exercise>
+Probe the correction $q = p/(p + (1-p)/w)$ at its limits. (a) Show that $w = 1$ gives $q = p$, and say why that is the required behavior. (b) For small $p$, derive the approximation $q \approx pw$ and compute the inflation factor $p/q$ at $p = 0.05, w = 0.1$. (c) Show that as $p \to 1$ the inflation factor falls toward 1, and conclude where in probability space a forgotten correction does the most damage, and why that is exactly where ads live.
+
+<Solution>
+(a) At $w = 1$: $q = p/(p + (1-p)) = p/1 = p$. Keeping every negative is no downsampling, so the correction must be the identity, the formula's sanity anchor.
+
+(b) The inflation factor is $p/q = p + (1-p)/w$. For $p \ll 1$ this is approximately $1/w$, so $q \approx pw$: raw predictions overstate rare-event probabilities by nearly the full factor $1/w$. At $p = 0.05, w = 0.1$: $p/q = 0.05 + 0.95/0.1 = 9.55$, so the raw prediction is 9.55× the honest one and the correction removes about 90% of the predicted mass.
+
+(c) As $p \to 1$, $p/q = p + (1-p)/w \to 1$: near-certain clicks are barely distorted, because downsampling negatives barely changes the evidence about an example that is almost always positive. So the distortion is maximal exactly in the rare-click regime, $p$ of a few percent, the regime every ad auction operates in. A forgotten correction therefore inflates the system's CTR estimates most where all of its traffic is, which is why the calibration ratio jumps toward $1/w$ within hours of the incident rather than drifting subtly.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this launch argument: "treatment shows +8% revenue in our user-split A/B; ship it." The experiment randomized users correctly, ran two weeks, and the p-value is comfortably small. Construct the failure, name the evidence that would expose it, state the fix, and price the fix: with per-arm conversion counts halved, what happens to the minimum detectable effect?
+
+<Solution>
+The failing step is not the statistics but the independence assumption under them: both arms bid from the same campaign budgets, so the arms interact through shared state. Construction: treatment wins auctions more efficiently, campaign budgets exhaust earlier each day, and an exhausted budget stops bidding in *both* arms, so control's evening auctions face thinner demand and earn less. Part of the +8% is budget transferred from control's hours to treatment's, not revenue created; the platform-wide number after a full launch will come in well under +8%, because there is no control left to take from.
+
+Exposing evidence: slice the lift by hour of day (a genuine model improvement lifts all hours; cannibalization concentrates the gap after budget-exhaustion time) and plot campaign exhaustion times over the experiment window (drifting earlier is the loop closing).
+
+Fix: budget-split, each campaign's budget divided into two independent half sub-campaigns, one per arm, making each arm a self-contained marketplace.
+
+Price: per-arm event counts roughly halve. The standard error of a relative-lift estimate on count-like metrics scales as $1/\sqrt{N}$, so at $N/2$ it grows by $\sqrt{2} \approx 1.41$; holding power and significance fixed, the minimum detectable effect grows by the same factor, and detecting the *original* MDE requires about twice the duration. The experiment is honest and slower, the trade the <Ref lesson="deployment-and-online-experiments">deployment lesson's</Ref> sample-size formula makes explicit.
+</Solution>
+</Exercise>
+
+<Exercise>
+The lesson asserted that miscalibration is priced; make the claim exact. Suppose every prediction is distorted by one common, strictly increasing map $\varphi$: the auction sees $\varphi(p_i)$ instead of $p_i$. (a) State which consumers of the predictions are invariant to this distortion and which are not, considering: the CTR ordering of ads, the auction's EV ordering under unequal bids, absolute thresholds (a quality floor "serve nothing below $p = 0.001$"), and pacing forecasts built from $\sum_i p_i$. (b) Exhibit two ads and a map $\varphi$ where the CTR ordering is unchanged but the auction winner flips. (c) Identify the one class of $\varphi$ the auction *is* invariant to, and say why the downsampling distortion is not in it.
+
+<Solution>
+(a) The CTR ordering survives: $p_i > p_j \iff \varphi(p_i) > \varphi(p_j)$ by monotonicity, the single-score invariance established in <Ref lesson="design-feed-ranking">the feed design's</Ref> exercises. Everything that reads magnitudes breaks: EV ordering compares $\varphi(p_i)\,b_i$ against $\varphi(p_j)\,b_j$ with different bids, and a monotone map does not preserve products against unequal multipliers; absolute thresholds compare $\varphi(p)$ against a constant calibrated for $p$; pacing forecasts sum distorted masses and mis-predict spend.
+
+(b) Ads A ($p = 0.10$, bid \$1) and B ($p = 0.02$, bid \$6). Honest EVs: $0.10$ vs $0.12$: B wins. Take $\varphi(p) = p^2$ (strictly increasing on $[0,1]$): EVs become $0.01 \times 1 = 0.010$ vs $0.0004 \times 6 = 0.0024$: A wins. The CTR order (A above B) never moved; the auction outcome did, because squaring stretched the ratio $p_A/p_B$ from 5 to 25, past the bid ratio of 6.
+
+(c) Linear maps $\varphi(p) = cp$ scale every EV by $c$ and preserve the auction ordering (though thresholds, pacing, and billing still break). The downsampling distortion is not linear: it is a constant shift of $\ln(1/w)$ in log-odds, which compresses high probabilities less than low ones; the worked example in the body is exactly a case where it flips the winner. The transferable statement: an auction is a magnitude consumer, and calibration is the only representative of a model's monotone equivalence class that all four consumers can share.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce and situate the lesson's worked NCE number: a model log loss of 0.273 bits against a base-rate log loss of 0.842 bits. (a) Compute the NCE. (b) Compute the NCE of the model that always predicts the base rate, and of a coin flip that always predicts 0.5. (c) Recompute the coin flip's NCE in this design's own regime, where CTR near 1% puts the featureless floor at 0.081 bits, and explain why the number moves so far. (d) Place the results on one scale and state what NCE = 1 means operationally for an ads team.
+
+<Solution>
+(a) $\mathrm{NCE} = 0.273/0.842 \approx 0.32$: the model's loss is about a third of what ignoring every feature costs.
+
+(b) The always-base-rate model *is* the normalizer, so its loss equals the denominator and its NCE is exactly 1. The coin flip predicts 0.5 on every impression, so its per-impression loss is $-\log_2 0.5 = 1$ bit regardless of the label, giving $\mathrm{NCE} = 1/0.842 \approx 1.19$. (The units check themselves: a binary base-rate entropy of 0.842 exceeds $\ln 2 \approx 0.693$, so these losses can only be bits.)
+
+(c) The coin still loses exactly 1 bit per impression, but the floor is now 0.081 bits, so $\mathrm{NCE} = 1/0.081 \approx 12$: the coin that was 19% worse than the featureless floor on the worked dataset is twelve times worse in the rare-click regime. The numerator never changed; the denominator did. This is why raw log losses do not transfer across base rates, and why the worked 0.32 can serve as a reference point at all: the ratio divides the base rate out.
+
+(d) The scale: 0 is perfection, 0.32 the worked model, 1.0 the featureless floor, and everything above 1 a model actively worse than knowing nothing but the CTR. NCE = 1 means the entire feature pipeline, model, and serving stack have added nothing beyond the training CTR itself: predictions carry no per-ad information, every auction is decided by bids alone, and the system's cost is pure loss. For an ads team the number is a budget line: $1 - \mathrm{NCE}$ is the fraction of the base rate's uncertainty the model actually removes, and a change that moves NCE from 0.32 to 0.31 is a real gain on the same scale, comparable across weeks and countries because the base rate is divided out (<Ref lesson="ranking-and-ctr">the ranking lesson's</Ref> reason for adopting it).
+</Solution>
+</Exercise>
+
+<Exercise>
+The impression–click join, under the substrate's lens. Impressions and clicks arrive as two event streams; the label rule is "click within $W = 15$ minutes of the impression." (a) Name the join type and what the processor holds in state. (b) A teammate proposes implementing the label rule with tumbling 15-minute windows: match an impression and a click only if both fall in the same window. State what happens to an impression logged at minute 14 of a window, and characterize the bias this implementation adds. (c) Say what the per-impression (sliding) implementation costs instead.
+
+<Solution>
+(a) A stream–stream join, keyed by impression ID: the processor holds a window of recent impressions and a window of recent clicks in keyed state, emitting a positive on match and a negative when an impression's deadline passes, <Ref lesson="batch-and-stream-processing">the processing lesson's</Ref> search-to-click join with money attached.
+
+(b) An impression at minute 14 has one minute of click opportunity before the tumbling window closes; its click at minute 16 lands in the next window and never matches. Effective label windows now range from 15 minutes (impression at minute 0) down to seconds (impression at the boundary), so the undercount from the delay tail is no longer uniform: it is a sawtooth over wall-clock time, hitting late-in-window impressions hardest. On top of the tail bias every finite $W$ carries, this adds an artifactual bias correlated with *when in the window* an ad was served: a pattern that will surface in the sliced calibration ratio and cost hours of confusion, because it looks like time-of-day drift and is actually a join bug.
+
+(c) The correct rule is per-impression: each impression opens its own window $[t, t+W]$ (a sliding join), so every impression gets the full 15 minutes. The cost is state and timers per open impression instead of shared window boundaries: at 40k impressions a second and a 15-minute window, on the order of 36 million open impressions held in keyed state, which is exactly the kind of bill the substrate module priced when it made windowed state the cost of unbounded inputs.
+</Solution>
+</Exercise>
+
+<Exercise>
+The platform maintains two rankers: a heavy model (better, expensive) and a light one (cheaper, slightly worse). Serving costs are $c_H$ and $c_L$ per thousand requests, and an interleaving experiment measured that the heavy ranker lifts expected revenue by a fraction $g$ over the light one, roughly uniformly. Before ranking, a cheap pre-score estimates each request's *eCPM* — its expected revenue per thousand such requests, the CPM a request is worth once its click probability is priced in. Write it $v$. (a) Derive the routing rule that maximizes profit. (b) Compute the threshold for $c_H = \textdollar 0.50$, $c_L = \textdollar 0.05$, $g = 2\%$. (c) The traffic averages **\$8 eCPM**, and 10% of requests carry 60% of the revenue. State what fraction of traffic the heavy model should serve, and compute the mean eCPM below which even that top decile stops clearing the threshold.
+
+<Solution>
+(a) Routing a request of value $v$ to the heavy ranker changes profit by $g \cdot v - (c_H - c_L)$: the revenue lift minus the marginal cost. The optimal rule routes heavy exactly when this is positive,
+$$
+v > v^* = \frac{c_H - c_L}{g}.
+$$
+
+(b) $v^* = (0.50 - 0.05)/0.02 = \textdollar 22.50$ per thousand requests: only traffic whose expected revenue beats \$22.50 eCPM earns the heavy model.
+
+(c) The top decile carries 60% of revenue on 10% of requests, so its mean value is $0.6/0.1 = 6\times$ the overall mean: $6 \times \textdollar 8 = \textdollar 48$ eCPM, comfortably past $v^* = \textdollar 22.50$. The remaining 90% of requests share the other 40% of revenue, a mean of $0.4/0.9 \times \textdollar 8 \approx \textdollar 3.56$, an order of magnitude under the threshold. So the heavy model serves roughly the top decile: the platform pays the full $c_H$ on 10% of traffic and captures the lift on 60% of the revenue. The break-even mean follows from the same $6\times$ factor: the decile clears $v^*$ only while $6\bar{v} > 22.50$, i.e. $\bar{v} > \textdollar 3.75$. Below that the heavy model is unprofitable on every request and the light one should serve all of the traffic.
+
+What this exercise built is **model routing** by request economics: a threshold on estimated value deciding which of two models answers, with the cheap model as the default and the expensive one reserved for traffic that repays it. That is precisely the router in the course's final reference architecture: <Ref lesson="ai-application-architecture">the AI application lesson</Ref> runs the same arithmetic between a small and a large LLM, where RouteLLM-style routing cuts serving cost about 2× at near-equal quality.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Pham, *Machine Learning Design Interview*, 2022 — Ch. 6 (ad click prediction: the waterfall serving model, NCE plus calibration as the offline pair, the 40k QPS / 100B-requests / 50 TB scale estimates, aggregator fan-out); Ch. 1, pp. 81–82 (budget-split A/B testing, after LinkedIn); Ch. 2, pp. 121–126 (miscalibration causes, calibration plots, and the Facebook downsampling correction).
+2. A. Aminian, A. Xu, *Machine Learning System Design Interview*, ByteByteGo, 2023 — Ch. 8 (ad click prediction on social platforms: the worked NCE example — log loss 0.273 against a 0.842 base-rate loss on a small dataset whose base-rate predictor emits 0.6, NCE ≈ 0.324; feature crosses and factorization machines; calibration for bidding).
+3. X. He et al., "Practical Lessons from Predicting Clicks on Ads at Facebook," ADKDD 2014 — normalized cross-entropy, the calibration ratio, the downsampling correction $q = p/(p+(1-p)/w)$, and the data-freshness experiment behind daily retraining. http://quinonero.net/Publications/predicting-clicks-facebook.pdf
+4. S. I. Ktena et al., "Addressing Delayed Feedback for Continuous Training with Neural Networks in CTR Prediction," RecSys 2019 — the click-delay measurement (most clicks within five minutes, a tail over hours) and the delay-modeling losses. https://arxiv.org/abs/1907.06558
+5. D. Sculley et al., "Hidden Technical Debt in Machine Learning Systems," NeurIPS 2015 — §4 (direct feedback loops: a model influencing the selection of its own training data, and randomization as mitigation); §7 (prediction bias as a sliceable monitoring diagnostic). https://papers.nips.cc/paper/2015/hash/86df7dcfd896fcaf2674f757a2463eba-Abstract.html
+6. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018 — Rule #29 (log serving-time features), Rule #30 (importance-weight sampled data, don't drop it), Rule #36 (positional features, additive and served constant). https://developers.google.com/machine-learning/guides/rules-of-ml
+7. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 4, pp. 92–94 (feedback-loop length and the Twitter delayed-click finding); Ch. 9 (the value-of-freshness experiment and Facebook's weekly-to-daily retraining decision).
+8. M. Liu et al., "Budget-split testing: A trustworthy and powerful approach to marketplace A/B testing," LinkedIn Engineering Blog, 2021 — the production budget-split design this lesson's experiment section follows. https://engineering.linkedin.com/blog/2021/budget-split-testing
+</References>

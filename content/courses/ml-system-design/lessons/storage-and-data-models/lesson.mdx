@@ -1,0 +1,246 @@
+Reading one user's row and scanning one column over a billion rows are opposite access patterns, and every storage engine is built for one of them at the expense of the other.
+
+The first module ended on paper: <Ref lesson="the-design-document">the design document</Ref> for Supermegaretail, the fictional grocery chain of about 3,000 stores whose demand forecast that module designed, fixed the framing, the metrics chain, and the baselines, and left its data section an explicit stub, because filling it takes facts about storage that no amount of framing supplies. This module descends to the substrate every ML system stands on. This lesson establishes the resting layer, which engine shape serves which access pattern and where training data physically lives; <Ref lesson="replication">the next lesson</Ref> copies that data across machines and pays the price in consistency.
+
+The route: the two access patterns and the arithmetic separating them; row-major and column-major layout, with the compression sorted columns buy; one bounded section on the two write paths underneath every store; the warehouse and its star schema; the lake and the ELT inversion; and the map of which store serves which stage of the ML lifecycle.
+
+## Two access patterns: the point read and the column scan
+
+Supermegaretail's checkout system and its training pipeline touch the same sales data and share no other property. When a customer pays, the system inserts one row (this order, this store, these items) and occasionally updates it; when a fraud check runs on the payment, it fetches that customer's recent history by key. Each request touches a handful of rows, is issued by a user who is waiting, and must finish in milliseconds. This pattern is *online transaction processing* (OLTP): small reads and writes located by key through an index, with disk seek time as the bottleneck.
+
+The training pipeline asks a different question of the same rows: average price per item over two years, sales summed per store per week, demand aggregated by region. An analytical query reads millions to billions of rows but only a few columns of each, and returns an aggregate, not the rows. No end user waits on it, so seconds or minutes of latency are acceptable, and the bottleneck is disk **bandwidth**, not seek time. This pattern is *online analytical processing* (OLAP).
+
+<Figure
+  src="./figures/oltp-vs-olap.svg"
+  alt="Two-column comparison of OLTP and OLAP across five axes: request shape, rows touched, bottleneck, latency, and typical engines"
+  caption="The two access patterns. Every axis follows from the first row: fetch a row by key, or aggregate a column over all rows."
+/>
+
+Through the 1980s the same databases served both patterns; the section on warehouses below covers why companies then split them. The physical reason one engine cannot do both well is byte layout, and the gap is not a constant factor to be tuned away. It scales with table width.
+
+<Example title="the scan arithmetic on fact_sales">
+Supermegaretail's sales table holds one row per item sold: roughly 3,000 stores selling about 1,000 items a day each is 3 million rows a day, a billion rows a year. The table is 100 columns wide (item, store, price, promotion, supplier, and 95 more), averaging 4 bytes per value: a 400-byte row, a **400 GB** table for the year.
+
+The query `SELECT AVG(unit_price) FROM fact_sales` needs one column. A row store lays each 400-byte row contiguously, so even though the query uses 1% of every row, the scan drags all 400 GB through the disk interface: at a sequential read rate of about 1 GB/s, roughly **7 minutes**. A column store keeps `unit_price` in its own file: 4 bytes × 10⁹ rows = **4 GB**, about 4 seconds at the same rate. Same data, same disk, same query; the layout alone changes the bytes touched by a factor of 100, before compression makes the column file several times smaller still.
+</Example>
+
+<Exercise>
+The nightly training export reads 8 of the 100 columns for all billion rows. Compute the bytes read under each layout and the ratio. Then state, without computing, what the ratio would be for `SELECT *`.
+
+<Solution>
+Column layout: 8 columns × 4 bytes × 10⁹ rows = 32 GB. Row layout: the full 400 GB, since every row is contiguous and must be read whole. Ratio 400/32 = 12.5×: exactly (columns stored)/(columns read), 100/8.
+
+For `SELECT *` the ratio is 1: both layouts read all 400 GB, and the column store now pays extra to reassemble each row from 100 separate files. The advantage is the ratio of columns ignored, nothing more; a query that ignores none gets none.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The OLTP/OLAP split survives every engine that claims to erase it (CockroachDB answers analytics from a transactional store; DuckDB takes transactions inside an analytical one), because the column advantage is layout, not algorithm: bytes on disk have exactly one order, an engine must commit to it, and whichever workload reads against that order pays the full width ratio.
+</KeyFact>
+
+<Remark title="data models, in one paragraph">
+This lesson stays inside the relational model because training data is relational: rows joined, filtered, aggregated. The other models are answers to other access patterns: document stores fit records read and written whole as self-contained trees, key-value stores fit access by key alone, graph databases fit queries that walk relationships. Each is an OLTP-side choice; none changes the analytics story below.
+</Remark>
+
+## Row-major and column-major: one table, two byte orders
+
+The arithmetic above assumed the two layouts; this section makes them concrete, because the same choice reappears in every file format an ML pipeline touches. A table is two-dimensional; a disk is one-dimensional; serialization must pick an order. *Row-major* formats store consecutive elements of a row adjacently: CSV, Avro, and the row pages of OLTP databases. *Column-major* formats store consecutive elements of a column adjacently: [Parquet](https://parquet.apache.org/) and ORC, the formats warehouses and data lakes standardize on.
+
+<Figure
+  src="./figures/row-vs-column.svg"
+  alt="The same six-row, four-column sales table serialized two ways: a row-major byte strip where price values are scattered every fourth cell and the whole strip must be read, and a column-major strip where the six price values sit contiguously and only that block is read"
+  caption="One table, two byte orders. Computing AVG(price) reads the shaded bytes: the entire row-major strip, one contiguous block of the column-major one."
+/>
+
+Each layout is fast in exactly one direction. Appending a new example is one contiguous write in row-major form and one write per column file in column-major form, so ingestion-side formats stay row-major. Reading 4 features of 1,000 for every row is 4 contiguous reads in column-major form and a full scan in row-major form, so training-side formats go columnar. Reassembly is possible because every column file keeps rows in the same order: the *k*-th entry of each file is row *k*. Binary beats text on top of either order; converting one 17,654-row CSV to Parquet cut it from 14 MB to 6 MB, and AWS measures Parquet at up to 6× smaller in S3 and 2× faster to unload from Redshift than text formats.
+
+### Sorted columns compress into run lengths
+
+Column files compress far beyond the binary-vs-text gain, because a column is a sequence of values from one distribution. Supermegaretail sells perhaps 100,000 distinct products, so a billion-row `product_sk` column has at most 100,000 distinct values; sort the table by date then product, and the column becomes long runs of repeated values. Run-length encoding stores each run as (value, count): a billion entries collapse to at most a few entries per product per day. The same structure supports *bitmap encoding*, one bit-vector per distinct value, which turns `WHERE product_sk IN (30, 68, 69)` into three bitwise ORs. The compression is strongest on the first sort column and fades down the sort priority; choosing the sort order is choosing which queries get it.
+
+Compression feeds a second win: *vectorized execution*. A compressed column block fits in the CPU's L1 cache, and the query engine iterates it in a tight, branch-free loop, applying operators like the bitmap AND directly on compressed data. The scan bottleneck moves from disk bandwidth to memory bandwidth, and the engine is built to saturate both. This is why column stores are not "row stores minus the unused columns": the layout unlocks an execution model row stores cannot use.
+
+### The DataFrame is a column store
+
+The layout choice sits inside tooling every ML engineer already runs, and it is routinely misread. Engineers arriving from NumPy treat a pandas DataFrame as an ndarray, iterating it row by row; ndarrays are row-major by default, so the habit is correct there. A DataFrame is not an ndarray: pandas is built around column-major storage, inherited from R's data frame.
+
+<Task>
+Predict, from the byte-strip figure above, which pandas access is the fast one — `df["price"]` or `df.iloc[3]` — and whether the gap should be percents or a multiple. Then check against the measurement below.
+</Task>
+
+The measurement: iterating one DataFrame by column takes 0.07 seconds where iterating the same DataFrame by row takes 2.41 seconds, a **35× penalty** for reading against the layout. The discriminating test is the conversion: turn the DataFrame into an ndarray and row access becomes fast again, because the bytes were reordered, not the code. The rule that replaces the habit: know the major order of every format in the pipeline, and read along it.
+
+## The two write paths: append-only and update-in-place
+
+Column files explain the scan side; something still has to absorb Supermegaretail's 3 million daily inserts and serve the fraud check's point reads. Every OLTP engine answers with one of two designs, and the pair is worth one section because both reappear as ML infrastructure in the next lessons. The *log-structured* school only appends to files and never modifies them; the *update-in-place* school treats the disk as fixed-size pages to overwrite. The first is the LSM-tree; the second is the B-tree.
+
+### The LSM path: append now, sort later
+
+The fastest possible write is appending to a file, and the log-structured merge-tree (LSM-tree) is the design that gets index-quality reads out of nothing but appends. Writes go to a *memtable*, an in-memory sorted tree; when it reaches a few megabytes it is flushed to disk as a sorted, immutable segment file (an *SSTable*); a background process *compacts* segments, merging them mergesort-style and dropping overwritten values. A plain append-only log on the side restores the memtable after a crash.
+
+<FigureSequence
+  name="lsm-write-path"
+  alt="Four frames of the LSM write path: writes accumulate in an in-memory memtable backed by a crash log; the full memtable flushes to disk as sorted segment 1; new writes fill the memtable again while a read checks memtable then segment 2 then segment 1; compaction merges the two segments into one, discarding overwritten values"
+  caption="The LSM write path. Every disk write is sequential: a flush of a sorted memtable, or a merge of already-sorted segments."
+/>
+
+<Task>
+Step through the four frames and answer at frame 3: how many places can hold the latest value for a key, and in what order must a read check them?
+</Task>
+
+The read at frame 3 checks the memtable, then each segment from newest to oldest, which is the design's cost: a lookup for a key that does not exist would scan every segment. Engines patch this with *Bloom filters*, compact in-memory summaries that answer "definitely absent" and skip the disk read. The design is Google Bigtable's (2006, the source of the terms memtable and SSTable), named LSM-tree by Patrick O'Neil's group in 1996, and shipped today as [RocksDB](https://rocksdb.org/) and LevelDB and inside Cassandra and HBase.
+
+### The B-tree path: overwrite the page
+
+<Figure
+  src="./figures/btree-lookup.svg"
+  alt="A three-level B-tree descent: a root page of key boundaries, an interior page subdividing the 200 to 300 range, and a leaf page containing key 251, with the followed references highlighted"
+  caption="Looking up key 251: three page reads, root to leaf. With 4 KB pages and a branching factor around 500, four levels address 256 TB."
+/>
+
+The B-tree, the index in effectively every relational database since 1970, keeps keys sorted like an SSTable but abandons append-only: the database is fixed-size pages, traditionally 4 KB, and a write reads the page holding the key, changes it, and overwrites it in place. Pages form a tree; each page holds a few hundred key boundaries and child references, so a four-level tree of 4 KB pages addresses **256 TB**, and any key is 3–4 page reads away, every time. Because a crash mid-overwrite corrupts pages, every B-tree fronts itself with a *write-ahead log* (WAL): each modification is appended to the log before touching the tree, and recovery replays it.
+
+### The price each pays: 40× random against 5× sequential
+
+Both designs write each record more than once, and *write amplification* (bytes written to disk per byte of data written by the application) is the axis that separates them. A B-tree writes the WAL entry plus the whole page: updating a 100-byte row costs a 4 KB page write, 40× amplification, at a random disk location. An LSM writes the crash log, the flush, and one rewrite per compaction round — five or so copies in all, every one sequential — which is why LSM engines sustain the higher write throughput and produce smaller files. What the B-tree buys instead is predictability: every read is the same 3–4 page descent, while an LSM read depends on how many segments compaction has left, and a compaction burst competes with foreground requests for the disk. At high percentiles, log-structured engines show latency spikes that B-trees do not, and under sustained write pressure a misconfigured compaction falls behind until segments pile up and reads degrade.
+
+<KeyFact>
+The write-path tradeoff: a B-tree pays ~40× amplification at random disk locations and gets reads that are always the same 3–4 page descent; an LSM pays ~5×, all sequential, and gives the predictability back — its read cost depends on the state of compaction, and the bill arrives as latency spikes at high percentiles.
+</KeyFact>
+
+<Remark title="both write paths return as ML infrastructure">
+Kafka, the event backbone of <Ref lesson="queues-and-logs">the queues lesson</Ref>, is the append-only log promoted from implementation detail to system interface; RocksDB, an LSM engine, is the embedded state store inside stream processors and online feature stores. The engines chosen here are the ones the rest of the module builds on.
+</Remark>
+
+## The warehouse: analytics moved off the product's database
+
+The OLTP engines above are tuned for the product, and the product is why analytics had to move out. An enterprise runs dozens of transaction systems (Supermegaretail's checkout, inventory, logistics, supplier management), each guarded by its operators, because one analyst's 400 GB scan competes for the same disk as every customer's checkout. Starting in the late 1980s, companies gave analysts a *data warehouse*: a separate, read-only copy of the data from every OLTP system, restructured for scanning. The copy process is *ETL*, extract–transform–load: pull from each source, clean and reshape into an analysis-friendly schema, load into the warehouse.
+
+### The star schema: one wide fact table, dimensions around it
+
+That analysis-friendly schema is nearly always the same shape, the *star schema*. One central *fact table* holds an event per row; *dimension tables* around it hold the who, what, where, and when that fact rows reference by foreign key.
+
+<Figure
+  src="./figures/star-schema.svg"
+  alt="Star schema for Supermegaretail: a central fact_sales table with foreign keys and measures, linked to four dimension tables for date, store, product, and promotion"
+  caption="Supermegaretail's warehouse core. Every row of fact_sales is one item sold; the dimensions carry the descriptive columns queries filter and group by."
+/>
+
+The proportions matter more than the diagram. Fact tables are wide, often over 100 columns, and enormous: the largest retailers hold tens of petabytes of transaction history, most of it facts. A typical analytical query touches 4 or 5 of those columns. That is the scan arithmetic from the first section made institutional, and it is why warehouse engines from the first generation (Teradata, Vertica) to the current one ([BigQuery](https://cloud.google.com/bigquery), Snowflake, Redshift) are column stores underneath. For the ML system, the warehouse is where training data is assembled: the demand forecast's training set is one query joining `fact_sales` to its dimensions, and the design document's data section can now name the store it reads from.
+
+## The lake and the ELT inversion
+
+The warehouse's discipline is *schema-on-write*: the transform runs before loading, so nothing lands without a declared schema. The discipline has a cost that grew with the data.
+
+### Schema-on-read: interpretation moves to the consumer
+
+Much of what an ML system learns from has no natural table shape (clickstreams, application logs, images, text), sources multiply faster than schemas get negotiated, and a transform decided up front discards whatever tomorrow's consumer needed. The *data lake* is the counter-position: a flat object store (S3, GCS, Azure Blob) holding raw bytes in any format, interpreted only when read, *schema-on-read*. The Hadoop community called the underlying bet the sushi principle, "raw data is better": making data available quickly beats modeling it ideally, and interpretation becomes the consumer's problem, which is an advantage precisely when producers and consumers are different teams.
+
+### Decoupled storage and compute invert ETL to ELT
+
+Cheap object storage also reordered the pipeline itself. Modern warehouses (BigQuery, Snowflake) *decouple storage from compute*: data rests in commodity object storage and query compute is rented by the second, so holding raw data in the warehouse costs little and transforming it there scales on demand. Under those prices, transform-before-load loses its rationale, and the pattern inverts to *ELT*: extract from sources, load raw, transform inside the warehouse as versioned, tested SQL.
+
+<Figure
+  src="./figures/elt-stack.svg"
+  alt="The modern ELT stack: an application OLTP database, event streams, and third-party APIs are extracted and loaded by an ingestion tool into a warehouse; a transform layer builds tested views inside it; dashboards and training jobs read the results; a data lake sits alongside holding raw and unstructured objects"
+  caption="The ELT stack. Extract-and-load is commodity tooling; the transform is SQL inside the warehouse; the lake holds what has no table shape yet."
+/>
+
+The stack in the figure is buildable today from standard parts: [Airbyte](https://airbyte.com/) connectors extract and load sources into BigQuery, and [dbt](https://www.getdbt.com/) defines the transforms as SQL models with schema tests and lineage, so the tables training reads are versioned and tested like code. The first consumers of a new data stack should be analytics dashboards, which prove the data correct and valuable before ML's heavier infrastructure arrives to depend on it.
+
+### The swamp, and the lakehouse correction
+
+The lake's failure mode is the direct consequence of its bet. Schema-on-read defers interpretation per consumer, so ten consumers pay the parsing, cleaning, and semantics cost ten times, divergently; and a store that accepts anything fills with data nobody can find, trust, or delete, the *data swamp*. As data grows, searching raw objects for the subset that matters gets inefficient enough that structure returns in a new place: *lakehouse* formats (Delta Lake, Iceberg) add tables, schemas, and transactions on top of lake storage, and hybrid platforms sell both halves. The stable pattern underneath the vendor motion: raw and unstructured data lands in the lake; data with a settled schema and regular consumers graduates to warehouse tables.
+
+## Where the ML system's data rests
+
+The stores are now distinct enough to assign. Supermegaretail's ML system, at rest, is four placements. The product runs on OLTP engines: orders, inventory, and user state, in row layout behind B-trees or LSM-trees, answering point reads and writes in milliseconds. System-generated events (clickstreams, application logs, everything high-volume and schema-fluid) land raw in the lake. The warehouse holds the star schema that ELT assembles from both, and training data is manufactured there: batch queries scanning columns over years of facts. Dashboards and the metrics chain of <Ref lesson="requirements-and-metrics">the requirements lesson</Ref> read the same tables, which is what keeps the model's training data and the business's reporting consistent with each other.
+
+The fourth placement is a gap this module closes later. At serving time the model needs features for one store in milliseconds, an OLTP-shaped read of warehouse-shaped data; no engine in this lesson serves both sides, and the standard resolution, a columnar offline store paired with a replicated key-value online store, is <Ref lesson="feature-platform">the module's closing application</Ref>.
+
+<Figure
+  src="./figures/resting-map.svg"
+  alt="Placement map of Supermegaretail's data at rest: a product OLTP box and a data lake box feed a warehouse box via ELT and graduation arrows, and a dashed arrow leads to a dashed online-feature-store box marked as having no engine in this lesson"
+  caption="The resting map. Three placements have engines from this lesson; the dashed fourth is the gap the feature platform closes."
+/>
+
+What is established: OLTP and OLAP are opposite access patterns with opposite bottlenecks; column layout wins scans by the ratio of columns ignored and compresses by sort order; underneath, every OLTP engine is an LSM-tree or a B-tree, trading write amplification against read predictability; training data is assembled in a columnar warehouse fed by ELT, with raw data resting in a lake. All of it so far describes one machine. Production runs many, holding copies of the same data, and copies disagree: <Ref lesson="replication">replication</Ref> is next.
+
+## Exercises
+
+<Exercise>
+For each workload, choose row-oriented or column-oriented storage and justify in one line: (a) fetching a user's profile on login; (b) the nightly backfill computing 90-day average sales per item across all stores; (c) the fraud model's serving-time lookup of one card's last 10 transactions; (d) an analyst's ad-hoc query for revenue by region by week over three years.
+
+<Solution>
+(a) Row: one entity's full record by key; a column store would reassemble it from one file per attribute. (b) Column: a few columns (item, date, quantity) scanned over everything; bytes touched shrink by the ignored-columns ratio. (c) Row: a point read by key under a millisecond budget; this is the OLTP pattern regardless of the data being "for ML". (d) Column: a classic star-schema aggregate, a few columns of a wide fact table.
+
+The classifier underneath: which fraction of each row does the query need, and is the caller waiting? Few rows + whole rows + waiting caller → row store; all rows + few columns + batch → column store.
+</Solution>
+</Exercise>
+
+<Exercise>
+A table has 3 columns, all equally sized, and its dominant access is reading and rewriting whole rows. Compute the column store's bytes-touched advantage for a full-row read, and state the general crossover condition under which columnar storage loses.
+
+<Solution>
+The advantage is (columns stored)/(columns read) = 3/3 = **1**: no bytes saved. The column store is now strictly worse: a full-row read is one contiguous read in row layout but three reads in three separate files here, and a full-row rewrite must update all three files consistently (in a sorted, compressed column store, an in-place update is impossible and the write goes through an LSM-style buffer).
+
+Crossover: columnar wins in proportion to the columns ignored. As columns-read approaches columns-stored, the byte advantage goes to 1 while the per-file seek, reassembly, and write costs remain; a narrow table read whole is the degenerate case where the warehouse layout only costs. This is why OLTP tables stay row-major even inside companies whose warehouses are columnar.
+</Solution>
+</Exercise>
+
+<Exercise>
+Estimate write amplification for a 100-byte record in each engine: (a) an LSM store with a crash log, a memtable flush, and size-tiered compaction that rewrites each byte once per level across 3 levels; (b) a B-tree with a WAL and 4 KB pages. Then explain why a Kafka-style event log beats both for an append-only click stream.
+
+<Solution>
+(a) LSM: 1 (crash log) + 1 (flush) + 3 (one rewrite per level) = **5×**, about 500 bytes written per 100-byte record, all as sequential I/O batched with other records.
+
+(b) B-tree: 1 WAL entry (~100 bytes) + one 4 KB page overwrite = ~4,200 bytes for a 100-byte change: **~40×**, and the page write is random I/O. (Some engines write the page twice to survive torn writes, doubling this.)
+
+For a write-heavy event log, the LSM's 5× sequential beats the B-tree's 40× random. But both engines pay their amplification to keep data sorted by key for reads. A click stream is consumed in arrival order, never by key, so Kafka drops the sorting machinery entirely: append to the log, amplification ~1× per replica, nothing rewritten ever. The general rule: amplification is the price of an ordering the reads need; pay for no ordering the reads don't use. The log-as-interface design is <Ref lesson="queues-and-logs">the queues lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "We'll put everything in the lake and decide schemas later; it's strictly more flexible than a warehouse." Name the two costs the claim ignores, and the case where lake-first is nonetheless the right call.
+
+<Solution>
+The word that fails is "strictly": schema-on-read does not remove the schema work, it moves and multiplies it. Cost one: every consumer pays interpretation separately. Ten pipelines reading the same raw events write ten parsers with ten cleaning policies, and they silently diverge, so "the number of orders yesterday" has ten values. Cost two: discoverability and trust decay. A store with no declared schemas has no catalog of what exists, what it means, or who owns it; unfindable data is unusable data (the swamp), and undeletable data is a compliance liability.
+
+Lake-first is still right where schema-on-write is impossible or premature: genuinely unstructured payloads (images, text, raw logs), sources whose schemas are outside your control and churn faster than negotiation, and data whose consumers are not known yet, where any up-front transform would guess wrong. The resolution is the graduation pattern from the lesson: land raw in the lake, and promote to warehouse tables the moment a schema settles and consumers recur.
+</Solution>
+</Exercise>
+
+<Exercise>
+A training fleet consumes preprocessed examples at 4 GB/s, and its 1 TB training set can rest either on local SSD (sequential read ~1 GB/s per device) or in object storage reached over 1 Gbps network links (~100 MB/s per link, many links served in parallel). Compute what each option needs to keep the fleet fed: how many local devices, and how many parallel readers over disjoint shards of the dataset. Then state the condition under which the object store is the right provision despite its 10× slower stream, and what the reader count implies about how the training files should be written.
+
+<Solution>
+Local SSD: 4 GB/s ÷ 1 GB/s = **4 devices**, with the terabyte split across them, kept in sync with the dataset's versions, and re-split whenever the fleet resizes. Object store: 4 GB/s ÷ 100 MB/s = **40 parallel readers**, each pulling its own shard over its own link; the store serves the links concurrently, so aggregate bandwidth is 40 × 100 MB/s, set by the reader count rather than by any device.
+
+The condition is shardability: the per-stream deficit is a fixed 10×, so the object store matches local disk at 10 readers on disjoint shards and beats it beyond that (40 here), while a job that cannot split its input is stuck at one link's 100 MB/s forever. That is what the reader count decides about the files: the dataset must be written as at least 40 shards (in practice, many files of tens to hundreds of megabytes), because the shard count caps the parallelism and the parallelism, not the link rate, sets the input bandwidth. A training set written as one 1 TB file has already chosen its read speed.
+</Solution>
+</Exercise>
+
+<Exercise>
+The demand model gains a serving-time feature: orders in the last 30 minutes for the store being predicted. Each prediction request assembles features for that store and its 24 regional neighbors — 25 parallel reads — and the serving contract tolerates a slow feature fetch on at most 5% of requests, where slow means any read over 20 ms. (a) Apply the tail-amplification formula of <Ref lesson="requirements-and-metrics">the requirements lesson</Ref> to derive the slow-read rate one read may have, and name the percentile at which the store must deliver 20 ms. (b) Using this lesson's characterization of each engine, show that neither the warehouse nor the product's OLTP store can hold that budget.
+
+<Solution>
+(a) With per-read slow probability $p$ and $N = 25$ parallel reads, the fetch is slow when any read is: $1-(1-p)^{25} \le 0.05$ requires $p \le 1 - 0.95^{1/25} \approx 0.002$. Each read may be slow once in 500: the store must deliver 20 ms at roughly **p99.8**. Fan-out turns a page-level 5% tolerance into a per-read percentile five times stricter than p99 — the budget is not given, it is manufactured by the fan-out.
+
+(b) The warehouse fails on freshness and on work shape: it is loaded in batch, so its contents are minutes to hours stale and "last 30 minutes" is partly absent; and its unit of work is the scan, with latency in seconds — three orders of magnitude over a 20 ms bound at any percentile.
+
+The OLTP store holds the fresh rows but the wrong work shape: each read is a range scan plus a count over recent orders, run on the engine processing checkouts, at the model's full request rate — precisely the interference the warehouse was invented to remove. And (a)'s budget bites at a high percentile, exactly where the write-path tradeoff says OLTP engines are weakest: an LSM store's compaction bursts surface as latency spikes at p99 and beyond, so even a lightly loaded engine misses 20 ms at p99.8 intermittently.
+
+What the feature requires is an aggregate maintained incrementally as orders arrive, served as a point read on the current value. Neither machine exists in this lesson: the first is stream processing (<Ref lesson="batch-and-stream-processing">batch and stream processing</Ref>), the second is the online half of a feature platform (<Ref lesson="feature-platform">the module's application</Ref>).
+</Solution>
+</Exercise>
+
+<References>
+1. M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017 — Ch. 3: hash indexes and append-only logs (pp. 72–76), SSTables and LSM-trees (pp. 76–79), B-trees (pp. 79–83), the B-tree/LSM comparison and write amplification (pp. 83–85), OLTP vs OLAP and data warehousing (pp. 90–95), column storage, compression, and vectorized processing (pp. 95–101); Ch. 10 (pp. 414–415): schema-on-read, the sushi principle, and data lakes.
+2. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 3: row-major vs column-major formats and the NumPy/pandas measurement, text vs binary formats, structured vs unstructured data and the warehouse/lake distinction, OLTP/OLAP and their blurring, storage/compute decoupling, ETL and ELT.
+3. G. Mohandas, "Data Engineering," *Made With ML (MLOps Course)* — the Airbyte → BigQuery → dbt ELT walkthrough, the raw-to-lake best practice, and the analytics-before-ML ordering. https://madewithml.com/courses/mlops/data-engineering/
+4. C. Huyen, "ML and Data Systems Fundamentals," CS 329S: Machine Learning Systems Design, Lecture 2 note, Stanford, 2022 — data formats, row/column layout, data models, and OLTP/OLAP for ML systems. https://docs.google.com/document/d/10K3pYTNvreVy5hl2EqWf_LX3mMW4CQw1TdMrHplMu00/
+5. P. O'Neil, E. Cheng, D. Gawlick, E. O'Neil, "The Log-Structured Merge-Tree (LSM-Tree)," *Acta Informatica* 33(4), 1996 — the original LSM design the lesson's write-path section describes.
+6. F. Chang, J. Dean, S. Ghemawat, W. C. Hsieh, D. A. Wallach, M. Burrows, T. Chandra, A. Fikes, R. E. Gruber, "Bigtable: A Distributed Storage System for Structured Data," *OSDI*, 2006 — §4 defines the SSTable file format; §5.3 (tablet serving) the memtable and the flush path the lesson's LSM section describes. https://static.googleusercontent.com/media/research.google.com/en//archive/bigtable-osdi06.pdf
+7. "UNLOAD," *Amazon Redshift Database Developer Guide* — the command's introduction carries the measurement quoted in the layout section: Parquet up to 2× faster to unload and up to 6× less S3 storage than text formats. https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html
+8. D. Martin, *The System Design Primer* — appendix, "Latency numbers every programmer should know": the sequential-read and network rates used in the exercises. https://github.com/donnemartin/system-design-primer
+</References>

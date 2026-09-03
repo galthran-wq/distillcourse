@@ -1,0 +1,333 @@
+ACID's four letters make four different promises, and most systems quietly break the I: the anomalies that weak isolation permits are precise, reproducible, and occasionally catastrophic.
+
+The substrate lessons left every guarantee informal. <Ref lesson="replication">Replication</Ref> ended with copies that disagree and a CAP choice resolved toward availability; <Ref lesson="partitioning">partitioning</Ref> split the keyspace and handed the partition-to-node map to a coordination service it did not explain. This chapter is the fine print behind both: what isolation levels, linearizability, and consensus actually guarantee, and what each costs. It is an off-path chapter because most ML infrastructure deliberately avoids this machinery: feature reads, caches, and metrics run on eventual consistency and idempotent retries. The cases that cannot are exact and worth naming up front: a model registry's "exactly one production version", a training scheduler's "one active run per pipeline", a quota or billing ledger, and the partition assignment itself.
+
+The route: ACID unpacked honestly; the four concurrency anomalies, each as a worked race; the three implementations of serializability; why distribution makes all of it harder (delays, clocks, pauses, and the fencing-token fix); linearizability and its price; two-phase commit; consensus and its packaged form, ZooKeeper; and the line through an ML platform separating what needs this machinery from what does not.
+
+## ACID: four promises, one of them negotiable
+
+The fine print starts with the acronym itself: of the four letters, only one — isolation — is a dial the application can set, and its default setting is what admits the anomalies this chapter catalogs. A transaction groups several reads and writes into one unit that succeeds or fails whole; the acronym describing its guarantees was coined by [Härder and Reuter in 1983](https://dl.acm.org/doi/10.1145/289.291) to name fault-tolerance mechanisms precisely. Forty years of marketing have blurred it, and the four letters now promise less, and less uniformly, than they appear to.
+
+**Atomicity is abortability.** It says nothing about concurrency. If a fault interrupts a transaction halfway through its writes (a crash, a full disk, a dropped connection), the database discards every write the transaction made, so the application can retry without wondering which half took effect. *Abortability* would have been the better word.
+
+**Consistency is the application's job.** The C means "the application's invariants hold": credits equal debits, at least one doctor is on call. A database cannot know these invariants, let alone enforce them; it stores what it is given. The C describes a property of well-written transactions, not of the engine; it is in the acronym largely to make the word work.
+
+<Figure
+  src="./figures/acid-honest.svg"
+  alt="Four boxes labeled A, C, I, D with their honest readings: atomicity is abortability, consistency is the application's job, durability is a stack of partial measures; isolation is highlighted as a dial with four levels from read uncommitted to serializable, the common default marked at read committed"
+  caption="ACID read honestly: three fixed properties and one graded dial, whose common default sits two levels below the textbook meaning."
+/>
+
+**Isolation is the negotiable dial.** The textbook meaning is *serializability*: concurrent transactions produce the same result as some one-at-a-time execution. Almost no system runs at that setting by default, because it costs throughput; what systems actually run are *weak isolation levels* that prevent some races and permit others. Oracle's level named "serializable" is not serializable. The next section catalogs exactly what each weakening lets through.
+
+**Durability is risk reduction.** A committed write survives a crash, via a write-ahead log on one node or replication across several. None of it is absolute: correlated faults, firmware bugs, and disks that lose data when unpowered all exist, so durability is a stack of partial measures, not a certificate.
+
+<KeyFact>
+Of ACID's four letters, only A and D are properties the database can deliver alone, and only I is graded: isolation is sold in levels, the level is a per-connection setting with a weak default, and every level below serializable admits named, reproducible anomalies.
+</KeyFact>
+
+## The anomaly zoo: four races, each with a name
+
+Weak isolation is not vague; each level permits a precise set of races. Four matter in practice, and each is a four-line scenario. They form a ladder: each isolation level removes the anomalies below its rung and leaves the ones above.
+
+### Dirty reads and dirty writes: the uncommitted escapes
+
+A *dirty read* is seeing another transaction's uncommitted write. An email arrives: one transaction inserts the message and increments the unread counter. A mailbox render that runs between the two writes shows the new email beside a counter reading zero: it has read half of an in-flight transaction. If the writer then aborts, the reader has seen data that never existed.
+
+<Figure
+  src="./figures/anomaly-dirty-read.svg"
+  alt="Two transaction timelines: T1 inserts an email, updates a counter, and commits; T2 reads between the insert and the counter update, seeing the new email with a zero counter, circled as the dirty read"
+  caption="Dirty read: T2 observes T1's uncommitted insert, so the mailbox and its counter disagree."
+/>
+
+A *dirty write* is overwriting an uncommitted value. Two buyers race for the same used car; the sale requires two writes, one to the listing and one to the invoice. Interleaved dirty writes award the car to Bob and send the invoice to Alice. *Read committed*, the default level in PostgreSQL, Oracle, and SQL Server, prevents both: writers hold a row lock until commit, and readers are served the old committed value while a write is in flight.
+
+### Read skew: every value committed, the combination never true
+
+Alice holds $1,000 split across two accounts. A transfer moves $100 from account 2 to account 1 while she loads her balance page: she reads account 1 before the transfer ($500) and account 2 after it ($400), and her total shows $900. Every value she read was committed (read committed permits this), but no moment ever contained that combination.
+
+<Figure
+  src="./figures/anomaly-read-skew.svg"
+  alt="Alice reads account 1 as 500 dollars before a transfer commits and account 2 as 400 dollars after it, so her total shows 900 while the true total is always 1000"
+  caption="Read skew: two committed reads straddle a transfer; the observed state existed at no instant."
+/>
+
+For a balance page this self-heals on reload. For a database backup or a long analytics scan it does not: a backup taken across hours of writes bakes the skew in, and a restore makes the vanished $100 permanent. The fix is *snapshot isolation*: every transaction reads from a consistent snapshot of the database as of its start, implemented by keeping several versions of each object (multi-version concurrency control) so that readers never block writers and writers never block readers. PostgreSQL, MySQL/InnoDB, Oracle, and SQL Server all offer it, under a confusion of names ("repeatable read" in the first two, "serializable" in Oracle).
+
+### Lost updates: read–modify–write races
+
+Two clients increment a counter stored at 42: each reads 42, computes 43, and writes 43. The final value is 43 after two increments; one update is silently gone. The same shape hides in any read-modify-write cycle: editing a JSON document, updating an account balance, two engineers saving a wiki page.
+
+<Figure
+  src="./figures/anomaly-lost-update.svg"
+  alt="Two transactions each read a counter at 42 and write 43; the second write clobbers the first, leaving 43 after two increments"
+  caption="Lost update: the second read–modify–write cycle never saw the first, so its write erases it."
+/>
+
+The problem is common enough that the fixes are standard: atomic operations (`UPDATE counters SET value = value + 1`), explicit locks (`SELECT ... FOR UPDATE`), automatic detection under snapshot isolation (PostgreSQL aborts the loser; MySQL/InnoDB does not), and *compare-and-set* (write only if the value still equals what was read, retry otherwise). Note the shared assumption: all of these presume a single up-to-date copy of the data. That assumption is exactly what replication removed, which is why this list returns, broken, in the distributed section.
+
+### Write skew: the check that passes twice
+
+The last anomaly defeats every mechanism listed so far. A hospital requires at least one doctor on call. Alice and Bob, tonight's two on-call doctors, both feel ill and click "go off call" at the same moment. Each transaction counts the doctors on call, reads 2, concludes leaving is safe, and updates *its own* row. Both commit. Zero doctors are on call.
+
+<FigureSequence
+  name="write-skew"
+  alt="Four frames: both doctors' transactions read a count of two on call; both safety checks pass; each updates its own row and commits; the shift board then shows zero on call and the invariant broken"
+  caption="Write skew under snapshot isolation: two disjoint writes, each justified by a premise the other invalidates."
+/>
+
+<Task>
+Step through the four frames and name, before frame 4, the object the two transactions both wrote. There is none: Alice wrote Alice's row and Bob wrote Bob's, which is why no dirty-write lock, no lost-update detector, and no compare-and-set fires.
+</Task>
+
+This is *write skew*: two transactions read the same data, make decisions on what they saw, and write to different objects, each write invalidating the other's premise. Snapshot isolation permits it, and the automatic lost-update detection of the previous section is blind to it because no single object was written twice. The pattern generalizes through a *phantom*: the transaction checks a condition ("no booking overlaps this slot", "this username is free", "spend so far is under budget"), and the concurrent transaction's write changes the result of that check by inserting a row the first transaction could not lock, because it did not exist yet. Locking rows you read (`SELECT ... FOR UPDATE`) saves the doctors, whose premise was existing rows; it cannot lock the absence of a row.
+
+<Exercise>
+An annotation platform enforces a labeling budget: before dispatching a batch to paid annotators, a job reads the spend ledger, checks $\text{spent} + \text{cost} \le \text{budget}$, and inserts a spend row. Two jobs dispatch concurrently under snapshot isolation and the budget is exceeded. Classify the anomaly, state why a unique constraint cannot fix it, and name the two fixes that work. Write your classification before opening.
+
+<Solution>
+Write skew via a phantom. The two jobs write different rows (two new spend entries), so there is no write-write conflict for any detector to see; each job's premise (the ledger sum it read) is invalidated by the other's insert; and the check is over an aggregate of rows including ones that do not exist yet, which is the phantom. A unique constraint cannot help because no two rows are equal: the violation lives in the sum, a multi-row invariant.
+
+Fix one is serializable isolation (the next section: SSI would abort one job at commit). Fix two is materializing the conflict: keep one budget-counter row per project and make every dispatch update it atomically ($\text{spent} \mathrel{{+}{=}} \text{cost}$ with a check), converting the multi-row invariant into single-row contention that ordinary locks serialize. The transferable move: when a check ranges over rows that might not exist, either escalate isolation or invent the row to lock.
+</Solution>
+</Exercise>
+
+<KeyFact>
+The zoo is a ladder. Read committed removes dirty reads and writes; snapshot isolation removes read skew; lost updates fall to atomic operations or detection; write skew survives everything below serializability, because it is the one anomaly with no object written twice: there is nothing for per-object machinery to collide on.
+</KeyFact>
+
+## Serializability: three ways to buy it
+
+Write skew ends the incremental patching: the only isolation level that prevents every anomaly, including ones not yet cataloged, is serializable — concurrent execution with the guaranteed effect of some serial order. Databases that offer it use one of exactly three techniques, and the choice is a workload question.
+
+### Actual serial execution
+
+Remove the concurrency: one thread, one transaction at a time. This became feasible around 2007 because RAM grew cheap enough to hold active OLTP datasets and because OLTP transactions are short. The throughput ceiling is one CPU core, so every transaction must be tiny and fast, and the interactive back-and-forth of a client session would starve the loop; systems in this family (VoltDB/H-Store, Redis, Datomic) therefore require transactions submitted whole, as stored procedures. Partitioning restores scaling only if transactions stay within one partition: VoltDB reports on the order of **1,000 cross-partition writes per second**, orders of magnitude below its single-partition rate, and adding machines does not raise it. Coordination, not computation, is the ceiling.
+
+### Two-phase locking: the pessimistic route
+
+For thirty years the only route: readers take shared locks, writers take exclusive locks, readers block writers and writers block readers, and every lock is held to commit. Phantoms are caught by locking index ranges covering the predicate a query read, so even not-yet-inserted rows conflict. The price is contention: one slow transaction holding locks stalls a queue of others — head-of-line blocking, the queueing effect <Ref lesson="requirements-and-metrics">the requirements lesson</Ref> showed server-side timers cannot see — deadlocks force retries, and tail latency turns unstable. MySQL/InnoDB's serializable level runs 2PL.
+
+### Serializable snapshot isolation: the optimistic route
+
+SSI, from [Cahill's 2008 algorithm](https://dl.acm.org/doi/10.1145/1376616.1376690): run everything on snapshot isolation without blocking, track which transactions read data that another transaction then wrote, and at commit time abort any transaction whose premise went stale. The doctors' second committer is aborted and retried. Under low contention the penalty over plain snapshot isolation is small; under high contention the abort-and-retry rate eats the gain. PostgreSQL's serializable level has been SSI since 9.1.
+
+| route | mechanism | pays with | fits when |
+|---|---|---|---|
+| serial execution | one thread, stored procedures | single-core ceiling, no interactive txns | in-RAM data, short txns, mostly one partition |
+| 2PL | shared/exclusive locks to commit | blocking, deadlocks, unstable tails | contention high, aborts unaffordable |
+| SSI | run free, abort stale premises at commit | retries under contention | contention low, read-heavy mixes |
+
+The chooser is contention: pessimism pays when conflicts are the rule, optimism when they are the exception, and serial execution when the workload is small and fast enough to make the question moot.
+
+## Distribution makes it worse: delays, clocks, pauses
+
+Everything above assumed one node. The fixes for lost updates (locks, compare-and-set) assume a single up-to-date copy of the data; a replicated, partitioned store has none, and the assumptions that quietly held on one machine fail in three specific ways.
+
+### Three assumptions that fail
+
+**Networks delay without bound.** A request, or its reply, can take arbitrarily long, so a timeout cannot distinguish a dead node from a slow one, the failover trap <Ref lesson="replication">the replication lesson</Ref> already priced. Every protocol below is shaped by this: nothing may depend on an answer arriving.
+
+**Clocks jump.** A node's time-of-day clock is quartz plus NTP: it drifts (Google budgets 200 ppm), gets forcibly reset backward when too far off, and is accurate at best to tens of milliseconds over the public internet. Last-write-wins conflict resolution, the multi-leader default <Ref lesson="replication">the replication lesson</Ref> showed silently discarding confirmed writes, trusts these clocks to order writes: node A writes $x = 1$ at timestamp 42.004, node B reads it and increments, and B's causally later write is stamped 42.003 by a clock 3 ms behind. LWW keeps the "later" 42.004 and silently drops the increment: a causally ordered pair, reversed by 3 ms of skew, with no error reported. Counters against this are not better clocks but logical ones, numbers that only count events; they return in the consensus section.
+
+**Processes pause.** Between any two instructions, a process can stop for minutes: stop-the-world garbage collection has been observed to run that long, and the pause is invisible from inside.
+
+<Remark title="the pause checklist">
+GC is only the famous entry. A virtual machine can be suspended and live-migrated; a laptop lid closes; the OS context-switches away under load; a page fault waits on a thrashing disk; synchronous I/O blocks where no file access is visible in the code; an operations engineer sends SIGSTOP. Every one of these preempts a thread mid-function and resumes it later, unaware. Code that computes "the lease is valid for 10 more seconds, proceed" assumes no pause between the check and the action, and nothing enforces that.
+</Remark>
+
+### The lease that expired mid-write
+
+The three failures compose into one canonical bug, which shipped in HBase. A storage service must allow only one client at a time to write a file, so clients take a *lease* (a lock with an expiry, so a crashed holder releases it) from a lock service. Client 1 holds the lease and pauses. The lease expires. Client 2 acquires it, legitimately, and writes. Client 1 wakes, believes itself still the holder (from its perspective no time has passed), and writes. The file is corrupted by two writers, each of which held the lease when it last checked.
+
+<Figure
+  src="./figures/lease-bug.svg"
+  alt="Client 1 holds a lease, pauses for a long stop-the-world pause during which the lease expires, client 2 acquires the lease and writes, then client 1 wakes and also writes; storage accepts both and the file is corrupted"
+  caption="The paused-client lease bug: the check was correct when made and stale when acted on."
+/>
+
+Checking the lease more often does not help; the pause can land between any check and its action. The fix moves the check to the only party with current knowledge: the resource itself.
+
+### Fencing tokens: monotonicity instead of clocks
+
+Have the lock service hand out, with each lease, a *fencing token*: a number that increases on every grant. Every write to the protected resource carries the writer's token, and the resource rejects any write whose token is lower than one it has already seen. Client 1 wakes and writes with token 33; the storage service, having processed client 2's write with token 34, rejects it. No clock is consulted anywhere: only a counter that never repeats, and a resource that remembers the maximum.
+
+<Figure
+  src="./figures/fencing.svg"
+  alt="The same lease timeline with tokens: client 2 writes with token 34 and is accepted; client 1 wakes and writes with stale token 33, which storage rejects because 33 is less than 34"
+  caption="Fencing: the resource checks token order itself, so a paused client's stale write bounces."
+/>
+
+<KeyFact>
+Fencing works because the check happens at the resource, at write time, against a monotonic counter: the three properties the buggy version lacked. A client-side check of any kind cannot be made safe, because a pause can always separate the check from the write. ZooKeeper's transaction id (`zxid`) is a ready-made fencing token.
+</KeyFact>
+
+The mitigation is general and cheap: most coordination in ML infrastructure is a lease plus a fencing check, and no stronger machinery. What remains is the machinery for the cases where even that is not enough, where several nodes must *agree*.
+
+## Linearizability: the single-copy illusion
+
+Replication's lag anomalies were tolerable because each had a purchasable patch (read-your-writes, monotonic reads). The strong guarantee that subsumes them all is *linearizability*: the system behaves as if there were exactly one copy of the data, and every operation takes effect atomically at some instant between its request and its response. The canonical violation: the 2014 World Cup final ends, Alice refreshes and sees the score, tells Bob, Bob refreshes and his lagging replica says the game is still on. Bob's read began after Alice's finished, yet returned older data; a single copy could not do that.
+
+<Figure
+  src="./figures/linearizability.svg"
+  alt="Three clients' operations drawn as bars from request to response, each with an atomic effect point; client C writes x to 1, client A reads 1, and client B, whose read starts after A's returned, must also read 1; the effect points connect in forward time order"
+  caption="Linearizability: every operation acts at one instant inside its bar, and those instants respect real time. Once any client has seen the new value, no one may see the old."
+/>
+
+<Task>
+Cover the dashed polyline and reconstruct the rule from the bars alone: place an effect dot inside each bar such that reads return the latest preceding write and the dots never move backward in time. Then check B's read: any placement returning 0 would need B's dot before C's, which sits to its left, outside B's bar.
+</Task>
+
+<Remark title="linearizability is not serializability">
+The names collide and the concepts do not. Serializability is a multi-object transaction property: some serial order exists, not necessarily one respecting real time. Linearizability is a single-object recency property: reads see the latest write, in real time, with no notion of transactions, and it does not prevent write skew. A system with both is *strictly serializable*; 2PL and serial execution provide that, while SSI does not, since reading from a snapshot is the deliberate opposite of reading the latest state.
+</Remark>
+
+### Who needs it, and who provides it
+
+Three needs genuinely require linearizability. **Locks and leader election:** every node must agree who holds the lock; a lock two nodes both think they hold is split brain. **Uniqueness and thresholds enforced at write time:** one username per registration, one production tag per model, never selling below zero stock. Each is a compare-and-set on a single up-to-date value. **Cross-channel races:** when data flows to a consumer by two paths (a file written to storage plus a queue message announcing it, the shape <Ref lesson="queues-and-logs">the next lesson</Ref> gives its own treatment), a non-linearizable store can serve the consumer an older file than the message described.
+
+On the supply side the field is thin. Single-leader replication is linearizable only if reads go to the leader and the leader is actually the leader: the delusional-leader problem again. Multi-leader is not. Leaderless quorums are not, despite the arithmetic: $w + r > n$ guarantees the read set overlaps the write set, as <Ref lesson="replication">the replication lesson</Ref> showed, but overlap does not order concurrent operations, and an execution can satisfy strict quorums while one reader sees a new value before another reader sees the old; one of the closing exercises builds it. Consensus systems are linearizable, and are essentially the only fault-tolerant things that are.
+
+### The honest price
+
+The cost has two parts, and only one involves failures. Under a network partition, a linearizable system must make the disconnected side wait or error: consistent or available when partitioned, the honest CAP statement <Ref lesson="replication">replication</Ref> settled, with "pick 2 of 3" already discarded there. The second part operates while the network is healthy: [Attiya and Welch](https://dl.acm.org/doi/10.1145/176575.176576) proved that linearizable reads and writes must each take time proportional to the uncertainty in network delay. Linearizability is slow always, not just during faults: the reason multi-core CPUs do not make RAM linearizable (they choose cache performance), and the reason ML serving paths, which fan out under a p99 budget, keep it off the hot path entirely.
+
+## Two-phase commit: atomicity across machines
+
+Isolation was one axis; the other ACID property that breaks under distribution is atomicity. A transaction touching two partitions (or a database plus a message broker) must commit everywhere or nowhere, and simply sending "commit" to all nodes fails: one node may honor it while another crashes first, and a commit, once visible, cannot be recalled. *Two-phase commit* (2PC) is the classic answer, and it is best read as a system of promises.
+
+The protocol adds one role, a *coordinator*, which drives both phases. Phase 1: it sends each participant a prepare request, asking whether it can commit. A participant that answers **yes** first writes everything to disk and checks every constraint, because the yes is a promise: it has surrendered the right to abort, whatever crashes follow. Phase 2: when all votes are in, the coordinator writes its decision to its own log (the *commit point*) and then delivers the decision, retrying forever. The protocol's correctness is exactly its two irrevocable points: the participant's yes, and the coordinator's logged decision.
+
+<Figure
+  src="./figures/two-phase-commit.svg"
+  alt="Message sequence between a coordinator and two participants: prepare requests, yes votes marked as the participants' point of no return, the coordinator's logged decision marked as the commit point, then commit messages; the window where participants are in doubt and hold locks is shaded"
+  caption="2PC: two irrevocable points, and between them a window where a participant can neither commit nor abort."
+/>
+
+The shaded window is the protocol's flaw. A participant that voted yes and hears nothing is *in doubt*: it cannot abort (it promised) and cannot commit (the decision might have been abort), so it waits, holding its row locks, until the coordinator recovers and reads its log. 2PC is a *blocking* protocol, and no timeout fixes it, because in-doubt participants deciding unilaterally is precisely the inconsistency the protocol exists to prevent. The performance bill is real too: distributed transactions in MySQL measure roughly **10× slower** than single-node ones, mostly extra fsyncs and round trips, which is why most cloud datastores decline to offer them and why the coordination-averse designs of the rest of this course exist.
+
+## Consensus: agreement that survives failures
+
+2PC's weakness is a single point of decision. The general problem underneath (several nodes proposing values, all deciding the same one) is *consensus*, and its definition is four properties: **uniform agreement** (no two nodes decide differently), **integrity** (no node decides twice), **validity** (the decision was somebody's proposal), and **termination** (every non-crashed node eventually decides). The first three are safety; termination is what 2PC lacks, since an in-doubt participant may wait forever on a dead coordinator. A dictator satisfies safety; fault tolerance is the hard part.
+
+### Total order is not enough
+
+*Lamport timestamps* look like a cheap substitute for consensus: they generate a total order of events without synchronized clocks. Each node stamps events with (counter, node id), every message carries the largest counter its sender has seen, and receivers fast-forward their counters to any larger value, so any causally later event gets a larger stamp, with ties broken by node id.
+
+The order is real but arrives too late. To enforce "one production tag per model" you could, after the fact, collect all claims and let the lowest timestamp win. But a node handling a claim must answer *now*, and it cannot know whether some unreached node holds a concurrent claim with a smaller stamp. A total order helps only once you know it is final, and knowing an order is final, node by node, message by message, is a problem called total order broadcast, which is consensus under another name: one decision per message slot.
+
+### To elect a leader, first elect a leader
+
+Every practical consensus algorithm (Paxos, Raft, Zab, Viewstamped Replication) internally uses a leader that sequences decisions, which looks circular: agreeing on a leader is itself consensus. The resolution is the *epoch number* (Raft says term, Paxos says ballot): the protocols never guarantee one leader, only one leader *per epoch*. Any node that suspects the leader dead starts an election under an incremented epoch; between two leaders from different epochs, the higher epoch wins.
+
+What stops a deposed leader from deciding anyway is the vote structure. A leader decides nothing on its own authority: every decision must be approved by a quorum of nodes, and a node approves only if it knows no higher epoch. The election quorum and the decision quorum must overlap (the same set-intersection argument as replication's $w + r > n$, now applied to votes), so if a higher-epoch election has happened, at least one voter in any decision quorum knows it, and the stale leader's proposal dies. This is 2PC's shape with the two fatal edits: the decider is elected rather than fixed, and a majority suffices rather than unanimity, so the crash of any minority, leader included, costs an election, not a deadlock. The price is the majority itself: three nodes to survive one failure, five to survive two, and synchronous round trips on every decision.
+
+<Figure
+  src="./figures/epoch-quorums.svg"
+  alt="Five nodes in a row; a quorum of three that elected a leader for epoch 25 overlaps a quorum of three that the deposed epoch-24 leader asks to approve a decision; the shared node has seen epoch 25 and rejects the epoch-24 proposal"
+  caption="Two majorities of five nodes must share a member. The overlap node has voted in the epoch-25 election, so the epoch-24 leader's decision quorum can never complete."
+/>
+
+### What ZooKeeper actually sells
+
+No ML platform implements consensus; it rents it. ZooKeeper (and etcd, its API rival) is a small replicated store: data fits in memory, updates go through the Zab total-order-broadcast protocol on an ensemble of three or five nodes, and the store is packaged with exactly the features distributed coordination needs:
+
+- **Linearizable atomic operations.** A compare-and-set on a ZooKeeper key is a distributed lock: of all concurrent claimants, exactly one succeeds, regardless of failures. This is the one feature that genuinely requires consensus.
+- **Total ordering.** Every operation gets a monotonically increasing transaction id, `zxid`: fencing tokens as a by-product of the replication protocol.
+- **Failure detection.** Clients hold sessions kept alive by heartbeats; when a session dies, its *ephemeral* keys vanish. A lock held as an ephemeral key releases itself when its holder does.
+- **Change notifications.** Clients watch keys and are told when they change, so "the leader is gone" or "partition 7 moved" propagates without polling.
+
+The combination is why <Ref lesson="partitioning">the partitioning lesson</Ref> found HBase, Kafka, and SolrCloud all parking their partition-to-node maps in ZooKeeper, and why the training orchestrators of module 5 park their scheduler state the same way: five nodes run the majority votes, thousands of clients rent the result, and the data is the slow-changing kind ("node 10.1.1.23 leads partition 7"), changing in minutes, not milliseconds.
+
+## Where the line sits in an ML platform
+
+The machinery is now priced, and the design judgment is where to pay for it. The discriminating question for any component: if two nodes briefly act on different answers, is something corrupted, or is something merely stale?
+
+<Figure
+  src="./figures/where-the-line-sits.svg"
+  alt="Two columns sorting ML platform components: needing linearizable coordination are the registry's production pointer, scheduler locks, quota and billing ledgers, and partition assignment; tolerating eventual consistency are feature reads, caches, metrics, training data reads, and embedding indexes"
+  caption="The line: coordination where disagreement corrupts, eventual consistency where it only goes stale."
+/>
+
+Left of the line, disagreement corrupts. The model registry's production pointer is a linearizable compare-and-set: two servers loading different "current" models is a silent A/B test nobody designed. A training scheduler's one-active-run lock is a lease plus fencing token: two concurrent runs writing one checkpoint path is the HBase file corruption with GPUs attached. Billing and quota ledgers are transactions in an ACID store, because a lost update here is money. And the partition assignment is ZooKeeper's original job.
+
+Right of the line, disagreement is staleness, and staleness is already budgeted. A feature read served from a replica seconds behind changes a prediction marginally; a metrics dashboard lagging a minute changes nothing; a cache serves yesterday's popular items until invalidation lands. These paths carry the platform's volume, which is why the whole substrate (<Ref lesson="replication">asynchronous replication</Ref>, <Ref lesson="partitioning">partitioned stores</Ref>, the <Ref lesson="feature-platform">feature platform's</Ref> eventually consistent online store) chooses availability and latency, and why this chapter is the exception rather than the rule.
+
+<KeyFact>
+The traffic is on the right of the line and the invariants are on the left. An ML platform runs its request volume on eventual consistency and routes its handful of exact decisions (pointer flips, locks, ledgers, assignments) through a rented consensus service, which is small precisely because so little belongs on it.
+</KeyFact>
+
+What is established: ACID's honest reading, with isolation as the graded letter; four named anomalies, of which write skew defeats everything below serializability; three serializability implementations priced by contention; the distributed failure triad and fencing tokens as the working fix; linearizability as the single-copy illusion, paid for in availability and in latency; 2PC's promises and its blocking window; and consensus, characterized by four properties and consumed as ZooKeeper. Nothing on the course's core path depends on this chapter; the main line resumes with data in motion: <Ref lesson="queues-and-logs">queues, logs, and change data capture</Ref>.
+
+## Exercises
+
+<Exercise>
+Classify each interleaving by anomaly name, choosing from: dirty read, dirty write, read skew, lost update, write skew. (a) Two deploy jobs write the same config key; the second write lands while the first job's transaction is still uncommitted, and the first then aborts, rolling back both changes' merge. (b) A nightly export reads the users table before a batch rename commits and the emails table after it, producing rows whose names and emails disagree. (c) Two schedulers each read `gpu_free = 8`, each reserve 6 by writing their own reservation row, and 12 GPUs are now reserved. (d) A metrics job reads a counter at 500, adds its batch of 40, and writes 540, erasing another job's concurrent +25. (e) A dashboard renders a training run as "completed" while the row's uncommitted status update is in flight; the update then aborts.
+
+<Solution>
+(a) Dirty write: the second write overwrote an uncommitted value, entangling the two transactions' outcomes. (b) Read skew: both reads were committed data, but from either side of one transaction, a state that never existed. (c) Write skew: both premises were the same read, both writes went to different rows, and the invariant (reservations ≤ capacity) broke with no write-write conflict. (d) Lost update: a read–modify–write cycle clobbered a concurrent one on the same object. (e) Dirty read: the dashboard saw a write that was later rolled back, reporting a state that never became true.
+
+The cue that separates (c) from (d): in a lost update the two transactions write the *same* object; in write skew they write *different* objects and only the invariant collides.
+</Solution>
+</Exercise>
+
+<Exercise>
+Run the on-call doctors under actual serial execution: one thread, each request submitted as a whole stored procedure. Show that the anomaly cannot occur, by construction rather than by detection. Then name the two workload properties that make serial execution affordable here, and one ML-platform workload from this course for which it would not be.
+
+<Solution>
+The two procedures execute in some order, say Alice's first: it reads count 2, checks $2 \ge 2$, writes Alice off call, completes. Bob's then runs against the resulting state: it reads count 1, its check $1 \ge 2$ fails, and it refuses. No interleaving exists because there is no concurrency; the premise each transaction acts on cannot go stale between its read and its write, since nothing else runs in that window. Nothing was detected or aborted: the race was removed, not caught.
+
+Affordable because: the on-call table is tiny (fits in RAM, so no transaction ever waits on disk) and the transactions are short (a count, a comparison, one row update: microseconds of a single core, which bounds the queue behind each one). A workload that breaks it is the feature store's online serving path from <Ref lesson="feature-platform">the feature-platform lesson</Ref>: millions of reads per second across gigabytes cannot ride one core, and no single request may stall the line. Serial execution fits small, hot, invariant-heavy state, which is exactly what coordination state is.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Our store requires $w + r > n$ on every operation, strict quorums with no sloppiness. Overlap is guaranteed, so our reads are linearizable." Construct the counterexample with $n = 3$, $w = 3$, $r = 2$, and name the missing ingredient.
+
+<Solution>
+Let $x = 0$ everywhere and let a writer send $x \leftarrow 1$ to all three replicas; the write is in flight, having landed on replica 1 but not yet on replicas 2 and 3. Reader A reads from $\{1, 2\}$: it sees $x = 1$ (from replica 1, newest version wins) and returns 1. Reader A's read completes. Reader B then begins, reading from $\{2, 3\}$: both still hold the old value, so B returns 0. B's read began after A's finished yet returned older data (the World Cup violation exactly) while every quorum condition held: $3 + 2 > 3$, and every read set intersected the write set. The step that fails is "overlap $\Rightarrow$ recency": overlap guarantees a read *encounters* the new value once it is anywhere in its quorum, but a partially propagated write is at different stages in different quorums, and nothing orders the readers.
+
+The missing ingredient is synchronous repair: a reader must write the newest value it saw back to a quorum *before* returning (and a writer must read state before writing), so that A's return certifies the value is quorum-durable and B must meet it. That closes reads and writes at real cost, and it still cannot make compare-and-set linearizable: deciding which of two concurrent CAS operations wins is consensus, which quorum arithmetic alone does not provide. Riak skips synchronous read repair for latency; Cassandra performs it and still loses linearizability through LWW timestamps. The safe assumption from <Ref lesson="replication">the replication lesson</Ref> stands: a Dynamo-style quorum is not a linearizable store.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two nodes run LWW with time-of-day clocks; node B's clock lags node A's by $\delta$. (a) Show that any write B makes within $\delta$ of a causally earlier write on A is silently discarded, and state the general condition on skew and write spacing for LWW to lose causally later data. (b) Show that a fencing scheme (one lock service issuing tokens $33, 34, \dots$; the resource rejecting non-increasing tokens) cannot lose a causally later write, and state exactly what the resource stores and checks. (c) Name the clock assumption each scheme makes.
+
+<Solution>
+(a) A writes $x \leftarrow v_1$ at true time $t$, stamped $T_A = t$. B reads $v_1$ (so its next write is causally later) and writes $x \leftarrow v_2$ at true time $t + \varepsilon$, stamped $T_B = t + \varepsilon - \delta$. If $\varepsilon < \delta$, then $T_B < T_A$ and LWW resolves "latest" to $v_1$: the causally later $v_2$ is dropped on every replica, with no error surfaced. The general condition: LWW loses causally ordered writes whenever inter-write spacing is smaller than inter-node clock skew, and since NTP skew is routinely milliseconds while dependent writes can be microseconds apart, the condition is met in normal operation, not in edge cases.
+
+(b) Causal order here runs through the lock service: to write, a client first acquires the lease, and the service issues tokens from one monotonic counter, so if B's write causally follows A's release (or A's expiry), B's token is strictly greater. The resource stores one integer, the highest token it has accepted, and rejects any write whose token is $\le$ that value. A causally later write carries a larger token and cannot be rejected in favor of an earlier one; a stale writer (the paused client) carries a smaller token and cannot overwrite. (c) LWW assumes synchronized physical clocks, which no deployment can guarantee to the required precision; fencing assumes only one monotonic counter at one service, a logical clock in the Lamport sense: the same trade the consensus section made, ordering by counting events instead of measuring time.
+</Solution>
+</Exercise>
+
+<Exercise>
+The model registry must support: "promote model v42 to production exactly once, even if two release jobs race" and "every serving replica learns of the promotion, and no replica ever applies promotions out of order." Map each requirement to a primitive from this lesson, name a packaged system providing both, and explain why the registry's model *artifacts* (the weights files) do not need the same treatment.
+
+<Solution>
+Exactly-once promotion is a linearizable compare-and-set: `prod_pointer: expect v41, set v42`. Of two racing jobs, exactly one CAS succeeds and the other fails cleanly and reports, rather than both "succeeding" on different replicas. In-order visibility is total order broadcast with notifications: promotions are appended to one totally ordered log of pointer changes, replicas subscribe, and every replica applies the same changes in the same sequence: a replica can lag but can never see v43 before v42. ZooKeeper provides both in one package (CAS via versioned writes, order via `zxid`, notifications via watches), which is why registries and orchestrators reach for it or for etcd rather than assembling the pieces.
+
+The artifacts need neither: weights files are immutable (v42's bytes are written once under a content-addressed or versioned key, never modified), so there are no concurrent writers to order and nothing for two nodes to disagree about. They live in ordinary replicated blob storage, right of the line. The pattern generalizes: make the bulk data immutable and eventually consistent, and shrink the mutable, coordinated part to a pointer.
+</Solution>
+</Exercise>
+
+<Exercise>
+Your training platform's scheduler must guarantee one active run per pipeline: a second `run()` on pipeline `churn-v3` while one is active must be refused, and a crashed run's slot must free itself. Sketch the design with this lesson's primitives: where the lock lives, how a crashed holder releases it, and how the artifact store survives a paused-but-alive run. State what the run must attach to every artifact write.
+
+<Solution>
+The lock is an ephemeral key `locks/churn-v3` in a consensus-backed store (ZooKeeper or etcd): acquisition is a linearizable create-if-absent, so of two concurrent `run()` calls exactly one obtains it. Ephemerality is the crash release: the key is bound to the holder's session, and when heartbeats stop, the session dies and the key vanishes, freeing the slot without an operator. The paused-but-alive run is the HBase scenario: a run stalls through a long GC or VM migration, its session expires, a replacement run acquires the lock, and the original wakes still believing it holds it. So acquisition must also return a fencing token (the lock key's monotonically increasing version), and the run attaches that token to every write it makes to checkpoints, metrics, and the metadata store, each of which rejects tokens below the highest seen. The zombie run's writes bounce; the replacement's proceed.
+
+The layer this exercise just built (a metadata store consulted before every step, a lock with a token, liveness by session) is exactly the coordination layer that workflow orchestrators implement around a metadata database rather than asking every pipeline author to rebuild: <Ref lesson="pipelines-and-orchestration">pipelines and orchestration</Ref> takes it up, with this machinery assumed rather than derived.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017 — Ch. 7: ACID's honest reading (pp. 223–228), the anomaly zoo with the doctors and the phantoms (pp. 233–251), the three serializability routes (pp. 251–266); Ch. 8: clocks and LWW (pp. 287–294), process pauses (pp. 295–299), the lease bug and fencing tokens (pp. 301–304); Ch. 9: linearizability and its cost (pp. 324–338), the nonlinearizable strict quorum (Fig. 9-6), Lamport timestamps and total order broadcast (pp. 345–352), 2PC (pp. 354–360), consensus and epochs (pp. 364–370), ZooKeeper (pp. 370–373).
+2. T. Härder, A. Reuter, "Principles of Transaction-Oriented Database Recovery," *ACM Computing Surveys* 15(4), 1983 — the paper that coined ACID, with the fault-tolerance framing this lesson's first section restates. https://dl.acm.org/doi/10.1145/289.291
+3. M. P. Herlihy, J. M. Wing, "Linearizability: A Correctness Condition for Concurrent Objects," *ACM TOPLAS* 12(3), 1990 — the formal definition behind the timing-diagram intuition, stated for arbitrary typed objects rather than read/write registers. https://dl.acm.org/doi/10.1145/78969.78972
+4. M. J. Cahill, U. Röhm, A. D. Fekete, "Serializable Isolation for Snapshot Databases," *SIGMOD*, 2008 — the SSI algorithm PostgreSQL adopted, with the stale-premise detection the serializability section sketches. https://dl.acm.org/doi/10.1145/1376616.1376690
+5. H. Attiya, J. L. Welch, "Sequential Consistency versus Linearizability," *ACM TOCS* 12(2), 1994 — the lower bound making linearizability slow in proportion to network-delay uncertainty, independent of faults. https://dl.acm.org/doi/10.1145/176575.176576
+6. P. Hunt, M. Konar, F. P. Junqueira, B. Reed, "ZooKeeper: Wait-Free Coordination for Internet-Scale Systems," *USENIX ATC*, 2010 — the system behind the packaged-consensus section: the data model, sessions and ephemerals, watches, and the ordering guarantees of Zab. https://www.usenix.org/conference/usenix-atc-10/zookeeper-wait-free-coordination-internet-scale-systems
+7. M. Kleppmann, "How to do distributed locking," kleppmann.com, 2016 — the fencing-token argument applied against the Redlock algorithm; the practitioner's companion to this lesson's lease section. https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
+8. M. Kleppmann, "A Critique of the CAP Theorem," arXiv:1509.05393, 2015 — why "pick 2 of 3" fails as a reading, and the sharper results that replace it. https://arxiv.org/abs/1509.05393
+</References>

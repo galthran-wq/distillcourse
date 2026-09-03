@@ -1,0 +1,320 @@
+A feature computed over yesterday's data and a feature computed over the last thirty seconds are produced by two different machines — batch and stream processing — and most production failures at this layer come from confusing their clocks.
+
+The module has fixed the substrate at rest and set it in motion: <Ref lesson="storage-and-data-models">the storage lesson</Ref> left engines matched to their access patterns, with the warehouse as the analytical store training reads from, and <Ref lesson="queues-and-logs">the previous lesson</Ref> left an ordered, replayable, partitioned log, with change data capture keeping every derived store a follower of one truth. What stands open is computation: nothing yet turns retained history or a moving stream into a feature value. This lesson supplies the two machines that do, and it ends at the split they produce, static versus streaming features, which every serving decision later in the course inherits. <Ref lesson="feature-platform">The module's closing lesson</Ref> then assembles both machines and both stores into a feature platform.
+
+The route: batch processing from a Unix one-liner to MapReduce to dataflow engines; reprocessing as batch's underrated feature; stream processing and its state; the two clocks and the windowing bug that confuses them; four window types, one ML feature each; joins in brief; and the two-pipeline problem, from the lambda architecture to its resolution.
+
+## The batch machine: output as a pure function of input
+
+A *batch job* reads a bounded input: yesterday's events, last month's orders, a full table. It computes over all of it, writes its output, and terminates. The ETL jobs that load the warehouse are batch jobs; so is every scheduled training run. Three properties define the machine: the input is bounded and immutable, the output is a pure function of that input, and the job ends.
+
+The smallest batch pipeline is a shell line. Given a web server's access log, the five most requested pages are:
+
+```bash
+cat access.log |
+  awk '{print $7}' |   # the URL field of each line
+  sort |               # same URL -> adjacent lines
+  uniq -c |            # count adjacent repeats
+  sort -r -n |         # order by count, descending
+  head -n 5
+```
+
+Each stage reads a stream of lines and writes one, and no stage holds more than a line of its input in memory at once, with one exception: `sort`. The obvious alternative is a short script holding a hash table from URL to counter, incremented per line, sorted at the end. Both produce the same report; they part ways the moment the data outgrows memory.
+
+### Sorting versus in-memory state
+
+The script's memory requirement is its **working set**: one hash-table entry per *distinct* URL, regardless of how many lines mention it. For most sites that fits in a gigabyte and the script is fine. When the working set exceeds memory, the script starts swapping and random access to a swapped hash table collapses; the pipeline does not care, because `sort` handles inputs larger than memory by design. It sorts chunks in memory, spills them as sorted runs to disk, and merges the runs sequentially: the same sequential-I/O discipline that made LSM-trees fast in <Ref lesson="storage-and-data-models">the storage lesson</Ref>. GNU `sort` does the spilling and the multi-core parallelism automatically, so the one-liner processes gigabytes in seconds, bottlenecked on disk read bandwidth rather than on memory. The closing estimation exercise puts numbers on exactly this contest.
+
+<KeyFact>
+When aggregation state outgrows memory, sorting beats hashing: it converts random access into sequential merges. This one trade is the design core of every batch framework: MapReduce's shuffle is the `sort` stage of the pipeline, industrialized.
+</KeyFact>
+
+## MapReduce distributes the pipeline; dataflow engines streamline it
+
+One disk's bandwidth caps the one-liner; the same four steps, spread over a cluster, remove the cap. [MapReduce](https://static.googleusercontent.com/media/research.google.com/en//archive/mapreduce-osdi04.pdf) (Google, 2004) generalizes the pipeline exactly:
+
+1. **Read and split** the input files into records (the `cat` stage, done by an input parser).
+2. **Map**: the job's code extracts a key and value from each record (the `awk` stage).
+3. **Shuffle**: the framework sorts all key–value pairs by key (the `sort` stage; the framework, not the job author, writes it).
+4. **Reduce**: the job's code combines the now-adjacent records per key (the `uniq -c` stage).
+
+<Figure
+  src="./figures/unix-to-mapreduce.svg"
+  alt="Two aligned four-step columns: the Unix pipeline cat, awk, sort, uniq -c on the left and MapReduce's input parser, mapper, shuffle, reducer on the right, with a toy log's data state shown between the columns after each step. The sort and shuffle row is highlighted."
+  caption="The same four steps, after DDIA Fig. 10-1. The highlighted row is the framework's: shuffle is sort, distributed."
+/>
+
+Distribution reuses machinery already established: the input lives pre-partitioned across the cluster's disks (<Ref lesson="partitioning">the partitioning lesson</Ref>'s move, applied to files), mappers run on the machines that hold their partition, and the shuffle routes each key to the reducer that owns its hash range. Mappers are stateless and reducers see one sorted key range each, so any task can be rerun anywhere from its immutable input.
+
+### Fault tolerance is an economic choice
+
+That rerunnability looks like caution about hardware. It is not. Google runs batch jobs at low priority on the same machines as production services, and the scheduler kills low-priority tasks whenever a higher-priority process needs the resources: a task running for an hour has **about a 5% chance of being preempted**, more than ten times the rate of actual hardware failure.
+
+<Example title="preemption arithmetic (DDIA Ch. 10)">
+A 5%-per-hour termination risk is $p = 1 - 0.95^{1/6} \approx 0.85\%$ per 10 minutes of task time. A job of 100 tasks, each running 10 minutes, finishes with no terminations with probability $(1-p)^{100} \approx 0.43$: the odds are better than even that at least one task dies. The formula is the tail-amplification computation of <Ref lesson="requirements-and-metrics">the requirements lesson</Ref> with a scheduler in place of a slow backend, and it says frequent task death is this environment's normal operation, not its exception.
+</Example>
+
+Design follows: because a killed task can be rerun from scratch at no correctness cost, batch jobs can be scheduled onto resources nobody else wants, and the cluster runs near full utilization. Fault tolerance by rerun is what makes cheap compute usable.
+
+### Dataflow engines drop the intermediate disk
+
+MapReduce materializes every job's full output to the distributed filesystem, so a workflow chained from several jobs writes each intermediate dataset to replicated disk and waits for each job to finish entirely before the next starts. *Dataflow engines*, [Spark](https://spark.apache.org/) (2010s) and [Flink](https://flink.apache.org/) among them, keep the model and drop the materialization: the whole workflow is one graph of operators, intermediates stream between operators in memory or on local disk, and sorting happens only where an operator needs it. Fault tolerance changes form, not substance: instead of rereading a materialized file, the engine recomputes a lost intermediate from the recorded lineage of operations that produced it. The computation must therefore be deterministic.
+
+## Reprocessing is the feature
+
+The rerun that tolerates faults also repairs mistakes, and for ML pipelines this is the property that matters most. Suppose the nightly job computing each store's mean prep time has divided by the wrong denominator for three weeks. On a batch pipeline the repair is mechanical. Fix the code and rerun the job over the retained input: the warehouse's raw tables, or the event log whose retention <Ref lesson="queues-and-logs">the previous lesson</Ref> computed at days per disk in practice. The corrupt outputs are overwritten by correct ones. A system that had updated state in place as events arrived would have nothing to rerun: the raw material would be gone, or entangled with the bug's outputs. Machine fault tolerance and *human* fault tolerance are the same mechanism, because code is the least reliable component in the pipeline and rerun treats code as replaceable and input as durable.
+
+### Backfill and migration
+
+The same rerun, pointed at history a feature never saw, is a **backfill**: invent `orders_90d` today and one job run produces its value for every past date, which is how training sets acquire new features without waiting 90 days.
+
+<Aside title="Schema migrations on railways">
+Reprocessing also enables migrations that would otherwise require downtime. When England standardized its railway gauge in 1846, existing lines were not shut down and relaid; a third rail was added so that trains of both gauges ran on the same track, and the old rail was removed only after every train had been converted. Derived data migrates the same way: derive the new-schema view alongside the old from the same retained input, shift readers over gradually, and drop the old view. Every stage is reversible, because both views are just reprocessings of the same log.
+</Aside>
+
+### The output: a static feature table
+
+The output of these nightly jobs is a table of per-entity feature values resting in the warehouse: mean prep time per store, 90-day purchase count per user. This lesson will name such features *static*; the table is exactly what <Ref lesson="feature-platform">the feature platform</Ref> serves as its offline half.
+
+<KeyFact>
+In a batch pipeline, fault tolerance, bug repair, backfill, and schema migration are one mechanism: rerun a pure function over immutable retained input. Everything the pipeline ever wrote is disposable; only the raw input is precious.
+</KeyFact>
+
+## Stream processing: the same computation, before the input ends
+
+Batch has a floor it cannot go under: its output is at least one batch period stale. Mean prep time tolerates a day of staleness; "orders in this store's queue right now" is worthless at even a five-minute delay, because the queue drains faster than that. The fix is not a faster batch job; it is dropping the assumption that the input ends. A *stream processor* is a consumer, in exactly <Ref lesson="queues-and-logs">the previous lesson</Ref>'s sense, that reads log topics as events arrive, updates its outputs incrementally, and never terminates.
+
+### Two consequences: state, and a new fault-tolerance shape
+
+Two consequences separate it from the batch machine. First, **state**: unable to re-read its input on every update, the processor carries running results (counters, window buffers, join indexes), partitioned by key across its consumer group. The current queue depth per store is a counter incremented on `order_created` and decremented on `order_delivered`; no per-update recomputation over history is needed or possible. Second, **fault tolerance changes shape**: "discard the output and rerun from the start" has no meaning when there is no end to run to, so the guarantees must be manufactured differently.
+
+<Remark title="effectively-once, demystified">
+Stream frameworks advertise *exactly-once semantics*. The term does not mean each event is delivered once; delivery remains at-least-once, as established for <Ref lesson="queues-and-logs">log consumers</Ref>. It means the visible output is *as if* each event were processed once. Two mechanisms get partway there: **microbatching** (Spark Streaming: chop the stream into ~1-second blocks and run each as a tiny batch job) and **checkpointing** (Flink: barriers in the stream trigger periodic snapshots of all operator state; on crash, rewind to the snapshot and its offsets). Both discard the partial work of a failed stretch, exactly as batch discards a failed task's output. Both stop at the framework's edge: an external side effect of the replayed stretch, a database write or an email, has already happened. Closing that last gap takes an idempotent sink (writes keyed by the input's offset, the move the previous lesson's overcount exercise derived) or an atomic commit of output together with offsets. "Effectively once", the more honest name, is at-least-once plus one of those.
+</Remark>
+
+<Figure
+  src="./figures/checkpoint-boundary.svg"
+  alt="A log partition of offset boxes 46 to 53 with a checkpoint barrier after offset 48 and a crash marked at offset 52, feeding a dashed box labeled stream processor that contains operator state. A blue arrow snapshots the state plus offset 48 into a checkpoint box; an amber arrow restores from it and rewinds to offset 49, with offsets 49 to 52 bracketed as replayed. A separate arrow crosses the dashed boundary to a box labeled email sent at 51, annotated that replay sends it again."
+  caption="What a checkpoint restores: everything inside the boundary, state and offset rewound together. The email crossed the boundary before the crash, so the replayed stretch sends it a second time."
+/>
+
+## The two clocks: event time and processing time
+
+Every event now has two timestamps, and they answer different questions. *Event time* is when the thing happened, stamped by its source; *processing time* is when the stream processor got around to it, read off the processor's own clock. In a healthy pipeline they differ by seconds. They are not guaranteed to, and the ways they diverge are routine, not exotic: queueing under load, a network fault, a consumer restarted after an outage, a phone that buffered a user's clicks offline for a day and uploaded them on reconnect. Above all, every replay: a backfill run today over last week's log processes at 15:00 events that happened last Tuesday.
+
+The Star Wars films are the standard mnemonic. Episodes IV, V, and VI were released 1977–1983, Episodes I, II, and III in 1999–2005: narrative order is event time, release order is processing time, and a viewer who watched in release order processed the story out of order without the story changing. A stream processor is that viewer, permanently.
+
+### The redeploy artifact: a spike that never happened
+
+Windowing by processing time is the bug this lesson's opening named. A processor counting requests per minute is redeployed and is down for a quarter of an hour; on restart it drains the backlog at full speed. Counted by processing time, fifteen minutes of ordinary traffic land in one window, and the metric reports a spike that never happened. Counted by event time, each event falls in the window it belongs to and the rate reads steady.
+
+<Figure
+  src="./figures/event-vs-processing.svg"
+  alt="Scatter of events with event time on the horizontal axis and processing time on the vertical axis. Steady events sit just above the diagonal. During a redeploy the consumer is down, then a near-horizontal amber stripe of backlog events is processed in a burst. A horizontal band shows a 5-minute processing-time window containing 7 events, read as a 4x spike, while a vertical band shows a 5-minute event-time window containing the true 2 events."
+  caption="After DDIA Fig. 11-7: lag is vertical distance above the diagonal. A processing-time window is a horizontal slice, and the backlog stripe fills one; an event-time window is a vertical slice, and reads the truth."
+/>
+
+For an ML feature the artifact is worse than a wrong dashboard, because a model consumes it silently: a per-card transaction-velocity feature computed in processing time sees every replay as a burst of rapid-fire spending. The closing refutation exercise runs that scenario to its decision.
+
+<KeyFact>
+Replay guarantees the two clocks diverge: every backfill and every recovery processes old events at today's wall-clock time. Windows keyed on processing time therefore turn the previous lesson's replay machinery, the mechanism this module relies on for correctness, into a data-corruption machine. Windows are keyed on event time.
+</KeyFact>
+
+### Stragglers: the completeness–latency trade
+
+Event-time windows buy correctness and pay in doubt: a window over the 37th minute can never be *proved* complete, because an event stamped 14:37 may still be sitting on an offline phone. Waiting longer makes features later; closing early undercounts. Production systems pick one of two postures: close the window on a deadline, drop later stragglers, and count the dropped as a monitored metric, acceptable when stragglers are a stable fraction; or close provisionally and emit corrections when stragglers arrive, which downstream consumers must then be able to apply. (Frameworks formalize the deadline as a *watermark*, a flowing estimate of "no events earlier than $t$ remain"; it is an estimate, not a guarantee, and the tradeoff survives the formalism.) There is no third option; choosing consciously per feature is the design act.
+
+## Four windows, one feature each
+
+With the clock chosen, *windowing* is how an unbounded stream becomes an aggregable one: events are grouped into finite windows, and each window's aggregate is a feature value. Four window types cover practice, and each corresponds to a feature shape that recurs through the rest of the course.
+
+### Window length is a modeling decision
+
+<Figure
+  src="./figures/weather-seasonality.png"
+  float="right"
+  width="m"
+  alt="A line chart with T (degC) on the vertical axis, running 12 to 19 with a horizontal gridline at every degree, and Time (years) on the horizontal axis with no tick marks. One thick blue trace crosses the full width through about eleven repeats of the same shape: a climb to a summer peak near 17 or 18 degrees, then a fall to a winter trough near 12 or 13. No two repeats match: peak heights differ by more than a degree, several peaks are twin-humped rather than single, one trough is far deeper than its neighbours, and the trace is jagged along its whole length, with rapid swings of several tenths of a degree riding on top of the yearly rise and fall."
+  caption="About eleven yearly cycles of a single temperature feature. The period is unmistakable; the curve is nowhere smooth. The fast jitter and the yearly swing are both real signal: which of the two a feature keeps is what the window length decides."
+/>
+
+Window length is a modeling decision before it is an infrastructure one. The Max Planck Institute's weather series samples temperature every 10 minutes for a decade, and the trace carries daily and yearly periods under real noise: an hour-long window sees weather, a year sees climate, and neither is "correct" except relative to what the feature must predict. The same holds for orders and clicks, whose days and weeks are as periodic as seasons. One rule, though, is absolute rather than a modeling choice: when a windowed feature becomes *training* data, its window must end at the moment the prediction would have been made, never after. Including later events is called time travel, and it is the point-in-time discipline <Ref lesson="training-serving-skew">a later lesson</Ref> builds into the platform.
+
+### The four types
+
+<FigureSequence
+  name="windows"
+  alt="Four frames showing the same twelve events on a one-hour timeline, bracketed four ways: tumbling 15-minute windows with counts 4, 3, 2, 3; overlapping 30-minute hopping windows every 10 minutes; sliding 30-minute windows each ending at an event; and two session windows separated by a 14-minute gap."
+  caption="One stream, four bracketings. The events never change; only the window rule does."
+/>
+
+<Task>
+Step through the four frames and check one event against each rule: the event at minute 23 lands in exactly one tumbling window, in three hopping windows, in every sliding window whose ringed end-event lies within 30 minutes after it, and in session 1.
+</Task>
+
+- **Tumbling** windows have fixed length and no overlap: each event belongs to exactly one. This is the shape of every calendar aggregate (orders per store per day, revenue per hour) and of batch jobs generally, since "yesterday's data" is a one-day tumbling window.
+- **Hopping** windows have fixed length and a shorter refresh period: a 30-minute window recomputed every 5 minutes. This is the workhorse for "recent activity" features that must be fresh but need not be exact to the second, such as ad clicks in the last 30 minutes or orders per store in the last half hour.
+- **Sliding** windows contain, for each moment (in practice, each event), everything within the trailing interval: mean prep time over the 30 minutes before *this* order. The 30-minute per-item click counter that closed <Ref lesson="queues-and-logs">the previous lesson</Ref>'s exercises was a sliding window maintained by hand, with its two clocks confused, as that exercise found.
+- **Session** windows have no fixed length at all: events group until a silence longer than the gap parameter, so the data decides the boundaries. Session features (pages viewed this session, time since session start) are the standard inputs of recommendation and abandonment models.
+
+### Hopping from tumbling buckets
+
+<Example title="a hopping window from tumbling buckets">
+Compute "orders per store, last 30 minutes, refreshed every 5" without storing raw events. Per store, keep six counters, one per 5-minute *tumbling* bucket of event time. On each order, increment the bucket its event timestamp falls in. Every 5 minutes, retire the oldest bucket, open a new one, and emit the sum of the six as the feature value. State per store is six integers regardless of order volume; a late straggler whose bucket still exists is simply added, and one whose bucket was retired is a counted drop. Any hopping window whose hop divides its length decomposes this way, which is why hopping is cheap and per-event sliding windows (which need the raw timestamps) are the expensive precision option.
+</Example>
+
+## Joins, briefly: batch joins by sorting, stream joins by state
+
+Aggregation is half of feature computation; the other half is joining, since a training row is typically activity events joined to entity attributes. In batch, joins ride the sort already built: map both datasets by the same key, and the shuffle, MapReduce's industrialized `sort`, delivers each key's records from both inputs to one reducer together, adjacent and ready to combine — a **sort-merge join**. (When one side fits in memory, the sort is skipped and the small table is shipped whole to every mapper: a **broadcast hash join**.) The framework chooses the algorithm; what the ML engineer chooses is the keys, and for training data one of the keys is time. Joining each activity event to feature values *as of that event's timestamp* is the point-in-time join <Ref lesson="training-serving-skew">a later lesson</Ref> makes the platform enforce, and it runs on this same machinery: both sides sorted by entity and time, merged.
+
+Streams have joins of their own, with state where the sort was, classified by what is being joined rather than by algorithm: two streams, a stream and a table, or two tables. The third continuously maintains a materialized view of the two tables' join, <Ref lesson="queues-and-logs">the previous lesson</Ref>'s CDC-fed follower restated as a join; the first two are the ones feature pipelines run.
+
+### Stream–stream: a window of both sides, held in state
+
+A *stream–stream join* holds a window of both streams in state, indexed by key. Joining search events to click events by session ID, to produce click-through labels, holds an hour of both and emits on match; the window bounds how long a click may lag its search, and the state it costs is the price of an unbounded input, exactly as with aggregation windows.
+
+### Stream–table: enrichment from a CDC-fed local copy
+
+A *stream–table join* enriches each event with an entity's current attributes: a click joined to the clicker's user profile. Querying the profile database per event would melt it, so the processor keeps a local copy of the table, kept current by subscribing to its <Ref lesson="queues-and-logs">change data capture</Ref> stream. This is the one real batch correspondence: a join against a locally held copy is the broadcast hash join in streaming form, with the shipped table kept continuously current instead of shipped once. The copy follows the table at its consumer lag, so an event can be enriched with a profile that was already edited. That staleness is small at serving time, and it becomes measurable model damage when training later joins fresher data than serving saw, the gap <Ref lesson="training-serving-skew">a later module</Ref> names training–serving skew.
+
+<Figure
+  src="./figures/stream-table-join.svg"
+  alt="Click events flow into a stream processor holding a local copy of the user_profiles table, and leave enriched as click plus profile as of now minus lag. Below, the user_profiles OLTP leader feeds the local copy over a CDC stream that follows by its consumer lag, with an annotation that serving joined the older row while training later joins the fresher one."
+  caption="Enrichment reads a copy that follows the table by its consumer lag. The row serving joined is slightly older than the row training will join later; that difference is the seed of training–serving skew."
+/>
+
+## Two pipelines, one bug
+
+Both machines are now on the table, and every ML organization runs both. The failure mode of running both is not either machine; it is the seam between them.
+
+The *lambda architecture*, proposed by Nathan Marz (the creator of the Storm stream processor) in 2011, made the seam a design: record all events in an immutable log; run a **batch layer** that periodically recomputes exact views over the whole log, and a **speed layer** that streams approximate updates over recent events; merge the two at query time. The log-and-reprocess core was right and shaped everything since. The two layers were the tax: the same feature logic lives in two codebases on two frameworks, the query-time merge is easy only for simple aggregates, and keeping the batch layer's periodic runs incremental reintroduces exactly the windowing problems the batch layer existed to avoid.
+
+<Figure
+  src="./figures/lambda-vs-unified.svg"
+  alt="Left panel: the lambda architecture, an event log fanning out to a nightly exact batch layer in codebase A and a streaming approximate speed layer in codebase B, merged at query time, with the duplicated feature logic flagged. Right panel: a replayable log feeding one stream engine with one codebase, where a bounded input is a batch run and reprocessing is a replay from an older offset."
+  caption="The lambda tax and its removal: the right panel has one implementation of every feature, and reprocessing is the same code at an older offset."
+/>
+
+The tax is not hypothetical, and it does not require adopting lambda on purpose. A team training an arrival-time model computes "average speed over the last 5 minutes" in a dataframe over a month of history; the serving team reimplements it as a sliding window in the stream pipeline; the two implementations drift with every unmirrored change, and the model trains on one feature while being served another. Two pipelines maintained by two teams is, in Huyen's account, a leading source of production feature bugs, and it is not a separate failure mode from this lesson's opening claim: what drifted implementations disagree about is which clock stamps the events and where the window's edges fall. The seam between two pipelines is a clock-and-semantics mismatch with a team on each side, the lambda architecture's tax reappearing inside a single feature.
+
+### Unification: batch as a bounded stream
+
+The resolution is one implementation that runs in both modes, and the module has already assembled its three prerequisites: a **replayable log** (the previous lesson), so historical and live events flow through the same channel; **effectively-once** processing (this lesson's Remark), so a rerun's output matches an uninterrupted run's; and **event-time windows** (this lesson), since during a replay processing time is meaningless. Given those three, "batch is a special case of streaming", as [Flink's maintainers argue](https://www.ververica.com/blog/batch-is-a-special-case-of-streaming), is operational fact, not slogan: a bounded input is a stream that happens to end, processed by the same code at full speed with its windows keyed on event time. The equivalent log-centric statement, sometimes called the kappa architecture, comes from Jay Kreps, co-creator of the Kafka log <Ref lesson="queues-and-logs">the previous lesson</Ref> ran on: keep only the stream pipeline, and let reprocessing be a replay from an older offset into a new output table. Either way the two-team bug becomes unwritable, because there is nothing to keep in sync.
+
+### The landing: static and streaming features
+
+What serving inherits from this lesson is the split in feature populations that the two machines produce. *Static features* change slowly and are computed by batch jobs over history into the warehouse: a store's mean prep time, a user's 90-day purchase count, updated nightly and read in bulk by training. *Streaming features* describe the current state of the world and are computed by stream jobs into a low-latency store: orders in the last 10 minutes, couriers available right now, seconds old at read time. A delivery ETA prediction needs both in the same request (the store's mean prep time and its queue depth now), and no single pipeline or store, as built so far, serves both.
+
+<Figure
+  src="./figures/static-vs-streaming.svg"
+  alt="One order-events log feeding two paths that meet at a single ETA prediction request: a nightly batch job writing mean prep time per store into a warehouse, and a 10-minute-window stream job writing orders in the last 10 minutes into an online key-value store."
+  caption="The split every serving decision inherits: one log, two machines, two stores, one prediction request reading both."
+/>
+
+<KeyFact>
+The static/streaming split, not the model, decides a product's serving architecture: which features it needs from each side is the question <Ref lesson="batch-and-online-prediction">module 5</Ref> opens with, before any model is chosen. And the boundary between the sides is a choice with a price, not a fact of nature: "orders per store in the last hour" can be a batch job rerun every few minutes (one warehouse pipeline, values minutes stale, history rescanned per run) or a stream job (values seconds old, paid for in operator state and an online store to serve from).
+</KeyFact>
+
+What is established: batch processing is a pure function of bounded immutable input, rerunnable for fault tolerance, bug repair, and backfill alike, distributed by MapReduce's four steps and streamlined by dataflow engines; stream processing is the same computation made incremental over an unbounded input, carrying state and manufacturing effectively-once from checkpoints plus idempotent sinks; events carry two clocks, and windows (tumbling, hopping, sliding, session) are keyed on event time because replay makes the clocks diverge by construction; joins run on sorting in batch and on CDC-fed state in streams; and unification, one codebase treating batch as a bounded stream, removes the two-pipeline bug while the static/streaming feature split remains as the layer's permanent output. The substrate is complete. <Ref lesson="feature-platform">The next lesson</Ref> assembles warehouse, stream jobs, and an online key-value store into a feature platform, and examines what the assembly costs.
+
+## Exercises
+
+<Exercise>
+For each feature, choose the machine (batch or stream) and, where a window applies, the window type: (a) a user's purchase count over the last 90 days; (b) the number of items in the user's cart right now; (c) a store's median delivery time over the last month; (d) clicks on this ad in the last 10 minutes.
+
+<Solution>
+(a) Batch. "Last 90 days recomputed nightly" is a **hopping window** (length 90 days, hop 1 day) executed as a scheduled job; nothing about the feature needs sub-day freshness, and 90 days of history lives in the warehouse, not in stream state.
+
+(b) Stream, and **no window**: this is current state, not an aggregate over a period. It is a per-user count incremented on add-to-cart and decremented on remove/checkout, exactly the queue-depth pattern. A window would be a modeling error, not just an implementation choice.
+
+(c) Batch. If "last month" means the calendar month, it is a **tumbling** window (one value per month); if it means "the trailing 30 days recomputed daily," it is hopping (30 days / 1 day). Medians, unlike counts, are not incrementally mergeable from small buckets without approximation, which is one more reason this is a batch recomputation over stored history.
+
+(d) Stream. A 10-minute trailing count needs freshness of seconds to minutes: a **hopping** window (10 min length, hop of a minute or less) via the tumbling-bucket construction of the worked example, or a **sliding** window if per-event precision is worth storing raw timestamps.
+
+The discriminator used four times: how stale may the value be, and is the quantity an aggregate over a period or the current state of the world.
+</Solution>
+</Exercise>
+
+<Exercise>
+The preemption arithmetic in reverse: in the worked example's environment, where any running task has a 5%-per-hour chance of being killed, a job is split into 1000 tasks. How short must each task run for the job, more likely than not, to finish with no task preempted at all? State what the answer implies for scheduling around preemption versus tolerating it.
+
+<Solution>
+A task running $t$ hours survives with probability $0.95^{t}$, and 1000 independent tasks all survive with probability $0.95^{1000t}$. Requiring $0.95^{1000t} \ge \tfrac12$ and taking logs: $1000\,t \cdot \ln 0.95 \ge \ln \tfrac12$, so $t \le \ln 2 / (1000 \times 0.0513) \approx 0.0135$ hours — about **49 seconds** per task. Every realistic task length (minutes to hours) makes at least one preemption more likely than not, and a job of hour-long tasks should expect dozens. No task-sizing choice schedules around a 5%-per-hour kill rate at this scale, so the design must make a killed task free to rerun, which is what stateless mappers over immutable, replicated input provide.
+</Solution>
+</Exercise>
+
+<Exercise>
+Take a tumbling window to both extremes. (a) Shrink it until each window holds one event: what has stream processing degenerated into, and what capability is lost? (b) Grow it to cover the entire (bounded) input: what machine appears, and what did the streaming run lose relative to running it as an actual batch job? (c) Using both limits, state operationally what "batch is a special case of streaming" means.
+
+<Solution>
+(a) One event per window means aggregation vanishes: the processor is a stateless per-event transformation (a map). What is lost is history: no feature can mention anything but the current event. What is gained is that state, checkpointing, and straggler handling all become trivial: there is nothing to carry.
+
+(b) A window equal to the whole bounded input emits once, at the end, a pure function of the entire input: that is the batch machine, recovered inside the stream engine. Relative to a purpose-built batch job, the streaming run kept its state in the engine's checkpointed operator state rather than in reruns over storage; for a giant window that state (or its aggregation buckets) is the cost. It also forfeited batch's simplest property, that intermediate progress is disposable and the whole thing reruns from files.
+
+(c) Operationally: a bounded input is a stream that ends. Run the same windowed, event-time-keyed code over it at full speed; the final window closes when the input does, and effectively-once makes the output equal to an uninterrupted run's. The two extremes show what the generalization spans: at one end stateless maps, at the other a full batch job, with every window type between. This is the unification argument of the lambda section, stated as a limit.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "We window our fraud features by processing time; it's simpler, and the two clocks are within seconds of each other anyway." Use a concrete redeploy scenario: the feature is transactions per card in the trailing 10 minutes, and the fraud model auto-blocks cards above a velocity threshold. Name the exact step at which the quoted reasoning fails and the decision it corrupts.
+
+<Solution>
+The failing step is "the two clocks are within seconds of each other anyway": true in steady state, and steady state is not when it matters. The consumer is redeployed at 14:00 and is down for 20 minutes; on restart it drains 20 minutes of backlog in under a minute. A processing-time window sees, for every card that transacted during the outage, all of that card's transactions land inside one 10-minute window: a card with four ordinary purchases across 20 minutes reads as four transactions in one window and crosses the velocity threshold. The corrupted decision is the auto-block: a batch of legitimate customers is blocked at 14:21, correlated (everyone who shopped during the outage), and the incident is triggered by the team's own deploy. The failure recurs on every restart, every lag spike, and every backfill, which is also why "we'll just not deploy during peak" is not a fix. Windowing by the transaction's event time dissolves the artifact: each purchase falls in the window it happened in, and velocities read steady. The general claim being refuted is the KeyFact of the two-clocks section: divergence is not an anomaly to hope away; replay and recovery guarantee it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derive effectively-once from at-least-once, then break it. A consumer counts orders per store. Input is a log partition delivering at-least-once; the consumer's state is `(last_offset, counts)` and its update rule is: on message with offset $o$, if $o \le$ `last_offset`, skip; else apply the increment and set `last_offset` $= o$. State and offset are checkpointed together atomically. (a) Show the visible counts equal those of an uninterrupted exactly-once run. (b) Add a side effect, an email alert per 100th order, and show where the guarantee breaks. (c) State the property of part (a)'s setup that part (b) lacks.
+
+<Solution>
+(a) After a crash, the consumer restores the checkpoint `(last_offset = k, counts)` and the log redelivers from some offset $\le k$ (at-least-once). Every redelivered message with $o \le k$ is skipped by the rule; every message with $o > k$ has, by atomicity of the checkpoint, never been applied to this state. Because a log partition replays the same messages in the same order (the determinism condition), each offset is applied to `counts` exactly once over any number of crashes: the final state is identical to the uninterrupted run's. At-least-once delivery plus offset-keyed idempotent updates plus atomic state-and-offset checkpointing = effectively-once.
+
+(b) The email leaves the framework. A crash after sending the 100th-order email but before the checkpoint restores state to before that order; on replay the increment is correctly skipped-or-reapplied into state, but the send is re-executed; nothing in the restored state records that the outside world already saw it. Two emails go out; the *counts* are still exact, and the guarantee broke only at the boundary where output escaped the checkpointable world.
+
+(c) Part (a)'s writes are absorbed into state that is versioned with the offsets: a retry is detectable and a rollback is possible. An email is neither: it cannot be keyed by offset at the recipient, rolled back, nor overwritten. The general rule (the effectively-once Remark): the guarantee extends exactly as far as sinks that are idempotent or transactional with the offsets, and not one side effect further.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce the sorting-versus-hashing contest at scale, in estimates. One machine, 8 GB of RAM, one disk sustaining ~100 MB/s effective sequential transfer (read or write) and ~100 µs per random 4 KB access. Input: a 10 GB log, 200 million lines, about 150 million distinct URLs; assume a hash-table entry costs ~100 bytes. Estimate the running time of (a) the in-memory-hash script and (b) an external merge sort (two sequential passes over the data, then a streaming `uniq`), and (c) conclude which the one-liner uses and why the shuffle exists.
+
+<Solution>
+(a) The working set is $1.5 \times 10^8 \times 100$ B $= 15$ GB against 8 GB of RAM: roughly half the table is swapped out at any time. Each of the $2 \times 10^8$ lines hashes to a uniformly random entry, so about half the lookups fault to disk at $10^{-4}$ s each: $10^8 \times 10^{-4}\,\text{s} = 10^4$ s, ≈ **3 hours**, dominated entirely by random I/O. (Under 8 GB of distinct-URL state the same script finishes in minutes; the cliff is at the memory boundary, which is the point.)
+
+(b) External sort: pass one reads 10 GB and writes sorted runs, pass two merges runs reading and writing 10 GB again: ~40 GB of sequential transfer at 100 MB/s = 400 s, plus a streaming count pass (10 GB, 100 s). ≈ **8–9 minutes**, dominated by sequential bandwidth.
+
+(c) A ~20× win for sorting, entirely from converting random access into sequential merges: the section's KeyFact quantified. `sort` spills and merges automatically, so the one-liner survives the memory cliff that kills the script. And this is why MapReduce's step 3 is a sort rather than a giant distributed hash table: the shuffle is exactly this estimate's winner, built into the framework so that reducers meet their keys pre-grouped without any node ever holding a working set.
+</Solution>
+</Exercise>
+
+<Exercise>
+Return to the CDC topology of <Ref lesson="queues-and-logs">the previous lesson</Ref>: an OLTP leader's change stream feeding four followers (search index, cache, warehouse, and online feature store). (a) All four consume the change stream; which of them serve *batch* readers and which serve *stream-fresh* readers, and what freshness does each inherit? (b) State what "replay" concretely means for the search index versus for a training job reading the warehouse, and name what each replay requires to be available.
+
+<Solution>
+(a) All four followers are stream consumers of the log: they apply changes continuously, and each is stale by exactly its consumer lag. They differ in who reads them: the search index, cache, and online feature store serve request-path readers, so their freshness (seconds of lag) is what users and models see; the warehouse serves batch readers (training jobs, analysts), so however continuously it ingests, its consumers see data as-of whenever the batch job ran. Freshness is a property of the whole path to the reader, not of the store's ingestion mode.
+
+(b) For the search index, replay is state reconstruction: consume the compacted CDC topic from offset 0 into a fresh index (the log-compaction recipe), requiring the compacted topic to exist and the index build to be idempotent. For a training job, replay is a batch rerun: re-execute the job over warehouse tables that are already materialized, requiring the raw tables (not just the job's outputs) to be retained. Same word, two mechanisms: rebuild a follower from the log, versus rerun a pure function over stored input. These are this lesson's stream and batch reprocessing stories respectively, side by side in one topology.
+</Solution>
+</Exercise>
+
+<Exercise>
+Design the feature "clicks per ad, last 60 minutes, refreshed every 10" end to end: choose the window type, construct its state without storing raw events, and state a straggler policy; then decide where the job's output must be written so that a prediction service can read it in under 10 ms at serving time, and justify why neither the warehouse nor the stream processor's internal state can be that place.
+
+<Solution>
+The window is hopping (60 min / 10 min), and the hop divides the length, so it decomposes into tumbling buckets: per ad, six 10-minute event-time buckets; on each click, increment the bucket its event timestamp falls in; every 10 minutes, retire the oldest bucket, open a new one, and emit the six-bucket sum keyed by `ad_id`. State per ad is six integers regardless of click volume. Straggler policy: a late click whose bucket still exists is added and appears from the next emission on; one later than 60 minutes is dropped and counted in a monitored late-events metric — the close-on-deadline posture, defensible here because a click too old for the window's own horizon cannot change any value still being served.
+
+The emission target must support a point read by key in single-digit milliseconds at the serving path's request rate: an online key-value store (Redis-class), written by the stream job on every emission. The warehouse fails on both axes established in <Ref lesson="storage-and-data-models">the storage lesson</Ref>: it is built for scans, with latency in seconds, and its batch-loaded contents miss the freshest window. The stream processor's internal state holds the correct value but is not a serving surface: it is partitioned across a consumer group, reachable only from inside the job, and a checkpoint-restore or rebalance moves it, putting the request path in a dependency on the job's internals.
+
+What this exercise just assembled is precisely a feature platform: a stream job maintaining windowed aggregates and materializing them into an online KV store, beside a warehouse holding the batch-computed history of the same features. It is the system <Ref lesson="feature-platform">the next lesson</Ref> examines as Feast's architecture.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017 — Ch. 10: the Unix log-analysis pipeline and sorting vs in-memory aggregation (pp. 391–394), MapReduce job execution and the four steps (pp. 397–403), reduce-side and map-side joins (pp. 403–410), the preemption argument for fault tolerance by design (pp. 417–419), materialization and dataflow engines (pp. 419–423); Ch. 11: event time vs processing time, stragglers, and the redeploy artifact (pp. 468–472, Fig. 11-7), window types (p. 472), stream joins (pp. 472–476), fault tolerance, microbatching, checkpointing, and idempotence (pp. 476–479); Ch. 12: reprocessing, the railway-gauge migration, the lambda architecture and unification (pp. 494–498).
+2. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 3, "Batch Processing Versus Stream Processing" (pp. 78–79): static vs dynamic features and the Flink position; Ch. 7 (pp. 199, 203–205): the DoorDash batch/streaming feature pair and the two-pipeline bug (Figs. 7-7, 7-8).
+3. J. Dean, S. Ghemawat, "MapReduce: Simplified Data Processing on Large Clusters," *OSDI*, 2004 — the original framework paper: programming model, execution, and fault tolerance by task re-execution. https://static.googleusercontent.com/media/research.google.com/en//archive/mapreduce-osdi04.pdf
+4. J. Kreps, "Questioning the Lambda Architecture," O'Reilly Radar, July 2014 — the log-and-reprocess (kappa) alternative: one stream pipeline, with reprocessing as replay into a new output table. https://www.oreilly.com/radar/questioning-the-lambda-architecture/
+5. K. Tzoumas, "Batch Is a Special Case of Streaming," Ververica (Flink) blog, September 2015 — the unification position this lesson's closing section operationalizes. https://www.ververica.com/blog/batch-is-a-special-case-of-streaming
+6. N. Marz, J. Warren, *Big Data: Principles and Best Practices of Scalable Realtime Data Systems*, Manning, 2015 — the lambda architecture from its author: immutable master dataset, batch and speed layers, query-time merge.
+7. R. Crowe, H. Hapke, E. Caveness, D. Zhu, *Machine Learning Production Systems*, O'Reilly, 2024 — Ch. 4 (p. 49): time travel and its safeguards; Ch. 5 (pp. 63–66): windowing and sampling for time series, and the Max Planck weather dataset shown in the windowing section.
+</References>

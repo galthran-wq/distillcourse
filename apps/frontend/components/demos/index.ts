@@ -99,4 +99,8 @@ export const demos: Record<
   NeighborEmbeddingExplorer: () =>
     import("./classical-ml/NeighborEmbeddingExplorer"),
   GpPosteriorExplorer: () => import("./classical-ml/GpPosteriorExplorer"),
+  TailLatencyExplorer: () =>
+    import("./ml-system-design/TailLatencyExplorer"),
+  ReshardingExplorer: () =>
+    import("./ml-system-design/ReshardingExplorer"),
 };

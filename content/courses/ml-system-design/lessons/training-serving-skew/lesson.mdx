@@ -1,0 +1,318 @@
+Training–serving skew is a difference between the features a model was trained on and the features it is served — and it is invisible to every offline metric, because the offline pipeline is the one that is wrong.
+
+Module 3's manufacturing line is three stations long: <Ref lesson="labels-and-feedback-loops">labels</Ref> with their sources priced, <Ref lesson="data-leakage-and-splitting">splits</Ref> that keep the offline metric honest, and <Ref lesson="features-at-scale">features</Ref> built to survive production. That last lesson closed on the open wound: every transform now runs in two places, the training pipeline and the serving path, and nothing yet guarantees the two computations agree; the Netflix timestamp already showed the two sides disagreeing by construction. This lesson names the gap, measures it, and repairs it; what the repairs still need, an automated watchdog, is the module's <Ref lesson="data-validation">final lesson</Ref>.
+
+The route: a four-month postmortem and the mechanism of its silence; the boundary between skew and drift; skew decomposed into three measurable gaps; three repair architectures, each honestly costed; and the one case where training and serving inputs differ on purpose.
+
+## One transform, two implementations: the Spotify postmortem
+
+The wound — one transform in two places, nothing holding the copies equal — has a canonical postmortem, and it starts at a recommendation shelf. Spotify's Podcast Model ranks podcasts for the "Shows you might like" shelf. The training pipeline reads raw listening data from the warehouse, transforms it into features, and trains; serving is a recommendation service on different infrastructure, owned by a different team, which computes the same features from live data and calls the model. One logical transform, two implementations; the serving implementation differed from the training one by a few lines of code.
+
+Nothing failed. Both implementations were valid programs producing plausible feature values: no exception, no crash, no alert. The model simply received inputs drawn from a slightly different distribution than the one it had learned, and its recommendations degraded for **four months** before the team detected it.
+
+### The mechanism of silence
+
+The silence has a mechanism. Every offline metric (the validation AUC, the holdout precision, the pre-launch evaluation) is computed on features produced by the *offline* transform. When the two implementations disagree, the offline pipeline is the wrong one of the pair: the metric that certifies the model is computed by the pipeline the bug lives in. <Ref lesson="feature-platform">The feature platform's second seam</Ref> stated this for post-fetch transforms; the Spotify bug is the same blindness at full pipeline width, and it is the production-scale version of the two-teams arrival-time bug <Ref lesson="batch-and-stream-processing" id="two-pipelines-one-bug">the stream-processing lesson</Ref> recorded: a batch dataframe on one side, a streaming window on the other, a team on each.
+
+<FigureSequence
+  name="spotify-skew"
+  alt="Four frames of a two-lane pipeline diagram. Frame 1: a blue training lane (warehouse, Python transform, training, model artifact) above an amber serving lane (live request, Java transform, model, recommendations), with a bracket marking the two transform boxes as one logical transform. Frame 2: the Java transform's formula diverges from the Python one by a few characters, annotated as valid code with no exception. Frame 3: the offline AUC badge with a green check attaches to the training lane, while the serving lane emits degraded recommendations behind a dashed barrier the metric never crosses. Frame 4 shows the fix: the Python transform is retired, serving logs its transformed features into a feature log that becomes the training set, and a TFDV comparator with a Chebyshev-distance alert watches the two distributions."
+  caption="The postmortem in four moves: one logical transform, a few divergent lines, a metric computed on the wrong side, and four silent months before the fix."
+/>
+
+<Task>
+Step through the four frames and, at frame 3, name the number the team was watching and the lane that produced it. The metric lives in the lane that is wrong; that fact is what the rest of the lesson repairs.
+</Task>
+
+### The fix: one implementation, a feature log, a comparator
+
+The fix Spotify shipped has three parts, and they preview the rest of this lesson: implement the transform once, in Java, so the serving path runs it natively; log the already-transformed features at serving time and assemble future training sets from the log; and compare training and serving feature distributions on a schedule with [TensorFlow Data Validation](https://www.tensorflow.org/tfx/guide/tfdv), alerting when the Chebyshev distance between them moves. Logging happens at the serving stage rather than in upstream services deliberately: the upstream transforms are owned by other teams, and the ML team must own the point where its own training data is captured.
+
+<KeyFact>
+The first honest signal of training–serving skew is a live business number sagging for unattributable reasons — a signal owned by another team, denominated in revenue, and pointing at nothing. Spotify's took four months to trace back to the transform.
+</KeyFact>
+
+## Skew is not drift: the boundary module 6 depends on
+
+Repairing the right disease requires separating two that share a symptom. The production-systems literature lists three causes under the name training–serving skew: a discrepancy between how the training and serving pipelines handle data; a change in the data between training time and serving time; and a feedback loop between the model and its own inputs. This course splits them.
+
+*Skew* is the first cause: your two computations disagree about the same world, an engineering defect on your side of the boundary. *Drift* is the second: the computations agree and the world moved. Feedback loops, the third, are <Ref lesson="labels-and-feedback-loops">the labeling lesson's</Ref> loops now running against the model's own inputs in production. The symptom is identical (live performance below offline) but the repairs are disjoint: skew is fixed by architecture, drift by data and retraining, loops by exploration. <Ref lesson="failures-and-drift">Module 6</Ref> opens by taking drift and loops as its subject, and it can only do so because this lesson takes skew off the table.
+
+### The joined-table case: the pipeline test decides
+
+The line is not always clean, and one classic sits astride it. A model joins document features (comment count, click total) from a table, at training time and again at serving time. No code differs. But the table's contents change between the training run and the serving moment, so the same document carries different feature values on the two sides. It behaves like drift (data moved) yet it yields to skew's repairs: log the feature values serving actually used, or snapshot the table so both sides read one version. The operational test is not "did the data change" but "could engineering have pinned the value": if yes, treat it as skew.
+
+<Remark title="a mismatch that is not skew">
+An augmented-reality startup with its office in St. Petersburg, a Baltic-coast city with about 1,600 sunny hours a year, collected and tested its computer-vision training data locally, through a cloudy Russian winter. Its lead investors demoed the prerelease build in Cyprus, a Mediterranean island with 3,400 sunny hours, and the vision component collapsed under full sun. By the pipeline test this is not skew: no two implementations disagreed. The training set failed to represent the serving environment from day zero: a distribution mismatch wearing skew's symptom. The discipline when live falls below offline: run the pipeline test first, because it is the one question with a definite answer.
+</Remark>
+
+## Measure before repairing: the three gaps
+
+A repair chosen before the loss is located is a guess. The instrument is one model evaluated four times: on its **training set**; on the **holdout** split; on **next-day data** (examples from after the training cutoff, per the rule that a model trained on data through January 5th is tested on January 6th and after); and on **live traffic**, a sampled slice scored with the features the serving path actually computed. Rules of ML #37 reads the three gaps between the four numbers as three different diseases.
+
+<Figure
+  src="./figures/three-gaps.svg"
+  alt="Four evaluation boxes in a row (training set 92.4, holdout 88.1, next-day 87.6, live traffic 79.3) with a bracket under each adjacent pair. Gap 1, train to holdout, is labeled overfitting, always positive. Gap 2, holdout to next-day, is labeled staleness from time-sensitive features. Gap 3, next-day to live, is highlighted in amber and labeled skew proper, an engineering error that should be near zero."
+  caption="One model, four evaluations, three gaps, each with its own cause family. Only the third should be zero, which is what makes it the one worth alarming on."
+/>
+
+| gap | between | cause family | expected size | repair lever |
+|---|---|---|---|---|
+| 1 | train → holdout | overfitting | always &gt; 0, not always bad | capacity, regularization |
+| 2 | holdout → next-day | time-sensitive features, staleness | always &gt; 0; tune regularization against next-day performance | retraining cadence, feature choice |
+| 3 | next-day → live | pipeline discrepancy (skew proper) | ≈ 0 in a correct system | this lesson's three architectures |
+
+### Gaps 1 and 2 are statistics; gap 3 is an equality
+
+Gap 1 is the familiar one and carries no production news: it exists in every fitted model, and shrinking it to zero usually means underfitting. Gap 2 is the price of time: features whose predictive value decays make next-day performance drop below holdout, and a large gap 2 is a portfolio finding (some feature is aging fast) answered by retraining cadence or by replacing the feature, not by pipeline work.
+
+Gap 3 is different in kind, not merely in cause: it is testable as an equality on a **single example**. Score one example through the training pipeline and score the same example through the serving path; a correct system returns bit-identical results. Gaps 1 and 2 are statistical estimates; gap 3 has a deterministic test that either passes or names an engineering error. The Spotify bug lived entirely in gap 3, and the single-example test would have found it on day one.
+
+### The Netflix timestamp, classified
+
+The decomposition also settles the module's outstanding case. <Ref lesson="features-at-scale" id="the-clock-a-feature-that-cannot-overlap">The Netflix timestamp feature</Ref> (raw play timestamps plus the current clock, worth an offline lift on the order of tens of percent) puts its serving value strictly outside the training range on every request. It does not sit in gap 3: both sides compute the feature with the same code, and the single-example test passes exactly. It is gap 2 in its most extreme form, a feature time-sensitive by construction, whose holdout-to-next-day drop grows with every hour since the training cutoff. The prescription follows the classification: no transform architecture helps, a tight retraining cadence bounds the damage, and next-day replay measures it. Misclassify it as gap 3 and a team spends a quarter unifying pipelines that already agree.
+
+<KeyFact>
+The fourth evaluation is not free: gap 3 exists only between next-day replay and live traffic scored with the features serving actually computed — so a team with no serving-feature log cannot measure its skew at all, only infer it from a sagging business metric. The instrument presupposes the first repair's machinery, run at sampling scale.
+</KeyFact>
+
+## Repair 1: log what serving saw
+
+The first architecture removes the disagreement by removing one of the disagreeing parties. Serving computes the features anyway, for every real request; Rule #29 says to treat that computation as the *only* one: append each request's transformed feature vector to a log, and assemble the next training set from the log joined with labels as they arrive. The training pipeline stops transforming raw data entirely. There is nothing left to diverge, so the gap-3 test passes by construction: training features are serving features, byte for byte. YouTube's home-page team made exactly this switch and reported significant quality improvements along with a reduction in code complexity: one implementation is also less code.
+
+Two more properties arrive free. A feature logged at request time is, by construction, the value *as of that request*: the point-in-time discipline repair 3 will need machinery for costs this architecture nothing. And the training distribution becomes exactly the served population: the model stops training on warehouse traffic it will never see (the bot-filter exercise below works out when that correction helps and when it bites back).
+
+### What log-and-wait costs
+
+The costs are real and the first one is the commonly missed one:
+
+- **New features wait.** A feature must be computed and logged at serving (live or in shadow) before any training set contains it, so adding one costs a full training window of waiting. A team that adopts log-and-wait without noticing this has silently capped its iteration speed at the logging horizon.
+- **Storage.** Full feature vectors per request add up; the standard answer is to log a fraction of traffic.
+- **Consistency is not correctness.** One buggy implementation is now wrong on both sides, consistently, and gap 3 will never see it.
+
+<Remark title="sampling with importance weights (Rule #30)">
+When storage forces sampling, do not keep files 1–12 and drop files 13–99. Sample each example with probability $p$ and give the kept ones weight $1/p$: logged at 30%, an example carries weight $10/3$. Importance weighting preserves the calibration properties the ranking modules will depend on; arbitrary dropping quietly reshapes the distribution the log exists to capture.
+</Remark>
+
+Where full logging is impossible, Rule #32 states the fallback: share code between the two pipelines wherever the batch/online difference allows. Its corollary has the sharpest edge: do not put training and serving in different programming languages, because that makes sharing nearly impossible. Spotify's four months began life as a Python/Java pair.
+
+## Repair 2: bake the transform into the artifact
+
+The second architecture attacks the interface. A model trained on transformed features exports a prediction signature that *demands* transformed features, which forces every caller to reimplement the transform. The Transform design pattern's canonical example is a bicycle-ride-duration model trained on three features (station name, day of week, hour of day) computed from two inputs, station name and timestamp. At prediction time the caller must send `dayofweek` as `'3'`, and whether that means Tuesday or Wednesday depends on which library's week convention the training pipeline used. The transform's private details have leaked into every client, and each client is a fresh chance to reintroduce Spotify's few divergent lines.
+
+The pattern keeps three things separate: *inputs*, what the caller has; *features*, what the model computes on; and *transforms*, the mapping between them. It then captures the transforms **inside the artifact**, so the model's public interface accepts raw inputs. One implementation exists; it ships with the weights; the serving path cannot diverge from it because the serving path executes it.
+
+### Instance-level, full-pass, and the analyze phase
+
+One distinction decides how much of a transform can ride in the artifact, recalled from <Ref lesson="features-at-scale">the feature lesson</Ref>'s statistics discussion:
+
+- An *instance-level transform* (a feature cross, an hour-of-day extraction, a hash) maps one row using nothing but that row. It can live directly as a layer of the model graph.
+- A *full-pass transform* (scaling by mean and variance, building a vocabulary) needs statistics over the whole dataset, and serving sees one request at a time: the statistics cannot be recomputed there.
+
+The resolution, in the shape `tf.transform` implements: an *analyze phase* runs over the training data once and computes the statistics; the emitted *transform graph* contains the instance-level logic with those statistics frozen in as constants; and the graph is prepended to the exported model, so serving applies mean and variance it could never compute. Training reads the pre-transformed data, so the transform also stops re-running every epoch. The pattern is what matters here, not the library; the platform that operationalizes it is <Ref lesson="inside-tfx">module 4's TFX lesson</Ref>.
+
+<FigureSequence
+  name="transform-into-artifact"
+  alt="Three frames of one layout: a training-data box feeding an amber analyze-phase box on the left, and an exported-artifact box on the right containing a transform-graph slot above a blue weights box, with a dimmed serving-request arrow along the bottom. Frame 1: the analyze phase computes mean 350, standard deviation 80, and a vocabulary from one pass over the training data; the transform-graph slot is empty and dashed. Frame 2: an arrow carries the statistics into the transform graph, which now reads (x minus 350) over 80 and vocab lookup, annotated as statistics frozen as constants. Frame 3: the serving arrow turns green and active, delivering raw inputs to the artifact, annotated that serving applies statistics it could never compute because one request at a time sees no dataset."
+  caption="The Transform pattern in three moves: one analyze pass computes the statistics, the statistics freeze into the transform graph as constants, and the graph ships inside the artifact the serving path executes."
+/>
+
+<Task>
+Step to frame 3 and name the two constants the serving path applies without ever seeing the training data. Then say in which frame they entered the artifact — that frame is the whole pattern.
+</Task>
+
+### The leakage lesson's scaler, given its name
+
+This is <Ref lesson="data-leakage-and-splitting">the leakage lesson's</Ref> scaler-artifact answer, generalized. That lesson established that $\mu_{\text{train}}$ and $\sigma_{\text{train}}$ must ship with the weights; the Transform pattern is the shipping mechanism with the discipline built in: the statistics are *part of the model*, not a config file beside it. The feature platform's post-fetch fork, where serving normalized by months-old config constants, is precisely what the pattern makes unrepresentable.
+
+Its costs: an analyze pass before training; artifact weight, since vocabularies and lookup tables ride inside the model; framework coupling (the transform must be expressible in the serving runtime's operations, so a stack whose service and model frameworks differ may simply be unable to execute the graph); and training-only transforms such as data augmentation stay outside the pattern, since serving must never apply them.
+
+## Repair 3: the feature store as single source, and the as-of join
+
+The third architecture is already built. <Ref lesson="feature-platform">The feature-platform lesson</Ref> assembled it: each feature declared once, computed once at ingestion, materialized to an offline store for training and an online store for serving. That lesson closed by conceding that storage consistency is not transform consistency; the concession can now be given an exact scope. The store eliminates *duplicated feature pipelines*: the transform that produced a stored value ran exactly once, so no Spotify-style pair of implementations exists for it. What it leaves open is everything after the fetch, which is repair 2's territory, and end-to-end certification of what the model actually received, which is repair 1's. The three repairs compose; they do not compete.
+
+The store-side guarantee this lesson must add is temporal. A training set is assembled by joining feature values onto label rows, and the join has one correct form.
+
+<Example title="the as-of join, on six rows">
+Label row: customer 42, label time $T = $ Mar 12, label = "placed an order within 7 days after $T$". Feature history for `spend_90d`, customer 42, as the offline store holds it:
+
+| valid from | spend_90d |
+|---|---|
+| Jan 05 | 118 |
+| Feb 10 | 233 |
+| **Mar 09** | **296** |
+| Mar 20 | 341 |
+| Apr 02 | 402 |
+
+The *as-of join* attaches the latest value whose validity begins at or before $T$: Mar 09's 296. The naive join (`JOIN ON customer_id` against the current table) attaches 402, a value computed over a window that *contains the label window* (Mar 12–19) and everything since. The feature has absorbed the outcome it exists to predict: this is <Ref lesson="data-leakage-and-splitting">temporal leakage</Ref>, reached through the feature store, and the offline metric it inflates is exactly as confident and exactly as wrong as the leakage lesson promised.
+</Example>
+
+<Figure
+  src="./figures/asof-join.svg"
+  alt="A label row for customer 42 at time T equals March 12, with its seven-day label window bracketed, above a five-row feature history table for spend_90d. The March 9 row, value 296, is highlighted green as the correct as-of-T join. The April 2 row, value 402, is struck through in amber and labeled as the as-of-now join that contains the label window."
+  caption="One label, five candidate feature rows, one correct join: the latest value as of the label's own timestamp. The as-of-now row reads the future."
+/>
+
+### Point-in-time correctness: a training-side guarantee
+
+*Point-in-time correctness* is the store-side guarantee that every training join is the as-of kind: the contract `get_batch_features` documented in the platform lesson, now with its reason attached. Serving needs no such machinery: a request reads the online store's current value, which at that moment is the as-of-now value, legitimately. The asymmetry is worth stating: the naive join is wrong only on the **training side**, which is why the bug inflates offline metrics and then vanishes into a gap-3 reading when live traffic, which cannot time-travel, fails to reproduce the inflated signal.
+
+<Figure
+  src="./figures/three-repairs.svg"
+  alt="Three small architecture diagrams side by side. Log and wait: a serving box writes transformed features to a log that becomes the training set; costs listed are a waiting window for new features and storage. Transform in the model: an artifact box containing a transform graph and weights, taking raw inputs; costs listed are an analyze pass and framework lock-in. Feature store: one store feeding training through an as-of join and serving through an online fetch; costs listed are infrastructure and post-fetch transforms remaining open."
+  caption="The three repairs with their price tags. They compose: a store for the fetch, a transform graph for what follows the fetch, logs to certify the whole path."
+/>
+
+### Choosing among the three
+
+Choosing is a matter of constraint, not taste. Log-and-wait fits when serving already computes the features and the team can wait a training window; transform-in-model fits when the transforms are instance-level (or full-pass with an analyze phase) and one framework spans the stack; the feature store fits when features are shared across models and teams and precomputed on their own cadences. A mature stack typically runs all three at once: the store supplying values, the artifact carrying post-fetch transforms, the serving log certifying end to end and becoming the next training set.
+
+<KeyFact>
+Every repair in this lesson buys consistency, not correctness: it guarantees one implementation, not a correct one. The uniformly wrong transform is the entry point no architecture closes; it is what the next lesson's schema and distribution checks exist for.
+</KeyFact>
+
+## Skew by design: the positional feature
+
+Everything so far treats any train/serve input difference as a defect. From that, one would expect the discipline to be total: every feature identical on both sides, always. Rule #36 maintains a deliberate exception, and it is the exception that proves the rules are about *control*, not sameness.
+
+Position bias: an item shown in the first slot is clicked more *because of the slot*, and a model trained naively on click logs learns that its own past ranking decisions are relevance. The repair is to give the model a `position` feature at training, so the click's positional component has somewhere to go other than into the document's weights, and then to withhold it at serving, because candidates are scored *before any order exists*: there is no true position to send. Every serving request carries the same constant default. Training inputs and serving inputs differ on purpose, permanently.
+
+<Figure
+  src="./figures/positional-feature.svg"
+  alt="Two panels. Left, training rows: a table of examples whose position column is filled with the real slots 1, 2, 3, 5 shown in blue. Right, a serving request: candidate rows all carrying position equals 1 as a constant default in amber, annotated that candidates are scored before any order exists. A band underneath states the additive rule: score equals f of the document features plus g of position, with position never crossed with document features."
+  caption="Managed skew: position is real at training, constant at serving, and confined to an additive term the serving path can hold fixed."
+/>
+
+### Confinement: additive, never crossed
+
+What makes this managed rather than pathological is confinement. The rule keeps the positional part of the model **separate and additive**, score $= f(\text{document features}) + g(\text{position})$, and never crosses position with any document feature. The asymmetry then lives inside one term, $g$, that serving holds constant; the moment position leaks into an interaction, withholding it at serving changes the document scores themselves, and the deliberate difference becomes ordinary skew. Ranking's deeper position-bias machinery (propensity weighting, exploration) belongs to <Ref lesson="ranking-and-ctr">module 7's ranking lesson</Ref>; what this module owes it is only the transform discipline above.
+
+### The exception breaks the naive monitor
+
+A comparator that checks "every training feature appears in serving requests" will page on `position` forever: the feature is *supposed* to exist in training and not at serving, and saying so requires a schema that can state presence per environment. That is precisely the machinery of the next lesson, and the last exercise below lands on it.
+
+What is established: skew is the pipeline disagreement, distinct from drift by the pipeline test; it decomposes into three gaps of which only the third should be zero, giving a deterministic single-example test; three composable architectures close it (logging serving-time features, baking transforms into the artifact, serving from a feature store with as-of joins); and one input difference, position, is maintained deliberately inside an additive term. The repairs share a dependency this lesson has only gestured at: a machine that watches feature presence, types, and distributions without a human in the loop. <Ref lesson="data-validation">The next lesson</Ref> builds that watchdog (schemas, statistics, drift comparators) and reproduces the reasoning behind the Google Play fix it bought a measured +2% install rate with.
+
+## Exercises
+
+<Exercise>
+A fraud model reports training accuracy 94.0, holdout accuracy 89.0, next-day replay accuracy 88.5, and live sampled accuracy 81.0. Attribute each gap to its cause family, judge which gaps are healthy, and name the repair family for the one that is not.
+
+<Solution>
+Gap 1 (train → holdout): $94.0 - 89.0 = 5.0$ points, overfitting. Always present; at this size, ordinary and tunable with regularization if desired.
+
+Gap 2 (holdout → next-day): $89.0 - 88.5 = 0.5$ points, staleness. Small: the feature set is barely time-sensitive, so a faster retraining cadence would buy almost nothing.
+
+Gap 3 (next-day → live): $88.5 - 81.0 = 7.5$ points, skew proper, and the only unhealthy number, because its expected value in a correct system is approximately zero. The first move is the deterministic test: push a handful of identical examples through the training pipeline and the serving path and diff the feature vectors bit for bit, which localizes the divergent transform. The repair family is this lesson's architectures: log serving-time features as the training set (Rule #29), or unify the implementation inside the artifact (Transform pattern), or move the disputed features behind the feature store. Choosing regularization or retraining here (the levers for gaps 1 and 2) would spend effort on the two gaps that are already fine.
+</Solution>
+</Exercise>
+
+<Exercise>
+The offline store holds this history for `avg_txn_30d`, customer 7 (the training set is assembled in early April, so the current-table value is the Mar 15 row):
+
+| valid from | avg_txn_30d |
+|---|---|
+| Feb 02 | 41 |
+| Feb 18 | 55 |
+| Mar 03 | 72 |
+| Mar 15 | 90 |
+
+Two label rows exist for customer 7, both "placed an order within 7 days": one at $T_1 = $ Feb 20, one at $T_2 = $ Mar 10. Give the value a correct as-of join attaches to each label row, the value a naive `JOIN ON customer_id` attaches, and the direction the offline metric moves under the naive join. Then say which of the three gaps the resulting live shortfall shows up in once the model ships.
+
+<Solution>
+As-of $T_1 = $ Feb 20: the latest row whose validity begins at or before Feb 20 is Feb 18, so the correct value is 55. As-of $T_2 = $ Mar 10: the Mar 03 row, value 72 (Mar 15 begins after $T_2$ and is ineligible).
+
+The naive join reads the current table and attaches 90 to both rows. That value's 30-day window ends Mar 15 and covers both label windows (Feb 20–27 and Mar 10–17): each feature value contains the ordering activity the label records, so the feature has absorbed its own outcome.
+
+The offline metric moves up: this is <Ref lesson="data-leakage-and-splitting">temporal leakage</Ref>, and the model learns to read the label out of the feature, on the holdout as well as the training split (both are built with the same join).
+
+Live, the online store can only serve the as-of-now value, which never contains the future, so the leaked signal does not exist and live performance falls below every offline number. Next-day replay data is assembled offline with the same defective join, so gaps 1 and 2 look normal and the entire shortfall surfaces between next-day and live: a gap-3 reading. The single-example transform test passes (no pipeline pair disagrees); the defect is in the training-side join, which is why point-in-time correctness is a store-side guarantee and not a transform fix.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: a team replaces its feature-engineered spam model with an end-to-end model over raw message text, no hand-built features at all, and declares training–serving skew structurally impossible. Which skew entry points does the change actually eliminate, and which survive?
+
+<Solution>
+Eliminated: every hand-written feature transform (scaling, bucketizing, vocabulary construction for engineered categoricals), because the duplicated feature pipeline no longer exists. That is a genuine shrinkage of the skew surface.
+
+Surviving: everything still computed between the raw event and the model's input tensor. Tokenization is a transform: the tokenizer's version, vocabulary file, and normalization rules (lowercasing, Unicode normalization, truncation and padding conventions) must match training exactly, and a tokenizer upgrade deployed to serving but not retrained against is a few-lines skew of exactly the Spotify kind. And any metadata joined onto the text (sender reputation, account age) reintroduces the joined-table problem: the table changes between the training run and the serving moment.
+
+The lesson of the degenerate case: skew attaches to *any computation before the model*, not to "feature engineering" as a named activity. Removing the feature pipeline shrinks the surface; only a system with literally no computation between event and input would have none, and tokenization alone guarantees that system does not exist for text.
+</Solution>
+</Exercise>
+
+<Exercise>
+A team serves every feature from a feature store and has already baked its post-fetch transforms into the model artifact, closing <Ref lesson="feature-platform">the feature platform's second seam</Ref> with repair 2. Two skew entry points remain open, both introduced in this lesson. Name them, construct a concrete failure for each, and say which of the three repairs closes each one.
+
+<Solution>
+**Residue 1: the training-side join.** The store's offline half holds full feature history, and a training set is assembled by joining that history onto label rows. A naive `JOIN ON customer_id` against the current table attaches as-of-now values — in the lesson's six-row example, 402 for a label at Mar 12, a value whose 90-day window contains the label window — so the feature absorbs the outcome it exists to predict. Nothing at serving is wrong: the online fetch legitimately reads the current value. The failure is training-side temporal leakage that inflates every offline number and then surfaces as a gap-3 reading, because live traffic cannot time-travel. The close is repair 3's temporal guarantee: point-in-time correctness in `get_batch_features`, every training join the as-of kind.
+
+**Residue 2: refresh-cadence divergence.** The online and offline stores materialize on different schedules. Take a near-real-time feature, `txn_count_10m`, updated by a streaming job on the online side but backfilled hourly on the offline side: the value the model was actually served at 12:03 and the value the offline history later records for 12:03 differ whenever the request fell between backfills. An as-of join cannot fix this — it reconstructs faithfully from a history that never contained the served value. The close is repair 1: log the feature vector serving actually used and assemble training sets from the log, which replaces reconstruction with a record of ground truth.
+
+The composition: repair 2 for post-fetch transforms, repair 3's as-of machinery for the join, repair 1 to certify end to end. The store alone shrinks the skew surface; it takes all three repairs to close it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Derivation the lesson skipped: log-and-wait replaces the warehouse-drawn training distribution with the served population. Using a two-segment toy (warehouse traffic is 75% human with $P(\text{click}) = 0.08$ and 25% bots with $P(\text{click}) = 0.40$, while the serving path sits behind a bot filter and serves humans only), show that the switch is a correction rather than a bug, then name the condition under which the same mechanism backfires.
+
+<Solution>
+Warehouse training: the base click rate the model calibrates to is $0.75 \times 0.08 + 0.25 \times 0.40 = 0.16$. The population it serves has base rate $0.08$: predictions are calibrated to a mixture that includes traffic the model will never score, overestimating click propensity roughly twofold on every real request (and worse, the bot segment's feature–label relationships contaminate the learned weights).
+
+Log-and-wait training: the log contains exactly the requests that passed the bot filter, so the training distribution *is* the served population: base rate $0.08$, human-only feature relationships. The offline/online mismatch this removes was never drift or pipeline skew; it was training on a population the system does not serve, and logging corrects it automatically.
+
+The backfire condition: the log is filtered by *the current model's own decisions*. When serving-time selection depends on predictions — a recommender only logs impressions for items it chose to show — the log stops being "the served population" and becomes "what the incumbent model liked," and training on it entrenches those choices: a degenerate feedback loop, the third cause in the skew/drift/loop taxonomy. The distinction that decides: a bot filter selects independently of the model's scores; a ranker's item selection does not.
+</Solution>
+</Exercise>
+
+<Exercise>
+Choose the repair architecture for each stack below, and name the property each choice forfeits:
+
+(a) Training runs in Python against the warehouse; serving is a Scala service owned by another team. The features feed this one model only, which retrains monthly, and the team can tolerate a month's wait before a new feature is trainable.
+
+(b) Fifty customer features are consumed by four models across three teams, each feature precomputed on its own refresh cadence.
+
+(c) One TensorFlow stack spans training and serving; the transforms are feature crosses plus mean–variance scaling; the team ships a new feature most weeks and cannot wait a training window for logs to accumulate.
+
+<Solution>
+(a) **Log-and-wait.** The Python/Scala split is Rule #32's two-languages corollary in the flesh: code sharing is nearly impossible, and transform-in-model is blocked by framework coupling (the graph must be expressible in the serving runtime, and the serving runtime is another team's Scala service). Serving already computes the features, so logging them removes the training-side implementation entirely. Forfeited: iteration speed — every new feature waits a full training window in the log before it can be trained on (acceptable here by the stated monthly cadence) — plus log storage, answered by weighted sampling.
+
+(b) **Feature store.** Shared features across models and teams are the store's defining case: one declared computation, one ingestion-time run, every consumer reads the same values on both the offline and online sides. Log-and-wait cannot serve this shape (each model's serving log captures only its own traffic and its own feature subset), and transform-in-model would bake fifty shared transforms into four artifacts — four implementations again. Forfeited: everything after the fetch stays open — post-fetch transforms still need repair 2, end-to-end certification still needs repair 1 — plus the infrastructure and the as-of join machinery the store must run.
+
+(c) **Transform-in-model.** Crosses are instance-level and ride in the graph directly; mean–variance scaling is full-pass and rides as analyze-phase constants; one framework spans the stack, so the exported graph executes natively at serving. Because the transform ships with the weights, a new feature is trainable the day it is written — no logging horizon, which is the constraint that ruled out log-and-wait. Forfeited: an analyze pass before every training run, artifact weight, and framework lock-in — the stack can never split its service and model frameworks without losing the pattern.
+
+A mature stack composes all three, but each of these stacks has one binding constraint, and the constraint — not preference — picks the repair.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review: <Ref lesson="data-leakage-and-splitting">the leakage lesson's</Ref> forward exercise listed what must ship beside the model weights: the fitted scaler's $\mu_{\text{train}}, \sigma_{\text{train}}$, imputation values, category vocabularies, hash bucket counts, and the transform code that applies them. Restate that answer in this lesson's vocabulary: which repair strategy is "ship the scaler with the model," and how does each listed item classify under the instance-level/full-pass distinction?
+
+<Solution>
+"Ship the scaler with the model" is repair 2, the Transform pattern: the transform logic and its fitted artifacts ride inside the exported model, so serving executes the one true implementation instead of reimplementing it against a shipped parameter list.
+
+Classification: $\mu_{\text{train}}$ and $\sigma_{\text{train}}$ are full-pass artifacts, computed by an analyze phase over the training split and frozen into the transform graph as constants. Imputation values (a median, a mean) are full-pass artifacts with the same treatment, and category vocabularies likewise: a vocabulary is a pass over the data. Hash bucket counts and the hash itself are instance-level: <Ref lesson="features-at-scale">the hashing trick</Ref> is pure code with a config constant, needing no analyze phase, which is exactly why that lesson called it the transform that "ships as code." The application order is code too, and the transform graph itself is what carries it.
+
+The leakage lesson's warning case (serving computes fresh statistics over live traffic) and the feature platform's config-constant fork are the two ways the same items go wrong when shipped *beside* the model instead of *inside* it: a parameter list beside the artifact invites a second implementation to consume it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Write the validation-schema entry for the `position` feature of the ranking model in the last section (its type, domain, and presence), precise enough that a machine could check incoming data against it. What does your entry have to say about training data versus serving requests, and what does that requirement tell you about the schema language?
+
+<Solution>
+Attempt: `position` has type integer and domain $[1, K]$ for page size $K$; its presence in training examples is required (every logged impression has a real slot); its presence in serving requests is forbidden, or fixed to the constant default (candidates are scored before an order exists).
+
+The entry cannot be written as a single presence value: the feature is *required in one environment and forbidden in the other*. A schema language with one global presence field must either reject all serving traffic (position missing) or accept training data with position absent (masking real logging failures). The requirement is per-environment presence — a schema with `TRAINING` and `SERVING` environments and features attached to a subset of them. That is exactly the *schema environments* machinery of <Ref lesson="data-validation">the next lesson</Ref>, where it also covers the other feature with this exact asymmetry: the label, present in training and impossible at serving by definition.
+</Solution>
+</Exercise>
+
+<References>
+1. K. Pham, *Machine Learning Design Interview*, 2022 — Ch. 1, "Spotify: one simple mistake took four months to detect" (pp. 91–96): the Podcast Model postmortem, the feature-logging fix, TFDV comparison, and the Chebyshev-distance alert.
+2. M. Zinkevich, *Rules of Machine Learning: Best Practices for ML Engineering*, Google, 2018 — the "Training-Serving Skew" section: Rules #29 (log serving-time features; the YouTube home-page switch), #30 (importance-weight sampled data), #31 (joined tables change), #32 (reuse code; the two-languages corollary), #33 (test on post-cutoff data), #36 (positional features), #37 (the three-gap decomposition). https://developers.google.com/machine-learning/guides/rules-of-ml
+3. V. Lakshmanan, S. Robinson, M. Munn, *Machine Learning Design Patterns*, O'Reilly, 2020 — Ch. 6, Design Pattern 21 "Transform": the inputs/features/transforms separation, the bicycle-duration example, instance-level versus dataset-level transforms, `tf.transform`'s analyze-and-transform phases, and the feature store as the alternate pattern.
+4. R. Crowe, H. Hapke, E. Caveness, D. Zhu, *Machine Learning Production Systems*, O'Reilly, 2024 — Ch. 3 (pp. 28–31): instance-level versus full-pass transformations; Ch. 12 (pp. 194–197): the three causes of training–serving skew and the Transform graph attached to the SavedModel.
+5. C. Huyen, *Designing Machine Learning Systems*, O'Reilly, 2022 — Ch. 7 (pp. 203–205): two pipelines maintained by two teams as a leading source of production feature bugs (Fig. 7-7).
+6. V. Babushkin, A. Kravchenko, *Machine Learning System Design*, Manning, 2023 — Ch. 14, §14.3.5: training–serving skew and the St. Petersburg/Cyprus campfire story.
+</References>
