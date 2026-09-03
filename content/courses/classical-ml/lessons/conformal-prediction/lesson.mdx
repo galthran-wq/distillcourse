@@ -1,0 +1,418 @@
+One held-out quantile turns any model's scores into prediction sets with guaranteed coverage: no distributional assumptions, no model correctness — only exchangeability — and the proof fits in a paragraph.
+
+This module has built the model-based road twice: <Ref lesson="bayesian-linear-regression">Bayesian linear regression</Ref> priced uncertainty through a posterior over weights, <Ref lesson="gaussian-processes">the Gaussian process</Ref> through a prior over functions, and both lessons ended on the same wound: every band is a probability statement *conditional on the model*, and the previous lesson's refutation exercise watched a fitted GP's 95% band widen honestly and still exclude the truth. What stands open is whether any error bar can survive a wrong model.
+
+This lesson's answer is the conformal bargain: assume only that the data points are exchangeable, and a single held-out quantile converts any model's scores into sets with finite-sample coverage. Validity comes free; usefulness is still bought with a good model. The route: the recipe run on a real classifier, the coverage theorem proved in full, score design for classification and regression, the marginal-versus-conditional boundary, and the economics of the calibration set.
+
+<Task>
+Three retrievals, closed book, before the recipe uses them. (1) From <Ref lesson="classification-metrics">the metrics lesson</Ref>: state what it means for a classifier's probabilities to be *calibrated*, and name the repair (Platt scaling) that fixes stated probabilities without any coverage guarantee. (2) From <Ref lesson="cross-validation-bootstrap">the resampling lesson</Ref>: state why an honest estimate needs data the fitted model never touched. (3) From <Ref lesson="gaussian-processes">the GP lesson</Ref>: state what the predictive variance $k_{**} - \mathbf{k}_*^\top (K + \sigma_n^2 I)^{-1} \mathbf{k}_*$ is conditional on. The first is what this lesson upgrades, the second is the mechanism it runs on, the third is the flaw it removes.
+</Task>
+
+## The recipe: one held-out quantile
+
+The output comes before the mechanism. Three photographs of fox squirrels from ImageNet, the 1,000-class image benchmark, go through a modern network that this lesson treats as a black box emitting softmax scores.
+
+<Figure
+  src="./figures/fox-squirrel-sets.jpg"
+  alt="Three photographs of fox squirrels of increasing difficulty, each above a braced prediction set: a singleton fox squirrel at 0.99, then four labels led by fox squirrel at 0.82, then six labels led by marmot at 0.30 with fox squirrel second at 0.22."
+  caption="One classifier, one 90% target: the set widens as the image gets harder, and on the hardest one the network's top guess is wrong while the true label still sits inside."
+/>
+
+On the easy image the procedure outputs the singleton $\{\text{fox squirrel}\}$, on which the network's softmax is $0.99$. On a partly occluded squirrel the softmax drops to $0.82$ and the set grows to four labels. On the hardest image the network's top guess is wrong (marmot at $0.30$, fox squirrel second at $0.22$), and the set grows to six labels that still contain the truth. The size of the set is the model's confession of difficulty, and the sets carry a guarantee no softmax carries: across test images, the true label lands inside the set about 90% of the time, no matter how miscalibrated the network is.
+
+### The calibration step, on the classifier
+
+The mechanism needs one ingredient beyond the trained model: $n$ fresh labeled pairs $(X_1, Y_1), \ldots, (X_n, Y_n)$ the model never saw, held out with the same discipline <Ref lesson="cross-validation-bootstrap">module 5</Ref> built. This is the *calibration set*; the running example reserves $n = 500$ pairs. Score each pair by how badly the model fits it: $s_i = 1 - \hat{f}(X_i)_{Y_i}$, one minus the softmax the model assigned the true class. The score sits near $0$ when the model was confidently right and near $1$ when it was badly wrong. Sort the scores and take
+
+$$
+\hat{q} = \text{the } \frac{\lceil (n+1)(1-\alpha) \rceil}{n} \text{ empirical quantile of } s_1, \ldots, s_n,
+$$
+
+which for $n = 500$ and error rate $\alpha = 0.1$ is the 451st smallest score: the $0.902$ quantile, not the $0.9$. The off-by-one is load-bearing, and the proof in the next section is where it earns its keep. For a new image, keep every class the model scores at least as well as that threshold: $C(X_{\text{test}}) = \{ y : \hat{f}(X_{\text{test}})_y \geq 1 - \hat{q} \}$. That is the entire algorithm: a few lines of numpy, one quantile, no retraining.
+
+<Definition title="conformal score">
+A **conformal score** is any function $s(x, y) \in \mathbb{R}$ measuring how badly a model's output at input $x$ agrees with candidate label $y$; larger scores encode worse agreement. The classifier's $s(x, y) = 1 - \hat{f}(x)_y$ is one choice among many, and the guarantee below holds for all of them.
+</Definition>
+
+Nothing in the construction is specific to softmax or to classification. The general recipe, for any input $x$ and any output $y$, discrete or continuous:
+
+1. **Model.** Start from any pre-trained model with a heuristic notion of uncertainty.
+2. **Score.** Define a score function $s(x, y)$ from it.
+3. **Quantile.** Compute $\hat{q}$, the $\lceil (n+1)(1-\alpha) \rceil / n$ quantile of the calibration scores $s_1, \ldots, s_n$.
+4. **Set.** Output the *prediction set*
+
+$$
+C(X_{\text{test}}) = \{ y : s(X_{\text{test}}, y) \leq \hat{q} \}.
+$$
+
+The claim these sets make, for a fresh test pair from the same distribution:
+
+$$
+1 - \alpha \;\leq\; \mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \big) \;\leq\; 1 - \alpha + \frac{1}{n+1}.
+$$
+
+At $n = 500$ the two sides pin coverage between $90\%$ and $90.2\%$: not a bound that happens to be loose, an equality up to a $1/(n+1)$ sliver.
+
+<FigureSequence
+  name="recipe"
+  alt="Four frames: nine calibration scores on a score line; the ceiling-quantile bar drawn at the 8th smallest; a test input's four per-label scores added below; the two labels under the bar collected into the prediction set"
+  caption="The recipe on nine calibration points (α = 0.2): score, take the ⌈(n+1)(1−α)⌉/n quantile, score every candidate label, keep the labels under the bar."
+/>
+
+<Task>
+Step through the four frames and track what never changes: the calibration scores are computed once, and after frame 2 the bar never moves. The model is never refit; the only thing calibration learned is where the bar goes, which is why the whole procedure costs one quantile.
+</Task>
+
+<Example title="a prediction set by hand">
+Nine calibration scores, already sorted: $0.05,\ 0.12,\ 0.19,\ 0.28,\ 0.36,\ 0.45,\ 0.58,\ 0.72,\ 0.90$. Target $\alpha = 0.2$.
+
+**The quantile.** $\lceil (n+1)(1-\alpha) \rceil = \lceil 10 \times 0.8 \rceil = 8$, so $\hat{q} = s_{(8)} = 0.72$, the 8th smallest of 9.
+
+**The set.** A test input gets softmax $(0.45, 0.31, 0.16, 0.08)$ over four classes A–D, so its per-label scores are $1$ minus each: $(0.55, 0.69, 0.84, 0.92)$. Classes with $s \leq 0.72$: $C(x) = \{\text{A}, \text{B}\}$. Equivalently, keep classes with softmax $\geq 1 - \hat{q} = 0.28$.
+
+**The guarantee bought.** Coverage lies in $[0.8,\ 0.8 + \tfrac{1}{10}] = [0.8, 0.9]$.
+
+**Tightening $\alpha$ with the same nine points.** At $\alpha = 0.1$, the index is $\lceil 10 \times 0.9 \rceil = 9$: $\hat{q}$ becomes the *largest* calibration score, $0.90$, and the same test input's set grows to $\{\text{A}, \text{B}, \text{C}\}$. Nine points can support a 90% claim only by conceding almost the whole score range; that is the finite-sample correction made visible.
+</Example>
+
+<Exercise>
+The paired problem. Nineteen calibration scores, sorted: $0.01, 0.02, 0.04, 0.06, 0.08, 0.11, 0.14, 0.18, 0.22, 0.27, 0.33, 0.39, 0.46, 0.54, 0.61, 0.70, 0.78, 0.87, 0.95$. At $\alpha = 0.1$: find the quantile index, $\hat{q}$, the prediction set for a test input with softmax $(0.62, 0.30, 0.08)$ over three classes, and the interval the guarantee pins coverage to. Compute the index before opening.
+
+<Solution>
+Index: $\lceil (19+1)(1-0.1) \rceil = \lceil 18 \rceil = 18$, so $\hat{q} = s_{(18)} = 0.87$: the 18th smallest of 19, the $18/19 \approx 0.947$ empirical quantile rather than the $0.9$.
+
+Set: per-label scores $1 - (0.62, 0.30, 0.08) = (0.38, 0.70, 0.92)$; classes with $s \leq 0.87$ are the first two, so $C(x) = \{1, 2\}$: class 3, at score $0.92$, misses the bar.
+
+Guarantee: coverage lies in $[0.9,\ 0.9 + \tfrac{1}{20}] = [0.90, 0.95]$. The transferable move: the index is always $\lceil (n+1)(1-\alpha) \rceil$ counted among $n$ scores. The $+1$ is the seat reserved for the test point, and the proof below makes the reservation exact.
+</Solution>
+</Exercise>
+
+## The guarantee: exchangeability makes the test rank uniform
+
+The recipe promised a probability; the assumption it rests on has not yet been named. It is weaker than everything this course has assumed so far.
+
+<Definition title="exchangeability">
+Random elements $Z_1, \ldots, Z_m$ are **exchangeable** if for every permutation $\pi$ of $\{1, \ldots, m\}$, the reordered vector $(Z_{\pi(1)}, \ldots, Z_{\pi(m)})$ has the same joint distribution as $(Z_1, \ldots, Z_m)$: the labels on the draws carry no information.
+</Definition>
+
+The canonical example is i.i.d. sampling: independence plus a common distribution makes every ordering equally likely, so i.i.d. implies exchangeable. The converse fails, which is why the theorem below is stated the way it is: draw two balls *without replacement* from an urn of five red and five blue, and the draws are dependent (the first ball changes the second's odds) yet exchangeable (red-then-blue and blue-then-red are equally likely).
+
+The definition's edges mark its reach. The degenerate case passes: $Z_1 = Z_2 = \cdots = Z_m$, one random variable copied $m$ times, is trivially permutation-invariant. The near-miss is a time series with drift: for hourly sensor readings $Z_t = t\beta + \varepsilon_t$, swapping an early and a late reading changes the joint distribution because the two positions have different means, so the permutation-invariance clause fails, and with it every guarantee in this lesson.
+
+Test your own pipeline against that clause and decide which side of the urn/time-series divide it sits on: calibration rows from last month scored against tomorrow's traffic sit on the wrong side, while a shuffled split of one fixed dataset is exchangeable by construction, which is what licenses the splits in every lab of this course.
+
+<Definition title="marginal coverage">
+A set-valued predictor $C$ has **marginal coverage** $1 - \alpha$ if $\mathbb{P}(Y_{\text{test}} \in C(X_{\text{test}})) \geq 1 - \alpha$, the probability averaged over everything random: the calibration draw and the test draw. Not per input, not per group; a later section prices that difference.
+</Definition>
+
+<Theorem title="split-conformal coverage (Papadopoulos, Proedrou, Vovk &amp; Gammerman 2002; upper bound Lei et al. 2018, Thm. 2.2)">
+Suppose $(X_1, Y_1), \ldots, (X_n, Y_n), (X_{\text{test}}, Y_{\text{test}})$ are exchangeable, and construct $\hat{q}$ and $C$ as in the recipe. Then
+
+$$
+\mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \big) \geq 1 - \alpha ,
+$$
+
+and if the scores are distinct with probability 1, also
+$\mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \big) \leq 1 - \alpha + \tfrac{1}{n+1}$.
+
+<Proof>
+The plan: reduce coverage to a statement about the test score's rank, use exchangeability to make that rank uniform, then count. Assume the $n + 1$ scores are distinct (ties are handled in the remark below).
+
+**Step 1, coverage is a rank event.** Write $s_i = s(X_i, Y_i)$ for the calibration scores, $s_{\text{test}} = s(X_{\text{test}}, Y_{\text{test}})$, and $s_{(1)} < \cdots < s_{(n)}$ for the sorted calibration scores. Set $k = \lceil (n+1)(1-\alpha) \rceil$. If $k > n$ (which happens exactly when $\alpha < \tfrac{1}{n+1}$), then $\hat{q} = \infty$: the set is all of $\mathcal{Y}$ and coverage is trivial. Otherwise $\hat{q} = s_{(k)}$, and by construction of the set,
+
+$$
+\{ Y_{\text{test}} \in C(X_{\text{test}}) \} = \{ s_{\text{test}} \leq s_{(k)} \}.
+$$
+
+**Step 2, the rank is uniform.** The $n+1$ scores are functions of the $n+1$ exchangeable pairs, applied identically to each, so the scores are exchangeable too. Every ordering of $n+1$ distinct exchangeable values is equally likely, so $s_{\text{test}}$ is equally likely to occupy each of the $n+1$ positions in the sorted order: for any integer $k \leq n$,
+
+$$
+\mathbb{P}\big( s_{\text{test}} \leq s_{(k)} \big) = \frac{k}{n+1}.
+$$
+
+This is the only step that uses a probabilistic assumption, and exchangeability is all it uses.
+
+**Step 3, count.** By definition of the ceiling, $k = \lceil (n+1)(1-\alpha) \rceil \geq (n+1)(1-\alpha)$, so
+
+$$
+\mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \big) = \frac{k}{n+1} \geq 1 - \alpha .
+$$
+
+The upper bound is the same count run from the other side, and the exercises reserve it: the miscoverage exercise mirrors this argument in three lines.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/rank-slots.svg"
+  alt="Nine sorted calibration scores on a line create ten gaps; a test score is equally likely to land in each gap, and the eight gaps at or below the eighth score are shaded as the coverage event"
+  caption="The whole proof: n + 1 exchangeable scores make the test score's position uniform over n + 1 gaps, and ⌈(n+1)(1−α)⌉ of them mean coverage."
+/>
+
+Step 3 is also where the off-by-one earns its keep. The naive $1-\alpha$ quantile of the $n$ calibration scores (index $\lceil n(1-\alpha) \rceil$) covers with probability $\lceil n(1-\alpha) \rceil / (n+1)$, which at $n = 10$, $\alpha = 0.1$ is $9/11 \approx 0.82$: an 8-point shortfall from the promised 90%. The corrected index $\lceil (n+1)(1-\alpha) \rceil$ reserves one seat among the $n+1$ for the test point, and the difference is the difference between a theorem and a near-miss.
+
+<Remark title="ties and exactness">
+With continuous scores, ties have probability zero and both bounds above hold. Discrete scores (counts, ranks) can tie; adding a vanishing amount of independent noise to every score restores distinctness without changing the sets materially, and the *smoothed* conformal predictor — randomized tie-breaking built into the rule — is exactly valid, with coverage equal to $1-\alpha$ (Vovk, Gammerman & Shafer 2005, Ch. 2). Practice ignores the randomization; the lower bound (the one deployments care about) needs no tie assumption at all.
+</Remark>
+
+<Task>
+Three comprehension checks on the proof. (1) Name the exact display where exchangeability enters, and verify that independence is used nowhere: the urn and the copied-variable examples above satisfy every step. (2) Rerun the count for the worked example's $n = 9$, $\alpha = 0.2$: $k = 8$, coverage $= 8/10 = 0.8$, the lower edge of the promised $[0.8, 0.9]$. (3) State which step breaks if the calibration pairs were used to train the model: the score function then treats the calibration points differently from the test point (it has memorized them), the $n+1$ scores are no longer exchangeable, and Step 2's uniform rank fails. That is <Ref lesson="cross-validation-bootstrap">module 5's</Ref> leakage rule, rediscovered as the hypothesis of a theorem.
+</Task>
+
+After ten modules in which every guarantee cost a Cauchy–Schwarz application, a dual program, or a concentration inequality, the course's final coverage theorem costs one counting argument. That cheapness is the point: nothing about the model was available to use, so nothing about the model is in the proof.
+
+<KeyFact>
+Each "any" in the theorem is real: any model, any score function, any data distribution, and the guarantee is exact to within $1/(n+1)$ in finite samples. What the theorem prices is coverage and nothing else: it does not say the sets are small, and the next section shows the guarantee holding for sets that are useless.
+</KeyFact>
+
+## Scores decide usefulness
+
+The theorem's generosity invites suspicion: a valid set from an arbitrarily bad model reads as too strong a promise. The escape hatch is size. Replace the classifier's score with pure noise ($s(x, y)$ an independent uniform draw for every pair, ignoring both the image and the label) and the theorem still holds, because noise scores are exchangeable.
+
+What the recipe then builds is a set containing each label with probability roughly $1 - \alpha$, independent of the input: on ImageNet at $\alpha = 0.1$, a random assortment of about 900 of the 1,000 labels, every time. Coverage 90%, information zero. Validity is free; usefulness is bought entirely by the score, which is where the model (and everything the first nine modules taught about fitting one) re-enters the story.
+
+### Classification: smallest sets or adaptive sets
+
+The softmax-threshold score of the recipe carries one optimality, and its hypothesis does real work: **if** the softmax vector is the true conditional distribution $\mathbb{P}(y \mid x)$, thresholding it gives the smallest *average* set size among all procedures with $1-\alpha$ coverage ([Sadinle, Lei & Wasserman 2019](https://arxiv.org/abs/1609.00451)). Drop the hypothesis and the claim dies — the noise score above is the same thresholding rule applied to garbage, and its 900-label sets are as far from smallest as sets get. Even with a good softmax, the average hides the distribution: a single global threshold spends its miscoverage budget on the hard inputs (which get small, frequently-wrong sets) and hoards coverage on the easy ones. The *adaptive prediction sets* (APS) score of [Romano, Sesia & Candès 2020](https://arxiv.org/abs/2006.02544) fixes the allocation. Its idea is the same oracle read differently: a true conditional distribution would let you greedily add classes from most to least likely until their mass reached $1 - \alpha$. The score operationalizes it:
+
+$$
+s(x, y) = \sum_{j=1}^{k} \hat{f}(x)_{\pi_j(x)}, \quad \text{where } y = \pi_k(x),
+$$
+
+the cumulative softmax mass down to and including the candidate label, with $\pi(x)$ sorting classes from most to least likely. The set greedily accumulates classes until the mass first exceeds $\hat{q}$ (keeping that final class, which also guarantees no empty sets). Where the threshold score reads one softmax entry, APS reads the whole vector; it pays a larger average size for sets whose coverage tracks difficulty instead of averaging over it.
+
+<FigureSequence
+  name="aps"
+  alt="Four frames: four softmax bars sorted descending above an empty cumulative-mass strip with the quantile at 0.85; class A's mass 0.45 added; B's added for 0.76; C's added, crossing the quantile at 0.92, closing the set at A, B, C with D excluded"
+  caption="APS on the softmax (0.45, 0.31, 0.16, 0.08) with q̂ = 0.85: stack mass from most to least likely, stop at the class that crosses the bar, keep it."
+/>
+
+<Task>
+Step through the frames and watch what the threshold score cannot do: the decision about class C uses the masses of A and B. Then check the per-label scores against the formula: $s(x, \text{A}) = 0.45$, $s(x, \text{B}) = 0.45 + 0.31 = 0.76$, $s(x, \text{C}) = 0.92$, $s(x, \text{D}) = 1.00$ — each label's score is the mass of everything at least as likely, itself included.
+</Task>
+
+<Example title="threshold set vs. APS set, same input">
+The test input of the recipe's worked example, softmax $(0.45, 0.31, 0.16, 0.08)$ over classes A–D. The threshold score at $\hat{q} = 0.72$ gave $C(x) = \{\text{A}, \text{B}\}$: keep classes with softmax $\geq 1 - 0.72 = 0.28$, each judged alone. For APS the calibration scores must be recomputed (they are cumulative masses now, not one-minus-softmax); suppose the same nine calibration images give $\hat{q} = 0.85$.
+
+**The APS scores.** Sorted order is already A, B, C, D, so the scores are the running sums: $0.45,\ 0.76,\ 0.92,\ 1.00$.
+
+**The set.** Accumulate until the mass first exceeds $0.85$: A ($0.45$), B ($0.76$), then C crosses at $0.92$ and is kept. $C(x) = \{\text{A}, \text{B}, \text{C}\}$.
+
+**Where the two sets differ.** Class C, at softmax $0.16 < 0.28$, fails the threshold test on its own; APS admits it because the two classes above it hold only $0.76$ of the mass, short of the $0.85$ the calibrated bar demands. One extra label is the price of reading the whole vector; the exercise below shows the same trade become drastic on a genuinely hard input.
+</Example>
+
+<Exercise>
+The score decision, run both ways. Same classifier, same quantiles ($\hat{q}_{\text{thr}} = 0.72$ for the threshold score, $\hat{q}_{\text{APS}} = 0.85$), two test inputs: an easy one with softmax $(0.88, 0.07, 0.03, 0.02)$ and a hard one with softmax $(0.30, 0.28, 0.24, 0.18)$, both over classes A–D. Build all four prediction sets, then say which score's set sizes track the difficulty of the input and which score is small on both.
+
+<Solution>
+Easy input. Threshold: keep softmax $\geq 0.28$, so only A qualifies: $\{\text{A}\}$. APS: the first class already carries $0.88 \geq 0.85$, so the crossing class is A itself: $\{\text{A}\}$. The two scores agree on confident inputs.
+
+Hard input. Threshold: A ($0.30$) and B ($0.28$) clear $0.28$, C ($0.24$) and D ($0.18$) do not: $\{\text{A}, \text{B}\}$, a two-label set holding only $0.58$ of the model's own probability mass. APS: running sums $0.30, 0.58, 0.82, 1.00$; the mass first exceeds $0.85$ at D, so the set is all four classes.
+
+The reading: APS sizes ($1$ vs. $4$) track difficulty; the threshold sizes ($1$ vs. $2$) barely move, and its two-label set on the near-uniform input is exactly the small-but-frequently-wrong behavior the section described — the input where the model is most confused gets a set the model itself assigns $42\%$ chance of missing. That is where a single global threshold spends its miscoverage budget, and both procedures still satisfy the same marginal $90\%$ theorem.
+</Solution>
+</Exercise>
+
+### Regression: conformalized quantile regression
+
+Changing task means changing score, never theorem. The plainest regression score is the absolute residual $s(x, y) = |y - \hat{f}(x)|$ against any fitted mean: $\hat{q}$ becomes a residual quantile and the set is the band $\hat{f}(x) \pm \hat{q}$, one width everywhere. On heteroscedastic data (the fanning residual pattern <Ref lesson="regression-diagnostics">the diagnostics lesson</Ref> taught you to spot), one width everywhere is the wrong shape, and the guarantee's honesty makes the wrongness visible rather than fixing it:
+
+<Figure
+  src="./figures/cqr-bands.svg"
+  alt="Two panels of the same heteroscedastic scatter: a constant-width residual-score band covering 97 percent on the quiet half and 83 percent on the noisy half, 90 percent marginally, and a CQR band hugging the fanning noise with 90 percent coverage on both halves"
+  caption="One dataset (noise growing with x), two scores, both marginally valid at 90%. The residual band buys its 90% by overcovering the quiet half (97%) and starving the noisy half (83%); CQR covers 90% on both."
+/>
+
+The residual band in the left panel earns its 90% marginally, by covering 97% where the noise is small and 83% where it is large: the two-group pathology of the next section, drawn on one axis. The repair is a base model that already has the right shape. *Quantile regression* fits a curve $\hat{t}_\gamma(x)$ to the conditional $\gamma$-quantile of $y$ by swapping squared loss for the pinball loss
+
+$$
+L_\gamma(\hat{t}, y) = \gamma\, (y - \hat{t})^+ + (1 - \gamma)\, (\hat{t} - y)^+ ,
+$$
+
+which at $\gamma = \tfrac{1}{2}$ is half the absolute error (the LAD regression of <Ref lesson="regression-diagnostics">module 3</Ref>), and at other $\gamma$ tilts the penalty so the fitted curve settles at the $\gamma$-quantile. *Conformalized quantile regression* (CQR; [Romano, Patterson & Candès 2019](https://arxiv.org/abs/1905.03222)) fits the two edges $\hat{t}_{\alpha/2}$ and $\hat{t}_{1-\alpha/2}$, then scores each calibration point by its signed distance to the nearest edge,
+
+$$
+s(x, y) = \max\big( \hat{t}_{\alpha/2}(x) - y,\;\; y - \hat{t}_{1-\alpha/2}(x) \big),
+$$
+
+negative inside the band, positive outside. The prediction set is the band pushed out by the calibrated correction: $C(x) = [\, \hat{t}_{\alpha/2}(x) - \hat{q},\; \hat{t}_{1-\alpha/2}(x) + \hat{q}\,]$. The correction runs both ways: an overcovering base band yields a negative $\hat{q}$ and the band *shrinks*. In the right panel the fitted band needed almost nothing ($\hat{q} = +0.01$). The conformal step's contribution there is not width but the theorem: it converts "roughly 90%, if the quantile fits are good" into "at least 90%, regardless".
+
+### The Bayes score: the module's two roads reconciled
+
+The best score, when you can have it, is the one this module spent two lessons building. Take a Bayesian model's posterior predictive density and score by its negative: $s(x, y) = -\hat{p}(y \mid x)$, so the prediction set is a highest-density region cut at a conformally calibrated threshold instead of the model's own. [Hoff (2023)](https://arxiv.org/abs/2105.14045) proved the corresponding optimality: if the model is correct, this score gives the smallest average sets among all procedures with $1-\alpha$ coverage.
+
+The two roads of this module land in one sentence: the model-based road is the best score designer there is (a GP's posterior predictive is exactly such a density), and the conformal step is what keeps the coverage claim standing when the model is wrong.
+
+<KeyFact>
+Division of labor, exactly: the theorem supplies coverage, the score supplies size. A wrong model costs width, never validity — the precise inverse of the module's first two lessons, where a wrong model produced beautiful narrow bands with no coverage at all.
+</KeyFact>
+
+## Marginal coverage is an average, not a promise per group
+
+The guarantee just proved holds on average over everything random at once, and averages can be assembled from parts that individually keep no promise. The claim practitioners want to make, that the sets are right 90% of the time *for each patient group*, does not follow.
+
+The standing counterexample: let the population be two groups, A with 90% of the mass and B with 10%, and suppose the sets always contain the truth in group A and never in group B. Marginal coverage: $0.9 \times 1 + 0.1 \times 0 = 0.9$. The theorem is satisfied; every single member of group B is failed every single time. Nothing in the proof resists this, because no conditioning bar appears anywhere in it: the miscoverage budget is spent where it is cheapest, which is the same mechanism that let the threshold score starve hard inputs, now operating on people.
+
+<Figure
+  src="./figures/marginal-conditional.svg"
+  alt="Two panels of covered and missed individuals in a 90 percent group A and a 10 percent group B: one shared quantile covers all of A and none of B yet stamps 90 percent marginal coverage; per-group quantiles cover at least 90 percent inside each group"
+  caption="The two-group construction. Left: one shared quantile, marginal 90%, group B never covered. Right: one quantile per group restores the guarantee inside every group."
+/>
+
+The repair is one line of bookkeeping: run the calibration once per group. Partition the calibration scores by group, compute a per-group quantile $\hat{q}^{(g)}$ from the $n_g$ scores of group $g$ (at the index $\lceil (n_g + 1)(1-\alpha) \rceil$), and give each test point the quantile of its own group.
+
+<Theorem title="group-balanced coverage (Vovk 2012)">
+If the group of an input is observable and the data are i.i.d., the sets $C(x) = \{ y : s(x, y) \leq \hat{q}^{(g(x))} \}$ satisfy $\mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \mid g(X_{\text{test}}) = g \big) \geq 1 - \alpha$ for every group $g$.
+
+<Proof>
+Condition on the test point's group being $g$. Given the group, the test pair and the $n_g$ calibration pairs of group $g$ are i.i.d. draws from the distribution restricted to that group, hence exchangeable, and the split-conformal theorem applies verbatim within the group.
+</Proof>
+</Theorem>
+
+The repair has a price the next section will let you compute: each group buys its guarantee with its *own* calibration points, so a group holding 10% of a 1,000-point calibration set runs on $n_g = 100$, with the wider coverage wobble that entails. The classification analogue calibrates per *true class* (include $y$ in the set when $s(x, y) \leq \hat{q}^{(y)}$, using the provisional label to pick the threshold, since the true one is unobserved) and delivers coverage conditional on each class. For a tumor screen that reads: the set contains *malignant* in at least 95% of the patients who actually have it — a guaranteed floor on exactly the quantity <Ref lesson="classification-metrics">module 5</Ref> called recall.
+
+Conditioning does not extend to the limit. Full conditional coverage, $\mathbb{P}(Y_{\text{test}} \in C(X_{\text{test}}) \mid X_{\text{test}} = x) \geq 1 - \alpha$ at every individual $x$, is impossible distribution-free: [Vovk (2012)](https://proceedings.mlr.press/v25/vovk12.html) and Lei and Wasserman showed that for continuous $X$ any procedure achieving it must return intervals of infinite expected width, and [Foygel Barber et al. (2021)](https://arxiv.org/abs/1903.04684) sharpened the boundary. Finitely many named groups are the tractable middle ground between one marginal average and an unattainable per-input promise.
+
+One more axis generalizes. Miscoverage is the expectation of one particular loss, $\mathbb{E}[\mathbf{1}\{Y \notin C(X)\}] \leq \alpha$, and the same calibrate-a-threshold move controls the expectation of any bounded loss that shrinks as the sets grow, a family called *conformal risk control*. The flagship example is multilabel prediction with the false-negative rate as the loss: tune the inclusion threshold so the output set misses at most 10% of each image's true labels on average. This lesson only names the idea and its heavy-duty sibling for non-monotone risks, Learn then Test; Angelopoulos and Bates's tutorial (§4.3 and Appendix A) develops both.
+
+<KeyFact>
+Marginal coverage is compatible with 0% coverage on a 10% subgroup. The guarantee you state to a stakeholder must name its conditioning: marginal by default, per-group only if calibrated per group, per-input never (impossible distribution-free).
+</KeyFact>
+
+## The economics of the calibration set
+
+One number remains unexamined: $n$. The theorem holds for any $n \geq 1$; what a small $n$ costs is not the average but the *spread*. Fix one calibration set and imagine an infinite stream of test points: the realized coverage of your deployed predictor is then a fixed number (some draws of the calibration set produce a lucky $\hat{q}$ and 93% coverage, others 87%), and the theorem's $\geq 1 - \alpha$ is only the average of that number over calibration draws. Vovk derived its exact distribution:
+
+$$
+\mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \;\big|\; \text{calibration set} \big) \sim \mathrm{Beta}(n + 1 - l,\; l), \qquad l = \lfloor (n+1)\alpha \rfloor ,
+$$
+
+a pure order-statistics fact: coverage given the calibration set equals the population probability below the $k$-th order statistic, and order statistics of exchangeable samples have Beta laws.
+
+<Figure
+  src="./figures/coverage-beta.svg"
+  alt="Beta densities of realized coverage for calibration sizes 100, 1000, and 10000 at alpha 0.1, centered near 0.9 and narrowing as n grows, with the n equals 1000 curve spanning roughly 0.88 to 0.92"
+  caption="What one calibration set actually buys (α = 0.1). Realized coverage is Beta-distributed around 1 − α; the spread shrinks like 1/√n."
+/>
+
+<Task>
+Read the figure against the law. At $n = 100$: $\mathrm{Beta}(91, 10)$, mean $0.901$, standard deviation $0.030$, so roughly one deployment in three sits outside $[0.87, 0.93]$. At $n = 1000$: $\mathrm{Beta}(901, 100)$, standard deviation $0.0095$, coverage typically $0.88$–$0.92$. At $n = 10000$ the standard deviation is $0.003$. Verify the $n^{-1/2}$ rate: $100\times$ the data, $10\times$ the precision.
+</Task>
+
+This is the source of the working rule quoted everywhere in the conformal literature: **about 1,000 calibration points** make realized coverage reliably land within about a point of nominal, and past that the returns diminish on the $n^{-1/2}$ schedule. The exact requirement — the $n$ needed to hold coverage within $\varepsilon$ of $1 - \alpha$ with probability 90% — follows from inverting the Beta law, tabulated here at $\alpha = 0.1$:
+
+| slack $\varepsilon$ | 0.1 | 0.05 | 0.01 | 0.005 | 0.001 |
+|---|---|---|---|---|---|
+| required $n$ | 22 | 102 | 2,491 | 9,812 | 244,390 |
+
+Twenty-two points already pin coverage within ±10 points; the last row says the final factor-10 of slack costs a quarter-million labeled pairs, the $1/\varepsilon^2$ price of averaging. These are also the points the model never gets to train on: split conformal's one real cost is that every calibration label is a training label forgone, and the group-balanced repair of the previous section multiplies the bill by the number of groups.
+
+### Checking a deployment: the R-trials protocol
+
+The Beta law also says how to *check* an implementation, and the discipline is <Ref lesson="cross-validation-bootstrap">module 5's</Ref>: a guarantee about a procedure is verified over replicates of the procedure, never by one number. Compute every score once and cache the pool; then, $R \geq 100$ times, shuffle the pool into calibration and validation halves, calibrate $\hat{q}$ on one and record the fraction of the other with $s \leq \hat{q}$. The $R$ coverages should histogram around $1 - \alpha$ with the Beta spread above (a finite validation half adds a computable extra width, the beta-binomial refinement of the tutorial's Appendix C); a mean visibly off $1 - \alpha$, or a spread wider than the law allows, is an implementation bug, with the off-by-one quantile index the commonest culprit.
+
+The protocol also marks the guarantee's boundary. All of it (theorem, Beta law, check) assumes the deployment traffic is exchangeable with the calibration pool, and the commonest way real systems break that is time: distributions drift, and a calibration set from last quarter is not exchangeable with next week — the near-miss of the exchangeability definition, now at deployment scale. The theorem does not degrade gracefully there; it simply does not apply, and measured coverage can be anything. Extensions exist that re-weight the calibration scores under a known covariate shift ([Tibshirani et al. 2019](https://arxiv.org/abs/1904.06019)) or track drift online; this course names them and stops. The honest deployment rule is the R-trials protocol run on data from the regime you will actually face.
+
+What is established: a four-line recipe converts any model's scores into prediction sets; exchangeability alone makes the test score's rank uniform, which pins coverage between $1-\alpha$ and $1-\alpha+1/(n+1)$; the score decides whether the sets are informative, with quantile-regression and posterior-density scores the strong choices; the guarantee is marginal, repairable per group at the cost of per-group data, and impossible per input; and a calibration set of about a thousand points holds realized coverage within a point of nominal. <Ref lesson="mauna-loa">The next lesson</Ref> takes the model-based road to its showcase, the composite-kernel Gaussian process forecasting atmospheric CO₂, and ends on this module's closing question: what the atmosphere itself says about bands that believe a kernel against bands that believe nothing. <Ref lesson="gp-lab">The lab</Ref> then has you build both and measure.
+
+## ★ Full conformal, and where the recipe came from
+
+Split conformal is historically the *special case*: the 2002 simplification (Papadopoulos, Proedrou, Vovk and Gammerman) of an older, statistically purer algorithm. *Full conformal prediction* spends no data on a split. For each candidate label $y$, refit the model on all $n+1$ points with $(X_{\text{test}}, y)$ plugged in as if true (the fitting algorithm must treat the points symmetrically), recompute every score under that refit model, and keep $y$ if its own score sits below the $\lceil (n+1)(1-\alpha) \rceil/n$ quantile of the others.
+
+The same rank argument gives the same guarantee, at a cost of $(n+1) \cdot K$ model fits for $K$ candidates: thousands of trainings for one prediction set, against split conformal's zero. Cross-conformal and the jackknife+ populate the middle of the compute–efficiency spectrum; the tutorial's §6 maps it.
+
+The statistical reading is worth the detour even if the computation is not: the inclusion condition is the acceptance region of a permutation test, so $C(x)$ is precisely the set of labels the data cannot reject as exchangeable with what came before.
+
+The idea's origin is Soviet. Vladimir Vovk, a Ukrainian-born student fed on the mathematics magazine *Kvant* as a schoolboy, became a student of Andrei Kolmogorov (the axiomatizer of modern probability) at Moscow State University in the late 1970s, and recalls Kolmogorov remarking on the way to the train station: "Look around you; you do not only see infinite sequences. There are finite sequences."
+
+Kolmogorov's program of finite algorithmic randomness became, in Vovk's hands, finite-sample exchangeability, and the "randomness deficiency" of an atypical element became the nonconformity score. Conformal prediction itself was hatched in 1996–1999 by Vovk, Gammerman, Saunders and Vladimir Vapnik, whose maximum-margin hyperplane <Ref lesson="svm-max-margin">module 4</Ref> built; the name was coined by Glenn Shafer in 2003 while the book *Algorithmic Learning in a Random World* was being written.
+
+## Exercises
+
+<Exercise>
+The upper bound, mirrored. Assuming the $n+1$ scores are distinct with probability 1, prove that split conformal does not overcover by more than a sliver:
+
+$$
+\mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \big) \leq 1 - \alpha + \frac{1}{n+1}.
+$$
+
+Mirror the rank argument; the only new ingredient is an upper estimate for the ceiling.
+
+<Solution>
+For $\alpha \geq \tfrac{1}{n+1}$, the proof's Step 1 and 2 give coverage exactly:
+
+$$
+\mathbb{P}\big( Y_{\text{test}} \in C(X_{\text{test}}) \big) = \mathbb{P}\big( s_{\text{test}} \leq s_{(k)} \big) = \frac{k}{n+1}, \qquad k = \lceil (n+1)(1-\alpha) \rceil .
+$$
+
+The ceiling of any real $z$ satisfies $\lceil z \rceil < z + 1$, so $k < (n+1)(1-\alpha) + 1$ and
+
+$$
+\frac{k}{n+1} < \frac{(n+1)(1-\alpha) + 1}{n+1} = 1 - \alpha + \frac{1}{n+1},
+$$
+
+and since coverage equals $k/(n+1)$, the bound follows. The displayed equality is where distinctness was used: with ties, several scores can pile onto $s_{(k)}$ and coverage can exceed $k/(n+1)$. For $\alpha < \tfrac{1}{n+1}$, $\hat q = \infty$ and coverage is 1, which satisfies the bound because $1 - \alpha + \tfrac{1}{n+1} \geq 1$ there. The transferable move: both bounds are the same uniform-rank count; the lower bound rounds the seat count up, the upper bound notes that rounding up costs at most one seat out of $n+1$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe, in three parts. (a) Show that $\alpha < \tfrac{1}{n+1}$ forces $C(X_{\text{test}})$ to be the entire label space, and explain in one sentence why the guarantee is met vacuously. (b) Compute the minimum calibration size $n$ at which a 99% set ($\alpha = 0.01$) can ever be smaller than everything. (c) For the random-score procedure ($s$ an independent uniform per pair), describe how you would verify the coverage guarantee empirically, and what the sets look like on a $K$-class problem.
+
+<Solution>
+(a) $\alpha < \tfrac{1}{n+1}$ gives $(n+1)(1-\alpha) > (n+1) - 1 = n$, so the index $\lceil (n+1)(1-\alpha) \rceil$ is at least $n+1$: the recipe asks for an order statistic beyond the largest of $n$ scores. The convention $\hat{q} = \infty$ is forced, every candidate satisfies $s \leq \hat{q}$, and $C(X_{\text{test}}) = \mathcal{Y}$. Coverage is 1 trivially: a set that excludes nothing cannot miss. The hypothesis $\alpha \geq \tfrac{1}{n+1}$ is exactly what rules the degenerate case out: with too few calibration points, the demanded confidence exceeds what $n$ ranks can certify, and the procedure says so by refusing to exclude anything.
+
+(b) Need $\alpha \geq \tfrac{1}{n+1}$, i.e. $n \geq \tfrac{1}{\alpha} - 1 = 99$: a 99% conformal set requires at least 99 calibration points before it can ever be informative.
+
+(c) Simulate $R$ trials: in each, draw $n$ calibration uniforms and one test uniform, set $\hat{q}$ to the $\lceil (n+1)(1-\alpha) \rceil$-th smallest, and record whether the test draw is $\leq \hat{q}$; the mean over trials lands near $1 - \alpha$ (between $1-\alpha$ and $1-\alpha + \tfrac{1}{n+1}$). The sets: each of the $K$ labels enters independently with probability about $0.9$ (its own fresh uniform against $\hat{q} \approx 0.9$), so the output is a random subset of expected size $\approx 0.9K$, about 900 of ImageNet's 1,000 labels, with composition unrelated to the image. Valid by the theorem, worthless by construction: the discriminating fact between "coverage" and "information".
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim from a model card: "Our conformal tumor classifier produces 90% prediction sets, so it is right 90% of the time for every patient subgroup." Name what the theorem does promise, exhibit the failure, and state the repair with its cost.
+
+<Solution>
+The theorem promises *marginal* coverage: $\mathbb{P}(Y \in C(X)) \geq 0.9$ averaged over the population and the calibration draw. The claim slips a conditioning bar into that statement, and the two-group construction breaks it: with subgroup A at 90% frequency always covered and subgroup B at 10% never covered, marginal coverage is $0.9 \times 1 + 0.1 \times 0 = 0.9$, so the guarantee holds while coverage for B's patients is 0%. The step that fails is treating an average as a uniform promise; no step of the rank argument conditions on the subgroup, so nothing in it constrains per-group behavior.
+
+The repair is group-balanced calibration: partition the calibration set by subgroup and compute $\hat{q}^{(g)}$ at index $\lceil (n_g+1)(1-\alpha) \rceil$ within each; the split-conformal theorem then applies within each group (conditioned on group, the pairs are still exchangeable), giving $\geq 90\%$ per subgroup. The cost is data: each subgroup's guarantee runs on its own $n_g$, so a 5% subgroup of a 1,000-point calibration set gets $n_g = 50$, with realized coverage spread $\mathrm{Beta}(46, 5)$-wide (sd $\approx 0.04$). Subgroups too small to calibrate, or unobserved at test time, cannot be repaired this way at all.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review: conformalize <Ref lesson="logreg-lab">your own tumor classifier</Ref>. Take the logistic model you trained on the Wisconsin diagnostic data, hold out 100 of the training rows as a calibration set (refit on the rest), and use the score $s(x, y) = 1 - \hat{p}(y \mid x)$, where $\hat{p}(1 \mid x) = \sigma(w^\top x + b)$ and $\hat{p}(0 \mid x) = 1 - \sigma(w^\top x + b)$. At $\alpha = 0.1$: state the quantile index, then describe the full procedure for measuring coverage and average set size on the test split, and enumerate what sets are possible for a binary problem.
+
+<Solution>
+Index: $\lceil 101 \times 0.9 \rceil = 91$, so $\hat{q}$ is the 91st smallest of the 100 calibration scores. Procedure: (1) refit the classifier without the 100 calibration rows, since scores must come from data the fit never touched or Step 2 of the coverage proof fails; (2) compute the 100 scores $1 - \hat{p}(Y_i \mid X_i)$ and take $\hat{q} = s_{(91)}$; (3) for each test row, $C(x) = \{ y \in \{0, 1\} : \hat{p}(y \mid x) \geq 1 - \hat{q} \}$; (4) report the fraction of test rows with $Y \in C(X)$ (expect $0.9$ up to the $\mathrm{Beta}(91, 10)$ wobble, sd $\approx 0.03$) and the mean $|C(X)|$.
+
+Possible sets: $\{1\}$ or $\{0\}$ (a confident singleton); $\{0, 1\}$ (the model cannot say at this confidence: $\hat{p}$ near $\tfrac12$ and $\hat{q} \geq \tfrac12$); and, when $\hat{q} < \tfrac12$, the empty set, for inputs where even the argmax has $\hat{p} < 1 - \hat{q}$. An empty set is a legal way for the threshold score to spend miscoverage budget (APS's greedy construction is the standard fix if empty sets are unacceptable). For a well-fit model on this data (test AUC near 0.99), expect mostly singletons with a small doubleton fraction: average set size just above 1 is the honest summary the lab's AUC threshold never provided, a per-patient statement of when the model is allowed to say it is not sure.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the coverage law. For $n = 100$ and $\alpha = 0.1$, simulate 5,000 replicates: in each, draw 100 calibration scores from any continuous distribution (uniform is convenient), compute $\hat{q}$, and record the *population* coverage of the resulting rule (for uniform scores this is exactly $\hat{q}$ itself). Histogram the 5,000 values and overlay the $\mathrm{Beta}(91, 10)$ density. State in advance what counts as a match.
+
+<Solution>
+The connection making the simulation trivial: with uniform scores, realized coverage given the calibration set is $\mathbb{P}(U \leq \hat{q}) = \hat{q}$, and $\hat{q}$ is the 91st order statistic of 100 uniforms, whose exact law is $\mathrm{Beta}(91, 100 - 91 + 1) = \mathrm{Beta}(91, 10)$: Vovk's formula with $l = \lfloor 101 \times 0.1 \rfloor = 10$. So the histogram of recorded coverages should track the overlaid density in location (mean $91/101 \approx 0.901$), spread (sd $\sqrt{91 \cdot 10 / (101^2 \cdot 102)} \approx 0.030$), and left skew (the density's tail runs toward low coverage, which is the direction deployments care about).
+
+A pre-stated match criterion: the empirical mean within $\pm 0.002$ of $0.901$ ($\approx 2.5$ standard errors at $R = 5000$), the empirical sd within 5% of $0.030$, and a Kolmogorov–Smirnov distance against the Beta CDF below $\approx 0.02$ ($D \approx 1.36/\sqrt{5000}$ at the 5% level). Any continuous score distribution gives the same histogram: coverage depends on scores only through ranks, which is the proof's Step 2 restated as a simulation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Generate $y = \sin(2\pi x) + 0.1\varepsilon$ on $x \in [0, 2]$, 150 points; fit <Ref lesson="gaussian-processes">your GP</Ref> with a squared-exponential kernel but hyperparameters deliberately mis-set (lengthscale $5\times$ too long), and read off its 95% bands. Then wrap the same wrong GP's mean in split conformal (absolute-residual score, 50 held-out calibration points, $\alpha = 0.05$). Measure both bands' realized coverage on fresh test data and explain the asymmetry you find.
+
+<Solution>
+The over-long lengthscale makes the GP treat the sine's swings as noise it should smooth through: the posterior mean is too flat, and the predictive variance (which, as the GP lesson showed, depends only on where the inputs sit and on the kernel, never on how badly the mean fits) stays narrow. Its "95%" bands typically cover far below nominal, with values in the 60–80% range normal for this setup: the bands answer how uncertain the model would be *if the kernel were true*, and it is not. The conformal wrapper feeds the same bad mean's absolute residuals into the quantile: $\hat{q}$ inflates to whatever width the residuals demand ($\lceil 51 \times 0.95 \rceil = 49$th smallest of 50), and measured coverage lands at $\geq 95\%$ up to the small-$n$ Beta wobble. The asymmetry: the GP's width is set *before* seeing its own errors, the conformal width is set *by* them. A wrong model costs the GP coverage and costs conformal only width — a constant-width band around a bad mean is wide and unadaptive, the CQR section's trade.
+
+This pairing measured on real data is <Ref lesson="gp-lab">the lab's</Ref> closing checkpoint pair (`coverage-check`, `gp-vs-conformal`), and the model-versus-assumption-free trade it exposes is the question <Ref lesson="mauna-loa">the Mauna Loa lesson</Ref> ends on.
+</Solution>
+</Exercise>
+
+<References>
+1. A. N. Angelopoulos, S. Bates, "A Gentle Introduction to Conformal Prediction and Distribution-Free Uncertainty Quantification," *Foundations and Trends in Machine Learning* 16(4), 2023 — the lesson's primary source: §1 the recipe and Fig. 1; §2 the score bank (APS, CQR, scalar uncertainty, Bayes); §3 adaptivity, the Beta law and Table 1; §4 group/class-conditional and risk control; §6 full conformal; §7 the history; Appendix D the proof reproduced here. https://arxiv.org/abs/2107.07511
+2. V. Vovk, A. Gammerman, G. Shafer, *Algorithmic Learning in a Random World*, Springer, 2005 (2nd ed. 2022) — the book of the founders: full conformal prediction, the online theory, and Ch. 2/10 for the history the starred section compresses.
+3. H. Papadopoulos, K. Proedrou, V. Vovk, A. Gammerman, "Inductive Confidence Machines for Regression," ECML 2002 — the paper that introduced the split (inductive) variant this lesson centers.
+4. J. Lei, M. G'Sell, A. Rinaldo, R. J. Tibshirani, L. Wasserman, "Distribution-Free Predictive Inference for Regression," *JASA* 113(523), 2018 — the general regression framework; its Theorem 2.2 is the upper bound quoted in the coverage theorem. https://arxiv.org/abs/1604.04173
+5. Y. Romano, E. Patterson, E. Candès, "Conformalized Quantile Regression," NeurIPS 2019 — the CQR score and its guarantees. https://arxiv.org/abs/1905.03222
+6. Y. Romano, M. Sesia, E. J. Candès, "Classification with Valid and Adaptive Coverage," NeurIPS 2020 — the APS score. https://arxiv.org/abs/2006.02544
+7. V. Vovk, "Conditional Validity of Inductive Conformal Predictors," ACML 2012, PMLR 25 — the Beta coverage law, group-conditional (label-conditional) conformal prediction, and the conditional-coverage impossibility result. https://proceedings.mlr.press/v25/vovk12.html
+8. R. Foygel Barber, E. J. Candès, A. Ramdas, R. J. Tibshirani, "The Limits of Distribution-Free Conditional Predictive Inference," *Information and Inference* 10(2), 2021 — the sharpened boundary of what conditional guarantees are achievable. https://arxiv.org/abs/1903.04684
+</References>

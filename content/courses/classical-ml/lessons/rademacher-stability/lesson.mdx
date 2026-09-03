@@ -1,0 +1,462 @@
+Two refinements replace counting with geometry: Rademacher complexity measures how well a class correlates with random noise on the actual data, and algorithmic stability bounds generalization with no capacity measure at all — regularization is stability.
+
+<Ref lesson="vc-dimension">The previous lesson</Ref> closed with the fundamental theorem in hand and two debts it cannot pay: the RBF machine's class has infinite VC dimension, and the boosted ensemble's finite one prices a five-point certificate at over a billion messages. Both failures share a root. The growth function maximizes over all placements of $n$ points, sees only binary labelings, and — like every capacity measure so far — ignores the algorithm entirely. This lesson builds the two repairs the module's remaining theorems run on. The route: the noise-correlation quantity and the master bound it buys; the norm-ball computation in which no dimension appears; then stability, an exact identity, and the theorem that a Tikhonov penalty makes any convex-loss learner stable.
+
+## Capacity on the sample: correlation with random signs
+
+<Task>
+Closed-book, from the last two lessons: state the VC generalization bound's capacity term, name the two models it fails on and why, and recall what quantity <Ref lesson="vc-dimension" id="exercises">the previous lesson's final exercise</Ref> measured on 20 points. Check below.
+</Task>
+
+<Aside>
+Answers: the capacity term is $\sqrt{2d\ln(en/d)/n}$ with $d = \operatorname{VCdim}$; it is vacuous for the RBF-kernel class ($d = \infty$) and useless for the 400-stump ensemble ($d \approx 1.7\times10^5$ against $n = 3{,}065$ messages). The exercise measured the expected best *correlation* of halfspaces with random $\pm1$ labels on a fixed 20-point sample: about $0.6$–$0.7$, under a ceiling of $0.85$. That quantity is this section's subject.
+</Aside>
+
+The forward exercise contained the repair's idea: instead of counting the labelings a class could realize on the worst $n$ points anywhere, hand the class pure noise on the points actually drawn and measure how well it fits. A class that can chase random labels on your data will chase the noise in your labels too; a class that cannot is safe.
+
+<Example title="two hypotheses, three points">
+Take a sample of three points and a class of two hypotheses whose value vectors on the sample are $g_1 = (+1,+1,+1)$ and $g_2 = (+1,-1,+1)$: they disagree only at the middle point. Draw a uniformly random sign vector $\sigma \in \{\pm1\}^3$ and record the better of the two correlations $\tfrac{1}{3}\sigma\cdot g_k$:
+
+| $\sigma$ | $\sigma \cdot g_1$ | $\sigma \cdot g_2$ | $\max$ |
+| --- | --- | --- | --- |
+| $(+,+,+)$ | $3$ | $1$ | $3$ |
+| $(+,+,-)$ | $1$ | $-1$ | $1$ |
+| $(+,-,+)$ | $1$ | $3$ | $3$ |
+| $(+,-,-)$ | $-1$ | $1$ | $1$ |
+| $(-,+,+)$ | $1$ | $-1$ | $1$ |
+| $(-,+,-)$ | $-1$ | $-3$ | $-1$ |
+| $(-,-,+)$ | $-1$ | $1$ | $1$ |
+| $(-,-,-)$ | $-3$ | $-1$ | $-1$ |
+
+The eight maxima sum to $8$, so the expected best inner product is $1$ and the expected best correlation is $\tfrac{1}{3}$. The value is readable: the class always matches the noise at the disagreement point (that choice is worth exactly the $|\sigma_2| = 1$ in every row), while the two agreement points contribute signs that average away. One hypothesis alone would score $0$; the freedom to choose is what earns the $\tfrac13$.
+</Example>
+
+### The definition, and its two endpoints
+
+<Definition title="empirical Rademacher complexity (Mohri Def. 3.1)">
+Let $\mathcal{G}$ be a family of real-valued functions on a domain $\mathcal{Z}$ and $S = (z_1, \dots, z_n)$ a fixed sample. The **empirical Rademacher complexity** of $\mathcal{G}$ on $S$ is
+$$
+\widehat{\mathfrak{R}}_S(\mathcal{G}) \;=\; \mathbb{E}_{\sigma}\!\left[\, \sup_{g \in \mathcal{G}} \frac{1}{n} \sum_{i=1}^{n} \sigma_i\, g(z_i) \right],
+$$
+where $\sigma_1, \dots, \sigma_n$ are independent uniform $\{\pm1\}$ variables, the *Rademacher variables*. The **Rademacher complexity** at sample size $n$ is its average over samples, $\mathfrak{R}_n(\mathcal{G}) = \mathbb{E}_{S \sim \mathcal{D}^n}[\widehat{\mathfrak{R}}_S(\mathcal{G})]$.
+</Definition>
+
+The computation above is the definition applied to $|\mathcal{G}| = 2$: $\widehat{\mathfrak{R}}_S = \tfrac13$. Two boundary cases calibrate the scale. A class with one function scores $0$: with nothing to choose, $\mathbb{E}_\sigma[\sigma \cdot g] = 0$, and noise cannot be fit at all. The class of *all* $\pm1$-valued functions scores $1$: whatever signs arrive, some function reproduces them exactly. Every class lives between those extremes, and where it lives depends on the sample $S$ in hand, not on a worst-case placement.
+
+<FigureSequence
+  name="noise-correlation"
+  alt="Three frames, each showing the same 14 points under a fresh random sign assignment, with a left panel giving the best halfspace and its correlation (0.43, 0.71, 0.86) and a right panel showing a tiny-bandwidth RBF memorizer scoring correlation 1.00 every time"
+  caption="Richness as noise-chasing: three draws of random signs on one 14-point sample. Halfspaces fit the noise imperfectly; the memorizer class fits every draw perfectly."
+/>
+
+Step through the three frames watching only the two printed correlations. The halfspace values fluctuate with the draw ($0.43$, $0.71$, $0.86$; averaging over many draws gives $\widehat{\mathfrak{R}}_S \approx 0.62$ for this sample), while the memorizer is pinned at $1.00$. A perfect score against pure noise is the signature of <Ref lesson="statistical-learning">the memorizer of lesson one</Ref>, now read off a single number.
+
+<KeyFact>
+The supremum is what makes the number a capacity: replacing $\sup_g$ by an average over $\mathcal{G}$ gives $0$ for every class, because each individual $g$ is uncorrelated with fresh noise. Rademacher complexity prices the *selection* the learner performs, the same selection <Ref lesson="learning-theory">the 1,000-coins experiment</Ref> showed is where generalization is lost.
+</KeyFact>
+
+### What the definition sees that counting does not
+
+Two properties distinguish the definition from everything in the previous lesson. It is *data-dependent*: $\widehat{\mathfrak{R}}_S$ is a functional of the sample you have, computable (in principle) by simulation, as the figure's numbers were. And it is defined for *real-valued* classes, not just binary ones, so losses, margins, and regression functions can be measured directly; that generality is what the module's remaining lessons spend.
+
+<Exercise>
+Symmetrize the worked example: enlarge the class to $\mathcal{G}' = \{g_1, -g_1, g_2, -g_2\}$ on the same three points and recompute $\widehat{\mathfrak{R}}_S(\mathcal{G}')$ by the same eight-row enumeration. Predict before computing whether it can decrease.
+
+<Solution>
+Strategy hint: with $\pm g$ both present, the supremum becomes $\max(|\sigma\cdot g_1|, |\sigma\cdot g_2|)/3$.
+
+For each $\sigma$, $\max(|\sigma\cdot g_1|, |\sigma\cdot g_2|) = \max(|\sigma_1+\sigma_2+\sigma_3|, |\sigma_1-\sigma_2+\sigma_3|)$. Rows of the table: $(+,+,+)\!:3$, $(+,+,-)\!:1$, $(+,-,+)\!:3$, $(+,-,-)\!:1$, and the four sign-flipped rows repeat the same values by symmetry. The sum is $2(3+1+3+1) = 16$, the expectation $2$, and $\widehat{\mathfrak{R}}_S(\mathcal{G}') = \tfrac{2}{3}$: doubling the class doubled the complexity here. It can never decrease: a supremum over a superset is at least the supremum over the subset, so $\mathcal{G} \subseteq \mathcal{G}'$ forces $\widehat{\mathfrak{R}}_S(\mathcal{G}) \le \widehat{\mathfrak{R}}_S(\mathcal{G}')$. The transferable move: monotonicity in the class is immediate from the definition, with none of the combinatorial work a growth-function comparison would need.
+</Solution>
+</Exercise>
+
+## The master bound: risk pays twice the noise correlation
+
+The quantity earns its place by appearing in a uniform convergence theorem, and the proof route is new: no union bound over behaviors, but a concentration inequality — stated here without proof — applied to the *supremum itself*, treated as a single random variable.
+
+<Theorem title="McDiarmid's inequality (McDiarmid 1989; Mohri Thm. D.8)">
+Let $X_1, \dots, X_n$ be independent and let $f$ satisfy the bounded-differences condition: changing the $i$-th argument alone changes $f$ by at most $c_i$. Then for any $\varepsilon > 0$,
+$$
+\Pr\big[f(X_1,\dots,X_n) - \mathbb{E}[f] \ge \varepsilon\big] \;\le\; \exp\!\left(\frac{-2\varepsilon^2}{\sum_{i=1}^n c_i^2}\right).
+$$
+</Theorem>
+
+Hoeffding is the special case where $f$ is an average; the gain is that $f$ may be any stable-enough functional, including a supremum over an infinite class.
+
+<Theorem title="Rademacher generalization bound (Mohri Thm. 3.3)">
+Let $\mathcal{G}$ be a family of functions from $\mathcal{Z}$ to $[0,1]$. For any $\delta > 0$, with probability at least $1-\delta$ over an iid sample $S$ of size $n$, every $g \in \mathcal{G}$ satisfies
+$$
+\mathbb{E}[g(z)] \;\le\; \frac{1}{n}\sum_{i=1}^n g(z_i) \;+\; 2\,\mathfrak{R}_n(\mathcal{G}) \;+\; \sqrt{\frac{\ln(1/\delta)}{2n}},
+$$
+and likewise with $2\widehat{\mathfrak{R}}_S(\mathcal{G})$ in place of $2\mathfrak{R}_n(\mathcal{G})$ at the cost of $3\sqrt{\ln(2/\delta)/2n}$.
+
+<Proof>
+Roadmap: (1) show the worst gap $\Phi(S) = \sup_g (\mathbb{E}[g] - \widehat{\mathbb{E}}_S[g])$ has bounded differences and concentrate it with McDiarmid; (2) bound $\mathbb{E}[\Phi]$ by $2\mathfrak{R}_n(\mathcal{G})$ by symmetrization. Both key steps are carried; the empirical variant is one more McDiarmid application plus a union bound, and is left to Mohri §3.1.
+
+**Step 1: bounded differences.** Replace one point of $S$ to get $S'$. For any single $g$, the empirical average moves by at most $1/n$ (one summand in $[0,1]$ changes), and a difference of suprema never exceeds the supremum of differences, so $|\Phi(S) - \Phi(S')| \le 1/n$. McDiarmid with $c_i = 1/n$ gives, with probability $1-\delta$,
+$$
+\Phi(S) \;\le\; \mathbb{E}_S[\Phi(S)] + \sqrt{\frac{\ln(1/\delta)}{2n}}.
+$$
+
+**Step 2: symmetrization in expectation.** Introduce a ghost sample $S'$ of $n$ fresh iid points. Since $\mathbb{E}[g] = \mathbb{E}_{S'}[\widehat{\mathbb{E}}_{S'}[g]]$, pulling the expectation outside the supremum (Jensen, applied to the convex sup) gives
+$$
+\mathbb{E}_S[\Phi(S)] \;\le\; \mathbb{E}_{S,S'}\Big[\sup_{g} \frac{1}{n}\sum_{i=1}^n \big(g(z_i') - g(z_i)\big)\Big].
+$$
+Now insert random signs: for each $i$, swapping $z_i \leftrightarrow z_i'$ leaves the joint distribution of $(S, S')$ unchanged, and multiplying the $i$-th difference by $\sigma_i \in \{\pm1\}$ is exactly such a swap. Averaging over all $2^n$ swap patterns therefore changes nothing:
+$$
+\mathbb{E}_{S,S'}\Big[\sup_g \frac{1}{n}\sum_i \big(g(z_i') - g(z_i)\big)\Big]
+= \mathbb{E}_{\sigma,S,S'}\Big[\sup_g \frac{1}{n}\sum_i \sigma_i\big(g(z_i') - g(z_i)\big)\Big].
+$$
+Splitting the supremum over the two terms (sub-additivity) and using that $\sigma_i$ and $-\sigma_i$ are identically distributed yields two identical Rademacher averages, one per sample: the right side is at most $2\,\mathfrak{R}_n(\mathcal{G})$. Combining with step 1 proves the first bound.
+</Proof>
+</Theorem>
+
+For binary classification under zero–one loss the loss class and the hypothesis class are tied by an exact factor: $\mathbf{1}[h(x) \ne y] = (1 - y\,h(x))/2$, so the loss family's Rademacher complexity is half the hypothesis class's (Mohri Lem. 3.4), and the bound reads, for every $h \in \mathcal{H}$ simultaneously,
+$$
+R(h) \;\le\; \widehat{R}_S(h) \;+\; \mathfrak{R}_n(\mathcal{H}) \;+\; \sqrt{\frac{\ln(1/\delta)}{2n}}.
+$$
+
+### Massart converts the old currencies
+
+The previous two lessons' bounds are special cases, by one maximal inequality.
+
+<Theorem title="Massart's lemma (Massart 2000; Mohri Thm. 3.7)">
+Let $A \subset \mathbb{R}^n$ be finite with $r_A = \max_{a \in A} \lVert a \rVert_2$. Then
+$$
+\mathbb{E}_\sigma\Big[\max_{a \in A} \frac{1}{n}\sum_{i=1}^n \sigma_i a_i\Big] \;\le\; \frac{r_A\sqrt{2\ln|A|}}{n}.
+$$
+</Theorem>
+
+On a fixed sample, a binary class realizes at most $|\mathcal{H}_S|$ distinct value vectors, each of norm exactly $\sqrt{n}$, so $\widehat{\mathfrak{R}}_S(\mathcal{H}) \le \sqrt{2\ln|\mathcal{H}_S|/n}$. Reading $|\mathcal{H}_S|$ three ways recovers the whole module: at most $|\mathcal{H}|$ for a finite class, giving back <Ref lesson="learning-theory">the finite-class rate</Ref> up to constants; at most the growth function $\tau_{\mathcal{H}}(n)$, giving <Ref lesson="vc-dimension">the ceiling the previous lesson's exercise computed</Ref> ($0.85$ for halfspaces on 20 points); and at most $(en/d)^d$ by Sauer, giving the VC bound $\sqrt{2d\ln(en/d)/n}$. The machinery strictly generalizes: everything counting could price, correlation prices too.
+
+<Figure
+  src="./figures/three-rulers.svg"
+  alt="A table of four hypothesis classes against three capacity measures, showing the finite-class bound failing beyond finite classes, VC failing on norm balls and RBF balls, Rademacher finite for all four, and a bottom row noting the fitted algorithm is invisible to all three"
+  caption="The module's map, updated. Each ruler reads finite strictly later than the one before it; none of the three sees the algorithm."
+/>
+
+<KeyFact>
+The conversion only goes one way. Massart turns any counting bound into a Rademacher ceiling, but the next section computes $\widehat{\mathfrak{R}}_S$ directly for a class whose growth function is $2^n$ forever — capacity that counting calls infinite and correlation calls small.
+</KeyFact>
+
+## The norm ball: four lines, and no dimension anywhere
+
+The debts are owed by one class: linear functions of bounded norm, $\mathcal{H} = \{x \mapsto \langle w, x\rangle : \lVert w \rVert \le \Lambda\}$, the set every $\ell_2$-regularized fit of <Ref lesson="ridge-lasso">module 3</Ref> and every SVM actually searches. Its VC dimension is the ambient $d$: useless for $d = 10^6$, meaningless for the RBF feature space. Its empirical Rademacher complexity is a four-line computation.
+
+Fix the sample and collect the signs inside the inner product: $\sum_i \sigma_i \langle w, x_i\rangle = \langle w, u\rangle$ with $u = \sum_i \sigma_i x_i$. The whole computation is now about one random vector. The ball's best response to the noise is to align with $u$, which is worth exactly $\Lambda\lVert u\rVert$; and $u$ is short, because a sum of independently signed vectors cancels most of its own length.
+
+<Figure
+  src="./figures/norm-ball-alignment.svg"
+  alt="Left: eight signed sample vectors chained tip to tail, meandering through 12.7 units of steps to a resultant u of length 3.6. Right: the norm ball with the best hypothesis drawn on its boundary aligned with u, labeled sup of the inner product equals Lambda times the norm of u."
+  caption="Both halves of the computation: the signed points chain into a short resultant u (left), and the ball's supremum is alignment with it, worth Λ‖u‖ (right)."
+/>
+
+<Theorem title="Rademacher complexity of the norm ball (Mohri Thm. 5.10)">
+Let $S = (x_1, \dots, x_n)$ with $\lVert x_i \rVert \le r$ for all $i$, and $\mathcal{H} = \{x \mapsto \langle w, x \rangle : \lVert w \rVert \le \Lambda\}$. Then
+$$
+\widehat{\mathfrak{R}}_S(\mathcal{H}) \;\le\; \frac{r\Lambda}{\sqrt{n}}.
+$$
+
+<Proof>
+$$
+\begin{aligned}
+\widehat{\mathfrak{R}}_S(\mathcal{H})
+&= \frac{1}{n}\,\mathbb{E}_\sigma\Big[\sup_{\lVert w\rVert \le \Lambda} \Big\langle w, \sum_{i=1}^n \sigma_i x_i \Big\rangle\Big]
+= \frac{\Lambda}{n}\,\mathbb{E}_\sigma\Big[\Big\lVert \sum_{i=1}^n \sigma_i x_i \Big\rVert\Big] \\
+&\le \frac{\Lambda}{n}\,\Big(\mathbb{E}_\sigma\Big[\Big\lVert \sum_{i=1}^n \sigma_i x_i \Big\rVert^2\Big]\Big)^{1/2}
+= \frac{\Lambda}{n}\,\Big(\sum_{i=1}^n \lVert x_i \rVert^2\Big)^{1/2}
+\le \frac{\Lambda\sqrt{n r^2}}{n} = \frac{r\Lambda}{\sqrt{n}}.
+\end{aligned}
+$$
+The second equality is Cauchy–Schwarz with the ball's supremum attained at $w = \Lambda u/\lVert u \rVert$ for $u = \sum_i \sigma_i x_i$; the first inequality is Jensen ($\mathbb{E}|X| \le \sqrt{\mathbb{E}X^2}$); the following equality expands the square and uses $\mathbb{E}[\sigma_i\sigma_j] = 0$ for $i \ne j$.
+</Proof>
+</Theorem>
+
+The capacity of the ball is the norm budget times the data radius, per $\sqrt{n}$. **No dimension appears.** The same $r\Lambda/\sqrt{n}$ holds for two features or a million, and it is finite for a class whose VC dimension says "shatters everything". What is charged is not how many directions exist but how far the fitted vector is allowed to reach, which is exactly what <Ref lesson="ridge-lasso">the $\ell_2$ penalty</Ref> constrains.
+
+<Figure
+  src="./figures/dimension-free.svg"
+  alt="Plot of two capacity terms against feature dimension on a log axis at n equals 3,065: the VC term rises with d and crosses into vacuity near d equals 570, while the norm-ball term stays flat at 0.18 from d equals 2 to d equals one million."
+  caption="No dimension appears, drawn: at n = 3,065 the VC route through the same ball grows with the ambient d and is vacuous past d ≈ 570; rΛ/√n reads 0.18 at every d."
+/>
+
+### The kernel version, and the tool for margins
+
+Substituting a feature map $\Phi$ for $x$ costs the argument nothing, because only norms and inner products were used; the closing exercises carry it. The result (Mohri Thm. 6.12): for a kernel with Gram matrix $K = [K(x_i, x_j)]_{ij}$ on the sample and $\mathcal{H} = \{x \mapsto \langle w, \Phi(x)\rangle : \lVert w \rVert \le \Lambda\}$,
+$$
+\widehat{\mathfrak{R}}_S(\mathcal{H}) \;\le\; \frac{\Lambda\sqrt{\operatorname{Tr}[K]}}{n} \;\le\; \sqrt{\frac{r^2\Lambda^2}{n}}, \qquad K(x,x) \le r^2 .
+$$
+This is the capacity term written on <Ref lesson="svm-dual-kernels">the debt note</Ref>: $\operatorname{Tr}[K]$ and the norm budget, an infinite-dimensional feature space priced by a finite trace. What the note also carries is a margin parameter $\rho$, and connecting a *margin* loss to the zero–one risk needs one more tool, stated now and spent next lesson.
+
+<Theorem title="Talagrand's contraction lemma (Mohri Lem. 5.7)">
+If $\varphi_1, \dots, \varphi_n$ are $c$-Lipschitz functions $\mathbb{R} \to \mathbb{R}$, then for any real-valued class $\mathcal{H}$,
+$$
+\mathbb{E}_\sigma\Big[\sup_{h}\frac1n\sum_i \sigma_i\, \varphi_i(h(x_i))\Big] \;\le\; c\;\widehat{\mathfrak{R}}_S(\mathcal{H}).
+$$
+</Theorem>
+
+Composing every hypothesis with a fixed Lipschitz map, a loss, a clipped margin, a link function, costs at most the Lipschitz constant. This is why measuring $\mathcal{H}$ itself suffices: the complexity of "loss of $\mathcal{H}$" never exceeds $c$ times the complexity of $\mathcal{H}$, with no fresh analysis per loss.
+
+<KeyFact>
+The pair proved in this section, $\widehat{\mathfrak{R}}_S(\text{ball}) \le r\Lambda/\sqrt{n}$ and contraction, is the complete toolkit of <Ref lesson="margin-bounds">the next lesson</Ref>: margin bound $=$ contraction applied to the clipped margin loss $+$ the ball computation. Both debts are paid with these two results and nothing else.
+</KeyFact>
+
+## Stability: bound the algorithm, not the class
+
+Everything so far, Rademacher included, is uniform over a class, and the ball bound wears the three costs of that quantifier. It charges for the worst vector in the ball, never for the $h_S$ ridge actually returns: the certificate is priced at radius $\Lambda$ even when the fit lands near the center. It sees the algorithm only through a norm budget named before the data arrive — the penalty does supply one (a minimizer of $\widehat{R}_S(h) + \lambda\lVert h\rVert^2$ does no worse than $h = 0$, so a loss bounded by $M$ confines it to $\lVert h\rVert \le \sqrt{M/\lambda}$, and the certificate genuinely tightens as $\lambda$ grows), but only that a-priori budget, nothing about what the fit did with the sample. And it says nothing at all about algorithms that fix no ball: unregularized ERM, 1-nearest-neighbor, and gradient descent stopped early each search an unbounded set, and every uniform bound in this module prices an unbounded set at infinity. From a theory whose subject is why fitted models generalize, one would expect the map from sample to fitted model to be the object of study; so far it enters only through the set it searches. The second refinement removes the class from the analysis entirely and studies the map $S \mapsto h_S$ that the algorithm is.
+
+The object it studies is sensitivity to one training point. Write $S^{(i)}$ for the sample $S$ with its $i$-th point replaced by an independent fresh point $z'$, write $h_S$ for the hypothesis the algorithm $A$ returns on $S$, and write $L_z(h)$ for the loss of $h$ at the point $z$. The first result is not a bound but an identity.
+
+<Theorem title="the replace-one identity (SSBD Thm. 13.2)">
+For any learning algorithm $A$, any distribution $\mathcal{D}$, and $i$ drawn uniformly from $\{1,\dots,n\}$,
+$$
+\mathbb{E}_{S}\big[R(h_S) - \widehat{R}_S(h_S)\big] \;=\; \mathbb{E}_{S, z', i}\big[L_{z_i}(h_{S^{(i)}}) - L_{z_i}(h_S)\big].
+$$
+
+<Proof>
+Both sides are computed on the joint draw of $S$ and $z'$. For the risk term: $z'$ is a fresh point for $h_S$, and swapping the names of $z_i$ and $z'$ leaves the joint distribution unchanged, so for every $i$,
+$$
+\mathbb{E}_S[R(h_S)] = \mathbb{E}_{S,z'}\big[L_{z'}(h_S)\big] = \mathbb{E}_{S,z'}\big[L_{z_i}(h_{S^{(i)}})\big].
+$$
+For the empirical term, linearity of expectation gives $\mathbb{E}_S[\widehat{R}_S(h_S)] = \mathbb{E}_{S,i}[L_{z_i}(h_S)]$. Subtracting the two displays, then averaging the first over uniform $i$, yields the identity.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/identity-measured.svg"
+  alt="Per-point losses of one cubic least-squares fit on 20 points: for each i, the loss at z_i when trained on it (amber) and when it was replaced before the fit (blue), with dashed lines at the two means, and the two expectations over 200,000 Monte Carlo draws printed equal at 0.54."
+  caption="The identity, measured on cubic least squares: each point's loss when trained on (amber) versus when swapped out before the fit (blue). Any single point can go either way; the gap between the averages is, in expectation, exactly the generalization gap — 0.54 both ways over 200,000 draws."
+/>
+
+The right side is the loss at $z_i$ when it was held out minus the loss when it was trained on: the *replace-one gap*. The identity says overfitting in expectation **is** instability, for every algorithm, with no hypotheses at all. An algorithm whose output barely moves when one point is swapped has, in expectation, no generalization gap to explain.
+
+<KeyFact>
+Every capacity bound of the last three lessons is one sufficient condition for the expected replace-one gap to be small; the identity is the ground truth they all approximate.
+</KeyFact>
+
+### From the identity to a high-probability bound
+
+The identity controls an expectation. A guarantee for the one sample you have needs the sensitivity to hold not on average but always, and that is a strictly stronger property; the two must not be conflated. The expectation version above (SSBD's *on-average* stability) is free but weak; the theorems below buy high-probability bounds and pay for them with a supremum.
+
+<Definition title="uniform stability (Bousquet &amp; Elisseeff 2002; Mohri Def. 14.1)">
+An algorithm $A$ is **uniformly $\beta$-stable** if for *any* two samples $S, S'$ of size $n$ differing in a single point and *every* test point $z$,
+$$
+\big|L_z(h_S) - L_z(h_{S'})\big| \;\le\; \beta .
+$$
+</Definition>
+
+The quantifiers are the content: any neighboring pair, every $z$, worst case throughout. A constant algorithm is $0$-stable and useless, so stability alone is never the goal; the productive question is how much fitting is compatible with a given $\beta$. At the other extreme, 1-NN is not usefully stable: replacing one training point repaints its entire Voronoi cell, so the loss at points in the cell changes by a constant, and $\beta$ does not shrink with $n$.
+
+<Theorem title="stability implies generalization (Bousquet &amp; Elisseeff 2002; Mohri Thm. 14.2)">
+Let $L$ be bounded by $M$ and $A$ uniformly $\beta$-stable. With probability at least $1-\delta$ over $S \sim \mathcal{D}^n$,
+$$
+R(h_S) \;\le\; \widehat{R}_S(h_S) \;+\; \beta \;+\; \big(2n\beta + M\big)\sqrt{\frac{\ln(1/\delta)}{2n}} .
+$$
+
+<Proof>
+Roadmap: apply McDiarmid to $\Phi(S) = R(h_S) - \widehat{R}_S(h_S)$; stability enters twice, once in the bounded differences and once in the expectation.
+
+**Bounded differences.** Replacing one point changes $\Phi$ through three routes: the risk of the returned hypothesis moves by at most $\beta$ (stability applied under the expectation over $z$); the $n-1$ shared training losses move by at most $\beta$ each; and the swapped point's own loss term moves by at most $M/n$. Total: $|\Phi(S) - \Phi(S')| \le 2\beta + M/n$, so McDiarmid gives $\Phi(S) \le \mathbb{E}[\Phi] + (2n\beta + M)\sqrt{\ln(1/\delta)/2n}$ with probability $1-\delta$.
+
+**The expectation.** By the replace-one identity, $\mathbb{E}[\Phi(S)]$ equals the expected replace-one gap, and uniform stability bounds that gap pointwise by $\beta$. Hence $\mathbb{E}[\Phi] \le \beta$, completing the proof.
+</Proof>
+</Theorem>
+
+The bound converges exactly when $\beta = o(1/\sqrt{n})$: the concentration term multiplies $\beta$ by $2n\sqrt{\ln(1/\delta)/2n} \sim \sqrt{n}$. An algorithm with $\beta = O(1/n)$ therefore generalizes at the familiar $O(1/\sqrt{n})$ rate, and everything reduces to identifying the algorithms that achieve $\beta = O(1/n)$. The answer is the lesson's title.
+
+## Regularization is stability: the Tikhonov theorem
+
+The algorithms that achieve it are the ones <Ref lesson="ridge-lasso">module 3</Ref> built. Let $\mathbb{H}$ be the RKHS of a kernel $K$ (for the linear kernel, plain weight vectors with $\lVert h \rVert_K = \lVert w \rVert$), and consider *regularized loss minimization*: return the minimizer over $\mathbb{H}$ of
+$$
+F_S(h) \;=\; \widehat{R}_S(h) + \lambda \lVert h \rVert_K^2 .
+$$
+Ridge regression, kernel ridge regression, the soft-margin SVM, and SVR are all instances, differing only in the loss. Two regularity conditions are needed. The loss is convex in the prediction, and it is Lipschitz in it:
+
+<Definition title="c-admissibility (Mohri Def. 14.3, there written σ-admissibility)">
+A loss $L$ is **$c$-admissible** if $|L(h'(x), y) - L(h(x), y)| \le c\,|h'(x) - h(x)|$ for all $h, h'$ and all $(x,y)$: changing the prediction by $\varepsilon$ changes the loss by at most $c\varepsilon$. The hinge loss and the $\epsilon$-insensitive loss have $c = 1$; the squared loss, when all predictions and labels stay in a range bounded by $\sqrt{M}$, has $c = 2\sqrt{M}$.
+</Definition>
+
+(The constant is Mohri's $\sigma$; this lesson writes $c$ because $\sigma_i$ already names the random signs.)
+
+### The theorem: a steep bowl cannot follow one point
+
+The theorem is the module's meeting point: every estimator on the list above enters convex and $c$-admissible, and leaves uniformly stable.
+
+<Theorem title="Tikhonov regularization is stable (Mohri Prop. 14.4)">
+Let $K(x,x) \le r^2$ on the domain and let $L$ be convex and $c$-admissible. The regularized-loss minimizer is uniformly $\beta$-stable with
+$$
+\beta \;\le\; \frac{c^2 r^2}{n\lambda}.
+$$
+
+<Proof>
+Roadmap: strong convexity applied at both minimizers turns "the two objectives differ at one point" into "the two minimizers are close"; admissibility converts closeness of functions into closeness of losses. Let $h$ minimize $F_S$, let $h'$ minimize $F_{S'}$ where $S'$ replaces $z_n$ by $z_n'$, and set $\Delta = h' - h$.
+
+**The two-point argument.** $F_S$ is the sum of a convex function and $\lambda\lVert\cdot\rVert_K^2$, hence $2\lambda$-strongly convex, and a $2\lambda$-strongly convex function exceeds its minimum by at least $\lambda \times$ squared distance (SSBD Lem. 13.5, which needs no differentiability). Applying this at each minimizer:
+$$
+F_S(h') - F_S(h) \ge \lambda\lVert\Delta\rVert_K^2,
+\qquad
+F_{S'}(h) - F_{S'}(h') \ge \lambda\lVert\Delta\rVert_K^2 .
+$$
+Adding the two, the regularizers cancel in pairs and only empirical risks remain:
+$$
+2\lambda\lVert\Delta\rVert_K^2 \;\le\; \widehat{R}_S(h') - \widehat{R}_S(h) + \widehat{R}_{S'}(h) - \widehat{R}_{S'}(h').
+$$
+
+**One point survives.** $S$ and $S'$ share $n-1$ points, whose loss terms cancel across the four sums, leaving
+$$
+2\lambda\lVert\Delta\rVert_K^2 \;\le\; \frac{1}{n}\Big[L_{z_n}(h') - L_{z_n}(h) + L_{z_n'}(h) - L_{z_n'}(h')\Big]
+\;\le\; \frac{c}{n}\Big(|\Delta(x_n)| + |\Delta(x_n')|\Big),
+$$
+by $c$-admissibility. The reproducing property and Cauchy–Schwarz give $|\Delta(x)| = |\langle \Delta, K(x,\cdot)\rangle| \le r\lVert\Delta\rVert_K$, so $2\lambda\lVert\Delta\rVert_K^2 \le (2cr/n)\lVert\Delta\rVert_K$, that is
+$$
+\lVert\Delta\rVert_K \;\le\; \frac{c\,r}{n\lambda}.
+$$
+
+**Back to losses.** For any $z$: $|L_z(h') - L_z(h)| \le c\,|\Delta(x)| \le c\,r\lVert\Delta\rVert_K \le c^2r^2/(n\lambda)$. (Mohri's proof runs the same argument through generalized Bregman divergences with subgradients, which is what licenses non-differentiable losses like the hinge.)
+</Proof>
+</Theorem>
+
+Strong convexity is the penalty term making the objective's bowl steep, so a perturbation of size $1/n$ in the objective can move the minimizer only $O(1/(n\lambda))$; the $\lambda$ in the denominator of $\beta$ *is* the steepness the penalty bought.
+
+### The corollaries, with every constant explicit
+
+Plugging $\beta$ into the stability theorem prices the module's algorithms one by one:
+
+- **SVM** (hinge, $c = 1$): $\beta \le r^2/(n\lambda)$, and with probability $1-\delta$, $\;R(h_S) \le \widehat{R}_S(h_S) + \frac{r^2}{n\lambda} + \big(\frac{2r^2}{\lambda} + \frac{r}{\sqrt\lambda} + 1\big)\sqrt{\frac{\ln(1/\delta)}{2n}}$ (Mohri Cor. 14.8), where the middle factor's extra terms bound the loss ceiling $M$.
+- **Kernel ridge regression** (squared loss bounded by $M$): $\beta \le 4Mr^2/(n\lambda)$ (Cor. 14.6).
+- **SVR** ($\epsilon$-insensitive, $c=1$): $\beta \le r^2/(n\lambda)$ (Cor. 14.5).
+
+<Example title="the SVM corollary, evaluated">
+Take an RBF-kernel SVM on the module's $n = 3{,}065$ spam messages. The RBF kernel has $K(x,x) = 1$, so $r = 1$, and at $\delta = 0.05$ the concentration factor is $\sqrt{\ln(20)/(2 \cdot 3065)} = 0.0221$.
+
+At $\lambda = 0.01$: the stability term is $\tfrac{1}{3065 \cdot 0.01} = 0.033$, the middle factor is $\tfrac{2}{0.01} + \tfrac{1}{\sqrt{0.01}} + 1 = 211$, and the excess over the empirical hinge risk is $0.033 + 211 \times 0.0221 \approx 4.7$ — vacuous several times over against a zero–one risk that cannot exceed $1$.
+
+At $\lambda = 1$: the stability term is $\tfrac{1}{3065} \approx 0.0003$, the factor is $2 + 1 + 1 = 4$, and the excess is $0.0003 + 4 \times 0.0221 \approx 0.09$. Because the hinge dominates the zero–one loss, this certifies that the SVM's true misclassification rate exceeds its empirical hinge risk by at most nine percentage points. The threshold $1/\sqrt{n} \approx 0.018$ separates the two settings — and, as with every certificate in this module, the $\lambda$ that certifies best need not be the $\lambda$ that predicts best.
+</Example>
+
+Nothing in the three corollaries mentions a feature dimension, a VC dimension, or even a hypothesis class. The RBF machine's second answer is now on the table: by the norm-ball bound, the *ball it searches* has small capacity, and by this theorem, the *algorithm that searches it* is stable, each argument sufficient on its own, neither aware of the infinite-dimensional space.
+
+<Figure
+  src="./figures/stability-mechanism.svg"
+  alt="Two panels of the same 12-point regression dataset with one point replaced (hollow marker dropped to a blue one), each showing the ridge fits before and after the replacement; at lambda 0.1 the two lines split visibly with max prediction change 1.95, at lambda 100 they nearly coincide with change 0.42"
+  caption="Stability, mechanically: one replaced point (hollow → blue), two ridge fits. The penalty pins the fit; β is the price the replaced point can no longer extract."
+/>
+
+<Task>
+Read the two printed numbers on the figure. The replaced point is identical in both panels; only $\lambda$ changed, and the maximum prediction change fell from $1.95$ to $0.42$. Verify the direction against $\beta \le c^2r^2/(n\lambda)$, and note the price visible in the right panel: the stable fit is also the more biased one, both lines flattened well below the trend.
+</Task>
+
+### What the bound costs, and where it dies
+
+The guarantee is monotone in $\lambda$, and that reading has teeth at both ends. The generalization term behaves as $O\big(\tfrac{1}{\lambda\sqrt n}\big)$, so the certificate is informative only when $\lambda \gg 1/\sqrt{n}$: meaningful regularization, not a numerical token — the worked example's two settings sit on opposite sides of exactly that line. As $\lambda \to 0$ the bound diverges: the theory's guarantee evaporates *exactly* when the regularization does.
+
+The divergence is the certificate's, not necessarily the algorithm's. Measured on a concrete instance — the no-intercept ridge slope minimizing $\frac1n\sum_i(y_i - wx_i)^2 + \lambda w^2$ on $n = 100$ points of $y = 0.6x + \varepsilon$ with $x$ uniform on $[0,10]$, refit fifty times per $\lambda$ with one training point replaced by a fresh draw — the sensitivity saturates. Below $\lambda \approx \overline{x^2} \approx 33$, the average squared input, the squared loss's own curvature already pins the minimizer: shrinking $\lambda$ from $33$ by three more orders of magnitude leaves the maximum prediction change at the unregularized value near $0.10$, while $c^2r^2/(n\lambda)$ grows a thousand-fold. The bound is a worst case over every convex admissible loss and every dataset in the ball, and it becomes sharp only in the strongly regularized regime past that crossover. The minimum-norm interpolators of <Ref lesson="double-descent">module 11</Ref> live at the far end of the gap, generalizing in practice at $\lambda \to 0$ where this theorem says nothing at all, which is precisely why they will require a new story.
+
+<Figure
+  src="./figures/beta-measured.svg"
+  alt="Log-log plot of the measured maximum prediction change after replacing one training point, for lambda from 0.01 to 1000: flat near 0.10 up to lambda about 33, then falling toward a dashed 1-over-lambda line marking the bound's shape, with the crossover at lambda equal to the mean squared input marked in blue"
+  caption="Measured replace-one sensitivity against the bound's shape: below the crossover λ ≈ mean x² the fit is only as stable as OLS and the 1/λ divergence is the certificate's alone; past it, measurement and bound decay together."
+/>
+
+<KeyFact>
+The theorem certifies the $\lambda$ committed to before the data arrive. A $\lambda$ tuned on $S$ — <Ref lesson="cross-validation-bootstrap">module 5's cross-validation</Ref> — is a selection among candidate algorithms, and the certificate survives only if it pays for the selection: over a grid of $k$ values, applying the bound to each at confidence $\delta/k$ keeps it valid at the price of $\ln k$ inside the concentration term, while a $\lambda$ found by unrestricted search on $S$ inherits no guarantee from this theorem at all.
+</KeyFact>
+
+## Two lenses, one module
+
+The lesson's two halves are the module's two possible subjects, and they triangulate with results the course already owns. Module 3 introduced $\lambda\lVert w\rVert^2$ as a bias–variance dial; this lesson proves the same knob is a stability dial, and the replace-one gap it controls is, by the identity, the expected generalization gap itself — the quantity <Ref lesson="cross-validation-bootstrap">module 5's leave-one-out protocols</Ref> estimate empirically, one held-out point at a time. Penalty, stability, and honest measurement are one mechanism seen from three modules.
+
+<Figure
+  src="./figures/reg-stab-gen.svg"
+  alt="A triangle connecting the module-3 penalty, this lesson's stability coefficient bound, and generalization, with edges labeled strong convexity, McDiarmid plus the identity, and cross-validation choosing lambda"
+  caption="The triangle this lesson closes: the penalty buys stability (strong convexity), stability is generalization (the identity, plus McDiarmid for high probability), and module 5's protocols pick the λ that trades them."
+/>
+
+| | capacity (VC, Rademacher) | stability |
+| --- | --- | --- |
+| object bounded | the worst $h$ in a class | the one $h_S$ the algorithm returns |
+| sees the data | Rademacher: yes; VC: no | yes, through $r$ and the sample |
+| sees the algorithm | never | only the algorithm |
+| applies to | any procedure searching $\mathcal{H}$ | strongly convex regularized minimizers (here) |
+| cannot see | the returned $h_S$, only the ball around it; anything with no norm budget (1-NN, early stopping) | anything about ERM without a penalty |
+| pays the module's debts | kernel ball: yes, with margins | SVM/KRR: yes, via $\beta \le c^2r^2/(n\lambda)$ |
+
+What stands established: Rademacher complexity measures a class by its best correlation with random signs on the sample at hand; McDiarmid converts it into uniform convergence at a price of twice the complexity; Massart shows every counting bound of the module is its special case; the norm ball costs $r\Lambda/\sqrt n$ and the kernel ball $\Lambda\sqrt{\operatorname{Tr}[K]}/n$, with no dimension in either; the expected generalization gap of any algorithm equals its expected replace-one gap; and Tikhonov-regularized minimizers are uniformly stable with $\beta \le c^2r^2/(n\lambda)$, making ridge, KRR, SVR, and the SVM generalize by a theorem that never mentions a hypothesis class. <Ref lesson="margin-bounds">The next lesson</Ref> spends the two tools left loaded here, contraction and the ball bounds, to prove the margin bounds that pay the module's two debts in full: the kernel SVM's dimension-free guarantee and the round-count-free explanation of AdaBoost's falling test error.
+
+## Exercises
+
+<Exercise>
+Compute the empirical Rademacher complexity of $\mathcal{H} = \{h_1, h_2\}$ on two points, where the value vectors are $h_1 = (+1, +1)$ and $h_2 = (+1, -1)$, by enumerating all four sign vectors. Then compare with Massart's ceiling for $|A| = 2$, $r_A = \sqrt2$, and state which is exact.
+
+<Solution>
+The inner products: $\sigma\cdot h_1 = \sigma_1 + \sigma_2$, $\sigma\cdot h_2 = \sigma_1 - \sigma_2$, so $\max = \sigma_1 + |\sigma_2| = \sigma_1 + 1$. Enumerating: $(+,+)\!: 2$, $(+,-)\!: 2$, $(-,+)\!: 0$, $(-,-)\!: 0$; the expectation is $1$ and $\widehat{\mathfrak{R}}_S(\mathcal{H}) = 1/2$. The structure repeats the lesson's worked example: the disagreement coordinate is always matched (worth $1/2$ per point pair), the agreement coordinate averages out. Massart: $\sqrt{2}\cdot\sqrt{2\ln 2}/2 \approx 0.83$. The enumeration is exact; Massart is a ceiling for arbitrary finite sets and pays for its generality here by a factor of $1.7$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Carry the kernel version the lesson only stated: for a PDS kernel $K$ with feature map $\Phi$ and $\mathcal{H} = \{x \mapsto \langle w, \Phi(x)\rangle : \lVert w\rVert \le \Lambda\}$, prove $\widehat{\mathfrak{R}}_S(\mathcal{H}) \le \Lambda\sqrt{\operatorname{Tr}[K]}/n$, and evaluate it for an RBF kernel on any sample of $n$ points. Write the whole chain before checking; every step has a twin in the linear proof.
+
+<Solution>
+Replace $x_i$ by $\Phi(x_i)$ in the four lines: $\widehat{\mathfrak{R}}_S(\mathcal{H}) = \frac1n \mathbb{E}_\sigma \sup_{\lVert w\rVert\le\Lambda} \langle w, \sum_i \sigma_i \Phi(x_i)\rangle = \frac{\Lambda}{n}\mathbb{E}_\sigma\lVert\sum_i \sigma_i\Phi(x_i)\rVert$ (Cauchy–Schwarz, attained) $\le \frac{\Lambda}{n}(\mathbb{E}_\sigma\lVert\sum_i\sigma_i\Phi(x_i)\rVert^2)^{1/2}$ (Jensen) $= \frac{\Lambda}{n}(\sum_i \lVert\Phi(x_i)\rVert^2)^{1/2}$ (independence kills cross terms). Now the one new move: $\lVert\Phi(x_i)\rVert^2 = \langle\Phi(x_i), \Phi(x_i)\rangle = K(x_i, x_i)$, so the sum is $\operatorname{Tr}[K]$ and $\widehat{\mathfrak{R}}_S(\mathcal{H}) \le \Lambda\sqrt{\operatorname{Tr}[K]}/n$. With $K(x,x) \le r^2$ this is at most $\sqrt{r^2\Lambda^2/n}$, recovering the linear form. For the RBF kernel $K(x,x) = 1$ always, so $\operatorname{Tr}[K] = n$ exactly and $\widehat{\mathfrak{R}}_S(\mathcal{H}) \le \Lambda/\sqrt{n}$: an infinite-dimensional feature space with the capacity of a unit-radius linear problem. The transferable move: the linear argument never used coordinates, so it survives any feature map verbatim.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe, both ends of the scale. (a) Compute $\widehat{\mathfrak{R}}_S$ of a class containing a single $\pm1$-valued hypothesis, and of the class of *all* $\pm1$-valued functions on the domain, on any sample of $n$ distinct points. (b) Insert both values into the binary master bound $R(h) \le \widehat{R}_S(h) + \mathfrak{R}_n(\mathcal{H}) + \sqrt{\ln(1/\delta)/2n}$ and interpret each resulting guarantee. (c) Name the earlier result each endpoint reproduces.
+
+<Solution>
+(a) Singleton: $\mathbb{E}_\sigma[\frac1n\sum_i \sigma_i h(x_i)] = 0$, since each term has mean zero and there is no supremum to exploit. All functions: for every $\sigma$ some function satisfies $h(x_i) = \sigma_i$ exactly, so the best correlation is $1$ for every draw and $\widehat{\mathfrak{R}}_S = 1$.
+
+(b) Singleton: $R(h) \le \widehat{R}_S(h) + \sqrt{\ln(1/\delta)/2n}$, a perfect certificate with no capacity charge. All functions: $R(h) \le \widehat{R}_S(h) + 1 + \dots$, an error bound above the entire range of the loss, excluding nothing.
+
+(c) The singleton bound is Hoeffding for one pre-committed hypothesis, <Ref lesson="learning-theory">the first theorem of this module</Ref> and the warrant behind module 5's fresh-test-set protocol: capacity zero eliminates the selection charge, never the estimation one. The vacuous bound is the memorizer of <Ref lesson="statistical-learning">the opening lesson</Ref> reappearing as a capacity value: a class that fits all noise perfectly carries a certificate that promises nothing, and no theorem in this module will ever improve it, because for that class the gap really can be maximal.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "The RBF-SVM's hypothesis class has infinite VC dimension, so no finite-sample guarantee can exist for it." Name the quantifier that the refutation changes, and give both independent repairs this lesson provides.
+
+<Solution>
+The claim is true about the wrong object. Infinite VC dimension makes the *worst hypothesis in the ambient class* uncontrollable: any bound quantified "for all $h$ in the full RBF space" is indeed vacuous, and <Ref lesson="vc-dimension">the fundamental theorem's lower bound</Ref> even shows distribution-free learning of that full class is impossible. But no algorithm searches the full class. Repair one (capacity, refined): the margin objective confines the SVM to a ball $\lVert f\rVert_{\mathbb H} \le \Lambda$, and the ball's empirical Rademacher complexity is at most $\Lambda\sqrt{\operatorname{Tr}[K]}/n$, finite and dimension-free; the master bound applies to the ball. Repair two (the algorithm): the soft-margin SVM is regularized loss minimization with the hinge loss, so it is uniformly $\beta$-stable with $\beta \le r^2/(n\lambda)$, and the stability theorem bounds its risk with no class mentioned at all. The changed quantifier: "for all $h \in \mathcal{H}$" became "for the ball the algorithm actually searches" in one repair and "for the $h_S$ the algorithm actually returns" in the other. The step that fails in the claim is the leap from "the ambient class is unlearnable" to "the algorithm's output is unguaranteed"; both repairs pass between exactly those two statements.
+</Solution>
+</Exercise>
+
+<Exercise>
+Price the stability certificate for <Ref lesson="logreg-lab">the logistic-regression lab</Ref>. The lab's L2 objective is $L(w,b) + \lambda\lVert w\rVert^2$ on $n = 400$ training rows with 30 standardized features; the logistic loss is $1$-Lipschitz in its prediction ($c = 1$). Measured on the standardized training matrix, the largest row norm is $r_{\max} \approx 19.9$ (one outlying tumor) while the median row norm is $\approx 4.3$. (a) Compute the $\beta$-bound for $\lambda \in \{0.01, 1, 10\}$ using $r_{\max}$. (b) Find the $\lambda$ that certifies $\beta \le 0.05$, and judge whether a model trained at that $\lambda$ would be worth certifying. (c) Explain which feature of the *uniform* definition forces $r_{\max}$ rather than a typical radius into the constant, and what the on-average alternative would use instead.
+
+<Solution>
+(a) $\beta \le c^2r^2/(n\lambda) = 396/(400\lambda)$: about $99$ at $\lambda = 0.01$, $0.99$ at $\lambda = 1$, $0.10$ at $\lambda = 10$. The first two are vacuous against a loss of typical size well below 1.
+
+(b) $\beta \le 0.05$ requires $\lambda \ge 396/(400 \cdot 0.05) \approx 20$. At $\lambda = 20$ the penalty dwarfs the data term (whose scale is a mean log-loss under 1), and the fit is pushed toward $w = 0$: a certified model that predicts almost nothing. This is the certification-versus-selection verdict of <Ref lesson="vc-dimension">the VC lesson's spam computation</Ref> recurring under the second lens: the bound's *direction* (gap shrinks like $r^2/\lambda$ per sample) is right and usable for comparing settings, while its absolute value at practical $\lambda$ overstates the measured train–holdout gap, which the lab shows to be a few hundredths.
+
+(c) Uniform stability quantifies over *every* neighboring pair and every test point, so the single worst row, the $19.9$-norm outlier, sets $r$; one atypical point inflates the constant by $(19.9/4.3)^2 \approx 21\times$. The on-average identity would charge typical rows at typical weights instead: the expected replace-one gap averages over which point is swapped, which is exactly why it is tighter and exactly what it gives up (no high-probability statement for your particular sample).
+</Solution>
+</Exercise>
+
+<Exercise>
+Measure stability empirically. Generate a 100-point dataset $y = 0.6x + \varepsilon$, $x \sim \mathrm{U}[0, 10]$, $\varepsilon \sim \mathcal{N}(0, 1)$. For each $\lambda \in \{0.01, 1, 100\}$: fit the no-intercept slope minimizing the lesson's objective $F_S(w) = \frac{1}{n}\sum_i (y_i - wx_i)^2 + \lambda w^2$ (sklearn's `Ridge(alpha=a)` minimizes $\sum_i (y_i - wx_i)^2 + a\,w^2$, whose data term is $n$ times heavier, so pass `alpha = n*lam`), then 50 times replace one uniformly chosen point by a fresh draw, refit, and record the maximum over a grid of $|f_S(x) - f_{S^{(i)}}(x)|$. Before running, state the shape $\beta \le c^2r^2/(n\lambda)$ predicts and what would count as agreement or as informative disagreement.
+
+<Solution>
+Prediction: the measured sensitivity should decrease monotonically in $\lambda$, never exceed the bound, and scale like $1/\lambda$ once $\lambda$ dominates the data's own curvature. Agreement is those three facts; informative disagreement is a *flattening* at small $\lambda$: the minimizer of $F_S$ is $w = \big(\tfrac1n\sum_i x_iy_i\big)/(\overline{x^2} + \lambda)$ with $\overline{x^2} = \tfrac1n\sum_i x_i^2$, so to leading order the slope's replace-one sensitivity is proportional to $1/(\overline{x^2} + \lambda)$, and for $\lambda \ll \overline{x^2} \approx 33$ the curve saturates at the OLS sensitivity instead of growing like $1/\lambda$. Running the experiment reproduces the measured curve in the lesson's log–log figure: one run gives a maximum prediction change of $\approx 0.10$ at both $\lambda = 0.01$ and $\lambda = 1$, roughly half that at $\lambda = 100$, and the clean $1/\lambda$ decay only well past the crossover. The reading: the theorem's $1/\lambda$ is the worst case over all convex admissible losses and all data in the ball; a specific quadratic problem is more stable than the bound at small $\lambda$, and the bound becomes sharp in the strongly regularized regime it was designed for. Reporting the measured curve against $c^2r^2/(n\lambda)$, with the crossover $\lambda \approx \overline{x^2}$ marked, is the deliverable.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward assembly. A soft-margin SVM on linearly separable data achieves geometric margin $\rho_{\mathrm{geom}}$ on all $n = 64$ training points, with data radius $r$ and norm budget $\Lambda$ satisfying $r\Lambda/\rho_{\mathrm{geom}} = 2$. Fix the margin level $\rho = \rho_{\mathrm{geom}}/2$. (a) Compute the empirical margin loss at level $\rho$ (the fraction of points with confidence margin below $\rho$). (b) Using contraction with the $1/\rho$-Lipschitz clipped margin loss and the ball bound, write the resulting risk bound and evaluate its capacity term. (c) Identify which lesson each ingredient came from, and what remains to be proved.
+
+<Solution>
+(a) Every training point has margin at least $\rho_{\mathrm{geom}} = 2\rho > \rho$, so the margin loss at level $\rho$ is exactly $0$.
+
+(b) The clipped margin loss is $1/\rho$-Lipschitz, so contraction charges $\tfrac{1}{\rho}$ times the ball's complexity: the capacity term is $2 \cdot \tfrac1\rho \cdot \tfrac{r\Lambda}{\sqrt n} = 2 \cdot \tfrac{2 \cdot 2}{8} = 1$ (using $r\Lambda/\rho = 2 r\Lambda/\rho_{\mathrm{geom}} = 4$ and $\sqrt{64} = 8$), giving $R(h) \le 0 + 1 + O(\sqrt{\ln(1/\delta)/n})$: the *entire* bound is the complexity term, and at $n = 64$ it is still vacuous, turning informative near $n \approx 1000$, the same arithmetic <Ref lesson="svm-dual-kernels">the debt note's closing exercise</Ref> found.
+
+(c) The ball bound and contraction are this lesson's; the margin loss and the geometry are <Ref lesson="svm-max-margin">module 4's</Ref>. What remains is the theorem that legitimately combines them, uniformly over hypotheses and margin levels, with the zero–one risk on the left: that margin bound is precisely what <Ref lesson="margin-bounds">the next lesson</Ref> proves, and the quantity assembled here, margin loss plus contraction-scaled ball complexity, is its exact statement.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — Ch. 3.1: Rademacher complexity, the master bound (Thm. 3.3) and its proof followed here, the loss–hypothesis conversion (Lem. 3.4), Massart's lemma (Thm. 3.7) and the growth-function corollary; Ch. 5.4: Talagrand's contraction lemma (Lem. 5.7) and the norm-ball computation (Thm. 5.10); Ch. 6.3: the kernel version (Thm. 6.12) and margin corollary (Cor. 6.13); Ch. 14: uniform stability (Def. 14.1), the stability generalization bound (Thm. 14.2), the Tikhonov stability proposition (Prop. 14.4) with the SVR/KRR/SVM corollaries (Cors. 14.5–14.8). Free online: https://cs.nyu.edu/~mohri/mlbook/
+2. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Ch. 13: the replace-one identity (Thm. 13.2), on-average-replace-one stability (Def. 13.3), strong convexity (Lem. 13.5) and the RLM stability rates carried into this lesson's proof; Ch. 26: the Rademacher calculus and contraction from the uniform-convergence side. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+3. O. Bousquet, A. Elisseeff, "Stability and Generalization," *Journal of Machine Learning Research* 2, 2002, pp. 499–526 — the origin of uniform stability, the stability-based generalization bounds, and the analysis of regularization algorithms that Mohri Ch. 14 systematizes. https://www.jmlr.org/papers/v2/bousquet02a.html
+4. P. L. Bartlett, S. Mendelson, "Rademacher and Gaussian Complexities: Risk Bounds and Structural Results," *Journal of Machine Learning Research* 3, 2002, pp. 463–482 — Rademacher complexity as the master data-dependent capacity, with the structural calculus (convex hulls, Lipschitz maps) behind this lesson's toolkit. https://www.jmlr.org/papers/volume3/bartlett02a/bartlett02a.pdf
+5. C. McDiarmid, "On the Method of Bounded Differences," in *Surveys in Combinatorics*, Cambridge University Press, 1989, pp. 148–188 — the concentration inequality both halves of the lesson run on.
+6. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.9–7.10: the practitioners' view of effective capacity and cross-validation as the working estimate of the gap this lesson's theorems bound. Free online: https://hastie.su.domains/ElemStatLearn/
+</References>

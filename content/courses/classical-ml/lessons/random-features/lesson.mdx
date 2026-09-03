@@ -1,0 +1,362 @@
+A random projection followed by a cosine is an unbiased estimate of a kernel: sample enough of them and a linear model on random features is a kernel machine — and a one-hidden-layer network whose first layer nobody trained.
+
+<Ref lesson="svm-dual-kernels">Module 4</Ref> bought infinite-dimensional feature spaces at a stated price: every prediction reads the whole support set, and everything runs through an $n \times n$ Gram matrix. <Ref lesson="gaussian-processes">Module 10</Ref> rebuilt the same kernels as priors over functions and paid the same bill, $O(n^3)$ in training points. And <Ref lesson="double-descent">the previous lesson</Ref> borrowed a family called *random Fourier features* as its capacity dial without deriving it.
+
+This lesson pays all three references at once: it derives the construction from a 1932 theorem of harmonic analysis, prices the approximation with module 9's concentration tool, cashes the speedup on measured benchmarks, and then reads the object at both ends of its width axis. At finite width it is the laboratory where double descent was first exhibited; at infinite width it becomes the kernel machine exactly, while a network with random weights becomes a Gaussian process.
+
+## One random cosine estimates the kernel
+
+<Task>
+Closed-book, from the prerequisites: write module 4's RBF kernel and the test-time cost of the kernel machine $f(x) = \sum_i \alpha_i k(x_i, x)$; state <Ref lesson="learning-theory">Hoeffding's inequality</Ref> for an average of $D$ bounded variables; and say in one sentence what <Ref lesson="gaussian-processes">module 10</Ref> means by a Gaussian process. Check below before continuing.
+</Task>
+
+<Aside>
+Answers: $k(x, x') = \exp(-\gamma \lVert x - x' \rVert^2)$, and evaluating $\sum_i \alpha_i k(x_i, x)$ costs $O(nd)$ per test point, one kernel evaluation per training point kept. Hoeffding: an average of $D$ independent variables bounded in $[a, b]$ deviates from its mean by $\varepsilon$ with probability at most $2\exp(-2D\varepsilon^2/(b-a)^2)$. A Gaussian process is a distribution over functions under which any finite set of function values is jointly Gaussian, with covariance given by a kernel. All three objects are on stage in this lesson.
+</Aside>
+
+The construction has three moving parts and no training. Fix a shift-invariant kernel $k(x, x') = k(\delta)$ with $\delta = x - x'$, scaled so $k(0) = 1$ (the RBF kernel qualifies: $k(x,x) = 1$). Draw a random *frequency* $\omega \in \mathbb{R}^d$ from a distribution $p(\omega)$ matched to the kernel, a random *phase* $b$ uniform on $[0, 2\pi]$, and define the single feature
+
+$$
+z_{\omega,b}(x) \;=\; \sqrt{2}\,\cos(\omega^\top x + b).
+$$
+
+<Figure
+  src="./figures/rff-projection.svg"
+  alt="Left: five points in the plane, each dropped by a dotted line onto a dashed line through the origin along a random direction omega, with two nearby points marked green; an arrow labeled wrap maps the projection line to a dashed circle on the right, where the projected points appear as dots and the green pair stays adjacent."
+  caption="One feature, geometrically: project every point onto a random direction ω ~ p(ω), then wrap the projection line around the unit circle. Points close in input land close on the circle; each new feature redraws ω and b."
+/>
+
+The claim to be earned: for the right $p(\omega)$, the product of two such features is an **unbiased estimator** of the kernel,
+
+$$
+\mathbb{E}_{\omega, b}\bigl[\, z_{\omega,b}(x)\, z_{\omega,b}(x') \,\bigr] \;=\; k(x - x').
+$$
+
+<Example title="one feature, then three hundred">
+Take $d = 1$, the RBF kernel with $\gamma = \tfrac12$, and the points $x = 0$, $x' = 1$, so the target is $k(1) = e^{-1/2} = 0.607$. The matched frequency distribution (derived below) is $\omega \sim \mathcal{N}(0, 1)$. One draw, $\omega = 0.6$, $b = 1.0$:
+
+$$
+z(0)\,z(1) = 2\cos(1.0)\cos(1.6) = 2 \times 0.5403 \times (-0.0292) = -0.032 .
+$$
+
+The single-feature estimate of $0.607$ is $-0.032$: unbiased means the average over draws is right, not that any draw is. Averaging $300$ independent draws (a three-line numpy loop) gives $0.593$, off by $0.014$.
+</Example>
+
+### The identity, in two lines
+
+The derivation is a trigonometric identity followed by a Fourier integral. Line one averages over the phase. The product-to-sum identity $2\cos A \cos B = \cos(A - B) + \cos(A + B)$ gives
+
+$$
+z_{\omega,b}(x)\, z_{\omega,b}(x') \;=\; \cos\bigl(\omega^\top (x - x')\bigr) \;+\; \cos\bigl(\omega^\top (x + x') + 2b\bigr).
+$$
+
+The first term does not involve $b$ at all, and depends on the two points only through the shift $\delta$. The second term has phase $2b$, uniform over two full periods, so its average over $b$ is exactly zero. Therefore $\mathbb{E}_b[z z'] = \cos(\omega^\top \delta)$.
+
+Line two averages over the frequency:
+
+$$
+\mathbb{E}_{\omega}\bigl[\cos(\omega^\top \delta)\bigr] \;=\; \int_{\mathbb{R}^d} p(\omega) \cos(\omega^\top \delta)\, d\omega .
+$$
+
+For the RBF kernel this integral can be computed outright. With $\omega \sim \mathcal{N}(0,\, 2\gamma I)$, the integral is the real part of the Gaussian characteristic function, $\mathbb{E}[e^{i\omega^\top\delta}] = e^{-\gamma\lVert\delta\rVert^2}$: exactly $k(\delta)$. The identity holds, and it holds because the Gaussian density was not an arbitrary choice: it is the Fourier transform of the RBF kernel. Which kernels admit such a density is the next section's theorem.
+
+{/* fig RffIdentityDissected: formula dissection of the unbiasedness identity, in place. Top line in KaTeX: 2\cos(\omega^\top x + b)\,\cos(\omega^\top x' + b) \;=\; \cos\bigl(\omega^\top(x - x')\bigr) + \cos\bigl(\omega^\top(x + x') + 2b\bigr), with an amber underbrace under \cos(\omega^\top(x-x')) labeled "depends only on the shift δ = x − x′" and a blue underbrace under the second cosine labeled "phase 2b ~ uniform over two periods — E_b = 0". Middle line: \mathbb{E}_{\omega}\bigl[\cos(\omega^\top \delta)\bigr] = \int p(\omega)\cos(\omega^\top \delta)\,d\omega = k(\delta), with an arrow onto p(\omega) labeled "the kernel's spectral density (Bochner)" and the final k(\delta) boxed amber. Bottom right: a small rounded box, amber border: "one random hidden unit: z_{\omega,b}(x) = \sqrt{2}\cos(\omega^\top x + b)". Colors: amber = the surviving shift term / the kernel, blue = the term averaged away; KaTeX via <M>, no SVG needed. */}
+<Figure
+  name="RffIdentityDissected"
+  alt="The unbiasedness identity dissected: the product of two random cosines splits into a shift term that survives and a phase term that averages to zero, and the frequency average of the shift term is the Bochner integral equal to the kernel"
+  caption="The identity, term by term: the phase average kills one cosine, the frequency average turns the other into the kernel."
+/>
+
+Averaging one noisy estimate is a Monte Carlo method, and Monte Carlo methods improve by adding samples. Stack $D$ independent features into one map and normalize:
+
+<Definition title="random Fourier features">
+For a shift-invariant kernel $k$ with spectral density $p(\omega)$, draw $\omega_1, \dots, \omega_D \sim p$ and $b_1, \dots, b_D \sim \mathrm{U}[0, 2\pi]$ independently, and define $z : \mathbb{R}^d \to \mathbb{R}^D$ by
+
+$$
+z(x) \;=\; \sqrt{\tfrac{2}{D}}\,\bigl(\cos(\omega_1^\top x + b_1),\; \dots,\; \cos(\omega_D^\top x + b_D)\bigr)^\top .
+$$
+
+Then $z(x)^\top z(x')$ is an average of $D$ independent unbiased estimates of $k(x - x')$, hence itself unbiased, with variance falling like $1/D$.
+</Definition>
+
+### The same formula, read as a network
+
+A linear model fitted on these features predicts $f(x) = \beta^\top z(x) = \sum_{j=1}^{D} \beta_j \sqrt{2/D}\, \cos(\omega_j^\top x + b_j)$. Read as an architecture, that formula is a one-hidden-layer network: each hidden unit computes an activation of a linear projection, $\cos(\omega_j^\top x + b_j)$, and the output layer combines the units linearly with weights $\beta$. The only departure from a trained network is that the first layer's parameters $\omega_j, b_j$ were **sampled once and frozen**; fitting touches $\beta$ alone, which keeps the optimization a linear least-squares or logistic problem, convex with everything <Ref lesson="gradient-descent">module 2</Ref> promised for convex problems.
+
+<KeyFact>
+Each costume carries its own validity condition. The kernel reading holds in expectation only: a finite-$D$ model is one Monte Carlo draw, off by $\Theta(1/\sqrt{D})$. The network reading holds only while $\omega_j, b_j$ stay frozen: one gradient step on the first layer, and no fixed kernel describes the model. The third costume, the Gaussian process, appears only at $D = \infty$.
+</KeyFact>
+
+<Figure
+  src="./figures/three-costumes.svg"
+  alt="Three panels: a kernel machine drawn as an n-by-n Gram matrix with f(x) as a weighted sum of kernel evaluations; a random-feature linear model drawn as an n-by-D feature matrix with f(x) equal to beta transpose z(x); and a one-hidden-layer network with frozen first-layer weights and trained output weights. A legend box states the three links: Bochner plus Monte Carlo with error proportional to one over root D, literal equality of the linear model and the network, and Neal's Gaussian-process limit at infinite width"
+  caption="The lesson's thesis: one object, three costumes. (a) ≈ (b) is Bochner plus Monte Carlo; (b) = (c) is a change of notation; (c) → GP at infinite width is Neal's limit, taken up below."
+/>
+
+## Bochner's theorem: the spectrum is a sampling recipe
+
+The derivation above worked because the Gaussian density happened to be the Fourier transform of the RBF kernel. The general statement is a classical theorem, proved by Salomon Bochner in 1932, that characterizes *every* kernel the construction can serve.
+
+<Theorem title="Bochner's theorem (Rudin 1962, §1.4.3; GPML Thm. 4.1)">
+A continuous shift-invariant function $k(x, x') = k(\delta)$ on $\mathbb{R}^d$ is positive semidefinite if and only if it is the Fourier transform of a finite non-negative measure $\mu$ on $\mathbb{R}^d$:
+
+$$
+k(\delta) \;=\; \int_{\mathbb{R}^d} e^{\,i\,\omega^\top \delta}\, d\mu(\omega).
+$$
+
+If $k(0) = 1$, then $\mu$ is a probability measure; its density $p(\omega)$, when it exists, is called the **spectral density** of $k$.
+</Theorem>
+
+### Two readings: a sampling license, a positivity test
+
+Read as a license, the theorem says the construction is never stuck: every legal stationary kernel of <Ref lesson="svm-dual-kernels">module 4's Mercer machinery</Ref> owns a spectrum, and scaling to $k(0) = 1$ makes that spectrum something a random number generator can draw from. Read in the other direction, it says positive semidefiniteness, the property module 4 could only verify through closure rules or eigenvalue checks, is *equivalent* to having non-negative power at every frequency. The three standard kernels give a compact dictionary:
+
+| kernel $k(\delta)$ | spectral density $p(\omega)$ |
+| --- | --- |
+| Gaussian $\;e^{-\lVert\delta\rVert^2/2}$ | Gaussian $\;(2\pi)^{-d/2}\, e^{-\lVert\omega\rVert^2/2}$ |
+| Laplacian $\;e^{-\lVert\delta\rVert_1}$ | Cauchy $\;\prod_j \frac{1}{\pi(1 + \omega_j^2)}$ |
+| Cauchy $\;\prod_j \frac{1}{1 + \delta_j^2}$ | Laplacian $\;2^{-d}\, e^{-\lVert\omega\rVert_1}$ |
+
+The Laplacian and Cauchy rows are Fourier duals of each other: the heavy-tailed kernel has the light-tailed spectrum and vice versa, with the Gaussian self-dual in the middle.
+
+### Smoothness is spectral decay
+
+<Figure
+  src="./figures/spectral-duality.svg"
+  alt="Two rows of Fourier pairs: the smooth Gaussian kernel paired with a light-tailed Gaussian spectrum, and the Laplacian kernel with its kink at zero paired with the heavy-tailed Cauchy spectrum whose second moment is infinite"
+  caption="Smoothness lives in the spectrum's decay: the Gaussian kernel's spectrum dies fast, so sampled frequencies stay small and draws are smooth; the Laplacian kernel's kink at 0 costs a Cauchy spectrum with no second moment."
+/>
+
+The duality is not a curiosity; it is <Ref lesson="gaussian-processes">module 10's</Ref> smoothness dial restated in frequency. A kernel that is very smooth at $\delta = 0$ (the SE kernel, infinitely differentiable) has a spectrum whose tails vanish faster than any polynomial, so the sampled $\omega$ are moderate and every random feature oscillates gently. The Laplacian kernel's kink at zero is the signature of module 10's rough Matérn-$\tfrac12$ draws, and its price in frequency is a Cauchy spectrum so heavy-tailed that $\mathbb{E}[\omega^2] = \infty$: arbitrarily fast oscillations appear among the sampled features, which is what it takes to build a non-differentiable function out of cosines.
+
+<KeyFact>
+The dictionary doubles as a diagnostic, and it carries a warning for the next section. A shift-invariant "kernel" whose Fourier transform dips negative is not positive semidefinite: no feature map exists for it. And a spectrum with no second moment (the Laplacian kernel's Cauchy spectrum) makes the uniform guarantee's constant $\sigma_p$ infinite: the pointwise rate below survives, the uniform bound as stated does not.
+</KeyFact>
+
+## The guarantee: unbiased is not accurate, and $D$ is the variance dial
+
+Unbiasedness sounds like the work is done. It is not: the worked example's single feature estimated $0.607$ as $-0.032$, and that miss was typical. At the example's numbers, one feature's estimate has variance $1 + \tfrac12 k(2\delta) - k(\delta)^2 = 0.70$, a standard deviation of $0.84$ for a target that lives in $[0, 1]$. A single random feature is an unbiased estimator whose noise is larger than its entire range; everything therefore rests on the averaging.
+
+### One fixed pair: exponential decay in $D$
+
+The averaging is controlled by the tool <Ref lesson="learning-theory">module 9</Ref> built for exactly this situation. Each summand $2\cos(\omega_j^\top x + b_j)\cos(\omega_j^\top x' + b_j)$ is bounded in $[-2, 2]$, and $z(x)^\top z(x')$ averages $D$ independent copies, so Hoeffding's inequality gives, for one fixed pair $(x, x')$,
+
+$$
+\Pr\Bigl[\,\bigl|z(x)^\top z(x') - k(x - x')\bigr| \ge \varepsilon\,\Bigr] \;\le\; 2\exp\!\Bigl(-\tfrac{D\varepsilon^2}{8}\Bigr).
+$$
+
+The deviation probability decays exponentially in $D$, and error $\varepsilon$ costs $D \sim 1/\varepsilon^2$ features, the Monte Carlo rate. (A paired-sines variant drops the phase and emits *two* coordinates per frequency, $\cos(\omega_j^\top x)$ and $\sin(\omega_j^\top x)$: at $D$ frequencies the map is $2D$-dimensional, normalized by $\sqrt{1/D}$ so that $z(x)^\top z(x')$ is still an average of $D$ terms — now $\cos(\omega_j^\top \delta)$ exactly, each bounded in $[-1, 1]$. Hoeffding then gives $2\exp(-D\varepsilon^2/2)$: a tighter constant per frequency, paid for with twice the feature dimension.)
+
+### Every pair at once: the ε-net upgrade
+
+A fixed pair is not enough, because the fitted model will evaluate the kernel at pairs chosen *after* the features are drawn: module 9's lesson about guarding every hypothesis at once, returned in miniature. The central claim of Ali Rahimi and Benjamin Recht's [Random Features for Large-Scale Kernel Machines](https://proceedings.neurips.cc/paper/2007/hash/013a006f03dbc5392effeb8f18fda755-Abstract.html) (NeurIPS 2007), the paper this lesson's construction comes from, upgrades the guarantee to every pair simultaneously:
+
+<Theorem title="uniform convergence of Fourier features (Rahimi & Recht 2007, Claim 1)">
+Let $\mathcal{M} \subset \mathbb{R}^d$ be compact with diameter $\operatorname{diam}(\mathcal{M})$, and let $\sigma_p^2 = \mathbb{E}_p[\omega^\top \omega]$ be the spectrum's second moment. For the random Fourier feature map,
+
+$$
+\Pr\Bigl[\, \sup_{x, x' \in \mathcal{M}} \bigl| z(x)^\top z(x') - k(x - x') \bigr| \ge \varepsilon \Bigr]
+\;\le\; 2^8 \Bigl( \frac{\sigma_p \operatorname{diam}(\mathcal{M})}{\varepsilon} \Bigr)^{\!2} \exp\!\Bigl( - \frac{D \varepsilon^2}{4(d + 2)} \Bigr),
+$$
+
+so $D = O\bigl(d\,\varepsilon^{-2} \log \frac{\sigma_p \operatorname{diam}(\mathcal{M})}{\varepsilon}\bigr)$ features suffice for uniform error $\varepsilon$ with any constant probability.
+
+<Proof>
+Idea only; the full argument is the paper's Appendix A. Cover the compact set of shifts $\delta$ with a net of finitely many centers at radius $r$; Hoeffding plus the union bound (module 9's two-step, verbatim) makes the error small at every center at once. Between centers, the error function is Lipschitz with a gradient whose expected squared norm is at most $\sigma_p^2$, so Markov's inequality keeps it from moving far off the net; optimizing $r$ against the two failure probabilities gives the stated constants.
+</Proof>
+</Theorem>
+
+The reading that matters for practice: the required $D$ grows *linearly* in the input dimension $d$, only logarithmically in the resolution set by $\sigma_p \operatorname{diam}(\mathcal{M})$, and not at all in the number of training points. For the RBF kernel, $\sigma_p^2 = 2d\gamma$: sharper kernels (larger $\gamma$) genuinely cost more features, the spectrum's spread pricing the approximation.
+
+### The rate, watched on a 20-point Gram matrix
+
+<FigureSequence
+  name="gram-approx"
+  alt="Three frames comparing the exact 20-by-20 RBF Gram matrix of two point clusters with its random-feature estimate at D equal to 10, 100, and 1000; the estimate's block structure sharpens and the printed maximum entry error falls from 0.61 to 0.22 to 0.05"
+  caption="The Gram matrix of 20 points (two clusters, γ = ½) against its random-feature estimate, one shared draw per frame. Only D changes between frames."
+/>
+
+<Task>
+Step through the three frames and read the error tallies: $0.61$, $0.22$, $0.05$ at $D = 10, 100, 1000$. Each tenfold in $D$ should buy roughly a threefold error reduction ($\sqrt{10} \approx 3.2$); check the measured ratios, $2.8$ and $4.4$, against that rate — Monte Carlo scatter around $3.2$, not a failure of it. Then note the blue cells at $D = 10$: with few features the estimated "kernel" takes negative values, which the true RBF kernel, strictly positive everywhere, never does.
+</Task>
+
+<KeyFact>
+Unbiasedness is relative to $p(\omega)$, and accuracy is bought only by $D$. Sample frequencies from the wrong spectral density and the estimator converges, at the same $1/\sqrt{D}$ rate, to the wrong kernel; the exercises make this failure concrete. "Unbiased" is a statement about the target of the averaging, never about the quality of a finite sample.
+</KeyFact>
+
+## The payoff in hours: what the approximation buys
+
+The guarantee explains why the approximation is safe; the accounting explains why anyone wants it.
+
+### The arithmetic: the support set drops out
+
+The kernel machine of module 4 predicts with $f(x) = \sum_{i} \alpha_i k(x_i, x)$: cost $O(nd)$ per test point, and the support set rides along with the model forever. The random-feature model predicts with $\beta^\top z(x)$: $O(Dd)$ to build the features, $O(D)$ for the dot product, and the model is one vector of length $D$ plus the $D$ frozen frequencies. Training tilts the same way: ridge regression on the $n \times D$ feature matrix is one $D \times D$ solve after a single pass over the data, where the kernel solvers of module 4 iterate over an $n \times n$ Gram matrix that may not fit in memory.
+
+### The measured record: a hundredfold at matched accuracy
+
+<Figure
+  src="./figures/speed-accuracy.svg"
+  alt="Test error against training wall-clock on a log time axis: on Adult, random Fourier features reach 14.9 percent in 9 seconds while an exact SVM takes 7 minutes for 15.1 percent; on Forest Cover, random binning reaches 2.2 percent in 25 minutes while libSVM needs 44 hours, and Fourier features stall at an open-circle 11.6 percent."
+  caption="Rahimi and Recht's Table 1, drawn as a race: at matched test error the random-feature point sits far left of the exact solver. The open circle is the reversal — smooth Fourier features stall at 11.6% on Forest Cover."
+/>
+
+The numbers behind the chart, from the paper's Table 1: on the Adult census-income task (32,000 training points, 123 features), Fourier features plus least squares reached **14.9% test error in 9 seconds** against a tuned SVM's 15.1% in 7 minutes. On the Forest Cover classification task (522,000 points, 54 features), the exact RBF-SVM needed **44 hours** of training for 2.2% error; random binning features — the paper's second construction, the starred section below — matched the 2.2% **in 25 minutes**, a hundredfold in wall-clock at equal accuracy.
+
+One row breaks the pattern: on Forest Cover the smooth Fourier features stalled at 11.6%, nowhere near the binning's 2.2%. Forest Cover's classes interlock so irregularly that the exact SVM keeps a huge support set and effectively memorizes locality, and globally smooth cosines are the wrong basis for memorization: the first appearance of a pattern this course meets again on tabular data.
+
+The comparison is against 2007 solvers, and the construction is not the state of the art: its role in this course is the conceptual bridge, plus a speedup that is real and still exploited inside large-scale kernel and GP approximations. The regime matters as much as the method — the benchmarks set $D$ in the hundreds against $n$ in the hundreds of thousands, and the arithmetic wins exactly while $D \ll n$.
+
+## ★ Random binning: the second construction
+
+The same unbiasedness logic works without cosines. *Random binning features* partition the input space by a randomly shifted grid at a randomly drawn resolution and one-hot encode which bin a point falls in. The grid distribution is chosen so that the probability two points share a bin equals $k(x, x')$, which makes $z(x)^\top z(x')$ an unbiased kernel estimate exactly as before.
+
+Averaging $P$ independent grids drives down the variance, and the same Hoeffding-plus-union-bound argument gives the same guarantee.
+
+The scope is narrower than the cosines'. The construction requires the per-coordinate pitch density $p(\delta) = \delta \ddot{k}(\delta)$ to be a genuine probability density, which holds for the Laplacian kernel ($p$ is a Gamma density) but fails for the Gaussian, whose second derivative changes sign. The method serves kernels of the Laplacian family, and its locality-preserving bins are exactly what beat the smooth cosines on Forest Cover.
+
+## The bridge, read in both directions
+
+The construction now runs as a dial from $D = 1$ to $D = \infty$, and the course has met both ends without naming them.
+
+### Finite $D$, swept: the laboratory where double descent lives
+
+<Ref lesson="double-descent">The previous lesson's</Ref> central measurement (test risk against the number of random Fourier features on MNIST, the 88% spike at $N = n$, the second descent below the classical optimum) was performed on exactly the family defined above, with Gaussian frequencies and the complex-exponential variant of the cosine. The choice was not incidental. Double descent needs a model family whose capacity turns smoothly through the interpolation threshold while everything else stays fixed, and the random-feature family is the cleanest such dial in existence: $D$ below $n$ is a classical under-parametrized linear model, $D = n$ is a square system with one interpolant, and $D$ beyond $n$ hands the choice to minimum-norm least squares.
+
+<Figure
+  src="./figures/width-axis.svg"
+  alt="Test risk sketched against the number of random features: the classical U below the interpolation threshold at D equals n, a spike at the threshold, and a second descent approaching a dashed line marking the kernel machine, which is the infinite-width limit"
+  caption="One axis, three regimes, two lessons: the previous lesson lived on the sweep; this lesson identifies the object waiting at the right-hand end."
+/>
+
+The far end of that axis was already in the previous lesson's figures: the flat reference line its risk panels descend toward is the minimum-norm *kernel* interpolant, because as $D \to \infty$ the feature Gram $z(x)^\top z(x')$ converges to $k(x - x')$ uniformly (Claim 1) and the fitted min-norm linear model converges to the corresponding kernel machine. The second descent is, in this exact sense, a march toward the object module 4 built: more random features means a better Monte Carlo of the kernel, and the interpolation spike is the price of stopping the Monte Carlo at $D = n$.
+
+### Infinite width the other way: a random network becomes a Gaussian process
+
+The network costume has its own $D \to \infty$ story, and it predates all of this. Consider a one-hidden-layer network with *every* weight random: $f(x) = \sum_{j=1}^{D} v_j\, h(\omega_j^\top x + b_j)$ with the hidden parameters $(\omega_j, b_j)$ drawn iid, any fixed activation $h$, and output weights $v_j$ drawn iid with mean zero and variance $\sigma_v^2 / D$. For any finite set of inputs, the vector of outputs $(f(x_1), \dots, f(x_m))$ is a sum of $D$ iid random vectors with finite covariance, so the central limit theorem applies to it jointly: as $D \to \infty$ the outputs become exactly jointly Gaussian.
+
+<FigureSequence
+  name="clt-width"
+  alt="Three scatter plots of a random network's outputs at two fixed inputs over 320 independent draws of all weights, at widths 1, 3, and 500, against the fixed 2-sigma ellipse and dashed 0.6-sigma core of the limiting Gaussian; the printed core tally falls from 139 to 83 to 54 draws, where a Gaussian would put about 53."
+  caption="The CLT over hidden units: 320 random networks per frame, each dot the output pair (f(0), f(1)). Only D changes between frames; the blue ellipses of the claimed Gaussian limit, correlation k(1) = 0.61, never move."
+/>
+
+<Task>
+Step through and read the core tally: $139$, $83$, $54$ draws inside the dashed core at $D = 1, 3, 500$, against the $\approx 53$ a Gaussian would put there. One cosine unit scaled by one Gaussian weight piles $2.6\times$ too much mass at the origin; by $D = 500$ every region carries Gaussian mass and the cloud is the ellipse.
+</Task>
+
+Jointly Gaussian values at every finite input set is, word for word, <Ref lesson="gaussian-processes">module 10's definition</Ref> of a Gaussian process. The limiting GP's covariance is the expected product of one unit's activations,
+
+$$
+k(x, x') \;=\; \sigma_v^2\; \mathbb{E}_{\omega, b}\bigl[\, h(\omega^\top x + b)\, h(\omega^\top x' + b) \,\bigr],
+$$
+
+which for $h = \cos$ and $\omega \sim p$ is, by this lesson's identity, the very kernel the features were built to estimate. This is Radford Neal's 1996 result, proved in his thesis on Bayesian neural networks, and it is the sentence module 10 promised to pick up from the other side: the GP was not merely *like* an infinite model — it is the infinite-width limit of a random network, and module 10's whole predictive machinery (posterior mean, honest bands, marginal likelihood) is what a network with unlearned features turns into when width stops binding. Williams later computed the limiting kernels in closed form for sigmoidal and Gaussian hidden units, so specific architectures map to specific named kernels.
+
+<Remark title="what the limit forgets (Bishop, PRML §6.4.7)">
+The infinite-width limit buys Gaussian tractability and quietly discards the property that makes finite networks more than kernel machines: in the limit, distinct outputs of the network become independent, and no hidden unit adapts to the data at all. The limit of a *trained* network is a different, harder question; for gradient-trained infinite-width networks the answer is again a fixed kernel, the neural tangent kernel of Jacot, Gabriel and Hongler (2018). Either way, infinite width lands on a kernel — which is exactly why the finite, feature-learning regime is where deep learning's power must live.
+</Remark>
+
+## What "classical versus deep" turns out to contrast
+
+The bridge changes what the course's closing comparison can mean.
+
+### One axis: features fixed before the data, or learned from it
+
+Kernels, random-feature models, and GPs are one family: **fixed features**, whether implicit in a Gram matrix, sampled from a spectrum, or integrated out in a prior. A trained network is the same architecture with the first layer unfrozen: **learned features**, frequencies moved to where the data wants them. The honest contrast is not "classical formulas versus neural magic"; it is whether the feature geometry is chosen before seeing data or adapted to it.
+
+### The measured cost of fixing the features
+
+<Ref lesson="svm-dual-kernels">The skin-of-the-orange experiment</Ref> showed a kernel SVM's error doubling when six pure-noise coordinates were appended, because an isotropic kernel weights every coordinate identically; random Fourier features inherit that verdict literally, since an isotropic $p(\omega)$ spends its frequency budget on junk directions exactly as readily as on signal. Where the fixed spectrum matches the problem, the classical object is fast, tractable, and honest about uncertainty. Where the data's geometry must be discovered — irrelevant coordinates dropped, axes rescaled, interactions found — feature learning is what pays, and no theorem in this lesson closes that gap.
+
+### What is established, and what remains
+
+What is established: every stationary kernel is a frequency distribution (Bochner), a cosine of a random projection estimates it without bias, $D$ features approximate it uniformly at the Monte Carlo rate with $D = O(d/\varepsilon^2 \cdot \log)$, the resulting linear model bought a measured hundredfold speedup at matched accuracy, and the object is simultaneously the double-descent laboratory at finite width and, at infinite width, the kernel machine and the Gaussian process. The classical toolkit is not deep learning's rival so much as its frozen limit and its fast approximation. One arena remains where the classical side still wins outright on the evidence, tabular data, and <Ref lesson="tabular-showdown">the final lesson</Ref> weighs that evidence.
+
+## Exercises
+
+<Exercise>
+Warm-up, by hand. For the RBF kernel with $\gamma = \tfrac12$ in one dimension, estimate $k(0 - 1) = e^{-1/2} = 0.607$ from the three feature draws $(\omega, b) \in \{(0.6,\ 1.0),\ (-1.2,\ 2.5),\ (0.3,\ 5.0)\}$: compute $z(x)^\top z(x')$ for $x = 0$, $x' = 1$ and compare with the exact value. Write the three summands before averaging.
+
+<Solution>
+Each summand is $2\cos(\omega \cdot 0 + b)\cos(\omega \cdot 1 + b) = 2\cos(b)\cos(\omega + b)$:
+
+$$
+\begin{aligned}
+(0.6,\ 1.0)&: & 2(0.5403)(-0.0292) &= -0.032\\
+(-1.2,\ 2.5)&: & 2(-0.8011)(0.2675) &= -0.429\\
+(0.3,\ 5.0)&: & 2(0.2837)(0.5544) &= +0.315
+\end{aligned}
+$$
+
+The average is $z(x)^\top z(x') = (-0.032 - 0.429 + 0.315)/3 = -0.049$, against the true $0.607$. Three features miss by more than the target's whole size and even get the sign wrong, exactly as the single-feature variance ($\approx 0.7$ per summand, so sd $\approx 0.84/\sqrt{3} \approx 0.48$ for the average) predicts. Nothing is broken: rerun with $D = 300$ and the estimate lands near $0.59$. The transferable move: check an estimator's variance against the size of what it estimates before trusting any small sample of it.
+</Solution>
+</Exercise>
+
+<Exercise>
+The derivation the lesson compressed. (a) For $\omega \sim \mathcal{N}(0, \sigma^2)$ in one dimension, prove $\mathbb{E}[\cos(\omega\delta)] = e^{-\sigma^2\delta^2/2}$ without invoking the characteristic function as known: differentiate $I(\delta) = \int \cos(\omega\delta)\, p(\omega)\, d\omega$ under the integral, integrate by parts, and solve the resulting differential equation. (b) Conclude the $d$-dimensional statement for $\omega \sim \mathcal{N}(0, 2\gamma I)$ by independence of coordinates. (c) Verify the table's Laplacian↔Cauchy row in the direction that needs no contour integral: show the Fourier transform of $k(\delta) = e^{-|\delta|}$ is proportional to the Cauchy density $1/(1 + \omega^2)$.
+
+<Solution>
+(a) With $p(\omega) = (2\pi\sigma^2)^{-1/2} e^{-\omega^2/2\sigma^2}$, differentiating under the integral gives $I'(\delta) = -\int \omega \sin(\omega\delta)\, p(\omega)\, d\omega$. Since $\omega\, p(\omega) = -\sigma^2 p'(\omega)$, integrate by parts: $I'(\delta) = \sigma^2 \int \sin(\omega\delta)\, p'(\omega)\, d\omega = -\sigma^2 \delta \int \cos(\omega\delta)\, p(\omega)\, d\omega = -\sigma^2 \delta\, I(\delta)$, the boundary terms vanishing against the Gaussian tails. The ODE $I' = -\sigma^2 \delta I$ with $I(0) = 1$ has the unique solution $I(\delta) = e^{-\sigma^2\delta^2/2}$.
+
+(b) For independent coordinates, $\mathbb{E}[e^{i\omega^\top\delta}] = \prod_j \mathbb{E}[e^{i\omega_j \delta_j}] = \prod_j e^{-\sigma^2\delta_j^2/2} = e^{-\sigma^2\lVert\delta\rVert^2/2}$; taking real parts and setting $\sigma^2 = 2\gamma$ gives $\mathbb{E}[\cos(\omega^\top\delta)] = e^{-\gamma\lVert\delta\rVert^2}$, the RBF kernel in the course's parametrization.
+
+(c) $\int_{-\infty}^{\infty} e^{-|\delta|} e^{-i\omega\delta}\, d\delta = \int_0^\infty e^{-\delta}\bigl(e^{i\omega\delta} + e^{-i\omega\delta}\bigr)\, d\delta = \frac{1}{1 - i\omega} + \frac{1}{1 + i\omega} = \frac{2}{1 + \omega^2}$, an elementary pair of convergent exponential integrals. Normalizing by $2\pi$ gives the Cauchy density $\frac{1}{\pi(1+\omega^2)}$: sampling frequencies for the Laplacian kernel means drawing Cauchy variates, heavy tails included.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two boundary probes. (a) Set $D = 1$: the fitted model is $f(x) = \beta_1 \sqrt{2} \cos(\omega_1^\top x + b_1)$. Describe the entire function class, say what "the kernel machine" has degenerated into, and reconcile this with the estimator still being unbiased. (b) Suppose the goal is the RBF kernel with $\gamma = \tfrac12$, but the frequencies are drawn from the Cauchy density $1/(\pi(1 + \omega^2))$ instead of $\mathcal{N}(0,1)$. What does $z(x)^\top z(x')$ converge to as $D \to \infty$, and what fitted behavior would betray the error?
+
+<Solution>
+(a) The class is $\{a \cos(\omega_1^\top x + b_1) : a \in \mathbb{R}\}$: scalar multiples of one fixed sinusoid, constant along every direction orthogonal to $\omega_1$. Fitting is a one-parameter sinusoid regression; nothing kernel-like survives. Unbiasedness is untouched because it is a statement about the average over *redraws* of $(\omega, b)$, while any single realized model is one term of that average, with variance ($\approx 0.7$ on a $[0,1]$-valued target) larger than the signal. $D = 1$ is the cleanest case of the lesson's warning: unbiased and useless are compatible.
+
+(b) By the identity, $z(x)^\top z(x') \to \mathbb{E}_{\text{Cauchy}}[\cos(\omega^\top\delta)]$, which is the Fourier transform of the Cauchy density: the *Laplacian* kernel $e^{-\lVert\delta\rVert_1}$, per the table read in reverse. The estimator converges cleanly, at the usual rate, to the wrong kernel: unbiasedness is always relative to $p(\omega)$. The fitted model would behave like module 10's Matérn-$\tfrac12$ machinery, jagged near the data with fatter-tailed similarity, rather than like the smooth SE fits — a diagnosable mismatch, not a crash.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute, then concede: "Random features cannot work. The whole point of learning is to extract features from data; a first layer of frozen random projections throws that away, so the method must fail on real problems." Name what the claim gets wrong, with the lesson's evidence, and then state precisely the true half it contains.
+
+<Solution>
+What it gets wrong: "must fail" is refuted by both theory and measurement. Claim 1 guarantees that $D = O(d/\varepsilon^2 \cdot \log)$ frozen random features reproduce the kernel machine's decision function uniformly to $\varepsilon$, and the kernel machine is not a strawman: it is module 4's carefully derived, margin-optimal object. The benchmarks then show the frozen features matching tuned SVMs on real tasks (14.9% vs 15.1% on Adult; 2.2% at a hundredth of the wall-clock on Forest Cover). The claim's hidden false step is assuming features must be *adapted* to be *useful*: what the features must actually do is span the right function class, and Bochner's theorem says random cosines from the right spectrum do.
+
+The true half: frozen features commit to a geometry before seeing data. The kernel's spectrum weights all coordinates isotropically, so junk dimensions cost accuracy (the skin-of-the-orange result: six noise features doubled a kernel SVM's error, and random features inherit the mechanism exactly); no frozen spectrum can drop a coordinate, rescale an axis, or discover an interaction. Feature learning pays precisely where the right geometry must be found rather than assumed, which is why the claim, wrong as a universal, correctly predicts where fixed features lose. The last lesson's tabular evidence is that boundary measured.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review (modules 10 + 11 composed). Take an SE-kernel GP regression you can compute exactly, such as $n = 40$ points from $y = \sin(x) + \varepsilon$, $\varepsilon \sim \mathcal{N}(0, 0.2^2)$ on $[-5, 5]$, with $\ell = 1$, $\sigma_f = 1$, $\sigma_n = 0.2$ (your <Ref lesson="gp-lab">gp-lab</Ref> code computes the exact posterior mean). Approximate the kernel with $D = 500$ random Fourier features ($\omega \sim \mathcal{N}(0, 1/\ell^2)$), refit the mean as ridge regression on the features with penalty $\sigma_n^2$, and report the maximum deviation from the exact GP mean on a dense grid. State what identity makes the two fits comparable, then repeat at $D = 50$ and $D = 2000$.
+
+<Solution>
+The identity: the exact GP posterior mean is kernel ridge regression, $m(x_*) = \mathbf{k}_*^\top (K + \sigma_n^2 I)^{-1} y$, and ridge on the feature matrix $Z$ gives $\hat m(x_*) = z(x_*)^\top (Z^\top Z + \sigma_n^2 I)^{-1} Z^\top y$; the push-through identity $Z^\top (Z Z^\top + \sigma_n^2 I)^{-1} = (Z^\top Z + \sigma_n^2 I)^{-1} Z^\top$ shows the second expression is the first with every kernel evaluation replaced by its random-feature estimate, so uniform Gram convergence drives $\hat m \to m$. This is <Ref lesson="bayesian-linear-regression">module 10's weight-space/function-space equivalence</Ref> run in reverse: the GP came from taking a feature model's width to infinity, and the approximation walks back down to finite width.
+
+Measured on the stated setup (20 seeds): median $\max_x |\hat m - m|$ is $\approx 0.06$ at $D = 50$, $\approx 0.02$ at $D = 500$, $\approx 0.01$ at $D = 2000$, against a mean of amplitude $\approx 1.1$ — a 2% worst-case error at $D = 500$, halving per quadrupling of $D$ as $1/\sqrt{D}$ dictates. Agreement criterion: the deviation should shrink at roughly the Monte Carlo rate and be far below $\sigma_n$; if it plateaus, the usual bug is frequencies drawn with variance $\ell^2$ instead of $1/\ell^2$.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: one row of Table 1 at desk scale. Design and run a comparison between an exact kernel method and random features on $n \approx 4{,}000$ training points (synthetic two-class rings, or any dataset at hand): (i) exact kernel ridge classification with the RBF kernel, one $n \times n$ solve; (ii) ridge on $D = 500$ random Fourier features. Report test error and wall-clock for both, and state in advance what would count as reproducing the paper's phenomenon.
+
+<Solution>
+Agreement criterion, stated first: matched test error (within a point) at an order of magnitude less time, growing with $n$; the phenomenon is the cost gap at equal accuracy, not a fixed number. One run of the ring design ($4{,}000$ train / $2{,}000$ test, $\gamma = \tfrac12$, ridge $10^{-2}$): exact kernel ridge 3.9% test error in 2.0 s (dominated by forming and solving the $4{,}000^2$ Gram system); random features with $D = 500$: 3.9% in 0.09 s, a twentyfold speedup at identical error. Machine constants vary; the scaling does not: the exact method's solve grows like $n^3$ and its Gram like $n^2$ memory, while the feature method grows linearly in $n$ at fixed $D$, which is how twentyfold at $n = 4{,}000$ becomes the paper's hundredfold at $n = 522{,}000$. At small $n$ the exact method is fine; nothing about random features pays until the Gram matrix hurts.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward. Build a tabular task with axis-aligned structure and junk: 10 features, of which the target depends on two through a step-like rule (say $y = 1$ iff $x_1 > 0.3$ or $x_2 < -0.5$), plus eight standard-normal noise features. Fit (i) random Fourier features ($D = 1{,}000$) with logistic regression and (ii) a gradient-boosted tree ensemble from <Ref lesson="gradient-boosting">module 7</Ref>, both lightly tuned. Record the test-error gap and explain, using this lesson and module 7, which inductive bias each model brought to a problem like this.
+
+<Solution>
+The trees win, usually by a wide margin, and each of this lesson's tools says why. The target is piecewise-constant along coordinate axes: a boosted tree reaches it in a handful of axis-aligned splits and never examines the noise features, because no split on them reduces loss. The random-feature model brings the opposite priors: its cosines are smooth and global, so approximating a step costs many high-frequency features (the spectrum's tail, priced by $\sigma_p$ in Claim 1), and its isotropic $p(\omega)$ spends the same frequency budget on the eight junk coordinates as on the two real ones: the skin-of-the-orange mechanism, now with the features visible instead of implicit. Smoothness mismatch, junk-feature fragility, and rotation-invariance where the data has a meaningful axis basis: these three are precisely the documented reasons tree ensembles beat neural and kernel methods on tabular benchmarks, measured across 45 datasets in <Ref lesson="tabular-showdown">the final lesson</Ref>, whose evidence this experiment reproduces in miniature.
+</Solution>
+</Exercise>
+
+<References>
+1. A. Rahimi, B. Recht, "Random Features for Large-Scale Kernel Machines," *NeurIPS* 2007 — the primary source: Theorem 1 (Bochner, as used here), the construction and Algorithm 1, Claim 1 with its ε-net proof (Appendix A), Fig. 1's kernel↔spectrum table, random binning (§4, Claim 2), and Table 1's measured benchmarks. https://proceedings.neurips.cc/paper/2007/hash/013a006f03dbc5392effeb8f18fda755-Abstract.html
+2. C. E. Rasmussen, C. K. I. Williams, *Gaussian Processes for Machine Learning*, MIT Press, 2006 — §4.2.1: Bochner's theorem (Thm. 4.1), spectral densities, and the smoothness-from-spectral-decay reading; §4.2.3 and eq. 4.15 for the Matérn spectra behind the roughness claims. Free online: https://gaussianprocess.org/gpml/
+3. M. Belkin, D. Hsu, S. Ma, S. Mandal, "Reconciling Modern Machine-Learning Practice and the Classical Bias–Variance Trade-off," *PNAS* 116(32), 2019 — §"Random Fourier features": the RFF family as the double-descent laboratory, and the min-norm kernel machine as its infinite-width reference. https://arxiv.org/abs/1812.11118
+4. R. M. Neal, *Bayesian Learning for Neural Networks*, Lecture Notes in Statistics 118, Springer, 1996 — Ch. 2: the infinite-width limit of a one-hidden-layer network with random weights is a Gaussian process.
+5. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §6.4.7: the Neal limit summarized, Williams's closed-form kernels for specific activations, and the independence-of-outputs caveat quoted in the Remark.
+6. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §17.2.8: the GP–network connection and the neural tangent kernel pointer. Free online: https://probml.github.io/pml-book/book1.html
+7. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §11.3: the anatomy of the one-hidden-layer network that the feature map reproduces. Free online: https://hastie.su.domains/ElemStatLearn/
+8. A. Jacot, F. Gabriel, C. Hongler, "Neural Tangent Kernel: Convergence and Generalization in Neural Networks," *NeurIPS* 2018 — the trained-network refinement of the infinite-width story, cited as a pointer. https://arxiv.org/abs/1806.07572
+</References>

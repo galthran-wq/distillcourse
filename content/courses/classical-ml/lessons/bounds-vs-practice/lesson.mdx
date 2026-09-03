@@ -1,0 +1,247 @@
+The margin theory makes measurable claims: run AdaBoost for a thousand rounds, plot the margin distribution at rounds 5, 100, and 1000, and the curves must march right while test error falls — this lesson runs the experiment and prices every bound in the module.
+
+The module's ladder is complete on paper: finite-class counting, VC dimension, <Ref lesson="rademacher-stability">Rademacher complexity and stability</Ref>, and <Ref lesson="margin-bounds">the margin bounds that paid the course's two debts</Ref>. What stands open is whether the explanations survive contact with data at the course's own scale, and the field settled how to ask: the experiment in [Schapire, Freund, Bartlett, and Lee (1998)](https://doi.org/10.1214/aos/1024691352), the paper whose theorems the previous lesson proved. This lesson reruns that experiment with the course's own algorithms on the course's own corpus, evaluates each of the module's bounds to an actual number on the fitted model, and closes the module with an honest ranking of what the theory delivers.
+
+## The claim on the table: one figure from 1998
+
+Whether the module's explanations survive data is decided against one specific figure, and that figure is read through three of the module's results; retrieve them before the data arrives.
+
+<Task>
+Three retrievals, closed book. (1) From <Ref lesson="margin-bounds">the margin lesson</Ref>: the two terms of the ensemble margin bound, and which of them the round count $T$ enters. (2) Same lesson: what the margin-push theorem (Thm. 7.7 in Mohri's numbering) guarantees about the fraction of training points with margin below $\rho$, and under which hypothesis on the round errors $\varepsilon_t$. (3) From <Ref lesson="vc-dimension">the VC lesson</Ref>: its verdict on the 400-stump spam ensemble: the approximate VC dimension it computed, and the sample size a five-point certificate would need. Check below.
+</Task>
+
+<Aside>
+Answers: (1) $R(g) \le \widehat{R}_{S,\rho}(g) + \frac{2}{\rho}\mathfrak{R}_n(\mathcal{H}) + \sqrt{\ln(1/\delta)/2n}$. The capacity term charges the *base* class, and $T$ enters neither term except through the measured margins. (2) The below-$\rho$ fraction is at most $\prod_t 2\sqrt{\varepsilon_t^{1-\rho}(1-\varepsilon_t)^{1+\rho}}$, decaying exponentially in $T$ whenever a persistent edge $\varepsilon_t \le \frac12 - \gamma$ holds with $\rho < \gamma$. (3) $d_{\text{ens}} \approx 1.7 \times 10^5$ at $T = 400$, needing $n \approx 1.4 \times 10^9$ messages for five points.
+</Aside>
+
+### The original run: C4.5 on letter
+
+<Figure
+  src="./figures/sfbl-fig1.png"
+  alt="Two columns, bagging on the left and boosting on the right. Top row: training and test error against the number of classifiers on a log axis, boosting's training error dropping to zero by round 5 while its test error keeps falling below the base classifier's line. Bottom row: cumulative distributions of the training margins after 5, 100 and 1000 rounds; boosting's three curves all rise steeply just above margin 0.5, while bagging's spread across the whole range from -1 to 1."
+  caption="The original. Error curves above, margin CDFs at rounds 5, 100 and 1000 below. Boosting's margin curves stand right of 0.5; bagging's barely move."
+  float="right"
+  width="m"
+/>
+
+The artifact is Figure 1 of the 1998 paper, the figure that turned "AdaBoost keeps improving after zero training error" from an anomaly into a theory. The experiment ran C4.5, Quinlan's standard decision-tree learner of the 1990s, on the *letter* benchmark: 16,000 training examples of handwritten capital letters rendered from 20 fonts, 26 classes, 4,000 held out. A single C4.5 tree scores 13.8% test error. Boosted for 1,000 rounds, the combined vote reaches training error zero **at round 5** and its test error then falls from 8.4% to 3.1% over the remaining 995 rounds. The bottom row is the paper's explanation: the cumulative distribution of training margins at rounds 5, 100, and 1000. At round 5 about 8% of training examples have margin below $0.5$; by round 100 every one is above it. The curves march right while the error falls, and the bagging column beside them is the control: 1,000 bagged trees reach 6.6% test error and their margin distribution barely moves.
+
+### The replication contract: shapes, not values
+
+The reproduction discipline is the module's standard, stated before running anything. Our base learners are not C4.5 and our corpus is not letter, so the **values will not replicate** and are not supposed to; the claims under test are the shapes. Four of them: training error exhausted early; test error not degrading over hundreds of rounds after; the low end of the margin distribution moving right while both happen; and no comparable motion under bagging.
+
+## The protocol: two lanes, every dial stated
+
+The contract above names the four shapes under test; the run that tests them is fixed next, dial by dial, so that the check can be repeated. Corpus: the 4,601-message spam corpus on <Ref lesson="spam-filter">ESL's fixed 3,065/1,536 split</Ref>, the course's benchmark since module 4, carrying the floor <Ref lesson="spam-ensembles">module 7 measured</Ref> (one pair of identical feature vectors with opposite labels in the training split, so no function of the features trains below $1/3{,}065$). Algorithm: AdaBoost exactly as <Ref lesson="adaboost">module 7 defined it</Ref>, $T = 1{,}000$ rounds, nothing tuned, error curves and margins read off the staged sums $F_t = \sum_{s\le t}\alpha_s h_s$, the same machinery <Ref lesson="boosting-lab">the boosting lab</Ref> built: one pass, no refitting per $T$. Margins: the normalized margin $y_i F_T(x_i)/\sum_{t \le T}\alpha_t \in [-1,1]$, <Ref lesson="margin-bounds">the margin lesson's normalization</Ref> exactly (the paper's definition is the multiclass generalization; on two classes they coincide).
+
+### Two lanes: depth-4 trees and stumps
+
+The paper ran its experiment twice, with C4.5 and with decision stumps, and the reproduction mirrors that: two lanes. The **depth-4 lane** boosts depth-4 weighted-gini trees, the stand-in for C4.5 and the learner behind <Ref lesson="adaboost">the AdaBoost lesson's mystery figure</Ref>. The **stump lane** boosts depth-1 stumps, the course's canonical weak learner and the one whose capacity every bound in this module has already priced. Trees are our own implementation; a different grower's tie-breaking moves these numbers by tenths of a point (the ensembles lesson's depth-4 run of the same recipe finished a few tenths lower), which is part of why shapes, not values, are the claims. All certificates below use $\delta = 0.05$.
+
+## The reproduction: the tail marches, the bulk does not
+
+<Figure
+  src="./figures/reproduction.svg"
+  alt="Two stacked panels for boosted depth-4 trees on the spam split: training error reaching the 1/3065 floor at round 82 while test error stays near 4.7 percent through round 1000, above margin CDFs at rounds 5, 100 and 1000 whose low tail moves right while the bulk shifts left; an inset zooms the region between margin -0.05 and 0.3, where the mass below margin 0.05 falls from 6.0 to 1.1 to 0.1 percent"
+  caption="The depth-4 lane, drawn to the original's layout. Training error is at the corpus floor from round 82; 918 rounds later nothing has blown up. Below, the margin CDFs with the low tail zoomed: the region left of 0.05 empties, 6.0% → 1.1% → 0.1%."
+/>
+
+### The error row: exhausted at round 82, flat to 1,000
+
+The error row replicates the paradox. Training error reaches the corpus floor at **round 82** and never moves again; the 918 rounds that follow multiply the ensemble's parameter count twelvefold, and the test error stays inside a 4.1–4.9% band. One binomial standard error is 0.54 points at this test-set size, so the band is noise around flat. The classical capacity account predicts a rising test curve here and delivers nothing of the kind; that is <Ref lesson="adaboost">the mystery figure</Ref> re-observed on real mail rather than a synthetic sphere. What our lane does not show is letter's continuing *fall* (8.4% to 3.1%): our test curve is flat, not falling, and the honest scoreboard records that as a partial replication. No degradation reproduces everywhere; continued improvement is a property letter has and this corpus, at this base learner, does not.
+
+<Task>
+Work the inset ($\rho \in [-0.05, 0.3]$, CDF axis to 12%) before the prose interprets it. Each curve's height at the $\rho = 0$ guide is that round's training error — check the $T = 5$ curve against the error row above. Then read the three dotted heights at the $0.05$ guide, the quantity the ensemble margin bound's loss term $\widehat{R}_{S,\rho}$ reads, and compute the factor by which that mass falls from $T = 5$ to $T = 1{,}000$; the caption holds the values to check against.
+</Task>
+
+### The margin row: two motions, one of them in the theory
+
+The margin row splits into two motions, and only one was in the original's headline. The low tail marches right, exactly as in 1998: the minimum margin climbs $-0.78 \to -0.006 \to -0.001$, and the fraction below $0.05$ falls sixty-fold. (The stubborn $-0.001$ is the contradictory pair: its two rows share one score, so one of the two margins is negative at every $T$; this is the corpus floor, visible in margin currency.) The bulk, meanwhile, drifts *left*: the median margin falls $0.72 \to 0.27 \to 0.18$. From the letter figure one would expect the whole distribution to march; ours moves only its tail, and the paper itself documents the mechanism: boosting is "willing to suffer significant reductions in the margins of those examples that already have large margins" to lift the small ones, the same median-for-minimum trade <Ref lesson="adaboost">the AdaBoost lesson's forward exercise</Ref> measured on the $\chi^2$ problem. The theory is indifferent to the difference: every bound in the module reads the CDF at small $\rho$, and the tail is what the push theorem moves.
+
+<Figure
+  src="./figures/stump-lane.svg"
+  alt="The stump lane: training error 3.9 percent and test error 5.8 percent both still falling at round 1000, above margin CDFs at rounds 5, 100 and 1000 that compress toward zero margin"
+  caption="The stump lane lands on the AdaBoost lesson's numbers (6.0% at T = 400, 5.8% at T = 1000). Margins compress toward 0 as Σαₜ grows: stumps cannot achieve large margins, and the paper's stump experiment says the same."
+/>
+
+### The stump lane: the paper's second experiment
+
+The stump lane is the paper's other experiment, reproduced. Training error never exhausts (3.9% at $T = 1{,}000$ and still creeping), the test error falls for the full thousand rounds, and the margin distribution *compresses*: the median slides from $0.46$ to $0.09$ as late rounds arrive with errors $\varepsilon_t \approx 0.49$ and vanishing vote weights. SFBL's own stump runs show precisely this: stumps are too weak for large margins, consistent with the push theorem's form, and generalization survives because the base class is so small.
+
+<KeyFact>
+What it would take for letter's whole-distribution march to reproduce, the push theorem states itself: its per-round factor $2\sqrt{\varepsilon_t^{1-\rho}(1-\varepsilon_t)^{1+\rho}}$ shrinks at every level $\rho < 1$ only if the weighted errors $\varepsilon_t$ stay small round after reweighted round — a base learner strong enough to keep winning as the distribution hardens, which C4.5's full trees were and neither of our lanes is. And this corpus refuses outright: the contradictory pair keeps one training margin negative at every $T$, so no base class marches this CDF wholly past zero. Letter's march is a property of a strong base learner on a clean corpus, not a law of boosting.
+</KeyFact>
+
+## Three certificates, one machine: the bounds priced
+
+The reproduction settled what the ensembles do; whether the module's ladder explains it is settled next, by pricing. Each of the module's bounds is now priced to a risk ceiling on the stump-lane ensemble, the lane whose capacity inputs are already on the module's books, at $T = 5$, $100$, and $1{,}000$, each certificate set against the measured test error. Three routes: the <Ref lesson="learning-theory">finite-class bound</Ref> on a discretized vote; the <Ref lesson="vc-dimension">VC bound</Ref> through the ensemble's dimension; the <Ref lesson="margin-bounds">ensemble margin bound</Ref>, whose capacity term is the stump class's Rademacher complexity priced by Massart and Sauer. (The module's fourth route, <Ref lesson="rademacher-stability">uniform stability</Ref>, declines the case honestly: its theorem prices algorithms with a regularization knob $\lambda$, and AdaBoost has none.)
+
+<Example title="pricing all three at T = 100">
+**Finite class.** Discretize each stump to 8-bit thresholds: $|\mathcal{H}_{\text{stump}}| = 57 \times 256 \times 2$, $\ln|\mathcal{H}_{\text{stump}}| = 10.3$. A vote of 100 stumps with 8-bit weights has $\ln|\mathcal{H}| = 100 \times (10.3 + 8\ln 2) = 1{,}583$, so the uniform tolerance is $\varepsilon = \sqrt{(1583 + \ln 40)/(2 \cdot 3065)} = 0.51$. Certificate: risk $\le 0.060 + 0.51 = 0.57$.
+
+**VC.** By <Ref lesson="vc-dimension">SSBD's ensemble lemma</Ref>, $d(100) = 100 \cdot 11 \cdot (3\log_2 1100 + 2) \approx 3.6 \times 10^4$, more than eleven times $n$: the growth function at $n = 3{,}065$ is $2^n$, so Massart's lemma prices the capacity term at exactly $\sqrt{2\ln 2} \approx 1.18$ — the term's ceiling, and its value whenever $d \ge n$, however large $d$ grows. Certificate: risk $\le 0.060 + 1.18 + 0.022 = 1.26$, the last term the $\sqrt{\ln(1/\delta)/2n}$ surcharge at the declared $\delta = 0.05$. Nothing — and with the capacity term pinned at $1.18$, nothing on this route can come in below training error plus $1.20$ at any $T$.
+
+**Margin.** Capacity $\sqrt{2 \cdot 10 \cdot \ln(e \cdot 3065/10)/3065} = 0.209$ for the stump class ($d_B \le 10$), so the bound reads $\widehat{\mathrm{CDF}}_{100}(\rho) + (2/\rho)(0.209) + 0.022$. The measured CDF gives $0.74$ at $\rho = 0.3$, total $2.16$; optimizing $\rho$ (legitimate at a $\sqrt{\log\log}$ surcharge below $0.02$ here) reaches $1.45$ and no lower. Certificate: risk $\le 1.45$. Also nothing, but for a measurable reason: our stump margins are small.
+</Example>
+
+<Exercise>
+The paired computation: price all three at $T = 1{,}000$ (train error $3.9\%$, measured CDF $0.98$ at $\rho = 0.3$, best-$\rho$ total $1.45$), and state which direction each certificate moved from $T = 100$ and through which term.
+
+<Solution>
+Finite class: $\ln|\mathcal{H}| = 1000 \times 15.8 = 15{,}825$, $\varepsilon = 1.61$, ceiling $0.039 + 1.61 = 1.65$: worse, through the $\sqrt{T}$ growth of the description length (it had crossed 1 near $T \approx 350$). VC: $d(1000) \approx 4.7 \times 10^5$; the capacity term is still pinned at its $1.18$ ceiling, so $0.039 + 1.18 + 0.022 = 1.24$: nearly unchanged, because the term saturated long before $T = 100$ and only the training error moves; a five-point certificate at this $T$ needs roughly four billion messages. Margin: best-$\rho$ total $1.45$: unchanged from $T = 100$, because its capacity term does not contain $T$ at all and the measured tail improvement and bulk compression offset. One certificate degrades with rounds, one was never alive, one is $T$-stable; none is below 1.
+</Solution>
+</Exercise>
+
+| $T$ | finite class (8-bit vote) | VC (fundamental theorem) | margin (Cor. 7.6 route, best $\rho$) | measured test error |
+| --- | --- | --- | --- | --- |
+| 5 | **0.24** | 1.32 | 1.26 | 0.130 |
+| 100 | 0.57 | 1.26 | 1.45 | 0.077 |
+| 1000 | 1.65 | 1.24 | 1.45 | **0.058** |
+
+<Figure
+  src="./figures/pricing.svg"
+  alt="Certified risk ceiling versus rounds on a log scale: the finite-class certificate rises like the square root of T from 0.24 to 1.65, the VC certificate sits pinned above 1 at every T, the margin certificate holds near 1.45 independent of T, and the measured test error falls to 0.058 far below all three"
+  caption="The verdict figure. Above the dashed line a certificate certifies nothing. One bound dies of √T, one arrived dead, one holds its level at any T; the measurement runs 21× below the best of them."
+/>
+
+### Reading the table: three different ways to fail
+
+The table is the module's verdict, and it must be read for discrimination, not despair. No bound certifies the deployed model: the sole sub-1 entry covers the toy-sized $T = 5$ vote, and the best ceiling at $T = 1{,}000$ — the VC column's $1.24$ — overshoots the measured $0.058$ by a factor of 21. The paper's own §2.2 said this in 1998: evaluated at $|\mathcal{H}| = 10^6$, its bounds "start to be meaningful only when the size of the training set is in the tens of thousands," and its Figure 3 plots them above $1$ at $n = 10{,}000$ for every level $\theta \le 1/8$. But the three columns fail differently, and the differences are the explanations' fingerprints. The finite-class column grows like $\sqrt{T}$: it prices the *description* of the vote, so every round costs capacity. That is the wrong currency, per the mystery. The VC column is dead at every $T$: already at $T = 5$, where $d(5) \approx 1.1 \times 10^3$ still sits below $n$, Sauer's exponent $d\ln(en/d) \approx 2{,}190$ exceeds $n \ln 2 \approx 2{,}124$, so the capacity term is pinned at its $2^n$ ceiling of $1.18$ from the start; from round 13, $d(T)$ outruns $n$ outright. The margin column alone is $T$-stable and moves only through a measurable property of the fit; priced on <Ref lesson="margin-bounds">the ring machine, where the fitted margins are large</Ref>, this same route produced the module's one working certificate, $0.35$ against a measured $0.00$. Vacuity here is a statement about our margins and our $n$, not about the route.
+
+<KeyFact>
+The table prices certificates, not explanations: a ceiling above 1 falsifies the promise of a guarantee at this $n$, not the margin account itself. Explanations are tested by prediction, and the margin account makes a sharp one: remove the persistent edge and the no-degradation regime should collapse. The noise experiment below runs exactly that test.
+</KeyFact>
+
+## The noise flip: the theory predicts its own failure
+
+Nine hundred flat rounds past exhaustion invite a general rule — train AdaBoost as long as you like — and the margin account refuses the generalization, because its load-bearing hypothesis is the persistent edge: <Ref lesson="margin-bounds">the push theorem</Ref> moves the tail only while $\varepsilon_t \le \frac12 - \gamma$, and <Ref lesson="adaboost">the exponential loss</Ref> chases mislabeled points, so flipped labels should kill the edges, stall the march, and convert late rounds from margin-building to noise-memorizing, restoring the classical upturn the clean run never showed. The check: flip 321 of the 3,065 training labels (10.5%, seed fixed), rerun the depth-4 lane, score against the untouched test set.
+
+<Figure
+  src="./figures/noise-upturn.svg"
+  alt="Test error versus rounds for the depth-4 booster on clean labels, flat near 4.7 percent, and with ten percent flipped training labels, reaching a minimum of 7.5 percent at round 235 and climbing about two points afterward"
+  caption="The predicted upturn. Clean labels: flat for 900 rounds past exhaustion. 10% flipped labels: minimum at round 235, then a two-point climb, the classical overfitting the clean lane never produced."
+/>
+
+### The upturn on schedule
+
+Every predicted symptom appears, with numbers. The test error bottoms at 7.5% around round 235 and then climbs about two points over the following several hundred rounds, while the clean lane sits flat; stopping early is suddenly worth something, exactly as the U-curve says once its hypothesis holds. The edges die on schedule: by the late rounds $\varepsilon_t \approx 0.495$, an edge of half a point, against double digits in the early rounds.
+
+### Where the capacity went
+
+<Figure
+  src="./figures/noise-margins.svg"
+  alt="Median normalized margin at rounds 5, 100 and 1000 for flipped and clean training points: flipped points climb from minus 0.40 across zero to plus 0.02 while clean points fall from 0.61 to 0.07"
+  caption="The margin ledger. The ensemble drags the flipped points across zero (by T = 1000, 88% of them sit at positive margin, the corrupted label learned as written) while the clean points' medians fall sevenfold to pay for it."
+/>
+
+At round 5 the flipped points sit where truth put them, at median margin $-0.40$: the early ensemble votes against the corrupted labels. A thousand rounds later 88% of them have *positive* margin (the booster has memorized the noise) and the clean points' median has been taxed from $0.61$ down to $0.07$ to fund it. Read against the bound, both lanes now tell one story: on clean data the loss term at small $\rho$ falls with $T$ and rounds are free; on noisy data the tail is "improved" only by fitting the flipped labels, the clean mass slides left, and the certificate degrades like the test error. The theory did not merely survive this check; it specified it. The published record agrees: Dietterich's noise experiments and the Breiman comparisons <Ref lesson="adaboost">quoted in module 7</Ref> found the same inversion at 5% noise.
+
+## Bagging beside boosting: margins do not travel between classes
+
+The 1998 figure's control column completes the reproduction, and it contains a trap the module's theorems already name. Bagging 300 full-grown trees on the same split (the <Ref lesson="bagging-random-forests">variance tool</Ref>, resampling and averaging, nothing reweighted) finishes at 5.2% test error, and its training-margin distribution does what the paper's did: nothing. The median vote margin is $1.0$ at $B = 5$ and $0.99$ at $B = 300$; four fifths of the training points sit above $0.9$ at every committee size. Averaging converges to its expectation, which for deep trees that memorize their bootstraps is near-unanimity on the training set, and no mechanism ever pushes it anywhere. Boosting's distribution, beside it, is still being reshaped at round 1,000. That is the mechanism contrast in one picture: a variance tool settles; a margin tool optimizes.
+
+<Figure
+  src="./figures/bagging-margins.svg"
+  alt="Margin CDFs over the training set for bagging with 300 full-grown trees and boosting with 1000 depth-4 trees: bagging's curve sits far to the right with most mass above 0.9 yet its test error is 5.2 percent, worse than boosting's 4.7"
+  caption="The control column. Bagging's margins dominate boosting's almost everywhere, and its test error is worse. Margins certify only jointly with the base class's capacity, and bagging's base class is full-grown trees."
+/>
+
+### The trap: margins do not compare across base classes
+
+The trap is in the comparison: bagging's margin CDF *dominates* boosting's over nearly the whole axis, yet bagging generalizes worse (5.2% against 4.7%). If margins alone certified, the plot would rank the two backwards. They do not, and the module's own theorem says why: the ensemble bound charges $\widehat{R}_{S,\rho}$ *plus* the base class's capacity, and bagging's base class is full-grown trees. Hundreds of leaves are a capacity a depth-4 tree never approaches, so bagging's large margins are priced against a class that devalues them. SFBL flag exactly this ("one must also always consider the complexity of the base classifiers"), and <Ref lesson="margin-bounds">the delta-function trap</Ref> is the limiting case: a base class rich enough makes any margins, on any labels, worth nothing. A margin CDF is evidence only at fixed base class; across classes it is not even comparable.
+
+## What an engineer keeps
+
+The module closes by ranking its own products, cashed against everything measured above.
+
+### The ranking: measurement, explanation, certificate
+
+**Measurement first.** At practical sample sizes, held-out error and <Ref lesson="cross-validation-bootstrap">the resampling machinery of module 5</Ref> remain the only instruments that say what a model's risk *is*. Nothing in this module unthroned them, and the pricing table shows the gap: a factor of 25 between the margin route's ceiling and the measured error.
+
+**Explanation second**, and it does real work. The margin-plus-capacity ledger predicted which lane would tolerate a thousand rounds and which would turn up at 235, and identified the exact hypothesis (the edge) whose death flips the regimes. It is also cheap to monitor: one pass over the staged sums the lab already computes buys the whole tail CDF. Two live gauges warn of trouble: $\varepsilon_t$ creeping to $\tfrac12$ (edges dying), and formerly very-negative margins climbing toward zero (labels being memorized).
+
+**Certificates last.** Real ones exist where margins are large relative to $\sqrt{n}$ (the ring machine's $0.35$) and do not exist for this corpus at this $n$. A promised ceiling above 1 is a fact about the promise, not the model.
+
+### What stands established
+
+The 1998 experiment replicates on the course's own tools in the claims the theorems need (early exhaustion without degradation, the tail's march, bagging's immobility) and departs where letter was special. The module's bounds, priced on one fitted machine, separate cleanly: a counting bound that degrades with $T$, a counting bound dead on arrival, and a $T$-stable margin certificate, loose here and meaningful only where large margins and large $n$ coincide. And the theory's noise prediction was delivered by experiment, upturn and all. The module's question of why any of it works has its honest answer: constraints and margins explain generalization and predict its failure; they do not yet price it at the scale engineers work. <Ref lesson="bayesian-linear-regression">The next module</Ref> changes what a guarantee is: instead of bounding one number, keep a distribution over predictions and let the model price its own uncertainty. Where even margins fall silent, in models that interpolate, <Ref lesson="double-descent">the course's final act</Ref> begins.
+
+## Exercises
+
+<Exercise>
+Warm-up from the stump lane's staged sums, where $\sum_t \alpha_t = 10.52$ at $T = 100$ and $33.56$ at $T = 1{,}000$. Three test messages: A (real mail, $y = -1$) has $F_{100} = -6.25$, $F_{1000} = -13.53$; B (real mail, $y = -1$) has $F_{100} = -0.21$, $F_{1000} = -0.67$; C (spam, $y = +1$) has $F_{100} = -1.80$, $F_{1000} = -4.10$. Compute all six normalized margins and state what happened to each message's classification and confidence between the two rounds.
+
+<Solution>
+Margin $= yF/\sum\alpha$. A: $6.25/10.52 = 0.594$, then $13.53/33.56 = 0.403$. B: $0.21/10.52 = 0.020$, then $0.67/33.56 = 0.020$. C: $-1.80/10.52 = -0.171$, then $-4.10/33.56 = -0.122$.
+
+A is confidently right at both rounds, but note the direction: its raw score more than doubled while its normalized margin *fell*; the denominator $\sum\alpha$ tripled, and normalization is what makes rounds comparable at all. B holds a wafer-thin correct margin at both rounds. C is misclassified spam at both rounds, slightly less confidently wrong at $T = 1{,}000$. The transferable move: raw scores $F$ drift with scale and mean nothing across $T$; every claim in this lesson's figures lives on the normalized quantity.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: compute the entire normalized-margin CDF of the stump lane at $T = 1$, using only one number from this lesson ($\varepsilon_1 = 0.201$). Then explain, from the form of the push theorem, why the march visible at $T = 100$ requires many rounds rather than a few strong ones.
+
+<Solution>
+At $T = 1$, $F = \alpha_1 h_1$ and the normalizer is $\alpha_1$, so every normalized margin is $y_i h_1(x_i) \in \{-1, +1\}$, and the CDF is a two-step staircase: height $0.201$ (the stump's training error) at $-1$, jumping to $1$ at $+1$, with nothing between. Margins in $(0,1)$ do not exist yet; they are manufactured by *disagreement* among rounds, which is why the $T = 5$ curves in both lanes are still coarse staircases ($2^5$ possible vote patterns).
+
+The push theorem bounds the below-$\rho$ fraction by $\prod_t 2\sqrt{\varepsilon_t^{1-\rho}(1-\varepsilon_t)^{1+\rho}}$: each factor is a number *slightly* below 1 (and below 1 at all only for $\rho < \gamma_t$), so the guarantee is a product of many near-unity terms, exponential in $T$ and negligible for small $T$. A single round, however accurate, contributes one factor; the march is compounding, not strength. That is also why the stump lane, whose late edges are half a point, moves only the region $\rho \approx 0$ and compresses everywhere else.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim with this lesson's own runs: "Our clean-lane test error never turned up in a thousand rounds, and neither did letter's — so training AdaBoost longer is always safe." Name the hypothesis whose failure breaks the claim and the measured evidence for its failure.
+
+<Solution>
+The 10%-noise run is the counterexample: same corpus, same learner, same algorithm, and the test error bottoms at 7.5% near round 235 and climbs about two points over the rounds that follow. Training longer past round 235 is strictly harmful there, and nothing in the claim's evidence distinguishes that lane from the clean one in advance except the labels.
+
+The failed hypothesis is the persistent edge $\varepsilon_t \le \frac12 - \gamma$ on truthful labels. Measured: late-round errors reach $0.495$ in the noise lane, so the push theorem's per-round factors sit at $1$ and the tail march it guarantees is over; what continues instead is exponential-loss weight concentration on the 321 flipped points, 88% of which end at positive margin. That is capacity spent memorizing flipped labels, the classical overfitting mechanism observed directly. "No upturn" is a property of clean, hull-separable data, not of AdaBoost; the theory states the boundary and the experiment confirmed it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped, the module's capstone: run the reproduction yourself. Boost your <Ref lesson="boosting-lab">boosting-lab</Ref> stumps (and, if compute allows, depth-4 trees) on the spam split to $T = 1{,}000$, reusing staged sums (never refitting per $T$); subsample the corpus and say so if you must. Produce the two-row figure: train/test error vs rounds over margin CDFs at $T \in \{5, 100, 1000\}$, axes matched to this lesson's. Then write a five-sentence results paragraph in the reproduction register: what replicated, what differed, and why.
+
+<Solution>
+Reference values from this lesson's runs (yours will differ by tenths): stump lane: test $13.0\%$, $7.7\%$, $5.8\%$ at $T = 5, 100, 1000$, train never below $3.9\%$, margin median compressing $0.46 \to 0.09$; depth-4 lane: train at the $1/3{,}065$ floor from round 82, test in a $4.1$–$4.9\%$ band thereafter; the tail values appear in the model paragraph below.
+
+A model results paragraph: "On the ESL spam split ($3{,}065/1{,}536$), AdaBoost over depth-4 gini trees exhausted its training error at round 82 and showed no test-error degradation through round 1,000, its test error holding at $4.7\% \pm 0.5$. The training-margin distribution's low tail moved right monotonically (mass below $0.05$: $6.0\%$, $1.1\%$, $0.1\%$ at rounds 5, 100, 1000) while the median fell from $0.72$ to $0.18$. This replicates the no-overfitting and tail-march claims of Schapire et al.'s Figure 1 but not its whole-distribution march or continuing test-error fall, which we attribute to the smaller achievable margins of our corpus and base class. A control with 10% flipped labels restored the classical upturn (minimum $7.5\%$ at round 235, $+2$ points after), consistent with the margin theory's persistent-edge hypothesis. Values are not comparable to the original (letter, C4.5, $n = 16{,}000$); shapes are."
+
+Grade your own paragraph on the register: claims separated into replicated/not, causes attributed to named differences, values disclaimed, controls reported. That register is the deliverable of every reproduction.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review with <Ref lesson="learning-theory">module 9's opening lesson</Ref>, as a derivation the body skipped: the table's finite-class column was computed at three values of $T$, and the claims that it "grows like $\sqrt{T}$" and crossed 1 near $T \approx 350$ were asserted, not derived. (a) Write the finite-class certificate for the 8-bit vote as a function of $T$ ($\ln|\mathcal{H}_{\text{stump}}| = 10.28$, 8-bit weights, $\delta = 0.05$, $n = 3{,}065$), show that its tolerance grows like $\sqrt{T}$ from a few rounds on, and derive the crossing round $T^{*}$ at which the ceiling passes 1, taking training error $\approx 5\%$ near the crossing. (b) The formula's $T$-free ingredient, the bare 8-bit stump class, has tolerance $\varepsilon = 0.048$ — the only comfortably sub-1 number anywhere in this lesson. State why quoting it for the deployed 1,000-stump vote repeats the 1,000-coins error, and what happens to it at 16-bit thresholds.
+
+<Solution>
+(a) One stump contributes $\ln|\mathcal{H}_{\text{stump}}| = 10.28$ and its 8-bit weight another $8\ln 2 = 5.55$, so $\ln|\mathcal{H}_T| = 15.83\,T$ and
+
+$$\varepsilon(T) = \sqrt{\frac{15.83\,T + \ln 40}{2 \cdot 3{,}065}} \approx 0.051\sqrt{T},$$
+
+the $\ln 40 = 3.7$ buried by $15.83\,T$ after a couple of rounds. Check against the table: $0.051\sqrt{100} = 0.51$, $0.051\sqrt{1000} = 1.61$. The ceiling passes 1 when $\varepsilon(T^{*}) = 1 - 0.05 = 0.95$, i.e. $T^{*} = (0.95^2 \cdot 6{,}130 - \ln 40)/15.83 \approx 349$ — the "crossed 1 near $T \approx 350$" of the pricing exercise, derived. The growth is structural, not a defect of the encoding: this route prices the *description* of the vote, each round appends one stump and one weight, so $\ln|\mathcal{H}|$ is linear in $T$ under any fixed per-round format — a cleverer format moves the constant $0.051$, never the $\sqrt{T}$.
+
+(b) $\varepsilon = \sqrt{(10.28 + \ln 40)/(2 \cdot 3065)} = 0.048$: every discretized stump's training error is within **4.8 points** of its risk, a genuinely meaningful, uniform, distribution-free certificate. But it covers the wrong object: the deployed model is a weighted vote of 1,000 stumps, and a certificate is a statement about a class — quoting a member class's certificate for a composite model repeats the 1,000-coins error, and part (a) is the price of honesty: a factor of $\sqrt{T}$. At 16 bits, $|\mathcal{H}| = 57 \times 65{,}536 \times 2$ gives $\ln|\mathcal{H}| = 15.8$ and $\varepsilon = 0.056$: the certificate loosens because the *storage format* changed, the discretization trick's known dishonesty from the opening lesson. The class that matters is what the fitting procedure can reach, not what a float can spell.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. The margin bound's capacity term for the stump class is $(2/\rho)\sqrt{2 \cdot 10 \ln(e n/10)/n}$. (a) Evaluate it at $\rho = 0.5$ for $n = 300$, $n = 3{,}065$, and $n = 30{,}650$. (b) The letter run achieved margin $\ge 0.5$ on *every* training point by round 100, at $n = 16{,}000$; evaluate the full bound (zero loss term, $\delta = 0.05$) for a stump-capacity class in that regime. (c) Now the wall: module 11 studies models that interpolate, meaning zero training error on data whose labels are partly noise. State what the noise experiment above implies about their margins, and what kind of guarantee could survive there.
+
+<Solution>
+(a) $4\sqrt{20\ln(e n/10)/n}$: $n = 300 \Rightarrow 2.17$; $n = 3{,}065 \Rightarrow 0.84$; $n = 30{,}650 \Rightarrow 0.31$. The term crosses from absurd to potentially meaningful over two decades of $n$: the bound enters its operating range as $\sqrt{n}$ grows, precisely SFBL's "tens of thousands."
+
+(b) $0 + 4\sqrt{20\ln(e \cdot 16000/10)/16000} + \sqrt{\ln 20/32000} \approx 0 + 0.41 + 0.01 \approx 0.42$: with letter's margins at letter's $n$, the certificate is real, loose against the measured 3.1% but a genuine sub-half guarantee. The theory's meaningful range is where large margins and large $n$ coincide.
+
+(c) On noisy labels the experiment showed margins at noise points go positive only by memorization, taxing clean margins to near zero. An interpolating model on noisy data cannot have large margins on the noise, so every bound in this module goes vacuous on it, and the classical prediction is the upturn we produced on demand. Yet module 11's models interpolate noise and generalize anyway; margins cannot save them, and something else must. Two roads leave this point: guarantees that abandon risk ceilings for calibrated *distributions* over predictions (<Ref lesson="bayesian-linear-regression">the next module's posterior</Ref> and its conformal endgame), and the direct assault on interpolation in <Ref lesson="double-descent">the epilogue's opening lesson</Ref>, where the U-curve itself is the casualty.
+</Solution>
+</Exercise>
+
+<References>
+1. R. E. Schapire, Y. Freund, P. Bartlett, W. S. Lee, "Boosting the Margin: A New Explanation for the Effectiveness of Voting Methods," *Annals of Statistics* 26(5), 1998, pp. 1651–1686 — the reproduced experiment: Fig. 1 (letter error curves and margin CDFs) with §1's 13.8/8.4/3.1 numbers; §2.2 and Fig. 3, the authors' own looseness verdict ("tens of thousands"); §4 and Figs. 4–5, the stump runs and the small-margins observation; §5, the base-classifier-complexity caveat behind the bagging trap. https://doi.org/10.1214/aos/1024691352
+2. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — §7.3: the ensemble margin bounds (Cors. 7.5–7.6) and the margin-push theorem (Thm. 7.7) priced in this lesson; Ch. 3: Massart's and Sauer's lemmas behind the capacity term. Free online: https://cs.nyu.edu/~mohri/mlbook/
+3. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Lemma 10.3: the ensemble VC dimension used in the pricing table; Remark 4.1: the discretization trick and its format-dependence. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+4. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — the spam corpus and the fixed 3,065/1,536 split (§9.2.5 and the book's dataset page); Ch. 10: boosting on this corpus; §16.2.3: margins along the boosting path. Free online: https://hastie.su.domains/ElemStatLearn/
+5. M. Hopkins, E. Reeber, G. Forman, J. Suermondt, "Spambase," UCI Machine Learning Repository, 1999 — the corpus behind both lanes. https://archive.ics.uci.edu/dataset/94/spambase
+6. T. G. Dietterich, "An Experimental Comparison of Three Methods for Constructing Ensembles of Decision Trees: Bagging, Boosting, and Randomization," *Machine Learning* 40(2), 2000, pp. 139–157 — the published precedent for the noise flip: AdaBoost's degradation under label noise, measured across benchmarks. https://doi.org/10.1023/A:1007607513941
+7. D. J. Slate, "Letter Recognition," UCI Machine Learning Repository, 1991 — the letter benchmark of the original experiment: 20,000 examples, 26 classes, 16 attributes. https://archive.ics.uci.edu/dataset/59/letter+recognition
+</References>

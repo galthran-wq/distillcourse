@@ -1,0 +1,332 @@
+The U-shaped test-error curve this course opened with is one half of the picture: push model capacity past the interpolation threshold and test error can fall a second time — on the same data, with zero training error throughout.
+
+Ten modules built the classical account: risk against training error, the bias–variance ledger, penalties, resampling, a theory module whose certificates price classes and algorithms, and, closing the arc, an uncertainty module in which the models price their own predictions (posterior bands from the model's assumptions, <Ref lesson="conformal-prediction">conformal sets</Ref> from none). That toolkit is complete on its own terms, so the epilogue does not extend it; it turns back to the one debt the theory module left unpaid. <Ref lesson="bounds-vs-practice">Module 9's closing experiment</Ref> ended at a wall it named precisely: models that interpolate noisy labels have no margins to speak of, so every bound in that module goes vacuous on them. Yet such models are trained daily, and they generalize. This lesson maps the wall. It presents the measured phenomenon, derives the mechanism at course level (minimum-norm interpolation, and why gradient descent finds it), states the exact asymptotic risk with its pole at the threshold, and closes by auditing which classical explanations survive.
+
+## The textbook rule, quoted against the record
+
+<Task>
+Closed-book, from the prerequisites: write the three terms of the <Ref lesson="bias-variance">bias–variance decomposition</Ref>; write the ridge estimator of <Ref lesson="ridge-lasso">module 3</Ref> and its $\lambda \to 0$ limit when $X^\top X$ is invertible; and recall from <Ref lesson="ols">the least-squares lesson</Ref> which object stays unique when $X^\top X$ is singular. Check below before continuing.
+</Task>
+
+<Aside>
+Answers: expected squared error at a point is $\sigma^2 + \text{bias}^2 + \text{variance}$; the ridge estimator is $\hat\beta_\lambda = (X^\top X + \lambda I)^{-1} X^\top y$, converging to the OLS solution $(X^\top X)^{-1}X^\top y$ as $\lambda \to 0$ when the inverse exists; and under singularity the fitted vector $\hat y$ (the projection of $y$ onto the column space) stays unique while the coefficient vector does not. The minimum-norm choice was introduced there as a tie-breaking convention. This lesson is where that convention becomes load-bearing.
+</Aside>
+
+<Figure
+  src="./figures/belkin-schematic.png"
+  alt="Two panels, risk plotted against capacity of the hypothesis class. Panel (a): a dashed training-risk curve falling towards zero and a solid test-risk curve making a U, its minimum marked 'sweet spot', with 'under-fitting' to the left of a dotted vertical line and 'over-fitting' to the right. Panel (b): the same axes carried further — the U rises into a spike at a dotted vertical line marked 'interpolation threshold', beyond which the test risk descends a second time, below its classical minimum, across the region labelled 'modern' interpolating regime; the training risk is at zero throughout that region."
+  caption="The claim as its authors drew it. (a) is the curve every textbook teaches: test risk down, then up, with a sweet spot in between. (b) is the same picture with the x-axis continued — past the interpolation threshold the test risk falls again, and keeps falling below the sweet spot."
+  float="right"
+  width="m"
+/>
+
+The Elements of Statistical Learning, the book behind half of this course's canon, states the classical corollary in one sentence on page 221: a model with zero training error "is overfit to the training data and will typically generalize poorly." Every earlier module treated that sentence as settled. The memorizer of <Ref lesson="statistical-learning">the opening lesson</Ref> is its proof by example, and the U-curve of <Ref lesson="bias-variance">module 1</Ref> is its picture: past the sweet spot, flexibility buys variance and test error climbs.
+
+In 2019, Belkin, Hsu, Ma and Mandal published the [curve that contradicts the sentence](https://arxiv.org/abs/1812.11118). Plot test risk against the number of parameters and the classical U appears, but only up to the *interpolation threshold*: the capacity at which the model first fits the training data exactly. At the threshold, test risk spikes. Beyond it, with training error pinned at zero, test risk **falls again**, often below the classical sweet spot. They named the shape *double descent*, and showed it in random-feature models, fully trained neural networks, and tree ensembles.
+
+The claim is not that overfitting is harmless. Exactly at the threshold the classical prediction is correct at its most extreme, and the spike is worse than anything the U-curve drew. The claim is that the classical picture's axis stopped too early: the regime beyond the threshold exists, was reachable all along, and behaves differently.
+
+<KeyFact>
+Every result of modules 1–9, the decomposition through the certificates, continues to govern fits that stay on the near side of the threshold: nothing on the classical half of the axis is revised by anything in this lesson.
+</KeyFact>
+
+## The evidence: ten thousand random features on MNIST
+
+The claim needs a model family whose capacity turns like a dial through the threshold. Belkin et al. used *random Fourier features*: predictors of the form
+
+$$
+h(x) = \sum_{k=1}^{N} a_k\, \phi(x; v_k), \qquad \phi(x; v) = e^{\sqrt{-1}\,\langle v, x\rangle},
+$$
+
+with the frequencies $v_1, \dots, v_N$ drawn once from a standard Gaussian and never trained. Only the coefficients $a_k$ are fitted, by least squares, so $N$ is the capacity dial. When the least-squares problem has many solutions ($N > n$), they take the one minimizing $\sum_k |a_k|^2$. The family is a two-layer network with a frozen first layer, and as $N \to \infty$ it converges to a kernel machine: the bridge <Ref lesson="random-features">the next lesson</Ref> builds in full.
+
+<Figure
+  src="./figures/rff-mnist.png"
+  alt="Six panels in two columns, zero-one loss on the left and squared loss on the right. Top row: test risk on a log scale against the number of random Fourier features N, in thousands, from 0 to 60. Each curve dips to a shallow minimum near N = 3000, climbs to a sharp spike at N = 10000, then falls monotonically to below the first minimum by N = 60000; a flat black line marks the min-norm kernel solution near the final value. Middle row: the coefficient L2 norm, also log scale, rises to a peak at exactly the same N = 10000 and decays afterwards toward the same flat kernel line. Bottom row: training risk falls to zero by roughly N = 4000 and stays there across the whole spike."
+  caption="The measurement. Test risk and coefficient norm peak at exactly N = n = 10⁴ — the width at which the fit first becomes exact — and both descend afterwards toward the min-norm kernel solution (flat black line), while training risk has been pinned at zero since well before the peak."
+/>
+
+On a subset of MNIST ($n = 10^4$ handwritten digits, ten classes) the measurement runs as follows. In the classical regime the U bottoms out around **4.5% test error** near $N = 3{,}000$ features. At $N = n = 10^4$, where the fit first becomes exact, test error peaks at **88%**: at the threshold the fit is no better than guessing among ten digits, whose chance error is 90%. Past the threshold it descends monotonically, reaching just over **2%** at $N = 6 \times 10^4$, roughly half the best error the classical regime contains.
+
+<Task>
+Read the published figure's two left panels together: locate the test-risk spike at $N = 10^4$, then check that the coefficient-norm panel below it peaks at the same $N$ and falls afterwards, tracking the risk curve's shape. That co-movement is the mechanism section's whole subject.
+</Task>
+
+The same shape appears where nothing is linear-in-features. A one-hidden-layer network trained by backpropagation on MNIST shows the spike at the parameter count matching $n \times K$ (examples times classes) and the second descent beyond it, and interpolating tree ensembles behave alike. The phenomenon also tolerates noise: networks and kernel machines trained to fit *corrupted* labels exactly still reach near-optimal test error, the observation that turned interpolation from malpractice into a theoretical problem ([Zhang et al., 2017](https://arxiv.org/abs/1611.03530)).
+
+<Aside>
+Why nobody saw it earlier. Three habits hid the right half of the curve. Practitioners regularized, and a $\lambda > 0$ fit never interpolates, so the threshold is never crossed. Model families in classical toolkits (splines with chosen knots, small trees, subset regression) were sized well under $n$ as a matter of course. And the one community that did fit enormous models, neural networks in the 1990s, early-stopped its optimizers, which acts as implicit regularization. The curve was not hard to produce; every classical default (the penalty, the sizing rule, the early stop) kept fits on the near side of the threshold.
+</Aside>
+
+## The mechanism on twenty points: splines past the threshold
+
+An MNIST measurement shows the phenomenon; a twenty-point example exposes the machinery. The setting is the course's own: natural splines from <Ref lesson="splines-gams">module 3</Ref>, fitted by least squares to $n = 20$ draws from $Y = \sin(X) + \varepsilon$, $X \sim U[-5,5]$, $\varepsilon \sim N(0, 0.3^2)$. This is the worked example of ISLP §10.8, recomputed here. A natural spline with $d$ degrees of freedom is a least-squares regression on $d$ basis functions, the constant included, with knots at $d$ equiprobability quantiles of the training $x$; so $d$ is the capacity dial, and $d = n = 20$ is the interpolation threshold, where the linear system turns square.
+
+<Figure
+  src="./figures/spline-double-descent.svg"
+  alt="Test and training mean squared error against spline degrees of freedom on log-log axes: a classical U with minimum near d = 6, a spike at the dashed threshold line d = n = 20 where training error hits zero, its median near 6 with an interquartile band reaching 25, and a second descent to about 0.37 beyond d = 40"
+  caption="Double descent on 20 points, computed: median test MSE (line) and interquartile band over 100 draws, d sampled in even steps. The classical U is the shaded left half; training error hits zero at d = n = 20 and stays there."
+/>
+
+The curve reproduces every feature of the MNIST plot at desk scale. The classical U bottoms near $d = 6$ at MSE $\approx 0.05$. At the threshold the fit destabilizes: the median test MSE at $d = 20$ is $\approx 6$, a **hundredfold** above the sweet spot, and the interquartile band stretches to $25$: the spread across draws is itself the variance explosion the risk formula below prices. Beyond the threshold the error falls back to $\approx 0.37$ by $d \approx 42$: a reasonable fit again, though in this low-$n$, noisy setting the second descent does *not* undercut the classical sweet spot. Whether it does depends on the signal-to-noise ratio; MNIST's is high, and there the far side wins.
+
+### One interpolant against a family of them
+
+<FigureSequence
+  name="mechanism"
+  alt="Three frames on one panel of the 20 training points and the true sine curve: first the unique d = 20 interpolant swinging off the panel, then eight sampled interpolants at d = 42 forming a gray sheaf, then the minimum-norm member highlighted in amber, visibly smoother"
+  caption="The mechanism, one dataset: at d = n there is exactly one interpolant; at d > n there are infinitely many, and the minimum-norm member is the tame one."
+/>
+
+<Task>
+Step through the three frames and read the two printed norms: the unique $d = 20$ interpolant carries $\lVert\hat\beta\rVert \approx 132$; the minimum-norm $d = 42$ interpolant, chosen from an infinite family, carries $\lVert\hat\beta\rVert \approx 22$. More basis functions bought a coefficient vector *six times smaller*.
+</Task>
+
+At $d = 20$ the linear system $B\beta = y$ is square: **exactly one** function in the family passes through all twenty points, and nothing about interpolation requires that function to be sane between the points. It thrashes, because forcing the last few degrees of freedom through noisy observations bends the curve violently. This is ordinary overfitting, at its catastrophic extreme.
+
+At $d = 42$ the system is underdetermined: the interpolants form an affine space of dimension $42 - 20 = 22$, and the fitting procedure must choose. Least squares as numpy's `lstsq` computes it, and as <Ref lesson="ols">the singular case of module 3</Ref> defined it, returns the member closest to the origin.
+
+<Definition title="minimum-norm interpolation">
+For $X \in \mathbb{R}^{n \times p}$ with $p \ge n$ and full row rank, the **minimum-norm interpolant** is
+$$
+\hat\beta = \operatorname*{arg\,min}_{b}\;\bigl\{ \lVert b \rVert_2 \;:\; Xb = y \bigr\} = X^\top (XX^\top)^{-1} y,
+$$
+equivalently $(X^\top X)^+ X^\top y$ with $(\cdot)^+$ the pseudoinverse. It satisfies $X\hat\beta = y$ exactly: zero training error by construction. Two instances calibrate the hypotheses. At $p = n$ with $X$ invertible, the boundary case, the constraint set is the single point $X^{-1}y$: the family collapses to the unique interpolant that thrashes at $d = 20$ above, and minimality selects nothing. And full row rank is the load-bearing clause: duplicate a row of $X$ (two identical training inputs) and $XX^\top$ turns singular, so the displayed formula is undefined — yet if the duplicated rows carry equal responses, interpolants still exist, and the pseudoinverse form $(X^\top X)^+X^\top y$ still returns the minimum-norm one. That robustness is why the definition's working form, and numpy's `lstsq`, use the pseudoinverse.
+</Definition>
+
+<Example title="a one-equation system, solved by hand">
+Take $n = 1$, $p = 2$: the single equation $3\beta_1 + 4\beta_2 = 5$, so $X = (3\;\; 4)$, $y = 5$. Every point on that line interpolates. The formula gives
+$$
+\hat\beta = X^\top (XX^\top)^{-1} y = \begin{pmatrix}3\\4\end{pmatrix}(25)^{-1} \cdot 5 = \begin{pmatrix}0.6\\0.8\end{pmatrix},
+$$
+with $\lVert\hat\beta\rVert = 1$. Geometrically: $\hat\beta$ is the foot of the perpendicular from the origin to the solution line, and it points along $X^\top$, the row space. Any other interpolant, say $(5/3, 0)$ with norm $1.67$, is farther out. The two facts just computed (smallest norm; lies in the row space) are the entire content of the next section's theorem.
+</Example>
+
+<Exercise>
+The same solve, one dimension up, attempted before opening: one equation, three unknowns, $\beta_1 + 2\beta_2 + 2\beta_3 = 9$. First say which clause of the definition the system satisfies and write down the direction $\hat\beta$ must point in; then compute the minimum-norm solution geometrically (no pseudoinverse formula until the check), verify it with $\hat\beta = X^\top(XX^\top)^{-1}y$, and state its norm against the norm of the sparse interpolant $(9, 0, 0)$.
+
+<Solution>
+Strategy first: $X = (1\;\;2\;\;2)$ has one row, trivially of full row rank with $p = 3 > n = 1$. The solution set is a plane; the minimum-norm member is the foot of the perpendicular from the origin, which lies along the normal direction, the row of $X$.
+
+Set $\hat\beta = c \cdot (1, 2, 2)^\top$ and impose the equation: $c(1 + 4 + 4) = 9$, so $c = 1$ and $\hat\beta = (1, 2, 2)^\top$. Check by formula: $XX^\top = 9$, so $X^\top(XX^\top)^{-1}y = (1,2,2)^\top \cdot \tfrac{1}{9} \cdot 9 = (1,2,2)^\top$. Its norm is $3$; the sparse interpolant $(9,0,0)$ has norm $9$, three times larger, though both fit the "data" exactly. The transferable move: min-norm solutions point along the row space, and their size is set by the data's size against the row's. More features of comparable scale in the row mean a smaller solution, the $n=1$ shadow of the norm-vs-df curve below.
+</Solution>
+</Exercise>
+
+Growing $d$ from 42 to 80 enlarges the family of interpolants, and a minimum over a larger set is smaller: the best-available norm can only fall. That is the mechanism in one sentence. The norm of the fitted coefficient vector peaks at the threshold, where there is no choice at all, and declines on both sides:
+
+<Figure
+  src="./figures/norm-vs-df.svg"
+  alt="Median coefficient norm against degrees of freedom on log-log axes with an interquartile band, rising gently through the classical regime, peaking near 84 at d equal to n, and falling steadily beyond"
+  caption="The norm of the fitted coefficients across the same 100 draws (median and interquartile band): the peak sits at d = n, and every added degree of freedom beyond it lowers the minimum achievable norm."
+/>
+
+Belkin et al.'s one-dimensional random-ReLU example gives the same reading with different numbers: interpolating 10 points with $N = 40$ random ReLU features produces a wild fit with coefficient norm $\approx 695$; with $N = 4000$ features the minimum-norm interpolant is visibly smooth, norm $\approx 159$. Choosing the smallest-norm function consistent with the data is an Occam principle (prefer the least extravagant explanation), and on the far side of the threshold, capacity is what pays for parsimony.
+
+<KeyFact>
+Past the interpolation threshold, the number of parameters stops measuring complexity: all models fit the data exactly, and what varies is the *norm* of the chosen interpolant, which falls as parameters are added. The x-axis of the double-descent plot is capacity; the quantity that governs risk is the norm — module 9's currency, not module 9's parameter counts.
+</KeyFact>
+
+## Why gradient descent finds it: the implicit bias of the optimizer
+
+The mechanism above assumed the fitting procedure picks the minimum-norm member. Nobody writes that objective down in practice; large models are fitted by gradient descent on the unpenalized loss, as in <Ref lesson="gradient-descent">module 2</Ref>. The reason the mechanism applies anyway is a two-line theorem.
+
+<Theorem title="gradient descent from zero converges to the min-norm interpolant (Hastie–Montanari–Rosset–Tibshirani, Prop. 1)">
+Let $X$ have rank $n$ with $p \ge n$. Initialize $\beta^{(0)} = 0$ and run gradient descent on the least-squares loss $\tfrac{1}{2}\lVert y - Xb\rVert^2$,
+$$
+\beta^{(k)} = \beta^{(k-1)} + t\, X^\top\!\bigl(y - X\beta^{(k-1)}\bigr),
+$$
+with step size $0 < t \le 1/\lambda_{\max}(X^\top X)$. Then $\beta^{(k)} \to \hat\beta$, the minimum-norm interpolant.
+
+<Proof>
+Roadmap: two facts and an intersection. (1) Convergence: the loss is a convex quadratic and the step-size condition is exactly module 2's stability bound for quadratics, so $\beta^{(k)}$ converges to some least-squares solution $\tilde\beta$. (2) Confinement: each update adds $t\,X^\top(\cdot)$, a vector in the row space of $X$; starting from $0 \in \operatorname{row}(X)$, every iterate, hence the limit $\tilde\beta$, lies in the row space. (3) The minimum-norm solution is the *unique* least-squares solution in the row space. Any solution decomposes as $b = b_{\text{row}} + b_{\text{null}}$ with the two parts orthogonal; $X b_{\text{null}} = 0$ means the null part changes nothing about the fit but adds $\lVert b_{\text{null}}\rVert^2$ to the squared norm, so the minimum-norm solution has $b_{\text{null}} = 0$. Two distinct row-space solutions would differ by a nonzero row-space vector inside the null space, impossible for a rank-$n$ matrix. Therefore $\tilde\beta = \hat\beta$.
+</Proof>
+</Theorem>
+
+<Exercise>
+Two comprehension checks on the proof, attempted before opening. (a) Justify the confinement step in full: why does each update stay in $\operatorname{row}(X)$, and why does membership survive the limit $k \to \infty$? (b) State exactly where the argument fails for $\beta^{(0)} \neq 0$, and what the limit is instead.
+
+<Solution>
+(a) The update adds $t\,X^\top r$ for a residual vector $r = y - X\beta^{(k-1)}$, and $X^\top r$ is a linear combination of $X$'s rows, hence a row-space vector; by induction from the base case $\beta^{(0)} = 0 \in \operatorname{row}(X)$, every iterate lies in $\operatorname{row}(X)$. Membership survives the limit because a subspace is a closed set: a convergent sequence of row-space vectors has a row-space limit.
+
+(b) Only the base case uses the initialization. From $\beta^{(0)} \neq 0$, the null-space component $P_{\text{null}}\beta^{(0)}$ never enters any residual ($Xb_{\text{null}} = 0$) and no update can change it, so it is carried unchanged into the limit: gradient descent converges to $\hat\beta + P_{\text{null}}\beta^{(0)}$, an interpolant whose squared norm exceeds the minimum by exactly $\lVert P_{\text{null}}\beta^{(0)}\rVert^2$. The min-norm conclusion needs the origin as the start, or any start with no null-space component.
+</Solution>
+</Exercise>
+
+<Figure
+  src="./figures/gd-rowspace.svg"
+  alt="Coefficient plane with the affine line of interpolants, the row space of X through the origin, and gradient-descent iterates marching from zero along the row space to the perpendicular foot, the minimum-norm solution"
+  caption="Proposition 1 drawn: iterates never leave the row space, and the one least-squares solution living there is the point of the interpolant line closest to the origin."
+/>
+
+The consequence deserves its name: *implicit regularization*. The objective contains no penalty, yet the algorithm behaves as if one were present, because the choice among the infinitely many zero-loss solutions is made by the optimizer's starting point and update geometry. Gradient descent from zero on squared loss selects exactly the $\ell_2$-minimal solution. The conjecture animating deep-learning theory is that stochastic gradient descent on nonconvex networks has an analogous small-norm bias, supported by the network evidence above and proved only in cases like this one.
+
+## The exact price: a pole at the threshold, and the curve that has no peak
+
+The spline experiment measured the spike; random-matrix theory prices it exactly. Hastie, Montanari, Rosset and Tibshirani analyze the simplest honest setting: $y = x^\top\beta + \varepsilon$ with isotropic features (independent entries, zero mean, unit variance), noise variance $\sigma^2$, signal strength $\lVert\beta\rVert^2 = r^2$, and both $n, p \to \infty$ with the *overparametrization ratio* $\gamma = p/n$ held fixed. The estimator is ridgeless least squares, which is the minimum-norm interpolant when $\gamma > 1$. Their Theorem 1 (the proof is random-matrix machinery beyond this course; the statement is the payoff) gives the limiting risk of $\hat\beta$ almost surely:
+
+$$
+R(\gamma) \;\longrightarrow\;
+\begin{cases}
+\;\sigma^2 \dfrac{\gamma}{1-\gamma}, & \gamma < 1,\\[10pt]
+\;\underbrace{r^2\Bigl(1 - \dfrac{1}{\gamma}\Bigr)}_{\text{bias}} \;+\; \underbrace{\sigma^2 \dfrac{1}{\gamma - 1}}_{\text{variance}}, & \gamma > 1.
+\end{cases}
+$$
+
+<Figure
+  src="./figures/pole-tuned-ridge.svg"
+  alt="Asymptotic risk against gamma on a log axis at SNR 5: the ridgeless curve rising to a pole at gamma equal to one and descending to a second minimum of 3.47 at gamma about 1.81, and the optimally tuned ridge curve rising smoothly with no peak, always below"
+  caption="Theorem 1's two branches at SNR = 5, with the optimally tuned ridge curve (Cor. 6) overlaid: tuning λ removes the peak entirely and dominates the interpolant at every γ."
+/>
+
+**Below the threshold** ($\gamma < 1$) there is no bias at all, exactly as <Ref lesson="ols">Gauss–Markov</Ref> promised for OLS, and the risk is pure variance, exploding like $1/(1-\gamma)$ as $\gamma \to 1$. The cause is the design matrix: at $\gamma$ near 1 its smallest singular values approach zero, $(X^\top X)^{-1}$ inflates, and the noise in $y$ is amplified without bound. The 88% spike and the spline catastrophe are this pole, measured. **Above the threshold** the two terms trade places. Variance now *falls* as $\gamma$ grows: more directions to spread the noise across, the norm shrinking per the mechanism. Bias *rises*, because the minimum-norm interpolant lives in the $n$-dimensional row space and captures only a $1/\gamma$ fraction of the signal's energy. Their sum is a second, genuine bias–variance trade-off, with a second minimum (at signal-to-noise ratio $\mathrm{SNR} = r^2/\sigma^2 = 5$: risk $3.47$ at $\gamma \approx 1.81$) and a limit of $r^2$, the null model's risk, as $\gamma \to \infty$. In this isotropic model, infinite overparametrization forgets the signal entirely.
+
+<Task>
+Verify two readings against the figure: both branches diverge at $\gamma = 1$, and the far branch dips below the null-risk line $r^2 = 5$ only for $\gamma$ beyond $\mathrm{SNR}/(\mathrm{SNR}-1) = 1.25$. With $\mathrm{SNR} \le 1$, the entire far branch sits above the null risk: interpolating pure noise never beats predicting zero.
+</Task>
+
+The companion result explains the norm panels of every figure above: the limiting squared norm of $\hat\beta$ is $r^2 + \sigma^2\gamma/(1-\gamma)$ below the threshold and $r^2/\gamma + \sigma^2/(\gamma-1)$ above (their Corollary 1). It diverges at $\gamma = 1$ and decreases monotonically beyond, confirming that the interpolant simplifies as capacity grows.
+
+### Tuning the penalty removes the peak
+
+The same paper prices the alternative the course has owned since <Ref lesson="ridge-lasso">module 3</Ref>. For ridge regression at the *optimal* penalty (in their per-sample scaling, $\lambda^* = \sigma^2\gamma/r^2$, the value the ridge lesson's ledger theorem guaranteed exists), the limiting risk curve is monotone in $\gamma$, **no pole**, no second descent, and it lies below the ridgeless curve at every $\gamma$ and every SNR. Cross-validated tuning attains the same limit. The reading matters more than the formula: the interpolation spike is not a law of overparametrized models; it is the cost of insisting on $\lambda = 0$. Double descent is what the risk landscape looks like to a procedure that refuses to regularize; a tuned procedure never encounters the peak at all.
+
+<KeyFact>
+The peakless, dominating tuned-ridge curve is a verdict about the isotropic, well-specified model, where the tuned optimum also sits at small capacity. Misspecification moves that boundary: when the observed features span only part of the true function, adding features past $\gamma = 1$ can lower bias *and* variance, the ridgeless risk can attain its global minimum in the overparametrized regime, and even the optimally tuned ridge risk has its minimum near $\gamma = 1$ rather than at small $\gamma$ (Hastie et al., §5–6). Tuning removes the spike; it does not restore smaller-is-better.
+</KeyFact>
+
+### Benign overfitting: when interpolating noise costs nothing
+
+One question remains inside the theory: the far branch above carries the noise penalty $\sigma^2/(\gamma-1)$, which vanishes only as $\gamma \to \infty$, yet real interpolating models fit noisy labels and pay almost nothing at moderate size. The resolution lives in the feature covariance $\Sigma$, which the isotropic model fixed to $I$: what matters is how $\Sigma$'s eigenvalues decay, and the right summary of the decay is one scalar per cut point.
+
+<Definition title="effective rank">
+For a covariance matrix $\Sigma$ with eigenvalues $\lambda_1 \ge \lambda_2 \ge \cdots$, the **effective rank** of the tail beyond position $k$ is
+$$
+r_k(\Sigma) \;=\; \frac{\sum_{i>k}\lambda_i}{\lambda_{k+1}} .
+$$
+It counts the comparable directions the tail's mass is spread across: a tail of $m$ equal eigenvalues has $r_k = m$ exactly, a geometric tail $\lambda_i = 2^{-i}$ has $r_k = 2$ at every $k$, and the isotropic model has $r_0(I_p) = p$.
+</Definition>
+
+<Figure
+  src="./figures/benign-spectra.svg"
+  alt="Two eigenvalue spectra on a log scale against index: a blue fast-decaying spectrum that exhausts itself by index 30, and an amber spectrum with five large eigenvalues followed by a long flat tail of comparable small eigenvalues continuing past index 60, with a dashed line marking the cut k = 5"
+  caption="Two covariance spectra at the same λ₁. Benign overfitting needs the amber shape: past the cut k, a long flat tail of comparable thin directions where interpolated noise barely moves predictions. The blue spectrum offers no such directions."
+/>
+
+<Theorem title="benign overfitting (Bartlett–Long–Lugosi–Tsigler 2020; as stated in Hastie et al., Cor. 4)">
+Assume the linear model above with general covariance $\Sigma$ (features $x = \Sigma^{1/2} z$ with $z$ of independent, bounded-moment entries), and suppose some integer $k$ and constant $c > 0$ satisfy
+$$
+r_k(\Sigma) \;\ge\; (1+c)\,n .
+$$
+Write $\beta_{\le k}$ for the projection of $\beta$ onto the top $k$ eigenvectors of $\Sigma$, $\beta_{>k}$ for the remainder, and $\lVert v \rVert_A^2 = v^\top A\, v$. Then, with probability at least $1 - Cn^{-D}$ ($C, D$ constants set by the moment assumptions), the min-norm interpolant's variance is at most
+$$
+\frac{2k\sigma^2}{n} \;+\; \frac{4n\sigma^2}{c}\cdot\frac{\sum_{i>k}\lambda_i^2}{\bigl(\sum_{i>k}\lambda_i\bigr)^2} \;+\; Cn^{-1/7},
+$$
+and its bias is at most $4\bigl(\tfrac{1}{n}\textstyle\sum_{i>k}\lambda_i\bigr)^2 \lVert\beta_{\le k}\rVert_{\Sigma^{-1}}^2 + \lVert\beta_{>k}\rVert_{\Sigma}^2 + Cn^{-1/7}$. The proof is random-matrix analysis beyond this course; the statement is used as read.
+</Theorem>
+
+Read the variance bound term by term. The first term charges $2k\sigma^2/n$: the $k$ leading directions cost what an ordinary $k$-parameter regression costs. The second term charges the tail: for a flat tail spread over $m$ comparable directions, $\sum_{i>k}\lambda_i^2/(\sum_{i>k}\lambda_i)^2 \approx 1/m$, so the term is of order $n/m$, small exactly when the tail has many more thin directions than data points. That is what the hypothesis $r_k(\Sigma) \ge (1+c)n$ buys: enough small-eigenvalue directions for the interpolant to hide the memorized noise where it barely moves predictions. The bias terms stay small when $\beta$'s energy sits in the top $k$ eigendirections. The isotropic model shows why it never benefited: with $k = 0$, $r_0 = p = \gamma n$ meets the hypothesis for $\gamma > 1 + c$, but the tail term is then of order $\sigma^2/\gamma$: the far branch's noise penalty, decaying only as overparametrization itself grows. The conditions are restrictive and checkable, which is the point. Benign overfitting is a theorem with hypotheses, not a slogan.
+
+## ★ When the optimal penalty is zero
+
+The tuned-ridge result above makes $\lambda = 0$ look like pure dogma. One structured case reverses the verdict. In a latent-space model, where the observed features are noisy linear images of a low-dimensional signal ($x = Wz + u$), Hastie et al. (§6.2) compute the ridge risk across $\lambda$ and find the optimum at $\lambda \to 0$ even with noisy responses: the feature noise $u$ acts as ridge regularization all by itself, adding an effective $\eta^2 I$ to the kernel matrix, so an explicit penalty on top is redundant. Kobak, Lomond and Sanchez (2020) established the same effect in linear regression and showed the optimal $\lambda$ can even be *negative* on real high-dimensional data. The engineering translation: when the features already carry enough noise in enough directions, interpolation is not a refusal to regularize, because the regularizer is built into the data. This is the honest boundary of the "always tune $\lambda$" rule, and it is exactly the regime where benign overfitting's long-flat-tail conditions hold.
+
+## What the classical bounds could not say, and what survives
+
+The course's theory module must now audit itself against the phenomenon. Each of <Ref lesson="learning-theory">module 9's</Ref> instruments makes a definite sound here, and the pattern of silence is informative.
+
+<Figure
+  src="./figures/bounds-silence.svg"
+  alt="Four rulers labeled Hoeffding plus union bound, VC dimension, uniform stability, and norms and margins, each drawn solid in the classical regime; in the shaded interpolating regime the first two turn to dashes marked silent and vacuous, stability fades as lambda goes to zero, and the norms-and-margins ruler continues solid in amber"
+  caption="Module 9's instruments in the interpolating regime: two go silent, one dies exactly in the ridgeless limit, and the norm-based family is the one still speaking."
+/>
+
+**Two-sided uniform convergence is structurally out.** The finite-class and VC arguments certify that empirical risk tracks true risk *uniformly over the class, in both directions*. A class rich enough to interpolate $n$ noisy points shatters the sample, so its <Ref lesson="vc-dimension">VC bound</Ref> reads $\ge 1$: the vacuous-frontier computation of module 9, now at every $n$. And no two-sided uniform statement can be repaired, because the class demonstrably contains members with zero empirical risk and large true risk; the memorizer of lesson one is in it. Any instrument that prices the whole class must condemn the interpolating class, including its benign members.
+
+**Stability dies in the ridgeless limit.** <Ref lesson="rademacher-stability">The stability theorem</Ref> bounds generalization for Tikhonov-regularized algorithms through a stability coefficient of at most $c^2 r_x^2/(n\lambda)$, with $r_x$ the data radius and no class capacity anywhere; it was the module's escape from vacuous counting. (Module 9 wrote this bound $\beta \le c^2 r^2/(n\lambda)$; both letters are spent in this lesson, $\beta$ on the coefficient vector and $r$ on the signal strength, so the module's symbols arrive renamed.) At fixed $\lambda$ it still speaks. But its certificate is priced in $1/\lambda$, and the min-norm interpolant is the $\lambda \to 0$ limit: the bound diverges precisely at the object this lesson studies.
+
+**Norms and margins survive, with an honest gap.** The Rademacher-ball bound charges $r_x\Lambda/\sqrt{n}$ for the class of predictors with norm at most $\Lambda$ on data of radius $r_x$, and the min-norm interpolant has, by construction, the smallest norm any interpolant can have: falling, past the threshold, exactly as the surviving bound wants. The qualitative predictions match. The certificate is worst where the norm spikes (the threshold) and improves as capacity grows (the second descent). What no known norm-based bound yet delivers is the *quantitative* risk curve: the constants are loose, and margins, the classification variant that <Ref lesson="margin-bounds">paid module 9's debts</Ref>, cannot even predict a second descent in regression. Belkin et al. say so plainly, and the honest closing statement is theirs: the empirical curve is established; a theory that derives it in generality does not yet exist.
+
+### The reconciliation, in one table
+
+The two pictures are one axis's two halves, and each rules its own regime:
+
+| The classical U governs when | Double descent appears when |
+| --- | --- |
+| the fit never interpolates: $\lambda > 0$, early stopping, CV-tuned complexity | training error is driven exactly to zero and capacity crosses $p \approx n$ |
+| capacity is measured in effective df on the near side of $n$ | capacity grows past the threshold, so the norm, not the count, sets complexity |
+| tuning is available: the tuned curve is peakless and never loses | the procedure fixes $\lambda = 0$ and relies on implicit regularization |
+| SNR is low: interpolating noise costs $\sigma^2/(\gamma-1)$ and never beats null | SNR is high, or the covariance tail is long and flat (benign conditions) |
+
+**The refutation the lesson owes.** Double descent does not overturn the bias–variance decomposition. The decomposition is an identity, proved in module 1 with no assumptions about capacity, and the far branch of Theorem 1 is itself a sum of a bias term and a variance term. What breaks is the folk corollary that the identity's terms trace a U against the number of parameters. Parameter count stops being a complexity measure the moment many models fit the data exactly, and against the right complexity measure, the norm, the classical intuition that simpler consistent explanations generalize better is precisely what the second descent exhibits. The U-curve of module 1, drawn at fixed $\gamma < 1$ with honest tuning, stands untouched.
+
+What is established: the double-descent risk curve is measured fact across model families; its mechanism at course level is minimum-norm interpolation, which gradient descent from zero provably selects; the asymptotic risk formula makes the threshold a pole and the far side a second bias–variance trade; tuned ridge removes the peak entirely; and of module 9's instruments, only the norm-based family still speaks past the threshold, qualitatively rightly, quantitatively not yet. The model family where all of this was first shown, random features, is itself the bridge between the course's kernel machines and neural networks, and <Ref lesson="random-features">the next lesson</Ref> derives it from Bochner's theorem.
+
+## Exercises
+
+<Exercise>
+The proof's convergence step cited module 2's stability bound without derivation; supply it. Show that for $0 < t \le 1/\lambda_{\max}(X^\top X)$, gradient descent on $\tfrac12\lVert y - Xb\rVert^2$ from *any* start converges to a least-squares solution. Work in the eigenbasis of $X^\top X$ and track each coordinate's error recursion.
+
+<Solution>
+Write the iteration's error against any least-squares solution $\beta^\star$: with $e^{(k)} = \beta^{(k)} - \beta^\star$, the update gives $e^{(k)} = (I - tX^\top X)\,e^{(k-1)}$, since $X^\top y = X^\top X \beta^\star$ (the normal equations). In the eigenbasis of $X^\top X$ with eigenvalues $\mu_j \ge 0$, each coordinate obeys $e_j^{(k)} = (1 - t\mu_j)^k e_j^{(0)}$. For $\mu_j > 0$ the step-size condition gives $0 \le 1 - t\mu_j < 1$, so the coordinate decays to zero; for $\mu_j = 0$ the coordinate is frozen, because the component of the start in the null space never moves. Hence $\beta^{(k)}$ converges to $\beta^\star + P_{\text{null}}(\beta^{(0)} - \beta^\star)$, a least-squares solution — the frozen coordinates are exactly the $P_{\text{null}}\beta^{(0)}$ the comprehension check after the proof identified informally, now with the rate: eigendirection $j$ contracts by $(1 - t\mu_j)$ per step, so the flattest positive directions converge last.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probes on the risk formula. Evaluate the limiting risk (a) as $\gamma \to 1$ from each side, naming which term diverges; (b) as $\gamma \to \infty$, and interpret the limit against the null estimator $\tilde\beta = 0$; (c) determine for which $\gamma > 1$ the interpolant beats the null risk when $\mathrm{SNR} = r^2/\sigma^2 \le 1$, and read the answer as a sentence about interpolating pure noise.
+
+<Solution>
+(a) From below, $R = \sigma^2\gamma/(1-\gamma) \to +\infty$: pure variance, the near-singular design amplifying noise. From above, the bias term $r^2(1 - 1/\gamma) \to 0$ while $\sigma^2/(\gamma - 1) \to +\infty$: again variance. The pole is a variance phenomenon on both sides, which is why regularization (a variance treatment) removes it while no amount of extra signal does.
+
+(b) As $\gamma \to \infty$: bias $\to r^2$, variance $\to 0$, risk $\to r^2$, the null risk, since the null estimator has bias $\lVert\beta\rVert^2 = r^2$ and no variance. Infinite isotropic overparametrization is indistinguishable from predicting zero: the signal's projection onto the $n$-dimensional row space carries $r^2/\gamma \to 0$ of its energy. The second descent ends at the null model, not at the truth.
+
+(c) Beating null requires $r^2(1-1/\gamma) + \sigma^2/(\gamma-1) < r^2$, i.e. $\sigma^2/(\gamma-1) < r^2/\gamma$, i.e. $\gamma > \mathrm{SNR}/(\mathrm{SNR}-1)$, which has no solution for $\mathrm{SNR} \le 1$. Sentence: when the signal is no stronger than the noise, the min-norm interpolant is worse than refusing to predict, at every level of overparametrization. Benign overfitting needs a signal worth keeping; with none, interpolation only memorizes noise.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute: "Double descent proves that overfitting is good, so regularization is obsolete — just make the model bigger instead of tuning $\lambda$." Name the step that fails, cite the result that breaks it, and state precisely what double descent does license.
+
+<Solution>
+The failing step is the inference from "test error falls past the threshold" to "falls below what tuning achieves." The tuned-ridge corollary breaks it: in the isotropic model, ridge at $\lambda^* = \sigma^2\gamma/r^2$ has a peakless risk curve that lies below the ridgeless curve at *every* $\gamma$ and every SNR, and CV attains it. So the bigger interpolating model never beats the tuned one, and at low SNR it fails absolutely (the boundary-probe exercise, part (c): worse than null for all $\gamma$ when $\mathrm{SNR} \le 1$). The refutation also runs empirically: fit the spline example with a tuned penalty and the spike disappears, with better test error throughout, ISLP's own remark.
+
+What double descent licenses is narrower and still valuable: interpolation *can* be benign. Under named conditions (min-norm-like implicit bias, high SNR or a long flat covariance tail), driving training error to zero is not the catastrophe the p. 221 rule predicted, so "zero training error" is no longer evidence of failure by itself. It licenses fitting big models without fear; it does not make them optimal. The one structured exception, where the optimal explicit penalty genuinely is zero because noise already present in the features acts as a built-in ridge, is itself a regularization story; the starred section works it out.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review with <Ref lesson="bias-variance">module 1</Ref>. The course's original U-curve experiment fitted polynomials of degree $0$ through $9$ to $n = 30$ noisy points. (a) Place the entire experiment on the $\gamma$ axis. (b) Say what degree would have been needed to reach the interpolation threshold, and why the classical experiment was structurally incapable of showing a second descent. (c) State the value of $\gamma$ at the spline experiment's sweet spot ($d = 6$, $n = 20$) and at its second-descent floor ($d \approx 42$), and conclude in one sentence how the two lessons' pictures compose.
+
+<Solution>
+(a) A degree-$k$ polynomial has $p = k + 1$ coefficients, so the sweep covers $\gamma = 1/30$ through $10/30 \approx 0.33$: the experiment never left the left third of the classical branch.
+
+(b) The threshold needs $p = n$: degree 29. The experiment stopped at degree 9 for the classical reason: beyond the sweet spot, test error was already climbing, and the p. 221 rule said nothing but worse lay further out. Structurally, a U-curve experiment that halts when the curve turns up *cannot* observe double descent, whatever the model family; the second descent begins only past $\gamma = 1$, three times beyond the sweep's right edge.
+
+(c) Sweet spot: $\gamma = 6/20 = 0.3$; second-descent floor: $\gamma = 42/20 = 2.1$. Composition: module 1's picture is the $\gamma < 1$ restriction of this lesson's picture. Every classical experiment lived at small $\gamma$, so the two curves never disagreed on any point both of them plotted.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the spline double descent. Draw $n = 20$ points from $Y = \sin(X) + \varepsilon$, $X \sim U[-5,5]$, $\sigma = 0.3$; build a natural-spline basis with $d$ degrees of freedom — $d$ basis functions with the constant included, knots at the $d$ equiprobability quantiles (levels $(j - \tfrac12)/d$) of the training $x$; any well-conditioned natural cubic basis works; fit by `numpy.linalg.lstsq`, which returns the min-norm solution when $d > 20$; and record test MSE against the true $\sin$ on a dense grid at $d \in \{8, 20, 42, 80\}$ over 100 replications. Report the four median errors, where training error first hits zero, and what happens to $\lVert\hat\beta\rVert$ across the four values. State in advance what would count as agreement with this lesson.
+
+<Solution>
+What to expect, from this lesson's own run (medians over 100 draws, basis orthonormalized on the test grid): MSE $\approx 0.06$ at $d=8$, $\approx 6$ at $d=20$ with a heavy upper tail (upper quartile $\approx 25$), $\approx 0.37$ at $d=42$, and $\approx 0.42$ at $d=80$; median norms $\approx 24$, $84$, $18$, $12$. Agreement is qualitative plus one order of magnitude, and the criteria differ in strength. Training error must reach zero at $d = 20$ exactly — that *is* pinned, by $d = n$, provided the basis counts the constant among its $d$ columns; a basis with a separate intercept column has $p = d + 1$ parameters and interpolates a step early, at $d = 19$. The test-error maximum is not pinned so finely: it sits in the threshold's immediate neighborhood, and a grid that samples $d = 19$ will often find the ensemble's worst point there, where twenty noisy points squeeze through nineteen coefficients; the exact vertex moves with the knot convention and the draw. The $d = 42$ error must fall at least an order of magnitude below the spike, and the norm must peak in the threshold region and *decrease* from $d = 42$ to $d = 80$ even as the parameter count nearly doubles. Exact values are basis- and seed-dependent: min-norm is a statement about coefficients, so the norm's absolute scale moves with the basis parametrization, another reminder that the honest complexity measure is attached to the function class's geometry, not to raw numbers. If the spike is absent entirely, the usual bug is a solver that regularizes silently (`rcond` too large, or ridge in disguise); the other spike-killer is knots placed exactly on the training points, which makes the $d = n$ fit the natural interpolating spline, the smoothest interpolant there is, and erases the catastrophe.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Draw 200 points $x_i \in \mathbb{R}^2$ from a standard Gaussian and build $D = 500$ random features $z_k(x) = \sqrt{2/D}\,\cos(w_k^\top x + b_k)$ with $w_k \sim N(0, I/\ell^2)$, $b_k \sim U[0, 2\pi]$, $\ell = 1$. Compute the $200 \times 200$ Gram matrix $\hat K_{ij} = z(x_i)^\top z(x_j)$ and compare it entrywise to the RBF kernel matrix $K_{ij} = \exp(-\lVert x_i - x_j\rVert^2/2)$ from <Ref lesson="svm-dual-kernels">module 4</Ref>. Report the maximum absolute deviation, then repeat at $D = 50$ and $D = 5000$ and state the trend.
+
+<Solution>
+The computation is ten lines of numpy; typical results: $\max_{ij}|\hat K_{ij} - K_{ij}| \approx 0.35$ at $D = 50$, $\approx 0.11$ at $D = 500$, $\approx 0.035$ at $D = 5000$, shrinking like $1/\sqrt{D}$, the Monte-Carlo rate. The mechanism: for each pair, $\mathbb{E}[2\cos(w^\top x + b)\cos(w^\top x' + b)] = \mathbb{E}[\cos(w^\top(x - x'))]$, and with Gaussian $w$ that expectation is exactly $\exp(-\lVert x - x'\rVert^2/2)$. Each random feature is an unbiased one-sample estimate of the RBF kernel, and $D$ features average the estimates. You have just verified, numerically, the theorem of Rahimi and Recht that <Ref lesson="random-features">the next lesson</Ref> derives from Bochner's theorem, and identified the model family of Belkin's Figure 2 as a finite-sample approximation to the kernel machine whose flat reference line its plots carry.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Belkin, D. Hsu, S. Ma, S. Mandal, "Reconciling Modern Machine-Learning Practice and the Classical Bias–Variance Trade-off," *PNAS* 116(32), 2019, pp. 15849–15854 — the double-descent curve (Fig. 1), the RFF-on-MNIST measurement with the norm panels (Fig. 2), the 1-D random-ReLU example (Fig. 3), the neural-network and ensemble evidence (Figs. 4–5), and the historical-absence discussion. Preprint: https://arxiv.org/abs/1812.11118
+2. T. Hastie, A. Montanari, S. Rosset, R. Tibshirani, "Surprises in High-Dimensional Ridgeless Least Squares Interpolation," *Annals of Statistics* 50(2), 2022, pp. 949–986 — Prop. 1 (gradient descent finds the min-norm interpolant), Thm. 1 and Cor. 1 (the exact risk and norm curves), Cor. 4 (benign overfitting via effective rank), Cor. 6 and §6 (optimally tuned ridge has no peak; the latent-space model with optimal λ → 0). https://arxiv.org/abs/1903.08560
+3. G. James, D. Witten, T. Hastie, R. Tibshirani, J. Taylor, *An Introduction to Statistical Learning with Applications in Python*, Springer, 2023 — §10.8: the natural-spline double descent on n = 20 reproduced in this lesson, and the explicit reconciliation with the bias–variance trade-off. Free online: https://www.statlearning.com
+4. P. L. Bartlett, P. M. Long, G. Lugosi, A. Tsigler, "Benign Overfitting in Linear Regression," *PNAS* 117(48), 2020, pp. 30063–30070 — the effective-rank characterization of when the min-norm interpolant is consistent despite fitting noise. https://arxiv.org/abs/1906.11300
+5. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — p. 221 (§7.2): the quoted classical rule on zero training error; Ch. 7: the optimism framework it belongs to. Free online: https://hastie.su.domains/ElemStatLearn/
+6. C. Zhang, S. Bengio, M. Hardt, B. Recht, O. Vinyals, "Understanding Deep Learning Requires Rethinking Generalization," ICLR 2017 — the randomization experiments: large networks interpolate arbitrary label noise, so uniform-convergence explanations cannot separate them from their generalizing twins. https://arxiv.org/abs/1611.03530
+7. D. Kobak, J. Lomond, B. Sanchez, "The Optimal Ridge Penalty for Real-World High-Dimensional Data Can Be Zero or Negative due to the Implicit Ridge Regularization," *JMLR* 21(169), 2020 — feature noise as built-in ridge; the starred section's empirical companion. https://jmlr.org/papers/v21/19-844.html
+</References>
