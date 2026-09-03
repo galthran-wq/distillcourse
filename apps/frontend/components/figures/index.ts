@@ -166,6 +166,7 @@ import NewtonPriceLedger from "./classical-ml/NewtonPriceLedger";
 import SgdTwoTargets from "./classical-ml/SgdTwoTargets";
 import LarPathSteps from "./classical-ml/LarPathSteps";
 import ElasticNetGrouping from "./classical-ml/ElasticNetGrouping";
+import BlrSquareCompletion from "./classical-ml/BlrSquareCompletion";
 import OptimismFormulaAnatomy from "./classical-ml/OptimismFormulaAnatomy";
 import VarianceFormulaAnatomy from "./classical-ml/VarianceFormulaAnatomy";
 import AdaboostStagewiseCrosswalk from "./classical-ml/AdaboostStagewiseCrosswalk";
@@ -175,6 +176,12 @@ import LaplacianQuadraticForm from "./classical-ml/LaplacianQuadraticForm";
 import RelaxationFeasibleSets from "./classical-ml/RelaxationFeasibleSets";
 import SpectralEmbeddingRows from "./classical-ml/SpectralEmbeddingRows";
 import UmapConstructionStrip from "./classical-ml/UmapConstructionStrip";
+import GpInheritance from "./classical-ml/GpInheritance";
+import GpPredictiveDissection from "./classical-ml/GpPredictiveDissection";
+import KernelMachineFamily from "./classical-ml/KernelMachineFamily";
+import Co2KernelLedger from "./classical-ml/Co2KernelLedger";
+import RffIdentityDissected from "./classical-ml/RffIdentityDissected";
+import ClassicalSpineMap from "./classical-ml/ClassicalSpineMap";
 
 export interface FigureComponentProps {
   /** 1-based frame number for multi-frame figures. */
@@ -364,6 +371,7 @@ export const figures: Record<string, RegisteredFigure> = {
   SgdTwoTargets: { component: SgdTwoTargets },
   LarPathSteps: { component: LarPathSteps, frames: 4 },
   ElasticNetGrouping: { component: ElasticNetGrouping },
+  BlrSquareCompletion: { component: BlrSquareCompletion },
   OptimismFormulaAnatomy: { component: OptimismFormulaAnatomy },
   VarianceFormulaAnatomy: { component: VarianceFormulaAnatomy },
   AdaboostStagewiseCrosswalk: { component: AdaboostStagewiseCrosswalk },
@@ -373,4 +381,10 @@ export const figures: Record<string, RegisteredFigure> = {
   RelaxationFeasibleSets: { component: RelaxationFeasibleSets },
   SpectralEmbeddingRows: { component: SpectralEmbeddingRows },
   UmapConstructionStrip: { component: UmapConstructionStrip },
+  GpInheritance: { component: GpInheritance },
+  GpPredictiveDissection: { component: GpPredictiveDissection },
+  KernelMachineFamily: { component: KernelMachineFamily },
+  Co2KernelLedger: { component: Co2KernelLedger },
+  RffIdentityDissected: { component: RffIdentityDissected },
+  ClassicalSpineMap: { component: ClassicalSpineMap },
 };

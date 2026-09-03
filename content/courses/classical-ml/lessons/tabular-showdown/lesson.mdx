@@ -1,0 +1,318 @@
+On 45 curated tabular datasets, tuned tree ensembles beat tuned neural networks at every hyperparameter budget — and the three reasons why are inductive biases this course has spent eleven modules naming.
+
+The epilogue has made two moves: <Ref lesson="double-descent">double descent</Ref> showed interpolating models generalizing where the classical bounds go silent, and <Ref lesson="random-features">the previous lesson</Ref> reduced "classical versus deep" to one honest axis, features fixed before the data against features learned from it, with feature learning expected to pay wherever the right geometry must be discovered. One arena stayed open, flagged since <Ref lesson="xgboost">module 7's adoption count</Ref>: tables, where the fixed, axis-aligned family keeps winning in practice. From the previous lesson's frame one would expect the learned-feature side to close that gap the moment someone tunes it seriously; the measured record shows the opposite, and resolving that reversal is this lesson's work. It reads one artifact, the NeurIPS 2022 benchmark of [Grinsztajn, Oyallon and Varoquaux](https://arxiv.org/abs/2207.08815), with <Ref lesson="cross-validation-bootstrap">module 5's</Ref> discipline, and attributes the gap it measures to three biases with course names. It is also the course's closing chapter.
+
+The route: the benchmark's construction, audited; the headline curves; the transform-and-compare design behind the paper's findings; the three findings, each cashed against an earlier module; the scope fence around all of it; and the course's close.
+
+## The artifact: 20,000 compute-hours against one objection
+
+<Task>
+Three retrievals before the evidence, closed book. (1) From <Ref lesson="gradient-boosting">module 7</Ref>: what kind of function does a sum of decision trees represent, geometrically? (2) From <Ref lesson="cross-validation-bootstrap">module 5</Ref>: why is "the best score my search found" an optimistic estimate, and what does an honest protocol do instead? (3) From <Ref lesson="knn-curse">the curse lesson</Ref>: what happens to a distance-based neighbor ranking when pure-noise coordinates are appended? Check below; all three are spent in this lesson.
+</Task>
+
+<Aside>
+Answers: a sum of axis-aligned trees is piecewise constant on a partition of the input space into axis-aligned boxes; a searched-over score is optimistic because picking the minimum of noisy estimates picks favorable noise, so honest protocols keep the data that selects separate from the data that scores (nested CV being the clean form); and appended noise coordinates add i.i.d. terms to every pairwise distance, so the ranking is progressively decided by the noise sum rather than the signal.
+</Aside>
+
+Most published tabular-deep-learning architectures through 2021 came with a claim to match or beat tree ensembles, and independent re-evaluations kept disagreeing: a plain Resnet matched several of the new models, and most failed on datasets their authors had not chosen. The failure modes are the ones <Ref lesson="imbalance-leakage">module 5's leakage lesson</Ref> catalogued when it read this same paper's exclusion list as an audit checklist: freedom in benchmark composition, unequal tuning effort, and no accounting for the variance of the tuning itself. The benchmark exists to remove those freedoms, and its budget states the seriousness: **20,000 compute-hours** of hyperparameter search across 45 datasets.
+
+### Construction: what a dataset must survive to enter
+
+The 45 datasets are what remains after the exclusion gauntlet <Ref lesson="imbalance-leakage">already read in module 5</Ref>: heterogeneous real-world columns only, dimension-to-sample ratio below 1/10, i.i.d. data only, nothing a default linear model nearly solves, no deterministic targets. On top of the exclusions sit scope decisions that keep the learning tasks homogeneous: training sets truncated to 10,000 rows (the *medium-sized* regime), all missing data dropped, classification binarized and balanced, categorical features capped at 20 levels. Each decision is also a fence around the conclusions, and the scope section below collects them.
+
+### Protocol: the search is inside the measurement
+
+The objection the design answers is the standing one: "trees win because nobody tuned the network properly." The protocol makes tuning effort part of the measured quantity. For each model on each dataset, a random search of roughly **400 hyperparameter draws** runs from published search spaces, defaults always first. After $n$ draws, the combination scoring best on a validation set is evaluated once on a test set neither the search nor the choice ever touched: exactly the inner-choice/outer-score separation <Ref lesson="cross-validation-bootstrap">nested cross-validation</Ref> enforces, at benchmark scale. The whole search order is then reshuffled **15 times**, so every point on the resulting curve carries a band showing how much of the score is tuning luck.
+
+<Figure
+  src="./figures/benchmark-protocol.svg"
+  alt="Pipeline from 45 curated datasets through a roughly 400-draw random search, validation-based selection, test scoring, and 15 reshuffles, to normalized score-versus-budget curves with tree ensembles above deep models; an amber bracket marks that selection and scoring never share a split and a blue bracket marks that the tuning run itself is the measured object"
+  caption="The benchmark as module-5 practice: what gets plotted is not a model's best score but the expected outcome of a tuning process of budget n, selection and scoring on separate splits, variance shown as a band."
+/>
+
+The output is a curve per model per dataset family: expected test score against search budget $n$. Aggregating across datasets of different difficulty needs a common scale:
+
+<Definition title="normalized test score">
+On one dataset, let $s_{\max}$ be the best test score achieved by any model and any hyperparameter draw, and let $s_{\mathrm{low}}$ be the score at the 10% test-error quantile across all evaluations (classification) or the 50% quantile (regression). A model's **normalized score** is the affine rescaling
+
+$$
+\tilde s \;=\; \frac{s - s_{\mathrm{low}}}{s_{\max} - s_{\mathrm{low}}},
+$$
+
+so $1$ means "as good as the best anything achieved here" and $0$ means "no better than the field's low quantile". Negative regression scores are clipped to $0$. The quantile floor, rather than the literal worst model, keeps one broken outlier from stretching every other model's score toward $1$.
+</Definition>
+
+<Example title="a normalized score, computed">
+On a classification dataset, the best evaluation anywhere reaches accuracy $s_{\max} = 0.94$ and the 10% error-quantile evaluation sits at $s_{\mathrm{low}} = 0.70$. A tuned model reaching $0.88$ scores
+
+$$
+\tilde s = \frac{0.88 - 0.70}{0.94 - 0.70} = \frac{0.18}{0.24} = 0.75 :
+$$
+
+three quarters of the way from the field's floor to its ceiling. The same accuracy on an easier dataset with $s_{\mathrm{low}} = 0.85$ would score $0.33$; the normalization is what makes averaging across datasets mean anything.
+</Example>
+
+### Entrants: module 7 versus the architectures this course does not teach
+
+The tree side is <Ref lesson="bagging-random-forests">the module-7 family</Ref> exactly as derived: RandomForest, gradient-boosted trees, and <Ref lesson="xgboost">XGBoost</Ref>. The deep side is four architectures this course does not teach, and this lesson treats all four as measurement subjects, not curriculum. The plain pair: the *MLP*, a stack of affine maps and elementwise nonlinearities with every weight trained by gradient descent, which module 11 has already met as <Ref lesson="random-features">the network whose first layer nobody trained</Ref>, here with the first layer unfrozen; and a *Resnet* variant adding skip connections and normalization.
+
+The other pair is attention-based, the *FT-Transformer* and *SAINT*, of which the first was benchmarked by [its own authors](https://arxiv.org/abs/2106.11959) convincingly enough against trees to count as deep learning's best case on tables.
+
+## The result: trees on top at every budget
+
+<Figure src="./figures/benchmark-curves.png" alt="Normalized test accuracy against number of random-search iterations on a log axis, for fifteen numerical-feature classification datasets. The RandomForest, GradientBoostingTree and XGBoost curves rise from about 0.78 to 0.94 and lie above the SAINT, FT Transformer, Resnet and MLP curves, which top out near 0.79, at every budget; dotted horizontal lines mark each model's default-hyperparameter score and shaded ribbons give the minimum and maximum over fifteen reshuffles of the search order." caption="Every tree curve starts above every deep curve at the default draw and is still above it after four hundred; the ribbons show the gap is wider than tuning luck." />
+
+<Task>
+Read the published panel against the protocol: find the dotted default-hyperparameter lines (the search's first iteration), confirm the tree curves sit above every deep curve at every budget from 1 to ~400 draws, and note how little the min–max ribbons of the 15 reshuffles overlap across the family gap at large budgets. Those three readings are the result.
+</Task>
+
+The headline is the ordering's uniformity. Across all four benchmark quadrants (classification and regression; numerical-only, with 15 and 19 datasets; mixed numerical-categorical, with 7 and 14) the tree curves start above the deep curves at the default draw and stay above through the full budget. The refutation is now explicit. The claim "the networks just weren't tuned enough" predicts the curves should cross as $n$ grows; they do not, the gap after 400 draws remains wide, and the reshuffle bands show it exceeds tuning luck. Replotting against wall-clock instead of iterations makes the verdict harsher, since each deep draw costs more: for equal time spent searching, the tree scores sit far above throughout. And the tuning was not perfunctory: the paper's own hyperparameter-importance analysis (§A.6) finds the learning rate dominating every other knob for the networks and the boosted trees alike, which is what per-dataset tuning genuinely mattering looks like.
+
+Two secondary readings sharpen what needs explaining. Categorical variables, the usually blamed culprit, are not the main story: the gap narrows on numerical-only datasets but most of it survives, so the explanation must live in the numbers, not the encodings. And capacity is not the missing ingredient either: the deep entrants train comfortably in the overparametrized regime <Ref lesson="double-descent">the epilogue legitimized</Ref>, so whatever separates the families is not how much the models can fit but what they fit *first*.
+
+<KeyFact>
+The winning models share two attributes, ensembling and the tree weak learner, and only the second is decisive: boosting and bagging over non-tree learners exist and do not win tables. The question the benchmark leaves is therefore a module-7 question with the answer missing (which property of an axis-aligned, piecewise-constant learner suits this data), and the paper answers it by experiment rather than speculation.
+</KeyFact>
+
+## The instrument: transform the data, watch who suffers
+
+A leaderboard states who wins; it cannot say why. The paper's second half applies the only instrument that can: **ablation on the data**. Choose a transformation that deletes or scrambles exactly one structural property of tabular data, apply it, rerun the entire benchmark machinery (search, selection, reshuffles), and read the change in each family's score. If a transformation removes something and only one family's score falls, that family was using it; if a transformation destroys a property and only one family survives, that family never relied on it. The design inherits module 5's logic of controlled comparison, pointed at inductive bias instead of at protocols.
+
+<Figure
+  src="./figures/three-ablations.svg"
+  alt="Three rows, one per ablation: Gaussian-smoothing a jagged target hurts trees but not networks, implying the real targets were irregular; appending Gaussian noise columns to a table degrades networks while boosted trees shrug, implying tables are full of uninformative features; rotating the feature basis reverses the ranking, implying the columns were a meaningful basis"
+  caption="The three ablations as one design: each arrow deletes or scrambles one property of tabular data, everything is refit from scratch, and the asymmetry of the damage assigns the credit."
+/>
+
+The three sections that follow are the figure's three rows. Each runs the same shape: the transformation, the measured asymmetry, the inference, and the earlier module whose account the inference cashes.
+
+## Finding 1: the targets are irregular, and smoothness is the networks' prior
+
+The first transformation smooths the target. On each training set, the labels are replaced by a Gaussian-kernel-smoothed version of themselves, the smoother's covariance set to the data covariance scaled by a squared lengthscale $\ell^2$ (features Gaussianized first, the analysis restricted to each dataset's five most important features to keep the smoothing honest). Test labels are untouched. At $\ell = 0$ nothing changes; as $\ell$ grows, high-frequency structure in the target is progressively erased before any model sees it.
+
+<Figure
+  src="./figures/target-smoothing.png"
+  alt="Boxplots of normalized test score for GradientBoostingTree, RandomForest, FT Transformer and Resnet at squared smoothing lengthscales 0, 0.05, 0.1 and 0.25, over 15 reshuffles of the random search. The tree boxes start at about 0.87 and 0.83 and fall steeply to about 0.64 and 0.61; the FT Transformer and Resnet boxes start at about 0.77 and 0.72 and fall gently, the FT Transformer ending near 0.65, level with or above the GradientBoostingTree."
+  caption="The smoothing measurement, as published (the paper's Fig. 3): each step of smoothing costs the tree models several points of normalized score and the networks a fraction of that, until the ordering itself gives way."
+  float="right"
+  width="m"
+/>
+
+The measured asymmetry, read from the paper's Figure 3: the smallest smoothing tested (squared lengthscale $0.05$) takes the gradient-boosted tree's normalized score from about $0.87$ to $0.80$ and the RandomForest's from $0.83$ to $0.76$, roughly seven points each, while the FT-Transformer moves from $0.77$ to $0.74$ and the Resnet from $0.72$ to $0.70$, two points apiece. At the heaviest smoothing the FT-Transformer's box edges above the GBT's: erase enough fine structure and the family ordering itself gives way. The inference runs through the asymmetry, not the drop. If the erased structure had been noise, erasing it would help or do nothing for everyone; instead it costs exactly the models that were winning. So the fine-grained, irregular part of these targets is *signal*, the trees were reading it, and the networks were never reading it in the first place: which is simultaneously why smoothing cannot hurt them and why they were behind.
+
+<Figure
+  src="./figures/electricity-boundaries.png"
+  alt="Two side-by-side decision-boundary maps over the same two features of the electricity dataset, red class below and blue class above, with the training points scattered on top. The RandomForest panel, labelled 85%, is cut into fine horizontal and vertical stripes that run the width of the plot; the MLP panel, labelled 80%, covers the identical region with four broad smooth blobs and no fine structure at all."
+  caption="The same two features, the same points, two fitted models: the forest's boundary is striped along the date axis, the MLP's is four smooth blobs painted over the same ground — and the stripes are worth five points of test accuracy."
+/>
+
+The paper's Figure 20 shows the mechanism as two fitted models. On the benchmark's electricity dataset (38,000 rows of an electricity market, the label whether the price moved up, the date among the features), a default RandomForest and a default MLP are fitted on the two most important features and their decision boundaries plotted over the same zoomed region. The forest's boundary is striped: fine, repeated vertical structure along the date axis. The MLP's is four smooth blobs. The stripes are not overfitting decoration: the forest interpolates its training data *and* scores **85%** on test against the MLP's **80%**. The date-structure is real, the piecewise-constant learner captures it, and the smooth learner paints over it and pays five accuracy points.
+
+### The bias has a name: smoothness, the course's own prior
+
+The networks' side of the asymmetry is documented beyond this paper: gradient-trained networks exhibit [spectral bias](https://arxiv.org/abs/1806.08734), fitting low-frequency components of a target long before high-frequency ones. Trees have no frequency preference to violate: an axis split is a step function, the least smooth object available, and a deep enough tree stacks steps into arbitrarily irregular surfaces. The paper's hyperparameter-importance table (§A.6) says the same thing from the other side: for the boosted trees, depth is a top knob behind the dominant learning rate; for the forest, which has no learning rate to tune, letting depth run unbounded is the single most important setting outright. In both columns the fitted sign says *deeper helps*, because depth is what buys irregularity.
+
+The finding also reads against this course's own toolkit. Smoothness is precisely the prior <Ref lesson="splines-gams">module 3</Ref> built into the spline penalty $\lambda \int f''(t)^2\,dt$ and <Ref lesson="gaussian-processes">module 10</Ref> built into the SE kernel's lengthscale: both machineries *assume* the target varies gently and spend their entire regularization budget enforcing it. On the bone-density curves and CO₂ trends those lessons fitted, the assumption was right. On tabular targets, the benchmark says, it is systematically wrong, and any smoothness-prior method (spline, GP, or network) leaves the irregular fraction of the signal unfit. One caveat is the paper's own: with enough dataset-specific regularization a network *can* learn irregular patterns, so the finding is about which functions come easily, not which are reachable.
+
+<KeyFact>
+The mismatch is repairable, and the paper points at how: it suggests the reported gains of periodic feature embeddings and target-aware binning in 2022's tabular networks are this finding in reverse, the first handing the network the high-frequency structure spectral bias fits last, the second smoothing the target the network faces. That is the origin of requirement three in the paper's closing specification: a tabular architecture must make irregular functions cheap.
+</KeyFact>
+
+## Finding 2: tables are full of uninformative features
+
+<Figure
+  src="./figures/discarded-features.png"
+  alt="Two curves of normalized GBT test score against the fraction of features removed in decreasing order of random-forest importance, from 0% to 90%. The cyan curve, a GBT fit without the removed features, stays near 1.0 out to half the features removed and bends downward only past 60%. The red curve, a GBT fit on the removed features only, sits very low at 10% removed, on a scale whose zero is random chance, and climbs only as genuinely informative features start joining the discard pile; wide ribbons give the 80% interval across datasets."
+  caption="The junk measurement, as published (the paper's Fig. 4): drop the least important half of the columns and a GBT barely notices (cyan); a GBT trained on the discarded columns alone (red) starts close to chance — the columns are empty, not redundant."
+  float="right"
+  width="m"
+/>
+
+The second transformation manipulates the columns, and it needs a preliminary fact established first: that real tabular datasets carry many columns that predict nothing. The paper measures this rather than assuming it. Rank each dataset's features by <Ref lesson="bagging-random-forests">random-forest importance</Ref>, drop an increasing fraction from the bottom, and refit a gradient-boosted tree: accuracy is barely affected with up to **half the features removed**. The decisive check is that the dropped columns were empty rather than merely redundant: a GBT trained *only on the discarded features* scores very low for the bottom 20% — on a scale anchored at random chance — and stays low up to 50%. The columns are not backup copies of the signal; they are junk, and half a typical table is made of them.
+
+### The asymmetry: networks pay for junk, trees do not consult it
+
+Now the two-sided experiment, the paper's Figure 5. Removing features in decreasing importance order **narrows** the gap: the tree and FT-Transformer curves fall as real signal leaves with the junk, while the Resnet's holds nearly flat out to 40% removed — what it loses in signal it wins back in junk it no longer has to ignore. Appending fresh junk (standard Gaussian columns, independent of the target and of each other) **widens** the gap: at doubled table width the GBT, the RandomForest and the FT-Transformer each give up about a tenth of their normalized score, and the Resnet, the panel's MLP-like entrant, gives up a quarter. Junk columns are a tax every architecture pays, and the MLP family pays at more than double the rate.
+
+<Figure
+  src="./figures/junk-features.png"
+  alt="Two panels of normalized test score after 30 reshuffles of the random search. Left, removing features in decreasing importance order from 0% to 90%: the GradientBoostingTree and RandomForest curves start at about 0.91 and 0.87, above the FT Transformer at 0.80 and the Resnet at 0.71, and the four curves converge as more features go before all plunge past 75%. Right, adding uninformative Gaussian features up to 100% of the table's width: the tree curves drop from 0.92 to 0.81 and from 0.88 to 0.77, the FT Transformer from 0.79 to 0.70, and the Resnet from 0.70 to 0.44, visibly widening the family gap."
+  caption="The two-sided experiment, as published (the paper's Fig. 5): removing junk (left) closes the Resnet's gap to the field; adding junk (right) widens it, the Resnet paying a quarter of its score where every other curve pays about a tenth."
+/>
+
+The tree side's resistance is structural, and <Ref lesson="xgboost">module 7's split-gain formula</Ref> states it in one line: a candidate split on a noise column rarely produces a coherent gradient sum on the rows it separates, so it loses the gain comparison and the column is simply never consulted. Feature selection is not a preprocessing step for a tree; it is what fitting *is*. The forward exercise of the XGBoost lesson measured exactly this resistance in miniature; this finding is that measurement at benchmark scale. The vulnerable side has course precedents too: <Ref lesson="knn-curse">the curse lesson</Ref> showed noise coordinates burying a distance-based ranking, and <Ref lesson="feature-engineering">the feature lesson</Ref> opened with the theorem-level version, a feature's value being relative to the learner that consumes it, then closed by previewing this very experiment. What none of those lessons supplied is *why* an MLP, which could in principle learn zero weights on every junk column, fails to do so at these sample sizes. That question has a theorem for an answer, and it is the third finding.
+
+## Finding 3: rotation reverses the ranking
+
+<Figure
+  src="./figures/rotation-reversal.png"
+  alt="Boxplots of normalized test score for GradientBoostingTree, RandomForest, FT Transformer and Resnet on the numerical classification benchmark, in the original basis and after a random rotation. Without rotation the two tree models sit at 0.94 and 0.89, above FT Transformer at 0.81 and Resnet at 0.75. With rotation the trees drop to 0.67 and 0.64, below FT Transformer at 0.73 and Resnet at 0.75; the Resnet box sits at the same height in both."
+  caption="The same information in a new basis, and the ranking flips: the tree models fall from the top to the bottom, and only the Resnet's box stays where it was."
+  float="right"
+  width="m"
+/>
+
+The last transformation destroys nothing at all, and that is its design: where no information is removed, any score change can only be charged to inductive bias. Draw one random rotation matrix $Q$ (uniform over the special orthogonal group), replace every input by $Qx$ in training and test alike, and rerun the benchmark. A rotation is invertible and even distance-preserving: every bit of information survives, every pairwise geometry survives. Only the *basis* changes; no coordinate of $Qx$ is any longer "age" or "income", and each is a random mixture of all of them.
+
+The measured result, in the paper's Figure 6a: the ranking **reverses**. Before rotation, the three tree models sit on top; after, the networks sit above the trees, with the Resnet above the FT-Transformer. One box does not move at all: the Resnet scores identically in both worlds. Identical information, a new basis, an opposite winner.
+
+### The theorem underneath: invariance has a sample-complexity price
+
+The Resnet's indifference is not luck; it is a definition being satisfied.
+
+<Definition title="rotationally invariant learning procedure (Ng 2004, Def. 4.1)">
+A learning algorithm $L$ is **rotationally invariant** if for every training set $S$, every rotation matrix $M$, and every test point $x$,
+
+$$
+L[S](x) \;=\; L[MS](Mx),
+$$
+
+where $MS$ applies $M$ to every input in $S$. For a stochastic algorithm, the two predictions must be equal in distribution. Train in a rotated world, test in the same rotated world, and nothing changes.
+</Definition>
+
+<Example title="k-NN is rotationally invariant">
+Rotations preserve distances: $\lVert Mx - Mz \rVert = \lVert x - z \rVert$ for any rotation $M$. The <Ref lesson="knn-curse">k-NN rule</Ref> reads its training set only through the distances from the test point, so rotating everything leaves every neighbor ranking, hence every vote, hence every prediction unchanged, and the definition is satisfied exactly. The paired exercise below asks for the opposite: a proof by construction that a boosted tree is *not* rotationally invariant.
+</Example>
+
+Sorting this course's own methods by the definition is a retrieval exercise across the whole syllabus:
+
+| rotationally invariant | not invariant |
+| --- | --- |
+| $\ell_2$-penalized <Ref lesson="logistic-regression">logistic regression</Ref> (Ng, Prop. 4.2) | the <Ref lesson="ridge-lasso">lasso</Ref>: the $\ell_1$ ball has corners on axes |
+| <Ref lesson="svm-dual-kernels">SVMs</Ref> with linear, polynomial, or RBF kernels | <Ref lesson="naive-bayes">naive Bayes</Ref>: per-coordinate factorization |
+| <Ref lesson="knn-curse">k-NN</Ref> (the example above) | <Ref lesson="decision-trees">trees</Ref>, and every <Ref lesson="xgboost">ensemble of them</Ref> |
+| <Ref lesson="lda-gda">Gaussian discriminant analysis</Ref> | |
+| pipelines that preprocess with <Ref lesson="pca">PCA</Ref> | |
+| backprop MLPs with spherically symmetric init (Ng) | |
+| <Ref lesson="random-features">random Fourier features</Ref>, isotropic $p(\omega)$, in Ng's stochastic sense | |
+
+The left column is most of classical and deep learning at once; the right column is the tabular winners plus the two methods the course built for feature selection. That alignment is Ng's theorem:
+
+<Theorem title="the price of rotational invariance (Ng 2004, Thm. 4.3)">
+Let $L$ be any rotationally invariant learning algorithm, and fix any $0 < \varepsilon < 1/8$, $0 < \delta < 1/100$. Then there exists a learning problem in $\mathbb{R}^n$ whose labels are determined by a single feature, $y = \mathbf{1}[x_1 \ge t]$, on which attaining 0–1 error at most $\varepsilon$ with probability at least $1 - \delta$ requires a training set of size
+
+$$
+m \;=\; \Omega(n / \varepsilon).
+$$
+</Theorem>
+
+The theorem is used here as read; its lower bound runs through the general sample-complexity machinery behind <Ref lesson="vc-dimension">module 9's matching lower bounds</Ref>, because an invariant learner facing one thresholded feature effectively faces every rotation of it, a class of halfspaces whose capacity grows linearly in $n$. The contrast result (Ng's Thm. 3.1) prices the alternative: for targets depending on few features, $\ell_1$-regularized logistic regression needs a sample growing only logarithmically in $n$, times a polynomial in the problem's other parameters. Between $\Omega(n/\varepsilon)$ and $O(\log n)$ sits everything this benchmark measured.
+
+The theorem is also the bridge between the last two findings. An invariant learner cannot see which direction is "the" feature; to ignore $n - 1$ irrelevant coordinates it must first recover the orientation from data, and the theorem prices that recovery at $\Omega(n)$ samples. Finding 2's junk-fragility is this price being paid at 10,000 rows; Finding 3's reversal is the price being *imposed* on the previously exempt: rotate the basis and the trees, whose splits are predicates on single columns, are suddenly the ones staring at meaningless coordinates, forced to approximate oblique structure with axis-aligned staircases. Supporting detail from the paper: remove the least-important half of the features *before* rotating and every non-invariant model's drop shrinks, exactly as a junk-mixing account predicts. And the practitioner's corollary explains a trend the paper notes in others' work: embedding layers ahead of MLPs and Transformers help on tables partly because *any* embedding breaks the invariance.
+
+### The symmetry that closes the epilogue
+
+The original basis deserves the loyalty because tabular columns are not coordinates; they are claims. <Ref lesson="feature-engineering">Module 5</Ref> made the point structurally: every column is a modeling decision, with units, semantics, and a name, and the benchmark's datasets are tables of exactly such decisions: age, dosage, price, date. The information a rotation preserves is the bits; what it destroys is the alignment between the basis and the meaning, which is where a table's learnable structure lives. <Ref lesson="random-features">The previous lesson</Ref> expected feature learning to win wherever the right geometry must be discovered. Tables are the case where the geometry was *already discovered*, by the humans who built the columns, and a rotation-invariant learner discards that discovery and buys it back at $\Omega(n)$ samples.
+
+Vision is the same argument with the sign flipped. Individual pixels carry no meaning, spatial arrangement carries all of it, and convolutional networks won images by building translation structure into the architecture. Deep learning wins where its built-in invariances match the representation's real symmetries, and loses where they break them.
+
+<KeyFact>
+Invariance is itself a bias, priced in samples: a learner indifferent to rotation pays Ng's $\Omega(n)$ bound whenever the basis it ignores was meaningful, and collects on the same indifference wherever the meaning lives elsewhere — in spatial arrangement, for images. The principle returns in the course's close as the benchmark's second engineering requirement: a tabular architecture that wants to win must preserve the orientation of the data.
+</KeyFact>
+
+## Scope: what 45 datasets do not establish
+
+Every construction decision from the first section returns here as a boundary on the conclusion. The conclusion covers **medium-sized (10,000-row), mostly numeric, curated, i.i.d. tables with no missing values and no high-cardinality categoricals**. The paper says so itself, lists the open regimes (very small data, very large data, missingness, high-cardinality encodings) as explicit unknowns, and its own large-scale appendix hints the gap narrows at 50,000 training rows, with a rigorous study left to future work.
+
+The sharpest self-inflicted caveat is §A.5. Kadra et al.'s ["Well-tuned Simple Nets Excel on Tabular Datasets"](https://arxiv.org/abs/2106.11189) reports MLPs matching XGBoost when the search space includes a large cocktail of regularization schemes, a wider search than this benchmark ran; and Kadra's own dataset suite includes deterministic game datasets that this benchmark's exclusion rules remove, on which the cocktail method excels. Benchmark composition drives conclusions in both directions, and the paper says so about its rival and, implicitly, about itself. The result is therefore an empirical claim with a date and a domain: on 2022's architectures and this regime, an inductive-bias mismatch with demonstrated mechanisms. It is not a law, and the paper never calls it one.
+
+## The course's close: one question, four answers
+
+The course opened on one question: why does a model fitted to a finite sample say anything about data it has never seen? Eleven modules later the answer has four working parts, and the benchmark just read exercises all of them. **Something must constrain**: a hypothesis class, a penalty, a prior — <Ref lesson="statistical-learning">bias, chosen</Ref> and <Ref lesson="ridge-lasso">priced</Ref>, with the tabular verdict showing that *which* bias matters as much as how much. **Something averages**: <Ref lesson="bagging-random-forests">ensembles</Ref> win back in variance what a low-bias learner pays, which is why the tabular winner is four hundred trees and not one. **Something measures**: <Ref lesson="cross-validation-bootstrap">protocols that keep selection and scoring apart</Ref>, without which the benchmark above would be one more disputed leaderboard. **Something guarantees**: <Ref lesson="learning-theory">concentration against capacity</Ref>, <Ref lesson="margin-bounds">margins</Ref>, and <Ref lesson="conformal-prediction">coverage that holds without belief</Ref>, the parts of the story that survive even where <Ref lesson="double-descent">the classical curve breaks</Ref>.
+
+{/* fig ClassicalSpineMap: the course's closing map — a single horizontal strip of eleven compact panels, one per spine step of course.yaml, each panel carrying the step's short label (Fitting is not learning / Estimation is likelihood / The linear model as projection / Three roads to a boundary / Measurement is part of the method / Local and recursive models / The ensemble resolution / Structure without labels / Why it works / Predictions with guarantees / Where the classical story breaks) and beneath it a one-line answer it contributed to the course's question "why does a finite sample guarantee anything?" (e.g. step 1 "risk, not training error"; step 2 "the likelihood floor"; step 3 "penalties price flexibility"; step 4 "three biases, one boundary"; step 5 "honest measurement"; step 6 "flexibility's variance bill"; step 7 "averaging pays it"; step 8 "structure without labels"; step 9 "capacity buys guarantees"; step 10 "uncertainty with coverage"; step 11 "and where it breaks"). The eleventh panel highlighted amber and slightly wider, closing with the tabular verdict: "on tables, the classical ensemble still wins — for stated reasons". Layout: flexbox row of small bordered panels, module numbers as small badges, HTML text (no KaTeX needed); colors: currentColor panels, amber for the final panel and the connecting arrow line running left to right. */}
+<Figure
+  name="ClassicalSpineMap"
+  alt="The course's eleven spine steps as one strip, each with the one-line answer it contributed to why a finite sample guarantees anything, ending in the highlighted tabular verdict: on tables, the classical ensemble still wins, for stated reasons"
+  caption="The course, as one line of argument: eleven steps, each contributing one clause to the answer, ending on the living frontier this lesson measured."
+/>
+
+The paper's closing contribution is a specification: a tabular architecture that wants to win must be robust to uninformative features, must preserve the orientation of the data, and must learn irregular functions easily. Those are this lesson's three findings restated as engineering requirements, all three standing open at the time of the benchmark; the closing exercise hands the specification to the reader.
+
+A finite sample teaches nothing by itself; every guarantee in these eleven modules was purchased by a stated bias, audited by an honest protocol, and priced by a bound or a coverage statement. On tabular data, as of the best evidence this course can read, the best-priced bias is still the classical one: an axis-aligned, irregularity-tolerant, junk-immune partition of the columns as given, averaged until its variance is paid. The course's vocabulary — bias, variance, invariance, capacity, coverage — is what made the previous sentence checkable, and that is what the vocabulary was for.
+
+## Exercises
+
+<Exercise>
+Warm-up on the benchmark's own metric. On one classification dataset, the best evaluation across all models and draws reaches accuracy $0.90$ and the 10% error-quantile evaluation sits at $0.60$. (a) Compute the normalized score of a tuned model reaching $0.86$. (b) A broken configuration scores $0.55$; state its normalized score under the classification rule, and say in one sentence why the definition uses a quantile floor instead of the literal worst evaluation.
+
+<Solution>
+(a) $\tilde s = (0.86 - 0.60)/(0.90 - 0.60) = 0.26/0.30 = 0.867$: the model covers 87% of the distance from the field's floor to its ceiling.
+
+(b) $(0.55 - 0.60)/0.30 = -0.167$, a negative score: the configuration is worse than the quantile floor. (The explicit clipping to $0$ is the regression rule; for classification the 10% quantile already tames the tail.) The floor is a quantile because the literal worst evaluation in a 400-draw random search is an outlier almost by construction (a divergent learning rate, a degenerate depth), and an affine scale anchored on an outlier would compress every meaningful difference toward $1$: the same reason <Ref lesson="classification-metrics">module 5</Ref> distrusted metrics anchored on degenerate baselines.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: rotation meets one-hot encoding. <Ref lesson="feature-engineering">Module 5's encoding lesson</Ref> turns a $K$-level categorical into $K$ indicator columns, each row carrying a single $1$. (a) Describe what a random rotation $Q$ does to such a block of columns: what do the rotated coordinates look like, and which properties of the encoding survive? (b) Explain why this makes the rotation experiment an argument about *representation*, not merely about geometry, and why the paper ran its rotation experiment on the numerical benchmark only.
+
+<Solution>
+(a) The one-hot block lives on the $K$ standard basis vectors $e_1, \dots, e_K$ (up to the row's other features). After rotation, row $i$'s block becomes a column of $Q$: a dense vector of $K$ real numbers, generically all nonzero, some negative. Everything that made the encoding an encoding is gone: entries are no longer in $\{0, 1\}$, no coordinate answers "is this category $k$?", sparsity is destroyed, and the predicate a tree split needs ("column $j > \tfrac12$" recovers category $j$ exactly) no longer exists in any single coordinate. What survives is the information: $Q$ is invertible, and the $K$ rotated points remain mutually equidistant vertices of the same simplex.
+
+(b) That is the point. The rotation changes no distances and deletes no bits; what it deletes is the alignment between coordinates and *meanings*, and every method that reads coordinates as predicates (trees, lasso, naive Bayes) loses access to structure that is still present but no longer addressable. A "meaningful basis" is exactly a basis in which cheap functions of single coordinates express the target; rotation invariance is indifference to that, which Ng's theorem prices at $\Omega(n)$ samples. Running the experiment on one-hot columns would have muddied this reading: rotating indicators produces inputs no tabular pipeline would ever feed a tree, so the observed drop would confound "lost the meaningful basis" with "fed a representation outside every model's operating regime". Restricting to Gaussianized numerical features keeps the transformation an honest isometry of the kind of data all seven models are built for.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute, by scope audit: "This benchmark proves deep learning is wrong for tabular data." Break the claim the way <Ref lesson="imbalance-leakage">module 5</Ref> reads any benchmark: list the paper's own exclusions and truncations, state the Kadra counterpoint fairly, and then state precisely what *is* established.
+
+<Solution>
+The word "proves" fails first, and the paper's own fences say where. Scope: training sets truncated to 10,000 rows (the 50,000-row appendix suggests a narrowing gap, unresolved); all missing data removed, though missingness is endemic in real tables and <Ref lesson="xgboost">XGBoost's default directions</Ref> exist precisely because of it; categoricals capped at 20 levels, excluding the high-cardinality columns where encoding choices dominate; i.i.d. only, excluding time series and streams; classification binarized and balanced, excluding the imbalanced problems module 5 spent a lesson on. Every excluded regime is one the claim "wrong for tables" would need and does not have. Counterpoint: Kadra et al. report regularization-cocktail MLPs matching XGBoost under a wider search space than this benchmark ran, on a dataset suite whose composition (including deterministic game datasets this benchmark excludes) favors their method; that cuts both ways, and it is exactly why the paper presents the counterpoint as an open caveat (§A.5) rather than refuting it. Date: the entrants are 2022 architectures; the result cannot bind later ones.
+
+What is established: on medium-sized, curated, mostly numeric i.i.d. tables, tuned tree ensembles beat tuned networks at every search budget, with the gap attributed by controlled ablation to three mechanisms: irregular targets versus spectral bias, junk features versus rotation-invariant learners, and a meaningful column basis that rotation destroys. That is an inductive-bias mismatch with mechanisms, on a stated domain, at a stated date. It licenses a strong default and a research agenda; it proves no universal.
+</Solution>
+</Exercise>
+
+<Exercise>
+The derivation the lesson used as read, in two halves. (a) State Ng's Theorem 4.3 precisely from memory (algorithm class, target class, guarantee, bound). (b) Prove that a gradient-boosted tree (indeed a single depth-1 tree) is *not* rotationally invariant, by constructing a four-point dataset and a rotation for which no stump can reproduce its pre-rotation fit. One split suffices.
+
+<Solution>
+(a) For any rotationally invariant learning algorithm $L$ (Def. 4.1: $L[S](x) = L[MS](Mx)$ for all $S$, rotations $M$, and $x$; in distribution if stochastic) and any $0 < \varepsilon < 1/8$, $0 < \delta < 1/100$: there exists a distribution over $\mathbb{R}^n$ with labels $y = \mathbf{1}[x_1 \ge t]$ (one relevant feature, a pure threshold) such that reaching 0–1 error $\le \varepsilon$ with probability $\ge 1 - \delta$ forces $m = \Omega(n/\varepsilon)$ training examples. The contrast class: $\ell_1$-regularized logistic regression needs only logarithmic dependence on the dimension.
+
+(b) Take $S = \{((1,0), 1),\ ((1,5), 1),\ ((-1,0), 0),\ ((-1,5), 0)\}$: labels are the sign of $x_1$, and the stump "$x_1 > 0$" fits $S$ with zero training error, so any sensible tree learner outputs it, and $L[S]$ classifies all four points correctly. Rotate by $45°$: $Q = \frac{1}{\sqrt2}\begin{pmatrix}1 & -1\\ 1 & 1\end{pmatrix}$ sends the four inputs to $(0.71, 0.71)$, $(-2.83, 4.24)$, $(-0.71, -0.71)$, $(-4.24, 2.83)$. Sort by the first coordinate: $-4.24\,(y{=}0)$, $-2.83\,(y{=}1)$, $-0.71\,(y{=}0)$, $0.71\,(y{=}1)$; the labels alternate, so no threshold on it separates them. By the second coordinate: $-0.71\,(0)$, $0.71\,(1)$, $2.83\,(0)$, $4.24\,(1)$, alternating again. Every stump on $QS$ therefore misclassifies at least one training point, so for some training input $x$, $L[QS](Qx) \ne L[S](x)$: the definition fails, witnessed by one split. The coda is the theorem's mechanism in miniature: a *deeper* tree can refit the rotated data, but only by building an axis-aligned staircase along the oblique boundary, and the number of steps, hence samples, that staircase needs is what $\Omega(n)$ is counting.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: Finding 2 at desk scale. Build a real tabular classification task (California housing with the label "above-median house value" works: 8 numeric features, ~20,000 rows) and train/validation/test splits of 8,000/3,000/5,000 rows. For junk levels of $0$, $8$, and $16$ appended standard-Gaussian columns (0%, 100%, 200% of the table's width), tune a gradient-boosted tree and an MLP with a small random search (15 draws each over learning rate, depth/width, and penalty; quantile-Gaussianize inputs for the MLP as the paper does), select on validation, score once on test. Plot the two degradation curves and state in advance what would count as reproducing the adding-features panel of Finding 2's published figure (the paper's Fig. 5b).
+
+<Solution>
+Agreement criterion, stated first: the GBT curve should stay nearly flat while the MLP curve falls by several times as much, and monotonically in the junk fraction; the paper's pattern is the *asymmetry* of the slopes, not any absolute number.
+
+Reference run, computed for this lesson: California housing from OpenML (`data_id=537`), a fixed permutation (`numpy.random.default_rng(0)`) making the 8,000/3,000/5,000 split, `HistGradientBoostingClassifier` and `MLPClassifier` with 15-draw searches from one seeded generator per junk level. Clean table, GBT $90.4\%$, MLP $87.7\%$; at $+8$ junk columns GBT $89.7\%$, MLP $85.9\%$; at $+16$, GBT $89.6\%$, MLP $85.3\%$. Doubling the table's width with noise costs the tuned GBT $0.8$ points; it costs the tuned MLP $2.4$, three times the rate, falling monotonically. Both mechanisms are visible in the fitted objects: the GBT's split gains on junk columns never win, so the columns go unconsulted (measured on the $+16$ winner, the junk columns' mean permutation importance is $0.001$ against the real columns' $0.09$), while the MLP's first layer carries nonzero weights on every junk input that its $\ell_2$ penalty shrinks but never zeroes: <Ref lesson="ridge-lasso">ridge shrinks, only the corner-bearing penalty selects</Ref>, and an $\ell_2$-penalized network sits on the invariant side of Ng's table. The transferable move: when comparing families, perturb the *data* along one axis and compare slopes; absolute scores confound too much to attribute anything.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review, modules 3 and 10 composed. Reproduce Finding 1 in miniature on a tabular regression: California housing, 5 features (median income, house age, average occupancy, latitude, longitude), 5,000 train / 5,000 test rows, features quantile-Gaussianized. Smooth the *training* targets with a Gaussian kernel smoother of lengthscale $\ell \in \{0, 0.25, 0.5, 1.0\}$ (covariance $\ell^2 I$ on the Gaussianized features; test targets untouched). Fit, at each $\ell$, a gradient-boosted tree and a smooth model (a natural-spline additive model in the spirit of <Ref lesson="splines-gams">module 3</Ref>, or your <Ref lesson="gp-lab">gp-lab</Ref> machinery on a subsample), and report test $R^2$ against the original targets. Who degrades, and what does the endpoint of the sweep mean?
+
+<Solution>
+Reference run, computed for this lesson: California housing from OpenML (`data_id=537`), one fixed permutation (`numpy.random.default_rng(0)`) making the 5,000/5,000 split, `QuantileTransformer(output_distribution="normal")` fit on train, `HistGradientBoostingRegressor(random_state=0)` at defaults versus a cubic `SplineTransformer` (20 knots) into `RidgeCV`. At $\ell = 0$: GBT $R^2 = 0.80$ against the spline model's $0.70$, a $0.10$ gap: the tree reading structure the smooth additive fit cannot. At $\ell = 0.25$: GBT $0.77$, spline $0.69$ (barely touched; mild smoothing erases nothing a smooth model ever used). At $\ell = 0.5$: GBT $0.68$, spline $0.65$. At $\ell = 1.0$: GBT $0.49$, spline $0.49$. The gap has collapsed from $0.10$ to under $0.01$.
+
+The reading: the GBT loses $0.30$ of $R^2$ across the sweep, the spline loses $0.21$, and the *difference between them*, the tree family's entire advantage, is what the smoother removed. Smoothing the target is a projection onto roughly the function class the spline and the SE-kernel GP believe in (<Ref lesson="splines-gams">the $\int f''^2$ penalty</Ref>, <Ref lesson="gaussian-processes">the lengthscale prior</Ref>); once the data is inside that class, the smoothness prior stops being wrong and the piecewise-constant learner's edge is gone. The endpoint is Finding 1 run in reverse: the tree's lead on real tables is exactly the mass of target structure that smoothness priors cannot represent.
+</Solution>
+</Exercise>
+
+<Exercise>
+Closing exercise, and the course's forward reach: the next lesson is the literature. (a) Take one dataset you own or work with. Write its three-sentence inductive-bias audit in the course's vocabulary: (1) what should *constrain*, meaning which bias (architectural, penalty, prior) matches the data's real structure and what evidence you have; (2) what should *average*, meaning where the variance will come from and what ensemble or resampling pays it; (3) what will *measure and guarantee*, meaning the protocol that keeps selection away from scoring and the bound or coverage statement you can honestly attach. Then say which of this lesson's three findings applies to your columns, and why. (b) The paper's closing specification (robust to uninformative features, orientation-preserving, cheap at irregular functions) stood open in 2022. Find one post-2022 tabular architecture claim (a paper or a leaderboard entry) and audit it against that specification: which of the three requirements does it address, by what mechanism, and what would its evidence need to clear, by this lesson's protocol standards, before you believed it?
+
+<Solution>
+(a) Possible answers; the form matters more than the instance. For a mid-sized transactional table (say 30,000 rows, 40 mixed columns, a few engineered ratios, some junk): (1) *constrain* with axis-aligned splits and second-order boosting, because the columns are individually meaningful (finding 3), several are likely uninformative (finding 2), and the target plausibly steps at business thresholds (finding 1), so the matched bias is <Ref lesson="xgboost">module 7's</Ref>, with $\lambda$, $\gamma$, and depth as the priced dials; (2) *average* via the ensemble itself, with <Ref lesson="bagging-random-forests">subsampling and column sampling</Ref> attacking the tree correlation $\rho$ that sets the variance floor; (3) *measure* with grouped or temporal folds if rows share entities or time (<Ref lesson="cross-validation-bootstrap">module 5</Ref>), tune inside nested CV, and attach a <Ref lesson="conformal-prediction">split-conformal</Ref> set for the deployed predictions, whose $1-\alpha$ coverage survives every modeling error above it.
+
+The retrieval behind each sentence is the course's spine: sentence 1 draws on steps 1–4 and 6–7 (bias named and priced, flexibility's variance bill), sentence 2 on step 7 (the ensemble resolution), sentence 3 on steps 5, 9, and 10 (measurement as method, capacity-priced guarantees, coverage without belief).
+
+(b) The record since the benchmark supplies both an entrant and a re-measurement, and the audit applies to each. [TabPFN](https://arxiv.org/abs/2207.01848) (Hollmann, Müller, Eggensperger and Hutter, ICLR 2023) is a transformer pre-trained once on millions of synthetic tabular tasks and applied to a new table by in-context learning, no gradient steps at all; its answer to the specification lives in the synthetic prior, which is drawn to include uninformative columns and irregular targets: requirements 1 and 3 bought at the training-distribution level rather than in the architecture, with column-order and sign symmetries handled by construction. Whether the purchase clears this lesson's evidence bar is exactly what the successor benchmark of [McElfresh et al.](https://arxiv.org/abs/2305.02997) (NeurIPS 2023) tests: 19 algorithms on 176 datasets, finding the tree–network gap smaller and more dataset-dependent than the 2022 headline; on a surprisingly large share of their datasets the family difference is negligible, or light tuning of a GBDT outweighs the choice of family altogether, while skewed and heavy-tailed feature distributions remain among the metafeatures that predict a tree win, this lesson's findings surviving as diagnostics. TabPFN is that suite's best performer *on average*, a result the paper reports alongside the model's hard constraint: it is effectively limited to 3,000 training rows and subsamples anything larger. Neither result overturns the other; they differ in regime, which is the scope lesson again. The transferable verdict standard is this lesson's protocol: budget-matched curves, selection kept away from scoring, and ablations that move only what their mechanism predicts. If you can hold a 2025 leaderboard claim to that standard and write the three-sentence audit of part (a) for your own data, the course has transferred what it had.
+</Solution>
+</Exercise>
+
+<References>
+1. L. Grinsztajn, E. Oyallon, G. Varoquaux, "Why Do Tree-Based Models Still Outperform Deep Learning on Tabular Data?," *NeurIPS 2022 Datasets and Benchmarks* — the lesson's artifact: §3 (dataset criteria, side-issue removals, the tuning protocol, the normalized score), §4 and Figs. 1–2 (the budget-curve result), §5 and Figs. 3–6 (the three findings), Figs. 4–5 (junk features measured; the remove/add asymmetry), Fig. 20 (the electricity boundaries), §A.2 (time curves, large-size hint), §A.5 (the Kadra caveat), §A.6 (hyperparameter importance). https://arxiv.org/abs/2207.08815
+2. A. Y. Ng, "Feature Selection, L1 vs. L2 Regularization, and Rotational Invariance," *ICML 2004* — Def. 4.1, Prop. 4.2, the invariant-algorithms inventory, Thm. 4.3 (the $\Omega(n/\varepsilon)$ lower bound), Thm. 3.1 (the logarithmic contrast). https://doi.org/10.1145/1015330.1015435
+3. N. Rahaman, A. Baratin, D. Arpit, F. Draxler, M. Lin, F. A. Hamprecht, Y. Bengio, A. Courville, "On the Spectral Bias of Neural Networks," *ICML 2019* — networks fit low frequencies first; the documented mechanism behind Finding 1's network side. https://arxiv.org/abs/1806.08734
+4. A. Kadra, M. Lindauer, F. Hutter, J. Grabocka, "Well-tuned Simple Nets Excel on Tabular Datasets," *NeurIPS 2021* — the regularization-cocktail counterpoint presented in the scope section. https://arxiv.org/abs/2106.11189
+5. Y. Gorishniy, I. Rubachev, V. Khrulkov, A. Babenko, "Revisiting Deep Learning Models for Tabular Data," *NeurIPS 2021* — the MLP, Resnet, and FT-Transformer implementations and search spaces the benchmark adopts. https://arxiv.org/abs/2106.11959
+6. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — Ch. 13: the MLP and its training, for readers who want the architecture this course measures but does not teach. Free online: https://probml.github.io/pml-book/book1.html
+7. T. Chen, C. Guestrin, "XGBoost: A Scalable Tree Boosting System," *KDD 2016* — the winning entrant, derived in full in <Ref lesson="xgboost">module 7</Ref>; §1 for the adoption count quoted in the throughline. https://arxiv.org/abs/1603.02754
+8. N. Hollmann, S. Müller, K. Eggensperger, F. Hutter, "TabPFN: A Transformer That Solves Small Tabular Classification Problems in a Second," *ICLR 2023* — the post-benchmark entrant the closing exercise audits against the paper's three requirements. https://arxiv.org/abs/2207.01848
+9. D. McElfresh, S. Khandagale, J. Valverde, V. Prasad C, B. Feuer, C. Hegde, G. Ramakrishnan, M. Goldblum, C. White, "When Do Neural Nets Outperform Boosted Trees on Tabular Data?," *NeurIPS 2023 Datasets and Benchmarks* — the successor benchmark: 19 algorithms, 176 datasets, the gap read against dataset metafeatures. https://arxiv.org/abs/2305.02997
+</References>

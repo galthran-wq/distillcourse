@@ -1,0 +1,429 @@
+Keep the full posterior instead of its mode and the linear model prices its own uncertainty: the predictive variance splits into noise plus a parameter-uncertainty term that grows away from the data and shrinks as data accumulates.
+
+The course has so far handled uncertainty three ways: modules 2 and 3 fit point estimates and computed how those estimates scatter across repeated samples, <Ref lesson="cross-validation-bootstrap">module 5</Ref> measured risk by resampling the one sample it had, and module 9 bounded the worst case.
+
+<Ref lesson="bounds-vs-practice">Module 9's closing lesson</Ref> conceded that its certificates do not price uncertainty at the scales engineers work at, and named the alternative this module builds: keep a distribution over predictions, and let the model price its own uncertainty.
+
+This lesson builds that machinery on the linear model, where every step is exact: the posterior over weights falls out of one completed square, the predictive variance splits into a noise floor plus a parameter term, and the same integral that normalizes Bayes' rule scores whole models. Every output is conditional on the model — the caveat the closing section states precisely and the rest of the module answers to.
+
+## One prior, one likelihood, and a point estimate to outgrow
+
+<Ref lesson="mle-map">The likelihood lesson</Ref> ended its Bayesian construction with a confession: MAP estimation computes a whole posterior and then keeps one number, the mode's location, discarding the spread. The same posterior $\mathrm{Beta}(7,4)$ that produced the estimate $2/3$ also carried a standard deviation of $0.14$, and the estimate said nothing about it. This lesson collects that debt for the linear model: the posterior is now the product, not a step on the way to a point.
+
+<Task>
+Three retrievals before the new material, closed book. (1) From <Ref lesson="mle-map">the likelihood lesson</Ref>: write the MAP objective, and the penalty dictionary's entry for a zero-mean Gaussian prior — which penalty it induces, and what ratio sets that penalty's strength $\lambda$. (2) From <Ref lesson="ridge-lasso">the ridge lesson</Ref>: write the ridge closed form, and the reason it exists for every $\lambda > 0$. (3) From <Ref lesson="ols">the least-squares lesson</Ref>: write the sampling covariance of OLS. All three reappear inside the next section's theorem.
+</Task>
+
+The setup is the module-3 linear model with its probabilistic reading made explicit. Data: $n$ observations, design matrix $X \in \mathbb{R}^{n \times d}$ with rows $x_i^\top$, targets $y \in \mathbb{R}^n$ (module 3 wrote $\beta$ and $p$ for the same objects; this module writes $w$ and $d$, the convention the Gaussian-process literature uses). Likelihood: $y = Xw + \varepsilon$ with $\varepsilon \sim \mathcal{N}(0, \sigma^2 I_n)$, the noise variance $\sigma^2$ **known**. The honest scope statement: a fully Bayesian treatment gives $\sigma^2$ a prior too (a normal–inverse-gamma joint prior keeps everything closed-form and turns the predictive into a Student $t$), and this lesson holds $\sigma^2$ fixed so that every formula stays short and exact. Prior: independent zero-mean Gaussians on the weights,
+
+$$
+p(w) = \mathcal{N}(w \mid 0, \tau^2 I_d).
+$$
+
+Everything the lesson does is multiply these two Gaussians and read the product three ways: as a distribution over $w$ (the posterior), as a distribution over the next observation (the predictive), and as a score for the model itself (the evidence).
+
+## The posterior: one completed square
+
+Bayes' rule gives $p(w \mid y) \propto p(y \mid w)\, p(w)$, and both factors are exponentials of quadratics in $w$, so their product is too: the conjugacy <Ref lesson="mle-map">the likelihood lesson</Ref> met in the Beta–Bernoulli pair, now in its multivariate Gaussian form. The scalar case shows the whole mechanism. For a one-parameter model $y_i = w x_i + \varepsilon_i$, the log-prior and log-likelihood add to
+
+$$
+-\frac{w^2}{2\tau^2} - \frac{1}{2\sigma^2} \sum_{i=1}^n (y_i - w x_i)^2
+= -\frac{1}{2} \underbrace{\Big( \frac{1}{\tau^2} + \frac{\sum_i x_i^2}{\sigma^2} \Big)}_{a}\, w^2 + \underbrace{\frac{\sum_i x_i y_i}{\sigma^2}}_{b}\, w + \text{const},
+$$
+
+and any expression of the form $-\tfrac{a}{2} w^2 + b w$ completes to $-\tfrac{a}{2}\big(w - \tfrac{b}{a}\big)^2 + \text{const}$: a Gaussian in $w$ with variance $1/a$ and mean $b/a$. The precision $a$ is prior precision plus data precision; the mean is the data's pull $b$ divided by the total precision. The matrix version is the same two moves with transposes.
+
+### The theorem: precision adds, the mean is pull over precision
+
+<Theorem title="the conjugate posterior (Bishop 3.49–3.54)">
+Under the likelihood $y \sim \mathcal{N}(Xw, \sigma^2 I_n)$ and prior $w \sim \mathcal{N}(0, \tau^2 I_d)$, the posterior is Gaussian,
+
+$$
+p(w \mid X, y) = \mathcal{N}(w \mid m_n, S_n),
+\qquad
+S_n^{-1} = \frac{1}{\tau^2} I_d + \frac{1}{\sigma^2} X^\top X,
+\qquad
+m_n = \frac{1}{\sigma^2}\, S_n X^\top y .
+$$
+
+<Proof>
+Write the log-posterior up to constants and expand both quadratics:
+
+$$
+\ln p(w \mid y) = -\frac{1}{2\sigma^2} (y - Xw)^\top (y - Xw) - \frac{1}{2\tau^2} w^\top w + \text{const}.
+$$
+
+Multiplying out $(y - Xw)^\top(y - Xw) = y^\top y - 2 w^\top X^\top y + w^\top X^\top X w$ and collecting by powers of $w$:
+
+$$
+\ln p(w \mid y) = -\frac{1}{2}\, w^\top \underbrace{\Big( \frac{1}{\tau^2} I + \frac{1}{\sigma^2} X^\top X \Big)}_{A}\, w + w^\top \underbrace{\frac{1}{\sigma^2} X^\top y}_{b} + \text{const}.
+$$
+
+The matrix square-completion identity: for any symmetric positive-definite $A$,
+
+$$
+-\tfrac12 w^\top A w + w^\top b = -\tfrac12 (w - A^{-1} b)^\top A\, (w - A^{-1} b) + \tfrac12 b^\top A^{-1} b,
+$$
+
+verified by expanding the right side: the cross terms produce $w^\top A A^{-1} b = w^\top b$, and the $b^\top A^{-1} b$ pieces cancel against the added constant. Here $A$ is positive definite for every $X$ and every $\tau^2 < \infty$, because $X^\top X$ is positive semidefinite and $\tau^{-2} I$ shifts every eigenvalue up by $\tau^{-2} > 0$, the same eigenvalue shift that made <Ref lesson="ridge-lasso">the ridge solution</Ref> exist unconditionally. So the log-posterior is, up to constants, $-\tfrac12 (w - A^{-1}b)^\top A (w - A^{-1}b)$: exactly the log-density of $\mathcal{N}(A^{-1} b,\, A^{-1})$. Reading off $S_n = A^{-1}$ and $m_n = A^{-1} b = \sigma^{-2} S_n X^\top y$ completes the proof; the normalizing constant is fixed by the standard Gaussian normalizer, no integral needed.
+</Proof>
+</Theorem>
+
+<Figure
+  name="BlrSquareCompletion"
+  alt="The collected quadratic form in w with its coefficient matrix and linear term highlighted, the completed-square template beneath it, and identification arrows reading off the posterior covariance and mean"
+  caption="The proof's one move: collect the exponent by powers of w, match it to a Gaussian's exponent, read off Sₙ and mₙ."
+/>
+
+### Ridge recovered: the mode is the mean
+
+Because the posterior is Gaussian, its mode and mean coincide, and both equal
+
+$$
+m_n = \Big( \frac{\sigma^2}{\tau^2} I + X^\top X \Big)^{-1} X^\top y
+= \hat\beta^{\text{ridge}}_{\lambda},
+\qquad \lambda = \frac{\sigma^2}{\tau^2}:
+$$
+
+<Ref lesson="mle-map">the penalty dictionary's</Ref> ridge entry, previously an identity between two objectives, is now a corollary of the full posterior.
+
+<KeyFact>
+Ridge regression is the posterior mean of Bayesian linear regression with $\lambda = \sigma^2/\tau^2$, so every ridge fit this course has computed was carrying a full covariance matrix $S_n$ — a $d \times d$ statement of how well each direction of weight space is pinned down — that it never used. The predictive error bars and the model scores below are what using it buys.
+</KeyFact>
+
+<Example title="a one-parameter posterior, by the numbers">
+Model $y_i = w x_i + \varepsilon_i$ with $\sigma = 0.5$ (so $1/\sigma^2 = 4$) and prior $w \sim \mathcal{N}(0, 1)$ ($\tau^2 = 1$). Two observations: $(x, y) = (1,\ 0.9)$ and $(2,\ 2.2)$.
+
+**Precision.** $\sum_i x_i^2 = 1 + 4 = 5$, so $S_2^{-1} = 1 + 4 \cdot 5 = 21$: the prior contributed one unit of precision, the data twenty. Posterior standard deviation: $1/\sqrt{21} \approx 0.218$, down from the prior's $1$.
+
+**Mean.** $\sum_i x_i y_i = 0.9 + 4.4 = 5.3$, so $m_2 = 4 \cdot 5.3 / 21 = 21.2/21 \approx 1.010$.
+
+**Ridge check.** $\lambda = \sigma^2/\tau^2 = 0.25$, and the ridge formula gives $5.3 / (5 + 0.25) = 5.3/5.25 \approx 1.010$: the same number, as the corollary requires.
+</Example>
+
+<Exercise>
+A third observation arrives: $(x, y) = (-1,\ -1.1)$. Update the Example's posterior twice (once sequentially, treating $\mathcal{N}(m_2, S_2)$ as the prior for the single new point, and once from scratch on all three points) and verify the two routes agree. Write the sequential precision update before opening the solution.
+
+<Solution>
+Strategy: precisions add, and the new mean is the precision-weighted combination of the old mean's pull and the new point's.
+
+**Sequential.** New precision: $S_3^{-1} = S_2^{-1} + x_3^2/\sigma^2 = 21 + 4 \cdot 1 = 25$. New mean: $m_3 = S_3 \big( S_2^{-1} m_2 + x_3 y_3 / \sigma^2 \big) = \big( 21 \cdot \tfrac{21.2}{21} + 4 \cdot 1.1 \big) / 25 = (21.2 + 4.4)/25 = 1.024$.
+
+**Batch.** $\sum_i x_i^2 = 1 + 4 + 1 = 6$, so $S_3^{-1} = 1 + 4 \cdot 6 = 25$; $\sum_i x_i y_i = 0.9 + 4.4 + 1.1 = 6.4$, so $m_3 = 4 \cdot 6.4 / 25 = 1.024$. Identical.
+
+The transferable fact: the agreement is structural, not numerical luck. $S_n^{-1}$ is a sum of per-observation terms plus the prior's, and sums do not care about grouping; the next section states this in general.
+</Solution>
+</Exercise>
+
+## Updating in motion: every observation adds precision
+
+The posterior's precision matrix explains what the exercise just observed. Writing $X^\top X = \sum_i x_i x_i^\top$,
+
+$$
+S_n^{-1} = \frac{1}{\tau^2} I + \frac{1}{\sigma^2} \sum_{i=1}^n x_i x_i^\top :
+$$
+
+each observation contributes one rank-one slab of precision, $\sigma^{-2} x_i x_i^\top$, in its own direction. Processing the points one at a time (yesterday's posterior as today's prior) or all at once lands on the same $(m_n, S_n)$, because a sum has no memory of its grouping. Uncertainty only ever shrinks.
+
+<Figure
+  src="./figures/precision-slabs.svg"
+  alt="A sum of matrix icons in the weight plane: an isotropic disk for the prior precision, plus one thin rank-one slab per observation oriented along that observation's input direction, equalling a larger tilted ellipse for the posterior precision"
+  caption="Posterior precision as a sum: the prior's isotropic disk plus one rank-one slab per observation, each lying along its own input direction xᵢ. Adding a slab only ever grows the total."
+/>
+
+<FigureSequence
+  name="sequential-film"
+  alt="Four frames, each with a posterior density over the intercept-slope plane on the left and six functions sampled from it over the data on the right, as the observation count grows from zero to one to two to twenty"
+  caption="A line y = w₀ + w₁x fitted to data from truth (w₀, w₁) = (−0.3, 0.5), noise σ = 0.2, prior τ² = 0.5. Left: the posterior in weight space (cross = truth); one point leaves an intercept–slope correlation of 0.91, twenty shrink the standard deviations to (0.045, 0.089). Right: six lines sampled from it. Recreated from Bishop, PRML Fig. 3.7."
+/>
+
+<Task>
+Step through the frames and answer from the pictures. Frame 2: the posterior after one point is a diagonal ridge, not a dot — which combination of intercept and slope did the point fix, and why do the sampled lines agree near it while disagreeing everywhere else? Frame 3: what does the second point determine that the first could not? Frame 4: the six sampled lines are visually one line, yet the data still scatter around it — whose spread remains?
+</Task>
+
+<Remark title="why the ridge is diagonal, and the cheap fix (Murphy, PML 11.7.5)">
+The elongated, tilted posterior of frames 2–3 is not an artifact of this dataset. Every line of high likelihood must pass near the mean of the observed data, so raising the slope forces the intercept down: the plausible $(w_0, w_1)$ pairs form a line of their own, like a wheel spinning around the data's center of mass. Centering the inputs ($x_i \leftarrow x_i - \bar{x}$) moves that pivot to the origin, where the intercept and slope decouple and the posterior's axes align with the coordinate axes. One subtraction buys a posterior that is easier to compute with, read, and (in larger models) sample from.
+</Remark>
+
+## The predictive distribution: the variance splits in two
+
+The posterior answers a question about parameters; the question a deployed model faces is about the next observation. The Bayesian answer refuses to pick a $w$ at all: average the model's prediction over every $w$ the posterior still considers plausible.
+
+<Definition title="posterior predictive distribution">
+For a test input $x_*$, the **posterior predictive distribution** of the response $y_*$ is the likelihood averaged over the posterior:
+
+$$
+p(y_* \mid x_*, X, y) = \int p(y_* \mid x_*, w)\; p(w \mid X, y)\, dw .
+$$
+</Definition>
+
+For this model the integral has a closed form, and the derivation is one line of probability rather than one page of algebra.
+
+<Theorem title="the predictive distribution (Bishop 3.58–3.59)">
+$$
+y_* \mid x_*, X, y \;\sim\; \mathcal{N}\!\Big( m_n^\top x_*,\;\; \sigma^2 + x_*^\top S_n\, x_* \Big).
+$$
+
+<Proof>
+Under the posterior, $y_* = w^\top x_* + \varepsilon_*$ with $w \sim \mathcal{N}(m_n, S_n)$ and $\varepsilon_* \sim \mathcal{N}(0, \sigma^2)$ independent. A linear function of a Gaussian vector is Gaussian: $w^\top x_* \sim \mathcal{N}(m_n^\top x_*,\; x_*^\top S_n x_*)$. Adding the independent Gaussian noise adds means and variances. (The integral form of the same computation, completing the square inside the convolution, is the guided derivation exercise at the chapter's end.)
+</Proof>
+</Theorem>
+
+### Reading the variance: floor plus flare
+
+The variance is the lesson's opening claim, now derived:
+
+$$
+\underbrace{\sigma^2}_{\text{noise floor}} \;+\; \underbrace{x_*^\top S_n\, x_*}_{\text{parameter uncertainty}} .
+$$
+
+The first term is the irreducible scatter of $y$ around the true line, the Bayes floor of <Ref lesson="bias-variance">the decomposition lesson</Ref>, which no amount of data removes.
+
+The second is the model's own confession of ignorance about $w$: a quadratic form in $x_*$, so it **grows** as $x_*$ moves away from the region where the data pinned $w$ down, and, since $S_n \to 0$ as observations accumulate, it shrinks to nothing in the large-$n$ limit.
+
+In the Example's numbers ($m_3 = 1.024$, $S_3 = 1/25$): at $x_* = 0.5$, inside the data, the predictive standard deviation is $\sqrt{0.25 + 0.25/25} \approx 0.51$ — the noise floor, essentially. At $x_* = 3$, past every observation, it is $\sqrt{0.25 + 9/25} \approx 0.78$, half again wider, with the widening entirely the parameter term's.
+
+<Figure
+  src="./figures/predictive-split.svg"
+  alt="A fitted line over twelve data points with two uncertainty bands: a constant-width inner band at plus and minus two noise standard deviations, and an outer band that adds the parameter term and flares open outside the data range"
+  caption="The split drawn: the inner band is ±2σ (the plugin approximation's entire answer, constant everywhere); the outer band adds x*ᵀSₙx* and flares where the data ends. Contrast after Murphy, PML Fig. 11.21."
+/>
+
+<Task>
+Read the figure at its edges: at the data's center (near $x = -0.2$) the two bands are nearly indistinguishable (total sd $0.208$ against noise floor $0.2$), while at $x = 2$, well past the last observation, the outer band is more than twice the inner one ($0.47$ against $0.2$). Locate the narrowest point of the outer band and check it sits inside the cloud of points, not at the plot's center.
+</Task>
+
+### What a point estimate deletes
+
+The inner band alone is what a point estimate produces. Plugging any single $\hat{w}$ into the likelihood (the *plugin approximation* $p(y_* \mid x_*, \hat{w}) = \mathcal{N}(y_* \mid \hat{w}^\top x_*, \sigma^2)$) yields a predictive variance of $\sigma^2$ everywhere: the same certainty far past the last data point as at the data's center. Both MLE and MAP fits, for all <Ref lesson="mle-map">their differences</Ref>, share this failure, because the failure is in the plugging, not the point: collapsing the posterior to any single $w$ deletes the very term that knew where the data ran out.
+
+<KeyFact>
+A constant-width error band on a regression plot is the signature of a plugin approximation; the flare is what carrying the posterior buys, and it is the behavior this module's remaining lessons generalize and then guarantee.
+</KeyFact>
+
+<Remark title="the flare is only as honest as the basis">
+The parameter term measures distance from the data as the features represent it, and a poorly chosen basis can invert its meaning. With localized basis functions (Gaussian bumps, as in <Ref lesson="splines-gams">the basis-expansion toolkit</Ref>), $\phi(x_*) \to 0$ far from every bump center, so $\phi(x_*)^\top S_n \phi(x_*) \to 0$ and the model becomes most confident exactly where it has no support at all: the bars narrow to the noise floor in the far extrapolation region. Bishop flags this pathology (PRML §3.3.2) as a motivation for Gaussian processes, whose uncertainty grows away from data by construction; <Ref lesson="gaussian-processes">the next lesson</Ref> builds them.
+</Remark>
+
+## The evidence: models scored with parameters integrated out
+
+The machinery so far runs inside one fixed model: a basis, a prior width $\tau^2$, a noise level. Choosing between models (degree 2 or degree 8, $\tau^2 = 1$ or $100$) was <Ref lesson="cross-validation-bootstrap">module 5's</Ref> business, paid for with held-out data. The posterior framework has its own answer, and it has been sitting in plain view: the denominator of Bayes' rule,
+
+$$
+p(w \mid X, y) = \frac{p(y \mid X, w)\, p(w)}{p(y \mid X)},
+$$
+
+which every calculation above ignored as "const".
+
+<Definition title="marginal likelihood (evidence)">
+The **marginal likelihood** of a model $\mathcal{M}$ (a basis, a prior, a noise level) is the probability it assigns to the observed targets with the parameters integrated out:
+
+$$
+p(y \mid X, \mathcal{M}) = \int p(y \mid X, w)\, p(w)\, dw .
+$$
+
+It is the likelihood not of a parameter value but of the model as a whole: the probability of generating this dataset by first drawing $w$ from the prior and then drawing $y$ from the likelihood.
+</Definition>
+
+<Theorem title="the evidence in closed form (Bishop 3.78–3.86)">
+For the model of this lesson,
+
+$$
+\ln p(y \mid X) = -\frac{d}{2} \ln \tau^2 \;-\; \frac{n}{2} \ln (2\pi\sigma^2) \;-\; E(m_n) \;-\; \frac{1}{2} \ln \big| S_n^{-1} \big|,
+\qquad
+E(m_n) = \frac{\lVert y - X m_n \rVert^2}{2\sigma^2} + \frac{\lVert m_n \rVert^2}{2\tau^2}.
+$$
+
+<Proof>
+Write the integrand as $(2\pi\sigma^2)^{-n/2} (2\pi\tau^2)^{-d/2} \exp\{-E(w)\}$ with $E(w) = \lVert y - Xw \rVert^2 / 2\sigma^2 + \lVert w \rVert^2 / 2\tau^2$. The posterior theorem already completed this square: $E(w) = E(m_n) + \tfrac12 (w - m_n)^\top S_n^{-1} (w - m_n)$, with all the $w$-dependence in the second term. The integral of its exponential is the standard Gaussian normalizer, $\int \exp\{-\tfrac12 (w - m_n)^\top S_n^{-1} (w - m_n)\}\, dw = (2\pi)^{d/2} |S_n^{-1}|^{-1/2}$. Multiplying the three factors and taking logs, the $(2\pi)^{d/2}$ from the integral cancels the $(2\pi)^{-d/2}$ from the prior's normalizer, leaving the display.
+</Proof>
+</Theorem>
+
+Two checks certify the formula. Counting: $d$ prior dimensions supply the $\ln \tau^2$ term, $n$ observations the $\ln \sigma^2$ term, and the determinant runs over the $d$ eigenvalues of $S_n^{-1}$. And at $n = 0$: $E(m_0) = 0$, $S_0^{-1} = \tau^{-2} I$, and the expression collapses to $-\tfrac{d}{2}\ln\tau^2 + \tfrac{d}{2}\ln\tau^2 = 0$: an empty dataset has probability one under every model, as it must.
+
+### Why the evidence penalizes complexity
+
+Nothing in the integral mentions parameter counts, yet the evidence behaves like a complexity-penalized score. Group the closed form's terms: $-E(m_n)$ is the fit (the penalized residual at the posterior mean), and the remaining pair is
+
+$$
+-\frac{d}{2}\ln\tau^2 - \frac12 \ln|S_n^{-1}|
+= \ln \frac{|S_n|^{1/2}}{\tau^d}
+= \ln \frac{\text{posterior volume}}{\text{prior volume}},
+$$
+
+a negative number that grows in magnitude the more the data compresses the prior. A model whose fit requires finely tuned parameters pays exactly for the tuning: the **Occam factor**, in [MacKay's](https://doi.org/10.1162/neco.1992.4.3.415) terminology.
+
+<Figure
+  src="./figures/occam-volume.svg"
+  alt="A large dashed circle in weight space representing the prior's volume with a much smaller amber ellipse inside it representing the posterior's volume, annotated with the Occam factor as the log of the volume ratio"
+  caption="The Occam factor drawn as the volume ratio it is: a fit that needs finely tuned weights leaves a small posterior inside a large prior, and the evidence charges the log of the shrinkage."
+/>
+
+The mechanism beneath both terms is conservation of probability. A model is a distribution over datasets, and distributions integrate to one: a flexible model spreads its unit of probability over the enormous set of datasets it could explain, so it assigns little to any particular one, while a rigid model concentrates its mass on few datasets and pays only when the observed one falls outside them.
+
+<Figure
+  src="./figures/occam-conservation.svg"
+  alt="Three normalized curves over a one-dimensional axis of all possible datasets: a tall narrow curve for the simple model, a medium curve, and a low broad curve for the complex model, with a vertical line at the observed dataset where the medium curve is highest"
+  caption="Each model's p(D) integrates to one over all datasets it could generate. At the observed D₀, the too-simple model has run out of mass, the too-complex model has spread thin, and the middle model peaks. Recreated from Bishop, PRML Fig. 3.13."
+/>
+
+<KeyFact>
+The Occam penalty is not an added term but an arithmetic consequence of normalization: complex models are penalized because they could have explained datasets that did not occur. No held-out data is involved — the evidence is computed on the training set alone, and selecting by it is legitimate for exactly the reason <Ref lesson="statistical-learning">training-error minimization</Ref> is not: the parameters were integrated out, not tuned.
+</KeyFact>
+
+### The Occam effect, computed
+
+Run the score on a concrete selection problem: $n = 20$ points with $x \in [-1, 1]$, targets from the quadratic truth $y = 0.3 - x + 1.5x^2$ plus noise $\sigma = 0.3$, candidate models the polynomial bases of degree $0$ through $8$ (all with $\tau^2 = 1$).
+
+One run of that protocol: the log-evidence climbs steeply to degree 2 ($-105.0,\ -24.9,\ -6.8$ for degrees 0, 1, 2) and then falls, gently and monotonically, to $-8.4$ at degree 8. The first unused degree costs $0.35$ nats of Occam factor, each degree after it another $0.2$–$0.3$, and none of them buys anything in fit.
+
+Test error, computed from 2,000 held-out points the evidence never saw, agrees about the winner but can barely separate the field: RMSE falls from $0.59$ at degree 1 to $0.311$ at degree 2, then drifts up to only $0.328$ by degree 8, because the posterior's shrinkage keeps the extra coefficients nearly harmless.
+
+<Figure
+  src="./figures/evidence-degree.svg"
+  alt="Two panels versus polynomial degree zero to eight: the left panel shows log-evidence rising steeply to a peak at degree two then declining gently, with an inset magnifying the decline over degrees two to eight; the right panel shows held-out test RMSE dropping to 0.311 at degree two and drifting up to 0.328 by degree eight"
+  caption="Degree selection on quadratic truth (n = 20, σ = 0.3), one run: the evidence (left) peaks at the true degree and pays for every degree past it; test RMSE (right) falls to 0.311 at degree 2 and drifts only to 0.328 by degree 8."
+/>
+
+<Task>
+Read off both panels what the first unused degree costs: the drop in log-evidence from the peak to degree 3, and the change in test RMSE over the same step. Then state which of the two panels required a second dataset to draw.
+</Task>
+
+Reruns with fresh draws move every number but not the shape: over six reruns the evidence's argmax sat at 2 four times (once each at 3 and 4), while the degree-2-to-8 spread of test RMSE stayed between $0.013$ and $0.041$ — an order of magnitude below the drop that separates degree 1 from degree 2. The evidence gives a clear argmax where the test-error curve goes nearly flat.
+
+Two connections place the evidence among the course's other selectors. First, it is not a rival of cross-validation but a relative: the evidence factorizes as $p(y \mid X) = \prod_i p(y_i \mid y_{1:i-1}, X)$, a product of one-step-ahead predictions each made by a model trained on the preceding points — structurally a sequential cousin of leave-one-out CV, scored by predictive density instead of error (Murphy, PML §5.2.4).
+
+Second, it turns hyperparameters into an optimization target: maximizing $\ln p(y \mid X, \tau^2, \sigma^2)$ over $\tau^2$ and $\sigma^2$ (*empirical Bayes*, or the *evidence approximation*) replaces module 5's grid-search-with-CV by a smooth objective computed on the training data, at the cost of trusting the model family. This is precisely how <Ref lesson="gaussian-processes">the next lesson</Ref> will set its kernel hyperparameters, with the same closed form doing the work.
+
+## Conditional on the model
+
+The machinery is now complete: a posterior with a covariance, a predictive with a flare, an evidence with a built-in razor. The correct statement of what it delivers is precise: the predictive bands are exact probability statements within the model — given the linear-in-features mean, the Gaussian noise at known $\sigma^2$, and the Gaussian prior.
+
+### Narrow and wrong, not wide and wrong
+
+**The claim:** "Bayesian error bars are honest uncertainty — a 95% band contains the truth 95% of the time." **The claim is false**, and the failure is not in the probability calculus but in its conditions: every formula in this lesson was derived inside the model, and none of them checks the model.
+
+The mechanism of the failure: fit the straight-line model to data whose truth is a curve and the machinery executes flawlessly — the posterior concentrates (on the best line), the parameter term shrinks with $n$, the bands tighten — around the wrong function. More data makes the bands narrower, not more honest, because $S_n \propto 1/n$ prices only the uncertainty about $w$ within the line family, and the truth is not in the family.
+
+<Figure
+  src="./figures/misspecified-band.svg"
+  alt="A flat fitted line with a narrow 95% predictive band over data generated from a quadratic, the dashed quadratic truth curve rising away from the band, and at x = 2 the true value y = 4 marked roughly 35 predictive standard deviations above the band"
+  caption="The straight line fitted to quadratic truth (y = x² + ε, σ = 0.1, n = 100): at x* = 2 the band is [0.12, 0.55] and the truth y = 4 sits ≈ 35 predictive standard deviations above it — narrow and wrong, not wide and wrong. The mis-specification exercise below computes every number."
+/>
+
+Mis-specifying $\sigma^2$ corrupts the bars the same way, since the noise floor is an input, not an estimate: every band in this lesson inherits its width partly from a number the data never audited.
+
+<KeyFact>
+The honest reading of every output in this lesson: **uncertainty priced under stated assumptions**. The bands measure the model's uncertainty about its own parameters, never the model's uncertainty about itself — and no amount of data converts the first into the second.
+</KeyFact>
+
+### What is established, and what comes next
+
+That caveat sets the module's remaining agenda, as fact rather than warning. Established here: exact posterior, predictive, and evidence for the linear-Gaussian model — the conjugate derivation by completed square, the variance split $\sigma^2 + x_*^\top S_n x_*$, ridge as a posterior mean, and evidence-based selection with its Occam mechanism.
+
+<Ref lesson="gaussian-processes">The next lesson</Ref> removes the finite basis: pushing this lesson's prior through the kernel trick of <Ref lesson="svm-dual-kernels">module 4</Ref> turns it into a distribution over functions, with the same predictive equations and the same evidence tuning the kernel; the closing exercise lands on its doorstep. <Ref lesson="conformal-prediction">The lesson after</Ref> attacks the conditioning itself: coverage guarantees that hold for any model and any distribution, by construction rather than by belief.
+
+## Exercises
+
+<Exercise>
+The scalar case of the machinery, no design matrix needed: an unknown mean $\mu$ with known noise. Model $y_i \sim \mathcal{N}(\mu, 1)$ (so $\sigma^2 = 1$), prior $\mu \sim \mathcal{N}(0, 1)$, and three observations $2.1,\ 2.9,\ 2.5$. Compute the posterior distribution of $\mu$, and express its mean as a shrinkage of the sample mean.
+
+<Solution>
+This is the lesson's model with $X = (1, 1, 1)^\top$ and $d = 1$. Posterior precision: $S_3^{-1} = 1/\tau^2 + n/\sigma^2 = 1 + 3 = 4$, so the posterior variance is $0.25$ (standard deviation $0.5$, halved from the prior's $1$). Posterior mean: $m_3 = \sigma^{-2} S_3 \sum_i y_i = 7.5/4 = 1.875$.
+
+The shrinkage reading: with $\lambda = \sigma^2/\tau^2 = 1$,
+$$
+m_3 = \frac{n}{n + \lambda}\, \bar{y} = \frac{3}{4} \cdot 2.5 = 1.875,
+$$
+the sample mean pulled a quarter of the way to the prior's zero: the same weighted-average form as <Ref lesson="mle-map">the Beta posterior mean</Ref>, with $\lambda$ playing the pseudo-count. As $n$ grows the weight $n/(n+\lambda) \to 1$ and the posterior mean converges to $\bar{y}$.
+</Solution>
+</Exercise>
+
+<Exercise>
+The Gaussian-integral steps the predictive theorem's proof compressed, in the scalar case. For posterior $w \sim \mathcal{N}(m, s^2)$ and likelihood $y_* \mid w \sim \mathcal{N}(w x_*, \sigma^2)$, evaluate
+$$
+p(y_*) = \int_{-\infty}^{\infty} \frac{1}{\sqrt{2\pi\sigma^2}} e^{-(y_* - w x_*)^2 / 2\sigma^2} \cdot \frac{1}{\sqrt{2\pi s^2}} e^{-(w - m)^2 / 2 s^2}\, dw
+$$
+directly, by completing the square in $w$. Guided route: (i) collect the exponent by powers of $w$ and identify the coefficients $a$ and $b$; (ii) integrate out the completed square; (iii) simplify what remains into a Gaussian in $y_*$ and read off its mean and variance.
+
+<Solution>
+(i) The joint exponent is $-\tfrac{a}{2} w^2 + b w - c$ with
+$$
+a = \frac{x_*^2}{\sigma^2} + \frac{1}{s^2},
+\qquad
+b = \frac{x_* y_*}{\sigma^2} + \frac{m}{s^2},
+\qquad
+c = \frac{y_*^2}{2\sigma^2} + \frac{m^2}{2 s^2}.
+$$
+
+(ii) Completing the square, $-\tfrac{a}{2}w^2 + bw = -\tfrac{a}{2}(w - b/a)^2 + b^2/2a$, and the $w$-integral of the first part is $\sqrt{2\pi/a}$. So $p(y_*) = \frac{1}{2\pi \sigma s} \sqrt{2\pi/a}\; e^{\,b^2/2a - c}$.
+
+(iii) Expand the exponent as a quadratic in $y_*$. With $a$ as above,
+$$
+\frac{b^2}{2a} - c = -\frac{1}{2}\cdot\frac{(y_* - m x_*)^2}{\sigma^2 + s^2 x_*^2},
+$$
+which follows by putting everything over the common denominator $2\sigma^2 s^2 a = 2(s^2 x_*^2 + \sigma^2)$: the $y_*^2$ coefficient collects to $s^2 x_*^2 + \sigma^2 - s^2 x_*^2$ over the denominator times $\sigma^2$, i.e. $1/(\sigma^2 + s^2 x_*^2)$, and the cross and constant terms assemble the shifted square. The prefactor $\frac{1}{2\pi\sigma s}\sqrt{2\pi/a} = \big(2\pi(\sigma^2 + s^2 x_*^2)\big)^{-1/2}$. Together: $y_* \sim \mathcal{N}(m x_*,\ \sigma^2 + s^2 x_*^2)$, the theorem's formula with $S_n = s^2$ in one dimension. The transferable move: a Gaussian integral only ever needs the exponent collected, completed, and normalized; the linear-transform proof in the body is the same computation with the bookkeeping hidden.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: both ends of the prior's dial. (a) Let $\tau^2 \to \infty$ with $X^\top X$ invertible. Compute the limits of $m_n$ and $S_n$, and name both objects (one from <Ref lesson="ols">module 3</Ref>) that the limits reproduce. Then state the two different claims the same matrix $\sigma^2 (X^\top X)^{-1}$ makes in its two roles. (b) Let $\tau^2 \to 0$. Compute the limits and say what the model now does with data. (c) State which of the two limits requires the invertibility assumption and why the finite-$\tau^2$ posterior never does.
+
+<Solution>
+(a) $S_n^{-1} = \tau^{-2} I + \sigma^{-2} X^\top X \to \sigma^{-2} X^\top X$, so $S_n \to \sigma^2 (X^\top X)^{-1}$, and $m_n \to (X^\top X)^{-1} X^\top y = \hat\beta^{\text{ols}}$: the flat-prior posterior is centered on OLS with covariance equal to <Ref lesson="ols">the least-squares lesson's</Ref> sampling covariance of $\hat\beta$. The two claims are different in kind. As a sampling covariance it describes how the estimator would scatter across hypothetical repeated datasets with $\beta$ fixed; as a posterior covariance it describes the remaining uncertainty about $w$ given the one dataset actually observed. The same matrix answers a frequentist question about replications and a Bayesian question about this sample. The numerical coincidence is special to the flat-prior Gaussian model, and keeping the two readings straight is what lets both schools use each other's computations.
+
+(b) $S_n^{-1} \to \infty \cdot I$, so $S_n \to 0$ and $m_n \to 0$: the posterior collapses onto the prior's mean regardless of $y$. An infinitely confident prior ignores data; equivalently $\lambda = \sigma^2/\tau^2 \to \infty$, ridge's null-model limit.
+
+(c) Only the flat-prior limit needs invertibility: $S_n$ at finite $\tau^2$ exists for every $X$ (the eigenvalue shift by $\tau^{-2}$), but the limit $\sigma^2(X^\top X)^{-1}$ requires all eigenvalues of $X^\top X$ to be positive. Where OLS fails (collinearity, $p > n$) the proper prior is not a convenience but the thing making the posterior exist. A related boundary fact for the next section's tool: the evidence itself degenerates as $\tau^2 \to \infty$ (the closed form's $-\tfrac{d}{2}\ln\tau^2 \to -\infty$), so model comparison cannot be run with fully flat priors.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "a Bayesian 95% predictive band contains the truth 95% of the time." Concrete setting: the truth is $y = x^2 + \varepsilon$ with $\varepsilon \sim \mathcal{N}(0, 0.1^2)$, inputs uniform on $[-1, 1]$; the model fitted is the straight line $y = w_0 + w_1 x$ with the correct $\sigma^2 = 0.01$ and prior $\tau^2 = 1$, on $n = 100$ points. Using population approximations ($X^\top X \approx n \operatorname{diag}(1, \tfrac13)$ for the columns $(1, x)$), compute the approximate predictive distribution at $x_* = 2$ and compare it with the true mean $y = 4$. Name what the band conditions on, and which module-10 tool repairs which part of the failure.
+
+<Solution>
+The population OLS line for $y = x^2$ on symmetric inputs has slope $\operatorname{Cov}(x, x^2)/\operatorname{Var}(x) = 0$ (odd moment) and intercept $\mathbb{E}[x^2] = \tfrac13$; with $n = 100$ and a weak prior, $m_n \approx (\tfrac13, 0)$. Covariance: $S_n \approx \sigma^2 (X^\top X)^{-1} \approx \operatorname{diag}(10^{-4},\ 3 \times 10^{-4})$. At $x_* = 2$: predictive mean $\approx \tfrac13$, parameter term $x_*^\top S_n x_* \approx 10^{-4} + 4 \cdot 3\times10^{-4} = 1.3 \times 10^{-3}$, total variance $\approx 0.01 + 0.0013 = 0.0113$, standard deviation $\approx 0.106$. The 95% band is roughly $[0.12,\ 0.55]$. The truth at $x_* = 2$ is $4.0$: about **35 predictive standard deviations** above the band's center. The band is not wide and wrong; it is narrow and wrong — maximally confident and excluding the truth.
+
+No step of the calculus failed. The band conditions on the linear mean function, the Gaussian noise, and the stated $\sigma^2$; the flare term priced uncertainty about $w$ within the line family, and the truth is not in the family. More data makes it worse: $S_n \propto 1/n$, so the band tightens around the wrong line. The repair the module ends with is <Ref lesson="conformal-prediction">conformal prediction</Ref>, which guarantees coverage on future draws from the same distribution as the data without believing the model: it would widen these bands to honest width on $[-1,1]$, where residuals reveal the quadratic misfit. What it cannot repair, and no assumption-free method can, is the extrapolation to $x_* = 2$ itself: there, only a better model class (the next lesson's route) changes the answer.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review with <Ref lesson="regularization-lab">the regularization lab</Ref>. (a) Show algebraically that the posterior mean $m_n$ equals the ridge estimate at $\lambda = \sigma^2/\tau^2$, starting from the theorem's $m_n = \sigma^{-2} S_n X^\top y$. (b) Verify numerically on $X = \begin{pmatrix} 1 & 0 \\ 0 & 2 \end{pmatrix}$, $y = (1, 2)^\top$, $\sigma^2 = 1$, $\tau^2 = 0.5$: compute $m_n$ from the posterior formulas and $\hat\beta^{\text{ridge}}_{\lambda}$ from the ridge closed form, and confirm they match. (c) State what your lab's SVD ridge solver computes that the posterior view says it should also report, and what extra output the posterior view adds.
+
+<Solution>
+(a) $m_n = \sigma^{-2} \big( \tau^{-2} I + \sigma^{-2} X^\top X \big)^{-1} X^\top y$. Pull $\sigma^{-2}$ inside the inverse: $= \big( \sigma^2 \tau^{-2} I + X^\top X \big)^{-1} X^\top y = (X^\top X + \lambda I)^{-1} X^\top y$ with $\lambda = \sigma^2/\tau^2$, the ridge closed form.
+
+(b) $\lambda = 1/0.5 = 2$. $X^\top X = \operatorname{diag}(1, 4)$, $X^\top y = (1, 4)^\top$. Ridge: $\operatorname{diag}(3, 6)^{-1} (1, 4)^\top = (\tfrac13, \tfrac23)^\top$. Posterior: $S_n^{-1} = 2 I + \operatorname{diag}(1, 4) = \operatorname{diag}(3, 6)$, $m_n = S_n X^\top y / 1 = (\tfrac13, \tfrac23)^\top$. Match. (Running the lab's `ridge-svd` checkpoint at $\lambda = 2$ on this design returns the same pair; the shrink factors are $d_j^2/(d_j^2 + \lambda) = \tfrac13$ and $\tfrac46$ against the OLS solution $(1, 1)$.)
+
+(c) The lab's solver already computes the posterior mean for a whole $\lambda$ grid: every ridge path is a family of posterior means indexed by prior width. What it never reports is $S_n$: the posterior view says the same SVD that gives the shrink factors $d_j^2/(d_j^2+\lambda)$ also gives $S_n = V \operatorname{diag}\!\big(\sigma^2/(d_j^2 + \lambda)\big) V^\top$ for free, and with it every error bar in this lesson.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the Occam effect and race it against cross-validation. Protocol: generate $n = 20$ points with $x \sim U[-1,1]$ and $y = 0.3 - x + 1.5x^2 + \varepsilon$, $\sigma = 0.3$; for degrees 1–8, compute the log-evidence (closed form, $\tau^2 = 1$, true $\sigma^2$) and the 5-fold CV error of the corresponding ridge fit at $\lambda = \sigma^2/\tau^2$; record each criterion's chosen degree; repeat for 20 replications. State in advance what counts as reproducing the Occam effect: the evidence's argmax should concentrate on the true degree 2.
+
+<Solution>
+Our run (seed-dependent in the counts, not the pattern): across 20 replications the evidence chose degree 2 sixteen times, with two votes each on 3 and 4; 5-fold CV chose degree 2 twelve times, degree 3 three times, and scattered five votes across 4–7. The Occam effect reproduces (the evidence's argmax concentrates on the truth), and the comparison adds a finding: at this $n$ the evidence is a modestly *lower-variance selector* than CV. The mechanism is visible in the body's figure: past the true degree the evidence falls (every extra degree pays its Occam factor and buys no fit), while the CV curve goes flat, and a flat curve's argmin is decided by fold noise. The comparison is honest only with the caveat attached: the evidence knew the true $\sigma^2$ and a well-scaled prior, and mis-specifying either shifts its peak, while CV assumed nothing. That trade — sharper selection bought by trusting the model family — is <Ref lesson="cross-validation-bootstrap">module 5's</Ref> machinery against this module's, in one experiment.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Substitute $m_n = \sigma^{-2} S_n X^\top y$ into the predictive mean $m_n^\top x_*$ and rearrange it into the form $\sum_{i=1}^n k(x_*, x_i)\, y_i$, identifying the function $k$. Then compute $\operatorname{Cov}(w^\top x_*,\ w^\top x')$ under the posterior for two test inputs, and compare its form with $k$'s.
+
+<Solution>
+$$
+m_n^\top x_* = \frac{1}{\sigma^2}\, x_*^\top S_n X^\top y = \sum_{i=1}^n \underbrace{\frac{1}{\sigma^2}\, x_*^\top S_n\, x_i}_{k(x_*,\, x_i)}\; y_i :
+$$
+the predictive mean is a weighted sum of the training targets, with weights $k(x_*, x_i)$ measuring a similarity between $x_*$ and each training input, large when the two align in the directions the posterior left wide. The covariance: $\operatorname{Cov}(w^\top x_*, w^\top x') = x_*^\top S_n\, x'$, which is $\sigma^2 k(x_*, x')$: the same bilinear form. One symmetric function of input pairs carries both the predictions and the correlations between predictions.
+
+That is the doorstep fact. Nothing in either formula uses the coordinates of $w$; the data enters only through pairwise evaluations of $k$. Replace the $d$-dimensional feature space by an infinite one whose $k$ is computed directly (the move <Ref lesson="svm-dual-kernels">the kernel trick</Ref> already made for the SVM) and the model becomes a distribution over functions with jointly Gaussian values: a Gaussian process, the subject of <Ref lesson="gaussian-processes">the next lesson</Ref>. Bishop calls this lesson's $k$ the *equivalent kernel* (PRML §3.3.3); the next lesson makes it the primitive object.
+</Solution>
+</Exercise>
+
+<References>
+1. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §3.3.1–3.3.2: the conjugate posterior, the sequential-learning Fig. 3.7 (recreated in this chapter's film), and the predictive distribution with its variance split (Eq. 3.59); §3.3.3: the equivalent kernel behind the forward exercise; §3.4: Bayesian model comparison and the dataset-space schematic Fig. 3.13 (recreated here); §3.5.1: the evidence closed form (Eq. 3.86) this chapter's theorem follows. Free online: https://www.microsoft.com/en-us/research/publication/pattern-recognition-machine-learning/
+2. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §11.7: posteriors and predictives for linear regression, the plugin-vs-posterior contrast of Fig. 11.21 (the idea behind this chapter's split figure), and the centering observation of §11.7.5; §5.2.3–5.2.4: the Bayesian Occam's razor via conservation of probability mass and the marginal-likelihood–LOO connection. Free online: https://probml.github.io/pml-book/book1.html
+3. D. J. C. MacKay, "Bayesian Interpolation," *Neural Computation* 4(3), 1992, pp. 415–447 — the evidence framework: the Occam-factor decomposition of the marginal likelihood and evidence-based selection of regularization constants, the source of this chapter's volume-ratio reading. https://doi.org/10.1162/neco.1992.4.3.415
+4. C. E. Rasmussen, C. K. I. Williams, *Gaussian Processes for Machine Learning*, MIT Press, 2006 — §2.1: the weight-space view — this chapter's model, in this chapter's notation, as the opening move of the Gaussian-process construction the next lesson completes. Free online: https://gaussianprocess.org/gpml/
+</References>

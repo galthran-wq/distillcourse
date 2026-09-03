@@ -1,0 +1,518 @@
+Every method so far was validated empirically; this module proves guarantees, and the first one is elementary — for a finite hypothesis class, empirical risk concentrates around true risk uniformly, at a cost logarithmic in the class size.
+
+The course has measured generalization and exploited the measurements: module 5 built hold-out and cross-validation estimates of risk, and <Ref lesson="wrong-way-cv">the leakage postmortem</Ref> ended in an empirical law, that anything fitted or selected must be fixed before the data that judges it. What stands open is why any of it deserves trust: no theorem yet connects a number computed on a finite sample to the risk it claims to estimate. This lesson supplies the first such theorems.
+
+The route: a concentration inequality for one pre-committed hypothesis; the exact computation showing how choosing among many hypotheses destroys it; the union-bound repair, yielding proved sample-complexity bounds for any finite class; the PAC definitions that name what was proved; the reconciliation of the theory's error ledger with module 1's bias–variance ledger; and the No Free Lunch theorem, which proves the restriction to a class is not a convenience but a necessity. One flaw survives to the end and hands off to the next lesson: every class the course actually fits is infinite.
+
+## One hypothesis, fixed in advance: Hoeffding's inequality
+
+The smallest version of the trust question involves no learning at all. A single predictor $h$ is fixed, before any data exists; then $n$ labeled examples arrive, drawn independently from the distribution $D$; the question is how far the computable number $\hat{R}(h)$ can sit from the unobservable one $R(h)$.
+
+<Task>
+Closed-book, from <Ref lesson="statistical-learning">the opening lesson</Ref>: state what $R(h)$ and $\hat{R}(h)$ are, and what the memorizer proved about the pair. Check yourself below before continuing; the whole module builds on these three items.
+</Task>
+
+<Aside>
+Answers: $R(h) = \mathbb{E}_{(X,Y)\sim D}[L(h(X), Y)]$ is the risk, the expected loss on a fresh draw, never observable; $\hat{R}(h) = \tfrac1n\sum_i L(h(x_i), y_i)$ is the empirical risk, computable from the sample; and the memorizer showed $\hat{R} = 0$ is compatible with $R = \tfrac12$, so empirical risk alone certifies nothing. What this lesson adds is the condition under which it certifies a great deal: the hypothesis, or the class it came from, fixed before the sample.
+</Aside>
+
+For a fixed $h$ and zero–one loss, each summand $L(h(x_i), y_i)$ is a $\{0,1\}$-valued random variable with mean exactly $R(h)$, and the summands are independent because the draws are. So $\hat{R}(h)$ is an average of $n$ independent, bounded random variables, and its expectation is $R(h)$. The law of large numbers says the average converges; what a finite-sample guarantee needs is a rate, and the classical rate is [Hoeffding's inequality](https://doi.org/10.1080/01621459.1963.10500830), proved by Wassily Hoeffding in 1963 for exactly this situation, averages of bounded independent variables.
+
+<Theorem title="Hoeffding's inequality (Hoeffding 1963)">
+Let $\theta_1, \dots, \theta_n$ be independent random variables with $\theta_i \in [0,1]$ and $\mathbb{E}[\theta_i] = \mu$ for all $i$. Then for every $\varepsilon > 0$,
+$$
+\Pr\left( \left| \frac{1}{n}\sum_{i=1}^n \theta_i - \mu \right| > \varepsilon \right) \;\le\; 2\exp\!\left(-2n\varepsilon^2\right).
+$$
+In particular, for a fixed predictor $h$ with loss in $[0,1]$,
+$$
+\Pr\big( |\hat{R}(h) - R(h)| > \varepsilon \big) \;\le\; 2e^{-2n\varepsilon^2}.
+$$
+</Theorem>
+
+The general proof (Hoeffding's lemma plus the Chernoff method) is in Appendix B of [Shalev-Shwartz and Ben-David](https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/) and Appendix D of [Mohri, Rostamizadeh and Talwalkar](https://cs.nyu.edu/~mohri/mlbook/); the starred section below derives the $2e^{-2n\varepsilon^2}$ shape from scratch for the coin-flip case, which is the only case zero–one loss needs.
+
+### What the bound says at real numbers
+
+Fix the tolerance $\varepsilon = 0.03$, three percentage points, and read the bound as $n$ grows:
+
+| $n$ | $2e^{-2n\varepsilon^2}$ |
+|---|---|
+| 100 | 1.67: says nothing (a probability bound above 1) |
+| 1,000 | 0.33 |
+| 5,000 | 0.00025: one chance in 4,000 |
+| 10,000 | $3 \times 10^{-8}$ |
+
+The onset is abrupt because $n$ sits in the exponent: additive increases in $n$ multiply the bound down. Below roughly $n = \ln 2 / (2\varepsilon^2) \approx 385$ the statement is vacuous at this tolerance; by $n = 5{,}000$ a three-point error in the measured risk is a 1-in-4,000 event, for **any** distribution and any bounded loss.
+
+<Figure
+  src="./figures/hoeffding.svg"
+  alt="Two sampling distributions of the empirical error of one fixed hypothesis around its true risk 0.30, at n equal to 1,000 and 10,000; the tails beyond plus or minus 0.03 are shaded amber and the Hoeffding bound on each tail is printed above"
+  caption="Concentration of the empirical error of one fixed hypothesis. The Hoeffding bound (printed) is loose against the actual tails (shaded) but is distribution-free and exponential in n."
+/>
+
+This theorem is module 5's missing warrant. A held-out test set scoring one prespecified model is exactly the theorem's setting: the model was fixed before the test draws, so the test error of <Ref lesson="spam-filter">the spam filter</Ref> on its 1,536 held-out messages is within $\pm 3.5$ points of the true risk with 95% confidence, with no assumption beyond iid sampling. (The binomial standard error module 5 quoted, about $\pm 1.2$ points at two SEs, is tighter because it uses the observed error rate; Hoeffding pays for needing nothing.)
+
+The iid assumption is the load-bearing one: every guarantee in this module is conditional on the sample being independent draws from the same distribution the risk is measured on. Drifting spam, grouped patients, or time-ordered records void the warranty before any theorem applies.
+
+<KeyFact>
+Hoeffding's guarantee is per-hypothesis and pre-registered: it covers one $h$ fixed before the sample. Nothing in the statement survives if $h$ is allowed to depend on $S$ — and the ERM hypothesis depends on $S$ by construction.
+</KeyFact>
+
+## ★ Where the exponential comes from
+
+The $2e^{-2n\varepsilon^2}$ shape can be derived in ten lines for a coin. Let $\theta_1, \dots, \theta_n$ be iid $\{0,1\}$ variables with mean $p$, let $\bar\theta$ be their average, and fix a target $a = p + \varepsilon$. For any $\lambda > 0$, Markov's inequality applied to the positive variable $e^{\lambda \sum_i \theta_i}$ gives
+
+$$
+\Pr(\bar\theta \ge a) = \Pr\!\big(e^{\lambda\sum\theta_i} \ge e^{\lambda n a}\big) \le \frac{\mathbb{E}\big[e^{\lambda\sum\theta_i}\big]}{e^{\lambda n a}} = \left( \frac{ p e^{\lambda} + (1-p) }{ e^{\lambda a} } \right)^{\!n},
+$$
+
+using independence to factor the expectation. The bracket is minimized at $e^{\lambda} = \frac{a(1-p)}{(1-a)p}$, and substituting gives
+
+$$
+\Pr(\bar\theta \ge p + \varepsilon) \;\le\; e^{-n\,\mathrm{KL}(p+\varepsilon \,\|\, p)}, \qquad \mathrm{KL}(a \| p) = a \ln\tfrac{a}{p} + (1-a)\ln\tfrac{1-a}{1-p}.
+$$
+
+The calculus inequality $\mathrm{KL}(p+\varepsilon\|p) \ge 2\varepsilon^2$ (Pinsker's inequality in this special case; check it by minimizing over $p$ at fixed $\varepsilon$) yields $\Pr(\bar\theta \ge p+\varepsilon) \le e^{-2n\varepsilon^2}$; the symmetric argument on the lower tail and a union of the two events gives the factor 2. The KL form is strictly stronger and explains a fact the next sections exploit: tails are much thinner when $p$ is near 0 than when $p$ is near $\tfrac12$, because $\mathrm{KL}(p+\varepsilon \,\|\, p) \approx \varepsilon\ln(\varepsilon/p)$ grows without bound as $p \to 0$, far beyond $2\varepsilon^2$. Hoeffding's constant is the worst case, attained at $p = \tfrac12$.
+
+## Choosing the best of many re-opens the gap
+
+Hoeffding appears to license ERM directly: compute $\hat{R}(h)$ for every $h$ in the class, return the minimizer; each estimate is accurate, so the winner's estimate is accurate too. The inference is false, and it fails by an exactly computable margin. The trap is worth quantifying in its purest form, where every hypothesis is identical and only selection varies.
+
+### One thousand fair coins
+
+Take 1,000 fair coins and flip each 100 times. Estimating one coin's heads probability is estimating a fixed hypothesis's risk; a coin showing 60 or more heads corresponds to an empirical estimate off by ten points. For **one coin fixed in advance**, the exact binomial tail is
+
+$$
+\Pr(\text{at least 60 heads in 100}) = \sum_{k=60}^{100}\binom{100}{k} 2^{-100} = 0.0284,
+$$
+
+comfortably inside Hoeffding's one-sided bound $e^{-2 \cdot 100 \cdot 0.01} = 0.135$. For the **best-looking of 1,000 coins**, independence gives the exact answer:
+
+$$
+\Pr(\text{some coin shows} \ge 60) = 1 - (1 - 0.0284)^{1000} = 1 - 3\times 10^{-13}.
+$$
+
+A certainty, to twelve decimal places. Scan 1,000 fair coins and the record-holder will show about 60% heads or better; its true heads rate is 50% regardless. No individual estimate misbehaved: each coin's tail probability is small. Selection did all the damage, by taking a maximum over 1,000 fluctuations and reporting the winner's score as if it were a pre-registered measurement.
+
+<FigureSequence
+  name="coins"
+  alt="Three frames: one coin's empirical heads-fraction distribution with the small tail beyond 0.6 shaded; a grid of 1,000 coins with about 28 crossing the threshold and the best one circled; the same grid at 530 flips per coin where the union bound holds every tail at once"
+  caption="The multiple-comparisons trap, exactly. One small tail probability, multiplied by 1,000 chances to be selected, is a certainty; shrinking every tail until the sum is small is the union bound."
+/>
+
+<Task>
+Step through the three frames. In frame 1, note the tail value 0.028: rare for one coin. In frame 2, count the amber coins: about 28 of 1,000, the count the 0.028 tail rate predicts; the circled one is what "pick the best" returns. In frame 3, the flips per coin rise to 530 and the amber population is gone: every tail is now $2.5\times10^{-5}$, and even 1,000 of them sum to 0.025.
+</Task>
+
+### The same failure in the course's own record
+
+This computation is the theorem-grade version of events the course has already witnessed. The ERM hypothesis $\hat{f} = \arg\min_{h \in \mathcal{H}} \hat{R}(h)$ is the best-looking coin: its empirical risk is a minimum over $|\mathcal{H}|$ fluctuating estimates, so it is biased low, and the size of the bias grows with the number of candidates inspected. <Ref lesson="wrong-way-cv">The wrong-way screening pipeline</Ref> reported 3% on a 50%-risk problem by exactly this mechanism, with features playing the coins; the law of large numbers refutation in <Ref lesson="statistical-learning">the opening lesson's exercises</Ref> is the same point stated qualitatively. What the coins add is arithmetic: the failure probability of "some hypothesis deviates" is at most the sum of the per-hypothesis failure probabilities, and can approach it.
+
+<KeyFact>
+The repair ahead prices selection in $\ln|\mathcal{H}|$, not $|\mathcal{H}|$: guarding a thousand candidates costs a few times the samples that guarding one does. That logarithm is also the repair's limit — the budget is infinite the moment the class is, the flaw this lesson ends on.
+</KeyFact>
+
+## The union bound: one guarantee for the whole class
+
+The repair is to guard every hypothesis before any selection happens. The tool is the *union bound*: for any events $A_1, \dots, A_K$, $\Pr(\cup_k A_k) \le \sum_k \Pr(A_k)$, the crudest inequality in probability, and sufficient here, because Hoeffding makes each summand exponentially small.
+
+<Definition title="uniform convergence over a class">
+A sample $S$ is **$\varepsilon$-representative** for a class $\mathcal{H}$ (with respect to $D$ and the loss) if every hypothesis's empirical risk is trustworthy at once:
+$$
+\sup_{h \in \mathcal{H}} \big| \hat{R}(h) - R(h) \big| \;\le\; \varepsilon.
+$$
+</Definition>
+
+On an $\varepsilon$-representative sample nothing can be misjudged by more than $\varepsilon$: not the ERM winner, not any candidate a selection procedure might prefer. That is the sense in which uniform convergence is selection-proof, and it is the property the coins lacked.
+
+<Figure
+  src="./figures/uniform.svg"
+  alt="Two panels showing six hypotheses' true risks as blue dots inside gray bands of width two epsilon, with empirical risks as amber dots: in the left panel every amber dot lies inside its band; in the right panel one hypothesis's empirical risk escapes far below its band and an arrow marks it as the one ERM returns"
+  caption="Representativeness is a property of the sample, demanded of the whole class at once. Left: every estimate within ε, so no selection can be misled. Right: one escaped estimate — and ERM finds exactly that hypothesis."
+/>
+
+<Theorem title="finite classes converge uniformly (SSBD Cor. 4.6, Mohri Thm. 2.13)">
+Let $\mathcal{H}$ be finite, with loss in $[0,1]$. For every $\varepsilon, \delta \in (0,1)$, if
+$$
+n \;\ge\; \frac{\ln(2|\mathcal{H}|/\delta)}{2\varepsilon^2},
+$$
+then with probability at least $1-\delta$ over $S \sim D^n$, the sample is $\varepsilon$-representative. Equivalently, with probability at least $1-\delta$,
+$$
+\forall h \in \mathcal{H}: \quad R(h) \;\le\; \hat{R}(h) + \sqrt{\frac{\ln|\mathcal{H}| + \ln(2/\delta)}{2n}}.
+$$
+
+<Proof>
+The failure event is a union over the class:
+$$
+\big\{ \exists h \in \mathcal{H}: |\hat{R}(h) - R(h)| > \varepsilon \big\} = \bigcup_{h \in \mathcal{H}} \big\{ |\hat{R}(h) - R(h)| > \varepsilon \big\}.
+$$
+Each $h \in \mathcal{H}$ is a fixed function (the class was chosen before the sample), so Hoeffding's inequality applies to each event separately, and the union bound sums the pieces:
+$$
+\Pr\big( \exists h: |\hat{R}(h) - R(h)| > \varepsilon \big) \;\le\; \sum_{h \in \mathcal{H}} 2e^{-2n\varepsilon^2} \;=\; 2|\mathcal{H}|\, e^{-2n\varepsilon^2}.
+$$
+Setting the right side equal to $\delta$ and solving for $n$ gives the first display; solving for $\varepsilon$ instead gives the second. $\;$ For the ERM consequence: if $S$ is $(\varepsilon/2)$-representative and $\hat{f}$ minimizes $\hat{R}$, then for every $h \in \mathcal{H}$,
+$$
+R(\hat{f}) \le \hat{R}(\hat{f}) + \tfrac{\varepsilon}{2} \le \hat{R}(h) + \tfrac{\varepsilon}{2} \le R(h) + \varepsilon,
+$$
+so ERM lands within $\varepsilon$ of the best risk in the class whenever $n \ge 2\ln(2|\mathcal{H}|/\delta)/\varepsilon^2$.
+</Proof>
+</Theorem>
+
+The three-inequality chain at the end converts a statistical property of the sample (representativeness) into a guarantee about an algorithm's output, with no reference to how the minimizer is found. Any procedure returning any empirical minimizer, or even a near-minimizer, inherits the bound.
+
+### Reading the bound: log |H| is a description length
+
+The class size enters only through $\ln|\mathcal{H}|$, and $\log_2|\mathcal{H}|$ has a name: it is the number of bits needed to write down which hypothesis was chosen. The bound therefore says that uniform trust costs a fixed number of samples **per bit of description**: at $\varepsilon = 0.1$, $\delta = 0.01$, about 35 samples per bit ($\ln 2 / 2\varepsilon^2$), and about 7 per bit in the realizable case below. This is a precise form of Occam's razor: among classes that fit equally well, the one describable in fewer bits carries the stronger guarantee. It is also why restricting to a class is affordable at all: the price of admitting $2^{16}$ candidate thresholds instead of one is not $2^{16}$ times more data but 16 bits' worth.
+
+<Figure
+  src="./figures/samples-per-bit.svg"
+  alt="Sample size n against description length in bits at epsilon 0.1 and delta 0.01: two straight lines, the agnostic rate near 35 samples per bit and the realizable rate near 7, with the threshold class at 16 bits and the rectangle class at 24.6 bits marked on both lines, and a note placing 1-kilobyte programs far off the chart at the same slopes"
+  caption="Sample complexity is linear in description length: ≈35 samples per bit (agnostic) against ≈7 (realizable). Class size enters nowhere else; the intercepts are the fixed cost of confidence."
+/>
+
+<Example title="the bound as a calculator">
+Let $\mathcal{H}$ be the thresholds $h_\theta(x) = \operatorname{sign}(x - \theta)$ with $\theta$ stored as a 16-bit number: $|\mathcal{H}| = 2^{16}$, so $\ln|\mathcal{H}| = 16\ln 2 = 11.09$. For uniform closeness $\varepsilon = 0.1$ with confidence $\delta = 0.01$:
+$$
+n \;\ge\; \frac{16\ln 2 + \ln 200}{2 \times 0.01} = \frac{11.09 + 5.30}{0.02} = 819.4,
+$$
+so $n = 820$ samples suffice. After 820 draws, every one of the 65,536 thresholds carries an empirical error within ten points of its true risk, simultaneously, with 99% confidence; therefore so does whichever threshold any procedure selects.
+</Example>
+
+<Exercise>
+Same calculator, next class up: axis-aligned rectangles whose four corner coordinates each take one of 100 grid values. Count $|\mathcal{H}|$ (order the two $x$-coordinates and the two $y$-coordinates), then compute the uniform-convergence $n$ at $\varepsilon = 0.1$, $\delta = 0.01$. Write the count before opening.
+
+<Solution>
+Per axis, an interval is an ordered pair of grid values with ties allowed: $\binom{100}{2} + 100 = 5{,}050$ choices. Two independent axes give $|\mathcal{H}| = 5{,}050^2 \approx 2.6 \times 10^7$, so $\ln|\mathcal{H}| = 2\ln 5{,}050 = 17.05$, about 24.6 bits. Then
+$$
+n \ge \frac{17.05 + 5.30}{0.02} = 1{,}117.6 \;\Rightarrow\; n = 1{,}118.
+$$
+Four hundred times more hypotheses than the threshold class, yet only 36% more samples: the logarithm is doing exactly what the bits reading promises. The transferable move: count the class by describing a member, then charge ~35 samples per bit.
+</Solution>
+</Exercise>
+
+Applied to the coins: guarding 1,000 hypotheses at tolerance $\varepsilon = 0.1$ with 95% confidence needs $n \ge \ln(2\cdot1000/0.05)/(2\cdot 0.01) \approx 530$ flips each — exactly the flip count that empties frame 3 of the sequence. The trap was never about fair coins: it was about budget.
+
+## Realizability buys a rate: the misleading-samples argument
+
+The $1/\varepsilon^2$ in the sample complexity is the price of estimating error rates near one half. A hypothesis with risk $p$ has empirical error with standard deviation $\sqrt{p(1-p)/n}$; resolving its risk to $\pm\varepsilon$ when $p \approx \tfrac12$ genuinely requires $n \sim 1/\varepsilon^2$ draws, which is why the agnostic bound cannot be improved in general.
+
+When the problem is *realizable* (some $h^\star \in \mathcal{H}$ has $R(h^\star) = 0$, so ERM always finds a hypothesis with $\hat{R} = 0$), the question changes. There is no need to estimate every risk to $\pm\varepsilon$; it is enough to rule out impostors, hypotheses with risk above $\varepsilon$ that survive the sample unscathed. Near $p = 0$ the binomial is far more cooperative: a risk-$\varepsilon$ hypothesis looks perfect on $n$ draws with probability $(1-\varepsilon)^n$, which dies at rate $e^{-\varepsilon n}$, linear in $\varepsilon$ rather than quadratic.
+
+<Theorem title="realizable finite-class bound (SSBD Cor. 2.3)">
+Let $\mathcal{H}$ be finite, assume some $h^\star \in \mathcal{H}$ has $R(h^\star) = 0$, and let $\hat{f}$ be any ERM output (so $\hat{R}(\hat{f}) = 0$). For every $\varepsilon, \delta \in (0,1)$, if
+$$
+n \;\ge\; \frac{\ln(|\mathcal{H}|/\delta)}{\varepsilon},
+$$
+then $\Pr\big( R(\hat{f}) > \varepsilon \big) \le \delta$.
+
+<Proof>
+Roadmap: name the bad hypotheses; name the samples that let a bad one impersonate a good one; show the failure event lives inside that set; bound the set's mass by the union bound.
+
+**The bad set.** Let $\mathcal{H}_B = \{h \in \mathcal{H} : R(h) > \varepsilon\}$. The learner fails only if $R(\hat{f}) > \varepsilon$, i.e. only if $\hat{f} \in \mathcal{H}_B$.
+
+**The misleading samples.** Since realizability forces $\hat{R}(\hat{f}) = 0$, the learner can output a bad hypothesis only if some bad hypothesis has zero empirical risk. Define the misleading set
+$$
+M = \big\{ S : \exists h \in \mathcal{H}_B,\; \hat{R}(h) = 0 \big\} = \bigcup_{h \in \mathcal{H}_B} \big\{ S : \hat{R}(h) = 0 \big\},
+$$
+so $\{ S : R(\hat{f}) > \varepsilon \} \subseteq M$.
+
+**One bad hypothesis at a time.** Fix $h \in \mathcal{H}_B$. It scores perfectly on one draw with probability $1 - R(h) \le 1 - \varepsilon$, and the draws are independent, so
+$$
+\Pr\big( \hat{R}(h) = 0 \big) \;\le\; (1-\varepsilon)^n \;\le\; e^{-\varepsilon n}.
+$$
+
+**Union.** Summing over $\mathcal{H}_B$ and enlarging to $\mathcal{H}$:
+$$
+\Pr\big( R(\hat{f}) > \varepsilon \big) \le \Pr(M) \le |\mathcal{H}_B| \, e^{-\varepsilon n} \le |\mathcal{H}|\, e^{-\varepsilon n},
+$$
+which is at most $\delta$ exactly when $n \ge \ln(|\mathcal{H}|/\delta)/\varepsilon$.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/misleading.svg"
+  alt="The space of all size-n samples drawn as a large rounded rectangle; five blue ovals mark, for each bad hypothesis, the set of samples on which it looks perfect, each of mass at most (1 minus epsilon) to the n; a green point outside every oval marks a sample on which ERM must succeed"
+  caption="The proof as a picture (after SSBD Fig. 2.1). ERM can only fail on a sample inside some oval; the union bound prices the ovals' total mass at (number of bad hypotheses) × (1−ε)ⁿ, and growing n shrinks every oval at once."
+/>
+
+The two proofs bound different events, and that is the entire rate difference. The agnostic proof had to keep **every** empirical risk pinned within $\varepsilon$ of its mean, a two-sided demand on fluctuating quantities near $\tfrac12$. This proof only has to starve a one-sided event, "a bad hypothesis stays spotless", whose probability collapses exponentially in $\varepsilon n$ because each additional draw independently has an $\varepsilon$-chance of exposing the impostor.
+
+<Example title="conjunctions learned from 149 examples (Mohri Ex. 2.6)">
+Let $\mathcal{H}$ be conjunctions of at most 10 Boolean literals over $x_1, \dots, x_{10}$ (each variable appears positively, negated, or not at all): $|\mathcal{H}| = 3^{10} = 59{,}049$. At $\delta = 0.02$, $\varepsilon = 0.1$ the realizable bound asks
+$$
+n \;\ge\; \frac{10\ln 3 + \ln 50}{0.1} = \frac{10.99 + 3.91}{0.1} = 149.
+$$
+There is also a cheap consistent learner: start from the conjunction of all 20 literals and delete every literal contradicted by a positive example. After 149 labeled bit-vectors, its output is 90% accurate with 98% confidence: a complete end-to-end guarantee, from a bound that fits on one line.
+</Example>
+
+<Exercise>
+Price the noise: for the same class of conjunctions, compute the sample size the agnostic bound demands at the same $\varepsilon = 0.1$, $\delta = 0.02$ (uniform convergence version), and state the ratio to 149.
+
+<Solution>
+$$
+n \ge \frac{\ln(2|\mathcal{H}|/\delta)}{2\varepsilon^2} = \frac{10.99 + \ln 100}{0.02} = \frac{10.99 + 4.61}{0.02} = 780.
+$$
+A factor of 5.2. Nothing about the class changed; only the promise did. Realizability lets the argument watch for perfect impostors (tail $e^{-\varepsilon n}$); without it, the argument must measure near-half error rates to $\pm\varepsilon$ (tail $e^{-2n\varepsilon^2}$), and at $\varepsilon = 0.1$ the exponents differ by the factor $1/2\varepsilon = 5$ that the numbers show.
+</Solution>
+</Exercise>
+
+<KeyFact>
+Two rates, one mechanism: clean problems cost $\tfrac{1}{\varepsilon}\ln\tfrac{|\mathcal{H}|}{\delta}$ samples, noisy ones $\tfrac{1}{2\varepsilon^2}\ln\tfrac{2|\mathcal{H}|}{\delta}$: a quadratic surcharge that comes from the variance of near-half-error hypotheses, not from any slack in the proofs. The same split recurs, with $|\mathcal{H}|$ replaced by a capacity measure, in every bound this module proves.
+</KeyFact>
+
+## PAC learning: the definition the bounds instantiate
+
+Both theorems share a shape: a sample size $n(\varepsilon, \delta)$, depending only on the class and the two tolerances, that works for every distribution. In 1984 Leslie Valiant isolated that shape as the definition of learnability, in ["A Theory of the Learnable"](https://doi.org/10.1145/1968.1972), the founding paper of computational learning theory. The acronym reads off the two tolerances: the output is *probably* (confidence $1-\delta$) *approximately* (accuracy $\varepsilon$) *correct*.
+
+<Definition title="PAC and agnostic PAC learnability (SSBD Defs. 3.1, 3.3)">
+A hypothesis class $\mathcal{H}$ is **agnostic PAC learnable** if there exist a function $n_{\mathcal{H}} : (0,1)^2 \to \mathbb{N}$ and a learning algorithm such that for every $\varepsilon, \delta \in (0,1)$ and **every** distribution $D$, given $n \ge n_{\mathcal{H}}(\varepsilon, \delta)$ iid examples the algorithm returns $h$ with
+$$
+R(h) \;\le\; \min_{h' \in \mathcal{H}} R(h') + \varepsilon \qquad \text{with probability at least } 1 - \delta.
+$$
+$\mathcal{H}$ is **PAC learnable** (realizable case) if the same holds with the guarantee $R(h) \le \varepsilon$, for every $D$ and labeling under which some member of $\mathcal{H}$ has zero risk.
+</Definition>
+
+The quantifier order is the content. The class and the sample-size function are fixed first; the adversary then picks any distribution; the guarantee must still hold. Nothing about $D$ is assumed beyond iid sampling (and the measurability fine print, which this course leaves to the texts). The two theorems above now read as one sentence each: **every finite class is agnostic PAC learnable** with $n_{\mathcal{H}}(\varepsilon,\delta) \le \lceil 2\ln(2|\mathcal{H}|/\delta)/\varepsilon^2 \rceil$, and PAC learnable in the realizable case with $n_{\mathcal{H}}(\varepsilon,\delta) \le \lceil \ln(|\mathcal{H}|/\delta)/\varepsilon \rceil$, by ERM in both cases.
+
+<Figure
+  src="./figures/quantifiers.svg"
+  alt="Three boxes in sequence: first the learner fixes the class, the sample-size function and the algorithm; second the adversary picks any distribution while seeing that commitment; third the guarantee that the returned hypothesis is within epsilon of the class's best must still hold with probability at least one minus delta"
+  caption="PAC learnability as a game whose move order is the definition: the commitment precedes the distribution. Reversing the order — tuning n(ε, δ) to the D at hand — would make the claim empty."
+/>
+
+Four instances calibrate the definition's boundary:
+
+- **Canonical:** any finite class, by the theorems just proved.
+- **Degenerate:** $|\mathcal{H}| = 1$: no selection, no union bound; Hoeffding alone is the guarantee, which is why a single prespecified model plus a fresh test set needs no theory of classes.
+- **Infinite but learnable:** concentric circles $\{ \mathbf{1}[\lVert x \rVert \le r] : r \ge 0 \}$, an infinite class that is PAC learnable with $n = \lceil \ln(1/\delta)/\varepsilon \rceil$, no class size anywhere (proved in the concentric-circles exercise at the end of the lesson). Finiteness is sufficient, never necessary.
+- **Near-miss:** the class of all functions on an infinite domain. It fails exactly the "every distribution" clause; the No Free Lunch section proves no $n(\varepsilon, \delta)$ can exist for it.
+
+### The discretization trick, honestly
+
+The finite-class bounds cover more practice than they appear to: any class a computer actually searches is finite, because its parameters live in machine words. A class with $d$ parameters in 64-bit floats has at most $2^{64d}$ members, so $\ln|\mathcal{H}| \le 64d \ln 2$, and the agnostic bound gives $n = O\!\big((64d + \ln(2/\delta))/\varepsilon^2\big)$, the origin of the folklore that sample complexity scales with parameter count.
+
+The trick measures the description, not the problem: the answer depends on the storage format (8-bit coefficients give a bound 8 times smaller than 64-bit ones, for the same statistical problem), so it estimates practice while measuring nothing intrinsic. The next lesson's VC dimension replaces the bit count with a quantity the class itself determines.
+
+<Figure
+  src="./figures/what-the-bound-sees.svg"
+  alt="Three hypothesis classes drawn as what they compute — a threshold on a number line, an axis-aligned rectangle around points, a listing of arbitrary code — each collapsing to a bit count of 16, 24.6 and 8,192 bits, all feeding one sample-complexity formula that reads nothing but the bit count"
+  caption="Three classes, one input to the theory: the bound reads ln|H| — the description length — and is blind to everything the hypotheses do."
+/>
+
+The extreme case makes the point: "every program of at most 1 kilobyte" is a legitimate hypothesis class, containing decision trees, digit classifiers, and everything else expressible in 8,192 bits — far off the right edge of the description-length chart above, but on the same two lines, at 56,829 samples with realizability and 284,179 without. If some such program has zero risk, 56,829 samples guarantee 90% accuracy with 99% confidence. The bound never asks what the hypotheses compute; a kilobyte of arbitrary code and a kilobyte of spline coefficients cost the same. That indifference is the finite-class theory's power and its bluntness in one: capacity, so far, is only a count.
+
+## ★ Representation decides tractability: k-term DNF versus k-CNF
+
+Statistical learnability is not the whole story, and one classical pair shows what it omits. A *k-term DNF* formula over $n$ Boolean variables is an OR of $k$ ANDs; the class has at most $3^{nk}$ members, so its PAC sample complexity is a polynomial $\tfrac{1}{\varepsilon}\big((\ln 3) nk + \ln\tfrac1\delta\big)$. Yet no efficient algorithm can PAC learn it *properly* (outputting a k-term DNF): for $k \ge 3$ that would solve graph 3-coloring, so it is impossible unless $\mathrm{RP} = \mathrm{NP}$.
+
+Meanwhile *k-CNF* formulas (an AND of ORs of at most $k$ literals) are efficiently learnable by a reduction to conjunctions over $(2n)^k$ derived variables, and every k-term DNF can be rewritten as a k-CNF. So the larger class is the easy one: returning a k-CNF that represents the target k-term DNF is tractable, while insisting on the small class's own representation is not, because converting the learned k-CNF back is the hard step.
+
+Sample complexity depends on $\ln|\mathcal{H}|$; computational tractability depends on how hypotheses are written down. Enlarging a class can make learning easier, a possibility nothing in the counting theory hints at.
+
+## Two ledgers of error, reconciled
+
+The agnostic bound guarantees ERM lands near the best risk in the class; it is silent about how good the class's best is. Splitting the total risk at that hinge gives the theory's master decomposition:
+
+$$
+R(\hat{f}) \;=\; \underbrace{\min_{h \in \mathcal{H}} R(h)}_{\displaystyle \varepsilon_{\mathrm{app}}} \;+\; \underbrace{\Big( R(\hat{f}) - \min_{h \in \mathcal{H}} R(h) \Big)}_{\displaystyle \varepsilon_{\mathrm{est}}}.
+$$
+
+The *approximation error* $\varepsilon_{\mathrm{app}}$ is a property of the class and the distribution alone: the cost of committing to $\mathcal{H}$, unchanged by any amount of data, and never below the Bayes error. The *estimation error* $\varepsilon_{\mathrm{est}}$ is the cost of finding the class's best member from a finite sample; it is the term the theorems control, at $\varepsilon_{\mathrm{est}} \le 2\sup_h |\hat{R}(h) - R(h)|$, hence with high probability at most $\sqrt{2\ln(2|\mathcal{H}|/\delta)/n}$. Enlarging the class moves the two terms in opposite directions, and that tension has a familiar face.
+
+<Figure
+  src="./figures/ledgers.svg"
+  alt="Two aligned panels over a shared capacity axis: the top shows approximation error falling and estimation error rising with their U-shaped sum labeled risk of ERM; the bottom shows bias squared plus noise falling and variance rising with the U-shaped expected test error; dashed connectors pair the falling terms and the rising terms across panels"
+  caption="Two ledgers, one trade. Blue terms are properties of the class, immune to data; amber terms are the price of a finite sample; both sums are U-shaped in capacity."
+/>
+
+<Ref lesson="bias-variance">Module 1's decomposition</Ref> split expected squared error at a point into noise plus squared bias plus variance. The correspondence is exact in role and deliberately inexact in mathematics:
+
+| | this lesson's ledger | module 1's ledger |
+|---|---|---|
+| identity for | 0–1 risk of ERM, any class | expected squared error at a point |
+| falls with capacity | approximation error $\varepsilon_{\mathrm{app}}$ | bias² (+ the fixed noise floor $\sigma^2$) |
+| rises with capacity | estimation error $\varepsilon_{\mathrm{est}}$ | variance |
+| controlled by | uniform convergence: $\le \sqrt{2\ln(2\lvert\mathcal{H}\rvert/\delta)/n}$ | closed forms per estimator ($\sigma^2/k$, $p\sigma^2/n$, …) |
+| statement type | high-probability bound, worst case over $D$ | exact expectation, per distribution |
+
+The differences are content, not blemish. The squared-loss ledger is an exact identity but exists only for squared loss (module 1 proved 0–1 risk admits no additive version); this ledger holds for any loss and any class but prices the fluctuating term by a worst-case bound rather than an equality. The estimation term is variance-like (it measures how far the sample's champion drifts from the class's true champion) and inherits variance's cures: more data, or a smaller class. What the theory adds to module 1 is the rate: the amber term shrinks like $\sqrt{\ln|\mathcal{H}|/n}$, which is a number, not a slogan, and the first quantitative answer to how rich a class $n$ samples can afford.
+
+## No Free Lunch: the class must exclude something
+
+The ledger tempts a final economy: take $\mathcal{H}$ to be all functions, drive the approximation error to its floor (the Bayes error exactly), and let data handle the rest. The union bound fails for that class, but the union bound is merely one proof technique; the temptation is the belief that some cleverer algorithm could learn without restriction. The No Free Lunch theorem eliminates the algorithm, not the proof: it is stated and proved against every learner at once.
+
+<Theorem title="No Free Lunch (SSBD Thm. 5.1)">
+Let $A$ be any learning algorithm for binary classification with 0–1 loss over a domain $\mathcal{X}$, and let the training-set size $n$ satisfy $n < |\mathcal{X}|/2$. Then there exists a distribution $D$ over $\mathcal{X} \times \{0,1\}$ such that:
+
+1. some function $f : \mathcal{X} \to \{0,1\}$ has $R(f) = 0$ (the task is realizable, hence learnable by ERM over $\{f\}$), yet
+2. with probability at least $1/7$ over $S \sim D^n$, $\;R(A(S)) \ge 1/8$.
+
+<Proof>
+Roadmap: build a family of tasks on $2n$ points; show the average task defeats $A$ by an exchange-of-averages argument; convert the average into the stated probability.
+
+**The adversary's family.** Pick $C \subseteq \mathcal{X}$ with $|C| = 2n$. Every function $f_i : C \to \{0,1\}$, and there are $T = 2^{2n}$ of them, defines a distribution $D_i$: draw $x$ uniformly from $C$ and label it $y = f_i(x)$. Each $D_i$ is realizable by its own $f_i$. The learner sees $n$ draws, at most half of $C$, so on at least $n$ points of $C$ it has seen nothing.
+
+**Max over tasks ≥ average over tasks.** It suffices to show
+$$
+\max_{i \le T} \; \mathbb{E}_{S \sim D_i^n} \big[ R_{D_i}(A(S)) \big] \;\ge\; \tfrac14 .
+$$
+Under $D_i$, a training set is a uniformly chosen sequence of $n$ points of $C$, labeled by $f_i$; write $S_j^i$ for the $j$-th such sequence ($j \le k = (2n)^n$) with $f_i$'s labels. Then, bounding the maximum below by the average over $i$ and swapping the two finite sums,
+$$
+\max_i \frac1k \sum_j R_{D_i}(A(S_j^i)) \;\ge\; \frac1k \sum_j \frac1T \sum_i R_{D_i}(A(S_j^i)) \;\ge\; \min_j \frac1T \sum_i R_{D_i}(A(S_j^i)),
+$$
+so it is enough to defeat $A$ on average over targets, for every fixed instance sequence $S_j$.
+
+**The pairing step.** Fix $S_j$ and let $v_1, \dots, v_p$ be the points of $C$ not appearing in it ($p \ge n$, at least half of $C$). Since the marginal is uniform on $C$,
+$$
+R_{D_i}(h) = \frac{1}{2n}\sum_{x \in C} \mathbf{1}[h(x) \ne f_i(x)] \;\ge\; \frac{1}{2}\cdot\frac{1}{p}\sum_{r=1}^{p} \mathbf{1}[h(v_r) \ne f_i(v_r)].
+$$
+Now fix one unseen point $v_r$ and pair the targets: $f_i \leftrightarrow f_{i'}$ where the two agree everywhere except at $v_r$. Paired targets label the training points identically, so $S_j^i = S_j^{i'}$, so $A$ returns the same hypothesis for both, and that hypothesis disagrees with exactly one of the pair at $v_r$. Averaged over all $T$ targets, $A$ therefore errs at $v_r$ exactly half the time:
+$$
+\frac1T \sum_{i=1}^{T} \mathbf{1}\big[A(S_j^i)(v_r) \ne f_i(v_r)\big] = \frac12 .
+$$
+Averaging over the unseen points and combining with the previous display: $\frac1T\sum_i R_{D_i}(A(S_j^i)) \ge \frac12 \cdot \frac12 = \frac14$, for every $j$, which proves the max-average claim.
+
+**From average to probability.** Some task $D = D_{i^*}$ has $\mathbb{E}[R_D(A(S))] \ge \tfrac14$. The risk is a $[0,1]$-valued variable, so the reverse Markov inequality ($\Pr(\theta \ge a) \ge \tfrac{\mathbb{E}\theta - a}{1 - a}$ for $\theta \in [0,1]$) with $a = \tfrac18$ gives $\Pr\big(R_D(A(S)) \ge \tfrac18\big) \ge \tfrac{1/4 - 1/8}{7/8} = \tfrac17$.
+</Proof>
+</Theorem>
+
+<FigureSequence
+  name="nfl"
+  alt="Three frames on a four-point domain: the sample covers two points and two stay unseen; the sixteen possible targets listed as a grid with one pair highlighted that agrees on everything except one unseen point; the per-column average error of one half marked under each unseen point, forcing average risk at least one quarter"
+  caption="The averaging argument at n = 2, |C| = 4. Whatever the learner answers on an unseen point, exactly half the surviving targets contradict it."
+/>
+
+<Task>
+Step through the frames and locate the single load-bearing move: in frame 2, the two highlighted targets produce identical training sets, so the learner (any learner, deterministic or clever) must answer identically, and is wrong against exactly one. Confirm from the grid that this pairing exhausts all 16 targets at each unseen column, which is what makes the column average exactly ½ in frame 3.
+</Task>
+
+### What the theorem does and does not say
+
+The theorem is a statement about the class of all tasks, not about any particular task. It does not say learning is hopeless; it says assumption-free learning is hopeless: any algorithm that comes with a guarantee over every distribution on a large domain guarantees nothing better than near-chance behavior somewhere. Corollary: the class of all functions over an infinite domain is not PAC learnable — the near-miss from the PAC section, now proved.
+
+Every working method must therefore smuggle in a commitment about which tasks it will fail on, and the course has been watching those commitments all along: the memorizer of <Ref lesson="statistical-learning">the opening lesson</Ref> is one learner exhibiting the failure NFL guarantees, restriction to rectangles was the first repair, <Ref lesson="mle-map">priors and their penalty terms</Ref> are the same commitment written as log-probabilities, and <Ref lesson="zipcode-digits">tangent distance</Ref> is the commitment "rotated digits are the same digit" written into a metric. None of these are optional extras on top of learning; by this theorem they are what learning consists of.
+
+<KeyFact>
+Inductive bias is mandatory, not prudent: with $n < |\mathcal{X}|/2$, every learner, including any future algorithm, has a realizable task on which it fails with constant probability, while a one-line ERM learner with the right tiny class succeeds. What separates learning from guessing is never the algorithm alone; it is the truth of the algorithm's commitments about the task.
+</KeyFact>
+
+## The flaw that remains: every interesting class is infinite
+
+What stands proved: for one pre-committed hypothesis, empirical risk concentrates at rate $2e^{-2n\varepsilon^2}$; selection among candidates re-opens the gap, at a price the coins computation makes exact; the union bound closes it for any finite class, at $\ln(2|\mathcal{H}|/\delta)/(2\varepsilon^2)$ samples in general and $\ln(|\mathcal{H}|/\delta)/\varepsilon$ under realizability; PAC learnability names the resulting guarantee; risk splits into an approximation term the class fixes and an estimation term the sample pays; and No Free Lunch proves the class must exclude something, for every learner that will ever exist.
+
+Every one of those results prices a class by counting it, and almost nothing this course fits is countable. Thresholds have a real parameter; halfspaces, ridge coefficient vectors, soft-margin SVMs, spline coefficient sets: all have $|\mathcal{H}| = \infty$, the union bound sums infinitely many tails, and both finite-class theorems go silent. The discretization trick patches the gap with machine-word arithmetic, but its answer changes with the float format, which no theorem about the problem should do.
+
+One observation points at the repair: the threshold class is infinite, yet on any 5 sample points it can produce only 6 of the 32 conceivable labelings (counted in the final exercise). What a class can do on $n$ points is finite even when the class is not, and replacing $|\mathcal{H}|$ by that count — the growth function, and the VC dimension that governs it — is the next lesson's subject.
+
+<Figure
+  src="./figures/thresholds-labelings.svg"
+  alt="Five points on a number line with a dashed candidate threshold theta between the second and third point; the five points cut the theta-axis into six shaded intervals, the label vector minus minus plus plus plus produced by this theta is printed under the points, and the summary counts uncountably many hypotheses but only 6 of 32 conceivable label vectors"
+  caption="The repair in one picture: uncountably many thresholds, six behaviors. The count that matters lives on the sample, not in the class."
+/>
+
+## Exercises
+
+<Exercise>
+One class size, two jobs — and the first question is which theorem applies. Both jobs compare $|\mathcal{H}| = 10^6$ candidate rules at target $\varepsilon = 0.05$, $\delta = 0.01$. (a) The candidates are decoding tables for a proprietary file format, and the format's own encoder generated the labels; its exact inverse sits somewhere in the set, so one candidate scores zero on every example. Decide which guarantee governs this job, then compute the certifying sample size. (b) The same million candidates now predict whether a user clicks an ad, scored on logged behavior; even the best of them errs on roughly one case in five. Which guarantee now, and how many samples? (c) The click dataset has $n = 10{,}000$ rows; invert the bound you chose in (b) for the tolerance it guarantees.
+
+<Solution>
+(a) "Some candidate has zero risk" is realizability, so the misleading-samples bound applies:
+$$
+n \ge \frac{\ln(|\mathcal{H}|/\delta)}{\varepsilon} = \frac{\ln 10^6 + \ln 100}{0.05} = \frac{13.82 + 4.61}{0.05} = 369.
+$$
+
+(b) A best-in-class error near 20% rules realizability out; only the agnostic uniform-convergence bound is available:
+$$
+n \ge \frac{\ln(2|\mathcal{H}|/\delta)}{2\varepsilon^2} = \frac{\ln(2\times10^8)}{0.005} = \frac{19.11}{0.005} = 3{,}823,
+$$
+about ten times the price of (a) — the $1/2\varepsilon$ factor between the two exponents, evaluated at $\varepsilon = 0.05$.
+
+(c) $\varepsilon = \sqrt{\ln(2|\mathcal{H}|/\delta)/(2n)} = \sqrt{19.11/20{,}000} = 0.031$.
+
+Reading: guarding a million comparisons at once costs surprisingly little ($\ln 10^6 \approx 14$), and 10,000 rows buy a uniform ±3.1 points. The winner of either comparison inherits its guarantee because it was in the guarded set before the data was seen; the same number computed after an unguarded search means nothing, which is the coins trap restated.
+</Solution>
+</Exercise>
+
+<Exercise>
+An infinite class, learned directly. Let $\mathcal{X} = \mathbb{R}^2$ and $\mathcal{H} = \{ h_r : r \ge 0 \}$ with $h_r(x) = \mathbf{1}[\lVert x \rVert \le r]$, concentric circles. Assume realizability: labels come from some $h_{r^*}$. Take the ERM that returns the smallest consistent radius, $\hat{r} = \max\{ \lVert x_i \rVert : y_i = 1 \}$ (and $\hat{r} = 0$ if there are no positives). Prove that $n \ge \tfrac{1}{\varepsilon}\ln\tfrac{1}{\delta}$ samples suffice for $\Pr(R(h_{\hat r}) > \varepsilon) \le \delta$, with no class size anywhere in the bound. Write down what plays the role of the "bad hypotheses" before opening.
+
+<Solution>
+Strategy: rerun the misleading-samples argument, but notice the infinitely many bad hypotheses form one nested family, so a single event replaces the union.
+
+Since every positive example satisfies $\lVert x_i \rVert \le r^*$, always $\hat{r} \le r^*$, and $h_{\hat r}$ errs only on the annulus $\{x : \hat{r} < \lVert x \rVert \le r^* \}$ (false negatives only). Write $g(r) = \Pr(r < \lVert X \rVert \le r^*)$, a decreasing, right-continuous function of $r$; the risk of the output is exactly $g(\hat{r})$. If $g(0) \le \varepsilon$ the risk is at most $\varepsilon$ automatically, so assume $g(0) > \varepsilon$ and set $r_\varepsilon = \inf\{r : g(r) \le \varepsilon\}$. Right-continuity gives $g(r_\varepsilon) \le \varepsilon$, and by the infimum property the closed annulus $A = \{x : r_\varepsilon \le \lVert x \rVert \le r^*\}$ has mass at least $\varepsilon$.
+
+The one bad event: no training point lands in $A$ (every point of $A$ is labeled positive, since $A$ lies inside the true circle). If some sample point lands there, then $\hat{r} \ge r_\varepsilon$, so the risk is $g(\hat{r}) \le g(r_\varepsilon) \le \varepsilon$. Hence
+$$
+\Pr\big(R(h_{\hat r}) > \varepsilon\big) \le \Pr(\text{no sample point in } A) \le (1-\varepsilon)^n \le e^{-\varepsilon n} \le \delta
+$$
+when $n \ge \ln(1/\delta)/\varepsilon$.
+
+The role of $\mathcal{H}_B$ is played by the single annulus $A$: all the infinitely many bad hypotheses ($r < r_\varepsilon$) are ruled out by the same sample point, so the union over them collapses to one term. This is the first sighting of the next lesson's theme: what matters is not how many hypotheses exist but how many genuinely different ways they can fail on a sample.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe, both ends of the class-size dial, at $\varepsilon = 0.05$, $\delta = 0.01$. (a) $|\mathcal{H}| = 1$: what do the union bound and the finite-class machinery contribute, what sample size certifies the single model, and which module-5 practice is this? (b) $\mathcal{H}$ = all functions on a finite domain with $|\mathcal{X}| = 20$: compute the uniform-convergence sample size, then reconcile it with No Free Lunch, which seems to forbid learning this class.
+
+<Solution>
+(a) With one hypothesis the union bound is the identity and the class machinery evaporates: Hoeffding alone gives $n \ge \ln(2/\delta)/(2\varepsilon^2) = \ln 200 / 0.005 = 1{,}060$. This is the fresh-test-set protocol of <Ref lesson="cross-validation-bootstrap">module 5</Ref>: one prespecified model, untouched holdout: the only setting where "no theory needed" is actually true, because the theory reduces to one concentration inequality.
+
+(b) All functions on 20 points: $|\mathcal{H}| = 2^{20}$, $\ln|\mathcal{H}| = 13.86$, so $n \ge (13.86 + \ln 200)/0.005 = 3{,}832$. Perfectly finite and non-vacuous: with ~3,800 samples you see each of the 20 domain points about 190 times and estimate all 20 conditional label probabilities; "learning all functions" on a small finite domain is just frequency estimation. No Free Lunch is not contradicted, because its hypothesis is $n < |\mathcal{X}|/2 = 10$: invert the bound at $n = 9$ and the guaranteed tolerance is $\varepsilon = \sqrt{(13.86 + \ln 200)/18} \approx 1.03$, so the bound promises nothing at all in NFL's regime. The two theorems meet exactly at their boundaries: below $|\mathcal{X}|/2$ samples, no guarantee is possible (NFL); with enough samples to see the domain many times over, the "unlearnable" class becomes an estimation problem. NFL has teeth precisely when the domain dwarfs the sample, which for 256-pixel images ($|\mathcal{X}| = 2^{256}$) is always.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "We measured 2% error on $10^6$ test examples, so future error is $2\% \pm 0.1\%$ — no learning theory needed." Name the hidden hypothesis-selection in a typical project, state the condition under which the naive reading becomes valid, and check whether the claimed $\pm 0.1\%$ survives even then at 99% confidence.
+
+<Solution>
+The hidden selection: in a real project the reported model was chosen using the test data, directly (picking the best of several architectures by test score) or slowly (months of decisions steered by repeated test-set peeks). Either way the reported number is the minimum of many fluctuating estimates (the best-looking coin), and Hoeffding's premise, a hypothesis fixed before the sample, is false. The failure step is not the arithmetic but the pretense that $h$ and $S$ are independent; with $K$ effective comparisons the deviation probability inflates by up to $K$, and $K$ is usually unknown and large.
+
+The valid setting: one prespecified model, a fresh test set never used for any decision, iid draws from the deployment distribution. Then Hoeffding applies with $|\mathcal{H}| = 1$: at $n = 10^6$, $\delta = 0.01$, the guarantee is $\varepsilon = \sqrt{\ln 200/(2\times10^6)} = 0.0016$: ±0.16 points, so even in the clean setting the claimed ±0.1 slightly overreaches (it would need $n \ge \ln 200/(2\times 0.001^2) = 2.65\times10^6$). And all of it is conditional on iid: if the deployed distribution drifts from the test distribution, no sample size rescues the number. The claim's spirit is right in exactly one configuration, and module 5's protocols exist to put projects into it.
+</Solution>
+</Exercise>
+
+<Exercise>
+Price a blunder from the record. <Ref lesson="wrong-way-cv">The wrong-way pipeline</Ref> reported roughly 3% error on a problem whose true risk is 50%. From memory (check against that lesson only afterwards): how many candidate features did the screening step inspect, how many did it keep, and how many labels did it use? Treat the screen as choosing one hypothesis from the class of all feature subsets of that shape. (a) Compute $\ln|\mathcal{H}|$. (b) Decide which of this lesson's two finite-class bounds applies to the pipeline's situation, then compute the tolerance $\varepsilon$ it can certify at the pipeline's sample size with $\delta = 0.05$, and interpret. (c) How many samples would honest uniform convergence over this selection class require at $\varepsilon = 0.1$?
+
+<Solution>
+The setup to recall: the screen ranked 5,000 features and kept the best 100, using all $n = 50$ labels before any split — so the selection class is the $\binom{5000}{100}$ feature subsets.
+
+(a) $\ln\binom{5000}{100} = 487$ (Stirling: $\approx 100(\ln 50 + 1) = 491$, exact 487.0): the screen quietly searched a class of $e^{487}$ hypotheses.
+
+(b) With true risk at 50%, no candidate comes near zero risk, so realizability fails and only the agnostic uniform-convergence bound applies: $\varepsilon = \sqrt{(487 + \ln 40)/(2 \cdot 50)} = \sqrt{4.91} = 2.2$. The certified tolerance exceeds the entire $[0,1]$ range of the loss: at $n = 50$ the theory can promise nothing about a quantity selected from this class, so an observed 47-point gap between reported and true error is fully consistent with the bounds; the blunder is not merely explained but priced. Selection over $e^{487}$ candidates with 50 samples is exactly the 1,000-coins experiment scaled up until certainty of self-deception.
+
+(c) $n \ge (487 + \ln 40)/(2 \times 0.01) = 24{,}534$: roughly 500 times the data the pipeline had. The two honest escapes are the ones module 5 prescribed: shrink the class to what the data can guard, or move the selection inside the folds so the reported number is computed on data the selection never saw ($|\mathcal{H}| = 1$ per fold, part (a) of the previous exercise).
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: bound versus reality on the spam filter. <Ref lesson="spam-filter">The logistic spam model</Ref> has 58 coefficients (57 features plus intercept) and was fitted on 3,065 messages. Discretize each coefficient to 8 bits. (a) Compute $\ln|\mathcal{H}|$ and the uniform-convergence tolerance $\varepsilon$ at $n = 3{,}065$, $\delta = 0.05$. (b) The measured test error is 5.9% and the train–test gap on this data is on the order of one point; state the factor by which the bound overshoots the observed gap. (c) Recompute at 16 bits per coefficient and draw the honest conclusion about the discretization trick. State your acceptance criterion before computing: what overshoot factor would make you call the bound "loose but informative" versus "vacuous in practice"?
+
+<Solution>
+(a) $\ln|\mathcal{H}| = 58 \times 8 \times \ln 2 = 321.6$. Then $\varepsilon = \sqrt{(321.6 + \ln 40)/(2 \times 3065)} = \sqrt{0.0531} = 0.230$: the bound certifies that every discretized coefficient vector's training error is within **23 points** of its risk.
+
+(b) The observed train–test gap is roughly 1 point, so the bound overshoots by a factor of about 20. Against a reasonable criterion (say, "informative" within 3×, "vacuous" beyond 10×), this bound is vacuous as a predictor of the gap, while being perfectly true.
+
+(c) At 16 bits: $\ln|\mathcal{H}| = 643$, $\varepsilon = 0.325$. The certified tolerance grew by 40% because the storage format changed, with the statistical problem untouched: the discretization trick measures the description, not the difficulty. Three morals carry forward: finite-class bounds are worst-case over all distributions and all classes of the same size, and the spam distribution is far kinder than the worst case; the class that matters is not "all 8-bit coefficient vectors" but the far smaller set the fitting procedure can actually reach; and quantifying exactly this looseness, bound by bound, is the closing business of <Ref lesson="bounds-vs-practice">this module's final lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Five points sit on the line at $x = 1, 2, 3, 4, 5$. The threshold class $\{\operatorname{sign}(x - \theta) : \theta \in \mathbb{R}\}$ is infinite. Count exactly how many distinct label vectors $(h(1), \dots, h(5))$ it can produce, list them, and compare with the $2^5 = 32$ conceivable labelings. Then compute the same count for $n$ points in general position.
+
+<Solution>
+Sliding $\theta$ from below 1 to above 5, the label vector changes only when $\theta$ crosses a data point: $(+,+,+,+,+)$, $(-,+,+,+,+)$, $(-,-,+,+,+)$, $(-,-,-,+,+)$, $(-,-,-,-,+)$, $(-,-,-,-,-)$: exactly **6** of the 32 conceivable labelings. In general, $n$ distinct points cut the $\theta$-axis into $n+1$ intervals, every $\theta$ in one interval produces the same label vector, and different intervals produce different vectors: $n+1$ labelings out of $2^n$. An uncountably infinite class, restricted to what it can do on this sample, collapses to $n+1$ behaviors.
+
+That count is the *growth function* of the class, and it is the quantity that replaces $|\mathcal{H}|$ in the union bound: 6 effective hypotheses, not infinitely many, is what the sample can distinguish, and $\ln 6$, not $\ln \infty$, is what concentration should pay for. Making that replacement rigorous (it needs a symmetrization trick, because the 6 behaviors depend on the sample) and characterizing when the growth function stays polynomial is <Ref lesson="vc-dimension">the next lesson</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Ch. 2: the realizable finite-class bound (Cor. 2.3) and the misleading-samples proof recreated in this lesson's figure (Fig. 2.1); Ch. 3: the PAC and agnostic PAC definitions (Defs. 3.1, 3.3); Ch. 4: uniform convergence, Hoeffding, the agnostic bound (Cor. 4.6), and the discretization trick (Remark 4.1); Ch. 5: the No Free Lunch theorem (Thm. 5.1) with the averaging proof followed here, and the error decomposition (Eq. 5.7); Appendix B: the full proof of Hoeffding's inequality. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+2. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — Ch. 2: the same bounds with explicit constants (Thms. 2.5, 2.13), the conjunctions-from-149-examples computation (Ex. 2.6), the log₂|H|-as-bits reading and Occam discussion (§2.3), and the k-term-DNF/k-CNF representation-dependence pair (Exs. 2.8–2.9); Appendix D: concentration inequalities. Free online: https://cs.nyu.edu/~mohri/mlbook/
+3. W. Hoeffding, "Probability Inequalities for Sums of Bounded Random Variables," *Journal of the American Statistical Association* 58(301), 1963 — the source of the concentration inequality, including the KL-divergence form the starred section derives for the Bernoulli case. https://doi.org/10.1080/01621459.1963.10500830
+4. L. G. Valiant, "A Theory of the Learnable," *Communications of the ACM* 27(11), 1984 — the founding PAC paper; Valiant's original definition also demands polynomial runtime, the computational thread the starred DNF/CNF section samples. https://doi.org/10.1145/1968.1972
+5. D. H. Wolpert, "The Lack of A Priori Distinctions Between Learning Algorithms," *Neural Computation* 8(7), 1996 — the original no-free-lunch results for supervised learning, stated in a different (off-training-set) framework than the SSBD version proved here.
+6. A. Ng, T. Ma, *CS229 Lecture Notes*, Stanford, 2023 — Ch. 8: the finite-class analysis with the same Hoeffding-plus-union-bound structure, a second presentation of this lesson's core argument.
+7. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §5.4.4: the finite-class bound in two displays, and its placement next to cross-validation as the analytic alternative to resampling. Free online: https://probml.github.io/pml-book/book1.html
+</References>

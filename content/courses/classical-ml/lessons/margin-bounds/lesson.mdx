@@ -1,0 +1,363 @@
+Two facts the course left unexplained — a kernel SVM working in an infinite-dimensional feature space, and AdaBoost's test error falling for hundreds of rounds after training error reaches zero — have the same explanation, and it is the margin.
+
+This module has climbed a ladder of capacity measures: Hoeffding plus a union bound for finite classes, VC dimension for infinite ones, then <Ref lesson="rademacher-stability">Rademacher complexity and stability</Ref>, which left two tools loaded (the norm-ball bound $r\Lambda/\sqrt{n}$ and Talagrand's contraction lemma) and a promise to spend them here. What stands open is exactly the two debts the methods module wrote: the RBF machine that should memorize and does not, and the boosted ensemble that keeps improving after there is nothing left to fit. This lesson proves the margin bounds that pay both, from the same two tools, and closes with what the theory honestly does not deliver. The route: the margin loss and the master margin bound; the SVM corollary with no dimension in it, priced on real data; the convex-hull lemma and the ensemble bound with no round count in it; the theorem that AdaBoost manufactures margins; then the counterexamples that mark the theory's edge.
+
+## Two debts, one suspect
+
+<Task>
+Three retrievals before the new machinery, closed book. (1) From <Ref lesson="rademacher-stability">the previous lesson</Ref>: the empirical Rademacher complexity of the ball $\{x \mapsto \langle w, x\rangle : \lVert w\rVert \le \Lambda\}$ on a sample of radius $r$, and its kernel form in $\operatorname{Tr}[K]$. (2) Same lesson: what composing every hypothesis with one fixed $c$-Lipschitz function does to $\widehat{\mathfrak{R}}_S$. (3) From <Ref lesson="adaboost">the AdaBoost lesson's forward exercise</Ref>: the definition of a training point's normalized margin, and what 800 extra rounds did to the smallest ones. Check below.
+</Task>
+
+<Aside>
+Answers: (1) $\widehat{\mathfrak{R}}_S \le r\Lambda/\sqrt{n}$, and $\Lambda\sqrt{\operatorname{Tr}[K]}/n$ for a kernel class; no dimension in either. (2) Contraction: at most multiplies it by $c$. (3) $y_i F(x_i)/\sum_t \alpha_t \in [-1,1]$; between rounds 200 and 1,000 the minimum rose from $0.040$ to $0.080$ while the median slipped: the low tail, not the bulk, is what late rounds move.
+</Aside>
+
+The two debts, restated with their numbers. <Ref lesson="svm-dual-kernels">Module 4's kernel lesson</Ref> fitted an RBF-SVM on 64 ring-and-disk points: an infinite-dimensional feature space, capacity that every counting argument calls unbounded, and a measured test error of 3.9%. <Ref lesson="adaboost">Module 7's AdaBoost lesson</Ref> boosted depth-4 trees to zero training error by round 105 and then watched the test error fall for 895 more rounds, 10.9% to 9.0%, while the ensemble's VC dimension grew linearly in $T$. Both are one failure: <Ref lesson="vc-dimension">the VC bound</Ref> prices which class was searched, and by that price both models are bankrupt.
+
+<Figure
+  src="./figures/debts-restated.svg"
+  alt="Two small panels: the kernel lesson's broken-axis U-curve with a question mark at infinite dimension and test error 3.9%, and the AdaBoost lesson's training and test curves with training at zero from round 105 and test still falling; a bracket joins both to one box reading: the margin"
+  caption="The debts side by side. Capacity says overfit; the record says otherwise, twice. One quantity, measured on the fit rather than the class, will answer both."
+/>
+
+The repair changes the question. Both models do not merely fit their samples; they fit them confidently: every ring point sits far from the fitted boundary in score, and every training margin of the boosted ensemble is strictly positive and growing. The bounds of this lesson charge for confidence demanded, not for functions available, and confidence is a property of the fitted score. The next section builds the loss that measures it.
+
+## The margin loss: a ramp between two step functions
+
+The object every bound in this lesson runs on is the *confidence margin* $y\,h(x)$ of a real-valued score $h$ at a labeled point: positive when $h$ classifies $(x, y)$ correctly, with $|h(x)|$ as the confidence. It is the same product <Ref lesson="svm-max-margin">module 4 called the functional margin</Ref>, now applied to any real-valued hypothesis, kernel machines and voting ensembles alike, with no separability assumed. A loss on this quantity has to do two jobs at once: dominate the 0–1 error, so that bounding it bounds the risk, and stay Lipschitz, so that contraction can price it. A step function does the first job and fails the second; the hinge does the second and is unbounded. The ramp between them does both.
+
+<Example title="one score table, three losses">
+Five training points with confidence margins $y_i h(x_i) = -0.4,\ 0.1,\ 0.35,\ 0.8,\ 1.2$, and margin level $\rho = 0.5$.
+
+The 0–1 error counts one miss: $1/5 = 0.20$. The *ramp* at level $\rho$ charges $1$ for the miss, $1 - 0.1/0.5 = 0.8$ and $1 - 0.35/0.5 = 0.3$ for the two low-confidence hits, and $0$ for the two margins above $0.5$: mean $2.1/5 = 0.42$. The threshold count $\frac1n\#\{i : y_i h(x_i) \le \rho\}$ charges the miss and both low-confidence hits fully: $3/5 = 0.60$. The three values nest, $0.20 \le 0.42 \le 0.60$, and they always do: the ramp sits between the 0–1 step and the $\rho$-threshold step pointwise.
+</Example>
+
+<Definition title="ρ-margin loss and empirical margin loss (Mohri Defs. 5.5–5.6)">
+For $\rho > 0$, the **$\rho$-margin loss** applied to a confidence margin $u = y\,h(x)$ is
+$$
+\Phi_\rho(u) \;=\; \begin{cases} 1 & u \le 0 \\ 1 - u/\rho & 0 \le u \le \rho \\ 0 & u \ge \rho. \end{cases}
+$$
+The **empirical margin loss** of $h$ on the sample $S$ at level $\rho$ is $\widehat{R}_{S,\rho}(h) = \frac{1}{n}\sum_{i=1}^n \Phi_\rho\big(y_i h(x_i)\big)$.
+</Definition>
+
+<Figure
+  src="./figures/margin-loss-sandwich.svg"
+  alt="The zero-one step, the ramp at level rho, and the hinge plotted against the confidence margin; the ramp is annotated with its two roles: it dominates the zero-one loss on the left and its slope minus one over rho is the Lipschitz constant contraction will charge"
+  caption="The sandwich 1(u ≤ 0) ≤ Φρ(u) ≤ 1(u ≤ ρ). Left of zero the ramp counts every error; the slope −1/ρ is the price contraction charges."
+/>
+
+Two properties carry everything. **Domination**: $\mathbf{1}_{u \le 0} \le \Phi_\rho(u) \le \mathbf{1}_{u \le \rho}$, so the true risk is at most the expected ramp loss, and the empirical ramp loss is at most the fraction of training points with margin $\le \rho$, the readable form the boosting figures use. **Lipschitzness**: $\Phi_\rho$ has slope at most $1/\rho$ in absolute value, so composing a hypothesis class with $\Phi_\rho$ costs a factor $1/\rho$ under <Ref lesson="rademacher-stability">contraction</Ref>; steeper demands, bigger capacity charge. The 0–1 loss is the $\rho \to 0$ limit and has no finite Lipschitz constant, which is exactly why the module's earlier bounds had to price the whole class instead.
+
+<Exercise>
+The paired computation: for the same five margins, evaluate $\widehat{R}_{S,\rho}$ at $\rho = 0.1$ and at $\rho = 2$, and state what the two values, together with $0.42$ at $\rho = 0.5$, show about $\rho \mapsto \widehat{R}_{S,\rho}(h)$.
+
+<Solution>
+At $\rho = 0.1$: the miss contributes $1$; the margin $0.1$ sits exactly at $\rho$, so $\Phi_\rho(0.1) = 0$; the rest are above $\rho$. Loss $= 1/5 = 0.20$, equal to the 0–1 error here.
+
+At $\rho = 2$: every margin is below $\rho$, so all five ramp values are positive: $1,\ 1 - 0.05 = 0.95,\ 1 - 0.175 = 0.825,\ 1 - 0.4 = 0.6,\ 1 - 0.6 = 0.4$; mean $3.775/5 = 0.755$.
+
+The three values $0.20,\ 0.42,\ 0.755$ increase in $\rho$, and always do: $\Phi_\rho(u)$ is nondecreasing in $\rho$ pointwise. Demanding more confidence can only cost more, and as $\rho$ falls to $0$ the loss falls to the plain training error (when no margin is exactly zero). The bound of the next section trades this increasing term against a capacity term that decreases in $\rho$.
+</Solution>
+</Exercise>
+
+## The margin bound: confidence buys a certificate
+
+The pieces assemble into the module's master margin bound in five lines, because every hard step was proved last lesson. The theorem is uniform over the class: it holds simultaneously for every $h$, including the one the algorithm picked by looking at the data, the selection charge the <Ref lesson="learning-theory">1,000-coins experiment</Ref> made mandatory.
+
+<Theorem title="margin bound for binary classification (Koltchinskii &amp; Panchenko 2002; Mohri Thm. 5.8)">
+Let $\mathcal{H}$ be a set of real-valued functions and fix $\rho > 0$. For any $\delta > 0$, with probability at least $1 - \delta$ over an iid sample $S$ of size $n$, every $h \in \mathcal{H}$ satisfies
+$$
+R(h) \;\le\; \widehat{R}_{S,\rho}(h) \;+\; \frac{2}{\rho}\,\mathfrak{R}_n(\mathcal{H}) \;+\; \sqrt{\frac{\ln(1/\delta)}{2n}},
+$$
+and likewise with $\frac{2}{\rho}\widehat{\mathfrak{R}}_S(\mathcal{H})$ in place of the middle term at the cost of $3\sqrt{\ln(2/\delta)/2n}$.
+
+<Proof>
+Roadmap: apply the master Rademacher bound to the ramp-composed class, then strip the ramp with contraction and the labels with a symmetry.
+
+Let $\widetilde{\mathcal{H}} = \{(x,y) \mapsto y\,h(x) : h \in \mathcal{H}\}$ and consider $\Phi_\rho \circ \widetilde{\mathcal{H}}$, a family with values in $[0,1]$. <Ref lesson="rademacher-stability">The master bound (Mohri Thm. 3.3)</Ref> gives, with probability $1-\delta$, for all $h$:
+$$
+\mathbb{E}\big[\Phi_\rho(y\,h(x))\big] \;\le\; \widehat{R}_{S,\rho}(h) + 2\,\mathfrak{R}_n\big(\Phi_\rho \circ \widetilde{\mathcal{H}}\big) + \sqrt{\frac{\ln(1/\delta)}{2n}}.
+$$
+The left side dominates $R(h)$, since $\mathbf{1}_{u \le 0} \le \Phi_\rho(u)$. For the middle term, $\Phi_\rho$ is $\frac1\rho$-Lipschitz, so <Ref lesson="rademacher-stability">Talagrand's contraction lemma</Ref> gives $\mathfrak{R}_n(\Phi_\rho \circ \widetilde{\mathcal{H}}) \le \frac{1}{\rho}\mathfrak{R}_n(\widetilde{\mathcal{H}})$. Finally the labels vanish: $\sigma_i\, y_i$ is distributed exactly as $\sigma_i$ (each $y_i = \pm 1$ is a fixed sign the symmetric $\sigma_i$ absorbs), so
+$$
+\mathfrak{R}_n(\widetilde{\mathcal{H}}) = \frac1n\,\mathbb{E}\Big[\sup_h \sum_i \sigma_i\, y_i\, h(x_i)\Big] = \mathfrak{R}_n(\mathcal{H}).
+$$
+The empirical variant substitutes the empirical form of the master bound.
+</Proof>
+</Theorem>
+
+The two terms pull against each other in $\rho$: raising the demanded confidence shrinks the capacity charge by $1/\rho$ and grows the loss term, which counts every training point below the demand. The certificate is strong exactly when both stay small at once: a large $\rho$ that few training points violate. Whether such a $\rho$ exists is a property of the fitted score on the data, not of the theorem.
+
+<Remark title="choosing ρ after looking (Mohri Thm. 5.9)">
+As stated, $\rho$ must be fixed before the sample is drawn (the same fine print as every certificate in this module). The theorem generalizes to hold uniformly over all $\rho \in (0, r]$ at the price of a term $\sqrt{\log\log_2(2r/\rho)/n}$, by a union bound over the geometric grid $\rho_k = r/2^k$: doubling coarseness costs a doubly-logarithmic factor, so quoting the margin the fit actually achieved is legitimate. The evaluations below use the fixed-$\rho$ form and say so.
+</Remark>
+
+<KeyFact>
+Everything that follows — SVM, kernel, ensemble — is this one bound with a different $\mathfrak{R}_n(\mathcal{H})$ plugged in; the two debts differ only in the plug-in. And $\rho$ is the one term the algorithm, not the class, controls: each half of the payment below is a capacity computation plus a statement about the margins the fitted model actually achieved.
+</KeyFact>
+
+## Debt 1 paid: the kernel bound with no dimension in it
+
+The first debt names its own plug-in. The SVM searches a norm ball, and <Ref lesson="rademacher-stability">the previous lesson computed that ball's capacity</Ref> in four lines: $r\Lambda/\sqrt{n}$, with no dimension anywhere. Substituting it into the margin bound produces the corollary the debt note carried.
+
+<FigureSequence
+  name="bound-assembly"
+  alt="Four frames assembling the SVM margin bound: the norm-ball capacity brick from the previous lesson, the contraction factor two over rho wrapping it, the ramp-loss and concentration terms completing the inequality, and the assembled bound evaluated on the ring data giving 0.35 at n equal to 2000"
+  caption="The bound assembled from parts the module already owns — the norm-ball capacity, the 2/ρ contraction price, the loss and concentration terms — then made to output a number on the ring data."
+/>
+
+<Theorem title="margin bound for norm-bounded linear and kernel hypotheses (Mohri Cor. 5.11, Cor. 6.13)">
+Let $K$ be a PDS kernel with $K(x,x) \le r^2$, feature map $\Phi$, and $\mathcal{H} = \{x \mapsto \langle w, \Phi(x)\rangle : \lVert w\rVert \le \Lambda\}$. Fix $\rho > 0$. With probability at least $1-\delta$, for every $h \in \mathcal{H}$:
+$$
+R(h) \;\le\; \widehat{R}_{S,\rho}(h) \;+\; 2\sqrt{\frac{r^2\Lambda^2/\rho^2}{n}} \;+\; \sqrt{\frac{\ln(1/\delta)}{2n}},
+\qquad
+R(h) \;\le\; \widehat{R}_{S,\rho}(h) \;+\; \frac{2\sqrt{\operatorname{Tr}[K]\,\Lambda^2/\rho^2}}{n} \;+\; 3\sqrt{\frac{\ln(2/\delta)}{2n}}.
+$$
+
+<Proof>
+Insert $\widehat{\mathfrak{R}}_S(\mathcal{H}) \le \Lambda\sqrt{\operatorname{Tr}[K]}/n \le \sqrt{r^2\Lambda^2/n}$ (<Ref lesson="rademacher-stability">Mohri Thms. 5.10 and 6.12, proved last lesson</Ref>) into the two forms of the margin bound.
+</Proof>
+</Theorem>
+
+No feature dimension appears in either inequality. The capacity is the norm budget $\Lambda$, the data radius through $r$ or $\operatorname{Tr}[K]$, and the demanded confidence $\rho$: the three quantities the fitted machine actually committed to. This is the formula on <Ref lesson="svm-dual-kernels">the debt note</Ref>, now proved; its one-sentence ancestor is the pre-Rademacher bound ESL quotes (§12.3.8), $h \le r^2\Lambda^2$ for the VC dimension of margin-$1$ hyperplanes within a radius-$r$ ball, the same three quantities routed through counting.
+
+### The bound made to output numbers
+
+Every symbol is measurable on a fitted machine, so the bound can be evaluated.
+
+<Example title="the certificate priced on the ring data">
+Computed for this lesson: an RBF-SVM ($\gamma = 1$, $C = 1$, dual coordinate ascent) on ring-and-disk data at three sample sizes, with $r = 1$ from the kernel diagonal, $\Lambda = \sqrt{\alpha^\top Q\, \alpha} = \lVert w\rVert_{\mathbb H}$ read off each solution, and $\rho = 1$, the canonical functional margin, fixed in advance. At $\delta = 0.05$, using the empirical form (capacity $2\Lambda/\sqrt n$, concentration $3\sqrt{\ln(2/\delta)/2n}$):
+
+| $n$ | $\Lambda$ | $\widehat{R}_{S,1}$ | capacity | concentration | bound |
+|---|---|---|---|---|---|
+| $200$ | $4.9$ | $0.005$ | $0.69$ | $0.29$ | $\le 0.99$ |
+| $1{,}000$ | $5.7$ | $0.000$ | $0.36$ | $0.13$ | $\le 0.49$ |
+| $2{,}000$ | $5.8$ | $0.000$ | $0.26$ | $0.09$ | $\le 0.35$ |
+
+The margin-loss column counts violations of the demanded confidence: one training point of 200 dips below $\rho = 1$ at $n = 200$, none after. The fit itself has stopped changing — 44 support vectors from $n = 1{,}000$ on, $\Lambda$ moving only $5.7 \to 5.8$ — while the measured test error at $n = 2{,}000$ is zero on 2,000 fresh points.
+</Example>
+
+So the certificate genuinely shrinks like $1/\sqrt n$: loose by orders of magnitude against the measured error, but **finite and sample-driven** where the VC bound reads infinity at every $n$.
+
+### Why this does not contradict the lower bounds
+
+<Ref lesson="vc-dimension">The fundamental theorem's lower bound</Ref> says that for any learner over a class of VC dimension $d$ some distribution forces error $\Omega(\sqrt{d/n})$; $d$ is infinite here, so from that side one would expect no distribution-free guarantee at all. There is none, and the corollary does not offer one. On the bad distributions the lower bound constructs, no large margin is achievable: $\widehat{R}_{S,\rho}$ is large for every useful $\rho$, and the corollary goes vacuous exactly there (Mohri §5.4's resolution). The bound is distribution-independent as a statement, but the favorable margin it hinges on is distribution-dependent: the guarantee is unconditional, the condition for it to bite is not.
+
+<KeyFact>
+The quantifier is the payment. The guarantee never covers the ambient infinite-dimensional class; it covers the ball $\lVert w\rVert \le \Lambda$ and the confidence $\rho$ the fitted machine actually used, both measurable after training. Debt 1 is paid in the currency of the fit, not of the class.
+</KeyFact>
+
+## Debt 2, first half: the convex hull is free
+
+The second debt is owed by a different geometry. AdaBoost's output $f = \sum_t \alpha_t h_t$ has nonnegative weights, and its scale is arbitrary ($\operatorname{sign} f$ ignores $\lVert\alpha\rVert_1$), so the natural normalized object is $\bar f = f / \lVert\alpha\rVert_1$, whose confidence margin $y\bar f(x)$ is exactly <Ref lesson="adaboost">the normalized margin the AdaBoost lesson's forward exercise computed</Ref>, a number in $[-1, 1]$. Mohri's Definition 7.3 calls the same quantity the *$L_1$-geometric margin*, and the name marks a real geometric difference from the SVM's.
+
+Both margins are instances of one formula, $|{\alpha \cdot h(x)}|/\lVert\alpha\rVert_p$, read in the space whose coordinates are the base-hypothesis values $h(x) = (h_1(x), \dots, h_T(x))$. The SVM normalizes in $\ell_2$, and its margin is the Euclidean distance from $h(x)$ to the separating hyperplane; boosting normalizes in $\ell_1$, and its margin is the $\ell_\infty$ distance: the widest axis-aligned slab, not the widest corridor. The two norms select different extreme hyperplanes on the same data, which is why SVM intuition transfers to boosting only through the theorems, not through the pictures.
+
+<Figure
+  src="./figures/l1-l2-margins.svg"
+  alt="Two panels with the same two-class points: the left normalizes the weight vector in the l2 norm and shades a Euclidean margin corridor; the right normalizes in the l1 norm and shades the l-infinity slab, selecting a different hyperplane"
+  caption="One point set, two norms (after Mohri Fig. 7.6). The ℓ2 ball buys Euclidean distance; the ℓ1 ball buys ℓ∞ distance, and the optimal hyperplanes differ."
+/>
+
+The normalized ensemble lives in the *convex hull* of the base class,
+$$
+\operatorname{conv}(\mathcal{H}) = \Big\{ \textstyle\sum_{k=1}^{p} \mu_k h_k \;:\; p \ge 1,\ \mu_k \ge 0,\ \sum_k \mu_k = 1,\ h_k \in \mathcal{H} \Big\},
+$$
+and $\bar f$ qualifies: its weights $\alpha_t/\lVert\alpha\rVert_1$ are nonnegative and sum to one. The hull is an infinite enlargement of $\mathcal{H}$ (each $h$ is the $p = 1$ mixture): from a class of 400 stumps one would expect the set of all their convex mixtures to be vastly richer, and the module's own monotonicity fact (a supremum over a superset never decreases) guarantees the capacity cannot drop. The lemma below says it does not rise either.
+
+<Theorem title="the convex hull adds nothing (after Mohri Lem. 7.4)">
+For any class $\mathcal{H}$ of real-valued functions and any sample $S$,
+$$
+\widehat{\mathfrak{R}}_S\big(\operatorname{conv}(\mathcal{H})\big) \;=\; \widehat{\mathfrak{R}}_S(\mathcal{H}).
+$$
+
+<Proof>
+Fix a sign vector $\sigma$ and expand the supremum over the hull:
+$$
+\sup_{\substack{h_1,\dots,h_p \in \mathcal{H} \\ \mu \ge 0,\ \sum_k \mu_k = 1}} \sum_{i=1}^n \sigma_i \sum_{k=1}^p \mu_k h_k(x_i)
+\;=\; \sup_{h_1,\dots,h_p \in \mathcal{H}}\ \sup_{\mu \ge 0,\ \sum_k \mu_k = 1}\ \sum_{k=1}^p \mu_k \Big(\sum_{i=1}^n \sigma_i h_k(x_i)\Big).
+$$
+The inner problem is linear in $\mu$ over the probability simplex, and a linear function on a simplex is maximized at a vertex: put all the weight on the $k$ whose bracket is largest. The inner supremum is therefore $\max_k \sum_i \sigma_i h_k(x_i)$, and maximizing that over $h_1, \dots, h_p \in \mathcal{H}$ is just $\sup_{h \in \mathcal{H}} \sum_i \sigma_i h(x_i)$. Taking $\mathbb{E}_\sigma$ of both sides finishes the proof.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/conv-hull-free.svg"
+  alt="Left: the value vectors of four base hypotheses as points with their shaded convex hull, dashed level lines of the noise functional sigma, and the maximizing vertex highlighted; right: the equality of the two Rademacher complexities with the consequence that the number of rounds T never enters"
+  caption="The noise functional σ·g is linear, so its maximum over the hull sits at a vertex, a base hypothesis. Mixing buys expressiveness and costs no capacity."
+/>
+
+The reason is one sentence: Rademacher complexity is a supremum of a linear functional of the hypothesis's value vector, and linear functionals take their maxima at extreme points, which are the base hypotheses themselves. Averaging can express functions no stump can (the whole point of boosting), but against any single noise draw, no mixture ever beats the best vertex. The simplex constraint $\sum_k \mu_k = 1$ is load-bearing: Mohri states the lemma for the larger hull $\lVert\mu\rVert_1 \le 1$, where $\mu = 0$ is also a vertex and the inner supremum becomes $\max\big(0, \max_k \sum_i \sigma_i h_k(x_i)\big)$ — for a class whose supremum goes negative on some draws (a singleton $\mathcal{H} = \{h\}$ already does), that extra hull is strictly more complex, and the equality needs a side condition such as $0 \in \mathcal{H}$ or closure under negation. AdaBoost's $\bar f$ has weights summing to exactly one, so the simplex form is the one the debt needs. Plugging the lemma into the margin bound gives the ensemble guarantee, and $T$ is nowhere in it: the bound for $\operatorname{conv}(\mathcal{H})$ is the bound for $\mathcal{H}$, scaled by $1/\rho$ (the derivation, with its VC-dimension form via Massart and Sauer, is the first closing exercise).
+
+<Theorem title="ensemble margin bound (Mohri Cor. 7.5)">
+Let $\mathcal{H}$ be a set of real-valued functions and fix $\rho > 0$. With probability at least $1-\delta$, for every $g \in \operatorname{conv}(\mathcal{H})$:
+$$
+R(g) \;\le\; \widehat{R}_{S,\rho}(g) \;+\; \frac{2}{\rho}\,\mathfrak{R}_n(\mathcal{H}) \;+\; \sqrt{\frac{\ln(1/\delta)}{2n}} .
+$$
+</Theorem>
+
+Applied to $\bar f$, which has the same risk as $f$ since $\operatorname{sign}$ ignores scale, the bound charges AdaBoost for its base class and the achieved margins, and for nothing else. Rounds 106 through 1,000 add terms, capacity in the VC ledger, and zero in this one. That is half the debt: growing $T$ is free. What it does not yet explain is why those rounds help, and the answer needs a theorem about what AdaBoost does to $\widehat{R}_{S,\rho}(\bar f)$.
+
+## Debt 2, second half: AdaBoost pushes the margin mass right
+
+The ensemble bound leaves one dial for the algorithm to turn: the empirical margin loss at level $\rho$, bounded by the fraction of training points with normalized margin $\le \rho$. From an algorithm derived with no mention of margins one would expect no particular effect on that fraction; the record of <Ref lesson="adaboost">the forward exercise</Ref> (every one of the ten smallest margins roughly doubled between rounds 200 and 1,000) says otherwise, and the effect is a theorem. It was proved by [Schapire, Freund, Bartlett, and Lee (1998)](https://doi.org/10.1214/aos/1024691352) in the paper that created the margin explanation; the proof below rides on the telescoping identity the <Ref lesson="adaboost">training-error theorem</Ref> already established.
+
+<Theorem title="AdaBoost drives the margin loss down (SFBL 1998, Thm. 5; Mohri Thm. 7.7)">
+Let $f = \sum_{t=1}^T \alpha_t h_t$ be AdaBoost's output after $T$ rounds, with round errors $\varepsilon_t < \tfrac12$. Then for any $\rho > 0$, the fraction of training points with normalized margin at most $\rho$ obeys
+$$
+\frac{1}{n}\,\#\big\{i : y_i \bar f(x_i) \le \rho\big\} \;\le\; 2^T \prod_{t=1}^T \sqrt{\varepsilon_t^{\,1-\rho}\,(1-\varepsilon_t)^{\,1+\rho}} .
+$$
+
+<Proof>
+Roadmap: exponentiate the indicator, reuse the weight identity, and absorb the $\rho$-shift into the per-round factors.
+
+A point has margin $\le \rho$ exactly when $y_i f(x_i) \le \rho\lVert\alpha\rVert_1$, and $\mathbf{1}_{u \le 0} \le e^{-u}$ gives
+$$
+\frac{1}{n}\sum_i \mathbf{1}_{y_i f(x_i) - \rho\lVert\alpha\rVert_1 \le 0}
+\;\le\; e^{\rho\lVert\alpha\rVert_1}\cdot \frac1n \sum_i e^{-y_i f(x_i)}
+\;=\; e^{\rho\lVert\alpha\rVert_1} \prod_{t=1}^T Z_t ,
+$$
+the equality being <Ref lesson="adaboost">the telescoping identity</Ref>: the mean exponential loss is exactly the product of the normalizers. Now distribute $e^{\rho\lVert\alpha\rVert_1} = \prod_t e^{\rho\alpha_t}$ into the product and substitute the closed forms $Z_t = 2\sqrt{\varepsilon_t(1-\varepsilon_t)}$ and $e^{\alpha_t} = \sqrt{(1-\varepsilon_t)/\varepsilon_t}$:
+$$
+e^{\rho\alpha_t} Z_t \;=\; \Big(\tfrac{1-\varepsilon_t}{\varepsilon_t}\Big)^{\rho/2} \cdot 2\sqrt{\varepsilon_t(1-\varepsilon_t)}
+\;=\; 2\sqrt{\varepsilon_t^{\,1-\rho}(1-\varepsilon_t)^{\,1+\rho}} .
+$$
+</Proof>
+</Theorem>
+
+At $\rho = 0$ the theorem is the training-error bound verbatim. The new content is $\rho > 0$: with a persistent edge $\varepsilon_t \le \frac12 - \gamma$, each factor is at most $\sqrt{(1-2\gamma)^{1-\rho}(1+2\gamma)^{1+\rho}}$, and this base is strictly below $1$ whenever $\rho < \gamma$. **The fraction of training points with margin below any level smaller than the edge decays exponentially in $T$.** Concretely, at $\gamma = 0.1$ and $\rho = 0.05$ the per-round factor is $e^{-0.0103}$: on $n = 2{,}000$ points the sub-$0.05$-margin fraction is forced to exactly zero by roughly round 740, long after training error hit zero, which a single $\gamma = 0.1$ edge achieves near round 380. The course's own run beats that schedule: recomputing <Ref lesson="adaboost">the AdaBoost lesson's χ²₁₀ experiment</Ref> (depth-4 trees, $n = 2{,}000$, training error zero from round 105) and reading off the normalized margins gives a sub-$0.05$ fraction of $0.208$ at round 5, $0.012$ at round 200, and zero by round 400.
+
+<Figure
+  src="./figures/margin-cdf-march.svg"
+  alt="Empirical cumulative distributions of normalized training margins at rounds 5, 200, and 1000 of the chi-squared run; a dashed vertical at rho = 0.05 marks the three heights 0.21, 0.01, and 0.00, the round-5 staircase crosses x = 0 at height 0.21 while the later curves start at zero, and the round-1000 curve rises above the round-200 curve at moderate margins"
+  caption="Margin CDFs of the χ²₁₀ run (computed for this lesson: rounds 5/200/1000 of the AdaBoost lesson's experiment). The ensemble bound reads the height at ρ; the low tail marches right while the bulk above it slips left."
+/>
+
+<Task>
+Read the figure against the bound. Fix the dashed level $\rho = 0.05$: the CDF height there is the ensemble margin bound's loss term, and it falls $0.21 \to 0.01 \to 0.00$ across rounds 5, 200, 1,000 — on the leg from round 200 to round 1,000 the certificate improves although training error is zero the whole way (zero from round 105). Then check the left ends: the round-5 staircase crosses $x = 0$ at height $0.21$ (training errors remain), the later curves at zero. Last, find where the round-1000 curve climbs above the round-200 curve, near $u \approx 0.09$: above the tail the mass moved *left* — the median slipped $0.130 \to 0.107$, <Ref lesson="adaboost">the forward exercise's</Ref> trade — and the bound never reads that region, which is why the trade costs nothing.
+</Task>
+
+The two halves now snap together into the debt's payment. The ensemble bound says risk $\le$ (margin-CDF height at $\rho$) $+$ (base-class capacity)$/\rho$, with no $T$. The push theorem says AdaBoost lowers that height (equivalently, lets $\rho$ be chosen larger at zero loss) for as long as edges persist. Rounds after zero training error are not idle and not overfitting; they are manufacturing the quantity the true bound depends on. The falling test curve in <Ref lesson="adaboost">the mystery figure</Ref> is what a margin-CDF march looks like from the outside.
+
+<KeyFact>
+The persistent-edge hypothesis is load-bearing, twice. Edges persist on clean, separable-by-the-hull data (Mohri §7.3.5: a positive edge exists exactly when the sample is $\operatorname{conv}(\mathcal{H})$-separable); on noisy data <Ref lesson="adaboost">the exponential loss chases mislabeled points</Ref>, $\varepsilon_t$ climbs toward $\tfrac12$, and the theorem's product stalls at 1: the theory predicts its own failure case.
+</KeyFact>
+
+## ★ The 1998 route: sloppy covers
+
+Schapire, Freund, Bartlett, and Lee proved their generalization bound three years before the Rademacher machinery existed, by a sampling argument. To show that a majority vote $f$ with margins $> \theta$ on the sample generalizes, draw $N$ base hypotheses independently from the distribution the vote's weights define, and let $g$ be their unweighted average: a random, much simpler object. Chernoff bounds make $g$ close to $f$ everywhere with high probability, so the finite family of $N$-term averages forms an approximating set, a *sloppy cover*: it need only match $f$ up to margin $\theta/2$ on most points, not everywhere. A union bound over that family, of size $|\mathcal{H}|^N$, then transfers the sample's margin record to the population, and optimizing $N \approx \ln(n)/\theta^2$ yields, with probability $1-\delta$,
+$$
+R(f) \;\le\; \frac{1}{n}\#\{i : y_i \bar f(x_i) \le \theta\} \;+\; O\!\left(\sqrt{\frac{\log n \, \log|\mathcal{H}|}{n\,\theta^2} + \frac{\log(1/\delta)}{n}}\right)
+$$
+for every vote and every $\theta > 0$ simultaneously (SFBL Thm. 1; the infinite-class version replaces $\log|\mathcal{H}|$ with the base class's VC dimension). The shape matches the ensemble margin bound up to the $\log n$ factor; the contraction route carried in this lesson is the one later work sharpened, which is why it is the one this course proves in full.
+
+## What the margin theory does and does not claim
+
+The module's character requires the ledger's other column, and the 1998 paper itself opens it: three limits, each with a concrete exhibit.
+
+### The constants are loose, by the authors' own arithmetic
+
+SFBL's own generalization bound (their Theorem 1) charges, for a margin level $\theta > 0$, the fraction of training margins at or below $\theta$ plus a capacity term of order $\sqrt{\log n \log|\mathcal{H}|/(n\theta^2)}$. Their §2.2 evaluates it at $|\mathcal{H}| = 10^6$, $\delta = 0.01$ and concludes that the bounds "start to be meaningful only when the size of the training set is in the tens of thousands"; their own Figure 3 shows it above $1$ at $n = 10{,}000$ for every level $\theta \le 1/8$. This lesson's ring numbers repeat the verdict at smaller scale: a certificate of $0.35$ against a measured error of $0.00$. The bounds' value is structural, not numerical: finite where VC reads infinity, $T$-free where VC grows, correct in what they respond to.
+
+### Voting is not smoothing
+
+A large margin certifies; a mere vote does not, and the intuition that averaging many classifiers is inherently safer (smoothing, in the ensemble folklore) is the documented misconception the 1998 paper set §5.4 aside to refute. The counterexample is fully constructive. Take the base class of *delta functions*, classifiers that answer $+1$ on one point and $-1$ everywhere else, or the reverse, plus the two constants. This class shatters any three points (a constant or a delta realizes each of the eight labelings) and no four, since none of its members splits four points two against two: VC dimension 3, as simple as an infinite class gets. For any $n$-point sample, the vote of $2n$ of them fits every label: one delta per training point, padded with constants to balance. Boosting this class (the margin-push theorem with $\rho = 0$) reaches zero training error on any labeling, including pure noise, so the vote generalizes not at all. The margin analysis prices it correctly: for balanced classes the construction's every margin is exactly $1/n$, so at any level $\rho \gtrsim 1/n$ the margin-loss term is $1$ and the bound promises nothing. Zero training error with vanishing margins is the memorizer of <Ref lesson="statistical-learning">lesson one</Ref> wearing an ensemble; what separates the boosted stumps from it is the size of the margins, and only that.
+
+<Figure
+  src="./figures/delta-trap.svg"
+  alt="A row of labeled training points each carrying its own delta-function spike, whose balanced vote fits every label with normalized margin exactly one over n; a box notes that at any level rho of order one over n the margin loss term equals one and the bound is vacuous, correctly"
+  caption="The delta-function trap (SFBL §5.4): 2n votes fit any labels with margins 1/n. The bound refuses to certify it: vacuity as a correct verdict."
+/>
+
+### Margins explain; they do not prescribe
+
+If margins carry the guarantee, maximizing them directly should improve the algorithm; the theory's own currency says so, and the currency can be optimized: the maximum $L_1$-margin over $\operatorname{conv}(\mathcal{H})$ is a linear program ([Grove &amp; Schuurmans 1998](https://cdn.aaai.org/AAAI/1998/AAAI98-100.pdf); Mohri §7.3.4). The record shows the opposite. Breiman's arc-gv and the LP experiments found that maximizing the minimum margin increases test error more often than not; in Breiman's ionosphere run the modified algorithm raised **every** training margin and still generalized worse, at $n = 351$, far below where any of the bounds apply. AdaBoost itself does not maximize the minimum margin ([Rudin, Daubechies &amp; Schapire 2004](https://www.jmlr.org/papers/v5/rudin04a.html) exhibit convergence to $\tfrac13$ where $\tfrac38$ is achievable; the margin-push theorem guarantees only $\ge \rho_{\max}/2$), yet it beats the maximizers. The working reading, already in SFBL's discussion: the bounds depend on the whole margin distribution through $\widehat{R}_{S,\rho}$ at every level, not on the minimum alone, and an algorithm that spends capacity lifting one worst point can pay for it across the rest of the CDF. The field records this as an incompleteness, not a resolution.
+
+### The verdicts
+
+What the theory claims: a fit with large margins on the sample carries a risk certificate that no feature dimension and no round count enters, and AdaBoost provably manufactures such fits while its edges persist. What it does not claim: tight constants (loose by orders of magnitude at practical $n$), safety for voting as such (delta functions), or that margins should be maximized directly (Breiman's anomaly). Both debts are paid, and paid honestly: with an explanation, not a prediction of the error's value.
+
+What stands established: the ramp loss sandwiches the 0–1 loss and is $1/\rho$-Lipschitz; contraction turns the master Rademacher bound into a margin bound; the norm-ball plug-in pays debt 1 with a dimension-free certificate that outputs numbers ($\le 0.35$ on 2,000 ring points, against infinity from VC); the convex-hull lemma and the margin-push theorem pay debt 2 with a $T$-free bound whose loss term AdaBoost provably drives down; and the theory's boundaries are marked by its own counterexamples. Every claim in this lesson is measurable (margin CDFs, traces, norms, bound values), and <Ref lesson="bounds-vs-practice">the next lesson</Ref> measures them: it reproduces the 1998 margin-distribution experiment on the course's own runs and prices every bound in the module against the observed test errors.
+
+## Exercises
+
+<Exercise>
+The derivation the lesson stated but did not carry. (a) From the master margin bound and the convex-hull lemma, derive the ensemble margin bound: for all $g \in \operatorname{conv}(\mathcal{H})$, $R(g) \le \widehat{R}_{S,\rho}(g) + \frac{2}{\rho}\mathfrak{R}_n(\mathcal{H}) + \sqrt{\ln(1/\delta)/2n}$. (b) Using <Ref lesson="rademacher-stability">Massart's lemma</Ref> and Sauer's lemma, derive its VC form for a base class of VC dimension $d$: the capacity term becomes $\frac{2}{\rho}\sqrt{2d\ln(en/d)/n}$. (c) Evaluate (b) for the 400-stump spam ensemble with the stump class's $d_B \le 10$ from <Ref lesson="vc-dimension">the VC lesson's debt computation</Ref>, $n = 3{,}065$, $\rho = 0.1$, and compare with that lesson's verdict on the same ensemble.
+
+<Solution>
+(a) Apply the master margin bound with $\operatorname{conv}(\mathcal{H})$ as the hypothesis set: $R(g) \le \widehat{R}_{S,\rho}(g) + \frac{2}{\rho}\mathfrak{R}_n(\operatorname{conv}(\mathcal{H})) + \sqrt{\ln(1/\delta)/2n}$. The lemma replaces $\mathfrak{R}_n(\operatorname{conv}(\mathcal{H}))$ by $\mathfrak{R}_n(\mathcal{H})$: it holds for the empirical complexity at every sample, hence for the average. Nothing else changes; $T$ never appears because the hull already contains every $T$.
+
+(b) On a sample, a binary class of VC dimension $d$ realizes at most $(en/d)^d$ value vectors (Sauer), each of $\ell_2$ norm $\sqrt n$; Massart gives $\widehat{\mathfrak{R}}_S(\mathcal{H}) \le \sqrt{2d\ln(en/d)/n}$. Averaging over samples and inserting into (a) gives the claim, which is Mohri's Corollary 7.6.
+
+(c) With $d_B = 10$, $n = 3{,}065$: $\sqrt{2 \cdot 10 \cdot \ln(3065 e/10)/3065} = \sqrt{20 \cdot 6.73/3065} = 0.21$; divided by $\rho = 0.1$ and doubled: $\approx 4.2$. Vacuous at this $\rho$ (informative only once the margins support $\rho \gtrsim 0.4$ at small loss), but the comparison is the point: the VC route priced the $T$-term ensemble class at $d_{\text{ens}} \approx 1.7 \times 10^5$, a certificate that degrades with every round, while this bound charges the stump class once, at any $T$, and improves as the margin CDF marches. The transferable move: when a bound is vacuous, say which dial (here $\rho$, the achieved margins) would rescue it; that is what the next lesson measures.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: the bound's operating window. Take the kernel margin bound with the ring numbers ($n = 2{,}000$, $r = 1$, $\Lambda = 5.8$, all training margins in $[0.80, 1.9]$, $\delta = 0.05$). (a) Evaluate the bound as $\rho \to 0$ and name what each term does. (b) Evaluate it at $\rho = 3$, above every achieved margin. (c) Give the window of $\rho$ values where the certificate is nontrivial (below $1$), and the $\rho$ minimizing it. (d) State which hypothesis of the contraction step fails in the $\rho \to 0$ limit, and what that recovers.
+
+<Solution>
+(a) The loss term falls to the plain training error, $0$; the capacity term $2\Lambda/(\rho\sqrt n) = 0.26/\rho \to \infty$. The certificate retreats to vacuity exactly as the demanded confidence vanishes.
+
+(b) Every margin is below $3$, and most are far below: the ramp charges $1 - u/3$ per point; with margins averaging $\approx 1.2$ the loss term is roughly $0.6$, the capacity term is $0.26/3 = 0.09$, and the total $\approx 0.6 + 0.09 + 0.09 = 0.78$, approaching the trivial bound from below while certifying nothing useful; at still larger $\rho$ the loss term saturates at $1$.
+
+(c) Nontrivial requires $0.26/\rho + 0.09 + \widehat{R}_{S,\rho} < 1$. For $\rho \le 0.80$ the loss term is $0$, so any $\rho > 0.26/0.91 \approx 0.29$ works: the window is roughly $\rho \in (0.3, 0.8]$ plus a little beyond as the loss term grows slowly. The minimum sits at the largest $\rho$ the margins cover: $\rho = 0.80$, giving $0 + 0.33 + 0.09 = 0.42$, slightly better than the lesson's pre-committed $\rho = 1$; using it legitimately requires the uniform-over-$\rho$ version's $\sqrt{\log\log}$ surcharge.
+
+(d) Contraction charges the Lipschitz constant of $\Phi_\rho$, which is $1/\rho \to \infty$: the ramp steepens into the 0–1 step, which is not Lipschitz at all. The limit recovers the situation of the pre-margin lessons (bounding the 0–1 loss class directly), which for this kernel class meant infinite VC dimension and no certificate. The margin bound's entire content is that demanding confidence is what makes the loss priceable.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "The ensemble margin bound is independent of $T$, so running AdaBoost forever cannot hurt." Use the module's own records, and name the hypothesis in the margin-push theorem that the refutation turns on.
+
+<Solution>
+Two counterexamples, one per failure mode. **Noisy labels:** the bound's loss term is not guaranteed to fall; the margin-push theorem's decay requires persistent edges $\varepsilon_t \le \frac12 - \gamma$. On mislabeled data the exponential loss concentrates weight on unfixable points (<Ref lesson="adaboost">the noise section</Ref>: 5% flipped labels grew AdaBoost's test error by about a fifth of itself across Breiman's nine datasets), $\varepsilon_t$ drifts toward $\frac12$, the per-round factor toward $1$, and late rounds push noise-fitting stumps into the vote: the margins on the corrupted points are being fought over, and the CDF stops marching. **Adversarial base class:** with delta functions, every round keeps an edge and the bound's loss term even goes to zero at $\rho = 0$, yet generalization is chance, because the achieved margins are $O(1/n)$ and the loss term equals $1$ at every useful $\rho$. The bound is $T$-free but not unconditionally favorable: it promises something only when a nontrivial $\rho$ gets small loss.
+
+The claim's failing step is quantifier confusion: "the bound does not degrade with $T$" is true; "the bound guarantees improvement with $T$" requires the persistent-edge hypothesis on a base class whose margins can be large: benign data, expressive-enough-but-not-adversarial $\mathcal{H}$. Named precisely: $\exists\gamma > 0: \varepsilon_t \le \frac12 - \gamma$ for all $t$, plus $\rho < \gamma$ reachable with $\rho$ well above $1/n$-scale.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review: the IOU from module 4, literally computed. <Ref lesson="svm-dual-kernels">The kernel lesson's forward exercise</Ref> priced its ring fit at $m = 64$, $\Lambda/\rho = 4$, RBF kernel. (a) Recompute its capacity term $2\sqrt{\operatorname{Tr}[K]\Lambda^2/\rho^2}/m$ and add the concentration term $3\sqrt{\ln(2/\delta)/2m}$ at $\delta = 0.05$ to price the whole certificate (margin loss $0$). (b) That exercise claimed "informative at $m \approx 1000$": check it against this lesson's measured $n = 1{,}000$ run (capacity $0.36$, concentration $0.13$). (c) Explain why $\operatorname{Tr}[K] = m$ exactly for the RBF kernel and what that does to the bound's form.
+
+<Solution>
+(a) $\operatorname{Tr}[K] = 64$, so the capacity term is $2\sqrt{64 \cdot 16}/64 = 2 \cdot 32/64 = 1.0$, the number the forward exercise found. Concentration: $3\sqrt{\ln 40/128} = 3 \times 0.170 = 0.51$. Certificate: $R(h) \le 0 + 1.0 + 0.51$, vacuous at $m = 64$, exactly as the IOU warned.
+
+(b) At $n = 1{,}000$ the forward exercise's arithmetic predicts capacity $2 \cdot 4/\sqrt{1000} = 0.25$; the measured run gives $0.36$, because the real fit's $\Lambda/\rho$ came out $5.7$, not the exercise's assumed $4$: the bound's inputs are empirical, and honest evaluation uses the fitted values. Either way the certificate crosses into informative territory ($0.49$ measured) near $n = 1{,}000$: the claim survives with its constant corrected.
+
+(c) $K(x, x) = e^{-\gamma \cdot 0} = 1$ at every point, so the trace is the sample size regardless of data, dimension, or $\gamma$, and the capacity term collapses to $2(\Lambda/\rho)/\sqrt{m}$: the entire kernel geometry enters through the fitted norm and margin alone. This is the review's point: the quantity module 4 could only name, this module's theorems price, and the price is a function of three measurable numbers.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: Breiman's anomaly in miniature. On one dataset (the $\chi^2_{10}$ problem from <Ref lesson="adaboost">the AdaBoost lesson</Ref> at $n = 500$, or any two-class set with a few hundred points), boost depth-1 stumps for $T = 200$ rounds, freeze the 200 stumps, and compare two weightings of the same base hypotheses: (i) AdaBoost's $\alpha$; (ii) the $\alpha$ maximizing the minimum normalized margin, i.e. the LP $\max_{\alpha \ge 0, \lVert\alpha\rVert_1 = 1} \min_i y_i\, \alpha \cdot h(x_i)$, solvable with `scipy.optimize.linprog` on variables $(\alpha, \rho)$. Report both minimum margins, both full margin CDFs, and both test errors. Before running, state what outcome supports "the distribution matters, not the minimum," and what outcome would refute it.
+
+<Solution>
+Protocol: the LP has constraints $y_i\,\alpha\cdot h(x_i) \ge \rho$ for all $i$, $\sum_t \alpha_t = 1$, $\alpha \ge 0$, objective $\max \rho$; `linprog` minimizes, so negate. Feed both weightings the same stump predictions matrix $h(x_i) \in \{\pm1\}^{200}$.
+
+Prediction that supports the distribution reading: the LP's minimum margin comes out strictly larger (it is optimal for that criterion by construction; the margin-push theorem guarantees AdaBoost only $\ge \rho_{\max}/2$, and Rudin et al. exhibit real gaps), while its margin CDF is worse in the bulk (mass shifted left at moderate levels) and its test error is equal or higher. That is Breiman's and Grove–Schuurmans's recorded outcome: min-margin up, generalization not improved, more often than not worse. What would refute it: the LP winning on test error consistently at these sample sizes, an outcome that would rehabilitate min-margin as the operative quantity and contradict the published record rather than the theory (both weightings satisfy the same ensemble bound).
+
+Typical run of this recipe: AdaBoost min margin $\approx 0.02$–$0.05$ with median $\approx 0.15$; LP min margin $2$–$3\times$ larger with a visibly thinner middle of the CDF; test errors within a point of each other or LP worse. Report the two CDFs overlaid: the picture, not the two minima, is the finding. The transferable move: when a theory names a sufficient statistic (here $\widehat{R}_{S,\rho}$ at all $\rho$), test competitors on the statistic, not only on the outcome.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Using your <Ref lesson="boosting-lab">boosting-lab</Ref> AdaBoost run on the spam corpus (or the lesson's $\chi^2$ run), compute the normalized margins $y_i F_T(x_i)/\sum_{t\le T}\alpha_t$ from the staged predictions at $T = 10$ and $T = 200$, and plot the two empirical CDFs on one axis. Report: the training error at each $T$ (the CDF height at $0$), the fraction below $\rho = 0.05$ at each $T$, and the minimum margin at each $T$.
+
+<Solution>
+The staged sums are exactly what the lab's `staged-predict` checkpoint built: $F_T(x_i)$ accumulates $\alpha_t h_t(x_i)$, and dividing by the running $\sum \alpha_t$ normalizes to $[-1,1]$. Expected shape on spam: at $T = 10$ the CDF crosses zero at a positive height (a few percent training error) and rises steeply, most margins small and many below $0.05$; at $T = 200$ it crosses at or near zero and the whole low tail has shifted right, the sub-$0.05$ fraction down severalfold, the minimum margin positive. If your $T = 200$ minimum is still negative, spam's mislabeled-looking points are the reason: the edge condition degrading, the refutation exercise's first failure mode observed live.
+
+What you have drawn is the pair of curves this lesson's theory runs on, and the experiment is half-finished: overlaying rounds 5/100/1000 with the test-error curve, and pricing the ensemble bound at each round, is precisely the reproduction of Schapire–Freund–Bartlett–Lee's Figure 1 that <Ref lesson="bounds-vs-practice">the next lesson</Ref> carries out.
+</Solution>
+</Exercise>
+
+<References>
+1. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — §5.4: the margin loss (Defs. 5.5–5.6), the margin bounds (Thms. 5.8–5.9) whose proofs this chapter follows, the norm-ball corollary (Cor. 5.11), and the resolution of the apparent conflict with the VC lower bounds; §6.3: the kernel complexity and margin bounds (Thm. 6.12, Cor. 6.13); §7.3: the $L_1$-margin (Def. 7.3), the convex-hull lemma (Lem. 7.4), the ensemble bounds (Cors. 7.5–7.6), the margin-push theorem (Thm. 7.7), LP margin maximization (§7.3.4) and the game-theoretic edge–margin connection (§7.3.5). Free online: https://cs.nyu.edu/~mohri/mlbook/
+2. R. E. Schapire, Y. Freund, P. Bartlett, W. S. Lee, "Boosting the Margin: A New Explanation for the Effectiveness of Voting Methods," *Annals of Statistics* 26(5), 1998, pp. 1651–1686 — the margin-distribution explanation: Thm. 1 and the sloppy-cover proof sketched in the starred section, §2.2's own looseness verdict and the Breiman/Grove–Schuurmans discussion, Thm. 5 (the margin-push bound), §5.4 (the delta-function construction). https://doi.org/10.1214/aos/1024691352
+3. V. Koltchinskii, D. Panchenko, "Empirical Margin Distributions and Bounding the Generalization Error of Combined Classifiers," *Annals of Statistics* 30(1), 2002, pp. 1–50 — the Rademacher-complexity route to margin bounds that replaced the covering argument and that Mohri's chapter, and this lesson, present. https://doi.org/10.1214/aos/1015362183
+4. A. J. Grove, D. Schuurmans, "Boosting in the Limit: Maximizing the Margin of Learned Ensembles," *AAAI-98*, 1998 — the LP-boosting experiments: maximizing the minimum margin without the expected generalization gain. https://cdn.aaai.org/AAAI/1998/AAAI98-100.pdf
+5. L. Breiman, "Prediction Games and Arcing Algorithms," *Neural Computation* 11(7), 1999, pp. 1493–1517 — arc-gv and the min-margin anomaly, including the run in which every margin increased and test error worsened. https://doi.org/10.1162/089976699300016106
+6. C. Rudin, I. Daubechies, R. E. Schapire, "The Dynamics of AdaBoost: Cyclic Behavior and Convergence of Margins," *Journal of Machine Learning Research* 5, 2004, pp. 1557–1595 — the proof that AdaBoost need not converge to the maximum $L_1$-margin, with the $\tfrac13$-versus-$\tfrac38$ example. https://www.jmlr.org/papers/v5/rudin04a.html
+7. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §12.3.8: the VC-dimension margin bound $h \le r^2\Lambda^2$ cited as the ancestor; §16.2.3: boosting's regularization path and margins, the practitioners' companion to this chapter's theory. Free online: https://hastie.su.domains/ElemStatLearn/
+8. P. L. Bartlett, S. Mendelson, "Rademacher and Gaussian Complexities: Risk Bounds and Structural Results," *Journal of Machine Learning Research* 3, 2002, pp. 463–482 — the structural calculus (convex hulls, Lipschitz compositions) behind both plug-ins used here. https://www.jmlr.org/papers/volume3/bartlett02a/bartlett02a.pdf
+</References>

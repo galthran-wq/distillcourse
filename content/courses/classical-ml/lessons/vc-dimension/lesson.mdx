@@ -1,0 +1,412 @@
+An infinite hypothesis class can behave like a finite one: what matters is not how many hypotheses exist but how many labelings they realize on n points — and that count is either 2ⁿ forever or a polynomial, with nothing in between.
+
+<Ref lesson="learning-theory">The previous lesson</Ref> proved that any finite class converges uniformly at a cost of $\ln|\mathcal{H}|$, then closed on the flaw: every class the course actually fits (halfspaces, ridge coefficient vectors, kernel machines) is infinite, and its final exercise found the repair's raw material, a threshold class that realizes only 6 of the 32 conceivable labelings on 5 points. This lesson builds the theory of that count. It defines the growth function and the VC dimension, computes both for the course's classes, proves Sauer's lemma (the dichotomy the opening states), assembles the fundamental theorem of PAC learning in both directions, and then prices the course's own models with it, finding two places where the price comes out infinite.
+
+## The right count: labelings, not hypotheses
+
+<Task>
+Closed-book, from <Ref lesson="learning-theory">the previous lesson</Ref>: state the finite-class uniform-convergence sample size, say why its proof dies for an infinite class, and recall how many labelings $\{\operatorname{sign}(x-\theta)\}$ produced on 5 points. Check below before continuing.
+</Task>
+
+<Aside>
+Answers: $n \ge \ln(2|\mathcal{H}|/\delta)/(2\varepsilon^2)$ makes a sample $\varepsilon$-representative for a finite class; the proof is Hoeffding for each $h$ plus a union bound over the class, and for infinite $\mathcal{H}$ the union sums infinitely many equal tails, giving a bound of $\infty$. On 5 points the thresholds produced exactly 6 label vectors, all of the form $(-,\dots,-,+,\dots,+)$: an infinite class with 6 distinguishable behaviors.
+</Aside>
+
+The union bound charged one Hoeffding tail per **hypothesis**. The 5-point computation says that is the wrong unit of account: infinitely many thresholds collapse into 6 behaviors on the sample, and two hypotheses that agree on every sample point cannot be told apart by any empirical quantity. The honest currency is the set of *restrictions* to the sample.
+
+<Definition title="restriction and growth function (SSBD Defs. 6.2, 6.9)">
+For a class $\mathcal{H}$ of functions $\mathcal{X} \to \{0,1\}$ and a finite set $C = \{c_1, \dots, c_n\} \subseteq \mathcal{X}$, the **restriction** of $\mathcal{H}$ to $C$ is the set of label vectors
+$$
+\mathcal{H}_C = \big\{ (h(c_1), \dots, h(c_n)) : h \in \mathcal{H} \big\} \subseteq \{0,1\}^n .
+$$
+The **growth function** of $\mathcal{H}$ is the worst case over placements:
+$$
+\tau_{\mathcal{H}}(n) = \max_{C \subseteq \mathcal{X},\, |C| = n} |\mathcal{H}_C| .
+$$
+</Definition>
+
+For thresholds $h_a(x) = \mathbf{1}[x < a]$ the computation is one sentence: sliding $a$ across $n$ distinct points changes the label vector only at a crossing, so $|\mathcal{H}_C| = n+1$ for every configuration, and $\tau_{\mathcal{H}}(n) = n+1$. An uncountable class, and a growth function that is a line. Replacing $|\mathcal{H}|$ by $\tau_{\mathcal{H}}(n)$ in the finite-class bound would turn $\ln|\mathcal{H}| = \infty$ into $\ln(n+1)$, and $\sqrt{\ln(n+1)/n} \to 0$: the class would be learnable after all.
+
+That replacement is a theorem, not a substitution: the $\tau_{\mathcal{H}}(n)$ behaviors depend on the sample, so Hoeffding's fixed-in-advance premise fails for them, and repairing that costs a doubling trick (the starred section below). The repair consumes the count; the sections before it establish which classes have polynomial growth and what decides it.
+
+## Shattering: the sets a class cannot explain away
+
+The extreme case of growth is the ceiling $2^n$, and it has a name and a meaning. If $\mathcal{H}_C = \{0,1\}^{|C|}$, every conceivable labeling of $C$ realized, the class is said to *shatter* $C$. A shattered set is a set about which the class has no opinion: whatever labels arrive, some hypothesis explains them perfectly, so a perfect fit on $C$ carries zero evidence about anything off $C$. This is the memorizer of <Ref lesson="statistical-learning">the opening lesson</Ref> reborn as a property of a class: an explanation that can accommodate every phenomenon is worthless as an explanation.
+
+The largest size a class can shatter is therefore the scale at which it stops being a memorizer, and that scale is the capacity measure of this module.
+
+<Definition title="VC dimension (Vapnik &amp; Chervonenkis 1971)">
+The **VC dimension** of $\mathcal{H}$, written $\operatorname{VCdim}(\mathcal{H})$, is the largest $d$ such that some set of $d$ points is shattered by $\mathcal{H}$ (equivalently, the largest $n$ with $\tau_{\mathcal{H}}(n) = 2^n$). If arbitrarily large sets are shattered, $\operatorname{VCdim}(\mathcal{H}) = \infty$.
+</Definition>
+
+The definition comes from the 1971 paper of [Vapnik and Chervonenkis](https://doi.org/10.1137/1116025), which proved uniform convergence for classes of finite VC dimension; the connection to the PAC framework was completed by [Blumer, Ehrenfeucht, Haussler and Warmuth](https://doi.org/10.1145/76359.76371) in 1989. Two clauses in it repay care. The quantifier is some set, not every set: three collinear points are never shattered by halfspaces in the plane, and that proves nothing, because a triangle is (below). And computing $\operatorname{VCdim}(\mathcal{H}) = d$ always takes **both directions**: exhibit one shattered set of size $d$, and prove that no set of size $d+1$, however placed, is shattered.
+
+<KeyFact>
+The two directions are priced differently. $\operatorname{VCdim} \ge d$ costs one witness — a single configuration, checkable by finite enumeration. $\operatorname{VCdim} \le d$ must hold over every configuration of $d+1$ points at once, so it needs a geometric invariant no placement escapes — an extreme point for rectangles, a Radon partition for halfspaces below. Upper bounds are where VC computations stall.
+</KeyFact>
+
+## The gallery: the course's classes, both directions
+
+Each class this course has fitted gets its capacity computed here, lower bound then upper bound. The upper bounds are geometry: an extreme-point argument for rectangles, Radon's theorem for halfspaces.
+
+### Thresholds: d = 1
+
+One point $\{c\}$ is shattered: $a = c+1$ labels it 1, $a = c-1$ labels it 0. Two points $c_1 < c_2$ are not: the labeling $(0,1)$ needs a threshold left of $c_1$ and right of $c_2$ at once. So $\operatorname{VCdim} = 1$, matching the growth function $n+1$ computed above, which equals $2^n$ exactly up to $n = 1$.
+
+### Rectangles: d = 4, by the interior point
+
+<Figure
+  src="./figures/rectangles.svg"
+  alt="Top: four points in a diamond with a thin rectangle capturing the top and bottom points while excluding left and right. Bottom: five points, with the bounding rectangle of the four extremes shown dashed and the fifth point trapped inside it."
+  caption="Axis-aligned rectangles: the diamond is shattered (16 labelings); a fifth point is always inside the extremes' rectangle."
+  float="right"
+  width="s"
+/>
+
+<Example title="axis-aligned rectangles (SSBD §6.3.3, Mohri Ex. 3.14)">
+**Lower bound.** Place 4 points in a diamond: north, east, south, west. Any subset of the diamond is exactly the set of points extremal in some window of coordinates, so a rectangle can be shrunk or stretched to contain precisely that subset; the figure shows $\{N, S\}$ in, $\{E, W\}$ out, the least obvious case. All 16 labelings are realized: the diamond is shattered, $\operatorname{VCdim} \ge 4$.
+
+**Upper bound.** Take any 5 points. Choose a leftmost, a rightmost, a topmost, and a bottommost among them (ties broken arbitrarily); call the remaining point $c_5$. Every coordinate of $c_5$ lies between the chosen extremes, so any rectangle containing the four extreme points contains $c_5$. The labeling (extremes $+$, $c_5$ $-$) is unrealizable, and this argument used nothing about where the 5 points sit. $\operatorname{VCdim} = 4$.
+</Example>
+
+The upper-bound move is worth naming, because it recurs: do not enumerate configurations; find, inside every configuration, one labeling that geometry forbids.
+
+<Exercise>
+Run both directions for intervals $h_{a,b}(x) = \mathbf{1}[x \in (a,b)]$ on the line: exhibit a shattered 2-point set, prove no 3-point set is shattered, then compute the growth function $\tau(n)$ exactly and compare it with what Sauer's lemma (next section) will predict for $d = 2$. Attempt all three parts before opening; the third is a counting argument, not a formula lookup.
+
+<Solution>
+Strategy hint: for the upper bound, order the points and look for the labeling no single interval can produce; for the count, ask what an interval's positive set looks like on a sorted sample.
+
+**Shattering 2 points** $c_1 < c_2$: intervals around both, around each alone, and disjoint from both give all 4 labelings. **No 3 points:** for $c_1 < c_2 < c_3$, the labeling $(1, 0, 1)$ requires an interval containing $c_1$ and $c_3$ but not the point between them — impossible for a single interval. So $\operatorname{VCdim} = 2$.
+
+**The count:** on $n$ sorted points, an interval's positive set is a contiguous run. There are $\binom{n}{2} + n = \binom{n+1}{2}$ nonempty runs (choose the endpoints) plus the empty labeling: $\tau(n) = \binom{n+1}{2} + 1 = 1 + n + \binom{n}{2}$. Sauer's bound for $d = 2$ is $\binom{n}{0} + \binom{n}{1} + \binom{n}{2}$: the identical number. Intervals meet the bound with equality at every $n$, a first sign that the lemma is tight, not generous.
+</Solution>
+</Exercise>
+
+### Halfspaces: d + 1, and Radon's theorem decides
+
+Halfspaces $h_{w,b}(x) = \operatorname{sign}(w \cdot x + b)$ over $\mathbb{R}^d$ are the boundary class of <Ref lesson="logistic-regression">logistic regression</Ref>, <Ref lesson="lda-gda">LDA</Ref>, and <Ref lesson="svm-max-margin">the linear SVM</Ref> alike, so their capacity is the one number this section owes the rest of the course.
+
+<FigureSequence
+  name="halfspace-shatter"
+  alt="Four frames: three points separated by one line for one labeling; a grid of all eight labelings of the three points, each realized by a line; four points in convex position where the alternating labeling makes the two class hulls cross; four points with one interior where the surround labeling is unrealizable"
+  caption="Halfspaces in the plane: 3 points shatter; 4 points always fail, by one of two hull obstructions."
+/>
+
+<Task>
+Step through the four frames. Frames 1–2 are the lower bound: count that all $2^3 = 8$ labelings appear. Frames 3–4 are the two cases of the upper bound: identify, in each, the pair of convex hulls that intersect — that intersection is what the proof below extracts from any $d+2$ points.
+</Task>
+
+**Lower bound in $\mathbb{R}^d$.** Take the origin $x_0 = 0$ and the standard basis vectors $x_1 = e_1, \dots, x_d = e_d$: $d+1$ points. Given any target labels $y_0, y_1, \dots, y_d \in \{-1,+1\}$, set $w = (y_1, \dots, y_d)$ and $b = y_0/2$. Then $w \cdot x_i + b = y_i + y_0/2$, which has the sign of $y_i$ (since $|y_i| = 1 > 1/2$), and $w \cdot x_0 + b = y_0/2$, which has the sign of $y_0$. Every labeling is realized by writing it into the weight vector: the set is shattered, $\operatorname{VCdim} \ge d+1$.
+
+**Upper bound.** The figure's two failure cases (crossing hulls, trapped point) are both instances of one fact of convex geometry.
+
+<Theorem title="Radon's theorem (Mohri Thm. 3.13)">
+Any set of $d+2$ points in $\mathbb{R}^d$ can be partitioned into two subsets $X_1, X_2$ whose convex hulls intersect.
+
+<Proof>
+Let the points be $x_1, \dots, x_{d+2}$. The system
+$$
+\sum_{i=1}^{d+2} \alpha_i x_i = 0, \qquad \sum_{i=1}^{d+2} \alpha_i = 0
+$$
+is $d+1$ linear equations in $d+2$ unknowns, so it has a nonzero solution $\beta$. Because the $\beta_i$ sum to zero and are not all zero, both $I_1 = \{i : \beta_i > 0\}$ and $I_2 = \{i : \beta_i \le 0\}$ are nonempty; take $X_1, X_2$ to be the corresponding points and $s = \sum_{i \in I_1} \beta_i > 0$.
+
+Dividing the first equation through by $s$ and moving the $I_2$ terms across:
+$$
+\sum_{i \in I_1} \frac{\beta_i}{s}\, x_i \;=\; \sum_{i \in I_2} \frac{-\beta_i}{s}\, x_i .
+$$
+Both sides are convex combinations (nonnegative coefficients summing to 1) of $X_1$ and of $X_2$ respectively, and they are the same point. That point lies in both hulls.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/radon.svg"
+  alt="Two four-point configurations in the plane: convex position partitioned into two diagonal pairs whose connecting segments cross at a marked point, and a triangle with an interior point where the interior point itself is the hull intersection"
+  caption="Radon's two faces at d = 2: pair vs pair with crossing segments, or point vs triangle with the point inside. The partition always exists; only its shape varies."
+/>
+
+Now let $C$ be any $d+2$ points and $X_1, X_2$ a Radon partition. A halfspace assigning $+1$ to all of $X_1$ and $-1$ to all of $X_2$ would put the two convex hulls strictly on opposite sides of its boundary, but the hulls share a point. That labeling is unrealizable, so no $d+2$ points are shattered: $\operatorname{VCdim}(\text{halfspaces in } \mathbb{R}^d) = d+1$. (Dropping the bias term $b$ costs the origin trick and one dimension of capacity: homogeneous halfspaces have $\operatorname{VCdim} = d$.)
+
+Radon published the theorem in 1921, fifty years before it acquired a consequence for learning, and nothing probabilistic entered the argument: capacity is combinatorics and geometry, and probability consumes the count only in the symmetrization step below.
+
+### Finite classes: the old currency converts
+
+For finite $\mathcal{H}$, always $|\mathcal{H}_C| \le |\mathcal{H}|$, so a shattered set of size $k$ forces $2^k \le |\mathcal{H}|$: $\operatorname{VCdim}(\mathcal{H}) \le \log_2|\mathcal{H}|$. The previous lesson's description-length reading survives as an upper bound: bits can only overstate capacity, and the gap can be arbitrarily large (thresholds restricted to a grid of $k$ values have $|\mathcal{H}| = k+1$ and VC dimension still 1). The closing exercises probe both extremes.
+
+## One parameter, infinite capacity
+
+The gallery invites a reading: thresholds have 1 parameter and $d = 1$, halfspaces have $d+1$ parameters and capacity $d+1$, rectangles 4 and 4. That reading, **capacity is the number of parameters**, is folklore old enough to have hardened into the sample-size rules of thumb of applied statistics. It is false, and the counterexample is one trigonometric function.
+
+<Figure
+  src="./figures/sin-monster.svg"
+  alt="A rapidly oscillating sine curve over a horizontal axis with six sample points on the axis labeled plus, minus, plus, minus, plus, plus according to the curve's sign at each point"
+  caption="The class {x ↦ ⌈sin(θx)⌉} has one real parameter and infinite VC dimension: at large θ the sign pattern on any finite set is programmable."
+/>
+
+<Theorem title="one parameter, VCdim = ∞ (SSBD Ex. 6.8, ESL §7.9)">
+The class $\mathcal{H} = \{ h_\theta : \theta \in \mathbb{R} \}$ over $\mathcal{X} = \mathbb{R}$, with $h_\theta(x) = \lceil \sin(\theta x) \rceil$, has infinite VC dimension.
+
+<Proof>
+Fix any $d$ and take the points $c_m = 2^m$ for $m = 1, \dots, d$. Given target labels $y_1, \dots, y_d \in \{0,1\}$, build the number $u \in (0,1)$ whose binary expansion is $0.\bar{y}_1 \bar{y}_2 \cdots \bar{y}_d 1$ (each $\bar{y}_m = 1 - y_m$, with a final 1 appended), and set $\theta = \pi u$. The digit-extraction identity $\lceil \sin(2^m \pi u) \rceil = 1 - u_m$, where $u_m$ is the $m$-th binary digit of $u$ (valid whenever some later digit of $u$ is 1, which the appended 1 guarantees), gives
+$$
+h_\theta(c_m) = \lceil \sin(2^m \pi u) \rceil = 1 - \bar{y}_m = y_m
+\qquad \text{for every } m \le d .
+$$
+Every labeling of $\{2, 4, \dots, 2^d\}$ is realized, for every $d$.
+</Proof>
+</Theorem>
+
+A real parameter carries infinitely many bits, and this class reads them back out: multiplying by $2^m$ shifts the binary expansion of $\theta/\pi$ until digit $m$ sits in front, and the sine's sign reports it. One dial, arbitrarily many stored answers. Parameter counting fails because it measures how the class is written, not what it can do; the VC dimension measures the doing directly.
+
+The consequence is not academic. By the fundamental theorem below, infinite VC dimension means **no** distribution-free guarantee at any sample size: this one-parameter class is unlearnable in the PAC sense, while the 58-parameter spam halfspace is learnable with explicit rates. And the confusion this example kills returns at full scale in <Ref lesson="double-descent">module 11</Ref>, where million-parameter models generalize and the capacity ledger has to be rebuilt again.
+
+<KeyFact>
+Capacity is not parameter count, in either direction: $\lceil\sin(\theta x)\rceil$ has one parameter and $\operatorname{VCdim} = \infty$, while a heavily constrained million-parameter linear class can carry less effective capacity than a free cubic. What enters every theorem of this module is $d = \operatorname{VCdim}$, and nothing else about the parameterization.
+</KeyFact>
+
+## Sauer's lemma: 2ⁿ forever, or a polynomial
+
+The gallery's growth functions were all either $2^n$ (up to $d$) or visibly polynomial after. The opening's claim that nothing lies in between is now provable, and it is the combinatorial heart of the module. The lemma was proved three times independently: by [Sauer](https://doi.org/10.1016/0097-3165(72)90019-2) in 1972, answering a question of Erdős; by Shelah with Perles the same year, in model theory; and by Vapnik and Chervonenkis, in the 1971 paper already cited.
+
+<Theorem title="Sauer–Shelah–Perles (SSBD Lemma 6.10, Mohri Cor. 3.18)">
+If $\operatorname{VCdim}(\mathcal{H}) \le d < \infty$, then for all $n$,
+$$
+\tau_{\mathcal{H}}(n) \;\le\; \sum_{i=0}^{d} \binom{n}{i} \;=:\; \Phi_d(n),
+$$
+and in particular $\tau_{\mathcal{H}}(n) \le (en/d)^d$ for all $n \ge d$: polynomial of degree $d$.
+
+<Proof>
+Roadmap: prove the stronger, self-strengthening claim that for **every** finite $C$,
+$$
+|\mathcal{H}_C| \;\le\; \big|\{ B \subseteq C : \mathcal{H} \text{ shatters } B \}\big|,
+$$
+by induction on $|C|$, splitting $\mathcal{H}_C$ on its first coordinate; the lemma follows because a class of VC dimension $d$ shatters only sets of size $\le d$, of which $C$ contains at most $\Phi_d(n)$. (The empty set counts as shattered by any nonempty class.)
+
+**Base.** $|C| = 1$: either $\mathcal{H}_C$ has one label vector (right side counts $\{\emptyset\}$, so both sides are 1) or two (the point is shattered; both sides are 2).
+
+**Split.** Let $C = \{c_1, \dots, c_n\}$, $C' = \{c_2, \dots, c_n\}$, and sort the label vectors of $\mathcal{H}_C$ by their tails: a tail $(y_2, \dots, y_n)$ either appears with exactly one value of the first coordinate, or with both. Let $Y_0$ be the set of all tails that appear at all, and $Y_1$ the set of tails that appear **doubled**. Every vector of $\mathcal{H}_C$ is counted once in this bookkeeping, so $|\mathcal{H}_C| = |Y_0| + |Y_1|$.
+
+**The $Y_0$ branch.** $Y_0$ is exactly $\mathcal{H}_{C'}$. By induction on the smaller set, $|Y_0| \le |\{B \subseteq C' : \mathcal{H} \text{ shatters } B\}| = |\{B \subseteq C : c_1 \notin B,\ \mathcal{H} \text{ shatters } B\}|$.
+
+**The $Y_1$ branch.** Let $\mathcal{H}' \subseteq \mathcal{H}$ contain the hypotheses participating in doubled pairs — those $h$ for which some $h' \in \mathcal{H}$ agrees with $h$ on all of $C'$ and differs at $c_1$. Then $Y_1 = \mathcal{H}'_{C'}$, and $\mathcal{H}'$ has the key property: if $\mathcal{H}'$ shatters $B \subseteq C'$, it also shatters $B \cup \{c_1\}$, since every labeling of $B$ comes with both labels of $c_1$ attached. By induction applied to $\mathcal{H}'$ and $C'$,
+$$
+|Y_1| \le |\{B \subseteq C' : \mathcal{H}' \text{ shatters } B\}| = |\{B \subseteq C : c_1 \in B,\ \mathcal{H}' \text{ shatters } B\}|,
+$$
+and since $\mathcal{H}' \subseteq \mathcal{H}$, replacing $\mathcal{H}'$ by $\mathcal{H}$ on the right only enlarges the count.
+
+**Sum.** The two branches count disjoint families ($c_1 \notin B$ versus $c_1 \in B$), so $|\mathcal{H}_C| = |Y_0| + |Y_1| \le |\{B \subseteq C : \mathcal{H} \text{ shatters } B\}|$, completing the induction.
+
+**The polynomial form.** For $n \ge d$, multiply each term of $\Phi_d(n)$ by $(n/d)^{d-i} \ge 1$ and extend the sum:
+$$
+\Phi_d(n) \le \Big(\frac{n}{d}\Big)^{d} \sum_{i=0}^{n} \binom{n}{i} \Big(\frac{d}{n}\Big)^{i} = \Big(\frac{n}{d}\Big)^{d} \Big(1 + \frac{d}{n}\Big)^{n} \le \Big(\frac{en}{d}\Big)^{d},
+$$
+by the binomial theorem and $(1+x) \le e^x$.
+</Proof>
+</Theorem>
+
+<Figure
+  src="./figures/sauer-induction.svg"
+  alt="Left: a table of six binary label vectors on three points, with the two pairs differing only in the first coordinate highlighted, and the counts Y0 = 4 distinct tails plus Y1 = 2 doubled tails summing to 6. Right: a small table of the binomial sums Phi_d(n) with an arrow pair showing Phi_2(4) = Phi_2(3) + Phi_1(3), Pascal's recursion."
+  caption="The induction in one instance: splitting the restriction on its first point yields |Y₀| + |Y₁|, and the binomial-sum bound absorbs the split by Pascal's rule."
+/>
+
+<Task>
+Verify the figure's instance against the proof: the six vectors $\{000, 100, 010, 001, 101, 011\}$ on $C = \{c_1, c_2, c_3\}$ have $Y_0 = \{00, 10, 01, 11\}$ and $Y_1 = \{00, 01\}$. Then list the subsets of $C$ the six vectors shatter: $\emptyset$, all three singletons, $\{c_1, c_3\}$, and $\{c_2, c_3\}$ — six in all, while $\{c_1, c_2\}$ fails because no vector restricts to $11$ there. So the inductive claim $|\mathcal{H}_C| \le \#\{\text{shattered subsets}\}$ is **tight** here, $6 = 6$, and the one unit of slack in $6 \le \Phi_2(3) = 7$ is exactly the unshattered $\{c_1, c_2\}$: $\Phi_2(3)$ counts all seven subsets of size $\le 2$, shattered or not. Finally name, in one sentence, the step where the induction gets its power. (One answer: the doubled tails are charged to a class $\mathcal{H}'$ that shatters one point more than it appears to, trading a bigger count for a smaller dimension.)
+</Task>
+
+### The dichotomy, read off
+
+Combining the definition with the lemma: if $\operatorname{VCdim} = \infty$, then $\tau_{\mathcal{H}}(n) = 2^n$ for every $n$; if $\operatorname{VCdim} = d < \infty$, then $\tau_{\mathcal{H}}(n) = 2^n$ up to $n = d$ and is at most $(en/d)^d$ from there on. Exponential forever, or polynomial of degree $d$ past the breakpoint: no class in existence grows like $2^{\sqrt n}$ or $2^{n/2}$. The bound is not generous: the in-body exercise showed intervals attaining $\Phi_2(n)$ exactly, and thresholds attain $\Phi_1(n) = n+1$ exactly.
+
+<Figure
+  src="./figures/growth-function.svg"
+  alt="Log-scale plot of the growth function against n for thresholds, intervals, and rectangles, each following the 2-to-the-n diagonal before bending away at n equal to its VC dimension, with the exponential reference line continuing to the corner"
+  caption="The dichotomy's portrait: log₂ τ(n) for three classes. Each curve rides 2ⁿ until n = d, then bends to a polynomial of degree d; no curve between the diagonal and the polynomials is possible."
+/>
+
+<KeyFact>
+The dichotomy prices the worst placement: $\tau_{\mathcal{H}}(n)$ maximizes over all configurations of $n$ points, so one exotic shatterable configuration anywhere in $\mathcal{X}$ drives the count exponential even if every sample a distribution actually produces behaves polynomially. The kernel machine at the end of this lesson falls through exactly this crack, and it is <Ref lesson="rademacher-stability">the next lesson's</Ref> reason to measure capacity on the sample at hand instead.
+</KeyFact>
+
+## ★ From counting to concentration: the double-sample trick
+
+Substituting $\ln \tau_{\mathcal{H}}(n)$ for $\ln|\mathcal{H}|$ needs one honest repair: the behaviors in $\mathcal{H}_S$ are defined by the sample, so applying Hoeffding to them is exactly the selection sin the previous lesson's coins exposed. The classical fix, symmetrization (SSBD §6.5.2), earns the substitution in five steps.
+
+1. **Ghost sample.** Introduce a second, imaginary sample $S'$ of the same size. Since $R(h) = \mathbb{E}[\hat{R}_{S'}(h)]$, the worst gap $\sup_h (R(h) - \hat{R}_S(h))$ is at most the expected worst **gap between two samples**, $\mathbb{E}\sup_h(\hat{R}_{S'}(h) - \hat{R}_S(h))$: the unobservable $R$ has been eliminated in favor of $2n$ points.
+2. **Swap symmetry.** $S$ and $S'$ are iid, so exchanging $z_i \leftrightarrow z_i'$ coordinate by coordinate changes nothing; averaging over all $2^n$ exchange patterns inserts independent random signs $\sigma_i \in \{\pm 1\}$ in front of each per-point difference.
+3. **Freeze the points.** Condition on the $2n$ data points. The supremum now ranges over $\mathcal{H}$ restricted to those points: at most $\tau_{\mathcal{H}}(2n)$ behaviors, a **finite** set, fixed once the points are, with only the signs still random.
+4. **Concentrate and union.** For one fixed behavior, the signed average is a bounded zero-mean variable; Hoeffding bounds its tail, and a union (or Massart's maximal lemma, Mohri Thm. 3.7) over the $\tau_{\mathcal{H}}(2n)$ behaviors costs the familiar logarithm.
+5. **Cash in Sauer.** $\ln \tau_{\mathcal{H}}(2n) \le d \ln(2en/d)$, giving a uniform-convergence rate of order $\sqrt{d \ln(n/d)/n}$.
+
+<FigureSequence
+  name="symmetrization"
+  alt="Four frames: the supremum gap between true and empirical risk with the true risk drawn as an unobservable expectation; the expectation replaced by a ghost sample of n imaginary points; random signs inserted with swapped pairs shown exchanged; the two samples frozen and the class collapsed to a finite list of at most tau of 2n behaviors"
+  caption="Symmetrization frame by frame: each step removes one obstacle — the unobservable R, then the missing randomness, then the infinite class — until Hoeffding and a union bound apply."
+/>
+
+<Task>
+Step through the four frames and name, for each, the obstacle it removes. Then identify the frame that turns an infinite supremum into a finite maximum — that is where the growth function, and through it Sauer's lemma, enters the argument.
+</Task>
+
+The result, in the form SSBD prove in-chapter (Thm. 6.11): with probability at least $1 - \delta$, every $h \in \mathcal{H}$ satisfies
+$$
+\big|R(h) - \hat{R}(h)\big| \;\le\; \frac{4 + \sqrt{\ln \tau_{\mathcal{H}}(2n)}}{\delta\sqrt{2n}} .
+$$
+The $1/\delta$ (rather than $\sqrt{\ln(1/\delta)}$) betrays the shortcut: this version converts an expectation bound by Markov's inequality. The sharp version replaces Markov with McDiarmid's inequality and tightens the logarithm by chaining; that is SSBD Chapter 28, and this course does not reproduce it. The five steps above are the honest skeleton, and step 2 is the one that makes everything after it legal.
+
+## The fundamental theorem: capacity is a law
+
+Everything is assembled: infinite VC dimension makes a class unlearnable (a shattered set of size $2n$ hands the No Free Lunch adversary of <Ref lesson="learning-theory">the previous lesson</Ref> exactly the free family it needs, at every $n$); finite VC dimension makes the growth function polynomial, and symmetrization converts the polynomial into uniform convergence. The two directions meet in the module's central theorem.
+
+<Theorem title="the fundamental theorem of statistical learning (SSBD Thms. 6.7–6.8)">
+For a class $\mathcal{H}$ of binary classifiers under 0–1 loss, the following are equivalent: (1) $\mathcal{H}$ has the uniform convergence property; (2) ERM is a successful agnostic PAC learner for $\mathcal{H}$; (3) $\mathcal{H}$ is agnostic PAC learnable; (4) $\mathcal{H}$ is PAC learnable; (5) ERM is a successful PAC learner; (6) $\operatorname{VCdim}(\mathcal{H}) = d < \infty$.
+
+Moreover the sample complexity is determined by $d$ up to absolute constants $C_1 < C_2$:
+$$
+C_1\, \frac{d + \ln(1/\delta)}{\varepsilon^2} \;\le\; n_{\mathcal{H}}(\varepsilon, \delta) \;\le\; C_2\, \frac{d + \ln(1/\delta)}{\varepsilon^2}
+\qquad \text{(agnostic)},
+$$
+and in the realizable case $C_1 \frac{d + \ln(1/\delta)}{\varepsilon} \le n_{\mathcal{H}}(\varepsilon, \delta) \le C_2 \frac{d \ln(1/\varepsilon) + \ln(1/\delta)}{\varepsilon}$.
+</Theorem>
+
+**The dictionary.** The theorem is the finite-class story of the previous lesson with $\ln|\mathcal{H}|$ struck out and $d$ written in: same $1/\varepsilon^2$ against $1/\varepsilon$ split between noisy and clean problems, same per-unit pricing, now roughly a constant number of samples **per unit of VC dimension** instead of per bit of description. Halfspaces in $\mathbb{R}^{57}$ stop being "infinite, no guarantee" and become "$d = 58$, priced like a 58-bit finite class".
+
+**The equivalence.** Six statements collapse into one property. In particular (3) $\Rightarrow$ (1) says something not at all obvious: for binary classification, any successful learning method, however exotic, implies that plain uniform convergence held all along, so ERM would also have worked. Learnability, uniform convergence, and finite capacity are one phenomenon in this setting. (The equivalence is specific to it: for some multiclass and general losses, learnability without uniform convergence is possible; SSBD Ch. 13 has the counterexample.)
+
+**The lower bound.** The left-hand inequalities are the part with no analogue in anything proved so far: no algorithm, ERM or otherwise, learns with fewer than $C_1 (d + \ln(1/\delta))/\varepsilon^2$ samples. The proof (Mohri §3.4) is the probabilistic method: concentrate a distribution on a shattered set of size $d$, give one point mass $1 - 8\varepsilon$ and spread $8\varepsilon$ over the rest, and draw the target's labels on the shattered points at random. A sample of size $n \ll d/\varepsilon^2$ misses (or barely visits) most of the low-mass points; on an unseen shattered point, every labeling is consistent with everything observed, so the learner's answer is wrong with probability $\tfrac12$ under the random target, and if the average over targets is bad, some fixed target is bad. Averaging the adversary into existence, exactly as in No Free Lunch, but now inside a class of finite capacity: Mohri's Theorem 3.23 gets $n \ge d/(320\varepsilon^2)$ from it.
+
+<Figure
+  src="./figures/sample-complexity-sandwich.svg"
+  alt="Sample complexity plotted against VC dimension: two straight lines with slopes C1 over epsilon squared and C2 over epsilon squared bound a shaded band, and the true sample complexity curve runs inside the band"
+  caption="The sandwich (agnostic case): symmetrization plus Sauer supplies the upper line, the shattered-set adversary the lower one, and the true sample complexity is pinned between them — capacity sets the rate up to an absolute constant."
+/>
+
+<KeyFact>
+Both directions of the rate are distribution-free, and the lower one is witnessed by an adversarial distribution built on a shattered set. The law $\Theta\big((d + \ln(1/\delta))/\varepsilon^2\big)$ therefore pins the worst case over distributions, not any particular dataset's gap: a benign distribution can be far easier, which is why the certificates computed next are simultaneously true and $45\times$ looser than what the spam data actually does.
+</KeyFact>
+
+## The bounds against the course's own models
+
+A theorem with explicit constants can be evaluated, and this module's contract requires evaluating it on the course's actual classifiers: the train–test gaps that <Ref lesson="cross-validation-bootstrap">module 5</Ref> estimated empirically with held-out data and cross-validation are what the theory now claims to certify. The explicit form used below is Mohri's Corollary 3.19: with probability $1-\delta$, for all $h \in \mathcal{H}$,
+$$
+R(h) \;\le\; \hat{R}(h) + \sqrt{\frac{2 d \ln(en/d)}{n}} + \sqrt{\frac{\ln(1/\delta)}{2n}} .
+$$
+
+### Where it works: the spam halfspace
+
+<Ref lesson="spam-filter">The spam filter's</Ref> logistic model draws a halfspace over the corpus's 57 features: $d = 58$, $n = 3{,}065$ training messages. At $\delta = 0.05$ the bound certifies every halfspace's training error to within $\sqrt{2 \cdot 58 \ln(e \cdot 3065/58)/3065} + \sqrt{\ln 20/6130} = 0.434 + 0.022 \approx \textbf{46 points}$. True, uniform, distribution-free — and about $45\times$ the observed train–test gap of roughly one point. Driving the certification down to five points requires $n \approx 5 \times 10^5$: half a million messages for a class the course fit usefully on three thousand.
+
+The applied rule of thumb $n \ge 10\,d$, taught as the point where VC reasoning "kicks in" (Abu-Mostafa et al., *Learning From Data*, Ch. 2), gives $n = 580$ here — where the same bound certifies $\pm 86$ points. The rule encodes empirical experience of kind distributions, not the theorem's constants.
+
+The qualitative content survives everything. The certified gap scales as $\sqrt{(d/n)\ln(n/d)}$, so **samples per unit of VC dimension** is the ratio that decides, and the bound does eventually reach any target. That is more than the U-curve of <Ref lesson="bias-variance">module 1</Ref> ever promised: a guarantee with a rate, uniform over the class, for any distribution.
+
+### Where it goes vacuous: the two debts
+
+The module set out to pay two debts, and the tool just built cannot pay either.
+
+<Figure
+  src="./figures/vacuous-frontier.svg"
+  alt="Certified error gap against sample size on a log axis for three classes: halfspaces with d = 58 dropping below the five-point line near five hundred thousand samples, an ensemble of 400 boosted stumps with capacity bound near 170,000 needing over a billion samples, and RBF kernel machines pinned at gap 1 for every sample size, with the spam training set size marked as a vertical line"
+  caption="The VC bound priced on the course's models. Halfspaces-58: loose but eventually useful. 400 boosted stumps: a five-point certificate needs ~1.4 billion samples. RBF machines: VCdim = ∞, no certificate at any n."
+/>
+
+<Task>
+Read the figure at the dashed vertical line ($n = 3{,}065$, all the spam training data there is): the amber curve certifies ±46 points, the blue curve certifies nothing (still pinned at 1), the green line certifies nothing forever. Then read each curve's crossing of the five-point line, or its failure to cross.
+</Task>
+
+**Debt 1: the kernel machine.** The RBF-kernel SVM of <Ref lesson="svm-dual-kernels">module 4</Ref> operates in an infinite-dimensional feature space, and its function class shatters any finite set of distinct points (shrink the bandwidth until each point carries its own bump). $\operatorname{VCdim} = \infty$: the fundamental theorem does not merely fail to help; its lower direction says the unrestricted class is unlearnable, while the fitted machine achieved 4% test error on the ring data and competitive error on spam. The escape must be that the algorithm never searches the unrestricted class. The margin objective confines it to a small-norm ball, and the capacity of that ball is not a VC dimension; it is the data-dependent quantity on the debt note, $\operatorname{Tr}[K]$ and $\Lambda/\rho$, which no combinatorial count sees.
+
+**Debt 2: the boosted ensemble.** <Ref lesson="adaboost">AdaBoost's</Ref> class after $T$ rounds, linear thresholds over $T$ stumps, has VC dimension growing essentially linearly in $T$: SSBD's Lemma 10.3 bounds it by $T(d_B+1)(3\log_2(T(d_B+1)) + 2)$, which for $T = 400$ stumps on the spam features ($d_B \le 10$) is about $1.7 \times 10^5$. The VC bound then wants $n \approx 1.4 \times 10^9$, over a billion messages, before certifying five points, and it deteriorates every round the algorithm runs. The theorem's verdict on the course's measured facts (test error still falling at round 1,000, on 3,065 messages) is a flat prediction of doom that did not happen. The bound is true and explains nothing here: it prices the class, while the phenomenon belongs to the margins the algorithm achieves. Capacity is again in the wrong currency.
+
+### One paragraph of SRM, and the close
+
+The bounds do suggest a model-selection principle: fit a nested ladder $\mathcal{H}_1 \subset \mathcal{H}_2 \subset \cdots$ of growing VC dimension and pick the class minimizing $\hat{R} + \text{(capacity penalty)}$, Vapnik's *structural risk minimization*. It is the theory's version of what <Ref lesson="cross-validation-bootstrap">module 5's nested cross-validation</Ref> does empirically: both charge a complexity rent before believing a training score, one from a theorem, one from held-out data. The bounds' looseness matters less for selection, where only relative size counts, than for certification; and the one family where the SRM program runs cleanly is the SVM's margin ladder, which is precisely where this module is heading.
+
+What stands established: the growth function is the right size measure for infinite classes; the VC dimension governs it through Sauer's dichotomy ($2^n$ forever or degree-$d$ polynomial, nothing between); finite VC dimension is equivalent to PAC learnability, with the sample complexity pinned at $\Theta((d + \ln(1/\delta))/\varepsilon^2)$ in both directions; and evaluated on the course's models the resulting bounds are true, loose where they apply ($45\times$ on the spam halfspace), and structurally silent on the kernel machine and the boosted ensemble, whose effective capacity is set by norms and margins the combinatorics cannot see. <Ref lesson="rademacher-stability">The next lesson</Ref> builds the capacity measure that can: Rademacher complexity, which asks not how many labelings a class could realize somewhere, but how well it correlates with random labels on the sample at hand; its companion, stability, abandons the class entirely and bounds the algorithm.
+
+## Exercises
+
+<Exercise>
+Finite classes, both extremes. (a) Prove $\operatorname{VCdim}(\mathcal{H}) \le \log_2|\mathcal{H}|$ for finite $\mathcal{H}$. (b) Construct, for every $k$, a class with $|\mathcal{H}| = 2^k$ achieving $\operatorname{VCdim} = k$ exactly. (c) Construct a family of classes where $\log_2|\mathcal{H}|$ is unbounded while the VC dimension stays 1, and say which of the two numbers the fundamental theorem says is the truth about learnability.
+
+<Solution>
+(a) If $\mathcal{H}$ shatters $C$ with $|C| = k$, then $\mathcal{H}_C$ contains all $2^k$ label vectors, and distinct vectors need distinct hypotheses: $2^k \le |\mathcal{H}|$, so $k \le \log_2|\mathcal{H}|$.
+
+(b) Fix $k$ domain points and let $\mathcal{H}$ be **all** $2^k$ functions on them (constant elsewhere). The $k$ points are shattered by construction, and (a) caps the dimension at $\log_2 2^k = k$: equality.
+
+(c) Thresholds restricted to a grid $\theta \in \{1, \dots, k\}$: $|\mathcal{H}| = k+1$ hypotheses, $\log_2(k+1)$ unbounded in $k$, but the $(0,1)$ labeling of two points is as impossible as ever: $\operatorname{VCdim} = 1$ for every $k$. The fundamental theorem prices learning by $d$, so the truth is $d = 1$: the sample complexity of the grid class does not grow with $k$ at all, and the finite-class bound $\ln|\mathcal{H}| = \ln(k+1)$ of <Ref lesson="learning-theory">the previous lesson</Ref> was an overcharge. The transferable move: $\log_2|\mathcal{H}|$ is always a ceiling, never the price.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: the bottom of the capacity scale. (a) Compute $\operatorname{VCdim}(\{h\})$ for a class containing a single hypothesis, minding the empty set. (b) What does the fundamental theorem's agnostic rate promise at that dimension, and which result from the previous lesson is it? (c) Let $\mathcal{H}_1, \mathcal{H}_2$ each have VC dimension $\le d$. Prove $\tau_{\mathcal{H}_1 \cup \mathcal{H}_2}(n) \le \tau_{\mathcal{H}_1}(n) + \tau_{\mathcal{H}_2}(n)$, and deduce $\operatorname{VCdim}(\mathcal{H}_1 \cup \mathcal{H}_2) \le 2d + 1$. (SSBD Ex. 6.11 asks for exactly this bound.)
+
+<Solution>
+(a) A single hypothesis realizes one labeling on any nonempty set, and $2^1 = 2 > 1$, so no 1-point set is shattered. The empty set is shattered vacuously ($2^0 = 1$ labeling, realized). $\operatorname{VCdim} = 0$.
+
+(b) At $d = 0$ the rate reads $n = \Theta(\ln(1/\delta)/\varepsilon^2)$: still positive. A class that can learn nothing still owes the cost of measuring its one member's risk, and that is Hoeffding for a single pre-committed hypothesis: the $|\mathcal{H}| = 1$ boundary case of <Ref lesson="learning-theory">the previous lesson</Ref>, and exactly what <Ref lesson="cross-validation-bootstrap">module 5's fresh-test-set protocol</Ref> buys by holding out data for one already-chosen model. Capacity zero eliminates selection cost, never estimation cost.
+
+(c) Any labeling realized by the union is realized by $\mathcal{H}_1$ or by $\mathcal{H}_2$, so the label-vector sets satisfy $(\mathcal{H}_1 \cup \mathcal{H}_2)_C = (\mathcal{H}_1)_C \cup (\mathcal{H}_2)_C$ and the counts add: $\tau_\cup(n) \le \tau_1(n) + \tau_2(n)$. Now suppose the union shatters a set of size $n = 2d+2$. Then
+$$
+2^{2d+2} \;\le\; \tau_1(2d+2) + \tau_2(2d+2) \;\le\; 2\,\Phi_d(2d+2)
+$$
+by Sauer. But $\Phi_d(2d+2) = \sum_{i \le d}\binom{2d+2}{i}$ counts strictly less than half of all $2^{2d+2}$ subsets: by the symmetry $\binom{m}{i} = \binom{m}{m-i}$ with $m = 2d+2$, the terms $i \le d$ and $i \ge d+2$ split evenly and the middle term $\binom{2d+2}{d+1} > 0$ belongs to neither, so $2\Phi_d(2d+2) = 2^{2d+2} - \binom{2d+2}{d+1} < 2^{2d+2}$. Contradiction; no $(2d+2)$-set is shattered, and $\operatorname{VCdim}(\mathcal{H}_1 \cup \mathcal{H}_2) \le 2d+1$. Merging two model families at most doubles-plus-one the capacity: a union is cheap, which is why <Ref lesson="learning-theory">last lesson's</Ref> log-priced unions and this bound tell one story.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "A model class with $10^6$ parameters needs on the order of $10^6$ labeled examples — parameter count sets the sample size." Break it in both directions with classes from this lesson, then state precisely which quantity the fundamental theorem puts in the sample complexity, and name the step at which the parameter-counting argument fails.
+
+<Solution>
+**Downward failure.** $\{x \mapsto \lceil\sin(\theta x)\rceil\}$ has one parameter and $\operatorname{VCdim} = \infty$: by the fundamental theorem's lower direction it is not PAC learnable at any sample size, distribution-free. One parameter, infinite appetite.
+
+**Upward failure.** Halfspaces over $10^6$ features have $d = 10^6 + 1$, and for the unrestricted class the lower bound $n \ge C_1 d/\varepsilon^2$ is real, but no fitted million-feature model is unrestricted. Constrain the weight norm, $\lVert w \rVert \le \Lambda$, with data in a ball of radius $r$ and predictions read through a margin $\rho$, and the relevant capacity becomes the norm-and-margin quantity previewed on <Ref lesson="svm-dual-kernels">the kernel debt note</Ref>, of order $\Lambda r/(\rho\sqrt{n})$, with no $10^6$ anywhere. A heavily regularized million-parameter linear class learns from thousands of examples, as <Ref lesson="ridge-lasso">module 3's ridge fits</Ref>, where an $\ell_2$ penalty made correlated coefficient vectors estimable from modest samples, already demonstrated empirically.
+
+**What actually enters:** $d = \operatorname{VCdim}(\mathcal{H})$, and only for the class the algorithm genuinely searches. The parameter-counting argument fails at the identification step "capacity $=$ how the class is written": a real parameter can store unboundedly many bits (sine), and a constraint can make most parameter settings unreachable (regularization). Capacity measures realizable behaviors, not notation.
+</Solution>
+</Exercise>
+
+<Exercise>
+Review, with a definitional trap. (a) Prove that the growth function of thresholds $\mathbf{1}[x < a]$ is exactly $n+1$, and check it against both Sauer forms ($\Phi_1(n)$ and $(en/1)^1$). (b) <Ref lesson="learning-theory">The previous lesson's</Ref> forward exercise counted 6 labelings of 5 points for the class $\{\operatorname{sign}(x - \theta)\}$ — reconcile the two counts. (c) Now take the two-orientation class $\mathcal{H}_{\pm} = \{x \mapsto s \cdot \operatorname{sign}(x - \theta) : s \in \{\pm 1\},\, \theta \in \mathbb{R}\}$: compute its growth function and VC dimension, and state the moral.
+
+<Solution>
+(a) On $n$ distinct sorted points, the label vector of $\mathbf{1}[x<a]$ is determined by how many points lie below $a$: the vectors are $1^k 0^{n-k}$ for $k = 0, \dots, n$, all realizable and no others, so $\tau(n) = n+1$ for every configuration, hence also the max. Sauer at $d = 1$ gives $\Phi_1(n) = 1 + n$, attained with equality, and the relaxed form $(en/1)^1 = en \ge n+1$ for $n \ge 1$: consistent, slightly looser.
+
+(b) $\operatorname{sign}(x-\theta)$ produces the mirror-image vectors $(-)^k(+)^{n-k}$: again one orientation, again $n+1$ patterns, and $5+1 = 6$. The two classes are the same family up to relabeling; both have $d = 1$.
+
+(c) $\mathcal{H}_\pm$ realizes both staircase directions: $n+1$ increasing patterns plus $n+1$ decreasing, minus the two constant vectors counted twice: $\tau(n) = 2n$. It shatters 2 points ($(+,+), (-,-), (-,+)$ from one orientation, $(+,-)$ from the other) but not 3, since $(+,-,+)$ is monotone in neither direction: $\operatorname{VCdim} = 2$, and $2n \le \Phi_2(n) = 1 + n + \binom{n}{2}$ holds — with equality at $n = 2$ (both sides are 4, the shattered pair) and growing slack from $n = 3$ on. The moral is definitional care: one bit of orientation moved the class from $d=1$ to $d=2$ and its growth from $n+1$ to $2n$. "The VC dimension of thresholds" is not well-posed until the class is written down exactly: the same discipline <Ref lesson="wrong-way-cv">module 5</Ref> demanded of validation protocols, where a half-specified procedure (feature selection outside the folds) silently changed the measured error, applied here to hypothesis classes.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: certify a tree, then measure it. Consider complete depth-3 binary decision trees over 10 binary features (7 internal nodes, each testing one feature; 8 labeled leaves), the small cousins of <Ref lesson="decision-trees">module 6's trees</Ref>. (a) Upper-bound $|\mathcal{H}|$ and hence $\operatorname{VCdim} \le \log_2|\mathcal{H}|$. (b) Evaluate the finite-class uniform-convergence tolerance at $n = 5{,}000$, $\delta = 0.05$. (c) Design the experiment that measures the bound's honesty: state what to generate, what to compare, and what outcome you expect before running it.
+
+<Solution>
+(a) Each internal node chooses one of 10 features and each leaf one of 2 labels: $|\mathcal{H}| \le 10^7 \cdot 2^8 = 2.56 \times 10^9$ (an overcount, since distinct trees can compute equal functions, which only helps the bound). $\ln|\mathcal{H}| \le 21.7$, so $\operatorname{VCdim} \le \log_2|\mathcal{H}| \le 31.3$: at most 31.
+
+(b) $\varepsilon = \sqrt{(\ln|\mathcal{H}| + \ln(2/\delta))/(2n)} = \sqrt{(21.7 + 3.7)/10^4} = 0.050$: at five thousand samples, every depth-3 tree's training error is certified within five points of its risk simultaneously, with 95% confidence. The certificate is genuinely usable because the class is small.
+
+(c) Design: draw $n = 5{,}000$ points uniformly on $\{0,1\}^{10}$, label by a fixed depth-3 tree with 10% label noise; fit a depth-3 tree greedily; compare its train–test gap (test = a fresh $10^5$-point draw, standing in for the risk) against the certified 0.05, and repeat over ~50 seeds for the distribution of gaps. Expected outcome, stated in advance: the bound never violated (it is a theorem), and the observed gaps concentrated well inside it, a few points at most, since the bound guards all $2.5 \times 10^9$ trees on the worst distribution while the experiment fits one greedy tree on a benign one. The measured looseness factor is the number to keep, and producing exactly such factors, bound by bound, is the business of <Ref lesson="bounds-vs-practice">the module's final lesson</Ref>.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. Fix 20 points spread in the plane (e.g., a jittered $4\times 5$ grid) and draw 5 independent uniform random sign vectors $\sigma^{(1)}, \dots, \sigma^{(5)} \in \{\pm 1\}^{20}$. For each, search halfspaces (directions at $5°$ steps, thresholds at projected midpoints) for the largest *correlation* $\frac{1}{20}\sum_i \sigma_i\, h(x_i)$, then average the 5 maxima. Predict, before computing: can the average reach 1, and what does Sauer say about it?
+
+<Solution>
+The average falls short of 1 unless a random labeling happens to be realizable: correlation 1 requires the halfspace to reproduce the sign vector exactly, and by Sauer with $d = 3$ (halfspaces in $\mathbb{R}^2$), the class realizes at most $\Phi_3(20) = 1 + 20 + 190 + 1140 = 1{,}351$ of the $2^{20} \approx 10^6$ labelings, so a random one is realizable with probability about $10^{-3}$. The searched maxima land well below 1, typically around $0.6$–$0.7$ on a spread-out configuration. A ceiling comes from Massart's finite-max lemma (Mohri Thm. 3.7), which bounds the expected maximum correlation of $N$ fixed sign patterns with $n$ uniform random signs by $\sqrt{2 \ln N / n}$: here $\sqrt{2\ln(1351)/20} \approx 0.85$.
+
+The quantity just computed, the expected best correlation of a class with random signs on a fixed sample, is the **empirical Rademacher complexity** of halfspaces on these 20 points: the data-dependent capacity measure that replaces the growth function in <Ref lesson="rademacher-stability">the next lesson</Ref>. The VC machinery bounded it by a worst-case count; the next lesson computes it from the data itself, which is exactly what the kernel and boosting debts require.
+</Solution>
+</Exercise>
+
+<References>
+1. S. Shalev-Shwartz, S. Ben-David, *Understanding Machine Learning: From Theory to Algorithms*, Cambridge University Press, 2014 — Ch. 6: restriction, shattering, VC dimension, the worked gallery, Sauer's lemma with the induction carried here (Lemma 6.10), the fundamental theorem (Thms. 6.7–6.8), the in-chapter symmetrization proof (§6.5.2, Thm. 6.11), the sine class (Ex. 6.8), unions (Ex. 6.11), and the Sauer–Shelah–Perles history (§6.7); Ch. 28: the sharp sample-complexity proofs the starred section defers to; Ch. 10, Lemma 10.3: the VC dimension of $T$-term ensembles used in the vacuous-frontier computation. Free online: https://www.cs.huji.ac.il/~shais/UnderstandingMachineLearning/
+2. M. Mohri, A. Rostamizadeh, A. Talwalkar, *Foundations of Machine Learning*, 2nd ed., MIT Press, 2018 — Ch. 3: the growth function, Massart's lemma (Thm. 3.7), Radon's theorem and the halfspace computation followed here (Thm. 3.13, Ex. 3.12), Sauer's lemma and the $(en/d)^d$ corollary (Thm. 3.17, Cor. 3.18), the explicit VC generalization bound evaluated on the spam halfspace (Cor. 3.19), and the realizable/agnostic lower bounds by the probabilistic method (§3.4, Thms. 3.20, 3.23). Free online: https://cs.nyu.edu/~mohri/mlbook/
+3. T. Hastie, R. Tibshirani, J. Friedman, *The Elements of Statistical Learning*, 2nd ed., Springer, 2009 — §7.9: the practitioners' reading of VC dimension, the sin(50x) figure (Fig. 7.5), the optimism bounds, and the account of structural risk minimization with its looseness caveat, the judgment on selection versus certification adopted in the SRM section. Free online: https://hastie.su.domains/ElemStatLearn/
+4. V. N. Vapnik, A. Ya. Chervonenkis, "On the Uniform Convergence of Relative Frequencies of Events to Their Probabilities," *Theory of Probability and Its Applications* 16(2), 1971 — the origin of the growth function, the VC dimension, the uniform-convergence theorem, and one of the three independent proofs of Sauer's lemma. https://doi.org/10.1137/1116025
+5. A. Blumer, A. Ehrenfeucht, D. Haussler, M. K. Warmuth, "Learnability and the Vapnik–Chervonenkis Dimension," *Journal of the ACM* 36(4), 1989 — the equivalence of finite VC dimension and PAC learnability, completing the fundamental theorem in the learning framework. https://doi.org/10.1145/76359.76371
+6. N. Sauer, "On the Density of Families of Sets," *Journal of Combinatorial Theory, Series A* 13(1), 1972 — Sauer's proof of the lemma, answering a question of Erdős. https://doi.org/10.1016/0097-3165(72)90019-2
+7. S. Shelah, "A Combinatorial Problem; Stability and Order for Models and Theories in Infinitary Languages," *Pacific Journal of Mathematics* 41(1), 1972 — the independent proof (with Perles) from model theory.
+8. Y. S. Abu-Mostafa, M. Magdon-Ismail, H.-T. Lin, *Learning From Data*, AMLBook, 2012 — Ch. 2: the VC analysis for practitioners and the $n \ge 10\,d_{\mathrm{VC}}$ rule of thumb cited in the applications section.
+</References>

@@ -1,0 +1,390 @@
+checkpoints:
+  kernel-matrix:
+    kind: exact
+    seed: 21
+    atol: 1.0e-9
+    inputs_code: |
+      # XB repeats two of XA's inputs, so the output carries zero-distance
+      # entries: k(x, x) must come back as the signal variance exactly.
+      XA = np.sort(rng.uniform(-3.0, 3.0, size=6))
+      XB = np.concatenate([XA[:2], np.array([-4.0, 0.0, 4.0])])
+      inputs = (XA, XB, 0.7, 2.5)
+    wrong:
+      - hint: "The 2 in the denominator is missing: the exponent is −r²/(2ℓ²), not −r²/ℓ². Your correlations decay a factor √2 too fast in distance."
+        code: |
+          def f(XA, XB, lengthscale, signal_var):
+              import numpy as np
+              r = XA[:, None] - XB[None, :]
+              return signal_var * np.exp(-(r**2) / lengthscale**2)
+      - hint: "The lengthscale is squared too: the exponent is −r²/(2ℓ²). With ℓ unsquared the ratio is not a pure number any more, and the kernel decays on a scale of √(2ℓ) rather than the ℓ the caller asked for."
+        code: |
+          def f(XA, XB, lengthscale, signal_var):
+              import numpy as np
+              r = XA[:, None] - XB[None, :]
+              return signal_var * np.exp(-(r**2) / (2 * lengthscale))
+      - hint: "The exponent uses the SQUARED distance. With |r| in place of r² this is the exponential (Matérn ν=½) kernel, whose draws are continuous but nowhere smooth."
+        code: |
+          def f(XA, XB, lengthscale, signal_var):
+              import numpy as np
+              r = XA[:, None] - XB[None, :]
+              return signal_var * np.exp(-np.abs(r) / (2 * lengthscale**2))
+      - hint: "signal_var is the variance σf², the kernel's value at zero distance: k(x, x) must equal signal_var, not its square root."
+        code: |
+          def f(XA, XB, lengthscale, signal_var):
+              import numpy as np
+              r = XA[:, None] - XB[None, :]
+              return np.sqrt(signal_var) * np.exp(-(r**2) / (2 * lengthscale**2))
+  prior-samples:
+    kind: exact
+    seed: 22
+    atol: 1.0e-9
+    inputs_code: |
+      X = np.linspace(-2.0, 2.0, 12)
+      Z = rng.standard_normal((12, 3))
+      inputs = (X, Z, 0.8, 1.5, 1.0e-8)
+    wrong:
+      - hint: "L is lower triangular and the draw is L @ Z, not Lᵀ @ Z: only L @ Z has covariance L Lᵀ = K. The transposed version has covariance Lᵀ L, which is not the kernel matrix."
+        code: |
+          def f(X, Z, lengthscale, signal_var, jitter=1.0e-8):
+              import numpy as np
+              r = X[:, None] - X[None, :]
+              K = signal_var * np.exp(-(r**2) / (2 * lengthscale**2))
+              L = np.linalg.cholesky(K + jitter * np.eye(len(X)))
+              return L.T @ Z
+      - hint: "Scaling each coordinate by its own standard deviation √K_ii draws INDEPENDENT values: the samples get the right marginal variance and none of the correlation the kernel asserts, so they are white noise, not functions."
+        code: |
+          def f(X, Z, lengthscale, signal_var, jitter=1.0e-8):
+              import numpy as np
+              r = X[:, None] - X[None, :]
+              K = signal_var * np.exp(-(r**2) / (2 * lengthscale**2))
+              return np.sqrt(np.diag(K) + jitter)[:, None] * Z
+      - hint: "The jitter never reached the matrix. It is not a safety net you can skip when cholesky happens not to raise — this K factorizes without it and returns a different L, so the draws are wrong by far more than the tolerance."
+        code: |
+          def f(X, Z, lengthscale, signal_var, jitter=1.0e-8):
+              import numpy as np
+              r = X[:, None] - X[None, :]
+              K = signal_var * np.exp(-(r**2) / (2 * lengthscale**2))
+              L = np.linalg.cholesky(K)
+              return L @ Z
+      - hint: "The jitter goes on the DIAGONAL only: `K + jitter` broadcasts ε into every entry, which adds a rank-one block of correlation to the prior instead of nudging its eigenvalues. It is ε·I that is added."
+        code: |
+          def f(X, Z, lengthscale, signal_var, jitter=1.0e-8):
+              import numpy as np
+              r = X[:, None] - X[None, :]
+              K = signal_var * np.exp(-(r**2) / (2 * lengthscale**2))
+              L = np.linalg.cholesky(K + jitter)
+              return L @ Z
+      - hint: "The jitter is the ε the signature declares, not one of your own choosing: this K is ill-conditioned enough that a different ε is a different factorization and different draws. Pass the argument through."
+        code: |
+          def f(X, Z, lengthscale, signal_var, jitter=1.0e-8):
+              import numpy as np
+              r = X[:, None] - X[None, :]
+              K = signal_var * np.exp(-(r**2) / (2 * lengthscale**2))
+              L = np.linalg.cholesky(K + 1.0e-6 * np.eye(len(X)))
+              return L @ Z
+  gp-posterior:
+    kind: exact
+    seed: 23
+    atol: 1.0e-8
+    inputs_code: |
+      # Ten noisy observations of a smooth function, six test inputs — two of
+      # them beyond the data, where the variance must return toward the prior.
+      xt = np.sort(rng.uniform(-3.0, 3.0, size=10))
+      xs = np.array([-4.5, -2.0, -0.5, 0.7, 2.2, 4.5])
+      ell, sf2 = 0.9, 2.0
+      K = sf2 * np.exp(-((xt[:, None] - xt[None, :]) ** 2) / (2 * ell**2))
+      Ks = sf2 * np.exp(-((xt[:, None] - xs[None, :]) ** 2) / (2 * ell**2))
+      kss = np.full(len(xs), sf2)
+      y = np.sin(2.0 * xt) + 0.2 * rng.standard_normal(10)
+      inputs = (K, y, Ks, kss, 0.04)
+    wrong:
+      - hint: "The noise is missing from the training block: the mean must solve (K + σn²I)α = y. Without it the posterior interpolates every noisy observation exactly and the variance collapses to nearly zero at the data."
+        code: |
+          def f(K, y, Ks, kss, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + 1e-10 * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              v = np.linalg.solve(L, Ks)
+              return Ks.T @ alpha, kss - (v**2).sum(axis=0)
+      - hint: "The variance never subtracts what the data revealed: V[f*] = k** − k*ᵀ(K+σn²I)⁻¹k*, computed as k** − vᵀv with v = L \\ k*. Returning k** alone reports the prior at every test point, data or no data."
+        code: |
+          def f(K, y, Ks, kss, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              return Ks.T @ alpha, kss.copy()
+      - hint: "The subtracted term skipped the solve: it is k*ᵀ(K+σn²I)⁻¹k*, not k*ᵀk*. Squaring k* directly ignores how redundant the training points are with each other."
+        code: |
+          def f(K, y, Ks, kss, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              return Ks.T @ alpha, kss - (Ks**2).sum(axis=0)
+      - hint: "This is V[y*], the variance of a new OBSERVATION: it adds the noise floor σn². The checkpoint asks for V[f*], the latent function's variance — the noise is added later, and only where the quantity predicted is a measurement."
+        code: |
+          def f(K, y, Ks, kss, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              v = np.linalg.solve(L, Ks)
+              return Ks.T @ alpha, kss - (v**2).sum(axis=0) + noise_var
+      - hint: "The mean is k*ᵀ(K+σn²I)⁻¹y, not k*ᵀy: without the solve the targets are averaged with raw kernel weights, which double-counts training points that sit close together."
+        code: |
+          def f(K, y, Ks, kss, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              v = np.linalg.solve(L, Ks)
+              return Ks.T @ y, kss - (v**2).sum(axis=0)
+  log-marginal:
+    kind: exact
+    seed: 24
+    atol: 1.0e-8
+    inputs_code: |
+      xt = np.sort(rng.uniform(-3.0, 3.0, size=14))
+      K = 1.4 * np.exp(-((xt[:, None] - xt[None, :]) ** 2) / (2 * 0.8**2))
+      y = np.cos(1.7 * xt) + 0.25 * rng.standard_normal(14)
+      inputs = (K, y, 0.09)
+    wrong:
+      - hint: "The determinant term is over-counted: log|K + σn²I| = 2 Σ log L_ii, and the objective wants HALF of it, so the term is −Σ log L_ii, not −2 Σ log L_ii."
+        code: |
+          def f(K, y, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              return -0.5 * y @ alpha - 2 * np.log(np.diag(L)).sum() - 0.5 * len(y) * np.log(2 * np.pi)
+      - hint: "The −(n/2)·log 2π normalizer is missing. It does not move the argmax over hyperparameters, but it is part of the log density, and every published log-evidence number includes it."
+        code: |
+          def f(K, y, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              return -0.5 * y @ alpha - np.log(np.diag(L)).sum()
+      - hint: "The complexity term has the wrong sign: a model whose K + σn²I has a LARGER determinant spreads its probability over more datasets, so the term must penalize, not reward."
+        code: |
+          def f(K, y, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              return -0.5 * y @ alpha + np.log(np.diag(L)).sum() - 0.5 * len(y) * np.log(2 * np.pi)
+      - hint: "The noise is missing from the determinant: the factorization must be of K + σn²I, and both terms must use the same matrix."
+        code: |
+          def f(K, y, noise_var):
+              import numpy as np
+              L = np.linalg.cholesky(K + noise_var * np.eye(len(y)))
+              alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+              L0 = np.linalg.cholesky(K + 1e-8 * np.eye(len(y)))
+              return -0.5 * y @ alpha - np.log(np.diag(L0)).sum() - 0.5 * len(y) * np.log(2 * np.pi)
+  hyperparam-grid:
+    kind: exact
+    seed: 25
+    # The grid's stiffest cell (ℓ = 5, σn² = 1e-4) has condition number ~3e5,
+    # where two LAPACK routes to the same log density already disagree at 1e-8:
+    # the tolerance is set above that noise, and every wrong variant here is
+    # hundreds of nats away.
+    atol: 1.0e-5
+    inputs_code: |
+      # Thirty observations of a wave with period ~4.2 in x and noise sd 0.15:
+      # the generating lengthscale and noise both sit inside the grid.
+      x = np.sort(rng.uniform(0.0, 6.0, size=30))
+      y = np.sin(1.5 * x) + 0.15 * rng.standard_normal(30)
+      ell_grid = np.array([0.1, 0.3, 0.6, 1.0, 2.0, 5.0])
+      noise_grid = np.array([0.0001, 0.0025, 0.02, 0.25, 1.0])
+      inputs = (x, y, ell_grid, noise_grid, 1.0)
+    wrong:
+      - hint: "The grid is scored by the data-fit term alone. Fit always improves as the noise shrinks and the lengthscale shortens, so this selection runs to the corner of the grid; the complexity term −½log|K+σn²I| is what stops it."
+        code: |
+          def f(x, y, ell_grid, noise_grid, signal_var):
+              import numpy as np
+              table = np.empty((len(ell_grid), len(noise_grid)))
+              for i, ell in enumerate(ell_grid):
+                  r = x[:, None] - x[None, :]
+                  K = signal_var * np.exp(-(r**2) / (2 * ell**2))
+                  for j, nv in enumerate(noise_grid):
+                      L = np.linalg.cholesky(K + nv * np.eye(len(y)))
+                      alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+                      table[i, j] = -0.5 * y @ alpha
+              i, j = np.unravel_index(np.argmax(table), table.shape)
+              return ell_grid[i], noise_grid[j], table
+      - hint: "The evidence is MAXIMIZED. Taking the argmin picks the configuration the data support least — here the shortest lengthscale with the smallest noise, a memorizer."
+        code: |
+          def f(x, y, ell_grid, noise_grid, signal_var):
+              import numpy as np
+              table = np.empty((len(ell_grid), len(noise_grid)))
+              for i, ell in enumerate(ell_grid):
+                  r = x[:, None] - x[None, :]
+                  K = signal_var * np.exp(-(r**2) / (2 * ell**2))
+                  for j, nv in enumerate(noise_grid):
+                      L = np.linalg.cholesky(K + nv * np.eye(len(y)))
+                      alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+                      table[i, j] = -0.5 * y @ alpha - np.log(np.diag(L)).sum() - 0.5 * len(y) * np.log(2 * np.pi)
+              i, j = np.unravel_index(np.argmin(table), table.shape)
+              return ell_grid[i], noise_grid[j], table
+      - hint: "The two grid axes are swapped when the winner is read back: row index i indexes ell_grid, column index j indexes noise_grid. Check the shape of the table against the order you unpacked."
+        code: |
+          def f(x, y, ell_grid, noise_grid, signal_var):
+              import numpy as np
+              table = np.empty((len(ell_grid), len(noise_grid)))
+              for i, ell in enumerate(ell_grid):
+                  r = x[:, None] - x[None, :]
+                  K = signal_var * np.exp(-(r**2) / (2 * ell**2))
+                  for j, nv in enumerate(noise_grid):
+                      L = np.linalg.cholesky(K + nv * np.eye(len(y)))
+                      alpha = np.linalg.solve(L.T, np.linalg.solve(L, y))
+                      table[i, j] = -0.5 * y @ alpha - np.log(np.diag(L)).sum() - 0.5 * len(y) * np.log(2 * np.pi)
+              flat = int(np.argmax(table))
+              return ell_grid[flat % len(ell_grid)], noise_grid[flat // len(ell_grid)], table
+  conformal-quantile:
+    kind: exact
+    seed: 26
+    atol: 1.0e-9
+    inputs_code: |
+      # 23 scores and α = 0.1: the rank the recipe selects sits strictly inside
+      # the sorted scores here, and every off-by-one lands on a different one.
+      scores = np.abs(1.3 * rng.standard_normal(23))
+      inputs = (scores, 0.1)
+    wrong:
+      - hint: "np.quantile interpolates at the n(1−α) position; split conformal needs an order statistic at index ⌈(n+1)(1−α)⌉ — the +1 is the seat reserved for the test point, and without it coverage falls short of 1−α."
+        code: |
+          def f(scores, alpha):
+              import numpy as np
+              n = len(scores)
+              return int(np.ceil(n * (1 - alpha))), float(np.quantile(scores, 1 - alpha))
+      - hint: "Rounding the index DOWN breaks the proof: the count k must satisfy k ≥ (n+1)(1−α), which is what makes coverage k/(n+1) ≥ 1−α. Use the ceiling."
+        code: |
+          def f(scores, alpha):
+              import numpy as np
+              n = len(scores)
+              k = int(np.floor((n + 1) * (1 - alpha)))
+              return k, float(np.sort(scores)[k - 1])
+      - hint: "The index k counts scores from 1: the k-th smallest is sorted[k−1] in numpy's 0-based indexing. Taking sorted[k] returns the (k+1)-th and quietly over-covers."
+        code: |
+          def f(scores, alpha):
+              import numpy as np
+              n = len(scores)
+              k = int(np.ceil((n + 1) * (1 - alpha)))
+              return k, float(np.sort(scores)[k])
+  coverage-check:
+    kind: exact
+    seed: 27
+    atol: 1.0e-9
+    inputs_code: |
+      # A model whose own error bars vary point to point, and residuals that
+      # really do scale with them: the two scores must disagree.
+      mu_cal = np.sin(rng.uniform(0.0, 6.0, size=80))
+      sd_cal = 0.2 + 0.9 * rng.random(80)
+      y_cal = mu_cal + sd_cal * rng.standard_normal(80)
+      mu_test = np.sin(rng.uniform(0.0, 6.0, size=200))
+      sd_test = 0.2 + 0.9 * rng.random(200)
+      y_test = mu_test + sd_test * rng.standard_normal(200)
+      inputs = (mu_cal, sd_cal, y_cal, mu_test, sd_test, y_test, 0.1)
+    wrong:
+      - hint: "The scaled score's interval is μ(x) ± q̂·σ(x), not μ(x) ± q̂: the score was divided by σ, so the threshold must be multiplied by it again to come back to the units of y."
+        code: |
+          def f(mu_cal, sd_cal, y_cal, mu_test, sd_test, y_test, alpha):
+              import numpy as np
+              def q_at(s):
+                  n = len(s)
+                  k = int(np.ceil((n + 1) * (1 - alpha)))
+                  return np.sort(s)[k - 1]
+              res = np.abs(y_cal - mu_cal)
+              q, qs = q_at(res), q_at(res / sd_cal)
+              d = np.abs(y_test - mu_test)
+              return float(np.mean(d <= q)), float(2 * q), float(np.mean(d <= qs)), float(2 * qs)
+      - hint: "The quantile is calibrated on the TEST residuals. That is the leak the coverage theorem forbids: scores the band is graded on cannot also set the band, and the coverage it reports is guaranteed by construction rather than measured."
+        code: |
+          def f(mu_cal, sd_cal, y_cal, mu_test, sd_test, y_test, alpha):
+              import numpy as np
+              def q_at(s):
+                  n = len(s)
+                  k = int(np.ceil((n + 1) * (1 - alpha)))
+                  return np.sort(s)[k - 1]
+              res = np.abs(y_test - mu_test)
+              q, qs = q_at(res), q_at(res / sd_test)
+              d = np.abs(y_test - mu_test)
+              return (float(np.mean(d <= q)), float(2 * q),
+                      float(np.mean(d <= qs * sd_test)), float(2 * (qs * sd_test).mean()))
+      - hint: "The width reported is the half-width. An interval [μ−q̂, μ+q̂] is 2q̂ wide."
+        code: |
+          def f(mu_cal, sd_cal, y_cal, mu_test, sd_test, y_test, alpha):
+              import numpy as np
+              def q_at(s):
+                  n = len(s)
+                  k = int(np.ceil((n + 1) * (1 - alpha)))
+                  return np.sort(s)[k - 1]
+              res = np.abs(y_cal - mu_cal)
+              q, qs = q_at(res), q_at(res / sd_cal)
+              d = np.abs(y_test - mu_test)
+              return (float(np.mean(d <= q)), float(q),
+                      float(np.mean(d <= qs * sd_test)), float((qs * sd_test).mean()))
+      - hint: "The score is the ABSOLUTE residual. Scoring the signed residual y − μ calibrates a one-sided threshold: the band it produces misses everything that falls below the mean, and its coverage lands near 1 − α/2 at best."
+        code: |
+          def f(mu_cal, sd_cal, y_cal, mu_test, sd_test, y_test, alpha):
+              import numpy as np
+              def q_at(s):
+                  n = len(s)
+                  k = int(np.ceil((n + 1) * (1 - alpha)))
+                  return np.sort(s)[k - 1]
+              res = y_cal - mu_cal
+              q, qs = q_at(res), q_at(res / sd_cal)
+              d = np.abs(y_test - mu_test)
+              return (float(np.mean(d <= q)), float(2 * q),
+                      float(np.mean(d <= qs * sd_test)), float(2 * (qs * sd_test).mean()))
+  gp-vs-conformal:
+    kind: review
+    rubric: |
+      The question, after the learner has measured both constructions twice on
+      the same record: on the exchangeable split (months held out at random)
+      the GP's own 90% band over-covers while the split-conformal band lands
+      near 0.90; on the forecast split (train through 1993, calibrate
+      1994–1997, test 1998–2003) the ordering reverses — the composite-kernel
+      GP band covers every test month and the conformal band covers about a
+      third of them. The learner is asked for the MECHANISM on each side — what
+      each band's width is computed from, and why that quantity was right in
+      one experiment and wrong in the other. The notebook has already named
+      exchangeability and said that the forecast split is where the code is
+      given different months, so the assumption's name is worth no credit on
+      its own.
+
+      Pass if the answer gets BOTH mechanisms right:
+      (1) the GP's band is a probability statement conditional on the kernel —
+      it is exact if the kernel's claims hold and worth nothing more than the
+      kernel otherwise; its width is computed from the kernel before any
+      residual is seen. Credit for this half requires naming that dependence as
+      what carried the forecast: the COMPOSITE kernel survives because its
+      terms encode the trend and the annual cycle, so its mean stays right and
+      its band stays calibrated far past the data. Widening with distance is
+      not by itself the answer and must not be credited as one — the SE
+      kernel's band widened over the same horizon to 44 ppm and covered 0.000
+      of the test months. An answer whose only mechanism is "the band widens
+      away from the data" fails this half, however fluent;
+      (2) split conformal's width is not computed from a model at all: it is
+      read off the calibration scores, and it transfers to the test points only
+      while those scores come from one common pool — which a random month-wise
+      split gives and a forecast does not. Credit for this half requires the
+      mechanism, not the word: the calibration months sit 0–4 years past the
+      training edge and the test months 4–10 years past it, prediction error
+      grows with the horizon, so one threshold fitted on the near months is
+      systematically TOO SMALL far out and coverage decays as the horizon
+      lengthens. An answer that names exchangeability, or notes that the
+      forecast split is ordered in time, without saying what that does to the
+      residuals and in which direction it moves the band, fails this half — the
+      notebook gave it the name.
+      Credit for noting that conformal's guarantee is about validity and not
+      width (a wrong model costs width, never validity, ON exchangeable data),
+      and for observing that neither method's failure is visible from inside
+      it — measured coverage on held-out data is the only referee.
+
+      Fail if the answer treats conformal as universally valid, or accounts for
+      its forecast failure only by naming exchangeability or the time ordering
+      without the mechanism in (2); if it claims the GP
+      band is unconditionally honest because it widens away from data; if it
+      attributes the flip to sample size, to the choice of α, or to a bug;
+      or if it only restates the measured numbers without naming an
+      assumption.
+  coverage-target:
+    kind: metric
+    metric: accuracy
+    threshold: 0.85
+    holdout: data/holdout_X.csv
+    labels_code: |
+      labels = np.loadtxt("private/holdout_y.csv")

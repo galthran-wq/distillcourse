@@ -1,0 +1,309 @@
+Forty-five years of atmospheric CO₂ measurements from one Hawaiian observatory, one composite kernel — trend, seasonal, medium-term, noise — and every hyperparameter chosen by the marginal likelihood alone: the canonical Gaussian-process application, checkable against the atmosphere itself.
+
+The module's machinery is complete: <Ref lesson="bayesian-linear-regression">Bayesian linear regression</Ref> produced posteriors and the marginal likelihood, <Ref lesson="gaussian-processes">the Gaussian process</Ref> turned kernels into legible priors over functions tuned by that likelihood, and <Ref lesson="conformal-prediction">conformal prediction</Ref> supplied the coverage guarantee that survives a wrong model. This lesson deploys all of it on the canon's most famous Gaussian process: the CO₂ model of Rasmussen and Williams' §5.4.3, published in 2006 with a 20-year extrapolation from data ending in 2003. Twenty-two further years of the actual atmosphere have since been measured, so the forecast can be graded, term by term and band by band, and the grading is the module's thesis enacted: honest uncertainty is uncertainty you can diagnose when it fails.
+
+## The record: one mountain has measured the atmosphere since 1958
+
+{/* img gpml-fig56: the reader must see the book's own Figure 5.6: the blue monthly CO₂ record 1958–2003 with the gray 95% predictive band extrapolated ~20 years, widening to the right; this published plot is the claim the lesson reproduces and then grades. Candidate gaussianproc-mauna-loa-co2: Rasmussen & Williams, GPML, Fig 5.6, printed p. 119 (PDF p. 137), http://gaussianprocess.org/gpml/chapters/RW.pdf (the capture is a full page; cut the figure with its axes). Placement float-right, width m. */}
+<Figure
+  src="./figures/gpml-fig56.png"
+  alt="Line plot of CO₂ concentration in ppm against year. A dotted blue curve of monthly Mauna Loa averages rises from about 316 ppm in 1958 to about 377 ppm in 2003, with a yearly sawtooth of a few ppm riding on the rise. From 2003 onward a gray band continues the same rising sawtooth to about 405 ppm in 2023, and the band grows visibly thicker the further right it goes."
+  caption="The forecast this lesson grades: past the last datum the 95% band thickens steadily to the right — the model stating, in ppm, how fast what it learned decays."
+  float="right"
+  width="m"
+/>
+
+Every construction below — the kernel's claims, the evidence that fits them, the grading of the 2003 forecast — refers to one data stream, so the stream's provenance comes first. In March 1958 Charles David Keeling of the Scripps Institution of Oceanography began drawing air samples at the Mauna Loa Observatory, a station at 3,397 m on the northern slope of the Mauna Loa volcano on the island of Hawaiʻi. The site was chosen for what it lacks: mid-Pacific, high above the inversion layer, far from vegetation and industry, it samples air mixed over a hemisphere rather than any local source. The instrument reports the CO₂ concentration in *parts per million* (ppm); averaged by month, the readings form the longest continuous instrumental record of the atmosphere's composition: the Keeling curve.
+
+The record opened at **315.7 ppm**. The 2003 annual mean was **376 ppm**; the 2025 annual mean, **427 ppm**, with the May 2025 monthly reading above 430.
+
+### Three structures in the raw series
+
+Three features are visible in the raw series. A long, smooth, accelerating rise. A sawtooth riding on it, five to six ppm from peak to trough within each year: most of the planet's land plants grow in the Northern Hemisphere, photosynthesis draws carbon out of the air through the northern spring and summer, and decay returns it in autumn; the curve peaks in mid-May and bottoms out in late September, every year. And small wanderings on the scale of a year or two that are neither trend nor season. These three features are, one for one, the first three claims the next section's kernel writes down — a trend term, a seasonal term, a medium-term term — with a fourth term to price what remains; the record's visible structure dictates the model's structure before any fitting begins.
+
+Rasmussen and Williams' §5.4.3 models the 545 monthly averages from 1958 through 2003 as a Gaussian process in one input, time. The construction below is theirs; every number in this lesson's reproduction is computed from the same public record, which NOAA's Global Monitoring Laboratory still updates monthly. That is the property that makes this the one textbook example whose extrapolation reality has since graded. The record is treated purely as a model-criticism exercise throughout; what the numbers imply for policy is a different discipline's question and is not taken up here.
+
+## The kernel: four claims about the atmosphere, eleven free numbers
+
+Three earlier results carry the construction. From <Ref lesson="gaussian-processes">the GP lesson's</Ref> kernel algebra: a sum of kernels is a sum of independent functions, so an additive composite kernel is a paragraph of separate claims about the signal, one summand per sentence. From the same lesson's predictive equations: the 95% band those equations produce is exact *conditional on the kernel* — a statement of $p(y_* \mid \text{data}, k)$, nothing broader. And from <Ref lesson="bayesian-linear-regression">Bayesian linear regression</Ref>: the log marginal likelihood's $\log|K_y|$ term charges for complexity, which is what will let one criterion set every free number below. The book writes four claims.
+
+### The four summands, read as sentences
+
+**Claim 1: a long smooth rise.** A squared-exponential term with amplitude $\theta_1$ and lengthscale $\theta_2$:
+
+$$
+k_1(x, x') = \theta_1^2 \exp\!\Big( -\frac{(x - x')^2}{2\theta_2^2} \Big).
+$$
+
+This asserts a trend component that is very smooth and changes character only over $\theta_2$ years. It does not assert the trend *rises* (no stationary kernel can), only that it is slow and smooth; the data will supply the direction.
+
+**Claim 2: a yearly cycle whose shape drifts slowly.** The periodic kernel of the GP lesson would repeat exactly forever; the seasonal drawdown has no obligation to hold its shape for a century. So the periodic factor is multiplied by an SE decay:
+
+$$
+k_2(x, x') = \theta_3^2 \exp\!\Big( -\frac{(x - x')^2}{2\theta_4^2} - \frac{2 \sin^2\!\big(\pi (x - x')\big)}{\theta_5^2} \Big),
+$$
+
+with amplitude $\theta_3$, decay time $\theta_4$ (how many years before the cycle's shape can wander), and smoothness $\theta_5$; the period itself is fixed at one year. This is the kernel-algebra product from <Ref lesson="gaussian-processes">the GP lesson</Ref>, locally periodic with a shape drifting on the $\theta_4$ timescale, deployed on the data it was built for.
+
+**Claim 3: medium-term wiggles at no single timescale.** A rational-quadratic term,
+
+$$
+k_3(x, x') = \theta_6^2 \Big( 1 + \frac{(x - x')^2}{2 \theta_8 \theta_7^2} \Big)^{-\theta_8},
+$$
+
+a scale-mixture of SE kernels: magnitude $\theta_6$, typical lengthscale $\theta_7$, and a shape parameter $\theta_8$ that spreads the mixture over many lengthscales at once. It exists for the year-to-two-year wanderings the first two claims exclude.
+
+**Claim 4: short-lived noise.** A small SE term (magnitude $\theta_9$, lengthscale $\theta_{10}$) for weather-scale correlation between adjacent months, plus an independent term $\theta_{11}^2 \delta_{pq}$ for measurement error. The full model is $k = k_1 + k_2 + k_3 + k_4$: **eleven hyperparameters**, $\theta_1$ through $\theta_{11}$.
+
+### The composite prior, drawn
+
+<FigureSequence
+  name="kernel-terms"
+  alt="Five frames, each with two panels: draws from one kernel component alone at its own vertical scale, and draws from the running sum of components at a fixed plus-minus 140 ppm scale; the final frame overlays the centered measured CO2 record on the composite draws"
+  caption="Each frame adds one claim's random functions to the running sum. By frame 5 the composite prior's draws are smooth rising or falling arcs carrying an annual sawtooth: a family that contains the measured record (blue)."
+/>
+
+<Task>
+Step through the frames and watch two things. First, the vertical scales: the trend term draws at ±140 ppm, the seasonal at ±6, the medium term at ±2, the noise at ±0.8. The kernel asserts a size for every phenomenon, not just a shape. Second, frame 5: the centered record threads the composite draws; the rising draw and the record differ only in details the noise terms price.
+</Task>
+
+One structural detail matters later. The noise claim's first term and the trend claim have *identical form*: both are SE kernels. Nothing in the model says which is which; the fit will make one large and slow (and we call it trend) and the other small and fast (and we call it noise). The labels are interpretations of fitted magnitudes, not built-in roles.
+
+### A hyperparameter is a checkable statement
+
+<Example title="reading a hyperparameter as a physical statement">
+The decay time $\theta_4$ will be fitted at 90 years; read that number as a physical statement. Under $k_2$, the correlation between the seasonal component's shape in two years $\Delta$ apart (comparing the same calendar date, so the $\sin$ term vanishes) is $\exp(-\Delta^2 / (2\theta_4^2))$.
+
+Across the full training record, $\Delta = 45$ years: $\exp(-45^2 / (2 \cdot 90^2)) = \exp(-0.125) = 0.88$. The claim: the sawtooth of 2003 should still be 88% correlated with the sawtooth of 1958, nearly the same shape drifted slightly. That is exactly what the record shows: the cycle's peak-to-peak grew from about 5 ppm in 1959 to about 6 ppm today while keeping its May-peak, September-trough profile.
+</Example>
+
+<Exercise>
+Same computation, on the term that will fail. The trend lengthscale $\theta_2$ will be fitted at 67 years. Compute the correlation the trend claim asserts between the trend's behavior now and its behavior (a) 20 years from now, (b) one full lengthscale (67 years) from now. Then state, in one sentence, what assumption a 20-year extrapolation of this term amounts to. Write the exponent before opening the solution.
+
+<Solution>
+(a) $\exp(-20^2 / (2 \cdot 67^2)) = \exp(-0.0446) = 0.956$. (b) $\exp(-67^2/(2 \cdot 67^2)) = e^{-1/2} = 0.61$.
+
+At a 20-year horizon the trend component is still 96% correlated with its training-window self: extrapolating it is a bet that the growth habit of the recent past continues essentially unchanged, with only 4% of the trend's variance freed to do something new. The transferable move: a stationary kernel's lengthscale converts directly into a statement of how far the past is assumed to reach; the reveal below is the atmosphere's response to this particular statement.
+</Solution>
+</Exercise>
+
+## The fit: eleven numbers from the evidence alone
+
+The module's claim was that the marginal likelihood can set hyperparameters without a validation set; this model exercises the claim at full strength, because nothing else is even feasible.
+
+### Cross-validation is arithmetically out
+
+A grid search over 11 dimensions at a modest five values per axis is $5^{11} \approx 49$ million fits, each an $O(n^3)$ Cholesky factorization. The evidence
+
+$$
+\log p(y \mid X, \theta) = -\tfrac12 y^\top K_y^{-1} y - \tfrac12 \log |K_y| - \tfrac{n}{2} \log 2\pi
+$$
+
+is instead one differentiable function of all eleven $\theta$'s at once, climbed by conjugate gradients. The book subtracts the record's empirical mean (341 ppm) and optimizes from several random restarts, because the objective is multimodal in an interpretable way: a start that assigns the trend role to the wrong SE term (the identical-form pair of the previous section) climbs into a worse local optimum. The best run reaches $\log p(y \mid X, \theta) = -108.5$.
+
+### The fitted values read back as physics
+
+{/* fig Co2KernelLedger: a table-figure of the 11 fitted hyperparameters, grouped by term. Four row-groups with the group's kernel term named at left in KaTeX (k₁ trend SE; k₂ seasonal periodic×SE; k₃ medium-term RQ; k₄ noise SE+iid). Columns: symbol (KaTeX θ₁…θ₁₁), fitted value with unit (θ₁ = 66 ppm; θ₂ = 67 yr; θ₃ = 2.4 ppm; θ₄ = 90 yr; θ₅ = 1.3; θ₆ = 0.66 ppm; θ₇ = 1.2 yr; θ₈ = 0.78; θ₉ = 0.18 ppm; θ₁₀ = 1.6 months; θ₁₁ = 0.19 ppm), and a short physical reading in words (e.g. θ₂: "the trend's habit spans ~7 decades"; θ₄: "the seasonal shape drifts on a ~90-yr scale"; θ₈: "wiggles at many timescales at once"; θ₉,θ₁₁: "total noise √(θ₉²+θ₁₁²) ≈ 0.26 ppm, i.e. the record is clean to a quarter ppm"). Color roles: amber for the fitted values column; currentColor text elsewhere. Layout: compact grid, group separators, one footer line "all 11 set by maximizing log p(y|X,θ); Rasmussen & Williams §5.4.3". */}
+<Figure
+  name="Co2KernelLedger"
+  alt="Table of the eleven fitted hyperparameters grouped by kernel term, each with its fitted value and a one-line physical reading"
+  caption="The fitted configuration, read as a description of the atmosphere. Every value was chosen by the evidence; none was imposed."
+/>
+
+The optimizer was given no units, no science, and 545 numbers, and returned the checkable description in the ledger above. One row settles the structural question the kernel section raised: the identical-form SE pair was told apart by magnitude alone, one term resolving to 66 ppm and 67 years (the trend role), the other to 0.18 ppm and 7 weeks (the noise role).
+
+### The period test: the evidence finds the year
+
+The book fixes the seasonal period at one year by construction. Freeing it makes the model's structure-finding measurable: hold the other hyperparameters at the fitted configuration, add the period $p$ as a twelfth, and scan the evidence. On the modern NOAA record through 2003 the curve peaks at $p = 0.9996$ years, one year to three decimals.
+
+The preference is not shallow: at $p = 1.01$, one percent off, the log evidence has fallen by more than 1,100 nats, an evidence ratio beyond $e^{1000}$. The marginal likelihood does not merely tolerate the annual cycle; 550 monthly numbers pin its period to a tenth of a percent.
+
+<KeyFact>
+Nothing in this fit saw held-out data, and nothing was told the physics. The evidence alone recovered the year (period 1.000), the near-exactness of the cycle (decay 90 yr ≫ the record), and the instrument's noise floor (0.26 ppm): <Ref lesson="bayesian-linear-regression">Bayesian Occam</Ref> operating as a measurement device, not a metaphor.
+</KeyFact>
+
+<Aside>
+**Reproducing the numbers on today's file.** The book's data (Keeling & Whorf, 2004, via CDIAC) had 545 monthly values with gaps; NOAA's current file has 550 rows through December 2003, with missing months interpolated and early values on a revised calibration scale. Rerunning the book's fitted configuration on today's rows gives $\log p(y \mid X, \theta) = -121.9$ against the book's $-108.5$: the same model on a slightly different vintage of the record (interpolated months violate the independent-noise claim mildly, and 5 extra rows shift the sum). Every reproduction number in this lesson (band widths, coverages, evidence scans) is computed on the current public file, so you can recompute all of them; the research exercise does.
+</Aside>
+
+## The reveal: the forecast against 22 years it never saw
+
+Everything above was available in 2003. Fit the composite kernel to the record through December 2003, predict forward with the GP predictive equations, and the book's Figure 5.6 appears: the mean continues the rise with the sawtooth intact, and the 95% band widens from under 1 ppm at the 2004 boundary to **16 ppm** at the 20-year horizon (our reproduction: 15.7).
+
+By the module's standards this is exemplary behavior: the error bars grow exactly as fast as the kernel says information about the past decays.
+
+From that behavior one would expect the honestly widening band to hold the future. The measured record says otherwise.
+
+<Figure
+  src="./figures/reveal.svg"
+  alt="The full CO2 record with the 2003-vintage GP forecast: training data to 2003, the amber forecast mean and 95 percent band to 2026, the blue measured record overlaid, and a per-window realized-coverage tally reading 92, 33, 0, 0, 0 percent"
+  caption="The 2003 forecast, graded by the atmosphere. The measured record (blue) climbs out of the 95% band in spring 2012 and never returns; realized coverage by window: 92% → 33% → 0% → 0% → 0%."
+/>
+
+<Task>
+Read the figure against three numbers. (1) 2004–2008: the band covers 55 of 60 months (92%) and the mean misses by 1.2 ppm on average; at short range the model is close to nominal. (2) Spring 2012: the record crosses the upper band edge for good; every later month sits above it. (3) December 2025: measured 427.5 ppm against a band topping out at 419.4; the atmosphere runs 8 ppm above everything the model considered 97.5th-percentile plausible.
+</Task>
+
+The failure is not uniform across the kernel's claims, and the additive structure lets the error be graded claim by claim:
+
+**The trend claim failed.** By 2024–2026 the mean underpredicts by 16.6 ppm on average, and the realized coverage of the 95% band is zero for every window after 2014.
+
+**The seasonal claim held.** Average the forecast's within-year shape over 2004–2025 and do the same for the measurements: two nearly coincident curves, peak in mid-May, trough in late September, peak-to-peak 5.7 ppm forecast against 5.8 measured. A cycle extrapolated from pre-2004 data still describes the atmosphere's breathing two decades later: the $\theta_4 = 90$-year decay claim, vindicated.
+
+<Figure
+  src="./figures/seasonal-check.svg"
+  alt="Predicted and measured mean seasonal cycles for 2004 to 2025 as two nearly coincident curves peaking in May and bottoming in September, peak-to-peak about 6 ppm"
+  caption="The claim that held: the forecast's mean seasonal shape (amber) against the measured one (blue), both averaged over 2004–2025. The model got the atmosphere's year right and its decade wrong."
+  float="right"
+  width="m"
+/>
+
+**The small claims are unfalsified.** The medium-term and noise terms priced fluctuations of under a ppm; the post-2003 residuals are dominated by the trend miss, and at 0.26 ppm the noise floor remains consistent with the instrument.
+
+## The autopsy: stationarity was the sentence that failed
+
+A band is a probability statement conditional on the kernel, so a failed band indicts a specific clause of the kernel; this section locates it.
+
+### Stationarity converts a lengthscale into a promise
+
+The trend term $k_1$ is *stationary*: it depends on $x - x'$ only, so it asserts that the trend's statistical behavior is the same in every era. The in-body exercise computed what that assertion is worth at the forecast horizon: a 20-year extrapolation inherits 96% of its behavior from the training window's habit.
+
+That habit is measurable, and its breach is only half the miss. Over the decade before 2003 the record grew by about **1.9 ppm per year**; over the decade before 2023, by about **2.5**: emissions accelerated, the growth rate rose by a third, and the extra growth — averaging 0.3 ppm per year across the ramp — accumulates to about 6 ppm over the two decades. The stationary prior supplies the other half: with no data ahead, a stationary kernel's predictive mean relaxes toward the training mean, so the forecast's own rate sags below even the old habit, averaging 1.5 ppm per year over the horizon. A record climbing at 2.2 ppm per year against a forecast climbing at 1.5, sustained for 20 years, is the 14-ppm gap at the end of 2023 that the reveal shows, still compounding toward the 16.6-ppm mean miss of 2024–26.
+
+<Figure
+  src="./figures/growth-rate.svg"
+  alt="Blue dots and line of the annual CO2 growth rate at Mauna Loa from 1959 to 2025, rising from around 1 ppm per year to around 2.5 with large year-to-year scatter; an amber horizontal segment marks the 1994 to 2003 mean of 1.9 ppm per year and continues as a dashed line past the 2004 training edge, and a second amber segment marks the 2014 to 2023 mean of 2.5"
+  caption="The diagnosis in one picture: the atmosphere's annual growth rate against the pre-2004 habit a stationary trend term extrapolates (dashed). Nearly every post-2004 year lands above the promise."
+/>
+
+### The refutation: a failed band is a located failure
+
+The diagnosis is worth stating as a refutation, because the misreading is common. *The claim:* "the 95% bands failed, so the Gaussian process was wrong to be confident." The bands did fail, and the conclusion does not follow. The band was never an unconditional promise; it was the exact 95% region of $p(y_* \mid \text{data}, k)$, a distribution conditional on the four claims of the kernel paragraph. When reality walked out of it, the event carried information: some clause is false.
+
+Checking the components then found the clause: not the year, not the noise floor, but the stationary trend. A model that reported no uncertainty, or a vaguely hedged one, would have been just as wrong about 2025 and would have offered nothing to interrogate. Failure with a **location** is the product; the alternative is failure without one.
+
+### The record has assumptions too
+
+Two further departures from the idealization are worth recording, both small against the 16-ppm story. Monthly averaging erases within-month structure, and the file's interpolated gap months violate the independent-noise claim outright. And since late 2022 the record itself has a seam: the Mauna Loa eruption cut power to the observatory in November 2022, and until July 2023 the "Mauna Loa" series was measured from Maunakea, 34 km away.
+
+<KeyFact>
+The model extrapolates statistical habit, not carbon. Nothing in $k$ knows that CO₂ is emitted, budgeted, or absorbed; a kernel can assert that the past's pattern persists, and only physics can say why it wouldn't. The GP's failure mode, a trend accelerating out of a stationary prior, was therefore predictable in kind, just not in magnitude, and no amount of hyperparameter fitting on pre-2004 data could have repaired it.
+</KeyFact>
+
+## Two guarantees priced on one problem
+
+The module built a second uncertainty machine precisely for wrong models, and this record is a wrong-model regime; the module's closing question is what <Ref lesson="conformal-prediction">the conformal wrapper</Ref> buys here that the posterior does not. The comparison needs a window where both can be graded, so it runs pre-2004, where the answer key is dense: train the composite GP on 1958–1989, calibrate on 1990–1994, test on 1995–2003.
+
+The conformal side follows its lesson's recipe verbatim: scores $s_i = |y_i - \hat\mu(x_i)|$ on the 60 calibration months, quantile index $\lceil 61 \times 0.95 \rceil = 58$, giving $\hat{q} = 2.96$ ppm; the prediction band is the GP mean plus or minus that constant. The GP side is the same model's own 95% band.
+
+<Figure
+  src="./figures/gp-vs-conformal.svg"
+  alt="Two panels over 1990 to 2003 showing the same GP mean and data: the amber GP 95 percent band widening from 2.4 to 5.1 ppm half-width with 87 percent coverage, and the blue constant conformal band of 3.0 ppm half-width with 82 percent coverage"
+  caption="One model, two bands, one grading window. The GP's band (amber) widens with horizon and covers 87% of test months; the conformal band (blue) is a constant 3.0 ppm and covers 82%. Nominal for both: 95%."
+/>
+
+Neither reaches its nominal 95%, and the two shortfalls have different causes worth separating. The GP undercovers (87%) because its kernel is mildly wrong in exactly the way the reveal showed at scale: the early 1990s grew slower than the late 1990s, so a model trained through 1989 underpredicts the test window's level.
+
+The conformal band undercovers (82%) for the reason its own lesson flagged as the guarantee's boundary: the coverage theorem needs the calibration and test points exchangeable, and a forecast is the opposite of exchangeable. Calibration months sit 0–5 years past the training edge, test months 5–14, and residuals grow with horizon, so the quantile calibrated on near months is systematically too small for far ones.
+
+The comparison prices the module's trade cleanly. The GP band carries a *mechanism* the conformal band cannot have: its width grows with horizon (half-width 2.4 ppm in 1995, 5.1 by 2003) because the kernel says information decays, while one calibrated quantile is a single number with no notion of horizon. The conformal band carries a *guarantee* the GP band cannot have, but only over the exchangeability it assumes, which time-ordered forecasting denies.
+
+On a drifting series, model-based bands fail where the model is wrong and assumption-free bands fail where the assumption is, and neither failure is visible from inside the method: measured coverage on genuinely held-out data, <Ref lesson="cross-validation-bootstrap">module 5's discipline</Ref>, is the only referee both sides accept.
+
+## The verdict ledger
+
+What this artifact establishes, entry by entry:
+
+- **Structure discovery worked.** The evidence, given no science, recovered the annual period to a tenth of a percent, the near-exactness of the seasonal cycle, and the instrument's quarter-ppm noise floor, and assigned the two identical-form SE terms their trend and noise roles by magnitude alone.
+- **Interpolation and short-range forecasting worked.** 92% realized coverage in the first five years, mean error about a ppm — and the seasonal claim held for two decades beyond the data.
+- **The trend claim failed diagnosably.** A stationary kernel met an accelerating emission history, the record left the 95% band in 2012, and the miss reached 8 ppm beyond the band's edge by 2025 — with the violated clause identifiable because the bands were exact conditional statements.
+- **No method in this course repairs the failure.** Conformal calibration redistributes honesty; it does not add knowledge. Only a model of emissions and carbon sinks — physics, not statistics — could have moved the 2025 forecast mean.
+
+Established: the module's toolkit assembled into the canon's flagship GP, its fit read as physics, its 20-year forecast graded by the atmosphere, and both of the course's uncertainty constructions priced on the same real record. <Ref lesson="gp-lab">The lab</Ref> has you build both machines, the Cholesky-based GP with its evidence and the conformal wrapper with its measured coverage, and verify them against held-out data. After that, one module remains: <Ref lesson="double-descent">where the classical story itself breaks</Ref>, on models that interpolate and generalize anyway.
+
+## ★ Fitting the eleven yourself
+
+The lesson used the book's fitted configuration; producing it is a gradient computation the lab's tools already contain. The evidence gradient has a closed form,
+
+$$
+\frac{\partial}{\partial \theta_j} \log p(y \mid X, \theta)
+= \tfrac12 y^\top K_y^{-1} \frac{\partial K_y}{\partial \theta_j} K_y^{-1} y
+- \tfrac12 \operatorname{tr}\!\Big( K_y^{-1} \frac{\partial K_y}{\partial \theta_j} \Big),
+$$
+
+where $\partial K_y / \partial \theta_j$ is an explicit matrix for every one of the eleven (each $\theta_j$ appears in exactly one summand of $k$). One Cholesky factorization per step prices all eleven derivatives at $O(n^2)$ each after the $O(n^3)$ solve.
+
+Practical discipline, in order of importance: optimize $\log \theta$ rather than $\theta$ (every hyperparameter is positive, and the scales span 66 ppm to 0.18 ppm); restart from several random initializations and keep the best evidence, because the role-swap optima of the fit section are real basins; and check the found optimum by perturbing one hyperparameter at a time and confirming the evidence falls — the period scan of this lesson is that check, run along one axis. Conjugate gradients from a handful of restarts reproduces the book's configuration to within rounding on this problem; the multimodality is mild once the roles are assigned correctly.
+
+## Exercises
+
+<Exercise>
+On the kernel as a paragraph. (a) State which of the four terms produces the sawtooth in samples from the composite prior, and why neither $k_1$ nor $k_3$ can. (b) The trend claim asserted, in passing, that no stationary kernel can make the trend rise. Prove the stronger statement — under any zero-mean GP prior, stationary or not, $f$ and $-f$ have identical distributions, so the prior asserts no direction at all — and then name the term in the predictive equations through which the forecast's rise actually enters. (c) What does $\theta_4 \to \infty$ recover?
+
+<Solution>
+(a) Only $k_2$ contains the $\sin^2(\pi(x-x'))$ factor, which makes the covariance itself periodic in the lag; draws from it repeat (approximately) every year. $k_1$ and $k_3$ are monotone decreasing in $|x - x'|$, so their draws have no preferred period at any scale.
+
+(b) A GP is determined by its mean and covariance function. If $f \sim \mathcal{GP}(0, k)$, then $-f$ has mean $-0 = 0$ and covariance $\operatorname{Cov}(-f(x), -f(x')) = k(x, x')$: the same two objects, hence the same distribution, for any kernel whatsoever. Every rising draw is exactly as probable as its falling mirror image, so the prior prefers no direction. The rise enters through the data: the predictive mean $k(x_*, X)\, K_y^{-1} y$ is linear in the observations $y$, and the observed record's sign selects the rising members of the family. The kernel prices shapes and sizes; the measurements choose among them — which is why the autopsy charged $k_1$ with the wrong *habit* (the growth rate's statistics), never the wrong direction.
+
+(c) $\theta_4 \to \infty$ removes the SE factor entirely, leaving the pure periodic kernel: a cycle that repeats *exactly*, forever. The deletion-probe exercise below measures what the data pay for that assertion.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe by deletion, using the reproduction setup of the research exercise (book configuration, NOAA rows through 2003, mean subtracted). (a) Delete $k_2$ entirely and re-evaluate: the log evidence falls from $-122$ to $-9{,}535$. The in-sample residuals' standard deviation rises from 0.16 to 0.65 ppm, and their per-calendar-month means swing from $-1.1$ ppm (September–October) to $+0.9$ ppm (May). Explain what structure is left in the residuals and why the remaining terms absorb only part of the sawtooth. (b) Delete only the SE decay factor on $k_2$ (the $\theta_4$ part, i.e. $\theta_4 \to \infty$): the evidence falls from $-122$ to $-151$. What claim did the decay factor encode, and what do 29 nats say about it?
+
+<Solution>
+(a) With $k_2$ gone, no term can carry a repeating annual component, so the model must explain a ±3 ppm sawtooth with terms whose claims forbid it. The short-lengthscale noise term ($\theta_{10} = 1.6$ months) can chase adjacent-month correlation and soaks up part of each ramp, which is why the leftover monthly-mean residual swings ±1 ppm rather than the full ±3. It pays for that flexibility in the $\log|K_y|$ complexity term and still leaves systematic calendar structure (positive residuals every May, negative every September: the leftover seasonal signature). A drop of nine thousand nats is the evidence stating that the seasonal claim is not decoration; it is most of what the model knows.
+
+(b) The decay factor encoded "the cycle repeats *almost* exactly, free to drift on a $\theta_4$-year timescale." Removing it asserts exact repetition forever. The 29-nat drop (evidence ratio $e^{29} \approx 4 \times 10^{12}$) says the record detectably rejects a frozen cycle: the sawtooth's slow amplitude growth across 45 years is real signal, and the composite kernel's ability to state "almost periodic" rather than "periodic" is worth twelve orders of magnitude of evidence.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute, precisely: "the model's 95% bands failed (reality escaped them), so the Gaussian process was wrong to report confidence at all." Name what the band actually promised, what the escape event therefore tells you, and what is genuinely conceded to the critic.
+
+<Solution>
+The band promised: *if* the four kernel claims hold, then 95% of future months fall inside. It is a conditional statement, exact given the kernel (the same conditionality the <Ref lesson="gaussian-processes">GP lesson's</Ref> refutation exercise established for the SE prior). The escape event is therefore modus tollens, not embarrassment: the conditional's premise is false, and locating *which* clause fails is possible precisely because each additive term makes a separate falsifiable claim. Running the check: the seasonal shape verifies (peak month and amplitude still correct in 2025), the noise floor verifies, and the trend misses in a specific direction with a specific growth-rate mismatch (1.9 → 2.5 ppm/yr): the stationarity clause of $k_1$ is the failed sentence.
+
+Conceded: the bands were too narrow as unconditional forecasts, and anyone who read them unconditionally was misled; conditionality must be stated, not assumed understood. Not conceded: that reporting no confidence would have been better. A bandless point forecast would be 17 ppm wrong in 2025 with no event marking *when* the model left its domain (the band supplies that: spring 2012) and no structure marking *what* failed. The failure of an honest band is a diagnosis; the failure of a bare number is just an error.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped, the lesson's core artifact: reproduce the reveal. Download NOAA GML's monthly file (`co2_mm_mlo.txt`), take the rows before January 2004 (550 months), subtract the empirical mean (341.3 ppm), and build $K_y$ from the four terms with the book's fitted values ($\theta_1{=}66$, $\theta_2{=}67$, $\theta_3{=}2.4$, $\theta_4{=}90$, $\theta_5{=}1.3$, $\theta_6{=}0.66$, $\theta_7{=}1.2$, $\theta_8{=}0.78$, $\theta_9{=}0.18$, $\theta_{10}{=}1.6/12$, $\theta_{11}{=}0.19$; time in years). Predict mean and variance at every measured month from 2004 on via <Ref lesson="gaussian-processes">Algorithm 2.1</Ref>, and report: the 95% band's full width at the 20-year horizon, and realized coverage in the windows 2004–08, 2009–13, 2014–18, 2019–23, 2024–26. State in advance what counts as reproducing the book: band width near 16 ppm at 20 years.
+
+<Solution>
+The computation is one Cholesky factorization of a $550 \times 550$ matrix and two triangular solves per prediction month, under a second in numpy. Our run: log evidence $-121.9$ on the modern file; band width at the end of 2023 $15.7$ ppm against the book's 16 (the residual gap is data vintage, per the fit section's aside); coverage $92\%$, $33\%$, $0\%$, $0\%$, $0\%$ across the five windows, with the record crossing the upper band permanently in spring 2012 and the 2024–26 mean miss at 16.6 ppm. Agreement within a percent or two of these coverages counts as success; exact equality does not occur even between two NOAA file vintages, because interpolated months move individual coverage calls near the band edge. The transferable move: a published model plus a public record makes an honest-evaluation pipeline about thirty lines long.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review, the evidence as model referee. On the same 1958–2003 setup, replace the composite kernel with a single SE kernel plus independent noise and optimize its three hyperparameters (a coarse grid suffices). The best plain-SE configuration lands near $\sigma_f \approx 37$ ppm, $\ell \approx 20$ yr, $\sigma_n \approx 2$ ppm with log evidence about $-1{,}215$, against the composite's $-122$. (a) Interpret the fitted $\sigma_n$: what did the SE model decide the sawtooth is? (b) State the evidence ratio and what principle from <Ref lesson="bayesian-linear-regression">module 10's first lesson</Ref> licenses reading it as a model comparison. (c) Explain why this comparison needed no held-out data, and what it still cannot tell you (the reveal is a hint).
+
+<Solution>
+(a) $\sigma_n \approx 2$ ppm is the seasonal amplitude, not the instrument's: unable to represent a periodic component, the SE model files the entire sawtooth under measurement noise: a coherent story, and a false one (the "noise" repeats every May).
+
+(b) $\Delta \log p = 1{,}093$ nats: the data favor the composite by $e^{1093}$. The license is Bayesian Occam: the marginal likelihood is $p(y \mid \text{model})$ with parameters integrated out, so it already charges each model for its spread over datasets, and ratios of it are posterior odds under equal priors, the same arithmetic that ranked polynomial degrees, now ranking kernels. Structure that captures 550 points' real regularities (the period, the near-exact cycle) is rewarded despite its eight extra hyperparameters.
+
+(c) The evidence is computed on training data alone; no split is needed because complexity is priced by normalization, not by refitting (this was the module's claim, exercised at 11 hyperparameters where CV was arithmetically impossible). What it cannot tell you: how either model behaves *outside the training distribution*. The composite kernel's evidence victory is enormous, and its trend claim still failed from 2012 on: the evidence ranks descriptions of the data you have, and the reveal graded a claim about data no fit had seen.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward, to the lab. Take the model trained on 1958–1989 from the two-guarantees section, but calibrate on the full 1990–2003 window ($n = 168$ residual scores; $\hat{q}$ comes out at 3.32 ppm) and deploy the conformal band on 2004 onward. (a) Compute the quantile index. (b) Our run's realized coverage by window: 100%, 100%, 50%, 0%, 0% for 2004–08 through 2024–26; explain the decay using the coverage theorem's one assumption. (c) The same model's own GP band covers 100% of 2004–26. Before crediting the GP, compute what its half-width has grown to by 2026 (the answer is near 20 ppm) and say what that coverage is worth.
+
+<Solution>
+(a) $\lceil (168 + 1) \times 0.95 \rceil = \lceil 160.55 \rceil = 161$: $\hat{q}$ is the 161st smallest of the 168 scores.
+
+(b) The theorem needs the test score exchangeable with the calibration scores. Calibration months lie 1–14 years past the training edge; deployment months lie 15–37 years past it, and residuals grow with horizon (the trend miss compounds). The test scores are drawn from a systematically larger distribution than the calibrated one, so the fixed 3.32-ppm quantile covers early deployment (when horizons still resemble calibration's) and then decays to zero as the horizon leaves the calibrated regime: the conformal lesson's "time is the commonest breaker of exchangeability," measured.
+
+(c) The 1989-vintage GP's half-width reaches 19.8 ppm by 2026 (against 8.0 in 2010): trained on 14 fewer years, its bands are humbler, and reality stays inside: 100% coverage, at the price of a ±20 ppm statement about a 427 ppm quantity. Coverage alone is not the product; the fit-through-2003 model covered 0% with sharp bands, and this one covers 100% with bands too wide to plan against. Pricing that trade with your own hands (the Cholesky GP, its evidence, the conformal wrapper, and measured coverage for both) is <Ref lesson="gp-lab">the lab</Ref>, the module's last word.
+</Solution>
+</Exercise>
+
+<References>
+1. C. E. Rasmussen, C. K. I. Williams, *Gaussian Processes for Machine Learning*, MIT Press, 2006 — §5.4.3 "Mauna Loa Atmospheric Carbon Dioxide": the composite kernel (eqs. 5.15–5.19), the fitted hyperparameters, and Figs. 5.6–5.8, the artifact this lesson reproduces and grades; §5.4.1 for the evidence machinery; Algorithm 2.1 for the implementation. Free online: https://gaussianprocess.org/gpml/
+2. NOAA Global Monitoring Laboratory, *Trends in Atmospheric Carbon Dioxide — Mauna Loa*, https://gml.noaa.gov/ccgg/trends/ — the monthly-mean record (`co2_mm_mlo.txt`, public domain) used for every reproduction number and post-2003 grading in this lesson. Credit as requested by the data providers: X. Lan, NOAA/GML, and R. Keeling, Scripps Institution of Oceanography (scrippsco2.ucsd.edu). The file's header documents the 1958–1974 Scripps segment (C. D. Keeling) and the 2022–23 Maunakea substitution.
+3. C. D. Keeling, T. P. Whorf, "Atmospheric CO₂ records from sites in the SIO air sampling network," in *Trends: A Compendium of Data on Global Change*, CDIAC, Oak Ridge National Laboratory, 2004 — the data vintage the book fitted (545 monthly values, 1958–2003).
+4. A. N. Angelopoulos, S. Bates, "A Gentle Introduction to Conformal Prediction and Distribution-Free Uncertainty Quantification," *Foundations and Trends in Machine Learning*, 2023 — the split-conformal recipe and the exchangeability boundary (time-series caveat) this lesson's comparison measures. https://arxiv.org/abs/2107.07511
+</References>

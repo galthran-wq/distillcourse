@@ -1,0 +1,408 @@
+Push Bayesian linear regression through the kernel trick and the prior becomes a distribution over functions: a Gaussian process, whose posterior mean and variance have closed forms and whose kernel is chosen by the data itself.
+
+<Ref lesson="bayesian-linear-regression">The previous lesson</Ref> rebuilt the linear model around its posterior and left two debts standing: the error bars are only as honest as the hand-picked basis (localized bases make the model *most* confident exactly where it has no data), and nothing in the framework says which basis to pick. This lesson pays both with a tool the course already owns. <Ref lesson="svm-dual-kernels">Module 4</Ref> showed that any algorithm touching data only through inner products can swap them for a kernel and compute in an implicit, possibly infinite, feature space; the Bayesian linear model turns out to be such an algorithm. The result is the classical apex of model-based uncertainty: a prior over functions whose assumptions are legible in the kernel, and whose marginal likelihood (the same evidence that scored polynomial degrees) tunes that kernel from the training data alone. The route: the weight-space-to-function-space equivalence proved; the function-space definition and its prior samples; the predictive equations by Gaussian conditioning; the Cholesky algorithm; kernels as assumptions; the evidence as hyperparameter tuner, with its two-optima honest face; and the kernel-machine family portrait that closes the course's kernel thread.
+
+## The inheritance: the predictive touches features only through inner products
+
+The opening claims the kernel trick applies to Bayesian linear regression at all; the claim rests on two earlier results, so retrieve them before they are used.
+
+<Task>
+Three retrievals, closed book. (1) From <Ref lesson="bayesian-linear-regression">Bayesian linear regression</Ref>: write the posterior precision $S_n^{-1} = \tau^{-2} I + \sigma^{-2} X^\top X$ and the predictive distribution $\mathcal{N}(m_n^\top x_*,\ \sigma^2 + x_*^\top S_n x_*)$. (2) From <Ref lesson="svm-dual-kernels">the kernel lesson</Ref>: write the definition of a kernel, $k(x, x') = \langle \varphi(x), \varphi(x') \rangle$, and the condition that makes a symmetric function one (every Gram matrix PSD). (3) From the previous lesson's closing exercise: the predictive mean rearranged into the form $\sum_i k(x_*, x_i)\, y_i$. All three are about to become one object.
+</Task>
+
+The setup is the previous lesson's model with an explicit basis: $n$ observations, targets $y \in \mathbb{R}^n$, and a feature map $\varphi: \mathbb{R}^d \to \mathbb{R}^N$ with feature matrix $\Phi \in \mathbb{R}^{n \times N}$ (rows $\varphi(x_i)^\top$). Likelihood $y = \Phi w + \varepsilon$ with $\varepsilon \sim \mathcal{N}(0, \sigma^2 I)$, prior $w \sim \mathcal{N}(0, \tau^2 I_N)$. Everything derived there carries over with $\Phi$ in place of $X$: the posterior over $w$ has precision $A = \tau^{-2} I + \sigma^{-2} \Phi^\top \Phi$, and the predictive distribution for the function value $f_* = \varphi(x_*)^\top w$ is Gaussian with mean $\sigma^{-2} \varphi_*^\top A^{-1} \Phi^\top y$ and variance $\varphi_*^\top A^{-1} \varphi_*$.
+
+The obstruction is the size of $A$: it is $N \times N$, the dimension of the *feature space*. A cubic-spline basis keeps $N$ modest; the RBF kernel's feature space, which <Ref lesson="svm-dual-kernels">module 4</Ref> showed is infinite-dimensional, makes $A$ unbuildable. The theorem below removes the obstruction by pure algebra: the same distribution, rewritten so that $\varphi$ appears only inside inner products.
+
+<Theorem title="weight space equals function space (Rasmussen &amp; Williams §2.1.2)">
+Define $k(x, x') = \tau^2\, \varphi(x)^\top \varphi(x')$, and write $K \in \mathbb{R}^{n \times n}$ for the matrix $K_{ij} = k(x_i, x_j)$, $\mathbf{k}_*$ for the vector $k(x_i, x_*)$, and $k_{**} = k(x_*, x_*)$. Then the predictive distribution above equals
+
+$$
+f_* \mid y \;\sim\; \mathcal{N}\!\Big( \mathbf{k}_*^\top (K + \sigma^2 I)^{-1} y,\;\; k_{**} - \mathbf{k}_*^\top (K + \sigma^2 I)^{-1} \mathbf{k}_* \Big),
+$$
+
+in which every matrix inverted is $n \times n$ and $\varphi$ never appears outside $k$.
+
+<Proof>
+**The mean.** Start from the identity $\sigma^{-2} \Phi^\top (\tau^2 \Phi \Phi^\top + \sigma^2 I) = \sigma^{-2} \tau^2\, \Phi^\top \Phi\, \Phi^\top + \Phi^\top = \tau^2 \big( \tau^{-2} I + \sigma^{-2} \Phi^\top \Phi \big) \Phi^\top = \tau^2 A\, \Phi^\top$. Multiply by $A^{-1}$ on the left and $(\tau^2 \Phi\Phi^\top + \sigma^2 I)^{-1}$ on the right:
+
+$$
+\sigma^{-2} A^{-1} \Phi^\top = \tau^2\, \Phi^\top \big( \tau^2 \Phi \Phi^\top + \sigma^2 I \big)^{-1} .
+$$
+
+Since $\tau^2 \Phi \Phi^\top = K$, the predictive mean becomes $\varphi_*^\top \cdot \sigma^{-2} A^{-1} \Phi^\top y = \tau^2 \varphi_*^\top \Phi^\top (K + \sigma^2 I)^{-1} y = \mathbf{k}_*^\top (K + \sigma^2 I)^{-1} y$, using $\tau^2 \Phi \varphi_* = \mathbf{k}_*$.
+
+**The variance.** The Woodbury identity, $\big( Z^{-1} + U^\top W^{-1} U \big)^{-1} = Z - Z U^\top \big( W + U Z U^\top \big)^{-1} U Z$ with $Z = \tau^2 I$, $W = \sigma^2 I$, $U = \Phi$, gives
+
+$$
+A^{-1} = \tau^2 I - \tau^2 \Phi^\top \big( \sigma^2 I + \tau^2 \Phi \Phi^\top \big)^{-1} \Phi\, \tau^2 ,
+$$
+
+and sandwiching with $\varphi_*$ yields $\varphi_*^\top A^{-1} \varphi_* = \tau^2 \varphi_*^\top \varphi_* - (\tau^2 \Phi \varphi_*)^\top (K + \sigma^2 I)^{-1} (\tau^2 \Phi \varphi_*) = k_{**} - \mathbf{k}_*^\top (K + \sigma^2 I)^{-1} \mathbf{k}_*$.
+</Proof>
+</Theorem>
+
+<Figure
+  name="GpInheritance"
+  alt="Three stacked boxes: the weight-space predictive formulas inverting an N-by-N matrix, the kernel substitution highlighting the inner products, and the kernelized formulas inverting an n-by-n matrix"
+  caption="One distribution, two coordinate systems. Module 10's formulas meet module 4's substitution; the feature map survives only inside k."
+/>
+
+Two consequences carry the rest of the lesson. **Cost:** the rewritten form inverts an $n \times n$ matrix, so the feature dimension $N$ has left every cost formula, exactly the accounting that made the kernel SVM viable. **Legitimacy:** any function $k$ with PSD Gram matrices is $\tau^2 \varphi^\top \varphi'$ for *some* feature map, by <Ref lesson="svm-dual-kernels">Mercer's condition</Ref>, so the formulas above accept any legal kernel, including ones whose feature space is infinite-dimensional. The RBF kernel drops in; so does anything built from the closure rules.
+
+<KeyFact>
+A Gaussian process is not a new model: it is Bayesian linear regression on the kernel's implicit features, computed without ever visiting them. Everything the previous lesson proved (the posterior, the predictive split, the evidence) transfers intact; the basis-choice problem becomes a kernel-choice problem, and kernel choice, unlike basis choice, will get an objective function.
+</KeyFact>
+
+## The function-space view: a prior over functions
+
+The crosswalk was algebra; the function-space reading says what object the algebra is manipulating. In the weight-space view a random $w$ plus a fixed basis defines a random *function* $f(x) = \varphi(x)^\top w$, and its values at any input set are jointly Gaussian, being linear images of the Gaussian $w$. Taking that property as the definition cuts the basis away entirely.
+
+<Definition title="Gaussian process (Rasmussen &amp; Williams, Def. 2.1)">
+A **Gaussian process** is "a collection of random variables, any finite number of which have a joint Gaussian distribution." It is specified by a *mean function* $m(x) = \mathbb{E}[f(x)]$ and a *covariance function* (kernel) $k(x, x') = \operatorname{Cov}\big(f(x), f(x')\big)$, written $f \sim \mathcal{GP}(m, k)$. This course takes $m = 0$ throughout.
+</Definition>
+
+The canonical example is the model above: $f(x) = \varphi(x)^\top w$ with $w \sim \mathcal{N}(0, \tau^2 I)$ has $\mathbb{E}[f(x)] = 0$ and $\operatorname{Cov}(f(x), f(x')) = \tau^2 \varphi(x)^\top \varphi(x')$ — a GP whose kernel is the crosswalk's $k$. The structurally different example is the *squared-exponential* (SE) kernel
+
+$$
+k(x, x') = \sigma_f^2 \exp\!\Big( -\frac{(x - x')^2}{2\ell^2} \Big),
+$$
+
+module 4's RBF kernel under its GP-literature name, whose feature space is infinite-dimensional. Nearby inputs get strongly correlated function values and distant ones nearly independent ones; the *lengthscale* $\ell$ sets what "nearby" means, and the *signal variance* $\sigma_f^2$ sets the prior's vertical scale. The boundary case is a finite index set, where the definition describes nothing more than an ordinary multivariate Gaussian. The near-miss is specifying the entries of the *inverse* covariance as a function of input pairs. The definition makes one structural demand — examining more variables must not change the distribution of fewer — and inverse-covariance specifications break it, because marginalizing a Gaussian drops rows and columns of $\Sigma$, not of $\Sigma^{-1}$. No consistent collection of random variables exists; the object fails the definition's opening clause.
+
+A prior over functions can be looked at. Evaluate the kernel on a grid, draw from $\mathcal{N}(0, K)$, and plot the draw against the grid:
+
+<Figure
+  src="./figures/prior-samples.svg"
+  alt="Three panels of three functions each drawn from a squared-exponential GP prior at lengthscales 0.3, 1, and 3, over the same axes with the constant plus-minus two sigma prior band shaded"
+  caption="What the SE prior asserts, at three lengthscales: every draw is smooth, wiggles about once per ℓ, and lives inside ±2σf. Computed draws from N(0, K); the genre of Rasmussen & Williams Fig. 2.2(a)."
+/>
+
+<Task>
+Read the panels as claims, not pictures: at $\ell = 0.3$ the prior asserts the function can reverse direction dozens of times across the window; at $\ell = 3$ it asserts two or three swings at most. Then state which panel's prior a memorizing lookup table would need, and note that no finite $\ell$ delivers it (the boundary exercise makes this exact).
+</Task>
+
+In words, $\ell$ is roughly **the distance you must move in input space before the function can change appreciably**. It is the single most consequential number in a GP model, and every figure in the rest of the lesson varies it.
+
+## The predictive equations: conditioning a partitioned Gaussian
+
+The prior asserts; data selects. The mechanism is the one fact about Gaussians this lesson needs beyond the previous lesson's stock, stated here and derived in the starred section.
+
+<Theorem title="Gaussian conditioning">
+Let $\begin{pmatrix} u \\ v \end{pmatrix} \sim \mathcal{N}\!\left( 0, \begin{pmatrix} \Sigma_{uu} & \Sigma_{uv} \\ \Sigma_{vu} & \Sigma_{vv} \end{pmatrix} \right)$ with $\Sigma_{uu}$ invertible. Then
+
+$$
+v \mid u \;\sim\; \mathcal{N}\!\Big( \Sigma_{vu} \Sigma_{uu}^{-1} u,\;\; \Sigma_{vv} - \Sigma_{vu} \Sigma_{uu}^{-1} \Sigma_{uv} \Big).
+$$
+</Theorem>
+
+Apply it to the objects a regression problem actually holds. Under the GP prior, the *noise-free* function values $\mathbf{f}$ at the training inputs and $f_*$ at a test input are jointly Gaussian with covariance blocks built from the kernel. Observations carry noise, $y_i = f(x_i) + \varepsilon_i$ with $\varepsilon_i \sim \mathcal{N}(0, \sigma_n^2)$ independent. From here on the noise variance wears the subscript $n$, to keep it distinct from the signal variance $\sigma_f^2$ that arrived with the kernel. Independent noise adds $\sigma_n^2 I$ to the *training block only*: the joint prior over what is observed and what is wanted is
+
+$$
+\begin{pmatrix} y \\ f_* \end{pmatrix} \sim \mathcal{N}\!\left( 0, \begin{pmatrix} K + \sigma_n^2 I & \mathbf{k}_* \\ \mathbf{k}_*^\top & k_{**} \end{pmatrix} \right),
+$$
+
+and conditioning on $y$ gives the **predictive equations** of Gaussian process regression:
+
+$$
+\bar{f}_* = \mathbf{k}_*^\top (K + \sigma_n^2 I)^{-1} y,
+\qquad
+\mathbb{V}[f_*] = k_{**} - \mathbf{k}_*^\top (K + \sigma_n^2 I)^{-1} \mathbf{k}_* .
+$$
+
+These are the crosswalk theorem's formulas, re-derived in two lines from conditioning, the promised equivalence of the two views now visible from both sides. For a prediction about the next *observation* $y_*$ rather than the function, add the noise floor: $\mathbb{V}[y_*] = \mathbb{V}[f_*] + \sigma_n^2$. Setting $\sigma_n = 0$ recovers the noise-free case, in which the posterior mean interpolates the data exactly.
+
+<Figure
+  name="GpPredictiveDissection"
+  alt="The predictive mean and variance formulas with underbraces: the mean as kernel weights times targets, the variance as prior variance minus the information the observations carry"
+  caption="The two equations dissected. The mean is a weighted vote of the targets; the variance is the prior minus what the data revealed, and the targets never enter it."
+/>
+
+### Reading the mean: the smoother family rejoined
+
+The mean $\bar{f}_* = \sum_i w_i(x_*)\, y_i$ is a linear smoother: the same functional form as <Ref lesson="kernel-smoothing">the Nadaraya–Watson estimator</Ref>, which also averaged targets with input-similarity weights. Three things separate the cousins. The GP's weights come from a PSD kernel *filtered through* $(K + \sigma_n^2 I)^{-1}$, so they account for the redundancy among training points rather than weighting each independently; at $\sigma_n = 0$ the GP interpolates while the smoother does not; and where the smoother's bandwidth had to be tuned by cross-validation, the GP's hyperparameters will get a training-data objective two sections from now. What the smoother never had at any bandwidth is the second equation: a variance, priced by the same kernel.
+
+### Reading the variance: collapse at data, prior far away
+
+The variance is the prior variance at $x_*$ minus a non-negative term measuring what the observations reveal about $f(x_*)$, and $y$ appears nowhere in it: with the kernel fixed, the error bars are determined by *where* you measured, before any target value arrives. In the worked example below, the standard deviation of $f$ at a training input collapses to roughly the noise level, and far from all data $\mathbf{k}_* \to 0$ returns the full prior. This is the behavior the previous lesson's localized-basis pathology lacked, and it is now structural rather than lucky — uncertainty grows off the data *by construction*, for any kernel that decays with distance.
+
+<Example title="a two-point GP, by the numbers">
+SE kernel with $\ell = 1$, $\sigma_f = 1$, noise $\sigma_n = 0.2$; observations $(x, y) = (-1, 0.5)$ and $(1, -0.8)$.
+
+**The matrix.** $k(-1, 1) = e^{-2} = 0.135$, so $K + \sigma_n^2 I = \begin{pmatrix} 1.04 & 0.135 \\ 0.135 & 1.04 \end{pmatrix}$.
+
+**Between the data, $x_* = 0$.** $\mathbf{k}_* = (e^{-1/2}, e^{-1/2}) = (0.607, 0.607)$. Solving gives weights $w = (K + \sigma_n^2 I)^{-1} \mathbf{k}_* = (0.516, 0.516)$: an even vote. Mean $0.516 \cdot 0.5 + 0.516 \cdot (-0.8) = -0.155$; variance $1 - 0.607 \cdot 0.516 \cdot 2 = 0.374$, sd $0.61$, well below the prior's $1$ and well above the noise floor.
+
+**At a training input, $x_* = 1$.** $\mathbf{k}_* = (0.135, 1)$, weights $(0.005, 0.961)$, nearly all weight on the point being predicted. Mean $-0.766$, the target $-0.8$ shrunk slightly toward the prior; sd of $f$ is $0.196 \approx \sigma_n$, so the data has taught the model everything but the noise.
+
+**Outside the data, $x_* = 2$.** $\mathbf{k}_* = (0.011, 0.607)$, weights $(-0.066, 0.592)$. Mean $-0.507$, pulled by the near point only; sd $0.80$, most of the way back to the prior's $1$.
+</Example>
+
+<Exercise>
+The scalar case of the conditioning theorem, carried fully. One *noise-free* observation $f_1 = 1.2$ at $x_1 = 0$; SE kernel with $\ell = 1$, $\sigma_f = 1$. (a) Write the $2 \times 2$ joint covariance of $(f_1, f_*)$ for a test point $x_*$. (b) Apply the conditioning theorem to get the predictive mean and variance at $x_* = 1$, numerically. (c) Check both boundary behaviors: $x_* \to x_1$ and $x_* \to \infty$. Write the joint covariance before opening the solution.
+
+<Solution>
+(a) With $c = k(x_1, x_*) = e^{-x_*^2/2}$, the joint is $\begin{pmatrix} f_1 \\ f_* \end{pmatrix} \sim \mathcal{N}\!\left( 0, \begin{pmatrix} 1 & c \\ c & 1 \end{pmatrix} \right)$.
+
+(b) The theorem with $u = f_1$, $v = f_*$ (all blocks scalars): mean $c \cdot f_1$, variance $1 - c^2$. At $x_* = 1$: $c = e^{-1/2} = 0.607$, so mean $0.607 \cdot 1.2 = 0.728$ and variance $1 - e^{-1} = 0.632$.
+
+(c) As $x_* \to x_1$, $c \to 1$, so the mean tends to $f_1$ and the variance to $0$, exact interpolation of a noise-free observation. As $x_* \to \infty$, $c \to 0$, so the mean tends to $0$ and the variance to $1$, the prior untouched. The transferable move: every GP prediction is this computation with matrices in place of the scalars, and both boundary behaviors survive the upgrade.
+</Solution>
+</Exercise>
+
+Repeating the conditioning as observations arrive one at a time produces the prior-to-posterior collapse, the module's central picture:
+
+<FigureSequence
+  name="conditioning"
+  alt="Four frames over fixed axes: the SE prior band with three sample functions; then the posterior after one, three, and six observations, the band pinching at each observed point and reopening past the last observation toward a dashed guide at x = 4.5"
+  caption="The prior-to-posterior collapse (SE kernel, ℓ = 1, σn = 0.2). Each observation pinches the band to near the noise floor locally; past the last point the band reopens toward the prior."
+/>
+
+<Task>
+Step through the frames and verify three numbers against the predictive equations. The observations sit at $x = (-3,\ -2.5,\ -1.7,\ -1,\ 0.5,\ 1.5)$, with $\ell = 1$, $\sigma_f = 1$, $\sigma_n = 0.2$. After all six points, the sd at the observation at $x = 0.5$ is $0.19 \approx \sigma_n$. At the dashed guide $x = 4.5$, three lengthscales past the last observation, it is $1.00$, the prior recovered to two decimals; that check needs no inversion, since every entry of $\mathbf{k}_*$ is at most $e^{-9/2} = 0.011$ and $K \succeq 0$ keeps the smallest eigenvalue of $K + \sigma_n^2 I$ above $\sigma_n^2$, so the subtracted term is under $\|\mathbf{k}_*\|^2 / \sigma_n^2 < 0.004$. And at $x = -0.25$, the middle of the widest gap, the band bulges to sd $0.31$ — above the pinch at the observations, well under the prior's $1$. Then note what never happens: the band nowhere narrows in a region with no data.
+</Task>
+
+The demo below runs the same machinery live, on the interval $[0, 1]$. On the **medium** preset, place observations until the widest 95% band on $[0, 1]$ falls to $1.00$ or below, using as few points as possible; the readout tracks the width, and the vertical marker sits where the band is widest — at first that is the interval's ends, which no observation brackets, and only once the boundaries are pinned does it move to the biggest interior gap. The variance equation makes the marker the whole strategy: where to measure next depends on the observation *positions* only, never on the $y$-values. Then switch to **short** and confirm the same points no longer suffice. A shorter lengthscale is a prior under which information propagates a shorter distance, so identical measurements pin less of the function.
+
+<Demo name="GpPosteriorExplorer" caption="Click to place observations; the posterior mean and 95% band refit on every change. Presets set the SE lengthscale; the readout scores the widest band against the ≤ 1.00 target." />
+
+## Algorithm 2.1: Cholesky, never invert
+
+The equations call for $(K + \sigma_n^2 I)^{-1}$ twice, and the correct implementation never forms that inverse: explicit inversion is slower and numerically worse than solving the two triangular systems a Cholesky factorization provides. Rasmussen and Williams state the reference implementation as their Algorithm 2.1; the same six lines are <Ref lesson="gp-lab">the lab's</Ref> kernel:
+
+```text
+L  = cholesky(K + σn²I)              # n³/6 multiplies: the one cubic step
+α  = Lᵀ \ (L \ y)                    # two triangular solves, O(n²)
+f̄* = k*ᵀ α                           # mean: O(n) per test point
+v  = L \ k*                          # O(n²) per test point
+V[f*] = k(x*, x*) − vᵀv              # variance
+log p(y|X) = −½ yᵀα − Σᵢ log Lᵢᵢ − (n/2) log 2π
+```
+
+The last line is free: the log determinant in the marginal likelihood, the quantity the next section optimizes, satisfies $\log |K + \sigma_n^2 I| = 2 \sum_i \log L_{ii}$, a by-product of the factorization already paid for. One $O(n^3)$ factorization therefore buys the mean, every pointwise variance at $O(n^2)$ each, and the model's evidence.
+
+<KeyFact>
+The prohibition is numerical, not stylistic. Forming $K^{-1}$ explicitly costs about three times the flops of factor-and-solve, and the residual of an inverse-multiplied solution grows by a factor of the condition number of $K + \sigma_n^2 I$ — a factor the backward-stable triangular solves never pay, and one that blows up as training inputs crowd together and the noise floor shrinks (the closing eigenvalue exercise shows the mechanism). <Ref lesson="gp-lab">The lab's</Ref> checkpoints enforce the discipline.
+</KeyFact>
+
+## Kernels are assumptions
+
+With the machinery fixed, the entire modeling content of a GP lives in one place: the kernel is the prior's full statement about the function. The three kernels below are the working vocabulary, and each encodes a different, checkable assumption.
+
+<Figure
+  src="./figures/kernel-zoo.svg"
+  alt="Three panels of two draws each from a squared-exponential kernel, a Matern one-half kernel, and a periodic kernel, showing smooth, jagged, and repeating sample functions"
+  caption="Three priors, made visible: SE draws are infinitely differentiable, Matérn ν = ½ draws are continuous but nowhere smooth, periodic draws repeat exactly. Choosing a kernel is choosing which panel the truth lives in."
+/>
+
+**Squared exponential.** Infinitely differentiable sample paths: an assumption of *extreme* smoothness. Stein's monograph on spatial interpolation (kriging, 1999) argues that such smoothness is unrealistic for most physical processes and recommends the Matérn class instead. The objection is worth knowing because the SE kernel remains the default throughout machine learning, mostly harmlessly, though its insistence on smoothness can over-smooth sharp features.
+
+**Matérn.** A family with an explicit roughness dial: the process is $k$-times (mean-square) differentiable exactly when the parameter $\nu$ exceeds $k$, recovering the SE kernel as $\nu \to \infty$ and, at $\nu = \tfrac12$, the very rough exponential kernel $\sigma_f^2 e^{-|x - x'|/\ell}$ of the Ornstein–Uhlenbeck process (the 1930 model of a Brownian particle's velocity). The practical defaults are the half-integer members with simple closed forms,
+
+$$
+k_{3/2}(r) = \sigma_f^2 \Big( 1 + \tfrac{\sqrt{3}\,r}{\ell} \Big) e^{-\sqrt{3}\,r/\ell},
+\qquad
+k_{5/2}(r) = \sigma_f^2 \Big( 1 + \tfrac{\sqrt{5}\,r}{\ell} + \tfrac{5 r^2}{3 \ell^2} \Big) e^{-\sqrt{5}\,r/\ell},
+$$
+
+with $r = |x - x'|$; beyond $\nu = \tfrac72$, finite noisy data cannot tell the members apart, so the dial has only a few useful positions.
+
+**Periodic.** MacKay's 1998 construction maps $x$ to the circle $(\cos \tfrac{2\pi x}{p}, \sin \tfrac{2\pi x}{p})$ and applies an SE kernel there, giving $k(x, x') = \sigma_f^2 \exp\big( -\tfrac{2}{\ell^2} \sin^2 \tfrac{\pi (x - x')}{p} \big)$. Every draw repeats with period $p$ exactly, forever — a strong claim no stationary decaying kernel can make.
+
+### Kernel algebra: assumptions compose
+
+<Ref lesson="svm-dual-kernels">Module 4's closure rules</Ref> proved sums and products of kernels are kernels; the GP view adds the *meaning*. If $f_1 \sim \mathcal{GP}(0, k_1)$ and $f_2 \sim \mathcal{GP}(0, k_2)$ are independent, then $f_1 + f_2$ is a GP with kernel $k_1 + k_2$: **adding kernels is adding independent functions**, one per additive component of the signal. Multiplying a periodic kernel by a long-lengthscale SE kernel yields draws that are locally periodic but whose cycle drifts over the years — precisely the term that will carry the seasonal component of atmospheric CO₂ in <Ref lesson="mauna-loa">the Mauna Loa lesson's composite kernel</Ref>. Kernel engineering is hypothesis writing, one summand per claim.
+
+### Hyperparameters: one dataset, several stories
+
+The working SE model has three hyperparameters, $\theta = (\ell, \sigma_f, \sigma_n)$, and they trade off against each other. On data drawn from an $\ell = 1$ process, refitting with $\ell$ forced short drives the fitted noise to nearly zero (every wiggle must be signal, and the bars flare violently between points); forcing $\ell$ long drives the fitted noise up to swallow most of the variance (the data becomes a slow trend plus scatter). Both are coherent stories. Both are wrong. Choosing between such stories is a model-selection problem, and the previous lesson built the exact tool.
+
+## The marginal likelihood: three terms, and an honest failure mode
+
+For GP regression the evidence needs no new derivation: under the model, $y$ is a single draw from a zero-mean Gaussian with covariance $K_y = K + \sigma_n^2 I$ (the joint prior with the function values integrated out), so the <Ref lesson="bayesian-linear-regression">marginal likelihood</Ref> is one Gaussian density,
+
+$$
+\log p(y \mid X, \theta)
+= \underbrace{-\tfrac12\, y^\top K_y^{-1} y}_{\text{data fit}}
+\;\underbrace{-\;\tfrac12 \log |K_y|}_{\text{complexity}}
+\;\underbrace{-\;\tfrac{n}{2} \log 2\pi}_{\text{const}} ,
+$$
+
+with every hyperparameter hidden inside $K_y$. The three terms pull against each other exactly as the Occam mechanism demands. A short lengthscale makes $K_y$ nearly diagonal: the model can accommodate any targets (data fit healthy), but a flexible prior spreads its probability over vastly many datasets, and $\log |K_y|$ prices the spread. A long lengthscale makes $K_y$ nearly singular: cheap on complexity, but the data-fit term collapses unless the targets really are that smooth. No held-out data enters; the balance is normalization arithmetic, as it was for polynomial degrees.
+
+<Figure
+  src="./figures/evidence-terms.svg"
+  alt="Data-fit, complexity, and log marginal likelihood curves versus lengthscale on a log axis, for twenty points drawn from a lengthscale-one process, with the peak marked near 1.3 and the data-fit and total curves diving off the bottom of the plot past lengthscale 2.7"
+  caption="The trade computed (n = 20 points from an ℓ = 1 process; σf, σn held at truth). Complexity rewards long lengthscales, data fit destroys them; the product peaks at ℓ ≈ 1.3."
+/>
+
+<Task>
+Read the figure at its ends against the peak, where $\log p(y \mid X) = -1.0$. At $\ell = 0.1$, data fit is only $3$ nats worse than at the peak while the complexity term is $21$ nats worse — flexibility bought almost nothing and paid heavily. At $\ell = 3$ the collapse is too steep to read off the plot: the data-fit curve crosses the floor near $\ell = 2.7$ and keeps falling, and computed rather than read it sits $128$ nats below its value at the peak, against a complexity improvement of $8$. Note the asymmetry (a gentle decline leftward, a cliff rightward) and keep it in mind when reading optimizer traces.
+</Task>
+
+Maximizing this objective over $\theta$ is *empirical Bayes*, the move the previous lesson previewed, and it runs on gradients: $\partial_\theta \log p(y \mid X, \theta)$ has a closed form in $K_y^{-1}$ and $\partial_\theta K_y$, costing $O(n^2)$ per hyperparameter once the $O(n^3)$ factorization is paid. Where the kernel smoother's bandwidth needed a cross-validation grid, the GP's kernel is tuned by smooth optimization of a training-data quantity: this is what "the kernel is chosen by the data itself" means.
+
+### Rival local optima: model selection's honest face
+
+The objective is not concave, and its local optima are not numerical noise: each one is a coherent interpretation of the data. Take seven observations (the dataset of the research exercise, drawn from an $\ell = 1$, $\sigma_n = 0.1$ process) and map the evidence over $(\ell, \sigma_n)$ with $\sigma_f = 1$; three local maxima appear, two of them serious rivals. One explains the data as a low-noise, short-lengthscale signal that threads every point; the other as a smooth trend with substantial noise (the third, a shallow compromise between them, trails by a fraction of a nat — the research exercise maps all three).
+
+<Figure
+  src="./figures/two-optima.svg"
+  alt="Two panels fitting the same seven points: a wiggly low-noise posterior with lengthscale 0.8, and a nearly linear high-noise posterior with lengthscale 9, with log evidence minus 6.67 and minus 6.59"
+  caption="Two locally optimal stories for one 7-point dataset. Their log evidences differ by 0.08 nats: odds of about 1.08. Seven points cannot decide; the truth (ℓ = 1) is the wiggly story's neighborhood."
+/>
+
+The two stories sit **0.08 nats apart**: posterior odds of about $1.08$, a dead heat. Rasmussen and Williams' own 7-point example (§5.4.1, Fig. 5.5) behaves the same way — a complicated low-noise optimum against a simple high-noise one, the complex model's marginal likelihood about 60% higher (roughly $0.5$ nats), and with the complex story as the global optimum there. Three consequences follow. Gradient optimization from a single start lands in whichever basin the start belongs to, so **multiple restarts are mandatory practice**, not paranoia. With more data one optimum typically outgrows the others by orders of magnitude, and the ambiguity resolves itself. And the ambiguity is the method working correctly: with seven points, confidently selecting either story would be the error.
+
+<KeyFact>
+The marginal likelihood penalizes complexity automatically (that is normalization, not a tuned heuristic) but it is not omniscient: it is non-concave, its local optima are rival explanations of the data, and it compares only the models actually placed on the table, all of which may be wrong. Occam is built in; restarts and skepticism are not.
+</KeyFact>
+
+## One kernel machine, three objectives
+
+The course has now met three methods that predict with $f(x) = \sum_i \alpha_i\, k(x_i, x)$: kernel ridge regression (module 3's ridge pushed through module 4's trick), support vector regression (the SVM's $\varepsilon$-insensitive cousin, named in module 4), and GP regression. They are one family separated by objective, and the family portrait closes the course's kernel thread.
+
+<Figure
+  name="KernelMachineFamily"
+  alt="A table comparing kernel ridge regression, support vector regression, and GP regression by objective, which points the solution uses, cost, and what uncertainty each reports"
+  caption="One prediction form, three objectives. The GP's mean is exactly kernel ridge's prediction (the mixed-review exercise proves it); what the same O(n³) buys in addition is the variance and the evidence."
+/>
+
+Everything here is $O(n^3)$ in training points and $O(n^2)$ per predictive variance, which in practice caps exact GP regression near $n \approx 10^4$ on ordinary hardware. The standard escape, *inducing-point* (sparse) approximations that compress $n$ points into $m \ll n$ pseudo-inputs at $O(n m^2)$, is named here and not developed. Two further pointers close open edges. For classification, a Bernoulli likelihood destroys the conjugacy every formula above relied on; the posterior must be approximated (the Laplace approximation of Bishop §6.4, or expectation propagation), and this course leaves it there. And the function-space view has a bridge into deep learning: Neal proved in 1996 that a one-hidden-layer Bayesian neural network converges to a Gaussian process as its width goes to infinity, a sentence module 11's <Ref lesson="random-features">random-features lesson</Ref> picks up from the other side.
+
+Established: GP regression is Bayesian linear regression under the kernel trick, its predictive equations are one Gaussian conditioning, its implementation is one Cholesky factorization, its kernel is a legible prior over functions, and its hyperparameters are tuned by the marginal likelihood, automatically Occam-penalized and honestly multimodal. Every error bar in this machinery remains conditional on the kernel; what a *kernel-free* guarantee costs is the question <Ref lesson="conformal-prediction">the next lesson</Ref> answers. <Ref lesson="mauna-loa">The lesson after it</Ref> then applies the machinery to the atmosphere: a composite kernel, engineered term by term and scored by the evidence, extrapolating the CO₂ record with bands that widen honestly.
+
+## ★ The conditioning formula, derived
+
+The lesson's one linear-algebra prerequisite, proved by decorrelation: no density manipulation required.
+
+<Theorem title="Gaussian conditioning, derived">
+With $\begin{pmatrix} u \\ v \end{pmatrix} \sim \mathcal{N}\!\left( 0, \begin{pmatrix} \Sigma_{uu} & \Sigma_{uv} \\ \Sigma_{vu} & \Sigma_{vv} \end{pmatrix} \right)$ and $\Sigma_{uu}$ invertible:
+$v \mid u \sim \mathcal{N}\big( \Sigma_{vu} \Sigma_{uu}^{-1} u,\ \Sigma_{vv} - \Sigma_{vu} \Sigma_{uu}^{-1} \Sigma_{uv} \big)$.
+
+<Proof>
+The plan: build from $v$ a variable uncorrelated with $u$, conclude independence, and read the conditional off the decomposition.
+
+**Step 1, decorrelate.** Define $z = v - \Sigma_{vu} \Sigma_{uu}^{-1} u$. Then
+$$
+\operatorname{Cov}(z, u) = \operatorname{Cov}(v, u) - \Sigma_{vu} \Sigma_{uu}^{-1} \operatorname{Cov}(u, u) = \Sigma_{vu} - \Sigma_{vu} \Sigma_{uu}^{-1} \Sigma_{uu} = 0 .
+$$
+
+**Step 2, independence.** $(z, u)$ is a linear image of the jointly Gaussian $(u, v)$, hence jointly Gaussian; for jointly Gaussian variables, zero covariance is independence. This is the step that fails for general distributions: uncorrelated is weaker than independent everywhere except inside a joint Gaussian.
+
+**Step 3, condition.** Write $v = z + \Sigma_{vu} \Sigma_{uu}^{-1} u$. Conditioning on $u$ leaves $z$'s distribution untouched (independence) and freezes the second term at a constant. So $v \mid u$ is Gaussian with mean $\mathbb{E}[z] + \Sigma_{vu} \Sigma_{uu}^{-1} u = \Sigma_{vu} \Sigma_{uu}^{-1} u$ and covariance $\operatorname{Cov}(z)$.
+
+**Step 4, the covariance of $z$.** Expanding,
+$$
+\operatorname{Cov}(z) = \Sigma_{vv} - 2\, \Sigma_{vu} \Sigma_{uu}^{-1} \Sigma_{uv} + \Sigma_{vu} \Sigma_{uu}^{-1} \Sigma_{uu} \Sigma_{uu}^{-1} \Sigma_{uv} = \Sigma_{vv} - \Sigma_{vu} \Sigma_{uu}^{-1} \Sigma_{uv} .
+$$
+</Proof>
+</Theorem>
+
+Two features of the result do real work upstream: the conditional mean is *linear* in $u$ (which is why the GP mean is a linear smoother), and the conditional covariance does not involve $u$ at all (which is why the error bars ignore the targets).
+
+## Exercises
+
+<Exercise>
+Compute the $3 \times 3$ SE kernel matrix ($\ell = 1$, $\sigma_f = 1$) for the inputs $x = \{0, 1, 3\}$, then verify it is positive semidefinite by computing (or numerically checking) its eigenvalues. State which pair of inputs the smallest eigenvalue is telling you about.
+
+<Solution>
+The entries are $k(x_i, x_j) = e^{-(x_i - x_j)^2/2}$: $k(0,1) = e^{-1/2} = 0.607$, $k(1,3) = e^{-2} = 0.135$, $k(0,3) = e^{-9/2} = 0.011$, ones on the diagonal:
+
+$$
+K = \begin{pmatrix} 1 & 0.607 & 0.011 \\ 0.607 & 1 & 0.135 \\ 0.011 & 0.135 & 1 \end{pmatrix},
+\qquad
+\text{eigenvalues } (0.381,\ 0.995,\ 1.624).
+$$
+
+All are positive, as <Ref lesson="svm-dual-kernels">Mercer's condition</Ref> requires of any Gram matrix of a legal kernel. The small eigenvalue $0.381$ belongs to the near-redundancy between $x = 0$ and $x = 1$: one lengthscale apart, their function values are correlated $0.607$, so the prior considers the contrast $f(0) - f(1)$ a low-variance direction. Push the two inputs together and this eigenvalue slides toward zero, which is the numerical reason GP code adds $\sigma_n^2$ (or a tiny jitter) to the diagonal before factorizing.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe: both ends of the lengthscale dial, with the noisy predictive equations. (a) Let $\ell \to 0$ with $\sigma_f$, $\sigma_n$ fixed. Compute the limits of $K$, $\mathbf{k}_*$, and the predictive mean and variance, both at a training input and away from all of them. Name the predictor this reproduces from <Ref lesson="statistical-learning">the course's first lesson</Ref>. (b) Let $\ell \to \infty$. Show the predictive mean tends to the same constant everywhere and identify that constant. (c) State what each limit says about the prior-as-assumption.
+
+<Solution>
+(a) Off-diagonal SE entries $e^{-(x_i - x_j)^2 / 2\ell^2} \to 0$, so $K \to \sigma_f^2 I$; likewise $\mathbf{k}_* \to 0$ for any $x_*$ not equal to a training input. Away from the data, the mean tends to $0$ and the variance to $\sigma_f^2$, the untouched prior. At $x_* = x_i$ exactly, $\mathbf{k}_* \to \sigma_f^2 e_i$, so the mean $\to \frac{\sigma_f^2}{\sigma_f^2 + \sigma_n^2}\, y_i$ and the variance $\to \sigma_f^2 - \frac{\sigma_f^4}{\sigma_f^2 + \sigma_n^2} = \frac{\sigma_f^2 \sigma_n^2}{\sigma_f^2 + \sigma_n^2}$. The model reproduces (slightly shrunken) targets at the training inputs and the prior everywhere else: the **memorizer**. Zero-lengthscale learning is the lookup table that opened the course, now exhibited as a degenerate prior rather than a strawman. This is its last cameo.
+
+(b) As $\ell \to \infty$, every kernel entry $\to \sigma_f^2$: $K \to \sigma_f^2 \mathbf{1}\mathbf{1}^\top$ and $\mathbf{k}_* \to \sigma_f^2 \mathbf{1}$. By Sherman–Morrison, $(\sigma_n^2 I + \sigma_f^2 \mathbf{1}\mathbf{1}^\top)^{-1} y = \tfrac{1}{\sigma_n^2} y - \tfrac{\sigma_f^2 (\mathbf{1}^\top y)}{\sigma_n^2 (\sigma_n^2 + n \sigma_f^2)} \mathbf{1}$, and multiplying by $\sigma_f^2 \mathbf{1}^\top$ collapses the mean to
+
+$$
+\bar f_* = \frac{n \sigma_f^2}{n \sigma_f^2 + \sigma_n^2}\, \bar{y}
+\qquad \text{for every } x_* :
+$$
+
+the sample mean, shrunk toward zero — a constant fit, the same shrinkage form as the scalar posterior of <Ref lesson="bayesian-linear-regression">the previous lesson's first exercise</Ref>.
+
+(c) Neither limit is a pathology; both are priors doing exactly what they claim. $\ell$ states how far an observation's information propagates: zero lengthscale asserts no generalization at all (fitting without learning), infinite lengthscale asserts total generalization (one global constant). Real modeling is the choice of a finite propagation distance, and the evidence of the marginal-likelihood section is what makes that choice accountable.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "the GP's error bars widen away from the data, so they are honest about extrapolation." Concrete setting: truth $f(x) = 0.3 x + 2 \sin(\pi x)$, observed with small noise on $x \in [0, 8]$, modeled by a zero-mean SE-kernel GP with hyperparameters fitted by the marginal likelihood; predict at $x_* = 20$. Describe what the predictive distribution does, name the step in the claim that fails, and state the two-level fix hierarchy.
+
+<Solution>
+The fitted SE model handles the training window well: with $\ell$ near a fraction of the period and $\sigma_f^2$ near the sample variance (roughly $2$-ish signal units), the posterior mean tracks the wiggles. At $x_* = 20$, twelve units (many lengthscales) past the last observation, $\mathbf{k}_* \approx 0$, so the mean reverts to the prior's $0$ and the bars widen to $\pm 2 \sigma_f \approx \pm 4$. The truth is $0.3 \cdot 20 + 2\sin(20\pi) = 6$ — **outside the band**. The bars widened and excluded the truth anyway.
+
+The failing step is the word "honest." The variance $k_{**} - \mathbf{k}_*^\top (K + \sigma_n^2 I)^{-1} \mathbf{k}_*$ can only ever widen back to $k_{**}$ — *the prior's own variance*. Off the data, the bars report the prior, and a zero-mean stationary prior assigns essentially no mass to functions with a persistent trend; the truth was never in the model's support worth mentioning. GP bars are exact probability statements *relative to the kernel*: the same conditional-on-the-model verdict <Ref lesson="bayesian-linear-regression">the previous lesson</Ref> delivered for the linear case, undefeated by the flare.
+
+The fix hierarchy has two levels. (1) A better kernel: add a linear term and a periodic term by kernel algebra and let the evidence score the composition; that is precisely the construction of <Ref lesson="mauna-loa">the CO₂ lesson later in this module</Ref>, and it is the only fix that can help at $x_* = 20$, because extrapolation is exactly where assumptions are all you have. (2) Assumption-free coverage: <Ref lesson="conformal-prediction">conformal prediction</Ref> guarantees marginal coverage without believing the kernel, but only on-distribution; no method, conformal included, converts bad extrapolation assumptions into good coverage off the data's support.
+</Solution>
+</Exercise>
+
+<Exercise>
+Mixed review. (a) Kernel ridge regression fits $\hat\beta = (\Phi^\top \Phi + \lambda I)^{-1} \Phi^\top y$ in the feature space and predicts $\varphi_*^\top \hat\beta$. Show its prediction equals the GP posterior mean with kernel $k = \tau^2 \varphi^\top \varphi'$, and find the $\lambda$ that makes the match exact. (b) State what the GP computes, at the same $O(n^3)$ order, that the ridge fit does not.
+
+<Solution>
+(a) The push-through identity from the inheritance proof, with $\lambda$ in place of $\sigma^2/\tau^2$: $\Phi^\top (\Phi \Phi^\top + \lambda I) = (\Phi^\top \Phi + \lambda I) \Phi^\top$, hence $(\Phi^\top \Phi + \lambda I)^{-1} \Phi^\top = \Phi^\top (\Phi \Phi^\top + \lambda I)^{-1}$. So
+
+$$
+\varphi_*^\top \hat\beta
+= \varphi_*^\top \Phi^\top (\Phi \Phi^\top + \lambda I)^{-1} y
+= \tfrac{1}{\tau^2} \mathbf{k}_*^\top \big( \tfrac{1}{\tau^2} K + \lambda I \big)^{-1} y
+= \mathbf{k}_*^\top (K + \tau^2 \lambda I)^{-1} y ,
+$$
+
+which is the GP mean $\mathbf{k}_*^\top (K + \sigma_n^2 I)^{-1} y$ exactly when $\lambda = \sigma_n^2 / \tau^2$: <Ref lesson="bayesian-linear-regression">ridge-equals-posterior-mean</Ref>, kernelized, with modules 3 and 4 composed in one line.
+
+(b) The identical Cholesky factorization of $K + \sigma_n^2 I$ that produces the ridge/GP point prediction also yields the predictive variance at every test point ($O(n^2)$ each) and the log marginal likelihood (a by-product of the factor's diagonal). Ridge regression computes the mean and stops; the GP's surplus for the same asymptotic price is the entire uncertainty apparatus (bars and evidence), which is why the family-portrait figure lists their costs in the same column.
+</Solution>
+</Exercise>
+
+<Exercise>
+Research-shaped: reproduce the two-optima phenomenon. Data (7 points):
+
+$$
+\begin{aligned}
+x &= (-4.49,\ -3.44,\ 0.40,\ 0.93,\ 1.13,\ 1.82,\ 2.89), \\
+y &= (-0.23,\ -0.70,\ -0.90,\ -0.61,\ -0.57,\ -1.56,\ -1.76).
+\end{aligned}
+$$
+
+Fix $\sigma_f = 1$ and grid the log marginal likelihood (Algorithm 2.1's last line) over $\ell \in [0.1, 20]$ and $\sigma_n \in [0.01, 2]$, both log-spaced. Report every local maximum, the log-evidence gap between the top two, and plot the posterior fit at each. State in advance what counts as reproducing the phenomenon: at least two well-separated local maxima, one short-$\ell$/low-noise and one long-$\ell$/high-noise.
+
+<Solution>
+Our run (a $55 \times 55$ grid, refined locally) finds **three** local maxima. The *wiggly* story at $(\ell, \sigma_n) \approx (0.80,\ 0.037)$ with $\log p(y \mid X) = -6.67$ (near-interpolation, bars flaring between points); the *smooth* story at $(\ell, \sigma_n) \approx (9.2,\ 0.44)$ with $\log p(y \mid X) = -6.59$ (an almost linear trend with most variation priced as noise); and a shallower *compromise* basin at $(\ell, \sigma_n) \approx (2.4,\ 0.34)$ with $\log p(y \mid X) = -6.77$, which reads the data as a moderately smooth curve with moderate noise. The top two sit $0.08$ nats apart — posterior odds of about $1.08$, a dead heat — and the compromise trails the leader by only $0.18$ nats, odds of about $1.2$. Here the *smooth* story noses ahead even though the generating process ($\ell = 1$, $\sigma_n = 0.1$) lives in the wiggly basin: with $n = 7$ the evidence genuinely cannot tell, which is the phenomenon. The two dominant fits appear in the body's two-optima figure.
+
+Practical morals to report with the numbers: a gradient run started at the default $(1, 1)$ climbs into one basin and never sees the other two, so hyperparameter optimization needs multiple restarts — and three basins on a two-parameter surface means even two restarts can miss one; and rerunning with more data drawn from the same process, one optimum outgrows the others by orders of magnitude; the ambiguity is a small-$n$ condition, not a permanent one.
+</Solution>
+</Exercise>
+
+<Exercise>
+Forward computation. The Mauna Loa observatory's monthly CO₂ record (NOAA GML, continuous since 1958: a rise from 315 ppm then to past 420 ppm now, with a seasonal sawtooth of about 6 ppm riding on it) is the classical GP benchmark. Fit a zero-mean SE-kernel GP to the first 30 years (center the data; tune $\ell, \sigma_f, \sigma_n$ by marginal likelihood with restarts) and extrapolate 10 years. Describe what happens to the seasonal cycle in the forecast, and why it must.
+
+<Solution>
+In-sample, the fitted SE kernel does respectably: with a shortish lengthscale it can track both the trend and the seasonal wiggle through the training window. In the forecast, the seasonal cycle survives for roughly one lengthscale past the last observation and then **vanishes**; the mean decays toward the (centered) prior mean and the band settles at $\pm 2\sigma_f$. It must vanish because an SE kernel's correlation dies with distance; the model has no way to assert "what happened every twelve months will keep happening," so ten years out, next January is as unknown as any other month. The trend fares no better: a zero-mean stationary prior forgets it too, exactly the refutation exercise's failure.
+
+The repair is not a better optimizer but a better hypothesis, written in kernel algebra: a long-lengthscale SE term for the trend, a periodic term multiplied by a slow SE decay for the almost-exactly-annual cycle, a rational-quadratic term for medium-term irregularities, and a noise term — the 11-hyperparameter composite kernel of Rasmussen and Williams §5.4.3, engineered term by term and scored by the evidence. Building and reading that kernel is <Ref lesson="mauna-loa">the CO₂ lesson later in this module</Ref>.
+</Solution>
+</Exercise>
+
+<References>
+1. C. E. Rasmussen, C. K. I. Williams, *Gaussian Processes for Machine Learning*, MIT Press, 2006 — §2.1–2.2: the weight-space/function-space equivalence and Definition 2.1; §2.3 and Fig. 2.5: hyperparameter effects; Algorithm 2.1: the Cholesky implementation this chapter reproduces; Ch. 4: the kernel catalogue (SE, Matérn, periodic) and kernel algebra (§4.2.4); §5.4.1 and Figs. 5.3–5.5: the marginal-likelihood decomposition and the two-local-optima example. Free online: https://gaussianprocess.org/gpml/
+2. K. P. Murphy, *Probabilistic Machine Learning: An Introduction*, MIT Press, 2022 — §17.2: GP regression, the kernel-regression comparison (§17.2.3), the weight-space proof (§17.2.4), numerical issues (§17.2.5), the two-optima Fig. 17.9, the infinite-width network connection (§17.2.8), and the one-paragraph scaling survey (§17.2.9). Free online: https://probml.github.io/pml-book/book1.html
+3. C. M. Bishop, *Pattern Recognition and Machine Learning*, Springer, 2006 — §6.4: Gaussian processes from the kernel side, and §6.4.5–6.4.6: GP classification via the Laplace approximation, the pointer this chapter names and does not develop.
+4. M. L. Stein, *Interpolation of Spatial Data: Some Theory for Kriging*, Springer, 1999 — the source of the objection to squared-exponential smoothness and of the Matérn recommendation quoted in the kernel section.
+5. D. J. C. MacKay, "Introduction to Gaussian Processes", in C. M. Bishop (ed.), *Neural Networks and Machine Learning* (NATO ASI Series F, vol. 168), Springer, 1998 — the circle-warping construction of the periodic kernel, reproduced as eq. (4.31) of Rasmussen & Williams.
+6. R. M. Neal, *Bayesian Learning for Neural Networks*, Springer, 1996 — the infinite-width limit: a one-hidden-layer Bayesian network converges to a Gaussian process, the bridge module 11 crosses in the other direction.
+</References>
