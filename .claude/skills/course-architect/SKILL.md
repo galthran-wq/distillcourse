@@ -1,7 +1,7 @@
 ---
 name: course-architect
 description: Launch the course-factory workflow to research and design a new course structure (canon discovery, source-reading swarm, synthesis into course.yaml + a resumable research dossier), in an isolated worktree branch. Use when creating a new course.
-argument-hint: "<topic, e.g. 'financial mathematics'>"
+argument-hint: "<topic, plus any design intent — e.g. 'ml system design; practical not academic; prerequisite is classical ML'>"
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:*), Bash(git *)
 ---
@@ -24,10 +24,22 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
 
 ## Workflow
 
-1. **Resolve the course.** Slugify the topic (kebab-case). If
-   `content/courses/<slug>/` already exists on the current branch, this is a
-   restructure — confirm with the user before proceeding (existing `drafted`+
-   lessons are frozen either way).
+1. **Resolve the course.** Split the argument into the TOPIC (the subject,
+   which slugifies to kebab-case) and the DESIGN INTENT — anything the human
+   said about format, audience, angle, or what the course must assume its
+   reader already knows. The intent is not decoration: it binds both canon
+   selection and structure synthesis, so carry it through verbatim rather
+   than paraphrasing it away. If there is none, there is none.
+
+   If `content/courses/<slug>/course.yaml` already exists on the current
+   branch, this is a restructure — confirm with the user before proceeding
+   (existing `drafted`+ lessons are frozen either way). A directory holding
+   only `research/` is NOT a restructure: that is staged raw material for a
+   course that does not exist yet, and the run proceeds normally.
+
+   Note what is staged: list `content/courses/<slug>/research/texts/`. Files
+   there are source copies the human obtained for this course, and the
+   factory treats each as canon by fiat. Report the count in step 4.
 
 2. **Isolate.** Enter a git worktree on branch `course/<slug>`
    (EnterWorktree). One course = one branch; nothing lands on master until
@@ -35,7 +47,9 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
    /lesson-factory runs — happens inside this worktree.
 
 3. **Launch the factory.** Invoke the Workflow tool:
-   `{name: "course-factory", args: {phase: "structure", slug: "<slug>", topic: "<topic>", root: "<absolute worktree path>"}}`.
+   `{name: "course-factory", args: {phase: "structure", slug: "<slug>", topic: "<topic>", brief: "<design intent, verbatim>", root: "<absolute worktree path>"}}`.
+   Omit `brief` only when the human stated no intent at all — it is what
+   keeps a course from defaulting to a generic survey of its subject.
    `root` is mandatory: workflow subagents inherit the session's launch
    directory, not your worktree — without it they write into the wrong
    checkout (usually master).
