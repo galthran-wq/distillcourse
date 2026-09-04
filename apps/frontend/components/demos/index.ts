@@ -103,4 +103,8 @@ export const demos: Record<
     import("./ml-system-design/TailLatencyExplorer"),
   ReshardingExplorer: () =>
     import("./ml-system-design/ReshardingExplorer"),
+  ArbitrageLock: () => import("./quant/ArbitrageLock"),
+  ReplicationWalker: () => import("./quant/ReplicationWalker"),
+  ExerciseRuleExplorer: () => import("./quant/ExerciseRuleExplorer"),
+  QuadraticVariationZoom: () => import("./quant/QuadraticVariationZoom"),
 };
