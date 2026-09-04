@@ -554,6 +554,35 @@ for ax, (name, (f, f_t, f_x, f_xx)) in zip(axes, _cases.items()):
 fig.tight_layout()
 plt.show()
 
+# %% [markdown]
+# If the shape assertion or the slope fails, open the hints in order.
+#
+# <details><summary>Hint 1 — the two axes</summary>
+#
+# Two axes, two jobs. The stride reads the grid, which is the last axis of a
+# single path and of a batch alike — `W[..., ::stride]`, never `W[::stride]`,
+# which on an $(M, n + 1)$ array keeps every stride-th path and leaves each
+# on the fine grid. The sums run over the cells, also the last axis:
+# `np.sum(..., axis=-1)` returns one number on a path and $M$ on a batch,
+# and stacking the three gives $(3,)$ or $(3, M)$ with no branch on the
+# input's shape. The time grid is one-dimensional either way; numpy
+# broadcasts $\Delta t$ across the paths on its own.
+#
+# </details>
+#
+# <details><summary>Hint 2 — pseudocode</summary>
+#
+# ```
+# tc <- t read at the stride;  Wc <- W read at the stride along its last axis
+# dt <- diff(tc);              dW <- diff(Wc) along the last axis
+# tl, Wl <- tc and Wc without their last entry: the cells' left endpoints
+# return [sum(f_t(tl, Wl) * dt),  sum(f_x(tl, Wl) * dW),  0.5 * sum(f_xx(tl, Wl) * dt)]
+#        each sum over the last axis
+# ```
+#
+# </details>
+
+
 # %%
 # One path, then a batch of paths: the three sums of the first, then the
 # (3, M) array of the second.
@@ -742,6 +771,52 @@ b.set_title("the same study without the coupling", fontsize=9)
 fig.tight_layout()
 plt.show()
 
+# %% [markdown]
+# If the error does not grow with the step, or the slope lands outside
+# $[0.4, 0.6]$, open the hints in order.
+#
+# <details><summary>Hint 1 — strategy</summary>
+#
+# Three things are computed once and three things per $R$. Once: the
+# horizon $T = N\,dt$; the endpoint $W(T)$ of every path, which is the row
+# sum of its fine increments; and from it the exact endpoint $S(T)$ — one
+# number per path, the same number at every $R$, since every resolution
+# rides the same path. Per $R$: the coarse increments, which are the fine
+# ones summed in blocks of $R$ along the time axis — a reshape to
+# $(M, N/R, R)$ and a sum over the last axis, no new randomness anywhere;
+# the scheme run on them at step $R\,dt$, which is `em_solve` on a batch;
+# and the mean over paths of $|X(T) - S(T)|$. The mean of the absolute
+# differences, path by path — not the absolute difference of the means,
+# which is the weak error and falls at a different order.
+#
+# </details>
+#
+# <details><summary>Hint 2 — pseudocode</summary>
+#
+# ```
+# M, N <- shape of dW;  T <- N * dt
+# exact <- S(T) on every path from W(T) = row sums of dW          # (M,)
+# for R in Rs:
+#     coarse <- dW reshaped to (M, N / R, R), summed over the last axis
+#     X <- em_solve(drift mu x, diffusion sigma x, x0, coarse, R * dt)
+#     error[R] <- mean over paths of |X[:, -1] - exact|
+# return the errors in the order of Rs
+# ```
+#
+# </details>
+#
+# <details><summary>Hint 3 — last resort</summary>
+#
+# ```
+# exact = gbm_exact(x0, mu, sigma, N * dt, dW.sum(axis=1))
+# coarse = dW.reshape(M, N // R, R).sum(axis=2)
+# X = em_solve(lambda x: mu * x, lambda x: sigma * x, x0, coarse, R * dt)
+# errors.append(np.mean(np.abs(X[:, -1] - exact)))
+# ```
+#
+# </details>
+
+
 # %%
 distill.check("strong-order", strong_errors)
 
@@ -777,33 +852,52 @@ distill.submit_review(
 )
 
 # %% [markdown]
-# ## 9. Open task: volatility from discretely observed paths
+# ## 9. Open task: volatility from a noisy feed
 #
 # Section 3 measured $[\log S, \log S](T) = \sigma^2 T$ on a simulated path
-# whose $\sigma$ was known. `data/holdout_paths.csv` holds 160 paths of
+# whose $\sigma$ was known, at every mesh: the meter's reading of a log
+# price does not move with the stride, up to the theorem's spread of
+# $\sqrt{2/m}$ at $m$ cells. `data/holdout_paths.csv` holds 160 paths of
 # geometric Brownian motion observed at discrete times — columns `path`,
 # `t`, `S` — each with its own $S_0$, drift, horizon and observation count
-# (between 40 and 250 observations after the first, over a quarter to two
-# years), each simulated with a volatility that is held out. Estimate
-# $\sigma$ for every path, **in percent** (a volatility of $0.35$ is
-# submitted as $35$), in path order. The server scores the root-mean-square
-# error against the held-out truths; the threshold is an RMSE of $3.5$
-# percentage points.
+# (80 to 400 observations after the first, over a quarter to two years),
+# each simulated with a volatility that is held out. The prices did not
+# arrive clean. They came through a feed that records, at every observation
+# time, the true log price plus an error of its own:
 #
-# What the bench says about the task before any code: the meter of section 2
-# is an estimator of $\sigma^2 T$, and by the module's theorem its spread
-# around the truth is $\sqrt{2/m}$ relative at $m$ cells — about $22\%$ of
-# $\sigma^2$ at $m = 40$, $11\%$ of $\sigma$, or roughly $4$ percentage
-# points on a volatility of $35\%$. The threshold is set so that a correctly
-# scaled estimator passes with room and a wrongly scaled one does not:
-# the paths do not share a grid, and a per-step standard deviation
-# annualized by a constant, or a sum taken over prices rather than log
-# prices, misses by a factor. Nothing is scaffolded below the loader except
-# the two plots that read your estimates back to you. You have a simulator
-# with a known $\sigma$; the classical-ml habit is to measure an estimator's
-# error on paths where the truth is known before trusting it on paths where
-# it is not, and the second plot is that study — your own estimator on
-# simulated paths, against the truth they were built with. Try the task
+# $$\log S^{\mathrm{obs}}(t_j) = \log S(t_j) + \varepsilon_j, \qquad
+# \varepsilon_j \sim N(0, \eta^2) \text{ independent, of each other and of the path},$$
+#
+# with $\eta$ one number for the whole feed — bid–ask bounce and tick
+# rounding in the stylized form of Roll (1984). The feed's $\eta$ is not
+# given. Estimate $\sigma$ for every path, **in percent** (a volatility of
+# $0.35$ is submitted as $35$), in path order. The server scores the
+# root-mean-square error against the held-out truths; the threshold is an
+# RMSE of $3.5$ percentage points.
+#
+# The baseline is section 3's identity applied as it stands,
+# $\hat\sigma = \sqrt{Q_1 / T}$ with $Q_1$ the sampled quadratic variation
+# of the observed log prices over the path's own grid and $T$ the path's own
+# horizon. `plain_sigma` below is that estimator, complete; on the holdout
+# it scores an RMSE of $6.6$ points. The theorem's spread alone,
+# $\sigma / \sqrt{2m}$ per path, is $1.8$ points over this mix, and an
+# estimator that models the feed scores between $2$ and $3$. The plot after
+# the loader shows what the baseline meets: the meter's reading against the
+# stride, on the holdout's three longest paths and on a clean simulated path
+# of the same kind. Section 3 says the reading is flat in the stride; on the
+# holdout's paths it is not.
+#
+# Work out from the noise model what the meter reads at stride $s$, and what
+# the model implies for the covariance of consecutive observed log returns;
+# build the estimator from the two facts. Write it as a function of the
+# whole holdout — what the model says the paths share can only be estimated
+# across them — with the signature below, which is the only scaffold: it
+# returns the estimates and the noise level as the estimator read it, so
+# the calibration bench can check both against what it was built with.
+# No library volatility estimators. The classical-ml habit applies:
+# `make_bench` simulates paths of the holdout's kind, noise included, at a
+# $\sigma$ and an $\eta$ you choose, and the cell after the estimator runs
+# yours on them against the truth before the holdout sees it. Try the task
 # before opening the hints.
 
 # %%
@@ -814,110 +908,228 @@ def load_holdout(path="data/holdout_paths.csv"):
     return [(table[ids == k, 1], table[ids == k, 2]) for k in range(ids.max() + 1)]
 
 
+def plain_sigma(t, S):
+    """Section 3's identity as it stands: 100 sqrt(Q_1 / T), the sampled QV of log S at stride 1 over the horizon."""
+    return 100 * np.sqrt(sampled_qv(np.log(S)) / (t[-1] - t[0]))
+
+
+def make_bench(rng, sigma, eta, counts=(80, 160, 250, 400), size=400):
+    """Paths of the holdout's kind with the truth known: GBM over one year, observed through a feed of level eta.
+
+    Args:
+        rng: numpy Generator.
+        sigma, eta: the volatility every path is simulated with and the feed's noise level.
+        counts: observation counts to draw from, one per path.
+        size: number of paths.
+    Returns:
+        list of (t, S) pairs in the holdout's form, S the observed prices.
+    """
+    bench = []
+    for m in rng.choice(counts, size=size):
+        t = grid(int(m), 1.0)
+        log_S = np.log(gbm_exact(100.0, 0.08, sigma, t, cumpath(brownian_increments(int(m), 1.0, rng))))
+        bench.append((t, np.exp(log_S + eta * rng.standard_normal(t.size))))
+    return bench
+
+
+def plot_signature(paths, labels, strides=(1, 2, 3, 4, 6, 8, 12, 16), ax=None):
+    """The meter's reading against the stride: 100 sqrt(Q_s / T_s) for each stride, one line per path.
+
+    Q_s is the sampled quadratic variation of log S over the cells of s observations
+    that fit in the path, T_s the time those cells cover.
+    """
+    ax = ax or plt.figure(figsize=(6, 3.5)).gca()
+    for (t, S), label in zip(paths, labels):
+        x, m = np.log(S), S.size - 1
+        reads = [100 * np.sqrt(sampled_qv(x[: (m // s) * s + 1], s) / (t[(m // s) * s] - t[0])) for s in strides]
+        ax.plot(strides, reads, "o-", ms=3, lw=1, label=label)
+    ax.set_xlabel("stride s (observations per cell)")
+    ax.set_ylabel("100·√(Q_s / T_s)")
+    ax.legend(fontsize=8)
+    return ax
+
+
 holdout = load_holdout()
 print(f"{len(holdout)} paths; observations per path from "
       f"{min(len(t) for t, _ in holdout) - 1} to {max(len(t) for t, _ in holdout) - 1}; "
       f"horizons {sorted({round(float(t[-1]), 2) for t, _ in holdout})}")
 
 # %%
-# `sigma_hat`: (160,) array, the estimated volatility of each path in percent, in path order.
-# BEGIN SOLUTION
-sigma_hat = np.array([100 * np.sqrt(sampled_qv(np.log(S)) / (t[-1] - t[0])) for t, S in holdout])
-# END SOLUTION
+# The signature: the baseline's reading of a path at every stride. On a clean
+# path it wanders within the theorem's spread and nothing else; on the
+# holdout's paths it falls with the stride and settles.
+_longest = sorted(range(len(holdout)), key=lambda k: -holdout[k][0].size)[:3]
+_clean = make_bench(np.random.default_rng(10), sigma=0.35, eta=0.0, counts=(400,), size=1)
+plot_signature([holdout[k] for k in _longest] + _clean,
+               [f"holdout path {k}, m = {holdout[k][0].size - 1}" for k in _longest] + ["clean simulated path, σ = 35, m = 400"])
+plt.title("the meter's reading against the stride", fontsize=9)
+plt.show()
+
+# %%
+def estimate_sigma(paths):
+    """Volatility of every path of a noisy feed, in percent, and the feed's noise level.
+
+    Args:
+        paths: list of (t, S) pairs — t (m + 1,) observation times, S (m + 1,) the
+            observed prices — every path recorded by one feed with one noise level.
+    Returns:
+        sigma_hat: (len(paths),) array, the estimated volatility of each path in percent,
+            in the order given.
+        eta_hat: float, the feed's noise level as the estimator read it, in log-price
+            units (nan if the route never estimates it).
+    """
+    # BEGIN SOLUTION
+    # The feed's level, pooled: consecutive observed log returns share one error
+    # with opposite signs, so their covariance is -eta^2 on every path.
+    returns = [np.diff(np.log(S)) for _, S in paths]
+    eta2 = -sum(np.sum(r[:-1] * r[1:]) for r in returns) / sum(r.size - 1 for r in returns)
+    eta2 = max(eta2, 0.0)
+    sigma_hat = []
+    for t, S in paths:
+        x, m = np.log(S), S.size - 1
+        q1 = sampled_qv(x)
+        # The reading at stride s is sigma^2 T + 2 (m / s) eta^2 with a spread of
+        # sqrt(s) (1 + b / s) times the theorem's, b the noise-to-signal ratio:
+        # smallest at s = b, with at least 20 cells kept. A pilot estimate sets b.
+        pilot = max(q1 - 2 * m * eta2, 0.05 * q1)
+        s = int(np.clip(round(2 * m * eta2 / pilot), 1, m // 20))
+        cells = m // s
+        variance = max(sampled_qv(x[: cells * s + 1], s) - 2 * cells * eta2, 0.0) / (t[cells * s] - t[0])
+        sigma_hat.append(100 * np.sqrt(variance))
+    return np.array(sigma_hat), float(np.sqrt(eta2))
+    # END SOLUTION
+
+# %% [markdown]
+# The calibration study, before the holdout. `bench` is four hundred paths
+# of the holdout's kind — geometric Brownian motion observed at $m$ points
+# over a year through a feed of level `bench_eta` — every one simulated at
+# $\sigma = 0.35$, the number the holdout keeps from you. The level is
+# yours to set; the line below sets it to what your estimator reads off the
+# holdout, which is the feed the estimator will face. Run yours and the
+# baseline on the bench and read the plot: the points should fill the band
+# $35 \pm 35/\sqrt{2m}$, thin at $m = 400$ and wide at $m = 80$, with the
+# baseline's sitting above it by an amount that grows with $m$. The RMS
+# errors printed under the plot should sit near the theorem's numbers
+# count by count, and the level read back off the bench should be the
+# level it was built with. An estimator whose points sit off the band by a
+# constant factor is wrong in its scaling; one whose error grows with $m$
+# still reads the noise as volatility; one whose level comes back at half
+# or twice the truth has the covariance's sign or its count wrong.
+
+# %%
+bench_eta = estimate_sigma(holdout)[1]
+bench = make_bench(np.random.default_rng(9), sigma=0.35, eta=bench_eta)
+bench_counts = np.array([len(t) - 1 for t, _ in bench])
+bench_hat, bench_eta_hat = estimate_sigma(bench)
+bench_plain = np.array([plain_sigma(t, S) for t, S in bench])
+assert bench_hat.shape == (len(bench),)
+ax = plot_sigma_estimates(bench_counts, bench_hat, truth=35.0, title=f"the calibration study: σ = 35 known, feed level {bench_eta:.4f}")
+ax.plot(bench_counts, bench_plain, "x", ms=3, alpha=0.5, color="0.5", label="baseline")
+ax.legend(fontsize=8)
+plt.show()
+for _m in sorted(set(bench_counts)):
+    _err, _err_plain = bench_hat[bench_counts == _m] - 35.0, bench_plain[bench_counts == _m] - 35.0
+    print(f"m = {_m:>3d}: RMS error {np.sqrt(np.mean(_err**2)):.2f} points, theorem's σ/√(2m) = {35 / np.sqrt(2 * _m):.2f}, "
+          f"baseline {np.sqrt(np.mean(_err_plain**2)):.2f}")
+print(f"all m: RMS error {np.sqrt(np.mean((bench_hat - 35.0)**2)):.2f} points, baseline {np.sqrt(np.mean((bench_plain - 35.0)**2)):.2f}")
+print(f"feed level: built with {bench_eta:.4f}, read back {bench_eta_hat:.4f}")
+
+# %%
+sigma_hat, eta_hat = estimate_sigma(holdout)
 assert sigma_hat.shape == (len(holdout),)
+print(f"the holdout's feed, as read: η = {eta_hat:.4f}")
 distill.submit_predictions("qv-sigma", sigma_hat)
 
 # %% [markdown]
 # The score is one number over 160 estimates. Read the estimates themselves:
 # each against its path's observation count, wearing the error bar the
-# theorem grants it, $\pm\hat\sigma/\sqrt{2m}$. The bars should shrink from
-# left to right by the square root of the count, and the cloud should sit
-# where the simulator's volatilities were drawn from. What the plot cannot
-# show is a scaling error — every point off by the same factor keeps the same
-# shape — which is why the cell after it exists.
+# theorem grants a clean path, $\pm\hat\sigma/\sqrt{2m}$ — a floor, since
+# the feed's noise widens it on the paths where the noise is a large share
+# of the reading. The bars should shrink from left to right by the square
+# root of the count, and the cloud should sit where the simulator's
+# volatilities were drawn from.
 
 # %%
 counts = np.array([len(t) - 1 for t, _ in holdout])
-plot_sigma_estimates(counts, sigma_hat, title="the held-out paths: your estimates, their theorem's bars")
+plot_sigma_estimates(counts, sigma_hat, title="the held-out paths: your estimates, a clean path's bars")
 plt.show()
 
 # %% [markdown]
-# The calibration study. `bench` is four hundred paths of the holdout's
-# kind — geometric Brownian motion observed at $m$ points over a year, in
-# the same `(t, S)` form — every one simulated at $\sigma = 0.35$, the one
-# number the holdout keeps from you. Run your estimator on it exactly as
-# you ran it on `holdout`, and hand the estimates to the plot with the
-# truth: the points should fill the band $35 \pm 35/\sqrt{2m}$, thin at
-# $m = 250$ and wide at $m = 40$, and the RMS errors printed under it should
-# match the theorem's numbers count by count, about $2.6$ points over the
-# mix. An estimator whose points sit off the band by a
-# constant factor, or whose error is ten points, is wrong in its scaling,
-# not unlucky.
-
-# %%
-_rng = np.random.default_rng(9)
-_counts = _rng.choice([40, 80, 160, 250], size=400)
-bench = []
-for _m in _counts:
-    _t = grid(int(_m), 1.0)
-    bench.append((_t, gbm_exact(100.0, 0.08, 0.35, _t, cumpath(brownian_increments(int(_m), 1.0, _rng)))))
-
-# `bench_hat`: (400,) array, the estimated volatility of each bench path in percent, in order.
-# BEGIN SOLUTION
-bench_hat = np.array([100 * np.sqrt(sampled_qv(np.log(S)) / (t[-1] - t[0])) for t, S in bench])
-# END SOLUTION
-plot_sigma_estimates(_counts, bench_hat, truth=35.0, title="the calibration study: σ = 35 known")
-plt.show()
-for _m in (40, 250):
-    _err = bench_hat[_counts == _m] - 35.0
-    print(f"m = {_m:>3d}: RMS error {np.sqrt(np.mean(_err**2)):.2f} points, theorem's σ/√(2m) = {35 / np.sqrt(2 * _m):.2f}")
-print(f"all m: RMS error {np.sqrt(np.mean((bench_hat - 35.0)**2)):.2f} points")
-
-# %% [markdown]
-# <details><summary>Hint 1 — the identity, and the grid</summary>
+# If stuck, open the hints in order — each is more specific than the last.
 #
-# $[\log S, \log S](T) = \sigma^2 T$ on every path, whatever the drift, so
-# $\hat\sigma = \sqrt{Q / T}$ with $Q$ the sampled quadratic variation of the
-# path's log prices over its own observation grid and $T$ the path's own
-# horizon — the last entry of its `t` column, not a constant. The meter of
-# section 2 computes $Q$ at stride $1$ from `np.log(S)`. Removing the mean
-# log return first (the sample standard deviation of the log returns,
-# divided by $\sqrt{\Delta t}$) is the same estimator up to a term of order
-# $(\mu\Delta t)^2$, and scores within two percent of it here.
+# <details><summary>Hint 1 — what the meter reads on the feed</summary>
+#
+# The observed log return over a cell of $s$ observations is the true one
+# plus the errors at the cell's two ends, $r_j + \varepsilon_{(j+1)s} -
+# \varepsilon_{js}$; its square has expectation $\sigma^2 s\,\Delta t +
+# 2\eta^2$, and over the $m/s$ cells
+#
+# $$E[Q_s] = \sigma^2 T + 2\,\frac{m}{s}\,\eta^2 .$$
+#
+# The reading is high by twice the noise variance per cell, a term that
+# falls with the stride — the signature plot's falling curve — and that at
+# stride $1$ on a low-volatility path with many observations is larger than
+# the quantity being measured. The noise-to-signal ratio of a path,
+# $b = 2m\eta^2 / (\sigma^2 T)$, is the number that decides everything below.
 #
 # </details>
 #
-# <details><summary>Hint 2 — read the calibration plot</summary>
+# <details><summary>Hint 2 — the feed's level, from the data</summary>
 #
-# The band in the calibration plot is the theorem, $\hat\sigma$ within
-# $\sigma/\sqrt{2m}$ of $\sigma$ — $3.9$ points at $m = 40$, $1.6$ at
-# $m = 250$ — and a correct estimator's points fill it, about a third of
-# them outside as a one-standard-deviation band allows. Three wrong shapes
-# to recognise: every point off the band by a factor that does not move
-# with $m$ — a sum over prices instead of log prices, which measures
-# $\sigma^2\int S^2\,dt$; a factor that grows like $\sqrt m$ — a per-step
-# deviation annualized by a constant instead of the path's own $\Delta t$;
-# every point below the band and falling with $m$ — the sum divided by the
-# count. The holdout mixes the counts, and a correct estimator's RMS error
-# there is near $2.8$ points.
+# Consecutive observed returns at stride $1$ share one error with opposite
+# signs, $r^{\mathrm{obs}}_j$ ending in $+\varepsilon_{j+1}$ and
+# $r^{\mathrm{obs}}_{j+1}$ starting in $-\varepsilon_{j+1}$, so
+# $\operatorname{Cov}(r^{\mathrm{obs}}_j, r^{\mathrm{obs}}_{j+1}) = -\eta^2$.
+# The level is one number for the feed: average $r_j r_{j+1}$ over every
+# consecutive pair of every path — about $38{,}000$ pairs — and negate. The
+# same average over one path has a spread of about $\sigma^2\Delta t/\sqrt m$,
+# larger than $\eta^2$ itself on most paths, and an estimator that corrects
+# each path with its own level scores $3.2$ on the holdout against $2.7$ for
+# the pooled one. Check the number on the bench: build it at a level and
+# read the level back.
 #
 # </details>
 #
-# <details><summary>Hint 3 — last resort</summary>
+# <details><summary>Hint 3 — two routes, and the choice</summary>
+#
+# Subtract: $\hat\sigma^2 = (Q_1 - 2m\hat\eta^2) / T$ is unbiased, with a
+# spread of $(1 + b)$ times the theorem's — the noise is squared into every
+# cell and does not average out of the sum. Coarsen: at stride $s$ the bias
+# falls to $2(m/s)\eta^2$ and the theorem's spread grows by $\sqrt s$;
+# subtracting the residual bias there leaves a spread of $\sqrt s\,(1 + b/s)$
+# times the theorem's, smallest at $s = b$. So correct at stride $1$ where
+# $b < 1$ — most of this holdout — and coarsen to about $s = b$ and correct
+# there where $b > 1$, with a pilot estimate of $\sigma^2$ standing in for
+# the truth in $b$ and at least twenty cells kept. On this holdout the
+# stride rule scores $2.3$, the plain correction $2.7$, coarsening without
+# the correction $3.2$, the baseline $6.6$. A corrected variance can come
+# out negative on a low-volatility path — floor it at zero, or at a small
+# fraction of $Q_1$.
+#
+# </details>
+#
+# <details><summary>Hint 4 — last resort</summary>
+#
+# The pooled level and the plain correction, which clears the threshold:
 #
 # ```
-# sigma_hat = np.array([100 * np.sqrt(sampled_qv(np.log(S)) / t[-1]) for t, S in holdout])
+# returns = [np.diff(np.log(S)) for _, S in paths]
+# eta2 = -sum(np.sum(r[:-1] * r[1:]) for r in returns) / sum(r.size - 1 for r in returns)
+# sigma_hat = np.array([100 * np.sqrt(max(sampled_qv(np.log(S)) - 2 * (S.size - 1) * eta2, 0) / (t[-1] - t[0]))
+#                       for t, S in paths])
+# return sigma_hat, np.sqrt(eta2)
 # ```
 #
 # </details>
 #
-# The estimator is the plain realized-volatility estimator, and the theorem
-# behind it says its precision is set by the observation count alone. Module
-# 8 takes it to real prices, where the observation count can be raised by
-# sampling faster only until microstructure noise makes the sampled
-# quadratic variation grow with the sampling rate rather than converge —
-# the point at which the theorem's hypotheses, not its arithmetic, are the
-# question.
+# The estimator is realized volatility with Roll's correction, and the
+# theorem behind it says its precision is set by the observation count and
+# the noise-to-signal ratio, nothing else. Module 8 takes it to real prices,
+# where the feed's level is neither constant nor independent of the path,
+# sampling faster raises the count and the ratio together, and the signature
+# plot you drew — the reading against the sampling interval — is the
+# standard diagnostic for where the theorem's hypotheses, not its
+# arithmetic, become the question.
 
 # %%
 distill.dump()

@@ -28,6 +28,15 @@ checkpoints:
                   j = np.arange(i + 1)
                   out.append(S0 * u**j * d ** (i - j))
               return np.concatenate(out)
+      - hint: "The exponent of d is i − j, the number of tails so far, not i: with d^i every node carries i down moves on top of its j up moves, and the whole lattice sinks — S[i][i] should be S0 u^i, with no d in it."
+        code: |
+          def f(S0, u, d, r, n):
+              import numpy as np
+              out = []
+              for i in range(n + 1):
+                  j = np.arange(i + 1)
+                  out.append(S0 * u**j * d**i)
+              return np.concatenate(out)
   risk-neutral-prob:
     kind: exact
     seed: 102
@@ -234,6 +243,19 @@ checkpoints:
       K = float(S0 * rng.uniform(0.9, 1.3))
       inputs = (S0, u, d, r, n, K)
     wrong:
+      - hint: "This is the European lattice — the American pass takes the larger of exercising now and continuing at every node, not only at expiry; with no maximum, no node before the last date ever exercises and the put is worth its European twin."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g > 0
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+                  E[i] = np.zeros(i + 1, dtype=bool)
+              return np.concatenate(V), np.concatenate(E).astype(float)
       - hint: "The continuation value is not discounted. Undiscounted continuation is too large, so fewer nodes exercise — and every value is too high. Divide the risk-neutral average by 1 + r before comparing it with the intrinsic value."
         code: |
           def f(S0, u, d, r, n, K):

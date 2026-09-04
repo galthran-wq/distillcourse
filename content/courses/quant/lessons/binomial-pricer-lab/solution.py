@@ -396,29 +396,23 @@ def walk_hedge(tree, X0, Delta, path):
 
 # %% [markdown]
 # Two blanks in one cell, and the second depends on the first. Try both
-# before opening the folds; the assertions in the next cell tell the two
+# before opening any fold; the assertions in the next cell tell the two
 # apart — a wrong delta fails the first assertion, a wrong walk fails the
-# mismatch check after it.
+# mismatch check after it. Each blank has its own ladder, so a fold opened
+# for the hedge gives nothing away about the walk.
+#
+# **`hedge`**
 #
 # <details><summary>Hint 1 — strategy</summary>
 #
-# **The hedge.** The two successors of node $(i, j)$ are $(i + 1, j + 1)$
-# and $(i + 1, j)$, so on date $i + 1$ the up-child of every date-$i$ node
-# is `V[i + 1][1:]` and the down-child is `V[i + 1][:-1]` — the same two
+# The two successors of node $(i, j)$ are $(i + 1, j + 1)$ and
+# $(i + 1, j)$, so on date $i + 1$ the up-child of every date-$i$ node is
+# `V[i + 1][1:]` and the down-child is `V[i + 1][:-1]` — the same two
 # slices section 3's pass averaged, each of length $i + 1$ and aligned with
 # date $i$. The slope across the successors is the value spread over the
 # price spread of those same two slices, and the stock lattice supplies the
 # price spread. $B$ is then the displayed formula, one line, on date $i$'s
 # own arrays. Both lattices stop at date $n - 1$.
-#
-# **The walk.** Three running quantities: the current price (start at
-# $S_0$), the number of heads so far (start at $0$ — it is the node index
-# $j$ on the current date) and the wealth (start at $X_0$). At each date
-# the hedger reads the shares at the node they are standing on, *before*
-# the toss; then the toss moves the price by $u$ or $d$; then the new
-# wealth is what the shares are now worth plus what the money-market
-# position grew to. Update the price and the head count only after the
-# wealth is written.
 #
 # </details>
 #
@@ -431,15 +425,44 @@ def walk_hedge(tree, X0, Delta, path):
 #         Delta[i] = (value spread across date i+1's adjacent nodes)
 #                    / (price spread across the same nodes)      # length i+1
 #         B[i]     = V[i] - Delta[i] * S[i]
-#
-# walk_hedge(tree, X0, Delta, path):
-#     X[0] = X0;  price = S0;  heads = 0
-#     for i, toss in enumerate(path):
-#         shares    = Delta[i][heads]
-#         new_price = price * (u if toss == 1 else d)
-#         X[i + 1]  = shares * new_price + (1 + r) * (X[i] - shares * price)
-#         price, heads = new_price, heads + toss
 # ```
+#
+# </details>
+#
+# **`walk_hedge`**
+#
+# <details><summary>Hint 1 — strategy</summary>
+#
+# Three running quantities: the current price (start at $S_0$), the number
+# of heads so far (start at $0$ — it is the node index $j$ on the current
+# date) and the wealth (start at $X_0$). At each date the hedger reads the
+# shares at the node they are standing on, *before* the toss; then the toss
+# moves the price by $u$ or $d$; then the new wealth is what the shares are
+# now worth plus what the money-market position grew to. Update the price
+# and the head count only after the wealth is written.
+#
+# </details>
+#
+# <details><summary>Hint 2 — the step, in words</summary>
+#
+# Standing on date $i$ with $j$ heads so far, the shares are
+# `Delta[i][j]` — read at the node you are standing on, before the toss.
+# The money-market position on that date is whatever wealth the shares did
+# not use: the wealth minus the shares times the *current* price. Then the
+# toss happens, the price becomes $S u$ on a 1 and $S d$ on a 0, and the
+# wealth on date $i + 1$ is the shares at the new price plus the
+# money-market position grown by $1 + r$. That is module 2's wealth
+# equation; a loop over `enumerate(path)` writes one entry of `X` per
+# iteration.
+#
+# </details>
+#
+# <details><summary>Hint 3 — last resort</summary>
+#
+# The line in the loop, with `shares = Delta[i][heads]` read before the
+# toss and `new_price` the price after it:
+#
+# `X[i + 1] = shares * new_price + (1 + r) * (X[i] - shares * price)`
 #
 # </details>
 
