@@ -162,12 +162,32 @@ const brief = argv.brief
   ? `\n\nCourse design intent from the human (binding — shape source choice and structure around it): ${argv.brief}`
   : ''
 
+// agent() returns null once the runtime's own retries are exhausted — which
+// a sustained 529 storm does within a minute. Without this, that null used to
+// ride the pipeline all the way down: figure scans on a lesson never written,
+// QA on nothing, the next lesson drafted against a missing prerequisite. A
+// distinct label per attempt keeps each try its own line in the progress tree.
+const RETRIES = 2
+const run = async (prompt, opts = {}) => {
+  let out = await agent(prompt, opts)
+  for (let i = 1; out === null && i <= RETRIES; i++) {
+    log(`${opts.label ?? 'agent'}: no result, retry ${i}/${RETRIES}`)
+    out = await agent(prompt, { ...opts, label: `${opts.label ?? 'agent'} (retry ${i})` })
+  }
+  return out
+}
+
 if (phaseArg === 'structure') {
   const topic = argv.topic ?? slug
 
+  // The human may stage source copies (PDFs) under research/texts/ before the
+  // run — the paywalled books the swarm could never reach on its own. Those
+  // are canon by fiat: the scout adds to them, it never replaces them.
+  const stagedNote = `\n\nBEFORE any searching: list content/courses/${slug}/research/texts/ (if it does not exist, skip this paragraph). Every file there is a copy the HUMAN staged for this course. Each is canon by fiat: emit it in your output as a source, with title and author taken from the file itself (read its first pages with \`pdftotext -l 3\`, never guessed from the filename alone), \`url\` set to its absolute path on disk, and \`why\` stating that the human staged it plus the role you judge it fills. Then supplement with what you find yourself, and make each addition earn a role the staged set does not already cover. Never drop, rename or silently substitute a staged source.`
+
   phase('Canon')
-  const canon = await agent(
-    `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials, but NEVER omit a canonical source just because you found no accessible copy — include it anyway; inaccessible sources are reported to the human, who can obtain copies from the publishers. Return via structured output; put verified URLs where you have them.${brief}`,
+  const canon = await run(
+    `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials, but NEVER omit a canonical source just because you found no accessible copy — include it anyway; inaccessible sources are reported to the human, who can obtain copies from the publishers. Return via structured output; put verified URLs where you have them.${stagedNote}${brief}`,
     { label: 'canon-scout', model: 'sonnet', schema: CANON_SCHEMA },
   )
   const sources = canon.sources
@@ -190,8 +210,8 @@ if (phaseArg === 'structure') {
     await pipeline(
       sources,
       (s) =>
-        agent(
-          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Find where it can actually be read, fetch its table of contents, and decide the split. Shard ONLY when the full text is accessible AND the source is big (roughly 350+ pages or 25+ chapters): 2-4 shards along chapter boundaries, balanced by page count. Otherwise return a single shard covering everything. Report access honestly (full | toc-only | summary-based | not-found) and pass on the best reading location you found so readers do not re-hunt. If you cannot find the source at all, do NOT invent a location and do NOT quietly settle for second-hand descriptions of it — return access "not-found" with \`where\` describing what you tried; the human will obtain a copy from the publisher.`,
+        run(
+          `${at}Scope ONE source for a reading swarm: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind})${s.url ? `, URL: ${s.url}` : ' — locate it yourself (WebSearch), prefer official/legal copies'}. Before searching the web, list content/courses/${slug}/research/texts/: if a file there IS this source (confirm against the PDF’s own first pages, not just the filename), that is your answer — access "full", \`where\` = that file’s absolute path, and say in \`where\` that the human staged it. Only hunt online when nothing on disk matches. Otherwise, find where it can actually be read, fetch its table of contents, and decide the split. Shard ONLY when the full text is accessible AND the source is big (roughly 350+ pages or 25+ chapters): 2-4 shards along chapter boundaries, balanced by page count. Otherwise return a single shard covering everything. Report access honestly (full | toc-only | summary-based | not-found) and pass on the best reading location you found so readers do not re-hunt. If you cannot find the source at all, do NOT invent a location and do NOT quietly settle for second-hand descriptions of it — return access "not-found" with \`where\` describing what you tried; the human will obtain a copy from the publisher.`,
           { label: `scope: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SCOPE_SCHEMA },
         ).then((scope) => {
           accessLog.push({ title: s.title, access: scope ? scope.access : 'scope-failed', where: scope ? scope.where : '' })
@@ -202,7 +222,7 @@ if (phaseArg === 'structure') {
         scope.access !== 'not-found' &&
         parallel(
           scope.shards.map((shard, i) => () =>
-            agent(
+            run(
               `${at}Source to summarize: "${s.title}"${s.author ? ` by ${s.author}` : ''} (${s.kind}). Reason it is canon: ${s.why}. Access per the scoper: ${scope.access}; read it at: ${scope.where}. ${scope.shards.length > 1 ? `YOUR SHARD (${i + 1}/${scope.shards.length}): ${shard.range} — read ONLY this range, report ONLY from it, and stay silent about the rest of the book; the swarm covers it.` : 'You cover the whole source.'} Follow your source-reader briefing.\n\n${capNote} For this source use the tag \`${(s.title.match(/[A-Za-z0-9]+/g) || ['src']).slice(0, 2).join('').toLowerCase().slice(0, 12)}${scope.shards.length > 1 ? `-s${i + 1}` : ''}-\`.`,
               { label: `read: ${s.title.slice(0, 22)}${scope.shards.length > 1 ? ` [${i + 1}/${scope.shards.length}]` : ''}`, phase: 'Read', agentType: 'source-reader', schema: SUMMARY_SCHEMA },
             ),
@@ -212,7 +232,7 @@ if (phaseArg === 'structure') {
         const kept = (parts || []).filter(Boolean)
         if (kept.length === 0) return null
         if (kept.length === 1) return kept[0]
-        return agent(
+        return run(
           `${at}Merge these shard summaries of ONE source — "${s.title}"${s.author ? ` by ${s.author}` : ''} — into a single source summary of the same shape. Concatenate topics, chapter_map and assignments in book order; keep EVERY key_result, gem, assignment and figure idea with its chapter pointer (dedupe only true duplicates); rank image_candidates across shards and keep at most 8 (do NOT delete the losing captures from disk — just omit them from the list); synthesize one pedagogy note. Shard summaries (JSON): ${JSON.stringify(kept)}`,
           { label: `merge: ${s.title.slice(0, 28)}`, phase: 'Read', model: 'sonnet', schema: SUMMARY_SCHEMA },
         )
@@ -225,7 +245,7 @@ if (phaseArg === 'structure') {
   if (degraded.length) log(`ATTENTION — sources NOT fully read (report to the human, never silently omit; they can obtain copies from the publishers): ${degraded.map((d) => `"${d.title}" [${d.access}]`).join('; ')}`)
 
   phase('Synthesize')
-  const synthesis = await agent(
+  const synthesis = await run(
     [
       `${at}You are the course architect for the course "${topic}" (slug: ${slug}) in this repo. Read docs/pedagogy.md (C rules AND L2/L10/L15/L16, E6/E7, D1 — they constrain what you plan), docs/content-model.md, docs/playbook-core.md, the domain overlay (docs/playbook-math.md for a mathematical subject, docs/playbook-history.md for a historical one), docs/voita-playbook.md (lesson skeleton, framework-first + flaw-driven sequencing, density norms), and the example .claude/skills/course-architect/examples/course.yaml.${brief}`,
       `Source summaries from the reading swarm (JSON): ${JSON.stringify(summaries)}`,
@@ -255,7 +275,7 @@ if (phaseArg === 'structure') {
 
 if (phaseArg === 'lessons') {
   phase('Lessons')
-  const plan = await agent(
+  const plan = await run(
     `${at}Read content/courses/${slug}/course.yaml and return ALL lessons with status "planned", in course order (modules in file order, lessons in file order within each module). type = the entry's \`type\` field verbatim; hasDemo = the lesson's demo field is not null.`,
     { label: 'plan', model: 'sonnet', schema: PLAN_SCHEMA },
   )
@@ -277,18 +297,24 @@ if (phaseArg === 'lessons') {
     // A lab is authored by executing code, not by writing prose: the
     // lab-author skill's write -> uv run -> green loop, never lesson-writer.
     const isLab = lesson.type === 'lab'
-    await (isLab
-      ? agent(labPrompt(lesson.slug), { label: `lab: ${lesson.slug}`, phase: 'Lessons' })
-      : agent(
+    const draft = await (isLab
+      ? run(labPrompt(lesson.slug), { label: `lab: ${lesson.slug}`, phase: 'Lessons' })
+      : run(
         `${at}Write the lesson: course-slug ${slug}, lesson-slug ${lesson.slug}. Follow your lesson-writer briefing (lesson-author skill + research brief).`,
         { label: `write: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
       ))
+    // No draft means nothing downstream has a subject, and every later lesson
+    // is written against this one's final text — stop here rather than plod on.
+    if (draft === null) {
+      log(`${lesson.slug}: writer produced nothing after retries — stopping; ${todo.length - written.length} lesson(s) left planned`)
+      break
+    }
     // Figures fan out in parallel — drawn and sourced alike. Builders own
     // only their own files: they never touch the registry, credits.yaml or
     // lesson.mdx, and one closing agent lands everything shared. A lab has no
     // FIGURE PLAN: its brief is short and its visuals are plots the notebook
     // draws from the learner's own results.
-    const figs = isLab ? null : await agent(
+    const figs = isLab ? null : await run(
       `${at}Figure scan for lesson ${slug}/${lesson.slug}: read content/courses/${slug}/lessons/${lesson.slug}/lesson.mdx and the FIGURE PLAN in content/courses/${slug}/research/${lesson.slug}.md, and return everything still to build.\n\nTwo kinds. kind="component": <Figure name="..."> / <FigureSequence name="..."> references whose PascalCase name is NOT registered in apps/frontend/components/figures/index.ts (kebab-case names are plain SVG files already on disk — ignore those); the spec comes FIRST from the writer's {/* fig <Name>: ... */} comment — copy it verbatim — enriched from the FIGURE PLAN and surrounding prose. kind="sourced": every {/* img <file-stem>: ... */} handoff comment in the MDX and every \`source:\` entry in the FIGURE PLAN whose image file is not yet in the lesson's figures/ dir; the spec must carry what the reader must see, the research/images.yaml candidate id WITH its capture path under content/courses/${slug}/research/images/ when the pool has one — and when it does not, say "no pool candidate" plus whatever source pointer the handoff names, so the builder knows to hunt.`,
       { label: `figure-scan: ${lesson.slug}`, phase: 'Lessons', model: 'sonnet', schema: FIGLIST_SCHEMA },
     )
@@ -298,7 +324,7 @@ if (phaseArg === 'lessons') {
       const built = (
         await parallel(
           figs.missing.map((f) => () =>
-            agent(
+            run(
               f.kind === 'sourced'
                 ? [
                     `${at}Produce ONE sourced image: ${f.name}${f.isSequence ? ' (multi-frame, used via <FigureSequence>)' : ''} for lesson ${slug}/${lesson.slug}.`,
@@ -317,7 +343,7 @@ if (phaseArg === 'lessons') {
           ),
         )
       ).filter(Boolean)
-      await agent(
+      await run(
         [
           `${at}Land the figures built for lesson ${slug}/${lesson.slug}. Built: ${JSON.stringify(figs.missing.map((f) => ({ name: f.name, kind: f.kind, isSequence: f.isSequence })))}. Builder reports: ${JSON.stringify(built)}.`,
           `Component figures: add an import and a registry entry per figure in apps/frontend/components/figures/index.ts (frames: N for sequences, per the builder report), then verify each renders by registry name (\`npm run figure -- <Name>\`).`,
@@ -328,13 +354,13 @@ if (phaseArg === 'lessons') {
       )
     }
     if (lesson.hasDemo) {
-      await agent(
+      await run(
         `${at}Execute this repo's demo-builder skill, non-interactively: read .claude/skills/demo-builder/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug}. Respect its hard limits.`,
         { label: `demo: ${lesson.slug}`, phase: 'Lessons' },
       )
     }
     const qaPrompt = `${at}Execute this repo's course-qa skill, non-interactively: read .claude/skills/course-qa/SKILL.md and follow it exactly for course-slug ${slug}, lesson-slug ${lesson.slug} (read-only, ${isLab ? 'lab lesson — build the notebook and score it against the rubric\'s lab section B1-B8, reading it as the learner before you open solution.py; report nothing `npm run validate` already reports' : 'full rubric'}). Then produce structured output: ready=true only if no REQUIRED fixes remain; fixes = prioritized required fixes (max 5).`
-    const qa = await agent(qaPrompt, {
+    const qa = await run(qaPrompt, {
       label: `qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
     })
     // The recorded verdict must describe the lesson as it stands: when a fix
@@ -343,13 +369,13 @@ if (phaseArg === 'lessons') {
     let revised = false
     if (qa && !qa.ready && qa.fixes.length > 0) {
       await (isLab
-        ? agent(labPrompt(lesson.slug, qa.fixes), { label: `fix: ${lesson.slug}`, phase: 'Lessons' })
-        : agent(
+        ? run(labPrompt(lesson.slug, qa.fixes), { label: `fix: ${lesson.slug}`, phase: 'Lessons' })
+        : run(
           `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
           { label: `fix: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
         ))
       revised = true
-      finalQa = await agent(qaPrompt, {
+      finalQa = await run(qaPrompt, {
         label: `re-qa: ${lesson.slug}`, phase: 'Lessons', model: 'opus', schema: QA_SCHEMA,
       })
     }

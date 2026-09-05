@@ -1,0 +1,987 @@
+Exchange-traded equity options are American, yet most of the calls among them never rationally exercise early — and the exceptions, dividend captures the day before ex-date, are priced by the same backward induction this module proved.
+
+This is the thirteenth move of the course's argument, which claims that a
+derivative's price is enforced by replication rather than estimated from
+beliefs, and the fourth move of its third module. The module has now proved
+the whole American theory on the tree: <Ref lesson="stopping-times">the
+first lesson</Ref> fixed the admissible exercise rules as stopping times,
+<Ref lesson="american-derivatives">the second</Ref> showed that the
+backward pass with a maximum at every node computes the smallest
+supermartingale dominating the payoff, that no stopping time collects
+more than its root value, that $\tau^* = \min\{n : V_n = G_n\}$ collects
+exactly that, and that a convex payoff vanishing at zero is never exercised
+early, and <Ref lesson="first-passage-perpetual-put">the third</Ref> found
+the \$4 put's boundary at $2$ and read it as interest on the strike
+against the upside the live put keeps. What stands open is how any of this
+reads on an exchange, where exercise is a notice sent to a clearing house,
+assignment is a draw, stocks pay dividends, and a trader can lose money on
+a position whose payoff is the same in every state of the world. This
+lesson holds the module's theorems against that system: the call theorem
+is obeyed daily, in the form of a quote that never falls below intrinsic
+value plus interest on the strike; a dividend breaks one hypothesis of the
+theorem and restores exercise at exactly one date, which the pass prices
+with one extra factor in the lattice; the put's boundary dips before an
+ex-date; and a documented failure, a "riskless" box spread that lost
+money, is a stopping time the seller left out of the maximum. <Ref
+lesson="binomial-pricer-lab">The lab</Ref> then builds the pricer these
+markets assume.
+
+The route: the exercise and assignment mechanics needed to read the
+artifacts; the sell-don't-exercise decomposition of a deep-in-the-money
+call; the ex-date comparison in dollars, the theorem that confines call
+exercise to the date before an ex-date, and the CRR recursion that prices
+it; the put's boundary with a dividend inserted; the box-spread
+post-mortem; and the list of places where the exchange departs from the
+tree.
+
+## The system: exercise is an order the holder sends, assignment is a draw the writer receives
+
+The module's theorems are statements about a holder who chooses a
+stopping time and a seller who hedges against every one. On an exchange
+the holder and the seller never meet, and the two clauses of the
+replication theorem, "the hedge can pay whenever the buyer exercises" and
+"the buyer may exercise at any stopping time", are implemented by a
+clearing house.
+
+<Figure
+  src="./figures/occ-flow.svg"
+  alt="A pipeline of five boxes: holder, broker, OCC, clearing member, writer; an exercise notice travels left to right, the OCC box is labelled random draw, and the writer box is labelled assigned; a note below states the $0.01 expiry threshold"
+  caption="An exercise notice travels from the holder to the OCC; the OCC draws a clearing member at random, the member picks one of its writers, and that writer is assigned."
+/>
+
+Every listed equity option in the United States is cleared by the
+[Options Clearing Corporation](https://www.theocc.com/), the OCC, which
+guarantees every writer's obligation and keeps the record of every open
+position. A holder who wants to exercise instructs a broker; the broker's
+clearing member places an *exercise notice* with the OCC; the OCC selects
+at random a member with an open short position in the same contract, and
+that member selects, by a procedure fixed in advance, one of its own
+writers. That writer is *assigned*: for a call, deliver the stock and
+receive $K$; for a put, take the stock and pay $K$. The holder's $\tau$ is
+a decision. The writer's is a draw from the pool of every open short
+position in the contract, which is the first departure from the tree and
+the last section's business.
+
+At expiry the choice is made for the holder unless the holder objects.
+Under the OCC's *exercise by exception* rule, an expiring equity option
+whose intrinsic value at the closing price is at least \$0.01 is exercised
+automatically unless the clearing member instructs otherwise, and an
+option below that threshold lapses. A writer whose short strike sits within
+cents of the close does not know, at the close, whether stock will arrive
+on Monday; the name for that is *pin risk*, and it is also on the last
+section's list.
+
+The vocabulary of this section is all the artifacts need: notice,
+assignment, exercise by exception. Everything else in the lesson is the
+module's.
+
+## Theorem 4.5.1 on the tape: the deep-in-the-money call is sold, never exercised
+
+The convex-payoff theorem of <Ref lesson="american-derivatives">the second
+lesson</Ref> (Shreve I, Theorem 4.5.1) says that on a stock paying no
+dividends the American call's price process equals the European call's at
+every node, and $\tau \equiv N$ is optimal. Its observable consequence on
+an exchange is a quote: an American call on a non-dividend stock trades at
+its European value, and that value never falls below intrinsic value plus
+one thing the holder who exercises throws away.
+
+### Two portfolios again: what the buyer of the call pays
+
+<Ref lesson="static-bounds-parity">Put–call parity</Ref>, proved in the
+second lesson of the course for European options with no model of the
+stock, reads $c = S - Ke^{-rT} + p$, with $p$ the European put at the same
+strike and expiry. Since $C = c$ by the theorem, the American call's price
+is
+$$
+C \;=\; \underbrace{(S - K)}_{\text{exercise value}}
+      \;+\; \underbrace{K\bigl(1 - e^{-rT}\bigr)}_{\text{interest on the strike}}
+      \;+\; \underbrace{p}_{\text{the put}} ,
+$$
+for a call in the money, and each of the two extra terms is nonnegative.
+A holder who exercises collects the first term. A holder who sells collects
+all three, because the buyer, who can carry the hedge of the module at
+exactly this cost, pays no less.
+
+<Example title="the \$70 call at \$85, 45 days, r = 3%">
+The strike discounted: $Ke^{-rT} = 70\,e^{-0.03 \times 45/365} = 70 \times
+0.99631 = 69.74$. The interest the strike earns over 45 days is
+$70 - 69.74 = 0.26$. The alive floor of the call is $S - Ke^{-rT} = 85 -
+69.74 = 15.26$, already above the exercise value $15.00$ by the $0.26$.
+
+The \$70 put with the same expiry is quoted at $0.55$. Parity then gives
+the call's price: $C = 15.26 + 0.55 = 15.81$. Exercise pays $15.00$.
+Selling pays $15.81$, and the $0.81$ difference decomposes as $0.26$ of
+interest on the strike plus $0.55$ of insurance against the stock falling
+through \$70 in the next 45 days. Per contract of 100 shares the holder
+who exercises hands the market \$81.
+
+The holder who wants the shares rather than cash reaches the same
+conclusion by a different route: keep the call, put the \$70 per share in
+the money market for 45 days, and pay the strike at expiry, having earned
+the $0.26$ and kept the option to walk away.
+</Example>
+
+<Figure
+  src="./figures/sell-vs-exercise.svg"
+  alt="Two horizontal bars: the exercise bar is 15.00 of intrinsic value in blue; the sale bar is the same 15.00 plus a thin amber segment of 0.26 interest and a green segment of 0.55 put value, with the last dollar magnified below to make the two segments legible"
+  caption="Exercising collects the blue bar; selling collects all three segments, because the buyer pays S − Ke⁻ʳᵀ + p."
+/>
+
+The decomposition is the theorem's proof read as a price. The chord
+inequality $g(S) \le \frac{1}{1 + r}g((1 + r)S)$ of the second lesson said
+that the payoff scales up faster than the strike's interest; the put term
+is the conditional-Jensen slack, the value of the branches where the stock
+ends below $K$ and the exercised holder would have wished not to own it.
+On the tape both terms are cents on a deep-in-the-money call and dollars
+near the money, and neither is ever negative.
+
+<KeyFact>
+The early-exercise premium of an American call on a stock paying no
+dividend is zero, not small: the theorem's quantifier is exact, and the
+hypothesis the zero hangs on is the absence of any dividend inside the
+option's life, the one the next section removes.
+</KeyFact>
+
+## Dividends: exercise just before the ex-date, and one factor in the lattice
+
+From the theorem one would expect a dividend to shift the call's price
+and leave the rule "never exercise" intact. It does the opposite: the
+price moves by the dividend, and the rule acquires exactly one exception.
+A dividend is paid to whoever owns the share on the *ex-dividend date*,
+the first day the share trades without the right to it; on that morning
+the share opens lower by the dividend, and the call holder, who does not
+own a share, receives nothing. Between ex-dates nothing has changed, and
+at one date something has.
+
+### The two-date comparison in dollars
+
+<Example title="the \$100 call at \$104, a \$0.50 dividend tomorrow, 30 days after it, r = 1%">
+Two fates for the call on the last cum-dividend day.
+
+**Exercise today.** Pay $100$, receive a share worth $104$ that will
+collect the $0.50$ tomorrow: the exercise value is $104 - 100 = 4.00$.
+
+**Hold through the ex-date.** Tomorrow the share is worth $104 - 0.50 =
+103.50$ and no further dividend falls in the option's life, so the call
+theorem applies from tomorrow on and the call's floor is the European
+floor on the ex-dividend stock: $(S - D) - Ke^{-r\tau}$ with $\tau$ the 30
+days remaining. $Ke^{-r\tau} = 100\,e^{-0.01 \times 30/365} = 99.92$, so
+the floor is $103.50 - 99.92 = 3.58$, and the call's value tomorrow is
+$3.58$ plus the put at \$100 on the ex-dividend stock.
+
+**The comparison.** Exercise beats the floor by $4.00 - 3.58 = 0.42$,
+which is the dividend $0.50$ the exercised holder captures minus the
+interest $K(1 - e^{-r\tau}) = 0.08$ that the holder who waits keeps.
+Exercise is optimal exactly when the put is worth less than $0.42$: deep in
+the money, where a 30-day put 3.4% out of the money is worth cents, the
+holder exercises; near the money, where the put is worth dollars, the
+holder waits.
+</Example>
+
+<Figure
+  src="./figures/dividend-race.svg"
+  alt="A timeline with three ticks, today cum-dividend at S = 104, the ex-date where S drops to 103.50, and expiry 30 days later; above it a blue bar for the exercise value 4.00 and below it a bar for the hold value 3.58 plus an unknown green put segment; the balance line states that exercise wins when the put is worth less than 0.42"
+  caption="The dividend race at the last cum-dividend date: the dividend goes to the exercised holder, the strike's interest and the put go to the holder who waits."
+/>
+
+The comparison has two consequences that hold for any stock. First, a
+dividend smaller than the interest on the strike over the time to expiry,
+$D \le K(1 - e^{-r\tau})$, can never make exercise optimal, whatever the
+stock price: the hold floor already exceeds the exercise value. Second,
+when $D > K(1 - e^{-r\tau})$ the exercise value exceeds the floor by
+$D - K(1 - e^{-r\tau})$, and for a high enough stock price the put is
+worth less than that. At 1% rates a \$0.50 quarterly dividend beats a
+month's interest on a \$100 strike six times over; at 5% and three months
+to run it does not beat it at all. The closing exercises put the same
+comparison on other numbers.
+
+<Exercise>
+Same call, same stock at $104$, same strike. (a) The dividend is \$0.05
+instead of \$0.50, 30 days and 1% as before. (b) The dividend is \$0.50,
+but the rate is 5% and expiry is 90 days after the ex-date. In each case
+compute the interest on the strike over the remaining life, the hold floor
+after the ex-date, and say whether any stock price makes exercise optimal.
+Write the inequality that decides before opening the solution.
+
+<Solution>
+**Strategy hint.** Compare $D$ with $K(1 - e^{-r\tau})$ first; only if the
+dividend is larger does the stock price matter.
+
+**(a)** $K(1 - e^{-r\tau}) = 100(1 - e^{-0.01 \times 30/365}) = 0.08$.
+The hold floor is $(104 - 0.05) - 99.92 = 4.03$, above the exercise value
+$4.00$ before the put is even counted. Since $0.05 < 0.08$, no stock price
+makes exercise optimal: raising $S$ raises the exercise value and the
+floor by the same amount.
+
+**(b)** $K(1 - e^{-r\tau}) = 100(1 - e^{-0.05 \times 90/365}) = 1.23$.
+The hold floor is $103.50 - 98.77 = 4.73$, above $4.00$ by $0.73 = 1.23 -
+0.50$. Again no stock price makes exercise optimal.
+
+The transferable move: the dividend competes with the interest on the
+strike over the remaining life, and only when it wins that comparison
+does the put's value, which does depend on $S$, get a vote.
+</Solution>
+</Exercise>
+
+### Why only the date before an ex-date: the theorem, piecewise
+
+The example asserted that the call theorem applies from the ex-date on.
+The general statement is that a dividend restores exercise at one kind of
+date and no other, and its proof is the theorem's Step 2 with the
+martingale property of the discounted stock checked date by date.
+
+<Theorem title="exercise only before an ex-date (CRR 1979 §6; Hull §15.12; Shreve II §8.5.2)">
+In the $N$-period model with $r > 0$, let the stock pay a proportional
+dividend $\delta S$ at each of a known set of ex-dividend dates, so that
+$S_{n+1} = (1 - \delta)^{v_{n+1}}\,\omega_{n+1} S_n$ with $\omega_{n+1} \in
+\{u, d\}$ and $v_{n+1} = 1$ at an ex-date and $0$ otherwise. Then the
+American call with intrinsic value $(S_n - K)^+$ is never exercised at a
+date $n < N$ such that $n + 1$ is not an ex-dividend date, except where its
+intrinsic value is zero. Exercise, if optimal at all, occurs at a date
+immediately before an ex-dividend date or at expiry.
+
+<Proof>
+Roadmap: at a date whose successor is not an ex-date, the continuation
+value is bounded below by the exercise value plus one period's interest on
+the strike, by dominance, conditional Jensen and the martingale step; the
+bound is strict wherever the call is in the money.
+
+Fix $n < N$ with $v_{n+1} = 0$. By clause (i) of the Snell theorem,
+$V_{n+1} \ge (S_{n+1} - K)^+$, so the continuation value at $n$ satisfies
+$$
+\frac{1}{1 + r}\tilde E_n[V_{n+1}]
+\;\ge\; \frac{1}{1 + r}\tilde E_n\bigl[(S_{n+1} - K)^+\bigr]
+\;\ge\; \frac{1}{1 + r}\bigl(\tilde E_n[S_{n+1}] - K\bigr)^+
+\;=\; \Bigl(S_n - \frac{K}{1 + r}\Bigr)^+ ,
+$$
+the second inequality by conditional Jensen for the convex function
+$x \mapsto (x - K)^+$, and the equality because with no dividend at
+$n + 1$ the discounted stock is a $\tilde P$-martingale,
+$\tilde E_n[S_{n+1}] = (1 + r)S_n$. Since $r > 0$,
+$(S_n - K/(1 + r))^+ > S_n - K = (S_n - K)^+$ whenever $S_n > K$; for
+$S_n \le K$ the exercise value $(S_n - K)^+$ is zero, so exercising
+collects nothing there, whatever the bound is worth (it is positive for
+$K/(1 + r) < S_n \le K$, which only says the continuation is too). So the
+continuation strictly exceeds the exercise value at every such node where
+the call is in the money, and $V_n = G_n$ there only if $G_n = 0$, an
+exercise that collects nothing. The strictness
+is where $r > 0$ is spent: at $r = 0$ the chain still shows that
+continuation attains the maximum, which is the form Shreve I, Theorem
+4.5.1 states, but with both successors in the money Jensen is tight,
+$V_n = G_n > 0$, and exercising is value-equivalent to waiting rather than
+worse. This is the sentence where the argument is general: the only
+property of the date used is $v_{n+1} = 0$.
+
+At a date with $v_{n+1} = 1$ the same chain gives
+$\tilde E_n[S_{n+1}] = (1 - \delta)(1 + r)S_n$ and the bound
+$\bigl((1 - \delta)S_n - K/(1 + r)\bigr)^+$, which can fall below
+$S_n - K$; no conclusion follows, and the pass must compare.
+</Proof>
+</Theorem>
+
+Three checks on the proof. The idea in one sentence: between ex-dates the
+tree is the tree of the second lesson and the theorem's Step 2 runs
+unchanged; at the step across an ex-date the discounted stock drops by the
+dividend, the martingale equality becomes a supermartingale inequality,
+and Jensen no longer delivers the floor. The hypothesis the dividend
+breaks is not $g(0) = 0$, which the call still satisfies, but the
+martingale property of the discounted stock. The proof also yields the
+necessary condition for exercise at a pre-ex-date node: the continuation
+is at least $((1 - \delta)S_n - K/(1 + r))^+$, so exercise requires
+$S_n - K > (1 - \delta)S_n - K/(1 + r)$, that is
+$\delta S_n > K - K/(1 + r)$: the dividend must exceed one period's
+interest on the strike, the discrete form of $D > K(1 - e^{-r\tau})$.
+
+### The pass absorbs the dividend: CRR's recursion
+
+The theorem says where to look; the pass says what the value is. Cox, Ross
+and Rubinstein's [1979 paper](https://doi.org/10.1016/0304-405X(79)90015-1)
+handles the dividend in its §6 with one change to the lattice and none to
+the comparison.
+
+<Remark title="the dividend-adjusted lattice (CRR 1979, §6)">
+With $v(n, i)$ the number of ex-dividend dates among the next $n - i$
+periods, the stock price at the node reached by $j$ up-moves is
+$u^j d^{\,n - i - j}(1 - \delta)^{v(n, i)} S$, and the call's value there is
+$$
+C(n, i, j) = \max\Bigl\{u^j d^{\,n - i - j}(1 - \delta)^{v(n, i)} S - K,\;
+\frac{1}{1 + r}\bigl[\tilde p\,C(n, i - 1, j + 1) + \tilde q\,C(n, i - 1, j)\bigr]\Bigr\}.
+$$
+The lattice still recombines, because a proportional dividend multiplies
+every node at a date by the same factor; the comparison at each node is
+the American algorithm of the second lesson verbatim; and the hedge
+ratio is the same difference quotient. The one operational change is in
+the hedge: a seller short the stock over an ex-date owes the dividend to
+the lender, and a seller long it collects it.
+</Remark>
+
+<Example title="the \$5 call on the \$4 tree with a halving dividend at n = 2">
+The tree is the module's, $u = 2$, $d = \tfrac12$, $r = \tfrac14$,
+$\tilde p = \tilde q = \tfrac12$, discount $0.8$, three periods, strike
+$5$, and the stock pays half of itself out at time $2$: a caricature
+chosen so that the lattice stays in powers of two. Prices: $4$; $8, 2$;
+after the halving $8, 2, 0.5$; then $16, 4, 1, 0.25$.
+
+**Time 3.** Payoffs $11, 0, 0, 0$.
+
+**Time 2** (ex-dividend, no dividend ahead). At $8$: intrinsic $3$,
+continuation $0.8 \times \tfrac12 (11 + 0) = 4.4$; continue, as the theorem
+says. At $2$ and $0.5$: $0$.
+
+**Time 1** (the last cum-dividend date). At $S_1 = 8$: intrinsic $3$,
+continuation $0.8 \times \tfrac12 (4.4 + 0) = 1.76$; $V_1 = 3$,
+**exercise**. At $S_1 = 2$: $0$.
+
+**Time 0.** Intrinsic $0$, continuation $0.8 \times \tfrac12 (3 + 0) =
+1.2$; $V_0 = 1.2$.
+
+The European call on the same dividend-paying tree is worth $0.704$
+(time 2 values $4.4, 0, 0$; time 1 values $1.76, 0$; root $0.704$), so the
+right to exercise before the ex-date is worth $0.496$ at the root, against
+the zero it was worth without the dividend. At the exercise node the
+necessary condition holds with room: the dividend $\delta S_1 = 4$ against
+one period's interest on the strike, $5 - 5/1.25 = 1$.
+</Example>
+
+<Figure
+  float="right"
+  width="s"
+  src="./figures/dividend-node.svg"
+  alt="The node with price 8 at time 1 of the five-dollar call with an ex-date next period: exercising pays 3; continuing leads to price 8 after the halving worth 4.4 or price 2 worth 0, so the continuation is 0.8 times one half of 4.4, which is 1.76; a bar below shows exercise larger by 1.24"
+  caption="The same node diagram as the second lesson's, with a dividend: intrinsic 3 against continuation 1.76, and the holder exercises."
+/>
+
+The comparison at this node is the one the theorem could not settle: at
+$S_1 = 8$ the bound
+$((1 - \delta)S_1 - K/(1 + r))^+ = (4 - 4)^+ = 0$ says nothing, and the
+full continuation $1.76$ loses to $3$.
+
+<Exercise>
+Rerun the pass with a $20\%$ dividend at time $2$ instead of $50\%$,
+prices $4$; $8, 2$; $12.8, 3.2, 0.8$; $25.6, 6.4, 1.6, 0.4$. Find $V_1$ at
+$S_1 = 8$, decide whether the holder exercises, and compute the root value
+and the European value. Then check the necessary condition
+$\delta S_1 > K - K/(1 + r)$ at that node and explain what the check does
+and does not decide. Write the time-2 values before opening.
+
+<Solution>
+**Strategy hint.** The theorem confines the question to the node
+$S_1 = 8$; everything else is the European pass.
+
+**Time 3.** Payoffs $20.6, 1.4, 0, 0$.
+
+**Time 2.** At $12.8$: intrinsic $7.8$, continuation $0.8 \times \tfrac12
+(20.6 + 1.4) = 8.8$; $V_2 = 8.8$. At $3.2$: $0.8 \times \tfrac12 \times 1.4
+= 0.56$. At $0.8$: $0$.
+
+**Time 1.** At $S_1 = 8$: intrinsic $3$, continuation $0.8 \times \tfrac12
+(8.8 + 0.56) = 3.744$; $V_1 = 3.744$, **continue**. At $S_1 = 2$:
+$0.8 \times \tfrac12 \times 0.56 = 0.224$.
+
+**Time 0.** $0.8 \times \tfrac12 (3.744 + 0.224) = 1.5872$, and the
+European value is the same number, since no node exercised.
+
+**The condition.** $\delta S_1 = 1.6 > 1 = K - K/(1 + r)$: the dividend
+beats the strike's interest, so the theorem's bound
+$((1 - \delta)S_1 - K/(1 + r))^+ = 6.4 - 4 = 2.4$ is below $3$ and does
+not rule exercise out. It does not rule it in either: the continuation
+exceeds the bound by $1.344$, the value of the lower branch, where the
+stock lands at $3.2 < K$ and the holder who kept the call is not forced
+to own a share bought at $5$. The transferable move: the dividend-versus-
+interest inequality is necessary; the full comparison, which carries the
+put value, is what decides, and it decides in favour of exercise only
+above a critical price.
+</Solution>
+</Exercise>
+
+### The critical price Ŝ
+
+The two exercises show the same node deciding both ways as the dividend
+changes; fixing the dividend and moving the stock gives the object CRR
+name. At a pre-ex-date node the exercise value $S - K$ rises one-for-one
+with $S$, while the continuation rises more slowly, because the put term
+inside it shrinks as the stock climbs. The two cross once, at a
+*critical price* $\hat S$: the lowest price at which the hedging portfolio
+one period on is worth exactly $S - K$. Above $\hat S$ the holder
+exercises, below it the holder waits, and CRR record its comparative
+statics without solving for it: $\hat S$ is lower the higher the dividend
+yield, the lower the interest rate, and the lower the strike. The lattice
+of the example puts $\hat S$ between the exercised node $S_1 = 8$ and the
+next lattice price below it, and cannot resolve it further, which is the
+same coarseness the six-period put showed in the second lesson.
+
+<KeyFact>
+The module's algorithm was already general enough for dividends: one
+factor $(1 - \delta)^{v}$ in the lattice, nothing in the comparison. What
+the dividend changes is the theorem, not the pass: the discounted stock is
+no longer a martingale across the ex-date, Jensen no longer delivers the
+floor, and the pass finds an exercise node at exactly the date before the
+ex-date and nowhere else.
+</KeyFact>
+
+## Puts: exercised early with no dividend, and the boundary that dips before an ex-date
+
+The put needs no dividend to be exercised early: <Ref
+lesson="american-derivatives">the second lesson</Ref> found the \$5 put's
+exercise nodes on a tree with none, and <Ref
+lesson="first-passage-perpetual-put">the third</Ref> read the boundary as
+the level where interest lost on the strike first exceeds the upside the
+live put keeps. On an exchange this is the ordinary case: deep
+in-the-money puts are exercised before expiry, and the writers of those
+puts are assigned.
+
+### The dividend runs the other way for the put
+
+For the put a coming dividend is a reason to wait, not to act: the
+ex-date drop is a fall in the stock the put holder gets for free by
+holding through it. CRR record the direction in §6, that the effect of
+dividends yet to be paid diminishes the advantage of immediate exercise,
+and the pass shows it as a boundary that dips at the date before the
+ex-date and resumes after.
+
+<Figure
+  src="./figures/boundary-calendar.svg"
+  alt="The six-period four-dollar put's lattice on a logarithmic price axis with a dashed vertical line marking a halving dividend between n = 3 and n = 4; exercise nodes are amber and the amber step boundary drops at n = 3, where the node S = 2 is ringed in blue and labelled 2.2 greater than 2, waits, then resumes after the ex-date at the halved lattice prices; a dashed grey step shows the boundary without the dividend"
+  caption="The six-period $4 put with a halving dividend at n = 4: the node S = 2 at n = 3, an exercise node without the dividend, now waits for the drop, and the boundary dips for one date."
+/>
+
+<Task>
+Read the node $S = 2$ at $n = 3$ off the figure. Without the dividend the
+second lesson's closing exercise had it exercised, $2$ against a
+continuation of $1.52$. With the halving at $n = 4$ its successors are
+$2$, an exercise node worth $2$, and $0.5$, worth $3.5$; compute
+$0.8 \times \tfrac12 (2 + 3.5)$ and confirm $2.2 > 2$: the holder waits
+through the ex-date. The full pass, which carries the root from $0.969$
+without the dividend to $1.068$ with it, the put being worth more on a
+stock about to drop, is one of the closing exercises.
+</Task>
+
+### The short side: assignment on the deep put, and the pin at expiry
+
+The writer of a deep-in-the-money put on an exchange is on the wrong side
+of the second lesson's optimal rule. At a node where $V_n = G_n$ the
+rational holder exercises, and the replication theorem says the writer's
+hedge holds exactly $G_n$ there: an assigned writer who followed the
+theorem pays out of the hedge and is whole. An assigned writer who did
+not, or who priced the put as European and hedged the smaller value,
+is short, in cash and on a date chosen by someone else, the amount the
+replication-with-consumption theorem of <Ref
+lesson="american-derivatives">the second lesson</Ref> called $C_n$
+(subscripted; the unsubscripted $C$ of this lesson is the call's price):
+the seller's withdrawal at that node, $V_n$ minus the discounted
+continuation, which is exactly what the American hedge holds above the
+European one there. The box spread of the next section is that sentence
+with numbers.
+
+At expiry the draw is replaced by the threshold. A put whose strike is
+\$0.01 above the close is exercised by exception; one whose strike is
+\$0.01 below lapses; and a writer whose strike is the close itself learns
+on the following business day whether a holder overrode the rule. The
+module's model has $V_N = G_N$ and no uncertainty at $N$; the exchange
+has a cent of it.
+
+<KeyFact>
+On the exchange the put's early exercise is the common case and the
+call's is the exception, exactly as the module ordered them, and a coming
+dividend moves the two in opposite directions: it creates a call exercise
+node at the date before the ex-date and removes put exercise nodes at the
+same date.
+</KeyFact>
+
+## The box spread post-mortem: a stopping time the seller left out of the maximum
+
+From <Ref lesson="expectation-vs-arbitrage">the first lesson's</Ref>
+replication argument one would expect a combination of options whose
+payoff is $K_2 - K_1$ in every state of the world to be a zero-coupon bond,
+priced at $(K_2 - K_1)e^{-rT}$ and riskless to sell at any higher price.
+Hull's Business Snapshot 12.1 records a trader who sold one above that
+price and lost money, and the previous section named the reason in
+advance: the writer of a deep put was short a withdrawal on a date chosen
+by someone else. The combination is a *box spread*, a bull call spread
+plus a bear put spread at the same two strikes $K_1 < K_2$: long the $K_1$
+call, short the $K_2$ call, long the $K_2$ put, short the $K_1$ put. At
+expiry the calls pay $(S_T - K_1)^+ - (S_T - K_2)^+$ and the puts pay
+$(K_2 - S_T)^+ - (K_1 - S_T)^+$, and the sum is $K_2 - K_1$ in every state.
+For European options the bond argument is exact; the Snapshot's legs are
+American.
+
+### The position, in Hull's numbers
+
+A stock trades at \$50 with 30% volatility, no dividend expected, and
+$r = 8\%$. A trader is offered the chance to sell a two-month 55/60 box
+for \$5.10 on the CBOE, the Chicago Board Options Exchange, where the four
+contracts are listed: buy the \$60 call, buy the \$55 put, sell the \$55
+call, sell the \$60 put. The box pays $60 - 55 = 5$ at expiry in every
+state, worth $5\,e^{-0.08 \times 2/12} = 4.93$ today. Selling it for
+$5.10$ looks like $0.17$ of free money.
+
+<FigureSequence
+  name="box-spread"
+  alt="Three frames of four leg cards, long 60 call, short 55 call, long 55 put, short 60 put, each showing its European and American price; frame 1 tallies the European value 4.93 against the 5.10 received; frame 2 highlights the short 60 put card in amber as assigned on day one, buy one share at 60 worth 50; frame 3 marks the remaining position at 54.74, subtracts the 60 paid, adds the 5.10 received, and shows a loss of 0.16"
+  caption="The sold 55/60 box: four legs priced as European, the short $60 put assigned on day one, and the remaining position marked at market."
+/>
+
+<Task>
+Step through the three frames. On frame 1, sum the four European prices,
+$0.26 + 5.23 - 0.96 - 9.46$, and confirm the seller owes $4.93$, the
+discounted \$5. On frame 2, read the \$60 put's American price, $10.00$,
+against its intrinsic value $60 - 50$, and name what $V_0 = G_0$ means for
+the holder's rule. On frame 3, redo the tally
+$5.10 - 60.00 + 54.74$ and confirm $-0.16$.
+</Task>
+
+The four legs, priced by a Black–Scholes pricer as European and as
+American (Hull's DerivaGem, the table in the Snapshot): the \$60 call
+$0.26$ both ways and the \$55 call $0.96$ both ways, since a call on a
+non-dividend stock is the same option under both labels; the \$55 put
+$5.23$ European and $5.44$ American; the \$60 put $9.46$ European and
+$10.00$ American. The European box is $0.70 + 4.23 = 4.93$, the number
+above. The American box is $0.70 + 4.56 = 5.26$. The trader sold for
+$5.10$ something worth $5.26$.
+
+### The diagnosis in the module's language
+
+The \$60 put's American price is $10.00$, and $10.00 = 60 - 50$ is its
+intrinsic value. In the second lesson's terms, $V_0 = G_0$ at the root:
+the stopping time $\tau^* = \min\{n : V_n = G_n\}$ is $0$, and the holder
+of that put exercises at once. The trader who sold it is assigned on the
+first day, pays $60$ for a share worth $50$, and is left holding the share,
+the \$55 put, the short \$55 call and the \$60 call, a position worth
+$50 + 5.44 - 0.96 + 0.26 = 54.74$ at market. The ledger: $5.10$ received,
+$60$ paid, $54.74$ held, net $-0.16$ per share, or \$16 per contract, on
+a trade whose payoff was the same in every state of the world.
+
+The module result that diagnoses it is the optimal-exercise theorem of
+<Ref lesson="american-derivatives">the second lesson</Ref>: the American
+price is the maximum of $\tilde E[G_\tau/(1 + r)^\tau]$ over every
+stopping time, and a seller who prices at the value of one convenient
+rule, $\tau \equiv N$, has priced a different contract. The European box
+value $4.93$ is $\tilde E[G_N/(1 + r)^N]$ summed over four legs; the
+American value $5.26$ is the same sum with the maximum over $\tau$ taken
+inside two of them, and the counterparty on the \$60 put held a $\tau$ the
+seller ignored. Nothing about the box's certainty at expiry protects the
+seller from a date before expiry.
+
+<KeyFact>
+The failure is not the box's. Any combination with a short American leg
+priced at $\tau \equiv N$, a vertical put spread, a calendar spread, a
+conversion, has fixed one convenient stopping time for a counterparty who
+holds all of them, and the shortfall lands on a date the seller did not
+pick. The pricer that does not repeat the Snapshot's mistake takes the
+maximum at every node of every leg, and that node-by-node check, with the
+replicating portfolio verified beside it, is what <Ref
+lesson="binomial-pricer-lab">the lab</Ref> builds.
+</KeyFact>
+
+## Where the idealisation ends: lotteries, cash dividends, costs, and the tree's size
+
+The module's results used in this lesson are four: the convex-payoff
+theorem for the call, the Snell-envelope price as a maximum over all
+stopping times, the backward pass with CRR's dividend factor, and the
+put's exercise region. Each holds on the exchange to the extent listed
+here, and departs where listed.
+
+### Assignment is a lottery, not a chosen stopping time
+
+The holder's $\tau$ is a stopping time; a single writer's is a random draw from every open short
+position, and the theorem's hedge is a hedge against the option, not
+against the draw. The replication theorem still holds, because the hedge
+carries $V_n \ge G_n$ at every node and can pay whichever writer is
+picked; what the writer needs beyond the theorem is the cash and margin
+to deliver on a date chosen by the OCC's random-number generator, and
+the box-spread seller had neither the price nor the cash. Pin risk at
+expiry is the same departure at $n = N$.
+
+### Dividends are cash, uncertain, and declared late
+
+The CRR factor is a proportional yield, which keeps the lattice recombining. A cash dividend
+$D$ does not: $uS - D$ followed by $d$ differs from $dS - D$ followed by
+$u$, and the number of nodes grows with the number of dates before the
+ex-date. Hull's escrow model (§15.12 for the closed form, §21.3 for the tree)
+repairs it by running the tree on $S$ minus the present value of the
+dividends and adding the escrow back at each node; the amount and the date themselves are forecasts, revised when
+the company declares, and the theorem's "known ex-dividend dates" is an
+assumption a pricer refreshes weekly. Merton's perpetual-warrant footnote
+of <Ref lesson="static-bounds-parity">the second lesson of the
+course</Ref> is the same caveat in its oldest form.
+
+### Exercise is not free
+
+Assignment and exercise carry fees, exercising a
+call converts an option position into a stock position with a different
+margin requirement, and the sale alternative of the second section loses
+the bid–ask spread, which on a deep-in-the-money option can be wider than
+the interest and the put together. The theorem's inequality $C > S - K$ is
+strict; the amount by which it is strict is the budget for these costs,
+and near expiry on a deep-in-the-money call that budget is cents.
+
+### Trees stop scaling
+
+The pass is exact for a one-dimensional Markov state and cheap on a
+recombining lattice; for a path-dependent payoff, a non-recombining
+dividend, or several underlying assets, the node count is exponential,
+and the closing exercise measures the wall. The standard
+industrial answer past it is regression Monte Carlo: simulate paths,
+estimate the continuation value at each date by regressing realised
+payoffs on functions of the state, and exercise where intrinsic beats the
+estimate. That is the method of
+[Longstaff and Schwartz (2001)](https://doi.org/10.1093/rfs/14.1.113);
+it is beyond this course's scope, and its European half,
+Monte Carlo pricing with its $1/\sqrt N$ error, is <Ref
+lesson="monte-carlo-pricing">the sixth module's</Ref>. Between the two
+labels, a *Bermudan* option (Hull §26.3) may be exercised only on listed
+dates, and the pass prices it by taking the maximum at those dates alone.
+
+<Figure
+  src="./figures/node-count-wall.svg"
+  alt="Node count against number of steps on a logarithmic axis from 1 to 10 to the 16: the recombining lattice's (n+1)(n+2)/2 is a nearly flat blue curve reaching 1,326 at n = 50, a green dot at 9,451 marks the lattice split by a cash dividend at step 25, and the path tree's 2 to the n is a straight amber line crossing the dashed one-second guide at 10 to the 8 near n = 27 and reaching about 10 to the 15, 130 days, at n = 50"
+  caption="The wall: recombination keeps the lattice at n² nodes; anything that breaks it grows as 2ⁿ, and passes the one-second line before n = 30."
+/>
+
+What is established: on a stock paying no dividends the American call
+trades at the European price, and the tape enforces the theorem as a
+quote of $S - K$ plus interest on $K$ plus the put, which the holder who
+exercises rather than sells forfeits; a dividend breaks the martingale
+property of the discounted stock across the ex-date and nothing else, so
+exercise is confined to the date before an ex-date, is possible only when
+the dividend beats the strike's interest over the remaining life, and is
+priced by the pass with one factor $(1 - \delta)^v$ in the lattice; the
+put's boundary dips before an ex-date and resumes after it; and a box of
+American options sold at the European price loses money because the price
+is a maximum over every stopping time and the deep short put's is
+attained at $\tau = 0$. What is not established is the pricer itself:
+every number in this module was computed by hand on a tree of at most six
+periods, and the boundary was read off a lattice too coarse to place it.
+<Ref lesson="binomial-pricer-lab">The lab</Ref> builds the pricer, verifies
+its replicating portfolio at every node, and extracts the exercise
+boundary from a tree fine enough to locate it.
+
+## Exercises
+
+<Exercise>
+An American call with strike \$100 on a non-dividend stock at \$120 has 60
+days to run; $r = 4\%$, and the \$100 put with the same expiry is quoted
+at $0.35$. Compute what a holder who exercises today forfeits, split into
+its two parts, and state the rational way out of the position for a holder
+who wants cash and for one who wants the shares.
+
+<Solution>
+$Ke^{-rT} = 100\,e^{-0.04 \times 60/365} = 99.34$, so the interest on the
+strike over 60 days is $0.66$. The alive floor is $120 - 99.34 = 20.66$,
+and with the put, parity gives $C = 20.66 + 0.35 = 21.01$. Exercise pays
+$20.00$. Forfeited: $1.01$ per share, $0.66$ of interest and $0.35$ of
+insurance, \$101 per contract.
+
+A holder who wants cash sells the call for at least $21.01$. A holder who
+wants the shares keeps the call, invests the \$100 per share for 60 days,
+and pays the strike at expiry, keeping the interest and the right to walk
+away if the stock is below \$100 then. The transferable move: the
+alternative to exercising is never "nothing"; it is the option one period
+on, which parity prices from the put.
+</Solution>
+</Exercise>
+
+<Exercise>
+Reproduce Hull's box in full. With $K_1 = 55$, $K_2 = 60$, $r = 8\%$,
+$T = 2/12$: (a) write the payoff of the sold box at expiry in each of the
+three ranges $S_T \le 55$, $55 < S_T \le 60$, $S_T > 60$ and confirm it is
+$-5$ throughout; (b) compute its European value; (c) from the Snapshot's
+prices, compute the American value of each spread and of the box; (d)
+walk the assignment: the trader sells the box for $5.10$, the \$60 put is
+exercised at once, and the remaining legs are unwound at their American
+prices. State the loss and the fact about the \$60 put that made it
+certain rather than possible.
+
+<Solution>
+**Strategy hint.** The box is two spreads; the American premium lives in
+the put spread only.
+
+**(a)** For the sold box the trader is long the \$60 call, short the \$55
+call, long the \$55 put, short the \$60 put. $S_T \le 55$: calls $0$,
+puts $(55 - S_T) - (60 - S_T) = -5$. $55 < S_T \le 60$: calls
+$-(S_T - 55)$, puts $-(60 - S_T)$, sum $-5$. $S_T > 60$: calls
+$(S_T - 60) - (S_T - 55) = -5$, puts $0$. The seller pays $5$ in every
+state.
+
+**(b)** $5\,e^{-0.08 \times 2/12} = 5 \times 0.98676 = 4.93$.
+
+**(c)** Call spread: $0.96 - 0.26 = 0.70$, European and American alike.
+Put spread: European $9.46 - 5.23 = 4.23$; American $10.00 - 5.44 =
+4.56$. Box: European $4.93$, matching (b); American $5.26$.
+
+**(d)** Received $5.10$. Assigned on the \$60 put: pay $60$, receive a
+share worth $50$. Unwind: sell the share $50$, sell the \$55 put $5.44$,
+buy back the \$55 call $0.96$, sell the \$60 call $0.26$: $54.74$. Net
+$5.10 - 60 + 54.74 = -0.16$ per share, which is $5.10 - 5.26$: the
+mark-to-market loss of selling at $5.10$ what was worth $5.26$. Certain
+rather than possible because the \$60 put's American price equals its
+intrinsic value, $10.00 = 60 - 50$: $V_0 = G_0$, so $\tau^* = 0$ and a
+rational holder exercises immediately. The transferable move: a
+"riskless" combination of American options is riskless only over the
+stopping times its seller priced, and $\tau = 0$ is always one of them.
+</Solution>
+</Exercise>
+
+<Exercise>
+Refute this claim: "Early exercise of an American call is always
+irrational. The proof of the convex-payoff theorem uses only that
+$(s - K)^+$ is convex and vanishes at $0$, and a dividend changes neither
+fact." Give the counterexample from the lesson with its numbers, name the
+step of the proof that fails and the hypothesis the dividend violates, and
+say what remains true of the claim.
+
+<Solution>
+**The counterexample.** The \$5 call on the \$4 tree with the halving
+dividend at time $2$: at $S_1 = 8$ intrinsic $3$ against continuation
+$1.76$, exercise strictly optimal, root value $1.2$ against European
+$0.704$.
+
+**The step.** Step 2 of the proof writes $(1 + r)S_n = \tilde E_n[S_{n+1}]$
+and applies conditional Jensen to get $g(S_n) \le \frac{1}{1 +
+r}\tilde E_n[g(S_{n+1})]$. Across an ex-date $\tilde E_n[S_{n+1}] =
+(1 - \delta)(1 + r)S_n$, the equality fails, and the chain delivers only
+$g((1 - \delta)S_n) \le \frac{1}{1 + r}\tilde E_n[g(S_{n+1})]$, a floor
+below the exercise value. At $S_1 = 8$: $g(4) = 0$ against $1.76$, true
+and useless. The claim is right that convexity and $g(0) = 0$ survive; the
+hypothesis violated is the one stated in the proof's Step 2 and in the
+theorem's model assumptions, that the discounted stock is a
+$\tilde P$-martingale.
+
+**What remains true.** Between ex-dates the martingale property holds and
+the theorem applies date by date: an American call on a dividend-paying
+stock is never exercised at a date whose successor is not an ex-date, and
+never at all if every dividend is below the strike's interest to the next
+exercise opportunity. The transferable move: a theorem's hypotheses
+include the model's, and "the stock pays no dividends" was one of them.
+</Solution>
+</Exercise>
+
+<Exercise>
+The six-period \$4 put of the boundary figure, on the module's tree
+($u = 2$, $d = \tfrac12$, $r = \tfrac14$, discount $0.8$, $\tilde p =
+\tilde q = \tfrac12$), with the stock halving at $n = 4$. Run the backward
+pass twice, without the dividend and with it, and confirm that the root
+value rises from $0.969$ to $1.068$. Then list the exercise nodes of each
+pass, name the node of the shared lattice ($n \le 3$) whose status
+changes, and say where the boundary sits, in dollars, at $n = 4$ and
+$n = 5$ in each case.
+
+<Solution>
+**Strategy hint.** The two lattices agree up to $n = 3$ and differ from
+$n = 4$ on; every continuation is $0.8 \times \tfrac12$ times the sum of
+the two successors, and a node exercises when $4 - S$ beats it. Values
+are listed under prices, exercise nodes in bold with the continuation
+they beat in parentheses.
+
+**Without the dividend.**
+Time 6: prices $256, 64, 16, 4, 1, 0.25, 0.0625$; payoffs
+$0, 0, 0, 0, 3, 3.75, 3.9375$.
+Time 5: prices $128, 32, 8, 2, 0.5, 0.125$; values $0, 0, 0$,
+**$2$** ($1.2$), **$3.5$** ($2.7$), **$3.875$** ($3.075$).
+Time 4: prices $64, 16, 4, 1, 0.25$; values $0, 0, 0.8$, **$3$** ($2.2$),
+**$3.75$** ($2.95$).
+Time 3: prices $32, 8, 2, 0.5$; values $0, 0.32$, **$2$** ($1.52$),
+**$3.5$** ($2.7$).
+Time 2: prices $16, 4, 1$; values $0.128, 0.928$, **$3$** ($2.2$).
+Time 1: prices $8, 2$; values $0.4224$, **$2$** ($1.5712$).
+Time 0: $0.8 \times \tfrac12 (0.4224 + 2) = 0.969$.
+
+**With the halving at $n = 4$.**
+Time 6: prices $128, 32, 8, 2, 0.5, 0.125, 0.03125$; payoffs
+$0, 0, 0, 2, 3.5, 3.875, 3.96875$.
+Time 5: prices $64, 16, 4, 1, 0.25, 0.0625$; values $0, 0, 0.8$,
+**$3$** ($2.2$), **$3.75$** ($2.95$), **$3.9375$** ($3.1375$).
+Time 4, ex-dividend: prices $32, 8, 2, 0.5, 0.125$; values $0, 0.32$,
+**$2$** ($1.52$), **$3.5$** ($2.7$), **$3.875$** ($3.075$).
+Time 3, cum-dividend, prices $32, 8, 2, 0.5$, each node's successors
+being its own price and a quarter of it: at $32$, $0.8 \times \tfrac12
+(0 + 0.32) = 0.128$; at $8$, $0.8 \times \tfrac12 (0.32 + 2) = 0.928$;
+at $2$, $0.8 \times \tfrac12 (2 + 3.5) = 2.2 > 2$, the node of the Task,
+which waits; at $0.5$, $0.8 \times \tfrac12 (3.5 + 3.875) = 2.95 < 3.5$,
+**$3.5$**.
+Time 2: prices $16, 4, 1$; $0.8 \times \tfrac12 (0.128 + 0.928) =
+0.4224$; $0.8 \times \tfrac12 (0.928 + 2.2) = 1.2512$; $0.8 \times
+\tfrac12 (2.2 + 3.5) = 2.28 < 3$, **$3$**.
+Time 1: prices $8, 2$; $0.8 \times \tfrac12 (0.4224 + 1.2512) = 0.6694$;
+$0.8 \times \tfrac12 (1.2512 + 3) = 1.7005 < 2$, **$2$**.
+Time 0: $0.8 \times \tfrac12 (0.6694 + 2) = 1.068$.
+
+**The nodes.** Without the dividend the exercise nodes are $S = 2$ at
+$n = 1$; $S = 1$ at $n = 2$; $S = 2$ and $0.5$ at $n = 3$; $S = 1$ and
+$0.25$ at $n = 4$; $S = 2$, $0.5$ and $0.125$ at $n = 5$. With it they
+are $S = 2$ at $n = 1$; $S = 1$ at $n = 2$; $S = 0.5$ alone at $n = 3$;
+$S = 2$, $0.5$ and $0.125$ at $n = 4$; $S = 1$, $0.25$ and $0.0625$ at
+$n = 5$. The one node of the shared lattice that changes is $S = 2$ at
+$n = 3$: exercised without the dividend, waiting with it, which is the dip
+in the figure. After the ex-date the exercise rows are the same rows of
+the lattice at half the price, so the boundary in dollars reads $S \le 2$
+at $n = 4$ and $S \le 1$ at $n = 5$ with the dividend, against $S \le 1$
+and $S \le 2$ without: the halving shifted the lattice, not the rule.
+The root rises by $0.099$ because the whole lower half of the tree from
+$n = 4$ on is worth more to a put on a stock about to lose half its
+price. The transferable move: a proportional dividend changes the prices
+the pass compares against, never the comparison, and the nodes it flips
+are exactly the pre-ex-date ones, in the direction opposite to the call's.
+</Solution>
+</Exercise>
+
+<Exercise>
+Boundary probe. On the dividend-adjusted tree, let the yield $\delta \to 0$
+with everything else fixed. Show directly from the continuation bound of
+the theorem that the set of prices at which exercise is optimal at a
+pre-ex-date node shrinks to nothing, so that the critical price
+$\hat S \to \infty$, and say what the limiting tree is. Then do the same
+for the continuous-time condition $D > K(1 - e^{-r\tau})$ as $D \to 0$.
+
+<Solution>
+At a pre-ex-date node the continuation is at least
+$((1 - \delta)S - K/(1 + r))^+$, so exercise requires
+$S - K > (1 - \delta)S - K/(1 + r)$, that is $\delta S > K r/(1 + r)$,
+that is $S > K r/(\delta(1 + r))$. The right side grows without bound as
+$\delta \to 0$: for every fixed $S$ there is a $\delta_0 > 0$ below which
+the inequality fails and the node continues. So the exercise set at the
+node is empty for small enough $\delta$ and $\hat S \to \infty$. The
+limiting tree is the second lesson's, on which the theorem holds at every
+node, and the exception has vanished continuously into the rule rather
+than switching off: at $\delta = 0.5$ the node $S_1 = 8$ exercised, at
+$\delta = 0.2$ it did not, and no $\delta$ makes a node exercise whose
+dividend is below the strike's one-period interest.
+
+In continuous time, $D \le K(1 - e^{-r\tau})$ rules exercise out at every
+stock price, and for $D$ below the interest on the strike over the
+remaining life the condition holds for every $S$. As $D \to 0$ the
+threshold is met for every $\tau > 0$ and $r > 0$, which is the call
+theorem of the course's second lesson. The transferable move: an
+exception that depends on a parameter should reduce to the theorem when
+the parameter is switched off, and this one does.
+</Solution>
+</Exercise>
+
+<Exercise>
+Two lower bounds and a parity relation, from the tools of the course's
+second lesson. (a) Prove $P \ge K - S$ for an American put and compare
+with the European bound $p \ge Ke^{-rT} - S$, stating which is larger and
+by how much. (b) Prove $S - K \le C - P \le S - Ke^{-rT}$ for American
+options on a non-dividend stock, using $C = c$ and $P \ge p$. (c) In Hull's
+box, which of the four legs carries the early-exercise premium, on which
+side of the parity inequalities does that premium live, and what does the
+\$60 put's $10.00$ say about where in the interval $C - P$ sits for that
+strike? Decide which kind of problem each part is before starting.
+
+<Solution>
+**Strategy hint.** (a) is a dominance argument; (b) is parity plus one
+inequality per side; (c) is reading numbers against (b).
+
+**(a)** An American put can be exercised now for $K - S$, so a price below
+that is an arbitrage: buy the put, exercise, collect $K - S - P > 0$.
+Hence $P \ge K - S$. The European bound is $Ke^{-rT} - S$, smaller by
+$K(1 - e^{-rT})$, the interest on the strike: the American holder can have
+$K$ now, the European holder only at $T$.
+
+**(b)** Right side: $C = c$ for a call on a non-dividend stock, and
+$P \ge p$, so $C - P \le c - p = S - Ke^{-rT}$ by European parity. Left
+side, by the dominance lemma of the course's second lesson: portfolio A
+is one European call plus $K$ in cash invested at $r$; portfolio B is one
+American put plus one share. If B's holder exercises the put at some time
+$t < T$, B is worth exactly $K$ then (the share is delivered for $K$),
+while A is worth $c_t + Ke^{rt} \ge K$. If the put is held to expiry, B is
+worth $\max(S_T, K)$ and A is worth
+$(S_T - K)^+ + Ke^{rT} = \max(S_T, K) + K(e^{rT} - 1) \ge \max(S_T, K)$.
+A never pays less than B at any exit
+B's holder can choose, so A never costs less: $c + K \ge P + S$, and with
+$C = c$ this is $C - P \ge S - K$.
+
+**(c)** Only the put legs: $C = c$ for both calls. The premium lives on
+the right side of (b): $C - P$ sits below $S - Ke^{-rT}$ by exactly
+$P - p$, the early-exercise premium, which is $0.54$ for the \$60 put and
+$0.21$ for the \$55. For the \$60 strike, $P = 10.00 = K - S$: the
+American put sits exactly on the bound of (a). The interval in (b) is
+$[S - K,\ S - Ke^{-rT}] = [-10.00,\ -9.21]$, and $C - P = 0.26 - 10.00 =
+-9.74$ clears its left end by exactly $C = 0.26$, the call's whole value,
+and sits below its right end $-9.21$ by $P - p = 0.54$, the early-exercise
+premium just quoted, to within the cent the Snapshot's rounding allows. A
+put worth no more than immediate exercise pushes $C - P$ as far left in
+the interval as the call's price permits.
+The transferable move: the parity interval's width $K(1 - e^{-rT})$ is
+the strike's interest, and the American put's position in it measures how
+close its holder is to exercising.
+</Solution>
+</Exercise>
+
+<Exercise>
+Count the work. (a) A recombining tree with $n$ steps has how many nodes,
+and how many for $n = 50$? (b) A fixed cash dividend at step $25$ splits
+the lattice: each of the time-25 nodes carries a different ex-dividend
+price and starts its own recombining lattice for the remaining 25 steps.
+Count the nodes. (c) A dividend rule that pays a fraction of the running
+maximum makes the state path-dependent; count the nodes of the path tree
+for $n = 50$. (d) At $10^8$ node evaluations per second, time each pass,
+and say which one no tree can do. Then estimate what a method that
+samples $10^5$ paths of 50 steps costs, and state what it gives up.
+
+<Solution>
+**(a)** $(n + 1)(n + 2)/2$: for $n = 50$, $51 \times 52/2 = 1{,}326$
+nodes.
+
+**(b)** $26 \times 27/2 = 351$ nodes in the first 25 steps, part (a) at
+$n = 25$; then $26$ lattices of $25$ steps with $351$ nodes each, whose
+roots are the $26$ time-25 nodes already counted, so each adds $351 - 1
+= 350$ new nodes: $351 + 26 \times 350 = 9{,}451$ nodes. Larger by a
+factor of about seven, still trivial.
+
+**(c)** Every path is its own state: $2^{50} \approx 1.1 \times 10^{15}$
+nodes, and $2^{51} - 1$ counting every date.
+
+**(d)** (a) takes $13$ microseconds and (b) $95$ microseconds; (c) at
+$10^8$ per second takes $1.1 \times 10^7$ seconds, about $130$ days, and
+doubles with every added step. No tree does it. Sampling $10^5$ paths of
+$50$ steps is $5 \times 10^6$ increments, $50$ milliseconds, linear in the
+number of steps whatever the dividend rule; what it gives up is exactness
+and, for an American claim, the continuation value at each node, which
+the tree had for free and which a simulation must estimate by regressing
+realised payoffs on the state. The transferable move: the tree's economy
+is recombination, and any feature that breaks it turns $n^2$ into $2^n$.
+This wall is why <Ref lesson="binomial-pricer-lab">the lab</Ref> builds
+the tree pricer for the claims a tree can price, and why <Ref
+lesson="monte-carlo-pricing">the sixth module</Ref> prices European claims
+by sampling paths, with an error that falls as $1/\sqrt N$ rather than a
+node count that grows as $2^n$; Longstaff and Schwartz's regression is the
+American extension, past this course's scope.
+</Solution>
+</Exercise>
+
+<References>
+1. John C. Hull, *Options, Futures, and Other Derivatives*, 9th ed.
+   (Pearson, 2015): §10.8 (the Options Clearing Corporation, exercise and
+   assignment), §11.5 (calls on a non-dividend-paying stock: the
+   sell-don't-exercise argument), §11.7 (dividends: bounds, early
+   exercise, parity), §12.3 and Business Snapshot 12.1 (box spreads and
+   "Losing Money with Box Spreads", with the DerivaGem price table used
+   above), §15.12 (dividends: the escrow model, conditions (15.24)–(15.26)
+   for early exercise before an ex-date, Black's approximation), §26.3
+   (Bermudan options).
+2. John C. Cox, Stephen A. Ross and Mark Rubinstein, "Option Pricing: A
+   Simplified Approach", *Journal of Financial Economics* 7 (1979),
+   229–263, §6 "Dividends and put pricing": the dividend-adjusted
+   recursion $C(n, i, j)$, the critical price $\hat S$ and its comparative
+   statics, and Table 3. https://doi.org/10.1016/0304-405X(79)90015-1
+3. Steven E. Shreve, *Stochastic Calculus for Finance I: The Binomial
+   Asset Pricing Model* (Springer, 2004), §4.4–4.5: the American
+   algorithm, the replication and optimal-exercise theorems, and Theorem
+   4.5.1, the results this lesson applies.
+4. Steven E. Shreve, *Stochastic Calculus for Finance II: Continuous-Time
+   Models* (Springer, 2004), §8.5.2 (an American call on an asset paying
+   dividends: the pre-dividend value $h_n(x) = \max\{x - K, C_n(t_n, (1 -
+   a_n)x)\}$ and the recursion between dividend dates) and §8.7 Notes (the
+   pointer to Longstaff–Schwartz and Tsitsiklis–Van Roy for American
+   claims by simulation).
+5. Francis A. Longstaff and Eduardo S. Schwartz, "Valuing American
+   Options by Simulation: A Simple Least-Squares Approach", *Review of
+   Financial Studies* 14, no. 1 (2001), 113–147.
+   https://doi.org/10.1093/rfs/14.1.113
+6. Options Industry Council, "Options Exercise" (reference-library FAQ):
+   OCC's exercise-by-exception procedure, the \$0.01 in-the-money
+   threshold for expiring equity options, and random assignment of
+   exercise notices to clearing members.
+   https://www.optionseducation.org/referencelibrary/faq/options-exercise
+</References>

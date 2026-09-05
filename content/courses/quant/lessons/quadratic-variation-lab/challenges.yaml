@@ -1,0 +1,353 @@
+checkpoints:
+  scaled-walk:
+    kind: exact
+    seed: 201
+    atol: 1.0e-9
+    inputs_code: |
+      n = int(rng.choice([96, 128, 160]))
+      inputs = (rng.integers(0, 2, size=n), float(rng.uniform(0.5, 3.0)))
+    wrong:
+      - hint: "The steps are scaled by Δt, not √Δt. The walk's variance over [0, T] is then T·Δt instead of T, and its quadratic variation collapses toward zero as the mesh refines instead of pinning to T — the single most diagnostic slip in the module."
+        code: |
+          def f(tosses, T):
+              import numpy as np
+              tosses = np.asarray(tosses)
+              steps = (T / tosses.size) * np.where(tosses == 1, 1.0, -1.0)
+              return np.concatenate([[0.0], np.cumsum(steps)])
+      - hint: "The walk starts at 0: the output has n + 1 entries, W[0] = 0, then the running sum after each toss. Yours has n entries and begins at the first step."
+        code: |
+          def f(tosses, T):
+              import numpy as np
+              tosses = np.asarray(tosses)
+              return np.cumsum(np.sqrt(T / tosses.size) * np.where(tosses == 1, 1.0, -1.0))
+      - hint: "The step is √(T/n), not 1/√n: n tosses cover a horizon of T, so each cell is Δt = T/n long and the step's square must equal it. Shreve's 1/√n is the T = 1 case."
+        code: |
+          def f(tosses, T):
+              import numpy as np
+              tosses = np.asarray(tosses)
+              steps = np.where(tosses == 1, 1.0, -1.0) / np.sqrt(tosses.size)
+              return np.concatenate([[0.0], np.cumsum(steps)])
+  sampled-qv:
+    kind: exact
+    seed: 202
+    atol: 1.0e-9
+    inputs_code: |
+      n, T = 512, float(rng.uniform(0.5, 2.0))
+      t = np.linspace(0.0, T, n + 1)
+      smooth = np.sin(3.0 * t) + t**2
+      dW = np.sqrt(T / n) * rng.standard_normal((4, n))
+      paths = np.concatenate([np.zeros((4, 1)), np.cumsum(dW, axis=-1)], axis=-1)
+      # One path, then a batch of three: the batch must come back one number per row.
+      inputs = (smooth, paths[0], paths[1:], (1, 4, 32, 128))
+    wrong:
+      - hint: "The stride reads the wrong axis on a batch: path[::stride] keeps every stride-th row of an (M, n + 1) array and leaves every row on the fine grid, so the batch comes back with M/stride numbers of the fine-grid sum. The grid is the last axis — path[..., ::stride] — on a single path and a batch alike."
+        code: |
+          def f(smooth, W, batch, strides):
+              import numpy as np
+              def qv(path, s):
+                  coarse = np.asarray(path)[::s]
+                  return np.sum(np.diff(coarse, axis=-1)**2, axis=-1)
+              table = np.array([[qv(p, s) for s in strides] for p in (smooth, W)])
+              return (table, *(qv(batch, s) for s in strides))
+      - hint: "The sum is divided by the number of cells. That is the sample variance of the increments — a number that stays put as the mesh refines and is smaller than the quadratic variation by a factor of n/stride. Quadratic variation is a sum, not an average."
+        code: |
+          def f(smooth, W, batch, strides):
+              import numpy as np
+              def qv(path, s):
+                  d = np.diff(np.asarray(path)[..., ::s], axis=-1)
+                  return np.sum(d**2, axis=-1) / d.shape[-1]
+              table = np.array([[qv(p, s) for s in strides] for p in (smooth, W)])
+              return (table, *(qv(batch, s) for s in strides))
+      - hint: "The increments are not squared: that is the first-order variation, which is finite for a smooth path and grows without bound for a Brownian one. The quadratic variation squares each increment before summing."
+        code: |
+          def f(smooth, W, batch, strides):
+              import numpy as np
+              def qv(path, s):
+                  return np.sum(np.abs(np.diff(np.asarray(path)[..., ::s], axis=-1)), axis=-1)
+              table = np.array([[qv(p, s) for s in strides] for p in (smooth, W)])
+              return (table, *(qv(batch, s) for s in strides))
+      - hint: "The stride is ignored: every column is the fine-grid sum. A stride of s reads the path at every s-th grid point, from the first to the last, and sums the squared increments of that coarser partition."
+        code: |
+          def f(smooth, W, batch, strides):
+              import numpy as np
+              def qv(path, s):
+                  return np.sum(np.diff(np.asarray(path), axis=-1)**2, axis=-1)
+              table = np.array([[qv(p, s) for s in strides] for p in (smooth, W)])
+              return (table, *(qv(batch, s) for s in strides))
+  qv-study:
+    kind: exact
+    seed: 203
+    atol: 1.0e-9
+    inputs_code: |
+      n, T = 2048, float(rng.uniform(0.5, 2.0))
+      dW = np.sqrt(T / n) * rng.standard_normal(n)
+      c = float(rng.uniform(-2.0, 2.0))
+      S0, mu, sigma = float(rng.uniform(20.0, 200.0)), float(rng.uniform(-0.1, 0.3)), float(rng.uniform(0.1, 0.8))
+      inputs = (dW, T, c, S0, mu, sigma, (256, 64, 16, 4, 1))
+    wrong:
+      - hint: "The last row is the quadratic variation of the price S, not of log S. [S, S](T) = σ² ∫ S² dt depends on the path's level; the realized-variance identity σ² T holds for the log price."
+        code: |
+          def f(dW, T, c, S0, mu, sigma, strides):
+              import numpy as np
+              n = dW.size
+              t = np.linspace(0.0, T, n + 1)
+              W = np.concatenate([[0.0], np.cumsum(dW)])
+              S = S0 * np.exp((mu - 0.5 * sigma**2) * t + sigma * W)
+              def qv(path, s):
+                  return np.sum(np.diff(path[::s])**2)
+              return np.array([[qv(p, s) for s in strides] for p in (W, np.sin(t), W + c * t, S)])
+      - hint: "log S drifts at μ − σ²/2, not at μ. The limit does not care — drift is invisible to the meter — but the sampled value at a finite mesh does, through the cross term 2σ(drift)Δt W(T), and the check reads the finite-mesh number. This is the −½σ² the module met three times."
+        code: |
+          def f(dW, T, c, S0, mu, sigma, strides):
+              import numpy as np
+              n = dW.size
+              t = np.linspace(0.0, T, n + 1)
+              W = np.concatenate([[0.0], np.cumsum(dW)])
+              logS = np.log(S0) + mu * t + sigma * W
+              def qv(path, s):
+                  return np.sum(np.diff(path[::s])**2)
+              return np.array([[qv(p, s) for s in strides] for p in (W, np.sin(t), W + c * t, logS)])
+      - hint: "The smooth path is sampled on the wrong grid: the grid has n + 1 points from t = 0 to t = T, and np.linspace(0, T, n) spaces them differently from the increments' grid. Build every process on grid(n, T)."
+        code: |
+          def f(dW, T, c, S0, mu, sigma, strides):
+              import numpy as np
+              n = dW.size
+              t = np.linspace(0.0, T, n + 1)
+              W = np.concatenate([[0.0], np.cumsum(dW)])
+              logS = np.log(S0) + (mu - 0.5 * sigma**2) * t + sigma * W
+              def qv(path, s):
+                  return np.sum(np.diff(path[::s])**2)
+              return np.array([[qv(p, s) for s in strides] for p in (W, np.sin(np.linspace(0.0, T, n)), W + c * t, logS)])
+  ito-vs-stratonovich:
+    kind: exact
+    seed: 204
+    atol: 1.0e-9
+    inputs_code: |
+      n, T = 512, float(rng.uniform(0.5, 2.0))
+      inputs = (np.sqrt(T / n) * rng.standard_normal(n), 8)
+    wrong:
+      - hint: "Left and right are swapped: your \"left\" sum reads the integrand at the end of each cell. The evaluation point decides the answer — the right-endpoint sum converges to (W(T)² + T)/2, the left to (W(T)² − T)/2 — so the correction's sign has flipped."
+        code: |
+          def f(dW, stride):
+              import numpy as np
+              W = np.concatenate([[0.0], np.cumsum(dW)])
+              n = W.size - 1
+              def s(integrand, point):
+                  offset = {"left": stride, "mid": stride // 2, "right": 0}[point]
+                  reads = np.arange(0, n, stride) + offset
+                  return np.sum(integrand[reads] * np.diff(W[::stride]))
+              return np.array([s(W, p) for p in ("left", "mid", "right")] + [s(W**2, p) for p in ("left", "mid", "right")])
+      - hint: "The cells moved with the evaluation point: your increments are taken from the shifted grid W[offset::stride], so the \"right\" sum pairs each read with the next cell's increment and drops a cell. The increment is always W((j + 1)s) − W(js); only the read of the integrand moves."
+        code: |
+          def f(dW, stride):
+              import numpy as np
+              W = np.concatenate([[0.0], np.cumsum(dW)])
+              n = W.size - 1
+              def s(integrand, point):
+                  offset = {"left": 0, "mid": stride // 2, "right": stride}[point]
+                  reads = np.arange(0, n, stride) + offset
+                  inc = np.diff(W[offset::stride])
+                  k = min(reads.size, inc.size)
+                  return np.sum(integrand[reads[:k]] * inc[:k])
+              return np.array([s(W, p) for p in ("left", "mid", "right")] + [s(W**2, p) for p in ("left", "mid", "right")])
+      - hint: "The stride is ignored for the increments: the integrand is read once per cell but multiplied by a single fine-step increment. The increment is the whole cell's, W((j + 1)s) − W(js)."
+        code: |
+          def f(dW, stride):
+              import numpy as np
+              W = np.concatenate([[0.0], np.cumsum(dW)])
+              n = W.size - 1
+              def s(integrand, point):
+                  offset = {"left": 0, "mid": stride // 2, "right": stride}[point]
+                  reads = np.arange(0, n, stride) + offset
+                  return np.sum(integrand[reads] * dW[::stride])
+              return np.array([s(W, p) for p in ("left", "mid", "right")] + [s(W**2, p) for p in ("left", "mid", "right")])
+  ito-formula-check:
+    kind: exact
+    seed: 205
+    atol: 1.0e-9
+    inputs_code: |
+      # f(t, x) = t x² + x³: a genuine f_t, and dt terms that do not cancel.
+      f_t = lambda t, x: x**2
+      f_x = lambda t, x: 2 * t * x + 3 * x**2
+      f_xx = lambda t, x: 2 * t + 6 * x
+      n, T = 256, float(rng.uniform(0.5, 2.0))
+      t = np.linspace(0.0, T, n + 1)
+      dW = np.sqrt(T / n) * rng.standard_normal((4, n))
+      paths = np.concatenate([np.zeros((4, 1)), np.cumsum(dW, axis=-1)], axis=-1)
+      # One path, then a batch of three: the batch must come back as (3, M).
+      inputs = (f_t, f_x, f_xx, t, paths[0], paths[1:], 4)
+    wrong:
+      - hint: "The batch collapsed: on an (M, n + 1) array each sum ran over every axis and returned one number, so the batch came back as (3,) instead of (3, M). The cells are the last axis — sum with axis=-1 — and the stride reads that axis too, W[..., ::stride], never W[::stride], which on a batch strides the paths."
+        code: |
+          def f(f_t, f_x, f_xx, t, W, stride):
+              import numpy as np
+              tc, Wc = t[::stride], np.asarray(W)[..., ::stride]
+              dt, dW = np.diff(tc), np.diff(Wc, axis=-1)
+              tl, Wl = tc[:-1], Wc[..., :-1]
+              return np.array([np.sum(f_t(tl, Wl) * dt), np.sum(f_x(tl, Wl) * dW), 0.5 * np.sum(f_xx(tl, Wl) * dt)])
+          def g(f_t, f_x, f_xx, t, W, batch, stride):
+              return f(f_t, f_x, f_xx, t, W, stride), f(f_t, f_x, f_xx, t, batch, stride)
+      - hint: "The ½ in front of the f_xx sum is missing. The second-order Taylor term is ½ f_xx (ΔW)², and (ΔW)² → Δt keeps the half."
+        code: |
+          def f(f_t, f_x, f_xx, t, W, stride):
+              import numpy as np
+              tc, Wc = t[::stride], np.asarray(W)[..., ::stride]
+              dt, dW = np.diff(tc), np.diff(Wc, axis=-1)
+              tl, Wl = tc[:-1], Wc[..., :-1]
+              return np.array([np.sum(f_t(tl, Wl) * dt, axis=-1), np.sum(f_x(tl, Wl) * dW, axis=-1), np.sum(f_xx(tl, Wl) * dt, axis=-1)])
+          def g(f_t, f_x, f_xx, t, W, batch, stride):
+              return f(f_t, f_x, f_xx, t, W, stride), f(f_t, f_x, f_xx, t, batch, stride)
+      - hint: "The third sum multiplies f_xx by (ΔW)² instead of Δt. That is the Taylor expansion's own second-order term, and it converges to the same limit; the formula's third term is deterministic, ½ ∫ f_xx dt, and the checkpoint reads the formula's sums."
+        code: |
+          def f(f_t, f_x, f_xx, t, W, stride):
+              import numpy as np
+              tc, Wc = t[::stride], np.asarray(W)[..., ::stride]
+              dt, dW = np.diff(tc), np.diff(Wc, axis=-1)
+              tl, Wl = tc[:-1], Wc[..., :-1]
+              return np.array([np.sum(f_t(tl, Wl) * dt, axis=-1), np.sum(f_x(tl, Wl) * dW, axis=-1), 0.5 * np.sum(f_xx(tl, Wl) * dW**2, axis=-1)])
+          def g(f_t, f_x, f_xx, t, W, batch, stride):
+              return f(f_t, f_x, f_xx, t, W, stride), f(f_t, f_x, f_xx, t, batch, stride)
+      - hint: "The partial derivatives are read at the right endpoint of each cell. The Itô sums read the integrand where the cell starts, (t_j, W(t_j)); at the right endpoint the middle sum picks up an extra ∫ f_xx dt, and the total overshoots by twice the correction."
+        code: |
+          def f(f_t, f_x, f_xx, t, W, stride):
+              import numpy as np
+              tc, Wc = t[::stride], np.asarray(W)[..., ::stride]
+              dt, dW = np.diff(tc), np.diff(Wc, axis=-1)
+              tr, Wr = tc[1:], Wc[..., 1:]
+              return np.array([np.sum(f_t(tr, Wr) * dt, axis=-1), np.sum(f_x(tr, Wr) * dW, axis=-1), 0.5 * np.sum(f_xx(tr, Wr) * dt, axis=-1)])
+          def g(f_t, f_x, f_xx, t, W, batch, stride):
+              return f(f_t, f_x, f_xx, t, W, stride), f(f_t, f_x, f_xx, t, batch, stride)
+  euler-maruyama:
+    kind: exact
+    seed: 206
+    atol: 1.0e-9
+    inputs_code: |
+      L, T = 64, 1.0
+      mu, sigma = float(rng.uniform(-0.5, 1.5)), float(rng.uniform(0.2, 1.0))
+      inputs = (mu, sigma, float(rng.uniform(0.5, 100.0)), np.sqrt(T / L) * rng.standard_normal((4, L)), T / L)
+    wrong:
+      - hint: "The noise term is scaled by √Δt a second time. The increments handed to the solver are already Brownian increments — each is of size √Δt — and the scheme multiplies b(X) by ΔW as given."
+        code: |
+          def f(mu, sigma, x0, dW, dt):
+              import numpy as np
+              X = np.empty(dW.shape[:-1] + (dW.shape[-1] + 1,))
+              X[..., 0] = x0
+              for j in range(dW.shape[-1]):
+                  x = X[..., j]
+                  X[..., j + 1] = x + mu * x * dt + sigma * x * np.sqrt(dt) * dW[..., j]
+              return X
+      - hint: "The drift is scaled by √Δt like the noise. The drift term is a(X) Δt — a rate times a duration; only the Brownian increment is of order √Δt, and it already is."
+        code: |
+          def f(mu, sigma, x0, dW, dt):
+              import numpy as np
+              X = np.empty(dW.shape[:-1] + (dW.shape[-1] + 1,))
+              X[..., 0] = x0
+              for j in range(dW.shape[-1]):
+                  x = X[..., j]
+                  X[..., j + 1] = x + mu * x * np.sqrt(dt) + sigma * x * dW[..., j]
+              return X
+      - hint: "That is Euler on log S, and for that SDE the scheme is exact: you returned the closed-form solution on the path. The checkpoint asks for the scheme on the price SDE, dS = μ S dt + σ S dW, whose error against the exact solution is what section 7 measures."
+        code: |
+          def f(mu, sigma, x0, dW, dt):
+              import numpy as np
+              W = np.concatenate([np.zeros(dW.shape[:-1] + (1,)), np.cumsum(dW, axis=-1)], axis=-1)
+              t = dt * np.arange(dW.shape[-1] + 1)
+              return x0 * np.exp((mu - 0.5 * sigma**2) * t + sigma * W)
+      - hint: "The coefficients are read at the new point: a(X_{j+1}) needs the value the step is computing. Euler–Maruyama freezes a and b at the start of the cell, X_j, the way every left-endpoint sum in this lab does."
+        code: |
+          def f(mu, sigma, x0, dW, dt):
+              import numpy as np
+              X = np.empty(dW.shape[:-1] + (dW.shape[-1] + 1,))
+              X[..., 0] = x0
+              for j in range(dW.shape[-1]):
+                  x = X[..., j]
+                  X[..., j + 1] = x / (1 - mu * dt - sigma * dW[..., j])
+              return X
+  strong-order:
+    kind: exact
+    seed: 207
+    atol: 1.0e-9
+    inputs_code: |
+      N, T, M = 256, 1.0, 300
+      mu, sigma = float(rng.uniform(0.5, 2.0)), float(rng.uniform(0.5, 1.2))
+      inputs = (mu, sigma, 1.0, np.sqrt(T / N) * rng.standard_normal((M, N)), T / N, (1, 2, 4, 8, 16))
+    wrong:
+      - hint: "Each step size runs on its own freshly drawn paths, and the exact solution on yet another set. The error then contains the Monte-Carlo difference between independent endpoints, which does not shrink with Δt, and the slope is noise. Every resolution must consume the same fine increments, summed in blocks of R."
+        code: |
+          def f(mu, sigma, x0, dW, dt, Rs):
+              import numpy as np
+              M, N = dW.shape
+              T = N * dt
+              fresh = np.random.default_rng(0)
+              out = []
+              for R in Rs:
+                  inc = np.sqrt(R * dt) * fresh.standard_normal((M, N // R))
+                  X = np.full(M, float(x0))
+                  for j in range(N // R):
+                      X = X + mu * X * R * dt + sigma * X * inc[:, j]
+                  exact = x0 * np.exp((mu - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * fresh.standard_normal(M))
+                  out.append(np.mean(np.abs(X - exact)))
+              return np.array(out)
+      - hint: "That is the weak error, |E X_em(T) − E S(T)|: the difference of the means. The strong error is the mean of the differences, E |X_em(T) − S(T)| path by path, and it is the one whose order is ½."
+        code: |
+          def f(mu, sigma, x0, dW, dt, Rs):
+              import numpy as np
+              M, N = dW.shape
+              T = N * dt
+              exact = x0 * np.exp((mu - 0.5 * sigma**2) * T + sigma * dW.sum(axis=1))
+              out = []
+              for R in Rs:
+                  inc = dW.reshape(M, N // R, R).sum(axis=2)
+                  X = np.full(M, float(x0))
+                  for j in range(N // R):
+                      X = X + mu * X * R * dt + sigma * X * inc[:, j]
+                  out.append(abs(np.mean(X) - np.mean(exact)))
+              return np.array(out)
+      - hint: "The reference endpoint drifts at μ, not μ − σ²/2. Against that reference the scheme's error does not fall with Δt, because the reference is not the solution of the SDE the scheme discretizes."
+        code: |
+          def f(mu, sigma, x0, dW, dt, Rs):
+              import numpy as np
+              M, N = dW.shape
+              T = N * dt
+              exact = x0 * np.exp(mu * T + sigma * dW.sum(axis=1))
+              out = []
+              for R in Rs:
+                  inc = dW.reshape(M, N // R, R).sum(axis=2)
+                  X = np.full(M, float(x0))
+                  for j in range(N // R):
+                      X = X + mu * X * R * dt + sigma * X * inc[:, j]
+                  out.append(np.mean(np.abs(X - exact)))
+              return np.array(out)
+  why-left-endpoint:
+    kind: review
+    rubric: |
+      The learner computed left, midpoint and right-endpoint sums of
+      ∫ W dW on one path, saw three different limits, and was asked why
+      finance forces the left endpoint and what a midpoint-rule trader could
+      do.
+      Pass if the answer (a) names the property: the integrand is a position
+      (holding) that must be decided before the increment it multiplies is
+      known — adapted, non-anticipating, measurable at the start of the cell,
+      "settled at the left endpoint", or an equivalent statement in plain
+      words — AND (b) states the consequence of the other rules: a midpoint
+      (or right-endpoint) trader sizes the position using price movement
+      that is still in the future (peeks ahead), and that this is
+      information no trader has / an arbitrage / a gain from foresight.
+      Credit (b) whether or not the gap's size (Q/2 → T/2 for the midpoint,
+      T for the right endpoint) is stated; naming it is a bonus, not a
+      requirement.
+      Fail if the answer argues only that the Itô convention is "standard",
+      "a definition", or "what makes the integral a martingale" without
+      connecting the choice to the integrand being known at the cell's start;
+      or if it says the evaluation points give the same answer in the limit;
+      or if it names the martingale property alone as the reason with no
+      mention of positions or of anticipation.
+      Grade the property named and the consequence, not the prose.
+  qv-sigma:
+    kind: metric
+    metric: rmse
+    threshold: -3.5
+    holdout: data/holdout_paths.csv
+    labels_code: |
+      # Percent on the wire: the truths are 100 × sigma, one per path in path order.
+      labels = np.loadtxt("private/holdout_sigma.csv")

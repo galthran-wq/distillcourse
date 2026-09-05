@@ -85,7 +85,11 @@ const mdxParser = unified().use(remarkParse).use(remarkMdx).use(remarkMath);
 
 /** Normalizes prose for opening-line comparison: quotes, dashes, whitespace. */
 function normalizeProse(text: string): string {
+  // mdast-util-to-string drops the $ delimiters of inline math while
+  // course.yaml keeps them; compare both sides without them (and without the
+  // backslash that escapes a literal dollar in markdown).
   return text
+    .replace(/\\?\$/g, "")
     .replace(/[‘’“”"']/g, "'")
     .replace(/[–—]/g, "-")
     .replace(/\s+/g, " ")

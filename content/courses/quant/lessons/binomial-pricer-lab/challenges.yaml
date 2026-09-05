@@ -1,0 +1,407 @@
+checkpoints:
+  stock-lattice:
+    kind: exact
+    seed: 101
+    atol: 1.0e-9
+    inputs_code: |
+      n = int(rng.integers(5, 9))
+      u = float(rng.uniform(1.15, 1.8))
+      d = float(rng.uniform(0.55, 0.9))
+      r = float(rng.uniform(0.01, 0.1))
+      inputs = (float(rng.uniform(20.0, 150.0)), u, d, r, n)
+    wrong:
+      - hint: "Index j counts heads (up moves): S[i][j] = S0 u^j d^(i−j) rises with j, so S[i][0] is the lowest price on date i. Your lattice runs the other way."
+        code: |
+          def f(S0, u, d, r, n):
+              import numpy as np
+              out = []
+              for i in range(n + 1):
+                  j = np.arange(i + 1)
+                  out.append(S0 * d**j * u ** (i - j))
+              return np.concatenate(out)
+      - hint: "An n-period tree has n + 1 dates, 0 through n; the lattice is one array short."
+        code: |
+          def f(S0, u, d, r, n):
+              import numpy as np
+              out = []
+              for i in range(n):
+                  j = np.arange(i + 1)
+                  out.append(S0 * u**j * d ** (i - j))
+              return np.concatenate(out)
+      - hint: "The exponent of d is i − j, the number of tails so far, not i: with d^i every node carries i down moves on top of its j up moves, and the whole lattice sinks — S[i][i] should be S0 u^i, with no d in it."
+        code: |
+          def f(S0, u, d, r, n):
+              import numpy as np
+              out = []
+              for i in range(n + 1):
+                  j = np.arange(i + 1)
+                  out.append(S0 * u**j * d**i)
+              return np.concatenate(out)
+  risk-neutral-prob:
+    kind: exact
+    seed: 102
+    atol: 1.0e-12
+    inputs_code: |
+      u = float(rng.uniform(1.15, 1.8))
+      d = float(rng.uniform(0.55, 0.9))
+      r = float(rng.uniform(0.01, 0.1))
+      inputs = (float(rng.uniform(20.0, 150.0)), u, d, r, int(rng.integers(3, 8)))
+    wrong:
+      - hint: "That is q̃ = (u − 1 − r)/(u − d), the probability of a tail. The head probability p̃ = (1 + r − d)/(u − d) weights the up-child; the two sum to one."
+        code: |
+          def f(S0, u, d, r, n):
+              return (u - 1 - r) / (u - d)
+      - hint: "The interest rate is missing: p̃ solves S0 = (p̃ u S0 + (1 − p̃) d S0)/(1 + r), so the numerator is 1 + r − d, not 1 − d."
+        code: |
+          def f(S0, u, d, r, n):
+              return (1 - d) / (u - d)
+  european-price:
+    kind: exact
+    seed: 103
+    atol: 1.0e-9
+    inputs_code: |
+      n = int(rng.integers(4, 9))
+      u = float(rng.uniform(1.15, 1.8))
+      d = float(rng.uniform(0.55, 0.9))
+      r = float(rng.uniform(0.01, 0.1))
+      S0 = float(rng.uniform(20.0, 150.0))
+      K = float(S0 * rng.uniform(0.8, 1.2))
+      inputs = (S0, u, d, r, n, K)
+    wrong:
+      - hint: "The continuation value is discounted: each step back divides the risk-neutral average by 1 + r. Without it every node is too high by a factor (1 + r) per period remaining."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.abs(S[n] - K)
+              for i in range(n - 1, -1, -1):
+                  V[i] = p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]
+              return np.concatenate(V)
+      - hint: "The children are swapped: the up-child of node (i, j) is (i + 1, j + 1) and takes weight p̃; the down-child (i + 1, j) takes 1 − p̃."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.abs(S[n] - K)
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][:-1] + (1 - p) * V[i + 1][1:]) / (1 + r)
+              return np.concatenate(V)
+      - hint: "The payoff is applied at every date, not only the last: a European claim pays nothing before expiry, so only V[n] is the payoff and every earlier node is pure continuation."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.abs(S[n] - K)
+              for i in range(n - 1, -1, -1):
+                  V[i] = np.maximum(np.abs(S[i] - K), (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r))
+              return np.concatenate(V)
+  replicating-portfolio:
+    kind: exact
+    seed: 104
+    atol: 1.0e-9
+    inputs_code: |
+      n = int(rng.integers(4, 9))
+      u = float(rng.uniform(1.15, 1.8))
+      d = float(rng.uniform(0.55, 0.9))
+      r = float(rng.uniform(0.01, 0.1))
+      S0 = float(rng.uniform(20.0, 150.0))
+      K = float(S0 * rng.uniform(0.8, 1.2))
+      inputs = (S0, u, d, r, n, K)
+    wrong:
+      - hint: "The denominator of Δ_i(j) is the price spread between the two successors, S_{i+1}(j+1) − S_{i+1}(j), not the up move from the current price S_{i+1}(j+1) − S_i(j)."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.maximum(S[n] - K, 0.0)
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+              D, B = [], []
+              for i in range(n):
+                  D.append((V[i + 1][1:] - V[i + 1][:-1]) / (S[i + 1][1:] - S[i]))
+                  B.append(V[i] - D[i] * S[i])
+              return np.concatenate(D), np.concatenate(B)
+      - hint: "B_i(j) is the money-market position taken at date i, V_i(j) − Δ_i(j) S_i(j). Its value one period later, (1 + r) times that, is what the wealth equation grows it to — not the position itself."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.maximum(S[n] - K, 0.0)
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+              D, B = [], []
+              for i in range(n):
+                  D.append((V[i + 1][1:] - V[i + 1][:-1]) / (S[i + 1][1:] - S[i + 1][:-1]))
+                  B.append((1 + r) * (V[i] - D[i] * S[i]))
+              return np.concatenate(D), np.concatenate(B)
+      - hint: "Δ_i is read off date i + 1: the spread of the claim's two possible values one toss ahead over the spread of the two possible prices. Differences taken on date i itself give a lattice of the wrong shape and the wrong slope."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.maximum(S[n] - K, 0.0)
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+              D, B = [], []
+              for i in range(1, n + 1):
+                  D.append((V[i][1:] - V[i][:-1]) / (S[i][1:] - S[i][:-1]))
+                  B.append(V[i][:-1] - D[-1] * S[i][:-1])
+              return np.concatenate(D), np.concatenate(B)
+  hedge-walk:
+    kind: exact
+    seed: 105
+    atol: 1.0e-9
+    inputs_code: |
+      n = int(rng.integers(5, 9))
+      u = float(rng.uniform(1.15, 1.8))
+      d = float(rng.uniform(0.55, 0.9))
+      r = float(rng.uniform(0.01, 0.1))
+      S0 = float(rng.uniform(20.0, 150.0))
+      K = float(S0 * rng.uniform(0.8, 1.2))
+      inputs = (S0, u, d, r, n, K, rng.integers(0, 2, size=n))
+    wrong:
+      - hint: "The money-market position grows: X_{i+1} = Δ_i S_{i+1} + (1 + r)(X_i − Δ_i S_i). Without the (1 + r) the hedge loses one period's interest on its cash at every step."
+        code: |
+          def f(S0, u, d, r, n, K, path):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.maximum(S[n] - K, 0.0)
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+              D = [(V[i + 1][1:] - V[i + 1][:-1]) / (S[i + 1][1:] - S[i + 1][:-1]) for i in range(n)]
+              X = np.empty(n + 1)
+              X[0] = V[0][0]
+              s, heads = S0, 0
+              for i, toss in enumerate(path):
+                  s_next = s * (u if toss else d)
+                  X[i + 1] = D[i][heads] * s_next + (X[i] - D[i][heads] * s)
+                  s, heads = s_next, heads + int(toss)
+              return X
+      - hint: "The path's 1 is a head, an up move: the stock is multiplied by u on a 1 and by d on a 0, and the node index j is the number of 1s so far. Your walk reads the tosses the other way round."
+        code: |
+          def f(S0, u, d, r, n, K, path):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.maximum(S[n] - K, 0.0)
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+              D = [(V[i + 1][1:] - V[i + 1][:-1]) / (S[i + 1][1:] - S[i + 1][:-1]) for i in range(n)]
+              X = np.empty(n + 1)
+              X[0] = V[0][0]
+              s, heads = S0, 0
+              for i, toss in enumerate(path):
+                  s_next = s * (d if toss else u)
+                  X[i + 1] = D[i][heads] * s_next + (1 + r) * (X[i] - D[i][heads] * s)
+                  s, heads = s_next, heads + int(not toss)
+              return X
+      - hint: "Δ is chosen at date i, before the toss, and the node index is the number of heads so far — not after the toss. Reading Δ_i at the node the path is about to move to uses information the hedger does not have yet."
+        code: |
+          def f(S0, u, d, r, n, K, path):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V = [None] * (n + 1)
+              V[n] = np.maximum(S[n] - K, 0.0)
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+              D = [(V[i + 1][1:] - V[i + 1][:-1]) / (S[i + 1][1:] - S[i + 1][:-1]) for i in range(n)]
+              X = np.empty(n + 1)
+              X[0] = V[0][0]
+              s, heads = S0, 0
+              for i, toss in enumerate(path):
+                  s_next = s * (u if toss else d)
+                  j = min(heads + int(toss), i)
+                  X[i + 1] = D[i][j] * s_next + (1 + r) * (X[i] - D[i][j] * s)
+                  s, heads = s_next, heads + int(toss)
+              return X
+  american-put:
+    kind: exact
+    seed: 106
+    atol: 1.0e-9
+    inputs_code: |
+      n = int(rng.integers(5, 9))
+      u = float(rng.uniform(1.15, 1.8))
+      d = float(rng.uniform(0.55, 0.9))
+      r = float(rng.uniform(0.01, 0.1))
+      S0 = float(rng.uniform(20.0, 150.0))
+      K = float(S0 * rng.uniform(0.9, 1.3))
+      inputs = (S0, u, d, r, n, K)
+    wrong:
+      - hint: "This is the European lattice — the American pass takes the larger of exercising now and continuing at every node, not only at expiry; with no maximum, no node before the last date ever exercises and the put is worth its European twin."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g > 0
+              for i in range(n - 1, -1, -1):
+                  V[i] = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+                  E[i] = np.zeros(i + 1, dtype=bool)
+              return np.concatenate(V), np.concatenate(E).astype(float)
+      - hint: "The continuation value is not discounted. Undiscounted continuation is too large, so fewer nodes exercise — and every value is too high. Divide the risk-neutral average by 1 + r before comparing it with the intrinsic value."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g > 0
+              for i in range(n - 1, -1, -1):
+                  cont = p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]
+                  g = np.maximum(K - S[i], 0.0)
+                  V[i], E[i] = np.maximum(g, cont), g > cont
+              return np.concatenate(V), np.concatenate(E).astype(float)
+      - hint: "The intrinsic value is what exercising pays today, undiscounted: compare g(S_i) itself with the discounted continuation. Discounting the intrinsic value as well shifts the exercise region down by one node and undervalues the claim."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g > 0
+              for i in range(n - 1, -1, -1):
+                  cont = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+                  g = np.maximum(K - S[i], 0.0) / (1 + r)
+                  V[i], E[i] = np.maximum(g, cont), g > cont
+              return np.concatenate(V), np.concatenate(E).astype(float)
+      - hint: "The values are right and the exercise flags are not: a node is an exercise node only where the intrinsic value is STRICTLY greater than the continuation value. Where both are zero — a put far out of the money — nothing is exercised, and ≥ marks every such node."
+        code: |
+          def f(S0, u, d, r, n, K):
+              import numpy as np
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g >= 0
+              for i in range(n - 1, -1, -1):
+                  cont = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+                  g = np.maximum(K - S[i], 0.0)
+                  V[i], E[i] = np.maximum(g, cont), g >= cont
+              return np.concatenate(V), np.concatenate(E).astype(float)
+  exercise-boundary:
+    kind: exact
+    seed: 107
+    atol: 1.0e-6
+    inputs_code: |
+      # A fifty-step CRR-calibrated put near the Wolfram demonstration's parameters.
+      K = float(rng.uniform(40.0, 48.0))
+      sigma = float(rng.uniform(0.2, 0.4))
+      inputs = (40.0, K, 0.07, sigma, 3.0, 50)
+    wrong:
+      - hint: "That is the LOWEST exercising node — on a put it is the bottom of the lattice, and it falls over time instead of rising toward the strike. The boundary is the highest node on each date where exercising still beats continuing."
+        code: |
+          def f(S0, K, rate, sigma, T, n):
+              import numpy as np
+              dt = T / n
+              u = np.exp(sigma * np.sqrt(dt)); d = 1 / u; r = np.exp(rate * dt) - 1
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g > 0
+              for i in range(n - 1, -1, -1):
+                  cont = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+                  g = np.maximum(K - S[i], 0.0)
+                  V[i], E[i] = np.maximum(g, cont), g > cont
+              b = np.zeros(n + 1)
+              for i in range(n + 1):
+                  hits = np.flatnonzero(E[i])
+                  if hits.size:
+                      b[i] = S[i][hits.min()]
+              return b
+      - hint: "The boundary is a price, not an index: return S[i][j*] for the highest exercising node j*, not j* itself."
+        code: |
+          def f(S0, K, rate, sigma, T, n):
+              import numpy as np
+              dt = T / n
+              u = np.exp(sigma * np.sqrt(dt)); d = 1 / u; r = np.exp(rate * dt) - 1
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g > 0
+              for i in range(n - 1, -1, -1):
+                  cont = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+                  g = np.maximum(K - S[i], 0.0)
+                  V[i], E[i] = np.maximum(g, cont), g > cont
+              b = np.zeros(n + 1)
+              for i in range(n + 1):
+                  hits = np.flatnonzero(E[i])
+                  if hits.size:
+                      b[i] = float(hits.max())
+              return b
+      - hint: "The last node that exercises on each date is the highest one where the flag is True; the first continuing node above it is not the boundary. Your boundary sits one lattice level too high."
+        code: |
+          def f(S0, K, rate, sigma, T, n):
+              import numpy as np
+              dt = T / n
+              u = np.exp(sigma * np.sqrt(dt)); d = 1 / u; r = np.exp(rate * dt) - 1
+              S = [S0 * u ** np.arange(i + 1) * d ** (i - np.arange(i + 1)) for i in range(n + 1)]
+              p = (1 + r - d) / (u - d)
+              V, E = [None] * (n + 1), [None] * (n + 1)
+              g = np.maximum(K - S[n], 0.0)
+              V[n], E[n] = g, g > 0
+              for i in range(n - 1, -1, -1):
+                  cont = (p * V[i + 1][1:] + (1 - p) * V[i + 1][:-1]) / (1 + r)
+                  g = np.maximum(K - S[i], 0.0)
+                  V[i], E[i] = np.maximum(g, cont), g > cont
+              b = np.zeros(n + 1)
+              for i in range(n + 1):
+                  hits = np.flatnonzero(E[i])
+                  if hits.size:
+                      b[i] = S[i][min(hits.max() + 1, i)]
+              return b
+  no-early-exercise-call:
+    kind: review
+    rubric: |
+      The learner ran an American call on a non-dividend CRR tree, found zero
+      exercise nodes before expiry, and was asked which theorem predicted it,
+      what its hypotheses are, and — for at least one hypothesis — what the
+      count would do if it failed.
+      Pass if the answer (a) attributes the result to the convex-payoff /
+      no-early-exercise theorem (Shreve Vol I Theorem 4.5.1, or a clear
+      description of it: an American claim with a convex payoff vanishing at
+      zero has the European price) AND (b) names at least two of its three
+      hypotheses: the payoff g is convex; g(0) = 0; the interest rate is
+      non-negative (r ≥ 0) — crediting "no dividends" as the condition that
+      keeps the discounted stock a martingale counts toward (b) — AND (c)
+      states for at least one named hypothesis that its failure lets exercise
+      nodes appear before expiry (the count becomes positive): the put fails
+      g(0) = 0 and section 6 found exercise nodes; a negative rate, or a
+      dividend, restores early exercise for the call. Any one such case
+      satisfies (c); it need not be worked numerically.
+      Fail if the answer argues only from "time value" or "a call is worth
+      more alive than dead" without naming a hypothesis, attributes the
+      result to put–call parity alone, claims the same holds for the put, or
+      names hypotheses without saying what any failure does to the count.
+      Grade the theorem, the hypotheses named and the failure case, not the
+      prose.
+  converged-price:
+    kind: metric
+    metric: rmse
+    threshold: -0.04
+    holdout: data/holdout_puts.csv
+    labels_code: |
+      # Dollars in the file, tenths of a cent on the wire: the submission is
+      # 1000 × price, so the threshold of 0.04 is four thousandths of a cent.
+      labels = 1000.0 * np.loadtxt("private/reference_prices.csv")

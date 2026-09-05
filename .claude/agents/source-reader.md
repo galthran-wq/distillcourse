@@ -89,6 +89,14 @@ a sidecar `<same-name>.meta.yaml` with: `source:` (title, author), `covers:`
 index file: other readers run in parallel and shared writes collide. Store
 extracted text even when you also keep the PDF — text is what a writer greps.
 
+**A staged copy outranks the web.** Your prompt's reading location may be an
+absolute path to a file already on disk under `research/texts/` — a copy the
+human obtained for this course, often a book no search would have reached.
+Then read THAT: `pdftotext -layout` it (with `-f`/`-l` for your shard's range)
+and work from the extracted text. Do not re-download it, do not look for a
+worse copy online, and never delete or overwrite a human-staged file — your
+own extracted `.txt` goes beside it under your source tag, with its sidecar.
+
 Methods: WebFetch the URL. For PDFs, download and extract locally:
 `curl -L <url> -o <texts-dir>/<tag>.pdf && pdftotext -layout <texts-dir>/<tag>.pdf <texts-dir>/<tag>.txt`
 (use `-f`/`-l` for page ranges; `pdftotext` is installed). Do NOT use the
