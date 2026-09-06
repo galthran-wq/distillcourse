@@ -141,8 +141,10 @@ export function Aside({ children }: { children: ReactNode }) {
  * A passage quoted from a source — the evidence a reading rests on. Bilingual
  * when the children hold an <Original>: that block is lifted out and set
  * beside the translation (globals.css lays the two out side by side on a
- * wide screen, stacked on a phone). `source` is the locator the reader
- * checks the passage against — a siglum, a section, the translator.
+ * wide screen, stacked on a phone); an <Original> with nothing beside it —
+ * a Latin tag the prose glosses itself — stands alone. `source` is the
+ * locator the reader checks the passage against — a siglum, a section, the
+ * translator.
  */
 export function Quote({
   source,
@@ -163,7 +165,9 @@ export function Quote({
           {original.props.children}
         </blockquote>
       )}
-      <blockquote className="quote-text">{translation}</blockquote>
+      {translation.length > 0 && (
+        <blockquote className="quote-text">{translation}</blockquote>
+      )}
       {source !== undefined && (
         <figcaption className={`quote-source ${LABEL_CLASS}`}>{source}</figcaption>
       )}
