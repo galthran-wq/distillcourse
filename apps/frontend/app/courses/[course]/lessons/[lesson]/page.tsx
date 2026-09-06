@@ -25,6 +25,8 @@ import {
   Example,
   Exercise,
   KeyFact,
+  Original,
+  Quote,
   Proof,
   References,
   Remark,
@@ -131,6 +133,8 @@ export default async function LessonPage({
       />
     ),
     Aside,
+    Quote,
+    Original,
   };
 
   // The ToC is collected during the same render pass that assigns heading

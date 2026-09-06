@@ -90,6 +90,32 @@ lesson's title (or the given children) as a link; `id` deep-links a heading
 anchor. If the target isn't published/readable yet it renders as plain
 text. Validator errors on unknown slugs (`ref-target`).
 
+## `<Quote source?="GS 108, trans. Nauckhoff">…</Quote>`
+
+A passage quoted from a source — the evidence a reading rests on. The
+markdown children are the text (in translation, where the lesson uses one);
+`source` is the locator the reader checks it against — siglum, section,
+translator — set as a mono label under the quote. Where the lesson reads the
+original, put it first inside `<Original lang="de">…</Original>`: on a wide
+screen the original sits beside the translation, on a phone above it.
+`lang` is the original's BCP-47 tag and lives on that block alone, so
+hyphenation and screen readers switch language there. `<Original>` is only
+ever a child of `<Quote>`. A plain markdown `>` blockquote stays for what is
+not a sourced passage: a paraphrased objection, a line the lesson puts in a
+reader's mouth.
+
+```mdx
+<Quote source="GS 108, trans. Nauckhoff">
+<Original lang="de">
+Gott ist todt: aber so wie die Art der Menschen ist, wird es vielleicht noch
+Jahrtausende lang Höhlen geben, in denen man seinen Schatten zeigt.
+</Original>
+
+God is dead: but given the way of men, there may for millennia yet be caves
+in which his shadow is shown.
+</Quote>
+```
+
 ## `<Aside>…</Aside>`
 
 Collapsible tangent; never load-bearing.

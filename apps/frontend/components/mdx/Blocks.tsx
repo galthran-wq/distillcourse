@@ -1,4 +1,9 @@
-import type { ReactNode } from "react";
+import {
+  Children,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { LABEL_CLASS } from "@/components/ui/styles";
 
 /**
@@ -130,4 +135,49 @@ export function Aside({ children }: { children: ReactNode }) {
       <div className="mt-3">{children}</div>
     </details>
   );
+}
+
+/**
+ * A passage quoted from a source — the evidence a reading rests on. Bilingual
+ * when the children hold an <Original>: that block is lifted out and set
+ * beside the translation (globals.css lays the two out side by side on a
+ * wide screen, stacked on a phone). `source` is the locator the reader
+ * checks the passage against — a siglum, a section, the translator.
+ */
+export function Quote({
+  source,
+  children,
+}: {
+  source?: string;
+  children: ReactNode;
+}) {
+  const parts = Children.toArray(children);
+  const original = parts.find(
+    (c) => isValidElement(c) && c.type === Original,
+  ) as ReactElement<OriginalProps> | undefined;
+  const translation = parts.filter((c) => c !== original);
+  return (
+    <figure className="quote">
+      {original !== undefined && (
+        <blockquote className="quote-original" lang={original.props.lang}>
+          {original.props.children}
+        </blockquote>
+      )}
+      <blockquote className="quote-text">{translation}</blockquote>
+      {source !== undefined && (
+        <figcaption className={`quote-source ${LABEL_CLASS}`}>{source}</figcaption>
+      )}
+    </figure>
+  );
+}
+
+type OriginalProps = { lang: string; children: ReactNode };
+
+/**
+ * The original-language text of a <Quote>, which renders it itself; on its
+ * own it is inert. `lang` is the BCP-47 tag of that text alone, so
+ * hyphenation and screen readers switch language for the original only.
+ */
+export function Original({ children }: OriginalProps) {
+  return <>{children}</>;
 }
