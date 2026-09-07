@@ -53,6 +53,8 @@ const ALLOWED_COMPONENTS = new Set([
   "FigureSequence",
   "Demo",
   "Aside",
+  "Quote",
+  "Original",
   "Ref",
   "Definition",
   "Theorem",

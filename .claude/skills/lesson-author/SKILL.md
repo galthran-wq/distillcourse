@@ -178,6 +178,9 @@ agent cuts, verifies and credits it (docs/figures.md §Sourced images).
      "the Yawp's chapter describes…" scaffolding mid-prose. Name a source
      inline ONLY when the source is the subject: a primary document read or
      quoted, a measurement whose method is the point, a named thesis.
+     A passage quoted from a source is a `<Quote source="…">`, with the
+     original inside `<Original lang="…">` wherever the lesson reads one;
+     a bare `>` blockquote is for what is not a sourced passage.
      Secondary surveys live in References only.
    - End with `<References>`: real, verified sources with chapter-level
      pointers (L8). Never invent a citation.
