@@ -1,6 +1,6 @@
 ---
 name: lesson-writer
-description: Writes or revises ONE textbook-chapter lesson by executing the repo's lesson-author skill, grounded in the per-lesson research brief. Used by the course-factory workflow; inherits the session model (must be Fable-class).
+description: Writes or revises ONE textbook-chapter lesson by executing the repo's lesson-author skill, grounded in the per-lesson research brief. Used by the course-factory and course-revision workflows, which run it on Opus.
 tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, WebSearch, ToolSearch
 ---
 

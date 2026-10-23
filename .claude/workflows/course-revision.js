@@ -103,7 +103,7 @@ const done = await pipeline(
         `Figures: author the plain-SVG figures the FIGURE PLAN calls for yourself, and leave {/* fig <Name>: ... */} handoff comments for component figures and {/* img <file-stem>: ... */} handoffs for sourced images — a later agent in this same run builds and lands them. Do NOT write a <Figure src> for an image file that does not exist yet.`,
         `Hard limits: touch only this lesson's directory (lesson.mdx, its figures/) — no course.yaml edits (it is already drafted and its key_image stays), no other lessons, no docs. Finish with \`npm run validate ${slug} ${lesson.slug}\` and report what you gained, what you cut, and the new exercise mix.`,
       ].join('\n\n'),
-      { label: `revise: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer' },
+      { label: `revise: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer', model: 'opus' },
     ),
   async (_prev, lesson) => {
     const figs = await agent(
@@ -166,7 +166,7 @@ const done = await pipeline(
     if (qa && !qa.ready && qa.fixes.length > 0) {
       await agent(
         `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
-        { label: `fix: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer' },
+        { label: `fix: ${lesson.slug}`, phase: 'Revise', agentType: 'lesson-writer', model: 'opus' },
       )
       fixed = true
       finalQa = await agent(qaPrompt, {

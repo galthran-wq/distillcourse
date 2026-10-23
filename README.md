@@ -63,14 +63,15 @@ content/courses/<course>/
 
 ## Authoring: the course factory (primary path)
 
-Course production is a two-button workflow, orchestrated on Fable (both
-buttons refuse to run on other models), inside a git worktree on branch
+Course production is a two-button workflow — Fable only for synthesizing
+the structure from the sources, Opus for scouting the canon and writing
+lessons, Sonnet for reading — inside a git worktree on branch
 `course/<slug>` — nothing lands on master until the human merges.
 
-1. `/course-architect "<topic>"` — canon discovery (perplexity deep
+1. `/course-architect "<topic>"` — canon discovery on Opus (perplexity deep
    research) → a sonnet swarm reads the sources, each reader also scouting
    the few images that would have to be the real artefact and reporting what
-   the source makes students build → synthesis writes
+   the source makes students build → synthesis on Fable writes
    `course.yaml`, `concepts.yaml`, and the `research/` dossier (including
    `images.yaml`, the shortlist, and per-lesson figure plans that say which
    visuals we draw and which we source). Labs are planned here too: a module
@@ -79,7 +80,7 @@ buttons refuse to run on other models), inside a git worktree on branch
 2. **Human curates** `course.yaml` AND the per-lesson `research/` briefs in
    the worktree — the main editorial checkpoint.
 3. `/lesson-factory <slug> [n]` — per planned lesson, sequentially:
-   lesson-writer (session model, grounded in the brief) → figure-artist
+   lesson-writer (Opus, grounded in the brief) → figure-artist
    agents in parallel (drawn figures, and sourced images cut from the
    research captures) → demo-builder where specced → opus QA → one fix
    cycle. A `type: lab` lesson goes to the lab-author skill instead — the

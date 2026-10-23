@@ -3,10 +3,10 @@ export const meta = {
   description: 'Research-driven course production: canon discovery, source-reading swarm, structure synthesis with a resumable research dossier; then per-lesson write→demo→QA iteration',
   whenToUse: 'Invoked by the /course-architect (phase: structure) and /lesson-factory (phase: lessons) skills. Args: {phase, slug, topic?, count?}.',
   phases: [
-    { title: 'Canon', detail: 'perplexity deep research: the mainstream sources', model: 'sonnet' },
+    { title: 'Canon', detail: 'perplexity deep research: the mainstream sources', model: 'opus' },
     { title: 'Read', detail: 'scope → readers (big books shard by ToC) → merge; readers capture image candidates and the source\'s own assignments', model: 'sonnet' },
-    { title: 'Synthesize', detail: 'course.yaml (chapters + the labs the canon\'s assignments justify) + research dossier (session model)' },
-    { title: 'Lessons', detail: 'write → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson; a lab lesson goes to lab-author instead of the writer' },
+    { title: 'Synthesize', detail: 'course.yaml (chapters + the labs the canon\'s assignments justify) + research dossier', model: 'fable' },
+    { title: 'Lessons', detail: 'write(opus) → figures (drawn + sourced, in parallel) → demo → QA(opus) → fix → re-QA(opus), per lesson; a lab lesson goes to lab-author instead of the writer' },
   ],
 }
 
@@ -188,7 +188,7 @@ if (phaseArg === 'structure') {
   phase('Canon')
   const canon = await run(
     `${at}Identify the canonical mainstream materials for learning "${topic}" at the level of a busy engineer (no prior expertise, comfortable with math). Use ToolSearch to load mcp__perplexity__perplexity_research and run ONE deep research query, then curate its output yourself. If that MCP server is not connected in this session, fall back to WebSearch — several targeted queries (standard textbooks, university syllabi, primary sources, best visual resources) — and say in your output which route you took. Source count is subject-dependent — no fixed cap; for a rich subject expect roughly 10-15 items: the standard textbooks, strong university course syllabi/lecture notes (with URLs), the load-bearing primary papers, good surveys, and 1-2 exceptional visual/interactive resources. Every item must earn a distinct role (a lesson or module it grounds) — no padding with redundant near-duplicates. Prefer freely accessible materials, but NEVER omit a canonical source just because you found no accessible copy — include it anyway; inaccessible sources are reported to the human, who can obtain copies from the publishers. Return via structured output; put verified URLs where you have them.${stagedNote}${brief}`,
-    { label: 'canon-scout', model: 'sonnet', schema: CANON_SCHEMA },
+    { label: 'canon-scout', model: 'opus', schema: CANON_SCHEMA },
   )
   // The human may stage copies after a run — the books the swarm reported as
   // toc-only. On resume every unchanged scope/read replays from cache, so
@@ -277,7 +277,7 @@ if (phaseArg === 'structure') {
       `5c. A LAB lesson's brief (1g) replaces the FIGURE PLAN and the EXERCISE PLAN with a LAB PLAN — the ARC block still applies, and this brief is what the lab-author skill is grounded in later. The LAB PLAN states: the one artifact the learner builds; the CANON GROUNDING, quoted from the dossier's \`assignments\` with its source pointer (which assignment of which source this lab is modelled on, and where it departs); the dataset or inputs, small enough to ship, with where they come from and their licence; one line per planned checkpoint — what the learner writes, what verifies it, and which earlier checkpoint's output it consumes; the final open task with its metric and a rough threshold to calibrate against; and the canonical bugs worth declaring as known-wrong variants (the sign a learner drops, the normalization they forget). Say what is deliberately NOT blanked (plotting helpers, data loading) — those ship complete.`,
       `Then run \`npm run validate ${slug}\` and fix everything. Final message: outcomes, one-line module arc, per-source role, which modules end with a lab and the canon assignment each is grounded in (or, when the canon assigns nothing, that no labs were planned and why), assumptions made.`,
     ].join('\n\n'),
-    { label: 'synthesize-structure' },
+    { label: 'synthesize-structure', model: 'fable' },
   )
   return { phase: 'structure', sources: sources.length, read: summaries.length, not_fully_read: degraded, synthesis }
 }
@@ -307,10 +307,10 @@ if (phaseArg === 'lessons') {
     // lab-author skill's write -> uv run -> green loop, never lesson-writer.
     const isLab = lesson.type === 'lab'
     const draft = await (isLab
-      ? run(labPrompt(lesson.slug), { label: `lab: ${lesson.slug}`, phase: 'Lessons' })
+      ? run(labPrompt(lesson.slug), { label: `lab: ${lesson.slug}`, phase: 'Lessons', model: 'opus' })
       : run(
         `${at}Write the lesson: course-slug ${slug}, lesson-slug ${lesson.slug}. Follow your lesson-writer briefing (lesson-author skill + research brief).`,
-        { label: `write: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
+        { label: `write: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer', model: 'opus' },
       ))
     // No draft means nothing downstream has a subject, and every later lesson
     // is written against this one's final text — stop here rather than plod on.
@@ -378,10 +378,10 @@ if (phaseArg === 'lessons') {
     let revised = false
     if (qa && !qa.ready && qa.fixes.length > 0) {
       await (isLab
-        ? run(labPrompt(lesson.slug, qa.fixes), { label: `fix: ${lesson.slug}`, phase: 'Lessons' })
+        ? run(labPrompt(lesson.slug, qa.fixes), { label: `fix: ${lesson.slug}`, phase: 'Lessons', model: 'opus' })
         : run(
           `${at}Revise the lesson ${slug}/${lesson.slug}: apply these required QA fixes — ${JSON.stringify(qa.fixes)} — following your lesson-writer briefing (revision mode, same hard limits). Validate after.`,
-          { label: `fix: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer' },
+          { label: `fix: ${lesson.slug}`, phase: 'Lessons', agentType: 'lesson-writer', model: 'opus' },
         ))
       revised = true
       finalQa = await run(qaPrompt, {

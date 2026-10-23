@@ -9,18 +9,10 @@ allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:
 # Course Architect (factory mode)
 
 You are the orchestrator button for course structure. The heavy lifting runs
-in the `course-factory` workflow; your job is the gate, the worktree, the
-launch, and the report.
-
-## 0. MODEL GATE — check first, before anything else
-
-Identify your own model from your system prompt. Course architecture MUST be
-orchestrated by **Claude Fable 5** (`claude-fable-5`) or a Mythos-class
-successor. If you are any other model (Opus, Sonnet, Haiku, …):
-**STOP immediately.** Output exactly this and do nothing else:
-
-> Course architecture requires Fable. Switch the session model (/model) and
-> re-run /course-architect.
+in the `course-factory` workflow; your job is the worktree, the launch,
+and the report. The workflow pins each stage's model itself — the canon scout
+on Opus, the readers on Sonnet, synthesis on Fable — so any session model can
+orchestrate it.
 
 ## Workflow
 
@@ -53,11 +45,11 @@ successor. If you are any other model (Opus, Sonnet, Haiku, …):
    `root` is mandatory: workflow subagents inherit the session's launch
    directory, not your worktree — without it they write into the wrong
    checkout (usually master).
-   The workflow runs: canon discovery (perplexity deep research) → a
+   The workflow runs: canon discovery on Opus (perplexity deep research) → a
    sonnet reading swarm (one source-reader agent per source, each also
    reporting what its source makes students BUILD — homeworks, projects,
    labs) → synthesis on
-   the session model, producing `course.yaml`, `concepts.yaml`, and the
+   Fable, producing `course.yaml`, `concepts.yaml`, and the
    **research dossier** (`research/sources.yaml`, `research/images.yaml` —
    the shortlist of real images the readers found worth sourcing — and
    `research/<lesson>.md` per lesson, whose FIGURE PLAN tags each visual
