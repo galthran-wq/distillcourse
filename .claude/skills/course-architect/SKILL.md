@@ -3,7 +3,7 @@ name: course-architect
 description: Launch the course-factory workflow to research and design a new course structure (canon discovery, source-reading swarm, synthesis into course.yaml + a resumable research dossier), in an isolated worktree branch. Use when creating a new course.
 argument-hint: "<topic, plus any design intent — e.g. 'ml system design; practical not academic; prerequisite is classical ML'>"
 disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:*), Bash(git *)
+allowed-tools: Read, Write, Glob, Grep, Workflow, Agent, EnterWorktree, Bash(npm run validate:*), Bash(git *)
 ---
 
 # Course Architect (factory mode)
@@ -80,6 +80,32 @@ orchestrate it.
      does not back);
    - when satisfied, run `/lesson-factory <slug>` to write lessons;
    - merge the `course/<slug>` branch only when the course is worth shipping.
+
+## Re-running one stage without the workflow
+
+When the reading swarm has already run and only synthesis must run again
+(the constitution changed, the human rewrote the brief, a few sources were
+added), do not resume the workflow: a resume replays the longest unchanged
+prefix of agent calls and re-runs everything after the first changed one,
+so adding a source or touching an early prompt re-reads the whole canon.
+Run the synthesis as one agent yourself instead (Agent tool, `model:
+fable`, a general-purpose agent):
+
+- Take the reader summaries from the previous run's journal
+  (`<transcriptDir>/journal.jsonl`; one `result` row per agent, labelled by
+  its `started` row): per source, the `merge:` result where the source was
+  sharded, otherwise its single `read:` result — from the latest read pass.
+  Write them to a file in the scratchpad.
+- Give the agent the same instructions the workflow's `synthesize-structure`
+  call would build — the synthesis prompt in `course-factory.js` with the
+  summaries replaced by the path of that file, and the not-fully-read list
+  corrected — as a file too; a prompt that size does not belong inline.
+- A handful of new sources can be read by the synthesis agent itself
+  (name them, with where they are cached); a large batch goes through a
+  `phase: structure, until: read` run first.
+
+Report exactly as step 4 says; the result is the same artefacts the
+workflow would have written.
 
 ## Hard limits
 

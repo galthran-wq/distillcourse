@@ -3,7 +3,7 @@ name: lesson-factory
 description: Launch the course-factory workflow's lesson phase — iterate over planned lessons (write on Opus, build specced demos, author labs through lab-author, opus QA, one fix cycle each) inside the course's worktree branch. Use after the human has curated the course structure and research briefs.
 argument-hint: "<course-slug> [count]"
 disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Workflow, EnterWorktree, Bash(npm run validate:*), Bash(uv --version), Bash(git *)
+allowed-tools: Read, Glob, Grep, Workflow, Agent, EnterWorktree, Bash(npm run validate:*), Bash(uv --version), Bash(git *)
 ---
 
 # Lesson Factory
@@ -62,6 +62,18 @@ Opus — so any session model can orchestrate it.
    remind the human: review in `npm run dev`, flip statuses to `reviewed`
    themselves, and merge the branch when ready — a lab is reviewed by
    solving a few of its cells in Colab, not by reading its brief.
+
+## Re-running one stage without the workflow
+
+Re-writing, re-figuring or re-checking a few lessons does not need a
+workflow run: launch the stage's agent directly with the Agent tool — the
+`lesson-writer` agent (model opus) with the write or revise instruction the
+workflow would give it, a QA agent executing the course-qa skill on one
+lesson, a fix agent with the QA fix list. That is simpler than resuming a
+stopped workflow, which replays only the unchanged prefix of its calls and
+re-runs everything after the first changed one. Keep the course order: a
+lesson is written only after the lessons before it are final and their
+ledger entries (`research/taught/`) exist.
 
 ## Hard limits
 
